@@ -1,0 +1,563 @@
+{
+ "format": "floodnet-bulletin/1",
+ "kind": "daily",
+ "id": "daily-2026-10-27",
+ "issued_at": "2026-10-26T18:32:12.346Z",
+ "period": {
+  "from": "2026-10-25T18:32:12.346Z",
+  "to": "2026-10-26T18:32:12.346Z",
+  "label": "24 hours to 4:32 am Tuesday"
+ },
+ "presenter": "tech-wizard",
+ "cohost": "seasoned-hydrographer",
+ "outlook": {
+  "sky": "stormy",
+  "label": "Stormy"
+ },
+ "headline": "Hillcrest repeater quiet since 2:15 Monday afternoon, on top of the Lockyer, still mostly dark behind Toowoomba for a third day.",
+ "stats": [
+  {
+   "label": "stations heard",
+   "value": 779,
+   "tone": "neutral"
+  },
+  {
+   "label": "checks received",
+   "value": 64,
+   "unit": "%",
+   "was": 81,
+   "tone": "bad"
+  },
+  {
+   "label": "quiet, keep a schedule",
+   "value": 30,
+   "tone": "warn"
+  },
+  {
+   "label": "critical findings",
+   "value": 28,
+   "tone": "bad"
+  }
+ ],
+ "scenes": [
+  {
+   "type": "title",
+   "title": "Good morning",
+   "secs": 13,
+   "say": "Good morning, Alex Chen presenting. Stormy again. Thirty stations that keep a schedule are quiet, down from Sunday, but nearly all of them sit behind two repeaters: Toowoomba, and now Hillcrest."
+  },
+  {
+   "type": "map",
+   "title": "Lockyer, day three",
+   "sub": "Toowoomba repeater not heard since early Sunday",
+   "sev": "critical",
+   "secs": 25,
+   "say": "The Lockyer first. The Toowoomba repeater hasn't been heard since early Sunday morning. Behind it, Gatton, Upper Tenthill, Bill Gunn Dam and their neighbours are still quiet. Withcott, Helidon and Goltz Road got single copies through on Monday, strong ones, so the last hop to us is fine. The break is further up: the repeater, its power, or its link.",
+   "stations": [
+    "toowoomba_al",
+    "mt_glorious_al_rptr",
+    "gatton_al",
+    "upper_tenthill_al",
+    "bill_gunn_dam_al",
+    "rockside_mt_al",
+    "fifteen_mile_al",
+    "ma_ma_ck_al"
+   ],
+   "marks": [
+    {
+     "id": "toowoomba_al",
+     "kind": "silent",
+     "sev": "critical",
+     "label": "Toowoomba AL"
+    },
+    {
+     "id": "mt_glorious_al_rptr",
+     "kind": "repeater",
+     "sev": "warn",
+     "label": "Mt Glorious"
+    },
+    {
+     "id": "gatton_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "upper_tenthill_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "bill_gunn_dam_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "rockside_mt_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "fifteen_mile_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "ma_ma_ck_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "withcott_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "helidon_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "goltz_rd_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "gormans_gap_al",
+     "kind": "silent",
+     "sev": "warn"
+    }
+   ],
+   "links": [
+    {
+     "from": "gatton_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "upper_tenthill_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "bill_gunn_dam_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "rockside_mt_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "fifteen_mile_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "ma_ma_ck_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "withcott_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "helidon_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "goltz_rd_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "gormans_gap_al",
+     "to": "toowoomba_al",
+     "style": "blame"
+    },
+    {
+     "from": "toowoomba_al",
+     "to": "mt_glorious_al_rptr",
+     "style": "path"
+    }
+   ],
+   "areas": [
+    {
+     "lat": -27.55,
+     "lon": 152.2,
+     "km": 30,
+     "sev": "critical",
+     "label": "Lockyer, behind Toowoomba"
+    }
+   ],
+   "focus": {
+    "lat": -27.45,
+    "lon": 152.35,
+    "km": 70
+   }
+  },
+  {
+   "type": "map",
+   "title": "A new low over Logan",
+   "sub": "Hillcrest repeater quiet since 2:15 pm Monday",
+   "sev": "critical",
+   "secs": 25,
+   "say": "New overnight: Hillcrest itself. Its own reports stopped at 2:15 on Monday afternoon, and six stations around it went quiet from about then. All week, about half of the copies on Hillcrest's carrier came through corrupted. A failing radio fits that as well as a power fault. If its neighbours return through Constitution Hill, the area is fine and it's the repeater.",
+   "stations": [
+    "hillcrest_wine_glass",
+    "constitution_hill",
+    "darlington_al",
+    "chambers_creek_al",
+    "springfield_lakes_al",
+    "springfield_lakes_ll_dam_al",
+    "romani_al",
+    "meadow_flat_rd_bridge_al"
+   ],
+   "marks": [
+    {
+     "id": "hillcrest_wine_glass",
+     "kind": "silent",
+     "sev": "critical",
+     "label": "Hillcrest"
+    },
+    {
+     "id": "constitution_hill",
+     "kind": "repeater",
+     "sev": "info",
+     "label": "Constitution Hill"
+    },
+    {
+     "id": "darlington_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "chambers_creek_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "springfield_lakes_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "springfield_lakes_ll_dam_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "romani_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "meadow_flat_rd_bridge_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "tallegalla_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "constitution_hill_al",
+     "kind": "silent",
+     "sev": "warn"
+    }
+   ],
+   "links": [
+    {
+     "from": "darlington_al",
+     "to": "hillcrest_wine_glass",
+     "style": "blame"
+    },
+    {
+     "from": "chambers_creek_al",
+     "to": "hillcrest_wine_glass",
+     "style": "blame"
+    },
+    {
+     "from": "springfield_lakes_al",
+     "to": "hillcrest_wine_glass",
+     "style": "blame"
+    },
+    {
+     "from": "springfield_lakes_ll_dam_al",
+     "to": "hillcrest_wine_glass",
+     "style": "blame"
+    },
+    {
+     "from": "romani_al",
+     "to": "hillcrest_wine_glass",
+     "style": "blame"
+    },
+    {
+     "from": "meadow_flat_rd_bridge_al",
+     "to": "hillcrest_wine_glass",
+     "style": "blame"
+    }
+   ],
+   "areas": [
+    {
+     "lat": -27.67,
+     "lon": 153,
+     "km": 25,
+     "sev": "warn",
+     "label": "around Hillcrest"
+    }
+   ],
+   "focus": {
+    "lat": -27.65,
+    "lon": 152.95,
+    "km": 45
+   }
+  },
+  {
+   "type": "receivers",
+   "title": "Our end is steady",
+   "presenter": "seasoned-hydrographer",
+   "sev": "info",
+   "secs": 17,
+   "say": "Graham, on our end. Both receiver sticks ran the whole day, signal steady, and no settings were changed in the last thirty hours. One leftover: 152.400 still isn't being listened to, so anything that only reaches us there stays quiet.",
+   "items": [
+    {
+     "name": "rpi-83071968 stick 1",
+     "up": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "note": "up all day; settings unchanged"
+    },
+    {
+     "name": "rpi-83071968 stick 2",
+     "up": [
+      1,
+      0.83,
+      0.83,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "note": "up all day; settings unchanged"
+    }
+   ]
+  },
+  {
+   "type": "battery",
+   "title": "Batteries",
+   "presenter": "turbo",
+   "sev": "warn",
+   "secs": 21,
+   "say": "Turbo here, batteries at a gallop! South Ripley read 10.1 volts after four nights at 13.2. Rosewood dropped to 10, bounced back to 13.3, then 11.3. One-night steps like that look more like bad readings than tired batteries. Kunghur is different: a real slide, to 9.5, and now it's quiet.",
+   "items": [
+    {
+     "id": "south_ripley_wards_rd_al",
+     "name": "South Ripley (Wards Rd) AL",
+     "v": 10.1,
+     "nights": [
+      13.2,
+      13.2,
+      13.2,
+      13.2,
+      10.1
+     ]
+    },
+    {
+     "id": "rosewood_al_b",
+     "name": "Rosewood AL-B",
+     "v": 11.3,
+     "nights": [
+      13.3,
+      13.3,
+      13.3,
+      10,
+      13.3,
+      13.3,
+      11.3
+     ]
+    },
+    {
+     "id": "thornton_school_roa",
+     "name": "Thornton (School Rd) AL",
+     "v": 9.4,
+     "nights": [
+      12.9,
+      12.9,
+      12.8,
+      12.8,
+      9.4
+     ]
+    },
+    {
+     "id": "kunghur_the_junction",
+     "name": "Kunghur (The Junction)",
+     "v": 9.5,
+     "nights": [
+      11.4,
+      11,
+      9.5
+     ]
+    }
+   ],
+   "stations": [
+    "south_ripley_wards_rd_al",
+    "rosewood_al_b",
+    "thornton_school_roa",
+    "kunghur_the_junction"
+   ]
+  },
+  {
+   "type": "checks",
+   "title": "Check signals",
+   "secs": 8,
+   "sev": "warn",
+   "say": "Nitto here, righto! Checks received fell to sixty-four percent, from eighty-one. Greenbank, Gatton and Gormans Gap missed their last eight.",
+   "stations": [
+    "greenbank_thompson_rd_al",
+    "murrumba_downs_al",
+    "gatton_al",
+    "whiteway_rd_overflow",
+    "moggill_al"
+   ],
+   "items": [
+    {
+     "id": "greenbank_thompson_rd_al",
+     "name": "Greenbank (Thompson Rd) AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Missed checks rising — 100% in the last 24 h"
+    },
+    {
+     "id": "murrumba_downs_al",
+     "name": "Murrumba Downs AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Missed checks rising — 100% in the last 24 h"
+    },
+    {
+     "id": "gatton_al",
+     "name": "Gatton AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 15 checks"
+    },
+    {
+     "id": "whiteway_rd_overflow",
+     "name": "Whiteway Rd Overflow AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Missed checks rising — 100% in the last 24 h"
+    },
+    {
+     "id": "moggill_al",
+     "name": "Moggill AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Missed checks rising — 100% in the last 24 h"
+    }
+   ],
+   "presenter": "nitwit"
+  },
+  {
+   "type": "list",
+   "title": "Worth a look today",
+   "secs": 13,
+   "say": "Worth a look: Hillcrest first, it's new. Then Toowoomba, going on three days, and Kunghur's battery. And good news: a hundred and fifty-six stations the server had called silent were heard again.",
+   "stations": [
+    "hillcrest_wine_glass",
+    "toowoomba_al",
+    "kunghur_the_junction",
+    "misty_morn_al"
+   ],
+   "items": [
+    {
+     "sev": "critical",
+     "id": "hillcrest_wine_glass",
+     "text": "Hillcrest repeater: own reports stopped 2:15 pm Monday; 6 stations around it quiet."
+    },
+    {
+     "sev": "critical",
+     "id": "toowoomba_al",
+     "text": "Toowoomba repeater: not heard since early Sunday; Lockyer stations behind it quiet."
+    },
+    {
+     "sev": "warn",
+     "id": "kunghur_the_junction",
+     "text": "Kunghur (The Junction): battery slid to 9.5 V, now quiet."
+    },
+    {
+     "sev": "info",
+     "text": "152.400 still not listened to."
+    },
+    {
+     "sev": "ok",
+     "id": "misty_morn_al",
+     "text": "Heard again: 156 stations the server had called silent."
+    }
+   ]
+  },
+  {
+   "type": "signoff",
+   "title": "That’s the network",
+   "secs": 7,
+   "say": "That's the network: two repeaters, one cause each. That's not a fault, that's a symptom. Back tomorrow.",
+   "line": "That’s not a fault, that’s a symptom."
+  }
+ ],
+ "sources": {
+  "readings": 24653,
+  "stations_heard": 779,
+  "gathered_at": "2026-10-26T18:32:12.346Z"
+ },
+ "caveats": [
+  "Hillcrest's site power could not be checked: no battery report from it is in this period.",
+  "Whether Toowoomba is off the air or only unheard cannot be told from here.",
+  "The sudden battery steps may be corrupted values; tonight's lows will tell."
+ ],
+ "author": "Claude Code, from the bulletin draft and read-only queries"
+}
