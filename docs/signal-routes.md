@@ -1,6 +1,6 @@
 # Signal Routes — what comes in from where
 
-The **Signal Routes** tab (🛤️, Data group) takes every burst the base stations'
+The **Signal Routes** tab (🛤️, Admin group, beside Base Stations) takes every burst the base stations'
 receivers heard over today, the last three days or the last seven, and follows
 each one back to the transmitter that put it on the air: the field station
 itself, or the repeater that relayed it. Then it draws the answer four ways —

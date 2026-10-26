@@ -6,13 +6,17 @@
 //   R1  off air sixteen hours (a schedule kept and stopped), corrupting 40% of
 //       what it relays — sixty copies as strong as the clean one, at all hours,
 //       some clean upstream — with no daily charge: the Hillcrest case;
-//   R2  corrupting 4.4%, the copies keeping evening hours;
+//   R2  corrupting 4.4%, the copies keeping evening hours, and its signal
+//       2 dB down on its line — weakening, a note short of the finding;
 //   R3  "silent" but heard three times a week with no schedule: seldom heard,
 //       a note, never off air;
 //   R4  its carrier 2.8 ppm off the fleet on three days, and 17 ppm out on one
-//       day — that day set aside; and its signal 4.2 dB weaker in a week (0083);
+//       day — that day set aside; and its signal 4.2 dB weaker in a week (0083),
+//       its line drawn;
 //   R5, R6  off air six minutes apart: stopped together;
-//   R7  three evening dropouts, each back by morning.
+//   R7  three evening dropouts, each back by morning; heard 10.4 dB over the
+//       noise, a link with little margin, its corrupted copies much weaker
+//       than the clean ones — our receivers mishearing it.
 //
 //   1. **The reads** — the findings asked for in id chunks of the repeaters, the
 //      network's kinds and who is quiet now, each for the period (found before
@@ -32,6 +36,8 @@
 //   6. **The exports** — floodnet-named CSV and text.
 //   7. **No database** — the error, Try again, and the demo.
 //   8. **A phone** — nothing wider than 375 px.
+//   9. **A database before 0083** — the signal's columns refused with a 400,
+//      asked again without them: the carriers there, nothing said missing.
 //
 // Run:  npm run backbone
 
@@ -57,6 +63,7 @@ const until = async (page, fn, arg, timeout = 20_000) => page.waitForFunction(fn
 
 let FIX = null;
 let MODE = 'ok';          // 'ok' | 'down' (health_finding answers 500)
+let NO_SNR = false;       // a database before 0083: transmitter_summary has no snr_* columns
 const asked = [];
 const SERVED = new Set(['health_finding', 'transmitter_summary', 'flip_summary', 'flip_sources', 'reading_daily', 'station_health']);
 const json = (route, body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
@@ -98,7 +105,12 @@ async function standIn(page) {
         : kinds ? FIX.network.filter(f => kinds.includes(f.kind) && inPeriod(f)) : [];
       return json(route, page_(rows, sp));
     }
-    if (rel === 'transmitter_summary') return json(route, FIX.tsum);
+    if (rel === 'transmitter_summary') {
+      if (NO_SNR && /snr_/.test(sp.get('select') || '')) {
+        return json(route, { code: '42703', message: 'column transmitter_summary.snr_db does not exist', details: null, hint: null }, 400);
+      }
+      return json(route, NO_SNR ? FIX.tsum.map(t => Object.fromEntries(Object.entries(t).filter(([k]) => !k.startsWith('snr_')))) : FIX.tsum);
+    }
     if (rel === 'flip_summary') return json(route, FIX.fsum);
     if (rel === 'flip_sources') return json(route, []);
     if (rel === 'reading_daily') {
@@ -154,11 +166,16 @@ function fixture(reps, now) {
     return { heard_at: iso(Math.min(t, now - HOUR)), true_addr: 5000 + k, true_value: 10, bad_addr: 5000 + k, bad_value: 26, bits: 1, addr_flip: false, gap_s: 2,
       rule: 'fit', bad_snr: 18, good_snr: 19, bad_tx: 'st:' + R2.id, bad_how: 'carrier', good_tx: 'st:' + R2.id, good_measured: true };
   });
+  tsum.push({ tx: 'st:' + R2.id, via: 'repeater', freq_mhz: 151.525, w_days: 0, bursts: 450, receivers: 1, days: [], ppm: [], judged_at: iso(now - HOUR),
+    snr_db: 16.0, snr_sd: 1.1, snr_change_db: -2.0, snr_season_db: null, snr_receivers: 1, snr_judged: 1, snr_falling: 0,
+    snr_days: [5, 4, 3, 2, 1].map(k => iso(now - k * DAY).slice(0, 10)), snr_rel: [0.1, -0.6, -1.2, -1.7, -2.1] });
   // R3: heard three times, no schedule — seldom heard.
   silent(R3, { severity: 'warn', title: 'Quiet for 4.0 days', evidence: { lastHeard: now - 4 * DAY, reports: 3 }, first_seen: iso(now - 3 * DAY) });
   // R4: off the fleet, with one wild day.
   tsum.push({ tx: 'st:' + R4.id, via: 'repeater', freq_mhz: 151.525, w_days: 4, w_ppm: 2.4, bursts: 900, receivers: 1,
-    days: [4, 3, 2, 1].map(k => iso(now - k * DAY).slice(0, 10)), ppm: [-2.9, -2.8, 17.0, -2.7], judged_at: iso(now - HOUR) });
+    days: [4, 3, 2, 1].map(k => iso(now - k * DAY).slice(0, 10)), ppm: [-2.9, -2.8, 17.0, -2.7], judged_at: iso(now - HOUR),
+    snr_db: 11.0, snr_sd: 1.2, snr_change_db: -4.2, snr_season_db: null, snr_receivers: 1, snr_judged: 1, snr_falling: 1,
+    snr_days: [4, 3, 2, 1].map(k => iso(now - k * DAY).slice(0, 10)), snr_rel: [-1.0, -2.5, -3.8, -4.4] });
   own.push(F({ source: 'transmitters', kind: 'transmitter-snr-falling', station_id: R4.id, subject: 'st:' + R4.id, severity: 'warn',
     title: `${R4.name}: SNR down 4.2 dB in a week`, detail: 'Heard on its own carrier by 1 base station, at about 11.0 dB over the receiver\'s noise over the last 7 days.',
     evidence: { drop_db: 4.2, window: 'week', action: 'Check its antenna, the cable and connectors.' }, first_seen: iso(now - 2 * DAY) }));
@@ -171,6 +188,13 @@ function fixture(reps, now) {
     silent(R7, { severity: 'warn', title: 'Silent — missed its last 3 checks', evidence: { lastHeard: t, periodMin: 180, trailingMisses: 3 },
       first_seen: iso(t + 9 * HOUR), cleared_at: iso(t + 13 * HOUR) });
   });
+  tsum.push({ tx: 'st:' + R7.id, via: 'repeater', freq_mhz: 151.5, w_days: 0, bursts: 400, receivers: 1, days: [], ppm: [], judged_at: iso(now - HOUR),
+    snr_db: 10.4, snr_sd: 1.9, snr_change_db: 0.2, snr_season_db: null, snr_receivers: 1, snr_judged: 1, snr_falling: 0,
+    snr_days: [3, 2, 1].map(k => iso(now - k * DAY).slice(0, 10)), snr_rel: [0.3, -0.2, 0.1] });
+  fsum.push({ tx: 'st:' + R7.id, station_id: R7.id, bursts: 400, flips: 8, rate: 0.02, clear: 0, clear_rate: 0, clean_upstream: 0, addr_flips: 0, addresses: 3, top: [], fleet_rate: 0.0004 });
+  const A7 = R7.addrs.length ? R7.addrs : [6000];
+  flips[R7.id] = Array.from({ length: 8 }, (_, k) => ({ heard_at: iso(now - (1 + k) * HOUR * 7), true_addr: A7[k % A7.length], true_value: 40, bad_addr: A7[k % A7.length],
+    bad_value: 41, bits: 1, addr_flip: false, gap_s: 3, rule: 'fit', bad_snr: 9, good_snr: 22, bad_tx: 'st:' + R7.id, bad_how: 'carrier', good_tx: 'st:' + R7.id, good_measured: true }));
   // A finding from before the period, which no period asks for.
   silent(R7, { severity: 'warn', title: 'Silent — long ago', evidence: { lastHeard: now - 80 * DAY, periodMin: 180 },
     first_seen: iso(now - 79 * DAY), cleared_at: iso(now - 78 * DAY) });
@@ -265,6 +289,28 @@ try {
     sg && sg.sev === 'warn' && sg.title === 'SNR down 4.2 dB in a week'
       && sg.facts.some(f => /the stations behind it have lost that margin too/.test(f))
       && r4.points.some(p => /Its own signal is weaker at the base stations that hear it/.test(p)), JSON.stringify({ sg, points: r4 && r4.points }));
+  ok('…its line under the finding, each day against its usual, its level not said twice',
+    sg && sg.facts.some(f => /^Day by day against its usual: −1\.0 dB on .*, −4\.4 dB on /.test(f)) && !sg.facts.some(f => /^Heard about/.test(f)),
+    JSON.stringify(sg && sg.facts));
+  const s2 = r2 && r2.issues.find(i => i.kind === 'signal');
+  ok('a fall half way to the finding is a note: weakening, its level and its line',
+    s2 && s2.sev === 'info' && s2.title === 'Signal weakening — down 2.0 dB in a week'
+      && s2.facts.some(f => /^Heard about 16\.0 dB over the noise \(±1\.1 a burst\)/.test(f)) && s2.facts.some(f => /−2\.1 dB on /.test(f))
+      && r2.issues[0].kind === 'corrupt', JSON.stringify(s2));
+  const r7s = row(R7.id);
+  const s7 = r7s && r7s.issues.find(i => i.kind === 'signal'), c7 = r7s && r7s.issues.find(i => i.kind === 'corrupt');
+  ok('a level near where decodes stop is a link with little margin, and copies much weaker than the clean ones our end mishearing',
+    s7 && s7.sev === 'info' && /^Little margin — heard 10\.4 dB over the noise/.test(s7.title)
+      && c7 && c7.sev === 'info' && c7.facts.some(f => /^8 arrived more than 6 dB weaker than the clean copy/.test(f))
+      && r7s.points.some(p => /^Most of its corrupted copies arrived much weaker than the clean ones/.test(p))
+      && r7s.points.some(p => /little margin \(10\.4 dB over the noise\)/.test(p)), JSON.stringify({ s7, c7, points: r7s && r7s.points }));
+  const sigRow = await page.evaluate(id => {
+    const g = [...document.querySelectorAll(`#bk-r-${id} svg.bk-timeline g`)].find(x => (x.querySelector('.bk-rowlabel') || {}).textContent === 'Signal');
+    const meta = (document.querySelector(`#bk-r-${id} .panel-header + p`) || {}).textContent || '';
+    return g ? { dots: g.querySelectorAll('circle').length, line: !!g.querySelector('polyline.bk-sigline'), flag: !!g.querySelector('.bk-flag'), meta } : { meta };
+  }, R4.id);
+  ok('its timeline draws the signal\'s line, the finding a flag under it, and the section gives its level',
+    sigRow.dots === 4 && sigRow.line && sigRow.flag && /heard 11\.0 dB over the noise/.test(sigRow.meta), JSON.stringify(sigRow));
   const r5 = row(R5.id), r6 = row(R6.id);
   ok('two repeaters off air six minutes apart each name the other',
     r5 && r6 && r5.points[0] === `It stopped together with ${R6.name}: look first for what they share.`
@@ -385,6 +431,26 @@ try {
   ok('the demo: made-up findings on the real station file, said so, a summary and sections', /A demo:/.test(demo.status) && demo.rows >= 4 && demo.sections >= 4,
     JSON.stringify(demo));
   await c2.close();
+
+  // ── 9. a database before 0083 ──────────────────────────────────────────
+  const c3 = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  NO_SNR = true;
+  const before83 = asked.length;
+  const p3 = await open(c3);
+  await p3.evaluate(() => switchTab('backbone'));
+  await until(p3, () => Backbone.state().phase === 'ready');
+  const old = await p3.evaluate(([r2, r4]) => {
+    const A = Backbone.state().A, row = id => A.rows.find(r => r.id === id) || { issues: [] };
+    return { note: Backbone.state().note, carrier: row(r4).issues.some(i => i.kind === 'carrier'), sig4: (row(r4).issues.find(i => i.kind === 'signal') || {}).title || null,
+      sig2: row(r2).issues.some(i => i.kind === 'signal'), how: (document.querySelector('.bk-how') || {}).textContent || '' };
+  }, [R2.id, R4.id]);
+  const ts = asked.slice(before83).filter(a => a.rel === 'transmitter_summary');
+  ok('a database before 0083: asked with the signal, refused, asked again without — and nothing said missing',
+    ts.length === 2 && /snr_db/.test(ts[0].url) && !/snr_/.test(ts[1].url) && old.note === '' && old.carrier, JSON.stringify({ urls: ts.map(a => a.url.slice(0, 120)), old }));
+  ok('…the finding still an issue, no line to weaken by, and the page saying the signal waits on 0083',
+    old.sig4 === 'SNR down 4.2 dB in a week' && !old.sig2 && /does not keep the signal yet \(migration 0083\)/.test(old.how.replace(/\s+/g, ' ')), JSON.stringify(old));
+  NO_SNR = false;
+  await c3.close();
 
   ok('no page errors', errors.length === 0, errors.join(' | '));
 } catch (e) {

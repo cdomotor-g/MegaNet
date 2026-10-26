@@ -25,8 +25,12 @@
 //                                transmitter findings (0075, 0077, 0078, 0083):
 //                                off channel, drifting, corrupting, its signal
 //                                fading.
-//   transmitter_summary (0077)   its carrier against the fleet, day by day: the
-//                                fingerprint every burst it relays carries.
+//   transmitter_summary (0077,   its carrier against the fleet, day by day: the
+//                        0083)   fingerprint every burst it relays carries — and
+//                                how far over the base stations' noise that
+//                                carrier arrives, with its line against its own
+//                                past (asked again without, for a database
+//                                before 0083).
 //   recent_flips() (0078)        every corrupted copy that came on its carrier
 //                                in the period — as strong as the clean copy or
 //                                not, the clean one reaching us another way or
@@ -102,6 +106,13 @@ const Backbone = (() => {
   const NET_KINDS = ['repeater-down', 'area-silence', 'shared-spell'];
   const F_COLS = 'id,source,kind,subject,station_id,severity,title,detail,evidence,first_seen,last_seen,cleared_at';
   const T_COLS = 'tx,via,freq_mhz,w_days,w_ppm,w_hz,b_days,b_ppm,change_ppm,bursts,receivers,days,ppm,judged_at';
+  // Its signal (0083): the week's level and spread, its two changes, how many
+  // base stations hear it on its own carrier and how many saw it fall, and its
+  // line — each day against its usual, the receivers' own steps taken out.
+  const SNR_COLS = 'snr_db,snr_sd,snr_change_db,snr_season_db,snr_receivers,snr_judged,snr_falling,snr_days,snr_rel';
+  const SNR_WARN = 3;                // dB fallen: the server's tx_snr_drop_warn_db
+  const SNR_FLOOR = 8.5;             // dB over the noise where decodes stopped on the live receptions (0083)
+  const SNR_THIN = 12;               // dB: this close to the floor is little margin
   const FS_COLS = 'tx,station_id,bursts,flips,rate,clear,clear_rate,clean_upstream,addr_flips,addresses,top,fleet_rate,judged_at';
 
   const S = {
@@ -120,6 +131,7 @@ const Backbone = (() => {
     air: '',             // '' | 'loading' — reading the receptions for the pass ranges
     map: null, layer: null, fitted: false,
     readDays: false,     // the stored period has been read once
+    snrCols: null,       // whether transmitter_summary has 0083's signal columns (null: not asked yet)
   };
 
   // ── Small things ──────────────────────────────────────────────────────────
@@ -252,7 +264,7 @@ const Backbone = (() => {
           .then(x => x.flat()),
         fetchAll(`health_finding?select=${F_COLS}&kind=in.(${NET_KINDS.join(',')})&${overlap}&order=id.asc`, seq),
         quietly(fetchAll('health_finding?select=station_id,severity,first_seen&kind=eq.silent&cleared_at=is.null&order=id.asc', seq)),
-        quietly(dbSelect(`transmitter_summary?select=${T_COLS}&limit=5000`)),
+        quietly(carrierRows()),
         quietly(dbSelect(`flip_summary?select=${FS_COLS}&flips=gt.0&limit=2000`)),
         quietly(dbSelect('flip_sources?select=period_days,data,built_at')),
         quietly(Promise.all(chunks(ids, ID_CHUNK).map(c => fetchAll(`reading_daily?select=station_id,bucket,n&station_id=${inList(c)}`
@@ -286,6 +298,24 @@ const Backbone = (() => {
         : `Could not read the network's findings — ${(err && err.message) || err}.`;
     }
     redraw();
+  }
+
+  // The carriers, with their signal when the database keeps it: one before
+  // 0083 has the table without the signal's columns, which PostgREST says with
+  // a 400 naming the column — so it is asked again without them, once.
+  const noColumn = err => !!(err && err.status === 400) && /column .* does not exist/.test(String((err && err.message) || err));
+  async function carrierRows() {
+    if (S.snrCols !== false) {
+      try {
+        const rows = await dbSelect(`transmitter_summary?select=${T_COLS},${SNR_COLS}&limit=5000`);
+        S.snrCols = true;
+        return rows;
+      } catch (err) {
+        if (!noColumn(err)) throw err;
+        S.snrCols = false;
+      }
+    }
+    return dbSelect(`transmitter_summary?select=${T_COLS}&limit=5000`);
   }
 
   // The repeaters whose own carrier any evidence has caught relaying a
@@ -377,6 +407,7 @@ const Backbone = (() => {
         level: worstSev((live.length ? live : issues).map(i => i.sev)),
         resolved: !live.length,
         lastHeard: h ? ms(h.last_seen_at) : null,
+        snr: fin((tsum.get('st:' + R.id) || {}).snr_db),
         reports: days,
         spans: spansOf(c),
       });
@@ -586,6 +617,9 @@ const Backbone = (() => {
     const n = rows.length;
     const capped = n >= 1000;
     const clear = rows.filter(r => r.bad_snr == null || r.good_snr == null || Number(r.bad_snr) >= Number(r.good_snr) - 6).length;
+    // Much weaker than the clean copy (0083's other side of the SNR): the base
+    // station mishearing a weak burst, not the repeater sending wrong bits.
+    const weak = n - clear;
     const upstream = rows.filter(r => r.good_tx && r.good_tx !== tx && !ownAddrs.has(Number(r.true_addr))).length;
     const ghosts = rows.filter(r => r.addr_flip).length;
     const H = hoursOf(rows);
@@ -604,6 +638,7 @@ const Backbone = (() => {
     facts.push(`${capped ? 'At least 1,000' : num(n)} corrupted cop${n === 1 ? 'y' : 'ies'} came on its own carrier in the period`
       + (fs ? `; in the last week ${num(fs.flips)} of the ${num(fs.bursts)} bursts it sent (${pct(fs.rate)}, against ${pct(fs.fleet_rate)} for a typical transmitter).` : '.'));
     if (n) facts.push(`${num(clear)} arrived as strong as the clean copy, so the bits were already wrong when it sent them — its receiver, its site or its radio — not misheard at our end.`);
+    if (weak) facts.push(`${num(weak)} arrived more than 6 dB weaker than the clean copy — those are more likely our receivers mishearing a weak burst than this repeater sending wrong bits.`);
     if (upstream) facts.push(`${num(upstream)} also reached us clean by another way, so the corruption entered at this repeater.`);
     if (ghosts) facts.push(`${num(ghosts)} landed on another address: readings filed under a station that did not send them.`);
     if (H.pattern === 'hours') facts.push(`${pct(H.share)} of them came between ${String(H.at).padStart(2, '0')}:00 and ${String((H.at + 6) % 24).padStart(2, '0')}:00 — interference keeps hours like that.`);
@@ -617,7 +652,7 @@ const Backbone = (() => {
       short: rateSays ? `${pct(rate)} of relays corrupted` : `${capped ? '1,000+' : num(n)} corrupted cop${n === 1 ? 'y' : 'ies'}`,
       detail: 'Copies of other stations\' readings with a bit or two wrong, on its own carrier — so it sent them.',
       facts, hours: n >= 6 ? H : null,
-      ev: { n, clear, upstream, ghosts, rate, pattern: H.pattern },
+      ev: { n, clear, weak, upstream, ghosts, rate, pattern: H.pattern },
     };
   }
 
@@ -672,23 +707,74 @@ const Backbone = (() => {
   // Its signal (0083): the server's transmitter-snr-falling on its own carrier
   // — everything it relays reaching the base stations that much weaker, their
   // own steps already taken out, judged against its own past at each.
+  // Short of the finding, transmitter_summary's line (0083) says two more
+  // things: a fall more than half way to it (Station Health's "weakening"),
+  // and a level within a few dB of where decodes stop — a link with little
+  // margin, which is the path or the site more than a fault. Both are notes.
+  const fin = v => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+  const dB = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)}`;
+  // Its signal line in the period: each day against its usual, in dB.
+  function signalLine(t, from) {
+    if (!t || !Array.isArray(t.snr_days) || !Array.isArray(t.snr_rel)) return [];
+    const floor = dayMs(isoDay(from));
+    return t.snr_days.map((d, i) => ({ t: dayMs(d), v: fin(t.snr_rel[i]) })).filter(p => Number.isFinite(p.t) && p.v != null && p.t >= floor);
+  }
   function signal(c) {
     const list = c.own.filter(f => f.kind === 'transmitter-snr-falling');
-    if (!list.length) return null;
-    const open = list.filter(f => !f.cleared_at);
-    const lead = (open.length ? open : list).slice().sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity] || ms(b.last_seen) - ms(a.last_seen))[0];
-    const e = ev(lead);
-    const drop = Number(e.drop_db) || null;
-    const facts = [lead.detail].filter(Boolean);
-    facts.push('Everything it relays reaches the base stations that much weaker, so the stations behind it have lost that margin too — the weakest of them go quiet first.');
-    if (e.action) facts.push(e.action);
-    return {
-      kind: 'signal', cat: 'signal', sev: lead.severity, ongoing: !lead.cleared_at,
-      title: String(lead.title).replace(/^.*?: (?=SNR)/, '') + (lead.cleared_at ? ` — cleared ${whenShort(ms(lead.cleared_at))}` : ''),
-      short: drop ? `Signal down ${drop.toFixed(1)} dB` : 'Signal fading',
-      detail: 'How far above the base stations\' noise its own transmissions arrive, against its own past.',
-      facts, ev: { drop, window: e.window || null },
-    };
+    const t = c.tsum.get('st:' + c.R.id) || null;
+    const level = t ? fin(t.snr_db) : null, sd = t ? fin(t.snr_sd) : null;
+    const week = t ? fin(t.snr_change_db) : null, season = t ? fin(t.snr_season_db) : null;
+    const fallen = Math.min(week ?? 0, season ?? 0);
+    const line = signalLine(t, c.from);
+    // What the summary says of any of them: its level, its line, its agreement.
+    const known = [];
+    if (level != null) {
+      known.push(`Heard about ${level.toFixed(1)} dB over the noise${sd != null ? ` (±${sd.toFixed(1)} a burst)` : ''} on its own carrier over the last week, by `
+        + `${plural(Number(t.snr_receivers) || 1, 'base station')}; decodes stop near ${SNR_FLOOR} dB.`);
+    }
+    if (line.length) known.push(`Day by day against its usual: ${line.slice(-5).map(p => `${dB(p.v)} dB on ${dayLabel(p.t + 12 * HOUR)}`).join(', ')}.`);
+    if (t && Number(t.snr_judged) > 1) known.push(`${num(t.snr_falling)} of the ${num(t.snr_judged)} base stations with a past to judge it by saw it fall.`);
+    if (list.length) {
+      const open = list.filter(f => !f.cleared_at);
+      const lead = (open.length ? open : list).slice().sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity] || ms(b.last_seen) - ms(a.last_seen))[0];
+      const e = ev(lead);
+      const drop = Number(e.drop_db) || null;
+      const facts = [lead.detail].filter(Boolean);
+      facts.push('Everything it relays reaches the base stations that much weaker, so the stations behind it have lost that margin too — the weakest of them go quiet first.');
+      // Its level once: the finding's own words already give it.
+      facts.push(...known.filter(f => !/^Heard about/.test(f) || !/dB over/.test(lead.detail || '')));
+      if (e.action) facts.push(e.action);
+      return {
+        kind: 'signal', cat: 'signal', sev: lead.severity, ongoing: !lead.cleared_at,
+        title: String(lead.title).replace(/^.*?: (?=SNR)/, '') + (lead.cleared_at ? ` — cleared ${whenShort(ms(lead.cleared_at))}` : ''),
+        short: drop ? `Signal down ${drop.toFixed(1)} dB` : 'Signal fading',
+        detail: 'How far above the base stations\' noise its own transmissions arrive, against its own past.',
+        facts, line, ev: { drop, window: e.window || null, level },
+      };
+    }
+    if (fallen <= -0.6 * SNR_WARN) {
+      const by = week != null && week === fallen ? 'in a week' : 'over three months';
+      return {
+        kind: 'signal', cat: 'signal', sev: 'info', ongoing: true,
+        title: `Signal weakening — down ${(-fallen).toFixed(1)} dB ${by}`,
+        short: `Signal down ${(-fallen).toFixed(1)} dB`,
+        detail: 'How far above the base stations\' noise its own transmissions arrive, against its own past.',
+        facts: [...known, `Not yet the ${SNR_WARN} dB the server calls fading, but on its way: an antenna, cable or connectors going, or its transmitter's power, show here before it goes quiet.`],
+        line, ev: { drop: -fallen, level, early: true },
+      };
+    }
+    if (level != null && level < SNR_THIN) {
+      return {
+        kind: 'signal', cat: 'signal', sev: 'info', ongoing: true,
+        title: `Little margin — heard ${level.toFixed(1)} dB over the noise`,
+        short: `Signal ${level.toFixed(1)} dB, little margin`,
+        detail: 'How far above the base stations\' noise its own transmissions arrive.',
+        facts: [...known, `Within ${(level - SNR_FLOOR).toFixed(1)} dB of where decodes stop: a bad day's fade, rain on the path or a neighbour's noise takes it under, and every station it relays with it. `
+          + 'Its path to the base stations Flood-Net hears it with, or its site — which may not be the base it was built to reach.'],
+        line, ev: { level, thin: true },
+      };
+    }
+    return null;
   }
 
   function power(c) {
@@ -773,10 +859,16 @@ const Backbone = (() => {
     else if (!off && bitsReal) out.push('It sends the wrong bits: its receiver, its site or its radio — a receiver parked beside it would tell which.');
     if (bitsReal && bits.ev.pattern === 'hours') out.push('The corrupted copies keep hours, which interference near the site does and a failing radio does not.');
     if (bitsReal && bits.ev.pattern === 'all' && !off) out.push('At all hours, which is more like equipment or a weak input than interference.');
+    // Copies much weaker than the clean ones are our end mishearing it.
+    if (bits && !bits.ev.circumstantial && bits.ev.weak >= 5 && bits.ev.weak >= bits.ev.n / 2) {
+      out.push('Most of its corrupted copies arrived much weaker than the clean ones: our receivers mishearing it over a weak link, more than the repeater sending wrong bits.');
+    }
     // Its antenna and feeder are what it hears through as well as what it
     // sends on: weaker out and corrupting what comes in point at both.
-    if (sig && bitsReal && !off) out.push('Weaker on the air and corrupting what it relays: its antenna, feeder or connectors, which it hears through as well as sends on, fit both.');
-    else if (sig && !off) out.push('Its own signal is weaker at the base stations that hear it: its antenna, feeder or connectors, or its transmitter\'s power.');
+    const fading = sig && !sig.ev.thin;
+    if (fading && bitsReal && !off) out.push('Weaker on the air and corrupting what it relays: its antenna, feeder or connectors, which it hears through as well as sends on, fit both.');
+    else if (fading && !off) out.push('Its own signal is weaker at the base stations that hear it: its antenna, feeder or connectors, or its transmitter\'s power.');
+    if (sig && sig.ev.thin && !off) out.push(`It reaches the base stations with little margin (${sig.ev.level.toFixed(1)} dB over the noise): its path or its site more than a fault, and the first to go in a fade.`);
     if (car && bitsReal) {
       out.push(car.sev !== 'info' ? 'A carrier that is off or moving, as well as corrupted relays, points at the radio itself.'
         : `Its carrier moved ${car.ev.range.toFixed(1)} ppm across the ${plural(car.ev.nd, 'day')} it was measured${car.ev.nd < 3 ? ' — too few to lean on, but' : ', and'} a failing radio would do both.`);
@@ -965,8 +1057,22 @@ const Backbone = (() => {
         });
       if (dots.length) add('carrier', 'Carrier', dots.join(''));
     }
+    // Its signal: the line, each day against its usual (0083) — up is
+    // stronger, the dashes its usual — and the server's finding as a flag
+    // under it; the finding alone, a bar, on a database with no line.
     const sg = spans.filter(s => s.row === 'signal' && (s.to == null || s.to >= x0)).sort((a, b) => SEV_RANK[b.sev] - SEV_RANK[a.sev]);
-    if (sg.length) add('signal', 'Signal', sg.map(s => bar(s, s.sev === 'critical' ? 'bk-span-bad' : 'bk-span-warn')).join(''));
+    const sigT = S.raw && Array.isArray(S.raw.tsum) ? S.raw.tsum.find(t => t.tx === 'st:' + r.id) || null : null;
+    const sline = signalLine(sigT, x0);
+    if (sline.length) {
+      const Y = v => 1 + ((3 - Math.max(-9, Math.min(3, v))) / 12) * (RH - 2);
+      const pts = sline.map(p => [X(p.t + 12 * HOUR), Y(p.v)]);
+      add('signal', 'Signal', `<line class="bk-zero" x1="${L}" x2="${W - RP}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}"/>`
+        + (pts.length > 1 ? `<polyline class="bk-sigline" points="${pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')}"/>` : '')
+        + sline.map((p, i) => `<circle class="${p.v <= -2 * SNR_WARN ? 'bk-dot-bad' : p.v <= -SNR_WARN ? 'bk-dot-warn' : 'bk-dot-ok'}" cx="${pts[i][0].toFixed(1)}" cy="${pts[i][1].toFixed(1)}" r="2.6"><title>${esc(`${dayLabel(p.t + 12 * HOUR)}: ${dB(p.v)} dB against its usual`)}</title></circle>`).join('')
+        + sg.map(s => `<line class="bk-flag" x1="${X(s.from).toFixed(1)}" x2="${X(s.to == null ? x1 : s.to).toFixed(1)}" y1="${RH + 1}" y2="${RH + 1}"><title>${esc(s.what)}</title></line>`).join(''));
+    } else if (sg.length) {
+      add('signal', 'Signal', sg.map(s => bar(s, s.sev === 'critical' ? 'bk-span-bad' : 'bk-span-warn')).join(''));
+    }
     const pw = spans.filter(s => s.row === 'power' && (s.to == null || s.to >= x0)).sort((a, b) => SEV_RANK[b.sev] - SEV_RANK[a.sev]);
     if (pw.length) add('power', 'Power', pw.map(s => bar(s, s.sev === 'critical' ? 'bk-span-bad' : s.sev === 'warn' ? 'bk-span-warn' : 'bk-span-info')).join(''));
     if (!rows.length) return '';
@@ -989,6 +1095,7 @@ const Backbone = (() => {
     if (air.length) said.push(`off air ${air.map(s => `from ${when(s.from)}${s.to == null ? ', still' : ` to ${when(s.to)}`}`).join('; ')}`);
     if (flips) said.push(`${num(flips.ev.n)} corrupted copies`);
     if (sg.length) said.push(`signal fading from ${when(sg[0].from)}`);
+    if (sline.length) said.push(`signal ${dB(sline[sline.length - 1].v)} dB against its usual on ${dayLabel(sline[sline.length - 1].t + 12 * HOUR)}`);
     if (pw.length) said.push(`power findings ${pw.length}`);
     return `<svg class="bk-timeline" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escAttr(`${r.name} over the last ${A.days} days: ${said.join('; ') || 'what was found, day by day'}`)}">
       ${ticks.join('')}${parts.join('')}<line class="bk-now" x1="${W - RP}" x2="${W - RP}" y1="0" y2="${H - 16}"/>
@@ -1016,10 +1123,11 @@ const Backbone = (() => {
     const R = r.R;
     const freq = R.rep && R.rep.tx_mhz ? `${Number(R.rep.tx_mhz).toFixed(4).replace(/0+$/, '').replace(/\.$/, '')} MHz` : '';
     const heard = r.lastHeard ? `own reports last heard ${when(r.lastHeard)}` : R.own.length ? 'its own reports not heard lately' : 'no sensors of its own';
+    const snr = r.snr != null ? `heard ${r.snr.toFixed(1)} dB over the noise` : '';
     const bits = r.issues.some(i => i.kind === 'corrupt');
     return `<section class="panel bk-sec bk-sec--${r.resolved ? 'resolved' : r.level}" id="bk-r-${escAttr(r.id)}" aria-labelledby="bk-h-${escAttr(r.id)}">
       <div class="panel-header"><h3 id="bk-h-${escAttr(r.id)}">${r.rank}. ${esc(r.name)}</h3>${sevHtml(r.level, r.resolved)}</div>
-      <p class="small txt-muted">${esc([behindText(r), freq, heard].filter(Boolean).join(' · '))} · score ${Math.round(r.score)}</p>
+      <p class="small txt-muted">${esc([behindText(r), freq, snr, heard].filter(Boolean).join(' · '))} · score ${Math.round(r.score)}</p>
       ${timelineSvg(r, A)}
       ${r.points.length ? `<div class="bk-points"><b>What it points to.</b> ${r.points.map(esc).join(' ')}</div>` : ''}
       <ol class="bk-issues">${r.issues.map(issueHtml).join('')}</ol>
@@ -1048,16 +1156,21 @@ const Backbone = (() => {
       <details class="bk-how" data-k="how"><summary><h3 class="bk-inline-h" id="bk-h-how">How it is worked out</h3></summary>
         <p class="small">Every repeater on record, with what the network's own tools found about it in the period: Station Health's findings (its own station
           silent, the stations behind it gone quiet together, its battery) and when each opened and cleared; the carrier fingerprint every burst it relays
-          carries (Station Health's <em>Transmitter frequency</em>); the corrupted copies that came on that carrier (<em>Bit-Flip Sources</em>); and, for editors,
-          its pass ranges on record against what it really relays (<em>Signal Routes</em>).</p>
+          carries, and how far over the base stations' noise that carrier arrives, day by day against its own past (Station Health's <em>Transmitter frequency
+          and signal</em>); the corrupted copies that came on that carrier (<em>Bit-Flip Sources</em>); and, for editors, its pass ranges on record against what
+          it really relays (<em>Signal Routes</em>).${S.snrCols === false ? ' The database this reads does not keep the signal yet (migration 0083): its line and'
+          + ' level are left out until it does.' : ''}</p>
         <p class="small"><b>The ranking.</b> Each issue scores its severity (critical 10, warning 4, note 1) × how much of the network leans on the repeater
           (1 to 2.5 — the field stations only it passes in full and the others a quarter) × whether it is still going on (1, or ½ once it cleared) × what
-          kind of trouble it is (off air 1.2, corrupted relays 1, dropping out and power 0.8, carrier 0.7, pass ranges 0.5); corrupted copies count up to half
+          kind of trouble it is (off air 1.2, corrupted relays 1, its signal 0.9, dropping out and power 0.8, carrier 0.7, pass ranges 0.5); corrupted copies count up to half
           again as they mount. A repeater's score is the sum, and the repeaters are ranked by it; its state is the worst of what is still going on.
           The stations behind a repeater are the field stations whose addresses its pass ranges hold, within ${REACH_KM} km of it.</p>
         <p class="small"><b>Reading it.</b> "As strong as the clean copy" means the bits were already wrong when the repeater sent them: its receiver heard the
           station badly, or its radio is failing — not our receiver mishearing it. "Reached us clean another way" means the error entered at this repeater.
-          Interference keeps hours; a failing radio does not. A carrier measured on one or two days, and a day far from the rest, can be a receiver's tuning
+          Interference keeps hours; a failing radio does not. A corrupted copy more than 6 dB weaker than the clean one is more likely our receivers mishearing
+          a weak burst. Its signal fading by ${SNR_WARN} dB is the server's finding; half way there is a note, and so is a level within a few dB of the
+          ${SNR_FLOOR} dB where decodes stop — at the base stations Flood-Net hears it with, which may not be the one it was built to reach.
+          A carrier measured on one or two days, and a day far from the rest, can be a receiver's tuning
           rather than the repeater: say so before it is a crystal. The history behind these findings began on 21 October 2026, so a long period holds what
           there is.</p>
       </details></div>`;
@@ -1268,8 +1381,9 @@ const Backbone = (() => {
   // after a fortnight of corrupting half of what it relays (all hours, clean
   // copies upstream) with no daily charge; one whose stations went quiet
   // together, its carrier swinging and its corrupted copies keeping evening
-  // hours; one dropping out overnight with its battery low; one whose carrier
-  // sits three parts per million off the fleet; one with only a note.
+  // hours and its signal weakening; one dropping out overnight with its
+  // battery low; one whose carrier sits three parts per million off the fleet,
+  // heard with little margin; one with only a note.
   function demoRaw() {
     const reg = register();
     const now = Date.now(), days = S.days, from = now - days * DAY;
@@ -1324,7 +1438,9 @@ const Backbone = (() => {
       network.push(F({ kind: 'repeater-down', subject: 'repeater-down:rep:' + R2.id, severity: 'critical',
         title: `${Math.min(8, R2.members.length)} stations behind ${R2.st.name} went quiet together`, first_seen: iso(down + 4 * HOUR),
         evidence: { stations: R2.members.slice(0, 8).map(s => s.id), repeaters: [R2.id], from: down, to: down + 2 * HOUR, stillHeard: 1 } }));
-      tsum.push({ tx: 'st:' + R2.id, via: 'repeater', freq_mhz: Number(R2.rep.tx_mhz) || 151.525, days: [isoDay(now - 6 * DAY), isoDay(now - 3 * DAY)], ppm: [1.4, -1.5], bursts: 168, receivers: 1 });
+      tsum.push({ tx: 'st:' + R2.id, via: 'repeater', freq_mhz: Number(R2.rep.tx_mhz) || 151.525, days: [isoDay(now - 6 * DAY), isoDay(now - 3 * DAY)], ppm: [1.4, -1.5], bursts: 168, receivers: 1,
+        snr_db: 15.2, snr_sd: 1.3, snr_change_db: -2.2, snr_receivers: 1, snr_judged: 1, snr_falling: 0,
+        snr_days: [8, 7, 6, 5, 4, 3].map(k => isoDay(now - k * DAY)), snr_rel: [0.2, -0.4, -1.1, -1.6, -2.0, -2.4] });
       fsum.push({ tx: 'st:' + R2.id, station_id: R2.id, bursts: 355, flips: 22, rate: 0.062, clear: 22, clear_rate: 0.062, clean_upstream: 3, addr_flips: 9, addresses: 11, top: [], fleet_rate: 0.0004 });
       flips.set(R2.id, flipRows(R2, 26, k => [19, 20, 21, 22, 23, 0, 1][k % 7], 0).filter(f => ms(f.heard_at) < down));
       quietSome(R2, Math.min(8, R2.members.length));
@@ -1343,7 +1459,9 @@ const Backbone = (() => {
     }
     if (R4) {
       tsum.push({ tx: 'st:' + R4.id, via: 'repeater', freq_mhz: Number(R4.rep.tx_mhz) || 151.525,
-        days: [4, 3, 2, 1].map(k => isoDay(now - k * DAY)), ppm: [-2.8, -2.9, -2.7, -2.8], bursts: 960, receivers: 1 });
+        days: [4, 3, 2, 1].map(k => isoDay(now - k * DAY)), ppm: [-2.8, -2.9, -2.7, -2.8], bursts: 960, receivers: 1,
+        snr_db: 10.6, snr_sd: 1.6, snr_change_db: -0.3, snr_receivers: 1, snr_judged: 1, snr_falling: 0,
+        snr_days: [4, 3, 2, 1].map(k => isoDay(now - k * DAY)), snr_rel: [-0.3, 0.2, -0.1, 0.1] });
       findings.push(F({ source: 'transmitters', kind: 'transmitter-off-channel', station_id: R4.id, subject: 'st:' + R4.id, severity: 'warn',
         title: `${R4.st.name}: transmitting -2.8 ppm off the others (-424 Hz)`, first_seen: iso(now - 3 * DAY) }));
     }

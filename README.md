@@ -5800,7 +5800,8 @@ worked by hand and drives the tab in Chromium.
 
 ### 36. Signal Routes (What Comes In From Where, by Its Carrier)
 
-🛤️ **Signal Routes**, in the **Data** group, follows every burst the base
+🛤️ **Signal Routes**, in the **Admin** group beside Base Stations (it began in
+the Data group, and moved to make room for the Backbone), follows every burst the base
 stations' receivers heard over today, three days or seven back to the
 transmitter that put it on the air — the field station itself, or the repeater
 whose **carrier** it came on, since a repeater sends everything it relays on its
@@ -5820,14 +5821,16 @@ it to a fixture on the real station file.
 
 ### 37. Backbone (the State of the Backbone, Repeater by Repeater)
 
-🗼 **Backbone**, in the **Admin** group beside Base Stations and Network Review,
-is headed **State of the backbone**: every repeater on record with something
+🗼 **Backbone**, in the **Data** group beside Station Health, whose findings
+it ranks, is headed **State of the backbone**: every repeater on record with something
 wrong with it over the period picked (7 to 90 days, **30** to start), **ranked
 by the sum of its issues**, worst first, and inside each repeater its issues
 ranked by how much each matters — **off air**, **dropping out**, relaying
 **corrupted copies** on its own carrier (as strong as the clean copy, or
 reaching us clean another way, says the error starts at the repeater: its
-hardware or its site), a **carrier** off the fleet or moving, its **power**,
+hardware or its site), its **signal** at the base stations against its own
+past (`0083`: fading, weakening, or heard with little margin), a **carrier** off
+the fleet or moving, its **power**,
 and — for editors — its **pass ranges against the air**. A summary names each
 repeater and its one or two key issues with a score bar and a map; then a
 section a repeater: a timeline of the period, every issue with its evidence,

@@ -210,16 +210,18 @@ const TABS = [
       find: 'messages telemetry arrivals incoming ingest raw log fade margin ingress base pathway follow live decode calibration value volts battery converted' },
     { id: 'health',     label: 'Station Health',         icon: '🚦',
       find: 'monitoring maintenance o&m faults alarms battery trend voltage solar charge missed checks check signals timed reports silent quiet offline outage schedule repeater down receiver stopped base station network health data quality corrupted copies bit flips ghosts rain gauge blocked tipped level stuck flatline register unknown address agent ai claude briefing triage network weather bulletin daily weekly summary animation news droggies presenter' },
-    // 🛤️ Signal Routes (signal-routes.js) is the sixth, and the group's last:
-    // what came in from where — each burst the base stations heard followed
-    // back to the transmitter that sent it, by its carrier, set against the
-    // pass ranges on record, and split by protocol and frame format. Its find
-    // words are the questions it answers ("which repeater", "came in",
-    // "iflows") — none starting "no", so "no signal" still finds Offline &
-    // Install on its two words, and never "network", "decode" or "packet",
-    // which nav.mjs's probes hold for other tabs.
-    { id: 'signalroutes', label: 'Signal Routes',        icon: '🛤️',
-      find: 'routes route came in from where which repeater relayed relay relays carrier offset fingerprint heard via direct hop hops path paths pass range record off record unexplained copies concentrator concentration alert2 legacy binary iflows enhanced ascii format formats protocol protocols sankey flow diagram' },
+    // 🗼 Backbone (backbone.js), headed "State of the backbone", is the sixth,
+    // and the group's last, beside Station Health, whose findings it ranks:
+    // the repeaters ranked by what has gone wrong with each over a period —
+    // off air, corrupted relays, their signal, a carrier off the fleet, power,
+    // pass ranges against the air. Its find words are the questions a meeting
+    // asks of it ("worst repeaters", "faulty", "ranked") and nothing another
+    // tab answers to: a word it shared with a later group's tab ("power",
+    // "location", "carrier offset", "relays") would now win that tab's tie,
+    // since the earlier group takes it. Never "network", "signal" or "the",
+    // which nav.mjs holds for other tabs.
+    { id: 'backbone',   label: 'Backbone',               icon: '🗼',
+      find: 'state backbone repeaters faulty worst ranked ranking rank priority priorities criticality critical issues problems relaying corrupting off air dropouts dropping out meeting monthly fortnight' },
   ] },
   { group: 'Site visits', tabs: [
     // 📌 Nearby (nearby.js) heads the group because it is where a visit
@@ -312,17 +314,18 @@ const TABS = [
       find: 'administration users accounts people roles privileges permissions groups allowlist editors sign in access database datastore data source schema load stations.json github file snapshot backup settings storage reset migration dashboard health stats statistics visitors analytics last seen online active size tables volume connections' },
     { id: 'basestations', label: 'Base Stations',        icon: '🖥️',
       find: 'ingest points receivers fleet devices heartbeat check-in checking in uptime temperature under-voltage uplink queue remote manage restart reboot update upgrade release log ssh keys login maintenance team public key' },
-    // 🗼 Backbone (backbone.js), headed "State of the backbone": the repeaters
-    // ranked by what has gone wrong with each over a period — off air,
-    // corrupted relays, a carrier off the fleet, power, pass ranges against
-    // the air — drawn from Station Health's findings, the carrier fingerprints
-    // and Bit-Flip Sources. Filed here beside Base Stations and Network Review,
-    // the backbone's other two tabs, because the Data group beside Station
-    // Health is at nav.mjs's ceiling of six. Its find words are the questions
-    // a meeting asks of it ("worst repeaters", "faulty", "ranked") — never
-    // "network", "signal" or "the", which nav.mjs holds for other tabs.
-    { id: 'backbone',   label: 'Backbone',               icon: '🗼',
-      find: 'state backbone repeaters faulty faults worst ranked ranking priority priorities criticality critical issues problems hardware site location relays corrupting corrupted carrier offset fingerprint ppm off air silent down dropouts dropping out power battery solar pass ranges record meeting summary overview monthly' },
+    // 🛤️ Signal Routes (signal-routes.js), beside Base Stations: what came in
+    // from where — each burst the base stations' receivers heard followed back
+    // to the transmitter that sent it, by its carrier, set against the pass
+    // ranges on record, and split by protocol and frame format. Editors only,
+    // like most of this group; it moved here from the Data group to make room
+    // there for the Backbone beside Station Health. Its find words are the
+    // questions it answers ("which repeater", "came in", "iflows") — none
+    // starting "no", so "no signal" still finds Offline & Install on its two
+    // words, and never "network", "decode" or "packet", which nav.mjs's probes
+    // hold for other tabs.
+    { id: 'signalroutes', label: 'Signal Routes',        icon: '🛤️',
+      find: 'routes route came in from where which repeater relayed relay relays carrier offset fingerprint heard via direct hop hops path paths pass range record off record unexplained copies concentrator concentration alert2 legacy binary iflows enhanced ascii format formats protocol protocols sankey flow diagram' },
     { id: 'review',     label: 'Network Review',         icon: '📐',
       find: 'network review design audit planning fade margin matrix radio mobile rm comparison calibration calibrate attenuator path margin measured field test redundancy two paths second path gateways repeater relocation move proposed site hops tdma alert2 frequency principles licence' },
     { id: 'a2plan',     label: 'ALERT2 Transition Plan', icon: '🧭',     who: 'a2plan',
@@ -2444,15 +2447,20 @@ const HELP = {
            + 'its issues ranked by how much each matters. The summary names each repeater and its one or two key issues, with a bar '
            + 'of its score and a map; then a section a repeater — a timeline of the period, every issue with its evidence, and what '
            + 'they point to. Drawn from what the other tabs already find: Station Health\'s findings (off air, the stations behind '
-           + 'it gone quiet together, dropouts, its battery), the <strong>carrier fingerprint</strong> every burst it relays carries, '
-           + 'the <strong>corrupted copies</strong> that came on that carrier, and — for editors — its <strong>pass ranges against '
-           + 'the air</strong>. It reads itself again every fifteen minutes while it is open.',
+           + 'it gone quiet together, dropouts, its battery), the <strong>carrier fingerprint</strong> every burst it relays carries '
+           + 'and its <strong>signal</strong> at the base stations against its own past, the <strong>corrupted copies</strong> that came '
+           + 'on that carrier, and — for editors — its <strong>pass ranges against the air</strong>. It reads itself again every '
+           + 'fifteen minutes while it is open.',
     watch: [
       '<strong>"As strong as the clean copy"</strong> means the repeater sent the wrong bits — its receiver heard the station badly, '
       + 'or its radio is failing — rather than our receiver mishearing it; <strong>"reached us clean another way"</strong> means the '
       + 'error entered at that repeater. Interference keeps hours; a failing radio does not.',
       'A carrier measured on one or two days, or one day far from the rest, can be a receiver\'s own tuning that day rather than the '
       + 'repeater — the section says how many days stand behind it.',
+      '<strong>Its signal</strong> (how far over the noise its own carrier arrives) needs migration 0083 on the database. Once it is '
+      + 'there: the server\'s fading finding at 3 dB, its line day by day, and as notes a fall half way to the finding and a level close '
+      + 'to where decodes stop. A low level is its path to the base stations Flood-Net hears it with — not necessarily the one it was '
+      + 'built to reach.',
       'The score is a ranking, not a measurement: severity × how much of the network leans on the repeater × still going on or '
       + 'not × the kind of trouble. <em>How it is worked out</em>, at the foot of the tab, gives the weights.',
       'The findings it reads began on 21 October 2026, so a long period holds what there is. The pass ranges against the air need '

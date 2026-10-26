@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 111, date: '2026-10-26', items: [
+      '<strong>🗼 Backbone</strong> has moved into the <strong>Data</strong> group, beside Station Health, whose findings it ranks; '
+        + '<strong>🛤️ Signal Routes</strong> has moved to <strong>Admin</strong>, beside Base Stations, to make room — a group holds six.',
+      'The Backbone now reads each repeater\'s <strong>signal</strong> too: how far over the noise its own carrier reaches the base '
+        + 'stations, drawn as a line against its usual on its timeline, and — short of the fading finding — a note when it is '
+        + '<strong>weakening</strong> or heard with <strong>little margin</strong>. And when most of a repeater\'s corrupted copies '
+        + 'arrive much weaker than the clean ones, it says that is more likely our receivers mishearing it than the repeater. '
+        + 'The signal shows once the database has its migration (0083).',
+    ] },
     { n: 110, date: '2026-10-26', items: [
       'Station Health\'s <strong>📺 Network Weather</strong> bulletin is a <strong>video player</strong> now: a big ▶ in the middle '
         + 'of the picture, and under it a <strong>seek bar</strong> split into the bulletin\'s scenes — point at one for its title, '

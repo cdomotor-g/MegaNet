@@ -2667,6 +2667,8 @@ td {
 .bk-span-warn { fill: var(--warn); }
 .bk-span-info { fill: var(--muted); }
 .bk-flag { stroke: var(--bad); stroke-width: 2; }
+.bk-zero { stroke: var(--muted); stroke-opacity: .5; stroke-dasharray: 2 3; }
+.bk-sigline { fill: none; stroke: var(--bk-signal); stroke-width: 1.5; }
 .bk-dot-ok { fill: var(--ok); }
 .bk-dot-warn { fill: var(--warn); }
 .bk-dot-bad { fill: var(--bad); }

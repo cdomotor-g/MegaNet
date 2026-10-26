@@ -819,6 +819,15 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 189 — 2026-10-27: 🗼 Backbone beside Station Health, and its signal's line
+
+The owner: *"move it into the Data group next to Station Health, and please bring in the SNR work that just landed on main."* **Opens and closes nothing.**
+
+- **The move**: 🗼 Backbone is the Data group's sixth, after Station Health; 🛤️ Signal Routes moved to Admin beside Base Stations to make room (`nav.mjs`'s ceiling of six). The Backbone's find words were cut to what no later group's tab answers to — in an earlier group it would win their ties ("power" from the SWR Meter, "location" from Nearby, "carrier offset" from Signal Routes).
+- **The signal (`0083`)**, beyond revision 188's finding: `transmitter_summary`'s `snr_*` read beside the carrier (a 400 naming the column means a database before `0083`, asked again without them); each repeater's section gives its level, and its timeline the line — each day against its usual — with the fading finding flagged under it; short of the finding, a fall more than half way to it is a *weakening* note, and a level under 12 dB (decodes stopped near 8.5 on the live receptions) *little margin* — the path or the site more than a fault. Corrupted copies more than 6 dB weaker than the clean copy are counted, and most of them weak points at our receivers mishearing a weak link rather than the repeater.
+- **Live**: the database is at `79`, so none of the signal shows yet — `0080`–`0083` still wait on db-migrate's secret (revision 188's owner line).
+- **Checks:** `npm run backbone` (new checks: the line, weakening, little margin, weak copies, the pre-`0083` retry), `nav`, `tabs`, `smoke`, `views`, `help`, `exports`, `looks`, `signalroutes`, the cheap five.
+
 ### Revision 188 — 2026-10-27: 📶 Each transmitter's signal, from its own carrier (#217)
 
 The owner: *"is there anywhere which we are tracking the signal to noise of a given station where we know a signal is coming from the station directly because of the carrier … track the signal to noise drift over time … antenna degradation … put it in with that carrier drift information … highlight the ones which appear to be becoming more noisy … account for sudden step changes across all signals which might relate to the receiver … just the stations we can hear directly … planning ahead for when we have more than just the one receiver."* **Opens and closes nothing**; #217 (under #214) carries it.
