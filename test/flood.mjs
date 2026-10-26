@@ -1072,6 +1072,9 @@ async function browserHalf(FS) {
       // Recorded on the station (0040): the 4.5 m tower, tall enough for its
       // major class and 1% AEP level to fall on it.
       s.tower_height = 4.5;
+      // Gatton's record now says manual_water_level, which wins (0039): this
+      // section needs the automatic tower.
+      window.__gattonType = s.station_type; s.station_type = 'auto_water_level';
       if (typeof SLS !== 'undefined') { window.__slsFor = SLS.forStation; SLS.forStation = (...a) => (a[0] && a[0].id === 'gatton' ? null : window.__slsFor(...a)); }
       DigitalTwin.rebuild();
     });
@@ -1088,7 +1091,7 @@ async function browserHalf(FS) {
     ok('…its bands in the scale\'s colours', TWR.parts.filter(n => n === 'flood level band').length > 0);
     await page.evaluate(() => {
       const s = state.data.stations.find(x => x.id === 'gatton');
-      s.name = window.__gattonName; delete s.flood_peaks; delete s.tower_height;
+      s.name = window.__gattonName; delete s.flood_peaks; delete s.tower_height; s.station_type = window.__gattonType;
       if (window.__slsFor) SLS.forStation = window.__slsFor;
       DigitalTwin.rebuild();
     });

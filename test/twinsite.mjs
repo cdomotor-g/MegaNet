@@ -260,6 +260,9 @@ async function browserHalf() {
         && near(d.model.size.x, 0.1, 1e-3) && d.model.parts.includes('gauge board') && d.model.parts.includes('gauge board graduations'),
       J({ structure: d.model.structure, size: d.model.size }));
 
+    // 'alpha' now carries station_type manual_water_level, which wins (0039);
+    // this check is about a manual station the type does not settle.
+    await page.evaluate(() => { const a = state.data.stations.find(s => s.id === 'alpha'); if (a) a.station_type = null; });
     d = await open('alpha');
     ok('a manual station that reads both is both, side by side, and the notes say they are often apart on the ground',
       d.model.structure === 'collector+staff' && d.model.parts.includes('collector body') && d.model.parts.includes('gauge board')
