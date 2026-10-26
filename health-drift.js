@@ -31,6 +31,17 @@
 // the fleet that receiver hears. So 0 ppm is "like the rest", not "exactly on
 // frequency"; a transmitter far from the rest, or one moving, is the one to
 // check.
+//
+// And its signal (0083): the SNR of the same bursts — only those its own
+// carrier says it sent, so a station heard through its repeater never takes
+// on the repeater's strength — followed against its own past at each base
+// station that hears it, each receiver's own steps (everything it hears
+// moving at once) taken out. A fall of tx_snr_drop_warn_db in a week, or over
+// three months, is the server's `transmitter-snr-falling`: an antenna, cable
+// or connector going, or the transmitter's power. The panel's Signal view, a
+// line on the station's card and in its editor, and a word under Needs
+// attention (attnHtml()). A database before 0083 has no signal columns: the
+// rows are asked for again without them, and the signal says it is not kept.
 
 const HealthDrift = (() => {
 
@@ -43,6 +54,8 @@ const HealthDrift = (() => {
     findings: [],      // open findings, source transmitters
     warn: 2.5,         // the off-channel line, ppm (app_meta tx_offset_warn_ppm)
     drift: 1,          // the drift line, ppm against the 30 days before (tx_drift_warn_ppm)
+    snrWarn: 3,        // the signal's line, dB fallen (tx_snr_drop_warn_db)
+    view: 'carrier',   // 'carrier' (frequency) | 'signal' (SNR)
     show: 'look',      // 'look' (findings and near the line) | 'all'
     kind: 'all',       // 'all' | 'alert' | 'alert2' | 'repeater'
     q: '',
@@ -56,23 +69,42 @@ const HealthDrift = (() => {
   const dayMs = d => Date.parse(String(d).slice(0, 10) + 'T00:00:00Z');
   const quietly = p => p.catch(() => []);
   const COLS = 'tx,protocol,station_id,via,freq_mhz,w_days,w_ppm,w_hz,b_days,b_ppm,change_ppm,bursts,receivers,days,ppm,judged_at';
+  const SNR_COLS = 'snr_db,snr_sd,snr_change_db,snr_season_db,snr_receivers,snr_judged,snr_falling,snr_days,snr_rel';
   const F_COLS = 'kind,subject,station_id,severity,title,detail,first_seen';
+  const CARRIER_KINDS = new Set(['transmitter-off-channel', 'transmitter-drift']);
+  const SIGNAL_KIND = 'transmitter-snr-falling';
   // A database before 0077 has no transmitter_summary.
   const missing = err => !!(err && (err.code === 'PGRST205' || err.code === '42P01' || err.status === 404))
     || /Could not find the table|does not exist/.test(String((err && err.message) || err));
+  // One before 0083 has the table without its signal columns: PostgREST says
+  // so with a 400 naming the column.
+  const noColumn = err => !!(err && err.status === 400) && /column .* does not exist/.test(String(err.message || err));
+  let snrCols = true;
+  async function askRows(filter, limit) {
+    if (snrCols) {
+      try {
+        return await dbSelect(`transmitter_summary?select=${COLS},${SNR_COLS}${filter}&limit=${limit}`);
+      } catch (err) {
+        if (!noColumn(err)) throw err;
+        snrCols = false;
+      }
+    }
+    return dbSelect(`transmitter_summary?select=${COLS}${filter}&limit=${limit}`);
+  }
 
-  // The two lines, asked once whoever needs them first — the panel or a card.
+  // The three lines, asked once whoever needs them first — the panel or a card.
   let knobsAsked = null;
   function askKnobs() {
     if (!knobsAsked) {
       // Kept once answered; a failure keeps the defaults and is asked again
       // by whoever needs them next.
-      knobsAsked = dbSelect('app_meta?select=key,value&key=in.(tx_offset_warn_ppm,tx_drift_warn_ppm)').then(list => {
+      knobsAsked = dbSelect('app_meta?select=key,value&key=in.(tx_offset_warn_ppm,tx_drift_warn_ppm,tx_snr_drop_warn_db)').then(list => {
         (list || []).forEach(k => {
           const v = Number(k.value);
           if (!Number.isFinite(v) || v <= 0) return;
           if (k.key === 'tx_offset_warn_ppm') S.warn = v;
           if (k.key === 'tx_drift_warn_ppm') S.drift = v;
+          if (k.key === 'tx_snr_drop_warn_db') S.snrWarn = v;
         });
       }, () => { knobsAsked = null; });
     }
@@ -84,7 +116,7 @@ const HealthDrift = (() => {
     S.asked = true; S.loading = true; S.err = '';
     try {
       const [rows, findings] = await Promise.all([
-        dbSelect(`transmitter_summary?select=${COLS}&limit=5000`),
+        askRows('', 5000),
         quietly(dbSelect(`health_finding?select=${F_COLS}&source=eq.transmitters&cleared_at=is.null&limit=5000`)),
         askKnobs(),
       ]);
@@ -119,16 +151,24 @@ const HealthDrift = (() => {
     return { name: r.station_id || tail, number: '', id: null, rep: isRep };
   }
 
+  // The worst open finding of the kinds asked for, by subject.
+  function worstBy(kinds) {
+    const m = new Map();
+    S.findings.forEach(f => {
+      if (!kinds(f.kind)) return;
+      const was = m.get(f.subject);
+      if (!was || (f.severity === 'critical' && was.severity !== 'critical')) m.set(f.subject, f);
+    });
+    return m;
+  }
+
   function summary() {
     if (!S.rows) return [];
-    const fBy = new Map();
-    S.findings.forEach(f => {
-      const was = fBy.get(f.subject);
-      if (!was || (f.severity === 'critical' && was.severity !== 'critical')) fBy.set(f.subject, f);
-    });
+    const fBy = worstBy(k => CARRIER_KINDS.has(k)), sBy = worstBy(k => k === SIGNAL_KIND);
     return S.rows.map(r => {
       const w = who(r);
       const days = (r.days || []).map(dayMs), ppm = (r.ppm || []).map(Number);
+      const sDays = (r.snr_days || []).map(dayMs), rel = (r.snr_rel || []).map(Number);
       return {
         tx: r.tx, protocol: r.protocol, via: r.via, who: w,
         ppm: r.w_ppm == null ? null : Number(r.w_ppm), hz: r.w_hz == null ? null : Number(r.w_hz),
@@ -137,16 +177,30 @@ const HealthDrift = (() => {
         freq: r.freq_mhz == null ? null : Number(r.freq_mhz),
         pts: days.map((t, i) => ({ t, ppm: ppm[i] })).filter(p => Number.isFinite(p.t) && Number.isFinite(p.ppm)),
         finding: fBy.get(r.tx) || null,
+        // Its signal (0083): absent altogether on a database before it.
+        snr: fin(r.snr_db), snrSd: fin(r.snr_sd), snrChange: fin(r.snr_change_db), snrSeason: fin(r.snr_season_db),
+        snrRx: Number(r.snr_receivers) || 0, snrJudged: Number(r.snr_judged) || 0, snrFalling: Number(r.snr_falling) || 0,
+        snrPts: sDays.map((t, i) => ({ t, v: rel[i] })).filter(p => Number.isFinite(p.t) && Number.isFinite(p.v)),
+        sFinding: sBy.get(r.tx) || null,
         judgedAt: r.judged_at || null,
       };
     }).sort((x, y) => (!!y.finding - !!x.finding) || (Math.abs(y.ppm ?? 0) - Math.abs(x.ppm ?? 0)) || (x.tx < y.tx ? -1 : 1));
   }
+  // The signal's order: its finding first, then the furthest fallen.
+  const fallen = r => Math.min(r.snrChange ?? 0, r.snrSeason ?? 0);
+  const bySignal = rows => rows.slice().sort((x, y) => (!!y.sFinding - !!x.sFinding)
+    || ((y.sFinding && y.sFinding.severity === 'critical') - (x.sFinding && x.sFinding.severity === 'critical')) || (fallen(x) - fallen(y))
+    || (x.tx < y.tx ? -1 : 1));
+  const hasSignal = r => r.snr != null || r.snrPts.length > 0;
 
   const near = r => r.finding || (r.ppm != null && Math.abs(r.ppm) >= S.warn * 0.8) || (r.change != null && Math.abs(r.change) >= 0.5);
+  // A signal near its line: its finding, or two thirds of the way there.
+  const nearS = r => r.sFinding || fallen(r) <= -S.snrWarn * 0.6;
   const ofKind = (r, k) => (k === 'all' ? true : k === 'repeater' ? r.who.rep : r.protocol === k && !(k === 'alert' && r.who.rep));
   function filtered(rows) {
     const q = S.q.trim().toLowerCase();
-    return rows.filter(r => (S.show === 'all' || near(r)) && ofKind(r, S.kind)
+    const sig = S.view === 'signal';
+    return rows.filter(r => (sig ? hasSignal(r) && (S.show === 'all' || nearS(r)) : S.show === 'all' || near(r)) && ofKind(r, S.kind)
       && (!q || `${r.who.name} ${r.who.number} ${r.tx}`.toLowerCase().includes(q)));
   }
 
@@ -163,6 +217,22 @@ const HealthDrift = (() => {
       + (pts.length ? `<path d="${line}" fill="none" stroke="currentColor" stroke-width="1.5"/>${dots}` : '') + '</svg>';
   }
 
+  // The signal's line: 90 days of it against its usual (the thirty days
+  // before last week), in dB, the band ±the line, the fall below the middle.
+  function snrSparkSvg(pts) {
+    const W = 120, H = 28, DAYS = 90, t1 = todayUtc(), t0 = t1 - (DAYS - 1) * DAY;
+    const shown = pts.filter(p => p.t >= t0);
+    const lim = Math.max(S.snrWarn * 2, ...shown.map(p => Math.abs(p.v || 0)));
+    const x = t => ((t - t0) / Math.max(1, t1 - t0)) * (W - 4) + 2;
+    const y = v => H / 2 - (v / lim) * (H / 2 - 2);
+    const line = shown.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
+    const dots = shown.length < 3 ? shown.map(p => `<circle cx="${x(p.t).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="1.6" fill="currentColor"/>`).join('') : '';
+    return `<svg class="hl-drift-spark hl-snr-spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true" focusable="false">`
+      + `<rect x="0" y="${y(S.snrWarn).toFixed(1)}" width="${W}" height="${(y(-S.snrWarn) - y(S.snrWarn)).toFixed(1)}" fill="currentColor" opacity="0.07"/>`
+      + `<line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="2 2"/>`
+      + (shown.length ? `<path d="${line}" fill="none" stroke="currentColor" stroke-width="1.5"/>${dots}` : '') + '</svg>';
+  }
+
   function statusHtml(r) {
     if (r.finding) {
       const cls = r.finding.severity === 'critical' ? 'txt-bad' : 'txt-warn';
@@ -171,6 +241,16 @@ const HealthDrift = (() => {
     }
     if (r.ppm != null && Math.abs(r.ppm) >= S.warn * 0.8) return '<span class="txt-muted">Near the line</span>';
     return '<span class="txt-muted">Like the rest</span>';
+  }
+
+  function snrStatusHtml(r) {
+    if (r.sFinding) {
+      const cls = r.sFinding.severity === 'critical' ? 'txt-bad' : 'txt-warn';
+      return `<span class="${cls}" title="${escAttr(r.sFinding.title)}"><span aria-hidden="true">⚠</span> Fading</span>`;
+    }
+    if (r.snrChange == null && r.snrSeason == null) return '<span class="txt-muted">Too soon</span>';
+    if (fallen(r) <= -S.snrWarn * 0.6) return '<span class="txt-muted">Weakening</span>';
+    return '<span class="txt-muted">Steady</span>';
   }
 
   const kindWord = r => (r.who.rep ? 'Repeater' : r.protocol === 'alert2' ? 'ALERT2' : 'ALERT');
@@ -201,14 +281,36 @@ const HealthDrift = (() => {
       <tbody>${body}</tbody></table></div>`;
   }
 
+  const dbText = v => (v == null ? '<span class="small txt-muted">too soon</span>' : `${sgn(v, 1)} <span class="small">dB</span>`);
+  function snrTableHtml(rows) {
+    const body = rows.map(r => `
+      <tr>
+        <th scope="row">${nameHtml(r)}</th>
+        <td class="num">${r.snr == null ? '—' : `${r.snr.toFixed(1)} <span class="small">dB</span>`}${r.snrSd == null ? ''
+          : `<br><span class="small">±${r.snrSd.toFixed(1)} dB a burst</span>`}</td>
+        <td class="num">${dbText(r.snrChange)}</td>
+        <td class="num">${dbText(r.snrSeason)}</td>
+        <td>${snrSparkSvg(r.snrPts)}</td>
+        <td class="num">${num(r.snrRx)}${r.snrJudged > 1 ? `<br><span class="small">${num(r.snrFalling)} of ${num(r.snrJudged)} saw a fall</span>` : ''}</td>
+        <td>${snrStatusHtml(r)}</td>
+      </tr>`).join('');
+    return `<div class="table-wrap"><table class="hl-table hl-drift-table hl-snr-table">
+      <caption class="sr-only">Each transmitter's signal over the receivers' noise, only from bursts its own carrier says it sent: the last week, its change from the thirty days before and over three months with each receiver's own shifts taken out, its last 90 days, the base stations that hear it directly, and the server's finding</caption>
+      <thead><tr><th scope="col">Transmitter</th><th scope="col" class="num">SNR, last 7 days</th><th scope="col" class="num">Change from the 30 before</th>
+        <th scope="col" class="num">Three months</th><th scope="col">90 days</th><th scope="col" class="num">Base stations</th><th scope="col">Now</th></tr></thead>
+      <tbody>${body}</tbody></table></div>`;
+  }
+
   function controlsHtml(all) {
-    const n = k => all.filter(r => ofKind(r, k)).length;
+    const n = k => all.filter(r => ofKind(r, k) && (S.view !== 'signal' || hasSignal(r))).length;
     const opt = (v, label, cur) => `<option value="${v}"${cur === v ? ' selected' : ''}>${esc(label)}</option>`;
     return `<div class="hl-drift-controls">
+      <label>Look at <select onchange="HealthDrift.set('view', this.value)">
+        ${opt('carrier', 'Carrier frequency', S.view)}${opt('signal', 'Signal (SNR)', S.view)}</select></label>
       <label>Show <select onchange="HealthDrift.set('show', this.value)">
         ${opt('look', 'Needs a look', S.show)}${opt('all', 'Every transmitter', S.show)}</select></label>
       <label>Kind <select onchange="HealthDrift.set('kind', this.value)">
-        ${opt('all', `All (${all.length})`, S.kind)}${opt('alert', `Legacy ALERT stations (${n('alert')})`, S.kind)}
+        ${opt('all', `All (${n('all')})`, S.kind)}${opt('alert', `Legacy ALERT stations (${n('alert')})`, S.kind)}
         ${opt('repeater', `Repeaters (${n('repeater')})`, S.kind)}${opt('alert2', `ALERT2 (${n('alert2')})`, S.kind)}</select></label>
       <label>Find <input type="search" value="${escAttr(S.q)}" placeholder="Name, number or address" aria-label="Find a transmitter"
         oninput="HealthDrift.set('q', this.value)"></label>
@@ -218,8 +320,8 @@ const HealthDrift = (() => {
   function render() {
     if (!S.asked && typeof dbSelect === 'function') setTimeout(load, 0);
     const head = `
-      <div class="panel-header"><h3 id="hl-h-drift">Transmitter frequency</h3>
-        <span class="small">each transmitter's carrier against the others, and whether it is moving</span></div>`;
+      <div class="panel-header"><h3 id="hl-h-drift">Transmitter frequency and signal</h3>
+        <span class="small">each transmitter's carrier against the others, its signal against its own past, and whether either is moving</span></div>`;
     if (S.err === 'not on this database yet') return head + '<p class="small txt-muted">The database this is connected to does not keep carrier offsets yet.</p>';
     if (S.err) return head + `<p class="small txt-bad">${esc(S.err)}</p>`;
     if (!S.rows) return head + '<p class="small">Asking the server for the carrier offsets…</p>';
@@ -231,15 +333,27 @@ const HealthDrift = (() => {
     const legacy = all.filter(r => r.protocol === 'alert').length;
     const at = all[0].judgedAt ? new Date(all[0].judgedAt) : null;
     const lead = flagged.length
-      ? `<p><b>${num(flagged.length)} of ${num(all.length)} transmitter${all.length === 1 ? '' : 's'} to check</b> — ${flagged.slice(0, 3).map(r => esc(r.finding.title)).join('; ')}${flagged.length > 3 ? '; …' : ''}.</p>`
-      : `<p>All ${num(all.length)} transmitters measured are within ${esc(String(S.warn))} ppm of the rest, and none has moved by ${esc(String(S.drift))} ppm in a week.</p>`;
-    const rows = filtered(all);
+      ? `<p><b>${num(flagged.length)} of ${num(all.length)} transmitter${all.length === 1 ? '' : 's'} to check</b> — ${flagged.slice(0, 3).map(r => esc(r.finding.title)).join('; ')}${flagged.length > 3 ? '; …' : ''}.${signalLeadHtml(all)}</p>`
+      : `<p>All ${num(all.length)} transmitters measured are within ${esc(String(S.warn))} ppm of the rest, and none has moved by ${esc(String(S.drift))} ppm in a week.${signalLeadHtml(all)}</p>`;
+    const sig = S.view === 'signal';
+    const rows = sig ? bySignal(filtered(all)) : filtered(all);
     const shown = S.more ? rows : rows.slice(0, PAGE);
-    const empty = !rows.length
+    const empty = !snrCols && sig ? '<p class="small txt-muted">The database this is connected to does not keep the signal yet (db/migrations/0083_station_snr.sql).</p>'
+      : !rows.length
       ? `<p class="small">${S.show === 'look' ? 'Nothing here needs a look. <button class="link-btn" onclick="HealthDrift.set(\'show\', \'all\')">Show every transmitter</button>' : 'No transmitter matches.'}</p>` : '';
     const more = rows.length > shown.length
       ? `<p><button class="btn" onclick="HealthDrift.set('more', true)">Show all ${num(rows.length)}</button></p>` : '';
-    return head + lead + `
+    const about = sig ? `
+      <p class="small hl-drift-sub">The signal over the receiver's noise (SNR) of every burst a base station decodes — counted only where the
+        burst's carrier says who sent it: a burst a repeater relayed is the repeater's strength, so a station heard only through its repeater has
+        no signal here (its repeater does), and a station heard both ways is measured on its own bursts alone. Each base station's view of a
+        transmitter is followed against its own past, never against another's; everything a receiver hears moving at once — its antenna, cable,
+        gain or the noise at its site — is worked out day by day and taken out. A fall of ${esc(String(S.snrWarn))} dB in the last week against
+        the thirty days before, or over the last thirty days against two months earlier, is a finding: usually the antenna, its cable or connectors
+        (water, corrosion, knocked or loosened), or the transmitter's power. The line is its last 90 days against that usual; the band is
+        ±${esc(String(S.snrWarn))} dB. A base station new this month has no say until it has a past; one that alone saw a fall may be its own
+        path. Bursts below about 8 dB do not decode, so a station near there has little left to lose and fades into missed checks instead.</p>`
+      : `
       <p class="small hl-drift-sub">${num(legacy)} legacy ALERT and ${num(all.length - legacy)} ALERT2 transmitters, judged by the server
         ${at ? `at ${esc(at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}` : 'hourly'}.
         Base stations measure every burst's carrier offset. A burst relayed by a repeater is on the repeater's carrier, so the server puts each
@@ -247,12 +361,59 @@ const HealthDrift = (() => {
         are measured too. Each receiver's own crystal error is worked out day by day and taken out, and each transmitter is shown against the median
         of the fleet that receiver hears — so 0 ppm is <em>like the rest</em>, not exactly on frequency, and the shaded band is ±${esc(String(S.warn))} ppm.
         Further than that from the rest over a week is a warning; a move of ${esc(String(S.drift))} ppm against the thirty days before is drift — usually an ageing crystal, or a
-        site running hot or cold, and worth a visit before it goes quiet.</p>
+        site running hot or cold, and worth a visit before it goes quiet.</p>`;
+    return head + lead + about + `
       ${controlsHtml(all)}
-      ${empty || tableHtml(shown)}${more}`;
+      ${empty || (sig ? snrTableHtml(shown) : tableHtml(shown))}${more}`;
+  }
+
+  // The signal's sentence, after the carrier's: how many are fading, the
+  // worst named, and the way to them — or that none is.
+  function signalLeadHtml(all) {
+    if (!snrCols) return '';
+    const fading = bySignal(all.filter(r => r.sFinding));
+    const measured = all.filter(hasSignal).length;
+    if (!measured) return '';
+    const to = S.view === 'signal' ? '' : ` <button class="link-btn" onclick="HealthDrift.set('view', 'signal')">Signal</button>`;
+    if (!fading.length) return ` <span class="hl-snr-lead">None of the ${num(measured)} heard directly is fading.${to}</span>`;
+    return ` <span class="hl-snr-lead"><b class="${fading.some(r => r.sFinding.severity === 'critical') ? 'txt-bad' : 'txt-warn'}">${num(fading.length)} fading</b>
+      — ${fading.slice(0, 3).map(r => esc(r.sFinding.title)).join('; ')}${fading.length > 3 ? '; …' : ''}.${to}</span>`;
+  }
+
+  // Under Needs attention (health.js places it): what the server's radio
+  // checks found, which the readings the tab works out cannot — a
+  // transmitter fading, off channel or drifting — with the way to them.
+  function attnHtml() {
+    if (!S.rows) return '';
+    const all = summary();
+    const fading = bySignal(all.filter(r => r.sFinding)), carrier = all.filter(r => r.finding);
+    if (!fading.length && !carrier.length) return '';
+    const name = r => esc(r.who.name);
+    const bits = [];
+    if (fading.length) {
+      bits.push(`<b>${num(fading.length)} transmitter${fading.length === 1 ? '' : 's'} fading</b> — ${fading.slice(0, 4).map(r => `${name(r)}
+        (<span class="${r.sFinding.severity === 'critical' ? 'txt-bad' : 'txt-warn'}">${esc(String(r.sFinding.title).replace(/^.*?: /, ''))}</span>)`).join(', ')}${fading.length > 4 ? ', …' : ''}`);
+    }
+    if (carrier.length) bits.push(`${num(carrier.length)} off channel or drifting`);
+    return `<p class="small hl-attn-radio"><span aria-hidden="true">📡</span> From the base stations' radio checks: ${bits.join('; ')}.
+      <button type="button" class="link-btn" onclick="HealthDrift.toPanel('${fading.length ? 'signal' : 'carrier'}')">See them</button></p>`;
+  }
+
+  // Down to the panel, at the view asked for, its heading focused.
+  function toPanel(view) {
+    if (view === 'signal' || view === 'carrier') S.view = view;
+    S.show = 'look'; S.q = ''; S.kind = 'all'; S.more = false;
+    redraw();
+    const h = document.getElementById('hl-h-drift');
+    if (!h) return;
+    h.setAttribute('tabindex', '-1');
+    if (h.scrollIntoView) h.scrollIntoView({ block: 'start' });
+    h.focus({ preventScroll: true });
   }
 
   function redraw() {
+    const note = document.getElementById('hl-attn-radio');
+    if (note) note.innerHTML = attnHtml();
     const el = document.getElementById('hl-drift');
     if (!el) return;
     const had = document.activeElement && el.contains(document.activeElement) && document.activeElement.type === 'search';
@@ -269,7 +430,7 @@ const HealthDrift = (() => {
   }
 
   function set(k, v) {
-    if (!['show', 'kind', 'q', 'more'].includes(k)) return;
+    if (!['view', 'show', 'kind', 'q', 'more'].includes(k)) return;
     S[k] = v;
     if (k !== 'more') S.more = false;
     redraw();
@@ -353,7 +514,7 @@ const HealthDrift = (() => {
     const subj = `or=${encodeURIComponent(`(station_id.eq.${quoted(id)},subject.in.(${keys}))`)}`;
     try {
       const [rows, findings] = await Promise.all([
-        dbSelect(`transmitter_summary?select=${COLS}&${tx}&limit=50`),
+        askRows(`&${tx}`, 50),
         quietly(dbSelect(`health_finding?select=${F_COLS}&source=eq.transmitters&cleared_at=is.null&${subj}&limit=50`)),
         askKnobs(),
       ]);
@@ -437,19 +598,60 @@ const HealthDrift = (() => {
     return r.via === 'repeater' ? 'legacy ALERT, as a repeater — its relays' : 'legacy ALERT';
   }
 
+  // Its signal (0083), as heard: the last week's SNR at the base stations
+  // that hear it on its own carrier, and how steady it is burst to burst.
+  function signalHtml(r, fade) {
+    const snr = fin(r.snr_db), sd = fin(r.snr_sd), rx = Number(r.snr_receivers) || 0;
+    if (snr == null) {
+      return '<span class="txt-muted">not measured in the last week</span>' + note(r.via === 'repeater'
+        ? 'no burst on its carrier carried an SNR often enough — three a day at a base station that hears three or more transmitters'
+        : 'only bursts on its own carrier count — a station heard only through its repeater is the repeater\'s signal, not its own');
+    }
+    const verdict = fade ? ` — <span class="${sevCls(fade)}" title="${escAttr(fade.title)}"><span aria-hidden="true">⚠</span> fading</span>` : '';
+    return `${snr.toFixed(1)} dB over the noise${sd == null ? '' : ` · ±${sd.toFixed(1)} dB burst to burst`}${verdict}`
+      + note(`at ${plural(rx, 'base station')} that hear${rx === 1 ? 's' : ''} it on its own carrier, the last 7 days${rx > 1 ? ' — a level to read, not to compare: each path is its own' : ''}`);
+  }
+
+  // How it has moved, against its own past at each base station, each
+  // receiver's own steps taken out.
+  function signalChangeHtml(r, fade) {
+    const wk = fin(r.snr_change_db), season = fin(r.snr_season_db);
+    const judged = Number(r.snr_judged) || 0, falling = Number(r.snr_falling) || 0;
+    if (wk == null && season == null) {
+      return '<span class="txt-muted">too soon to judge</span>' + note(
+        'it needs 3 days in the last week and 5 in the 30 before at one base station (10 and 10 for three months)');
+    }
+    const word = v => (v == null ? '' : v <= -S.snrWarn ? `<span class="${fade ? sevCls(fade) : 'txt-warn'}">fading</span>`
+      : v <= -S.snrWarn * 0.6 ? 'weakening' : v >= S.snrWarn ? 'stronger' : '<span class="txt-muted">steady</span>');
+    const parts = [];
+    if (wk != null) parts.push(`${sgn(wk, 1)} dB against the 30 days before — ${word(wk)}`);
+    if (season != null) parts.push(`${sgn(season, 1)} dB over three months — ${word(season)}`);
+    const agree = judged > 1 ? note(`${num(falling)} of the ${num(judged)} base stations that judge it saw a fall of ${esc(String(S.snrWarn))} dB${
+      falling && falling < judged ? ' — one path alone may be the path, not the station' : ''}`) : '';
+    return parts.join('; ') + agree;
+  }
+
   function txBlockHtml(s, r, findings) {
     const fs = findings.filter(f => f.subject === r.tx);
     const off = fs.find(f => f.kind === 'transmitter-off-channel');
     const drift = fs.find(f => f.kind === 'transmitter-drift');
-    const other = fs.filter(f => f !== off && f !== drift);
+    const fade = fs.find(f => f.kind === SIGNAL_KIND);
+    const other = fs.filter(f => f !== off && f !== drift && f !== fade);
     const pts = (r.days || []).map((d, i) => ({ t: dayMs(d), ppm: Number((r.ppm || [])[i]) }))
       .filter(p => Number.isFinite(p.t) && Number.isFinite(p.ppm));
+    // A database before 0083 has no signal columns at all.
+    const kept = 'snr_receivers' in r;
+    const sPts = (r.snr_days || []).map((d, i) => ({ t: dayMs(d), v: Number((r.snr_rel || [])[i]) }))
+      .filter(p => Number.isFinite(p.t) && Number.isFinite(p.v));
     return `<div class="hd-card-tx" data-tx="${escAttr(r.tx)}">
       ${line('Offset', offsetHtml(r, off))}
       ${channelHtml(s, r)}
       ${line('Drift', driftHtml(r, drift))}
+      ${kept ? line('Signal', signalHtml(r, fade)) + (fin(r.snr_db) == null && !sPts.length ? '' : line('Signal change', signalChangeHtml(r, fade)))
+        : line('Signal', '<span class="txt-muted">not kept on this database yet</span>')}
       ${other.map(f => line('Also', `<span class="${sevCls(f)}"><span aria-hidden="true">⚠</span> ${esc(f.title)}</span>`)).join('')}
       ${pts.length ? `<div class="hd-card-spark">${sparkSvg(pts)}${note(`its last 37 days against the rest; the band is ±${esc(String(S.warn))} ppm`)}</div>` : ''}
+      ${sPts.length ? `<div class="hd-card-spark hd-card-snr">${snrSparkSvg(sPts)}${note(`its signal's last 90 days against its usual, the receivers' own steps taken out; the band is ±${esc(String(S.snrWarn))} dB`)}</div>` : ''}
       ${note(`${esc(kindText(r))} · ${plural(Number(r.w_days) || 0, 'day')} in the last week, ${plural(Number(r.bursts) || 0, 'burst')}, `
         + `${plural(Number(r.receivers) || 0, 'base station')}`)}
     </div>`;
@@ -464,17 +666,20 @@ const HealthDrift = (() => {
       return `<span class="mn-pop-line mn-pop-indent txt-muted">could not ask the server (${esc(a.error)}) — ${again}</span>`;
     }
     const rows = (a.rows || []).slice().sort((x, y) => (x.tx.startsWith('st:') ? 0 : 1) - (y.tx.startsWith('st:') ? 0 : 1) || (x.tx < y.tx ? -1 : 1));
-    const door = `<button type="button" class="link-btn" onclick="HealthDrift.open('${escAttr(s.id)}')"
-        title="${escAttr(`Open the Station Health tab's Transmitter frequency panel on ${s.name || s.id}`)}">Transmitter frequency in Station Health</button>`;
+    // To the panel at the signal when that is what is wrong, else the carrier.
+    const fadingHere = (a.findings || []).some(f => f.kind === SIGNAL_KIND);
+    const door = `<button type="button" class="link-btn" onclick="HealthDrift.open('${escAttr(s.id)}'${fadingHere ? ", 'signal'" : ''})"
+        title="${escAttr(`Open the Station Health tab's Transmitter frequency and signal panel on ${s.name || s.id}`)}">Transmitter frequency and signal in Station Health</button>`;
     if (!rows.length) {
       return `<span class="mn-pop-line mn-pop-indent">not measured yet</span>${note(`No base station's SDR has heard its own carrier
         often enough — three bursts in a day, on RPi ALERT 0.14 or later. A station heard only through its repeater is measured as the
-        repeater, and a station whose carrier sits within 30 Hz of its repeater's is put down to the repeater.`)}`;
+        repeater — its carrier and its signal both — and a station whose carrier sits within 30 Hz of its repeater's is put down to the repeater.`)}`;
     }
     const at = rows[0].judged_at ? new Date(rows[0].judged_at) : null;
     return rows.map(r => txBlockHtml(s, r, a.findings || [])).join('')
       + note(`Its carrier against the other transmitters the same base stations hear, each receiver's own error taken out — so 0 is
-        like the rest, not exactly on frequency. Judged hourly${at && Number.isFinite(at.getTime())
+        like the rest, not exactly on frequency; its signal against its own past at each base station, each receiver's own steps taken out.
+        Judged hourly${at && Number.isFinite(at.getTime())
           ? `, last at ${esc(at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}` : ''}${a.status === 'loading' ? ', asking again…' : ''}. ${door}`);
   }
 
@@ -502,6 +707,10 @@ const HealthDrift = (() => {
         (±${esc(String(S.warn))} ppm off the rest is a warning); <b>Channel</b> is the channel it was heard on, checked against the TX
         saved for it in the register; <b>Drift</b> is how far it has moved against the thirty days before (${esc(String(S.drift))} ppm
         is drift — usually an ageing crystal, or a site running hot or cold, and it tends to end in silence).
+        <b>Signal</b> is how far above the receiver's noise its own bursts arrive — only those on its own carrier, never its repeater's
+        relays of it; <b>Signal change</b> is how far that has moved against the thirty days before and over three months, at each base
+        station against its own past, with every receiver's own steps taken out (a fall of ${esc(String(S.snrWarn))} dB is a finding —
+        usually the antenna, its cable or connectors, or the transmitter's power).
       </div>
       <div class="hd-card-body" id="ef-carrier-body">${bodyHtml(s)}</div></div>`;
   }
@@ -523,20 +732,22 @@ const HealthDrift = (() => {
 
   // The door: the Station Health tab on the station, at the Transmitter
   // frequency panel, found there by its name among every transmitter.
-  function open(id) {
+  function open(id, view) {
     const s = stationOf(id);
     if (!s || typeof Health === 'undefined' || !Health.showStation) return;
     if (state.mapFullscreen && typeof toggleMapFullscreen === 'function') toggleMapFullscreen(false);
     S.show = 'all'; S.kind = 'all'; S.q = s.name || ''; S.more = false;
+    S.view = view === 'signal' ? 'signal' : 'carrier';
     Health.showStation(id, 'carrier');
   }
 
   // What the tests read, and the door they fill it through.
-  function state_() { return { rows: S.rows, findings: S.findings, summary: summary(), err: S.err, warn: S.warn, drift: S.drift, show: S.show, kind: S.kind, q: S.q,
+  function state_() { return { rows: S.rows, findings: S.findings, summary: summary(), err: S.err, warn: S.warn, drift: S.drift, snrWarn: S.snrWarn,
+    view: S.view, show: S.show, kind: S.kind, q: S.q, signalKept: snrCols,
     cards: [...cards.entries()].map(([id, c]) => ({ id, status: c.status, rows: c.rows ? c.rows.length : null })) }; }
   function adopt(rows, findings) { S.asked = true; S.loading = false; S.err = ''; adoptRows(rows, findings); redraw(); paintOpen(); }
 
-  return { render, load, adopt, set, state: state_,
+  return { render, load, adopt, set, state: state_, attnHtml, toPanel,
     // one station's: its card on the map and the station editor
     cardHtml, cardAsk, editorHtml, retry, open, txOnRecord };
 })();

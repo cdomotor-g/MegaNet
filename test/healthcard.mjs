@@ -668,14 +668,16 @@ try {
     const days = n => [...Array(n)].map((_, g) => new Date(Date.now() - (n - 1 - g) * DAY).toISOString().slice(0, 10));
     const tx = (st, over) => ({ tx: `st:${st.id}`, protocol: 'alert', station_id: st.id, via: 'own', freq_mhz: 151.5, w_days: 1,
       w_ppm: 0, w_hz: 0, b_days: 0, b_ppm: null, change_ppm: null, bursts: 10, receivers: 1, days: days(1), ppm: [0],
-      judged_at: new Date().toISOString(), ...over });
+      judged_at: new Date().toISOString(), snr_db: null, snr_sd: null, snr_change_db: null, snr_season_db: null,
+      snr_receivers: 0, snr_judged: 0, snr_falling: 0, snr_days: [], snr_rel: [], ...over });
     const finding = (st, kind, severity, title) => ({ kind, subject: `st:${st.id}`, station_id: st.id, severity, title, detail: '',
       evidence: {}, first_seen: new Date().toISOString(), source: 'transmitters', cleared_at: null });
     carrierStub = new PostgrestStub({
       base: DB,
       columns: {
         transmitter_summary: new Set(['tx', 'protocol', 'station_id', 'via', 'freq_mhz', 'w_days', 'w_ppm', 'w_hz', 'b_days', 'b_ppm',
-          'change_ppm', 'bursts', 'receivers', 'days', 'ppm', 'judged_at']),
+          'change_ppm', 'bursts', 'receivers', 'days', 'ppm', 'judged_at',
+          'snr_db', 'snr_sd', 'snr_change_db', 'snr_season_db', 'snr_receivers', 'snr_judged', 'snr_falling', 'snr_days', 'snr_rel']),
         health_finding: new Set(['kind', 'subject', 'station_id', 'severity', 'title', 'detail', 'evidence', 'first_seen', 'source', 'cleared_at']),
         app_meta: new Set(['key', 'value', 'updated_at']),
       },
@@ -683,16 +685,23 @@ try {
         transmitter_summary: [
           // A repeater whose relays were heard on another channel than its TX on record, measured one day.
           tx(CF.moved, { via: 'repeater', freq_mhz: 152.25, w_ppm: 0.23, w_hz: 35, bursts: 118 }),
-          // A repeater on its channel, moving 1.4 ppm against the thirty days before.
+          // A repeater on its channel, moving 1.4 ppm against the thirty days before — and fading, 4.3 dB weaker at both
+          // base stations that hear it (0083).
           tx(CF.drifting, { via: 'repeater', w_days: 7, w_ppm: 1.5, w_hz: 227, b_days: 20, b_ppm: 0.1, change_ppm: 1.4, bursts: 900,
-            days: days(27), ppm: days(27).map((_, i) => (i < 20 ? 0.1 : 1.5)) }),
-          // A field station 3 ppm off the rest, steady, with no TX on record — and a day measured on each of three days.
+            days: days(27), ppm: days(27).map((_, i) => (i < 20 ? 0.1 : 1.5)),
+            snr_db: 14.2, snr_sd: 1.1, snr_change_db: -4.3, snr_receivers: 2, snr_judged: 2, snr_falling: 2,
+            snr_days: days(40), snr_rel: days(40).map((_, i) => (i < 33 ? 0 : -4.3)) }),
+          // A field station 3 ppm off the rest, steady, with no TX on record — and a day measured on each of three days;
+          // its signal steady in a week and over three months.
           tx(CF.off, { freq_mhz: 151.525, w_days: 3, w_ppm: -3.0, w_hz: -455, b_days: 9, b_ppm: -3.12, change_ppm: 0.12, bursts: 40,
-            days: days(3), ppm: [-3.1, -3.0, -2.9] }),
+            days: days(3), ppm: [-3.1, -3.0, -2.9],
+            snr_db: 9.8, snr_sd: 1.6, snr_change_db: 0.3, snr_season_db: -0.2, snr_receivers: 1, snr_judged: 1, snr_falling: 0,
+            snr_days: days(80), snr_rel: days(80).map(() => 0.1) }),
         ],
         health_finding: [
           finding(CF.drifting, 'transmitter-drift', 'critical', `${CF.drifting.name}: drifted +1.4 ppm in a week`),
           finding(CF.off, 'transmitter-off-channel', 'warn', `${CF.off.name}: transmitting -3.0 ppm off the others (-455 Hz)`),
+          finding(CF.drifting, 'transmitter-snr-falling', 'warn', `${CF.drifting.name}: SNR down 4.3 dB in a week`),
           { ...finding(CF.off, 'transmitter-drift', 'warn', 'cleared long ago'), cleared_at: new Date(Date.now() - 9 * DAY).toISOString() },
         ],
         app_meta: [{ key: 'tx_offset_warn_ppm', value: '2.5' }, { key: 'tx_drift_warn_ppm', value: '1' }],
@@ -708,8 +717,8 @@ try {
     const cls = label => { const r = [...el.querySelectorAll('.acma-row')].find(x => flat(x.firstElementChild.textContent) === label);
       return r ? [...r.querySelectorAll('[class*="txt-"]')].map(x => x.className).join(' ') : ''; };
     return { rows, text: flat(el.textContent), busy: !!el.querySelector('[aria-busy="true"]'),
-             cls: { Offset: cls('Offset'), Channel: cls('Channel'), Drift: cls('Drift') },
-             spark: !!el.querySelector('svg.hl-drift-spark'), door: (el.querySelector('button[onclick^="HealthDrift.open"]') || {}).getAttribute?.('onclick') || null,
+             cls: { Offset: cls('Offset'), Channel: cls('Channel'), Drift: cls('Drift'), Signal: cls('Signal'), 'Signal change': cls('Signal change') },
+             spark: !!el.querySelector('svg.hl-drift-spark'), snrSpark: !!el.querySelector('svg.hl-snr-spark'), door: (el.querySelector('button[onclick^="HealthDrift.open"]') || {}).getAttribute?.('onclick') || null,
              inIds: !!el.closest('.acma-sect') && !!el.closest('.acma-sect').querySelector('.stn-card-ids:not(.stn-card-carrier)') };
   }, sel);
   const carrierCard = async st => {
@@ -735,15 +744,28 @@ try {
     cMoved && /legacy ALERT, as a repeater — its relays · 1 day in the last week, 118 bursts, 1 base station/.test(cMoved.text)
       && cMoved.door === `HealthDrift.open('${CF.moved.id}')` && cMoved.spark, J({ text: cMoved && cMoved.text.slice(-320), door: cMoved && cMoved.door }));
 
+  check('…its signal not measured: a repeater\'s relays carried no SNR often enough, said',
+    cMoved && /^not measured in the last week/.test(cMoved.rows.Signal || '') && !('Signal change' in cMoved.rows) && !cMoved.snrSpark, J(cMoved && cMoved.rows));
+
   const cDrift = await carrierCard(CF.drifting);
   check('a repeater on its own channel and drifting: ✓ its TX on record, and the server\'s critical drift said in red',
     cDrift && /^heard on 151\.500 MHz — ✓ its TX on record$/.test(cDrift.rows.Channel || '') && /txt-ok/.test(cDrift.cls.Channel)
       && cDrift.rows.Drift === '⚠ drifting — +1.40 ppm against the 30 days before' && /txt-bad/.test(cDrift.cls.Drift), J(cDrift && { rows: cDrift.rows, cls: cDrift.cls }));
+  check('…and fading (0083): its SNR as heard, how steady, the server\'s warning beside it, at how many base stations',
+    cDrift && /^14\.2 dB over the noise · ±1\.1 dB burst to burst — ⚠ fading at 2 base stations that hear it on its own carrier, the last 7 days/.test(cDrift.rows.Signal || '')
+      && /txt-warn/.test(cDrift.cls.Signal) && !/SNR down/.test(cDrift.rows.Also || ''), J(cDrift && { rows: cDrift.rows, cls: cDrift.cls }));
+  check('…how far it fell against the thirty days before, both base stations agreeing, its 90 days\' line, and the door at the signal',
+    cDrift && /^−4\.3 dB against the 30 days before — fading 2 of the 2 base stations that judge it saw a fall of 3 dB$/.test(cDrift.rows['Signal change'] || '')
+      && cDrift.snrSpark && cDrift.door === `HealthDrift.open('${CF.drifting.id}', 'signal')`, J(cDrift && { rows: cDrift.rows, door: cDrift.door }));
   const cOff = await carrierCard(CF.off);
   check('a field station off the rest: the warning beside its offset, steady, its channel with nothing on record to check against',
     cOff && cOff.rows.Offset === '−455 Hz · −3.00 ppm — ⚠ off the rest' && /txt-warn/.test(cOff.cls.Offset)
       && cOff.rows.Drift === '+0.12 ppm against the 30 days before — steady'
       && cOff.rows.Channel === 'heard on 151.525 MHz no TX on record to check it against' && !/cleared long ago/.test(cOff.text), J(cOff && { rows: cOff.rows, cls: cOff.cls }));
+  check('…its signal steady in a week and over three months, heard by one base station',
+    cOff && /^9\.8 dB over the noise · ±1\.6 dB burst to burst at 1 base station that hears it on its own carrier, the last 7 days$/.test(cOff.rows.Signal || '')
+      && cOff.rows['Signal change'] === '+0.3 dB against the 30 days before — steady; −0.2 dB over three months — steady' && cOff.snrSpark,
+    J(cOff && cOff.rows));
   const cNone = await carrierCard(CF.none);
   check('a station with no rows: not measured yet, and why it may not be', cNone && /not measured yet/.test(cNone.text)
     && /heard only through its repeater/.test(cNone.text) && !cNone.spark, J(cNone && cNone.text));

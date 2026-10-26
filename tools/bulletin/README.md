@@ -74,7 +74,13 @@ delivering others afterwards); the groups the analysis made (`areas`);
 batteries; check strips; each receiver stick hour by hour and its upload lag
 in six-hour blocks (`lag_by_6h`); **signal fading** per station per stick,
 with what the stick itself did taken out, and grouped by repeater
-(`signal`); **carrier fingerprints** — who is off the fleet, who moved, who
+(`signal`) — and the server's own **signal by carrier** (`signal.by_carrier`,
+0083): each transmitter's SNR only from bursts its own carrier says it sent,
+so a station behind a repeater never takes on the repeater's fade (the
+per-stick numbers can), against its own past at each base station with the
+receivers' own steps taken out, its week and its three months, how many base
+stations judged it and how many saw the fall. Where the two disagree, trust
+`by_carrier`; **carrier fingerprints** — who is off the fleet, who moved, who
 jumped day to day, whose carrier vanished (`carrier.notable`, each with the
 days it was measured); **bit flips by who sent them** and the hours they keep
 (`flips`); the rain; the server's findings opened and cleared in the period;

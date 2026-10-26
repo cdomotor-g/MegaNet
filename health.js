@@ -379,6 +379,7 @@ const Health = (() => {
           <span class="small">${esc(attnCountText())}</span></div>
         ${filtersHtml()}
         <div id="hl-findings">${findingsHtml()}</div>
+        <div id="hl-attn-radio">${typeof HealthDrift !== 'undefined' ? HealthDrift.attnHtml() : ''}</div>
       </section>
       <section class="panel" id="hl-station" aria-labelledby="hl-h-stn">${stationHtml()}</section>
       <section class="panel" aria-labelledby="hl-h-checks">${matrixHtml()}</section>

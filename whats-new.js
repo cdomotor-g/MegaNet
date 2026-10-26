@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 109, date: '2026-10-26', items: [
+      'Each transmitter\'s <strong>signal</strong> beside its carrier fingerprint, on its card on the Stations map and in its '
+        + 'Station details: how far above the noise its <strong>own</strong> bursts arrive — never its repeater\'s relays of it — '
+        + 'and how far that has moved against the 30 days before and over three months, with every base station\'s own steps '
+        + 'taken out. A station <strong>fading</strong> (usually its antenna, cable or connectors) is a finding on its card, under '
+        + 'Station Health\'s <em>Needs attention</em>, and in <strong>Transmitter frequency and signal</strong>\'s new '
+        + '<em>Signal</em> view. Administrators see each receiver\'s own steps on the <strong>Base Stations</strong> tab, under '
+        + '<em>Signal across what it hears</em>.',
+    ] },
     { n: 108, date: '2026-10-26', items: [
       'New: <strong>🗼 Backbone</strong>, in the Admin group — the <strong>state of the backbone</strong>. Every repeater with something '
         + 'wrong over the period you pick (30 days to start), <strong>ranked by the sum of its issues</strong>: off air, dropping out, '

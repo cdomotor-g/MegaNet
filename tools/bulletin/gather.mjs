@@ -17,7 +17,9 @@
 //     kept delivering others after they stopped
 //   * signal fading at each receiver, station by station, and then grouped:
 //     one station fading is its own path; several behind one repeater is the
-//     repeater; everything one receiver hears is the receiver
+//     repeater; everything one receiver hears is the receiver — and the
+//     server's own (0083): each transmitter's SNR from bursts its own carrier
+//     says it sent, the receivers' steps taken out, a week and three months
 //   * carrier fingerprints: who is off the fleet, who moved, who jumped from
 //     one day to the next, whose carrier vanished — and, for each, which
 //     receivers measured it, because a receiver's own error looks exactly
@@ -275,6 +277,8 @@ export function buildFacts({ kind, A, rows, doc, server = {}, now, p0, p1, ctx0 
   // ── signal fading: station by station at each stick, then grouped ──
   const fade = signalFade(A, rows, p0, ctx0, reg);
   fade.stations.forEach(x => stn(x.station_id));
+  fade.by_carrier = carrierSignalFacts(server.transmitters, server.transmitterFindings, reg);
+  fade.by_carrier.fading.forEach(x => stn(x.station_id));
 
   // ── carrier fingerprints ──
   const carrier = carrierFacts(server.transmitters, server.transmitterFindings, p0, p1, reg);
@@ -412,6 +416,27 @@ export function signalFade(A, rows, p0, ctx0, reg) {
   return { sticks, stations: fading.slice(0, 15), repeaters: reps.slice(0, 6) };
 }
 
+// Signal by carrier, from meganet.transmitter_summary (0083): each
+// transmitter's SNR only from bursts its own carrier says it sent — so a
+// station heard through its repeater never takes on the repeater's fade, as
+// it can in signalFade() above — against its own past at each base station,
+// each receiver's own steps taken out; its week against the thirty days
+// before and its last thirty days against two months earlier, how many base
+// stations judged it and how many saw the fall, and the server's findings.
+export function carrierSignalFacts(txs, txFindings, reg) {
+  const list = (Array.isArray(txs) ? txs : []).filter(t => t.snr_db != null || (Array.isArray(t.snr_days) && t.snr_days.length));
+  const name = t => (t.station_id && reg.get(t.station_id) ? reg.get(t.station_id).name : t.tx);
+  const found = new Map((Array.isArray(txFindings) ? txFindings : []).filter(f => f.kind === 'transmitter-snr-falling').map(f => [f.subject, f]));
+  const fell = t => Math.min(t.snr_change_db ?? 0, t.snr_season_db ?? 0);
+  const fading = list.filter(t => found.has(t.tx) || fell(t) <= -2).sort((a, b) => fell(a) - fell(b)).slice(0, 20).map(t => ({
+    tx: t.tx, station_id: t.station_id || null, name: name(t), kind: t.protocol === 'alert2' ? 'alert2' : t.via === 'repeater' ? 'repeater' : 'station',
+    snr_db: round(t.snr_db, 1), spread_db: round(t.snr_sd, 1), week_db: round(t.snr_change_db, 1), three_months_db: round(t.snr_season_db, 1),
+    base_stations: t.snr_receivers, judged: t.snr_judged, saw_fall: t.snr_falling,
+    finding: found.has(t.tx) ? { severity: found.get(t.tx).severity, title: found.get(t.tx).title } : null,
+    days: t.snr_days, rel_db: t.snr_rel }));
+  return { measured: list.length, judged: list.filter(t => t.snr_change_db != null).length, fading };
+}
+
 // Carrier fingerprints, from meganet.transmitter_summary (0077): each
 // transmitter's last week against the fleet, its thirty days before, and its
 // days one by one.
@@ -533,6 +558,7 @@ export function summary(f) {
   f.batteries.slice(0, 5).forEach(b => L.push(`  battery: ${b.name} ${b.last_night_v} V, ${b.slope_v_per_night} V/night${b.finding ? ` — ${b.finding.title}` : ''}`));
   f.signal.repeaters.forEach(r => L.push(`  signal: ${r.fading} of ${r.measured} stations behind ${r.name} fading (${r.median_relative_db} dB)`));
   f.signal.sticks.forEach(s => L.push(`  signal at ${s.stick}: median change ${s.median_change_db} dB over ${s.stations} stations`));
+  ((f.signal.by_carrier || {}).fading || []).slice(0, 6).forEach(x => L.push(`  signal by carrier: ${x.name} — ${x.week_db ?? '?'} dB in a week, ${x.three_months_db ?? '?'} dB in three months${x.finding ? ` (${x.finding.severity})` : ''}`));
   f.carrier.notable.slice(0, 6).forEach(c => L.push(`  carrier: ${c.name} — ${c.why}`));
   f.flips.senders.slice(0, 4).forEach(s => L.push(`  flips: ${s.name} sent ${s.clear} clear corrupted copies (${(100 * s.clear_rate).toFixed(1)}%)`));
   if (f.rain.stations_with_rain) L.push(`  rain: ${f.rain.stations_with_rain} gauges, most ${f.rain.top[0].mm} mm at ${f.rain.top[0].name}`);

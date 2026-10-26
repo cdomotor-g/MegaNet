@@ -19162,6 +19162,10 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hl-drift-sub { max-width: 72ch; }
 .hl-drift-controls { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; margin: .5rem 0; }
 .hl-drift-controls input[type="search"] { min-width: 12rem; max-width: 100%; }
+/* Its signal (0083): the lead's signal sentence on a line of its own, and the
+   word under Needs attention set apart from the list it follows. */
+.hl-snr-lead { display: block; margin-top: .25rem; }
+.hl-attn-radio { margin: var(--sp-2) 0 0; padding-top: var(--sp-2); border-top: 1px dashed var(--border); max-width: 90ch; }
 .hl-ftable td, .hl-ftable th, .hl-airtable td, .hl-airtable th { white-space: normal; }
 .hl-ftable .hl-fwhere, .hl-airtable .hl-fwhere { min-width: 8rem; font-weight: 600; }
 .hl-fwhat b { display: block; }

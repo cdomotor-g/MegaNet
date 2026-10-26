@@ -109,12 +109,15 @@ async function standIn(page) {
   // the server's transmitter_summary has them — and the station's finding.
   await page.route('**/rest/v1/transmitter_summary?*', route => {
     const days = [...Array(20)].map((_, g) => new Date(Date.now() - (19 - g) * 86400e3).toISOString().slice(0, 10));
-    const row = (tx, protocol, station_id, via, ppm, hz) => ({ tx, protocol, station_id, via, freq_mhz: 151.5, w_days: 7, w_ppm: ppm, w_hz: hz,
-      b_days: 13, b_ppm: ppm, change_ppm: 0.02, bursts: 56, receivers: 1, days, ppm: days.map(() => ppm), judged_at: new Date().toISOString() });
+    // Their signal (0083): the repeater fading 5.2 dB in a week, the station steady, the ALERT2 one too soon to judge.
+    const row = (tx, protocol, station_id, via, ppm, hz, snr) => ({ tx, protocol, station_id, via, freq_mhz: 151.5, w_days: 7, w_ppm: ppm, w_hz: hz,
+      b_days: 13, b_ppm: ppm, change_ppm: 0.02, bursts: 56, receivers: 1, days, ppm: days.map(() => ppm), judged_at: new Date().toISOString(),
+      snr_days: days, snr_rel: days.map((_, i) => (i < 13 ? 0 : snr.change || 0)), snr_receivers: 1, snr_judged: snr.change == null ? 0 : 1,
+      snr_falling: (snr.change || 0) <= -3 ? 1 : 0, snr_db: snr.db, snr_sd: 1.2, snr_change_db: snr.change, snr_season_db: null });
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
-      row('a2:4101', 'alert2', null, 'path', 0.07, 10),
-      row('st:amiens_knob_al', 'alert', 'amiens_knob_al', 'repeater', 0.4, 61),
-      row('st:abergowrie_br_al', 'alert', 'abergowrie_br_al', 'own', -3.0, -455)]) });
+      row('a2:4101', 'alert2', null, 'path', 0.07, 10, { db: 18.4, change: null }),
+      row('st:amiens_knob_al', 'alert', 'amiens_knob_al', 'repeater', 0.4, 61, { db: 11.0, change: -5.2 }),
+      row('st:abergowrie_br_al', 'alert', 'abergowrie_br_al', 'own', -3.0, -455, { db: 12.5, change: 0.4 })]) });
   });
   // Bit flips, by who sent them (0078): a repeater sending corrupted copies,
   // a station that was only misheard, and the events behind them.
@@ -143,6 +146,9 @@ async function standIn(page) {
     ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
         { kind: 'transmitter-off-channel', subject: 'st:abergowrie_br_al', station_id: 'abergowrie_br_al', severity: 'warn',
           title: 'Abergowrie Bridge AL: transmitting -3.0 ppm off the others (-455 Hz)', detail: '', evidence: { offset_ppm: -3.0 },
+          first_seen: new Date(Date.now() - 3600e3).toISOString() },
+        { kind: 'transmitter-snr-falling', subject: 'st:amiens_knob_al', station_id: 'amiens_knob_al', severity: 'warn',
+          title: 'Amiens Knob AL: SNR down 5.2 dB in a week', detail: '', evidence: { drop_db: 5.2 },
           first_seen: new Date(Date.now() - 3600e3).toISOString() }]) })
     : route.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify(WORLD ? [
@@ -444,6 +450,32 @@ try {
   ok('…a kind at a time, one found by its address, and a line each', reps.length === 1 && /^Amiens Knob/.test(reps[0])
     && found.length === 1 && /4101/.test(found[0]) && spark === 1, JSON.stringify({ reps, found, spark }));
   await page.evaluate(() => { HealthDrift.set('q', ''); HealthDrift.set('show', 'look'); });
+
+  // ── Its signal (0083) ──────────────────────────────────────────────────────
+  // The fading repeater named in the lead, under Needs attention with a door
+  // to the panel's Signal view — and there, it alone needs a look; every
+  // transmitter's signal on asking.
+  const sigLead = await page.evaluate(() => { const el = document.getElementById('hl-drift'); return el ? (el.querySelector('p') || {}).textContent.replace(/\s+/g, ' ') : ''; });
+  const attn = await page.evaluate(() => { const el = document.getElementById('hl-attn-radio'); return el ? el.textContent.replace(/\s+/g, ' ').trim() : null; });
+  ok('Signal: the fading repeater named in the panel\'s lead, and under Needs attention with the carrier\'s one beside it',
+    /1 fading — Amiens Knob AL: SNR down 5\.2 dB in a week/.test(sigLead) && attn != null
+      && /From the base stations' radio checks: 1 transmitter fading — Amiens Knob AL \(SNR down 5\.2 dB in a week\); 1 off channel or drifting\. See them/.test(attn),
+    JSON.stringify({ sigLead, attn }));
+  await page.evaluate(() => document.querySelector('#hl-attn-radio button').click());
+  const sigLook = await driftRows();
+  const sigState = await page.evaluate(() => ({ view: HealthDrift.state().view, focus: document.activeElement && document.activeElement.id,
+    head: [...document.querySelectorAll('#hl-drift thead th')].map(th => th.textContent.trim()) }));
+  ok('…its door opens the Signal view: the repeater alone, its SNR, its fall, its line and its finding',
+    sigState.view === 'signal' && sigState.focus === 'hl-h-drift' && sigLook.length === 1 && /^Amiens Knob AL .*Repeater/.test(sigLook[0])
+      && /11\.0 dB/.test(sigLook[0]) && /−5\.2 dB/.test(sigLook[0]) && /Fading/.test(sigLook[0]) && sigState.head.includes('Three months'),
+    JSON.stringify({ sigLook, sigState }));
+  await page.evaluate(() => HealthDrift.set('show', 'all'));
+  const sigAll = await driftRows();
+  const sigSparks = await page.evaluate(() => document.querySelectorAll('#hl-drift svg.hl-snr-spark path').length);
+  ok('…every transmitter\'s signal on asking, the fading one first, the steady one steady, the new one too soon',
+    sigAll.length === 3 && /^Amiens Knob/.test(sigAll[0]) && sigAll.some(r => /^Abergowrie/.test(r) && /Steady/.test(r))
+      && sigAll.some(r => /^ALERT2 4101/.test(r) && /Too soon/.test(r)) && sigSparks === 3, JSON.stringify({ sigAll, sigSparks }));
+  await page.evaluate(() => { HealthDrift.set('view', 'carrier'); HealthDrift.set('show', 'look'); });
 
   // ── Bit flips, by who sent them (0078) ─────────────────────────────────────
   await until(page, () => typeof HealthFlips !== 'undefined' && HealthFlips.state().rows

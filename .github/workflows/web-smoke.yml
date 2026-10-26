@@ -1925,6 +1925,13 @@ jobs:
       - name: check_flip_fingerprints.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_flip_fingerprints.sql
+      # Signal (0083): each transmitter's SNR only from bursts its own carrier
+      # says it sent — a station behind a repeater never takes on the
+      # repeater's fade — each receiver's own steps taken out, a fall in a week
+      # or in three months a finding, a base station new this week no say.
+      - name: check_station_snr.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_station_snr.sql
       # A reading's frequency and signal (0050): stored from the reading or
       # its envelope, readable by anon like the rest of it, the first copy's
       # kept on a duplicate — and a bad one stored as null, never a refusal.

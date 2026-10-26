@@ -53,7 +53,7 @@ const BaseStations = (function () {
   let formNote = null;
   // The log a station sent back, shown until the panel closes: { id, lines }.
   let logShown = null;
-  const timers = { list: null, detail: null, watch: null, wf: null, ch: null };
+  const timers = { list: null, detail: null, watch: null, wf: null, ch: null, sig: null };
   let lastAsk = 0;
   // The newest RPi ALERT release, as GitHub says: what a station's "Install the
   // latest release" and its nightly timer fetch (rpi-alert-update asks the same
@@ -1302,6 +1302,152 @@ const BaseStations = (function () {
     loadCh();
   }
 
+  // ── its receivers' own signal (0083) ─────────────────────────────────────
+  // Every transmitter a receiver hears on that transmitter's own carrier is
+  // followed against its own past; the median of how far they all sat from
+  // their usual, day by day, is the receiver's own shift — its antenna, cable,
+  // gain or the noise at its site moving everything at once. The server takes
+  // it out before it judges any station's signal (Station Health's
+  // Transmitter frequency and signal); here it is shown as the receiver's,
+  // with its noise floor beside it to say which: everything weaker with the
+  // floor where it was is the signal (antenna, cable, a connector, the
+  // preamp); with the floor up, it is noise. admin_base_station_signal(), from
+  // receiver_snr_day, judged hourly.
+
+  const SIG_MS = 1800000;   // judged hourly: half an hour is plenty
+  const SIG_DAYS = 90;
+  const SIG_PROTO = { alert: 'ALERT', alert2: 'ALERT2' };
+  // { id, r, err } — r as the database answered.
+  let sig = null, sigBusy = false;
+
+  const sigMean = a => (a.length ? a.reduce((n, v) => n + v, 0) / a.length : null);
+  const sigDb = v => (v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + ' dB');
+
+  // A receiver's days, read: the last week against the thirty before, the
+  // biggest step (three days either side of a day), the noise floor's move.
+  function sigRead(rx, warn, today) {
+    const DAY = 86400000;
+    const days = (rx.days || []).map(d => ({ t: Date.parse(String(d[0]).slice(0, 10) + 'T00:00:00Z'), shift: Number(d[1]), links: Number(d[2]), nf: d[4] == null ? null : Number(d[4]) }))
+      .filter(d => isFinite(d.t) && isFinite(d.shift)).sort((a, b) => a.t - b.t);
+    const age = d => Math.round((today - d.t) / DAY);
+    const wk = days.filter(d => age(d) < 7), before = days.filter(d => age(d) >= 7 && age(d) < 37);
+    const week = wk.length >= 3 && before.length >= 5 ? sigMean(wk.map(d => d.shift)) - sigMean(before.map(d => d.shift)) : null;
+    const nfOf = l => sigMean(l.map(d => d.nf).filter(v => v != null && isFinite(v)));
+    const nfWeek = week != null && nfOf(wk) != null && nfOf(before) != null ? nfOf(wk) - nfOf(before) : null;
+    let step = null;
+    for (let i = 3; i + 3 <= days.length; i++) {
+      const s = sigMean(days.slice(i, i + 3).map(d => d.shift)) - sigMean(days.slice(i - 3, i).map(d => d.shift));
+      if (step == null || Math.abs(s) > Math.abs(step.db)) step = { db: s, t: days[i].t };
+    }
+    if (step && Math.abs(step.db) < warn) step = null;
+    return { name: rx.name || rx.point_id, protocol: rx.protocol, days, week, nfWeek, step, links: days.length ? days[days.length - 1].links : 0 };
+  }
+
+  function sigSpark(days, warn, today) {
+    const W = 140, H = 30, t0 = today - (SIG_DAYS - 1) * 86400000;
+    const shown = days.filter(d => d.t >= t0);
+    const lim = Math.max(warn * 2, ...shown.map(d => Math.abs(d.shift)));
+    const x = t => ((t - t0) / Math.max(1, today - t0)) * (W - 4) + 2, y = v => H / 2 - (v / lim) * (H / 2 - 2);
+    const line = shown.map((d, i) => `${i ? 'L' : 'M'}${x(d.t).toFixed(1)},${y(d.shift).toFixed(1)}`).join('');
+    return `<svg class="hl-drift-spark bs-sig-spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true" focusable="false">`
+      + `<rect x="0" y="${y(warn).toFixed(1)}" width="${W}" height="${(y(-warn) - y(warn)).toFixed(1)}" fill="currentColor" opacity="0.07"/>`
+      + `<line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="currentColor" stroke-opacity="0.35" stroke-dasharray="2 2"/>`
+      + (shown.length ? `<path d="${line}" fill="none" stroke="currentColor" stroke-width="1.5"/>` : '') + '</svg>';
+  }
+
+  // What a receiver's shift says, in words.
+  function sigVerdict(x, warn) {
+    if (x.week == null) return ['qs-dim', 'too soon to say', 'it needs 3 days in the last week and 5 in the 30 before'];
+    const floor = x.nfWeek == null ? '' : Math.abs(x.nfWeek) < 1.5 ? 'its noise floor where it was, so the signal itself: the antenna, its cable or a connector, the preamp or the gain'
+      : x.nfWeek > 0 ? `its noise floor up ${x.nfWeek.toFixed(1)} dB with it, so new noise at the site — something nearby switched on, or interference`
+      : `its noise floor down ${Math.abs(x.nfWeek).toFixed(1)} dB`;
+    if (x.week <= -warn) return ['txt-warn', 'everything it hears is weaker', floor];
+    if (x.week >= warn) return ['', 'everything it hears is stronger', floor];
+    if (Math.abs(x.week) >= warn / 2) return ['', 'moving a little', ''];
+    return ['txt-ok', 'steady', ''];
+  }
+
+  function sigShellHtml(s) {
+    return `<section class="panel bs-sig" aria-labelledby="bs-sig-h">
+      <div class="panel-header"><h2 id="bs-sig-h">Signal across what it hears</h2></div>
+      <p class="small" id="bs-sig-sum" aria-live="polite"></p>
+      <div id="bs-sig-body"></div>
+      <p class="small qs-dim">For each of ${esc(s.label)}'s receivers, every transmitter it hears on that transmitter's own carrier, each
+        against its own usual SNR; the middle of how far they all sat from it, day by day, is the receiver's own — a step on every station at
+        once is the receiver, its antenna, cable or gain, or the noise at its site, not the stations. Station Health takes it out before it
+        judges any station's signal. The line is its last ${SIG_DAYS} days against its mean over them; the band is ±${esc((sig && sig.r && sig.r.warn_db) || 3)} dB.
+        Its noise floor (uncalibrated dBFS) is beside it: everything weaker with the floor where it was is the signal; with the floor up, it is noise.</p>
+    </section>`;
+  }
+
+  function sigBodyHtml(list, warn, today) {
+    if (!list.length) return '';
+    return `<div class="table-wrap" role="region" tabindex="0" aria-labelledby="bs-sig-h"><table class="adm-table bs-sig-t">
+        <caption class="sr-only">Each receiver's own SNR shift: the last week against the thirty days before, its biggest step, its noise floor, its last ${SIG_DAYS} days</caption>
+        <thead><tr><th scope="col">Receiver</th><th scope="col">Last 7 days</th><th scope="col" class="bs-wide">What it says</th><th scope="col">Biggest step</th><th scope="col">${SIG_DAYS} days</th><th scope="col">Stations it is judged by</th></tr></thead>
+        <tbody>${list.map(x => {
+          const [cls, word, why] = sigVerdict(x, warn);
+          return `<tr>
+            <th scope="row">${esc(x.name)} <span class="small qs-dim">${esc(SIG_PROTO[x.protocol] || x.protocol)}</span></th>
+            <td class="small">${x.week == null ? '—' : esc(sigDb(x.week)) + ' <span class="qs-dim">against the 30 days before</span>'}</td>
+            <td class="small"><strong class="${cls}">${esc(word)}</strong>${why ? `<div class="qs-dim">${esc(why)}</div>` : ''}</td>
+            <td class="small">${x.step ? `${esc(sigDb(x.step.db))} <span class="qs-dim">on ${esc(new Date(x.step.t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' }))}</span>` : '<span class="qs-dim">none past the band</span>'}</td>
+            <td>${sigSpark(x.days, warn, today)}</td>
+            <td class="small">${esc(x.links)}</td>
+          </tr>`;
+        }).join('')}</tbody></table></div>`;
+  }
+
+  function paintSig() {
+    if (state.activeTab !== 'basestations') return;
+    const el = document.getElementById('bs-sig');
+    if (!el) return;
+    const s = stationOf();
+    if (!isAdmin() || !s) { if (el.innerHTML) { el.innerHTML = ''; el.dataset.sig = ''; } return; }
+    if (el.dataset.sig !== String(s.id) || !el.firstElementChild) { el.innerHTML = sigShellHtml(s); el.dataset.sig = String(s.id); }
+    const today = Date.parse(new Date(now()).toISOString().slice(0, 10) + 'T00:00:00Z');
+    const warn = (sig && sig.r && Number(sig.r.warn_db)) || 3;
+    const list = sig && sig.id === s.id && sig.r ? (sig.r.receivers || []).map(rx => sigRead(rx, warn, today)) : [];
+    const weaker = list.filter(x => x.week != null && x.week <= -warn);
+    const judged = sig && sig.r && sig.r.judged_at ? ` <span class="qs-dim">Judged ${esc(ago(sig.r.judged_at))}.</span>` : '';
+    const sum = !sig || sig.id !== s.id ? 'Loading…' : sig.err ? `<span class="txt-bad">${esc(sig.err)}</span>`
+      : !list.length ? 'Not judged yet: it needs three or more transmitters heard on their own carriers in a day, on RPi ALERT 0.14 or later.'
+      : (weaker.length ? `<strong class="txt-warn">${weaker.map(x => esc(x.name) + ' (' + esc(SIG_PROTO[x.protocol] || x.protocol) + ')').join(', ')}:
+          everything ${weaker.length === 1 ? 'it hears is' : 'they hear is'} weaker than the 30 days before</strong> — the receiver, not the stations;
+          Station Health has taken it out of theirs.`
+        : `Every receiver hears what it usually does, within ${esc(warn)} dB.`) + judged;
+    const set = (id, html) => { const e = document.getElementById(id); if (e && e.innerHTML !== html) keepFocus(e, () => { e.innerHTML = html; }); };
+    set('bs-sig-sum', sum);
+    set('bs-sig-body', sigBodyHtml(list, warn, today));
+  }
+
+  async function loadSig() {
+    if (!isAdmin() || openId == null || sigBusy) return;
+    const id = openId;
+    sigBusy = true;
+    try {
+      const r = await dbRpc('admin_base_station_signal', { p_id: id });
+      if (openId !== id) return;
+      setNow(r.now);
+      sig = { id, r, err: null };
+    } catch (err) {
+      if (openId !== id) return;
+      sig = { id, r: null, err: err.status === 404 ? 'The database does not have this yet — apply db/migrations/0083_station_snr.sql.'
+        : 'Could not load its receivers\' signal: ' + err.message };
+    } finally {
+      sigBusy = false;
+    }
+    paintSig();
+  }
+
+  function sigStart() {
+    clearInterval(timers.sig);
+    timers.sig = null;
+    if (openId == null) return;
+    loadSig();
+    timers.sig = setInterval(() => { if (!document.hidden && state.activeTab === 'basestations') loadSig(); }, SIG_MS);
+  }
+
   // ── team keys ────────────────────────────────────────────────────────────
 
   function keysHtml() {
@@ -1359,6 +1505,7 @@ const BaseStations = (function () {
       <div id="bs-detail">${detailHtml()}</div>
       <div id="bs-wf"></div>
       <div id="bs-ch"></div>
+      <div id="bs-sig"></div>
       <div id="bs-keys">${keysHtml()}</div>
       <div class="panel">
         <div class="panel-header"><h2>How a base station is reached</h2></div>
@@ -1379,6 +1526,7 @@ const BaseStations = (function () {
     keepFocus(el, () => { el.innerHTML = render(); });
     paintWf();
     paintCh();
+    paintSig();
   }
 
   // A repaint must not take the keyboard's place away. Whatever had focus is
@@ -1409,6 +1557,7 @@ const BaseStations = (function () {
     set('bs-list', list ? listHtml() : '');
     paintWf();
     paintCh();
+    paintSig();
     const d = document.getElementById('bs-detail');
     if (!d) return;
     const s = stationOf();
@@ -1513,8 +1662,8 @@ const BaseStations = (function () {
   }
 
   function stop() {
-    clearInterval(timers.list); clearTimeout(timers.detail); clearInterval(timers.watch); clearInterval(timers.wf); clearInterval(timers.ch);
-    timers.list = timers.detail = timers.watch = timers.wf = timers.ch = null;
+    clearInterval(timers.list); clearTimeout(timers.detail); clearInterval(timers.watch); clearInterval(timers.wf); clearInterval(timers.ch); clearInterval(timers.sig);
+    timers.list = timers.detail = timers.watch = timers.wf = timers.ch = timers.sig = null;
   }
 
   function init() {
@@ -1524,7 +1673,7 @@ const BaseStations = (function () {
     loadKeys();
     loadLatest();
     timers.list = setInterval(() => { if (!document.hidden && state.activeTab === 'basestations') { load(); loadLatest(); } }, LIST_MS);
-    if (openId != null) { loadDetail(); wfStart(); chStart(); timers.watch = setInterval(() => { if (!document.hidden) watch(false); }, WATCH_MS); }
+    if (openId != null) { loadDetail(); wfStart(); chStart(); sigStart(); timers.watch = setInterval(() => { if (!document.hidden) watch(false); }, WATCH_MS); }
     if (typeof registerTabTeardown === 'function') registerTabTeardown('base-stations', stop);
   }
 
@@ -1546,13 +1695,15 @@ const BaseStations = (function () {
     wfStart();
     ch = null;
     chStart();
+    sig = null;
+    sigStart();
     announce('Opened ' + (s ? s.label : 'the base station') + '.');
   }
 
   function close() {
     openId = null; detail = null; askErr = null; form = null; formNote = null; logShown = null;
-    wf = null; wfImg = null; wfHoverAt = null; ch = null;
-    clearInterval(timers.watch); clearTimeout(timers.detail); clearInterval(timers.wf); clearInterval(timers.ch);
+    wf = null; wfImg = null; wfHoverAt = null; ch = null; sig = null;
+    clearInterval(timers.watch); clearTimeout(timers.detail); clearInterval(timers.wf); clearInterval(timers.ch); clearInterval(timers.sig);
     repaint();
   }
 

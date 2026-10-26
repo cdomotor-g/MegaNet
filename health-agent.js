@@ -357,6 +357,23 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
       findings_needing_attention: att.slice(0, 70).map(compactFinding),
       findings_needing_attention_total: att.length,
       notes_by_kind: infoKinds,
+      radio_checks: radioChecks(),
+    };
+  }
+
+  // What the server's own radio measurements found, which the readings above
+  // cannot show (0075–0083): a transmitter fading, off channel, drifting or
+  // sending corrupted copies — once Transmitter frequency and signal has its
+  // rows. The words that say what they are travel with them, since SYSTEM is
+  // pinned in worker/briefing.js.
+  function radioChecks() {
+    if (typeof HealthDrift === 'undefined') return null;
+    const st = HealthDrift.state();
+    if (!st.rows || !(st.findings || []).length) return null;
+    return {
+      about: 'Open findings from the base stations\' own radio measurements, judged hourly by the server. transmitter-snr-falling: the transmitter\'s signal over the receivers\' noise has fallen against its own past — counted only from bursts on its own carrier, never its repeater\'s relays of it, with each receiver\'s own steps taken out; usually its antenna, cable or connectors, or its power, and a station fading now goes silent later. transmitter-off-channel / transmitter-drift: its carrier is far from the rest or moving (an ageing crystal, a hot or cold site). transmitter-corrupting: it sends copies of readings with bits wrong.',
+      findings: st.findings.slice(0, 40).map(f => ({ kind: f.kind, severity: f.severity, subject: f.subject, station_id: f.station_id || null,
+        title: f.title, detail: f.detail || '', since: f.first_seen || null })),
     };
   }
 

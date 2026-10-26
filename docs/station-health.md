@@ -508,7 +508,8 @@ bursts, and the finding.
 **On the station's card, and in its Station details.** The same rows, one
 station's, as its **Carrier fingerprint**: under its ALERT IDs and frequencies
 on its card on the Stations map, and under its ALERT addresses in the station
-editor, word for word (`health-drift.js`):
+editor, word for word (`health-drift.js`) — with its signal under them
+([Transmitter signal](#transmitter-signal), below):
 
 - **Offset** — the last week's, in Hz and ppm, against the rest, and whether
   that is like the rest, near the line or the server's off-channel finding.
@@ -543,6 +544,85 @@ address until the register has its station's `alert2_station_id`.
 `tools/check_transmitter_drift.sql` holds the server to a made-up network of
 both kinds, three repeaters and the cases above, with a receiver whose crystal
 wanders 180 Hz.
+
+## Transmitter signal
+
+The same panel's **Signal** view (*Look at → Signal (SNR)*; the panel is
+*Transmitter frequency and signal*) follows each transmitter's **SNR** — how
+far above the receiver's noise its bursts arrive — for months, so a station
+whose antenna, cable or connectors are going shows here before it goes quiet
+(`0083`).
+
+**Only its own bursts.** Every burst a base station decodes comes with its
+SNR, but a burst relayed by a repeater arrives at the *repeater's* strength.
+So the SNR goes exactly where the carrier offset goes ([above](#transmitter-frequency)):
+a burst the carrier puts down to the station is the station's, one on a
+repeater's carrier is the repeater's, and nothing else is counted — not an
+unexplained copy, not a burst two repeaters could have sent, not a stray on
+another carrier, not a day with two carriers under one name. A station heard
+only through its repeater has no signal here (its repeater does); a station
+heard both ways is measured on its own bursts alone, and never takes on its
+repeater's fade.
+
+**Against its own past, a base station at a time.** SNR is a path: a station
+heard at 12 dB by one base station may be 25 dB at another, so two base
+stations' numbers are never set against each other. Each base station's view
+of a transmitter is compared with its own past — its last week against the
+thirty days before, and its last thirty days against days 61 to 90, since
+antennas and coax go slowly too — and the transmitter's change is those
+views' together, weighted by bursts. A base station new this month has no past
+to compare with and no say until it has one, so adding receivers adds evidence
+rather than mixing scales; and when only one of several base stations saw a
+fall, the finding says so — that may be the path (something new in the way),
+not the station.
+
+**Each receiver's own steps taken out.** A receiver's antenna, cable, gain or
+the noise at its site moves everything it hears at once. So each day, each
+receiver's own shift — the median of how far every transmitter it heard on its
+own carrier sat from its usual (three or more) — is worked out and taken out
+before any transmitter is judged. A step on every station at once is the
+receiver's, and is shown as the receiver's on the Base Stations tab
+([base-stations.md](base-stations.md#signal-across-what-it-hears)); a finding
+says when the receivers moved over the same days, and by how much. ALERT and
+ALERT2 are kept apart (two decoders).
+
+**What is a finding.** `transmitter-snr-falling`, checked every hour with the
+tab closed: a fall of 3 dB, in the week or over the three months, whichever is
+worse, is a warning; 6 dB is critical when most of the base stations judging it
+saw it (`app_meta` `tx_snr_drop_warn_db`, `tx_snr_drop_crit_db`). On the live
+receptions a direct link's daily mean moved about 1 dB day to day, so a week's
+mean is good to about half a dB. It needs 3 days in the last week and 5 in the
+thirty before at one base station (10 and 10 for three months).
+
+**Where it shows.** On the station's card (its *Findings*, under its Health)
+and in the *Carrier fingerprint* on its card and in its Station details:
+
+- **Signal** — the last week's SNR at the base stations that hear it on its
+  own carrier (a level to read, not to compare), and its spread burst to
+  burst;
+- **Signal change** — against the thirty days before and over three months,
+  each steady, weakening or fading, and how many of the base stations judging
+  it saw the fall;
+- its last 90 days as a line against its usual, the band ±3 dB.
+
+In this tab, a line under *Needs attention* names the transmitters fading (and
+the ones off channel or drifting), with a door to the panel's Signal view; the
+panel's lead says how many are fading; the AI briefing's overview carries the
+server's transmitter findings (`radio_checks`); and the morning bulletin's facts
+carry them as `signal.by_carrier`, beside the older per-stick fade.
+
+**Limits.** Bursts below about 8 dB do not decode, so a station already near
+there has little left to lose: its fall shows as missed checks rather than
+here, and the bursts that still decode flatter it. Only what a base station's
+SDR hears is measured, from RPi ALERT 0.14 (the carrier) on. A station whose
+carrier sits within 30 Hz of its repeater's is the repeater's, as for the
+offset. A day is rolled up again for three days and never once its receptions
+are gone; the line and the three-month change fill in as the weeks go by.
+`npm run health` and `npm run healthcard` hold the panel and the card;
+`tools/check_station_snr.sql` holds the server to a made-up network: a receiver
+whose signals all step down 5 dB, a station fading in a week, one sliding over
+three months, a repeater fading with stations behind it that must not, one
+base station's path alone, a base station new this week, and ALERT2.
 
 ## Bit flips, by who sent them
 

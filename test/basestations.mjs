@@ -292,6 +292,16 @@ const FNS = {
   },
   admin_base_station_channels: a => Object.assign({ now: new Date(dbNow()).toISOString(), from: ago(a.p_days * 86400), to: ago(600) },
     a.p_id === 11 ? CHANNELS : { site: null, channels: [], register: [] }, { days: a.p_days, by: a.p_days <= 14 ? 'hour' : 'day' }),
+  // Its receivers' own SNR shift by day (0083): RTL-SDR 1's ALERT stepped down
+  // 5 dB nine days ago with its noise floor where it was; its ALERT2 steady.
+  admin_base_station_signal: a => {
+    const day = g => new Date(dbNow() - g * 86400e3).toISOString().slice(0, 10);
+    const days = step => [...Array(60)].map((_, i) => 59 - i)
+      .map(g => [day(g), +(0.3 * Math.sin(g) + (g < 10 ? step : 0) - step / 6).toFixed(2), 41, 420, -38.5]);
+    return { now: new Date(dbNow()).toISOString(), judged_at: ago(1200), warn_db: 3,
+      receivers: a.p_id === 11 ? [{ point_id: 'sdr-1', protocol: 'alert', name: 'RTL-SDR 1', days: days(-5) },
+                                  { point_id: 'sdr-1', protocol: 'alert2', name: 'RTL-SDR 1', days: days(0) }] : [] };
+  },
   admin_base_station_key_add: a => {
     db.keys.unshift({ id: 6, key_type: 'ssh-ed25519', fingerprint: 'SHA256:newkeynewkeynewkeynewkeynewkeynewkeynewkeyA', owner: a.p_owner,
       comment: 'sam@desk', added_at: ago(0), added_by: 'admin@example.test', removed_at: null, removed_by: null });
@@ -586,6 +596,19 @@ try {
   await until(async () => /apply db\/migrations\/0081_base_station_channels\.sql/.test(await text('#bs-ch-sum')), 'a database without 0081 is told which file to apply');
   await page.click('#bs-ch button:has-text("7 days")');
   await until(() => page.evaluate(() => document.querySelectorAll('#bs-ch tbody tr').length === 7), '…and the week comes back when it can');
+
+  // ── Signal across what it hears (0083) ───────────────────────────────────────
+  ok('opening it asks for its receivers\' own signal', sent('admin_base_station_signal').some(a => a.p_id === 11), JSON.stringify(sent('admin_base_station_signal')));
+  await until(() => page.evaluate(() => document.querySelectorAll('#bs-sig tbody tr').length === 2), 'a row a receiver and protocol');
+  const sigSum = (await text('#bs-sig-sum')).replace(/\s+/g, ' ');
+  ok('a line says which receiver hears everything weaker — the receiver, not the stations',
+    /^RTL-SDR 1 \(ALERT\): everything it hears is weaker than the 30 days before — the receiver, not the stations; Station Health has taken it out of theirs\./.test(sigSum), sigSum);
+  const sigRows = await page.evaluate(() => [...document.querySelectorAll('#bs-sig tbody tr')].map(tr => [...tr.children].map(c => c.innerText.replace(/\s+/g, ' ').trim())));
+  ok('…its ALERT row: how far, the noise floor where it was so the signal itself, the step and when, and its line',
+    /^−4\.[0-9] dB against the 30 days before$/.test(sigRows[0][1]) && /^everything it hears is weaker its noise floor where it was, so the signal itself/.test(sigRows[0][2])
+      && /^−[45]\.[0-9] dB on /.test(sigRows[0][3]) && sigRows[0][5] === '41'
+      && await page.evaluate(() => !!document.querySelector('#bs-sig tbody tr svg.bs-sig-spark path')), JSON.stringify(sigRows[0]));
+  ok('…its ALERT2 row steady, no step', /^steady/.test(sigRows[1][2]) && /none past the band/.test(sigRows[1][3]), JSON.stringify(sigRows[1]));
 
   const detail = (await text('#bs-detail')).replace(/\s+/g, ' ');
   ok('its health', /mt-stuart/.test(detail) && /192\.168\.1\.40/.test(detail) && /58\.4 °C/.test(detail) && /under-voltage since boot/.test(detail), detail.slice(0, 400));

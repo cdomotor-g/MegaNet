@@ -185,6 +185,35 @@ now. Licences on frequencies the station neither hears nor lists are folded
 away beneath. It reads the hourly rollups, so the last hour may not be in yet,
 and a month comes by the day.
 
+## Signal across what it hears
+
+Under that, **Signal across what it hears** (`0083`) is each of the station's
+receivers' own SNR, day by day. Station Health follows every transmitter's
+signal against its own past, counting only bursts its own carrier says it sent
+([station-health.md → Transmitter signal](station-health.md#transmitter-signal));
+a receiver's antenna, cable, gain or the noise at its site moves everything it
+hears at once, so each day the server works out how far all of a receiver's
+transmitters sat from their usual — the median, three or more — and takes it
+out before judging any of them. This panel shows that shift as the receiver's:
+
+- **Last 7 days** — its shift against the thirty days before, and what it
+  says: *steady*, or *everything it hears is weaker* (or stronger) by 3 dB or
+  more, with its **noise floor** beside it to say which — weaker with the floor
+  where it was is the signal (the antenna, its cable or a connector, the
+  preamp or the gain); with the floor up as well, it is new noise at the site;
+- **Biggest step** — the largest move between three days and the three after,
+  and when, if it is past the band;
+- its last 90 days as a line, the band ±3 dB, and how many transmitters the
+  latest day was judged from.
+
+A receiver and protocol a row (ALERT and ALERT2 come from two decoders). The
+noise floor is the receiver's own, uncalibrated dBFS, from the reception
+rollups. It is judged hourly (`refresh_transmitter_findings()`, into
+`receiver_snr_day`) and asked for when a station is opened and every half hour
+while it stays open (`admin_base_station_signal()`, administrators only). It
+needs RPi ALERT 0.14 or later (the carrier), and three transmitters heard on
+their own carriers in a day.
+
 ## Noticed with the tab closed
 
 Every five minutes the database works out, by itself (`pg_cron`,
