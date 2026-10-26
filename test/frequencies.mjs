@@ -176,8 +176,120 @@ async function main() {
         && lines[0].startsWith(`RX ${repeater.repeater.rx_mhz} · TX ${repeater.repeater.tx_mhz} MHz`) && /primary/.test(lines[0])
         && lines[1] === 'RX 150.4125 · TX 155.9125 MHz Voice, licence 123456/1',
       JSON.stringify(lines));
-    check('a station with no pair has no block',
-      await page.evaluate(id => { showStationCard(id); return !document.querySelector('#stn-card .stn-card-freqs'); }, field.id));
+    check('a station with no pair and no radio has no block',
+      await page.evaluate(() => {
+        const s = state.data.stations.find(x => !x.proposed && !Frequencies.pairs(x).length && !stationAlertIds(x).length
+          && x.alert2_station_id == null && x.lat != null);
+        showStationCard(s.id);
+        return !document.querySelector('#stn-card .stn-card-freqs');
+      }));
+
+    log('\nAssumed, and heard on\n');
+    // Upper Rainbow AL (539229): Kroombit (28.5 km, 151.500 in and out),
+    // Banana Range (46.6 km, in on 151.500, out on 152.400) and Mt Hopeful
+    // (57.2 km, in on 152.400) carry its AlertIDs; only Kroombit is direct.
+    const UR = 'upper_rainbow_al';
+    await page.evaluate(() => { state.mapMaxLinkKm = 100; });
+    const ago = h => new Date(Date.now() - h * 3600e3).toISOString();
+    const readingRows = [
+      { station_id: UR, addr: 'a:944', freq_mhz: 151.5, protocol: 1, reading_ts: ago(1) },
+      { station_id: UR, addr: 'a:944', freq_mhz: '151.500000', protocol: 1, reading_ts: ago(2) },
+      { station_id: UR, addr: 'a:945', freq_mhz: 151.5, protocol: 1, reading_ts: ago(3) },
+      { station_id: UR, addr: 'a:944', freq_mhz: 152.4, protocol: 1, reading_ts: ago(4) },
+      { station_id: UR, addr: 'a:944', freq_mhz: 151.5375, protocol: 2, reading_ts: ago(5) },
+      { station_id: UR, addr: 'a:944', freq_mhz: null, protocol: 1, reading_ts: ago(6) },
+      { station_id: null, addr: 'a:944', freq_mhz: 151.5, protocol: 1, reading_ts: ago(7) },
+      { station_id: 'somewhere_else', addr: 'a:944', freq_mhz: 151.95, protocol: 1, reading_ts: ago(8) },
+    ].map(r => ({ alert_id: Number(r.addr.slice(2)), a2_station: null, a2_sensor: null, station_number: null, channel: '',
+                  received_at: r.reading_ts, value_raw: 1, path: 'serial-monitor/test', ...r }));
+    const asked = [];
+    let mode = 'ok';
+    await page.route('**://*.supabase.co/rest/v1/**', route => {
+      const url = decodeURIComponent(route.request().url());
+      if (!/\/rest\/v1\/reading\?/.test(url)) return route.fallback();
+      asked.push(url);
+      if (mode === 'down') return route.abort('connectionrefused');
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(readingRows) });
+    });
+
+    const freqCard = () => page.evaluate(() => {
+      const block = document.querySelector('#stn-card .stn-card-freqs');
+      if (!block) return null;
+      const rows = {};
+      block.querySelectorAll('.acma-row').forEach(r => {
+        rows[r.firstElementChild.textContent.trim()] = {
+          vals: [...r.querySelectorAll('.freq-val')].map(e => e.textContent.trim()),
+          notes: [...r.querySelectorAll('.freq-why')].map(e => e.textContent.replace(/\s+/g, ' ').trim()),
+          text: r.lastElementChild.textContent.replace(/\s+/g, ' ').trim(),
+          title: r.firstElementChild.title,
+        };
+      });
+      return rows;
+    });
+
+    await page.evaluate(id => showStationCard(id), UR);
+    const C = await page.evaluate(id => {
+      const c = Frequencies.carriersOf(state.data.stations.find(x => x.id === id));
+      return { all: c.all.map(x => x.r.name), direct: c.direct.map(x => x.r.name) };
+    }, UR);
+    check('a station\'s carriers are the repeaters whose pass ranges carry its AlertIDs',
+      ['Kroombit Repeater AL', 'Banana Range AL', 'Mt Hopeful AL'].every(n => C.all.includes(n)), JSON.stringify(C));
+    check('…and only the nearest, which no nearer carrier feeds, is taken to hear it directly',
+      C.direct.length === 1 && C.direct[0] === 'Kroombit Repeater AL', JSON.stringify(C));
+    await page.waitForFunction(() => /MHz/.test(document.querySelector('#stn-card .stn-card-freqs')?.textContent || '')
+      && !document.querySelector('#stn-card .stn-card-freqs [aria-busy]'), null, { timeout: 10_000 });
+    let card = await freqCard();
+    check('the card says what it is assumed to transmit on: its direct carrier\'s RX, and whose',
+      card && card.Assumed && card.Assumed.vals.join('|') === 'TX 151.500 MHz'
+        && /^Kroombit Repeater AL \(28\.\d km\) listens there$/.test(card.Assumed.notes[0])
+        && !/Banana|Hopeful/.test(card.Assumed.text) && /Max TX distance \(100 km/.test(card.Assumed.title),
+      JSON.stringify(card && card.Assumed));
+    check('…and the channels its readings were heard on, most heard first, only its own rows counted',
+      card && card['Heard on'] && card['Heard on'].vals.join('|') === '151.500 MHz|152.400 MHz|151.5375 MHz',
+      JSON.stringify(card && card['Heard on']));
+    const hn = (card && card['Heard on'] && card['Heard on'].notes) || [];
+    check('…each saying how often and what is known to be on it: direct or a carrier\'s relay, or neither',
+      /^ALERT · 3 readings, last .+ — direct, or relayed by Kroombit Repeater AL$/.test(hn[0] || '')
+        && /^ALERT · 1 reading, last .+ — relayed by Banana Range AL and Mt Hopeful AL$/.test(hn[1] || '')
+        && /^ALERT2 · 1 reading, last .+ — neither its assumed TX nor a channel its carriers transmit on$/.test(hn[2] || ''),
+      JSON.stringify(hn));
+    check('…and the reading on an address it shares, put down to nobody, said and not counted',
+      /^1 more reading came on an address it shares, put down to no station, and is not counted\.$/.test(hn[3] || ''),
+      JSON.stringify(hn));
+    // The card's other reading requests (sensor-sparks.js's day) are not this
+    // line's; the one that carries freq_mhz is the Health section's own.
+    const withFreq = () => asked.filter(u => /select=[^&]*freq_mhz/.test(u));
+    check('Heard on costs no request of its own: the card\'s readings carry freq_mhz, once',
+      withFreq().length === 1 && /order=reading_ts\.desc&limit=1000/.test(withFreq()[0]), JSON.stringify(asked));
+    await page.evaluate(() => repaintStnCard());
+    check('…and a repaint asks nothing new', withFreq().length === 1, String(withFreq().length));
+
+    await page.evaluate(() => { state.mapMaxLinkKm = 20; repaintStnCard(); });
+    card = await freqCard();
+    check('with the Max TX distance under its nearest carrier, nothing is assumed, and it says why',
+      card && /^none within 20 km/.test(card.Assumed.text)
+        && /Kroombit Repeater AL, is 28\.\d km off — past the Max TX distance\./.test(card.Assumed.text),
+      JSON.stringify(card && card.Assumed));
+    check('…and nothing heard is called direct or relayed by a link it no longer assumes',
+      card && /^ALERT · 3 readings, last .+ — relayed by Kroombit Repeater AL$/.test(card['Heard on'].notes[0] || ''),
+      JSON.stringify(card && card['Heard on'].notes));
+    await page.evaluate(() => { state.mapMaxLinkKm = 100; });
+
+    const lone = await page.evaluate(() => {
+      const s = state.data.stations.find(x => !x.proposed && stationAlertIds(x).length && !findRepeaterMatches(x).length
+        && !x.roles.includes('repeater') && x.lat != null);
+      return s && s.id;
+    });
+    mode = 'down';
+    await page.evaluate(id => showStationCard(id), lone);
+    await page.waitForFunction(() => /could not ask/.test(document.querySelector('#stn-card .stn-card-freqs')?.textContent || ''),
+      null, { timeout: 10_000 }).catch(() => {});
+    card = await freqCard();
+    check('a station no repeater carries says so, and a datastore that cannot be reached says that',
+      card && card.Assumed && card.Assumed.text === 'no repeater carries its AlertIDs'
+        && card['Heard on'] && /^could not ask the datastore/.test(card['Heard on'].text),
+      JSON.stringify(card));
+    mode = 'ok';
 
     await context.close();
 

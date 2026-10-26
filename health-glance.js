@@ -147,9 +147,12 @@ const HealthGlance = (() => {
   const NET_PAGE = 1000;
   const NET_PAGES = 10;                // 10,000 station_status rows, then say so
   // What HealthAnalysis reads off a reading — and no more: the signal columns
-  // and the duplicate bookkeeping are the tab's, not the card's.
+  // and the duplicate bookkeeping are the tab's, not the card's. freq_mhz is
+  // the one exception, and not HealthAnalysis's: the channel a base station
+  // heard each reading on, for the Heard on line under the card's frequencies
+  // (channelsFrom, frequencies.js) — a column on the same request, not a second.
   const CARD_SELECT = 'addr,alert_id,a2_station,a2_sensor,station_number,channel,station_id,'
-                    + 'reading_ts,received_at,value_raw,protocol,path';
+                    + 'reading_ts,received_at,value_raw,protocol,path,freq_mhz';
   // `online` and `since` say how long the ingest has been hearing a station:
   // see "The classes" above.
   const NET_SELECT = 'station_id,online,since,last_seen_at,last_reading_at';
@@ -315,6 +318,35 @@ const HealthGlance = (() => {
     };
   }
 
+  // The channels its readings were heard on, for the Heard on line under the
+  // card's frequencies (frequencies.js). A base station's receiver puts the
+  // frequency it heard a reading on beside it (0050), directly or through a
+  // repeater, so the card's own readings say which channels reach Flood-Net
+  // from the station. Only the rows the datastore put down to it: one on an
+  // address it shares, put down to nobody, is counted beside them as `shared`
+  // and not in them; one put down to another station is that station's. Pure.
+  //   { list: [{ mhz, protocol, n, last }] most heard first, n, shared, since, capped }
+  function channelsFrom(s, rows) {
+    const by = new Map();
+    let n = 0, shared = 0, since = Infinity;
+    for (const r of rows || []) {
+      const f = r && r.freq_mhz != null && r.freq_mhz !== '' ? Number(r.freq_mhz) : NaN;
+      if (!Number.isFinite(f) || f <= 0) continue;
+      if (r.station_id !== s.id) { if (r.station_id == null) shared++; continue; }
+      const t = Date.parse(r.reading_ts);
+      const mhz = Math.round(f * 10000) / 10000;
+      const key = `${mhz}|${r.protocol}`;
+      const c = by.get(key) || { mhz, protocol: r.protocol == null ? null : Number(r.protocol), n: 0, last: null };
+      c.n++;
+      if (Number.isFinite(t) && (c.last == null || t > c.last)) c.last = t;
+      by.set(key, c);
+      n++;
+      if (Number.isFinite(t) && t < since) since = t;
+    }
+    return { list: [...by.values()].sort((a, b) => b.n - a.n || (b.last || 0) - (a.last || 0)),
+             n, shared, since: Number.isFinite(since) ? since : null, capped: (rows || []).length >= CARD_ROWS };
+  }
+
   // Its checks, slot by slot, for the strip on the card and in the editor:
   // { P, slots: [{ t, outcome, missing }] }, or null with no schedule learned.
   // A check is received, received with frames lost, or not heard. Whether a
@@ -383,6 +415,7 @@ const HealthGlance = (() => {
                                     : `station_id=eq.${encodeURIComponent(s.id)}`;
     const rows = await dbSelect(`reading?select=${CARD_SELECT}&${filter}&order=reading_ts.desc&limit=${CARD_ROWS}`);
     const g = glanceFrom(s, rows, now_());
+    g.channels = channelsFrom(s, rows);
     // No readings left: readings age out after about two years, and the ingest's
     // own record of when it last heard the station does not. So a station
     // with nothing in meganet.reading costs a second, one-row request — unless
@@ -1131,6 +1164,17 @@ const HealthGlance = (() => {
     runCard(s);
   }
 
+  // The channels its card's readings were heard on, for frequencies.js's
+  // Heard on line: null before the card has asked, `asking` while it does with
+  // nothing in hand, `error` when it could not, else channelsFrom's answer
+  // with status `ok` — the last one kept while it asks again. onHeard says when.
+  function channels(id) {
+    const c = cards.get(id);
+    if (!c) return null;
+    if (c.glance && c.glance.channels) return Object.assign({ status: 'ok' }, c.glance.channels);
+    return { status: c.status === 'error' ? 'error' : 'asking' };
+  }
+
   // A line on the card, pressed: the Station Health tab, on this station, at
   // the part of it the line was about. Out of full screen first, for the
   // reason fieldDataFromCard gives — the tab would be switched invisibly
@@ -1145,6 +1189,8 @@ const HealthGlance = (() => {
   return {
     // the card
     cardHtml, ask, retry, open,
+    // the channels its readings were heard on, for its frequencies (frequencies.js)
+    channels,
     // its checks, slot by slot: the strip's press, and the editor's copy
     stripClick, checksHtml,
     // the pins
@@ -1157,7 +1203,7 @@ const HealthGlance = (() => {
     // ⏱️ Latency (map-latency.js): { lastHeard, firstHeard }
     known: id => { const k = knowledgeOf(id); return { lastHeard: k.lastHeard, firstHeard: k.firstHeard }; },
     // the rules, for test/healthcard.mjs and for #215 to keep honest
-    classify, bars, glanceFrom, quietFinding, findingsOf, fromServer,
+    classify, bars, glanceFrom, channelsFrom, quietFinding, findingsOf, fromServer,
     classOf: id => classOf(id),
     // what is known, for the check
     _state: () => ({

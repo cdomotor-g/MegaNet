@@ -8384,7 +8384,10 @@ function stnCardHtml(s) {
       ${idTypes.length ? `<div class="stn-card-ids"><span class="small txt-muted">AlertID</span><br>${idTypes.map(t =>
         `<span class="mn-pop-line mn-pop-indent">${esc(t.id)}${t.types.length ? ' — ' + esc(t.types.join(' / ')) : ''}</span>`).join('<br>')}</div>` : ''}
       <!-- Every RX/TX pair the station has, the repeater's own first, one to a
-           line like the addresses above (0033, frequencies.js). -->
+           line like the addresses above (0033, frequencies.js) — then what it
+           is assumed to transmit on, from the pass ranges of the repeaters
+           likely to hear it directly, and the channels the base stations
+           heard it on, painted in place when HealthGlance's readings land. -->
       ${Frequencies.cardHtml(s)}
       <!-- Its carrier fingerprint (#217, health-drift.js): where its carrier
            sits against the rest, the channel it was heard on against the TX

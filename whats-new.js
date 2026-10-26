@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 101, date: '2026-10-26', items: [
+      'A station\'s card on the <strong>Stations</strong> map now says what it transmits on, under its AlertIDs, even where '
+        + 'no frequency is on record: <strong>Assumed</strong> — the channel the repeaters likely to hear it directly listen '
+        + 'on, worked out from their pass ranges and the <em>Max TX distance</em> — and <strong>Heard on</strong> — the '
+        + 'channels the base stations actually heard its readings on, how often, and whether each was it direct or a '
+        + 'repeater relaying it.',
+    ] },
     { n: 100, date: '2026-10-26', items: [
       'The tag under the pointer on <strong>〽️ the elevation profile</strong> now gives the height of what stands on the '
         + 'ground there — trees, crops, buildings — between the ground height and the signal: <em>531 m · 18 m trees · '

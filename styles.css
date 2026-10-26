@@ -7822,6 +7822,13 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
    rule between them. */
 .hd-card-why { display: block; }
 .hd-card-body > .hd-card-why { margin-top: .3rem; }
+
+/* Assumed and Heard on, under a station's frequencies on its card
+   (frequencies.js): a channel a line, and what is known about it on a line of
+   its own under it, as the carrier fingerprint's caveats are. */
+.stn-card-freqs .freq-val,
+.stn-card-freqs .freq-why { display: block; }
+.stn-card-freqs .freq-why + .freq-val { margin-top: .2rem; }
 .hd-card-tx + .hd-card-tx { margin-top: .35rem; padding-top: .35rem; border-top: 1px dashed var(--border); }
 .hd-card-spark { display: flex; align-items: center; gap: .5rem; margin: .2rem 0; }
 .hd-card-spark .hl-drift-spark { flex: none; }
