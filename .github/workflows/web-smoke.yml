@@ -533,6 +533,18 @@ jobs:
         working-directory: test
         run: npm run signalroutes
 
+      # 🗼 Backbone, "State of the backbone" (backbone.js): the findings, the
+      # carriers and the corrupted copies read for the period from a planted
+      # month on the real repeaters — the off-air corrupting one first, issues
+      # worst first inside it, a seldom-heard one only a note, a carrier's odd
+      # day set aside, two stopping together, evening dropouts; the summary,
+      # the map, the period, Signal Routes folded in, the exports, the demo and
+      # a phone.
+      - name: Backbone
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run backbone
+
       # 🧪 The Bit Bench and ⚡ Bit Errors (bit-model.js, bit-bench.js,
       # bit-errors.js): the frame read back by three decoders, the arithmetic,
       # each fault's fingerprint, pasted readings, then both tabs in Chromium —

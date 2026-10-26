@@ -1412,6 +1412,12 @@ const SignalRoutes = (() => {
     S.days = PERIODS.includes(d) ? d : 3;
     if (signedIn()) load(); else redraw();
   }
+  // The same read from another tab (backbone.js's pass ranges against the
+  // air), which waits for it: its promise, settled once the analysis is in.
+  function loadDays(d) {
+    S.days = PERIODS.includes(d) ? d : 3;
+    return signedIn() ? load() : Promise.resolve();
+  }
   function setMode(m) { S.mode = m === 'alert2' ? 'alert2' : 'alert'; S.pick = null; S.allRoutes = false; redraw(); }
   function pick(col, id) {
     if (!col || (S.pick && S.pick.col === col && S.pick.id === id)) S.pick = null;
@@ -1494,6 +1500,6 @@ const SignalRoutes = (() => {
   }
   function state_() { return { days: S.days, phase: S.phase, mode: S.mode, pick: S.pick, rep: S.rep, demo: S.demo, err: S.err, A: S.A }; }
 
-  return { render, init, load, demo, setDays, setMode, pick, pickNode, pickRep, setGaps, showAll, scrollTo, authChanged,
+  return { render, init, load, loadDays, demo, setDays, setMode, pick, pickNode, pickRep, setGaps, showAll, scrollTo, authChanged,
     exportRoutesCsv, exportPassCsv, adopt, analyse, attribute, state: state_ };
 })();

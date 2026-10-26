@@ -96,6 +96,8 @@ const Glyphs = (() => {
     print:     '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>',
     chain:     '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
     route:     '<circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"/>',
+    // Backbone: two masts on their hills, the link between them.
+    backbone:  '<path d="M4.5 21 7 12l2.5 9M5.6 17.5h2.8"/><path d="M14.5 21l2.5-9 2.5 9M15.6 17.5h2.8"/><circle cx="7" cy="10" r="1.2"/><circle cx="17" cy="10" r="1.2"/><path d="M8.8 8.6c2-1.8 4.4-1.8 6.4 0"/><path d="M7 4.6c3.2-2.6 6.8-2.6 10 0"/>',
     // Signal Routes: three stations on the left flowing through one relay to a base.
     routes:    '<circle cx="4" cy="5" r="1.8"/><circle cx="4" cy="12" r="1.8"/><circle cx="4" cy="19" r="1.8"/><path d="M5.8 5c4 0 4 7 6.2 7M5.8 19c4 0 4-7 6.2-7M5.8 12H12"/><circle cx="13.5" cy="12" r="1.5"/><path d="M15 12h4"/><rect x="19" y="9" width="3" height="6" rx=".8"/>',
     signpost:  '<path d="M12 2.5v19"/><path d="M5 5.5h11l3 2.75-3 2.75H5z"/><path d="M19 13.5H8l-3 2.75L8 19h11z"/>',
@@ -141,7 +143,7 @@ const Glyphs = (() => {
     nearby: 'nearby', inspections: 'inspect', maintenance: 'tools', history: 'history', camera: 'camera', photos: 'photos',
     levels: 'survey', twopeg: 'pegs', surveyguide: 'book',
     propagation: 'waves', biterrors: 'bolt', swr: 'meter', kbstaff: 'staff', kblogbook: 'logbook', kblifecycle: 'cycle', kblevel: 'solar', kbriver: 'gauge',
-    admin: 'admin', basestations: 'base', review: 'review', a2plan: 'plan', tdma: 'slots',
+    admin: 'admin', basestations: 'base', backbone: 'backbone', review: 'review', a2plan: 'plan', tdma: 'slots',
   };
 
   // An inspection sheet's sections (0009's section_key), for the row of signs

@@ -956,6 +956,7 @@ const Auth = (function () {
                        typeof SiteFeatures !== 'undefined' ? SiteFeatures : null,
                        typeof HealthAgent !== 'undefined' ? HealthAgent : null,
                        typeof SignalRoutes !== 'undefined' ? SignalRoutes : null,
+                       typeof Backbone    !== 'undefined' ? Backbone    : null,
                        typeof NavViews    !== 'undefined' ? NavViews    : null,
                        typeof Push        !== 'undefined' ? Push        : null]) {
       if (!mod || !mod.authChanged) continue;

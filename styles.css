@@ -2602,6 +2602,86 @@ td {
 .sr-map { height: 460px; border-radius: var(--r-md); margin-top: var(--sp-2); }
 .sr-base-icon { color: var(--text); font-size: 18px; line-height: 18px; text-align: center; text-shadow: 0 0 3px var(--panel); }
 
+/* State of the backbone (backbone.js): a colour per kind of trouble — off air
+   and dropping out in the status inks, the rest from the ARRO chart's series
+   set (design-system §1) — set on the page rather than :root, so each var()
+   resolves under whichever theme is on. A class carries its colour as --c,
+   which a swatch, a bar's share, a timeline's bar and an hour's bar each paint
+   with. The map reads --bad, --warn and --muted (drawMap). */
+.bk-page {
+  --bk-air: var(--bad);
+  --bk-bits: var(--ad-series-6);
+  --bk-drops: var(--warn);
+  --bk-power: var(--ad-series-3);
+  --bk-carrier: var(--ad-series-4);
+  --bk-ranges: var(--ad-series-8);
+}
+.bk-c-air     { --c: var(--bk-air); }
+.bk-c-bits    { --c: var(--bk-bits); }
+.bk-c-drops   { --c: var(--bk-drops); }
+.bk-c-power   { --c: var(--bk-power); }
+.bk-c-carrier { --c: var(--bk-carrier); }
+.bk-c-ranges  { --c: var(--bk-ranges); }
+.bk-sw { display: inline-block; flex: none; width: .75em; height: .75em; border-radius: 2px; background: var(--c, var(--muted)); margin-right: .35em; vertical-align: -1px; }
+.bk-controls { flex-wrap: wrap; gap: var(--sp-1); }
+.bk-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: var(--sp-2); margin-top: var(--sp-3); }
+.bk-tile { display: flex; flex-direction: column; gap: .1rem; min-width: 0; border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3); }
+.bk-tile-n { font-size: var(--fs-xl); font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.bk-tile-l { font-size: var(--fs-sm); color: var(--muted); }
+.bk-summary td, .bk-summary th { vertical-align: top; white-space: normal; }
+.bk-summary .bk-behind { display: block; font-weight: 400; }
+.bk-summary tr.is-resolved { color: var(--muted); }
+.bk-summary tr.is-selected > * { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.bk-row--critical > td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
+.bk-row--warn > td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+.bk-keyissues { min-width: 13rem; }
+.bk-ki { display: flex; align-items: baseline; }
+.bk-ki + .bk-ki { margin-top: .15rem; }
+.bk-ki--note { color: var(--muted); }
+.bk-ki--note .bk-sw { opacity: .45; }
+.bk-barcell { min-width: 10rem; white-space: nowrap; }
+.bk-bar { display: inline-flex; width: 8rem; height: .8rem; border-radius: 3px; overflow: hidden; vertical-align: middle; background: color-mix(in srgb, var(--muted) 12%, transparent); }
+.bk-seg { display: block; flex: none; height: 100%; width: var(--bk-w, 0); background: var(--c); }
+.bk-score { margin-left: var(--sp-1); font-weight: 600; font-variant-numeric: tabular-nums; }
+.bk-key { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); }
+.bk-key-item { display: inline-flex; align-items: center; }
+.bk-air { margin-top: var(--sp-2); }
+.bk-map { height: 340px; border-radius: var(--r-md); margin-top: var(--sp-2); }
+.bk-base-icon { color: var(--text); font-size: 14px; line-height: 14px; text-align: center; text-shadow: 0 0 3px var(--panel); }
+.bk-sec { border-left: 4px solid var(--border); }
+.bk-sec--critical { border-left-color: var(--bad); }
+.bk-sec--warn { border-left-color: var(--warn); }
+.bk-timeline { display: block; width: 100%; height: auto; margin: var(--sp-2) 0; }
+.bk-track { fill: color-mix(in srgb, var(--muted) 8%, transparent); }
+.bk-grid { stroke: var(--border); stroke-width: 1; }
+.bk-now { stroke: var(--text); stroke-width: 1.5; stroke-dasharray: 2 2; }
+.bk-rowlabel { font-size: 11px; fill: var(--text); }
+.bk-axis { font-size: 10px; fill: var(--muted); }
+.bk-timeline rect[class^="bk-c-"], .bk-hours rect { fill: var(--c); }
+.bk-cell-0 { fill: none; stroke: var(--bad); stroke-opacity: .55; }
+.bk-cell-1 { fill: color-mix(in srgb, var(--ok) 45%, transparent); }
+.bk-cell-2 { fill: var(--ok); }
+.bk-span-bad { fill: var(--bad); }
+.bk-span-warn { fill: var(--warn); }
+.bk-span-info { fill: var(--muted); }
+.bk-flag { stroke: var(--bad); stroke-width: 2; }
+.bk-dot-ok { fill: var(--ok); }
+.bk-dot-warn { fill: var(--warn); }
+.bk-dot-bad { fill: var(--bad); }
+.bk-points { margin: var(--sp-2) 0; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md); background: color-mix(in srgb, var(--accent) 7%, transparent); max-width: 90ch; }
+.bk-issues { display: grid; gap: var(--sp-3); list-style: none; margin: var(--sp-2) 0 0; padding: 0; }
+.bk-issue { border-top: 1px solid var(--border); padding-top: var(--sp-2); min-width: 0; }
+.bk-issue-h { display: flex; align-items: baseline; margin: 0; font-size: var(--fs-md); }
+.bk-issue-meta { margin: .15rem 0 var(--sp-1); }
+.bk-facts { margin: 0; padding-left: 1.2rem; }
+.bk-facts li { max-width: 80ch; margin-bottom: .2rem; }
+.bk-fig { margin: var(--sp-2) 0 0; }
+.bk-hours { display: block; width: 192px; max-width: 100%; height: auto; }
+.bk-links { margin-top: var(--sp-3); }
+.bk-minor summary, .bk-how summary { cursor: pointer; }
+.bk-inline-h { display: inline; margin: 0; font-size: var(--fs-md); }
+.bk-minor-list { columns: 22rem auto; column-gap: var(--sp-4); padding-left: 1.2rem; }
+
 .bf-td-match { text-align: center; }
 
 /* Role and station-of-interest pills inside the map popups. The hue arrives as

@@ -819,6 +819,15 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 187 — 2026-10-27: 🗼 State of the backbone
+
+The owner: *"a state of the backbone tab … draw on the work we've done around network health and pass range assessment and carrier offset identification of repeaters … lay out issues in order of station and ranked by the criticality of the sum of the issues … the sort of thing we're seeing at Toowoomba and Hillcrest … dynamic … depending on the period the user selects … a summary section at the top … then sections diving into the details … some visuals."* **Opens and closes nothing.**
+
+- **`backbone.js`** — a new tab, **Backbone**, headed *State of the backbone*, in the **Admin** group beside Base Stations and Network Review (the Data group beside Station Health is at `nav.mjs`'s ceiling of six). Every repeater on record ranked by the sum of its issues over 7–90 days (30 to start), its issues ranked inside it: off air, seldom heard (a note — heard a few times a week with no schedule, not missing), dropping out (overnight said), corrupted relays on its own carrier (clear copies, clean upstream, the hours they keep), carrier off the fleet or moving (one wild day set aside), power, and pass ranges against the air (Signal Routes' analysis, editors). Repeaters that stopped together are said to have. A summary (tiles, the worst twelve with two key issues and a score bar each, a map) and a section each (a timeline, the evidence, *what it points to*). Reads itself again every fifteen minutes; the period is remembered on the device.
+- **No migration.** Everything it reads is already public (`health_finding`, `transmitter_summary`, `flip_summary`, `flip_sources`, `recent_flips()`, `reading_daily`, `station_health`) but the receptions, which an editor reads through Signal Routes (`SignalRoutes.loadDays`, new).
+- **First look at the live data** (30 days, read-only): Hillcrest AL (Wine Glass) first — 50% of what it relays corrupted (100 of 102 clear, 8 clean upstream, at all hours), off air since 2:15 pm Mon 26 Oct, no daily charge; Toowoomba AL second — 32% corrupted, off air since 4:23 am Sun 25 Oct with 21 of the 37 stations behind it quiet, stopped within 16 minutes of Paradise Ck Rd AL; then Schultz Lookout and Mt Petersen (stopped within a minute of each other), Constitution Hill AL, Kunghur, Mt Glorious AL RPTR (4.2% corrupted, clean upstream). Constitution Hill's 17 ppm on 21 Oct (a stick with no correction yet) is set aside as the odd day it was.
+- **Checks:** `npm run backbone` (new, in CI), `tabs` (two entries), `smoke` (51 tabs), `nav`, `help`, `exports`, `looks`, `signalroutes`, the cheap five.
+
 ### Revision 186 — 2026-10-26: 🛤️ Signal Routes
 
 The owner: *"explore graphically what's coming in from where … use the fingerprinting of the carrier signals … what field stations are coming in through what repeaters … if that correlates to the pass range settings that we have on record … what's coming in on ALERT2 and what's coming in on legacy, and whether anything is coming in on iFLOWS or just legacy ALERT binary."* **Opens and closes nothing.**

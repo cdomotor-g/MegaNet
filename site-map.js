@@ -347,6 +347,14 @@ const SiteMap = (function () {
       ],
       note: 'Administrators only.',
     },
+    backbone: {
+      what: 'State of the backbone: the repeaters ranked by what has gone wrong with each over a period you pick — off air, corrupted relays, a carrier off the fleet, power, pass ranges against the air — each with its evidence and what it points to.',
+      use: [
+        'Run through the repeaters most at fault, worst first, in a meeting',
+        'See the evidence that a repeater\'s hardware or site is corrupting what it relays',
+        'Take the ranking away as a CSV, or the summary as text',
+      ],
+    },
     review: {
       what: 'A network reviewed the way a planner does it: every station\'s fade margin to every repeater, base or proposed site, beside what the attenuator found on site.',
       use: [
@@ -475,6 +483,7 @@ const SiteMap = (function () {
     { text: 'Explain a reading on an address nobody owns', tab: 'bitflipper' },
     { text: 'Find the repeater that is corrupting readings', tab: 'flipsources' },
     { text: 'See which repeater each station comes in through', tab: 'signalroutes' },
+    { text: 'Rank the repeaters by what is wrong with them', tab: 'backbone' },
     { text: 'Work out what could have corrupted a station\'s readings', tab: 'bitbench' },
     { text: 'Work out what is interfering with a repeater', tab: 'workbench' },
     { text: 'Listen to ALERT off the air',                 tab: 'serial' },

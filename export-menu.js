@@ -145,6 +145,18 @@ const ExportMenu = (function () {
         call: ['SignalRoutes.exportPassCsv'],
         ready: () => { const A = typeof SignalRoutes !== 'undefined' && SignalRoutes.state().A; return !A ? 'Nothing read yet — read the receptions, or show the demo.' : A.reps.length ? '' : 'No repeater\'s carrier was found in this period.'; } },
     ],
+    backbone: () => {
+      const ready = () => {
+        const A = typeof Backbone !== 'undefined' && Backbone.state().A;
+        return !A ? 'Nothing read yet — wait for the findings, or show the demo.' : A.rows.length ? '' : 'No repeater has anything wrong in this period.';
+      };
+      return [
+        { label: 'The ranking — CSV', sub: 'every repeater with something wrong in the period, worst first: each issue, its severity, whether it is still going on, its score and its evidence',
+          call: ['Backbone.exportCsv'], ready },
+        { label: 'The summary — text', sub: 'each repeater, worst first, with its key issues and what they point to — for a meeting\'s notes or an email',
+          call: ['Backbone.exportText'], ready },
+      ];
+    },
     flipsources: () => [
       { label: 'The suspects — CSV', sub: 'every repeater that could have corrupted a reading, with its carrier evidence, pass-range share and rate',
         call: ['FlipSources.exportCsv'], empty: 'There is no bit-flip evidence for this period yet.' },

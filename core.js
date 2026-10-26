@@ -312,6 +312,17 @@ const TABS = [
       find: 'administration users accounts people roles privileges permissions groups allowlist editors sign in access database datastore data source schema load stations.json github file snapshot backup settings storage reset migration dashboard health stats statistics visitors analytics last seen online active size tables volume connections' },
     { id: 'basestations', label: 'Base Stations',        icon: '🖥️',
       find: 'ingest points receivers fleet devices heartbeat check-in checking in uptime temperature under-voltage uplink queue remote manage restart reboot update upgrade release log ssh keys login maintenance team public key' },
+    // 🗼 Backbone (backbone.js), headed "State of the backbone": the repeaters
+    // ranked by what has gone wrong with each over a period — off air,
+    // corrupted relays, a carrier off the fleet, power, pass ranges against
+    // the air — drawn from Station Health's findings, the carrier fingerprints
+    // and Bit-Flip Sources. Filed here beside Base Stations and Network Review,
+    // the backbone's other two tabs, because the Data group beside Station
+    // Health is at nav.mjs's ceiling of six. Its find words are the questions
+    // a meeting asks of it ("worst repeaters", "faulty", "ranked") — never
+    // "network", "signal" or "the", which nav.mjs holds for other tabs.
+    { id: 'backbone',   label: 'Backbone',               icon: '🗼',
+      find: 'state backbone repeaters faulty faults worst ranked ranking priority priorities criticality critical issues problems hardware site location relays corrupting corrupted carrier offset fingerprint ppm off air silent down dropouts dropping out power battery solar pass ranges record meeting summary overview monthly' },
     { id: 'review',     label: 'Network Review',         icon: '📐',
       find: 'network review design audit planning fade margin matrix radio mobile rm comparison calibration calibrate attenuator path margin measured field test redundancy two paths second path gateways repeater relocation move proposed site hops tdma alert2 frequency principles licence' },
     { id: 'a2plan',     label: 'ALERT2 Transition Plan', icon: '🧭',     who: 'a2plan',
@@ -2425,6 +2436,32 @@ const HELP = {
     links: [{ label: 'Base stations: checking in, what may be asked, and the team keys', href: 'docs/base-stations.md' },
             { label: 'Ingest tokens, and base stations that ask for one', href: 'docs/ingest-http.md' }],
     related: ['admin', 'msglog', 'health'],
+  },
+
+  backbone: {
+    summary: '<strong>State of the backbone</strong>: every repeater on record with something wrong with it over the period you pick '
+           + '(7 to 90 days, 30 by default), <strong>ranked by the sum of its issues</strong>, worst first, and inside each repeater '
+           + 'its issues ranked by how much each matters. The summary names each repeater and its one or two key issues, with a bar '
+           + 'of its score and a map; then a section a repeater — a timeline of the period, every issue with its evidence, and what '
+           + 'they point to. Drawn from what the other tabs already find: Station Health\'s findings (off air, the stations behind '
+           + 'it gone quiet together, dropouts, its battery), the <strong>carrier fingerprint</strong> every burst it relays carries, '
+           + 'the <strong>corrupted copies</strong> that came on that carrier, and — for editors — its <strong>pass ranges against '
+           + 'the air</strong>. It reads itself again every fifteen minutes while it is open.',
+    watch: [
+      '<strong>"As strong as the clean copy"</strong> means the repeater sent the wrong bits — its receiver heard the station badly, '
+      + 'or its radio is failing — rather than our receiver mishearing it; <strong>"reached us clean another way"</strong> means the '
+      + 'error entered at that repeater. Interference keeps hours; a failing radio does not.',
+      'A carrier measured on one or two days, or one day far from the rest, can be a receiver\'s own tuning that day rather than the '
+      + 'repeater — the section says how many days stand behind it.',
+      'The score is a ranking, not a measurement: severity × how much of the network leans on the repeater × still going on or '
+      + 'not × the kind of trouble. <em>How it is worked out</em>, at the foot of the tab, gives the weights.',
+      'The findings it reads began on 21 October 2026, so a long period holds what there is. The pass ranges against the air need '
+      + 'an editor: they read the last seven days of receptions, as Signal Routes does.',
+    ],
+    links: [
+      { label: 'State of the backbone — what is gathered, how it is ranked, and how to read it', href: 'docs/backbone.md' },
+    ],
+    related: ['health', 'flipsources', 'signalroutes', 'passranges', 'basestations', 'review'],
   },
 
   review: {

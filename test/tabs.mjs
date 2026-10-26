@@ -320,6 +320,19 @@ const SEED_SIGNALROUTES = `async () => {
   await new Promise(r => setTimeout(r, 300));
 }`;
 
+// The Backbone draws its summary and sections only once the findings are in,
+// which this harness never gives it (the datastore is aborted, so it opens on
+// its error with Try again and a demo); the demo is the module's own door to
+// the same drawing. Every fold opened, because a closed <details> is
+// display:none, and a repeater picked so the map's second state is measured.
+const SEED_BACKBONE = `async () => {
+  Backbone.demo();
+  const A = Backbone.state().A;
+  if (A && A.rows.length) Backbone.showOnMap(A.rows[0].id);
+  document.querySelectorAll('#main-content details').forEach(d => { d.open = true; });
+  await new Promise(r => setTimeout(r, 300));
+}`;
+
 const SEED_BITFLIPPER = `async () => {
   const addr = String(state.data.stations
     .flatMap(s => (s.sensors || []).map(x => x.alert_id))
@@ -918,6 +931,8 @@ const CONVERTED = [
   { id: 'flipsources', label: 'Bit-Flip Sources', issue: '#244', seed: SEED_FLIPSOURCES },
   { id: 'signalroutes', label: 'Signal Routes — signed out', issue: 'born converted' },
   { id: 'signalroutes', label: 'Signal Routes — the demo, a repeater picked, every fold open', issue: 'born converted', seed: SEED_SIGNALROUTES },
+  { id: 'backbone',   label: 'Backbone — no datastore', issue: 'born converted' },
+  { id: 'backbone',   label: 'Backbone — the demo, a repeater picked, every fold open', issue: 'born converted', seed: SEED_BACKBONE },
   { id: 'workbench',  label: 'Interference Workbench — intro',       issue: '#139' },
   { id: 'workbench',  label: 'Interference Workbench — worked case', issue: '#139', seed: SEED_WORKBENCH },
   { id: 'packets',    label: 'ALERT Packets',   issue: '#140', seed: SEED_PACKETS },

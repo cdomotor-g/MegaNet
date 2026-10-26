@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 108, date: '2026-10-26', items: [
+      'New: <strong>🗼 Backbone</strong>, in the Admin group — the <strong>state of the backbone</strong>. Every repeater with something '
+        + 'wrong over the period you pick (30 days to start), <strong>ranked by the sum of its issues</strong>: off air, dropping out, '
+        + 'relaying <strong>corrupted copies</strong> on its own carrier, a <strong>carrier</strong> off the fleet or moving, its power, '
+        + 'and — for editors — its pass ranges against what it really relays. A summary of each repeater\'s key issues with a map, '
+        + 'then a section each: a timeline, the evidence, and what it points to. It reads itself again every fifteen minutes.',
+    ] },
     { n: 107, date: '2026-10-26', items: [
       'New: <strong>🛤️ Signal Routes</strong>, in the Data group — what comes in from where. Every burst the base stations '
         + 'heard, followed back to the field station or the repeater that sent it by its <strong>carrier</strong>, drawn as a '

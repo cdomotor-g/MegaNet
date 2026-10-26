@@ -5818,6 +5818,26 @@ through an ALERT2 concentrator. Both tables download as CSV
 ([docs/signal-routes.md](docs/signal-routes.md)). `npm run signalroutes` holds
 it to a fixture on the real station file.
 
+### 37. Backbone (the State of the Backbone, Repeater by Repeater)
+
+🗼 **Backbone**, in the **Admin** group beside Base Stations and Network Review,
+is headed **State of the backbone**: every repeater on record with something
+wrong with it over the period picked (7 to 90 days, **30** to start), **ranked
+by the sum of its issues**, worst first, and inside each repeater its issues
+ranked by how much each matters — **off air**, **dropping out**, relaying
+**corrupted copies** on its own carrier (as strong as the clean copy, or
+reaching us clean another way, says the error starts at the repeater: its
+hardware or its site), a **carrier** off the fleet or moving, its **power**,
+and — for editors — its **pass ranges against the air**. A summary names each
+repeater and its one or two key issues with a score bar and a map; then a
+section a repeater: a timeline of the period, every issue with its evidence,
+and what they point to. Repeaters that stopped together are said to have. It
+gathers what Station Health's findings, the carrier fingerprints, Bit-Flip
+Sources and Signal Routes already find — all public but the last — and reads
+itself again every fifteen minutes. The ranking downloads as CSV and the
+summary as text ([docs/backbone.md](docs/backbone.md)). `npm run backbone` holds
+it to a planted month on the real station file.
+
 ## Deployment Plan
 
 The plan the consolidation was built to, kept as the record of it. **Every
