@@ -1828,6 +1828,10 @@ const HELP = {
       + 'redundancy is visible.',
       '<strong>Readings as a table</strong>, under the chart, is the same numbers without a mouse — '
       + 'the Plots tab\'s, unchanged, and capped at 300 rows with the cap stated.',
+      'A <strong>group</strong> — a river\'s height gauges, or the rain gauges around a station, '
+      + 'sent here by a <em>Flood-Net plot</em> from a river\'s callout or a station\'s card — is '
+      + 'listed under its own name, a row a gauge under the station it came from. Picking a '
+      + 'station puts it away; ✕ beside its name does too.',
     ],
     links: [
       { label: 'How the 357 filter works — the test, drawn', call: 'ArroData.explain()' },

@@ -15,7 +15,9 @@
 // map-here.js and map-move-pin.js only to ask whether one of them owns the
 // click. All from inside its own functions, so this file's position among the
 // modules is free. places.js asks selectNamed() for a river picked in 📍 Find
-// a place.
+// a place. The callout places group-plots.js's pair for the river's gauges
+// (GroupPlots.riverHtml), and group-plots.js asks riverOf(), stationsAlong()
+// and near() which river a gauge stands on and who else does.
 //
 // ── Why this exists ─────────────────────────────────────────────────────────
 // Asked for in these words: "what I really need is the rivers themselves
@@ -116,6 +118,7 @@ const MapRiverLines = (function () {
   const LABEL_CHAR_PX = 6.6;    // the names' rough advance, for fitting and spacing
   const NOTE_BTN_CAP  = 12;
   const STATION_PAD   = 0.05;   // deg; a gauge this far outside a river's box is not on it
+  const NEAR_M        = 300;    // a gauge with no stream recorded this close to a line stands on it
   const CALLOUT_STATIONS = 8;
 
   let map = null, timer = null, moveRaf = null;
@@ -759,6 +762,90 @@ const MapRiverLines = (function () {
       .sort((a, b) => String(a.name).localeCompare(String(b.name)));
   }
 
+  // ── Along a river, for group-plots.js ─────────────────────────────────────
+  // Half the register's river height gauges carry no `stream` — 580 of 1,283
+  // — and a plot of "every gauge on this river" that left them out would be
+  // half a river. So a gauge with no stream recorded joins the river whose
+  // line passes within NEAR_M of it, as the lines are drawn (the national
+  // index, and whichever tiles have arrived). 247 of the 580 stand within
+  // 200 m of a principal river; at a confluence the nearer line wins.
+
+  // Metres from a point to a run's line: flat ground over a few hundred
+  // metres is ground enough.
+  function metresTo(lat, lon, run) {
+    const ll = run.ll, kx = Math.cos(lat * Math.PI / 180) * 111320, ky = 110540;
+    let best = Infinity;
+    for (let i = 2; i < ll.length; i += 2) {
+      const d = segDist2(0, 0, (ll[i - 1] - lon) * kx, (ll[i - 2] - lat) * ky, (ll[i + 1] - lon) * kx, (ll[i] - lat) * ky);
+      if (d < best) best = d;
+    }
+    return Math.sqrt(best);
+  }
+
+  // The nearest line to a point within NEAR_M, of the rivers `among` (all of
+  // them by default): { river, m } or null.
+  function nearestLine(lat, lon, among) {
+    const dLat = NEAR_M / 110540, dLon = NEAR_M / (111320 * Math.cos(lat * Math.PI / 180));
+    let best = null;
+    for (const r of among || rivers) {
+      for (const run of r.runs) {
+        const b = run.box;
+        if (lat < b[0] - dLat || lat > b[2] + dLat || lon < b[1] - dLon || lon > b[3] + dLon) continue;
+        const m = metresTo(lat, lon, run);
+        if (m <= NEAR_M && (!best || m < best.m)) best = { river: r, m };
+      }
+    }
+    return best;
+  }
+
+  // The stations along a river: the ones whose stream names it (stationsOn),
+  // then the ones with no stream recorded whose nearest line, within NEAR_M,
+  // is this river's. Each says how it got there.
+  function stationsAlong(r) {
+    const out = stationsOn(r).map(st => ({ st, how: 'stream' }));
+    const box = riverBox(r);
+    const all = (typeof state !== 'undefined' && state.data && state.data.stations) || [];
+    if (!box) return out;
+    const [s, w, n, e] = box, pad = 2 * NEAR_M / 110540;
+    for (const st of all) {
+      if (st.stream || st.lat == null || st.lon == null
+          || st.lat < s - pad || st.lat > n + pad || st.lon < w - pad || st.lon > e + pad) continue;
+      const hit = nearestLine(st.lat, st.lon);
+      if (hit && hit.river === r) out.push({ st, how: 'line', m: hit.m });
+    }
+    return out;
+  }
+
+  // The river a station stands on, from what is loaded: the river its stream
+  // names whose extent holds it, the nearest of them where the name is several
+  // rivers; else, with no stream recorded, the line within NEAR_M. Null when
+  // neither finds one — or when the rivers are not here yet.
+  function riverOfStation(st) {
+    if (!data || !st || st.lat == null || st.lon == null) return null;
+    if (st.stream) {
+      const k = riverKey(st.stream);
+      const named = rivers.filter(r => riverKey(r.name) === k);
+      for (const [name, r] of minorByName) if (riverKey(name) === k) named.push(r);
+      const holding = named.filter(r => {
+        const b = riverBox(r);
+        return b && st.lat >= b[0] - STATION_PAD && st.lat <= b[2] + STATION_PAD
+          && st.lon >= b[1] - STATION_PAD && st.lon <= b[3] + STATION_PAD;
+      });
+      if (holding.length <= 1) return holding[0] ? { river: holding[0], how: 'stream' } : null;
+      const hit = nearestLine(st.lat, st.lon, holding);
+      return { river: hit ? hit.river : holding.sort((a, b) => b.area - a.area)[0], how: 'stream' };
+    }
+    const hit = nearestLine(st.lat, st.lon);
+    return hit ? { river: hit.river, how: 'line', m: hit.m } : null;
+  }
+
+  // A river by the id a note button carries: an index into the national
+  // file, or `m:` and a minor creek's name.
+  function riverById(id) {
+    return typeof id === 'string' && id.startsWith('m:') ? minorByName.get(id.slice(2)) : rivers[Number(id)];
+  }
+  const idOf = r => String(r.id);   // a minor creek's is already `m:` and its name
+
   function calloutHtml(r) {
     const line = (html, cls) => `<span class="mn-pop-line${cls ? ' ' + cls : ''}">${html}</span><br>`;
     const out = [`<strong>${esc(r.title)}</strong><br>`];
@@ -794,6 +881,9 @@ const MapRiverLines = (function () {
     } else {
       out.push(line(esc('No station in the register names it as its stream.'), 'txt-muted'));
     }
+    // Every river height gauge along it, plotted together — in ARRO on one
+    // graph, or out of the Flood-Net datastore (group-plots.js).
+    if (typeof GroupPlots !== 'undefined') out.push(GroupPlots.riverHtml(idOf(r), r.title, stationsAlong(r)));
     out.push(`<div class="mn-popup-actions pill-row">
       <button type="button" class="pill" onclick="MapRiverLines.zoomToSelected()">Zoom to the whole ${esc(kindWord(r.name).toLowerCase())}</button>
       <button type="button" class="pill" onclick="MapRiverLines.clearSelection()">Clear selection</button>
@@ -1050,8 +1140,7 @@ const MapRiverLines = (function () {
     // A note button (or anything holding a river's id): select it and open its
     // callout, without moving the map.
     pick(id) {
-      const r = typeof id === 'string' && id.startsWith('m:')
-        ? minorByName.get(id.slice(2)) : rivers[Number(id)];
+      const r = riverById(id);
       if (r) select(r, { callout: true });
     },
 
@@ -1088,6 +1177,26 @@ const MapRiverLines = (function () {
 
     // Wait for the national file — the harness, and Places, ask.
     ready: ensureData,
+
+    // group-plots.js: the river a station stands on, as { id, title, how }
+    // or null — `how` is 'stream' when its stream names it and 'line' when
+    // it has none and stands within NEAR_M of the line — and every station
+    // along a river, as [{ st, how }]. From what is loaded: near() waits for
+    // the national file and the tiles around a point first.
+    riverOf(st) {
+      const hit = riverOfStation(st);
+      return hit ? { id: idOf(hit.river), title: hit.river.title, how: hit.how } : null;
+    },
+    stationsAlong(id) {
+      const r = riverById(id);
+      return r ? stationsAlong(r) : [];
+    },
+    loaded() { return !!data; },
+    near(lat, lon) {
+      return ensureData().then(() => (isFinite(lat) && isFinite(lon)
+        ? ensureTiles(lat - 0.05, lon - 0.05, lat + 0.05, lon + 0.05) : null));
+    },
+    NEAR_M,
 
     // The harness blocks the live service, so a check that can never fetch a
     // minor creek hands its features in here and they take the real path.

@@ -62,6 +62,45 @@ A river's stations are the register's stations whose `stream` names it — with
 the register's shorthands read as words (CK, R, STH, NTH) — and that stand
 inside its extent, because "Deep Creek" is several different creeks.
 
+## Plotting a river's gauges together
+
+A selected river's callout ends with a pair of pills for **every river height
+gauge along it** (`group-plots.js`), and the names of the stations they
+capture under them:
+
+- **📈 ARRO this river** opens ARRO's graph with each gauge's Water Level
+  device on one chart (`devices[]=site|device`, the last seven days), at most
+  40 of them.
+- **📉 Flood-Net plot** opens a dialog of what each gauge has sent, out of the
+  Flood-Net datastore: a strip a gauge on one time axis, **highest ground
+  first** — roughly upstream to downstream, so a flood is seen going down the
+  river — each on its own scale, because each reads against its own zero.
+  24 hours to 12 months; the pointer or the arrow keys read every strip at
+  one instant; the gauges are a table one press away. **Open in Field Data**
+  takes the same gauges and window to that tab, ticked as a group, where they
+  are filtered, inspected and exported.
+
+The gauges along a river are the stations above that carry a river height
+sensor, **and** the gauges with no `stream` recorded — 580 of the register's
+1,283 — that stand within 300 m of the river's line as drawn. The callout
+marks those *(on its line)*.
+
+The same pair is on a **station's card**, under *Plot with its neighbours*:
+
+- **River** — for a station with a river height sensor: the river it stands
+  on (the one its stream names, or with no stream the line within 300 m of
+  it), and every gauge along it. With the rivers switched off, or a stream
+  the Geofabric does not draw, the gauges whose stream has the same name
+  within 60 km, and the card says it matched by name alone.
+- **Rain** — for a station with a rain gauge: every rain gauge within a
+  distance of it, nearest first, on **one** millimetre scale so the bars
+  compare. 25 km to start; the slider takes it from 5 to 100 km, on the card
+  or in the dialog, and this device remembers it.
+
+A gauge is a measurement, not a sensor row: *Rainfall* and *Rainfall
+Increment* on one ALERT address are one gauge (ARRO is handed the increment),
+and two register records on one address are one strip, not two.
+
 ## A river's catchment, and a gauge's
 
 Selecting a river also shows **the land that drains into it**: outlined, and

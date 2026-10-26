@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-27** (revision 188 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-27** (revision 190 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -818,6 +818,16 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 190 — 2026-10-27: 📈 A station's neighbours, plotted together
+
+The owner: *"for when a user clicks a river, please create an 'ARRO this river' where the button/link/pill show the stations it captures and takes the user to arro with all the stations river height sensors plotted … rain and river versions of this feature for stations … for rain sensors it arro plots rain within a number of klm (pick a default and add a slider for the user), and for river sensors it plots other river sensors on that same stream … ALSO, create floodnet plot versions of these … on a modal which has a link over to the fully fledged data plotting tool."* **Opens and closes nothing.**
+
+- **`group-plots.js`** (new): a river's callout ends with **📈 ARRO this river** (every gauge's Water Level device on one ARRO graph, `buildArroUrl`, at most 40) and **📉 Flood-Net plot**, with the names of the stations they capture. A station's card gains *Plot with its neighbours*: **River** for a river height gauge (the river it stands on and every gauge along it) and **Rain** for a rain gauge (every rain gauge within 5–100 km, **25 to start**, a slider on the card and in the dialog, remembered on the device). The dialog is a strip a gauge on one time axis out of the datastore (`SensorSparks.readWindow`/`seriesOf`, an address a request, four at a time) — levels highest ground first on their own scales, rain nearest first on one mm scale — read at one instant by pointer or arrow keys, with a table; **Open in Field Data** hands every gauge over.
+- **Along a river** (`map-river-lines.js`: `riverOf`, `stationsAlong`, `near`): the stations whose stream names it, plus the gauges with **no stream recorded** within 300 m of its line — 580 of the 1,283 level gauges have none, 247 of those stand within 200 m of a principal river. With the rivers off, or a stream the Geofabric does not draw, the gauges whose stream has the same name within 60 km, said so.
+- **A gauge is a measurement**: Rainfall and Rainfall Increment on one address are one gauge (ARRO handed the increment); the register's duplicate records on one address are one strip.
+- **Field Data** takes a group (`ArroData.fieldOpenGroup`): listed under its name, a row a gauge under its own station, each series labelled with it; picking a station puts the group away.
+- **Checks:** `npm run groupplots` (new, in CI); `riverlines`, `movepin`, `sensorsparks`, `fieldprobe`, `fieldkind`, `stncard`, `stationscard`, `adnav`, `dialogs`, `registry`, `help`, `firstvisit`, `smoke`, the cheap five.
 
 ### Revision 189 — 2026-10-27: 🗼 Backbone beside Station Health, and its signal's line
 

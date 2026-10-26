@@ -12,7 +12,8 @@
 // way out, where app.js used to say so for it); across to app.js for
 // renderMain and renderTabs; to datastore.js for dbSelect; to modal.js for
 // Modal; and to flood-stages.js for FloodStages, which places a station's
-// flood classes and AEP levels in a series' datum (#226).
+// flood classes and AEP levels in a series' datum (#226). group-plots.js
+// comes in through fieldOpenGroup(), several stations' addresses at once.
 //
 // 3,272 lines, the largest of the fourteen and the subject of #128. Moving it
 // gave it a file; it did not decompose it, and the file size is not an
@@ -2135,6 +2136,7 @@ const ArroData = (function () {
       empty:     '',
       seq:       0,         // in-flight query id; a late reply for an old one is dropped
       probe:     newFieldProbe(),   // what the datastore says it holds — see fieldProbe()
+      group:     null,      // several stations' addresses at once — see fieldOpenGroup()
     };
   }
 
@@ -2475,8 +2477,16 @@ const ArroData = (function () {
   function fieldSelectableAddrs() {
     const out = fieldAddrs(fieldStation()).map(a => a.addr);
     const seen = new Set(out);
+    for (const g of fieldGroupItems()) if (!seen.has(g.addr)) { seen.add(g.addr); out.push(g.addr); }
     for (const r of fq().probe.rows) if (!seen.has(r.addr)) { seen.add(r.addr); out.push(r.addr); }
     return out;
+  }
+
+  // The group's addresses, while no single station is picked: a station
+  // picked over them is the operator changing the question.
+  function fieldGroupItems() {
+    const q = fq();
+    return q.group && !q.stationId ? q.group.items : [];
   }
 
   function fieldWindow(q) {
@@ -2712,7 +2722,7 @@ const ArroData = (function () {
       return;
     }
 
-    const known = new Map(fieldAddrs(st).map(a => [a.addr, a]));
+    const known = new Map([...fieldGroupItems(), ...fieldAddrs(st)].map(a => [a.addr, a]));
     const prev = ad;
     ad = inst;                       // adoptSeries() writes into the active instance
     try {
@@ -2729,10 +2739,13 @@ const ArroData = (function () {
         // with whichever station the picker was showing would undo exactly
         // that separation. The picked station stands when the readings name
         // nobody, which is the 244 unresolved addresses' case.
+        // A group's address names the station it was gathered from, which
+        // stands in for the picked one on the same terms.
         const ownerId = rows.find(r => r.station_id)?.station_id || null;
-        const owner = ownerId && ownerId !== st?.id
+        const named = hit?.station || st;
+        const owner = ownerId && ownerId !== named?.id
           ? ((state.data?.stations || []).find(x => x.id === ownerId) || { id: ownerId, name: ownerId })
-          : st;
+          : named;
         const label = [owner?.name || fieldAddrLabel(addr),
                        sensor?.type || hit?.label || fieldAddrLabel(addr)].filter(Boolean).join(' · ');
         const warn = [];
@@ -2869,6 +2882,8 @@ const ArroData = (function () {
             </label>
           </div>` : ''}
 
+        ${!st ? fieldGroupHtml() : ''}
+
         ${fieldProbeHtml()}
 
         <div class="panel-header ad-subhead">
@@ -2907,6 +2922,35 @@ const ArroData = (function () {
         ${q.error ? `<div class="small ad-note ad-note--bad ad-field-msg">${esc(q.error)}
             <button class="ad-inline-link" onclick="ArroData.fieldClearError()">dismiss</button></div>` : ''}
         ${q.empty ? `<div class="small ad-warn ad-field-msg">${esc(q.empty)}</div>` : ''}
+      </div>`;
+  }
+
+  // The group fieldOpenGroup() handed in: one row an address, under the
+  // station it came from, ticked like any other.
+  function fieldGroupHtml() {
+    const q = fq();
+    const g = q.group;
+    if (!g || !g.items.length) return '';
+    const allOn = g.items.every(it => q.sensors.includes(it.addr));
+    return `
+      <div class="ad-field-sensors ad-field-group">
+        <div class="panel-header ad-subhead">
+          <h3 class="ad-subhead-h" id="ad-group-h"
+              title="Gathered by a group plot — the gauges along a river, or around a station. Pick a station above to put the group away.">${esc(g.title || 'Group')}</h3>
+          <button class="btn-link" onclick="ArroData.fieldAllSensors()"
+                  aria-label="${allOn ? 'Untick every sensor in the group' : 'Tick every sensor in the group'}">${allOn ? 'none' : 'all'}</button>
+          <button class="ad-x" title="Put the group away"
+                  aria-label="Put away ${escAttr(g.title || 'the group')}"
+                  onclick="ArroData.fieldGroupClear()">✕</button>
+        </div>
+        ${g.items.map(it => `
+          <label class="ad-chk ad-sensor-row">
+            <input type="checkbox" ${q.sensors.includes(it.addr) ? 'checked' : ''}
+                   onchange="ArroData.fieldToggleSensor('${escAttr(it.addr)}')">
+            <span>${esc(it.station ? it.station.name : fieldAddrLabel(it.addr))}
+              <span class="small">${esc(it.label)}</span>
+              <span class="small mono">${esc(it.addr)}</span></span>
+          </label>`).join('')}
       </div>`;
   }
 
@@ -2998,6 +3042,7 @@ const ArroData = (function () {
   // station's addresses under another station's name.
   function fieldSetStation(id, find) {
     const q = fq();
+    if (id) q.group = null;
     q.stationId = id || '';
     q.find = id ? '' : (find || '');
     q.sensors = [];
@@ -3052,6 +3097,7 @@ const ArroData = (function () {
   function fieldOpenStation(id) {
     const q = fq();
     const st = (state.data?.stations || []).find(s => s.id === id) || null;
+    q.group = null;
     q.stationId = st ? st.id : '';
     q.find   = '';
     q.extra  = '';
@@ -3082,6 +3128,7 @@ const ArroData = (function () {
         String(s.station_number || '') === num || String(s.site?.number || '') === num) || null;
     }
     const q = fq();
+    q.group = null;
     q.stationId = st ? st.id : '';
     q.find = '';
     q.probe = newFieldProbe();
@@ -3111,6 +3158,7 @@ const ArroData = (function () {
     const q = fq();
     const st = (state.data?.stations || []).find(s => s.id === stationId) || null;
     const known = st ? fieldAddrs(st).some(x => x.addr === a) : false;
+    q.group     = null;
     q.stationId = st ? st.id : '';
     q.find    = '';
     q.probe   = newFieldProbe();
@@ -3121,6 +3169,46 @@ const ArroData = (function () {
     q.res     = 'auto';
     q.error   = ''; q.empty = '';
     fieldRun();
+  }
+
+  // The group plot's door in (group-plots.js): a river's height gauges, or
+  // the rain gauges around a station — several stations' addresses at once,
+  // which the picker's one station cannot hold. They are listed as a group of
+  // their own, each ticked, each under the name of the station it was
+  // gathered from, and drawn over the dialog's window; picking a station
+  // puts the group away, because that is a different question.
+  // `items` is [{ addr, station, sensor, label }]. Callers switchTab('field')
+  // first, for fieldShow()'s reason.
+  function fieldOpenGroup({ title = '', items = [], win = '7d' } = {}) {
+    const list = [], seen = new Set();
+    for (const it of items) {
+      const a = String(it && it.addr || '').trim();
+      if (!a || seen.has(a)) continue;
+      seen.add(a);
+      list.push({ addr: a, station: it.station || null, sensor: it.sensor || null,
+                  label: it.label || (it.sensor && it.sensor.type) || fieldAddrLabel(a) });
+    }
+    if (!list.length) return;
+    const q = fq();
+    q.group     = { title: String(title), items: list };
+    q.stationId = '';
+    q.find      = '';
+    q.probe     = newFieldProbe();
+    q.sensors   = list.map(it => it.addr);
+    q.extra     = '';
+    q.win       = AD_FIELD_WINDOWS.some(w => w[0] === win) ? win : '7d';
+    q.from      = ''; q.to = '';
+    q.res       = 'auto';
+    q.error     = ''; q.empty = '';
+    fieldRun();
+  }
+
+  function fieldGroupClear() {
+    const q = fq();
+    const drop = new Set((q.group?.items || []).map(it => it.addr));
+    q.group = null;
+    q.sensors = q.sensors.filter(a => !drop.has(a));
+    renderSide();
   }
 
   // What the chart says about itself. Only on the Field tab: the ARRO tab's
@@ -8060,6 +8148,7 @@ const ArroData = (function () {
     fieldOpenStation,
     // and the station editor's sparklines' — one address, one window
     fieldOpenAddr,
+    fieldOpenGroup, fieldGroupClear,
     // exposed for reasoning about the filter outside the UI
     parseCsv, parseName, linkStation, guessKind, runFilter, walk357,
     // and about which addresses a station is reachable on, which is two shapes

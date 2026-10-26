@@ -3271,6 +3271,41 @@ h2.h-bad {
 .sspk-foot .txt-muted { flex: 1 1 16rem; }
 .sspk-unsaved { color: var(--text); }
 
+/* A station's neighbours plotted together (group-plots.js). On the station
+   card and in a river's callout: a pair of pills — ARRO, and the Flood-Net
+   plot — with the names of the stations they capture under them, and for rain
+   the radius slider over the pair. In the dialog: a strip a gauge on one time
+   axis, the sparkline dialog's marks and colours (the .sspk-* above), each
+   strip's name and value over it so a phone keeps the chart full width. */
+.gplot-row + .gplot-row { margin-top: var(--sp-2); }
+.gplot-row-head { margin: var(--sp-1) 0; }
+.gplot-pills { margin: var(--sp-1) 0; }
+.gplot-names, .gplot-gaps { display: block; line-height: 1.4; }
+.gplot-gaps { margin-top: .15rem; }
+.gplot-km { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); }
+.gplot-km output { font-variant-numeric: tabular-nums; }
+.gplot-range { flex: 1 1 8rem; min-width: 8rem; accent-color: var(--accent); }
+.gplot-km--dlg { margin-bottom: var(--sp-2); }
+.gplot-callout { margin: .2rem 0 .1rem; }
+.gplot-callout .gplot-pills { margin: .2rem 0; }
+.gplot-sub { margin: 0 0 var(--sp-2); color: var(--muted); }
+.gplot-wins { margin-bottom: var(--sp-2); }
+.gplot-head { margin: var(--sp-1) 0; }
+.gplot-stage { border-radius: var(--r-sm); touch-action: pan-y; }
+.gplot-stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gplot-strip { border-top: 1px solid var(--border); padding-top: .15rem; }
+.gplot-strip:first-child { border-top: 0; }
+.gplot-strip-head {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--sp-2);
+  font-size: var(--fs-sm);
+}
+.gplot-name { font-weight: 600; }
+.gplot-val { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gplot-chart, .gplot-axis { display: block; width: 100%; height: auto; overflow: visible; }
+.gplot-hold { min-height: 2.2rem; display: flex; align-items: center; padding-left: 50px; }
+.gplot-read { min-height: 1.5em; margin: var(--sp-1) 0 0; font-variant-numeric: tabular-nums; }
+.gplot-foot .pill { text-decoration: none; }
+
 /* A frequency pair in the station editor (0033): the sensor row's grammar —
    one wrapping line of boxes, the two frequencies short and fixed, the use
    taking what is left — for the same reason it wraps: at 375 px the fixed half

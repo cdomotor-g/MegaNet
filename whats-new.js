@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 112, date: '2026-10-26', items: [
+      'Plot a station\'s <strong>neighbours</strong> with it. Click a <strong>river</strong> on the Stations map and its callout '
+        + 'has <strong>📈 ARRO this river</strong> — every river height gauge along it on one ARRO graph — and '
+        + '<strong>📉 Flood-Net plot</strong>, the same gauges out of the Flood-Net datastore, a strip each, highest ground first, '
+        + 'with the names of the stations each captures. A station\'s card has the same under <em>Plot with its neighbours</em>: '
+        + 'its <strong>river</strong>, for a river height gauge, and the <strong>rain</strong> gauges around it, within a distance '
+        + 'you set with the slider (25 km to start). The plot\'s <em>Open in Field Data</em> takes every gauge there.',
+    ] },
     { n: 111, date: '2026-10-26', items: [
       '<strong>🗼 Backbone</strong> has moved into the <strong>Data</strong> group, beside Station Health, whose findings it ranks; '
         + '<strong>🛤️ Signal Routes</strong> has moved to <strong>Admin</strong>, beside Base Stations, to make room — a group holds six.',

@@ -1205,6 +1205,15 @@ jobs:
         working-directory: test
         run: npm run sensorsparks
 
+      # A station's neighbours plotted together (group-plots.js): a river's
+      # height gauges and a station's rain gauges, in ARRO on one graph and
+      # out of the datastore (stood in for) a strip each, and the door onto
+      # Field Data with every one of them.
+      - name: Group plots — a river's gauges and the rain around a station, ARRO and Flood-Net
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run groupplots
+
       # Every title's words above the pointer (tooltips.js), not in the
       # browser's box under it where the pointer covers them. It stands down
       # under automation, so no other check meets it; this one asks for it.

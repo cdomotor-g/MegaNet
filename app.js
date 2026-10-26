@@ -8054,6 +8054,9 @@ function repaintStnCard() {
   // Its health (#218): one request for its readings, kept per station for a
   // few minutes, so a repaint asks nothing new (health-glance.js).
   HealthGlance.ask(s);
+  // …and the river it stands on, for its neighbours' plots, once the rivers
+  // around it are here (group-plots.js).
+  if (typeof GroupPlots !== 'undefined') GroupPlots.cardAsk(s);
   // …and its carrier fingerprint, kept per station for ten minutes, the
   // server judging hourly (health-drift.js).
   if (typeof HealthDrift !== 'undefined') HealthDrift.cardAsk(s);
@@ -8350,6 +8353,13 @@ function stnCardHtml(s) {
          Nothing for a proposed station, which has nothing to have heard. The
          owner stays the card's first row, as it always is. -->
     ${HealthGlance.cardHtml(s)}
+    <!-- Its neighbours plotted with it (group-plots.js): a river height
+         gauge's river — every gauge along it — and a rain gauge's
+         surroundings, within the distance its slider says, each in ARRO on one
+         graph or out of the datastore a strip each. Filled again by
+         GroupPlots.cardAsk once the rivers around it have arrived. Nothing
+         for a station with neither kind of sensor. -->
+    ${typeof GroupPlots !== 'undefined' ? GroupPlots.cardHtml(s) : ''}
     <div class="acma-sect">
       ${acmaCardRow('Stn #', s.station_number ? esc(s.station_number)
         : s.proposed ? '<span class="txt-muted">none yet — proposed</span>' : null)}

@@ -17,6 +17,8 @@
 // station-editor.js draws the slot on each row (slotHtml) and app.js's
 // stationEditorCardDrawn() asks for the slots to be filled (fill), whichever
 // way the card was drawn — on its own or with the whole Stations tab.
+// group-plots.js reads several addresses the same way, a strip each:
+// readWindow, seriesOf, xTicks and addrLabel.
 //
 // ── What a row's line is ─────────────────────────────────────────────────────
 //
@@ -842,6 +844,8 @@ const SensorSparks = (function () {
     slotHtml, fill, open, setWin, toField, point, unpoint, key,
     // for test/sensorsparks.mjs
     seriesOf, addrLabel, xTicks, yAxis, WINS,
+    // for group-plots.js, which reads and draws several addresses the same way
+    readWindow,
   };
 })();
 
