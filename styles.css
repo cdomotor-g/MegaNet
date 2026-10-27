@@ -19552,8 +19552,6 @@ button.adm-danger:hover { border-color: var(--bad); }
   transition: transform .15s ease, background-color .15s ease, color .15s ease; }
 .hb-bigplay-disc .hb-i { width: 48%; height: 48%; }
 .hb-bigplay:hover .hb-bigplay-disc, .hb-bigplay:focus-visible .hb-bigplay-disc { background: var(--hb-accent); color: #04121e; transform: scale(1.06); }
-.hb-bigplay:focus-visible { outline: none; }
-.hb-bigplay:focus-visible .hb-bigplay-disc { outline: 3px solid var(--hb-ink); outline-offset: 3px; }
 .hb-stage:has(.hb-bigplay) .hb-lower { display: none; }
 /* ▶ or ⏸ blooming in the middle as it is pressed. */
 .hb-flash-slot { position: absolute; left: 50%; top: 50%; z-index: 1; pointer-events: none; }
@@ -19565,7 +19563,6 @@ button.adm-danger:hover { border-color: var(--bad); }
 /* The player's bar. */
 .hb-ctl { position: relative; padding: .15rem .45rem .25rem; border-radius: 0 0 14px 14px; background: var(--hb-bar); }
 .hb-seek { position: relative; height: 22px; margin: 0 .4rem; cursor: pointer; touch-action: none; border-radius: 6px; }
-.hb-seek:focus { outline: none; }
 .hb-seek:focus-visible { box-shadow: 0 0 0 2px var(--hb-accent); }
 .hb-segs { position: absolute; inset: 0; display: flex; gap: 3px; align-items: center; }
 .hb-seg { position: relative; flex: var(--f, 1) 1 0; min-width: 3px; height: 4px; border-radius: 2px;
@@ -19617,7 +19614,7 @@ button.adm-danger:hover { border-color: var(--bad); }
   background: none; color: var(--hb-ink); font: inherit; font-size: .9rem; text-align: left; }
 .hb-speed-menu button::before { content: ""; width: 1rem; text-align: center; }
 .hb-speed-menu button[aria-checked="true"]::before { content: "✓"; color: var(--hb-accent); font-weight: 700; }
-.hb-speed-menu button:hover, .hb-speed-menu button:focus-visible { background: rgba(242,247,251,.12); outline: none; }
+.hb-speed-menu button:hover, .hb-speed-menu button:focus-visible { background: rgba(242,247,251,.12); }
 /* A narrow player keeps the buttons and the time; the scene's title is the
    lower third's, on the picture. */
 @container (max-width: 560px) {

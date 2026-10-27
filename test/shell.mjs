@@ -680,6 +680,9 @@ try {
       // replacing. `--page-max` is allowed because it *is* the token.
       inlineStyles: [...main.querySelectorAll('[style]')]
         .filter(el => el.tagName !== 'COL')
+        // Leaflet positions its own panes, tiles and markers with inline styles;
+        // the Address map became a card drawn on open (57d4ba5), so it is here.
+        .filter(el => !el.closest('.leaflet-container'))
         .map(el => el.getAttribute('style'))
         .filter(s => !/^--/.test(s.trim())).length,
     };
