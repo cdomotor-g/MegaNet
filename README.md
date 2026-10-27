@@ -198,6 +198,11 @@ MegaNet/
 ├── map-cameras.js          ← MapCameras — the councils' and QLDTraffic's flood and
 │                             road cameras on the Stations map, the viewer with each one's latest
 │                             picture and its age, and the station card's section
+├── map-rain.js             ← MapRain — the rain the network's own gauges measured,
+│                             painted between them as a heat map over the Stations
+│                             map: a window's total or its heaviest hour, each
+│                             gauge's figure, the heaviest falls, and the last 24
+│                             hours played back
 ├── map-relocate.js         ← MapRelocate — 🚚 the station relocation finder: the
 │                             ground round a station that has to move, coloured by
 │                             fade margin to its repeaters, open sky and cover, kept
@@ -1319,6 +1324,7 @@ here.
 - **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, the Queensland property boundaries and road reserve on the ground when their switches are on, a polar coverage plot lying on the relief, your Draw & measure sketches on the ground (and its tools drawing there), pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray, and water rising through the ground's heights to show how the land lies (an animation, not flood modelling; on until turned off)
 - **Mobile coverage** — each carrier's own 4G coverage map, as Telstra, Optus and TPG give it to the ACCC: where a phone works outdoors and where only with an external antenna, one carrier at a time or the best of the three
 - **Flood & road cameras** — the ~600 cameras councils publish on their disaster dashboards and TMR publishes on QLDTraffic, a pin each; press one for its latest picture and how old it is. On for everybody, signed in or not, from zoom 8
+- **Rainfall heat map** — the rain the network's own gauges measured, painted between them: the last hour to the last week, since 9 am or the last whole rain day, as a total or as the heaviest hour; an opacity slider, how far each gauge's figure spreads, each gauge's figure beside its station, the five heaviest falls, and the last 24 hours played back an hour a frame. Off until switched on; signed in or not
 - Elevation shading over any base map, with an opacity slider
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
 - **Rivers and creeks** on by default — every principal named river and creek in Australia from the Bureau's Geofabric, named along its course and drawn heavier the more country drains through it; hover one for its name, click it to select it end to end and see which stations are on it
@@ -2534,6 +2540,30 @@ read from the councils' dashboards and QLDTraffic weekly
 picture goes no further than Cloudflare's edge cache, for a minute.
 `docs/council-cameras.md` has where the list comes from, which councils it
 covers, and why storing the pictures was not done.
+
+**Rainfall heat map.** *Rainfall heat map (the network's gauges)*, under the
+rivers in **Map display**, paints the rain Flood-Net's own gauges have
+measured — out of the datastore, so signed in or not — as a heat map between
+them, in twelve steps from pale blue through green and yellow to red and
+purple, the order the Bureau's rain maps use. Pick the window (the last hour,
+3, 6, 12 or 24 hours, 3 or 7 days, *since 9 am* — today's rain day — or the
+*24 hours to 9 am*, on Brisbane's clock) and what to show: the rain fallen, in
+millimetres, or the **peak intensity**, the most that fell in any one hour,
+in mm/h. The opacity slider sets how much of the map shows through; *Spread
+from each gauge* (10–80 km, 30 to start) sets how far a gauge's figure
+reaches, and nothing is painted further than that from every gauge — this is
+what the gauges measured, not radar, and the note says so. From zoom 9 each
+wet gauge's figure sits beside its station (the heavier one where two would
+overlap), and from zoom 11 the dry ones too, as *0.0*; press one for its
+station. The note names the five heaviest falls, a press from each, and how
+many gauges were heard. **▶ Play the last 24 hours** shows the rain in each
+hour, one after another, with a slider to stop on any hour. A gauge counts
+when it has been heard from since a day before the window opened — heard and
+no tips is dry, not heard is left out — and its rain is its tips with the
+counter's wraps, resets and corrupted frames taken out, as Station Health
+counts them, at the station's bucket size (0.2 mm a tip where none is
+recorded). Read again every five minutes while it is on; the settings are
+remembered on the device.
 
 **Wind loading regions.** *Wind regions (AS/NZS 1170.2)*, another **Map
 display** switch, draws the Standard's wind loading regions — A0–A5, B1, B2,

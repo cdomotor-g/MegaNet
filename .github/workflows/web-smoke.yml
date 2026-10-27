@@ -1421,6 +1421,21 @@ jobs:
         working-directory: test
         run: npm run councilcams
 
+      # The rainfall heat map (map-rain.js): the rain the network's gauges
+      # measured, painted between them. Under Node, the arithmetic — the
+      # twelve steps, the rain day on Brisbane's clock, a window's tips and its
+      # heaviest hour, a wrapped counter and a corrupted frame, the weighting
+      # out to the reach and nothing past it. Then in Chromium on the real
+      # register with the datastore stood in for: off and unread until switched
+      # on, requests of at most 150 addresses reaching back 48 hours, a silent
+      # gauge left out, the storm's colour over its gauge, opacity, reach,
+      # figures by zoom, the heaviest named, the 3-day window read again, the
+      # peak, the last 24 hours played, a failed read said so, and off.
+      - name: Rainfall heat map — the network's gauges, painted between them, a window, its peak and the last 24 hours
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run rainmap
+
       # Zip packs on the Field Photos tab (photo-zip.js). `photos` never drops a
       # zip, and everything a zip can do wrong is quiet: wrong bytes still
       # decode, a wrong code page is a wrong title, a zip that lies about its

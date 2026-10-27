@@ -5259,6 +5259,12 @@ function mapDisplayControlsHtml() {
       …with its catchment, shaded by height
     </label>
     <p class="filter-note" id="map-river-lines-note">${MapRiverLines.noteHtml()}</p>
+    <!-- The rain the network's own gauges measured (map-rain.js), painted
+         between them as a heat map, with its window, measure, opacity, spread,
+         each gauge's figure and the last 24 hours played back. Under the
+         rivers because it is the other half of the same question: what fell,
+         and where it is going. -->
+    ${MapRain.controlsHtml()}
     <!-- Ground height as colour (#186). It was a base map until then, one radio
          beside OSM-Topo — and picked as a base it took the localities, the
          roads and the watercourses with it. It is over the base now, with the
@@ -5647,6 +5653,7 @@ function mapLegendOffLayersHtml() {
     !state.mapElev            && 'Elevation shading',
     !state.mapSurvey          && 'Survey marks',
     !state.mapRiverLines      && 'Rivers and creeks',
+    !state.mapRain            && 'Rainfall heat map',
     !state.mapRivers          && 'River highlighting',
     !state.mapContours        && 'LiDAR contours',
     !state.mapPeaks           && 'Highest ground in view',
@@ -5825,6 +5832,7 @@ function mapLegendHtml() {
     </span>` : ''}
     ${MapRiverLines.active() ? MapRiverLines.legendHtml() : ''}
     ${RiverCatchments.active() ? RiverCatchments.legendHtml() : ''}
+    ${MapRain.active() ? MapRain.legendHtml() : ''}
     ${MapRivers.active() ? `
     <span class="legend-item">
       <span class="legend-line legend-line-river"></span>
@@ -6082,6 +6090,7 @@ function stopStationsMap() {
   MapLots.detach();
   MapPhotos.detach();
   MapCameras.detach();
+  MapRain.detach();
   MapWind.detach();
   MapMini.detach();
   // Not a detach — MapLos holds no layer — but the same duty: the queue is
@@ -6268,6 +6277,7 @@ function initMap() {
   MapLots.attach(state.map);
   MapPhotos.attach(state.map);
   MapCameras.attach(state.map);
+  MapRain.attach(state.map);
   MapWind.attach(state.map);
   // The minimap, bottom right: a second map further out, with this one's view
   // outlined on it (map-mini.js). Before the first refresh, which re-fits this

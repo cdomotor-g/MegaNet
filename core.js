@@ -1182,6 +1182,12 @@ const HELP = {
       + 'The mix and the order are remembered. Below that the panel holds more than fits its first screenful — '
       + 'LiDAR contours, wind regions, line-of-sight checks, survey marks, ACMA licensing — '
       + 'and the legend\'s last line names whichever of them are currently off.',
+      '<strong>Rainfall heat map</strong>, under the rivers in Layers, paints the rain the network\'s own '
+      + 'gauges have measured as a heat map between them: pick the window (the last hour to the last week, '
+      + 'since 9 am, or the 24 hours to 9 am) and the rain fallen or its heaviest hour, and set its opacity '
+      + 'and how far each gauge\'s figure spreads — nothing is painted beyond that, because it is the gauges, '
+      + 'not radar. Zoom in for each gauge\'s figure beside its station; <strong>▶ Play the last 24 hours</strong> '
+      + 'shows the rain hour by hour.',
       'In the Calm look the map starts quiet: the pale <strong>Light</strong> base map (<strong>Dark</strong> '
       + 'in the dark theme), every link in one colour, and waterways, survey marks, wind regions, road '
       + 'parcels, property boundaries, the backbone paths, the arrowheads, the forecast outlines and the '
@@ -4658,6 +4664,11 @@ const state = {
   // unless switched off, for everybody: one small file the first time the map
   // is zoomed in.
   mapCameras:    localStorage.getItem('mn-council-cameras') !== 'off',
+  // The Stations map's rainfall heat map (map-rain.js): the rain the
+  // network's own gauges measured, painted between them. Off unless switched
+  // on, and remembered once it is: it reads the datastore and paints over
+  // everything, which is the operator's to ask for.
+  mapRain:       localStorage.getItem('mn-rain') === 'on',
   // The Stations map's 📌 site features (site-features.js, 0061): a
   // station's orifice outlet, pits, benchmarks, boards and orifice run. On
   // unless switched off, for the photos' reason: signed out it asks nothing.

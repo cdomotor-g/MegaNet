@@ -17996,6 +17996,69 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 .stn-card-cam-list .pill .mn-cam-swatch { flex: none; }
 .stn-card-cam-at { color: var(--ok); font-weight: 600; }
 
+/* ── The rainfall heat map on the Stations map (map-rain.js) ──
+   The surface is an image the browser smooths as it scales it up; the key is
+   one strip of the twelve steps with each step's lower bound under it, in the
+   Map display panel and in the legend alike. A gauge's figure is a pill that
+   hangs off the station's point up and to the right, so the pin under it
+   stays the thing at the point. The colours are the layer's own (literal, as
+   the image's are), each with the ink map-rain.js picked for it. */
+.mn-rain-surface { image-rendering: auto; }
+.mn-rain-ramp {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  list-style: none;
+  width: 100%;
+}
+.mn-rain-ramp li::before {
+  content: '';
+  display: block;
+  height: 10px;
+  background: var(--dot);
+}
+.mn-rain-ramp li:first-child::before { border-radius: 2px 0 0 2px; }
+.mn-rain-ramp li:last-child::before { border-radius: 0 2px 2px 0; }
+.mn-rain-ramp span {
+  display: block;
+  font-size: .66rem;
+  line-height: 1.3;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.legend-rain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+.mn-rain-top { display: block; margin-top: .2rem; }
+.mn-rain-lapse { margin: .5rem 0 .2rem; }
+.mn-rain-lapse-btns { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.mn-rain-lapse button { padding: .35rem .7rem; font-size: .85rem; }
+.mn-rain-lapse.is-on { padding: .4rem .5rem; border: 1px solid var(--line); border-radius: var(--r-md); }
+.mn-rain-fig-icon { background: none; border: 0; }
+.mn-rain-fig {
+  position: absolute;
+  left: 7px;
+  bottom: 5px;
+  padding: 0 .3rem;
+  border-radius: 999px;
+  background: var(--dot);
+  color: var(--ink);
+  border: 1px solid rgba(0, 0, 0, .35);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .3);
+  font: 600 11px/15px system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.mn-rain-fig-icon:focus-visible .mn-rain-fig {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+
 /* ── Print (#118) ────────────────────────────────────────────────────────────
    The workbook's own print setup is A4 portrait, one page per station visit,
    Arial with 8pt labels and 10pt bold banner headings, and an explicit print

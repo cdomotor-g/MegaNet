@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 123, date: '2026-10-27', items: [
+      'The <strong>Stations</strong> map can paint the <strong>rain</strong> the network\'s own gauges have measured as a '
+        + '<strong>heat map</strong> between them — switch on <strong>Rainfall heat map</strong> under <strong>Map display</strong>. '
+        + 'Pick the window (the last hour to the last week, since 9 am, or the 24 hours to 9 am) and whether to show the rain '
+        + 'fallen or its heaviest hour; slide its <strong>opacity</strong> and how far each gauge\'s figure spreads. Zoom in for '
+        + 'each gauge\'s figure beside its station, see the five heaviest falls named, and press <strong>▶ Play the last 24 '
+        + 'hours</strong> to watch the rain move hour by hour. Signed in or not.',
+    ] },
     { n: 122, date: '2026-10-27', items: [
       'New in the Knowledge base: <strong>🪛 Pinouts</strong> — the connectors a site visit meets, drawn pin by pin with a table '
         + 'beside each: RS-232 on a DB9 (male and female) and a DB-25, the <strong>ELPRO ERT-A2</strong>\'s MIL connectors (pin for '
