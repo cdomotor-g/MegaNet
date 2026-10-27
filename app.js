@@ -4741,9 +4741,12 @@ function stationsMapPanels(map) {
     id: 'display', icon: '🗺️', dockIcon: Glyphs.rail('layers'), title: 'Layers',
     btnLabel: 'Layers — base maps, overlays, link colours and labels',
     group: 'show', order: 20,
+    // The ACMA block is the panel's last section, and has a heading of its own
+    // like the rest: with only a rule above it, its one switch read as one more
+    // row of Labels & export.
     html: () => `
       <div id="map-display-block">${mapDisplayControlsHtml()}</div>
-      <div class="filter-block">${acmaFilterBlockHtml()}</div>`,
+      <div class="filter-block"><div class="map-display-h">ACMA licences</div>${acmaFilterBlockHtml()}</div>`,
     // The panel is rebuilt with the map on every render of the tab; the find
     // term is not, so a term that was in the box comes back filtering the rows
     // that were just built.
@@ -5142,7 +5145,7 @@ function mapDisplayControlsHtml() {
              onchange="state.mapHideOthers=this.checked;refreshMapLayers()">
       Hide stations that don't match
     </label>
-    <label class="filter-check">
+    <label class="filter-check mapd-join">
       <input type="checkbox" ${state.mapRelated ? 'checked' : ''}
              onchange="state.mapRelated=this.checked;stationsFilterChanged()">
       Include related repeaters
@@ -5284,7 +5287,7 @@ function mapDisplayControlsHtml() {
              aria-valuetext="${Math.round(state.mapElevOpacity * 100)} per cent"
              oninput="document.getElementById('elev-opacity-val').textContent=Math.round(this.value*100)+'%';this.setAttribute('aria-valuetext',Math.round(this.value*100)+' per cent');MapElevation.setOpacity(+this.value)">
     </label>
-    <label class="filter-check"
+    <label class="filter-check filter-sub"
            title="Hillshade over the band colour — the hue is still the height and nothing else. Off gives the flat banding Radio Mobile draws the same colour file as.">
       <input type="checkbox" ${MapElevation.relief() ? 'checked' : ''}
              onchange="MapElevation.setRelief(this.checked)">
@@ -5562,6 +5565,58 @@ function mapDisplayRows(root) {
   return groups;
 }
 
+// One card per control: a switch and everything that hangs off it — its
+// sliders, its selects, its sub-switch, its key, its note — drawn as one boxed
+// group (styles.css, .mapd-card), so the eye can tell where one control ends
+// and the next begins. Under one heading the panel was a single column of
+// thirty-odd rows at one indent, and a slider read as belonging to whichever
+// switch happened to be nearest.
+//
+// The markup stays the flat list mapDisplayRows reads, so the cards are worked
+// out here rather than wrapped in the HTML. A top-level switch, the link colour
+// radio group, the owner block and the look's note each start a card; a
+// heading ends one; anything else joins the card above it. Two exceptions say
+// so on the row itself — .mapd-join is a switch that belongs with the one above
+// (the four pin styles, Include related repeaters) — or by what they are: the
+// base maps are one stack, so consecutive base rows are one card.
+//
+// The cards are worked out over the whole list and then drawn over the rows the
+// find box left showing, so a hidden row drops out of its card rather than
+// handing its siblings to the card above. Re-run after every rebuild and every
+// find (applyMapDisplayFind), and after a base map is dragged (map-controls.js),
+// which moves rows without rebuilding.
+const MAPD_CARD_CLASSES = ['mapd-card', 'mapd-card-top', 'mapd-card-end'];
+
+function markMapDisplayCards(root = document.getElementById('map-display-block')) {
+  if (!root) return;
+  const card = new Map();
+  let n = 0, prev = null;
+  for (const el of root.children) {
+    el.classList.remove(...MAPD_CARD_CLASSES);
+    if (el.id === 'map-display-find-row' || el.id === 'map-display-find-none') continue;
+    // A heading closes the card; Send view to Map Generator is an action under
+    // the last card, not a setting, and stands bare.
+    if (el.classList.contains('map-display-h') || el.classList.contains('mg-send-row')) {
+      prev = null;
+      continue;
+    }
+    const base = el.classList.contains('mn-base-row');
+    const starts = !prev
+      || (base ? !prev.classList.contains('mn-base-row')
+               : !el.classList.contains('mapd-join')
+                 && el.matches('.filter-check:not(.filter-sub), [role="radiogroup"], .mapd-owner, .mapd-calm'));
+    if (starts) n++;
+    card.set(el, n);
+    prev = el;
+  }
+  const shown = [...card.keys()].filter(el => !el.hidden);
+  shown.forEach((el, i) => {
+    el.classList.add('mapd-card');
+    if (card.get(shown[i - 1]) !== card.get(el)) el.classList.add('mapd-card-top');
+    if (card.get(shown[i + 1]) !== card.get(el)) el.classList.add('mapd-card-end');
+  });
+}
+
 function applyMapDisplayFind() {
   const root = document.getElementById('map-display-block');
   if (!root) return;
@@ -5593,6 +5648,7 @@ function applyMapDisplayFind() {
     h.classList.toggle('mapd-h--first', first && !h.hidden);
     if (!h.hidden) first = false;
   }
+  markMapDisplayCards(root);
   // The ACMA block is the panel's other half and lives outside #map-display-block
   // (it is rendered by acmaFilterBlockHtml and re-rendered by its own code), so
   // it is filtered whole rather than row by row — it is one subject, and a
@@ -5603,6 +5659,10 @@ function applyMapDisplayFind() {
       || terms.every(t => (acma.textContent || '').toLowerCase().includes(t));
     acma.hidden = !hit;
     if (hit) shown++;
+    // Its heading is the topmost one drawn when the find box has hidden
+    // every section above it.
+    const head = acma.querySelector('.map-display-h');
+    if (head) head.classList.toggle('mapd-h--first', first && hit);
   }
   const none = document.getElementById('map-display-find-none');
   if (none) {

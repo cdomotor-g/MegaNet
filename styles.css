@@ -8620,44 +8620,120 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 /* Group headings inside the 👁️ Map display flyout (#175). The flyout scrolls,
    and a column of checkboxes past the fold gives nobody a reason to scroll
    it; a heading says what kind of thing is under it. */
-/* …and since #191 it draws a rule as well as saying it. Uppercase small caps in
-   --muted was the whole of the separation, and it is not enough: an eye going
+/* …and since #191 it drew a rule as well as saying it, because an eye going
    down a single column of checkboxes reads a heading as one more row unless
-   something physically stops it. The rule is the section break; the space on
-   both sides of it is what stops the rule reading as an underline for whatever
-   sits above. Above rather than below, because a heading belongs to the block
-   that follows it — a line under the words would fence the heading in with its
-   own section instead of fencing off the previous one. */
+   something physically stops it. A hairline and small muted capitals were
+   still not enough to stop it, so a heading is a band now: tinted with the
+   accent, a bar down its edge, the words in the text colour, and a clear
+   space above it that no gap between two controls comes near. The band is the
+   section break; the controls under it sit in cards (.mapd-card, below), so a
+   heading and a control can no longer be mistaken for each other. */
 .map-display-h {
-  font-size: .72rem;
-  font-weight: 600;
-  letter-spacing: .04em;
+  font-size: .74rem;
+  font-weight: 700;
+  letter-spacing: .06em;
   text-transform: uppercase;
-  color: var(--muted);
-  margin: var(--sp-4) 0 var(--sp-2);
-  padding-top: var(--sp-3);
-  border-top: 1px solid var(--border);
+  color: var(--text);
+  margin: var(--sp-5) 0 var(--sp-2);
+  padding: .4rem .6rem;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
 }
 
 /* The first heading is no longer the block's first child — the find row is —
    so this reaches whichever heading is drawn first, hidden rows and all. There
-   is nothing above it to divide from, so it takes neither rule nor space. */
+   is nothing above it to divide from, so it takes no space above. */
 .map-display-h:first-child,
 .mapd-find + .filter-note + .map-display-h,
 .map-display-h.mapd-h--first {
+  margin-top: 0;
+}
+
+/* …unless a card is drawn above it after all — the Calm look's note, ahead of
+   Base maps — which it has to stand clear of like any other. */
+#map-display-block > .mapd-card-end + .map-display-h {
+  margin-top: var(--sp-5);
+}
+
+/* One card per control (app.js, markMapDisplayCards): a switch and its
+   sliders, selects, sub-switch, key and note share one tinted, bordered box,
+   with a gap between one card and the next. The rows are siblings in a flat
+   list, so the card is drawn on each of them — the sides on every row, the top
+   edge on the first, the bottom on the last — and their vertical margins
+   become padding, because a margin is a gap the card's colour does not cover
+   (a sub-switch's indent included, or the card has a notch at its edge).
+   Border-box, so a row that asks for the full width — the rain key — asks for
+   the card's and not the card's plus its padding.
+   The tint is the text colour laid thin over whatever the panel is, so it
+   reads as a raised surface in every theme and every look. Scoped to direct
+   children: the radio labels inside the link colour group and the switch
+   inside a base-map row are rows of their card, not cards. */
+#map-display-block {
+  --mapd-card-bg: color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+#map-display-block > .mapd-card {
+  box-sizing: border-box;
+  margin: 0;
+  padding: .2rem .65rem;
+  background: var(--mapd-card-bg);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+#map-display-block > .mapd-card-top {
+  margin-top: var(--sp-2);
+  padding-top: .45rem;
+  border-top: 1px solid var(--border);
+  border-top-left-radius: var(--r-md);
+  border-top-right-radius: var(--r-md);
+}
+
+#map-display-block > .mapd-card-end {
+  padding-bottom: .5rem;
+  border-bottom: 1px solid var(--border);
+  border-bottom-left-radius: var(--r-md);
+  border-bottom-right-radius: var(--r-md);
+}
+
+/* The switch that names a card is its title; a sub-switch, a slider's label
+   and a note are what it holds. */
+#map-display-block > .filter-check.mapd-card:not(.filter-sub) {
+  font-weight: 600;
+}
+
+/* A sub-switch keeps its indent, as padding now that the margin is gone. */
+#map-display-block > .mapd-card.filter-sub {
+  padding-left: calc(.65rem + 1.5rem);
+}
+
+/* The ACMA block is the panel's last section and arrives as a sibling
+   .filter-block rather than as rows of #map-display-block, so it carries its
+   own heading (app.js, stationsMapPanels) and is one card on its own. */
+#map-display-block + .filter-block {
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
 }
 
-/* The ACMA block is the panel's fifth section and arrives as a sibling
-   .filter-block rather than as one of these headings, so the seam above it has
-   to be drawn on its own top edge — otherwise the one break the panel most
-   needs is the only one it does not have. */
-#map-display-block + .filter-block {
-  margin-top: var(--sp-4);
-  padding-top: var(--sp-3);
-  border-top: 1px solid var(--border);
+/* Its heading is the block's first child, which the rule above for the
+   panel's first heading would otherwise take the space from. */
+#map-display-block + .filter-block > .map-display-h:not(.mapd-h--first) {
+  margin-top: var(--sp-5);
+}
+
+#map-display-block + .filter-block > #acma-filter-block {
+  margin-top: var(--sp-2);
+  padding: .45rem .65rem .5rem;
+  background: var(--mapd-card-bg, color-mix(in srgb, var(--text) 5%, transparent));
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+#map-display-block + .filter-block > #acma-filter-block > .filter-check {
+  margin-top: 0;
+  font-weight: 600;
 }
 
 /* The fade-margin thresholds and the Save button. Two short number boxes side

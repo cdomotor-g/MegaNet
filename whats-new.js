@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 125, date: '2026-10-27', items: [
+      'The map\'s <strong>Layers</strong> panel is easier to read: each section heading is a coloured band, and each '
+        + 'control sits in a box of its own together with its sliders, choices and notes, so you can see where one '
+        + 'ends and the next begins. The ACMA licences switch has its own heading at the bottom.',
+    ] },
     { n: 124, date: '2026-10-27', items: [
       'New: <strong>Investigations</strong> — write-ups of strange data and what was behind it, two printed pages '
         + 'each, at <strong>floodwarning.net/investigations</strong> and linked from the help on <strong>Plots</strong> and '

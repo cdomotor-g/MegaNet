@@ -464,7 +464,14 @@ function addBaseLayers(map, opts = {}) {
     // (Map display's Find box depends on that), so they move among themselves
     // and never past the heading or the note.
     const rowsIn = box => [...box.querySelectorAll(':scope > .mn-base-row')];
+    // The rows are one card in Map display, its top and bottom edges drawn on
+    // whichever rows are first and last (app.js, markMapDisplayCards); a row
+    // moved in place takes its edge with it until the card is marked again.
+    const remark = box => {
+      if (box.id === 'map-display-block' && typeof markMapDisplayCards === 'function') markMapDisplayCards(box);
+    };
     function commit(box, focusName) {
+      remark(box);
       const next = rowsIn(box).map(r => r.dataset.baseRow).filter(n => pick[n]);
       if (next.length !== order.length || next.every((n, i) => n === order[i])) return;
       order = next;
@@ -504,6 +511,7 @@ function addBaseLayers(map, opts = {}) {
           if (above && ev.clientY < mid) { box.insertBefore(row, r); break; }
           if (!above && ev.clientY > mid) box.insertBefore(row, r.nextSibling);
         }
+        remark(box);
       };
       const up = ev => {
         if (ev.pointerId !== e.pointerId) return;

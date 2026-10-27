@@ -502,7 +502,9 @@ const MapSymbols = (function () {
 
   // ── Map display ───────────────────────────────────────────────────────────
   // Its own section, under its own heading, ahead of Stations & links: what a
-  // pin looks like comes before which pins and lines are drawn.
+  // pin looks like comes before which pins and lines are drawn. The four
+  // switches are one card in the panel (.mapd-join, app.js markMapDisplayCards):
+  // they are four answers to one question, and the note counts all four.
   function sectionHtml() {
     if (needSls()) askSls();
     return `
@@ -513,19 +515,19 @@ const MapSymbols = (function () {
              onchange="MapSymbols.setShapes(this.checked)">
       Triangles for river height (water level) gauges
     </label>
-    <label class="filter-check"
+    <label class="filter-check mapd-join"
            title="A gauge a person reads, not a radio: the station type says manual, the Bureau's Service Level Specification calls it Manual, or the Bureau reads it daily and nothing says a radio does. It reports nothing over the radio, so silence from it is not a fault.">
       <input type="checkbox" ${state.mapPinManual ? 'checked' : ''}
              onchange="MapSymbols.setManual(this.checked)">
       Grey for gauges read by hand (manual)
     </label>
-    <label class="filter-check"
+    <label class="filter-check mapd-join"
            title="A TM station: its Telemetry field says a Campbell or older data logger, its name ends TM, or a satellite terminal reads it and nothing says ALERT. A logger and modem rather than an ALERT radio, so the receivers do not hear it — the green is left for ALERT stations.">
       <input type="checkbox" ${state.mapPinTm ? 'checked' : ''}
              onchange="MapSymbols.setTm(this.checked)">
       Black for TM stations
     </label>
-    <label class="filter-check"
+    <label class="filter-check mapd-join"
            title="The Bureau's forecast locations (Schedule 2 of the Service Level Specification — a height is predicted) outlined in solid pink, its information locations (Schedule 3 — reported and classified, not predicted) in dashed pink.">
       <input type="checkbox" ${state.mapPinSls ? 'checked' : ''}
              onchange="MapSymbols.setOutlines(this.checked)">
