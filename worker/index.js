@@ -60,6 +60,11 @@
 // issue, emailed, or both, for somebody with no account anywhere; brakes on
 // volume rather than a sign-in. worker/report.js, docs/bug-reports.md.
 //
+// An eighth: /api/cameras/*, the latest picture from each of the councils'
+// flood and road cameras in data/council-cameras.json, fetched when somebody
+// opens one and kept only in the edge cache — public, read-only, and only the
+// addresses in that catalog. worker/cameras.js, docs/council-cameras.md.
+//
 // And one that is not a door at all: scheduled() below, every minute
 // (wrangler.toml's [triggers]), sends the administrators' notifications —
 // worker/push.js, db/migrations/0066_push_notifications.sql. Nothing a
@@ -70,6 +75,7 @@ import { isPhotoPath, handlePhotos } from './photos.js';
 import { isArchivePath, handleArchive } from './archive.js';
 import { isBriefingPath, handleBriefing } from './briefing.js';
 import { isReportPath, handleReport } from './report.js';
+import { isCameraPath, handleCameras } from './cameras.js';
 import { runPush } from './push.js';
 
 export { BriefingLedger } from './briefing.js';
@@ -484,6 +490,11 @@ export default {
     // The bug reporter's Send (worker/report.js): anybody, from this origin or
     // the github.io copy, a few a minute and DAY_MAX a day.
     if (isReportPath(url.pathname)) return handleReport(request, env);
+
+    // The councils' camera pictures (worker/cameras.js): anybody, only the
+    // cameras in the committed catalog, the council asked at most once a
+    // minute per location whoever is looking.
+    if (isCameraPath(url.pathname)) return handleCameras(request, env, ctx);
 
     // Everything else is a static asset, and assets are served before this runs.
     // A request that gets here for any other path is a path that does not exist.

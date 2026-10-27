@@ -1,0 +1,88 @@
+# Weekly refresh of the councils' camera catalog (data/council-cameras.json),
+# committed straight to main.
+#
+# WHAT. tools/council_cameras.py reads QIT Plus's public list of the councils
+# on its Guardian IMS disaster dashboard, then each dashboard's own camera list
+# (/dashboard/getCameras), into the one file the Stations map's Council
+# cameras layer draws and the Worker's /api/cameras/* looks a camera up in
+# (map-cameras.js, worker/cameras.js, docs/council-cameras.md) — and TMR's own
+# flood cameras from QLDTraffic's floodcameras.geojson, beside them. About 70
+# small requests, one at a time; a minute or two. No pictures — those are fetched
+# live, when somebody opens a camera.
+#
+# WHY WEEKLY. Councils add a camera a few times a year and move one less often
+# than that. A week is soon enough for a new camera to show up, and a week of
+# quiet writes nothing: the tool leaves the file alone when no camera and no
+# council changed, so this job only commits a real change.
+#
+# WHY STRAIGHT TO MAIN. CLAUDE.md: patches go to main, no PRs — and a data PR
+# nobody merges is worse than no refresh (acma-refresh.yml learnt that).
+#
+# SAFETY. A council whose dashboard does not answer keeps last week's cameras,
+# marked with when it last answered, rather than vanishing for a week. And the
+# tool refuses to write a catalog that has lost more than 30% of the last
+# one's cameras — QIT Plus moving the endpoint, say — so the job fails (GitHub
+# emails the owner; the CI doctor sees a red run) instead of quietly emptying
+# the layer. Run it by hand with --force once the loss is understood.
+#
+# Pushes made with GITHUB_TOKEN start no other workflow, so this never launches
+# the web smoke test; a refresh pushed by hand does, and `councilcams` checks
+# the file. Cloudflare deploys on every push to main, which is what puts a new
+# camera in the Worker's reach as well as on the map.
+
+name: Refresh council cameras
+
+on:
+  schedule:
+    # 18:43 UTC Tuesday = 04:43 AEST Wednesday, a quiet hour for the councils.
+    - cron: '43 18 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: council-cameras
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read every council's camera list
+        run: |
+          set -o pipefail
+          python3 tools/council_cameras.py | tee "$RUNNER_TEMP/cameras.txt"
+
+      - name: Summarise
+        if: ${{ always() }}
+        run: |
+          {
+            echo '## Council cameras'
+            echo
+            echo '```'
+            tail -n 80 "$RUNNER_TEMP/cameras.txt" 2>/dev/null || echo '(the tool printed nothing)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit to main if anything changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add data/council-cameras.json
+          if git diff --cached --quiet; then
+            echo "No camera or council changed since the last refresh — nothing to commit."
+            exit 0
+          fi
+          counts=$(python3 -c "import json;m=json.load(open('data/council-cameras.json'))['meta'];print(f\"{m['cameras']} cameras from {m['councils']} councils\")")
+          git commit -m "Council cameras: the weekly refresh — ${counts}" \
+                     -m "From each council's Guardian IMS disaster dashboard (tools/council_cameras.py)."
+          for attempt in 1 2; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            echo "Push rejected (attempt $attempt); retrying after rebase."
+            sleep 10
+          done
+          exit 1

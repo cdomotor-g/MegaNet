@@ -195,6 +195,9 @@ MegaNet/
 │                             that say whose they are and who to call
 ├── map-photos.js           ← MapPhotos — the Stations map's 📷 pins, a cone each
 │                             way the camera faced
+├── map-cameras.js          ← MapCameras — the councils' and QLDTraffic's flood and
+│                             road cameras on the Stations map, the viewer with each one's latest
+│                             picture and its age, and the station card's section
 ├── map-relocate.js         ← MapRelocate — 🚚 the station relocation finder: the
 │                             ground round a station that has to move, coloured by
 │                             fade margin to its repeaters, open sky and cover, kept
@@ -343,6 +346,7 @@ MegaNet/
 │   ├── site-exposure.md                    (tides and soils on the station card — rows, sources, limits)
 │   ├── site-land.md                        (the land — tenure, council, address — on the station and What is here cards)
 │   ├── road-owners.md                      (who manages each road and bridge — the map layer, the card section, sources, limits, what else QLDTraffic has)
+│   ├── council-cameras.md                  (the councils' and QLDTraffic's flood and road cameras — where the list comes from, why no picture is stored, the route)
 │   ├── rivers.md                           (the rivers layer — the Geofabric, what is drawn at which zoom, selecting a river, its files, rebuilding them)
 │   ├── mobile-coverage.md                  (the mobile signal estimate on the station and What is here cards — how, the grades, how it agrees with the carriers' maps, limits)
 │   ├── BOM spec erts_data_formats_doc.pdf   (ERTS Data Formats spec, ALERT Packets tab)
@@ -356,7 +360,8 @@ MegaNet/
 │
 ├── worker/                 ← the Cloudflare Worker in front of the site (wrangler.toml)
 │   ├── index.js                            (/api/db — the database proxy; /api/session — the gate's sign-in)
-│   └── api.js                              (/api/v1, /api/mcp — the read-only agent API and MCP server)
+│   ├── api.js                              (/api/v1, /api/mcp — the read-only agent API and MCP server)
+│   └── cameras.js                          (/api/cameras — the councils' camera pictures, fetched live, never stored)
 │
 ├── bridge/                 ← the MQTT → Flood-Net subscriber (#B6; Node, one dependency)
 │   ├── README.md                           (running it, its config, and what its logs mean)
@@ -1308,6 +1313,7 @@ here.
 - **What’s here?** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub, the land's tenure and council, the estimated mobile signal for each carrier, and the nearest station, repeater and survey mark
 - **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, the Queensland property boundaries and road reserve on the ground when their switches are on, a polar coverage plot lying on the relief, your Draw & measure sketches on the ground (and its tools drawing there), pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray, and water rising through the ground's heights to show how the land lies (an animation, not flood modelling; on until turned off)
 - **Mobile coverage** — each carrier's own 4G coverage map, as Telstra, Optus and TPG give it to the ACCC: where a phone works outdoors and where only with an external antenna, one carrier at a time or the best of the three
+- **Flood & road cameras** — the ~600 cameras councils publish on their disaster dashboards and TMR publishes on QLDTraffic, a pin each; press one for its latest picture and how old it is. On for everybody, signed in or not, from zoom 8
 - Elevation shading over any base map, with an opacity slider
 - Station name labels on, off, or automatic — appearing once you zoom in far enough to read them
 - **Rivers and creeks** on by default — every principal named river and creek in Australia from the Bureau's Geofabric, named along its course and drawn heavier the more country drains through it; hover one for its name, click it to select it end to end and see which stations are on it
@@ -2502,6 +2508,28 @@ The sources are the State's Queensland Roads and Tracks (CC BY 4.0) and TMR's
 bridge register (CC BY 3.0 AU); Queensland only. `docs/road-owners.md` has the
 classes, the sources, the limits and what else QLDTraffic publishes.
 
+**Flood and road cameras.** *Flood & road cameras (councils, QLDTraffic)*, in
+the same **Map display** panel, draws every camera a council shows on its
+disaster dashboard — 49 councils, most of Queensland's (Lockyer Valley's 27
+cameras among them) and two in NSW — and TMR's own QLDTraffic flood cameras,
+about 600 in all: a near-black tile with a white camera
+on it, a **blue** stripe along its foot for a flood camera at a causeway,
+bridge or gauge board and **amber** for a road camera (mostly TMR's QLDTraffic
+cameras the council has chosen to show). Press one for its latest picture,
+fetched from the camera's own server when you press it, with when that
+server says it last changed — *Updated 1:17 pm — 12 minutes ago* — and, past
+three hours, that it is old and may not show the crossing as it is now; the
+council's dashboard (or QLDTraffic) a link away, and the Flood-Net station it
+stands at, or the nearest within 2 km. A quarter of the cameras stand within
+250 m of a Flood-Net gauge, and that station's card names them under its flood
+classes; most of the rest are crossings with no gauge at all.
+**On by default, for everybody**, from zoom 8; nothing is stored — the list is
+read from the councils' dashboards and QLDTraffic weekly
+(`tools/council_cameras.py`), and a
+picture goes no further than Cloudflare's edge cache, for a minute.
+`docs/council-cameras.md` has where the list comes from, which councils it
+covers, and why storing the pictures was not done.
+
 **Wind loading regions.** *Wind regions (AS/NZS 1170.2)*, another **Map
 display** switch, draws the Standard's wind loading regions — A0–A5, B1, B2,
 C and D — under the pins, on the severity ramp the Standard's own map uses:
@@ -3310,6 +3338,10 @@ Side panel or modal showing full station record:
   carrier what its own 4G map says there; it agrees with the carriers' own
   outdoor maps at 88% of a random 150 stations (`site-mobile.js`;
   `docs/mobile-coverage.md`)
+- **Flood & road cameras at this station**, under the flood classes: the
+  councils' and QLDTraffic's cameras within 2 km, nearest first — *At this station*
+  within 250 m — each a press away from its latest picture; nothing at all for
+  a station with none (`map-cameras.js`; `docs/council-cameras.md`)
 - **Equipment**, for signed-in editors: what the station's register says is
   fitted there, once an administrator has approved it (`photo-review.js`)
 - **Site features**, for signed-in editors: where its orifice outlet, pits,

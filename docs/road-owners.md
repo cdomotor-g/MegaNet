@@ -141,12 +141,14 @@ the QLDTraffic API specification licenses as CC BY 4.0 AU:
   for NSW). About 2 MB, 400 kB compressed; a delta feed carries the last
   changes.
 - **`floodcameras.geojson`** — about 120 flood cameras on causeways and bridges,
-  each with a current image.
+  each with a current image. **Drawn now**, with the councils' cameras, by the
+  Stations map's *Flood & road cameras* layer (`docs/council-cameras.md`).
 - **`webcameras.geojson`**, **`districts.geojson`**, rest areas and more.
 
 A road closed by flooding near a gauge, and a camera looking at the crossing
-the gauge measures, are both things a flood warning network would use; that is
-a layer of its own, and an issue on the roadmap.
+the gauge measures, are both things a flood warning network would use. The
+cameras are a layer now; the events are a layer of their own still to come, and
+an issue on the roadmap (#238).
 
 ---
 

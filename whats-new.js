@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 120, date: '2026-10-27', items: [
+      'The <strong>Stations</strong> map draws the <strong>flood and road cameras councils publish</strong> on their disaster '
+        + 'dashboards — 49 councils, Lockyer Valley\'s among them — and <strong>TMR\'s QLDTraffic flood cameras</strong>, about 600 '
+        + 'in all, as dark tiles with a camera on them: a blue stripe for a flood camera, amber for a road camera. Press one for '
+        + 'its latest picture and how old it is, with the council\'s dashboard a link away. A station\'s card names the cameras '
+        + 'at or near it. For everybody, signed in or not, from zoom 8 — switch them off under <strong>Map display</strong>.',
+    ] },
     { n: 119, date: '2026-10-27', items: [
       'The <strong>ARRO graph</strong> links — <strong>📈 ARRO this river</strong> and <strong>ARRO rain</strong>, the graph link in '
         + 'a station\'s details, and the Bit Flipper\'s — open as a graph of one sensor with the others added to it, the way ARRO\'s '

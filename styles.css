@@ -293,6 +293,18 @@
      ink is what sits on it. */
   --photo: #ffc400;
   --photo-ink: #3a2a00;
+  /* The councils' cameras (map-cameras.js) — a picture somebody else takes, so
+     a pin that cannot be mistaken for a field photo's yellow: a near-black
+     tile with a white camera on it, as a CCTV sign is, edged in white so it
+     holds on dark imagery, and a stripe along its foot saying which kind —
+     water blue for a flood camera, road amber for a road camera. One set for
+     both themes: like the leader, the pins are drawn over base maps that do
+     not go dark with the app. Never text on a page, so outside the contrast
+     contract; the white glyph on --cam is 16.9:1. */
+  --cam: #17212b;
+  --cam-ink: #ffffff;
+  --cam-flood: #29b6f6;
+  --cam-road: #ffb300;
 
   /* ── Radio Path Maps: the eight region fills (#137) ────────────────────────
      A categorical palette, and the one kind of colour set that does not reduce
@@ -17851,6 +17863,138 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   outline-offset: var(--focus-offset);
 }
 .legend-photo { display: inline-block; width: 1.2rem; text-align: center; }
+
+/* ── The councils' cameras on the Stations map (map-cameras.js) ──
+   A tile centred on the camera's point — where a field photo's dot sits on its
+   point and its badge stands off it, this is the whole pin — with the stripe
+   along its foot for the kind, and a count on its shoulder when it stands for
+   several. */
+.mn-cam-icon { background: none; border: 0; }
+.mn-cam-pin {
+  position: absolute;
+  left: -12px;
+  top: -12px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  box-sizing: border-box;
+  border-radius: 6px;
+  background: var(--cam);
+  border: 2px solid var(--cam-ink);
+  border-bottom: 4px solid var(--cam-flood);
+  color: var(--cam-ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .45);
+  cursor: pointer;
+}
+.mn-cam-pin--road { border-bottom-color: var(--cam-road); }
+/* Several of both kinds under one pin: half of each. */
+.mn-cam-pin--mixed { border-bottom-color: transparent; }
+.mn-cam-pin--mixed::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  bottom: -4px;
+  height: 4px;
+  border-radius: 0 0 6px 6px;
+  background: linear-gradient(90deg, var(--cam-flood) 50%, var(--cam-road) 50%);
+}
+.mn-cam-glyph { display: block; width: 16px; height: 16px; fill: currentColor; }
+.mn-cam-count {
+  position: absolute;
+  right: -9px;
+  top: -9px;
+  min-width: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: var(--r-pill);
+  background: var(--cam-ink);
+  color: var(--cam);
+  border: 1px solid var(--cam);
+  font-size: .68rem;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+}
+.mn-cam-icon:focus-visible .mn-cam-pin {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+/* The legend's and the station card's own copy of the pin, in the line. */
+.mn-cam-swatch {
+  position: relative;
+  left: auto;
+  top: auto;
+  display: inline-grid;
+  vertical-align: middle;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  border-width: 1.5px;
+  border-bottom-width: 3px;
+  box-shadow: none;
+  cursor: default;
+}
+.mn-cam-swatch .mn-cam-glyph { width: 13px; height: 13px; }
+
+/* The viewer, in the modal shell. */
+.mn-cam-view { display: grid; gap: var(--sp-2); }
+.mn-cam-choose { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin: 0; padding: 0; list-style: none; }
+.mn-cam-choose .pill[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.mn-cam-fig { margin: 0; }
+.mn-cam-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 12rem;
+  border-radius: var(--r-md);
+  background: var(--cam);
+  overflow: hidden;
+}
+.mn-cam-img { display: block; width: 100%; height: auto; max-height: 70vh; object-fit: contain; }
+.mn-cam-img[hidden] { display: none; }
+.mn-cam-wait { margin: 0; padding: var(--sp-3); color: var(--cam-ink); text-align: center; }
+.mn-cam-wait:empty { display: none; }
+.mn-cam-meta { margin: var(--sp-1) 0 0; }
+.mn-cam-warnline { margin: 0; }
+.mn-cam-warnline:empty { display: none; }
+.mn-cam-acts { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.mn-cam-facts { display: grid; gap: .2rem; margin: 0; }
+.mn-cam-facts > div { display: flex; flex-wrap: wrap; gap: 0 var(--sp-1); }
+.mn-cam-facts dt { color: var(--muted); min-width: 7.5rem; }
+.mn-cam-facts dd { margin: 0; overflow-wrap: anywhere; }
+.mn-cam-note,
+.mn-cam-safety,
+.mn-cam-credit { margin: 0; overflow-wrap: anywhere; }
+
+/* The station card's section — nothing at all for a station with no camera
+   near it, which is most of them. */
+.stn-card-cams-sect:empty { display: none; }
+.stn-card-cam-list {
+  list-style: none;
+  margin: var(--sp-1) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-1);
+}
+.stn-card-cam-list li { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; min-width: 0; }
+/* A camera's name is a council's whole description of the spot — "Laidley
+   Creek, Clarks Bridge, Thornton School Road, Thornton" — so the pill wraps
+   inside the card rather than running out of it. */
+.stn-card-cam-list .pill {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.stn-card-cam-list .pill .mn-cam-swatch { flex: none; }
+.stn-card-cam-at { color: var(--ok); font-weight: 600; }
 
 /* ── Print (#118) ────────────────────────────────────────────────────────────
    The workbook's own print setup is A4 portrait, one page per station visit,

@@ -4619,6 +4619,11 @@ const state = {
   // draws nothing for a session that is not signed in, and a photo somebody
   // took is the first thing they will look for.
   mapPhotos:     localStorage.getItem('mn-field-photos') !== 'off',
+  // The Stations map's flood and road cameras (map-cameras.js): the cameras
+  // councils publish on their disaster dashboards, and TMR's on QLDTraffic. On
+  // unless switched off, for everybody: one small file the first time the map
+  // is zoomed in.
+  mapCameras:    localStorage.getItem('mn-council-cameras') !== 'off',
   // The Stations map's 📌 site features (site-features.js, 0061): a
   // station's orifice outlet, pits, benchmarks, boards and orifice run. On
   // unless switched off, for the photos' reason: signed out it asks nothing.

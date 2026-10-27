@@ -112,6 +112,11 @@ on:
       # The Dropbox photo sync and the bucket script CI now runs (0035).
       - 'tools/field-photos/**'
       - 'tools/storage_bucket.sql'
+      # The councils' camera catalog and the tool that writes it: a refresh
+      # pushed by hand is checked (councilcams); the weekly job's own pushes
+      # start no workflow.
+      - 'data/council-cameras.json'
+      - 'tools/council_cameras.py'
       - '.github/workflows/web-smoke.yml'
   pull_request:
     paths:
@@ -205,6 +210,11 @@ on:
       # The Dropbox photo sync and the bucket script CI now runs (0035).
       - 'tools/field-photos/**'
       - 'tools/storage_bucket.sql'
+      # The councils' camera catalog and the tool that writes it: a refresh
+      # pushed by hand is checked (councilcams); the weekly job's own pushes
+      # start no workflow.
+      - 'data/council-cameras.json'
+      - 'tools/council_cameras.py'
       - '.github/workflows/web-smoke.yml'
   workflow_dispatch:
 
@@ -1381,6 +1391,23 @@ jobs:
         if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run photos
+
+      # The councils' flood and road cameras (map-cameras.js, worker/cameras.js,
+      # data/council-cameras.json). Under Node, the Worker route against stand-ins
+      # for the assets, the edge cache and the cameras' servers: only a camera in
+      # the catalog, fetched from exactly its address with nothing of the
+      # caller's; a picture by its own bytes; the camera asked at most once a
+      # minute and once for a burst; the last good picture standing in, marked
+      # stale, for six hours — and the catalog itself held to its shape. Then in
+      # Chromium the layer, for a session signed in to nothing: no pins and no
+      # list fetched far out, pins centred and clickable, the viewer saying how
+      # old a picture is (and that an old one is), the council's own address
+      # when the Worker refuses, two cameras on one pin, three views of one, and
+      # the station card naming the camera at the Thornton gauge.
+      - name: Council cameras — every one placed, its latest picture fetched by its id and said how old
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run councilcams
 
       # Zip packs on the Field Photos tab (photo-zip.js). `photos` never drops a
       # zip, and everything a zip can do wrong is quiet: wrong bytes still

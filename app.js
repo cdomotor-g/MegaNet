@@ -5372,6 +5372,12 @@ function mapDisplayControlsHtml() {
       Field photos (📷)
     </label>
     <p class="filter-note" id="map-photos-note">${MapPhotos.noteHtml()}</p>
+    <!-- The flood and road cameras (map-cameras.js): a pin where each camera
+         a council shows on its disaster dashboard stands, and each of TMR's
+         QLDTraffic flood cameras, and its latest picture on a click. Beside the field photos because it is the
+         same question — what does the site look like — answered by somebody
+         else's camera, for everybody, signed in or not. -->
+    ${MapCameras.controlsHtml()}
     <!-- A station's site features (site-features.js, 0061): its orifice
          outlet, pits, benchmarks, gauge boards and orifice run. Beside the
          photos because they are the same ground at the same scale, and
@@ -5647,6 +5653,7 @@ function mapLegendOffLayersHtml() {
     !state.mapRoadOwners      && 'Road & bridge owners',
     !state.mapLots            && 'Property boundaries',
     !state.mapPhotos          && 'Field photos',
+    !state.mapCameras         && 'Flood & road cameras',
     !state.mapSiteFeatures    && 'Site features',
     !state.mapWind            && 'Wind regions',
     !state.mapCatchments      && 'River catchments',
@@ -5872,6 +5879,7 @@ function mapLegendHtml() {
       <span class="small">Field photos — where each was taken, a cone the way the camera faced.
         Click one for the photos taken there</span>
     </span>` : ''}
+    ${MapCameras.active() ? MapCameras.legendHtml() : ''}
     ${SiteFeatures.active() ? SiteFeatures.legendHtml() : ''}
     ${MapRoads.active() ? `
     <span class="legend-item">
@@ -6072,6 +6080,7 @@ function stopStationsMap() {
   MapRoadOwners.detach();
   MapLots.detach();
   MapPhotos.detach();
+  MapCameras.detach();
   MapWind.detach();
   MapMini.detach();
   // Not a detach — MapLos holds no layer — but the same duty: the queue is
@@ -6257,6 +6266,7 @@ function initMap() {
   MapRoadOwners.attach(state.map);
   MapLots.attach(state.map);
   MapPhotos.attach(state.map);
+  MapCameras.attach(state.map);
   MapWind.attach(state.map);
   // The minimap, bottom right: a second map further out, with this one's view
   // outlined on it (map-mini.js). Before the first refresh, which re-fits this
@@ -8089,6 +8099,8 @@ function repaintStnCard() {
   SiteRoads.ask(`mn-roads-card-${s.id}`, s);
   // …and the mobile signal there, on the same terms (site-mobile.js).
   SiteMobile.ask(`mn-mobile-card-${s.id}`, s);
+  // …and the councils' cameras near it, out of a list read once (map-cameras.js).
+  MapCameras.ask(`mn-cams-card-${s.id}`, s);
   // …and the catchment above its gauge, from a 75 KB index read once.
   RiverCatchments.ask(`mn-catch-card-${s.id}`, s);
   // The equipment register, for a signed-in editor, on the same terms.
@@ -8367,6 +8379,7 @@ function stnCardHtml(s) {
   const landId   = `mn-land-card-${s.id}`;
   const roadsId  = `mn-roads-card-${s.id}`;
   const mobileId = `mn-mobile-card-${s.id}`;
+  const camsId   = `mn-cams-card-${s.id}`;
   const ownerId  = `mn-owner-card-${s.id}`;
   const nets     = (s.radio_network_ids || []).map(id => netName(id)).filter(Boolean).join(', ');
   const isRpt    = s.roles.includes('repeater');
@@ -8488,6 +8501,14 @@ function stnCardHtml(s) {
          editor has added since. Its own section, like the SLS below it, and
          empty for a station none of those lists names. river-details.js. -->
     ${RiverDetails.cardHtml(s)}
+    <!-- The flood and road cameras at or near the station (map-cameras.js):
+         the flood camera a council or TMR has on the same crossing or gauge board, and
+         its latest picture a press away. Under the flood classes and the
+         crossing because it is the same water, seen. Nothing at all for a
+         station with no camera within 2 km, which is most of them; filled by
+         MapCameras.ask once the camera list is read. -->
+    ${located ? `<div class="acma-sect stn-card-cams-sect" id="${escAttr(camsId)}"
+         data-mn-cams="${escAttr(MapCameras.key(s))}">${MapCameras.html(s)}</div>` : ''}
     <!-- The land that drains to the station, from the Bureau's Geofabric
          catchments (river-catchments.js): its area, how it was found, and a
          button that shades it on the map. Filled by RiverCatchments.ask once

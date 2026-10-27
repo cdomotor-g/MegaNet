@@ -498,6 +498,30 @@ Or give the eight files with `--year`, `--telstra`, `--optus`, `--tpg` and
 `--mocn` (each OUTDOOR EXT_ANT, `.kml` or the ACCC's `.zip`).
 `docs/mobile-coverage.md` has the encoding.
 
+## `council_cameras.py` — the councils' and QLDTraffic's flood and road cameras
+
+Most Queensland councils' disaster dashboards are one product, QIT Plus's
+Guardian IMS, and every one answers `GET /dashboard/getCameras` with the
+GeoJSON behind its own Flood Cameras page. This reads QIT Plus's public list of
+those dashboards (an ArcGIS layer, which carries each council's boundary too),
+then each dashboard's camera list, and TMR's own flood cameras from QLDTraffic
+(`floodcameras.geojson`, CC BY 4.0), into `data/council-cameras.json` — the file
+the Stations map's **Flood & road cameras** layer draws
+(`map-cameras.js`) and the Worker's `/api/cameras/*` looks a camera up in
+(`worker/cameras.js`). Where each camera is, its name, flood or road, its
+picture addresses and the council's note; never a picture. Standard library
+only; ~70 requests one at a time, a minute or two.
+
+```bash
+python3 tools/council_cameras.py                 # what .github/workflows/council-cameras.yml runs, weekly
+python3 tools/council_cameras.py --dry-run       # fetch and report, write nothing
+python3 tools/council_cameras.py --save-raw DIR  # keep every answer, then --from-raw DIR rebuilds offline
+```
+
+A council that does not answer keeps last week's cameras; a run that has lost
+more than 30% of the cameras writes nothing (`--force` writes it), and a week
+with no change writes nothing either. `docs/council-cameras.md` has the rest.
+
 ## `import_arro_sensors.py` — fold ARRO sensor exports into `stations.json`
 
 ARRO's **Sensors — List by System** report exports one workbook per state with
