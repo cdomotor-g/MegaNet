@@ -635,8 +635,8 @@ const HELP = {
            + 'buzzing one out; a <strong>4–20 mA calculator</strong> that scales a current and checks the loop has the '
            + 'voltage to drive it; the RF connectors told apart; and how to read a pinout without getting it backwards.',
     watch: [
-      'Every pinout says where it came from — a standard, the maker\'s manual, a second-hand source such as a cable '
-      + 'listing, or not verified — and links it. The unit\'s own label beats anything here; meter the pins before power goes on.',
+      'Every pinout says where it came from — a standard, the maker\'s manual, a crew\'s own field finding, a second-hand source such as a cable '
+      + 'listing, or not verified — and links the document where there is one. The unit\'s own label beats anything here; meter the pins before power goes on.',
       'Drawings are of the <strong>front</strong> (the mating face) unless you turn them over. A socket\'s face, and either '
       + 'sex seen from the back, is the mirror image of a plug\'s face: pin 1 moves from the top left to the top right.',
       'RS-232\'s signal names are the computer\'s: TXD is an output on a computer (DTE) and an input on a modem (DCE). '

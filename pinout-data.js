@@ -51,6 +51,7 @@ const PinoutData = (function () {
   const SURE = {
     standard:   { label: 'Published standard', short: 'Standard', blurb: 'From the standard that defines the connector — true of every unit that follows it.' },
     maker:      { label: 'Maker\'s document', short: 'Maker', blurb: 'From the manufacturer\'s own manual, datasheet or protocol document.' },
+    field:      { label: 'Field finding', short: 'Field', blurb: 'Found on site by a Flood-Net crew with the equipment in hand — not in the maker\'s documents. If a unit of yours behaves differently, say so.' },
     general:    { label: 'General practice', short: 'Practice', blurb: 'True of the kind of device, not checked against this model\'s manual — confirm on the unit\'s label.' },
     second:     { label: 'Second-hand source', short: 'Second-hand', blurb: 'From a cable maker\'s listing, a reseller or a user group, not the maker\'s own manual — check it on the unit before wiring.' },
     unverified: { label: 'Not verified', short: 'Unverified', blurb: 'Nobody has confirmed this yet. Meter it out and check the unit\'s label before you wire to it.' },
@@ -463,10 +464,38 @@ const PinoutData = (function () {
       warn: '<strong>RS-485\'s polarity is in doubt:</strong> ELPRO\'s 2025 and 2021 manuals give A and B the other way round. RS-485 also needs the internal MIL-spec socket moved from RS232 to RS485, and then shares the SDI-12 (which a base receiver does not offer). ' + MIL_SEX,
       notes: [
         'The legacy ERRTS canister\'s serial cable (CBLSERERT) fits: "use the standard serial cable that is used on the Legacy ERTS cannisters" (Cables, below). Unplug USB first — RS-232 does not work with USB connected.',
+        'Capturing from the internal DB9 instead, a logger must hold DTR, RTS and RX high or the ERT-A2 sends nothing (ERT-A2 · internal DB9). Whether this connector needs the same has not been checked.',
         'ELPRO\'s drawings of the PC end disagree on which DB9 pin is TX; the mapping (A to 3, B to 2, C to 5) is the same in all three. Meter the PC end if unsure.',
         'Insert: 14S-6 by its pattern — our reading.',
       ],
       find: 'elpro ert-a2 erta2 errts canister serial rs232 rs-232 rs485 sdi-12 cblserert mil milspec circular',
+    },
+    {
+      id: 'erta2-db9', cat: 'alert', name: 'ELPRO ERT-A2 — internal DB9 (SERIAL)',
+      short: 'ERT-A2 · internal DB9', unit: 'The DB9 marked SERIAL inside the ERT-A2: the same RS-232 as the MIL Serial connector, and what a base station\'s logger is wired to',
+      face: { type: 'dsub', shell: 'DE9' }, gender: 'F', sure: 'maker', sources: [SRC.erta2, SRC.erta2deck],
+      pins: [
+        P(1, 'DCD?', 'unknown', '', 'Not in ELPRO\'s documents.'),
+        P(2, 'TX', 'tx', 'out', 'Data out of the ERT-A2 — to the logger\'s or PC\'s receive. It sends here as a modem (DCE) would.'),
+        { ...P(3, 'RX', 'rx', 'in', 'Data into the ERT-A2. When a logger only captures, hold it high instead: 2.5 V or more.'), found: true },
+        { ...P(4, 'DTR', 'ctrl', 'in', 'Data Terminal Ready, from whatever is listening. Hold it high — 2.5 V or more — or nothing comes out.'), found: true },
+        P(5, 'GND', 'ground', '', 'Ground.'),
+        P(6, 'DSR?', 'unknown', '', 'Not in ELPRO\'s documents.'),
+        { ...P(7, 'RTS', 'ctrl', 'in', 'Request To Send, from whatever is listening. Hold it high — 2.5 V or more — or nothing comes out.'), found: true },
+        P(8, 'CTS?', 'unknown', '', 'Not in ELPRO\'s documents.'),
+        P(9, 'RI?', 'unknown', '', 'Not in ELPRO\'s documents.'),
+      ],
+      found: [
+        '<strong>A dumb three-wire link does not work.</strong> Capturing the ERT-A2\'s data from this DB9 into a logger such as a CR300, nothing comes out unless <strong>DTR (pin 4), RTS (pin 7) and RX (pin 3, into the ERT-A2) are held high</strong> — 2.5 V is enough. The ERT-A2 has to be "triggered" into thinking something is listening on the port; TX, RX and ground alone leave it silent.',
+      ],
+      warn: 'ELPRO documents pins 2, 3 and 5 only, and does not say the socket\'s sex: female is drawn because it sends on pin 2, as a modem\'s (DCE) socket does — check yours. Pins 4 and 7 come from the field finding above; 1, 6, 8 and 9 are unknown.',
+      notes: [
+        'Check it with a meter: logger connected and running, pins 3, 4 and 7 to pin 5 should each read 2.5 V or more while the ERT-A2 is due to send. If one reads about 0 V, that is why the logger hears nothing.',
+        'Our guess at why, not ELPRO\'s: many RS-232 driver chips switch their transmitters off while nothing is driving their inputs, to save power — so a link whose far end sleeps, floats or is never wired leaves them off.',
+        'The CR300 sends on pin 2 too (both ends are DCE), so the data crosses: ERT-A2 pin 2 to the logger\'s pin 3 (Cables, below).',
+        'Whether the MIL Serial connector — and ELPRO\'s three-wire CBLSERERT on it — needs the same has not been checked.',
+      ],
+      find: 'elpro ert-a2 erta2 internal db9 de-9 serial rs232 rs-232 dtr rts logger cr300 capture three wire 3-wire held high',
     },
     {
       id: 'erta2-terminals', cat: 'alert', name: 'ELPRO ERT-A2 — internal push-in terminals',
@@ -496,7 +525,7 @@ const PinoutData = (function () {
         P('3-GND', '3 · GND', 'ground', '', 'Supply block 3: ground.'),
         P('4-BAT', '4 · BAT', 'power', 'both', 'Supply block 4: battery. Not with an internal lithium battery fitted.'),
       ],
-      notes: ['Each row of the drawing is one block. The internal DB9 marked SERIAL carries the same RS-232 as the MIL Serial connector: pin 2 TX, 3 RX, 5 GND.'],
+      notes: ['Each row of the drawing is one block. The internal DB9 marked SERIAL carries the same RS-232 as the MIL Serial connector — and a logger capturing from it must hold DTR, RTS and RX high (ERT-A2 · internal DB9).'],
       find: 'elpro ert-a2 erta2 internal terminals push-in dio ai loop rs485 sdi-12 htr sol bat',
     },
     {
@@ -938,6 +967,22 @@ const PinoutData = (function () {
       notes: [
         'Three wires, RS-232 at the ERT-A2\'s default. ELPRO gives the mapping, not the DB9\'s sex; to a PC\'s male port it is female, as drawn.',
         'Unplug the ERT-A2\'s USB first — its RS-232 does not work with USB connected.',
+        'A logger capturing from the internal DB9 needs DTR, RTS and RX held high (ERT-A2 · internal DB9); if this three-wire cable gives a PC nothing, try the same here.',
+      ],
+    },
+    {
+      id: 'erta2-db9-cr300', name: 'ERT-A2 internal DB9 to a CR300 — capture, with DTR, RTS and RX held high', sure: 'field', sources: [SRC.erta2, SRC.cr1000],
+      a: { conn: 'erta2-db9', gender: 'M', label: 'Into the ERT-A2\'s SERIAL DB9' },
+      b: { conn: 'cr300-rs232', gender: 'M', label: 'Into the CR300\'s RS-232' },
+      wires: [[2, 3, 'The ERT-A2\'s data → the logger\'s receive'], [5, 5, 'Ground'], [4, 6, 'Held high from the logger\'s DTR']],
+      loops: { a: [[4, 7], [4, 3]] },
+      found: [
+        'The ERT-A2 sends nothing to a logger on a plain three-wire cable: DTR, RTS and RX (into the ERT-A2) must be held high, 2.5 V or more.',
+      ],
+      notes: [
+        'Pins 3, 4 and 7 are joined at the ERT-A2\'s end and fed from the CR300\'s DTR (pins 1 and 6), which should sit positive while the program keeps the port open (SerialOpen). That source is our suggestion — meter ERT-A2 pin 4 to pin 5 for 2.5 V or more before trusting it. Anything that holds all three steady at 2.5 V or more does the same job.',
+        'Capture only: the ERT-A2\'s RX is held high rather than wired to the logger\'s transmit, so the logger cannot talk to the ERT-A2 on this cable. Set the ERT-A2 up over its USB.',
+        'The CR300\'s RS-232 pins are the CR1000\'s table (see CR300 · RS-232) — meter pin 6 before relying on it.',
       ],
     },
     {
@@ -1108,7 +1153,7 @@ const PinoutData = (function () {
   };
   function csvRows(conn) {
     return conn.pins.map(p => [conn.name, conn.gender === 'M' ? 'male' : conn.gender === 'F' ? 'female' : '', p.n, p.sig, KINDS[p.kind] || p.kind,
-      DIR[p.dir] || '', p.what, p.wire, SURE[conn.sure].label].map(csvCell).join(','));
+      DIR[p.dir] || '', p.what, p.wire, p.found ? SURE.field.label : SURE[conn.sure].label].map(csvCell).join(','));
   }
   const CSV_HEAD = 'connector,gender on the unit,pin,signal,kind,direction at the unit,what it does,wire colour,how sure';
   function csv(ids) {

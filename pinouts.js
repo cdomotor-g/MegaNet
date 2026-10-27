@@ -64,7 +64,7 @@ const Pinouts = (function () {
     if (!p) return `Pick a ${word(c).toLowerCase()} on the drawing or in the table.`;
     const kind = D().KINDS[p.kind] || '';
     const where = p.dir ? ` · ${dirWord[p.dir].toLowerCase()}` : '';
-    return `${word(c)} ${lab(p)} — ${p.sig}${where}. ${p.what}${p.wire ? ` Wire: ${p.wire}.` : ''}${kind && p.kind !== 'nc' ? ` (${kind}.)` : ''}`;
+    return `${word(c)} ${lab(p)} — ${p.sig}${where}. ${p.what}${p.wire ? ` Wire: ${p.wire}.` : ''}${kind && p.kind !== 'nc' ? ` (${kind}.)` : ''}${p.found ? ' Field finding.' : ''}`;
   }
 
   // ── Drawing a face ─────────────────────────────────────────────────────────
@@ -176,6 +176,13 @@ const Pinouts = (function () {
     return '';
   }
 
+  // What a crew found on site that no maker's document says: trusted markup,
+  // written in pinout-data.js.
+  function foundHtml(list) {
+    if (!list || !list.length) return '';
+    return `<div class="po-found" role="note"><h4>🔧 Found in the field</h4>${list.map(t => `<p>${t}</p>`).join('')}</div>`;
+  }
+
   // ── The page ───────────────────────────────────────────────────────────────
 
   function render() {
@@ -263,6 +270,7 @@ const Pinouts = (function () {
     return `<h3 id="po-view-h">${esc(c.name)}</h3>
       <p class="po-unit">${esc(c.unit)}${c.face.insert ? `${/[.)]$/.test(c.unit) ? '' : '.'} <span class="po-insert">Insert: ${esc(c.face.insert)}.</span>` : ''}</p>
       <p class="po-sure-line"><span class="po-sure po-sure--${c.sure}">${esc(sure.label)}</span> <span class="small">${esc(sure.blurb)}</span></p>
+      ${foundHtml(c.found)}
       ${c.warn ? `<p class="po-caution" role="note">${c.warn}</p>` : ''}
       <div class="po-view-grid">
         <figure class="po-fig">
@@ -293,7 +301,7 @@ const Pinouts = (function () {
       <tbody>${rows.map(p => `<tr class="po-row${S.pin === p.n ? ' is-sel' : ''}" data-row="${escAttr(p.n)}">
         <th scope="row"><button type="button" class="po-pin-btn po-k-${p.kind}" aria-pressed="${S.pin === p.n}" onclick="Pinouts.pin('${escAttr(p.n)}')"
           aria-label="${escAttr(`${word(c)} ${lab(p)}`)}">${esc(lab(p))}</button></th>
-        <td><strong>${esc(p.sig)}</strong></td><td>${esc(dirWord[p.dir])}</td><td>${esc(p.what)}</td>${hasWire ? `<td>${esc(p.wire)}</td>` : ''}</tr>`).join('')}
+        <td><strong>${esc(p.sig)}</strong></td><td>${esc(dirWord[p.dir])}</td><td>${esc(p.what)}${p.found ? ' <span class="po-tag-field">Field finding</span>' : ''}</td>${hasWire ? `<td>${esc(p.wire)}</td>` : ''}</tr>`).join('')}
       ${unused.length ? `<tr><th scope="row">${esc(runs(unused))}</th><td>—</td><td>—</td><td>Not used by this interface.</td>${hasWire ? '<td></td>' : ''}</tr>` : ''}</tbody>
     </table></div>`;
   }
@@ -398,6 +406,7 @@ const Pinouts = (function () {
     const colours = rows.some(r => r.wire);
     return `<h4>${esc(k.name)}</h4>
       <p class="po-sure-line"><span class="po-sure po-sure--${k.sure}">${esc(D().SURE[k.sure].label)}</span> <span class="small">${esc(D().SURE[k.sure].blurb)}</span></p>
+      ${foundHtml(k.found)}
       <div class="po-cable-wrap" role="region" aria-label="${escAttr(`${k.name}, drawn`)}" tabindex="0">${cableSvg(k)}</div>
       <div class="table-wrap" role="region" aria-label="${escAttr(`Buzz-out list for ${k.name}`)}" tabindex="0"><table class="po-table po-buzz">
         <caption class="sr-only">Each wire of ${esc(k.name)}, to tick as it is checked for continuity</caption>

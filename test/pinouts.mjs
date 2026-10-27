@@ -6,7 +6,9 @@
 //   on pins that exist; the colours a cable's listing gives matching the ones
 //   its radio's or header's own table gives; the DCE end of RS-232 the DTE's
 //   with every direction turned round; the 9-to-25 adapter keeping each
-//   signal's name. Where a pin sits: a male DE-9's pin 1 top left from the
+//   signal's name. The field finding on the ERT-A2's internal DB9 — DTR, RTS
+//   and RX held high or nothing comes out — on its pins, its cable and in the
+//   CSV. Where a pin sits: a male DE-9's pin 1 top left from the
 //   front, a socket's top right, and the back of either the mirror of its
 //   front. The 4–20 mA arithmetic against figures worked by hand: the scale,
 //   the volts across a resistor, NAMUR NE 43's bands at their edges, and the
@@ -117,6 +119,23 @@ console.log('\nRS-232\n');
   const cr = D.cableById('cr300-beam');
   ok('CR300 to the Beam: two female DCE ports and a male-to-male null modem', D.byId('cr300-rs232').gender === 'F' && D.byId('beam-9602n').gender === 'F'
     && cr.a.gender === 'M' && cr.b.gender === 'M' && cr.wires.some(w => w[0] === 2 && w[1] === 3));
+}
+
+console.log('\nThe ERT-A2\'s internal DB9: found in the field\n');
+{
+  const db9 = D.byId('erta2-db9'), pin = n => db9.pins.find(p => p.n === String(n));
+  ok('a field finding is a level of its own, between the maker\'s document and general practice',
+    J(Object.keys(D.SURE).slice(0, 4)) === J(['standard', 'maker', 'field', 'general']));
+  ok('the DB9 sends on 2 and listens on 3, and DTR (4), RTS (7) and RX (3) are marked found in the field',
+    pin(2).dir === 'out' && pin(3).dir === 'in' && [3, 4, 7].every(n => pin(n).found) && ![1, 2, 5, 6, 8, 9].some(n => pin(n).found)
+      && /2\.5 V/.test(db9.found[0]) && /three-wire/.test(db9.found[0]));
+  const k = D.cableById('erta2-db9-cr300');
+  const joined = new Set(k.loops.a.flat().map(String));
+  ok('its cable to a CR300: data 2 → 3, ground, and 3, 4 and 7 joined at the ERT-A2\'s end and held high',
+    k.sure === 'field' && k.wires.some(w => w[0] === 2 && w[1] === 3) && k.wires.some(w => w[0] === 5 && w[1] === 5)
+      && ['3', '4', '7'].every(n => joined.has(n)) && k.wires.some(w => w[0] === 4) && !k.wires.some(w => w[0] === 3), J(k.wires));
+  const rows = D.csv(['erta2-db9']).trim().split('\n');
+  ok('the CSV says which pins are a field finding', /,Field finding$/.test(rows[4]) && /Maker's document$/.test(rows[2]), J([rows[2], rows[4]]));
 }
 
 console.log('\nWhere a pin sits\n');
@@ -238,6 +257,16 @@ try {
   const mx = await page.evaluate(() => ({ h: document.getElementById('po-view-h').textContent, rows: document.querySelectorAll('#po-view tbody .po-row').length,
     wire: document.querySelector('#po-view .po-row[data-row="1"]').textContent }));
   ok('the Maxon SD-125: nine pins, pin 1 the audio in on the green wire', /Maxon SD-125/.test(mx.h) && mx.rows === 9 && /Audio in/.test(mx.wire) && /Green/.test(mx.wire), J(mx));
+
+  // The field finding, where a tech will see it.
+  await page.evaluate(() => Pinouts.pick('erta2-db9', true));
+  const fd = await page.evaluate(() => ({ found: document.querySelector('#po-view .po-found')?.textContent || '',
+    tags: [...document.querySelectorAll('#po-view .po-row')].filter(r => r.querySelector('.po-tag-field')).map(r => r.dataset.row) }));
+  ok('the ERT-A2\'s internal DB9 says what was found in the field, and tags pins 3, 4 and 7',
+    /Found in the field/.test(fd.found) && /DTR \(pin 4\), RTS \(pin 7\) and RX/.test(fd.found) && J(fd.tags) === J(['3', '4', '7']), J(fd));
+  await page.evaluate(() => Pinouts.cable('erta2-db9-cr300'));
+  ok('…and its cable to a CR300 carries the finding too', await page.evaluate(() => /Found in the field/.test(document.querySelector('#po-cable .po-found')?.textContent || '')));
+  await page.evaluate(() => Pinouts.pick('maxon-sd125', true));
 
   // A cable, wire by wire.
   await page.evaluate(() => Pinouts.cable('cr300-beam'));

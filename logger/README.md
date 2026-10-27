@@ -378,6 +378,33 @@ cannot be tested by watching it work.
 
 ---
 
+## Wiring the receiver to the logger
+
+The ERT-A2's internal DB9 (marked SERIAL) sends on pin 2, and so does the
+CR300's RS-232 port — both are wired as a modem (DCE) — so the data crosses:
+**ERT-A2 pin 2 to the CR300's pin 3**, and ground, pin 5 to pin 5.
+
+**A plain three-wire cable is not enough.** Found in the field: the ERT-A2
+sends nothing until **DTR (pin 4), RTS (pin 7) and RX (pin 3, into the
+ERT-A2) are held high** — 2.5 V is enough. It has to be "triggered" into
+thinking something is listening on the port; TX, RX and ground alone leave it
+silent, and this program waits for bytes that never come.
+
+- Join pins 3, 4 and 7 at the ERT-A2's end and hold them at a steady positive
+  level. The CR300's DTR (pins 1 and 6) is one source — this program opens the
+  port once and keeps it open, so it should stay up — but meter it rather than
+  trust it.
+- **Check with a meter:** logger connected and running, ERT-A2 pins 3, 4 and 7
+  to pin 5 should each read 2.5 V or more. One near 0 V is the fault.
+- The symptom: a new install whose `RxBlockBytes` stays at 0 and whose
+  `SecsSinceRx` never stops climbing, while the receiver is plainly hearing
+  stations.
+
+The 🪛 **Pinouts** tab in the Knowledge base draws it: *ERT-A2 · internal DB9*,
+and the cable *ERT-A2 internal DB9 to a CR300*, with a tick box per wire.
+
+---
+
 ## Loading it
 
 The receiver occupies the RS-232 port, so **talk to the logger over USB**, not
@@ -544,7 +571,7 @@ program cannot parse what it is sending*, and those two have nothing in common.
 
 | Variable | Means |
 | --- | --- |
-| `SecsSinceRx` | Seconds since the last byte arrived. Climbing past a station's reporting interval means the problem is upstream of this program: cable, receiver, power. |
+| `SecsSinceRx` | Seconds since the last byte arrived. Climbing past a station's reporting interval means the problem is upstream of this program: cable, receiver, power. On a cable that has never worked, first check the ERT-A2's DTR, RTS and RX are held high (*Wiring the receiver to the logger*). |
 | `RxAvail`, `RxBlockBytes`, `RxBytesTotal` | Bytes waiting in the port, bytes taken this scan, bytes since startup. |
 | `RxNulls` | NUL bytes seen. A binary feed carries nine to eleven per frame and that is correct; a non-zero count on a feed you believe is ASCII means the port format is wrong. |
 | `RxBufLen`, `RxBufDrops` | Bytes waiting to be framed, and times the buffer filled with nothing framable in it. |

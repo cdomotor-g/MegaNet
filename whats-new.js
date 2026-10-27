@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 127, date: '2026-10-27', items: [
+      '<strong>🪛 Pinouts</strong> has the <strong>ERT-A2\'s internal DB9</strong>, with a crew\'s field finding: a logger such as a '
+        + 'CR300 capturing from it gets nothing on a plain three-wire cable — <strong>DTR, RTS and RX must be held high</strong> (2.5 V '
+        + 'is enough) for the ERT-A2 to send. The cable to a CR300 is drawn wire by wire, and pins found in the field are marked as such.',
+    ] },
     { n: 126, date: '2026-10-27', items: [
       '🕵️ <strong>Investigations</strong> is a tab now, in a new <strong>Network health</strong> group with '
         + '<strong>Station Health</strong> and <strong>Backbone</strong>, just under <strong>Data</strong>. Each write-up '

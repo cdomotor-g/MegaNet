@@ -21696,6 +21696,12 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
 .po-sure--standard, .po-sure--maker { color: var(--ok); }
 .po-sure--general, .po-sure--second { color: var(--warn); }
 .po-sure--unverified { color: var(--bad); }
+.po-sure--field { color: var(--accent); }
+/* What a crew found on site and no maker's document says. */
+.po-found { border-left: 4px solid var(--accent); background: var(--panel-register); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); margin-bottom: var(--sp-3); }
+.po-found h4 { margin-top: 0; }
+.po-found p:last-child { margin-bottom: 0; }
+.po-tag-field { display: inline-block; margin-left: var(--sp-1); padding: 0 var(--sp-1); border: 1px solid currentColor; border-radius: var(--r-pill); color: var(--accent); font-size: var(--fs-xs); font-weight: 700; white-space: nowrap; }
 .po-sure-line .small { color: var(--muted); }
 
 /* The connector */
