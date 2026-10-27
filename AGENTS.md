@@ -54,6 +54,15 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     was last heard, and the groups that went quiet together (around a place,
     or behind a repeater). From the server's health run every 15 minutes;
     `checked_at` says when it last looked.
+  - `get_station_health` — `GET /api/v1/stations/{id}/health?days=3|7|14`:
+    what Station Health says about one station — its findings (severity, what,
+    what to do, since when, evidence), its learned check schedule with checks
+    received and missed each day, and its battery's night lows and trend.
+  - `get_health_findings` — `GET /api/v1/health/findings?owner=&ids=&min_severity=&days=`:
+    the same for a page of stations, worst first — by owner (`owners` in the
+    answer lists them), by up to 100 station ids, or by network, basin, kind
+    or `bbox`. A 503 "not available yet" on either means database migration
+    0085 has not been applied yet.
   - `get_flood_levels` — `GET /api/v1/stations/{id}/flood-levels`
   - `get_service_level` — `GET /api/v1/stations/{id}/service-level`
   - `list_catchments`, `get_catchment` — `GET /api/v1/catchments[/{id}]`

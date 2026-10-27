@@ -146,6 +146,7 @@ export const READABLE_RELATIONS = Object.freeze(new Set([
   'inspection_chart_fade_margin',
   'link_fade_margin', 'app_meta',
   'health_finding', 'health_refresh',
+  'health_card', 'health_card_run',
 ]));
 
 // Relations on that list that a migration still to be applied to the live
@@ -158,6 +159,10 @@ export const READABLE_RELATIONS = Object.freeze(new Set([
 const ARRIVES_WITH = Object.freeze({
   reading_latest: Object.freeze({ migration: 'db/migrations/0057_reading_latest.sql',
     meanwhile: 'one station\'s own readings are at GET /api/v1/stations/{id}/readings' }),
+  health_card: Object.freeze({ migration: 'db/migrations/0085_health_cards.sql',
+    meanwhile: 'the stations silent now are at GET /api/v1/health/silent' }),
+  health_card_run: Object.freeze({ migration: 'db/migrations/0085_health_cards.sql',
+    meanwhile: 'the stations silent now are at GET /api/v1/health/silent' }),
 });
 
 const UNREACHABLE_HINT =
@@ -1078,6 +1083,7 @@ function stationLinks(rc, id) {
   return {
     station: base,
     dossier: `${base}/dossier`,
+    health: `${base}/health`,
     readings: `${base}/readings`,
     flood_levels: `${base}/flood-levels`,
     service_level: `${base}/service-level`,
@@ -2300,6 +2306,367 @@ async function silentStationsEndpoint(rc, params) {
   }, 'stations');
 }
 
+// ── Station Health: a station's card, and a page of them ─────────────────────
+// "What does Station Health say about this station?" — the tab's station
+// view: its findings with their evidence and what to do, its learned check
+// schedule with what arrived and what was missed each day, and its battery's
+// night lows and trend. A field team asked for it to plan a run from and to
+// read on arrival. The server's run of Station Health every fifteen minutes
+// works it out for each of the tab's windows and keeps one card per station
+// heard (0085: tools/health/report.mjs, tools/health/cards.mjs for the shape);
+// this reads the cards and nothing else works anything out.
+//
+// GET /stations/{id}/health — one station, one window:
+//   1. the station, live, as every station route resolves it;
+//   2. side by side: its card; when each window was last worked out; when the
+//      ingest last heard it (said when the window holds nothing from it); and
+//      its SLS rows, for its owner.
+// GET /health/findings — the same for a page of stations, worst first:
+//   1. the window's card summaries (worst severity and counts, not the cards):
+//      those with a finding at min_severity or worse, or the ones named;
+//   2. those stations, live and matching the filters;
+//   3. whose each is (owners, kept ten minutes);
+//   4. the page's cards, and for a station named and not heard, when the
+//      ingest last heard it.
+
+export const HEALTH_WINDOWS = Object.freeze([3, 7, 14]);
+export const HEALTH_DEFAULT_DAYS = 7;
+export const STATION_HEALTH_PARAMS = ['days'];
+export const FINDINGS_PARAMS = ['owner', 'ids', 'network', 'basin', 'type', 'bbox', 'min_severity', 'days', 'limit', 'offset'];
+const CARD_SUMMARY_SELECT = 'station_id,status,worst,findings,attention';
+const HEALTH_STATION_SELECT = 'id,name,station_number,lat,lon,roles,location_types,alert_ids,stream,basin,radio_network_ids';
+// The battery's two lines, as health-analysis.js draws them (BATT_WARN_V,
+// BATT_CRIT_V): a night low at or under these is low, or critical.
+// test/agent-api.mjs holds them to that file.
+export const BATTERY_THRESHOLDS_V = Object.freeze({ low: 12.2, critical: 11.8 });
+
+function parseDays(v) {
+  if (v === undefined || v === '') return HEALTH_DEFAULT_DAYS;
+  const n = Number(String(v).trim());
+  if (!HEALTH_WINDOWS.includes(n)) {
+    throw bad(`"days" is one of Station Health's windows: ${HEALTH_WINDOWS.join(', ')} (default ${HEALTH_DEFAULT_DAYS}).`);
+  }
+  return n;
+}
+
+// Whose station it is, as the app's station card and Station Health's owner
+// filter say it (app.js stationOwner): the Service Level Specification's owner
+// wherever it lists the station — its first entry, the more specific
+// statement of service and then Queensland's — else the owner recorded on the
+// station. A joint owner is each of its parties, so "Bureau/Seqwater" is found
+// under either, and the documents' two spellings of the Bureau are one.
+const OWNER_PARTY_ALIAS = { Bureau: 'Bureau of Meteorology' };
+const tidyParty = p => {
+  const t = String(p).replace(/\s+/g, ' ').replace(/(\S)\(/g, '$1 (').replace(/[\s\-–]+$/, '').trim();
+  return OWNER_PARTY_ALIAS[t] || t;
+};
+const ownerParties = raw => [...new Set(String(raw || '').split(/\s*[/,]\s*/).map(tidyParty).filter(Boolean))];
+// A party as asked for: the same tidying, any case, "Bureau" for the Bureau.
+const partyKey = p => { const t = tidyParty(p); return (t.toLowerCase() === 'bureau' ? OWNER_PARTY_ALIAS.Bureau : t).toLowerCase(); };
+
+function ownerFrom(sls, own) {
+  const make = (raw, from, source) => {
+    const parties = ownerParties(raw);
+    return parties.length ? { name: parties.join(' / '), parties, from, source } : null;
+  };
+  if (sls && sls.owner && String(sls.owner).trim()) {
+    return make(sls.owner, 'sls', `the Bureau's ${sls.jurisdiction || 'QLD'} Service Level Specification`);
+  }
+  return own && String(own).trim() ? make(own, 'station', 'recorded on the station') : null;
+}
+
+const SLS_OWNER_SELECT = 'station_id,bureau_number,owner,jurisdiction,' + SLS_ROLES.map(([k]) => k).join(',');
+
+// Every live station's owner, by id: the SLS rows that name a station and the
+// few stations with an owner of their own — five reads, kept ten minutes in
+// the isolate and at the edge. The SLS changes by edition, not by the hour.
+const ownersOf = rc => memo('owners', 600000, async () => {
+  const [sls, own] = await Promise.all([
+    rc.up.selectAll('sls_location', [['select', SLS_OWNER_SELECT], ['station_id', 'not.is.null'],
+      ['order', 'station_id.asc,bureau_number.asc,jurisdiction.asc']], 4 * LIMITS.candidateMax, { ttl: 600 }),
+    rc.up.selectAll('station', [['select', 'id,owner'], ['deleted_at', 'is.null'], ['owner', 'not.is.null'],
+      ['order', 'id.asc']], LIMITS.candidateMax, { ttl: 600 }),
+  ]);
+  const first = new Map();
+  for (const r of bySlsRank(sls.rows)) if (!first.has(r.station_id)) first.set(r.station_id, r);
+  const ownBy = new Map(own.rows.map(r => [r.id, r.owner]));
+  const out = new Map();
+  for (const id of new Set([...first.keys(), ...ownBy.keys()])) {
+    const o = ownerFrom(first.get(id), ownBy.get(id));
+    if (o) out.set(id, o);
+  }
+  return out;
+});
+
+// When each window was last worked out: { days → { at, detail } }.
+async function cardRuns(rc) {
+  const { rows } = await rc.up.select('health_card_run', [['select', 'days,at,detail'], ['order', 'days.asc']]);
+  return new Map(rows.map(r => [Number(r.days), r]));
+}
+
+function windowOf(run, days) {
+  const d = (run && run.detail) || {};
+  return {
+    days,
+    from: typeof d.t0 === 'string' ? d.t0 : null,
+    to: typeof d.t1 === 'string' ? d.t1 : (run ? run.at : null),
+    time_zone: typeof d.tz === 'string' && d.tz ? d.tz : 'Australia/Brisbane',
+  };
+}
+
+// One station's health, as both routes answer it: the station, its owner, and
+// its card for the window — or that the window holds nothing from it.
+function healthRow(rc, st, { card, owner, days, heardAt }) {
+  const c = card ? card.card || {} : null;
+  const lastHeard = c ? c.last_heard_at || null : heardAt || null;
+  return {
+    id: st.id,
+    name: st.name || (c && c.name) || st.id,
+    station_number: st.station_number || null,
+    lat: num(st.lat),
+    lon: num(st.lon),
+    kinds: stationKinds(st),
+    basin: st.basin || null,
+    stream: st.stream || null,
+    radio_network_ids: st.radio_network_ids || [],
+    owner: owner || null,
+    status: c ? (card.status || c.status || null) : 'not heard',
+    worst: c ? card.worst || null : null,
+    attention: c ? card.attention || 0 : 0,
+    last_heard_at: lastHeard,
+    minutes_since_heard: lastHeard ? minutesSince(lastHeard, rc.now) : null,
+    heard_by: c ? c.heard_by || [] : [],
+    findings: c ? c.findings || [] : [],
+    schedule: c ? c.schedule || null : null,
+    battery: c && c.battery ? { ...c.battery, thresholds_v: BATTERY_THRESHOLDS_V } : null,
+    link: `${rc.origin}${API_PREFIX}/stations/${encodeURIComponent(st.id)}/health${days === HEALTH_DEFAULT_DAYS ? '' : `?days=${days}`}`,
+  };
+}
+
+const HEALTH_NOTES = {
+  rules: 'Station Health\'s own rules (health-analysis.js — the Station Health tab\'s), run by the server every fifteen minutes over the window\'s telemetry ingested into Flood-Net. A check counts as missed only when a receiver that hears the station was listening; checks missed network-wide, or when nobody was listening, are counted apart.',
+  scope: 'Only stations whose telemetry reaches Flood-Net can be judged: most report through the Bureau\'s own systems, and a station with nothing here may simply not send to Flood-Net.',
+  status: 'status is the station\'s worst own finding (critical, warn, info), ok when nothing was found, irregular when no check schedule could be learned (it may report on events only), or not heard when the window holds nothing from it.',
+};
+
+function freshnessNotes(notes, run, days, rc) {
+  if (!run) {
+    notes.push(`The server has not worked out the ${days}-day cards yet. Its run reports them every fifteen minutes once db/migrations/0085_health_cards.sql is applied; until then the stations silent now are at /api/v1/health/silent.`);
+    return null;
+  }
+  const ago = minutesSince(run.at, rc.now);
+  if (ago > SILENT_STALE_MINUTES) {
+    notes.push(`The server last worked this window out ${ago} minutes ago — its every-fifteen-minutes run may have stopped, so this is older than it looks.`);
+  }
+  if (run.detail && run.detail.complete === false) {
+    notes.push('The server\'s last run could not read the whole window (it hit its row cap), so a station it did not reach keeps its card from the run before.');
+  }
+  return ago;
+}
+
+async function stationHealthEndpoint(rc, rawId, params) {
+  const days = parseDays(params.days);
+  const { row: st, resolved_from } = await resolveStationRow(rc, rawId, HEALTH_STATION_SELECT + ',owner');
+  const [card, runs, health, sls] = await Promise.all([
+    rc.up.select('health_card', [['select', `${CARD_SUMMARY_SELECT},card,changed_at`], ['days', `eq.${days}`], ['station_id', `eq.${st.id}`]]),
+    cardRuns(rc),
+    settle(healthRowsFor(rc, st.id)),
+    settle(rc.up.select('sls_location', [['select', SLS_OWNER_SELECT], ['station_id', `eq.${st.id}`], ['order', 'bureau_number.asc']])),
+  ]);
+  const notes = [];
+  const run = runs.get(days) || null;
+  const got = card.rows[0] || null;
+  const heard = health.ok ? (health.value[0] || null) : null;
+  const owner = ownerFrom(sls.ok ? bySlsRank(sls.value.rows)[0] : null, st.owner);
+  const row = healthRow(rc, st, { card: got, owner, days, heardAt: heard && (heard.last_reading_at || heard.last_seen_at) });
+  const ago = freshnessNotes(notes, run, days, rc);
+  if (!run) row.status = 'not recorded';
+  else if (!got) {
+    const longer = HEALTH_WINDOWS.filter(w => w > days);
+    notes.push(`Nothing from ${row.name} reached Flood-Net in the last ${days} days, so there is nothing to work out.`
+      + (row.last_heard_at ? ` Flood-Net last heard it at ${row.last_heard_at}.` : health.ok ? ' Flood-Net has never heard it.' : '')
+      + (longer.length ? ` A longer window (days=${longer[longer.length - 1]}) may reach back to it.` : ''));
+  }
+  if (!health.ok && !got) notes.push('When the ingest last heard it could not be read just now.');
+  notes.push(HEALTH_NOTES.rules, HEALTH_NOTES.status, HEALTH_NOTES.scope);
+  const others = {};
+  for (const w of HEALTH_WINDOWS) {
+    if (w !== days) others[w] = `${rc.origin}${API_PREFIX}/stations/${encodeURIComponent(st.id)}/health?days=${w}`;
+  }
+  const { link, ...rest } = row;
+  return {
+    ...(resolved_from ? { resolved_from } : {}),
+    ...rest,
+    days,
+    window: windowOf(run, days),
+    checked_at: run ? run.at : null,
+    minutes_since_checked: ago,
+    card_changed_at: got ? got.changed_at || null : null,
+    other_windows: others,
+    notes,
+    links: stationLinks(rc, st.id),
+    source: 'meganet.health_card (the server\'s Station Health run, one card per station heard per window); meganet.health_card_run; meganet.station; meganet.sls_location (owner); meganet.station_health (when the ingest last heard it)',
+    generated_at: new Date().toISOString(),
+  };
+}
+
+const MIN_SEVERITY = ['critical', 'warn', 'info'];
+
+function parseIds(v) {
+  if (v === undefined) return undefined;
+  const ids = uniq(String(v).split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
+  if (!ids.length) throw bad('"ids" is empty: give station ids, comma-separated.');
+  const badId = ids.find(id => !STATION_ID_RE.test(id));
+  if (badId) throw bad(`"${badId.slice(0, 80)}" in "ids" is not a station id. Station ids are lowercase slugs such as "abergowrie_br_al".`);
+  if (ids.length > LIMITS.listMax) throw bad(`"ids" names ${ids.length} stations; at most ${LIMITS.listMax} at a time.`);
+  return ids;
+}
+
+function parseOwners(v) {
+  if (v === undefined) return undefined;
+  const raw = cleanText(v, 'owner', 300);
+  const want = uniq(raw.split(',').map(s => s.trim()).filter(Boolean));
+  if (!want.length) throw bad('"owner" is empty.');
+  return want;
+}
+
+async function healthFindingsEndpoint(rc, params) {
+  const notes = [];
+  const f = {
+    owner: parseOwners(params.owner),
+    ids: parseIds(params.ids),
+    network: parseSlug(params.network, 'network'),
+    basin: cleanText(params.basin, 'basin'),
+    type: parseEnum(params.type, 'type', ['rain', 'river', 'repeater', 'base']),
+    bbox: parseBbox(params.bbox),
+    min_severity: parseEnum(params.min_severity, 'min_severity', MIN_SEVERITY),
+    days: parseDays(params.days),
+    limit: parseIntParam(params.limit, 'limit', { min: 1, max: LIMITS.listMax, dflt: LIMITS.listDefault, clampMax: true }, notes),
+    offset: parseIntParam(params.offset, 'offset', { min: 0, max: LIMITS.offsetMax, dflt: 0 }),
+  };
+  const echo = stripNulls({ owner: f.owner ? f.owner.join(',') : undefined, ids: f.ids ? f.ids.join(',') : undefined,
+    network: f.network, basin: f.basin, type: f.type,
+    bbox: f.bbox ? [f.bbox.west, f.bbox.south, f.bbox.east, f.bbox.north].join(',') : undefined,
+    min_severity: f.min_severity, days: f.days, limit: f.limit, offset: f.offset });
+  // Named stations are all answered, found or not, unless a severity is asked
+  // for too; otherwise a station is listed for a finding at the least severe
+  // asked (any, by default).
+  const everyNamed = !!f.ids && !f.min_severity;
+  const least = f.min_severity || 'info';
+  const sevs = MIN_SEVERITY.slice(0, MIN_SEVERITY.indexOf(least) + 1);
+
+  const filters = stationFilterPairs({ basin: f.basin, network: f.network, type: f.type });
+  if (f.type === 'rain' || f.type === 'river') filters.push(logicPair([TYPE_TERMS[f.type]]));
+  if (f.bbox) {
+    filters.push(['lat', `gte.${f.bbox.south}`], ['lat', `lte.${f.bbox.north}`],
+      ['lon', `gte.${f.bbox.west}`], ['lon', `lte.${f.bbox.east}`]);
+  }
+
+  // 1. The window's summaries, and when it was last worked out.
+  const pairs = [['select', CARD_SUMMARY_SELECT], ['days', `eq.${f.days}`], ['order', 'station_id.asc']];
+  if (f.ids) pairs.push(['station_id', `in.${pgList(f.ids)}`]);
+  if (!everyNamed) pairs.push(['worst', `in.${pgList(sevs)}`]);
+  const [found, runs] = await Promise.all([
+    rc.up.selectAll('health_card', pairs, LIMITS.candidateMax),
+    cardRuns(rc),
+  ]);
+  const run = runs.get(f.days) || null;
+  const summaries = new Map(found.rows.map(r => [r.station_id, r]));
+
+  // 2. Those stations — or every one named — live and matching the filters.
+  const wanted = f.ids || [...summaries.keys()];
+  const rowsById = wanted.length ? byKey(await stationRowsByIds(rc, wanted, HEALTH_STATION_SELECT, filters)) : new Map();
+  // A named station missing from them is unknown — unless a filter left it
+  // out (stationFilterPairs always holds the deleted_at pair), which one more
+  // read tells apart.
+  let unknownIds = [];
+  if (f.ids) {
+    const missing = f.ids.filter(id => !rowsById.has(id));
+    const live = missing.length && filters.length > 1
+      ? byKey(await stationRowsByIds(rc, missing, 'id', [['deleted_at', 'is.null']])) : new Map();
+    unknownIds = missing.filter(id => !live.has(id));
+  }
+
+  // 3. Whose each is.
+  const owners = await settle(ownersOf(rc));
+  const ownerMap = owners.ok ? owners.value : new Map();
+  if (!owners.ok) {
+    if (f.owner) throw owners.error;
+    notes.push('Station owners could not be read just now; owner is null on every row.');
+  }
+  let candidates = [...rowsById.keys()].filter(id => everyNamed || summaries.has(id));
+  const facet = new Map();
+  for (const id of candidates) {
+    const o = ownerMap.get(id);
+    for (const p of o ? o.parties : ['none']) facet.set(p, (facet.get(p) || 0) + 1);
+  }
+  if (f.owner) {
+    const want = new Set(f.owner.map(partyKey));
+    candidates = candidates.filter(id => {
+      const o = ownerMap.get(id);
+      return o ? o.parties.some(p => want.has(partyKey(p))) : want.has('none');
+    });
+    if (!candidates.length && !f.ids) {
+      notes.push(`No station in this window has the owner ${f.owner.map(o => `"${o}"`).join(' or ')}; "owners" lists those that do, with how many stations each.`);
+    }
+  }
+
+  // Worst first; then the most needing attention, the most found, the id. A
+  // station named and not heard goes last.
+  const rank = id => { const s = summaries.get(id); return s ? (SEVERITY_RANK[s.worst] ?? 3) : 4; };
+  candidates.sort((a, b) => rank(a) - rank(b)
+    || ((summaries.get(b)?.attention || 0) - (summaries.get(a)?.attention || 0))
+    || ((summaries.get(b)?.findings || 0) - (summaries.get(a)?.findings || 0))
+    || (a < b ? -1 : a > b ? 1 : 0));
+  const pageIds = candidates.slice(f.offset, f.offset + f.limit);
+
+  // 4. The page's cards, and when the ingest last heard a named station the
+  //    window holds nothing from.
+  const heardIds = pageIds.filter(id => summaries.has(id));
+  const silentIds = pageIds.filter(id => !summaries.has(id));
+  const [cards, heard] = await Promise.all([
+    heardIds.length ? rc.up.select('health_card', [['select', `${CARD_SUMMARY_SELECT},card`], ['days', `eq.${f.days}`],
+      ['station_id', `in.${pgList(heardIds)}`]]) : { rows: [] },
+    silentIds.length ? settle(rc.up.select('station_health', [['select', 'station_id,last_seen_at,last_reading_at'],
+      ['station_id', `in.${pgList(silentIds)}`], ['order', 'last_seen_at.desc.nullslast']])) : { ok: true, value: { rows: [] } },
+  ]);
+  const cardBy = byKey(cards.rows, 'station_id');
+  const heardBy = new Map();
+  if (heard.ok) for (const r of heard.value.rows) if (!heardBy.has(r.station_id)) heardBy.set(r.station_id, r.last_reading_at || r.last_seen_at);
+  const page = pageIds.map(id => healthRow(rc, rowsById.get(id), {
+    card: cardBy.get(id) || null, owner: ownerMap.get(id) || null, days: f.days, heardAt: heardBy.get(id) || null }));
+
+  const ago = freshnessNotes(notes, run, f.days, rc);
+  if (!run) page.forEach(r => { if (r.status === 'not heard') r.status = 'not recorded'; });
+  if (unknownIds.length) notes.push(`${unknownIds.length} id(s) named no live station: ${unknownIds.join(', ')}.`);
+  if (found.truncated) notes.push(`More than ${LIMITS.candidateMax} stations in this window; this answer covers the first ${LIMITS.candidateMax}.`);
+  notes.push(HEALTH_NOTES.rules, HEALTH_NOTES.status, HEALTH_NOTES.scope);
+
+  const nextOffset = f.offset + page.length;
+  const nextParams = {};
+  for (const k of FINDINGS_PARAMS) if (params[k] !== undefined) nextParams[k] = params[k];
+  nextParams.limit = String(f.limit);
+  return {
+    count: page.length,
+    total: candidates.length,
+    limit: f.limit,
+    offset: f.offset,
+    next: page.length && nextOffset < candidates.length ? pageLink(rc, '/health/findings', nextParams, nextOffset) : null,
+    query: echo,
+    days: f.days,
+    window: windowOf(run, f.days),
+    checked_at: run ? run.at : null,
+    minutes_since_checked: ago,
+    owners: [...facet.entries()].map(([owner, stations]) => ({ owner, stations }))
+      .sort((a, b) => b.stations - a.stations || (a.owner < b.owner ? -1 : 1)),
+    stations: page,
+    ...(unknownIds.length ? { unknown_ids: unknownIds } : {}),
+    notes,
+    source: 'meganet.health_card (the server\'s Station Health run, one card per station heard per window); meganet.health_card_run; meganet.station; meganet.sls_location and meganet.station (owners); meganet.station_health (when the ingest last heard a station named and not heard)',
+    generated_at: new Date().toISOString(),
+  };
+}
+
 // ── Catchments and networks ──────────────────────────────────────────────────
 
 async function catchmentsEndpoint(rc) {
@@ -2355,11 +2722,13 @@ export const ENDPOINTS = Object.freeze([
   { path: '/api/v1/stations', op: 'searchStations', summary: 'Search and filter stations; compact rows, or GeoJSON with format=geojson.' },
   { path: '/api/v1/stations/{id}', op: 'getStation', summary: 'One station\'s full register record, its SLS rows and health.' },
   { path: '/api/v1/stations/{id}/dossier', op: 'getStationDossier', summary: 'Everything a report needs about one station, labelled with its sources.' },
+  { path: '/api/v1/stations/{id}/health', op: 'getStationHealth', summary: 'What Station Health says about one station over 3, 7 or 14 days: its findings, its check schedule day by day, its battery\'s night lows.' },
   { path: '/api/v1/stations/{id}/readings', op: 'getStationReadings', summary: 'Telemetry ingested into Flood-Net: raw, hourly or daily, bounded windows.' },
   { path: '/api/v1/stations/{id}/flood-levels', op: 'getStationFloodLevels', summary: 'Flood classes, SLS classes, crossings, gauge zero, flood effects, AEP levels and one AHD ladder.' },
   { path: '/api/v1/stations/{id}/service-level', op: 'getStationServiceLevel', summary: 'The station\'s entries in the Service Level Specifications (Queensland; New South Wales and the ACT).' },
   { path: '/api/v1/readings/latest', op: 'getLatestReadings', summary: 'Every station\'s newest reading on each channel, in one call: by network, basin, kind or bounding box.' },
   { path: '/api/v1/health/silent', op: 'getSilentStations', summary: 'The stations gone quiet now, and the groups that went quiet together, from the server\'s own health run.' },
+  { path: '/api/v1/health/findings', op: 'getHealthFindings', summary: 'Station Health for a page of stations, worst first — by owner, by station ids, or by network, basin, kind or bounding box.' },
   { path: '/api/v1/catchments', op: 'listCatchments', summary: 'The 77 Queensland drainage basins.' },
   { path: '/api/v1/catchments/{id}', op: 'getCatchment', summary: 'One basin and its stations.' },
   { path: '/api/v1/networks', op: 'listNetworks', summary: 'Radio networks, maintenance hubs and Radio Mobile systems.' },
@@ -2405,6 +2774,9 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
     schema: { type: 'integer', minimum: 1, maximum: max, default: dflt } });
   const offsetParam = { name: 'offset', in: 'query', required: false, description: 'Rows to skip, for paging; follow "next".',
     schema: { type: 'integer', minimum: 0, default: 0 } };
+  const daysParam = { name: 'days', in: 'query', required: false,
+    description: `The window Station Health works over, in days: ${HEALTH_WINDOWS.join(', ')} (default ${HEALTH_DEFAULT_DAYS}), as on the tab.`,
+    schema: { type: 'integer', enum: [...HEALTH_WINDOWS], default: HEALTH_DEFAULT_DAYS } };
   const errors = {
     400: { $ref: '#/components/responses/BadRequest' },
     404: { $ref: '#/components/responses/NotFound' },
@@ -2466,6 +2838,9 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
       '/api/v1/stations/{id}/dossier': op('getStationDossier', 'Get a station dossier',
         'Everything an assessment report needs about one station in one call: identity, location, radio, telemetry and health, SLS, Bureau flood details, AEP levels, inspections, nearby stations — each section labelled with its source and status.',
         [idParam], ok('The dossier.')),
+      '/api/v1/stations/{id}/health': op('getStationHealth', 'Get a station\'s health',
+        'Station Health on one station over 3, 7 or 14 days: its findings worst first (severity, title, detail, action, since, evidence), its learned check schedule with checks received and missed each day, and its battery\'s night lows and trend. From the server\'s run every 15 minutes.',
+        [idParam, daysParam], ok('The station\'s health over the window.')),
       '/api/v1/stations/{id}/readings': op('getStationReadings', 'Get readings',
         `Telemetry ingested into Flood-Net for one station. raw: up to ${LIMITS.windowMaxDays.raw} days; hourly: ${LIMITS.windowMaxDays.hourly}; daily: ${LIMITS.windowMaxDays.daily}. At most ${LIMITS.readingsMax} rows per call.`,
         [
@@ -2503,6 +2878,19 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
           formatParam,
           limitParam(LIMITS.latestMax, LIMITS.latestDefault), offsetParam,
         ], okOrGeo('A page of silent stations, worst first, and the groups; or a GeoJSON FeatureCollection of the stations.')),
+      '/api/v1/health/findings': op('getHealthFindings', 'Get Station Health findings',
+        'Station Health for a page of stations, worst first, each as getStationHealth answers it — to plan a maintenance run: by owner, station ids, network, basin, kind or bounding box. Lists stations with a finding at min_severity or worse; with ids, every station named.',
+        [
+          q('owner', 'Station owners, comma-separated, as the Service Level Specification (or the station) names them — e.g. "Seqwater" or "Bureau of Meteorology"; "none" for no owner on record. The answer\'s owners lists them.', { type: 'string', maxLength: 300 }),
+          q('ids', `Station ids, comma-separated, up to ${LIMITS.listMax} — every one is answered, with or without findings, unless min_severity is given too.`, { type: 'string' }),
+          q('network', 'A radio network id. See /api/v1/networks.', { type: 'string' }),
+          q('basin', 'Words in the Bureau\'s basin name for the station, e.g. "Burdekin".', { type: 'string' }),
+          q('type', 'A kind: rain, river, repeater or base — the same rule as /api/v1/stations.', { type: 'string', enum: ['rain', 'river', 'repeater', 'base'] }),
+          q('bbox', 'A bounding box, "west,south,east,north" in decimal degrees — longitude first — e.g. 152.5,-28.2,153.6,-27.0.', { type: 'string', pattern: '^-?\\d+(\\.\\d+)?(,-?\\d+(\\.\\d+)?){3}$' }),
+          q('min_severity', 'The least severe finding a station must have to be listed: critical, warn (needs attention) or info (any; the default).', { type: 'string', enum: MIN_SEVERITY }),
+          daysParam,
+          limitParam(LIMITS.listMax, LIMITS.listDefault), offsetParam,
+        ], ok('A page of stations\' health, worst first, and the owners in the window.')),
       '/api/v1/catchments': op('listCatchments', 'List catchments', 'The 77 Queensland drainage basins with basin number, area and drainage division.', [], ok('Catchments.')),
       '/api/v1/catchments/{id}': op('getCatchment', 'Get a catchment and its stations', 'One basin (by id or name) and a page of its stations.',
         [{ name: 'id', in: 'path', required: true, description: 'Catchment id, e.g. "herbert".', schema: { type: 'string' } },
@@ -2573,6 +2961,7 @@ async function routeRest(rc, sub, params) {
     if (parts.length === 3) {
       switch (parts[2]) {
         case 'dossier': none(); return dossierEndpoint(rc, parts[1]);
+        case 'health': return stationHealthEndpoint(rc, parts[1], allowParams(params, STATION_HEALTH_PARAMS));
         case 'readings': return readingsEndpoint(rc, parts[1],
           allowParams(params, ['from', 'to', 'resolution', 'channel', 'limit', 'offset']));
         case 'flood-levels': none(); return floodLevelsEndpoint(rc, parts[1]);
@@ -2586,6 +2975,9 @@ async function routeRest(rc, sub, params) {
   }
   if (parts[0] === 'health' && parts.length === 2 && parts[1] === 'silent') {
     return silentStationsEndpoint(rc, allowParams(params, SILENT_PARAMS));
+  }
+  if (parts[0] === 'health' && parts.length === 2 && parts[1] === 'findings') {
+    return healthFindingsEndpoint(rc, allowParams(params, FINDINGS_PARAMS));
   }
   if (parts[0] === 'catchments') {
     if (parts.length === 1) { none(); return catchmentsEndpoint(rc); }
@@ -2883,6 +3275,7 @@ const SERVER_INFO = Object.freeze({
 export const MCP_INSTRUCTIONS = [
   'Flood-Net (floodwarning.net) is the engineering register of the Bureau of Meteorology\'s Queensland (and neighbouring) flood-warning telemetry network: rainfall and river-height field stations, the repeaters that relay them, base stations, and the radio paths between. This server is READ-ONLY and serves only public data.',
   'Station ids are lowercase slugs such as "abergowrie_br_al" (a Bureau number also works). Find stations with search_stations or stations_near, then call get_station_dossier for everything about one station in a single call — identity, location, radio, telemetry and health, the Service Level Specification entry, the Bureau\'s flood classes, crossings and gauge zero, AEP levels, inspection numbers and nearby stations, each labelled with its source. Use get_flood_levels or get_service_level when only that is needed.',
+  'For what Station Health says about a station — its findings with what to do, its check schedule day by day, its battery\'s night lows — call get_station_health; for a maintenance run\'s worth of stations, get_health_findings by owner or by station ids.',
   'For what every gauge is saying now, call get_latest_readings once — by radio network, basin, kind or bounding box if you like — rather than get_readings station by station; it covers only telemetry ingested into Flood-Net, which most stations do not send. For what has gone quiet, call get_silent_stations. For a map, search_stations, stations_near, get_latest_readings and get_silent_stations answer GeoJSON with format "geojson".',
   'Heights: flood classes, crossings and flood effects are metres on the gauge, not AHD; AEP levels are modelled metres AHD and indicative only. Say which source a figure came from. Sections report status "ok", "not recorded" or "unavailable" — never read "not recorded" as zero.',
   `Be gentle: ${rateLimitWords().join('; ')}. Cache what you fetch and do not walk the whole network station by station.`,
@@ -2982,6 +3375,31 @@ export const MCP_TOOLS = Object.freeze([
       format: formatArg, limit: limitArg(LIMITS.latestMax, LIMITS.latestDefault), offset: offsetArg,
     }, additionalProperties: false },
     route: a => ['/health/silent', pick(a, ['network', 'basin', 'type', 'bbox', 'severity', 'format', 'limit', 'offset'])],
+  },
+  {
+    name: 'get_station_health',
+    title: 'Get a station\'s health',
+    description: 'What Station Health says about one station over the last 3, 7 or 14 days (7 by default), as the tab shows it when the station is opened: its findings worst first — severity, title, detail, the action to take, since when, and the evidence — its learned check schedule (every how many minutes, the slot times, when the next check is due) with the checks received, received incomplete and missed each day, and its battery\'s night lows with their trend in volts a day and days to critical. From the server\'s own run every fifteen minutes; checked_at says when it last looked. Only telemetry that reaches Flood-Net can be judged.',
+    inputSchema: { type: 'object', properties: {
+      id: idArg,
+      days: { type: 'integer', enum: [...HEALTH_WINDOWS], description: `The window, in days: ${HEALTH_WINDOWS.join(', ')} (default ${HEALTH_DEFAULT_DAYS}).` },
+    }, required: ['id'], additionalProperties: false },
+    route: a => [`/stations/${enc(a.id)}/health`, pick(a, ['days'])],
+  },
+  {
+    name: 'get_health_findings',
+    title: 'Get Station Health findings',
+    description: `Station Health for a page of stations at a time, worst first — each with its findings, check schedule and battery as get_station_health gives them — for planning a maintenance run: by owner (as the Service Level Specification names it; "owners" in the answer lists them), by a list of up to ${LIMITS.listMax} station ids, or by radio network, basin, kind or bounding box. Lists the stations with a finding at min_severity or worse (any finding by default; every station named when ids are given).`,
+    inputSchema: { type: 'object', properties: {
+      owner: { type: 'string', maxLength: 300, description: 'Owners, comma-separated, e.g. "Seqwater" or "Bureau of Meteorology"; "none" for no owner on record.' },
+      ids: { type: 'string', maxLength: 6600, description: `Station ids, comma-separated, up to ${LIMITS.listMax}.` },
+      network: listFilters.network, basin: listFilters.basin, type: listFilters.type,
+      bbox: { type: 'string', maxLength: 100, description: 'A bounding box, "west,south,east,north" in decimal degrees — longitude first — e.g. "152.5,-28.2,153.6,-27.0".' },
+      min_severity: { type: 'string', enum: MIN_SEVERITY, description: 'The least severe finding a station must have: critical, warn (needs attention) or info (any; the default).' },
+      days: { type: 'integer', enum: [...HEALTH_WINDOWS], description: `The window, in days: ${HEALTH_WINDOWS.join(', ')} (default ${HEALTH_DEFAULT_DAYS}).` },
+      limit: limitArg(LIMITS.listMax, LIMITS.listDefault), offset: offsetArg,
+    }, additionalProperties: false },
+    route: a => ['/health/findings', pick(a, ['owner', 'ids', 'network', 'basin', 'type', 'bbox', 'min_severity', 'days', 'limit', 'offset'])],
   },
   {
     name: 'list_catchments',

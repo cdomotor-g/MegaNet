@@ -27,6 +27,10 @@ See [`docs/agent-api.md`](../docs/agent-api.md).
   and on station search answers GeoJSON for a map (`[lon, lat]`).
 - `get_silent_stations` (`/api/v1/health/silent`) lists what has gone quiet —
   stations silent now and groups that went quiet together.
+- `get_station_health` (`/api/v1/stations/{id}/health?days=3|7|14`) is what
+  Station Health says about one station — findings, check schedule day by day,
+  battery night lows; `get_health_findings` (`/api/v1/health/findings`) the
+  same for a page of stations, by owner or station ids.
 - Flood classes are metres on the gauge, AEP levels modelled m AHD (indicative);
   quote each figure's source and datum.
 

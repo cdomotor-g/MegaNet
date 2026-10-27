@@ -10,7 +10,8 @@ No sign-in or key. Rate limits: 60 requests / 60 s per client, 20 requests / 10 
 - [OpenAPI 3.1 document](https://floodwarning.net/api/v1/openapi.json): every endpoint, for function-calling agents and ChatGPT Actions
 - [Latest readings](https://floodwarning.net/api/v1/readings/latest): what every gauge reporting into Flood-Net is saying now, in one call — each station's newest reading on every channel, by network, basin, kind or bbox (west,south,east,north); add format=geojson for a map, as on /api/v1/stations
 - [Silent stations](https://floodwarning.net/api/v1/health/silent): what has gone quiet — the stations Station Health finds silent now, worst first, and the groups that went quiet together, from the server's run every 15 minutes; filter by network, basin, type, bbox or severity; format=geojson for a map
-- [MCP server](https://floodwarning.net/api/mcp): Streamable HTTP (POST JSON-RPC), stateless, read-only; tools search_stations, stations_near, get_station, get_station_dossier, get_readings, get_latest_readings, get_silent_stations, get_flood_levels, get_service_level, list_catchments, get_catchment, list_networks
+- [Station health findings](https://floodwarning.net/api/v1/health/findings): what Station Health says about a page of stations at a time, worst first — each one's findings (severity, what, what to do, since, evidence), learned check schedule with checks received and missed each day, and battery night-low trend over 3, 7 or 14 days; by owner, station ids, network, basin, type or bbox. One station: /api/v1/stations/{id}/health
+- [MCP server](https://floodwarning.net/api/mcp): Streamable HTTP (POST JSON-RPC), stateless, read-only; tools search_stations, stations_near, get_station, get_station_dossier, get_readings, get_latest_readings, get_silent_stations, get_station_health, get_health_findings, get_flood_levels, get_service_level, list_catchments, get_catchment, list_networks
 
 ## Docs
 

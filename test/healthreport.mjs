@@ -23,6 +23,11 @@
 //     per six hours and only what arrived since in between, the same report;
 //     a database without 0059 is told plainly and the run does not fail; no
 //     secret key, no report
+//   * each station as the tab shows it (0085): a card per station heard,
+//     carrying exactly the analysis' findings about it, its schedule's counts
+//     day by day and its battery's night lows; a run reports them for the
+//     tab's three windows, every batch naming every station heard; a database
+//     without 0085 takes the findings and is told plainly about the cards
 //
 // Run:  npm run healthreport
 //       npm run healthreport -- -v    also print what passed
@@ -31,7 +36,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FILES, SNAPSHOT, topLevel, loadAnalysis, analyse, toReport, run } from '../tools/health/report.mjs';
+import { FILES, SNAPSHOT, topLevel, loadAnalysis, analyse, toReport, run, cardWindows, CARD_BATCH } from '../tools/health/report.mjs';
+import { stationCards, CARD_MAX_BYTES, CARD_VERSION } from '../tools/health/cards.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -101,6 +107,53 @@ ok('evidence says what to do and since when, in words and times a person can rea
   !!silent && typeof silent.evidence.action === 'string' && silent.evidence.action.length > 10
     && !isNaN(Date.parse(silent.evidence.since)) && silent.evidence.category === 'comms');
 
+// ── the cards (0085): each station as the tab shows it ───────────────────────
+
+const cards = stationCards(A, { now: NOW });
+ok('a card for every station the analysis heard, and none for one it did not',
+  cards.length === A.stations.size && cards.every(c => A.stations.has(c.station_id) && c.card.station_id === c.station_id),
+  `${cards.length} cards, ${A.stations.size} stations`);
+const about = id => A.findings.filter(f => f.stationId === id || f.repeaterId === id
+  || (f.evidence && Array.isArray(f.evidence.stations) && f.evidence.stations.some(x => (x && x.id) === id || x === id)));
+ok('each card carries exactly the analysis\' findings about its station — the same ids, severities, words and actions',
+  cards.every(c => {
+    const want = about(c.station_id);
+    return c.card.findings.length === want.length && want.every(f => c.card.findings.some(g => g.id === f.id && g.severity === f.severity
+      && g.title === f.title && g.detail === f.detail && g.action === (f.action || null)));
+  }), cards.map(c => `${c.station_id}:${c.card.findings.length}/${about(c.station_id).length}`).join(' '));
+ok('…worst first, with the worst and the counts beside the card',
+  cards.every(c => c.findings === c.card.findings.length && c.attention === c.card.findings.filter(f => f.severity !== 'info').length
+    && c.worst === (c.card.findings[0] ? c.card.findings[0].severity : null)
+    && c.card.findings.every((f, i, l) => !i || ['critical', 'warn', 'info'].indexOf(l[i - 1].severity) <= ['critical', 'warn', 'info'].indexOf(f.severity))));
+const sc = cards.find(c => c.station_id === silentId);
+const sS = A.stations.get(silentId);
+ok('the planted silent station\'s card: silent, its schedule\'s counts day by day adding up to the window\'s',
+  !!sc && sc.worst === 'critical' && sc.card.findings[0].kind === 'silent' && sc.card.schedule
+    && sc.card.schedule.every_minutes === sS.schedule.P / 60000 && sc.card.schedule.trailing_misses === sS.schedule.trailingMisses
+    && ['received', 'incomplete', 'missed', 'missed_network_wide', 'unknown'].every(k =>
+      sc.card.schedule.daily.reduce((n, d) => n + d[k], 0) === { received: sS.schedule.counts.hits, incomplete: sS.schedule.counts.partial,
+        missed: sS.schedule.counts.misses, missed_network_wide: sS.schedule.counts.net, unknown: sS.schedule.counts.unknown }[k])
+    && sc.card.schedule.daily.every(d => /^\d{4}-\d{2}-\d{2}$/.test(d.date))
+    && sc.card.schedule.spells.some(sp => sp.open) && !isNaN(Date.parse(sc.card.schedule.next_due_at)),
+  sc ? JSON.stringify(sc.card.schedule).slice(0, 300) : 'no card');
+const fc = cards.find(c => c.station_id === world.roles.falling);
+const fB = A.stations.get(world.roles.falling).battery;
+ok('the planted falling battery\'s card: its night lows night by night and their trend, as the analysis has them',
+  !!fc && fc.card.battery && fc.card.battery.night_lows.length === fB.nights.length && fc.card.battery.night_lows.length >= 4
+    && fc.card.battery.trend_v_per_day < -0.04 && Math.abs(fc.card.battery.trend_v_per_day - fB.slope) < 0.001
+    && fc.card.battery.night_lows.every(p => !isNaN(Date.parse(p.at)) && p.v > 10 && p.v < 15)
+    && fc.card.findings.some(f => f.kind === 'battery-falling'),
+  fc ? JSON.stringify(fc.card.battery).slice(0, 300) : 'no card');
+const grp = cards.find(c => c.card.findings.some(f => f.about === 'group'));
+ok('a group\'s finding is on each of its stations\' cards, marked as the group\'s, its times said as times',
+  !!grp && grp.card.findings.filter(f => f.about === 'group').every(f => f.evidence.from == null || !isNaN(Date.parse(f.evidence.from))),
+  grp ? grp.station_id : 'no group finding on any card');
+ok('every card fits what the database takes', cards.every(c => JSON.stringify(c.card).length <= CARD_MAX_BYTES && c.card.v === CARD_VERSION),
+  String(Math.max(...cards.map(c => JSON.stringify(c.card).length))));
+ok('the windows are the tab\'s, and --cards picks among them',
+  JSON.stringify(cardWindows([])) === '[3,7,14]' && JSON.stringify(cardWindows(['--cards', '14,7'])) === '[7,14]'
+    && cardWindows(['--cards', 'none']).length === 0 && (() => { try { cardWindows(['--cards', '5']); return false; } catch (_) { return true; } })());
+
 const big = toReport({ id: 'repeater-down:rep:x', kind: 'repeater-down', severity: 'critical', title: 't', detail: 'd',
   evidence: { stations: Array.from({ length: 900 }, (_, i) => 'station_number_' + i), from: 1 } });
 ok('a long list in the evidence is cut to fit, with its length kept',
@@ -108,8 +161,8 @@ ok('a long list in the evidence is cut to fit, with its length kept',
 
 // ── a run, against a stand-in for the database ───────────────────────────────
 
-function standIn({ missing = false, register = 0 } = {}) {
-  const seen = { pages: 0, reported: null, keys: new Set(), registerAsked: 0, since: [] };
+function standIn({ missing = false, register = 0, cardsMissing = false } = {}) {
+  const seen = { pages: 0, reported: null, keys: new Set(), registerAsked: 0, since: [], cards: [] };
   const json = (status, body) => ({ ok: status < 400, status, text: async () => JSON.stringify(body) });
   const fetch = async (url, init = {}) => {
     const u = new URL(url);
@@ -127,6 +180,12 @@ function standIn({ missing = false, register = 0 } = {}) {
       return json(200, { at: seen.reported.at, open: seen.reported.findings.length,
         opened: seen.reported.findings.map((f, i) => ({ id: i + 1, kind: f.kind, subject: f.subject, severity: f.severity, title: f.title })),
         worse: [], cleared: [] });
+    }
+    if (u.pathname.endsWith('/rpc/report_station_cards')) {
+      if (cardsMissing) return json(404, { code: 'PGRST202', message: 'Could not find the function meganet.report_station_cards' });
+      const b = JSON.parse(init.body).p_report;
+      seen.cards.push(Object.assign(b, { key: h.apikey }));
+      return json(200, { at: b.at, days: b.days, complete: b.complete, upserted: b.cards.length, unchanged: 0, removed: 0 });
     }
     if (u.pathname.endsWith('/reading')) {
       seen.pages++;
@@ -171,6 +230,18 @@ ok('…and says what it reported and what changed', out && out.opened && lines.s
   lines.slice(-4).join(' | '));
 
 ok('…from the register the database gave', !!rep && rep.detail.register === 'database' && s1.seen.registerAsked === 1);
+
+const byDays = d => s1.seen.cards.filter(b => b.days === d);
+ok('…and the cards for each of the tab\'s windows, with the secret key, the run\'s time, complete, every batch naming every station heard',
+  [3, 7, 14].every(d => byDays(d).length === Math.max(1, Math.ceil(byDays(d)[0].heard.length / CARD_BATCH))
+    && byDays(d).every(b => b.at === rep.at && b.complete === true && b.key === 'sb_secret_test' && b.detail.days === d
+      && b.heard.length === byDays(d).reduce((n, x) => n + x.cards.length, 0))),
+  s1.seen.cards.map(b => `${b.days}d:${b.cards.length}/${b.heard.length}`).join(' '));
+const wk = byDays(7).flatMap(b => b.cards);
+ok('…the week\'s from the findings\' own analysis, card for card',
+  wk.length === cards.length && cards.every(c => { const r = wk.find(x => x.station_id === c.station_id); return r && r.worst === c.worst && r.findings === c.findings; }),
+  `${wk.length} reported, ${cards.length} worked out`);
+ok('…and says what it reported', lines.some(l => /^Cards reported, 14 days: \d+ stations/.test(l)), lines.filter(l => /^Cards/.test(l)).join(' | '));
 
 const s4 = standIn({ register: 2 });
 const lines4 = [];
@@ -218,6 +289,15 @@ const s2 = standIn({ missing: true });
 const lines2 = [];
 const out2 = await run({ fetch: s2.fetch, argv: [], env: { SUPABASE_SECRET_KEY: 'sb_secret_test' }, log: l => lines2.push(l) });
 ok('a database without 0059 is told plainly, and the run does not fail', out2.missing === true && lines2.some(l => /apply db\/migrations\/0059/.test(l)));
+
+const s6 = standIn({ cardsMissing: true });
+const lines6 = [];
+const out6 = await run({ fetch: s6.fetch, argv: [], env: { SUPABASE_SECRET_KEY: 'sb_secret_test' }, log: l => lines6.push(l) });
+ok('a database without 0085 takes the findings, is told plainly about the cards, and the run does not fail',
+  !!s6.seen.reported && out6.cardsMissing === true && lines6.filter(l => /apply db\/migrations\/0085/.test(l)).length === 1);
+const s7 = standIn();
+await run({ fetch: s7.fetch, argv: ['--cards', 'none'], env: { SUPABASE_SECRET_KEY: 'sb_secret_test' }, log: () => {} });
+ok('--cards none reports the findings and no cards', !!s7.seen.reported && s7.seen.cards.length === 0);
 
 let err3 = null;
 try { await run({ fetch: standIn().fetch, argv: [], env: {}, log: () => {} }); } catch (err) { err3 = err.message; }

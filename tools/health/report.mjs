@@ -31,9 +31,18 @@
 // the tab shows is history (a spell that came back) or slow diagnosis (a
 // marginal path), and stays on the tab.
 //
+// And each station as the tab shows it when opened (0085): for each of the
+// tab's windows — 3, 7 and 14 days — a card per station heard, with all its
+// findings, its schedule day by day and its battery's night lows
+// (tools/health/cards.mjs), reported to meganet.report_station_cards() for the
+// agent API's /stations/{id}/health and /health/findings. So a run reads the
+// longest of them, and works each window out from its own days of it.
+//
 // Run:  SUPABASE_SECRET_KEY=… node tools/health/report.mjs
 //       … --dry-run        work it out and print it; report nothing
-//       … --days 14        a longer window (7 by default, as the tab's)
+//       … --days 14        a longer window for the findings (7 by default, as the tab's)
+//       … --cards 3,7      the windows to make cards for (3,7,14 by default;
+//                          `none` for none)
 //       … --cache DIR      keep the register and the week in DIR between runs
 //                          (the workflow's actions/cache; see "the database")
 //
@@ -47,6 +56,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { CARD_WINDOWS, stationCards } from './cards.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..', '..');
@@ -65,8 +75,10 @@ export const SNAPSHOT = 'stations.json';
 
 const DAY = 86400000, HOUR = 3600000, MIN = 60000;
 // Station Health's own paging (health.js): twelve-hour chunks, a thousand rows
-// a page — PostgREST's ceiling on this project — four chunks at a time.
-const CHUNK_MS = 12 * HOUR, PAGE = 1000, PARALLEL = 4, MAX_ROWS = 250000;
+// a page — PostgREST's ceiling on this project — four chunks at a time. A
+// fortnight, which the cards' longest window reads, was 234,000 readings in
+// October 2026.
+const CHUNK_MS = 12 * HOUR, PAGE = 1000, PARALLEL = 4, MAX_ROWS = 500000;
 const SELECT = 'addr,alert_id,a2_station,a2_sensor,station_number,channel,station_id,'
              + 'reading_ts,received_at,value_raw,value,unit,protocol,source,path,'
              + 'dup_count,dup_paths,freq_mhz,rssi_dbm,level_dbfs,snr_db';
@@ -304,13 +316,51 @@ export async function fetchInputs(fetch, { url, key, t0, t1, retryMs, log = () =
   return { doc, register: from, rows, capped, read: 'whole' };
 }
 
-export async function report(fetch, { url, secret, body }) {
-  const res = await fetch(`${url}/rest/v1/rpc/report_station_findings`, {
+export async function report(fetch, { url, secret, body, fn = 'report_station_findings' }) {
+  const res = await fetch(`${url}/rest/v1/rpc/${fn}`, {
     method: 'POST',
     headers: { apikey: secret, Authorization: `Bearer ${secret}`, 'Content-Profile': 'meganet', 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_report: body }),
   });
-  return answer(res, 'report_station_findings');
+  return answer(res, fn);
+}
+
+// ── the cards ────────────────────────────────────────────────────────────────
+
+// Cards per call: a fortnight's run is about 2.5 MB in all, its biggest card
+// under 10 KB, so a batch stays well under a megabyte.
+export const CARD_BATCH = 200;
+
+// `--cards 3,7,14` (the default), `--cards 7`, `--cards none`.
+export function cardWindows(argv) {
+  const i = argv.indexOf('--cards');
+  if (i < 0) return [...CARD_WINDOWS];
+  const v = String(argv[i + 1] || '');
+  if (v === 'none') return [];
+  const want = v.split(',').map(Number).filter(n => CARD_WINDOWS.includes(n));
+  if (!want.length) throw new Error(`--cards takes ${CARD_WINDOWS.join(',')} (or some of them), or none — not "${v}"`);
+  return [...new Set(want)].sort((a, b) => a - b);
+}
+
+// One window's cards, reported a batch at a time; each batch names every
+// station heard, so a complete run forgets the ones it no longer heard
+// whichever batch lands last. → { missing } when the database lacks 0085.
+async function reportCards(fetch, { url, secret, at, days, complete, detail, cards, log }) {
+  const heard = cards.map(c => c.station_id);
+  const sum = { upserted: 0, unchanged: 0, removed: 0 };
+  for (let i = 0; i < Math.max(1, cards.length); i += CARD_BATCH) {
+    const body = { at, days, complete, detail, heard, cards: cards.slice(i, i + CARD_BATCH) };
+    let out;
+    try {
+      out = await report(fetch, { url, secret, body, fn: 'report_station_cards' });
+    } catch (err) {
+      if (err.status === 404 || err.code === 'PGRST202') return { missing: true };
+      throw err;
+    }
+    if (out && out.stale) { log(`  ${days} days: a newer run's cards are already in (${out.last}); these were not used.`); return out; }
+    for (const k of Object.keys(sum)) sum[k] += out[k] || 0;
+  }
+  return sum;
 }
 
 // ── the run ──────────────────────────────────────────────────────────────────
@@ -319,6 +369,7 @@ export async function run({ fetch = globalThis.fetch, argv = process.argv.slice(
   const dry = argv.includes('--dry-run');
   const di = argv.indexOf('--days');
   const days = di >= 0 ? Math.max(1, Math.min(14, Number(argv[di + 1]) || 7)) : 7;
+  const windows = cardWindows(argv);
   const { url, publishable } = project();
   const secret = env.SUPABASE_SECRET_KEY;
   if (!url || !publishable) throw new Error('core.js no longer says where the database is (DB_ORIGIN, DB_ANON_KEY)');
@@ -328,7 +379,12 @@ export async function run({ fetch = globalThis.fetch, argv = process.argv.slice(
   const now = started, t0 = now - days * DAY;
   const ci = argv.indexOf('--cache');
   const cache = ci >= 0 && argv[ci + 1] ? argv[ci + 1] : null;
-  const { doc, register, rows, capped, read } = await fetchInputs(fetch, { url, key: publishable, t0, t1: now, retryMs, log, cache, now });
+  // What is read is the longest window asked for, the findings' or a card's;
+  // each is worked out from its own days of it.
+  const tRead = now - Math.max(days, ...windows) * DAY;
+  const { doc, register, rows: all, capped, read } = await fetchInputs(fetch, { url, key: publishable, t0: tRead, t1: now, retryMs, log, cache, now });
+  const within = from => (from <= tRead ? all : all.filter(r => Date.parse(r.reading_ts) >= from));
+  const rows = within(t0);
   const api = loadAnalysis();
   const { A, findings } = analyse(api, rows, doc, { now, t0 });
   const took = Date.now() - started;
@@ -336,7 +392,20 @@ export async function run({ fetch = globalThis.fetch, argv = process.argv.slice(
   log(`${A.counts.stationsHeard} stations heard; reporting ${findings.length} findings `
     + `(${counts.critical || 0} critical, ${counts.warn || 0} warnings, ${counts.info || 0} notes) in ${took} ms`);
   for (const f of findings) log(`  ${f.severity.padEnd(8)} ${f.title}${f.station_id ? ` [${f.station_id}]` : ''}`);
-  if (dry) return { dry: true, findings };
+
+  // The cards, a window at a time — the findings' own analysis where the
+  // windows are the same — keeping only the cards, not each analysis.
+  const cardSets = windows.map(w => {
+    const tw = now - w * DAY;
+    const began = Date.now();
+    const sub = w === days ? rows : within(tw);
+    const Aw = w === days ? A : analyse(api, sub, doc, { now, t0: tw }).A;
+    const cards = stationCards(Aw, { now });
+    const bytes = cards.reduce((n, c) => n + JSON.stringify(c.card).length, 0);
+    log(`Cards, ${w} days: ${cards.length} stations, ${(bytes / 1e6).toFixed(2)} MB, in ${Date.now() - began} ms`);
+    return { days: w, t0: tw, readings: sub.length, heard: Aw.counts.stationsHeard, cards };
+  });
+  if (dry) return { dry: true, findings, cards: cardSets };
 
   const body = {
     at: new Date(now).toISOString(),
@@ -365,6 +434,27 @@ export async function run({ fetch = globalThis.fetch, argv = process.argv.slice(
   for (const f of out.opened) log(`  opened   ${f.title}`);
   for (const f of out.worse) log(`  worse    ${f.title} (was ${f.was})`);
   for (const f of out.cleared) log(`  cleared  ${f.title}`);
+
+  // A database without 0085 yet takes the findings and not the cards: said
+  // once, and the run does not fail.
+  out.cards = [];
+  for (const set of cardSets) {
+    const res = await reportCards(fetch, {
+      url, secret, at: body.at, days: set.days, complete: !capped, cards: set.cards, log,
+      detail: {
+        t0: new Date(set.t0).toISOString(), t1: body.detail.t1, days: set.days, readings: set.readings,
+        stations_heard: set.heard, register, read, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
+        commit: body.detail.commit,
+      },
+    });
+    if (res.missing) {
+      log('The database does not have meganet.report_station_cards() yet — apply db/migrations/0085_health_cards.sql. No cards reported.');
+      out.cardsMissing = true;
+      break;
+    }
+    if (!res.stale) log(`Cards reported, ${set.days} days: ${set.cards.length} stations — ${res.upserted} changed, ${res.unchanged} unchanged, ${res.removed} no longer heard.`);
+    out.cards.push(Object.assign({ days: set.days, stations: set.cards.length }, res));
+  }
   return out;
 }
 

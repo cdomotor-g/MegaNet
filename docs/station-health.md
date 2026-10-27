@@ -839,6 +839,22 @@ seen, when last, and when it cleared. They are public, like the readings they
 come from. History (a spell that came back) and slow diagnosis (a marginal path)
 stay on the tab.
 
+**Each station, as the tab shows it (`0085`).** The same run also writes down,
+for each of the tab's windows — 3, 7 and 14 days — what the tab shows when a
+station is opened: every finding about it (its own, as a repeater, and a
+group's it is one of) with the evidence and what to do, its learned check
+schedule with what arrived and what was missed each day, and its battery's
+night lows and trend — one card per station heard (`tools/health/cards.mjs`),
+reported to `report_station_cards()` and kept in `meganet.health_card`. A card
+is rewritten only when it changed, and a station a whole run no longer heard
+loses its card. They are public, like the findings. The agent API serves them
+— [`/api/v1/stations/{id}/health`](agent-api.md#get-apiv1stationsidhealth)
+for one station and [`/api/v1/health/findings`](agent-api.md#get-apiv1healthfindings)
+for a page of them by owner or station ids — so a field app can plan a run
+from them and read them on arrival. For the fortnight the run reads 14 days
+(234,000 readings in October 2026) once per six-hour slot instead of a week;
+working out the three windows adds about ten seconds a run.
+
 **What the tab shows of it.** While the week is still arriving, the status line
 gives the server's last look — what it found, worst first. Once the tab has
 worked it out, the line says how long ago the server last looked, and if that is
@@ -870,9 +886,13 @@ The run's log ends `Reported: N open — …`, and
 Until the secret is there, every run says so in a notice and does nothing else.
 
 `npm run healthreport` holds the run to the demo week: what it reports is exactly
-this tab's findings of those kinds, the planted silent station among them.
+this tab's findings of those kinds, the planted silent station among them, and
+each station's card exactly the tab's findings about it, its schedule and its
+battery.
 `tools/check_health_findings.sql` holds the database to what it does with a
-report.
+report, and `tools/check_health_cards.sql` to what it does with the cards. Until
+`0085` is applied a run reports the findings, says once in its log that the
+cards wait for the migration, and does not fail.
 
 ## Limits
 

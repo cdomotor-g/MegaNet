@@ -43,6 +43,11 @@ Documentation: [`docs/agent-api.md`](docs/agent-api.md).
 - What has gone quiet: `get_silent_stations` (`/api/v1/health/silent`) — the
   stations silent now and the groups that went quiet together, from the
   server's health run every 15 minutes (`checked_at` says when it last looked).
+- What Station Health says about a station: `get_station_health`
+  (`/api/v1/stations/{id}/health?days=3|7|14`) — its findings with what to do,
+  its check schedule day by day, its battery's night lows; and for a page of
+  stations, by owner or station ids, `get_health_findings`
+  (`/api/v1/health/findings`).
 - For a map, `format=geojson` (tool argument `format: "geojson"`) on station
   search, `stations_near` and the latest readings answers a GeoJSON
   FeatureCollection: points at `[lon, lat]`, properties the JSON row, stations

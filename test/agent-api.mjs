@@ -27,6 +27,7 @@ import { repo } from './lib/paths.mjs';
 import { PostgrestStub } from './lib/postgrest-stub.mjs';
 import worker, { dbProxyTarget } from '../worker/index.js';
 import * as api from '../worker/api.js';
+import { CARD_WINDOWS } from '../tools/health/cards.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const results = [];
@@ -83,6 +84,9 @@ const COLUMNS = Object.fromEntries(Object.entries({
   app_meta: 'key value updated_at',
   health_finding: 'id source kind subject station_id ingest_token_id rx_key severity title detail evidence first_seen last_seen cleared_at',
   health_refresh: 'source at took_ms detail',
+  // 0085: each station as Station Health shows it, per window.
+  health_card: 'days station_id status worst findings attention card changed_at',
+  health_card_run: 'days at detail',
 }).map(([k, v]) => [k, new Set(v.split(' '))]));
 
 const T = Object.fromEntries(Object.keys(COLUMNS).map(k => [k, []]));
@@ -1140,6 +1144,180 @@ section('Silent stations');
     && none.json.notes.some(n => /not recorded a health run/.test(n)));
 }
 
+// ── Station Health: a station's card, and a page of them (0085) ──────────────
+section('Station Health cards');
+{
+  const ago = m => iso(NOW - m * 60000);
+  const placed = T.station.filter(st => !st.deleted_at && st.lat != null && st.lon != null && st.station_number);
+  const slsRows = id => T.sls_location.filter(r => r.station_id === id);
+  const oneOwner = owner => placed.find(st => slsRows(st.id).length === 1 && slsRows(st.id)[0].owner === owner);
+  const BUR = oneOwner('Bureau');                       // the QLD SLS's word for the Bureau
+  const SEQ = oneOwner('Seqwater');
+  const JOINT = placed.find(st => slsRows(st.id).length === 1 && /^Bureau\/./.test(slsRows(st.id)[0].owner || ''));
+  const QUIET = placed.find(st => ![BUR, SEQ, JOINT].includes(st) && !slsRows(st.id).length);
+  const GONE = placed.find(st => ![BUR, SEQ, JOINT, QUIET].includes(st) && !slsRows(st.id).length);
+  const dead = T.station.find(st => st.deleted_at);
+  check('the fixtures for the cards exist', !!(BUR && SEQ && JOINT && QUIET && GONE), [BUR, SEQ, JOINT, QUIET, GONE].map(x => x && x.id).join(' '));
+  const finding = (id, kind, severity, about = 'station', extra = {}) => ({ id: `${kind}:${id}`, kind, category: 'comms', severity, about,
+    title: `${kind} at ${id}`, detail: `What was found at ${id}.`, action: 'Check it.', since: ago(300), cause: null, evidence: { periodMin: 180 }, ...extra });
+  const card = (st, findings, { battery = null, status } = {}) => ({
+    v: 1, station_id: st.id, name: st.name, station_number: st.station_number, status: status || (findings[0] ? findings[0].severity : 'ok'),
+    last_heard_at: ago(400), heard_by: ['serial-monitor/rpi-test'], findings,
+    schedule: { every_minutes: 180, learned_from: 'battery', tolerance_s: 324, slot_times: ['02:41', '05:41'], next_due_at: ago(-20),
+      sensors_per_check: ['a:1'], checks: { due: 50, received: 45, incomplete: 1, missed: 4, missed_network_wide: 0, unknown: 2 },
+      received_share: 0.92, miss_rate: 0.08, scattered_miss_rate: 0, trailing_misses: 3, clock: { offset_s: -2, drift_s_per_day: null },
+      daily: [{ date: '2026-10-26', received: 8, incomplete: 0, missed: 0, missed_network_wide: 0, unknown: 0 },
+              { date: '2026-10-27', received: 2, incomplete: 1, missed: 4, missed_network_wide: 0, unknown: 2 }],
+      spells: [] },
+    battery,
+  });
+  const row = (days, c, changed = ago(30)) => ({ days, station_id: c.station_id, status: c.status,
+    worst: c.findings[0] ? c.findings[0].severity : null, findings: c.findings.length,
+    attention: c.findings.filter(x => x.severity !== 'info').length, card: c, changed_at: changed });
+  const batt = { address: 'a:2', alert_id: 2, latest: { at: ago(60), v: 12.4 }, last_night_low_v: 12.1, min_v: 12.1, max_v: 13.6,
+    night_lows: [{ at: ago(2880), v: 12.3 }, { at: ago(1440), v: 12.2 }, { at: ago(600), v: 12.1 }], day_highs: [],
+    trend_v_per_day: -0.1, days_to_critical: 3, daily_swing_v: 1.2, flat: false, spikes_set_aside: 0 };
+  const group = finding('area', 'area-silence', 'warn', 'group', { id: `area-silence:area:${BUR.id}`, evidence: { stations: [BUR.id, JOINT.id], from: ago(400) } });
+  T.health_card.push(
+    row(7, card(BUR, [finding(BUR.id, 'silent', 'critical'), group])),
+    row(7, card(SEQ, [finding(SEQ.id, 'battery-low', 'warn')], { battery: batt })),
+    row(7, card(JOINT, [finding(JOINT.id, 'rain-reset', 'info')])),
+    row(7, card(QUIET, [])),
+    row(14, card(BUR, [finding(BUR.id, 'silent', 'critical'), finding(BUR.id, 'silent-spell', 'info')])),
+    ...(dead ? [row(7, card(dead, [finding(dead.id, 'silent', 'critical')]))] : []),
+  );
+  T.health_card_run.push({ days: 3, at: ago(4), detail: { t0: ago(4 + 3 * 1440), t1: ago(4), tz: 'Australia/Brisbane', complete: true } },
+    { days: 7, at: ago(4), detail: { t0: ago(4 + 7 * 1440), t1: ago(4), tz: 'Australia/Brisbane', complete: true } },
+    { days: 14, at: ago(4), detail: { t0: ago(4 + 14 * 1440), t1: ago(4), tz: 'Australia/Brisbane', complete: true } });
+  T.station_health.push({ station_key: GONE.id, station_id: GONE.id, station_name: GONE.name, online: null, since: ago(90000),
+    last_seen_at: ago(20000), last_reading_at: ago(20000), minutes_since_seen: 20000, minutes_since_reading: 20000, last_status: null,
+    reported_by: 'http', updated_at: ago(20000) });
+  api.resetApiState();
+
+  const r = await get(`/api/v1/stations/${SEQ.id}/health`);
+  const j = r.json || {};
+  check('GET /api/v1/stations/{id}/health: the week\'s card — its findings with what to do and since when, its schedule day by day, its battery\'s night lows',
+    r.status === 200 && j.id === SEQ.id && j.days === 7 && j.status === 'warn' && j.worst === 'warn' && j.findings.length === 1
+      && j.findings[0].action === 'Check it.' && j.findings[0].since === ago(300) && j.findings[0].evidence.periodMin === 180
+      && j.schedule.daily.length === 2 && j.schedule.checks.missed === 4 && j.battery.night_lows.length === 3
+      && j.battery.trend_v_per_day === -0.1, JSON.stringify(j).slice(0, 400));
+  check('…with the battery\'s lines, its owner from the SLS, when it was last heard and how long ago',
+    JSON.stringify(j.battery.thresholds_v) === JSON.stringify({ low: 12.2, critical: 11.8 })
+      && j.owner && j.owner.name === 'Seqwater' && j.owner.from === 'sls'
+      && j.last_heard_at === ago(400) && j.minutes_since_heard === 400 && j.lat === Number(SEQ.lat), JSON.stringify(j.owner));
+  check('…the window, its time zone, when the server worked it out, and the other windows',
+    j.window.days === 7 && j.window.from === ago(4 + 7 * 1440) && j.window.time_zone === 'Australia/Brisbane'
+      && j.checked_at === ago(4) && j.minutes_since_checked === 4 && !j.notes.some(n => /may have stopped/.test(n))
+      && /days=3$/.test(j.other_windows[3]) && /days=14$/.test(j.other_windows[14]) && !j.other_windows[7]
+      && /\/health$/.test(j.links.health), JSON.stringify(j.window));
+  const fort = await get(`/api/v1/stations/${BUR.id}/health?days=14`);
+  check('days=14: the fortnight\'s card; a joint owner\'s parties; the Bureau by its full name',
+    fort.status === 200 && fort.json.days === 14 && fort.json.findings.length === 2 && fort.json.findings[1].kind === 'silent-spell'
+      && fort.json.owner.parties.join('|') === 'Bureau of Meteorology', JSON.stringify(fort.json.owner));
+  const byNumber = await get(`/api/v1/stations/${SEQ.station_number}/health`);
+  check('…and a Bureau number finds the station', byNumber.status === 200 && byNumber.json.id === SEQ.id && /station number/.test(byNumber.json.resolved_from || ''));
+  const notHeard = await get(`/api/v1/stations/${GONE.id}/health`);
+  check('a station the window holds nothing from: not heard, when Flood-Net last heard it, and a longer window offered',
+    notHeard.status === 200 && notHeard.json.status === 'not heard' && notHeard.json.findings.length === 0 && notHeard.json.schedule === null
+      && notHeard.json.last_heard_at === ago(20000) && notHeard.json.notes.some(n => /nothing to work out.*days=14/.test(n)),
+    JSON.stringify(notHeard.json.notes));
+  const badDays = await get(`/api/v1/stations/${SEQ.id}/health?days=5`);
+  const badParam = await get(`/api/v1/stations/${SEQ.id}/health?window=7`);
+  check('a window the tab does not have, and a parameter it does not know, are 400s', badDays.status === 400 && /3, 7, 14/.test(badDays.json.detail)
+    && badParam.status === 400, `${badDays.status} ${badParam.status}`);
+
+  // A page of them.
+  const all = await get('/api/v1/health/findings');
+  const ids = (all.json.stations || []).map(x => x.id);
+  check('GET /api/v1/health/findings: every station with a finding, worst first — not one with none, not a deleted station',
+    all.status === 200 && JSON.stringify(ids) === JSON.stringify([BUR.id, SEQ.id, JOINT.id]) && all.json.total === 3,
+    JSON.stringify(ids));
+  const first = all.json.stations[0];
+  check('…each as the station route answers it, with its link', first.findings.length === 2 && first.findings[1].about === 'group'
+    && first.schedule.daily.length === 2 && first.owner.name === 'Bureau of Meteorology' && /\/stations\/.+\/health$/.test(first.link),
+    JSON.stringify(first).slice(0, 300));
+  const own = Object.fromEntries((all.json.owners || []).map(o => [o.owner, o.stations]));
+  check('…and the owners in it, a joint owner counted under each party', own['Bureau of Meteorology'] === 2 && own.Seqwater === 1
+    && Object.keys(own).length >= 3, JSON.stringify(all.json.owners));
+  const crit = await get('/api/v1/health/findings?min_severity=critical');
+  const warn = await get('/api/v1/health/findings?min_severity=warn');
+  check('min_severity: critical only; warn and worse', crit.json.stations.map(x => x.id).join() === BUR.id
+    && warn.json.stations.map(x => x.id).join() === [BUR.id, SEQ.id].join(), `${crit.json.total} ${warn.json.total}`);
+  const seq = await get('/api/v1/health/findings?owner=seqwater');
+  const bur = await get('/api/v1/health/findings?owner=Bureau');
+  const two = await get('/api/v1/health/findings?owner=Seqwater,Bureau%20of%20Meteorology');
+  check('owner: as the SLS names it, any case, the Bureau by either name, a joint owner under each party, several at once',
+    seq.json.stations.map(x => x.id).join() === SEQ.id && bur.json.stations.map(x => x.id).join() === [BUR.id, JOINT.id].join()
+      && two.json.total === 3, `${seq.json.total} ${bur.json.total} ${two.json.total}`);
+  const nobody = await get('/api/v1/health/findings?owner=Nobody%20Council');
+  check('…an owner with no station here is an empty page that says so', nobody.status === 200 && nobody.json.total === 0
+    && nobody.json.notes.some(n => /No station in this window has the owner/.test(n)));
+  const named = await get(`/api/v1/health/findings?ids=${QUIET.id},${GONE.id},${SEQ.id},zz_no_such_station`);
+  const namedIds = named.json.stations.map(x => x.id);
+  check('ids: every station named, found or not — worst first, one not heard last — and the ids that are no station',
+    named.status === 200 && JSON.stringify(namedIds) === JSON.stringify([SEQ.id, QUIET.id, GONE.id])
+      && named.json.stations[1].status === 'ok' && named.json.stations[2].status === 'not heard'
+      && named.json.stations[2].last_heard_at === ago(20000) && JSON.stringify(named.json.unknown_ids) === '["zz_no_such_station"]',
+    JSON.stringify(namedIds));
+  const namedWarn = await get(`/api/v1/health/findings?ids=${QUIET.id},${SEQ.id}&min_severity=warn`);
+  check('…and with min_severity, only those of them with such a finding', namedWarn.json.stations.map(x => x.id).join() === SEQ.id);
+  const p1 = await get('/api/v1/health/findings?limit=2');
+  const p2 = p1.json.next ? await get(new URL(p1.json.next).pathname + new URL(p1.json.next).search) : null;
+  check('paging: limit and next, through to the end', p1.json.stations.length === 2 && !!p2 && p2.json.stations.length === 1
+    && p2.json.stations[0].id === JOINT.id && p2.json.next === null, p1.json.next);
+  const box = [Number(SEQ.lon) - 0.0001, Number(SEQ.lat) - 0.0001, Number(SEQ.lon) + 0.0001, Number(SEQ.lat) + 0.0001];
+  const inBox = await get(`/api/v1/health/findings?bbox=${box.join(',')}`);
+  check('bbox: only the stations inside it', inBox.status === 200 && inBox.json.stations.map(x => x.id).includes(SEQ.id)
+    && !inBox.json.stations.map(x => x.id).includes(BUR.id));
+  const fortnight = await get('/api/v1/health/findings?days=14');
+  check('days=14: the fortnight\'s cards', fortnight.json.stations.map(x => x.id).join() === BUR.id && fortnight.json.window.days === 14);
+  const tooMany = await get(`/api/v1/health/findings?ids=${Array.from({ length: 101 }, (_, i) => `s${i}`).join(',')}`);
+  const badSev = await get('/api/v1/health/findings?min_severity=dire');
+  const badId = await get('/api/v1/health/findings?ids=Not%20An%20Id');
+  check('more than 100 ids, a severity it does not take and something that is not an id are 400s',
+    tooMany.status === 400 && badSev.status === 400 && badId.status === 400, `${tooMany.status} ${badSev.status} ${badId.status}`);
+
+  const tool = await rpc('tools/call', { name: 'get_station_health', arguments: { id: SEQ.id, days: 7 } });
+  const toolText = (tool.json.result && tool.json.result.content[0].text) || '';
+  check('the tool get_station_health answers the same', tool.json.result && !tool.json.result.isError
+    && JSON.parse(toolText).findings[0].kind === 'battery-low', toolText.slice(0, 160));
+  const tool2 = await rpc('tools/call', { name: 'get_health_findings', arguments: { owner: 'Seqwater' } });
+  check('…and get_health_findings', tool2.json.result && !tool2.json.result.isError
+    && tool2.json.result.structuredContent.stations.map(x => x.id).join() === SEQ.id);
+
+  // A run that has stopped is said to have; no run at all is not recorded.
+  T.health_card_run.forEach(x => { x.at = ago(200); });
+  api.resetApiState();
+  const stale = await get(`/api/v1/stations/${SEQ.id}/health`);
+  check('a window last worked out over three quarters of an hour ago is said to be older than it looks',
+    stale.json.notes.some(n => /200 minutes ago .*may have stopped/.test(n)));
+  T.health_card_run.length = 0;
+  api.resetApiState();
+  const unrun = await get(`/api/v1/stations/${GONE.id}/health`);
+  check('…and with no run at all, not recorded, and nothing passed off as current', unrun.status === 200 && unrun.json.status === 'not recorded'
+    && unrun.json.checked_at === null && unrun.json.notes.some(n => /0085_health_cards/.test(n)));
+
+  // Before 0085 reaches the database: a 503 naming it, not a 502.
+  stub.fault = rel => (rel === 'health_card' || rel === 'health_card_run'
+    ? new Response('{"code":"42P01","message":"relation \\"meganet.health_card\\" does not exist"}', { status: 404 }) : null);
+  const early = await get(`/api/v1/stations/${SEQ.id}/health`);
+  const early2 = await get('/api/v1/health/findings');
+  stub.fault = null;
+  check('before 0085 is applied both answer 503 not available yet, naming it', early.status === 503 && early2.status === 503
+    && early.json.error === 'not available yet' && /0085_health_cards/.test(early.json.migration || ''), `${early.status} ${early2.status}`);
+
+  // The battery's lines are health-analysis.js' own.
+  const ha = fs.readFileSync(repo('health-analysis.js'), 'utf8');
+  const v = name => Number((new RegExp(`const ${name} = ([0-9.]+);`).exec(ha) || [])[1]);
+  check('the battery lines the API gives are health-analysis.js\' own', api.BATTERY_THRESHOLDS_V.low === v('BATT_WARN_V')
+    && api.BATTERY_THRESHOLDS_V.critical === v('BATT_CRIT_V'), `${v('BATT_WARN_V')} ${v('BATT_CRIT_V')}`);
+  check('…and the windows the tab\'s, as the run makes cards for', JSON.stringify(api.HEALTH_WINDOWS) === JSON.stringify(CARD_WINDOWS));
+
+  T.health_card.length = 0;
+  T.station_health.splice(T.station_health.findIndex(x => x.station_id === GONE.id), 1);
+  api.resetApiState();
+}
+
 // ── GeoJSON (#230) ───────────────────────────────────────────────────────────
 section('GeoJSON');
 
@@ -1278,6 +1456,7 @@ function toolArgs(name) {
     case 'get_readings': return { id: RICH.id, resolution: 'daily', from: day(NOW - 10 * 24 * hour) };
     case 'get_latest_readings': return { type: 'river', limit: 3 };
     case 'get_silent_stations': return { limit: 3 };
+    case 'get_health_findings': return { min_severity: 'warn', limit: 3 };
     case 'list_catchments': case 'list_networks': return {};
     case 'get_catchment': return { id: RICH.catchment_ids[0], limit: 3 };
     default: return { id: RICH.id };
@@ -1436,7 +1615,7 @@ section('MCP');
   const list = await rpc('tools/list', {}, { headers: { 'MCP-Protocol-Version': '2025-06-18' } });
   const tools = list.json.result.tools;
   const expected = ['search_stations', 'get_station', 'get_station_dossier', 'stations_near', 'get_readings', 'get_latest_readings', 'get_silent_stations',
-    'list_catchments', 'get_catchment', 'get_flood_levels', 'get_service_level', 'list_networks'];
+    'get_station_health', 'get_health_findings', 'list_catchments', 'get_catchment', 'get_flood_levels', 'get_service_level', 'list_networks'];
   check('tools/list has every tool', expected.every(n => tools.some(t => t.name === n)) && tools.length === expected.length, tools.map(t => t.name).join(', '));
   check('every tool is annotated read-only and has an object input schema', tools.every(t => t.annotations.readOnlyHint === true
     && t.annotations.destructiveHint === false && t.inputSchema.type === 'object' && t.description.length > 40));

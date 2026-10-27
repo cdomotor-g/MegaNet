@@ -2155,6 +2155,14 @@ jobs:
       - name: check_alert_allocations.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_alert_allocations.sql
+      # Each station as Station Health shows it, for the agent API (0085):
+      # the run's cards kept a batch at a time, rewritten only when they
+      # changed, forgotten only by a complete run that no longer heard the
+      # station; an older run's batch refused; read by all, written by the
+      # secret key alone.
+      - name: check_health_cards.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_health_cards.sql
       # …and the same for the AEP sheets' SQL (0033): it attaches rows by
       # number and by position into columns only it and the editor write.
       - name: The AEP levels' SQL still fits the schema

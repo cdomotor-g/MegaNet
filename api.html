@@ -304,6 +304,27 @@
           </td>
         </tr>
         <tr>
+          <td><code>GET /api/v1/stations/{id}/health</code></td>
+          <td><code>get_station_health</code></td>
+          <td>
+            What Station Health says about one station over <code>days</code>
+            (3, 7 or 14): its findings with what to do, its check schedule day
+            by day, its battery's night lows and trend.
+            <a href="/api/v1/stations/abergowrie_br_al/health">Example</a>
+          </td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/health/findings</code></td>
+          <td><code>get_health_findings</code></td>
+          <td>
+            The same for a page of stations, worst first: by <code>owner</code>,
+            <code>ids</code>, <code>network</code>, <code>basin</code>,
+            <code>type</code> or <code>bbox</code>, with
+            <code>min_severity</code> and <code>days</code>.
+            <a href="/api/v1/health/findings?min_severity=warn">Example</a>
+          </td>
+        </tr>
+        <tr>
           <td><code>GET /api/v1/stations/{id}/flood-levels</code></td>
           <td><code>get_flood_levels</code></td>
           <td>Flood and SLS classes, crossings, gauge zero, flood effects, AEP levels and one AHD ladder. <a href="/api/v1/stations/abergowrie_br_al/flood-levels">Example</a></td>

@@ -4,8 +4,13 @@
 # tab runs — and what it finds wrong now (a station silent past its checks, a
 # repeater or an area gone quiet together, a receiver that stopped delivering,
 # a battery low or not charging) is reported to meganet.report_station_findings(),
-# which opens, updates and clears it in meganet.health_finding.
-# tools/health/report.mjs is the run; docs/station-health.md is the rest.
+# which opens, updates and clears it in meganet.health_finding. And each
+# station as the tab shows it when opened — all its findings, its check
+# schedule day by day, its battery's night lows — for each of the tab's
+# windows (3, 7, 14 days), reported to meganet.report_station_cards() (0085)
+# for the agent API's /stations/{id}/health and /health/findings; so it reads
+# a fortnight. tools/health/report.mjs is the run (tools/health/cards.mjs the
+# cards); docs/station-health.md is the rest.
 #
 # Why a scheduled workflow. The rules are the browser's and must stay one copy,
 # so whatever runs them runs JavaScript; working a week out takes over a second
@@ -23,8 +28,9 @@
 #   SUPABASE_SECRET_KEY    the project's secret key (Supabase → Project Settings → API Keys)
 #                          — the same one the field photo syncs use
 #
-# The secret key is used for one call only: report_station_findings(), which
-# takes nothing but findings and checks their shape. The readings and the
+# The secret key is used for two calls only: report_station_findings() and
+# report_station_cards(), which take nothing but findings and cards and check
+# their shape. The readings and the
 # register are read with the publishable key, as the page reads them.
 
 name: Station health
@@ -83,9 +89,10 @@ jobs:
         with:
           node-version: '22'
 
-      # The register (870 KB compressed) and the whole week (1.1 MB) are read
-      # once per six-hour slot and kept here; the runs between ask only for the
-      # readings received since. Read whole every fifteen minutes they would be
+      # The register (870 KB compressed) and the whole fortnight (234,000
+      # readings in October 2026) are read once per six-hour slot and kept
+      # here; the runs between ask only for the readings received since. Read
+      # whole every fifteen minutes they would be
       # near 6 GB a month of the database's egress: more than the free plan's
       # 5 GB for everything when this was written, and a needless share of the
       # Pro plan's 250 GB now (tools/health/report.mjs, "the database").

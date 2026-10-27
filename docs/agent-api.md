@@ -7,7 +7,11 @@ radio, sensors and health, the Service Level Specification entry, the Bureau's
 flood classes, crossings and gauge zero, AEP levels, inspection numbers and the
 stations nearby — with one call per station if it wants everything. It can also
 ask what every gauge reporting into Flood-Net is saying now, in one call
-([latest readings](#get-apiv1readingslatest)), and have any list of stations as
+([latest readings](#get-apiv1readingslatest)), what Station Health says about a
+station — its findings and what to do about them, its check schedule day by
+day, its battery's night lows ([station health](#get-apiv1stationsidhealth)) —
+or about a field team's whole run of stations at once
+([health findings](#get-apiv1healthfindings)), and have any list of stations as
 [GeoJSON for a map](#geojson-for-a-map).
 
 It was built for drafting **assessment reports**, and the one-call
@@ -221,6 +225,8 @@ says what to change; an unknown tool or malformed request is a JSON-RPC error.
 | `get_readings` | Telemetry ingested into Flood-Net: raw, hourly or daily | `GET /api/v1/stations/{id}/readings` |
 | `get_latest_readings` | What every gauge is saying now: each station's newest reading on every channel, in one call, by network, basin, kind or bounding box; `format: "geojson"` for a map | `GET /api/v1/readings/latest` |
 | `get_silent_stations` | What has gone quiet: the stations silent now, worst first, with when each was last heard, and the groups that went quiet together; by network, basin, kind, bounding box or severity; `format: "geojson"` for a map | `GET /api/v1/health/silent` |
+| `get_station_health` | What Station Health says about one station over 3, 7 or 14 days: its findings with what to do, its check schedule day by day, its battery's night lows and trend | `GET /api/v1/stations/{id}/health` |
+| `get_health_findings` | The same for a page of stations, worst first: by owner, station ids, network, basin, kind or bounding box | `GET /api/v1/health/findings` |
 | `get_flood_levels` | Flood classes, SLS classes, crossings, gauge zero, flood effects, AEP levels, one AHD ladder | `GET /api/v1/stations/{id}/flood-levels` |
 | `get_service_level` | The station's Service Level Specification entry | `GET /api/v1/stations/{id}/service-level` |
 | `list_catchments` | The 77 Queensland drainage basins | `GET /api/v1/catchments` |
@@ -701,6 +707,160 @@ curl -s 'https://floodwarning.net/api/v1/health/silent?severity=critical'
 }
 ```
 
+### `GET /api/v1/stations/{id}/health`
+
+What the **Station Health** tab shows when a station is opened, for a program:
+the station's **findings** worst first — severity, what was found, the evidence,
+what to do, since when — its **learned check schedule** with what arrived and
+what was missed each day, and its **battery's night lows** with their trend. It
+was asked for by a field team, to plan a run from and to read on arrival.
+
+Nothing is worked out here. The server's own run of Station Health — the tab's
+`health-analysis.js`, every fifteen minutes with nobody's browser open (see
+[Station Health](station-health.md#with-the-tab-closed)) — works each of the
+tab's windows out and keeps a card per station heard; this reads the card.
+`checked_at` and `minutes_since_checked` say when it last did, and a note says
+so if that is more than 45 minutes ago. Like the silent stations, it can only
+judge a station whose telemetry is ingested into Flood-Net.
+
+| Parameter | Meaning |
+|---|---|
+| `days` | the window, `3`, `7` (the default) or `14` days — the tab's three |
+
+```sh
+curl -s 'https://floodwarning.net/api/v1/stations/abergowrie_br_al/health?days=7'
+```
+
+```json
+{
+  "id": "abergowrie_br_al", "name": "Abergowrie Bridge AL", "station_number": "532028",
+  "lat": -18.5144, "lon": 146.0006, "kinds": ["rain", "river"], "basin": "Herbert River",
+  "owner": { "name": "Bureau of Meteorology", "parties": ["Bureau of Meteorology"], "from": "sls",
+             "source": "the Bureau's QLD Service Level Specification" },
+  "status": "warn", "worst": "warn", "attention": 2,
+  "last_heard_at": "2026-10-27T02:41:12.000Z", "minutes_since_heard": 38,
+  "heard_by": ["serial-monitor/rpi-6dfef7f4"],
+  "findings": [
+    { "id": "battery-low:abergowrie_br_al", "kind": "battery-low", "category": "power", "severity": "warn", "about": "station",
+      "title": "Battery low — 12.1 V", "detail": "Its lowest last night was 12.1 V, under 12.2 V (about half charge at rest).",
+      "action": "Plan a visit: test the battery under load, and the panel, regulator and fuse.",
+      "since": null, "cause": null, "evidence": { "lastNightV": 12.1, "latestV": 12.6 } },
+    { "id": "battery-falling:abergowrie_br_al", "kind": "battery-falling", "severity": "warn", "title": "Battery falling 0.06 V a day", "…": "…" }
+  ],
+  "schedule": {
+    "every_minutes": 180, "learned_from": "battery", "tolerance_s": 324,
+    "slot_times": ["02:41", "05:41", "08:41", "11:41", "14:41", "17:41", "20:41", "23:41"],
+    "next_due_at": "2026-10-27T04:41:00.000Z", "sensors_per_check": ["a:6038", "a:6039", "a:6040"],
+    "checks": { "due": 55, "received": 52, "incomplete": 1, "missed": 2, "missed_network_wide": 0, "unknown": 1 },
+    "received_share": 0.96, "miss_rate": 0.04, "scattered_miss_rate": 0.04, "trailing_misses": 0,
+    "clock": { "offset_s": -3.2, "drift_s_per_day": null },
+    "daily": [
+      { "date": "2026-10-21", "received": 6, "incomplete": 0, "missed": 0, "missed_network_wide": 0, "unknown": 0 },
+      { "date": "2026-10-22", "received": 7, "incomplete": 1, "missed": 0, "missed_network_wide": 0, "unknown": 0 },
+      "…"
+    ],
+    "spells": []
+  },
+  "battery": {
+    "address": "a:6040", "alert_id": 6040, "latest": { "at": "2026-10-27T02:41:12.000Z", "v": 12.6 },
+    "last_night_low_v": 12.1, "min_v": 12.1, "max_v": 13.8,
+    "night_lows": [{ "at": "2026-10-20T19:41:12.000Z", "v": 12.5 }, { "at": "2026-10-21T19:41:09.000Z", "v": 12.4 }, "…"],
+    "day_highs": [{ "at": "2026-10-21T04:41:10.000Z", "v": 13.8 }, "…"],
+    "trend_v_per_day": -0.06, "days_to_critical": 5, "daily_swing_v": 1.3, "flat": false, "spikes_set_aside": 0,
+    "thresholds_v": { "low": 12.2, "critical": 11.8 }
+  },
+  "days": 7,
+  "window": { "days": 7, "from": "2026-10-20T03:15:00.000Z", "to": "2026-10-27T03:15:00.000Z", "time_zone": "Australia/Brisbane" },
+  "checked_at": "2026-10-27T03:15:00.000Z", "minutes_since_checked": 4, "card_changed_at": "2026-10-27T02:45:00.000Z",
+  "other_windows": { "3": "https://floodwarning.net/api/v1/stations/abergowrie_br_al/health?days=3", "14": "…" },
+  "notes": ["Station Health's own rules …"],
+  "source": "meganet.health_card …"
+}
+```
+
+- **Findings** are exactly the tab's: the same `id`, `kind`, `category`
+  (power, comms, sensor, data, network, register), `severity` (`critical`,
+  `warn`, `info` — a note), `title`, `detail` and `action`, with `since` (when
+  the condition began, where the finding has one) and its `evidence` in
+  numbers, times as ISO 8601. `about` says whose it is: the station's own, the
+  station `repeater` it is about, or a `group` it is one of (stations that went
+  quiet together around a place or behind a repeater) — a group's finding is
+  on each of its stations. Every kind is in
+  [Station Health → Every finding](station-health.md#every-finding).
+- **`status`** is the station's worst own finding, `ok` when nothing was found,
+  `irregular` when no check schedule could be learned (a station that reports
+  on events only), `not heard` when the window holds nothing from it (then
+  `last_heard_at` is when Flood-Net's ingest last heard it, if ever, and a
+  longer window is suggested), and `not recorded` when the server has not
+  worked the window out yet.
+- **The schedule is learned, not assumed:** `every_minutes` is the period its
+  reports keep, among the intervals a logger is set to; `slot_times` the day's
+  check times (listed when there are 24 or fewer), `next_due_at` the next one.
+  A check is `received`, `incomplete` (some of `sensors_per_check` missing),
+  `missed` while a receiver that hears the station was listening,
+  `missed_network_wide` (most of the network missed that quarter-hour — not the
+  station's), or `unknown` (nothing that hears it was listening). `daily`
+  counts them per day; `spells` are runs of four or more misses, `open` while
+  it is still in one. `received_share` is received over due.
+- **The battery is trended on its night lows** — the lowest reading between
+  18:00 and 09:00 in the station's own solar time, night after night —
+  Theil–Sen, so one bad night cannot move it: `trend_v_per_day`, and
+  `days_to_critical` to 11.8 V at that rate. `daily_swing_v` is day high
+  against night low — whether charge is arriving at all. `thresholds_v` are
+  the lines the findings use.
+- **Dates and clock times** (`daily[].date`, `slot_times`) are in
+  `window.time_zone`, Queensland's; every other time is ISO 8601 UTC.
+- Until migration `0085` is applied to the live database the route answers
+  **503** `"not available yet"`, naming it
+  ([For the owner](#apply-0085-for-station-health-per-station)).
+
+### `GET /api/v1/health/findings`
+
+The same for **a page of stations at a time**, worst first — what *Export
+findings* gives on the tab, for planning a campaign: every row is what
+[`/stations/{id}/health`](#get-apiv1stationsidhealth) answers for that station
+(its `link`), with its owner. By default it lists the stations with at least one
+finding; `ids` names them instead.
+
+| Parameter | Meaning |
+|---|---|
+| `owner` | owners, comma-separated, as the station card's Owner row says them — the Service Level Specification's owner where it lists the station, else the one recorded on the station: `Seqwater`, `Bureau of Meteorology` (`Bureau` also works), a council. Any case. A joint owner (`Bureau/Sunwater`) is found under each party. `none` is no owner on record. `owners` in the answer lists those in the window |
+| `ids` | station ids, comma-separated, up to 100 — the sites you are working on. Every one is answered, found or not (`ok`, `not heard`), unless `min_severity` is given too; one that names no live station is listed in `unknown_ids` |
+| `network` | a radio network id — see `/api/v1/networks` |
+| `basin` | words in the Bureau's basin name for the station (`Burdekin`) |
+| `type` | `rain`, `river`, `repeater` or `base` — the same rule as [`/api/v1/stations`](#get-apiv1stations) |
+| `bbox` | a box, `west,south,east,north` in decimal degrees — longitude first |
+| `min_severity` | the least severe finding a station must have to be listed: `critical`, `warn` (needs attention, the tab's default list) or `info` (any — the default) |
+| `days` | the window, `3`, `7` (the default) or `14` |
+| `limit`, `offset` | 25 stations a page by default and at most 100; follow `next` |
+
+Order: worst finding first, then the most needing attention, the most found,
+the id; a station named and not heard last.
+
+```sh
+curl -s -H 'X-FloodNet-Client: your-name' \
+  'https://floodwarning.net/api/v1/health/findings?owner=Seqwater&min_severity=warn&days=7' \
+  | jq '{total, owners: .owners[:3], stations: [.stations[] | {id, worst, findings: [.findings[].title]}]}'
+```
+
+```json
+{
+  "total": 3,
+  "owners": [{ "owner": "Seqwater", "stations": 3 }],
+  "stations": [
+    { "id": "…", "worst": "critical", "findings": ["Silent — missed its last 5 checks"] },
+    { "id": "…", "worst": "warn", "findings": ["Battery low — 12.1 V", "Battery falling 0.06 V a day"] },
+    { "id": "…", "worst": "warn", "findings": ["Misses 27% of its checks"] }
+  ]
+}
+```
+
+The answer also carries `count`, `limit`, `offset`, `next`, `query`, `days`,
+`window`, `checked_at`, `minutes_since_checked`, `owners` (every owner among
+the stations the other filters kept, with how many stations each — a joint
+owner counted under each party; `none` for no owner on record), `notes` and
+`source`. A page of 100 fortnight cards is under a megabyte.
+
 ### `GET /api/v1/catchments`
 
 The 77 Queensland drainage basins: id, name, basin number, area, region and
@@ -757,7 +917,8 @@ location and eventually consistent — a brake, not an exact quota.
 
 Other caps: 100 rows per page; a 250 km search radius; 5,000 readings per call;
 reading windows of 7 / 31 / 731 days (raw / hourly / daily); 1,000 stations per
-call of the latest readings (100 by default); at most 5,000 stations considered
+call of the latest readings (100 by default); 100 station ids per call of the
+health findings; at most 5,000 stations considered
 by one filtered search before paging; 32 database reads per request, six at a
 time, each with a 10-second timeout; MCP bodies up to 64 KB and batches of up to
 10.
@@ -802,6 +963,13 @@ quote it:
   latest readings — are what reached that ingest. Most stations report through
   the Bureau's systems, so "not recorded" here, or a station missing from the
   latest readings, says nothing about whether a station works.
+- **Station Health is worked out by the server, not here.** The cards behind
+  [`/stations/{id}/health`](#get-apiv1stationsidhealth) and
+  [`/health/findings`](#get-apiv1healthfindings) are the server's run of the
+  tab's own rules every fifteen minutes; `checked_at` says when. A missed check
+  counts only while a receiver that hears the station was listening, so a
+  station only one receiver hears cannot be judged while that receiver is
+  down — its checks are `unknown`, not missed.
 - **Positions are `[lon, lat]` in GeoJSON** and `lat`, `lon` everywhere else —
   including `near=lat,lon`. `bbox` is GeoJSON's order, west, south, east, north.
 - **Inspections are numbers only.** Remarks, who inspected and any free text
@@ -913,6 +1081,36 @@ Like every migration it raises `meganet.app_meta.schema_version` (to 57, never
 down), so `DB_SCHEMA_VERSION` in `core.js` follows it in a commit of its own;
 until then the app's Data source panel reports the database as newer than the
 app, which is true and harmless.
+
+### Apply 0085, for Station Health per station
+
+[`/stations/{id}/health`](#get-apiv1stationsidhealth) and
+[`/health/findings`](#get-apiv1healthfindings) (the MCP tools
+`get_station_health` and `get_health_findings`) read `meganet.health_card` and
+`meganet.health_card_run`, which `db/migrations/0085_health_cards.sql` creates,
+and the cards in them are written by the Station Health workflow
+(`.github/workflows/station-health.yml`) — which deploys with the push, and from
+its next run reports cards to a database that has the migration. Until it is
+applied both routes answer 503 `"not available yet"` naming it, and each run's
+log says `apply db/migrations/0085_health_cards.sql. No cards reported.`
+without failing. Nothing else depends on it.
+
+1. Apply it the way every migration is applied
+   ([`db/README.md`, "Applying"](../db/README.md)): **Actions** →
+   **db-migrate** → **Run workflow** on `main`, or in the Supabase dashboard →
+   **SQL Editor** → **New query**, paste the whole of
+   `db/migrations/0085_health_cards.sql` and **Run**. It is idempotent and
+   checks itself at the end.
+2. Within fifteen minutes the next Station Health run reports the cards (its
+   log ends `Cards reported, 14 days: … stations`). Check it from anywhere:
+
+   ```sh
+   curl -s 'https://floodwarning.net/api/v1/health/findings?limit=1' | jq '{total, checked_at, error}'
+   ```
+
+`tools/check_health_cards.sql` proves the migration, in a transaction that
+rolls back, so it is safe against the live database. `DB_SCHEMA_VERSION` in
+`core.js` follows it to 85 once it is live.
 
 ### Check which limiter is running
 
