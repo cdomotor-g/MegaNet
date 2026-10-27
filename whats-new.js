@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 113, date: '2026-10-27', items: [
+      '<strong>Station Health</strong> no longer calls a battery <strong>critical</strong> on another station\'s reading: a frame '
+        + 'from a station not yet in Flood-Net, heard with its address garbled into a station\'s battery address, is now set aside '
+        + 'as a ghost. Thornton (School Rd) AL\'s 9.4 V was one — its battery reads 12.7–12.9 V at night.',
+    ] },
     { n: 112, date: '2026-10-26', items: [
       'Plot a station\'s <strong>neighbours</strong> with it. Click a <strong>river</strong> on the Stations map and its callout '
         + 'has <strong>📈 ARRO this river</strong> — every river height gauge along it on one ARRO graph — and '

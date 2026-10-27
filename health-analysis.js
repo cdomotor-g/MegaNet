@@ -462,6 +462,13 @@ const HealthAnalysis = (() => {
   //                                        only look alike are both in line
   //                                        with their own, and stay readings.
   //
+  // The twin of a ghost on a station's own address may be on an address no
+  // station here uses — a station not yet on file — when that address is in
+  // line with its own reports: 1772 reads 90-odd every minute on 151.575 MHz,
+  // and one 1772 = 94 was heard as 4076 = 94 in the same instant, Thornton's
+  // battery at 9.4 V between two of 12.8. Then the unfiled frame is the real
+  // one, and is not made a ghost of the filed one.
+  //
   // A ghost is set aside from its address's station before anything else is
   // worked out, so it neither counts as a check nor bends a battery trend.
   function findGhosts(txs, resolveTx) {
@@ -487,8 +494,8 @@ const HealthAnalysis = (() => {
       fits.set(tx, d);
       return d;
     };
-    const real = txs.filter(tx => tx.aid != null && tx.aid <= 8191 && !resolveTx(tx).foreign);
-    const times = real.map(tx => tx.t);
+    const twins = txs.filter(tx => tx.aid != null && tx.aid <= 8191);
+    const times = twins.map(tx => tx.t);
     let n = 0;
     for (const tx of txs) {
       if (tx.aid == null || tx.aid > 8191) continue;
@@ -498,9 +505,11 @@ const HealthAnalysis = (() => {
       if (filed && (tx.bad.length || !Number.isInteger(tx.v) || fit(tx) <= FIT_TOL)) continue;
       const i = lowerBound(times, tx.t - COPY_WINDOW);
       let best = null;
-      for (let j = i; j < real.length && real[j].t <= tx.t + COPY_WINDOW; j++) {
-        const o = real[j];
+      for (let j = i; j < twins.length && twins[j].t <= tx.t + COPY_WINDOW; j++) {
+        const o = twins[j];
         if (o.aid === tx.aid || o.ghostOf) continue;
+        const oFiled = !resolveTx(o).foreign;
+        if (!filed && !oFiled) continue;                       // two unfiled: nothing says which
         const ab = pop((o.aid ^ tx.aid) & 0x1FFF);
         const vb = Number.isInteger(o.v) && Number.isInteger(tx.v) ? pop((o.v ^ tx.v) & 0x7FF) : 99;
         if (ab + vb > 3 || (best && ab + vb >= best.bits)) continue;
@@ -508,6 +517,8 @@ const HealthAnalysis = (() => {
           const os = resolveTx(o).st;
           if (os && own.st && os.id === own.st.id) continue;   // one station's two sensors
           if (fit(o) > FIT_TOL) continue;                      // the twin must be in line with its own
+        } else if (fit(tx) <= FIT_TOL && fit(o) > FIT_TOL) {
+          continue;                                            // in line with its own, and the filed one is not: that one is the ghost
         }
         best = { of: o, bits: ab + vb, addrBits: ab, valueBits: vb, filed };
       }

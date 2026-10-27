@@ -224,7 +224,12 @@ stored readings:
   (more than 5 counts from its last and next) while the near-twin is in line with
   its own. `4803 = 51` two seconds after `4801 = 51`, where 4801 reads 50-odd all
   week and 4803 reads in the thousands, is 4801's frame. Two stations whose frames
-  only look alike are both in line with their own, and stay readings.
+  only look alike are both in line with their own, and stay readings. The near-twin
+  may be on an address no station here uses — a station not yet on file — when
+  that address is in line with its own reports; then it is the real frame, and
+  the one on the station's address is its ghost. `1772 = 94` and `4076 = 94` in
+  the same instant, where 1772 reads 90-odd every minute and 4076 (Thornton's
+  battery) 12.8 V every three hours, is 1772's frame, not a 9.4 V battery.
 
 Corrupted copies and ghosts are set aside before anything else is worked out —
 a ghost neither counts as a check nor bends a battery trend — and both count

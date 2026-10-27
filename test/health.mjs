@@ -324,6 +324,48 @@ try {
     gh && !gh.bHas51 && gh.bN === 16 && gh.ghosts && gh.ghosts.onStationAddresses === 1, JSON.stringify(gh));
   ok('two stations\' frames that only look alike are both kept', gh && gh.lookAlikeKept && gh.lookAlikeGhosts === 0, JSON.stringify(gh));
 
+  // A ghost on a station's battery address whose twin is on an address no
+  // station here uses: Thornton's 4076 = 94 (9.4 V) beside 1772 = 94, 1772
+  // reading 90-odd every minute. The battery is not critical, and 1772's
+  // frame is not made a ghost of Thornton's.
+  const gu = await page.evaluate(() => {
+    const H = 3600e3, pop = x => { let n = 0; while (x) { n += x & 1; x >>>= 1; } return n; };
+    const idx = SensorValues.index();
+    let pick = null;
+    for (const [a, l] of idx) {
+      if (l.length !== 1 || l[0].kind !== 'battery' || l[0].station.lat == null || !isFinite(l[0].station.lon)) continue;
+      for (let k1 = 0; k1 < 13 && !pick; k1++) for (let k2 = k1 + 1; k2 < 13 && !pick; k2++) {
+        const u = a ^ (1 << k1) ^ (1 << k2);
+        if (u >= 1 && u <= 8191 && !(idx.get(u) || []).length) pick = { a, u, st: l[0].station };
+      }
+      if (pick) break;
+    }
+    if (!pick) return null;
+    // Seven minutes past midnight in the station's solar time, so the ghost
+    // is the lowest of the last night.
+    const tg = Date.UTC(2026, 8, 2) - pick.st.lon / 15 * H + 7 * 60e3 + 41e3;
+    const t0 = tg - 25 * H, now = tg + 9 * H;
+    const rec = (aid, t, v) => ({ addr: 'a:' + aid, alert_id: aid, reading_ts: new Date(t).toISOString(), received_at: new Date(t + 2000).toISOString(),
+      value_raw: v, protocol: 1, path: 'serial-monitor/test-pi-sdr2', dup_count: 0, dup_paths: [] });
+    const rows = [];
+    for (let t = t0 - 7 * 60e3, k = 0; t < now; t += 3 * H, k++) rows.push(rec(pick.a, t, 128 + (k % 2)));
+    for (let t = t0 + 30e3, k = 0; t < now; t += 10 * 60e3, k++) rows.push(rec(pick.u, t, 90 + (k % 5)));
+    rows.push(rec(pick.u, tg, 94), rec(pick.a, tg, 94));
+    const A = HealthAnalysis.run(rows, { t0: t0 - H, t1: now, now });
+    const S = A.stations.get(pick.st.id);
+    const gf = A.findings.find(f => f.kind === 'ghosts');
+    const uTx = (A.txs || []).find(tx => tx.aid === pick.u && tx.t === tg);
+    return { pair: [pick.a, pick.u], bits: pop(pick.a ^ pick.u),
+      has94: S ? S.txs.some(tx => tx.v === 94) : null,
+      lowest: S && S.battery && S.battery.series.length ? Math.min(...S.battery.series.map(p => p.V)) : null,
+      critical: A.findings.some(f => f.kind === 'battery-critical' && f.stationId === pick.st.id),
+      ghosts: gf ? gf.evidence : null, unfiledKept: !!uTx && !uTx.ghostOf };
+  });
+  ok('a frame on a station\'s battery address beside its twin on an unfiled address that keeps its own reports is a ghost — no critical battery',
+    gu && gu.bits === 2 && gu.has94 === false && gu.lowest >= 12.8 && !gu.critical && gu.ghosts && gu.ghosts.ghosts === 1 && gu.ghosts.onStationAddresses === 1,
+    JSON.stringify(gu));
+  ok('and the unfiled address\'s own frame is kept, not made a ghost of the station\'s', gu && gu.unfiledKept, JSON.stringify(gu));
+
   // ── the tab ────────────────────────────────────────────────────────────────
   // Every sentence the status line says, kept: what it said while the week was
   // still arriving is gone by the time the analysis is drawn.
