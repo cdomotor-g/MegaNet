@@ -728,55 +728,74 @@ judge a station whose telemetry is ingested into Flood-Net.
 | `days` | the window, `3`, `7` (the default) or `14` days — the tab's three |
 
 ```sh
-curl -s 'https://floodwarning.net/api/v1/stations/abergowrie_br_al/health?days=7'
+curl -s -H 'X-FloodNet-Client: your-name' \
+  'https://floodwarning.net/api/v1/stations/round_mountain_al/health?days=7'
 ```
+
+A real answer, from 27 October 2026, trimmed (`…`) — Round Mountain AL, whose
+battery went critical while its checks stopped arriving whole:
 
 ```json
 {
-  "id": "abergowrie_br_al", "name": "Abergowrie Bridge AL", "station_number": "532028",
-  "lat": -18.5144, "lon": 146.0006, "kinds": ["rain", "river"], "basin": "Herbert River",
-  "owner": { "name": "Bureau of Meteorology", "parties": ["Bureau of Meteorology"], "from": "sls",
+  "id": "round_mountain_al", "name": "Round Mountain AL", "station_number": "40945",
+  "lat": -28.0708, "lon": 152.9272, "kinds": ["rain", "river"], "basin": "Logan-Albert Rivers",
+  "owner": { "name": "Scenic Rim Regional Council", "parties": ["Scenic Rim Regional Council"], "from": "sls",
              "source": "the Bureau's QLD Service Level Specification" },
-  "status": "warn", "worst": "warn", "attention": 2,
-  "last_heard_at": "2026-10-27T02:41:12.000Z", "minutes_since_heard": 38,
-  "heard_by": ["serial-monitor/rpi-6dfef7f4"],
+  "status": "critical", "worst": "critical", "attention": 3,
+  "last_heard_at": "2026-10-27T05:50:04.419Z", "minutes_since_heard": 61,
+  "heard_by": ["serial-monitor/rpi-83071968-sdr1", "…"],
   "findings": [
-    { "id": "battery-low:abergowrie_br_al", "kind": "battery-low", "category": "power", "severity": "warn", "about": "station",
-      "title": "Battery low — 12.1 V", "detail": "Its lowest last night was 12.1 V, under 12.2 V (about half charge at rest).",
-      "action": "Plan a visit: test the battery under load, and the panel, regulator and fuse.",
-      "since": null, "cause": null, "evidence": { "lastNightV": 12.1, "latestV": 12.6 } },
-    { "id": "battery-falling:abergowrie_br_al", "kind": "battery-falling", "severity": "warn", "title": "Battery falling 0.06 V a day", "…": "…" }
+    { "id": "battery-critical:round_mountain_al", "kind": "battery-critical", "category": "power", "severity": "critical",
+      "about": "station", "title": "Battery critical — 11.8 V",
+      "detail": "Its lowest last night was 11.8 V — at or below 11.8 V the radio starts to brown out.",
+      "action": "Visit: replace or recharge the battery and check the charging circuit before the radio browns out.",
+      "since": null, "cause": null, "evidence": { "latestV": 13, "lastNightV": 11.8, "slopeVPerDay": 0 } },
+    { "id": "missed-rising:round_mountain_al", "kind": "missed-rising", "category": "comms", "severity": "warn",
+      "about": "station", "title": "Missed checks rising — 100% in the last 24 h",
+      "detail": "8 of 8 checks missed in the last day, against 56% before (every 3 h).",
+      "action": "Check the antenna, cable and connectors, and the path to its repeater — compare with its last fade margin.",
+      "since": null, "cause": null, "evidence": { "n24": 8, "nPrior": 48, "rate24": 1, "ratePrior": 0.56 } },
+    { "id": "shared-spell:spell:couran_point_al@498021", "kind": "shared-spell", "category": "network", "severity": "warn",
+      "about": "group", "title": "113 stations across 217 km, Pottsville West Reservoir to Linville AL, went silent together, and came back",
+      "since": "2026-10-24T20:38:21.206Z", "evidence": { "from": "2026-10-24T20:38:21.206Z", "to": "2026-10-25T19:19:43.044Z",
+      "stations": ["coplicks_br_al", "…"], "stationsTotal": 113 }, "…": "…" },
+    "…"
   ],
   "schedule": {
     "every_minutes": 180, "learned_from": "battery", "tolerance_s": 324,
-    "slot_times": ["02:41", "05:41", "08:41", "11:41", "14:41", "17:41", "20:41", "23:41"],
-    "next_due_at": "2026-10-27T04:41:00.000Z", "sensors_per_check": ["a:6038", "a:6039", "a:6040"],
-    "checks": { "due": 55, "received": 52, "incomplete": 1, "missed": 2, "missed_network_wide": 0, "unknown": 1 },
-    "received_share": 0.96, "miss_rate": 0.04, "scattered_miss_rate": 0.04, "trailing_misses": 0,
-    "clock": { "offset_s": -3.2, "drift_s_per_day": null },
+    "slot_times": ["00:41", "03:41", "06:41", "09:41", "12:41", "15:41", "18:41", "21:41"],
+    "next_due_at": "2026-10-27T08:41:40.048Z", "sensors_per_check": ["a:5339", "a:5340", "a:5338"],
+    "checks": { "due": 56, "received": 8, "incomplete": 13, "missed": 35, "missed_network_wide": 0, "unknown": 0 },
+    "received_share": 0.38, "miss_rate": 0.63, "scattered_miss_rate": 0, "trailing_misses": 13,
+    "clock": { "offset_s": -9.7, "drift_s_per_day": 1 },
     "daily": [
-      { "date": "2026-10-21", "received": 6, "incomplete": 0, "missed": 0, "missed_network_wide": 0, "unknown": 0 },
-      { "date": "2026-10-22", "received": 7, "incomplete": 1, "missed": 0, "missed_network_wide": 0, "unknown": 0 },
+      { "date": "2026-10-20", "received": 0, "incomplete": 2, "missed": 0, "missed_network_wide": 0, "unknown": 0 },
+      { "date": "2026-10-21", "received": 1, "incomplete": 3, "missed": 4, "missed_network_wide": 0, "unknown": 0 },
       "…"
     ],
-    "spells": []
+    "spells": [{ "from": "2026-10-20T20:41:40.048Z", "to": "2026-10-21T05:41:40.048Z", "checks": 4, "open": false }, "…",
+               { "from": "2026-10-25T17:41:40.048Z", "to": "2026-10-27T05:41:40.048Z", "checks": 13, "open": true }]
   },
   "battery": {
-    "address": "a:6040", "alert_id": 6040, "latest": { "at": "2026-10-27T02:41:12.000Z", "v": 12.6 },
-    "last_night_low_v": 12.1, "min_v": 12.1, "max_v": 13.8,
-    "night_lows": [{ "at": "2026-10-20T19:41:12.000Z", "v": 12.5 }, { "at": "2026-10-21T19:41:09.000Z", "v": 12.4 }, "…"],
-    "day_highs": [{ "at": "2026-10-21T04:41:10.000Z", "v": 13.8 }, "…"],
-    "trend_v_per_day": -0.06, "days_to_critical": 5, "daily_swing_v": 1.3, "flat": false, "spikes_set_aside": 0,
+    "address": "a:5340", "alert_id": 5340, "latest": { "at": "2026-10-25T11:41:39.515Z", "v": 13 },
+    "last_night_low_v": 11.8, "min_v": 11.8, "max_v": 13.3,
+    "night_lows": [{ "at": "2026-10-20T17:41:40.545Z", "v": 12.9 }, { "at": "2026-10-21T17:41:40.332Z", "v": 12.9 }, "…"],
+    "day_highs": [],
+    "trend_v_per_day": 0, "days_to_critical": null, "daily_swing_v": null, "flat": false, "spikes_set_aside": 0,
     "thresholds_v": { "low": 12.2, "critical": 11.8 }
   },
   "days": 7,
-  "window": { "days": 7, "from": "2026-10-20T03:15:00.000Z", "to": "2026-10-27T03:15:00.000Z", "time_zone": "Australia/Brisbane" },
-  "checked_at": "2026-10-27T03:15:00.000Z", "minutes_since_checked": 4, "card_changed_at": "2026-10-27T02:45:00.000Z",
-  "other_windows": { "3": "https://floodwarning.net/api/v1/stations/abergowrie_br_al/health?days=3", "14": "…" },
+  "window": { "days": 7, "from": "2026-10-20T06:44:30.279Z", "to": "2026-10-27T06:44:30.279Z", "time_zone": "Australia/Brisbane" },
+  "checked_at": "2026-10-27T06:44:30.279+00:00", "minutes_since_checked": 7, "card_changed_at": "2026-10-27T06:44:30.279+00:00",
+  "other_windows": { "3": "https://floodwarning.net/api/v1/stations/round_mountain_al/health?days=3", "14": "…" },
   "notes": ["Station Health's own rules …"],
   "source": "meganet.health_card …"
 }
 ```
+
+`daily_swing_v` and `days_to_critical` are `null` here: the window holds no
+daytime battery reading to set against the nights, and no falling trend to
+project. A null is "not enough to say", never zero.
 
 - **Findings** are exactly the tab's: the same `id`, `kind`, `category`
   (power, comms, sensor, data, network, register), `severity` (`critical`,
@@ -810,9 +829,13 @@ curl -s 'https://floodwarning.net/api/v1/stations/abergowrie_br_al/health?days=7
   the lines the findings use.
 - **Dates and clock times** (`daily[].date`, `slot_times`) are in
   `window.time_zone`, Queensland's; every other time is ISO 8601 UTC.
-- Until migration `0085` is applied to the live database the route answers
-  **503** `"not available yet"`, naming it
-  ([For the owner](#apply-0085-for-station-health-per-station)).
+- **Windows are worked out separately**, as on the tab: a station can say
+  something different over 3 days than over 7 — a battery needs nights to be
+  judged, and a station that has sent little lately has few of them in a
+  short window. Ask for the window you want to plan from.
+- A **503** `"not available yet"` would mean the database lacks migration
+  `0085` (live since 27 October 2026 —
+  [For the owner](#apply-0085-for-station-health-per-station)).
 
 ### `GET /api/v1/health/findings`
 
@@ -843,14 +866,23 @@ curl -s -H 'X-FloodNet-Client: your-name' \
   | jq '{total, owners: .owners[:3], stations: [.stations[] | {id, worst, findings: [.findings[].title]}]}'
 ```
 
+A real answer, from 27 October 2026, trimmed. `owners` counts every owner
+among the stations the other filters keep — here, every station needing
+attention — so a client can see which owners it may ask for:
+
 ```json
 {
-  "total": 3,
-  "owners": [{ "owner": "Seqwater", "stations": 3 }],
+  "total": 24,
+  "owners": [{ "owner": "Bureau of Meteorology", "stations": 92 }, { "owner": "none", "stations": 79 },
+             { "owner": "Seqwater", "stations": 24 }],
   "stations": [
-    { "id": "…", "worst": "critical", "findings": ["Silent — missed its last 5 checks"] },
-    { "id": "…", "worst": "warn", "findings": ["Battery low — 12.1 V", "Battery falling 0.06 V a day"] },
-    { "id": "…", "worst": "warn", "findings": ["Misses 27% of its checks"] }
+    { "id": "nindooinbah_dam_al", "worst": "critical", "findings": ["Silent — missed its last 23 checks", "Battery low — 12.1 V",
+      "31% of its checks arrive incomplete", "Rain counter went backwards 2 times", "2 corrupted rain-gauge counts set aside"] },
+    { "id": "ewen_maddock_dam_al", "worst": "critical", "findings": ["Silent — missed its last 27 checks",
+      "Went silent for 15 h, then came back", "Rain counter went backwards 1 time", "4 corrupted rain-gauge counts set aside"] },
+    { "id": "bill_gunn_dam_al", "worst": "warn", "findings": ["Silent — missed its last 20 checks",
+      "9 stations around Bill Gunn Dam AL went quiet together", "Rain counter went backwards 1 time", "4 corrupted rain-gauge counts set aside"] },
+    "…"
   ]
 }
 ```
@@ -1083,6 +1115,9 @@ until then the app's Data source panel reports the database as newer than the
 app, which is true and harmless.
 
 ### Apply 0085, for Station Health per station
+
+Applied to the live database on 27 October 2026, with the cards reported from
+the next run; what follows is for a fresh project, or to check it.
 
 [`/stations/{id}/health`](#get-apiv1stationsidhealth) and
 [`/health/findings`](#get-apiv1healthfindings) (the MCP tools
