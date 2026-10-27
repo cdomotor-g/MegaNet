@@ -25,6 +25,10 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 116, date: '2026-10-27', items: [
+      'On the <strong>Stations</strong> map, point at a pin and it says the station\'s name — at every zoom, not just once you are '
+        + 'close enough for the names to be written on the map. In a stack of pins, the name follows the one you point at as they fan out.',
+    ] },
     { n: 115, date: '2026-10-27', items: [
       '<strong>🔗 Pass Ranges → Address space</strong> has an <strong>All addresses</strong> wheel: every ALERT address of a hub, '
         + '1 at the top and clockwise to 8,191, a wedge a block of a hundred — each address in use, set aside or free, how many '

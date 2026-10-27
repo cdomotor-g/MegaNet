@@ -4504,6 +4504,17 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   display: none;               /* no callout arrow — the pin is right above it */
 }
 
+/* A pin's name on hover (onStationPinOver) wears the label's look, and while
+   it shows, the line names the map hit-tests under the same pointer stand
+   aside — a pin on a river would otherwise have the river's name laid over
+   its own, and a click there goes to the pin. The rivers' fixed names stay. */
+.mn-pin-hovering .leaflet-tooltip.mn-river-label:not(.mn-river-label-fixed),
+.mn-pin-hovering .leaflet-tooltip.mn-road-label,
+.mn-pin-hovering .leaflet-tooltip.mn-bridge-label,
+.mn-pin-hovering .leaflet-tooltip.mn-survey-label {
+  display: none;
+}
+
 /* legend swatch for "matches filter" */
 .legend-dot-hit {
   box-shadow: 0 0 0 2px #ffc400;

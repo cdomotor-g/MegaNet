@@ -6269,6 +6269,8 @@ function initMap() {
   // Auto/On name labels are picked from what is in view, so they are re-picked
   // whenever the view changes rather than only when the layers are rebuilt.
   state.map.on('moveend zoomend', applyMapLabels);
+  // A hover name is for the pin under a still mouse; a pan or zoom drops it.
+  state.map.on('movestart zoomstart', clearStationPinHover);
   // The first fit is a jump, not a flight. The view it would fly from (MAP_HOME,
   // above) was never painted, and a view set as the tab opens has to be the one
   // that stays: a station opened from another tab (goToStation), a field photo
@@ -6406,6 +6408,7 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   const map = state.map;
   if (!map || !state.data) return;
   MapSpider.reset();                       // pins go home before any are replaced
+  clearStationPinHover();                  // a removed pin fires no mouseout
   state.mapMarkers.forEach(m => m.remove());
   state.mapLines.forEach(l => l.remove());
   state.mapMarkers = [];
@@ -6705,6 +6708,8 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     // openPopup() and isPopupOpen() go on working everywhere else.
     marker.off('click', marker._openPopup);
     marker.on('click', onStationPinClick);
+    marker.on('mouseover', onStationPinOver);
+    marker.on('mouseout', clearStationPinHover);
     state.mapMarkers.push(marker);
   }
 
@@ -7261,6 +7266,8 @@ function applyMapLabels() {
     // map hanging off it. Same for repeater focus, whose dim is deeper.
     const dim  = !!(m.mnFilterDim || m.mnFocusDimmed);
     if (want && !has) {
+      // The pin's own label takes over from the hover name it may be wearing.
+      if (_pinHover && _pinHover.marker === m) clearStationPinHover();
       m.bindTooltip(esc(s.name), {
         permanent: true, direction: 'bottom', offset: [0, m.mnRadius || 6],
         className: dim ? 'mn-pin-label mn-pin-label-dim' : 'mn-pin-label',
@@ -7275,6 +7282,46 @@ function applyMapLabels() {
       m.mnLabelDim = dim;
     }
   }
+}
+
+// ── Station name on hover ────────────────────────────────────────────────────
+// A pin under the mouse says its name when it carries no label of its own —
+// which at the national view is every pin, the labels staying off there. One
+// tooltip moved from pin to pin rather than one bound on each: applyMapLabels
+// reads a bound tooltip as "this pin is named", and ~3,100 bindings for the
+// one name the mouse is on would buy nothing. Mouse only: a tap is a click,
+// and the mouseover a tap emulates would leave the name stuck on the map.
+let _pinHover = null;          // { marker, tip, el } while a hover name is showing
+
+function onStationPinOver(e) {
+  const m = e.target, s = m.mnStation;
+  if (!s || !state.map || m.getTooltip()) return;   // already named on the map
+  if (L.Browser.mobile || !window.matchMedia('(hover: hover)').matches) return;
+  clearStationPinHover();
+  const tip = L.tooltip({
+    className: 'mn-pin-label', direction: 'top',
+    offset: [0, -((m.mnRadius || 6) + 2)], interactive: false,
+  }).setContent(esc(s.name)).setLatLng(m.getLatLng()).addTo(state.map);
+  // A hovered stack fans out under the pointer (map-spider.js), and the name
+  // goes with its pin rather than staying on the stack it came out of.
+  m.on('move', followStationPinHover);
+  // And it wins over a river's, road's or bridge's hover name under the same
+  // pointer (styles.css): the click goes to the pin, so the pin's name is true.
+  const el = state.map.getContainer();
+  el.classList.add('mn-pin-hovering');
+  _pinHover = { marker: m, tip, el };
+}
+
+function followStationPinHover() {
+  if (_pinHover) _pinHover.tip.setLatLng(_pinHover.marker.getLatLng());
+}
+
+function clearStationPinHover() {
+  if (!_pinHover) return;
+  _pinHover.marker.off('move', followStationPinHover);
+  _pinHover.el.classList.remove('mn-pin-hovering');
+  _pinHover.tip.remove();
+  _pinHover = null;
 }
 
 function setMapLabelMode(mode) {
