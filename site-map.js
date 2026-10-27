@@ -99,6 +99,14 @@ const SiteMap = (function () {
         'Work out whether a decibel lost matters, from a station\'s fade margin',
       ],
     },
+    pinouts: {
+      what: 'The connectors a site visit meets, drawn pin by pin — RS-232, the ALERT stations and their radios, the loggers and modems, the HS40 bubbler — with the cables made of them and where each pinout came from.',
+      use: [
+        'Find which pin is which on a DB9, a radio plug or a logger\'s terminals',
+        'Buzz out a null modem or a radio cable, wire by wire',
+        'Check a 4–20 mA loop has the voltage to drive the sensor',
+      ],
+    },
     propagation: {
       what: 'A lesson in how radio carries a reading from a gauge to a base — waves, shadows, trees, echoes, collisions and repeater delays — in pictures that move.',
       use: [
@@ -503,6 +511,7 @@ const SiteMap = (function () {
     { text: 'Learn how radio gets a reading home',         tab: 'propagation' },
     { text: 'Learn why bits go wrong, and how to tell the causes apart', tab: 'biterrors' },
     { text: 'Make sense of an SWR meter\'s readings',      tab: 'swr' },
+    { text: 'Look up which pin is which on a connector',   tab: 'pinouts' },
     { text: 'Practise reading a levelling staff',          tab: 'kbstaff' },
     { text: 'Walk through a routine river station visit',  tab: 'kbriver' },
   ];

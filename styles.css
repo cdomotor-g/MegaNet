@@ -21502,6 +21502,176 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
   .swm-in-grid--2 { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* ── 🪛 Pinouts (pinout-data.js, pinouts.js) ────────────────────────────────
+   The Knowledge base's connector library: a connector's face drawn in SVG with
+   each pin a control, its table beside it, the cables drawn wire by wire, a
+   4–20 mA calculator and the RF connectors. A pin's colour says what kind of
+   signal it is (--po-c, set by its .po-k-* class) and is never its only name:
+   the number is on it, the signal in the table and in its label. Pins take the
+   Site Map's group hues, which flip with the theme, and --sm-group-ink on them;
+   a socket is drawn as a ring, a pin as a dot, so the sex reads without colour. */
+.po-page h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-lg); line-height: var(--lh-tight); }
+.po-page h4 { margin: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-md); }
+.po-page p { margin: 0 0 var(--sp-3); max-width: 62rem; line-height: var(--lh-body); }
+.po-title { font-size: var(--fs-xl); }
+.po-lede { font-size: var(--fs-md); }
+.po-caution { border-left: 4px solid var(--warn); background: var(--panel-unsaved); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); }
+.po-toc { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); list-style: none; margin: 0; padding: 0; }
+.po-unit { color: var(--muted); }
+.po-insert { white-space: nowrap; }
+.po-none { color: var(--muted); }
+
+.po-k-power  { --po-c: var(--bad); }
+.po-k-ground { --po-c: var(--text); }
+.po-k-tx     { --po-c: var(--sm-group-1); }
+.po-k-rx     { --po-c: var(--sm-group-5); }
+.po-k-ctrl   { --po-c: var(--flood-moderate); }
+.po-k-bus    { --po-c: var(--sm-group-4); }
+.po-k-analog { --po-c: var(--sm-group-3); }
+.po-k-shield { --po-c: var(--sm-group-6); }
+.po-k-contact { --po-c: var(--sm-group-6); }
+.po-k-nc, .po-k-unknown { --po-c: var(--muted); }
+
+/* The library */
+.po-find { display: grid; gap: var(--sp-1); max-width: 30rem; margin-bottom: var(--sp-2); }
+.po-find label { font-weight: 600; font-size: var(--fs-sm); }
+.po-cats, .po-cable-pick { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); margin-bottom: var(--sp-2); }
+.po-chip { border-radius: var(--r-pill); font-size: var(--fs-sm); }
+.po-chip[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); font-weight: 600; }
+.po-cat-h { color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-size: var(--fs-xs); }
+.po-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--sp-2); list-style: none; margin: 0; padding: 0; }
+.po-card {
+  display: grid; grid-template-columns: 76px minmax(0, 1fr); grid-template-rows: auto auto auto; gap: 0 var(--sp-2);
+  width: 100%; height: 100%; text-align: left; align-items: start; padding: var(--sp-2);
+  background: var(--panel-sub); border: 1px solid var(--border); border-radius: var(--r-md);
+}
+.po-card:hover { border-color: var(--accent); }
+.po-card[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.po-card .po-mini { grid-row: span 3; width: 76px; height: 52px; }
+.po-card-name { font-weight: 600; }
+.po-card-unit { color: var(--muted); font-size: var(--fs-xs); line-height: 1.3; }
+.po-card .po-sure { justify-self: start; margin-top: var(--sp-1); }
+
+/* How sure */
+.po-sure { display: inline-block; padding: 0 var(--sp-2); border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 700; border: 1px solid currentColor; }
+.po-sure--standard, .po-sure--maker { color: var(--ok); }
+.po-sure--general, .po-sure--second { color: var(--warn); }
+.po-sure--unverified { color: var(--bad); }
+.po-sure-line .small { color: var(--muted); }
+
+/* The connector */
+.po-view-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 16rem); gap: var(--sp-3) var(--sp-4); align-items: start; }
+.po-fig { margin: 0; min-width: 0; }
+.po-toggles { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); margin-bottom: var(--sp-2); }
+.po-seg { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); align-items: center; }
+.po-seg legend { font-weight: 600; font-size: var(--fs-sm); padding: 0; margin-bottom: var(--sp-1); }
+.po-seg label { display: inline-flex; gap: var(--sp-1); align-items: center; font-size: var(--fs-sm); }
+.po-face { display: block; width: 100%; max-width: 560px; height: auto; max-height: 340px; background: var(--panel-sub); border: 1px solid var(--border); border-radius: var(--r-md); }
+.po-say { min-height: 3em; margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); background: var(--panel-sub); border: 1px solid var(--border); }
+.po-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-1); font-size: var(--fs-sm); }
+.po-legend li { display: flex; gap: var(--sp-2); align-items: center; }
+.po-swatch { width: 14px; height: 14px; border-radius: 50%; flex: none; background: var(--po-c); }
+.po-swatch.po-k-nc, .po-swatch.po-k-unknown { background: transparent; border: 2px dashed var(--po-c); }
+
+/* The face: the flange, the D or the circle, the pins */
+.po-flange { fill: var(--panel); stroke: var(--border); stroke-width: 2; }
+.po-hole { fill: var(--panel-sub); stroke: var(--muted); stroke-width: 2; }
+.po-shell { fill: var(--panel-sub); stroke: var(--muted); stroke-width: 3; }
+.po-shell--f { fill: var(--bg); }
+.po-key { fill: var(--muted); }
+.po-pin { cursor: pointer; }
+.po-pin .po-halo { fill: none; stroke: transparent; stroke-width: 3; }
+.po-pin.is-sel .po-halo, .po-pin:hover .po-halo { stroke: var(--accent); }
+.po-pin:focus-visible .po-halo { stroke: var(--focus); stroke-width: 4; }
+.po-dot { fill: var(--po-c); }
+.po-plabel { fill: var(--sm-group-ink); font-size: 11px; font-weight: 700; pointer-events: none; }
+.po-sock { fill: var(--panel); stroke: var(--po-c); stroke-width: 4; }
+.po-slabel { fill: var(--text); font-size: 10px; font-weight: 700; pointer-events: none; }
+.po-k-nc .po-dot, .po-k-unknown .po-dot { fill: var(--panel); stroke: var(--po-c); stroke-width: 2; stroke-dasharray: 3 2; }
+.po-k-nc .po-plabel, .po-k-unknown .po-plabel { fill: var(--muted); }
+.po-k-nc .po-sock, .po-k-unknown .po-sock { stroke-width: 2; stroke-dasharray: 3 2; }
+.po-pad { fill: var(--po-c); }
+.po-k-nc .po-pad { fill: var(--panel); stroke: var(--po-c); stroke-dasharray: 3 2; }
+.po-term { fill: var(--panel); stroke: var(--po-c); stroke-width: 3; }
+.po-pin--term.is-sel .po-term, .po-pin--term:hover .po-term { stroke: var(--accent); stroke-width: 4; }
+.po-pin--term:focus-visible .po-term { stroke: var(--focus); stroke-width: 5; }
+.po-screw { fill: var(--panel-sub); stroke: var(--muted); stroke-width: 2; }
+.po-slot { fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+.po-tlabel { fill: var(--text); font-size: 11px; font-weight: 700; pointer-events: none; }
+.po-mini .po-halo, .po-mini title { display: none; }
+
+/* The table */
+.po-table td, .po-table th { vertical-align: top; }
+.po-row.is-sel td, .po-row.is-sel th { background: var(--panel-register); }
+.po-pin-btn { min-width: 2.6rem; padding: .1rem .4rem; font-weight: 700; border-radius: var(--r-pill); border: 2px solid var(--po-c); background: var(--panel); }
+.po-pin-btn[aria-pressed="true"] { background: var(--po-c); color: var(--sm-group-ink); }
+.po-k-nc.po-pin-btn[aria-pressed="true"], .po-k-unknown.po-pin-btn[aria-pressed="true"] { background: var(--panel); color: var(--text); }
+.po-notes { margin: 0 0 var(--sp-2); padding-left: 1.2rem; display: grid; gap: var(--sp-1); max-width: 62rem; }
+.po-src { margin: 0 0 var(--sp-2); padding-left: 1.2rem; font-size: var(--fs-sm); }
+
+/* Cables */
+.po-cable-wrap { overflow-x: auto; }
+/* Never narrower than its words can be read at: on a phone the drawing
+   scrolls inside its own named region instead of shrinking to a smudge. */
+.po-cable-svg { display: block; width: 100%; min-width: 520px; max-width: 680px; height: auto; }
+.po-cpin rect { fill: var(--panel-sub); stroke: var(--po-c); stroke-width: 2; }
+.po-cpin.is-idle rect { stroke: var(--border); }
+.po-cpin.is-idle text { fill: var(--muted); }
+.po-cpin-n { fill: var(--text); font-size: 12px; font-weight: 700; }
+.po-cpin-s { fill: var(--text); font-size: 11px; }
+.po-cend { fill: var(--text); font-size: 12px; font-weight: 700; }
+.po-cend-sub { fill: var(--muted); font-size: 11px; }
+.po-wire { fill: none; stroke: var(--po-c, var(--muted)); stroke-width: 3; stroke-linecap: round; opacity: .85; }
+.po-wire--loop { stroke: var(--muted); stroke-dasharray: 5 3; }
+.po-wire.is-ok { stroke-width: 4; opacity: 1; }
+.po-wire.is-hl { stroke: var(--draw); stroke-width: 6; opacity: 1; }
+.po-buzz-count { font-weight: 600; margin-top: var(--sp-2); }
+
+/* 4–20 mA */
+.po-loop-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.po-box { border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3) var(--sp-3); margin: 0; display: grid; gap: var(--sp-2); align-content: start; min-width: 0; }
+.po-box legend { font-weight: 600; padding: 0 var(--sp-1); }
+.po-field { display: grid; gap: 2px; font-size: var(--fs-sm); }
+.po-field-in { display: flex; align-items: center; gap: var(--sp-1); }
+.po-field-in input { width: 100%; min-width: 0; max-width: 9rem; }
+.po-unit-tag { color: var(--muted); }
+.po-loop-out { margin-bottom: var(--sp-3); }
+.po-band { border-left: 4px solid var(--muted); padding: var(--sp-1) var(--sp-3); }
+.po-band--ok { border-color: var(--ok); }
+.po-band--warn { border-color: var(--warn); }
+.po-band--bad { border-color: var(--bad); }
+.po-loop-svg { display: block; width: 100%; max-width: 600px; height: auto; margin-top: var(--sp-2); }
+.po-lbox { fill: var(--panel-sub); stroke: var(--muted); stroke-width: 2; }
+.po-res { fill: var(--panel); stroke: var(--sm-group-3); stroke-width: 3; }
+.po-lw { fill: none; stroke-width: 3; stroke-linejoin: round; }
+.po-lw--pwr { stroke: var(--bad); }
+.po-lw--sig { stroke: var(--sm-group-3); }
+.po-lw--gnd { stroke: var(--text); }
+.po-lt { fill: var(--text); font-size: 13px; font-weight: 600; }
+.po-lt-sub { fill: var(--muted); font-size: 12px; }
+
+/* RF connectors */
+.po-rf-cell { display: flex; gap: var(--sp-2); align-items: center; }
+.po-rf-face { width: 44px; height: 44px; flex: none; }
+.po-rf-body { fill: var(--panel-sub); stroke: var(--muted); stroke-width: 2; }
+.po-rf-thread { fill: none; stroke: var(--muted); stroke-width: 2; stroke-dasharray: 2 2; }
+.po-rf-diel { fill: var(--panel); stroke: var(--border); stroke-width: 1.5; }
+.po-rf-pin { fill: var(--sm-group-2); }
+.po-rf-sock { fill: var(--panel); stroke: var(--sm-group-2); stroke-width: 2.5; }
+.po-rf-slot { stroke: var(--muted); stroke-width: 3; stroke-linecap: round; }
+.po-rf-stud { fill: var(--muted); }
+
+/* Reading a pinout */
+.po-read-figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.po-read-fig { margin: 0; }
+.po-read-fig .po-face { max-height: 160px; }
+
+@media (max-width: 700px) {
+  .po-view-grid { grid-template-columns: minmax(0, 1fr); }
+  .po-card { grid-template-columns: 60px minmax(0, 1fr); }
+  .po-card .po-mini { width: 60px; height: 42px; }
+}
+
 /* ── Level surveys (level-survey.js, two-peg.js, survey-guide.js) ────────────
    📏 Level Survey, 🎯 Two-Peg Test and 📖 How to Survey: built for a phone in
    a paddock — one step at a time, big targets, numbers in a monospace face so

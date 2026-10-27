@@ -265,6 +265,11 @@ MegaNet/
 │                             stations, what a set of readings means; pure
 ├── swr-meter.js            ← SwrMeter — the 📟 SWR Meter tab: the line, the meters
 │                             drawn and worked, the lesson
+├── pinout-data.js          ← PinoutData — the 🪛 Pinouts library: every connector's pins,
+│                             where each pinout came from, the cables, where a pin sits
+│                             on a face, the 4–20 mA arithmetic; pure
+├── pinouts.js              ← Pinouts — the 🪛 Pinouts tab: faces and tables, cables to
+│                             buzz out, the loop calculator, RF connectors
 ├── owner-logos.js          ← OwnerLogos — each station owner's logo beside its name
 │                             on the station card and in the editor (the marks in assets/owners/)
 ├── health-bulletin.js      ← HealthBulletin — 📺 Network Weather at the top of Station

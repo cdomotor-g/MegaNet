@@ -798,6 +798,15 @@ const SEED_SWR = `async () => {
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 }`;
 
+// 🪛 Pinouts: the Maxon's DB9 turned to the wire side with a pin picked, a
+// hook-up with a wire ticked, and the calculator on a set-up that fails.
+const SEED_PO = `async () => {
+  Pinouts.pick('maxon-sd125', true); Pinouts.side(true); Pinouts.pin('5');
+  Pinouts.cable('hs40-cr300'); Pinouts.tick('0', true); Pinouts.hl('1');
+  Pinouts.preset('r250');
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+}`;
+
 const SEED_BS_OUT = `() => {
   if (window.__bsAuth) { Object.assign(Auth, window.__bsAuth); delete window.__bsAuth; }
   BaseStations.authChanged();
@@ -972,6 +981,8 @@ const CONVERTED = [
   { id: 'biterrors',  label: 'Bit Errors — the lesson, and two transmitters in its calculator', issue: 'born converted', seed: SEED_BE },
   { id: 'swr',        label: 'SWR Meter — as it opens', issue: 'born converted' },
   { id: 'swr',        label: 'SWR Meter — your readings, the needle meter on SWR', issue: 'born converted', seed: SEED_SWR },
+  { id: 'pinouts',    label: 'Pinouts — as it opens', issue: 'born converted' },
+  { id: 'pinouts',    label: 'Pinouts — a radio\'s DB9 from the back, a pin picked, a hook-up ticked', issue: 'born converted', seed: SEED_PO },
   { id: 'health',     label: 'Station Health — the demo week\'s board', issue: 'born converted', seed: SEED_HEALTH },
   { id: 'health',     label: 'Station Health — a station open, a missed check in context', issue: 'born converted', seed: SEED_HEALTH_STATION },
   { id: 'sitemap',    label: 'Site Map',        issue: 'born converted' },

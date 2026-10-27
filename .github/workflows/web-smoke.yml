@@ -589,6 +589,18 @@ jobs:
         working-directory: test
         run: npm run swr
 
+      # 🪛 Pinouts (pinout-data.js, pinouts.js): the library held to itself —
+      # every pin once, every cable's wires on pins that exist, a listing's
+      # colours matching the tables it joins, DCE the DTE turned round — where
+      # pin 1 sits on a face and its mirror, the 4–20 mA arithmetic and the
+      # loop's voltage; then the tab in Chromium — a pin picked on the drawing
+      # or the table, the plug that mates and the wire side, finding, a cable
+      # ticked off, the calculator's boxes and set-ups, the CSV, and a phone.
+      - name: Pinouts
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run pinouts
+
       # ⏱️ Latency (map-latency.js), against the demo week through the strict
       # PostgREST stub: the bands' edges; off until asked for; the first
       # opening of the pane turns it on; every pin a band or said otherwise,

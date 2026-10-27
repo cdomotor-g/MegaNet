@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 122, date: '2026-10-27', items: [
+      'New in the Knowledge base: <strong>🪛 Pinouts</strong> — the connectors a site visit meets, drawn pin by pin with a table '
+        + 'beside each: RS-232 on a DB9 (male and female) and a DB-25, the <strong>ELPRO ERT-A2</strong>\'s MIL connectors (pin for '
+        + 'pin the old ERRTS canister\'s), the <strong>Campbell AL200X</strong>, the <strong>Maxon SD-125</strong> and Ritron radios, '
+        + 'the <strong>Beam 9602N</strong> modem, the CR300\'s ports and terminals, the <strong>HS40</strong>\'s 4–20 mA and SDI-12 '
+        + 'block, VE.Direct and blank MIL inserts. Press a pin to see what it does, turn the face over or show the plug that '
+        + 'mates with it, buzz out a cable wire by wire, and check a 4–20 mA loop has the voltage. Each pinout says where it '
+        + 'came from. It is in the <strong>Field</strong> view too.',
+    ] },
     { n: 121, date: '2026-10-27', items: [
       'The <strong>🧪 Bit Bench</strong> opens on one section, <strong>A reading, bit by bit</strong>, in place of two. The frame '
         + 'is drawn the way <strong>ALERT Packets</strong> draws a message — four words side by side, each ten cells coloured by '

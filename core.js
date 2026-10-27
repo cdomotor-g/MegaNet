@@ -305,6 +305,16 @@ const TABS = [
     // nav.mjs's and palette.mjs's probes hold for other tabs.
     { id: 'swr',        label: 'SWR Meter',              icon: '📟',
       find: 'swr vswr standing wave ratio power meter watt meter wattmeter watts forward reflected reverse fwd ref rev return loss mismatch reflection coefficient gamma antenna test antenna tests feeder coax coaxial cable lmr-400 rg-58 rg-213 heliax connector connectors n-type so-239 pl-259 dummy load surecom sw-102 sw102 moonraker swr-400 swr400 avair diamond comm-connect 3030 through-line directional coupler tx ant input load calibrate cal knob needle bursts peak hold water ingress loose jumper adaptor low power decibel dbm fade margin' },
+    // 🪛 Pinouts (pinout-data.js, pinouts.js): the connectors a site visit
+    // meets, drawn pin by pin with where each pinout came from — a reference
+    // as much as a lesson, filed here beside the SWR Meter and offered in the
+    // Field view with it. Its find words are the connectors, the units by
+    // name and the signals on their pins — never "com", "port", "serial" or
+    // "elpro", which nav.mjs's probes hold for the Serial Monitor and the
+    // ALERT2 decoder, nor "install", "guide", "signal", "the", "bit" or
+    // "council", which nav.mjs's and palette.mjs's hold for others.
+    { id: 'pinouts',    label: 'Pinouts',                icon: '🪛',
+      find: 'pinout pinouts pin pins wiring wire wires colours colors connector plug socket male female gender changer db9 db-9 de9 de-9 db25 db-25 db15 da15 d-sub dsub rs232 rs-232 rs485 rs-485 null modem straight through loopback dte dce txd rxd rts cts dtr dsr dcd mil milspec mil-spec circular terminal terminals block sdi-12 sdi12 4-20 4-20ma milliamp current loop shunt resistor 250 ohm hs40 wl3100 kisters bubbler al200x al200 al205 campbell cr300 cr310 cr1000x cs i/o maxon sd125 sd-125 ritron rf320 beam 9602n iridium sbd satcom modem ert-a2 canister ve.direct victron tipping bucket ptt continuity buzz out multimeter n-type bnc tnc sma rp-sma' },
   ] },
   // Last, so it sits at the foot of the nav: nobody's daily work, and the one
   // group whose tab the header's load buttons and the Export tab's Data source
@@ -593,6 +603,30 @@ const HELP = {
       'A device set to reduce motion starts every drawing still and settled; ▶ Animate runs it.',
     ],
     related: ['inspections', 'propagation', 'health', 'review'],
+  },
+  pinouts: {
+    summary: 'A library of the connectors a site visit meets, each drawn as its face with every pin numbered where it really '
+           + 'sits and a table beside it: <strong>RS-232</strong> on a DE-9 (male and female, DTE and DCE) and a DB-25, '
+           + 'RS-485, SDI-12, 4–20 mA loops and a tipping-bucket gauge; the <strong>Campbell AL200X</strong> (and the older '
+           + 'AL200 and AL205), the <strong>Maxon SD-125</strong> and Ritron radios; the <strong>Beam 9602N</strong> SBD '
+           + 'modem; the <strong>CR300</strong>\'s ports and terminals and Campbell\'s CS I/O; the <strong>KISTERS '
+           + 'HS40</strong> bubbler\'s 4–20 mA and SDI-12 block; Victron\'s VE.Direct; and the ELPRO ERT-A2 and its '
+           + 'canister. Pick a pin on the drawing or in the table and the other follows; turn the face over to the wire '
+           + 'side, or show the plug that mates with it. Then the <strong>cables</strong> — null modems, loopback plugs, '
+           + 'Campbell\'s radio cables, the HS40 into a CR300 or an AL200X — drawn wire by wire with a tick box each for '
+           + 'buzzing one out; a <strong>4–20 mA calculator</strong> that scales a current and checks the loop has the '
+           + 'voltage to drive it; the RF connectors told apart; and how to read a pinout without getting it backwards.',
+    watch: [
+      'Every pinout says where it came from — a standard, the maker\'s manual, a second-hand source such as a cable '
+      + 'listing, or not verified — and links it. The unit\'s own label beats anything here; meter the pins before power goes on.',
+      'Drawings are of the <strong>front</strong> (the mating face) unless you turn them over. A socket\'s face, and either '
+      + 'sex seen from the back, is the mirror image of a plug\'s face: pin 1 moves from the top left to the top right.',
+      'RS-232\'s signal names are the computer\'s: TXD is an output on a computer (DTE) and an input on a modem (DCE). '
+      + 'Campbell names its loggers\' pins from the logger\'s side; each table says which way every pin goes at that unit.',
+      'The 4–20 mA presets are the HS40\'s WL3100 into the loggers on the network: a passive two-wire loop that needs '
+      + '9 V and signals a fault at 24 mA. The tick boxes and the calculator are kept only while the tab is open.',
+    ],
+    related: ['swr', 'inspections', 'serial', 'alert2'],
   },
   stations: {
     summary: 'The map fills the page, and its cards sit beside it in the <strong>side panel</strong> '

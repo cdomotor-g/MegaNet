@@ -73,6 +73,7 @@ const Glyphs = (() => {
     graph:     '<circle cx="6" cy="6" r="2.2"/><circle cx="18" cy="8" r="2.2"/><circle cx="9" cy="18" r="2.2"/><path d="M8.2 6.4 15.8 7.6M7 8l1.4 7.8M16.5 9.8l-6 6.6"/>',
     packet:    '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h2M11 10h2M15 10h2M7 14h10"/>',
     message:   '<path d="M4 4.5h16v11.5H9.5L4 20.5z"/><path d="M8 8.5h8M8 12h5"/>',
+    dsub:      '<path d="M2.5 7h19l-2.4 10H4.9z"/><path d="M7 10.5h.01M10.3 10.5h.01M13.7 10.5h.01M17 10.5h.01M8.7 13.8h.01M12 13.8h.01M15.3 13.8h.01"/>',
     plug:      '<path d="M9 2.5v4.5M15 2.5v4.5"/><path d="M6 7h12v3.5a6 6 0 0 1-12 0z"/><path d="M12 16.5v5"/>',
     launch:    '<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
     data:      '<rect x="3" y="3.5" width="18" height="17" rx="2"/><path d="m6.5 15.5 3.5-4.5 3 2.5 4.5-6"/>',
@@ -142,7 +143,7 @@ const Glyphs = (() => {
     arro: 'launch', arrodata: 'data', field: 'level', msglog: 'inbox', health: 'health', signalroutes: 'routes',
     nearby: 'nearby', inspections: 'inspect', maintenance: 'tools', history: 'history', camera: 'camera', photos: 'photos',
     levels: 'survey', twopeg: 'pegs', surveyguide: 'book',
-    propagation: 'waves', biterrors: 'bolt', swr: 'meter', kbstaff: 'staff', kblogbook: 'logbook', kblifecycle: 'cycle', kblevel: 'solar', kbriver: 'gauge',
+    propagation: 'waves', biterrors: 'bolt', swr: 'meter', pinouts: 'dsub', kbstaff: 'staff', kblogbook: 'logbook', kblifecycle: 'cycle', kblevel: 'solar', kbriver: 'gauge',
     admin: 'admin', basestations: 'base', backbone: 'backbone', review: 'review', a2plan: 'plan', tdma: 'slots',
   };
 

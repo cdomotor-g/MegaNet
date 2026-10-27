@@ -182,6 +182,11 @@ const ExportMenu = (function () {
       { label: 'This check, in words — TXT', sub: 'the meter, the readings, what they work out to and what to do — to paste into a report or a work order',
         call: ['SwrMeter.exportTxt'] },
     ],
+    pinouts: () => [
+      { label: 'This connector — CSV', sub: 'each pin of the connector on screen: its signal, which way it goes, what it does, the wire colour and how sure the pinout is',
+        call: ['Pinouts.exportCsv', 'one'] },
+      { label: 'Every connector — CSV', sub: 'the whole library, a row a pin, to print or keep with the field kit', call: ['Pinouts.exportCsv', 'all'] },
+    ],
     history: () => [
       { label: 'The records listed — CSV', sub: 'the inspection and maintenance records, as filtered', call: ['History.exportList'],
         empty: 'There are no records listed.' },
