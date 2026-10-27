@@ -31,11 +31,12 @@ const NOISE = /^Failed to load resource|ERR_BLOCKED_BY_CLIENT|ERR_FAILED/i;
 const near = (a, b, tol = 2) => Math.abs(a - b) <= tol;
 const J = v => JSON.stringify(v);
 
-// The first capped table on the tab that has more rows than it shows, and
-// its handle, as the page has them.
+// The first capped table on the tab that has more rows than it shows (one in
+// a fold that is shut has its handle hidden, rightly), and its handle, as the
+// page has them.
 const readTable = page => page.evaluate(() => {
   const wrap = [...document.querySelectorAll('#main-content .table-wrap.tall, #main-content .table-wrap.medium')]
-    .find(w => w.getClientRects().length && w.scrollHeight > w.clientHeight + 1);
+    .find(w => w.getClientRects().length && !w.closest('details:not([open])') && w.scrollHeight > w.clientHeight + 1);
   if (!wrap) return null;
   const grip = wrap.nextElementSibling;
   const r = wrap.getBoundingClientRect();
@@ -57,7 +58,7 @@ const readTable = page => page.evaluate(() => {
 const inView = async page => {
   await page.evaluate(() => {
     const wrap = [...document.querySelectorAll('#main-content .table-wrap.tall, #main-content .table-wrap.medium')]
-      .find(w => w.getClientRects().length && w.nextElementSibling && w.nextElementSibling.classList.contains('mn-grip')
+      .find(w => w.getClientRects().length && !w.closest('details:not([open])') && w.nextElementSibling && w.nextElementSibling.classList.contains('mn-grip')
         && !w.nextElementSibling.hidden);
     if (wrap) wrap.nextElementSibling.scrollIntoView({ block: 'center' });
   });

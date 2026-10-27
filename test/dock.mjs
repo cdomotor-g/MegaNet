@@ -617,7 +617,9 @@ try {
   await page.waitForTimeout(200);
 
   // ── 5. Leaving the tab, and the map being built again ────────────────────
-  await page.evaluate(() => switchTab('passranges'));
+  // A tab with no map of its own: Pass Ranges draws the Address map, and every
+  // map carries its own Layers wrapper.
+  await page.evaluate(() => switchTab('export'));
   await page.waitForTimeout(300);
   s = await look();
   const away = await page.evaluate(() => ({

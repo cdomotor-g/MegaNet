@@ -236,7 +236,7 @@ jobs:
     # check stopped skipping the rest (below): a red run now runs all of them,
     # and the first one (run 481) hit 40 at step 104 of 138 with seven red —
     # Install Chromium alone took seven minutes that time, 32 s the run before.
-    timeout-minutes: 60
+    timeout-minutes: 90
     # Every check after Syntax runs whether or not the one before it passed:
     # `if: !cancelled() && steps.syntax.outcome == 'success'` on each. Without
     # it the first red check skipped every check after it, so a run showed one
