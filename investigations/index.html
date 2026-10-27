@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Investigations — Flood-Net</title>
+  <meta name="description" content="Flood-Net investigations: dated write-ups of strange telemetry data and what was behind it, each with the data and the script that drew its figures.">
+  <link rel="canonical" href="https://floodwarning.net/investigations/">
+  <link rel="icon" type="image/svg+xml" href="../assets/icon-small.svg">
+  <!-- The list of investigations. Self-contained like about.html: no script,
+       no font, no stylesheet to fetch. No ?v= stamp: sw.js keeps none of this,
+       and the icon is the only thing it loads. Newest entry first; each entry
+       is one <article>, and its page sits beside this one. -->
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #16202a; --dim: #5a6772; --bg: #ffffff; --panel: #f4f7fa;
+      --line: #d6dee6; --brand: #0b5cab;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --ink: #e6edf3; --dim: #9bacba; --bg: #0d1319; --panel: #151d25;
+        --line: #27333d; --brand: #6fb4ff;
+      }
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --ink: #e6edf3; --dim: #9bacba; --bg: #0d1319; --panel: #151d25;
+      --line: #27333d; --brand: #6fb4ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 2rem 16px 4rem;
+      font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: var(--ink); background: var(--bg);
+    }
+    main { max-width: 46rem; margin: 0 auto; }
+    a { color: var(--brand); }
+    .crumb { font-size: .9rem; color: var(--dim); margin: 0 0 .6rem; }
+    h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 .3rem; }
+    h2 { font-size: 1.15rem; margin: 2.2rem 0 .6rem; color: var(--brand); }
+    .lede { font-size: 1.05rem; color: var(--dim); margin: 0 0 1.6rem; }
+    article {
+      background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--brand);
+      border-radius: 4px; padding: 1rem 1.15rem; margin: 0 0 1rem;
+    }
+    article h3 { font-size: 1.08rem; line-height: 1.35; margin: .1rem 0 .3rem; }
+    article p { margin: .4rem 0 0; }
+    .meta { font-size: .88rem; color: var(--dim); margin: 0; }
+    .pill {
+      display: inline-block; padding: 0 .5rem; border-radius: 999px; border: 1px solid var(--line);
+      font-size: .8rem; color: var(--dim); white-space: nowrap;
+    }
+    ul { padding-left: 1.2rem; }
+    li { margin: .3rem 0; }
+    code { font-size: .9em; }
+    footer {
+      margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+      color: var(--dim); font-size: .92rem;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <p class="crumb"><a href="../">Flood-Net</a></p>
+  <h1>Investigations</h1>
+  <p class="lede">
+    Write-ups of strange data and what was behind it. Each one is dated, says how sure it is, and keeps the exports
+    and the script that drew its figures in the repository, so anyone can check it or run it again on new data.
+  </p>
+
+  <article>
+    <p class="meta">01 · 27 October 2026 · Billaboo AL and Blackdown Tableland AL ·
+      <span class="pill">Open: cause narrowed, not confirmed</span></p>
+    <h3><a href="2026-10-corrupted-relay-copies.html">Climbing red crosses: corrupted relay copies at Billaboo and
+      Blackdown Tableland</a></h3>
+    <p>The crosses climbing above the rainfall line are second copies of real reports, damaged as they were relayed.
+      Each arrives about a second after a clean copy, with its upper bits changed. Old ALERT frames have no checksum,
+      and their check bits can't see damage in the last byte, so it gets through and reads high. The same fault
+      explains Blackdown Tableland's odd-looking reset, and Emerald Radar is the only repeater both stations share.</p>
+  </article>
+
+  <h2>Adding one</h2>
+  <ul>
+    <li>Take the next number and a short name, as <code>&lt;year&gt;-&lt;month&gt;-&lt;what&gt;</code>. The page
+      goes here as <code>investigations/&lt;name&gt;.html</code>, its data under
+      <code>data/investigations/&lt;name&gt;/</code>, and the script that computes its figures under
+      <code>tools/investigations/</code>.</li>
+    <li>Keep it to two printed pages. Lead with the answer, then the evidence, and say what is established, what is
+      likely and what is still open.</li>
+    <li>Add it to the top of this list, and to <code>sitemap.xml</code>.</li>
+    <li>Never quote site codes or landholder contact details. They stay in the inspection records.</li>
+  </ul>
+
+  <footer>
+    <a href="../">Flood-Net</a> · <a href="../about">About</a>
+  </footer>
+</main>
+</body>
+</html>

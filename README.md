@@ -364,6 +364,11 @@ MegaNet/
 │   ├── 357 Filter doco.doc                  (the 1998 first edition of the same spec)
 │   └── aem_Durikai_AL_541134_Rainfall_541134_0_R_5758.csv  (sample ARRO export)
 │
+├── investigations/         ← write-ups of strange data and what was behind it, two printed pages each
+│   ├── index.html                          (the list, newest first, and how to add one)
+│   └── 2026-10-corrupted-relay-copies.html (01 — corrupted relay copies at Billaboo and Blackdown Tableland)
+│                                           its exports in data/investigations/, its script in tools/investigations/
+│
 ├── db/                     ← the datastore's schema, as plain SQL
 │   ├── README.md                           (how to apply, and the rules — read first)
 │   └── migrations/                         (numbered, forward-only, run with psql)

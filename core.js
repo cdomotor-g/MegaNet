@@ -1544,6 +1544,8 @@ const HELP = {
       'Built by the server every hour from the last 7 or 30 days. Copies heard before the receivers '
       + 'measured carriers have no sender, and are weighed by pass range only.',
     ],
+    links: [{ label: 'Investigations — strange data we have looked into, and what was behind it',
+              href: 'investigations/' }],
     related: ['bitflipper', 'health', 'reception', 'workbench', 'bitbench'],
   },
 
@@ -1851,6 +1853,8 @@ const HELP = {
       { label: 'How the 357 filter works — the test, drawn', call: 'ArroData.explain()' },
       { label: 'Hydrology Raw Data Filtering — the specification (v2.1, 2009)',
         href: 'docs/Hydrology Raw Data Filtering Program Specification.pdf' },
+      { label: 'Investigations — strange data we have looked into, and what was behind it',
+        href: 'investigations/' },
     ],
     related: ['arro', 'field', 'stations'],
   },

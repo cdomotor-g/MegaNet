@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 124, date: '2026-10-27', items: [
+      'New: <strong>Investigations</strong> — write-ups of strange data and what was behind it, two printed pages '
+        + 'each, at <strong>floodwarning.net/investigations</strong> and linked from the help on <strong>Plots</strong> and '
+        + '<strong>Bit-Flip Sources</strong>. The first explains the crosses climbing above Billaboo AL\'s rainfall line '
+        + 'and Blackdown Tableland AL\'s odd-looking reset: copies of real readings damaged as they are relayed.',
+    ] },
     { n: 123, date: '2026-10-27', items: [
       'The <strong>Stations</strong> map can paint the <strong>rain</strong> the network\'s own gauges have measured as a '
         + '<strong>heat map</strong> between them — switch on <strong>Rainfall heat map</strong> under <strong>Map display</strong>. '
