@@ -3500,10 +3500,12 @@ const DB_SCHEMA = 'meganet';
 // holds (0073, #243). 74: receptions and submissions found by time with a
 // btree, and the archive counting from the rollups (0074). Both applied by
 // hand, bumped after; neither changes a shape the app reads.
-// 80 (a base station's connection over time) and 81 (its channels, from the
-// reception rollups) wait on the db-migrate workflow's SUPABASE_DB_URL
-// secret; this goes to 81 once both are applied.
-const DB_SCHEMA_VERSION = 79;
+// 80: a base station's connection over time (0080). 81: its channels, from the
+// reception rollups (0081). 82: the findings' titles in ppm (0082). 83:
+// transmitter signal (0083). 84: ALERT addresses set aside (0084). 85: each
+// station as Station Health shows it, for the agent API (0085). All six
+// applied together on 27 October 2026, bumped after.
+const DB_SCHEMA_VERSION = 85;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
