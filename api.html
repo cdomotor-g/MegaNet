@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Flood-Net station API — read-only station data for AI agents and scripts</title>
+  <meta name="description" content="Flood-Net's read-only station API and MCP server: what they serve, what you can do with them, how to connect Claude, ChatGPT, Gemini, Copilot or Cursor, and the limits. Public data, no sign-in or key.">
+  <!-- /api, not /api.html: Cloudflare's static assets answer the extension
+       with a 307 to the bare path (see about.html). The page is a static asset,
+       served before the Worker runs, so it does not touch /api/v1 or /api/mcp,
+       which the Worker answers (worker/api.js). docs/agent-api.md is the full
+       reference this page summarises; test/agent-docs.mjs holds both to the
+       code's URLs, limits, endpoints and tools. -->
+  <link rel="canonical" href="https://floodwarning.net/api">
+  <link rel="icon" type="image/svg+xml" href="assets/icon-small.svg?v=20261027i">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=20261027i">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=20261027i">
+  <meta name="theme-color" content="#0b5cab">
+
+  <!-- Self-contained for the same reason as about.html: no stylesheet, font or
+       script to fetch first, so it reads the same through a filtering proxy or
+       a fetch tool that does not run JavaScript — which is most of the agents
+       this page is about. -->
+  <style>
+    :root {
+      --ink: #16202a; --dim: #5a6772; --bg: #ffffff; --panel: #f4f7fa;
+      --line: #d6dee6; --brand: #0b5cab; --link: #0b5cab; --code: #eef2f6;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --ink: #e6edf3; --dim: #9bacba; --bg: #0d1319; --panel: #151d25;
+        --line: #27333d; --brand: #4a9eff; --link: #6fb4ff; --code: #1b252f;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 2rem 1rem 4rem;
+      font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: var(--ink); background: var(--bg);
+    }
+    main { max-width: 52rem; margin: 0 auto; }
+    .logo { display: block; width: 11rem; max-width: 50%; height: auto; margin: 0 0 1.2rem; }
+    @media (prefers-color-scheme: dark) {
+      .logo { background: #ffffff; border-radius: 10px; padding: .6rem .8rem; }
+    }
+    h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 .3rem; }
+    h2 { font-size: 1.2rem; margin: 2.6rem 0 .6rem; color: var(--brand); }
+    h3 { font-size: 1rem; margin: 1.6rem 0 .4rem; }
+    .lede { font-size: 1.08rem; color: var(--dim); margin: 0 0 1.6rem; }
+    a { color: var(--link); }
+    ul { padding-left: 1.2rem; }
+    li { margin: .35rem 0; }
+    dt { font-weight: 600; margin-top: .9rem; }
+    dd { margin: .15rem 0 0; color: var(--dim); }
+    code {
+      font: .88em/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: var(--code); padding: .08em .3em; border-radius: 3px;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      background: var(--code); border: 1px solid var(--line); border-radius: 4px;
+      padding: .8rem 1rem; overflow-x: auto; margin: .6rem 0 1rem;
+    }
+    pre code { background: none; padding: 0; overflow-wrap: normal; white-space: pre; }
+    .scroll { overflow-x: auto; margin: .6rem 0 1rem; }
+    table { border-collapse: collapse; width: 100%; font-size: .94rem; }
+    th, td { text-align: left; vertical-align: top; padding: .45rem .6rem; border-bottom: 1px solid var(--line); }
+    th { background: var(--panel); font-weight: 600; }
+    td code { white-space: nowrap; }
+    .glance th { width: 28%; background: none; }
+    .glance td code { white-space: normal; }
+    .note {
+      background: var(--panel); border: 1px solid var(--line);
+      border-left: 3px solid var(--brand);
+      padding: 1rem 1.15rem; margin: 1.5rem 0; border-radius: 4px;
+    }
+    .note p:first-child { margin-top: 0; }
+    .note p:last-child { margin-bottom: 0; }
+    .toc { columns: 2 14rem; padding-left: 1.2rem; margin: 0 0 1rem; }
+    .toc li { margin: .15rem 0; }
+    footer {
+      margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+      color: var(--dim); font-size: .92rem;
+    }
+  </style>
+</head>
+<body>
+<main>
+
+  <img class="logo" src="assets/logo.webp?v=20261027i" alt="" width="900" height="879">
+  <h1>Flood-Net station API</h1>
+  <p class="lede">
+    Flood-Net's station register, readable by programs as well as people. Point
+    an AI assistant or a script at it and it can look up any station in the
+    Bureau of Meteorology's Queensland flood-warning telemetry network — where
+    it is, how it reports, its flood levels and Service Level Specification
+    entry, its health and recent readings — with no sign-in and no key.
+  </p>
+
+  <div class="scroll">
+    <table class="glance">
+      <tr><th>REST API</th><td><code>https://floodwarning.net/api/v1</code></td></tr>
+      <tr><th>MCP server</th><td><code>https://floodwarning.net/api/mcp</code> (Streamable HTTP)</td></tr>
+      <tr><th>OpenAPI document</th><td><a href="/api/v1/openapi.json"><code>https://floodwarning.net/api/v1/openapi.json</code></a></td></tr>
+      <tr><th>Sign-in or key</th><td>None — it is read-only and serves only public data</td></tr>
+      <tr><th>Rate limits</th><td>60 requests / 60 s per client · 20 requests / 10 s per client (burst) · 240 requests / 60 s per address</td></tr>
+      <tr><th>Station ids</th><td>Lowercase slugs such as <code>abergowrie_br_al</code>; a Bureau station number also works</td></tr>
+      <tr><th>Full reference</th><td><a href="https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md">docs/agent-api.md</a> — every parameter, example answers, and setup for each agent</td></tr>
+    </table>
+  </div>
+
+  <ul class="toc">
+    <li><a href="#available">What is available</a></li>
+    <li><a href="#possible">What you can do with it</a></li>
+    <li><a href="#endpoints">The endpoints</a></li>
+    <li><a href="#connect">Connecting an AI assistant</a></li>
+    <li><a href="#http">From a script</a></li>
+    <li><a href="#limits">Limits and fair use</a></li>
+    <li><a href="#not">What it does not do</a></li>
+    <li><a href="#caveats">Reading the data correctly</a></li>
+  </ul>
+
+  <h2 id="available">What is available</h2>
+  <dl>
+    <dt>Stations</dt>
+    <dd>
+      Every field station, repeater and base station in the register: name,
+      Bureau and AWRC numbers, position and height (surveyed or modelled, and
+      which), basin, stream, local government area, maintenance hub, radio
+      networks, ALERT and ALERT2 addresses, satellite telemetry, sensors,
+      frequencies, the repeaters whose pass ranges cover it, and whether it is
+      only proposed. Search by name, number or ALERT address, filter by
+      catchment, basin, council area, hub, network, role or kind, or find the
+      stations near a point.
+    </dd>
+
+    <dt>A station dossier</dt>
+    <dd>
+      Everything about one station in a single answer, each section labelled
+      with where it came from and whether it is recorded: identity, location,
+      networks and radio, telemetry and health, the Service Level Specification
+      entries, the Bureau's listings, flood classes and crossings, gauge zero,
+      AEP levels, inspection numbers and the stations nearby, with a plain-words
+      summary on top. It is shaped for drafting assessment reports.
+    </dd>
+
+    <dt>Flood levels</dt>
+    <dd>
+      The Bureau's flood classes by edition, the SLS classes, road crossings,
+      the gauge zero in force and its datum, flood effects, modelled AEP levels,
+      and one ladder of all of them in metres AHD where the datum allows it.
+    </dd>
+
+    <dt>Service Level Specifications</dt>
+    <dd>
+      The station's entries in the Bureau's SLS documents for Queensland and for
+      New South Wales and the ACT: gauge type, data type, priority, owner,
+      schedules, flood classes and prediction — one entry per document, so a
+      border station shows both.
+    </dd>
+
+    <dt>Readings</dt>
+    <dd>
+      Telemetry ingested into Flood-Net — raw for the last 90 days, hourly and
+      daily rollups indefinitely — for one station, or the newest reading on
+      every channel of every reporting station in one call.
+    </dd>
+
+    <dt>Station health</dt>
+    <dd>
+      The stations that have gone silent now, worst first, with when each was
+      last heard and what to check, and the groups that went quiet together
+      (around one place, or behind one repeater) — from the server's own health
+      run every fifteen minutes.
+    </dd>
+
+    <dt>Catchments and networks</dt>
+    <dd>
+      The 77 Queensland drainage basins and their stations; the radio networks,
+      the Bureau's maintenance hubs and the Radio Mobile system presets.
+    </dd>
+
+    <dt>Maps</dt>
+    <dd>
+      Station searches, nearby stations, the latest readings and the silent
+      stations all answer as GeoJSON with <code>format=geojson</code>, ready
+      to drop onto a map.
+    </dd>
+  </dl>
+
+  <h2 id="possible">What you can do with it</h2>
+  <p>Some things people and their assistants use it for:</p>
+  <ul>
+    <li>
+      <strong>Draft an assessment report</strong> for a station — ask for its
+      dossier and an assistant has the facts and their sources in one call.
+    </li>
+    <li>
+      <strong>Answer questions about the network</strong> in plain words:
+      <em>“Which river gauges are within 20 km of Ingham?”</em>,
+      <em>“What are the flood classes at Abergowrie Bridge, and is the gauge
+      zero in AHD?”</em>, <em>“Which stations in the Burdekin are listed as
+      Manual in the SLS?”</em>
+    </li>
+    <li>
+      <strong>See what is happening now</strong> — every reporting gauge's
+      latest reading, or what has gone quiet and which repeater the silent
+      stations share.
+    </li>
+    <li>
+      <strong>Plan a trip</strong> — the stations near a point or on a hub,
+      nearest first, with distance and bearing.
+    </li>
+    <li>
+      <strong>Make a map</strong> — any station list as GeoJSON for QGIS, a web
+      map or a notebook.
+    </li>
+    <li>
+      <strong>Build on it</strong> — a script, a spreadsheet, a dashboard or a
+      custom GPT; the OpenAPI document describes every operation.
+    </li>
+  </ul>
+
+  <h2 id="endpoints">The endpoints</h2>
+  <p>
+    All <code>GET</code>, all JSON, CORS open. Each MCP tool is a thin adapter
+    over one REST endpoint — same data, same limits. The example links open the
+    live answer.
+  </p>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>REST endpoint</th><th>MCP tool</th><th>What it answers</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>GET /api/v1/</code></td>
+          <td>—</td>
+          <td>The index: version, endpoints, limits and links. <a href="/api/v1/">Example</a></td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/openapi.json</code></td>
+          <td>—</td>
+          <td>The whole API as an OpenAPI 3.1 document. <a href="/api/v1/openapi.json">Example</a></td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/stations</code></td>
+          <td><code>search_stations</code></td>
+          <td>
+            Search and filter stations: <code>q</code> (name, Bureau or AWRC
+            number, ALERT address), <code>catchment</code>, <code>basin</code>,
+            <code>lga</code>, <code>hub</code>, <code>network</code>,
+            <code>role</code>, <code>type</code>, <code>manual</code>,
+            <code>format</code>, <code>limit</code>, <code>offset</code>.
+            <a href="/api/v1/stations?q=abergowrie">Example</a>
+          </td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/stations?near=lat,lon</code></td>
+          <td><code>stations_near</code></td>
+          <td>
+            Stations within <code>radius_km</code> of a point (up to 250 km),
+            nearest first, with distance and bearing.
+            <a href="/api/v1/stations?near=-18.51,146.0&amp;radius_km=10&amp;type=river">Example</a>
+          </td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/stations/{id}</code></td>
+          <td><code>get_station</code></td>
+          <td>One station's full register record, its SLS rows and health. <a href="/api/v1/stations/abergowrie_br_al">Example</a></td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/stations/{id}/dossier</code></td>
+          <td><code>get_station_dossier</code></td>
+          <td>Everything about one station, each section labelled with its source. <a href="/api/v1/stations/abergowrie_br_al/dossier">Example</a></td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/stations/{id}/readings</code></td>
+          <td><code>get_readings</code></td>
+          <td>
+            Ingested telemetry: <code>resolution</code> (<code>raw</code>,
+            <code>hourly</code>, <code>daily</code>), <code>from</code>,
+            <code>to</code>, <code>channel</code>, <code>limit</code>,
+            <code>offset</code>.
+            <a href="/api/v1/stations/abergowrie_br_al/readings?resolution=daily">Example</a>
+          </td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/readings/latest</code></td>
+          <td><code>get_latest_readings</code></td>
+          <td>
+            Every reporting station's newest reading on each channel, by
+            <code>network</code>, <code>basin</code>, <code>type</code> or
+            <code>bbox</code>. <a href="/api/v1/readings/latest">Example</a>
+          </td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/health/silent</code></td>
+          <td><code>get_silent_stations</code></td>
+          <td>
+            The stations silent now and the groups that went quiet together;
+            filter as above, or by <code>severity</code>.
+            <a href="/api/v1/health/silent">Example</a>
+          </td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/stations/{id}/flood-levels</code></td>
+          <td><code>get_flood_levels</code></td>
+          <td>Flood and SLS classes, crossings, gauge zero, flood effects, AEP levels and one AHD ladder. <a href="/api/v1/stations/abergowrie_br_al/flood-levels">Example</a></td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/stations/{id}/service-level</code></td>
+          <td><code>get_service_level</code></td>
+          <td>The station's Service Level Specification entries. <a href="/api/v1/stations/abergowrie_br_al/service-level">Example</a></td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/catchments</code></td>
+          <td><code>list_catchments</code></td>
+          <td>The 77 Queensland drainage basins. <a href="/api/v1/catchments">Example</a></td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/catchments/{id}</code></td>
+          <td><code>get_catchment</code></td>
+          <td>One basin and a page of its stations. <a href="/api/v1/catchments/herbert">Example</a></td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/networks</code></td>
+          <td><code>list_networks</code></td>
+          <td>Radio networks, maintenance hubs and Radio Mobile systems — the ids <code>network=</code> and <code>hub=</code> take. <a href="/api/v1/networks">Example</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="connect">Connecting an AI assistant</h2>
+  <p>
+    The MCP server lets an assistant call the tools above itself. It needs no
+    authentication. Give it a name for your client — the
+    <code>X-FloodNet-Client</code> header, or <code>?client=your-name</code>
+    on the URL where headers cannot be set — so your share of the rate limit
+    is your own rather than everyone's on your network.
+  </p>
+
+  <h3>Claude Code</h3>
+  <pre><code>claude mcp add --transport http floodnet https://floodwarning.net/api/mcp \
+  --header "X-FloodNet-Client: your-name"</code></pre>
+
+  <h3>Claude Desktop and claude.ai</h3>
+  <p>
+    Settings → <strong>Connectors</strong> → <strong>Add custom connector</strong>,
+    name it <code>Flood-Net</code>, URL
+    <code>https://floodwarning.net/api/mcp?client=your-name</code>.
+  </p>
+
+  <h3>Cursor, VS Code (Copilot), Gemini CLI and Codex</h3>
+  <p>
+    Add a Streamable HTTP server with the URL
+    <code>https://floodwarning.net/api/mcp</code> and the header above — for
+    example, in Cursor's <code>.cursor/mcp.json</code>:
+  </p>
+  <pre><code>{
+  "mcpServers": {
+    "floodnet": {
+      "url": "https://floodwarning.net/api/mcp",
+      "headers": { "X-FloodNet-Client": "your-name" }
+    }
+  }
+}</code></pre>
+  <p>
+    Each tool's file and key differ slightly (VS Code's top-level key is
+    <code>servers</code>; Gemini CLI's is <code>httpUrl</code>); the
+    <a href="https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md#connecting-an-agent-mcp">full reference</a>
+    has each one.
+  </p>
+
+  <h3>ChatGPT and other function-calling agents</h3>
+  <p>
+    For a custom GPT: <strong>Configure</strong> → <strong>Create new
+    action</strong> → <strong>Import from URL</strong> →
+    <code>https://floodwarning.net/api/v1/openapi.json</code>, authentication
+    <strong>None</strong>. The same document serves Gemini function calling and
+    the OpenAPI toolkits of LangChain, LlamaIndex and the like.
+  </p>
+
+  <h2 id="http">From a script</h2>
+  <p>Any HTTP client will do:</p>
+  <pre><code>curl -s -H 'X-FloodNet-Client: your-name' \
+  'https://floodwarning.net/api/v1/stations?q=abergowrie' | jq '.stations[].id'
+
+curl -s -H 'X-FloodNet-Client: your-name' \
+  'https://floodwarning.net/api/v1/stations/abergowrie_br_al/flood-levels' | jq '.ladder_m_ahd'</code></pre>
+  <p>
+    Lists come a page at a time (25 rows by default, at most 100) with a
+    <code>next</code> link while there are more. Successful answers are cached
+    for 60 seconds and carry an <code>ETag</code>. Errors are always
+    <code>{ "error": "…", "detail": "…" }</code>, and <code>detail</code> says
+    what to change; an unknown parameter is refused with the list of the ones
+    that are accepted, rather than silently ignored.
+  </p>
+
+  <h2 id="limits">Limits and fair use</h2>
+  <p>
+    The app reads the same database, so the API is throttled to keep one
+    runaway agent from slowing it down for everyone:
+  </p>
+  <ul>
+    <li><strong>60 requests / 60 s</strong> per client (your address plus your client name);</li>
+    <li><strong>20 requests / 10 s</strong> per client, as a burst;</li>
+    <li><strong>240 requests / 60 s</strong> per address, whatever names it uses.</li>
+  </ul>
+  <p>
+    Past a limit the answer is <code>429</code> with a
+    <code>Retry-After</code> header; wait that long and carry on. Other caps:
+    100 rows per page, a 250 km search radius, 5,000 readings per call, and
+    reading windows of 7 days raw, 31 days hourly and 731 days daily.
+  </p>
+  <p>
+    Cache what you fetch, ask about the stations you need rather than walking
+    the whole network, and name your client.
+  </p>
+
+  <h2 id="not">What it does not do</h2>
+  <ul>
+    <li>
+      <strong>It is read-only.</strong> There is no way to change anything
+      through it — every request upstream is a read with the public key, the
+      same as a visitor to the app who has not signed in.
+    </li>
+    <li>
+      <strong>It serves public data only.</strong> Not inspection remarks or who
+      inspected a site (only the numbers a visit recorded), site access codes,
+      field photos, raw ingest payloads, or anything about users and editors.
+    </li>
+    <li>
+      <strong>It is not a bulk export.</strong> It answers a station, or a page
+      of stations, at a time. Taking the whole network away as a file is the
+      app's Export tab, for signed-in users.
+    </li>
+    <li>
+      <strong>It is not a warning service.</strong> See the note below.
+    </li>
+  </ul>
+  <div class="note">
+    <p>
+      <strong>Flood-Net is not a flood warning service, and it does not issue
+      warnings, forecasts or public alerts.</strong> Nothing the API returns
+      should be read as an official statement about flooding, river conditions
+      or public safety. For official Australian flood warnings and river height
+      data, go to
+      <a href="http://www.bom.gov.au/australia/flood/">the Bureau of
+      Meteorology</a>.
+    </p>
+  </div>
+
+  <h2 id="caveats">Reading the data correctly</h2>
+  <ul>
+    <li>
+      <strong>Gauge heights are not AHD.</strong> Flood classes, crossings and
+      flood effects are metres on the station's gauge; AEP levels are modelled
+      metres AHD. They are joined only through a gauge zero surveyed in AHD,
+      and the API says so rather than convert when there is none.
+    </li>
+    <li>
+      <strong>AEP levels are indicative</strong> — modelled, not observed, with
+      the source sheet's confidence score.
+    </li>
+    <li>
+      <strong>Readings are Flood-Net's own ingest.</strong> Most stations report
+      through the Bureau's systems instead, so a station missing from the
+      readings or the silent list says nothing about whether it works.
+    </li>
+    <li>
+      <strong>“Not recorded” is not zero</strong>, and “unavailable” means a
+      read failed — ask again.
+    </li>
+    <li>
+      <strong>Coordinates:</strong> <code>lat</code>, <code>lon</code>
+      everywhere (including <code>near=lat,lon</code>), except GeoJSON and
+      <code>bbox</code>, which put longitude first.
+    </li>
+  </ul>
+  <p>
+    The <a href="https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md#data-provenance-and-caveats">full reference</a>
+    goes through each of these, with example answers for every endpoint.
+  </p>
+
+  <footer>
+    <p>
+      <a href="/">Open the application</a> &middot;
+      <a href="/about">About Flood-Net</a> &middot;
+      <a href="https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md">Full API reference</a> &middot;
+      <a href="/api/v1/openapi.json">OpenAPI</a> &middot;
+      <a href="https://github.com/cdomotor-g/MegaNet/issues">Report a problem</a> &middot;
+      <a href="/terms">Terms of use</a>
+    </p>
+    <p>An independent open-source project. Not an official warning service.</p>
+  </footer>
+
+</main>
+</body>
+</html>

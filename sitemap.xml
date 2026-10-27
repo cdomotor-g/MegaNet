@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  The application and the three pages beside it, which is genuinely all there
+  The application and the four pages beside it, which is genuinely all there
   is: Flood-Net is a single-page application, so every tab beyond the first is a
   state of "/" rather than a URL a crawler could fetch. Listing them would be
   listing the same document under twenty names. See docs/floodwarning-net.md.
@@ -17,6 +17,12 @@
     <lastmod>2026-09-10</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://floodwarning.net/api</loc>
+    <lastmod>2026-10-27</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
   </url>
   <url>
     <loc>https://floodwarning.net/privacy</loc>

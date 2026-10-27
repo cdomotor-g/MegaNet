@@ -495,7 +495,7 @@ const Admin = (function () {
           ${link(docUrl('docs/access.md'), 'Access & sign-in')}
           ${link(docUrl('db/README.md'), 'Database schema & migrations')}
           ${link(docUrl('docs/field-photos.md#administrators'), 'Administrators')}
-          ${link(docUrl('docs/agent-api.md'), 'Agent API & MCP')}
+          ${link(docUrl('api.html'), 'Agent API & MCP')}
         </div>
       </div>`;
   }

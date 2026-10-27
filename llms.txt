@@ -14,6 +14,7 @@ No sign-in or key. Rate limits: 60 requests / 60 s per client, 20 requests / 10 
 
 ## Docs
 
+- [Station API page](https://floodwarning.net/api): what the API and MCP server serve, what they can be used for, how to connect each agent, and the limits — a summary of docs/agent-api.md for people
 - [docs/agent-api.md](https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md): the agent API — setup for Claude, Cursor, VS Code, Gemini CLI, Codex and ChatGPT; every endpoint; limits; data provenance and caveats
 - [AGENTS.md](https://github.com/cdomotor-g/MegaNet/blob/main/AGENTS.md): instructions for agents reading the data or working in the repository
 

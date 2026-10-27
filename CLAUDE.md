@@ -35,8 +35,8 @@
 
 ## Version stamp — bump it with every app change
 - Every script, stylesheet and icon the pages load carries one stamp, `?v=<date><letter>` (e.g. `?v=20261022g`), and the service worker (`sw.js`) serves a stamped file from the copy it kept. A change pushed under an unchanged stamp never reaches anyone who has opened Flood-Net before, however often they refresh.
-- So every push that changes a root `*.js` (`sw.js` and `whats-new.js` included), `styles.css`, `index.html` or a stamped file under `assets/` also bumps the stamp: today's date plus `a`, or the next letter if the stamp already has today's date (`20261022g` → `20261022h`; the next day, `20261023a`). Replace every occurrence at once in `index.html`, `about.html`, `privacy.html` and `terms.html`:
-  `sed -i 's/v=20261022g/v=20261022h/g' index.html about.html privacy.html terms.html`
+- So every push that changes a root `*.js` (`sw.js` and `whats-new.js` included), `styles.css`, `index.html` or a stamped file under `assets/` also bumps the stamp: today's date plus `a`, or the next letter if the stamp already has today's date (`20261022g` → `20261022h`; the next day, `20261023a`). Replace every occurrence at once in `index.html`, `about.html`, `api.html`, `privacy.html` and `terms.html`:
+  `sed -i 's/v=20261022g/v=20261022h/g' index.html about.html api.html privacy.html terms.html`
 - Bump it last, after `git pull --rebase origin main`, from the stamp `main` has now, because another thread may have moved it since you started. If a rejected push makes you rebase again and the stamp in the new `main` is not the one you bumped from, bump again from the new one. To check, run `grep -o 'v=20[0-9]*[a-z]*' index.html | sort | uniq -c`. It should show a single stamp, the one you set.
 
 ## Naming — the app is Flood-Net
@@ -85,7 +85,7 @@
 ## Agent API and MCP server (`worker/api.js`)
 - `https://floodwarning.net/api/v1` (REST; OpenAPI at `/api/v1/openapi.json`) and `https://floodwarning.net/api/mcp` (MCP, Streamable HTTP) serve public station data, read-only, to AI agents and scripts. The user doc is `docs/agent-api.md`. From Claude Code: `claude mcp add --transport http floodnet https://floodwarning.net/api/mcp`.
 - Keep it read-only by construction. Upstream requests are GETs to PostgREST with the publishable key, only for relations in `READABLE_RELATIONS`, and nothing from the caller's request is forwarded. Add a relation only if a migration grants it to `anon` and `db/README.md` lists it as public. No RPCs.
-- The limits are `RATE_LIMITS` / `LIMITS` in `worker/api.js` and `[[ratelimits]]` in `wrangler.toml` (period 10 or 60; wrangler ≥ 4.36). They are quoted in `docs/agent-api.md`, `AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `llms.txt` and `.cursor/rules/floodnet-api.mdc`, because each agent reads only its own file — change them together.
+- The limits are `RATE_LIMITS` / `LIMITS` in `worker/api.js` and `[[ratelimits]]` in `wrangler.toml` (period 10 or 60; wrangler ≥ 4.36). They are quoted in `docs/agent-api.md`, `api.html` (the human page at `/api`), `AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `llms.txt` and `.cursor/rules/floodnet-api.mdc`, because each agent reads only its own file — change them together.
 - Every MCP tool is an adapter over a `/api/v1` route: add the route and the tool together, and document both in `docs/agent-api.md` and `AGENTS.md`.
 - A `wrangler.toml` that does not validate breaks every deploy: `npx wrangler deploy --dry-run --outdir /tmp/wr` before pushing a change to it.
 - Checks: `cd test && npm run agentapi && npm run agentdocs` (Node only; add `npm run gate && npm run dbproxy` when `worker/index.js` changes).

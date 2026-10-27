@@ -118,9 +118,9 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   never reaches a browser that has opened the app before. Every push that
   changes a root `*.js`, `styles.css`, `index.html` or a stamped `assets/` file
   bumps it: today's date plus `a`, or the next letter if the stamp already has
-  today's date. Replace it in `index.html`, `about.html`, `privacy.html` and
+  today's date. Replace it in `index.html`, `about.html`, `api.html`, `privacy.html` and
   `terms.html` at once
-  (`sed -i 's/v=20261022g/v=20261022h/g' index.html about.html privacy.html terms.html`),
+  (`sed -i 's/v=20261022g/v=20261022h/g' index.html about.html api.html privacy.html terms.html`),
   last, after `git pull --rebase origin main`, from the stamp `main` has then;
   bump again if a later rebase brings in a different one.
 - **Naming:** the app is **Flood-Net** in anything a person reads (labels,

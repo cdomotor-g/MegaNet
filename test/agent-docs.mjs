@@ -109,6 +109,35 @@ check(`${DOC} states the latest readings' page, as the code sets it`,
 check(`${DOC} names the MCP protocol versions the server speaks`, api.MCP_VERSIONS.filter(v => v !== '2024-11-05').every(v => doc.includes(v)));
 check(`${DOC} carries the About page's disclaimer`, doc.includes('Flood-Net is not a flood warning service'));
 
+// ── The page at /api says the same ───────────────────────────────────────────
+// api.html is the human summary of docs/agent-api.md, and drifts the same way:
+// a limit, an endpoint or a tool the code has and the page does not. Comments
+// out, so a URL only in a comment does not count.
+
+const PAGE = 'api.html';
+const page = (read(PAGE) || '').replace(/<!--[\s\S]*?-->/g, '');
+check(`${PAGE} exists`, page.length > 0);
+check(`${PAGE} names the API base URL`, page.includes(api.API_BASE_URL), api.API_BASE_URL);
+check(`${PAGE} names the MCP URL`, page.includes(api.MCP_URL), api.MCP_URL);
+const pageMissing = RATE_PHRASES.filter(p => !page.includes(p));
+check(`${PAGE} states every rate limit as the code sets it`, pageMissing.length === 0, pageMissing.join('; '));
+const pageStale = [...page.matchAll(/(\d[\d,]*) requests \/ (\d+) s/g)].map(m => m[0]).filter(p => !RATE_PHRASES.includes(p));
+check(`${PAGE} quotes no other rate limit`, pageStale.length === 0, pageStale.join('; '));
+check(`${PAGE} names the client header`, page.includes(api.CLIENT_HEADER), api.CLIENT_HEADER);
+check(`${PAGE} points to ${DOC}`, page.includes(DOC));
+check(`${PAGE} says it is read-only`, /read-only/i.test(page));
+check(`${PAGE} carries the About page's disclaimer`, page.includes('Flood-Net is not a flood warning service'));
+const pagePaths = Object.keys(openapi.paths).filter(p => !page.includes(`GET ${p}<`));
+check(`${PAGE} lists every endpoint`, pagePaths.length === 0, pagePaths.join(', '));
+const pageTools = api.MCP_TOOLS.filter(t => !page.includes(`<code>${t.name}</code>`)).map(t => t.name);
+check(`${PAGE} lists every MCP tool`, pageTools.length === 0, pageTools.join(', '));
+check(`${PAGE} states the reading windows the code enforces`,
+  page.includes(`${api.LIMITS.windowMaxDays.raw} days raw`) && page.includes(`${api.LIMITS.windowMaxDays.hourly} days hourly`)
+  && page.includes(`${api.LIMITS.windowMaxDays.daily} days daily`));
+check(`${PAGE} states the page and row caps the code enforces`,
+  page.includes(`${api.LIMITS.listMax} rows per page`) && page.includes(`${api.LIMITS.readingsMax.toLocaleString('en-AU')} readings per call`)
+  && page.includes(`${api.LIMITS.radiusMaxKm} km search radius`));
+
 // ── wrangler.toml declares the bindings the code reads ───────────────────────
 
 const toml = read('wrangler.toml') || '';
@@ -173,4 +202,4 @@ if (bad.length) {
   console.log('  limit the code no longer has sends every agent that reads it the wrong way.\n');
   process.exit(1);
 }
-console.log(`PASS — ${results.length} checks: the docs, the five agent files and wrangler.toml all say what worker/api.js does.`);
+console.log(`PASS — ${results.length} checks: the docs, the /api page, the five agent files and wrangler.toml all say what worker/api.js does.`);

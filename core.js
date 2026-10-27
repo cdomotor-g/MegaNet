@@ -2387,7 +2387,7 @@ const HELP = {
     links: [{ label: 'Why the station list lives in Postgres, and what that bought',
               href: 'docs/datastore-decision.md' },
             { label: 'Station data for AI agents and scripts — the read-only API and MCP server',
-              href: 'docs/agent-api.md' }],
+              href: 'api.html' }],
     related: ['stations', 'passranges', 'admin'],
   },
   admin: {
