@@ -4975,11 +4975,13 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   max-height: min(11rem, 18vh);
 }
 
-/* The legend reads as a list in a column this narrow, not as a wrapped row. */
+/* The legend reads as a list in a column this narrow, not as a wrapped row —
+   of section headings and cards since they were added, so the gap is the
+   space between two cards (the rows inside one keep --sp-1, .legend-card). */
 .mn-mapctl .map-legend {
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--sp-1);
+  gap: var(--sp-2);
 }
 
 /* Below `md` the map itself shrinks to 52dvh (see the breakpoint block at the
@@ -8656,6 +8658,22 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   margin-top: var(--sp-5);
 }
 
+/* The cards' surface, shared by Layers and the Legend. The tint is the text
+   colour laid thin over the panel — opaque, and mixed with --panel because the
+   panel body is --panel in every theme and look — so it reads as a raised
+   surface on light, dark and sunlight alike. The shade under each card is the
+   theme's: a dark panel needs a deeper one to show at all. */
+.mn-mapctl {
+  --mapd-card-bg: color-mix(in srgb, var(--text) 5%, var(--panel));
+  --mapd-shade: rgba(8, 15, 24, .16);
+  --mapd-hi: rgba(255, 255, 255, .8);
+}
+
+[data-theme="dark"] .mn-mapctl {
+  --mapd-shade: rgba(0, 0, 0, .45);
+  --mapd-hi: rgba(255, 255, 255, .05);
+}
+
 /* One card per control (app.js, markMapDisplayCards): a switch and its
    sliders, selects, sub-switch, key and note share one tinted, bordered box,
    with a gap between one card and the next. The rows are siblings in a flat
@@ -8664,15 +8682,16 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
    become padding, because a margin is a gap the card's colour does not cover
    (a sub-switch's indent included, or the card has a notch at its edge).
    Border-box, so a row that asks for the full width — the rain key — asks for
-   the card's and not the card's plus its padding.
-   The tint is the text colour laid thin over whatever the panel is, so it
-   reads as a raised surface in every theme and every look. Scoped to direct
-   children: the radio labels inside the link colour group and the switch
-   inside a base-map row are rows of their card, not cards. */
-#map-display-block {
-  --mapd-card-bg: color-mix(in srgb, var(--text) 5%, transparent);
-}
+   the card's and not the card's plus its padding. Scoped to direct children:
+   the radio labels inside the link colour group and the switch inside a
+   base-map row are rows of their card, not cards.
 
+   The shade is drawn on every row too, and comes out as one shadow under the
+   whole card because of how it is cut: dropped as far as it is blurred, so no
+   row's shadow reaches above its own top edge, and every row's background is
+   opaque and painted after the row above it, so the part of a row's shadow
+   that falls under the next row is covered by it. What is left is the
+   shadow down both sides and under the last row. */
 #map-display-block > .mapd-card {
   box-sizing: border-box;
   margin: 0;
@@ -8680,6 +8699,7 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   background: var(--mapd-card-bg);
   border-left: 1px solid var(--border);
   border-right: 1px solid var(--border);
+  box-shadow: 0 3px 3px var(--mapd-shade);
 }
 
 #map-display-block > .mapd-card-top {
@@ -8688,6 +8708,7 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   border-top: 1px solid var(--border);
   border-top-left-radius: var(--r-md);
   border-top-right-radius: var(--r-md);
+  box-shadow: 0 3px 3px var(--mapd-shade), inset 0 1px 0 var(--mapd-hi);
 }
 
 #map-display-block > .mapd-card-end {
@@ -8695,6 +8716,18 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   border-bottom: 1px solid var(--border);
   border-bottom-left-radius: var(--r-md);
   border-bottom-right-radius: var(--r-md);
+}
+
+/* A slider that has nothing to act on dims (.filter-range.is-off). Its own
+   opacity would dim its stretch of the card with it — and, as a layer of its
+   own, paint its shade over the row beneath — so in a card it is the slider
+   and its label that dim, not the row. */
+#map-display-block > .mapd-card.is-off {
+  opacity: 1;
+}
+
+#map-display-block > .mapd-card.is-off > * {
+  opacity: .5;
 }
 
 /* The switch that names a card is its title; a sub-switch, a slider's label
@@ -8726,14 +8759,50 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 #map-display-block + .filter-block > #acma-filter-block {
   margin-top: var(--sp-2);
   padding: .45rem .65rem .5rem;
-  background: var(--mapd-card-bg, color-mix(in srgb, var(--text) 5%, transparent));
+  background: var(--mapd-card-bg);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
+  box-shadow: 0 3px 3px var(--mapd-shade), inset 0 1px 0 var(--mapd-hi);
 }
 
 #map-display-block + .filter-block > #acma-filter-block > .filter-check {
   margin-top: 0;
   font-weight: 600;
+}
+
+/* The legend (app.js, mapLegendHtml) in the same dress: a band per section
+   and a card per key, each card a real box here rather than rows drawn as
+   one. The column's gap (above) is the space between cards; a heading takes
+   more above it, and none above the first. */
+.map-legend > .map-display-h,
+.map-legend > .legend-card {
+  align-self: stretch;
+}
+
+.map-legend > .map-display-h {
+  margin: var(--sp-4) 0 0;
+}
+
+.map-legend > .map-display-h:first-child {
+  margin-top: 0;
+}
+
+.legend-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  padding: .45rem .65rem .5rem;
+  background: var(--mapd-card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: 0 3px 3px var(--mapd-shade), inset 0 1px 0 var(--mapd-hi);
+}
+
+/* The line naming the layers that are off is a pointer, not a key: no card,
+   and clear of the last one. */
+.map-legend > .legend-off {
+  margin-top: var(--sp-3);
 }
 
 /* The fade-margin thresholds and the Save button. Two short number boxes side

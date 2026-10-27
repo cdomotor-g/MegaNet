@@ -5821,6 +5821,21 @@ function mapWindLegendHtml() {
     </div>`;
 }
 
+// The legend in the same dress as Layers: a band per section — the pins, the
+// links, the overlays, the ACMA licences — and a card per key under it, so a
+// swatch can only be read against the rows in its own box. Under one flat
+// column the rain's twelve steps ran straight on into the camera pins and the
+// wind regions, and nothing said where one key stopped. A section with nothing
+// on is left out, heading and all: the legend lists what is ON.
+function mapLegendCard(html) {
+  return String(html || '').trim() ? `<div class="legend-card">${html}</div>` : '';
+}
+
+function mapLegendSection(title, cards) {
+  const body = cards.join('');
+  return body ? `<div class="map-display-h">${title}</div>${body}` : '';
+}
+
 function mapLegendHtml() {
   // With Colour pins by health on (#218) the fills are health, not role, so
   // the role rows give way to its key — and a proposed station, hollow in a
@@ -5831,19 +5846,23 @@ function mapLegendHtml() {
   // its bands in place of the roles. A gauge read by hand or a TM station keeps
   // its grey or black under it, so those rows stay.
   const latency = MapLatency.on();
-  return `
+  const pins = [
+    // What a pin's fill says, and its shape, its grey and its outline
+    // (map-symbols.js), each while its switch is on. Under health the fill is
+    // health's, so the grey row gives way as the role rows do. ⏱️ Latency's
+    // green flash as a message lands, while it is animated — under any
+    // colouring of the pins (map-latency.js).
+    mapLegendCard(`
     ${latency ? MapLatency.legendHtml() : health ? HealthGlance.legendHtml() : Object.entries(ROLE_LABEL).map(([k, v]) => `
       <span class="legend-item">
         <span class="legend-dot" style="--dot:${roleVar(k)}"></span>
         <span class="small">${v}</span>
       </span>`).join('')}
-    <!-- The pin's shape, its grey and its outline (map-symbols.js), each while
-         its switch is on. Under health the fill is health's, so the grey row
-         gives way as the role rows do. -->
     ${MapSymbols.legendHtml({ health })}
-    <!-- ⏱️ Latency's green flash as a message lands, while it is animated —
-         under any colouring of the pins (map-latency.js). -->
-    ${MapLatency.liveLegendHtml()}
+    ${MapLatency.liveLegendHtml()}`),
+    // What the filter did to a pin, and a proposed station (0039): hollow, in
+    // a dashed ring of its role's colour — planned, not built.
+    mapLegendCard(`
     <span class="legend-item">
       <span class="legend-dot legend-dot-hit" style="--dot:${roleVar('field')}"></span>
       <span class="small">Matches filter</span>
@@ -5852,26 +5871,23 @@ function mapLegendHtml() {
       <span class="legend-dot legend-dot-rel" style="--dot:${roleVar('repeater')}"></span>
       <span class="small">Related by pass range</span>
     </span>
-    <!-- A proposed station (0039): hollow, in a dashed ring of its role's
-         colour — planned, not built. -->
     ${health ? '' : `<span class="legend-item">
       <span class="legend-dot legend-dot-proposed" style="--dot:${roleVar('field')}"></span>
       <span class="small">Proposed — not yet established</span>
-    </span>`}
-    <!-- The plain link colour. With a colouring running it is not what a link
-         normally looks like any more — it is what is left for the ones the
-         colouring has no answer for — so the entry says which of the two it is
-         describing rather than letting an orange swatch imply the first. -->
+    </span>`}`),
+  ];
+  const links = [
+    // The plain link colour. With a colouring running it is not what a link
+    // normally looks like any more — it is what is left for the ones the
+    // colouring has no answer for — so the entry says which of the two it is
+    // describing rather than letting an orange swatch imply the first. The
+    // colouring's own key shares its card: they are one answer between them.
+    mapLegendCard(`
     <span class="legend-item">
       <span class="legend-line"></span>
       <span class="small">Pass-range link${state.mapLinkColour === 'plain' ? ''
         : ' — the plain colour, kept by a link the colouring has no figure for'}</span>
     </span>
-    ${state.mapShowBackbone ? `
-    <span class="legend-item">
-      <span class="legend-line legend-line-backbone"></span>
-      <span class="small">Backbone path — black dashes over whatever the link colour is saying</span>
-    </span>` : ''}
     ${MapFreq.active() ? MapFreq.rows().map(r => `
     <span class="legend-item">
       <span class="legend-line" style="border-top-color:${r.colour}"></span>
@@ -5881,90 +5897,6 @@ function mapLegendHtml() {
       <span class="small txt-muted">A link takes the channel of the repeater on its end. One with
         no recorded frequency keeps the plain link colour.</span>
     </span>` : '') : ''}
-    ${MapArrows.active() ? `
-    <span class="legend-item">
-      <span class="legend-arrow" aria-hidden="true">➤</span>
-      <span class="small">${MapArrows.drawing()
-        ? `Arrows run the way the traffic does — into the repeater, and on to the base. A
-           repeater-to-repeater path runs both ways and carries a head at each end; a backbone
-           path's arrows are black, like its dashes`
-        : `Arrows along the links are on, and draw from zoom ${MapArrows.minZoom} in — they grow
-           as you zoom, and are off out here where direction is not the question being asked`}</span>
-    </span>` : ''}
-    ${MapRiverLines.active() ? MapRiverLines.legendHtml() : ''}
-    ${RiverCatchments.active() ? RiverCatchments.legendHtml() : ''}
-    ${MapRain.active() ? MapRain.legendHtml() : ''}
-    ${MapRivers.active() ? `
-    <span class="legend-item">
-      <span class="legend-line legend-line-river"></span>
-      <span class="small">Matching watercourse (OpenStreetMap)</span>
-    </span>` : ''}
-    ${MapSurvey.active() ? [
-      // The survey layer's own pins as their keys, only for the kinds drawn.
-      ['bm',   'Qld benchmark — a survey mark with an AHD height'],
-      ['psm',  'Qld permanent survey mark, no AHD height'],
-      ['cors', 'Qld CORS site'],
-    ].filter(([k]) => MapSurvey.drawnKinds().has(k)).map(([k, label]) => `
-    <span class="legend-item">
-      <span class="mn-survey-pin mn-survey-${k} legend-survey" aria-hidden="true"></span>
-      <span class="small">${label}</span>
-    </span>`).join('') : ''}
-    ${MapElevation.active() ? `
-    <span class="legend-item">
-      <span class="legend-sq" style="--dot:${MapElevation.colourAt(600)}"></span>
-      <span class="small">Elevation shading — ground height in the Radio Mobile colour file's
-        twelve bands, keyed in full in Layers</span>
-    </span>` : ''}
-    ${MapContours.active() ? `
-    <span class="legend-item">
-      <span class="legend-line legend-line-contour"></span>
-      <span class="small">LiDAR contours (Qld Dept of Resources)</span>
-    </span>` : ''}
-    ${ElvisCoverage.active() ? `
-    <span class="legend-item">
-      <span class="legend-sq" style="--dot:#004385"></span>
-      <span class="small">Elevation data coverage — the best DEM resolution Australia holds
-        under each place, keyed in full in Layers. Profiles still read ~30 m terrain
-        everywhere (Elvis — Geoscience Australia / ICSM)</span>
-    </span>` : ''}
-    ${MapMobileCoverage.active() ? MapMobileCoverage.legendHtml() : ''}
-    ${MapPolar.active() ? mapPolarLegendHtml() : ''}
-    ${MapSites.active() ? MapSites.legendHtml() : ''}
-    ${MapRelocate.active() ? MapRelocate.legendHtml() : ''}
-    ${MapPeaks.active() ? `
-    <span class="legend-item">
-      <span class="legend-peak" aria-hidden="true">▲</span>
-      <span class="small">Highest ground in view — ${MapPeaks.peaks().length} summit${
-        MapPeaks.peaks().length === 1 ? '' : 's'}, ranked. Ground height off ~30 m terrain,
-        nothing standing on it</span>
-    </span>` : ''}
-    ${MapLots.active() ? `
-    <span class="legend-item">
-      <span class="legend-line legend-line-lot"></span>
-      <span class="small">Property boundary — lot/plan when zoomed in (Qld cadastre)</span>
-    </span>` : ''}
-    ${MapPhotos.active() ? `
-    <span class="legend-item">
-      <span class="legend-photo" aria-hidden="true">📷</span>
-      <span class="small">Field photos — where each was taken, a cone the way the camera faced.
-        Click one for the photos taken there</span>
-    </span>` : ''}
-    ${MapCameras.active() ? MapCameras.legendHtml() : ''}
-    ${SiteFeatures.active() ? SiteFeatures.legendHtml() : ''}
-    ${MapRoads.active() ? `
-    <span class="legend-item">
-      <span class="legend-sq" style="--dot:${MapRoads.legendColour()}"></span>
-      <span class="small">Road parcel — the road reserve, not the road (Qld cadastre). Hover for its name</span>
-    </span>` : ''}
-    ${MapRoadOwners.active() ? MapRoadOwners.legendHtml() : ''}
-    ${MapCatchments.active() ? mapCatchmentLegendHtml() : ''}
-    ${MapHubs.active() ? mapHubLegendHtml() : ''}
-    ${state.mapWind ? mapWindLegendHtml() : ''}
-    ${state.mapLos ? `
-    <span class="legend-item">
-      <span class="legend-line legend-line-los"></span>
-      <span class="small">Line of sight: an obstructed link draws red</span>
-    </span>` : ''}
     ${state.mapFade ? `
     <span class="legend-item">
       <span class="legend-line legend-line-fade-good"></span>
@@ -5977,13 +5909,110 @@ function mapLegendHtml() {
     <span class="legend-item">
       <span class="legend-line legend-line-fade-bad"></span>
       <span class="small">Under ${state.mapFadeOkDb} dB. A link with no figure yet keeps the plain link colour.</span>
-    </span>` : ''}
-    ${state.filters.acma.show ? Object.entries(ACMA_MECH).map(([k, m]) => `
+    </span>` : ''}`),
+    state.mapShowBackbone ? mapLegendCard(`
+    <span class="legend-item">
+      <span class="legend-line legend-line-backbone"></span>
+      <span class="small">Backbone path — black dashes over whatever the link colour is saying</span>
+    </span>`) : '',
+    MapArrows.active() ? mapLegendCard(`
+    <span class="legend-item">
+      <span class="legend-arrow" aria-hidden="true">➤</span>
+      <span class="small">${MapArrows.drawing()
+        ? `Arrows run the way the traffic does — into the repeater, and on to the base. A
+           repeater-to-repeater path runs both ways and carries a head at each end; a backbone
+           path's arrows are black, like its dashes`
+        : `Arrows along the links are on, and draw from zoom ${MapArrows.minZoom} in — they grow
+           as you zoom, and are off out here where direction is not the question being asked`}</span>
+    </span>`) : '',
+    state.mapLos ? mapLegendCard(`
+    <span class="legend-item">
+      <span class="legend-line legend-line-los"></span>
+      <span class="small">Line of sight: an obstructed link draws red</span>
+    </span>`) : '',
+  ];
+  const overlays = [
+    MapRiverLines.active() ? MapRiverLines.legendHtml() : '',
+    RiverCatchments.active() ? RiverCatchments.legendHtml() : '',
+    MapRain.active() ? MapRain.legendHtml() : '',
+    MapRivers.active() ? `
+    <span class="legend-item">
+      <span class="legend-line legend-line-river"></span>
+      <span class="small">Matching watercourse (OpenStreetMap)</span>
+    </span>` : '',
+    MapSurvey.active() ? [
+      // The survey layer's own pins as their keys, only for the kinds drawn.
+      ['bm',   'Qld benchmark — a survey mark with an AHD height'],
+      ['psm',  'Qld permanent survey mark, no AHD height'],
+      ['cors', 'Qld CORS site'],
+    ].filter(([k]) => MapSurvey.drawnKinds().has(k)).map(([k, label]) => `
+    <span class="legend-item">
+      <span class="mn-survey-pin mn-survey-${k} legend-survey" aria-hidden="true"></span>
+      <span class="small">${label}</span>
+    </span>`).join('') : '',
+    MapElevation.active() ? `
+    <span class="legend-item">
+      <span class="legend-sq" style="--dot:${MapElevation.colourAt(600)}"></span>
+      <span class="small">Elevation shading — ground height in the Radio Mobile colour file's
+        twelve bands, keyed in full in Layers</span>
+    </span>` : '',
+    MapContours.active() ? `
+    <span class="legend-item">
+      <span class="legend-line legend-line-contour"></span>
+      <span class="small">LiDAR contours (Qld Dept of Resources)</span>
+    </span>` : '',
+    ElvisCoverage.active() ? `
+    <span class="legend-item">
+      <span class="legend-sq" style="--dot:#004385"></span>
+      <span class="small">Elevation data coverage — the best DEM resolution Australia holds
+        under each place, keyed in full in Layers. Profiles still read ~30 m terrain
+        everywhere (Elvis — Geoscience Australia / ICSM)</span>
+    </span>` : '',
+    MapMobileCoverage.active() ? MapMobileCoverage.legendHtml() : '',
+    MapPolar.active() ? mapPolarLegendHtml() : '',
+    MapSites.active() ? MapSites.legendHtml() : '',
+    MapRelocate.active() ? MapRelocate.legendHtml() : '',
+    MapPeaks.active() ? `
+    <span class="legend-item">
+      <span class="legend-peak" aria-hidden="true">▲</span>
+      <span class="small">Highest ground in view — ${MapPeaks.peaks().length} summit${
+        MapPeaks.peaks().length === 1 ? '' : 's'}, ranked. Ground height off ~30 m terrain,
+        nothing standing on it</span>
+    </span>` : '',
+    MapLots.active() ? `
+    <span class="legend-item">
+      <span class="legend-line legend-line-lot"></span>
+      <span class="small">Property boundary — lot/plan when zoomed in (Qld cadastre)</span>
+    </span>` : '',
+    MapPhotos.active() ? `
+    <span class="legend-item">
+      <span class="legend-photo" aria-hidden="true">📷</span>
+      <span class="small">Field photos — where each was taken, a cone the way the camera faced.
+        Click one for the photos taken there</span>
+    </span>` : '',
+    MapCameras.active() ? MapCameras.legendHtml() : '',
+    SiteFeatures.active() ? SiteFeatures.legendHtml() : '',
+    MapRoads.active() ? `
+    <span class="legend-item">
+      <span class="legend-sq" style="--dot:${MapRoads.legendColour()}"></span>
+      <span class="small">Road parcel — the road reserve, not the road (Qld cadastre). Hover for its name</span>
+    </span>` : '',
+    MapRoadOwners.active() ? MapRoadOwners.legendHtml() : '',
+    MapCatchments.active() ? mapCatchmentLegendHtml() : '',
+    MapHubs.active() ? mapHubLegendHtml() : '',
+    state.mapWind ? mapWindLegendHtml() : '',
+  ].map(mapLegendCard);
+  const acma = state.filters.acma.show ? [mapLegendCard(Object.entries(ACMA_MECH).map(([k, m]) => `
       <span class="legend-item">
         <span class="legend-sq" style="--dot:${acmaMechVar(k)}"></span>
         <span class="small">${m.label}</span>
       </span>`).join('') + `
-    <span class="legend-item"><span class="small">ACMA RRL data (CC BY 4.0)${state.acma.threats ? ' · ' + esc(state.acma.threats.meta.source_date) : ''}</span></span>` : ''}
+    <span class="legend-item"><span class="small">ACMA RRL data (CC BY 4.0)${state.acma.threats ? ' · ' + esc(state.acma.threats.meta.source_date) : ''}</span></span>`)] : [];
+  return `
+    ${mapLegendSection('Station pins', pins)}
+    ${mapLegendSection('Links', links)}
+    ${mapLegendSection('Overlay layers', overlays)}
+    ${mapLegendSection('ACMA licences', acma)}
     ${mapLegendOffLayersHtml()}`;
 }
 

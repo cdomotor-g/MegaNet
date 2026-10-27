@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 128, date: '2026-10-27', items: [
+      'The map\'s <strong>Legend</strong> is laid out like <strong>Layers</strong> now: a heading for the station pins, '
+        + 'the links, the overlay layers and the ACMA licences, and each key in a box of its own. In both panels the '
+        + 'boxes carry a soft shadow, so where one ends and the next begins is plainer still.',
+    ] },
     { n: 127, date: '2026-10-27', items: [
       '<strong>🪛 Pinouts</strong> has the <strong>ERT-A2\'s internal DB9</strong>, with a crew\'s field finding: a logger such as a '
         + 'CR300 capturing from it gets nothing on a plain three-wire cable — <strong>DTR, RTS and RX must be held high</strong> (2.5 V '
