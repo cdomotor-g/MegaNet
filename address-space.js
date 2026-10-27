@@ -1,7 +1,7 @@
 // MegaNet — address-space.js
 //
 //   AddressSpace   the Pass Ranges tab's pictures of the ALERT address space,
-//                  and its Allocate card:
+//                  a card each, and its Allocate card:
 //                    * Allocate an ALERT address — pick where a new station
 //                      will report through (a repeater, anywhere in a radio
 //                      network, or straight to a base in a hub), how many
@@ -10,6 +10,7 @@
 //                      (0084, editors). The addresses set aside are listed
 //                      under it, each with what it is for and whether a station
 //                      has taken it up yet, and released from there.
+//                  In the Address space card, behind its two buttons:
 //                    * Each repeater — its pass ranges drawn as Signal Routes
 //                      draws them, squeezed to scale, with every address in
 //                      them marked in use, held by two stations, set aside, or
@@ -18,7 +19,8 @@
 //                      repeaters' ranges, with a lane a repeater underneath, so
 //                      which repeater carries which block, and where two carry
 //                      the same, is there to see; a table of the networks first.
-//                    * All addresses — the same 8,191 bent round one wheel, 1 at
+//                  And a card each, above it:
+//                    * All addresses — the 8,191 addresses round one wheel, 1 at
 //                      the top and clockwise, a wedge a block of a hundred: each
 //                      address to scale, how many repeaters carry it, and how
 //                      full each block is, so a gap shows as a gap. Point at a
@@ -28,7 +30,7 @@
 //                      for a hub, a radio network or every hub together, each
 //                      row with how full that block of a hundred is. Point at
 //                      one to say whose it is.
-//                    * Map — the repeaters as numbered circles: the free
+//                    * Address map — the repeaters as numbered circles: the free
 //                      addresses they carry, counted once however many of them
 //                      carry each. Circles merge as you zoom out, so the number
 //                      on one is what a region has left, and break apart as you
@@ -66,9 +68,6 @@ const AddressSpace = (() => {
   const VIEWS = [
     { id: 'repeaters', label: 'Each repeater' },
     { id: 'networks',  label: 'Each radio network' },
-    { id: 'wheel',     label: 'All addresses' },
-    { id: 'grid',      label: 'Address grid' },
-    { id: 'map',       label: 'Map' },
   ];
   const WORD = {
     use: 'in use', clash: 'held by two stations', alloc: 'set aside', free: 'free',
@@ -81,7 +80,8 @@ const AddressSpace = (() => {
     sort: 'busiest',       // busiest | fullest | freest | name
     shown: PAGE,
     only: null,            // a repeater shown on its own (from the map)
-    scope: null,           // the grid's: 'hub:<id>' | 'net:<id>'
+    scope: null,           // the grid's: 'all' | 'hub:<id>' | 'net:<id>'
+    wheelScope: null,      // the wheel's, the same
     pickAddr: null,        // the grid's picked address
     hoverAddr: null,
     wheelSel: null,        // the wheel's kept stretch: { lo, hi, wedge } or { lo, hi, gap }
@@ -480,15 +480,19 @@ const AddressSpace = (() => {
 
   // ── The address grid ──────────────────────────────────────────────────────
 
-  function gridScope(I) {
-    let sc = S.scope && I.scopes.get(S.scope);
+  // The grid's and the wheel's scope, each its own: the hub with the most
+  // repeaters until another is picked.
+  function pickScope(I, key) {
+    let sc = S[key] && I.scopes.get(S[key]);
     if (!sc || sc.kind === 'rep') {
       const h = I.hubList.slice().sort((a, b) => I.reps.filter(r => r.hub === b).length - I.reps.filter(r => r.hub === a).length)[0];
       sc = I.scopes.get('hub:' + h) || I.groups[0];
-      S.scope = sc ? sc.id : null;
+      S[key] = sc ? sc.id : null;
     }
     return sc;
   }
+  function gridScope(I) { return pickScope(I, 'scope'); }
+  function wheelScope(I) { return pickScope(I, 'wheelScope'); }
 
   function blockRows(I, sc) {
     const out = [];
@@ -513,9 +517,9 @@ const AddressSpace = (() => {
   }
 
   // The grid's and the wheel's Show: every hub together, a hub, a network.
-  function scopeSelectHtml(I, sc) {
+  function scopeSelectHtml(I, sc, setter) {
     const opt = s => `<option value="${escAttr(s.id)}"${s.id === sc.id ? ' selected' : ''}>${esc(s.name)}</option>`;
-    return `<label>Show <select onchange="AddressSpace.setScope(this.value)">
+    return `<label>Show <select onchange="AddressSpace.${setter}(this.value)">
           <optgroup label="All hubs — an address in use in any of them">${opt(I.scopes.get('all'))}</optgroup>
           <optgroup label="Hubs — every address">${I.hubList.map(h => opt(I.scopes.get('hub:' + h))).join('')}</optgroup>
           <optgroup label="Radio networks — the addresses their repeaters carry">${I.groups.map(opt).join('')}</optgroup>
@@ -549,7 +553,7 @@ const AddressSpace = (() => {
     const t = tally(I, sc), all = whole(sc);
     const blocks = blockRows(I, sc);
     return `<div class="control-row as-controls">
-        ${scopeSelectHtml(I, sc)}
+        ${scopeSelectHtml(I, sc, 'setScope')}
         <label>Address <input type="number" id="as-look" class="field-num" min="1" max="${MAX}" inputmode="numeric" value="${S.pickAddr ?? ''}"
           oninput="AddressSpace.lookup(this.value)" placeholder="5740"></label>
       </div>
@@ -801,7 +805,7 @@ const AddressSpace = (() => {
   }
 
   function wheelHtml(I) {
-    const sc = gridScope(I);
+    const sc = wheelScope(I);
     if (!sc) return '<p class="small">No hub or radio network to draw.</p>';
     const every = sc.kind === 'all', hub = whole(sc);
     const t = tally(I, sc), W = wedges(I, sc);
@@ -809,7 +813,7 @@ const AddressSpace = (() => {
     const k = (cls, text) => `<span class="sr-key"><span class="sr-sw ${cls}" aria-hidden="true"></span>${text}</span>`;
     const sel = S.wheelSel;
     return `<div class="control-row as-controls">
-        ${scopeSelectHtml(I, sc)}
+        ${scopeSelectHtml(I, sc, 'setWheelScope')}
       </div>
       <p class="small">${esc(captionText(I, sc))}. Every address, from 1 at the top clockwise to ${num(MAX)}; a wedge is a block of a hundred, a row
         of the address grid. ${every ? `The hubs reuse addresses, so here an address is in use when a station in any of the ${num(sc.hubs.length)} hubs holds it, shaded
@@ -932,9 +936,9 @@ const AddressSpace = (() => {
     const cv = document.getElementById('as-wheel');
     const I = index();
     if (!cv || !I) return;
-    const sc = gridScope(I);
-    const view = document.getElementById('as-view');
-    const D = Math.round(Math.max(240, Math.min(620, (view && view.clientWidth) || 560)));
+    const sc = wheelScope(I);
+    const body = document.getElementById('as-wheel-body');
+    const D = Math.round(Math.max(240, Math.min(620, (body && body.clientWidth) || 560)));
     const dpr = window.devicePixelRatio || 1;
     if (!quick || !WHEEL || WHEEL.I !== I || WHEEL.sc !== sc.id || WHEEL.D !== D || WHEEL.dpr !== dpr || WHEEL.q !== searchIds().join(',')) {
       WHEEL = wheelBase(I, sc, D, dpr);
@@ -996,7 +1000,7 @@ const AddressSpace = (() => {
     if (w !== S.wheelHover) {
       S.wheelHover = w;
       const I = index();
-      if (tip && I && w != null) tip.innerHTML = stretchHtml(I, gridScope(I), wedges(I, gridScope(I))[w], false);
+      if (tip && I && w != null) tip.innerHTML = stretchHtml(I, wheelScope(I), wedges(I, wheelScope(I))[w], false);
       drawWheel(true);
     }
     if (!tip) return;
@@ -1012,7 +1016,7 @@ const AddressSpace = (() => {
   }
   function showPick() {
     const I = index(), out = document.getElementById('as-wheel-out');
-    if (out && I) out.innerHTML = wheelReadoutHtml(I, gridScope(I));
+    if (out && I) out.innerHTML = wheelReadoutHtml(I, wheelScope(I));
     const s = S.wheelSel;
     document.querySelectorAll('.as-gaps .pill').forEach(b => b.setAttribute('aria-pressed', String(!!(s && s.gap && Number(b.dataset.lo) === s.lo))));
     drawWheel(true);
@@ -1041,16 +1045,17 @@ const AddressSpace = (() => {
     S.wheelSel = w == null ? null : { lo: w * ROW, hi: w * ROW + ROW - 1, wedge: w };
     showPick();
   }
-  // From the wheel's readout: the same address on the grid.
+  // From the wheel's readout: the same address on the grid, in the wheel's
+  // scope, and the grid brought into view.
   function toGrid(a) {
-    S.pickAddr = a; S.hoverAddr = null;
-    setView('grid');
+    S.scope = S.wheelScope; S.pickAddr = a; S.hoverAddr = null;
+    refreshGrid();
+    scrollTo('as-grid-card');
   }
 
   // ── The map ───────────────────────────────────────────────────────────────
 
   function mapHtml(I) {
-    const t = I.hubList.map(h => ({ h, t: tally(I, I.scopes.get('hub:' + h)) }));
     return `<div class="as-controls as-radios">
         <span role="radiogroup" aria-label="What the numbers count"><span class="small">Numbers count</span>
         ${[['free', 'free addresses'], ['use', 'in use'], ['alloc', 'set aside']].map(([v, l]) => `<label class="check-label"><input type="radio" name="as-count" value="${v}"${S.mapCount === v ? ' checked' : ''}
@@ -1061,9 +1066,13 @@ const AddressSpace = (() => {
       <p class="small sr-keys"><span class="sr-key"><span class="as-bubble-key as-f-low" aria-hidden="true"></span>under half taken</span>
         <span class="sr-key"><span class="as-bubble-key as-f-mid" aria-hidden="true"></span>half to 80% taken</span>
         <span class="sr-key"><span class="as-bubble-key as-f-high" aria-hidden="true"></span>80% taken or more</span></p>
-      <p class="small">A circle's number is the addresses its repeaters carry, each counted once however many of them carry it — so a merged circle is what
+      <p class="small" id="as-map-note">${mapNoteHtml(I)}</p>`;
+  }
+  function mapNoteHtml(I) {
+    const hs = I.hubList.filter(h => I.scopes.get('hub:' + h).carriedSet.size);
+    return `A circle's number is the addresses its repeaters carry, each counted once however many of them carry it — so a merged circle is what
         that region has left, not a sum. Zoom in and the circles break apart; press one to zoom to it, or a single repeater for its figures.
-        ${t.length ? `By hub, free under a repeater: ${t.filter(x => I.scopes.get('hub:' + x.h).carriedSet.size).map(x => `${esc(hubName(I, x.h))} <b>${num(freeCarried(I, x.h))}</b>`).join(' · ')}.` : ''}</p>`;
+        ${hs.length ? `By hub, free under a repeater: ${hs.map(h => `${esc(hubName(I, h))} <b>${num(freeCarried(I, h))}</b>`).join(' · ')}.` : ''}`;
   }
   function freeCarried(I, h) {
     const sc = I.scopes.get('hub:' + h);
@@ -1174,35 +1183,61 @@ const AddressSpace = (() => {
     }
   }
 
-  // ── The panel ─────────────────────────────────────────────────────────────
+  // ── The cards ─────────────────────────────────────────────────────────────
+  // All addresses, the Address grid and the Address map a card each, and
+  // under them Address space, each repeater or each radio network behind
+  // its two buttons. Each card's body is drawn, and redrawn, on its own.
 
+  function cardHtml(id, title, sub, body) {
+    return `<div class="panel as-panel" id="as-${id}-card">
+        <div class="panel-header"><h2 id="as-${id}-h">${title}</h2><span class="small">${sub}</span></div>
+        <div id="as-${id}-body">${body}</div>
+      </div>`;
+  }
+  function bodyOr(fn) {
+    const I = index();
+    if (!I) return '<p class="small">The station list is not loaded yet.</p>';
+    if (!I.reps.length) return '<p class="small">No repeater in the station list has pass ranges.</p>';
+    return fn(I);
+  }
   function panelHtml() {
-    return `<div class="panel as-panel">
-        <div class="panel-header"><h2 id="as-h">Address space</h2><span class="small">how full each block of ALERT addresses is</span></div>
+    return cardHtml('wheel', 'All addresses', 'every ALERT address round one wheel — where the gaps are', bodyOr(wheelHtml))
+      + cardHtml('grid', 'Address grid', 'every ALERT address, a hundred to a row', bodyOr(gridHtml))
+      + cardHtml('map', 'Address map', 'what each region has left', bodyOr(mapHtml))
+      + `<div class="panel as-panel">
+        <div class="panel-header"><h2 id="as-h">Address space</h2><span class="small">how full each repeater's and radio network's pass ranges are</span></div>
         <div class="control-row as-views" role="group" aria-label="Draw the address space by">
           ${VIEWS.map(v => `<button type="button" class="${S.view === v.id ? 'primary' : ''}" aria-pressed="${S.view === v.id}"
             onclick="AddressSpace.setView('${v.id}')">${esc(v.label)}</button>`).join('')}
         </div>
-        <div id="as-view">${viewHtml()}</div>
+        <div id="as-view">${bodyOr(I => (S.view === 'networks' ? networksHtml(I) : repeatersHtml(I)))}</div>
       </div>`;
-  }
-  function viewHtml() {
-    const I = index();
-    if (!I) return '<p class="small">The station list is not loaded yet.</p>';
-    if (!I.reps.length) return '<p class="small">No repeater in the station list has pass ranges.</p>';
-    return S.view === 'networks' ? networksHtml(I) : S.view === 'wheel' ? wheelHtml(I) : S.view === 'grid' ? gridHtml(I)
-      : S.view === 'map' ? mapHtml(I) : repeatersHtml(I);
   }
   function refreshView() {
     const el = document.getElementById('as-view');
-    if (!el) return;
-    if (S.view !== 'map') stopMap();
-    S.wheelHover = null;
-    el.innerHTML = viewHtml();
-    if (S.view === 'grid') drawGrid();
-    if (S.view === 'wheel') drawWheel();
-    if (S.view === 'map') initMap();
+    if (el) el.innerHTML = bodyOr(I => (S.view === 'networks' ? networksHtml(I) : repeatersHtml(I)));
   }
+  function refreshWheel() {
+    const el = document.getElementById('as-wheel-body');
+    if (!el) return;
+    S.wheelHover = null;
+    el.innerHTML = bodyOr(wheelHtml);
+    drawWheel();
+  }
+  function refreshGrid() {
+    const el = document.getElementById('as-grid-body');
+    if (!el) return;
+    el.innerHTML = bodyOr(gridHtml);
+    drawGrid();
+  }
+  // The map is made once, when the tab opens; after that only its circles
+  // and its note follow the figures.
+  function refreshMap() {
+    const el = document.getElementById('as-map-note'), I = index();
+    if (el && I) el.innerHTML = mapNoteHtml(I);
+    drawMap();
+  }
+  function refreshAll() { refreshView(); refreshWheel(); refreshGrid(); refreshMap(); }
 
   // ── The Allocate card ─────────────────────────────────────────────────────
 
@@ -1434,7 +1469,7 @@ const AddressSpace = (() => {
       S.busy = false;
     }
     refreshCard();
-    refreshView();
+    refreshAll();
   }
 
   async function release(batch) {
@@ -1458,7 +1493,7 @@ const AddressSpace = (() => {
       S.msg = { ok: false, text: `Not released: ${(e && e.message) || e}` };
     }
     refreshCard();
-    refreshView();
+    refreshAll();
   }
 
   async function load() {
@@ -1478,7 +1513,7 @@ const AddressSpace = (() => {
       S.alloc = { phase: missing ? 'missing' : (e && (e.status === 401 || e.status === 403)) ? 'denied' : 'error', rows: [], err: `Could not read what is set aside: ${msg}` };
     }
     refreshCard();
-    if (S.view !== 'map') refreshView(); else drawMap();
+    refreshAll();
   }
 
   // ── Controls ──────────────────────────────────────────────────────────────
@@ -1497,7 +1532,8 @@ const AddressSpace = (() => {
   function more(all) { S.shown = all ? Infinity : S.shown + PAGE; refreshView(); }
   function showAll() { S.only = null; S.shown = PAGE; refreshView(); }
   function showRep(id) { S.only = id; setView('repeaters'); scrollTo('as-h'); }
-  function setScope(id) { S.scope = id; S.pickAddr = null; S.hoverAddr = null; S.wheelSel = null; refreshView(); }
+  function setScope(id) { S.scope = id; S.pickAddr = null; S.hoverAddr = null; refreshGrid(); }
+  function setWheelScope(id) { S.wheelScope = id; S.wheelSel = null; refreshWheel(); }
   function setMapCount(v) { S.mapCount = ['free', 'use', 'alloc'].includes(v) ? v : 'free'; drawMap(); }
   function setHubLines(on) { S.hubLines = !!on; drawHubs(); }
   function scrollTo(id) { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
@@ -1506,14 +1542,14 @@ const AddressSpace = (() => {
   // the wheel mark what it searched for.
   function onFilter() {
     if (S.view === 'repeaters') { S.shown = PAGE; refreshView(); }
-    else if (S.view === 'grid') drawGrid();
-    else if (S.view === 'wheel') drawWheel();
+    drawGrid();
+    drawWheel(true);
   }
 
   function init() {
-    if (S.view === 'grid') drawGrid();
-    if (S.view === 'wheel') drawWheel();
-    if (S.view === 'map') initMap();
+    drawWheel();
+    drawGrid();
+    initMap();
     if (!signedIn()) { S.alloc = { phase: 'signedout', rows: [], err: '' }; refreshCard(); }
     else if (S.alloc.phase !== 'ready' && S.alloc.phase !== 'loading') load();
   }
@@ -1521,7 +1557,11 @@ const AddressSpace = (() => {
   function authChanged() {
     S.alloc = { phase: 'idle', rows: [], err: '' };
     S.msg = null;
-    if (typeof state !== 'undefined' && state.activeTab === 'passranges') { if (signedIn()) load(); else init(); refreshView(); }
+    if (typeof state !== 'undefined' && state.activeTab === 'passranges') {
+      if (signedIn()) load();
+      else { S.alloc = { phase: 'signedout', rows: [], err: '' }; refreshCard(); }
+      refreshAll();
+    }
   }
 
   // ── Exports ───────────────────────────────────────────────────────────────
@@ -1558,15 +1598,15 @@ const AddressSpace = (() => {
   }
 
   // For the tests and the export menu.
-  function state_() { return { view: S.view, sort: S.sort, shown: S.shown, only: S.only, scope: S.scope, pickAddr: S.pickAddr, alloc: S.alloc, form: { ...S.form }, msg: S.msg, map: S.map }; }
+  function state_() { return { view: S.view, sort: S.sort, shown: S.shown, only: S.only, scope: S.scope, wheelScope: S.wheelScope, pickAddr: S.pickAddr, alloc: S.alloc, form: { ...S.form }, msg: S.msg, map: S.map }; }
   function figures(id) {
     const I = index(), sc = I && I.scopes.get(id);
     return sc ? Object.assign({ id: sc.id, kind: sc.kind, name: sc.name, hubs: sc.hubs.slice() }, tally(I, sc)) : null;
   }
   function clustersAt() { const I = index(); return S.map && I ? clusters(I).map(c => ({ reps: c.reps.map(r => r.id), ...c.t })) : []; }
-  // The wheel's view of a stretch of the grid's scope, and what it keeps.
+  // The wheel's view of a stretch of its scope, and what it keeps.
   function stretchAt(lo, hi) {
-    const I = index(), sc = I && gridScope(I);
+    const I = index(), sc = I && wheelScope(I);
     if (!sc) return null;
     const c = stretch(I, sc, lo, hi);
     return Object.assign({}, c, { reps: c.reps.map(x => ({ id: x.r.id, n: x.part.length })) });
@@ -1575,7 +1615,7 @@ const AddressSpace = (() => {
 
   return {
     allocHtml, panelHtml, init, onFilter, authChanged, load,
-    setView, setSort, more, showAll, showRep, setScope, setMapCount, setHubLines, scrollTo,
+    setView, setSort, more, showAll, showRep, setScope, setWheelScope, setMapCount, setHubLines, scrollTo,
     gridHover, gridClick, lookup, wheelHover, wheelClick, wheelPick, wheelKey, toGrid,
     formChanged, useRun, allocateIn, allocate, release,
     exportCsv, exportAllocCsv, state: state_, index, figures, plan, clusters: clustersAt, bestFit, stretch: stretchAt, wheel,

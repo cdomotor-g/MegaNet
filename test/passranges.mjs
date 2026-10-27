@@ -7,6 +7,8 @@
 // counted the wrong hub, missed an exclusion or double-counted a network's
 // shared addresses is red.
 //
+//   0. **The cards** — All addresses, the Address grid and the Address map a
+//      card each, above Address space and its two buttons.
 //   1. **The figures** — the busiest repeaters drawn first, each repeater's
 //      in-use, free and longest free run as the oracle has them; a network's
 //      addresses counted once across its repeaters, a lane a repeater; the
@@ -153,6 +155,18 @@ try {
   await page.evaluate(() => switchTab('passranges'));
   await until(page, () => !!document.getElementById('as-alloc') && !!document.querySelector('.as-ruler'));
 
+  // ── 0. the cards ──────────────────────────────────────────────────────────
+  console.log('\nThe cards\n');
+  const cards = await page.evaluate(() => ({
+    order: [...document.querySelectorAll('.as-page h2')].map(h => h.id).filter(id => /^as-/.test(id)),
+    buttons: [...document.querySelectorAll('.as-views button')].map(b => b.textContent.trim()),
+  }));
+  ok('All addresses, the Address grid and the Address map a card each, above Address space',
+    J(cards.order) === J(['as-alloc-h', 'as-wheel-h', 'as-grid-h', 'as-map-h', 'as-h']), J(cards.order));
+  ok('…which keeps its two buttons, Each repeater and Each radio network', J(cards.buttons) === J(['Each repeater', 'Each radio network']), J(cards.buttons));
+  ok('…and the wheel, the grid and the map are drawn when the tab opens', await page.evaluate(() => document.getElementById('as-wheel').width > 0
+    && document.getElementById('as-grid').width > 0 && !!AddressSpace.state().map));
+
   // ── 1. the figures ────────────────────────────────────────────────────────
   console.log('\nThe figures, against the station file\n');
   const drawn = await page.evaluate(() => [...document.querySelectorAll('#as-view .as-ruler')].map(f => f.dataset.scope));
@@ -198,8 +212,6 @@ try {
   ok(`Each radio network: a table row and a figure a network (${groups.size})`, nets.rows === groups.size && nets.figs === groups.size, J(nets));
   ok('…and in a network\'s figure a lane a repeater, under the network\'s own', nets.lanes === netReps.length + 1, J(nets));
 
-  await page.evaluate(() => AddressSpace.setView('grid'));
-  await until(page, () => { const c = document.getElementById('as-grid'); return c && c.width > 0; });
   const hubHeld = new Set([...held.keys()].filter(k => k.startsWith('brisbane|')).map(k => Number(k.split('|')[1])));
   const hub = await page.evaluate(() => Object.assign(AddressSpace.figures('hub:brisbane'), { scope: AddressSpace.state().scope }));
   ok(`Address grid: the busiest hub first, and every address its stations hold in use (${hubHeld.size})`,
@@ -219,8 +231,7 @@ try {
 
   // ── 3. the grid ───────────────────────────────────────────────────────────
   console.log('\nThe grid\n');
-  await page.evaluate(() => AddressSpace.setView('grid'));
-  await until(page, () => { const c = document.getElementById('as-grid'); return c && c.width > 0; });
+  await page.locator('#as-grid').scrollIntoViewIfNeeded();
   await page.fill('#as-look', String(HELD));
   ok(`an address looked up names the station holding it (${HELD}, ${HELD_BY.name})`,
     await page.evaluate(n => document.getElementById('as-readout').textContent.includes(n), HELD_BY.name));
@@ -237,9 +248,7 @@ try {
 
   // ── 3b. the wheel ─────────────────────────────────────────────────────────
   console.log('\nAll addresses: the wheel\n');
-  await page.evaluate(() => AddressSpace.setView('wheel'));
-  await until(page, () => { const c = document.getElementById('as-wheel'); return c && c.width > 0; });
-  ok('the wheel shows the grid\'s hub', (await page.evaluate(() => AddressSpace.state().scope)) === 'hub:brisbane');
+  ok('the wheel starts on the busiest hub, as the grid does', (await page.evaluate(() => AddressSpace.state().wheelScope)) === 'hub:brisbane');
   const WG = Math.floor(HELD / 100), wlo = Math.max(1, WG * 100), whi = WG * 100 + 99;
   const wantReps = REPS.filter(r => r.hub === 'brisbane' && r.carried.some(a => a >= wlo && a <= whi)).map(r => r.id).sort();
   let wantHeld = 0;
@@ -276,8 +285,9 @@ try {
   for (let a = gap0.lo; a <= gap0.hi && firstFree == null; a++) if (carriedB.has(a)) firstFree = a;
   firstFree ??= gap0.lo;
   await page.evaluate(() => [...document.querySelectorAll('#as-wheel-out .link-btn')].find(b => /address grid/.test(b.textContent)).click());
-  const tg = await page.evaluate(() => AddressSpace.state());
-  ok(`…and On the address grid takes its first free address there, under a repeater if one is (${firstFree})`, tg.view === 'grid' && tg.pickAddr === firstFree, J({ view: tg.view, pick: tg.pickAddr }));
+  const tg = await page.evaluate(() => Object.assign(AddressSpace.state(), { look: document.getElementById('as-look').value }));
+  ok(`…and On the address grid takes its first free address there, under a repeater if one is (${firstFree})`, tg.scope === 'hub:brisbane' && tg.pickAddr === firstFree
+    && tg.look === String(firstFree), J({ scope: tg.scope, pick: tg.pickAddr, look: tg.look }));
 
   // Every hub together.
   const HUBS = DOC.hubs.map(h => h.id);
@@ -301,10 +311,10 @@ try {
   const ro2 = await page.evaluate(() => document.getElementById('as-readout').innerHTML);
   ok(`…on the grid, an address ${hubsAt(REUSED).length} hubs reuse is in use in each, not held by two (${REUSED})`,
     ro2.includes(`in use in ${hubsAt(REUSED).length} hubs`) && !/txt-bad/.test(ro2), ro2.slice(0, 300));
-  await page.evaluate(() => AddressSpace.setView('wheel'));
-  await until(page, () => { const c = document.getElementById('as-wheel'); return c && c.width > 0; });
-  const chip2 = await page.evaluate(() => ({ scope: document.querySelector('#as-view select').value, lo: Number((document.querySelector('.as-gaps .pill') || {}).dataset?.lo) }));
-  ok('…the wheel keeps the scope, its biggest gap the one nobody anywhere is on', chip2.scope === 'all' && chip2.lo === eLong.lo, J(chip2));
+  ok('…the grid and the wheel each keep their own', (await page.evaluate(() => AddressSpace.state().wheelScope)) === 'hub:brisbane');
+  await page.evaluate(() => AddressSpace.setWheelScope('all'));
+  const chip2 = await page.evaluate(() => ({ scope: document.querySelector('#as-wheel-body select').value, grid: AddressSpace.state().scope, lo: Number((document.querySelector('.as-gaps .pill') || {}).dataset?.lo) }));
+  ok('…on the wheel, its biggest gap the one nobody anywhere is on', chip2.scope === 'all' && chip2.grid === 'all' && chip2.lo === eLong.lo, J(chip2));
   const W2 = Array.from({ length: 82 }, (_, i) => i).find(w => new Set(REPS.filter(r => r.carried.some(a => a >= Math.max(1, w * 100) && a <= w * 100 + 99)).map(r => r.hub)).size >= 2);
   const w2lo = Math.max(1, W2 * 100), w2hi = W2 * 100 + 99;
   const want2 = REPS.filter(r => r.carried.some(a => a >= w2lo && a <= w2hi)).map(r => r.id).sort();
@@ -322,11 +332,10 @@ try {
   const hubNames = [...new Set(st2.reps.slice(0, 8).map(x => DOC.hubs.find(h => h.id === REPS.find(r => r.id === x.id).hub).name))];
   ok(`…and the callout says each one's hub (${hubNames.join(', ')})`, hubNames.every(n => tip2.includes(`(${n})`)), tip2.slice(0, 300));
   await page.mouse.move(wbox2.x + 2, wbox2.y + 2);
-  await page.evaluate(() => AddressSpace.setScope('hub:brisbane'));
+  await page.evaluate(() => { AddressSpace.setScope('hub:brisbane'); AddressSpace.setWheelScope('hub:brisbane'); });
 
   // ── 4. the map ────────────────────────────────────────────────────────────
   console.log('\nThe map\n');
-  await page.evaluate(() => AddressSpace.setView('map'));
   await until(page, () => !!AddressSpace.state().map);
   const at = z => page.evaluate(zz => { const m = AddressSpace.state().map; m.setZoom(zz, { animate: false }); return AddressSpace.clusters(); }, z);
   const far = await at(5), near = await at(11);
@@ -397,7 +406,6 @@ try {
 
   // ── 7. the exports ────────────────────────────────────────────────────────
   console.log('\nThe exports\n');
-  await page.evaluate(() => AddressSpace.setView('grid'));
   for (const [fn, name, head] of [['exportCsv', 'floodnet-alert-addresses-hub-brisbane.csv', 'address,status,stations,station_ids,set_aside_for,set_aside_by,carried_by'],
     ['exportAllocCsv', 'floodnet-alert-allocations.csv', 'address,hub,purpose,repeater,station,set_aside_by,set_aside_at,taken_up_by']]) {
     const [dl] = await Promise.all([page.waitForEvent('download'), page.evaluate(x => AddressSpace[x](), fn)]);
@@ -411,11 +419,13 @@ try {
   // ── 9. a phone ────────────────────────────────────────────────────────────
   console.log('\nA phone\n');
   await page.setViewportSize({ width: 375, height: 800 });
-  for (const v of ['repeaters', 'networks', 'wheel', 'grid', 'map']) {
+  await page.evaluate(() => renderMain());
+  await until(page, () => { const c = document.getElementById('as-wheel'); return c && c.width > 0; });
+  for (const v of ['repeaters', 'networks']) {
     await page.evaluate(x => AddressSpace.setView(x), v);
     await page.waitForTimeout(250);
     const wide = await page.evaluate(() => document.documentElement.scrollWidth);
-    ok(`${v}: nothing wider than a 375 px phone`, wide <= 376, String(wide));
+    ok(`every card, Address space showing ${v}: nothing wider than a 375 px phone`, wide <= 376, String(wide));
   }
   await context.close();
 

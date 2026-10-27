@@ -43,12 +43,12 @@
 // say "12 of 34" to anyone who can see them, and said nothing at all otherwise.
 
 // ── Address space and the Allocate card ──────────────────────────────────────
-// Between the filter and the tables, two panels from address-space.js
+// Between the filter and the tables, cards from address-space.js
 // (AddressSpace): the Allocate card — set ALERT addresses aside for a new
-// station, kept in the datastore (0084) — and Address space, the pass ranges
-// drawn repeater by repeater and network by network as Signal Routes draws
-// them, every address round a wheel and on a grid, and a map of what each
-// region has left. This file draws their shells in place and hands the filter
+// station, kept in the datastore (0084) — then All addresses (every address
+// round a wheel), the Address grid, the Address map of what each region has
+// left, and Address space, the pass ranges drawn repeater by repeater and
+// network by network as Signal Routes draws them. This file draws their shells in place and hands the filter
 // box to them; app.js calls AddressSpace.init() once the tab is on screen.
 
 // ── PASS RANGES tab ────────────────────────────────────────────────────────────

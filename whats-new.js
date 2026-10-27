@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 118, date: '2026-10-27', items: [
+      'In <strong>🔗 Pass Ranges</strong>, the <strong>All addresses</strong> wheel, the <strong>Address grid</strong> and the '
+        + '<strong>Address map</strong> are cards of their own now, under the Allocate card, instead of hiding behind buttons. '
+        + '<strong>Address space</strong>, under them, keeps <em>Each repeater</em> and <em>Each radio network</em>. The wheel '
+        + 'and the grid each have their own <em>Show</em>, so you can keep one on every hub together and the other on a hub.',
+    ] },
     { n: 117, date: '2026-10-27', items: [
       'The <strong>All addresses</strong> wheel and the <strong>Address grid</strong> in Pass Ranges can show <strong>Every hub '
         + 'together</strong>: an address is in use when a station in any hub holds it, shaded by how many hubs reuse it, and '

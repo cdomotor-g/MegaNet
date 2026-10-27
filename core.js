@@ -1286,12 +1286,14 @@ const HELP = {
            + 'each repeater carries. Stations no repeater covers are flagged as orphans. The chain on '
            + 'from a repeater to its base is drawn on the Stations map rather than listed here. One '
            + 'filter box drives both tables, and takes a name, a station number, an address or a '
-           + 'pasted list of them. <strong>Address space</strong> draws how full the ranges are — each '
-           + 'repeater\'s, each radio network\'s with a lane a repeater, every address of a hub — or of '
-           + 'every hub together — round one wheel (point at a wedge for the repeaters that carry it) '
-           + 'and on a grid, and a map whose numbered circles are the free addresses a region has left — and '
-           + '<strong>Allocate an ALERT address</strong> sets addresses aside for a new station, in the '
-           + 'datastore for everybody, so two people planning two sites cannot pick the same one.',
+           + 'pasted list of them. <strong>Allocate an ALERT address</strong> sets addresses aside for a '
+           + 'new station, in the datastore for everybody, so two people planning two sites cannot pick '
+           + 'the same one. Under it, a card each draws how full the addresses are: <strong>All '
+           + 'addresses</strong>, every address of a hub — or of every hub together — round one wheel '
+           + '(point at a wedge for the repeaters that carry it); the <strong>Address grid</strong>, the '
+           + 'same a hundred to a row; the <strong>Address map</strong>, whose numbered circles are the '
+           + 'free addresses a region has left; and <strong>Address space</strong>, each repeater\'s pass '
+           + 'ranges, or each radio network\'s with a lane a repeater.',
     watch: [
       '<strong>Free means free in the hub.</strong> The Bureau\'s hubs reuse addresses — Brisbane\'s '
       + '6039 is a river gauge, Perth\'s an orchard — so an address is in use when a station in the '
