@@ -193,7 +193,7 @@ const CalmShell = (() => {
         <div id="nav-groups" class="calm-sections">${groups}</div>
         <div class="calm-foot">
           ${typeof NavViews !== 'undefined' ? NavViews.navHeadHtml() : ''}
-          <p class="nav-legal"><a href="/about">About</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+          <p class="nav-legal"><a href="/about">About</a> · <a href="/api">API</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
         </div>
       </div>
       ${fieldBarHtml(phone)}`;
@@ -376,7 +376,7 @@ const CalmShell = (() => {
             ${icon(x.ico)}
             <span class="more-text"><strong>${esc(x.label)}</strong>${x.sub ? `<span class="small txt-muted">${esc(x.sub)}</span>` : ''}</span>
           </button>`).join('')}
-          <p class="nav-legal"><a href="/about">About</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+          <p class="nav-legal"><a href="/about">About</a> · <a href="/api">API</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
         </div>`,
     });
     const first = document.querySelector('#more-menu .more-item');

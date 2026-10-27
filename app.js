@@ -1867,7 +1867,7 @@ function renderTabs() {
       </div>
       <div id="nav-groups">${navGroupsHtml()}</div>
       <p id="nav-found" class="nav-found" role="status" aria-live="polite">${esc(navFoundText())}</p>
-      <p class="nav-legal"><a href="/about">About</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+      <p class="nav-legal"><a href="/about">About</a> · <a href="/api">API</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
     </div>`;
 }
 
