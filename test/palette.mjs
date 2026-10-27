@@ -129,6 +129,18 @@ async function main() {
     check('a station number puts its station first', L.labels[0] === 'Loudoun Br AL' && L.activeLabel === 'Loudoun Br AL', J(L.labels.slice(0, 3)));
     L = await type(page, 'gatton');
     check('a name ranks the ones that start with it first', L.labels[0].startsWith('Gatton') && L.groups[0] === 'Stations', J(L.labels.slice(0, 4)));
+    L = await type(page, 'al');
+    const shown = L.labels.filter(x => !/^(Show|All) \d+ /.test(x)).length;
+    const moreAt = L.labels.findIndex(x => /^Show \d+ more stations$/.test(x));
+    check('a short word lists four stations, then a line to show more', moreAt === 4 && L.groups[0] === 'Stations', J(L.labels.slice(0, 6)));
+    for (let i = 0; i < moreAt; i++) await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(60);
+    L = await look(page);
+    check('…and picking it lists more here, the dialog still up, the mark on the first new one',
+      L.open && L.focused && L.labels.filter(x => !/^All \d+ /.test(x)).length > shown && L.activeLabel === L.labels[4], J(L.labels.slice(0, 6)));
+    L = await type(page, 'bit');
+    check('"bit" still reaches the Bit Bench among the tabs', L.labels.includes('Bit Bench') && L.groups.includes('Tabs'), J(L.labels));
     L = await type(page, '4021-4025');
     const all = L.labels.find(x => /^All \d+ matching stations$/.test(x));
     check('an address window offers every station in it, as the list\'s filter', !!all, J(L.labels));

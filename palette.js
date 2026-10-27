@@ -55,8 +55,12 @@
 //           station-trail.js, route.js, bug-report.js, looks.js.
 
 const Palette = (() => {
-  const MAX_STATIONS = 8;
-  const MAX_TABS = 5;
+  // Four stations, then a line to show the rest here: with hundreds of
+  // station names, a short word matches a screenful of them and pushes the
+  // tabs it also matches out of sight ("bit" and the Bit Bench).
+  const MAX_STATIONS = 4;
+  const MAX_STATIONS_OPEN = 30;   // after "Show more" is picked
+  const MAX_TABS = 8;
   const MARK_DEBOUNCE_MS = 400;   // a pause before the survey register is asked
 
   let query = '';
@@ -64,6 +68,7 @@ const Palette = (() => {
   let active = 0;        // index into items of the one Enter opens
   let marks = { key: '', loading: false, error: '' };   // the survey-mark lookup for the text
   let markTimer = 0;
+  let stationsOpen = false;   // "Show more" picked for this text
 
   const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
 
@@ -105,10 +110,17 @@ const Palette = (() => {
     const prep = prepareSearch(q);
     const hits = data.stations.filter(s => stationMatchesSearch(s, prep));
     hits.sort((a, b) => rankStation(a, q) - rankStation(b, q) || a.name.localeCompare(b.name));
-    const list = hits.slice(0, MAX_STATIONS).map(s => ({
+    const list = hits.slice(0, stationsOpen ? MAX_STATIONS_OPEN : MAX_STATIONS).map(s => ({
       kind: 'station', icon: '📍', label: s.name, sub: stationSub(s), run: () => goToStation(s.id),
     }));
     const more = hits.length - list.length;
+    // The rest here, in the dialog, without leaving the tab: picking it keeps
+    // the dialog up (`stay`) and lists more under the same text.
+    if (more > 0 && !stationsOpen) {
+      list.push({ kind: 'station', offer: true, stay: true, icon: '⌄',
+        label: `Show ${Math.min(more, MAX_STATIONS_OPEN - MAX_STATIONS)} more stations`,
+        sub: 'In this list', run: showMoreStations });
+    }
     // The rest, as the Stations list would show them: the filter set to what
     // was typed. Always offered for an address window, whatever its size — a
     // window is a question about a block of stations, and the list is where
@@ -118,6 +130,15 @@ const Palette = (() => {
         sub: 'In the Stations list, the filter set to this', run: () => showAllStations(q) });
     }
     return { list, more };
+  }
+
+  // The marked option onto the first station that was not shown before, so
+  // the arrow keys carry on down the list from where they were.
+  function showMoreStations() {
+    stationsOpen = true;
+    items = results(query);
+    active = Math.min(MAX_STATIONS, items.length - 1);
+    paint();
   }
 
   function showAllStations(q) {
@@ -230,6 +251,8 @@ const Palette = (() => {
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
 
+  // Within a score, tabs whose label starts with what was typed come first
+  // ("bit" → Bit Bench before Reception Map, which matched on its group).
   function tabItems(q) {
     const terms = navTerms(q);
     if (!terms.length) return [];
@@ -241,7 +264,9 @@ const Palette = (() => {
         const score = navScore(navHaystack(tab, g.group), terms);
         if (!score) continue;
         best = Math.max(best, score);
-        scored.push({ tab, group: g.group, score, label: navScore(tab.label.toLowerCase(), terms) });
+        const label = tab.label.toLowerCase();
+        scored.push({ tab, group: g.group, score,
+                      label: navScore(label, terms) + (label.startsWith(terms[0]) ? 0.5 : 0) });
       }
     }
     return scored.filter(x => x.score === best)
@@ -411,6 +436,7 @@ const Palette = (() => {
 
   function input(text) {
     query = String(text || '');
+    stationsOpen = false;
     noteMarks(query);
     items = results(query);
     active = 0;
@@ -453,6 +479,7 @@ const Palette = (() => {
   function pick(n) {
     const it = items[n];
     if (!it) return;
+    if (it.stay) { it.run(); const box = document.getElementById('pal-q'); if (box) box.focus({ preventScroll: true }); return; }
     Modal.close();
     it.run();
   }
@@ -462,6 +489,7 @@ const Palette = (() => {
     const box = document.getElementById('pal-q');
     if (box) { box.focus(); box.select(); return; }
     query = '';
+    stationsOpen = false;
     Modal.open({
       title: 'Search',
       html: `
