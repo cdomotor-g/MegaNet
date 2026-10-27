@@ -3848,6 +3848,7 @@ function renderMain() {
     case 'admin':      el.innerHTML = Admin.render();         Admin.init();        break;
     case 'basestations': el.innerHTML = BaseStations.render(); BaseStations.init(); break;
     case 'backbone':   el.innerHTML = Backbone.render();       Backbone.init();   break;
+    case 'investigations': el.innerHTML = Investigations.render(); Investigations.init(); break;
     case 'review':     el.innerHTML = NetworkReview.render(); NetworkReview.init(); break;
     case 'a2plan':     el.innerHTML = Alert2Plan.render();    Alert2Plan.init();    break;
     case 'tdma':       el.innerHTML = TdmaPlanner.render();   TdmaPlanner.init();   break;

@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 126, date: '2026-10-27', items: [
+      '🕵️ <strong>Investigations</strong> is a tab now, in a new <strong>Network health</strong> group with '
+        + '<strong>Station Health</strong> and <strong>Backbone</strong>, just under <strong>Data</strong>. Each write-up '
+        + 'is a card that opens its two-page report.',
+    ] },
     { n: 125, date: '2026-10-27', items: [
       'The map\'s <strong>Layers</strong> panel is easier to read: each section heading is a coloured band, and each '
         + 'control sits in a box of its own together with its sliders, choices and notes, so you can see where one '

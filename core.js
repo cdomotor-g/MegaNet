@@ -208,10 +208,21 @@ const TABS = [
       find: 'readings telemetry datastore sensors chart plot window rainfall level quality' },
     { id: 'msglog',     label: 'Message Log',            icon: '📨',
       find: 'messages telemetry arrivals incoming ingest raw log fade margin ingress base pathway follow live decode calibration value volts battery converted' },
+  ] },
+  // ── Network health: Data, cut in two ───────────────────────────────────────
+  // Data held six — the readings, and what they say about the network — until
+  // 🕵️ Investigations would have made it seven, past nav.mjs's ceiling. The cut
+  // follows the job: the four above are the readings themselves, charted and
+  // logged; these three are judgements on them — each station's health, the
+  // repeaters ranked by what is wrong with each, and the write-ups of strange
+  // data and what was behind it. Filed straight after Data, so Station Health
+  // keeps its place in the order and a find word it shares with a later group
+  // still goes to it.
+  { group: 'Network health', tabs: [
     { id: 'health',     label: 'Station Health',         icon: '🚦',
       find: 'monitoring maintenance o&m faults alarms battery trend voltage solar charge missed checks check signals timed reports silent quiet offline outage schedule repeater down receiver stopped base station network health data quality corrupted copies bit flips ghosts rain gauge blocked tipped level stuck flatline register unknown address agent ai claude briefing triage network weather bulletin daily weekly summary animation news droggies presenter' },
-    // 🗼 Backbone (backbone.js), headed "State of the backbone", is the sixth,
-    // and the group's last, beside Station Health, whose findings it ranks:
+    // 🗼 Backbone (backbone.js), headed "State of the backbone", is the second,
+    // beside Station Health, whose findings it ranks:
     // the repeaters ranked by what has gone wrong with each over a period —
     // off air, corrupted relays, their signal, a carrier off the fleet, power,
     // pass ranges against the air. Its find words are the questions a meeting
@@ -222,6 +233,13 @@ const TABS = [
     // which nav.mjs holds for other tabs.
     { id: 'backbone',   label: 'Backbone',               icon: '🗼',
       find: 'state backbone repeaters faulty worst ranked ranking rank priority priorities criticality critical issues problems relaying corrupting off air dropouts dropping out meeting monthly fortnight' },
+    // 🕵️ Investigations (investigations.js) is the third: the write-ups in
+    // investigations/, read from that folder's own list. Its find words are
+    // what somebody holding a strange chart types — "why", "weird", "what
+    // happened", "write-up" — and never "report" or "review", which Station
+    // Health's timed reports and Admin's Network Review answer to.
+    { id: 'investigations', label: 'Investigations',     icon: '🕵️',
+      find: 'investigation investigations write-up write-ups writeup writeups case study studies why weird strange odd unexplained explained explanation root cause what happened what caused findings post-mortem postmortem' },
   ] },
   { group: 'Site visits', tabs: [
     // 📌 Nearby (nearby.js) heads the group because it is where a visit
@@ -1545,8 +1563,8 @@ const HELP = {
       + 'measured carriers have no sender, and are weighed by pass range only.',
     ],
     links: [{ label: 'Investigations — strange data we have looked into, and what was behind it',
-              href: 'investigations/' }],
-    related: ['bitflipper', 'health', 'reception', 'workbench', 'bitbench'],
+              call: "switchTab('investigations')" }],
+    related: ['bitflipper', 'health', 'reception', 'workbench', 'bitbench', 'investigations'],
   },
 
   bitbench: {
@@ -1854,7 +1872,7 @@ const HELP = {
       { label: 'Hydrology Raw Data Filtering — the specification (v2.1, 2009)',
         href: 'docs/Hydrology Raw Data Filtering Program Specification.pdf' },
       { label: 'Investigations — strange data we have looked into, and what was behind it',
-        href: 'investigations/' },
+        call: "switchTab('investigations')" },
     ],
     related: ['arro', 'field', 'stations'],
   },
@@ -2034,7 +2052,7 @@ const HELP = {
       { label: 'Station Health — every finding, what triggers it, and what to do',
         href: 'docs/station-health.md' },
     ],
-    related: ['msglog', 'reception', 'basestations', 'field', 'stations'],
+    related: ['msglog', 'reception', 'basestations', 'field', 'stations', 'investigations'],
   },
 
   signalroutes: {
@@ -2535,7 +2553,26 @@ const HELP = {
     links: [
       { label: 'State of the backbone — what is gathered, how it is ranked, and how to read it', href: 'docs/backbone.md' },
     ],
-    related: ['health', 'flipsources', 'signalroutes', 'passranges', 'basestations', 'review'],
+    related: ['health', 'flipsources', 'signalroutes', 'passranges', 'basestations', 'review', 'investigations'],
+  },
+
+  investigations: {
+    summary: 'Strange data we have looked into, and what was behind it: a <strong>write-up</strong> each, newest first, '
+           + 'that leads with the answer, then the evidence, and says what is <strong>established</strong>, what is '
+           + '<strong>likely</strong> and what is still <strong>open</strong>. Each is two printed pages with its figures, '
+           + 'and opens in a tab of its own to read, print or save as a PDF.',
+    watch: [
+      'A write-up is dated, and says how sure it is. "Open" means the cause is narrowed, not proven — read its next '
+      + 'steps before acting on it.',
+      'Every figure is drawn by a script from the exports kept beside it in the repository, so it can be checked, or '
+      + 'run again on new data.',
+      'The list is read from the investigations page itself, so it needs a connection; the reports are not saved '
+      + 'for use with no signal.',
+    ],
+    links: [
+      { label: 'The investigations as a page of their own', href: 'investigations/' },
+    ],
+    related: ['health', 'backbone', 'flipsources', 'arrodata', 'bitbench'],
   },
 
   review: {

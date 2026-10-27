@@ -109,6 +109,7 @@ const Glyphs = (() => {
     flag:      '<path d="M5 21V3.5"/><path d="M5 4h12l-2.5 4L17 12H5"/>',
     directions:'<path d="m3 11 18-8-8 18-2-8z"/>',
     search:    '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/>',
+    casefile:  '<path d="M13 21H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h8l4 4v4"/><path d="M14 3v4h4"/><circle cx="16" cy="16" r="3"/><path d="m18.2 18.2 2.3 2.3"/>',
     user:      '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
     sparkle:   '<path d="M12 3c.6 4.2 2.8 6.4 7 7-4.2.6-6.4 2.8-7 7-.6-4.2-2.8-6.4-7-7 4.2-.6 6.4-2.8 7-7z"/><path d="M19 15.5v4M17 17.5h4"/>',
     more:      '<circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/>',
@@ -125,6 +126,7 @@ const Glyphs = (() => {
     'Interference':        ['interfere', 'radio'],
     'ALERT':               ['decode',    'radio'],
     'Data':                ['data',      'data'],
+    'Network health':      ['health',    'data'],
     'Site visits':         ['inspect',   'field'],
     'Surveying':           ['survey',    'field'],
     'Field training':      ['staff',     'learn'],
@@ -145,6 +147,7 @@ const Glyphs = (() => {
     levels: 'survey', twopeg: 'pegs', surveyguide: 'book',
     propagation: 'waves', biterrors: 'bolt', swr: 'meter', pinouts: 'dsub', kbstaff: 'staff', kblogbook: 'logbook', kblifecycle: 'cycle', kblevel: 'solar', kbriver: 'gauge',
     admin: 'admin', basestations: 'base', backbone: 'backbone', review: 'review', a2plan: 'plan', tdma: 'slots',
+    investigations: 'casefile',
   };
 
   // An inspection sheet's sections (0009's section_key), for the row of signs

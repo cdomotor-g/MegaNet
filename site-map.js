@@ -363,6 +363,14 @@ const SiteMap = (function () {
         'Take the ranking away as a CSV, or the summary as text',
       ],
     },
+    investigations: {
+      what: 'Write-ups of strange data and what was behind it, newest first: each leads with the answer, shows the evidence in figures, and says what is proven and what is still open.',
+      use: [
+        'Find out why a station\'s chart looks wrong before chasing it yourself',
+        'Read, print or pass on a two-page report on a problem',
+        'See what has been established about a repeater, and what to check next',
+      ],
+    },
     review: {
       what: 'A network reviewed the way a planner does it: every station\'s fade margin to every repeater, base or proposed site, beside what the attenuator found on site.',
       use: [
@@ -464,7 +472,9 @@ const SiteMap = (function () {
     'ALERT': { step: 'What it actually sent',
       blurb: 'The messages themselves — decoded bit by bit, explained when they land on the wrong address, and heard live off the air.' },
     'Data': { step: 'What the sensors said',
-      blurb: 'The readings: charted, logged as they arrive, and read for what they say about each station\'s health.' },
+      blurb: 'The readings themselves: opened in ARRO, charted from its exports and from our own receivers, and logged as they arrive.' },
+    'Network health': { step: 'How it is holding up',
+      blurb: 'What the readings say about the network: each station\'s health, the repeaters ranked by what is wrong with each, and write-ups of strange data and what was behind it.' },
     'Site visits': { step: 'What we did on site',
       blurb: 'The paperwork of a visit, digitised — inspections, council maintenance, the record of both, and the photos.' },
     'Surveying': { step: 'How high it all is',
@@ -492,6 +502,7 @@ const SiteMap = (function () {
     { text: 'Find the repeater that is corrupting readings', tab: 'flipsources' },
     { text: 'See which repeater each station comes in through', tab: 'signalroutes' },
     { text: 'Rank the repeaters by what is wrong with them', tab: 'backbone' },
+    { text: 'Read why a chart looked wrong, and what was behind it', tab: 'investigations' },
     { text: 'Work out what could have corrupted a station\'s readings', tab: 'bitbench' },
     { text: 'Work out what is interfering with a repeater', tab: 'workbench' },
     { text: 'Listen to ALERT off the air',                 tab: 'serial' },
