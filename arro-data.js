@@ -1786,7 +1786,7 @@ const ArroData = (function () {
   // passing the series changes nothing).
   //
   // With them, the pen lifts wherever the *record* went quiet for longer than
-  // the series' own reporting interval. Missing data is the normal condition of
+  // the series' gap threshold — see fieldGapMs(). Missing data is the normal condition of
   // a radio telemetry network, and a line ruled across six hours of nothing is
   // the chart inventing readings — the one thing this tab exists to catch other
   // systems doing.
@@ -2509,20 +2509,25 @@ const ArroData = (function () {
     return 'daily';
   }
 
-  // How long a silence has to be before the chart stops joining across it. On a
-  // rollup that is one missing bucket. On raw readings it is taken from what the
-  // station actually does — three times the median gap it did report — because a
-  // 15-minute station and a tipping-bucket that only speaks when it rains are
-  // both normal, and one fixed threshold would libel one of them.
+  // How long a silence has to be before the chart stops joining across it: six
+  // hours, as #114 put it, or three times the median gap the station did report
+  // if that is longer. Six hours is a floor and not a starting point because an
+  // ALERT sensor speaks when its value changes, not on a clock — ten minutes
+  // apart on a rise, the best part of an hour on a slow recession — so an hour's
+  // quiet is the river holding still rather than a reading lost. A floor scaled
+  // from the median alone was set by the busiest stretch of the window and broke
+  // every recession after it into islands. On a daily rollup it is one missing
+  // day, which is already longer.
+  const AD_FIELD_GAP_FLOOR = 6 * 3600000;
+
   function fieldGapMs(t, n, res) {
-    if (res === 'hourly') return 1.5 * 3600000;
-    if (res === 'daily')  return 1.5 * AD_DAY;
+    if (res === 'daily') return 1.5 * AD_DAY;
     if (n < 4) return 0;
     const d = [];
     for (let i = 1; i < n; i++) { const g = t[i] - t[i - 1]; if (g > 0) d.push(g); }
     if (d.length < 3) return 0;
     d.sort((a, b) => a - b);
-    return Math.max(3 * d[d.length >> 1], 900000);   // never tighter than 15 minutes
+    return Math.max(3 * d[d.length >> 1], AD_FIELD_GAP_FLOOR);
   }
 
   // meganet.quality is six rows and never changes within a session.
