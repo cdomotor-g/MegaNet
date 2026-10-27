@@ -14,7 +14,11 @@
 //   2. **The filter box** — an address typed draws exactly the repeaters
 //      that carry it, each marked where it is.
 //   3. **The grid** — an address looked up names its station; a free one
-//      pointed at with the mouse offers itself to the Allocate card.
+//      pointed at with the mouse offers itself to the Allocate card. **The
+//      wheel** — a wedge counted as the station file has it, every repeater
+//      carrying any of it called out when it is pointed at and kept when it
+//      is pressed, the arrow keys stepping round; the biggest gap first, and
+//      kept, it takes its first free address to the grid.
 //   4. **The map** — circles merge as it zooms out and break apart as it
 //      zooms in; a merged circle's number is its repeaters' free addresses
 //      counted once, not summed.
@@ -228,6 +232,50 @@ try {
   ok('…to the Allocate card: the repeater that carries it, that address, one of it', formed.first === String(FREE) && formed.count === 1
     && REPS.find(r => 'rep:' + r.id === formed.where)?.carried.includes(FREE), J(formed));
 
+  // ── 3b. the wheel ─────────────────────────────────────────────────────────
+  console.log('\nAll addresses: the wheel\n');
+  await page.evaluate(() => AddressSpace.setView('wheel'));
+  await until(page, () => { const c = document.getElementById('as-wheel'); return c && c.width > 0; });
+  ok('the wheel shows the grid\'s hub', (await page.evaluate(() => AddressSpace.state().scope)) === 'hub:brisbane');
+  const WG = Math.floor(HELD / 100), wlo = Math.max(1, WG * 100), whi = WG * 100 + 99;
+  const wantReps = REPS.filter(r => r.hub === 'brisbane' && r.carried.some(a => a >= wlo && a <= whi)).map(r => r.id).sort();
+  let wantHeld = 0;
+  for (let a = wlo; a <= whi; a++) if ((held.get(`brisbane|${a}`) || []).length) wantHeld++;
+  const st = await page.evaluate(([lo, hi]) => AddressSpace.stretch(lo, hi), [wlo, whi]);
+  ok(`a wedge counted as the station file has it, every repeater carrying any of it named (${wlo}–${whi}: ${wantHeld} held, ${wantReps.length} repeaters)`,
+    st.held === wantHeld && J(st.reps.map(x => x.id).sort()) === J(wantReps), J({ held: st.held, reps: st.reps.map(x => x.id), wantReps }));
+  await page.locator('#as-wheel').scrollIntoViewIfNeeded();
+  const geo = await page.evaluate(() => AddressSpace.wheel().geom);
+  const wbox = await page.locator('#as-wheel').boundingBox();
+  const th = -Math.PI / 2 + (2 * Math.PI * (WG * 100 + 50)) / 8200, kk = wbox.width / geo.D;
+  const px = wbox.x + (geo.cx + Math.cos(th) * geo.R * 0.9) * kk, py = wbox.y + (geo.cy + Math.sin(th) * geo.R * 0.9) * kk;
+  await page.mouse.move(px, py);
+  const firstRep = REPS.find(r => r.id === st.reps[0].id);
+  const tip = await page.evaluate(() => { const t = document.getElementById('as-wheel-tip'); return { shown: !t.hidden, text: t.textContent, hover: AddressSpace.wheel().hover }; });
+  ok(`pointing at the wedge calls out the repeaters carrying it (${firstRep.name}, …)`, tip.shown && tip.hover === WG && tip.text.includes(`${wlo}–${whi}`) && tip.text.includes(firstRep.name), J(tip));
+  await page.mouse.click(px, py);
+  const kept = await page.evaluate(() => ({ sel: AddressSpace.wheel().sel, text: document.getElementById('as-wheel-out').textContent }));
+  ok('…pressing it keeps it, the readout naming them', kept.sel && kept.sel.wedge === WG && kept.text.includes(firstRep.name) && /On the address grid/.test(kept.text), J(kept));
+  await page.mouse.move(wbox.x + 2, wbox.y + 2);
+  ok('…and the callout goes when the pointer leaves the rings', await page.evaluate(() => document.getElementById('as-wheel-tip').hidden && AddressSpace.wheel().hover === null));
+  await page.focus('#as-wheel');
+  await page.keyboard.press('ArrowRight');
+  ok('the arrow keys step to the next wedge', (await page.evaluate(() => AddressSpace.wheel().sel)).wedge === (WG + 1) % 82);
+  const gap0 = figuresOf(Array.from({ length: MAX }, (_, i) => i + 1), ['brisbane']).runs.slice().sort((a, b) => (b.n - a.n) || (a.lo - b.lo))[0];
+  const chip = await page.evaluate(() => { const b = document.querySelector('.as-gaps .pill'); return b && { lo: Number(b.dataset.lo), text: b.textContent }; });
+  ok(`the biggest gap first under the wheel (${gap0.lo}–${gap0.hi}, ${gap0.n})`, chip && chip.lo === gap0.lo && chip.text.includes(`${gap0.lo}–${gap0.hi}`), J(chip));
+  await page.click('.as-gaps .pill');
+  const gk = await page.evaluate(() => ({ sel: AddressSpace.wheel().sel, text: document.getElementById('as-wheel-out').textContent, pressed: document.querySelector('.as-gaps .pill').getAttribute('aria-pressed') }));
+  ok('…pressed, it is kept and said to be a gap', gk.sel && gk.sel.gap && gk.sel.lo === gap0.lo && gk.sel.hi === gap0.hi
+    && gk.text.includes(`a gap of ${gap0.n.toLocaleString()}`) && gk.pressed === 'true', J(gk));
+  const carriedB = new Set(REPS.filter(r => r.hub === 'brisbane').flatMap(r => r.carried));
+  let firstFree = null;
+  for (let a = gap0.lo; a <= gap0.hi && firstFree == null; a++) if (carriedB.has(a)) firstFree = a;
+  firstFree ??= gap0.lo;
+  await page.evaluate(() => [...document.querySelectorAll('#as-wheel-out .link-btn')].find(b => /address grid/.test(b.textContent)).click());
+  const tg = await page.evaluate(() => AddressSpace.state());
+  ok(`…and On the address grid takes its first free address there, under a repeater if one is (${firstFree})`, tg.view === 'grid' && tg.pickAddr === firstFree, J({ view: tg.view, pick: tg.pickAddr }));
+
   // ── 4. the map ────────────────────────────────────────────────────────────
   console.log('\nThe map\n');
   await page.evaluate(() => AddressSpace.setView('map'));
@@ -315,7 +363,7 @@ try {
   // ── 9. a phone ────────────────────────────────────────────────────────────
   console.log('\nA phone\n');
   await page.setViewportSize({ width: 375, height: 800 });
-  for (const v of ['repeaters', 'networks', 'grid', 'map']) {
+  for (const v of ['repeaters', 'networks', 'wheel', 'grid', 'map']) {
     await page.evaluate(x => AddressSpace.setView(x), v);
     await page.waitForTimeout(250);
     const wide = await page.evaluate(() => document.documentElement.scrollWidth);

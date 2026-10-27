@@ -2648,6 +2648,24 @@ td {
 .as-grid-wrap { margin-top: var(--sp-2); }
 .as-grid-wrap canvas { display: block; width: var(--gw, 760px); height: var(--gh, 600px); cursor: crosshair; }
 .as-readout { min-height: 2.6em; margin: var(--sp-1) 0; }
+/* All addresses: the wheel. Its middle ring is the rulers' pass-range tint
+   stepped up a repeater at a time — one, two, three or more carrying it. */
+.as-c-cov1 { --c: color-mix(in srgb, var(--accent) 30%, transparent); }
+.as-c-cov2 { --c: color-mix(in srgb, var(--accent) 60%, transparent); }
+.as-c-cov3 { --c: var(--accent); }
+.as-wheel-wrap { position: relative; margin-top: var(--sp-2); }
+.as-wheel-wrap canvas { display: block; width: var(--ww, 560px); max-width: 100%; height: auto; aspect-ratio: 1 / 1; margin: 0 auto; cursor: pointer; border-radius: 50%; }
+.as-wheel-wrap canvas:focus-visible { outline: var(--focus-width) solid var(--focus); outline-offset: 2px; }
+.as-wheel-tip {
+  position: absolute; left: var(--tip-x, 0px); top: var(--tip-y, 0px); z-index: 4;
+  width: max-content; max-width: min(20rem, calc(100% - 8px)); padding: var(--sp-1) var(--sp-2);
+  background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md);
+  box-shadow: var(--shadow-2); pointer-events: none;
+}
+.as-wheel-tip p, .as-readout p { margin: 0 0 var(--sp-1); }
+.as-tip-h { font-weight: 600; }
+.as-tip-reps { gap: 0; }
+.as-wedges td, .as-wedges th { vertical-align: top; }
 .as-map { height: 480px; border-radius: var(--r-md); margin-top: var(--sp-2); }
 .as-bubble-wrap { background: none; border: 0; }
 .as-bubble { display: block; width: var(--d, 30px); height: var(--d, 30px); line-height: var(--d, 30px); border-radius: 50%; text-align: center; font-weight: 700; font-size: 12px; color: #fff;

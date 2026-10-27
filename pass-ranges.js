@@ -47,9 +47,9 @@
 // (AddressSpace): the Allocate card — set ALERT addresses aside for a new
 // station, kept in the datastore (0084) — and Address space, the pass ranges
 // drawn repeater by repeater and network by network as Signal Routes draws
-// them, an address grid, and a map of what each region has left. This file
-// draws their shells in place and hands the filter box to them; app.js calls
-// AddressSpace.init() once the tab is on screen.
+// them, every address round a wheel and on a grid, and a map of what each
+// region has left. This file draws their shells in place and hands the filter
+// box to them; app.js calls AddressSpace.init() once the tab is on screen.
 
 // ── PASS RANGES tab ────────────────────────────────────────────────────────────
 

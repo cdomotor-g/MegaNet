@@ -146,7 +146,7 @@ const ExportMenu = (function () {
         ready: () => { const A = typeof SignalRoutes !== 'undefined' && SignalRoutes.state().A; return !A ? 'Nothing read yet — read the receptions, or show the demo.' : A.reps.length ? '' : 'No repeater\'s carrier was found in this period.'; } },
     ],
     passranges: () => [
-      { label: 'The address grid — CSV', sub: 'every address of the hub or radio network the grid is showing: in use and by whom, set aside and for what, or free, and the repeaters that carry it',
+      { label: 'The address grid — CSV', sub: 'every address of the hub or radio network the grid and the wheel are showing: in use and by whom, set aside and for what, or free, and the repeaters that carry it',
         call: ['AddressSpace.exportCsv'], ready: gated },
       { label: 'The addresses set aside — CSV', sub: 'every allocation still live: the address, its hub, what it is for, the repeater and station, who set it aside and when, and the station that has taken it up',
         call: ['AddressSpace.exportAllocCsv'],

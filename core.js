@@ -1287,8 +1287,8 @@ const HELP = {
            + 'from a repeater to its base is drawn on the Stations map rather than listed here. One '
            + 'filter box drives both tables, and takes a name, a station number, an address or a '
            + 'pasted list of them. <strong>Address space</strong> draws how full the ranges are — each '
-           + 'repeater\'s, each radio network\'s with a lane a repeater, every address of a hub on a '
-           + 'grid, and a map whose numbered circles are the free addresses a region has left — and '
+           + 'repeater\'s, each radio network\'s with a lane a repeater, every address of a hub round '
+           + 'one wheel (point at a wedge for the repeaters that carry it) and on a grid, and a map whose numbered circles are the free addresses a region has left — and '
            + '<strong>Allocate an ALERT address</strong> sets addresses aside for a new station, in the '
            + 'datastore for everybody, so two people planning two sites cannot pick the same one.',
     watch: [

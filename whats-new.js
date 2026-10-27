@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 115, date: '2026-10-27', items: [
+      '<strong>🔗 Pass Ranges → Address space</strong> has an <strong>All addresses</strong> wheel: every ALERT address of a hub, '
+        + '1 at the top and clockwise to 8,191, a wedge a block of a hundred — each address in use, set aside or free, how many '
+        + 'repeaters carry it, and how full each block is, so the gaps show as gaps. Point at a wedge and it names the repeaters '
+        + 'that carry any of it; press it, or one of the <strong>biggest gaps</strong> listed under the wheel, to keep it, with '
+        + 'a button to allocate there.',
+    ] },
     { n: 114, date: '2026-10-27', items: [
       '<strong>🔗 Pass Ranges</strong> draws how full the ALERT addresses are, under <strong>Address space</strong>: '
         + '<strong>each repeater</strong>\'s pass ranges as Signal Routes draws them, every address in use, set aside or free; '
