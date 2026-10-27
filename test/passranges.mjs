@@ -18,7 +18,10 @@
 //      wheel** — a wedge counted as the station file has it, every repeater
 //      carrying any of it called out when it is pointed at and kept when it
 //      is pressed, the arrow keys stepping round; the biggest gap first, and
-//      kept, it takes its first free address to the grid.
+//      kept, it takes its first free address to the grid. **Every hub
+//      together** — in use when any hub's station holds it, two hubs on one
+//      address reuse and not a clash, the gaps the addresses nobody anywhere
+//      is on, and a wedge's repeaters from every hub, each named with its hub.
 //   4. **The map** — circles merge as it zooms out and break apart as it
 //      zooms in; a merged circle's number is its repeaters' free addresses
 //      counted once, not summed.
@@ -275,6 +278,51 @@ try {
   await page.evaluate(() => [...document.querySelectorAll('#as-wheel-out .link-btn')].find(b => /address grid/.test(b.textContent)).click());
   const tg = await page.evaluate(() => AddressSpace.state());
   ok(`…and On the address grid takes its first free address there, under a repeater if one is (${firstFree})`, tg.view === 'grid' && tg.pickAddr === firstFree, J({ view: tg.view, pick: tg.pickAddr }));
+
+  // Every hub together.
+  const HUBS = DOC.hubs.map(h => h.id);
+  const hubsAt = a => HUBS.filter(h => (held.get(`${h}|${a}`) || []).length);
+  const twoIn = a => HUBS.some(h => (held.get(`${h}|${a}`) || []).length > 1);
+  let eUse = 0, eClash = 0, eLong = null, eCur = null, REUSED = null;
+  for (let a = 1; a <= MAX; a++) {
+    const n = hubsAt(a).length;
+    if (twoIn(a)) eClash++; else if (n) eUse++;
+    if (n >= 2 && !twoIn(a) && REUSED == null) REUSED = a;
+    if (n) { eCur = null; continue; }
+    if (eCur && a === eCur.hi + 1) { eCur.hi = a; eCur.n++; } else eCur = { lo: a, hi: a, n: 1 };
+    if (!eLong || eCur.n > eLong.n) eLong = { ...eCur };
+  }
+  const every = await page.evaluate(() => AddressSpace.figures('all'));
+  ok(`Every hub together: in use where any hub's station holds it (${eUse}), two only inside one hub (${eClash}), the longest gap ${eLong.lo}–${eLong.hi}`,
+    every.n === MAX && every.use === eUse && every.clash === eClash && every.longest.lo === eLong.lo && every.longest.hi === eLong.hi,
+    J({ n: every.n, use: every.use, clash: every.clash, longest: every.longest && [every.longest.lo, every.longest.hi] }));
+  await page.evaluate(() => AddressSpace.setScope('all'));
+  await page.fill('#as-look', String(REUSED));
+  const ro2 = await page.evaluate(() => document.getElementById('as-readout').innerHTML);
+  ok(`…on the grid, an address ${hubsAt(REUSED).length} hubs reuse is in use in each, not held by two (${REUSED})`,
+    ro2.includes(`in use in ${hubsAt(REUSED).length} hubs`) && !/txt-bad/.test(ro2), ro2.slice(0, 300));
+  await page.evaluate(() => AddressSpace.setView('wheel'));
+  await until(page, () => { const c = document.getElementById('as-wheel'); return c && c.width > 0; });
+  const chip2 = await page.evaluate(() => ({ scope: document.querySelector('#as-view select').value, lo: Number((document.querySelector('.as-gaps .pill') || {}).dataset?.lo) }));
+  ok('…the wheel keeps the scope, its biggest gap the one nobody anywhere is on', chip2.scope === 'all' && chip2.lo === eLong.lo, J(chip2));
+  const W2 = Array.from({ length: 82 }, (_, i) => i).find(w => new Set(REPS.filter(r => r.carried.some(a => a >= Math.max(1, w * 100) && a <= w * 100 + 99)).map(r => r.hub)).size >= 2);
+  const w2lo = Math.max(1, W2 * 100), w2hi = W2 * 100 + 99;
+  const want2 = REPS.filter(r => r.carried.some(a => a >= w2lo && a <= w2hi)).map(r => r.id).sort();
+  let wantReuse = 0;
+  for (let a = w2lo; a <= w2hi; a++) if (hubsAt(a).length >= 2 && !twoIn(a)) wantReuse++;
+  const st2 = await page.evaluate(([lo, hi]) => AddressSpace.stretch(lo, hi), [w2lo, w2hi]);
+  ok(`…a wedge names the repeaters of every hub carrying it (${w2lo}–${w2hi}: ${want2.length}), and counts the reuse (${wantReuse})`,
+    J(st2.reps.map(x => x.id).sort()) === J(want2) && st2.hub2 + st2.hub3 === wantReuse, J({ reps: st2.reps.length, want: want2.length, reuse: st2.hub2 + st2.hub3 }));
+  await page.locator('#as-wheel').scrollIntoViewIfNeeded();
+  const geo2 = await page.evaluate(() => AddressSpace.wheel().geom);
+  const wbox2 = await page.locator('#as-wheel').boundingBox();
+  const th2 = -Math.PI / 2 + (2 * Math.PI * (W2 * 100 + 50)) / 8200, k2 = wbox2.width / geo2.D;
+  await page.mouse.move(wbox2.x + (geo2.cx + Math.cos(th2) * geo2.R * 0.9) * k2, wbox2.y + (geo2.cy + Math.sin(th2) * geo2.R * 0.9) * k2);
+  const tip2 = await page.evaluate(() => document.getElementById('as-wheel-tip').textContent);
+  const hubNames = [...new Set(st2.reps.slice(0, 8).map(x => DOC.hubs.find(h => h.id === REPS.find(r => r.id === x.id).hub).name))];
+  ok(`…and the callout says each one's hub (${hubNames.join(', ')})`, hubNames.every(n => tip2.includes(`(${n})`)), tip2.slice(0, 300));
+  await page.mouse.move(wbox2.x + 2, wbox2.y + 2);
+  await page.evaluate(() => AddressSpace.setScope('hub:brisbane'));
 
   // ── 4. the map ────────────────────────────────────────────────────────────
   console.log('\nThe map\n');

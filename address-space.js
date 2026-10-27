@@ -22,10 +22,12 @@
 //                      the top and clockwise, a wedge a block of a hundred: each
 //                      address to scale, how many repeaters carry it, and how
 //                      full each block is, so a gap shows as a gap. Point at a
-//                      wedge for the repeaters that carry any of it.
+//                      wedge for the repeaters that carry any of it. For a hub,
+//                      a radio network, or every hub together.
 //                    * Address grid — all 8,191 addresses, a hundred to a row,
-//                      for a hub or a radio network, each row with how full that
-//                      block of a hundred is. Point at one to say whose it is.
+//                      for a hub, a radio network or every hub together, each
+//                      row with how full that block of a hundred is. Point at
+//                      one to say whose it is.
 //                    * Map — the repeaters as numbered circles: the free
 //                      addresses they carry, counted once however many of them
 //                      carry each. Circles merge as you zoom out, so the number
@@ -39,7 +41,11 @@
 // a station entered twice. So an address is **in use** in a hub when a station
 // there holds it, **set aside** when a live allocation (0084) holds it and no
 // station does yet, and **free** otherwise; a scope that spans two hubs (the
-// Emerald network does) asks both. The register is the station file in
+// Emerald network does) asks both. Every hub together is the one scope that
+// does not: an address is **in use** there when a station in any hub holds
+// it — the wheel and the grid shade it by how many hubs do — **held by two**
+// only when two stations in one hub hold it, and **free** only when no hub's
+// station holds it and nobody has set it aside. The register is the station file in
 // memory, so an address saved onto a sensor a minute ago is already in use
 // here; an allocation is the datastore's, read when the tab opens, for signed-in
 // accounts the database approves.
@@ -67,6 +73,7 @@ const AddressSpace = (() => {
   const WORD = {
     use: 'in use', clash: 'held by two stations', alloc: 'set aside', free: 'free',
     direct: 'in use, carried by no repeater here', open: 'free, carried by no repeater here', out: 'outside this network\'s ranges',
+    hub1: 'in use in one hub', hub2: 'in use in two hubs', hub3: 'in use in three hubs or more',
   };
 
   const S = {
@@ -197,6 +204,7 @@ const AddressSpace = (() => {
       const rs = reps.filter(r => r.hub === h);
       scopeAdd(I, { id: 'hub:' + h, kind: 'hub', name: hubName(I, h), hubs: [h], reps: rs, addrs: null, carriedSet: new Set(union(rs)) });
     });
+    scopeAdd(I, { id: 'all', kind: 'all', name: 'Every hub together', hubs: I.hubList.slice(), reps, addrs: null, carriedSet: new Set(union(reps)) });
 
     S.idx = I; S.idxData = D; S.idxKey = key; S.idxRows = S.alloc.rows;
     return I;
@@ -225,10 +233,32 @@ const AddressSpace = (() => {
     if (n === 1) return 'use';
     return allocOf(I, hubs, a) ? 'alloc' : 'free';
   }
+  // Every hub together: two stations on an address are two only inside one
+  // hub; across hubs they are the reuse the address space is built for.
+  function hubsUsing(I, sc, a) {
+    let n = 0, two = false;
+    for (const h of sc.hubs) { const l = I.held.get(h) && I.held.get(h).get(a); if (l) { n++; if (l.length > 1) two = true; } }
+    return { n, two };
+  }
+  function scopeStatus(I, sc, a) {
+    if (sc.kind !== 'all') return status(I, sc.hubs, a);
+    const u = hubsUsing(I, sc, a);
+    return u.two ? 'clash' : u.n ? 'use' : allocOf(I, sc.hubs, a) ? 'alloc' : 'free';
+  }
+  // A scope of every address — a hub, or every hub together — rather than a
+  // network's ranges.
+  const whole = sc => sc.kind === 'hub' || sc.kind === 'all';
   // The finer word the grid uses: in a hub, an address no repeater there
-  // carries is somebody's straight to a base, or free only for one that will be.
+  // carries is somebody's straight to a base, or free only for one that will
+  // be; every hub together, in use in how many hubs.
   function cellStatus(I, sc, a) {
     if (a < 1 || a > MAX) return 'void';
+    if (sc.kind === 'all') {
+      const u = hubsUsing(I, sc, a);
+      if (u.two) return 'clash';
+      if (u.n) return u.n >= 3 ? 'hub3' : u.n === 2 ? 'hub2' : 'hub1';
+      return allocOf(I, sc.hubs, a) ? 'alloc' : sc.carriedSet.has(a) ? 'free' : 'open';
+    }
     if (sc.kind === 'hub') {
       const st = status(I, sc.hubs, a), carried = sc.carriedSet.has(a);
       return carried ? st : st === 'use' ? 'direct' : st === 'free' ? 'open' : st;
@@ -246,7 +276,7 @@ const AddressSpace = (() => {
     let t = I.tallies.get(sc.id);
     if (t) return t;
     t = { n: 0, use: 0, clash: 0, alloc: 0, free: 0 };
-    addrsOf(sc).forEach(a => { t.n++; t[status(I, sc.hubs, a)]++; });
+    addrsOf(sc).forEach(a => { t.n++; t[scopeStatus(I, sc, a)]++; });
     t.taken = t.use + t.clash + t.alloc;
     t.full = pct(t.taken, t.n);
     t.runs = freeRuns(I, sc);
@@ -258,7 +288,7 @@ const AddressSpace = (() => {
     const runs = [];
     let cur = null;
     addrsOf(sc).forEach(a => {
-      if (status(I, sc.hubs, a) !== 'free') { cur = null; return; }
+      if (scopeStatus(I, sc, a) !== 'free') { cur = null; return; }
       if (cur && a === cur.hi + 1) { cur.hi = a; cur.n++; } else runs.push(cur = { lo: a, hi: a, n: 1 });
     });
     return runs;
@@ -471,37 +501,61 @@ const AddressSpace = (() => {
         // n: what a repeater in scope carries — every in-scope address of a
         // network, the carried ones of a hub.
         if (st !== 'direct' && st !== 'open') b.n++;
-        if (st === 'use' || st === 'clash' || st === 'direct') b.use++;
+        if (st === 'use' || st === 'clash' || st === 'direct' || st.startsWith('hub')) b.use++;
         else if (st === 'alloc') b.alloc++;
         else if (st === 'free') b.free++;
       }
       // A hub's block is a hundred addresses; a network's, what it carries.
-      b.den = sc.kind === 'hub' ? b.valid : b.n;
+      b.den = whole(sc) ? b.valid : b.n;
       out.push(b);
     }
     return out;
   }
 
+  // The grid's and the wheel's Show: every hub together, a hub, a network.
+  function scopeSelectHtml(I, sc) {
+    const opt = s => `<option value="${escAttr(s.id)}"${s.id === sc.id ? ' selected' : ''}>${esc(s.name)}</option>`;
+    return `<label>Show <select onchange="AddressSpace.setScope(this.value)">
+          <optgroup label="All hubs — an address in use in any of them">${opt(I.scopes.get('all'))}</optgroup>
+          <optgroup label="Hubs — every address">${I.hubList.map(h => opt(I.scopes.get('hub:' + h))).join('')}</optgroup>
+          <optgroup label="Radio networks — the addresses their repeaters carry">${I.groups.map(opt).join('')}</optgroup>
+        </select></label>`;
+  }
+  // What each address's colour says, in this scope.
+  function statusKeysHtml(sc) {
+    const k = (cls, text) => `<span class="sr-key"><span class="sr-sw ${cls}" aria-hidden="true"></span>${text}</span>`;
+    if (sc.kind === 'all') {
+      return `${k('as-c-hub1', 'in use in one hub')}${k('as-c-hub2', 'in two')}${k('as-c-hub3', 'in three or more')}${k('as-c-alloc', 'set aside')}
+        ${k('as-c-clash', 'held by two stations in one hub')}${k('as-c-free', 'free in every hub, and a repeater carries it')}${k('as-c-open', 'free in every hub, no repeater carries it')}`;
+    }
+    const hub = sc.kind === 'hub';
+    return `${k('as-c-use', 'in use')}${hub ? k('as-c-direct', 'in use, no repeater here carries it') : ''}${k('as-c-alloc', 'set aside')}
+        ${k('as-c-clash', 'held by two stations')}${k('as-c-free', hub ? 'free, and a repeater here carries it' : 'free')}
+        ${hub ? k('as-c-open', 'free, no repeater here carries it') : k('as-c-out', 'outside the network\'s ranges')}`;
+  }
+  // The same, for the canvases: a colour and how strongly it is laid on.
+  function cellColours() {
+    const use = cssColour('--as-use', '#00838f'), muted = cssColour('--muted', '#7a8794');
+    return {
+      use: [use, 1], direct: [use, 0.42], hub1: [use, 0.45], hub2: [use, 0.72], hub3: [use, 1],
+      clash: [cssColour('--as-clash', '#c7401a'), 1], alloc: [cssColour('--as-alloc', '#b8860b'), 1],
+      free: [cssColour('--as-free', '#107c10'), 0.8], open: [muted, 0.18], out: [muted, 0.07],
+    };
+  }
+
   function gridHtml(I) {
     const sc = gridScope(I);
     if (!sc) return '<p class="small">No hub or radio network to draw.</p>';
-    const t = tally(I, sc);
-    const opt = s => `<option value="${escAttr(s.id)}"${s.id === sc.id ? ' selected' : ''}>${esc(s.name)}</option>`;
+    const t = tally(I, sc), all = whole(sc);
     const blocks = blockRows(I, sc);
-    const k = (cls, text) => `<span class="sr-key"><span class="sr-sw ${cls}" aria-hidden="true"></span>${text}</span>`;
     return `<div class="control-row as-controls">
-        <label>Show <select onchange="AddressSpace.setScope(this.value)">
-          <optgroup label="Hubs — every address">${I.hubList.map(h => opt(I.scopes.get('hub:' + h))).join('')}</optgroup>
-          <optgroup label="Radio networks — the addresses their repeaters carry">${I.groups.map(opt).join('')}</optgroup>
-        </select></label>
+        ${scopeSelectHtml(I, sc)}
         <label>Address <input type="number" id="as-look" class="field-num" min="1" max="${MAX}" inputmode="numeric" value="${S.pickAddr ?? ''}"
           oninput="AddressSpace.lookup(this.value)" placeholder="5740"></label>
       </div>
-      <p class="small">${esc(captionText(I, sc))}. A row is a block of a hundred — 4000 to 4099 — and the bar at its end how much of the block is taken${sc.kind === 'hub' ? '' : ' of what the network carries in it'}.
+      <p class="small">${esc(captionText(I, sc))}. A row is a block of a hundred — 4000 to 4099 — and the bar at its end how much of the block is taken${all ? '' : ' of what the network carries in it'}.
         Point at an address to see whose it is; pick a free one to allocate it.</p>
-      <p class="small sr-keys">${k('as-c-use', 'in use')}${sc.kind === 'hub' ? k('as-c-direct', 'in use, no repeater here carries it') : ''}${k('as-c-alloc', 'set aside')}
-        ${k('as-c-clash', 'held by two stations')}${k('as-c-free', sc.kind === 'hub' ? 'free, and a repeater here carries it' : 'free')}
-        ${sc.kind === 'hub' ? k('as-c-open', 'free, no repeater here carries it') : k('as-c-out', 'outside the network\'s ranges')}</p>
+      <p class="small sr-keys">${statusKeysHtml(sc)}</p>
       <div class="chart-scroll as-grid-wrap" role="region" tabindex="0" aria-label="${escAttr(`${sc.name}: the address grid — scroll sideways for the whole of it`)}">
         <canvas id="as-grid" role="img" aria-label="${escAttr(`Every ALERT address in ${sc.name}, a hundred to a row. ${captionText(I, sc)}. The table under the grid holds the same, block by block.`)}"
           onmousemove="AddressSpace.gridHover(event)" onmouseleave="AddressSpace.gridHover(null)" onclick="AddressSpace.gridClick(event)"></canvas>
@@ -509,10 +563,10 @@ const AddressSpace = (() => {
       <div id="as-readout" class="small as-readout" aria-live="polite">${readoutHtml(I, sc, S.pickAddr)}</div>
       <details class="sr-fold"><summary>Block by block — the same as a table</summary>
         <div class="table-wrap tall" role="region" tabindex="0" aria-label="${escAttr(`${sc.name}, block by block`)}">
-        <table class="hl-table"><caption class="sr-only">${esc(sc.name)}: each block of a hundred addresses, how many ${sc.kind === 'hub' ? 'are' : 'the network carries,'} in use, set aside and free</caption>
-          <thead><tr><th scope="col">Block</th>${sc.kind === 'hub' ? '' : '<th scope="col" class="num">Carried</th>'}<th scope="col" class="num">In use</th>
-            <th scope="col" class="num">Set aside</th><th scope="col" class="num">Free${sc.kind === 'hub' ? ', carried' : ''}</th><th scope="col" class="num">Taken</th></tr></thead>
-          <tbody>${blocks.filter(b => b.den).map(b => `<tr><th scope="row">${b.lo}–${b.hi}</th>${sc.kind === 'hub' ? '' : `<td class="num">${num(b.n)}</td>`}
+        <table class="hl-table"><caption class="sr-only">${esc(sc.name)}: each block of a hundred addresses, how many ${all ? 'are' : 'the network carries,'} in use, set aside and free</caption>
+          <thead><tr><th scope="col">Block</th>${all ? '' : '<th scope="col" class="num">Carried</th>'}<th scope="col" class="num">In use</th>
+            <th scope="col" class="num">Set aside</th><th scope="col" class="num">Free${all ? ', carried' : ''}</th><th scope="col" class="num">Taken</th></tr></thead>
+          <tbody>${blocks.filter(b => b.den).map(b => `<tr><th scope="row">${b.lo}–${b.hi}</th>${all ? '' : `<td class="num">${num(b.n)}</td>`}
             <td class="num">${num(b.use)}</td><td class="num">${num(b.alloc)}</td><td class="num">${num(b.free)}</td>
             <td class="num">${pct(b.use + b.alloc, b.den)}%</td></tr>`).join('')}</tbody></table></div></details>`;
   }
@@ -521,18 +575,26 @@ const AddressSpace = (() => {
   function readoutHtml(I, sc, a) {
     if (a == null || !sc) return 'Point at an address, or type one above.';
     if (!(a >= 1 && a <= MAX)) return `${esc(String(a))} is not an ALERT address — they run from 1 to ${num(MAX)}.`;
-    const hs = holders(I, sc.hubs, a), al = allocOf(I, sc.hubs, a);
+    const hs = holders(I, sc.hubs, a), al = allocOf(I, sc.hubs, a), every = sc.kind === 'all';
     const by = (I.coverBy.get(a) || []).filter(r => sc.hubs.includes(r.hub));
-    const carriers = by.length ? `carried by ${by.map(r => esc(r.name)).join(', ')}` : `no repeater in ${esc(sc.hubs.map(h => hubName(I, h)).join(' or '))} carries it`;
+    const repName = r => esc(every ? `${r.name} (${hubName(I, r.hub)})` : r.name);
+    const carriers = by.length ? `carried by ${by.map(repName).join(', ')}`
+      : every ? 'no repeater carries it' : `no repeater in ${esc(sc.hubs.map(h => hubName(I, h)).join(' or '))} carries it`;
     const open = s => (typeof goToStation === 'function'
       ? `<button type="button" class="link-btn" onclick="goToStation(${escAttr(JSON.stringify(s.id))})">${esc(s.name)}</button>` : esc(s.name));
     let what;
-    if (hs.length > 1) what = `<span class="txt-bad">held by ${num(hs.length)} stations</span>: ${hs.map(open).join(', ')}`;
+    if (every && hs.length) {
+      // Hub by hub: reuse across hubs is ordinary; two in one hub is not.
+      const by2 = sc.hubs.map(h => ({ h, l: (I.held.get(h) && I.held.get(h).get(a)) || [] })).filter(x => x.l.length);
+      what = `in use in ${plural(by2.length, 'hub')}: ${by2.map(x => `${esc(hubName(I, x.h))} — ${x.l.length > 1 ? `<span class="txt-bad">held by ${num(x.l.length)} stations</span>: ` : ''}${x.l.map(open).join(', ')}`).join('; ')}`;
+    } else if (hs.length > 1) what = `<span class="txt-bad">held by ${num(hs.length)} stations</span>: ${hs.map(open).join(', ')}`;
     else if (hs.length) what = `in use: ${open(hs[0])}${hs[0].station_number ? ` (${esc(hs[0].station_number)})` : ''}`;
     else if (al) what = `<span class="txt-warn">set aside</span> for “${esc(al.purpose)}” by ${esc(al.created_by || '—')}, ${esc(day(al.created_at))}`;
     else {
-      const where = by.length ? 'rep:' + by[0].id : sc.kind === 'hub' ? sc.id : 'hub:' + sc.hubs[0];
-      what = `<b class="as-f-low">free</b> <button type="button" class="link-btn" onclick="AddressSpace.allocateIn(${escAttr(JSON.stringify(where))}, ${a})">Allocate ${a}</button>`;
+      // Every hub together, an address is allocated in a hub: through the
+      // repeater that carries it, or not offered here.
+      const where = by.length ? 'rep:' + by[0].id : sc.kind === 'hub' ? sc.id : every ? null : 'hub:' + sc.hubs[0];
+      what = `<b class="as-f-low">free${every ? ' in every hub' : ''}</b>${where ? ` <button type="button" class="link-btn" onclick="AddressSpace.allocateIn(${escAttr(JSON.stringify(where))}, ${a})">Allocate ${a}</button>` : ''}`;
     }
     return `<b>${a}</b> — ${what} · ${carriers}${sc.kind === 'net' && !sc.set.has(a) ? ' · outside this network\'s ranges' : ''}`;
   }
@@ -569,12 +631,7 @@ const AddressSpace = (() => {
     const g = cv.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);
-    const col = {
-      use: [cssColour('--as-use', '#00838f'), 1], direct: [cssColour('--as-use', '#00838f'), 0.42],
-      clash: [cssColour('--as-clash', '#c7401a'), 1], alloc: [cssColour('--as-alloc', '#b8860b'), 1],
-      free: [cssColour('--as-free', '#107c10'), 0.8], open: [cssColour('--muted', '#7a8794'), 0.18],
-      out: [cssColour('--muted', '#7a8794'), 0.07],
-    };
+    const col = cellColours();
     const text = cssColour('--muted', '#7a8794'), ink = cssColour('--text', '#16202a');
     const inner = cell >= 5 ? cell - 1 : cell;
     g.font = '9px system-ui, sans-serif';
@@ -675,9 +732,9 @@ const AddressSpace = (() => {
   // repeaters that carry any of it and the part each carries.
   function stretch(I, sc, lo, hi) {
     lo = Math.max(1, lo); hi = Math.min(MAX, hi);
-    const c = { lo, hi, n: hi - lo + 1, use: 0, clash: 0, direct: 0, alloc: 0, free: 0, open: 0, out: 0 };
+    const c = { lo, hi, n: hi - lo + 1, use: 0, clash: 0, direct: 0, hub1: 0, hub2: 0, hub3: 0, alloc: 0, free: 0, open: 0, out: 0 };
     for (let a = lo; a <= hi; a++) c[cellStatus(I, sc, a)]++;
-    c.held = c.use + c.clash + c.direct;
+    c.held = c.use + c.clash + c.direct + c.hub1 + c.hub2 + c.hub3;
     c.den = c.n - c.out;
     c.full = pct(c.held + c.alloc, c.den);
     c.reps = sc.reps.map(r => {
@@ -712,29 +769,32 @@ const AddressSpace = (() => {
   // A stretch in words: brief for the callout, with its buttons for the
   // readout under the wheel.
   function stretchHtml(I, sc, c, rich) {
-    const hub = sc.kind === 'hub', span = c.lo === c.hi ? String(c.lo) : `${c.lo}–${c.hi}`;
-    const free = c.free + c.open;
+    const every = sc.kind === 'all', hub = whole(sc), span = c.lo === c.hi ? String(c.lo) : `${c.lo}–${c.hi}`;
+    const free = c.free + c.open, reused = c.hub2 + c.hub3;
     const head = `<b>${span}</b>${c.gap ? ` — a gap of ${num(c.n)}` : ''} · <b class="${fullCls(c.full)}">${c.full}% taken</b>`;
-    const counts = `${num(c.held)} in use · ${num(c.alloc)} set aside · ${num(free)} free${hub && free ? ` (${num(c.free)} under a repeater)` : ''}`
-      + `${c.clash ? ` · <span class="txt-bad">${num(c.clash)} held by two</span>` : ''}${c.out ? ` · ${num(c.out)} outside the network's ranges` : ''}`;
+    const counts = `${num(c.held)} in use${every && reused ? ` (${num(reused)} in two hubs or more)` : ''} · ${num(c.alloc)} set aside`
+      + ` · ${num(free)} free${every ? ' in every hub' : ''}${hub && free ? ` (${num(c.free)} under a repeater)` : ''}`
+      + `${c.clash ? ` · <span class="txt-bad">${num(c.clash)} held by two${every ? ' in one hub' : ''}</span>` : ''}${c.out ? ` · ${num(c.out)} outside the network's ranges` : ''}`;
     const LIMIT = rich ? 24 : 8;
-    const name = x => (rich ? `<button type="button" class="link-btn" onclick="AddressSpace.showRep(${escAttr(JSON.stringify(x.r.id))})">${esc(x.r.name)}</button>` : esc(x.r.name));
+    const label = x => (every ? `${x.r.name} (${hubName(I, x.r.hub)})` : x.r.name);
+    const name = x => (rich ? `<button type="button" class="link-btn" onclick="AddressSpace.showRep(${escAttr(JSON.stringify(x.r.id))})">${esc(label(x))}</button>` : esc(label(x)));
     const reps = c.reps.length
       ? `<p class="as-tip-h">Carried by ${plural(c.reps.length, 'repeater')}:</p>
         <ul class="hl-plain as-tip-reps">${c.reps.slice(0, LIMIT).map(x => `<li>${name(x)} <span class="small">${esc(runsText(x.part, 3))}${x.part.length > 1 ? ` (${num(x.part.length)})` : ''}</span></li>`).join('')}</ul>
         ${c.reps.length > LIMIT ? `<p class="small">and ${num(c.reps.length - LIMIT)} more</p>` : ''}`
-      : `<p class="as-tip-h">No repeater ${hub ? 'in the hub ' : ''}carries any of it${hub && free ? ' — only a station reporting straight to a base could use it' : ''}.</p>`;
+      : `<p class="as-tip-h">No repeater ${sc.kind === 'hub' ? 'in the hub ' : ''}carries any of it${hub && free ? ' — only a station reporting straight to a base could use it' : ''}.</p>`;
     if (!rich) return `<p>${head}</p><p class="small">${counts}</p>${reps}`;
-    // The first free address, under a repeater if one is: what Allocate offers.
+    // The first free address, under a repeater if one is: what Allocate
+    // offers. Every hub together, only one under a repeater, whose hub it goes in.
     let first = null;
-    for (const want of ['free', 'open']) {
+    for (const want of every ? ['free'] : ['free', 'open']) {
       for (let a = c.lo; a <= c.hi && first == null; a++) if (cellStatus(I, sc, a) === want) first = a;
     }
     let act = '';
     if (first != null) {
       const by = (I.coverBy.get(first) || []).filter(r => sc.hubs.includes(r.hub));
-      const where = by.length ? 'rep:' + by[0].id : hub ? sc.id : 'hub:' + sc.hubs[0];
-      act = ` · <button type="button" class="link-btn" onclick="AddressSpace.allocateIn(${escAttr(JSON.stringify(where))}, ${first})">Allocate ${first}</button>`;
+      const where = by.length ? 'rep:' + by[0].id : sc.kind === 'hub' ? sc.id : every ? null : 'hub:' + sc.hubs[0];
+      if (where) act = ` · <button type="button" class="link-btn" onclick="AddressSpace.allocateIn(${escAttr(JSON.stringify(where))}, ${first})">Allocate ${first}</button>`;
     }
     act += ` · <button type="button" class="link-btn" onclick="AddressSpace.toGrid(${first ?? c.lo})">On the address grid</button>`;
     return `<p>${head} · ${counts}${act}</p>${reps}`;
@@ -743,23 +803,18 @@ const AddressSpace = (() => {
   function wheelHtml(I) {
     const sc = gridScope(I);
     if (!sc) return '<p class="small">No hub or radio network to draw.</p>';
-    const hub = sc.kind === 'hub';
+    const every = sc.kind === 'all', hub = whole(sc);
     const t = tally(I, sc), W = wedges(I, sc);
     const gaps = t.runs.slice().sort((a, b) => (b.n - a.n) || (a.lo - b.lo)).slice(0, 10);
-    const opt = s => `<option value="${escAttr(s.id)}"${s.id === sc.id ? ' selected' : ''}>${esc(s.name)}</option>`;
     const k = (cls, text) => `<span class="sr-key"><span class="sr-sw ${cls}" aria-hidden="true"></span>${text}</span>`;
     const sel = S.wheelSel;
     return `<div class="control-row as-controls">
-        <label>Show <select onchange="AddressSpace.setScope(this.value)">
-          <optgroup label="Hubs — every address">${I.hubList.map(h => opt(I.scopes.get('hub:' + h))).join('')}</optgroup>
-          <optgroup label="Radio networks — the addresses their repeaters carry">${I.groups.map(opt).join('')}</optgroup>
-        </select></label>
+        ${scopeSelectHtml(I, sc)}
       </div>
       <p class="small">${esc(captionText(I, sc))}. Every address, from 1 at the top clockwise to ${num(MAX)}; a wedge is a block of a hundred, a row
-        of the address grid. Point at a wedge to see which repeaters carry it; press it to keep it here.</p>
-      <p class="small sr-keys"><span class="sr-key"><b>Outer ring</b>, each address:</span>${k('as-c-use', 'in use')}${hub ? k('as-c-direct', 'in use, no repeater here carries it') : ''}
-        ${k('as-c-alloc', 'set aside')}${k('as-c-clash', 'held by two stations')}${k('as-c-free', hub ? 'free, under a repeater' : 'free')}
-        ${hub ? k('as-c-open', 'free, no repeater carries it') : k('as-c-out', 'outside the network\'s ranges')}</p>
+        of the address grid. ${every ? `The hubs reuse addresses, so here an address is in use when a station in any of the ${num(sc.hubs.length)} hubs holds it, shaded
+        by how many do, and free only when none does — the gaps are the addresses nobody anywhere is on. ` : ''}Point at a wedge to see which repeaters carry it; press it to keep it here.</p>
+      <p class="small sr-keys"><span class="sr-key"><b>Outer ring</b>, each address:</span>${statusKeysHtml(sc)}</p>
       <p class="small sr-keys"><span class="sr-key"><b>Middle ring</b>, repeaters carrying it:</span>${k('as-c-cov1', 'one')}${k('as-c-cov2', 'two')}${k('as-c-cov3', 'three or more')}
         <span class="sr-key"><b>Inner bars</b>: how much of each block is taken</span></p>
       <div class="as-wheel-wrap">
@@ -769,7 +824,7 @@ const AddressSpace = (() => {
         <div id="as-wheel-tip" class="as-wheel-tip small" hidden></div>
       </div>
       <div id="as-wheel-out" class="small as-readout" aria-live="polite">${wheelReadoutHtml(I, sc)}</div>
-      ${gaps.length ? `<p class="small as-runs as-gaps">The biggest gaps — runs no station ${hub ? 'in the hub ' : ''}holds and nobody has set aside:
+      ${gaps.length ? `<p class="small as-runs as-gaps">The biggest gaps — runs no station ${every ? 'in any hub ' : sc.kind === 'hub' ? 'in the hub ' : ''}holds and nobody has set aside:
         ${gaps.map(g => `<button type="button" class="pill" data-lo="${g.lo}" aria-pressed="${!!(sel && sel.gap && sel.lo === g.lo)}"
           onclick="AddressSpace.wheelPick(${g.lo}, ${g.hi})">${g.lo === g.hi ? g.lo : `${g.lo}–${g.hi}`} <span class="small">(${num(g.n)})</span></button>`).join(' ')}</p>` : ''}
       <details class="sr-fold"><summary>Wedge by wedge — the same as a table</summary>
@@ -803,12 +858,7 @@ const AddressSpace = (() => {
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     const cx = D / 2, cy = D / 2, R = D / 2 - 36;
     const rA0 = R * 0.8, rB1 = R * 0.765, rB0 = R * 0.69, rC1 = R * 0.655, rC0 = R * 0.38;
-    const col = {
-      use: [cssColour('--as-use', '#00838f'), 1], direct: [cssColour('--as-use', '#00838f'), 0.42],
-      clash: [cssColour('--as-clash', '#c7401a'), 1], alloc: [cssColour('--as-alloc', '#b8860b'), 1],
-      free: [cssColour('--as-free', '#107c10'), 0.8], open: [cssColour('--muted', '#7a8794'), 0.18],
-      out: [cssColour('--muted', '#7a8794'), 0.07],
-    };
+    const col = cellColours();
     const cov = cssColour('--accent', '#0b5cab'), text = cssColour('--muted', '#7a8794'), ink = cssColour('--text', '#16202a');
     const sector = (a0, a1, r0, r1) => { g.beginPath(); g.arc(cx, cy, r1, a0, a1); g.arc(cx, cy, r0, a1, a0, true); g.closePath(); };
     // An arc of addresses, at least minPx wide at its rim.
@@ -1482,11 +1532,14 @@ const AddressSpace = (() => {
     const sc = gridScope(I);
     if (!sc) return;
     const lines = [['address', 'status', 'stations', 'station_ids', 'set_aside_for', 'set_aside_by', 'carried_by'].join(',')];
+    // Every hub together, each name says its hub: the same address is a
+    // different station in each.
+    const named = x => (sc.kind === 'all' ? `${x.name} (${hubName(I, x.hub_id || x.hub)})` : x.name);
     addrsOf(sc).forEach(a => {
       const hs = holders(I, sc.hubs, a), al = allocOf(I, sc.hubs, a);
       const by = (I.coverBy.get(a) || []).filter(r => sc.hubs.includes(r.hub));
-      lines.push([a, WORD[cellStatus(I, sc, a)] || '', hs.map(s => s.name).join('; '), hs.map(s => s.id).join('; '),
-        al ? al.purpose : '', al ? al.created_by : '', by.map(r => r.name).join('; ')].map(csvEscape).join(','));
+      lines.push([a, WORD[cellStatus(I, sc, a)] || '', hs.map(named).join('; '), hs.map(s => s.id).join('; '),
+        al ? al.purpose : '', al ? al.created_by : '', by.map(named).join('; ')].map(csvEscape).join(','));
     });
     dlText(`alert-addresses-${slug(sc.id)}.csv`, lines.join('\n') + '\n');
   }

@@ -2650,6 +2650,11 @@ td {
 .as-readout { min-height: 2.6em; margin: var(--sp-1) 0; }
 /* All addresses: the wheel. Its middle ring is the rulers' pass-range tint
    stepped up a repeater at a time — one, two, three or more carrying it. */
+/* Every hub together: in use in one hub, two, three or more — the in-use ink
+   laid on thicker the more hubs reuse the address. */
+.as-c-hub1 { --c: color-mix(in srgb, var(--as-use) 45%, transparent); }
+.as-c-hub2 { --c: color-mix(in srgb, var(--as-use) 72%, transparent); }
+.as-c-hub3 { --c: var(--as-use); }
 .as-c-cov1 { --c: color-mix(in srgb, var(--accent) 30%, transparent); }
 .as-c-cov2 { --c: color-mix(in srgb, var(--accent) 60%, transparent); }
 .as-c-cov3 { --c: var(--accent); }

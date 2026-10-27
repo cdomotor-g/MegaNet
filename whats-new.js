@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 117, date: '2026-10-27', items: [
+      'The <strong>All addresses</strong> wheel and the <strong>Address grid</strong> in Pass Ranges can show <strong>Every hub '
+        + 'together</strong>: an address is in use when a station in any hub holds it, shaded by how many hubs reuse it, and '
+        + 'free only when no hub\'s station does — so the gaps are the addresses nobody anywhere is on. Two stations count as '
+        + 'held by two only inside one hub, and each repeater the callout names says its hub.',
+    ] },
     { n: 116, date: '2026-10-27', items: [
       'On the <strong>Stations</strong> map, point at a pin and it says the station\'s name — at every zoom, not just once you are '
         + 'close enough for the names to be written on the map. In a stack of pins, the name follows the one you point at as they fan out.',
