@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 119, date: '2026-10-27', items: [
+      'The <strong>ARRO graph</strong> links — <strong>📈 ARRO this river</strong> and <strong>ARRO rain</strong>, the graph link in '
+        + 'a station\'s details, and the Bit Flipper\'s — open as a graph of one sensor with the others added to it, the way ARRO\'s '
+        + 'own links do, instead of a blank graph. The station you are on is the one the graph is opened from, and its week is '
+        + 'on Brisbane\'s clock wherever you are.',
+    ] },
     { n: 118, date: '2026-10-27', items: [
       'In <strong>🔗 Pass Ranges</strong>, the <strong>All addresses</strong> wheel, the <strong>Address grid</strong> and the '
         + '<strong>Address map</strong> are cards of their own now, under the Allocate card, instead of hiding behind buttons. '

@@ -210,6 +210,24 @@ try {
       && groups.pairs.slice(0, 40).every(p => groups.arro.url.includes(`devices%5B%5D=${encodeURIComponent(p)}`))
       && /^https:\/\/contrail-bom\.onerain\.au\/graph\/\?/.test(groups.arro.url),
     groups.arro && groups.arro.url.slice(0, 200));
+  // The shape of a graph ARRO opened itself (27 Oct 2026): one sensor's page,
+  // site_id and device_id first and tab=sensor_tab last, the rest added as
+  // devices[] — the anchor's own among them. Without the anchor it was blank.
+  const shape = (() => {
+    const u = new URL(groups.arro ? groups.arro.url : 'https://x/');
+    const keys = [...u.searchParams.keys()];
+    return {
+      site: u.searchParams.get('site_id'), dev: u.searchParams.get('device_id'),
+      order: [...new Set(keys)].join(','), devices: u.searchParams.getAll('devices[]'),
+      tz: u.searchParams.get('time_zone'), start: u.searchParams.get('data_start'),
+    };
+  })();
+  ok('…as one sensor\'s graph: this station\'s level is the page, the rest added to it, in the order ARRO\'s own link has',
+    shape.site === '3318' && shape.dev === '1' && shape.devices.includes('3318|1')
+      && shape.order === 'site_id,device_id,refresh,range,legend,thresholds,bin,time_zone,data_start,data_end,hidden_devices,devices[],tab'
+      && shape.tz === 'Australia/Brisbane' && /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(shape.start || '')
+      && /[?&]tab=sensor_tab$/.test(groups.arro.url) && !/has_regular_sensors|for_forecast|markers=|invalid=/.test(groups.arro.url),
+    JSON.stringify(shape));
 
   // ── 2. the station card ─────────────────────────────────────────────────
   console.log('\nThe station card\n');
@@ -234,7 +252,8 @@ try {
   if (VERBOSE) console.log(card);
   ok('a river row: ARRO this river and the Flood-Net plot, with the count each captures',
     card.river && /ARRO this river · \d+/.test(card.river.arroText) && /Flood-Net plot · \d+/.test(card.river.fn)
-      && card.river.target === '_blank' && /devices%5B%5D=3318%7C1/.test(card.river.arro), JSON.stringify(card.river));
+      && card.river.target === '_blank' && /devices%5B%5D=3318%7C1/.test(card.river.arro)
+      && /[?&]site_id=3318&device_id=1&/.test(card.river.arro), JSON.stringify(card.river));
   ok('…and the names of the stations it captures, this one marked',
     card.river && /Loudoun Br AL \(this one\)/.test(card.river.names) && card.river.names.split(',').length >= 3, card.river && card.river.names);
   ok('…on the Condamine River', card.river && /on the Condamine River/.test(card.river.head), card.river && card.river.head);
@@ -269,6 +288,7 @@ try {
     const pop = document.querySelector('.mn-rl-popup .gplot-callout');
     return {
       arro: pop?.querySelector('a.pill.gplot-arro')?.textContent.replace(/\s+/g, ' ').trim() || '',
+      href: pop?.querySelector('a.pill.gplot-arro')?.getAttribute('href') || '',
       fn: pop?.querySelector('button.pill.gplot-fn')?.textContent.replace(/\s+/g, ' ').trim() || '',
       names: pop?.querySelector('.gplot-names')?.textContent || '',
       stationButtons: document.querySelectorAll('.mn-rl-popup .mn-rl-station').length,
@@ -276,6 +296,10 @@ try {
   }, STATION);
   ok('the river\'s callout has the same pair, ARRO this river and the Flood-Net plot',
     /ARRO this river · \d+/.test(callout.arro) && /Flood-Net plot · \d+/.test(callout.fn) && /Loudoun Br AL/.test(callout.names), JSON.stringify(callout));
+  ok('…its ARRO graph the page of its first gauge, which it carries too', (() => {
+    const u = new URL(callout.href || 'https://x/');
+    return u.searchParams.get('site_id') && u.searchParams.getAll('devices[]')[0] === `${u.searchParams.get('site_id')}|${u.searchParams.get('device_id')}`;
+  })(), callout.href.slice(0, 160));
   ok('…beside its station buttons, unchanged', callout.stationButtons > 0 && callout.stationButtons <= 8, String(callout.stationButtons));
 
   // ── 4. the dialog ───────────────────────────────────────────────────────

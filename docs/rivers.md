@@ -69,8 +69,10 @@ gauge along it** (`group-plots.js`), and the names of the stations they
 capture under them:
 
 - **📈 ARRO this river** opens ARRO's graph with each gauge's Water Level
-  device on one chart (`devices[]=site|device`, the last seven days), at most
-  40 of them.
+  device on one chart, at most 40 of them, over the last seven days. Like
+  ARRO's own links it is one sensor's graph (`site_id`, `device_id`,
+  `tab=sensor_tab`) with the rest added (`devices[]=site|device`): from a
+  station's card, that station's gauge; from a river's callout, its first.
 - **📉 Flood-Net plot** opens a dialog of what each gauge has sent, out of the
   Flood-Net datastore: a strip a gauge on one time axis, **highest ground
   first** — roughly upstream to downstream, so a flood is seen going down the

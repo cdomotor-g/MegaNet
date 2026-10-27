@@ -5055,34 +5055,65 @@ function buildSensorIndex() {
   return idx;
 }
 
+// A moment as ARRO's graph takes it: on Brisbane's clock, because that is the
+// time_zone the link names — the browser's own clock was a window an hour or
+// more out for anybody outside Queensland's time zone in daylight saving.
 function formatArroLocal(d) {
   const p = x => String(x).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} `
-       + `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  try {
+    const f = new Intl.DateTimeFormat('en-AU', {
+      timeZone: 'Australia/Brisbane', hourCycle: 'h23',
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }).formatToParts(d).reduce((o, x) => (o[x.type] = x.value, o), {});
+    return `${f.year}-${f.month}-${f.day} ${p(f.hour)}:${f.minute}:${f.second}`;
+  } catch (_) {
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} `
+         + `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  }
 }
 
 // Build an ARRO graph URL for the given {station,sensor} pairs. Returns
 // { url, count } or null when no pair carries the site/device ids ARRO needs.
-function buildArroUrl(pairs) {
+//
+// The shape is a graph ARRO itself opened (27 Oct 2026), parameter for
+// parameter: the page is one sensor's — `site_id` and `device_id`, then
+// `tab=sensor_tab` — with every other device added as `devices[]=site|device`,
+// that sensor's own among them. A link with no sensor of its own to anchor it
+// opened a blank graph, which is what this built until then, along with four
+// parameters (markers, invalid, has_*_sensors, for_forecast) ARRO's own links
+// do not carry. The anchor is `anchor` when it is one of the pairs, else the
+// first. What ARRO's link has and this does not are three UUIDs — `view`,
+// `site` and `device` — that nothing in the register holds; ARRO's numeric
+// ids are taken to be enough without them.
+function buildArroUrl(pairs, { anchor = null } = {}) {
   const base = (state.bfArroBase || ARRO_DEFAULT_BASE).trim();
   const now = new Date(), start = new Date(now.getTime() - 7 * 86400e3);
-  const p = new URLSearchParams({
-    refresh: 'off', markers: 'false', legend: 'true', bin: '86400',
-    time_zone: 'Australia/Brisbane', invalid: 'true',
-    has_regular_sensors: 'true', has_forecast_sensors: 'false',
-    for_forecast: 'false', hidden_devices: 'none',
-    data_start: formatArroLocal(start), data_end: formatArroLocal(now),
-  });
-  const seen = new Set();
+  const seen = new Set(), keys = [];
+  let first = null;
   pairs.forEach(({ station, sensor }) => {
-    const dbId = station.site && station.site.db_id;
-    const dev  = sensor.device_id;
-    if (dbId == null || dev == null) return;
+    const dbId = station && station.site && station.site.db_id;
+    const dev  = sensor && sensor.device_id;
+    if (dbId == null || dev == null || dev === '') return;
     const key = `${dbId}|${dev}`;
-    if (!seen.has(key)) { seen.add(key); p.append('devices[]', key); }
+    if (seen.has(key)) return;
+    seen.add(key);
+    keys.push(key);
+    if (!first) first = { dbId, dev };
   });
-  if (!seen.size) return null;
-  return { url: base.replace(/\?+$/, '') + '?' + p.toString(), count: seen.size };
+  if (!keys.length) return null;
+  const aDb  = anchor && anchor.station && anchor.station.site && anchor.station.site.db_id;
+  const aDev = anchor && anchor.sensor && anchor.sensor.device_id;
+  const at = aDb != null && aDev != null && seen.has(`${aDb}|${aDev}`) ? { dbId: aDb, dev: aDev } : first;
+  const p = new URLSearchParams({
+    site_id: String(at.dbId), device_id: String(at.dev),
+    refresh: 'off', range: '', legend: 'true', thresholds: 'true', bin: '86400',
+    time_zone: 'Australia/Brisbane',
+    data_start: formatArroLocal(start), data_end: formatArroLocal(now),
+    hidden_devices: 'none',
+  });
+  keys.forEach(k => p.append('devices[]', k));
+  p.append('tab', 'sensor_tab');
+  return { url: base.replace(/\?+$/, '') + '?' + p.toString(), count: keys.length };
 }
 
 // ── Leaflet: drop canvas redraws that outlive their canvas ─────────────────────

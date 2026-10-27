@@ -43,9 +43,10 @@
 //
 // ── The two plots ───────────────────────────────────────────────────────────
 //
-// ARRO's graph takes the devices as `devices[]=site|device` and draws them on
-// one chart (buildArroUrl, core.js), at most ARRO_CAP of them — the nearest,
-// or the highest ground, and the pill says when it was cut.
+// ARRO's graph is one sensor's page — the station the group is about, or a
+// river's first gauge — with the rest added as `devices[]=site|device`, all
+// on one chart (buildArroUrl, core.js), at most ARRO_CAP of them — the
+// nearest, or the highest ground, and the pill says when it was cut.
 //
 // The Flood-Net plot is a dialog of strips on one time axis — a strip a gauge,
 // because a river's gauges each read against their own zero and a raw count
@@ -271,10 +272,16 @@ const GroupPlots = (function () {
 
   // ── what a group hands over ──────────────────────────────────────────────
 
+  // ARRO's graph is one sensor's page with the rest added to it, so it is
+  // anchored on the station the group is about — kept past the cap — or,
+  // from a river's callout, on the first gauge (buildArroUrl, core.js).
   function arroOf(g) {
     const have = [];
     for (const m of g.members) for (const ga of m.gauges) if (arroKey(m.st, ga)) have.push({ station: m.st, sensor: ga.arro });
-    const built = typeof buildArroUrl === 'function' ? buildArroUrl(have.slice(0, ARRO_CAP)) : null;
+    const own = g.anchorId ? have.find(p => p.station.id === g.anchorId) || null : null;
+    const sent = have.slice(0, ARRO_CAP);
+    if (own && !sent.includes(own)) sent[sent.length - 1] = own;
+    const built = typeof buildArroUrl === 'function' ? buildArroUrl(sent, { anchor: own }) : null;
     return built ? { url: built.url, count: built.count, of: have.length } : null;
   }
 
