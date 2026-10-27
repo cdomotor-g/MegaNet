@@ -380,28 +380,36 @@ cannot be tested by watching it work.
 
 ## Wiring the receiver to the logger
 
-The ERT-A2's internal DB9 (marked SERIAL) sends on pin 2, and so does the
-CR300's RS-232 port — both are wired as a modem (DCE) — so the data crosses:
-**ERT-A2 pin 2 to the CR300's pin 3**, and ground, pin 5 to pin 5.
+The ERT-A2's internal DB9 (marked SERIAL) goes to the CR300's **terminals, not
+its DB9**:
+
+| ERT-A2 internal DB9 | CR300 |
+| --- | --- |
+| pin 2 (TX — its data out) | **C1** |
+| pin 5 (GND) | **G** |
+| pins 3, 4 and 7 (RX, DTR, RTS), joined | **VX1**, set to **2.5 V** |
 
 **A plain three-wire cable is not enough.** Found in the field: the ERT-A2
-sends nothing until **DTR (pin 4), RTS (pin 7) and RX (pin 3, into the
-ERT-A2) are held high** — 2.5 V is enough. It has to be "triggered" into
-thinking something is listening on the port; TX, RX and ground alone leave it
-silent, and this program waits for bytes that never come.
+sends nothing until DTR, RTS and RX (into the ERT-A2) are held high — 2.5 V is
+enough. It has to be "triggered" into thinking something is listening on the
+port; TX, RX and ground alone leave it silent, and the logger waits for bytes
+that never come. VX1 at 2.5 V is what holds them there, so it has to stay set
+for as long as the ERT-A2 may send.
 
-- Join pins 3, 4 and 7 at the ERT-A2's end and hold them at a steady positive
-  level. The CR300's DTR (pins 1 and 6) is one source — this program opens the
-  port once and keeps it open, so it should stay up — but meter it rather than
-  trust it.
-- **Check with a meter:** logger connected and running, ERT-A2 pins 3, 4 and 7
-  to pin 5 should each read 2.5 V or more. One near 0 V is the fault.
+- C1 and C2 together are the CR300's COM1, which takes RS-232 logic levels, so
+  the ERT-A2's TX goes straight in. The CR300's DB9 stays free.
+- **Check with a meter:** logger running, ERT-A2 pins 3, 4 and 7 to pin 5
+  should each read 2.5 V. One near 0 V is the fault.
 - The symptom: a new install whose `RxBlockBytes` stays at 0 and whose
   `SecsSinceRx` never stops climbing, while the receiver is plainly hearing
   stations.
+- **This program, as it stands, reads the DB9** (`RX_PORT = ComRS232`) and does
+  not drive VX1. Wired as above, it needs `RX_PORT` pointed at C1's port and
+  VX1 held at 2,500 mV.
 
 The 🪛 **Pinouts** tab in the Knowledge base draws it: *ERT-A2 · internal DB9*,
-and the cable *ERT-A2 internal DB9 to a CR300*, with a tick box per wire.
+and the cable *ERT-A2 internal DB9 to a CR300's terminals*, with a tick box per
+wire.
 
 ---
 

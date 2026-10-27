@@ -131,9 +131,10 @@ console.log('\nThe ERT-A2\'s internal DB9: found in the field\n');
       && /2\.5 V/.test(db9.found[0]) && /three-wire/.test(db9.found[0]));
   const k = D.cableById('erta2-db9-cr300');
   const joined = new Set(k.loops.a.flat().map(String));
-  ok('its cable to a CR300: data 2 → 3, ground, and 3, 4 and 7 joined at the ERT-A2\'s end and held high',
-    k.sure === 'field' && k.wires.some(w => w[0] === 2 && w[1] === 3) && k.wires.some(w => w[0] === 5 && w[1] === 5)
-      && ['3', '4', '7'].every(n => joined.has(n)) && k.wires.some(w => w[0] === 4) && !k.wires.some(w => w[0] === 3), J(k.wires));
+  const to = n => (D.endPin(k.b, (k.wires.find(w => w[0] === n) || [])[1]) || { p: {} }).p;
+  ok('its hook-up to a CR300\'s terminals: data into C1, ground to a G, and 3, 4 and 7 joined and held at 2.5 V from VX1 — not the DB9',
+    k.sure === 'field' && to(2).n === 'C1' && to(5).kind === 'ground' && to(4).n === 'VX1'
+      && ['3', '4', '7'].every(n => joined.has(n)) && !k.wires.some(w => w[0] === 3) && !D.endConns(k.b).some(c => c.face.type === 'dsub'), J(k.wires));
   const rows = D.csv(['erta2-db9']).trim().split('\n');
   ok('the CSV says which pins are a field finding', /,Field finding$/.test(rows[4]) && /Maker's document$/.test(rows[2]), J([rows[2], rows[4]]));
 }

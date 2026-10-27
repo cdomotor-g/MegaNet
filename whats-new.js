@@ -28,7 +28,8 @@ const WhatsNew = (() => {
     { n: 127, date: '2026-10-27', items: [
       '<strong>🪛 Pinouts</strong> has the <strong>ERT-A2\'s internal DB9</strong>, with a crew\'s field finding: a logger such as a '
         + 'CR300 capturing from it gets nothing on a plain three-wire cable — <strong>DTR, RTS and RX must be held high</strong> (2.5 V '
-        + 'is enough) for the ERT-A2 to send. The cable to a CR300 is drawn wire by wire, and pins found in the field are marked as such.',
+        + 'is enough) for the ERT-A2 to send. Its hook-up to a CR300\'s terminals — data into C1, ground to G, the three held at 2.5 V '
+        + 'from VX1 — is drawn wire by wire, and pins found in the field are marked as such.',
     ] },
     { n: 126, date: '2026-10-27', items: [
       '🕵️ <strong>Investigations</strong> is a tab now, in a new <strong>Network health</strong> group with '
