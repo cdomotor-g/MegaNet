@@ -76,6 +76,7 @@ MegaNet/
 ├── path-profile.js         ← PathProfile — elevation profile, and the path physics
 ├── link-budget.js          ← LinkBudget — fade margin between two points
 ├── pass-ranges.js          ← Pass Ranges tab
+├── address-space.js        ← AddressSpace — Pass Ranges' address space pictures, map and Allocate card
 ├── bit-flipper.js          ← Bit Flipper tab
 ├── network-view.js         ← NetworkView — Ghosting Graph tab (the knowledge graph)
 ├── arro-launcher.js        ← ARRO Launcher tab

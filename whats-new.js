@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 114, date: '2026-10-27', items: [
+      '<strong>🔗 Pass Ranges</strong> draws how full the ALERT addresses are, under <strong>Address space</strong>: '
+        + '<strong>each repeater</strong>\'s pass ranges as Signal Routes draws them, every address in use, set aside or free; '
+        + '<strong>each radio network</strong> with a lane a repeater, so you can see which repeater carries which block; an '
+        + '<strong>address grid</strong> of a whole hub, a hundred to a row with how full each block is; and a <strong>map</strong> '
+        + 'whose numbered circles are the free addresses a region has left, merging as you zoom out and breaking apart as you zoom in.',
+      'A new <strong>Allocate an ALERT address</strong> card at the top of Pass Ranges suggests the free run that fits a new station '
+        + 'and, for editors, sets it aside for everybody — so two people planning two sites cannot pick the same address. '
+        + 'It works once the database has its migration (0084).',
+    ] },
     { n: 113, date: '2026-10-27', items: [
       '<strong>Station Health</strong> no longer calls a battery <strong>critical</strong> on another station\'s reading: a frame '
         + 'from a station not yet in Flood-Net, heard with its address garbled into a station\'s battery address, is now set aside '

@@ -73,6 +73,7 @@ const PROBES = [
   { q: 'network view',          want: 'network',     why: 'the old label, after the rename' },
   { q: 'network maps',          want: 'maps',        why: 'the old label, after the rename' },
   { q: 'orphan',                want: 'passranges',  why: 'a term from the tab, not its title' },
+  { q: 'allocate address',      want: 'passranges',  why: 'the job, not the label' },
   { q: 'radio mobile',          want: 'export',      why: 'what the output is for' },
   { q: 'guide',                 want: 'sitemap',     why: 'what a newcomer looks for' },
   { q: 'what does each tab do', want: 'sitemap',     why: 'the question, typed as asked' },

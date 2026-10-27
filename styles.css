@@ -2602,6 +2602,71 @@ td {
 .sr-map { height: 460px; border-radius: var(--r-md); margin-top: var(--sp-2); }
 .sr-base-icon { color: var(--text); font-size: 18px; line-height: 18px; text-align: center; text-shadow: 0 0 3px var(--panel); }
 
+/* Address space and the Allocate card (address-space.js, the Pass Ranges
+   tab): the rulers draw as Signal Routes' do — the same band for a pass range,
+   the same swatches and axis — with a colour per state of an address. "In use"
+   is Signal Routes' "on its carrier", set aside the warning ink, two stations
+   on one address the bad ink, and free the ok ink where it is drawn at all (the
+   grid; on a ruler free is the band showing through). Set on the page, so each
+   var() resolves under whichever theme is on; the grid's canvas reads the same
+   tokens (cssColour). */
+.as-page {
+  --as-use: var(--ad-series-6);
+  --as-alloc: var(--warn);
+  --as-clash: var(--bad);
+  --as-free: var(--ok);
+}
+.as-c-use    { --c: var(--as-use); }
+.as-c-direct { --c: color-mix(in srgb, var(--as-use) 42%, transparent); }
+.as-c-alloc  { --c: var(--as-alloc); }
+.as-c-clash  { --c: var(--as-clash); }
+.as-c-free   { --c: color-mix(in srgb, var(--as-free) 80%, transparent); }
+.as-c-open   { --c: color-mix(in srgb, var(--muted) 18%, transparent); }
+.as-c-out    { --c: color-mix(in srgb, var(--muted) 7%, transparent); }
+.as-c-range  { --c: color-mix(in srgb, var(--accent) 16%, transparent); }
+.as-c-excl   { --c: color-mix(in srgb, var(--bad) 22%, transparent); }
+.as-page svg rect[class^="as-c-"] { fill: var(--c); }
+.as-ruler { margin: var(--sp-2) 0 var(--sp-3); }
+.as-ruler svg { min-width: 560px; width: 100%; height: auto; display: block; }
+.as-ruler figcaption { margin-bottom: var(--sp-1); }
+.as-lane { font-size: 9.5px; }
+.as-mark { fill: var(--text); }
+.as-mark-line { stroke: var(--text); stroke-width: 1; stroke-dasharray: 2 2; }
+.as-mark-key { font-size: .8em; margin-right: .3em; }
+.as-f-low  { color: var(--ok); }
+.as-f-mid  { color: var(--warn); }
+.as-f-high { color: var(--bad); }
+.as-meter { display: inline-flex; width: 4.5rem; height: .6rem; vertical-align: 0; border-radius: 2px; overflow: hidden;
+  background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.as-m-use   { width: var(--w, 0); background: var(--as-use); }
+.as-m-alloc { width: var(--w, 0); background: var(--as-alloc); }
+.as-views button { flex: 0 1 auto; }
+.as-controls { margin: var(--sp-2) 0; }
+.as-radios { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-4); }
+.as-radios [role="radiogroup"] { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); }
+.as-nets td, .as-nets th { vertical-align: top; }
+.as-grid-wrap { margin-top: var(--sp-2); }
+.as-grid-wrap canvas { display: block; width: var(--gw, 760px); height: var(--gh, 600px); cursor: crosshair; }
+.as-readout { min-height: 2.6em; margin: var(--sp-1) 0; }
+.as-map { height: 480px; border-radius: var(--r-md); margin-top: var(--sp-2); }
+.as-bubble-wrap { background: none; border: 0; }
+.as-bubble { display: block; width: var(--d, 30px); height: var(--d, 30px); line-height: var(--d, 30px); border-radius: 50%; text-align: center; font-weight: 700; font-size: 12px; color: #fff;
+  background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 35%, transparent), 0 1px 4px rgba(0, 0, 0, .35); cursor: pointer; }
+.as-bubble.as-f-low  { background: var(--ok); }
+.as-bubble.as-f-mid  { background: var(--warn); }
+.as-bubble.as-f-high { background: var(--bad); }
+.as-bubble.is-one { border: 2px solid var(--panel); }
+.as-bubble-key { display: inline-block; width: .9em; height: .9em; border-radius: 50%; margin-right: .3em; vertical-align: -1px; background: currentColor; }
+.as-form { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); align-items: flex-end; margin: var(--sp-2) 0; }
+.as-form > label { display: grid; gap: var(--sp-1); min-width: 0; max-width: 100%; }
+.as-form .as-where select { max-width: 100%; min-width: min(22rem, 100%); }
+.as-form .as-purpose { flex: 1 1 18rem; }
+.as-form .as-station { flex: 1 1 14rem; }
+.as-form input[type="text"] { width: 100%; }
+.as-runs .pill { margin: 0 var(--sp-1) var(--sp-1) 0; }
+.as-why { margin: var(--sp-1) 0; color: var(--warn); }
+.as-allocs td, .as-allocs th { vertical-align: top; }
+
 /* State of the backbone (backbone.js): a colour per kind of trouble — off air
    and dropping out in the status inks, the rest from the ARRO chart's series
    set (design-system §1) — set on the page rather than :root, so each var()

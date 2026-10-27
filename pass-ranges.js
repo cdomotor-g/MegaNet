@@ -42,6 +42,15 @@
 // literals. The filter box also got an sr-only role="status": the two badges
 // say "12 of 34" to anyone who can see them, and said nothing at all otherwise.
 
+// ── Address space and the Allocate card ──────────────────────────────────────
+// Between the filter and the tables, two panels from address-space.js
+// (AddressSpace): the Allocate card — set ALERT addresses aside for a new
+// station, kept in the datastore (0084) — and Address space, the pass ranges
+// drawn repeater by repeater and network by network as Signal Routes draws
+// them, an address grid, and a map of what each region has left. This file
+// draws their shells in place and hands the filter box to them; app.js calls
+// AddressSpace.init() once the tab is on screen.
+
 // ── PASS RANGES tab ────────────────────────────────────────────────────────────
 
 // Does a station answer to the page's filter box? The box takes a station
@@ -85,7 +94,7 @@ function renderPassRangesHtml() {
   const orphans   = passRangeOrphans();
 
   return `
-    <div class="page">
+    <div class="page as-page">
       <div class="panel">
         <div class="panel-header"><h2>Pass Ranges</h2></div>
         <div class="stats stats-row">
@@ -108,6 +117,9 @@ function renderPassRangesHtml() {
         </p>
         <p id="pr-found" class="sr-only" role="status" aria-live="polite">${esc(passRangeFoundText())}</p>
       </div>
+
+      ${AddressSpace.allocHtml()}
+      ${AddressSpace.panelHtml()}
 
       <div id="pr-tables" class="stack">${passRangeTablesHtml()}</div>
     </div>`;
@@ -297,4 +309,6 @@ function onPassRangeFilter(value) {
   // things that happen away from where the user is looking.
   const found = document.getElementById('pr-found');
   if (found) found.textContent = passRangeFoundText();
+  // The repeaters drawn under Address space follow the box too.
+  AddressSpace.onFilter();
 }

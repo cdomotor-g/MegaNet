@@ -17,6 +17,8 @@
 // only) and alert2-plan.js for Alert2Plan.authChanged (the plan's list, 0076);
 // to station-history.js for StationHistory.authChanged (0056, editors only);
 // to site-features.js for SiteFeatures.authChanged (0061, editors only); to
+// address-space.js for AddressSpace.authChanged (0084: the ALERT addresses set
+// aside, approved accounts read them and editors make them); to
 // nav-views.js for NavViews.authChanged (0062: an account's own views); to
 // push.js for Push.authChanged (0066: an administrator's notifications and the
 // icon's count); to toast.js for the once-a-page notes; and to datastore.js
@@ -957,6 +959,7 @@ const Auth = (function () {
                        typeof HealthAgent !== 'undefined' ? HealthAgent : null,
                        typeof SignalRoutes !== 'undefined' ? SignalRoutes : null,
                        typeof Backbone    !== 'undefined' ? Backbone    : null,
+                       typeof AddressSpace !== 'undefined' ? AddressSpace : null,
                        typeof NavViews    !== 'undefined' ? NavViews    : null,
                        typeof Push        !== 'undefined' ? Push        : null]) {
       if (!mod || !mod.authChanged) continue;

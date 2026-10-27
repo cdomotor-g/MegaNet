@@ -154,7 +154,7 @@ const TABS = [
     { id: 'maps',       label: 'Radio Path Maps',        icon: '🗺️',
       find: 'network maps navigator pdf printed sheets radio path basin catchment region queensland' },
     { id: 'passranges', label: 'Pass Ranges',            icon: '🔗',
-      find: 'hop chain orphans gaps alertid address window coverage base' },
+      find: 'hop chain orphans gaps alertid address window coverage base allocate allocation reserve set aside spare unused free addresses fullness full blocks address space grid new id' },
     { id: 'export',     label: 'Export',                 icon: '📤',
       find: 'csv radio mobile networks clusters download stations.json backup escape hatch data source' },
     { id: 'mapgen',     label: 'Map Generator',          icon: '🖨️',
@@ -1286,8 +1286,23 @@ const HELP = {
            + 'each repeater carries. Stations no repeater covers are flagged as orphans. The chain on '
            + 'from a repeater to its base is drawn on the Stations map rather than listed here. One '
            + 'filter box drives both tables, and takes a name, a station number, an address or a '
-           + 'pasted list of them.',
+           + 'pasted list of them. <strong>Address space</strong> draws how full the ranges are — each '
+           + 'repeater\'s, each radio network\'s with a lane a repeater, every address of a hub on a '
+           + 'grid, and a map whose numbered circles are the free addresses a region has left — and '
+           + '<strong>Allocate an ALERT address</strong> sets addresses aside for a new station, in the '
+           + 'datastore for everybody, so two people planning two sites cannot pick the same one.',
     watch: [
+      '<strong>Free means free in the hub.</strong> The Bureau\'s hubs reuse addresses — Brisbane\'s '
+      + '6039 is a river gauge, Perth\'s an orchard — so an address is in use when a station in the '
+      + 'same hub holds it, set aside when an allocation does, and free otherwise. An allocation is '
+      + 'only a reservation: the address becomes a station\'s when its sensor is saved with it in the '
+      + 'station editor, and the card then says it was taken up and offers to release it.',
+      'The suggestion is the <strong>smallest free run that fits</strong>, not the first, so a big '
+      + 'block stays whole for a station that needs one. Type a first address to choose your own; '
+      + 'the card says what is wrong with it before anything is sent, and the datastore refuses one '
+      + 'a station holds or somebody has set aside even if the card could not see it.',
+      'Signed out, or before your account is approved, the allocations cannot be read and the '
+      + 'pictures show the register alone. Setting addresses aside needs an editor.',
       '<strong>Orphaned usually means unrecorded, not unserved.</strong> A station is orphaned '
       + 'here when no repeater\'s <em>recorded</em> pass ranges cover any of its addresses — and '
       + 'only 88 stations in the file carry a pass-range block at all. A site plainly reporting '

@@ -3810,7 +3810,7 @@ function renderMain() {
     case 'nearby':     el.innerHTML = Nearby.render();        Nearby.init();       break;
     case 'home':       el.innerHTML = Home.render();          Home.init();         break;
     case 'maps':       el.innerHTML = Maps.render();          Maps.init();         break;
-    case 'passranges': el.innerHTML = renderPassRangesHtml();             break;
+    case 'passranges': el.innerHTML = renderPassRangesHtml(); AddressSpace.init(); break;
     case 'rf':         el.innerHTML = renderRfHtml();        initRf();    break;
     case 'rfchanges':  el.innerHTML = RfChanges.render();    RfChanges.init();    break;
     case 'workbench':  el.innerHTML = Workbench.render();    Workbench.init();    break;

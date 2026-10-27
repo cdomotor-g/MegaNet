@@ -145,6 +145,13 @@ const ExportMenu = (function () {
         call: ['SignalRoutes.exportPassCsv'],
         ready: () => { const A = typeof SignalRoutes !== 'undefined' && SignalRoutes.state().A; return !A ? 'Nothing read yet — read the receptions, or show the demo.' : A.reps.length ? '' : 'No repeater\'s carrier was found in this period.'; } },
     ],
+    passranges: () => [
+      { label: 'The address grid — CSV', sub: 'every address of the hub or radio network the grid is showing: in use and by whom, set aside and for what, or free, and the repeaters that carry it',
+        call: ['AddressSpace.exportCsv'], ready: gated },
+      { label: 'The addresses set aside — CSV', sub: 'every allocation still live: the address, its hub, what it is for, the repeater and station, who set it aside and when, and the station that has taken it up',
+        call: ['AddressSpace.exportAllocCsv'],
+        ready: () => { const a = typeof AddressSpace !== 'undefined' && AddressSpace.state().alloc; return !a || a.phase !== 'ready' ? 'Sign in to read the allocations.' : a.rows.length ? '' : 'Nothing is set aside.'; } },
+    ],
     backbone: () => {
       const ready = () => {
         const A = typeof Backbone !== 'undefined' && Backbone.state().A;
@@ -251,7 +258,6 @@ const ExportMenu = (function () {
     propagation: 'A lesson in how radio travels — made-up demonstrations, not records; nothing on it is data to keep as a file.',
     biterrors:   'A lesson in why readings arrive wrong — still drawings of the physics, not records; the Bit Bench saves its batches.',
     maps:        'The printed sheets are the files: each one opens as its own PDF.',
-    passranges:  'Worked out from the station list, which Stations saves; the ranges travel with each station\'s record in that file.',
     bitflipper:  'A calculator: the variants of one address, on screen to read or copy.',
     packets:     'It decodes what is pasted into it: the paste was the file, and the decode is on screen to copy.',
     serial:      'A card per device, each with its own Save log — which device\'s log is a choice the card makes, not the banner.',
