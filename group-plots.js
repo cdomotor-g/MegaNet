@@ -15,7 +15,7 @@
 // xTicks — the readings are read and turned into a line exactly as a sensor
 // row's sparkline is); to sensor-values.js for SensorValues.kindOf; to
 // health-analysis.js for HealthAnalysis.fmtWhen; to modal.js for Modal; to
-// app.js for switchTab and toggleMapFullscreen; and to arro-data.js for
+// app.js for switchTab, toggleMapFullscreen and goToStation; and to arro-data.js for
 // ArroData.fieldChannelId and ArroData.fieldOpenGroup, the dialog's door.
 // All at call time; nothing here runs at load (`npm run toplevel`).
 // map-river-lines.js places riverHtml() in a river's callout; app.js places
@@ -55,9 +55,10 @@
 // first, which is roughly upstream to downstream, so a flood is seen going
 // down the river; rain goes nearest first, on one millimetre scale for every
 // strip so the bars compare. The pointer or the arrow keys read every strip
-// at one instant; the readings are a table one press away; **Open in Field
-// Data** takes the gauges and the window to the tab that filters, inspects
-// and exports them.
+// at one instant; the readings are a table one press away; a gauge's name,
+// over its strip or in the table, is its station on the Stations map; **Open
+// in Field Data** takes the gauges and the window to the tab that filters,
+// inspects and exports them.
 
 const GroupPlots = (function () {
   const HOUR = 3600000, DAY = 86400000;
@@ -732,7 +733,7 @@ const GroupPlots = (function () {
       else if (dlg.g.kind === 'rain' && isFinite(s.km)) tags.push(fmtKm(s.km));
       tags.push(SensorSparks.addrLabel ? SensorSparks.addrLabel(s.addr) : s.addr);
       const head = `<div class="gplot-strip-head">
-          <span class="gplot-name">${esc(s.st.name)}</span>
+          ${nameBtn(s.st, 'gplot-name')}
           <span class="small txt-muted">${esc(tags.join(' · '))}</span>
           <span class="gplot-val" id="gplot-v-${i}">${s.state === 'ok' ? esc(restValue(s)) : ''}</span>
         </div>`;
@@ -779,6 +780,13 @@ const GroupPlots = (function () {
     if (table) table.innerHTML = tableHtml();
   }
 
+  // A gauge's name, in its strip's head and its row of the table: a link to
+  // its station on the Stations map.
+  function nameBtn(st, cls = '') {
+    return `<button type="button" class="link-btn${cls ? ` ${cls}` : ''}" data-sid="${escAttr(String(st.id))}"
+      onclick="GroupPlots.toStation(this.dataset.sid)" title="${escAttr(`${st.name} on the Stations map`)}">${esc(st.name)}</button>`;
+  }
+
   // The data as a table (design-system.md, *Charts*, part 3): a row a gauge.
   function tableHtml() {
     const rain = dlg.g.kind === 'rain';
@@ -798,7 +806,7 @@ const GroupPlots = (function () {
         }
       } else if (s.state === 'wait') value = 'reading…';
       else if (s.state === 'err') value = 'could not be read';
-      return `<tr><td>${esc(s.st.name)}</td>${rain ? `<td class="num">${s.self ? '—' : esc(fmtKm(s.km))}</td>` : ''}
+      return `<tr><td>${nameBtn(s.st)}</td>${rain ? `<td class="num">${s.self ? '—' : esc(fmtKm(s.km))}</td>` : ''}
         <td class="mono">${esc(s.addr)}</td><td class="num">${n.toLocaleString()}</td>
         <td class="num">${esc(value)}</td><td>${esc(at)}</td></tr>`;
     }).join('');
@@ -905,9 +913,19 @@ const GroupPlots = (function () {
     if (typeof announce === 'function') announce(`Field Data: ${g.heading}, ${winOf(win).label}`);
   }
 
+  // A name in the dialog: that station on the Stations map, its card up. The
+  // dialog goes first, as the cameras' viewer's does (map-cameras.js), so the
+  // map it lands on is not under it.
+  function toStation(id) {
+    if (!stationById(id) || typeof goToStation !== 'function') return;
+    if (dlg) Modal.close();
+    goToStation(id);
+    if (typeof announce === 'function') announce(`${stationById(id).name}, on the Stations map`);
+  }
+
   return {
     riverHtml, cardHtml, cardAsk, setKm,
-    plot, dlgKm, setWin, retry, point, unpoint, key, toField,
+    plot, dlgKm, setWin, retry, point, unpoint, key, toField, toStation,
     // for test/groupplots.mjs
     gaugesOf, streamGroup, rainGroup, groupOf, arroOf, stripsOf, KM, WINS,
   };

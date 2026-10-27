@@ -23,8 +23,9 @@
 // slider changes them and is remembered; the river's callout has the same
 // pair; the dialog draws a strip a gauge from one request an address, reads
 // every strip at one instant under the arrow keys, says which sent nothing,
-// and Open in Field Data lands on that tab with every address ticked under
-// its own station. No sideways scroll at 375 px.
+// opens a gauge's station on the Stations map from its name, and Open in
+// Field Data lands on that tab with every address ticked under its own
+// station. No sideways scroll at 375 px.
 //
 //   npm run groupplots
 
@@ -410,6 +411,24 @@ try {
   ok('…the headline names the wettest', /sent readings in the last 7 days; the most, 10 mm at /.test(rain.head || ''), rain.head);
   ok('…and its slider narrows it, the title following', rain.at10 <= rain.at25 && rain.title === 'Rain within 10 km of Loudoun Br AL',
     `${rain.at25} → ${rain.at10}, ${rain.title}`);
+
+  // A gauge's name is its station on the Stations map.
+  const named = await page.evaluate(() => {
+    const btns = [...document.querySelectorAll('#gplot-strips button.gplot-name[data-sid]')];
+    const rows = document.querySelectorAll('#gplot-table tbody td button.link-btn[data-sid]').length;
+    const b = btns[btns.length - 1];
+    const want = { id: b && b.dataset.sid, name: b && b.textContent };
+    b?.click();
+    const m = document.getElementById('app-modal');
+    return { strips: document.querySelectorAll('#gplot-strips .gplot-strip').length, btns: btns.length, rows, want,
+             closed: !m || m.style.display === 'none', tab: state.activeTab, selected: state.selectedId,
+             card: document.querySelector('#stn-card')?.textContent || '' };
+  });
+  if (VERBOSE) console.log({ ...named, card: named.card.slice(0, 80) });
+  ok('a gauge\'s name, over its strip and in the table, opens its station on the Stations map',
+    named.btns > 1 && named.rows === named.btns && named.closed && named.tab === 'stations'
+      && named.selected === named.want.id && named.card.includes(named.want.name),
+    JSON.stringify({ ...named, card: named.card.slice(0, 80) }));
 
   // ── 6. on a phone ───────────────────────────────────────────────────────
   console.log('\nAt 375 px\n');
