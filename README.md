@@ -5750,29 +5750,37 @@ the sources, is [`docs/tdma-planner.md`](docs/tdma-planner.md).
 have corrupted a station's readings. Nothing on it needs a signal or the
 station list (with the list loaded, an address is named).
 
-1. **Numbers as bits.** A number typed in decimal, `0b…` binary or `0x…` hex,
-   at 8, 11 (a value), 13 (an address) or 16 bits: every bit a button to flip,
-   each set bit's share of the number as a bar, and the operations a fault
-   performs — shift, rotate, invert, reverse, Gray code, swap bytes, +1 — one
-   press away, animated.
-2. **The frame on the air.** An address and a value as ALERT Binary's 40 bits,
-   a word to a row, and the tones they go out as (1300.8 Hz for a 1, 2109.4 Hz
-   for a 0), ten bits at a time.
-3. **Faults.** Fourteen, in three families — *between the radios* (weak signal,
+1. **A reading, bit by bit.** An address and a value as ALERT Binary's 40
+   bits, drawn the way the ALERT Packets tab draws a message: four words side
+   by side, each ten cells coloured by what they carry (address, value, check
+   bits, start and stop), named underneath and timed, with a table of each
+   field's bits, where in the frame they travel and what they come to. Press an
+   address or value bit to flip it and the bench says what a receiver would make
+   of it — a ghost on another station, or a value out by so much — and that the
+   frame would still pass. Under it the number bench: the frame's own address
+   or value (or a byte or a 16-bit number of your own, typed in decimal, `0b…`
+   binary or `0x…` hex), every bit a button to flip, each set bit's share of
+   the number as a bar, and the operations a fault performs — shift, rotate,
+   invert, reverse, Gray code, swap bytes, +1 — one press away, animated; on
+   the address or the value, whatever changes moves in the frame too, the cells
+   it changed ringed. Pointing at a bit lights it everywhere it is drawn. Then
+   the tones the frame goes out as (1300.8 Hz for a 1, 2109.4 Hz for a 0), ten
+   bits at a time.
+2. **Faults.** Fourteen, in three families — *between the radios* (weak signal,
    impulse noise, reflections, a collision, intermodulation), *in the radio and
    the logger* (crystal drift, the PLL at key-up, clock drift, tone twist) and
    *in the wiring and the decoder* (a stuck bit, shifted, inverted or reversed
    lines, Gray code) — each with its settings, what it is, what it does to the
-   bits, a drawing of it at work on the frame (bits sent and heard, the
-   verdict), and buttons to the Bit Errors lesson and to where it shows in the
+   bits, a drawing of it at work on the frame (the bits sent and heard as two
+   strips, every flipped bit hatched in red, and the verdict), and buttons to the Bit Errors lesson and to where it shows in the
    network's own data. **Send a batch** (100, 500 or 2,000 frames) and the bench
    reads the fingerprint: what was clean, thrown out, lost, a ghost or a wrong
    value; where in the frame the flips landed and which way; whether they come
    in runs; whether they follow the time of day; whether one fixed rule
    explains every wrong reading — with the faults most consistent with it.
-4. **Whodunnit?** A batch from a fault the bench will not name, to be named
+3. **Whodunnit?** A batch from a fault the bench will not name, to be named
    from its fingerprint.
-5. **Your readings.** Pairs pasted in — what should have arrived, and what did
+4. **Your readings.** Pairs pasted in — what should have arrived, and what did
    — read the same way: the bits that differ, which way, where on the air they
    are sent, and the rule or the cause they point to.
 

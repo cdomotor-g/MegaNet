@@ -20514,6 +20514,10 @@ button.adm-danger:hover { border-color: var(--bad); }
   --rp-bit-val: #107c10;
   --rp-bit-chk: #7c35a3;
   --rp-bit-frm: #7a8794;
+  /* The ink the Bit Bench writes on a cell painted in one of the bit colours
+     above, or in --bad for a flipped one: white on the light theme's deep
+     grounds, near-black on the dark theme's pale ones. */
+  --rp-bit-ink: #ffffff;
 }
 [data-theme="dark"] {
   --rp-sky: #1d3247;
@@ -20529,6 +20533,7 @@ button.adm-danger:hover { border-color: var(--bad); }
   --rp-bit-val: #57d657;
   --rp-bit-chk: #c79ae8;
   --rp-bit-frm: #8d9aa8;
+  --rp-bit-ink: #0b1520;
 }
 
 .rp-page h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-lg); line-height: var(--lh-tight); }
@@ -20838,7 +20843,7 @@ details.rp-more[open] > summary { margin-bottom: var(--sp-2); }
 }
 .bb-page h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-lg); line-height: var(--lh-tight); }
 /* Each panel's heading wears its picture on a tile of its colour (Glyphs),
-   and the panel's top edge the same colour, so the seven tell apart at a
+   and the panel's top edge the same colour, so the six tell apart at a
    glance down a long page. */
 .bb-sec { border-top: 4px solid var(--hue, var(--hue-net)); }
 .bb-page h3.bb-sec-h { display: flex; align-items: center; gap: var(--sp-2); }
@@ -20877,7 +20882,83 @@ details.rp-more[open] > summary { margin-bottom: var(--sp-2); }
 .bb-chip-btn { border-radius: var(--r-pill); font-size: var(--fs-sm); }
 .bb-chip-btn.is-on { border-color: var(--accent); background: var(--subtle); font-weight: 600; }
 
-/* 1 · Numbers as bits */
+/* 1 · A reading, bit by bit. The frame is drawn the way the ALERT Packets
+   tab draws a message: four words side by side, each a strip of ten cells in
+   the colour of what they carry, named underneath. A cell paints its own
+   ground in the bench's bit colours — the ones its drawings use — and writes
+   on it in --rp-bit-ink; start and stop take the Packets tab's own grey,
+   ground and ink. The strip measures itself (a container), not the window,
+   so the small pair under a fault folds the same way inside its column: four
+   words to a row where every cell keeps a readable width, then two, then one. */
+.bb-strip { margin: var(--sp-2) 0; min-width: 0; container-type: inline-size; }
+.bb-strip-cap { margin-bottom: var(--sp-1); font-weight: 600; font-size: var(--fs-sm); }
+.bb-words { display: grid; grid-template-columns: minmax(0, 22rem); gap: var(--sp-2) var(--sp-3); }
+@container (min-width: 30rem) { .bb-words { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (min-width: 60rem) { .bb-words { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.bb-word { min-width: 0; }
+.bb-word-h { display: flex; justify-content: space-between; gap: var(--sp-1); margin-bottom: .2rem; font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+.bb-word-h b { color: var(--text); font-weight: 600; }
+.bb-cells, .bb-names { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); }
+.bb-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 2.25rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: inset -1px 0 0 rgba(0, 0, 0, .3);
+  font: 700 var(--fs-md) / 1 var(--font-mono);
+  color: var(--rp-bit-ink);
+}
+.bb-cell:first-child { border-radius: var(--r-sm) 0 0 var(--r-sm); }
+.bb-cell:last-child { border-radius: 0 var(--r-sm) var(--r-sm) 0; box-shadow: none; }
+.bb-cell--addr { background: var(--rp-bit-addr); }
+.bb-cell--val  { background: var(--rp-bit-val); }
+.bb-cell--chk  { background: var(--rp-bit-chk); }
+.bb-cell--frm  { background: var(--c-frame); color: var(--c-frame-t); }
+button.bb-cell { cursor: pointer; }
+button.bb-cell:hover { filter: brightness(1.15); }
+.bb-cell:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+/* The bit pointed at, here or wherever else it is drawn: a ring of the
+   panel's colour inside one of the text's, which shows on every ground. */
+.bb-cell.is-hl { box-shadow: inset 0 0 0 2px var(--panel), inset 0 0 0 4px var(--text); filter: brightness(1.12); }
+/* A flipped bit, under a fault: red, and hatched, so it is not told by its
+   colour alone. */
+.bb-cell.is-flip {
+  background: repeating-linear-gradient(135deg, rgba(255, 255, 255, .2) 0 3px, transparent 3px 7px), var(--bad);
+  color: var(--rp-bit-ink);
+}
+/* The bits a flip just changed: ringed, and dropping into place. */
+.bb-cell.is-changed { box-shadow: inset 0 0 0 2px var(--panel), inset 0 0 0 4px var(--text); animation: bb-landed .8s var(--ease, ease-out); }
+@keyframes bb-landed {
+  0% { transform: translateY(-.6rem); box-shadow: inset 0 0 0 2px var(--panel), inset 0 0 0 4px var(--text); }
+  60% { transform: none; box-shadow: inset 0 0 0 2px var(--panel), inset 0 0 0 4px var(--text); }
+  100% { transform: none; }
+}
+.bb-names span { padding-top: .1rem; text-align: center; font: .62rem / 1.2 var(--font-mono); color: var(--muted); overflow: hidden; }
+.bb-strip--small .bb-cell { height: 1.85rem; font-size: var(--fs-sm); }
+
+/* …the table of what each field carries, which is the strip's key as well:
+   a row pointed at lights its cells, a digit its bit. */
+.bb-fields { table-layout: auto; }
+.bb-fields th, .bb-fields td { overflow: visible; vertical-align: middle; }
+.bb-fields th[scope="row"] { font-weight: 600; }
+.bb-fields th[scope="row"] .bb-sw { margin-right: .25rem; vertical-align: 0; }
+.bb-fsub { display: block; font-weight: 400; font-size: var(--fs-xs); color: var(--muted); }
+.bb-fields th[scope="row"] .bb-fsub { margin-left: calc(14px + .25rem); }
+.bb-fbits { padding: 0; border: 0; background: none; font: 600 var(--fs-md) var(--font-mono); }
+.bb-fd { display: inline-block; min-width: .7em; text-align: center; border-radius: 2px; }
+.bb-fgrp { white-space: nowrap; }
+.bb-fd.is-hl { background: var(--text); color: var(--panel); }
+.bb-fval { font-size: var(--fs-lg); font-weight: 700; font-variant-numeric: tabular-nums; }
+.bb-fwho { display: block; color: var(--ok); font-size: var(--fs-sm); font-weight: 600; }
+.bb-say { margin-top: var(--sp-3); }
+
+/* …and the number bench under it. On the frame's address or value its bits
+   wear the field's colour, so a bit here is plainly the same as its cell. */
 .bb-num-top { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); align-items: flex-end; }
 .bb-num-in { display: grid; gap: var(--sp-1); font-weight: 600; font-size: var(--fs-sm); }
 .bb-num-in input { width: 12rem; font-family: var(--font-mono); font-size: var(--fs-md); }
@@ -20896,6 +20977,13 @@ details.rp-more[open] > summary { margin-bottom: var(--sp-2); }
 .bb-nbit-w { font-size: .62rem; opacity: .85; }
 .bb-nbit-v { font-size: 1.15rem; font-weight: 700; font-family: var(--font-mono); }
 .bb-nbit-i { font-size: .62rem; opacity: .75; }
+.bb-tint--addr .bb-nbit.is-on { background: var(--rp-bit-addr); border-color: var(--rp-bit-addr); color: var(--rp-bit-ink); }
+.bb-tint--val  .bb-nbit.is-on { background: var(--rp-bit-val);  border-color: var(--rp-bit-val);  color: var(--rp-bit-ink); }
+.bb-wbar.bb-tint--addr .bb-wseg { background: var(--rp-bit-addr); }
+.bb-wbar.bb-tint--val  .bb-wseg { background: var(--rp-bit-val); }
+.bb-nbit.is-hl { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--text); }
+.bb-chip-sub { color: var(--muted); font-weight: 400; }
+.bb-page p.bb-ops-h { margin: var(--sp-3) 0 var(--sp-1); font-weight: 600; font-size: var(--fs-sm); }
 .bb-nbit.is-flipped { animation: bb-flash .7s var(--ease, ease-out); }
 @keyframes bb-flash {
   0% { transform: scale(1.25); box-shadow: 0 0 0 4px color-mix(in srgb, var(--bad) 55%, transparent); }
@@ -20919,9 +21007,11 @@ details.rp-more[open] > summary { margin-bottom: var(--sp-2); }
 .bb-readout div { padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel); min-width: 0; }
 .bb-readout dt { font-size: var(--fs-xs); color: var(--muted); }
 .bb-readout dd { margin: 0; font-size: var(--fs-lg); font-weight: 700; overflow-wrap: anywhere; }
-.bb-ops { margin: var(--sp-2) 0; }
+.bb-ops { margin: 0 0 var(--sp-3); }
 
-/* 2 · The frame: a table of bits, a word to a row. */
+/* The frame as a table, a word to a row, each cell underlined in its field's
+   colour: where a batch's flips landed (3 · Faults), and the bits a pasted
+   reading differs in (5 · Your readings). */
 .table-wrap table.bb-frame { min-width: 32rem; }
 .bb-frame th[scope="row"] { text-align: left; white-space: nowrap; font-size: var(--fs-sm); }
 .bb-frame thead th { font-size: var(--fs-xs); font-weight: 600; color: var(--muted); text-align: center; }
@@ -20932,17 +21022,11 @@ details.rp-more[open] > summary { margin-bottom: var(--sp-2); }
 .bb-bit--val  { box-shadow: inset 0 -3px 0 var(--rp-bit-val); }
 .bb-bit--chk  { box-shadow: inset 0 -3px 0 var(--rp-bit-chk); }
 .bb-bit--frm  { box-shadow: inset 0 -3px 0 var(--rp-bit-frm); }
-.bb-bit--flip { background: var(--bad); }
-.bb-bit--flip .bb-bit-v, .bb-bit--flip .bb-bit-k { color: var(--panel); }
-.bb-frame--small .bb-bit-v { font-size: var(--fs-sm); }
-.table-wrap table.bb-frame--small { min-width: 26rem; }
-.bb-key { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-4); font-size: var(--fs-sm); color: var(--muted); }
-.bb-key li { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .bb-sw { display: inline-block; width: 14px; height: 10px; border-radius: 2px; background: var(--muted); flex: none; }
 .bb-sw--addr { background: var(--rp-bit-addr); }
 .bb-sw--val  { background: var(--rp-bit-val); }
 .bb-sw--chk  { background: var(--rp-bit-chk); }
-.bb-sw--frm  { background: var(--rp-bit-frm); }
+.bb-sw--frm  { background: var(--c-frame); }
 .bb-sw--clean    { background: var(--ok); }
 .bb-sw--rejected { background: var(--warn); }
 .bb-sw--lost     { background: var(--muted); }

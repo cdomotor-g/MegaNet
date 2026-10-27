@@ -174,6 +174,13 @@ const TEXT_PAIRS = [
   // both themes, because the ground does not move.
   ['#ffffff', '#107c10'], ['#ffffff', '#0b5cab'],
   ['#ffffff', '#c7401a'], ['#ffffff', '#7c35a3'],
+  // The Bit Bench's frame cells: the bench's bit colours painted as a cell's
+  // ground, and a flipped bit's red, each with the ink written on it. Unlike
+  // the Packets cells these move with the theme — deep grounds and white on
+  // the light ones, pale grounds and near-black on the dark — so the pairs are
+  // measured in every theme rather than once.
+  ['--rp-bit-ink', '--rp-bit-addr'], ['--rp-bit-ink', '--rp-bit-val'],
+  ['--rp-bit-ink', '--rp-bit-chk'], ['--rp-bit-ink', '--bad'],
 ];
 
 const NONTEXT_PAIRS = [

@@ -243,15 +243,15 @@ try {
   await page.evaluate(() => switchTab('bitbench'));
   await until(page, () => !!document.getElementById('bb-page'));
   const shape = await page.evaluate(() => ({
-    secs: ['bb-num', 'bb-frame', 'bb-site', 'bb-fault', 'bb-mystery', 'bb-pairs', 'bb-more'].filter(id => document.getElementById(id)),
+    secs: ['bb-bits', 'bb-site', 'bb-fault', 'bb-mystery', 'bb-pairs', 'bb-more'].filter(id => document.getElementById(id)),
     tiles: [...document.querySelectorAll('#bb-page .bb-sec')].map(sec => !!sec.querySelector('h3 .gl-tile svg')),
     hues: new Set([...document.querySelectorAll('#bb-page .bb-sec')].map(sec => getComputedStyle(sec).borderTopColor)).size,
     canv: [...document.querySelectorAll('#bb-page canvas')].map(c => !!c.getAttribute('aria-label')),
     fx: document.querySelectorAll('input[name="bb-fx"]').length,
     group: TABS.find(g => g.tabs.some(t => t.id === 'bitbench')).group,
   }));
-  ok('seven sections, every canvas named', shape.secs.length === 7 && shape.canv.length >= 4 && shape.canv.every(Boolean), JSON.stringify(shape));
-  ok('every section\'s heading wears a picture, the panels in six colours', shape.tiles.length === 7 && shape.tiles.every(Boolean) && shape.hues === 6, JSON.stringify(shape));
+  ok('six sections, every canvas named', shape.secs.length === 6 && shape.canv.length >= 4 && shape.canv.every(Boolean), JSON.stringify(shape));
+  ok('every section\'s heading wears a picture, each panel its own colour', shape.tiles.length === 6 && shape.tiles.every(Boolean) && shape.hues === 6, JSON.stringify(shape));
   ok('fourteen faults to pick from, under Interference', shape.fx === 14 && shape.group === 'Interference', JSON.stringify(shape));
 
   console.log('\nThe site in 3-D\n');
@@ -314,11 +314,81 @@ try {
     pressed: [...document.querySelectorAll('.bb-nbit')].filter(b => b.getAttribute('aria-pressed') === 'true').length }));
   ok('0b1010, bit 0 flipped, shifted left: 22, three bits pressed', numState.s.num === 22 && numState.dec === '22' && numState.pressed === 3, JSON.stringify(numState));
 
-  const table = await page.evaluate(() => {
-    const cells = [...document.querySelectorAll('#bb-frame-body .bb-frame tbody td .bb-bit-v')].map(c => c.textContent).join('');
-    return { cells, want: Array.from(BitModel.air(BitBench.state().addr, BitBench.state().value)).join('') };
+  ok('…on the value, the frame\'s own: its value is 22 too', numState.s.width === 11 && numState.s.value === 22, JSON.stringify(numState.s));
+
+  const strip = await page.evaluate(() => {
+    const cells = [...document.querySelectorAll('#bb-frame-body .bb-strip .bb-cell')];
+    const want = Array.from(BitModel.air(BitBench.state().addr, BitBench.state().value)).join('');
+    const kinds = cells.map(c => (c.className.match(/bb-cell--(\w+)/) || [])[1]);
+    const count = k => kinds.filter(x => x === k).length;
+    return { bits: cells.map(c => c.querySelector('.bb-cell-v').textContent).join(''), want,
+      words: document.querySelectorAll('#bb-frame-body .bb-word').length, counts: [count('addr'), count('val'), count('chk'), count('frm')],
+      buttons: document.querySelectorAll('#bb-frame-body button.bb-cell').length,
+      names: [...document.querySelectorAll('#bb-frame-body .bb-word:first-child .bb-names span')].map(x => x.textContent).join(' '),
+      rows: [...document.querySelectorAll('#bb-frame-body table.bb-fields tbody tr')].map(r => r.dataset.f).join(' ') };
   });
-  ok('the frame table holds the 40 bits on the air', table.cells === table.want, `${table.cells} / ${table.want}`);
+  ok('the frame drawn as the Packets tab draws one: four words of ten, the 40 bits on the air', strip.bits === strip.want && strip.words === 4, `${strip.bits} / ${strip.want}`);
+  ok('…13 address, 11 value, 8 check and 8 start and stop cells, the 24 that carry the reading pressable, each named underneath',
+    JSON.stringify(strip.counts) === '[13,11,8,8]' && strip.buttons === 24 && strip.names === 'S A0 A1 A2 A3 A4 A5 K K P'
+    && strip.rows === 'addr val chk frm', JSON.stringify(strip));
+
+  const bound = await page.evaluate(() => {
+    BitBench.setFrame('addr', 4021);
+    BitBench.width(13);
+    const a = BitBench.state();
+    BitBench.flipBit(0);
+    const b = BitBench.state();
+    const ringed = [...document.querySelectorAll('#bb-frame-body .bb-cell.is-changed')].map(c => c.dataset.k);
+    const say = document.getElementById('bb-frame-say').textContent.replace(/\s+/g, ' ');
+    const box = document.getElementById('bb-addr').value;
+    return { a, b, ringed, say, box };
+  });
+  ok('the bench on the address is the frame\'s address, and a bit flipped there moves in the frame, ringed',
+    bound.a.num === 4021 && bound.b.addr === 4020 && bound.b.num === 4020 && bound.box === '4020' && JSON.stringify(bound.ringed) === '["A0"]',
+    JSON.stringify(bound));
+  ok('…said as a ghost: the frame would pass, filed under another address', /Address bit 0 flipped: address 4,021 → 4,020/.test(bound.say)
+    && /a ghost/.test(bound.say) && bound.b.said.field === 'address', bound.say);
+  const air = await page.evaluate(() => {
+    const j = BitModel.airOf('value', 10);
+    const v0 = BitBench.state().value;
+    const cell = document.getElementById(`bb-cell-${j}`);
+    cell.focus();
+    cell.click();
+    const s = BitBench.state();
+    return { v0, s, focus: document.activeElement && document.activeElement.id, j,
+      say: document.getElementById('bb-frame-say').textContent.replace(/\s+/g, ' '),
+      pressed: document.getElementById('bb-nbit-10').getAttribute('aria-pressed') };
+  });
+  ok('pressing a value bit in the frame flips it, keeps focus, and takes the bench to the value', air.s.value === (air.v0 ^ 1024)
+    && air.s.width === 11 && air.s.num === air.s.value && air.focus === `bb-cell-${air.j}` && air.pressed === String(!!(air.s.value & 1024)),
+    JSON.stringify(air));
+  ok('…said as a wrong value, out by 1,024', /Value bit 10 flipped/.test(air.say) && /out by [+−]1,024/.test(air.say), air.say);
+  const lit = await page.evaluate(() => {
+    const fire = (el, type) => el.dispatchEvent(new MouseEvent(type, { bubbles: true }));
+    fire(document.getElementById('bb-nbit-3'), 'mouseover');
+    const one = [...document.querySelectorAll('#bb-bits .is-hl')].map(e => e.dataset.k + ':' + e.className.split(' ')[0]);
+    fire(document.querySelector('#bb-frame-body tr[data-f="chk"]'), 'mouseover');
+    const row = document.querySelectorAll('#bb-frame-body .bb-cell--chk.is-hl').length;
+    fire(document.getElementById('bb-bits'), 'mouseleave');
+    return { one, row, left: document.querySelectorAll('#bb-bits .is-hl').length };
+  });
+  ok('pointing at a bit lights it in the strip, on the bench and in the table; at a row, all its cells', JSON.stringify(lit.one.sort())
+    === JSON.stringify(['D3:bb-cell', 'D3:bb-fd', 'D3:bb-nbit']) && lit.row === 8 && lit.left === 0, JSON.stringify(lit));
+  const free = await page.evaluate(() => {
+    const before = BitBench.state();
+    BitBench.width(16);
+    BitBench.setNum('0xBEEF');
+    BitBench.op('swap');
+    const s = BitBench.state();
+    BitBench.width(11);
+    BitBench.setNum('3000');
+    return { before, s, wide: BitBench.state(), note: document.getElementById('bb-num-note').textContent };
+  });
+  ok('a 16-bit number of your own leaves the frame alone; one too big for the value is shown as 16 bits',
+    free.s.num === 0xEFBE && free.s.addr === free.before.addr && free.s.value === free.before.value
+    && free.wide.width === 16 && free.wide.num === 3000 && free.wide.value === free.before.value && /apart from the frame/.test(free.note),
+    JSON.stringify({ s: free.s.num, wide: free.wide.width }));
+  await page.evaluate(() => BitBench.width(11));
 
   const drawn = [];
   for (const id of await page.evaluate(() => Object.keys(BitModel.EFFECTS))) {
@@ -332,6 +402,16 @@ try {
     drawn.push(r.verdict && r.w > 0 && /at work on address/.test(r.label));
   }
   ok(`every fault drawn, sent and given a verdict (${drawn.filter(Boolean).length}/${drawn.length})`, drawn.length === 14 && drawn.every(Boolean));
+  const heard = await page.evaluate(() => {
+    BitBench.pick('noise'); BitBench.set('snr', 7); BitBench.keepOpen(true);
+    for (let k = 0; k < 40; k++) { BitBench.sendOne(); if (BitBench.state().live.flips.length) break; }
+    const strips = [...document.querySelectorAll('#bb-live .bb-strip')];
+    return { n: strips.length, caps: strips.map(s => s.querySelector('figcaption').textContent),
+      marked: strips[1] ? strips[1].querySelectorAll('.bb-cell.is-flip').length : -1, flips: BitBench.state().live.flips.length,
+      said: strips[1] ? [...strips[1].querySelectorAll('.is-flip .sr-only')].every(x => /flipped/.test(x.textContent)) : false };
+  });
+  ok('under a fault, the bits sent and heard as two strips, each flipped bit marked and said', heard.n === 2 && heard.caps[0] === 'Sent'
+    && /^Heard/.test(heard.caps[1]) && heard.flips > 0 && heard.marked === heard.flips && heard.said, JSON.stringify(heard));
 
   const b = await page.evaluate(() => {
     BitBench.pick('pll');

@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 121, date: '2026-10-27', items: [
+      'The <strong>🧪 Bit Bench</strong> opens on one section, <strong>A reading, bit by bit</strong>, in place of two. The frame '
+        + 'is drawn the way <strong>ALERT Packets</strong> draws a message — four words side by side, each ten cells coloured by '
+        + 'what they carry and named underneath — with a table of what each field comes to. Press an address or value bit to flip '
+        + 'it and the bench says what a receiver would make of it: a reading filed under another station, or a value out by so '
+        + 'much, in a frame that still passes. The number bench under it works on the frame\'s own address or value, so a bit '
+        + 'flipped or shifted there moves in the frame too, ringed; point at any bit and it lights wherever else it is drawn.',
+    ] },
     { n: 120, date: '2026-10-27', items: [
       'The <strong>Stations</strong> map draws the <strong>flood and road cameras councils publish</strong> on their disaster '
         + 'dashboards — 49 councils, Lockyer Valley\'s among them — and <strong>TMR\'s QLDTraffic flood cameras</strong>, about 600 '

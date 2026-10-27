@@ -1,32 +1,36 @@
 // MegaNet — bit-bench.js
 //
 //   BitBench   the 🧪 Bit Bench tab: a bench to play with the bits a station
-//              sends, and with the faults that change them on the way. Seven
+//              sends, and with the faults that change them on the way. Six
 //              sections, each something to do:
 //
-//                1  numbers as bits — decimal, binary and hex side by side,
-//                   every bit a button, and the operations a fault performs
-//                   (flip, shift, rotate, invert, reverse, Gray) one press away
-//                2  the frame on the air — an address and a value as the 40
-//                   bits ALERT Binary sends, and the tones they go out as
-//                3  where faults happen — one site in 3-D (bit-scene.js) with
+//                1  a reading, bit by bit — an address and a value as the 40
+//                   bits ALERT Binary sends, drawn as the ALERT Packets tab
+//                   draws a message (four words of coloured cells, and a
+//                   table of what each field carries); the number bench —
+//                   decimal, binary and hex side by side, every bit a button,
+//                   and the operations a fault performs (flip, shift, rotate,
+//                   invert, reverse, Gray) one press away — on the frame's own
+//                   address or value, so a bit flipped there moves in the
+//                   frame; and the tones the frame goes out as
+//                2  where faults happen — one site in 3-D (bit-scene.js) with
 //                   every fault's cause somewhere in it, toured a fault at a
 //                   time: each lit where it happens, with a close-up of what
 //                   goes wrong there
-//                4  faults — fourteen of them, from noise to a wire on the
+//                3  faults — fourteen of them, from noise to a wire on the
 //                   wrong pin: each drawn as it happens to a frame, one frame
 //                   at a time or five hundred, with the fingerprint the batch
 //                   leaves read out of its bits
-//                5  whodunnit — a batch from a fault the bench will not name,
+//                4  whodunnit — a batch from a fault the bench will not name,
 //                   to be told from its fingerprint alone
-//                6  your readings — pairs pasted in (what should have arrived,
+//                5  your readings — pairs pasted in (what should have arrived,
 //                   what did) read the same way
-//                7  where to read more: the ⚡ Bit Errors lesson, which takes
+//                6  where to read more: the ⚡ Bit Errors lesson, which takes
 //                   each fault in depth, and the tabs that show them in the
 //                   network's own data
 //
 // Each section's heading wears a picture on a tile of its own colour
-// (glyphs.js), so the seven tell apart at a glance down a long page.
+// (glyphs.js), so the six tell apart at a glance down a long page.
 //
 // After bit-model.js (BitModel: every number, every fault, every verdict),
 // bit-scene.js (BitScene: the site and its drawing) and core.js (esc,
@@ -44,14 +48,14 @@
 // seven seconds each, and only while it is on screen does it keep the loop
 // running. A device asking for reduced motion gets every drawing
 // still — the frame on the bench at its end, its verdict shown — with ▶ to run
-// it. Each canvas is named with what it shows now, and what it shows is also a
-// table or a sentence beside it: the bits sent and heard, the batch's counts
-// and where its flips landed.
+// it. Each canvas is named with what it shows now, and what it shows is also
+// set out beside it in named cells, a table or a sentence: the bits sent and
+// heard, the batch's counts and where its flips landed.
 //
 // The words here are the tab's; every figure is BitModel's, so the bench, the
 // lesson and test/bitbench.mjs cannot disagree about a number.
 //
-// Exposes: render, init, open, width, setNum, flipBit, op, setFrame,
+// Exposes: render, init, open, width, setNum, flipBit, op, flipAir, setFrame,
 //          randomFrame, siteTour, siteStep, siteShow, siteBench,
 //          pick, set, sendOne, play, batch, batchSize, fixed,
 //          mystery, guess, pairs, pairsField, pairsExample, exportCsv, goTo,
@@ -65,7 +69,7 @@ const BitBench = (function () {
   // not reset what somebody was in the middle of.
   const S = {
     width: 11, num: 1263, lastOp: '', lastBit: -1,
-    addr: 4021, value: 1263,
+    addr: 4021, value: 1263, shown: null, said: null,
     effect: 'noise', params: {},
     seed: 1, live: null, liveAt: 0, playing: true, playOnce: false, liveOpen: false,
     n: 500, fixed: false, batch: null,
@@ -367,13 +371,12 @@ const BitBench = (function () {
   // ── The sections ───────────────────────────────────────────────────────────
   // Each: its id, its name, and the picture and colour its heading wears.
   const SECS = [
-    ['bb-num',     '1 · Numbers as bits',        '1 · Numbers as bits',  'bits',      'net'],
-    ['bb-frame',   '2 · The frame on the air',   '2 · The frame',        'packet',    'data'],
-    ['bb-site',    '3 · Where faults happen',    '3 · Where it happens', 'interfere', 'field'],
-    ['bb-fault',   '4 · Faults',                 '4 · Faults',           'bolt',      'radio'],
-    ['bb-mystery', '5 · Whodunnit?',             '5 · Whodunnit?',       'search',    'learn'],
-    ['bb-pairs',   '6 · Your readings',          '6 · Your readings',    'data',      'admin'],
-    ['bb-more',    '7 · Where to read more',     '7 · Read more',        'book',      'net'],
+    ['bb-bits',    '1 · A reading, bit by bit',  '1 · The bits',         'packet',    'data'],
+    ['bb-site',    '2 · Where faults happen',    '2 · Where it happens', 'interfere', 'field'],
+    ['bb-fault',   '3 · Faults',                 '3 · Faults',           'bolt',      'radio'],
+    ['bb-mystery', '4 · Whodunnit?',             '4 · Whodunnit?',       'search',    'learn'],
+    ['bb-pairs',   '5 · Your readings',          '5 · Your readings',    'data',      'admin'],
+    ['bb-more',    '6 · Where to read more',     '6 · Read more',        'book',      'net'],
   ];
   const secOf = id => SECS.find(x => x[0] === id);
   const glyph = (name, cls) => (typeof Glyphs !== 'undefined' ? Glyphs.svg(name, cls) : '');
@@ -385,84 +388,13 @@ const BitBench = (function () {
       <h3 id="${id}-h" class="bb-sec-h" tabindex="-1">${tile}<span>${esc(title)}</span></h3>`;
   }
 
-  // ── 1 · Numbers as bits ────────────────────────────────────────────────────
-
-  const WIDTHS = [[8, '8 bits'], [11, '11 — a value'], [13, '13 — an address'], [16, '16 bits']];
-
-  function numBody() {
-    const M = BM(), w = S.width, v = S.num;
-    const bits = [];
-    for (let i = w - 1; i >= 0; i--) {
-      const on = (v >> i) & 1;
-      const flipped = BM().flip(v, i) & M.mask(w);
-      const anim = S.lastBit === i ? ' is-flipped' : '';
-      bits.push(`<button type="button" class="bb-nbit${on ? ' is-on' : ''}${anim}" id="bb-nbit-${i}" aria-pressed="${on ? 'true' : 'false'}"
-        aria-label="Bit ${i}, worth ${num(1 << i)}: ${on}. Flipping it makes ${num(flipped)}."
-        title="Flip bit ${i} (worth ${num(1 << i)}): ${num(v)} → ${num(flipped)}" onclick="BitBench.flipBit(${i})">
-        <span class="bb-nbit-w" aria-hidden="true">${num(1 << i)}</span><span class="bb-nbit-v" aria-hidden="true">${on}</span><span class="bb-nbit-i" aria-hidden="true">${i}</span></button>`);
-    }
-    // Each set bit's share of the number, as a bar — why the top bits matter.
-    const total = M.mask(w);
-    const segs = M.positions(v).reverse().map(i => `<span class="bb-wseg" style="--w:${((1 << i) / total * 100).toFixed(3)}%"
-      title="bit ${i}: ${num(1 << i)}"></span>`).join('');
-    const grouped = M.bin(v, w).replace(/\B(?=(\d{4})+(?!\d))/g, ' ');
-    const anim = S.lastOp ? ` bb-anim-${S.lastOp}` : '';
-    return `
-      <div class="bb-nbits${anim}" role="group" aria-label="The ${w} bits of ${num(v)}, most significant first">${bits.join('')}</div>
-      <div class="bb-ops button-group" role="group" aria-label="What a fault can do to the number">
-        ${OPS.map(([k, t, d]) => `<button type="button" class="btn" id="bb-op-${k}" title="${escAttr(d)}" aria-label="${escAttr(t.replace(/[⇇⇉↶↷]/g, '').trim() + ': ' + d)}"
-          ${k === 'swap' && w !== 16 ? 'disabled' : ''} onclick="BitBench.op('${k}')">${t}</button>`).join('')}
-      </div>
-      <div class="bb-wbar" aria-hidden="true">${segs}</div>
-      <p class="bb-aside bb-wbar-cap">Each set bit's share of the largest ${w}-bit number, ${num(total)}: bit ${w - 1} alone is ${pct((1 << (w - 1)) / total)} of it, bit 0 just ${((1 / total) * 100).toFixed(2)}%.</p>
-      <dl class="bb-readout">
-        <div><dt>Decimal</dt><dd>${num(v)}</dd></div>
-        <div><dt>Binary</dt><dd class="bb-mono">${grouped}</dd></div>
-        <div><dt>Hex</dt><dd class="bb-mono">0x${M.hex(v, w)}</dd></div>
-        <div><dt>Signed (two's complement)</dt><dd>${num(M.signed(v, w))}</dd></div>
-        <div><dt>Gray code of it</dt><dd>${num(M.toGray(v) & M.mask(w))}</dd></div>
-        <div><dt>Bits set</dt><dd>${M.popcount(v)} of ${w}</dd></div>
-      </dl>
-      <p class="bb-why"><strong>Why it matters:</strong> flipping bit 0 changes ${num(v)} by 1; flipping bit ${w - 1} changes it by
-        ${num(1 << (w - 1))}. One flipped bit can be a reading out by a millimetre or by a metre, and which it is depends only on
-        where the bit sits.</p>
-      <p class="bb-aside">Is it an ALERT address? <button type="button" class="link-btn" onclick="BitBench.tab('bitflipper')">See which
-        stations are a bit away from ${num((v & 8191) || 1)} on the Bit Flipper</button>.</p>`;
-  }
-
-  const OPS = [
-    ['shl', '⇇ Shift left', 'Every bit one place left: doubles it, losing the top bit'],
-    ['shr', 'Shift right ⇉', 'Every bit one place right: halves it, losing the bottom bit'],
-    ['rotl', '↶ Rotate left', 'Left, with the top bit coming round to the bottom'],
-    ['rotr', 'Rotate right ↷', 'Right, with the bottom bit coming round to the top'],
-    ['invert', 'Invert all', 'Every 1 to 0 and every 0 to 1'],
-    ['reverse', 'Reverse order', 'Bit 0 swaps with the top bit, and so on inwards'],
-    ['gray', 'To Gray code', 'n XOR (n ÷ 2), as a shaft encoder prints it'],
-    ['ungray', 'From Gray code', 'Back again'],
-    ['swap', 'Swap bytes', 'The two bytes of a 16-bit number change places (16 bits only)'],
-    ['inc', '+1', 'Add one, wrapping past the top to nought like a counter'],
-  ];
-
-  function numHtml() {
-    return `
-    ${secOpen('bb-num')}
-      <p>A reading travels as a row of bits, each worth twice the one to its right. Type a number — decimal, <code>0b…</code> for binary
-        or <code>0x…</code> for hex — or press the bits themselves to flip them.</p>
-      <div class="bb-num-top">
-        <label class="bb-num-in" for="bb-num-in">Number
-          <input type="text" id="bb-num-in" inputmode="numeric" autocomplete="off" spellcheck="false" value="${escAttr(String(S.num))}"
-            aria-describedby="bb-num-note" oninput="BitBench.setNum(this.value)"></label>
-        <fieldset class="bb-chips" aria-describedby="bb-num-note"><legend>Width</legend>
-          ${WIDTHS.map(([w, t]) => `<label class="bb-chip" for="bb-w-${w}"><input type="radio" name="bb-w" id="bb-w-${w}" value="${w}"
-            ${S.width === w ? 'checked' : ''} onchange="BitBench.width(${w})">${t}</label>`).join('')}
-        </fieldset>
-      </div>
-      <p class="bb-aside" id="bb-num-note">An ALERT reading's value is 11 bits (0–2,047) and its address 13 (0–8,191).</p>
-      <div id="bb-num-body">${numBody()}</div>
-    </section>`;
-  }
-
-  // ── 2 · The frame on the air ───────────────────────────────────────────────
+  // ── 1 · A reading, bit by bit ──────────────────────────────────────────────
+  // The two numbers a station sends, the 40 bits they go out as — drawn the
+  // way the ALERT Packets tab draws a message — and the number bench under
+  // them. The bench's 13- and 11-bit widths are the frame's address and value
+  // themselves, so a bit flipped on either moves in the frame too; and the
+  // frame's own address and value bits flip at a press. Pointing at a bit
+  // anywhere lights the same bit everywhere else it is drawn (wireBits).
 
   const KIND = { start: 'frm', stop: 'frm', A: 'addr', D: 'val', K: 'chk' };
   function cellLabel(c) {
@@ -478,63 +410,244 @@ const BitBench = (function () {
     return BM().cellName(c);
   }
 
-  // The word column, wide enough for its name; the ten bit columns share the rest.
-  const COLS = '<colgroup><col style="width:4.6rem"><col span="10"></colgroup>';
+  // Which of the frame's two numbers the bench is on, if either.
+  const boundField = () => (S.width === 13 ? 'address' : S.width === 11 ? 'value' : '');
+  const fieldNum = f => (f === 'address' ? S.addr : S.value);
+  const FIELD_WORD = { address: 'Address', value: 'Value' };
 
-  // The 40 bits as a table, a word to a row — the form a reader can step
-  // through, and the one the bench's drawings mirror.
-  function frameTable(bits, opt) {
+  // The 40 bits as four words side by side, the first sent on the left: each
+  // a strip of ten cells in the colour of what they carry, named underneath,
+  // with the moment it goes out. On the bench's own frame (`o.live`) the
+  // address and value bits are buttons that flip; anywhere else every cell is
+  // just a bit, the ones in `o.flips` marked as flipped.
+  function frameStrip(bits, opt) {
     const o = opt || {};
-    const L = BM().layout();
-    const flips = new Set(o.flips || []);
-    const rows = [0, 1, 2, 3].map(w => {
-      const cells = [];
+    const M = BM(), L = M.layout(), T = M.bitMs();
+    const flips = new Set(o.flips || []), changed = new Set(o.changed || []);
+    const words = [0, 1, 2, 3].map(w => {
+      const cells = [], names = [];
       for (let k = 0; k < 10; k++) {
         const c = L[w * 10 + k];
         const b = bits ? bits[c.j] : '·';
-        const f = flips.has(c.j);
-        cells.push(`<td class="bb-bit bb-bit--${KIND[c.kind]}${f ? ' bb-bit--flip' : ''}" title="${escAttr(cellWords(c))}${f ? ' — flipped' : ''}">`
-          + `<span class="bb-bit-v">${b}</span><span class="bb-bit-k" aria-hidden="true">${cellLabel(c)}</span>`
-          + `${f ? '<span class="sr-only">, flipped</span>' : ''}</td>`);
+        const key = cellLabel(c), f = flips.has(c.j);
+        const said = `${cellWords(c)}: ${b}${f ? ', flipped' : ''}`;
+        const cls = `bb-cell bb-cell--${KIND[c.kind]}${f ? ' is-flip' : ''}${changed.has(c.j) ? ' is-changed' : ''}`;
+        if (o.live && (c.kind === 'A' || c.kind === 'D')) {
+          const v = c.kind === 'A' ? S.addr : S.value, to = M.flip(v, c.i);
+          cells.push(`<button type="button" class="${cls}" id="bb-cell-${c.j}" data-k="${key}"
+            aria-label="${escAttr(`Word ${w + 1}, ${said}. Flip it: ${num(v)} becomes ${num(to)}.`)}"
+            title="${escAttr(`${cellWords(c)} — press to flip it: ${num(v)} → ${num(to)}`)}"
+            onclick="BitBench.flipAir(${c.j})"><span class="bb-cell-v">${b}</span></button>`);
+        } else {
+          cells.push(`<span class="${cls}" data-k="${key}" title="${escAttr(said)}"><span class="bb-cell-v" aria-hidden="true">${b}</span>`
+            + `<span class="sr-only">${esc(said)}</span></span>`);
+        }
+        names.push(`<span>${key}</span>`);
       }
-      return `<tr><th scope="row">Word ${w + 1}</th>${cells.join('')}</tr>`;
+      const t0 = num(w * 10 * T), t1 = num((w + 1) * 10 * T);
+      return `<div class="bb-word" role="group" aria-label="Word ${w + 1}, sent ${t0} to ${t1} ms in">
+          <div class="bb-word-h" aria-hidden="true"><b>Word ${w + 1}</b><span>${t0}–${t1} ms</span></div>
+          <div class="bb-cells">${cells.join('')}</div>
+          <div class="bb-names" aria-hidden="true">${names.join('')}</div>
+        </div>`;
     }).join('');
-    return `<div class="table-wrap"><table class="bb-frame${o.small ? ' bb-frame--small' : ''}">
-      <caption class="${o.capShown ? '' : 'sr-only'}">${esc(o.caption || 'The 40 bits on the air')}</caption>${COLS}
-      <thead><tr><th scope="col">Word</th><th scope="col">Start</th>${[0, 1, 2, 3, 4, 5, 6, 7].map(b => `<th scope="col">Bit ${b}</th>`).join('')}<th scope="col">Stop</th></tr></thead>
-      <tbody>${rows}</tbody></table></div>`;
+    const cap = o.caption || 'The 40 bits on the air';
+    return `<figure class="bb-strip${o.small ? ' bb-strip--small' : ''}"${o.capShown ? '' : ` aria-label="${escAttr(cap)}"`}>
+        ${o.capShown ? `<figcaption class="bb-strip-cap">${esc(cap)}</figcaption>` : ''}
+        <div class="bb-words">${words}</div>
+      </figure>`;
+  }
+
+  // The frame's fields, listed the way the ALERT Packets tab lists a decoded
+  // message: each one's bits most significant first, what they come to, and
+  // where in the frame they travel. Each row wears its cells' colour, so the
+  // table is the strip's key as well.
+  function fieldsHtml() {
+    const M = BM(), L = M.layout();
+    const who = stationName(S.addr);
+    // A field's digits in fours from the right, each its bit's (data-k), the
+    // line breaking only between the fours.
+    const digits = (v, w, k) => {
+      const groups = [];
+      M.bin(v, w).split('').forEach((d, n) => {
+        const i = w - 1 - n;
+        if (!n || (i + 1) % 4 === 0) groups.push([]);
+        groups[groups.length - 1].push(`<span class="bb-fd" data-k="${k}${i}">${d}</span>`);
+      });
+      return groups.map(g => `<span class="bb-fgrp">${g.join('')}</span>`).join(' ');
+    };
+    const words = kind => {
+      const ws = [...new Set(L.filter(c => c.kind === kind).map(c => c.word + 1))];
+      return ws.length > 1 ? `words ${ws[0]}–${ws[ws.length - 1]}` : `word ${ws[0]}`;
+    };
+    const checks = [0, 1, 2, 3].map(w => L.filter(c => c.word === w && c.kind === 'K').map(c => c.i).join('')).join(' ');
+    const rows = [
+      ['addr', 'Address', 'who sent it', digits(S.addr, 13, 'A'), `13 bits in ${words('A')}, sent least significant first`,
+        `<span class="bb-fval">${num(S.addr)}</span>${who ? `<span class="bb-fwho">${esc(who)}</span>` : ''}`],
+      ['val', 'Value', 'what it read', digits(S.value, 11, 'D'), `11 bits in ${words('D')}, sent least significant first`,
+        `<span class="bb-fval">${num(S.value)}</span>`],
+      ['chk', 'Check bits', 'K', esc(checks), '8 bits, the last two of every word', 'never change'],
+      ['frm', 'Start and stop', 'S and P', '0 … 1', '8 bits, the first and the last of every word', 'never change'],
+    ];
+    return `<div class="table-wrap"><table class="bb-fields">
+        <caption class="sr-only">What the 40 bits carry: each field's bits, most significant first, where in the frame they travel and what they come to</caption>
+        <thead><tr><th scope="col">Field</th><th scope="col">Bits, most significant first</th><th scope="col">Comes to</th></tr></thead>
+        <tbody>${rows.map(([k, name, sub, bits, at, val]) => `<tr data-f="${k}">
+          <th scope="row"><span class="bb-sw bb-sw--${k}" aria-hidden="true"></span> ${esc(name)} <span class="bb-fsub">${esc(sub)}</span></th>
+          <td><code class="bb-fbits">${bits}</code><span class="bb-fsub">${esc(at)}</span></td><td>${val}</td></tr>`).join('')}</tbody>
+      </table></div>`;
+  }
+
+  // What the last change to the frame would mean, had the air made it.
+  function sayHtml() {
+    const s = S.said;
+    if (!s) {
+      return `<strong>Nothing checks the 24 bits that carry the reading.</strong> ALERT Binary has no CRC, only the eight fixed check bits
+        and the start and stop bits. Press an address or a value bit to flip it: a frame that arrived like that would still pass, filed
+        under the wrong station or holding the wrong value. A check, start or stop bit flipped on the air is caught — the receiver
+        throws the frame out.`;
+    }
+    const head = `${esc(s.what)}: ${s.field} ${num(s.from)} → <strong>${num(s.to)}</strong>`;
+    if (s.from === s.to) return `${head} — no change.`;
+    if (s.field === 'address') {
+      const who = stationName(s.to);
+      return `${head}${who ? ` — ${esc(who)}` : ''}. A frame that arrived like this would pass, and the reading would be filed under
+        ${who ? 'that station' : `address ${num(s.to)}`} instead of ${num(s.from)}: a ghost. Nothing in the frame says it is wrong.`;
+    }
+    return `${head}, out by ${sgn(s.to - s.from)}. A frame that arrived like this would pass, with the wrong value in it — nothing in the
+      frame says so.`;
+  }
+  function sayText() {
+    const d = document.createElement('div');
+    d.innerHTML = sayHtml();
+    return d.textContent.replace(/\s+/g, ' ').trim();
   }
 
   function frameBody() {
     const M = BM();
     const tx = M.air(S.addr, S.value);
-    const who = stationName(S.addr);
+    // After a flip or a fault's operation, the cells it changed are ringed
+    // (and drop into place), so a bit flipped on the number shows where it
+    // travels; a number typed or drawn at random rings nothing.
+    const changed = S.shown && S.said ? [...tx.keys()].filter(j => tx[j] !== S.shown[j]) : [];
+    S.shown = tx;
     return `
-      ${frameTable(tx, { caption: `Address ${S.addr}, value ${S.value}, as the 40 bits on the air, a word to a row` })}
-      <ul class="bb-key" aria-label="What the colours mean">
-        <li><span class="bb-sw bb-sw--addr" aria-hidden="true"></span> address — 13 bits${who ? `: ${esc(who)}` : ''}</li>
-        <li><span class="bb-sw bb-sw--val" aria-hidden="true"></span> value — 11 bits</li>
-        <li><span class="bb-sw bb-sw--chk" aria-hidden="true"></span> check bits — fixed, 8</li>
-        <li><span class="bb-sw bb-sw--frm" aria-hidden="true"></span> start and stop — 8</li>
-      </ul>`;
+      ${frameStrip(tx, { live: true, changed, caption: `Address ${S.addr}, value ${S.value}, as the 40 bits on the air: four words of ten, word 1 first` })}
+      <p class="bb-aside">Word 1 goes first, and each word the same way: a start bit, eight bits least significant first, a stop bit.
+        Each bit lasts ${num(M.bitMs(), 2)} ms and the frame ${num(40 * M.bitMs())} ms.</p>
+      ${fieldsHtml()}
+      <p class="bb-why bb-say" id="bb-frame-say">${sayHtml()}</p>`;
   }
 
-  function frameHtml() {
+  // ── The number bench ───────────────────────────────────────────────────────
+
+  const WIDTHS = [[13, 'The address', '13 bits'], [11, 'The value', '11 bits'], [8, 'A byte', '8 bits'], [16, 'A 16-bit number', '16 bits']];
+  function numNote() {
+    const f = boundField();
+    if (f === 'address') return 'The frame\'s own address, 0 to 8,191: a bit flipped here moves in the frame above.';
+    if (f === 'value') return 'The frame\'s own value, 0 to 2,047: a bit flipped here moves in the frame above.';
+    return `A number of your own, apart from the frame: 0 to ${num(BM().mask(S.width))}. A number too big for the value or the address shows here as 16 bits.`;
+  }
+
+  function numBody() {
+    const M = BM(), w = S.width, v = S.num, f = boundField();
+    const k = f === 'address' ? 'A' : f === 'value' ? 'D' : '';
+    const what = f ? `${FIELD_WORD[f]} bit` : 'Bit';
+    const bits = [];
+    for (let i = w - 1; i >= 0; i--) {
+      const on = (v >> i) & 1;
+      const flipped = M.flip(v, i) & M.mask(w);
+      const anim = S.lastBit === i ? ' is-flipped' : '';
+      bits.push(`<button type="button" class="bb-nbit${on ? ' is-on' : ''}${anim}" id="bb-nbit-${i}"${k ? ` data-k="${k}${i}"` : ''} aria-pressed="${on ? 'true' : 'false'}"
+        aria-label="${what} ${i}, worth ${num(1 << i)}: ${on}. Flipping it makes ${num(flipped)}."
+        title="Flip ${what.toLowerCase()} ${i} (worth ${num(1 << i)}): ${num(v)} → ${num(flipped)}" onclick="BitBench.flipBit(${i})">
+        <span class="bb-nbit-w" aria-hidden="true">${num(1 << i)}</span><span class="bb-nbit-v" aria-hidden="true">${on}</span><span class="bb-nbit-i" aria-hidden="true">${k}${i}</span></button>`);
+    }
+    // Each set bit's share of the number, as a bar — why the top bits matter.
+    const total = M.mask(w);
+    const segs = M.positions(v).reverse().map(i => `<span class="bb-wseg" style="--w:${((1 << i) / total * 100).toFixed(3)}%"
+      title="bit ${i}: ${num(1 << i)}"></span>`).join('');
+    const grouped = M.bin(v, w).replace(/\B(?=(\d{4})+(?!\d))/g, ' ');
+    const anim = S.lastOp ? ` bb-anim-${S.lastOp}` : '';
+    const tint = f === 'address' ? ' bb-tint--addr' : f === 'value' ? ' bb-tint--val' : '';
+    const why = f === 'address'
+      ? `flipping bit 0 moves the address by 1; flipping bit 12 moves it by 4,096. Either way the reading lands on another station's
+        address, and the frame still passes.`
+      : f === 'value'
+        ? `flipping bit 0 changes the value ${num(v)} by 1; flipping bit 10 changes it by 1,024. One flipped bit can be a reading out by a
+          millimetre or by a metre, and which it is depends only on where the bit sits.`
+        : `flipping bit 0 changes ${num(v)} by 1; flipping bit ${w - 1} changes it by ${num(1 << (w - 1))}. One flipped bit can be a
+          reading out by a millimetre or by a metre, and which it is depends only on where the bit sits.`;
+    const flipper = f === 'value' ? ''
+      : `<p class="bb-aside">${f ? `Which stations are one bit away from address ${num(v)}?` : 'Is it an ALERT address?'}
+        <button type="button" class="link-btn" onclick="BitBench.tab('bitflipper')">See ${f ? 'them' : `which stations are a bit away from
+        ${num((v & 8191) || 1)}`} on the Bit Flipper</button>.</p>`;
+    return `
+      <div class="bb-nbits${anim}${tint}" role="group" aria-label="The ${w} bits of ${num(v)}, most significant first">${bits.join('')}</div>
+      <div class="bb-wbar${tint}" aria-hidden="true">${segs}</div>
+      <p class="bb-aside bb-wbar-cap">Each set bit's share of the largest ${w}-bit number, ${num(total)}: bit ${w - 1} alone is ${pct((1 << (w - 1)) / total)} of it, bit 0 just ${((1 / total) * 100).toFixed(2)}%.</p>
+      <dl class="bb-readout">
+        <div><dt>Decimal</dt><dd>${num(v)}</dd></div>
+        <div><dt>Binary</dt><dd class="bb-mono">${grouped}</dd></div>
+        <div><dt>Hex</dt><dd class="bb-mono">0x${M.hex(v, w)}</dd></div>
+        <div><dt>Signed (two's complement)</dt><dd>${num(M.signed(v, w))}</dd></div>
+        <div><dt>Gray code of it</dt><dd>${num(M.toGray(v) & M.mask(w))}</dd></div>
+        <div><dt>Bits set</dt><dd>${M.popcount(v)} of ${w}</dd></div>
+      </dl>
+      <p class="bb-ops-h">Do to it what a fault would:</p>
+      <div class="bb-ops button-group" role="group" aria-label="What a fault can do to the number">
+        ${OPS.map(([k, t, d]) => `<button type="button" class="btn" id="bb-op-${k}" title="${escAttr(d)}" aria-label="${escAttr(t.replace(/[⇇⇉↶↷]/g, '').trim() + ': ' + d)}"
+          ${k === 'swap' && w !== 16 ? 'disabled' : ''} onclick="BitBench.op('${k}')">${t}</button>`).join('')}
+      </div>
+      <p class="bb-why"><strong>Why it matters:</strong> ${why}</p>
+      ${flipper}`;
+  }
+
+  const OPS = [
+    ['shl', '⇇ Shift left', 'Every bit one place left: doubles it, losing the top bit'],
+    ['shr', 'Shift right ⇉', 'Every bit one place right: halves it, losing the bottom bit'],
+    ['rotl', '↶ Rotate left', 'Left, with the top bit coming round to the bottom'],
+    ['rotr', 'Rotate right ↷', 'Right, with the bottom bit coming round to the top'],
+    ['invert', 'Invert all', 'Every 1 to 0 and every 0 to 1'],
+    ['reverse', 'Reverse order', 'Bit 0 swaps with the top bit, and so on inwards'],
+    ['gray', 'To Gray code', 'n XOR (n ÷ 2), as a shaft encoder prints it'],
+    ['ungray', 'From Gray code', 'Back again'],
+    ['swap', 'Swap bytes', 'The two bytes of a 16-bit number change places (16 bits only)'],
+    ['inc', '+1', 'Add one, wrapping past the top to nought like a counter'],
+  ];
+  const OP_DONE = { shl: 'Shifted left', shr: 'Shifted right', rotl: 'Rotated left', rotr: 'Rotated right', invert: 'Inverted',
+    reverse: 'Reversed', gray: 'Turned into Gray code', ungray: 'Turned back from Gray code', swap: 'Bytes swapped', inc: 'One added' };
+
+  function bitsHtml() {
     const M = BM();
     return `
-    ${secOpen('bb-frame')}
-      <p>An ALERT station sends a reading as four words of ten bits: a start bit, eight bits least significant first, and a stop bit.
-        Thirteen carry the station's address, eleven its value — and nothing else checks them: ALERT Binary has no CRC, only eight
-        fixed check bits and the start and stop bits. <strong>Flip any of the 24 that carry the reading and the frame still passes</strong>,
-        on the wrong address or with the wrong value.</p>
+    ${secOpen('bb-bits')}
+      <p>A station sends each reading as two numbers — its <strong>address</strong>, which says who it is, and the <strong>value</strong>
+        it read — packed into 40 bits that go out one after another. Set the two numbers, or press a bit to flip it, and follow it from
+        the number to where it travels on the air.</p>
       <div class="bb-frame-in control-row">
-        <label for="bb-addr">Address <input type="number" class="field-num" id="bb-addr" min="1" max="8191" value="${S.addr}"
+        <label for="bb-addr">Address <input type="number" class="field-num" id="bb-addr" min="0" max="8191" value="${S.addr}"
           oninput="BitBench.setFrame('addr', this.value)"></label>
         <label for="bb-value">Value <input type="number" class="field-num" id="bb-value" min="0" max="2047" value="${S.value}"
           oninput="BitBench.setFrame('value', this.value)"></label>
         <button type="button" class="btn" onclick="BitBench.randomFrame()">🎲 Another station</button>
       </div>
+      <h4>On the air: four words of ten bits</h4>
       <div id="bb-frame-body">${frameBody()}</div>
+      <h4>One number, bit by bit</h4>
+      <p>Each bit is worth twice the one to its right. Pick the address or the value to see the frame's own number, or a byte or a
+        16-bit number of your own; type one in decimal, <code>0b…</code> for binary or <code>0x…</code> for hex.</p>
+      <div class="bb-num-top">
+        <label class="bb-num-in" for="bb-num-in">Number
+          <input type="text" id="bb-num-in" inputmode="numeric" autocomplete="off" spellcheck="false" value="${escAttr(String(S.num))}"
+            aria-describedby="bb-num-note" oninput="BitBench.setNum(this.value)"></label>
+        <fieldset class="bb-chips" aria-describedby="bb-num-note"><legend>Which number</legend>
+          ${WIDTHS.map(([w, t, b]) => `<label class="bb-chip" for="bb-w-${w}"><input type="radio" name="bb-w" id="bb-w-${w}" value="${w}"
+            ${S.width === w ? 'checked' : ''} onchange="BitBench.width(${w})">${t} <span class="bb-chip-sub">${b}</span></label>`).join('')}
+        </fieldset>
+      </div>
+      <p class="bb-aside" id="bb-num-note">${esc(numNote())}</p>
+      <div id="bb-num-body">${numBody()}</div>
       <h4>The tones it goes out as</h4>
       <p>Each bit is a burst of tone for ${num(M.bitMs(), 2)} ms — <strong>${num(M.MARK_HZ, 1)} Hz for a 1</strong> (the mark tone, also the
         idle line) and <strong>${num(M.SPACE_HZ, 1)} Hz for a 0</strong> (space) — and the tones swing the carrier's frequency, which is
@@ -543,7 +656,7 @@ const BitBench = (function () {
     </section>`;
   }
 
-  // ── 3 · Where faults happen ────────────────────────────────────────────────
+  // ── 2 · Where faults happen ────────────────────────────────────────────────
   // The site in 3-D (bit-scene.js draws it) and the sentence under it saying
   // where the fault happens. Its fault is always the Faults section's —
   // S.effect — so the two cards move together: the tour steps both, ten
@@ -595,7 +708,7 @@ const BitBench = (function () {
     </section>`;
   }
 
-  // ── 4 · Faults ─────────────────────────────────────────────────────────────
+  // ── 3 · Faults ─────────────────────────────────────────────────────────────
 
   function pickerHtml() {
     return FAMILIES.map(f => `
@@ -756,8 +869,8 @@ const BitBench = (function () {
         <span class="bb-aside">${l.j.flips.length ? `${l.j.flips.length} bit${l.j.flips.length > 1 ? 's' : ''} flipped${l.j.flips.length ? `: ${l.j.cleared.length} 1 → 0, ${l.j.set.length} 0 → 1` : ''}.` : 'No bit changed.'}</span></p>
       <details class="bb-more" ${S.liveOpen ? 'open' : ''} ontoggle="BitBench.keepOpen(this.open)"><summary id="bb-live-sum">The bits, sent and heard</summary>
         <div class="bb-pair">
-          ${frameTable(l.truth, { caption: fam(l.id) === 'data' ? 'What the station meant to send' : 'Sent', capShown: true, small: true })}
-          ${frameTable(l.ch.rx, { caption: l.ch.rx ? (fam(l.id) === 'data' ? 'What went on the air, and was heard' : 'Heard') : 'Heard — nothing decoded', capShown: true, small: true, flips: l.j.flips })}
+          ${frameStrip(l.truth, { caption: fam(l.id) === 'data' ? 'What the station meant to send' : 'Sent', capShown: true, small: true })}
+          ${frameStrip(l.ch.rx, { caption: l.ch.rx ? (fam(l.id) === 'data' ? 'What went on the air, and was heard' : 'Heard') : 'Heard — nothing decoded', capShown: true, small: true, flips: l.j.flips })}
         </div>
       </details>`;
   }
@@ -778,8 +891,10 @@ const BitBench = (function () {
         <strong>${num(n)}</strong> ${esc(t)} <span class="bb-aside">(${pct(n / st.n)})</span></li>`).join('')}</ul>`;
   }
 
-  // Where the flips landed, as the frame's own table with each cell shaded
-  // by its share of the flips.
+  // Where the flips landed, as the frame in a table, a word to a row, each
+  // cell shaded by its share of the flips. The word column is wide enough for
+  // its name; the ten bit columns share the rest.
+  const COLS = '<colgroup><col style="width:4.6rem"><col span="10"></colgroup>';
   function heatHtml(st, cap) {
     const L = BM().layout();
     const max = Math.max(1, ...st.flipsAt);
@@ -1051,8 +1166,7 @@ const BitBench = (function () {
         <nav class="bb-toc" aria-label="On this page">${SECS.map(([id, , t, pic]) =>
           `<button type="button" class="bb-toc-btn" onclick="BitBench.goTo('${id}')">${glyph(pic, 'gl bb-toc-gl')}${t}</button>`).join('')}</nav>
       </div>
-      ${numHtml()}
-      ${frameHtml()}
+      ${bitsHtml()}
       ${siteHtml()}
       ${faultHtml()}
       ${mysteryHtml()}
@@ -1903,6 +2017,7 @@ const BitBench = (function () {
     syncSite();
     S.site.at = performance.now();
     wireSite();
+    wireBits();
     const io = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver(es => {
       for (const e of es) { if (e.isIntersecting) onScreen.add(e.target.id); else onScreen.delete(e.target.id); }
       kick();
@@ -1915,39 +2030,73 @@ const BitBench = (function () {
 
   // ── Controls ───────────────────────────────────────────────────────────────
 
+  // The bench's number in its box — unless somebody is typing in it.
+  function syncNumBox() {
+    const box = document.getElementById('bb-num-in');
+    if (box && box !== document.activeElement) box.value = String(S.num);
+  }
+  function showWidth() {
+    const radio = document.getElementById(`bb-w-${S.width}`);
+    if (radio) radio.checked = true;
+    const note = document.getElementById('bb-num-note');
+    if (note) note.textContent = numNote();
+  }
+
+  // The frame's address or value, set: its box, its strip, and the frame on
+  // the bench under a fault all follow.
+  function putFrame(f, v) {
+    if (f === 'address') S.addr = v; else S.value = v;
+    const box = document.getElementById(f === 'address' ? 'bb-addr' : 'bb-value');
+    if (box && box !== document.activeElement) box.value = String(v);
+    paint('bb-frame-body', frameBody());
+    newLive();
+    repaintLive();
+    const fx = document.getElementById('bb-fixed');
+    if (fx && fx.nextElementSibling) fx.nextElementSibling.textContent = `Only the frame above (address ${S.addr}, value ${S.value}), rather than every station's`;
+  }
+
+  // The bench's number, set — and while the bench is on the address or the
+  // value, the frame's with it, `what` saying how it changed.
+  function commitNum(v, what) {
+    const f = boundField();
+    if (f) S.said = what ? { field: f, from: fieldNum(f), to: v, what } : null;
+    S.num = v;
+    syncNumBox();
+    repaintNum();
+    if (f) putFrame(f, v);
+  }
+
   function width(w) {
     if (![8, 11, 13, 16].includes(Number(w))) return;
     S.width = Number(w);
-    S.num = BM().wrap(S.num, S.width);
+    const f = boundField();
+    S.num = f ? fieldNum(f) : BM().wrap(S.num, S.width);
     S.lastOp = ''; S.lastBit = -1;
-    const box = document.getElementById('bb-num-in');
-    if (box) box.value = String(S.num);
+    syncNumBox();
+    showWidth();
     repaintNum();
   }
 
   function setNum(raw) {
-    const r = BM().parse(raw);
+    const M = BM();
+    const r = M.parse(raw);
     const box = document.getElementById('bb-num-in');
     if (box) { if (r || !String(raw).trim()) box.removeAttribute('aria-invalid'); else box.setAttribute('aria-invalid', 'true'); }
     if (!r) return;
-    const v = r.value < 0 ? BM().wrap(r.value, S.width) : r.value;
-    // A number too big for the width widens it, up to 16 bits.
-    if (v > BM().mask(S.width)) {
-      const fitW = [8, 11, 13, 16].find(w => v <= BM().mask(w));
-      if (fitW) { S.width = fitW; const radio = document.getElementById(`bb-w-${fitW}`); if (radio) radio.checked = true; }
-    }
-    S.num = BM().wrap(v, S.width);
+    const v = r.value < 0 ? M.wrap(r.value, S.width) : r.value;
+    // A number too big for the width is shown as 16 bits, apart from the
+    // frame: one too big for the value is no value, and not an address either.
+    if (v > M.mask(S.width) && v <= M.mask(16)) { S.width = 16; showWidth(); }
     S.lastOp = ''; S.lastBit = -1;
-    repaintNum();
+    commitNum(M.wrap(v, S.width), '');
   }
 
   function flipBit(i) {
     if (!(i >= 0 && i < S.width)) return;
-    S.num = BM().flip(S.num, i) & BM().mask(S.width);
+    const f = boundField();
     S.lastBit = i; S.lastOp = '';
-    const box = document.getElementById('bb-num-in');
-    if (box) box.value = String(S.num);
-    repaintNum();
+    commitNum(BM().flip(S.num, i) & BM().mask(S.width), f ? `${FIELD_WORD[f]} bit ${i} flipped` : '');
+    if (f) announce(sayText());
   }
 
   function op(k) {
@@ -1957,25 +2106,39 @@ const BitBench = (function () {
       ungray: () => M.fromGray(v) & M.mask(w), swap: () => (w === 16 ? M.swapBytes(v) : v), inc: () => M.wrap(v + 1, w) }[k];
     if (!out) return;
     if (k === 'swap' && w !== 16) return;
-    S.num = out();
     S.lastOp = k; S.lastBit = -1;
-    const box = document.getElementById('bb-num-in');
-    if (box) box.value = String(S.num);
-    repaintNum();
-    announce(`${num(v)} becomes ${num(S.num)}.`);
+    commitNum(out(), OP_DONE[k]);
+    announce(boundField() ? sayText() : `${num(v)} becomes ${num(S.num)}.`);
+  }
+
+  // A press on one of the frame's own address or value bits: flipped as the
+  // air might flip it, and what a receiver would make of that said under the
+  // strip. A bench on the frame's numbers moves to the one flipped.
+  function flipAir(j) {
+    const c = BM().layout()[j];
+    if (!c || (c.kind !== 'A' && c.kind !== 'D')) return;
+    const f = c.kind === 'A' ? 'address' : 'value';
+    const from = fieldNum(f), to = BM().flip(from, c.i);
+    S.said = { field: f, from, to, what: `${FIELD_WORD[f]} bit ${c.i} flipped` };
+    putFrame(f, to);
+    if (boundField()) {
+      S.width = f === 'address' ? 13 : 11;
+      S.num = to; S.lastBit = c.i; S.lastOp = '';
+      syncNumBox();
+      showWidth();
+      repaintNum();
+    }
+    announce(sayText());
   }
 
   function setFrame(which, raw) {
     const n = Math.round(Number(raw));
-    if (!Number.isFinite(n)) return;
-    if (which === 'addr') S.addr = Math.max(1, Math.min(8191, n));
-    else if (which === 'value') S.value = Math.max(0, Math.min(2047, n));
-    else return;
-    paint('bb-frame-body', frameBody());
-    newLive();
-    repaintLive();
-    const fx = document.getElementById('bb-fixed');
-    if (fx && fx.nextElementSibling) fx.nextElementSibling.textContent = `Only the frame above (address ${S.addr}, value ${S.value}), rather than every station's`;
+    const f = which === 'addr' ? 'address' : which === 'value' ? 'value' : '';
+    if (!f || !Number.isFinite(n)) return;
+    const v = Math.max(0, Math.min(BM().FIELDS[f].max, n));
+    S.said = null;
+    putFrame(f, v);
+    if (boundField() === f) { S.num = v; S.lastOp = ''; S.lastBit = -1; syncNumBox(); repaintNum(); }
   }
 
   function randomFrame() {
@@ -1983,10 +2146,34 @@ const BitBench = (function () {
     const keys = idx ? [...idx.keys()].filter(a => a > 0 && a < 8192) : [];
     S.addr = keys.length ? keys[Math.floor(Math.random() * keys.length)] : 1 + Math.floor(Math.random() * 8191);
     S.value = Math.floor(Math.random() * 2048);
-    const a = document.getElementById('bb-addr'), v = document.getElementById('bb-value');
-    if (a) a.value = String(S.addr);
+    const v = document.getElementById('bb-value');
     if (v) v.value = String(S.value);
-    setFrame('addr', S.addr);
+    S.said = null;
+    putFrame('address', S.addr);
+    const f = boundField();
+    if (f) { S.num = fieldNum(f); S.lastOp = ''; S.lastBit = -1; syncNumBox(); repaintNum(); }
+  }
+
+  // Pointing at a bit — in the strip, on the bench or in the field table —
+  // lights the same bit wherever else it is drawn; pointing at a field's row
+  // lights all its cells. Listened for on the section, so a repaint of a part
+  // keeps it.
+  function wireBits() {
+    const sec = document.getElementById('bb-bits');
+    if (!sec || sec.dataset.wired) return;
+    sec.dataset.wired = '1';
+    const light = e => {
+      sec.querySelectorAll('.is-hl').forEach(x => x.classList.remove('is-hl'));
+      const t = e && e.target && e.target.closest ? e.target.closest('[data-k], tr[data-f]') : null;
+      if (!t || !sec.contains(t)) return;
+      const sel = t.dataset.f ? `.bb-cell--${t.dataset.f}` : `[data-k="${t.dataset.k}"]`;
+      sec.querySelectorAll(sel).forEach(x => { if (x !== t) x.classList.add('is-hl'); });
+      t.classList.add('is-hl');
+    };
+    sec.addEventListener('mouseover', light);
+    sec.addEventListener('focusin', light);
+    sec.addEventListener('mouseleave', () => light(null));
+    sec.addEventListener('focusout', () => light(null));
   }
 
   // The site: turned by dragging it across (up and down still scrolls the
@@ -2258,13 +2445,13 @@ const BitBench = (function () {
   }
 
   return {
-    render, init, open, width, setNum, flipBit, op, setFrame, randomFrame, siteTour, siteStep, siteShow, siteBench,
+    render, init, open, width, setNum, flipBit, op, flipAir, setFrame, randomFrame, siteTour, siteStep, siteShow, siteBench,
     pick, set, sendOne, play, batch, batchSize, fixed,
     mystery, guess, pairs, pairsField, pairsExample, exportCsv, goTo, learn, tab, keepOpen,
     // The drawing kit, for the ⚡ Bit Errors lesson's figures: the same
     // canvases, colours and type as the bench's.
     ink: { fit, pal, text, line, alpha, caption, wrapText, FONT, FONT_B, MONO },
-    state: () => ({ effect: S.effect, params: { ...params(S.effect) }, num: S.num, width: S.width, addr: S.addr, value: S.value,
+    state: () => ({ effect: S.effect, params: { ...params(S.effect) }, num: S.num, width: S.width, addr: S.addr, value: S.value, said: S.said && { ...S.said },
       site: { id: S.effect, tour: S.site.tour, yaw: S.site.yaw },
       live: S.live ? { status: S.live.j.status, flips: S.live.j.flips.slice() } : null,
       batch: S.batch ? { id: S.batch.id, n: S.batch.n, counts: { ...S.batch.counts } } : null,
