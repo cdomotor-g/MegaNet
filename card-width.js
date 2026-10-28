@@ -162,11 +162,11 @@ const CardWidth = (() => {
     const box = fixed ? card.getBoundingClientRect()
       : { left: card.offsetLeft, top: card.offsetTop, width: card.offsetWidth, height: card.offsetHeight };
     grip.dataset.side = side;
-    grip.style.position = fixed ? 'fixed' : 'absolute';
-    grip.style.zIndex = cs.zIndex;
-    grip.style.top = `${box.top}px`;
-    grip.style.height = `${box.height}px`;
-    grip.style.left = `${side === 'right' ? box.left + box.width - INSET : box.left + INSET - grip.offsetWidth}px`;
+    grip.dataset.fixed = fixed ? 'true' : 'false';
+    grip.style.setProperty('--cw-z', cs.zIndex);
+    grip.style.setProperty('--cw-top', `${box.top}px`);
+    grip.style.setProperty('--cw-h', `${box.height}px`);
+    grip.style.setProperty('--cw-left', `${side === 'right' ? box.left + box.width - INSET : box.left + INSET - grip.offsetWidth}px`);
     const w = Math.round(box.width);
     grip.setAttribute('aria-valuemin', String(r.min));
     grip.setAttribute('aria-valuemax', String(Math.max(r.max, w)));

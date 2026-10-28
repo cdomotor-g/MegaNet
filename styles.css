@@ -2771,9 +2771,6 @@ td {
   0%, 100% { opacity: 1; box-shadow: 0 0 0 1px var(--map-leader-ink), inset 0 0 0 1px var(--map-leader-ink), 0 0 14px 5px var(--hit-glow); }
   50% { opacity: .6; box-shadow: 0 0 0 1px var(--map-leader-ink), inset 0 0 0 1px var(--map-leader-ink), 0 0 2px 0 var(--hit-glow); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .as-pin { animation: none; }
-}
 .as-hit-sw { display: inline-block; width: .8em; height: .8em; margin-right: .35em; vertical-align: -1px; border: 2px solid var(--hit-ring); border-radius: 2px;
   box-shadow: 0 0 0 1px var(--map-leader-ink), 0 0 5px 1px var(--hit-glow); }
 .as-hit-line { margin-top: var(--sp-1); }
@@ -8464,10 +8461,16 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
    does. */
 .mn-cardw {
   position: absolute;
+  z-index: var(--cw-z, auto);
+  top: var(--cw-top);
+  left: var(--cw-left);
+  height: var(--cw-h);
   width: 12px;
   cursor: col-resize;
   touch-action: none;    /* the pointer drag is ours, not the map's pan */
 }
+
+.mn-cardw[data-fixed="true"] { position: fixed; }
 
 .mn-cardw::before,
 .mn-cardw::after {
@@ -18494,6 +18497,10 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
     transition: none;
   }
 
+  .as-pin { animation: none; }
+  .fw-pane.is-active, .fw-ledchip-dot, .tm-cur, .fw-key { animation: none; }
+  .fw-ledchip-dot { background: #ffe35a; }
+
   /* The loading card's logo (#212's card, its detailed mark brought to life):
      no sheen sweeping it and no pulse through it, just the logo. */
   .ll-vivid, .ll-sheen, .ll-mesh path, .load-logo i::before, .load-logo i::after { animation: none; }
@@ -22504,7 +22511,7 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
   .fw-two, .fw-checker { grid-template-columns: minmax(0, 1fr); }
   .fw-win { min-height: 17rem; }
 }
-@media (max-width: 520px) {
+@media (max-width: 560px) {
   .fw-paths { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .fw-path { grid-template-columns: minmax(0, 1fr); padding: var(--sp-2); }
   .fw-path-i { grid-row: auto; }
@@ -22517,10 +22524,6 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
 }
 @media (pointer: coarse) {
   .fw-dot { width: 2.4rem; height: 2.4rem; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .fw-pane.is-active, .fw-ledchip-dot, .tm-cur, .fw-key { animation: none; }
-  .fw-ledchip-dot { background: #ffe35a; }
 }
 
 /* ── Level surveys (level-survey.js, two-peg.js, survey-guide.js) ────────────
