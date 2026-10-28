@@ -261,7 +261,7 @@ const Map3D = (function () {
   let cadFails = {};     // cadastre layer id → tiles the service would not give
   let sheets   = { rows: [], pick: [], queue: [], running: 0, gen: 0,
                    done: 0, failed: 0, dropped: 0, inView: 0 };
-  let buf      = null;   // { pos, clr, count } — the sheet geometry, in mercator
+  let buf      = null;   // { data, count } — the sheet geometry, in mercator (rebuildSheets)
   let sitePins = [];     // the site finder's pins and site marks, as ml.Markers
   let photoPins = [];    // the field photos' badges: [{ marker, pin }] (syncPhotos)
   let photoKey  = null;  // what they were last built from, so a pan that finds the same photos rebuilds nothing
@@ -477,24 +477,47 @@ const Map3D = (function () {
   // Read off the Leaflet layers rather than recomputed. `options.color` is the
   // colour the line ended up, after MapFreq recorded the channel, MapLos
   // painted an obstruction and MapFade banded a margin — i.e. after every
-  // decision the 2-D map made. `mnLinkRole` separates the white casing (which
-  // exists to lift a line off the base map and has nothing to say in 3-D, where
-  // the line is lifted off it by the terrain) from the core that carries the
-  // meaning.
+  // decision the 2-D map made. `mnLinkRole` separates the white casings from
+  // the cores that carry the meaning: the cores are mirrored, and the casing
+  // is drawn here under every one of them from the core itself
+  // (`mn-links-casing`), so it is never a second line to keep in step.
+  //
+  // What is *not* copied verbatim is how strong and how wide a line is, and
+  // that is the one place this view departs from 2-D on purpose. Link opacity
+  // opens at 25 % (since 2026-10-23): on the flat map that is a line over its
+  // own white casing, crisp at its full 1.5 px. Draped on tilted ground it is
+  // a line rendered into the terrain's texture and seen at a slant — an
+  // east–west link at 62° of pitch is under a pixel tall — at a quarter
+  // strength, under the rising water's blue; and the links were simply not
+  // there. So a line here is drawn at LINK_3D_OP of its strength at least, and
+  // LINK_3D_WIDTH times as wide. The floor scales the line's own opacity
+  // rather than replacing it, so the focus dim's fifth and a blast or a
+  // colouring's translucency keep their proportions; a slider set above the
+  // floor is drawn as set.
+  const LINK_3D_OP     = 0.85;
+  const LINK_3D_WIDTH  = 1.6;
+  const LINK_3D_CASING = 2.5;   // px the white casing shows past the line, both sides together
   function linkFeatures() {
     const out = [];
+    const v = Number(state.mapLinkOpacity);
+    const lift = v > 0 && isFinite(v) ? Math.max(v, LINK_3D_OP) / v : 1;
+    const casingMix = typeof MAP_LINK_CASING_MIX === 'number' ? MAP_LINK_CASING_MIX : 0.75;
     for (const l of (state.mapLines || [])) {
       const role = l.mnLinkRole;
       if (role === 'casing' || role === 'backbone-casing') continue;
       const pts = typeof l.getLatLngs === 'function' ? l.getLatLngs() : null;
       if (!pts || pts.length < 2) continue;
+      const op = Math.min(1, (l.options.opacity == null ? 1 : l.options.opacity) * lift);
       const props = {
         colour: l.options.color || '#ff6f00',
-        width:  (l.options.weight || 2) + (role === 'backbone' ? 1 : 0),
-        op:     l.options.opacity == null ? 1 : l.options.opacity,
+        width:  (l.options.weight || 2) * LINK_3D_WIDTH + (role === 'backbone' ? 1 : 0),
+        op,
+        // The casing's, as 2-D mixes it from the core's. A dash has none: it
+        // lies on its own core, which has one already.
+        cop:    role === 'backbone-dash' ? 0 : op * casingMix,
         // A backbone path is three stacked Leaflet lines: a casing, a
-        // coloured core and a black dashed overlay. The casing is dropped
-        // above; the dash is kept and drawn as a real dash, which is what
+        // coloured core and a black dashed overlay. The casing is drawn off
+        // the core (`cop`); the dash is kept and drawn as a real dash, which is what
         // says "backbone" once the core has taken the colouring's colour.
         dash:   role === 'backbone-dash' ? 1 : 0,
       };
@@ -1461,6 +1484,7 @@ const Map3D = (function () {
     const op = dimK === 1 ? ['get', 'op'] : ['*', ['get', 'op'], dimK];
     const set = (id, prop, value) => { if (map.getLayer(id)) map.setPaintProperty(id, prop, value); };
     set('mn-links', 'line-opacity', op);
+    set('mn-links-casing', 'line-opacity', dimK === 1 ? ['get', 'cop'] : ['*', ['get', 'cop'], dimK]);
     set('mn-stations', 'circle-opacity', op);
     set('mn-stations', 'circle-stroke-opacity', op);
     set('mn-stations-outline', 'circle-stroke-opacity', op);
@@ -1677,33 +1701,50 @@ const Map3D = (function () {
     setNote();
   }
 
-  // Every sheet in one pair of buffers. A strip per hop would be a draw call
-  // per hop; degenerate vertices stitch them into one strip instead, which is
-  // the standard trick and the difference between 80 draw calls a frame and one.
+  // Every sheet in one buffer, drawn in one call: a draw call per hop would be
+  // 80 a frame. Plain triangles, two to each stretch of a hop between samples,
+  // rather than one long strip stitched from hop to hop: a strip's joins have
+  // to be exactly degenerate, and the ones this used to make were not — the
+  // triangle across each join was a real one, a pale wedge from the end of one
+  // hop to the start of the next, wherever those were on the map.
+  //
+  // Each vertex carries, beside where it is and its colour, which edge it is on
+  // (−1 the ground, +1 the ray) and which way the hop runs there, so the shader
+  // can give the sheet its thickness (see the layer).
+  const SHEET_STRIDE = 7;       // floats a vertex: x, y, z, the hop's dx, dy, colour, edge
   function rebuildSheets() {
     if (!ml || !map) return;
     const exag = state.map3dExag || 1;
-    const pos = [], clr = [];
-    let count = 0;
+    const out = [];
     for (const row of sheets.rows) {
-      const strip = [];
+      if (row.length < 2) continue;
+      const g = [], r = [], t = [];
       for (const p of row) {
-        const g = ml.MercatorCoordinate.fromLngLat({ lng: p.lon, lat: p.lat }, p.ground * exag);
-        const r = ml.MercatorCoordinate.fromLngLat({ lng: p.lon, lat: p.lat }, p.ray * exag);
+        g.push(ml.MercatorCoordinate.fromLngLat({ lng: p.lon, lat: p.lat }, p.ground * exag));
+        r.push(ml.MercatorCoordinate.fromLngLat({ lng: p.lon, lat: p.lat }, p.ray * exag));
         // The ramp reads the Fresnel ratio, which is what pathAnalyse's verdict
         // reads: ≥0.6 clear, ≥0 marginal, <0 obstructed. Clamped either side so
         // a wildly clear hop is one green and not a gradient to white.
-        const t = p.ratio == null ? 1 : Math.max(0, Math.min(1, p.ratio / 0.6));
-        strip.push([g.x, g.y, g.z, t], [r.x, r.y, r.z, t]);
+        t.push(p.ratio == null ? 1 : Math.max(0, Math.min(1, p.ratio / 0.6)));
       }
-      if (strip.length < 4) continue;
-      // Degenerate joins: repeat the last vertex of the previous strip and the
-      // first of this one, so the triangles between them have zero area and
-      // draw nothing.
-      if (count) { const prev = pos.slice(-3); strip.unshift([prev[0], prev[1], prev[2], 1]); strip.unshift(strip[1]); }
-      for (const v of strip) { pos.push(v[0], v[1], v[2]); clr.push(v[3]); count++; }
+      const n = row.length;
+      // Which way the hop runs at each sample, over the ground: from the one
+      // before to the one after (one side only at the ends).
+      const dir = g.map((_, i) => {
+        const a = g[Math.max(0, i - 1)], b = g[Math.min(n - 1, i + 1)];
+        return [b.x - a.x, b.y - a.y];
+      });
+      const v = (i, top) => {
+        const c = top ? r[i] : g[i];
+        out.push(c.x, c.y, c.z, dir[i][0], dir[i][1], t[i], top ? 1 : -1);
+      };
+      for (let i = 0; i + 1 < n; i++) {
+        v(i, false); v(i, true);  v(i + 1, false);
+        v(i, true);  v(i + 1, true); v(i + 1, false);
+      }
     }
-    buf = count >= 3 ? { pos: new Float32Array(pos), clr: new Float32Array(clr), count } : null;
+    const count = out.length / SHEET_STRIDE;
+    buf = count >= 3 ? { data: new Float32Array(out), count } : null;
     if (map.getLayer('mn-sheets')) map.triggerRepaint();
     setNote();
   }
@@ -1713,15 +1754,62 @@ const Map3D = (function () {
   // wrote into: a sheet behind a ridge is hidden by the ridge, which is the
   // whole reading — a curtain that disappears into a hill is a hop that does
   // not clear it.
+  //
+  // ── Its thickness ──
+  // A sheet is a surface with no thickness, and most of the time the camera
+  // sees it nearly edge-on. Tens of metres of clearance over a hop seen from
+  // ten kilometres up and 62° over is under a pixel tall, and a surface under
+  // a pixel tall is drawn as whichever pixels its triangles happen to cross:
+  // a dotted, flickering thread that comes and goes as the camera moves.
+  // Looked down on from overhead, it is nothing at all.
+  //
+  // So every sheet is drawn SHEET_PX wider than it is, on screen: each vertex
+  // is moved half that, across the hop as the screen shows it, the ray's to the
+  // side the sky is on and the ground's to the other. From overhead that is a
+  // band SHEET_PX wide along the hop in the hop's colours; at a slant, a sheet
+  // never less than SHEET_PX tall; close in, a sheet with a pixel or two more
+  // round it. The ground's half goes into the hill and is hidden there by the
+  // depth test, as the sheet's foot always was. And where the ground is above
+  // the line, where the sheet has closed to nothing, the band is still there,
+  // red, rather than the hop going missing exactly where it is blocked.
+  //
+  // Which side is the sky's is read off the projection of straight up at that
+  // vertex, not off the ray's own vertex: where the sheet has closed the two
+  // are one point and say nothing. Along a straight hop it is the same side
+  // the whole way unless the hop runs straight at the camera, where the band
+  // can pinch for a sample.
+  const SHEET_PX    = 4;      // CSS px
+  const SHEET_ALPHA = 0.42;
   const sheetLayer = {
     id: 'mn-sheets', type: 'custom', renderingMode: '3d',
     onAdd(m, gl) {
+      // Screen directions are taken as the derivative of the projection along a
+      // direction (w = 0) rather than by projecting a second point a step away:
+      // a step of a metre is 2.5e-8 in mercator units, under float precision at
+      // the coordinates a hop sits at.
       const vs = `#version 300 es
         uniform mat4 u_matrix;
+        uniform vec2 u_half;
+        uniform float u_px;
         in vec3 a_pos;
+        in vec2 a_dir;
         in float a_t;
+        in float a_side;
         out float v_t;
-        void main() { v_t = a_t; gl_Position = u_matrix * vec4(a_pos, 1.0); }`;
+        vec2 onScreen(vec4 c, vec4 d) { return (d.xy * c.w - c.xy * d.w) * u_half; }
+        void main() {
+          v_t = a_t;
+          vec4 c = u_matrix * vec4(a_pos, 1.0);
+          gl_Position = c;
+          if (c.w <= 0.0) return;
+          vec2 along = onScreen(c, u_matrix * vec4(a_dir, 0.0, 0.0));
+          vec2 up    = onScreen(c, u_matrix * vec4(0.0, 0.0, 1.0, 0.0));
+          float len = length(along);
+          if (len <= 0.0) return;
+          vec2 n = vec2(-along.y, along.x) / len;
+          if (dot(n, up) < 0.0) n = -n;
+          gl_Position.xy += n * (a_side * 0.5 * u_px) / u_half * c.w;
+        }`;
       const fs = `#version 300 es
         precision highp float;
         uniform vec3 u_bad;
@@ -1741,26 +1829,27 @@ const Map3D = (function () {
         gl.compileShader(sh);
         return sh;
       };
+      this.map = m;
       this.prog = gl.createProgram();
       gl.attachShader(this.prog, mk(gl.VERTEX_SHADER, vs));
       gl.attachShader(this.prog, mk(gl.FRAGMENT_SHADER, fs));
       gl.linkProgram(this.prog);
-      this.aPos   = gl.getAttribLocation(this.prog, 'a_pos');
-      this.aT     = gl.getAttribLocation(this.prog, 'a_t');
+      this.attrs = [['a_pos', 3, 0], ['a_dir', 2, 3], ['a_t', 1, 5], ['a_side', 1, 6]]
+        .map(([name, size, at]) => ({ loc: gl.getAttribLocation(this.prog, name), size, at }));
       this.uMat   = gl.getUniformLocation(this.prog, 'u_matrix');
+      this.uHalf  = gl.getUniformLocation(this.prog, 'u_half');
+      this.uPx    = gl.getUniformLocation(this.prog, 'u_px');
       this.uBad   = gl.getUniformLocation(this.prog, 'u_bad');
       this.uMid   = gl.getUniformLocation(this.prog, 'u_mid');
       this.uGood  = gl.getUniformLocation(this.prog, 'u_good');
       this.uAlpha = gl.getUniformLocation(this.prog, 'u_alpha');
       this.vbo = gl.createBuffer();
-      this.tbo = gl.createBuffer();
       this.uploaded = null;
     },
     onRemove(m, gl) {
       if (this.prog) gl.deleteProgram(this.prog);
       if (this.vbo) gl.deleteBuffer(this.vbo);
-      if (this.tbo) gl.deleteBuffer(this.tbo);
-      this.prog = this.vbo = this.tbo = this.uploaded = null;
+      this.prog = this.vbo = this.uploaded = this.map = null;
     },
     render(gl, args) {
       if (!buf || !this.prog) return;
@@ -1775,27 +1864,28 @@ const Map3D = (function () {
         : args && args.modelViewProjectionMatrix ? args.modelViewProjectionMatrix
         : null;
       if (!mat) return;
+      const dpr = this.map && this.map.getPixelRatio ? this.map.getPixelRatio() : (window.devicePixelRatio || 1);
       gl.useProgram(this.prog);
       gl.uniformMatrix4fv(this.uMat, false, mat);
+      gl.uniform2f(this.uHalf, gl.drawingBufferWidth / 2, gl.drawingBufferHeight / 2);
+      gl.uniform1f(this.uPx, SHEET_PX * dpr);
       gl.uniform3fv(this.uBad,  rgb(cssVar('--map-line-blocked', '#d81b60')));
       gl.uniform3fv(this.uMid,  rgb(cssVar('--warn', '#f9a825')));
       gl.uniform3fv(this.uGood, rgb(cssVar('--ok', '#2e7d32')));
       // The site finder's dim reaches the sheets too: they are the network's
       // hops, and a candidate's path is hard to read through a curtain.
-      gl.uniform1f(this.uAlpha, 0.42 * dimK);
+      gl.uniform1f(this.uAlpha, SHEET_ALPHA * dimK);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
       if (this.uploaded !== buf) {
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-        gl.bufferData(gl.ARRAY_BUFFER, buf.pos, gl.DYNAMIC_DRAW);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.tbo);
-        gl.bufferData(gl.ARRAY_BUFFER, buf.clr, gl.DYNAMIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, buf.data, gl.DYNAMIC_DRAW);
         this.uploaded = buf;
       }
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-      gl.enableVertexAttribArray(this.aPos);
-      gl.vertexAttribPointer(this.aPos, 3, gl.FLOAT, false, 0, 0);
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.tbo);
-      gl.enableVertexAttribArray(this.aT);
-      gl.vertexAttribPointer(this.aT, 1, gl.FLOAT, false, 0, 0);
+      const stride = SHEET_STRIDE * 4;
+      for (const a of this.attrs) {
+        if (a.loc < 0) continue;
+        gl.enableVertexAttribArray(a.loc);
+        gl.vertexAttribPointer(a.loc, a.size, gl.FLOAT, false, stride, a.at * 4);
+      }
       // Premultiplied alpha, because that is what MapLibre's own framebuffer
       // is in; ONE_MINUS_SRC_ALPHA against a straight-alpha colour double-darkens
       // everything behind the sheet.
@@ -1807,8 +1897,9 @@ const Map3D = (function () {
       // them winning the whole overlap.
       gl.disable(gl.CULL_FACE);
       gl.depthMask(false);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, buf.count);
+      gl.drawArrays(gl.TRIANGLES, 0, buf.count);
       gl.depthMask(true);
+      for (const a of this.attrs) if (a.loc >= 0) gl.disableVertexAttribArray(a.loc);
     },
   };
 
@@ -1863,7 +1954,18 @@ const Map3D = (function () {
         // has to change is easier to add and drop than to edit in place.
         // The links, draped: MapLibre lays a line layer on the terrain surface,
         // which is the first of the two depictions — a line that tracks across
-        // the ground.
+        // the ground. Each over a white casing as in 2-D, drawn from the core
+        // itself (see linkFeatures), which is what keeps a line readable over
+        // the rising water, a satellite image or a dark base as it is there.
+        { id: 'mn-links-casing', type: 'line', source: 'mn-links',
+          filter: ['==', ['get', 'dash'], 0],
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color':   '#ffffff',
+            'line-width':   ['+', ['get', 'width'], LINK_3D_CASING],
+            'line-opacity': ['get', 'cop'],
+            'line-opacity-transition': { duration: 0, delay: 0 },
+          } },
         { id: 'mn-links', type: 'line', source: 'mn-links',
           layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: {
@@ -2131,11 +2233,11 @@ const Map3D = (function () {
   // The ground's raster stack, bottom up: a layer added later goes under the
   // first of the ones above it that exists, so the order never depends on
   // which was added first.
-  const GROUND = ['mn-base', 'mn-elev', 'mn-water', 'mn-polar', 'mn-lots', 'mn-roads', 'mn-links'];
+  const GROUND = ['mn-base', 'mn-elev', 'mn-water', 'mn-polar', 'mn-lots', 'mn-roads', 'mn-links-casing', 'mn-links'];
 
   function under(id) {
     const above = GROUND.slice(GROUND.indexOf(id) + 1);
-    return above.find(l => map.getLayer(l)) || 'mn-links';
+    return above.find(l => map.getLayer(l)) || 'mn-links-casing';
   }
 
   function dropCadastre(id) {
@@ -2864,7 +2966,10 @@ const Map3D = (function () {
     map.on('style.load', () => {
       ready = true;
       map.setTerrain({ source: 'mn-dem', exaggeration: state.map3dExag || 1 });
-      map.addLayer(sheetLayer);
+      // The sheets go over everything draped on the ground and under every
+      // pin, ring and badge stood on it: a hop's sheet starts at the pin it
+      // comes from, and drawn over it, the pin was behind a coloured film.
+      map.addLayer(sheetLayer, 'mn-sites-targets');
       syncElevation();
       syncCadastre();
       // A polar plot drawn before 3-D was opened is draped now (#188).

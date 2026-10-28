@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 142, date: '2026-10-28', items: [
+      'On the Stations map in ⛰️ <strong>3-D</strong>, the radio paths and backbone paths can be seen again: they are drawn '
+        + 'stronger and wider than on the flat map, over a white edge, so they read over the rising water and on tilted ground. '
+        + '<strong>Link opacity</strong> still works there above 85 %.',
+      '<strong>Line-of-sight sheets</strong> have some thickness now: from far off or straight overhead each one is a solid '
+        + 'coloured band along its path instead of a flickering thread, a blocked stretch stays a red band, the station pins '
+        + 'stand in front of them, and the pale wedges that sometimes joined one sheet to the next are gone.',
+    ] },
     { n: 141, date: '2026-10-28', items: [
       'The Knowledge base\'s <strong>💾 A2 Firmware</strong> is now the <strong>💾 ERT-A2 Simulator</strong>, rebuilt from PuTTY logs '
         + 'of real units: its terminal is the A2\'s own console — the login, every menu with the unit\'s letters, the prompts holding '

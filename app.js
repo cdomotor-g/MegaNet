@@ -7525,6 +7525,8 @@ function setMapLinkOpacity(v) {
     l.setStyle({ opacity: op });
   }
   MapArrows.schedule();
+  // The 3-D view draws these lines too, from their styles (map-3d.js).
+  Map3D.sync();
 }
 
 // The `n` stations closest to the centre of their own bounding box — used to

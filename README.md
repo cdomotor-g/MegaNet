@@ -1421,13 +1421,25 @@ exactly what they were a moment ago. The 2-D controls stay on screen and keep
 working while it is tilted, which is what makes it a mode rather than a
 separate tool — change a filter in 3-D and it is the same filter.
 
+The one thing it draws differently is how strong a link is. **Link opacity**
+opens at 25 %, which on the flat map is a crisp line over its white casing; on
+tilted ground it was a line seen at a slant at a quarter strength, under the
+rising water, and the links and backbone paths could not be seen at all. So in
+3-D every link is drawn at 85 % of its strength at least (a slider set higher
+is drawn as set, and a dimmed link stays as much dimmer than the rest), 1.6×
+as wide, over a white casing of its own.
+
 Two ways to read a radio path, and you can have both at once. The link line
 itself tracks across the ground, following every rise it crosses. Tick
 **Line-of-sight sheets** and each hop also grows a vertical surface between the
 ray and the ground under it — green where the path clears the 60% Fresnel zone,
 amber where the ground is inside it, red where the ground is above the line —
 so an obstruction is a curtain disappearing into a hill rather than a number in
-a table. The geometry is the Path profile tool's own, with one transform: a
+a table. Each sheet is drawn 4 px thicker than it is on screen, so one seen
+nearly edge-on, from far off or from straight overhead is a solid band along its
+hop rather than a flickering thread, and a blocked stretch, where the sheet has
+closed to nothing, is still there as a red band; the pins stand in front of the
+sheets. The geometry is the Path profile tool's own, with one transform: a
 profile chart keeps the line of sight straight and bends the earth up
 underneath it, and a 3-D view cannot, because the ground is drawn where the
 terrain says it is. So the earth bulge comes off the ray instead. The clearance

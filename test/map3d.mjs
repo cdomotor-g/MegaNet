@@ -78,6 +78,12 @@ const MAPLIBRE_DEV = JSON.parse(fs.readFileSync(new URL('./package.json', import
 // file for the same reason: the check reads the same points, not a copy of them.
 const WATER_GRID = Number((fs.readFileSync(new URL('../map-3d.js', import.meta.url), 'utf8')
   .match(/const WATER_GRID\s*=\s*(\d+)/) || [])[1]) || 0;
+// How strong and how wide a link is drawn on the terrain, and how thick a
+// sheet is at least (section 3 and 4), read from the file for the same reason.
+const M3D_SRC = fs.readFileSync(new URL('../map-3d.js', import.meta.url), 'utf8');
+const LINK_3D_OP    = Number((M3D_SRC.match(/const LINK_3D_OP\s*=\s*([\d.]+)/) || [])[1]) || 0;
+const LINK_3D_WIDTH = Number((M3D_SRC.match(/const LINK_3D_WIDTH\s*=\s*([\d.]+)/) || [])[1]) || 0;
+const SHEET_PX      = Number((M3D_SRC.match(/const SHEET_PX\s*=\s*([\d.]+)/) || [])[1]) || 0;
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
 const GL_TIMEOUT   = Number(process.env.MAP3D_TIMEOUT || 45_000);
 
@@ -472,11 +478,68 @@ ok('every core and backbone line is mirrored, and the casings are not',
    mirror.links === mirror.cores + mirror.dashes,
    `${mirror.links} features for ${mirror.cores} cores + ${mirror.dashes} dashes, `
    + `${mirror.casings} casings dropped`);
-ok('a white casing is never mirrored — in 3-D the terrain lifts the line',
+ok('a white casing is never mirrored as a line of its own — 3-D draws one from each core',
    mirror.casings > 0 && mirror.links < mirror.cores + mirror.dashes + mirror.casings,
    `${mirror.casings} casings on the 2-D map`);
 ok('each mirrored line carries the colour the 2-D map gave it',
    mirror.coloursMatch, `want ${mirror.sampleWant} got ${mirror.sampleGot}`);
+
+// How strong a link is drawn here. Link opacity opens at 25 % (2026-10-23),
+// and the mirror used to copy that across as it stood: a 1.5 px line at a
+// quarter strength, with no casing, draped on ground the camera sees at a
+// slant and under the rising water's blue — and in 3-D the links and the
+// backbone were simply not there. So a line is lifted to LINK_3D_OP of its
+// strength at least, in proportion (the focus dim's fifth stays a fifth), and
+// LINK_3D_WIDTH times as wide; the Link opacity slider still reaches it, above
+// the floor; and every core is drawn over a white casing of its own.
+const strengthOf = () => page.evaluate(() => {
+  const m = Map3D._map();
+  const lines = state.mapLines.filter(l => l.mnLinkRole !== 'casing' && l.mnLinkRole !== 'backbone-casing');
+  const f = Map3D._mirror().links.features;
+  const order = m.getLayersOrder();
+  return {
+    v: state.mapLinkOpacity, n: f.length, lines: lines.length,
+    rows: f.map((x, i) => ({ op: x.properties.op, cop: x.properties.cop, width: x.properties.width,
+                             dash: x.properties.dash, want: lines[i].options.opacity,
+                             weight: lines[i].options.weight, role: lines[i].mnLinkRole })),
+    casing: !!m.getLayer('mn-links-casing') && {
+      under: order.indexOf('mn-links-casing') === order.indexOf('mn-links') - 1,
+      filter: JSON.stringify(m.getFilter('mn-links-casing')),
+      colour: m.getPaintProperty('mn-links-casing', 'line-color'),
+      op: JSON.stringify(m.getPaintProperty('mn-links-casing', 'line-opacity')),
+    },
+    mix: typeof MAP_LINK_CASING_MIX === 'number' ? MAP_LINK_CASING_MIX : null,
+  };
+});
+const L1 = await strengthOf();
+const liftOf = v => Math.max(v, LINK_3D_OP) / v;
+const opBad = S => S.rows.filter(r => Math.abs(r.op - Math.min(1, r.want * liftOf(S.v))) > 1e-9);
+ok('LINK_3D_OP and LINK_3D_WIDTH are read from map-3d.js, and lift the line',
+   LINK_3D_OP > 0.5 && LINK_3D_OP <= 1 && LINK_3D_WIDTH > 1, `${LINK_3D_OP}, ${LINK_3D_WIDTH}`);
+ok('at Link opacity\u2019s opening 25 %, an undimmed link is drawn at LINK_3D_OP in 3-D, not at a quarter',
+   L1.v === 0.25 && L1.n === L1.lines && L1.rows.some(r => r.want === L1.v)
+     && L1.rows.filter(r => r.want === L1.v).every(r => Math.abs(r.op - LINK_3D_OP) < 1e-9),
+   JSON.stringify({ v: L1.v, sample: L1.rows.slice(0, 3) }));
+ok('…and every line in proportion to the strength 2-D gave it, so a dimmed one stays as dim beside the rest',
+   opBad(L1).length === 0, JSON.stringify(opBad(L1).slice(0, 3)));
+ok('…LINK_3D_WIDTH times as wide as 2-D draws it (a backbone a pixel more)',
+   L1.rows.every(r => Math.abs(r.width - (r.weight * LINK_3D_WIDTH + (r.role === 'backbone' ? 1 : 0))) < 1e-9),
+   JSON.stringify(L1.rows.slice(0, 3)));
+ok('every core has a white casing under it, drawn from the core, and a backbone\u2019s dashes none',
+   !!L1.casing && L1.casing.under && L1.casing.colour === '#ffffff' && L1.casing.op === '["get","cop"]'
+     && /"dash"\],0/.test(L1.casing.filter)
+     && L1.rows.every(r => (r.dash ? r.cop === 0 : Math.abs(r.cop - r.op * L1.mix) < 1e-9)),
+   JSON.stringify(L1.casing));
+// The slider restyles the 2-D lines in place, without a rebuild; the 3-D view
+// has to follow it all the same.
+await page.evaluate(() => setMapLinkOpacity(1));
+const L2 = await strengthOf();
+await page.evaluate(v => setMapLinkOpacity(v), L1.v);
+const L3 = await strengthOf();
+ok('Link opacity moved above the floor is drawn as set in 3-D, and moved back is lifted again',
+   L2.v === 1 && opBad(L2).length === 0 && L2.rows.some(r => r.op === 1)
+     && L3.v === L1.v && JSON.stringify(L3.rows) === JSON.stringify(L1.rows),
+   JSON.stringify({ at1: L2.rows.slice(0, 2), back: L3.rows.slice(0, 2) }));
 
 // The colouring is a property of the 2-D map, so changing it has to change the
 // 3-D view — without this, "it mirrors" could be true of a mirror taken once.
@@ -722,6 +785,81 @@ ok('2× exaggeration reaches the terrain', exag.exagApplied === 2, String(exag.e
 ok('…and changes no clearance ratio, so the colours say the same thing',
    exag.same, JSON.stringify(exag.diag));
 ok('the setting is remembered', exag.stored === '2');
+
+// Each hop's sheet is its own triangles. It used to be one long strip stitched
+// from hop to hop, and the stitches were not degenerate: the triangle across
+// each join was a real one, a pale wedge from the end of one hop to the start
+// of the next, wherever those were on the map. Two triangles a stretch, and
+// not one vertex more, is a buffer with no joins in it.
+const geom = await page.evaluate(() => {
+  const order = Map3D._map().getLayersOrder();
+  const at = id => order.indexOf(id);
+  return { verts: Map3D._sheets().verts,
+           want: Map3D._sheetRows().reduce((n, r) => n + (r.length - 1) * 6, 0),
+           sheets: at('mn-sheets'), lastDraped: at('mn-draw-ghost'),
+           firstPoint: at('mn-sites-targets'), pins: at('mn-stations') };
+});
+ok('every sheet is drawn as its own triangles, with nothing joining one hop to the next',
+   geom.verts > 0 && geom.verts === geom.want, JSON.stringify(geom));
+ok('…over everything draped on the ground and under every pin, so a pin is never behind a sheet',
+   geom.sheets > geom.lastDraped && geom.sheets < geom.firstPoint && geom.sheets < geom.pins, JSON.stringify(geom));
+
+// And it has a thickness. A sheet is a surface with none, and looked down on
+// from overhead it is nothing at all; tens of metres seen from kilometres away
+// is a dotted thread. Drawn SHEET_PX wider than it is on screen, it is a band
+// that wide along the hop from overhead. Measured where it is drawn: straight
+// down on a sheeted hop's middle, the pixels across the hop with the sheets
+// off and then on, and the ones that changed counted.
+const thick = await page.evaluate(async () => {
+  const m = Map3D._map();
+  const was = { center: m.getCenter(), zoom: m.getZoom(), pitch: m.getPitch(), bearing: m.getBearing() };
+  const settle = async () => {
+    await new Promise(r => setTimeout(r, 300));
+    for (let i = 0; i < 300 && (Map3D._sheets().pending > 0 || !m.areTilesLoaded()); i++) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+  };
+  // A clear sample in the middle of a hop, well off the ground.
+  let pick = null;
+  for (const row of Map3D._sheetRows()) {
+    const i = Math.floor(row.length / 2);
+    if (row[i].ray - row[i].ground > 20) { pick = [row[i - 1], row[i], row[i + 1]]; break; }
+  }
+  if (!pick) return { none: true };
+  m.jumpTo({ center: [pick[1].lon, pick[1].lat], zoom: 12, pitch: 0, bearing: 0 });
+  await settle();
+  const cv = m.getCanvas(), dpr = window.devicePixelRatio || 1;
+  const a = m.project([pick[0].lon, pick[0].lat]), b = m.project([pick[2].lon, pick[2].lat]);
+  const c = m.project([pick[1].lon, pick[1].lat]);
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const nx = -(b.y - a.y) / len, ny = (b.x - a.x) / len;
+  const across = () => new Promise(resolve => {
+    m.once('render', () => {
+      const gl = cv.getContext('webgl2') || cv.getContext('webgl');
+      const out = [];
+      for (let k = -12; k <= 12; k++) {
+        const x = Math.round((c.x + nx * k) * dpr), y = Math.round(gl.drawingBufferHeight - (c.y + ny * k) * dpr);
+        const px = new Uint8Array(4);
+        gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        out.push([px[0], px[1], px[2]]);
+      }
+      resolve(out);
+    });
+    m.triggerRepaint();
+  });
+  Map3D.setSheets(false);
+  await settle();
+  const off = await across();
+  Map3D.setSheets(true);
+  await settle();
+  const on = await across();
+  m.jumpTo(was);
+  const changed = on.filter((p, i) => Math.abs(p[0] - off[i][0]) + Math.abs(p[1] - off[i][1]) + Math.abs(p[2] - off[i][2]) > 24).length;
+  return { changed, off, on };
+});
+ok('…and from straight overhead a sheet is a band SHEET_PX wide along its hop, not a line nobody can see',
+   !thick.none && SHEET_PX >= 2 && thick.changed >= SHEET_PX - 1 && thick.changed <= SHEET_PX + 3,
+   JSON.stringify({ SHEET_PX, changed: thick.changed, none: !!thick.none }));
 
 // ── 5. the loud failure ─────────────────────────────────────────────────────
 // A DEM tile that will not come is flat ground on screen, and flat ground
