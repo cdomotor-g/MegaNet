@@ -2102,7 +2102,9 @@ const HELP = {
            + 'see what every receiver and neighbour was doing at that moment. <strong>Airtime</strong> '
            + 'shows whose transmissions land on top of each other at each receiver and whether it costs them, '
            + 'when each station\'s check signal goes out and how its logger keeps that time, and the check '
-           + 'time or repeater delay to change. <strong>AI briefing</strong> '
+           + 'time or repeater delay to change. <strong>Repeaters</strong> reads each repeater through the stations behind it, '
+           + 'its own site\'s station and battery, and what the base stations measure of its transmitter — off air, dropping out, '
+           + 'corrupting, fading, power — and says what the evidence points to. <strong>AI briefing</strong> '
            + 'hands the findings to Claude, which investigates and writes the briefing — or packs them into a file '
            + 'for the AI of your choice (Copilot, ChatGPT…) where Claude cannot be reached.',
     watch: [

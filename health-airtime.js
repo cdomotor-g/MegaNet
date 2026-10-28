@@ -40,6 +40,7 @@ const HealthAirtime = (() => {
     err: '',
     path: null,       // the receiver channel the folded hour is drawn for
     all: false,       // every check time, or the first SHOW
+    q: '',            // the find box: a station or repeater, in every table but the busiest minutes
   };
 
   const p2 = n => String(n).padStart(2, '0');
@@ -95,14 +96,18 @@ const HealthAirtime = (() => {
         one receiver channel, and nothing finer is claimed. Repeater delays are under a second — too fine to measure from these times;
         the delays offered are the Backbone's, put in front of the repeaters the corrupted copies point at.</p>
       ${kpisHtml(R)}
+      <div class="hl-filters">
+        <input type="search" class="hl-find" placeholder="Find a station or repeater" aria-label="Find a station or repeater in what to change, the check times and who lands together"
+               value="${escAttr(S.q)}" oninput="HealthAirtime.find(this.value)">
+      </div>
       <h4 id="hl-h-air-sug">What to change</h4>
-      ${suggestionsHtml(R)}
+      <div id="hl-air-sug-box">${suggestionsHtml(R)}</div>
       <h4 id="hl-h-air-hour">The hour, folded</h4>
       ${hourHtml(R)}
       <h4 id="hl-h-air-checks">Check signals: when each goes out</h4>
-      ${checksHtml(R)}
+      <div id="hl-air-checks-box">${checksHtml(R)}</div>
       <h4 id="hl-h-air-pairs">Who lands together, again and again</h4>
-      ${pairsHtml(R)}
+      <div id="hl-air-pairs-box">${pairsHtml(R)}</div>
       <div class="button-group hl-air-tools">
         <button class="ghost" onclick="HealthAirtime.exportCsv()" title="Every station's learned check time, how its logger keeps it, who it shares its moment with and the move suggested, as a spreadsheet">Export check times</button>
       </div>`;
@@ -140,8 +145,13 @@ const HealthAirtime = (() => {
     return stationBtn(s.stationId, s.station);
   }
 
+  // The find box: a row matches on the stations and repeaters it names.
+  const found = text => { const q = S.q.trim().toLowerCase(); return !q || String(text).toLowerCase().includes(q); };
+  const noMatch = what => `<p class="small hl-empty">No ${what} names “${esc(S.q.trim())}”.</p>`;
+
   function suggestionsHtml(R) {
-    const list = R.suggestions;
+    const list = R.suggestions.filter(s => found([s.station, ...(s.repeaterNames || []), s.title].join(' ')));
+    if (!list.length && S.q.trim() && R.suggestions.length) return noMatch('change');
     if (!list.length) {
       return `<p class="small hl-empty">${R.counts.clashes
         ? 'The checks that fall together have nowhere better to go, or the readings cannot say how their loggers keep time.'
@@ -266,8 +276,9 @@ const HealthAirtime = (() => {
   }
 
   function checksHtml(R) {
-    const list = R.checks;
-    if (!list.length) return '<p class="small">No station in the window kept a schedule regular enough to learn.</p>';
+    const list = R.checks.filter(c => found(`${c.name} ${c.clashWith.map(id => R.nameOf(id)).join(' ')}`));
+    if (!R.checks.length) return '<p class="small">No station in the window kept a schedule regular enough to learn.</p>';
+    if (!list.length) return noMatch('station\'s check');
     const moveOf = new Map(R.suggestions.filter(s => s.kind === 'move-check').map(s => [s.stationId, s]));
     const shown = S.all ? list : list.slice(0, SHOW);
     return `
@@ -297,9 +308,10 @@ const HealthAirtime = (() => {
   // was heard rather than from the schedules — so a check meeting a storm's
   // event reports is here too — and the moments three or more did at once.
   function pairsHtml(R) {
-    const list = R.pairs.slice(0, 15);
-    if (!list.length) return '<p class="small">No two stations\' frames landed together more than once at any receiver in the window.</p>';
-    const big = R.moments.slice(0, 8);
+    if (!R.pairs.length) return '<p class="small">No two stations\' frames landed together more than once at any receiver in the window.</p>';
+    const list = R.pairs.filter(p => found(p.names.join(' '))).slice(0, 15);
+    if (!list.length) return noMatch('pair of stations');
+    const big = R.moments.filter(m => found(m.names.join(' '))).slice(0, 8);
     return `
       <p class="small">Two stations whose frames landed within ${AirtimeAnalysis.TOGETHER_MS / 1000} s of each other at one receiver channel, most
         often first, with the minute past the hour it usually happened at — the same minute again and again is two checks meeting; scattered,
@@ -341,6 +353,17 @@ const HealthAirtime = (() => {
   }
   function setPath(p) { S.path = p; redraw(); }
   function toggleAll() { S.all = !S.all; redraw(); }
+  // The three tables the box narrows, painted again in place so it keeps
+  // the keyboard.
+  function find(q) {
+    S.q = String(q || '');
+    const R = result();
+    if (!R) return;
+    [['hl-air-sug-box', suggestionsHtml], ['hl-air-checks-box', checksHtml], ['hl-air-pairs-box', pairsHtml]].forEach(([id, f]) => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = f(R);
+    });
+  }
 
   function exportCsv() {
     const R = result();
@@ -364,7 +387,7 @@ const HealthAirtime = (() => {
   // What the tests read: the result, as plain data.
   function state_() { return { R: result(), path: S.path, all: S.all }; }
 
-  return { render, setPath, toggleAll, exportCsv, state: state_ };
+  return { render, setPath, toggleAll, find, exportCsv, state: state_ };
 })();
 
 if (typeof window !== 'undefined') window.HealthAirtime = HealthAirtime;

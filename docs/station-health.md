@@ -103,7 +103,7 @@ whole on the first ▶ (the site does not serve part of a file, which seeking
 would need) and is not kept by the service worker. The voices are AI speech,
 and the bulletin's footer says so.
 
-## Six ways in
+## The ways in
 
 - **Needs attention** — the findings, worst first: what is wrong, the evidence,
   and what to do. Filter by kind (power, check signals, network, sensors, data
@@ -119,10 +119,12 @@ and the bulletin's footer says so.
   the station's number and name, the sensor (its register type and ALERT
   address), its readings across the window as a sparkline, the latest, and the
   worst finding about it. [Below](#all-stations--sparklines).
-- **Receivers and repeaters** — each base station's delivery hour by hour, its
-  upload lag and its corrupted copies; each repeater with the stations heard
-  behind it, how many are silent now, and the corrupted copies it could have
-  carried.
+- **Receivers** — each base station's delivery hour by hour, its upload lag,
+  its corrupted copies and its channels.
+- **Repeaters** — each repeater the readings say anything about: the stations
+  heard behind it and how many of their checks got through, its own site's
+  station and battery, its radio as the base stations measure it, a state, and
+  what the evidence points to. [Below](#repeaters).
 - **Airtime** — which stations' transmissions land on top of each other at each
   receiver and whether it costs them, each station's check time and how its
   logger keeps it, and what to change: a check time, or a pair of repeaters'
@@ -745,6 +747,92 @@ for the last 30 — so the page asks once and draws at once.
 Copies heard before the receivers measured carriers (RPi ALERT 0.14) have no
 sender and are weighed by pass range only, so the carrier columns fill as the
 weeks go by. Both tables download as CSV from 📤 Export.
+
+## Repeaters
+
+(after *Receivers*; `health-repeaters.js`)
+
+A legacy ALERT frame does not say which repeater relayed it, so the card reads
+each repeater through what it relays and what its site says of itself, over
+the same window as the rest of the tab — and beside that, what the base
+stations' radio checks measure of its transmitter, from the *Transmitter
+frequency and signal* and *Bit flips* panels above, once the server has
+answered.
+
+A row is a repeater whose pass ranges hold a station heard in the window, or
+whose own site's station was heard. The columns:
+
+- **Behind it** — the stations heard whose addresses its pass ranges hold,
+  within reach; *only through it*, those no other repeater on file passes;
+  how many are silent now; and when the last of them was heard.
+- **Checks through** — of the timed checks those stations owed while a
+  receiver that hears them was listening, the share that arrived, against the
+  network's; and for the stations only it carries, theirs.
+- **Its own station** — most repeater sites carry a station of their own (a
+  battery, often a gauge): when it was last heard, and its battery's night
+  low and trend.
+- **Radio** — its share of the window's corrupted copies (split evenly among
+  the repeaters that could have carried each), those the base stations caught
+  on its own carrier, its signal over the noise and its change, and its
+  carrier against the fleet's.
+- **What it points to** — the issues, and what they suggest together.
+
+**The state** is the worst of what the row holds, each word explained on
+hover and in *What the words in this card mean* under the table:
+
+| State | When |
+| --- | --- |
+| Off air | The base stations' carrier measurements stop at it two days or more before the rest of the fleet's (critical with its own station or two stations behind it silent too); Station Health's *stations behind it went quiet together*; its own station and two or more behind it going quiet within a check period of each other (critical at three); or every one of two or more stations only it carries silent |
+| Dropping out | Stations behind it silent together and back again (*shared-spell*) |
+| Corrupting | The common factor in corrupted copies (*repeater-bitflips*), or the server's *transmitter-corrupting* on its carrier |
+| Fading | The server's *transmitter-snr-falling* |
+| Power | Its own station's battery critical, low, falling or not charging |
+| Site silent | Its own station silent, with no station only it carries heard since to say it still relays |
+| Off frequency | The server's *transmitter-off-channel* or *transmitter-drift* |
+| Losing checks | The stations only it carries got 15 points fewer of their checks through than the network, and under 85% |
+| Watch | Only notes: little signal margin (under 12 dB), more corrupted copies than most, a pair it should be staggered with, stations behind it losing checks that could come another way |
+| Working / Can't tell / Nothing behind it | Nothing against it; every station behind it can come another way and its site has no station heard; or its own station heard with nothing behind it |
+
+**What it points to** reads the pieces together, as possibilities:
+
+- Off air by its carrier: it has stopped transmitting, not just relaying —
+  and the corrupted copies counted against it were sent before; whether its
+  channel's rate fell with it says how much was its. With its own station
+  still heard, the site has power and the repeater's radio or antenna stopped.
+- Off air with its own station still heard: the site has power and is on the
+  air, so the way in — its receiver, receive antenna, or what it is set to
+  pass.
+- Off air with its own station silent: power first if its battery was low or
+  falling; a battery steady at 12.2 V or more points away from power, towards
+  the radio, a fuse or the antenna; no station of its own, and power and
+  radio cannot be told apart.
+- Dropping out overnight and back in daylight: a solar site that cannot carry
+  the night.
+- Corrupting and caught on its own carrier while the clean copy reached us
+  another way: the damage enters at this repeater. Corrupting by the pass
+  ranges alone, with the carrier check answered and not catching it: another
+  repeater on the same stations may be the one. A pair Airtime would stagger:
+  two repeaters keying together.
+- Fading and corrupting: the antenna, feeder or connectors, which it hears
+  through as well as sends on. Off frequency and corrupting: the radio.
+- Its own station silent on a low battery while the stations behind it are
+  still heard: the site's power is going.
+
+*Export repeaters* (also ⤓ Export → *The repeaters — CSV*) downloads the rows
+as the card is filtered. The 🗼 Backbone tab ranks the same repeaters over 7
+to 90 days from the server's records; this card is the window's readings.
+`npm run health` holds the reasoning to a network built for it.
+
+## Find boxes
+
+Every card with a table has a find box that narrows its rows as it is typed
+in: *Needs attention* (a station, its number or owner, a receiver, a repeater,
+or any word of the finding), *Check signals*, *All stations — sparklines*,
+*Airtime* (the stations and repeaters in *What to change*, the check times and
+who lands together), *Transmitter frequency and signal*, *Bit flips* (a
+transmitter, or an address and its station), *Receivers* and *Repeaters*. *A
+station* has a finder instead: any station heard in the window, by name,
+number or owner — press one of the matches, or Enter for the first.
 
 ## On a station's card, and its pin
 

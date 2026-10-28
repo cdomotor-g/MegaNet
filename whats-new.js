@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 148, date: '2026-10-28', items: [
+      '🚦 <strong>Station Health</strong> has a <strong>Repeaters</strong> card, under Receivers: each repeater the week\'s readings '
+        + 'reach, with the stations heard behind it and how many of their checks got through, its own site\'s station and battery, and '
+        + 'its radio as the base stations measure it — its signal, its carrier and the corrupted copies caught on it. Each gets a state '
+        + '(off air, dropping out, corrupting, fading, power, site silent…) and a line on what the evidence points to; hover a word for '
+        + 'what it means. <em>Export repeaters</em> saves it as a spreadsheet.',
+      'Every card on Station Health with a table now has a <strong>find box</strong> — Needs attention, Check signals, Airtime, Bit flips, '
+        + 'Receivers and Repeaters — and <strong>A station</strong> has a finder: type a name, number or owner and press a match, or Enter '
+        + 'for the first.',
+    ] },
     { n: 147, date: '2026-10-28', items: [
       'On the 📊 <strong>Plots</strong> and 🌡️ <strong>Field Data</strong> charts, every date along the bottom now has its day '
         + 'under it — MON, TUE and so on — and a heavier line marks where each week starts, at Monday midnight. Zoom out until the '

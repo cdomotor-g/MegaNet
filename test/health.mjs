@@ -35,6 +35,16 @@
 //     picked, only those needing attention, a station found by its number
 //     with the box keeping the keyboard, the reading under the pointer, a
 //     name opening its station at that sensor's chart, and the owner filter
+//   * Repeaters: a row for each repeater heard behind, its state saying
+//     what it means; and its reasoning on a network built for it — a site
+//     gone quiet with the stations only it carries on a steady battery is
+//     off air and not power, one caught on its own carrier with the clean
+//     copies coming another way is corrupting at its end, one sharing all it
+//     carries is "can't tell", a site silent on a low battery is power, a
+//     carrier the base stations stopped measuring before the rest is off air
+//   * a find box on every card with a table, narrowing its rows as it is
+//     typed in and keeping the keyboard; the station finder opening the
+//     first match on Enter
 //   * the door to the Reception Map carrying the same readings over
 //   * Claude's briefing, its tool loop run against a scripted client: tools
 //     answered, a tool that does not exist refused, the briefing drawn with
@@ -540,6 +550,144 @@ try {
   ok('…and the recent corrupted copies on asking: the true reading, what it became, who sent the corrupted and the clean copy',
     ev.length === 1 && /6038 Abergowrie Bridge AL = 1262/.test(ev[0]) && /6046 = 1262 1 bit/.test(ev[0]) && /Amiens Knob AL repeater/.test(ev[0])
       && /Abergowrie Bridge AL ghost$/.test(ev[0]), JSON.stringify(ev));
+
+  // ── Repeaters ──────────────────────────────────────────────────────────────
+  // The card on the demo week: a row for each repeater the week's stations
+  // are heard behind, each with a state that says what it means.
+  const repCard = await page.evaluate(() => {
+    const el = document.getElementById('hl-reps');
+    const R = HealthRepeaters.state().R;
+    return { head: el ? el.querySelector('h3').textContent : '', rows: el ? el.querySelectorAll('tbody tr').length : 0, n: R ? R.rows.length : 0,
+      chips: el ? [...el.querySelectorAll('tbody td .term-chip')].every(c => (c.getAttribute('title') || '').length > 20) : false,
+      words: el ? el.querySelectorAll('.hl-words dt').length : 0 };
+  });
+  ok('Repeaters: a card of every repeater heard behind, each row\'s state saying what it means, and the words in a fold',
+    repCard.head === 'Repeaters' && repCard.n >= 1 && repCard.rows === repCard.n && repCard.chips && repCard.words >= 15, JSON.stringify(repCard));
+  // …and its reasoning, on a network built for it: a repeater whose site and
+  // the stations only it carries went quiet together on a battery that was
+  // steady; one on the air whose stations lose checks, caught on its own
+  // carrier with the clean copies reaching us another way, and fading; two
+  // that carry the same one station, one with nothing of its own heard, the
+  // other's own station gone quiet on a low battery.
+  const repWhy = await page.evaluate(() => {
+    const now = Date.now(), H = 3600e3, D = 86400e3;
+    const st = (id, name, rep) => ({ id, name, station_number: id.toUpperCase(), lat: -27, lon: 153, roles: rep ? ['field', 'repeater'] : ['field'],
+      repeater: rep ? { pass_ranges: [{ low: 1, high: 9 }], exclusions: [] } : null });
+    const S = (s, o) => Object.assign({ st: s, findings: [], schedule: { P: 3 * H, counts: { due: 50, hits: 48, partial: 0 } }, lastHeard: now - H / 2, battery: null }, o || {});
+    const silent = t => ({ findings: [{ kind: 'silent', severity: 'critical', category: 'comms', title: 'Silent' }], lastHeard: t });
+    const battery = (v, slope) => ({ series: [{ t: now - 2 * D, V: v }, { t: now - D, V: v }], lastNight: v, slope, swing: 0.6, latest: { V: v } });
+    const alpha = st('alpha', 'Alpha', true), tA = now - 10 * H;
+    const Salpha = S(alpha, Object.assign(silent(tA), { battery: battery(12.7, 0) }));
+    const Sa = ['a1', 'a2', 'a3'].map((id, i) => S(st(id, id), silent(tA - i * 20 * 60e3)));
+    const bravo = st('bravo', 'Bravo', true);
+    const Sbravo = S(bravo, { battery: battery(12.9, 0) });
+    const Sb = ['b1', 'b2'].map(id => S(st(id, id), { schedule: { P: 3 * H, counts: { due: 40, hits: 18, partial: 2 } } }));
+    const charlie = st('charlie', 'Charlie', true), delta = st('delta', 'Delta', true);
+    const Sc1 = S(st('c1', 'c1'));
+    const Sdelta = S(delta, { findings: [{ kind: 'silent', severity: 'critical', category: 'comms', title: 'Silent' },
+      { kind: 'battery-low', severity: 'warn', category: 'power', title: 'Battery low — 11.9 V' }], lastHeard: now - 30 * H, battery: battery(11.9, -0.05) });
+    const rep = (s, members) => ({ rep: { st: s }, id: s.id, name: s.name, members: [S(s), ...members], silent: [], sent: 100, bad: 0, blame: 1, ghosts: 0, rate: 0.01 });
+    // Echo: its own station still heard, the stations behind it heard, but
+    // the base stations last measured its carrier four days before the rest.
+    const echo = st('echo', 'Echo', true);
+    const Secho = S(echo, { battery: battery(12.8, 0) });
+    const Se = ['e1', 'e2'].map(id => S(st(id, id)));
+    const today = Math.floor(now / D) * D;
+    const days = (from, to) => { const out = []; for (let t = today - from * D; t <= today - to * D; t += D) out.push({ t, ppm: 0.1 }); return out; };
+    const all = [Salpha, ...Sa, Sbravo, ...Sb, Sc1, Sdelta, Secho, ...Se];
+    const A = { now, t0: now - 7 * D, t1: now, counts: { checksDue: 1000, checksReceived: 900 }, findings: [],
+      stations: new Map(all.map(x => [x.st.id, x])), repeaters: [rep(alpha, Sa), rep(bravo, Sb), rep(charlie, [Sc1]), rep(delta, [Sc1]), rep(echo, Se)] };
+    const R = HealthRepeaters._analyse(A, {
+      stations: [alpha, bravo, charlie, delta, echo],
+      drift: [{ tx: 'st:bravo', who: { id: 'bravo' }, snr: 14, snrChange: -4.1, ppm: 0.2, finding: null, pts: days(6, 0),
+        sFinding: { severity: 'warn', title: 'Bravo: SNR down 4.1 dB in a week' } },
+        { tx: 'st:echo', who: { id: 'echo' }, snr: 20, snrChange: 0, ppm: 0.1, finding: null, sFinding: null, pts: days(12, 4) }],
+      flips: [{ tx: 'st:bravo', flips: 30, clear: 28, clean_upstream: 12 }],
+      flipFindings: [{ subject: 'st:bravo', severity: 'warn', title: 'Bravo: 30 corrupted copies in a week (5% of what it sent)' }],
+      radio: true,
+    });
+    const by = id => { const r = R.rows.find(x => x.id === id); return r && { state: r.state, sev: r.sev, members: r.members, only: r.only, issues: r.issues.map(i => i.k), points: r.points.join(' ') }; };
+    return { alpha: by('alpha'), bravo: by('bravo'), charlie: by('charlie'), delta: by('delta'), echo: by('echo'), order: R.rows.map(r => r.id) };
+  });
+  ok('…its site and the stations only it carries gone quiet together is off air, a steady battery pointing past power — and first',
+    repWhy.alpha && repWhy.alpha.state === 'offair' && repWhy.alpha.sev === 'critical' && repWhy.alpha.members === 3 && repWhy.alpha.only === 3
+      && /away from a flat battery/.test(repWhy.alpha.points) && repWhy.order[0] === 'alpha', JSON.stringify(repWhy));
+  ok('…caught on its own carrier with the clean copies coming another way is corrupting at its end, and fading too points at its antenna',
+    repWhy.bravo && repWhy.bravo.state === 'bits' && ['bits', 'signal', 'checks'].every(k => repWhy.bravo.issues.includes(k))
+      && /damage enters here/.test(repWhy.bravo.points) && /antenna, feeder or connectors/.test(repWhy.bravo.points), JSON.stringify(repWhy.bravo));
+  ok('…a station another repeater carries too, and no site of its own heard, is "can\'t tell"',
+    repWhy.charlie && repWhy.charlie.state === 'shared' && repWhy.charlie.sev === 'ok' && repWhy.charlie.only === 0, JSON.stringify(repWhy.charlie));
+  ok('…its own station gone quiet on a low battery while the stations behind it are still heard is the site\'s power going',
+    repWhy.delta && repWhy.delta.state === 'power' && repWhy.delta.issues.includes('site') && /site's power is going/.test(repWhy.delta.points), JSON.stringify(repWhy.delta));
+  ok('…and a carrier the base stations stopped measuring days before the rest is off air — its radio, with its site still heard',
+    repWhy.echo && repWhy.echo.state === 'offair' && repWhy.echo.sev === 'warn' && /stopped transmitting/.test(repWhy.echo.points)
+      && /own radio, its antenna or feeder/.test(repWhy.echo.points) && repWhy.bravo.state === 'bits', JSON.stringify(repWhy.echo));
+
+  // ── the find boxes ─────────────────────────────────────────────────────────
+  // Every card with a table has one: typed, its rows narrow to what matches
+  // with the box keeping the keyboard, and nothing matching says so.
+  const typeIn = async (sel, text) => { await page.fill(sel, ''); await page.click(sel); await page.keyboard.type(text); };
+  const rowsOf = sel => page.evaluate(s => [...document.querySelectorAll(s)].map(el => el.textContent.replace(/\s+/g, ' ').trim()), sel);
+  const keeps = sel => page.evaluate(s => document.activeElement === document.querySelector(s), sel);
+  const sought = await page.evaluate(id => { const st = Health.state().A.stations.get(id).st; return { name: st.name, number: st.station_number || '' }; }, WORLD.roles.falling);
+
+  await typeIn('.hl-attn .hl-find', silentName);
+  const attnRows = await rowsOf('.hl-ftable tbody tr');
+  ok('find boxes: Needs attention narrows to the findings naming what was typed, the box keeping the keyboard',
+    attnRows.length >= 1 && attnRows.every(t => t.includes(silentName)) && await keeps('.hl-attn .hl-find'), JSON.stringify(attnRows));
+  await typeIn('.hl-attn .hl-find', 'zzqx');
+  ok('…and says when nothing matches', /No finding here matches “zzqx”/.test((await rowsOf('#hl-findings .hl-empty'))[0] || ''));
+  await page.fill('.hl-attn .hl-find', '');
+  await page.evaluate(() => Health.attnFind(''));
+
+  await typeIn('#hl-station .hl-find', sought.number || sought.name);
+  const hits = await rowsOf('#hl-stn-hits button');
+  await page.keyboard.press('Enter');
+  const opened = await page.evaluate(() => Health.state().sel);
+  ok('…A station: the finder lists the stations that match, and Enter opens the first',
+    hits.length >= 1 && hits[0].includes(sought.name) && opened === WORLD.roles.falling, JSON.stringify({ hits, opened }));
+  await page.evaluate(() => Health.close());
+
+  await typeIn('[aria-labelledby="hl-h-checks"] .hl-find', sought.name);
+  const checkRows = await rowsOf('.hl-matrix tbody th');
+  ok('…Check signals: the stations that match', checkRows.length === 1 && checkRows[0].includes(sought.name)
+    && await keeps('[aria-labelledby="hl-h-checks"] .hl-find') && /that match/.test((await rowsOf('#hl-checks-count'))[0]), JSON.stringify(checkRows));
+  await page.fill('[aria-labelledby="hl-h-checks"] .hl-find', '');
+  await page.evaluate(() => Health.checksFind(''));
+
+  await typeIn('#hl-airtime .hl-find', sought.name);
+  const airRows = await rowsOf('#hl-air-checks-box tbody th');
+  ok('…Airtime: the check times of the station that matches', airRows.length === 1 && airRows[0].includes(sought.name) && await keeps('#hl-airtime .hl-find'),
+    JSON.stringify(airRows));
+  await page.evaluate(() => HealthAirtime.find(''));
+
+  // A transmitter matches on its own name and on the stations of the
+  // addresses it corrupted, so the station that was only misheard is left out.
+  await typeIn('#hl-flips .hl-find', 'Amiens');
+  const flipRows = await rowsOf('#hl-flips table.hl-flip-table tbody tr');
+  const flipEv = await rowsOf('#hl-flips table.hl-flip-events tbody tr');
+  await typeIn('#hl-flips .hl-find', 'zzqx');
+  const flipNone = await rowsOf('#hl-flips .hl-empty');
+  ok('…Bit flips: the transmitters and the recent copies that name it', flipRows.length === 1 && /^Amiens Knob AL/.test(flipRows[0])
+    && flipEv.length === 1 && /No transmitter caught sending a corrupted copy matches/.test(flipNone[0] || '') && await keeps('#hl-flips .hl-find'),
+    JSON.stringify({ flipRows, flipEv, flipNone }));
+  await page.evaluate(() => HealthFlips.find(''));
+
+  const rxName = await page.evaluate(() => (document.querySelector('#hl-rx-list tbody th') || {}).textContent || '');
+  await typeIn('[aria-labelledby="hl-h-net"] .hl-find', 'zzqx');
+  const rxNone = await rowsOf('#hl-rx-list .hl-empty');
+  await typeIn('[aria-labelledby="hl-h-net"] .hl-find', rxName.trim().slice(0, 6));
+  const rxRows = await rowsOf('#hl-rx-list tbody tr');
+  ok('…Receivers: by name, and none for a name no receiver has', rxName && rxRows.length >= 1 && /No receiver matches/.test(rxNone[0] || ''),
+    JSON.stringify({ rxName, rxRows: rxRows.length, rxNone }));
+  await page.evaluate(() => Health.rxFind(''));
+
+  const repName = await page.evaluate(() => HealthRepeaters.state().R.rows[0].name);
+  await typeIn('#hl-reps .hl-find', repName);
+  const repRows = await rowsOf('#hl-reps tbody tr');
+  ok('…Repeaters: the repeater that matches', repRows.length === 1 && repRows[0].includes(repName) && await keeps('#hl-reps .hl-find')
+    && /^1 of /.test((await rowsOf('#hl-reps-count'))[0]), JSON.stringify(repRows));
+  await page.evaluate(() => HealthRepeaters.find(''));
 
   await page.evaluate(() => Health.setCat('power'));
   const power = await page.evaluate(() => [...document.querySelectorAll('.hl-ftable tbody tr .hl-fwhat b')].map(b => b.textContent));

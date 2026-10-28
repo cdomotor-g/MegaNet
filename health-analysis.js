@@ -2030,6 +2030,9 @@ const HealthAnalysis = (() => {
     // (sensor-sparks.js), so a row's line is Station Health's.
     rainOf, spikesOf,
     fmtWhen, fmtSpan, fmtPeriod, ACTION, CATEGORY, CURRENT_KINDS,
+    // Whether a silence went at night and came back in daylight, in the
+    // site's own solar time — for the Repeaters card's shared silences too.
+    solarNight,
     PERIODS, COPY_WINDOW, BURST_WINDOW,
   };
 })();

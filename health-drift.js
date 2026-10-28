@@ -131,6 +131,8 @@ const HealthDrift = (() => {
     redraw();
     // A card or the editor open on a station reads the whole table now.
     paintOpen();
+    // The Repeaters card reads each repeater's signal and carrier from here.
+    if (typeof HealthRepeaters !== 'undefined') HealthRepeaters.changed();
   }
 
   function adoptRows(rows, findings) {
@@ -745,7 +747,10 @@ const HealthDrift = (() => {
   function state_() { return { rows: S.rows, findings: S.findings, summary: summary(), err: S.err, warn: S.warn, drift: S.drift, snrWarn: S.snrWarn,
     view: S.view, show: S.show, kind: S.kind, q: S.q, signalKept: snrCols,
     cards: [...cards.entries()].map(([id, c]) => ({ id, status: c.status, rows: c.rows ? c.rows.length : null })) }; }
-  function adopt(rows, findings) { S.asked = true; S.loading = false; S.err = ''; adoptRows(rows, findings); redraw(); paintOpen(); }
+  function adopt(rows, findings) {
+    S.asked = true; S.loading = false; S.err = ''; adoptRows(rows, findings); redraw(); paintOpen();
+    if (typeof HealthRepeaters !== 'undefined') HealthRepeaters.changed();
+  }
 
   return { render, load, adopt, set, state: state_, attnHtml, toPanel,
     // one station's: its card on the map and the station editor

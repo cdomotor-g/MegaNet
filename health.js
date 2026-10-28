@@ -116,6 +116,9 @@ const Health = (() => {
     // than the first sixty. ssMemo holds the rows worked out for H.A.
     ss: { kind: 'all', attn: false, find: '', all: false },
     ssMemo: null,
+    // The other cards' find boxes: Needs attention, the station finder in A
+    // station, Check signals and Receivers.
+    find: { attn: '', stn: '', checks: '', rx: '' },
     owners: storedOwners(),  // the owners picked; empty is every owner
     slsAsked: false,         // the SLS file, where most owners come from, sent for…
     slsFailed: false,        // …and did not load
@@ -388,6 +391,7 @@ const Health = (() => {
       <section class="panel" id="hl-drift" aria-labelledby="hl-h-drift">${typeof HealthDrift !== 'undefined' ? HealthDrift.render() : ''}</section>
       <section class="panel" id="hl-flips" aria-labelledby="hl-h-flips">${typeof HealthFlips !== 'undefined' ? HealthFlips.render() : ''}</section>
       <section class="panel" aria-labelledby="hl-h-net">${networkHtml()}</section>
+      <section class="panel" id="hl-reps" aria-labelledby="hl-h-reps">${typeof HealthRepeaters !== 'undefined' ? HealthRepeaters.render() : ''}</section>
       <section class="panel" aria-labelledby="hl-h-reg">${registerHtml()}</section>
       <section class="panel" id="hl-agent" aria-labelledby="hl-h-agent">${typeof HealthAgent !== 'undefined' ? HealthAgent.render() : ''}</section>`;
   }
@@ -599,6 +603,7 @@ const Health = (() => {
     const sec = document.querySelector('[aria-labelledby="hl-h-checks"]');
     if (sec) sec.innerHTML = matrixHtml();
     paintSpark();
+    if (typeof HealthRepeaters !== 'undefined') HealthRepeaters.changed();
     if (all) rerenderStation(); else drawMap();
   }
   function saveOwners() {
@@ -634,9 +639,23 @@ const Health = (() => {
 
   // ── needs attention ────────────────────────────────────────────────────────
 
+  // What the find box matches a finding on: where it is — the station, its
+  // number and owner, the receiver, the repeater, the address — and what it
+  // says.
+  function findingText(f) {
+    const st = f.stationId ? stationById(f.stationId) : null;
+    const rep = f.repeaterId ? stationById(f.repeaterId) : null;
+    const o = st || rep ? ownerOf(st || rep) : null;
+    return [f.station, st && st.station_number, rep && rep.name, rep && rep.station_number, o && o.name,
+      f.host && hostLabel(f.host), f.addr, f.title, f.detail].filter(Boolean).join(' ').toLowerCase();
+  }
+  function findingFound(f) {
+    const q = H.find.attn.trim().toLowerCase();
+    return !q || findingText(f).includes(q);
+  }
   function visibleFindings() {
     if (!H.A) return [];
-    return ownedFindings().filter(f => (H.showInfo || f.severity !== 'info') && (H.cat === 'all' || f.category === H.cat));
+    return ownedFindings().filter(f => (H.showInfo || f.severity !== 'info') && (H.cat === 'all' || f.category === H.cat) && findingFound(f));
   }
   function attnCountText() {
     const F = ownedFindings();
@@ -646,21 +665,26 @@ const Health = (() => {
     return `${crit} critical · ${warn} warnings · ${info} notes`;
   }
 
-  function filtersHtml() {
+  // Each kind with a finding the notes box and the find box leave, and how
+  // many; the one picked stays, at nought, so it can be unpicked.
+  function catChipsHtml() {
     const counts = new Map();
-    ownedFindings().forEach(f => { if (H.showInfo || f.severity !== 'info') counts.set(f.category, (counts.get(f.category) || 0) + 1); });
+    ownedFindings().forEach(f => { if ((H.showInfo || f.severity !== 'info') && findingFound(f)) counts.set(f.category, (counts.get(f.category) || 0) + 1); });
     const total = [...counts.values()].reduce((a, b) => a + b, 0);
+    return CATS.map(([k, label]) => {
+      const n = k === 'all' ? total : (counts.get(k) || 0);
+      if (k !== 'all' && !n && H.cat !== k) return '';
+      return `<button class="hl-chip${H.cat === k ? ' hl-chip--on' : ''}" aria-pressed="${H.cat === k}"
+                onclick="Health.setCat('${k}')">${esc(label)} <span class="hl-count">${n}</span></button>`;
+    }).join('');
+  }
+  function filtersHtml() {
     return `<div class="hl-filters">
-      <span class="hl-seg hl-seg--wrap" role="group" aria-label="Which kind of finding">
-        ${CATS.map(([k, label]) => {
-          const n = k === 'all' ? total : (counts.get(k) || 0);
-          if (k !== 'all' && !n) return '';
-          return `<button class="hl-chip${H.cat === k ? ' hl-chip--on' : ''}" aria-pressed="${H.cat === k}"
-                    onclick="Health.setCat('${k}')">${esc(label)} <span class="hl-count">${n}</span></button>`;
-        }).join('')}
-      </span>
+      <span class="hl-seg hl-seg--wrap" role="group" aria-label="Which kind of finding" id="hl-attn-cats">${catChipsHtml()}</span>
       <label class="hl-check"><input type="checkbox" ${H.showInfo ? 'checked' : ''} onchange="Health.setInfo(this.checked)">
         include notes</label>
+      <input type="search" class="hl-find" placeholder="Find — a station, receiver, repeater or word" aria-label="Find findings by station, receiver, repeater or word"
+             value="${escAttr(H.find.attn)}" oninput="Health.attnFind(this.value)">
     </div>`;
   }
 
@@ -685,7 +709,9 @@ const Health = (() => {
   function findingsHtml() {
     const list = visibleFindings();
     if (!list.length) {
-      return `<p class="small hl-empty">${filtering() && !ownedFindings().length
+      const q = H.find.attn.trim();
+      return `<p class="small hl-empty">${q ? `No finding here matches “${esc(q)}”.`
+        : filtering() && !ownedFindings().length
         ? 'Nothing found at the stations of the owners picked — or none of them was heard in the window.'
         : H.A.findings.length
         ? 'Nothing here at this level — tick “include notes” or pick another kind.'
@@ -797,12 +823,14 @@ const Health = (() => {
           ${!H.demo ? longer.map(([k, label]) => `<button class="ghost" onclick="Health.setWin('${k}')">Look back ${esc(label)}</button>`).join('') : ''}
           <button class="ghost" onclick="goToStation('${escAttr(gone.id)}')">Show on the Stations tab</button>
           <button class="ghost" onclick="Health.close()">Close</button>
-        </div>`;
+        </div>
+        ${stnFindHtml()}`;
     }
     if (!S) {
       return `<div class="panel-header"><h3 id="hl-h-stn">A station</h3></div>
-        <p class="small hl-empty">Pick a station — from Needs attention, the map, or Check signals — to see its check schedule slot by slot,
-          its battery across its solar day, its sensors, and what the rest of the network was doing at any moment you pick.</p>`;
+        <p class="small hl-empty">Pick a station — find it here, or from Needs attention, the map, or Check signals — to see its check schedule
+          slot by slot, its battery across its solar day, its sensors, and what the rest of the network was doing at any moment you pick.</p>
+        ${stnFindHtml()}`;
     }
     const st = S.st, sch = S.schedule;
     const worst = S.findings.length ? sevHtml(S.findings.reduce((w, f) => (f.severity === 'critical' || (f.severity === 'warn' && w.severity === 'info') ? f : w), S.findings[0]).severity) : '<span class="hl-sev txt-ok"><span aria-hidden="true">✓</span> Nothing found</span>';
@@ -824,6 +852,7 @@ const Health = (() => {
         <button class="ghost" onclick="Health.openField('${escAttr(st.id)}')" title="Chart its sensors on the Field Data tab">Chart on Field Data</button>
         <button class="ghost" onclick="Health.close()">Close</button>
       </div>
+      ${stnFindHtml()}
       ${S.findings.length ? `<h4 id="hl-h-stnf">Findings</h4><ul class="hl-flist">${S.findings.map(f => `<li>${sevHtml(f.severity)} <b>${esc(f.title)}</b>
         <span class="small">${esc(f.detail)}</span>${f.action ? ` <span class="small hl-faction"><span aria-hidden="true">→</span> ${esc(f.action)}</span>` : ''}</li>`).join('')}</ul>` : ''}
       ${sch ? stripHtml(S) : ''}
@@ -833,6 +862,40 @@ const Health = (() => {
       ${S.level ? levelHtml(S) : ''}
       ${sensorsHtml(S)}
       ${recentHtml(S)}`;
+  }
+
+  // The station finder: any station heard in the window, by its name, its
+  // number or its owner — the first few that match, a press each to open it
+  // here, Enter for the first. It looks past the owner filter: a station
+  // asked for by name is wanted whoever owns it.
+  const STN_HITS = 8;
+  function stationText(st) {
+    const o = ownerOf(st);
+    return [st.name, st.station_number, o && o.name].filter(Boolean).join(' ').toLowerCase();
+  }
+  function stnHits() {
+    const q = H.find.stn.trim().toLowerCase();
+    if (!q || !H.A) return [];
+    const rank = { critical: 0, warn: 1, info: 2, ok: 3, irregular: 4 };
+    return [...H.A.stations.values()].filter(S => stationText(S.st).includes(q))
+      .sort((a, b) => (b.st.name.toLowerCase().startsWith(q) - a.st.name.toLowerCase().startsWith(q))
+        || (rank[a.status] - rank[b.status]) || a.st.name.localeCompare(b.st.name));
+  }
+  function stnHitsHtml() {
+    const q = H.find.stn.trim();
+    if (!q) return '';
+    const hits = stnHits();
+    if (!hits.length) return `<span class="small txt-muted">No station heard in the window matches “${esc(q)}”.</span>`;
+    return hits.slice(0, STN_HITS).map(S => `<button class="hl-chip hl-chip--sm" onclick="Health.select('${escAttr(S.st.id)}')"
+        title="${escAttr(`Open ${S.st.name} here`)}">${esc(S.st.name)}${S.st.station_number ? ` <span class="hl-count">${esc(S.st.station_number)}</span>` : ''}</button>`).join('')
+      + (hits.length > STN_HITS ? ` <span class="small txt-muted">and ${num(hits.length - STN_HITS)} more — keep typing</span>` : '');
+  }
+  function stnFindHtml() {
+    return `<div class="hl-filters hl-stn-find">
+      <input type="search" class="hl-find" placeholder="Find a station — name, number or owner" aria-label="Find a station to open here, by name, number or owner"
+             value="${escAttr(H.find.stn)}" oninput="Health.stnFind(this.value)" onkeydown="if (event.key === 'Enter') Health.stnFindGo()">
+      <span class="hl-stn-hits" id="hl-stn-hits">${stnHitsHtml()}</span>
+    </div>`;
   }
 
   function phaseText(sch) {
@@ -1144,11 +1207,35 @@ const Health = (() => {
 
   // ── check signals, every station ───────────────────────────────────────────
 
-  function matrixHtml() {
-    const A = H.A;
-    const list = [...A.stations.values()].filter(S => S.schedule && S.schedule.daily && stationMatches(S.st));
+  // The stations the owner filter and the find box leave, worst first.
+  function matrixList() {
+    const q = H.find.checks.trim().toLowerCase();
+    const list = [...H.A.stations.values()].filter(S => S.schedule && S.schedule.daily && stationMatches(S.st) && (!q || stationText(S.st).includes(q)));
     const rank = { critical: 0, warn: 1, info: 2, ok: 3, irregular: 4 };
-    list.sort((a, b) => (rank[a.status] - rank[b.status]) || (b.schedule.missRate - a.schedule.missRate) || a.st.name.localeCompare(b.st.name));
+    return list.sort((a, b) => (rank[a.status] - rank[b.status]) || (b.schedule.missRate - a.schedule.missRate) || a.st.name.localeCompare(b.st.name));
+  }
+  function matrixCountText(list) {
+    return `${num(list.length)} stations with a learned schedule${filtering() ? ' of the owners picked' : ''}${H.find.checks.trim() ? ' that match' : ''}, worst first; the number in a day is its misses`;
+  }
+  function matrixHtml() {
+    const list = matrixList();
+    return `
+      <div class="panel-header"><h3 id="hl-h-checks">Check signals</h3>
+        <span class="small" id="hl-checks-count">${esc(matrixCountText(list))}</span></div>
+      <div class="qs-legend">${['hit', 'partial', 'miss', 'net', 'unknown'].map(k => `<span><i class="hl-key ${OUTCOME[k].cls}" aria-hidden="true"></i>${esc(OUTCOME[k].label)}</span>`).join('')}</div>
+      <div class="hl-filters">
+        <input type="search" class="hl-find" placeholder="Find a station — name, number or owner" aria-label="Find a station in Check signals by name, number or owner"
+               value="${escAttr(H.find.checks)}" oninput="Health.checksFind(this.value)">
+      </div>
+      <div id="hl-checks-body">${matrixBodyHtml(list)}</div>`;
+  }
+  function matrixBodyHtml(list) {
+    const A = H.A;
+    if (!list.length) {
+      const q = H.find.checks.trim();
+      return `<p class="small hl-empty">${q ? `No station with a learned schedule matches “${esc(q)}”.`
+        : `No station${filtering() ? ' of the owners picked' : ''} heard in the window kept a schedule regular enough to learn.`}</p>`;
+    }
     const days = [];
     for (let d = new Date(A.t0).setHours(0, 0, 0, 0); d < A.t1; d += DAY) days.push(d);
     const shown = H.matrixAll ? list : list.slice(0, 40);
@@ -1164,9 +1251,6 @@ const Health = (() => {
       return `<td class="hl-mcell" title="${escAttr(title)}"><span class="hl-mbar">${segs}</span><span class="sr-only">${esc(title)}</span>${due ? `<span class="hl-mnum">${x.miss ? x.miss : ''}</span>` : ''}</td>`;
     };
     return `
-      <div class="panel-header"><h3 id="hl-h-checks">Check signals</h3>
-        <span class="small">${num(list.length)} stations with a learned schedule${filtering() ? ' of the owners picked' : ''}, worst first; the number in a day is its misses</span></div>
-      <div class="qs-legend">${['hit', 'partial', 'miss', 'net', 'unknown'].map(k => `<span><i class="hl-key ${OUTCOME[k].cls}" aria-hidden="true"></i>${esc(OUTCOME[k].label)}</span>`).join('')}</div>
       <div class="table-wrap tall" role="region" tabindex="0" aria-labelledby="hl-h-checks">
         <table class="hl-table hl-matrix">
           <caption class="sr-only">Each station's checks per day: received, received with frames lost, missed</caption>
@@ -1611,13 +1695,34 @@ const Health = (() => {
       aria-label="${escAttr(`${h.host}: up to ${max} readings an hour; ${quiet} of ${n} hours with nothing`)}"><path d="${d}"/></svg>`;
   }
 
+  // The receivers the find box leaves: by name, channel or frequency.
+  function rxChannels(h) {
+    return h.paths.map(p => {
+      const ch = p.path === h.host ? '' : p.path.slice(h.host.length).replace(/^-/, '');
+      return ch ? ch + (p.freq ? ` · ${p.freq.toFixed(3)} MHz` : '') : (p.freq ? `${p.freq.toFixed(3)} MHz` : '—');
+    });
+  }
+  function rxList() {
+    const q = H.find.rx.trim().toLowerCase();
+    return H.A.receivers.filter(h => !q || [h.host, hostLabel(h.host), ...rxChannels(h)].join(' ').toLowerCase().includes(q));
+  }
+
   function networkHtml() {
-    const A = H.A;
-    const rx = A.receivers;
-    const reps = A.repeaters.filter(R => R.members.length).slice(0, 40);
     return `
-      <div class="panel-header"><h3 id="hl-h-net">Receivers and repeaters</h3></div>
-      <h4 id="hl-h-rx">Receivers</h4>
+      <div class="panel-header"><h3 id="hl-h-net">Receivers</h3>
+        <span class="small">each base station or gateway that delivered readings in the window</span></div>
+      <div class="hl-filters">
+        <input type="search" class="hl-find" placeholder="Find a receiver — name, channel or frequency" aria-label="Find a receiver by name, channel or frequency"
+               value="${escAttr(H.find.rx)}" oninput="Health.rxFind(this.value)">
+      </div>
+      <div id="hl-rx-list">${rxTableHtml(rxList())}</div>`;
+  }
+  function rxTableHtml(rx) {
+    if (!rx.length) {
+      const q = H.find.rx.trim();
+      return `<p class="small hl-empty">${q ? `No receiver matches “${esc(q)}”.` : 'No receiver delivered anything in the window.'}</p>`;
+    }
+    return `
       <div class="table-wrap"><table class="hl-table">
         <caption class="sr-only">Each base station or gateway that delivered readings in the window</caption>
         <thead><tr><th scope="col">Receiver</th><th scope="col">Delivering</th><th scope="col">Readings</th><th scope="col">Last</th>
@@ -1629,27 +1734,13 @@ const Health = (() => {
           <td class="${h.silentFor > HOUR ? 'txt-warn' : ''}">${esc(fmtAgo(h.last))}</td>
           <td>${h.lag.p50 != null ? `${h.lag.p50.toFixed(1)} s` : '—'}</td>
           <td>${num(h.corrupted)}${h.n ? ` <span class="small">(${(100 * h.corrupted / h.n).toFixed(1)}%)</span>` : ''}</td>
-          <td class="small">${h.paths.map(p => {
-            const ch = p.path === h.host ? '' : p.path.slice(h.host.length).replace(/^-/, '');
-            return esc(ch ? ch + (p.freq ? ` · ${p.freq.toFixed(3)} MHz` : '') : (p.freq ? `${p.freq.toFixed(3)} MHz` : '—'));
-          }).join('<br>')}</td></tr>`).join('')}</tbody>
-      </table></div>
-      <h4 id="hl-h-reps">Repeaters</h4>
-      <p class="small">Every repeater whose pass ranges carry an address heard in the window. Blame is each corrupted copy shared evenly among
-        the repeaters within reach that could have carried it — the common factor collects it. The
-        <button class="link-btn" onclick="Health.openReception()">Reception Map</button> takes these same readings further: every copy, which
-        repeater is the only path for some, and with positions and levels when a receiver has them.</p>
-      <div class="table-wrap medium" role="region" tabindex="0" aria-labelledby="hl-h-reps"><table class="hl-table">
-        <caption class="sr-only">Repeaters: the stations behind each that were heard, how many are silent, and corrupted copies it could have carried</caption>
-        <thead><tr><th scope="col">Repeater</th><th scope="col">Stations heard behind it</th><th scope="col">Silent now</th>
-          <th scope="col">Corrupted copies (blame)</th><th scope="col">Rate</th></tr></thead>
-        <tbody>${reps.map(R => `<tr>
-          <th scope="row"><button class="link-btn" onclick="goToStation('${escAttr(R.id)}')">${esc(R.name)}</button></th>
-          <td>${num(R.members.length)}</td>
-          <td class="${R.silent.length ? 'txt-warn' : ''}">${num(R.silent.length)}</td>
-          <td>${R.blame.toFixed(1)}</td>
-          <td>${(100 * R.rate).toFixed(1)}%</td></tr>`).join('')}</tbody>
+          <td class="small">${rxChannels(h).map(esc).join('<br>')}</td></tr>`).join('')}</tbody>
       </table></div>`;
+  }
+  function rxFind(q) {
+    H.find.rx = String(q || '');
+    const el = document.getElementById('hl-rx-list');
+    if (el && H.A) el.innerHTML = rxTableHtml(rxList());
   }
 
   // ── the register and the data ───────────────────────────────────────────────
@@ -1708,6 +1799,24 @@ const Health = (() => {
   function refresh() { run(); }
   function setCat(k) { H.cat = k; const el = document.getElementById('hl-findings'); if (el) { rerenderAttn(); } }
   function setInfo(v) { H.showInfo = !!v; rerenderAttn(); }
+  function attnFind(q) {
+    H.find.attn = String(q || '');
+    const cats = document.getElementById('hl-attn-cats');
+    if (cats) cats.innerHTML = catChipsHtml();
+    const list = document.getElementById('hl-findings');
+    if (list && H.A) list.innerHTML = findingsHtml();
+  }
+  // The station finder: the matches painted under the box as it is typed in;
+  // Enter opens the first.
+  function stnFind(q) {
+    H.find.stn = String(q || '');
+    const el = document.getElementById('hl-stn-hits');
+    if (el) el.innerHTML = stnHitsHtml();
+  }
+  function stnFindGo() {
+    const S = stnHits()[0];
+    if (S) select(S.st.id);
+  }
   function rerenderAttn() {
     const box = document.querySelector('.hl-attn');
     if (!box) return;
@@ -1715,9 +1824,21 @@ const Health = (() => {
   }
   function toggleMatrix() {
     H.matrixAll = !H.matrixAll;
-    const sec = document.querySelector('[aria-labelledby="hl-h-checks"]');
-    if (sec) sec.innerHTML = matrixHtml();
+    paintMatrix();
+    const more = document.querySelector('#hl-checks-body .hl-more');
+    if (more) more.focus();
   }
+  // The rows and the count, painted again in place so the find box keeps the
+  // keyboard.
+  function paintMatrix() {
+    if (state.activeTab !== 'health' || !H.A) return;
+    const list = matrixList();
+    const body = document.getElementById('hl-checks-body');
+    if (body) body.innerHTML = matrixBodyHtml(list);
+    const n = document.getElementById('hl-checks-count');
+    if (n) n.textContent = matrixCountText(list);
+  }
+  function checksFind(q) { H.find.checks = String(q || ''); paintMatrix(); }
 
   // `part` (PART_HEAD's keys) opens it at that part rather than its top: a
   // sparkline's row opens its station at that sensor's chart or section.
@@ -1727,6 +1848,7 @@ const Health = (() => {
     H.lens = null;
     H.missing = null;
     H.want = null;               // a pick here outranks one still on its way
+    H.find.stn = '';
     rerenderStation();
     loadInspections(id);
     syncRoute();
@@ -1946,6 +2068,9 @@ const Health = (() => {
     openLog, openAddr, openField, openReception, showStation, picked, wantStation, exportCsv, fetchReadings,
     slotStrip,
     setOwner, clearOwners, findOwner, owner, toAttention,
+    attnFind, stnFind, stnFindGo, checksFind, rxFind,
+    // Whether the owner filter leaves a station — the Repeaters card's rows.
+    owns: st => !!st && stationMatches(st),
     state: state_,
   };
 })();

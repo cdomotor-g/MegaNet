@@ -26,6 +26,7 @@ const HealthFlips = (() => {
   const S = {
     asked: false, loading: false, err: '',
     rows: null, overview: null, findings: [], events: null, evErr: '', showEvents: false, more: false,
+    q: '',                    // the find box: a transmitter, or an address and its station
     seen: new Map(),          // address → { rows } for the Bit Flipper (errors are not kept: asked again next time)
     seenAsking: new Set(),
     seenTimer: null,
@@ -84,6 +85,8 @@ const HealthFlips = (() => {
     }
     S.loading = false;
     redraw();
+    // The Repeaters card reads the corrupted copies caught on each repeater's carrier from here.
+    if (typeof HealthRepeaters !== 'undefined') HealthRepeaters.changed();
   }
 
   async function loadEvents() {
@@ -128,12 +131,22 @@ const HealthFlips = (() => {
     </tr>`;
   }
 
+  // What the find box matches: who sent it — name, number, its key — and the
+  // addresses in it with their stations.
+  const q = () => S.q.trim().toLowerCase();
+  const txText = tx => { const w = who(tx); return tx ? `${w.name} ${w.number || ''} ${tx}` : ''; };
+  const addrText = a => { const st = a == null ? null : stationOf(a); return a == null ? '' : `${a} ${st ? `${st.name} ${st.station_number || ''}` : ''}`; };
+  const rowFound = r => !q() || [txText(r.tx), ...(Array.isArray(r.top) ? r.top : []).map(t => `${addrText(t.true_addr)} ${t.bad_addr}`)].join(' ').toLowerCase().includes(q());
+  const eventFound = e => !q() || [addrText(e.true_addr), e.bad_addr, txText(e.bad_tx), txText(e.good_tx)].join(' ').toLowerCase().includes(q());
+
   function eventsHtml() {
     if (!S.showEvents) return `<p><button class="btn" onclick="HealthFlips.events()">Show the recent corrupted copies</button></p>`;
     if (!S.events) return '<p class="small">Asking the server for the recent corrupted copies…</p>';
     if (S.evErr) return `<p class="small txt-bad">${esc(S.evErr)}</p>`;
     if (!S.events.length) return '<p class="small">None in the last week.</p>';
-    const rows = S.events.slice(0, 200).map(e => `<tr>
+    const found = S.events.filter(eventFound);
+    if (!found.length) return `<p class="small hl-empty">No corrupted copy in the last week matches “${esc(S.q.trim())}”.</p>`;
+    const rows = found.slice(0, 200).map(e => `<tr>
       <td class="small">${esc(when(e.heard_at))}</td>
       <td>${addrHtml(e.true_addr)} = ${esc(String(e.true_value))}</td>
       <td>${e.addr_flip ? esc(String(e.bad_addr)) : ''} = ${esc(String(e.bad_value))} <span class="small">${num(e.bits)} bit${e.bits === 1 ? '' : 's'}</span></td>
@@ -146,7 +159,23 @@ const HealthFlips = (() => {
         <caption class="sr-only">The last week's corrupted copies, newest first: the true reading, what it was corrupted to, who sent the corrupted copy, who sent the clean one, and how the two were told apart</caption>
         <thead><tr><th scope="col">Heard</th><th scope="col">True reading</th><th scope="col">Corrupted to</th>
           <th scope="col">Corrupted copy sent by</th><th scope="col">Clean copy from</th><th scope="col">Told by</th></tr></thead>
-        <tbody>${rows}</tbody></table></div>${S.events.length > 200 ? `<p class="small">The newest 200 of ${num(S.events.length)}.</p>` : ''}`;
+        <tbody>${rows}</tbody></table></div>${found.length > 200 ? `<p class="small">The newest 200 of ${num(found.length)}.</p>` : ''}`;
+  }
+
+  // The table and the recent copies — what the find box narrows.
+  function bodyHtml() {
+    if (!S.rows.length) return '<p class="small">No transmitter has been caught sending a corrupted copy yet.</p>' + eventsHtml();
+    const rows = S.rows.filter(rowFound);
+    if (!rows.length) return `<p class="small hl-empty">No transmitter caught sending a corrupted copy matches “${esc(S.q.trim())}”.</p>` + eventsHtml();
+    const shown = S.more ? rows : rows.slice(0, PAGE);
+    const table = `<div class="table-wrap"><table class="hl-table hl-flip-table">
+        <caption class="sr-only">Each transmitter's corrupted copies over the last week, against what it sent: clear ones (as strong as the clean copy), the rate, how often the clean version reached us from upstream too, how many were wrong in the address, the commonest, and whether it stands out</caption>
+        <thead><tr><th scope="col">Sent by</th><th scope="col" class="num">Corrupted copies</th><th scope="col" class="num">Bursts it sent</th>
+          <th scope="col" class="num">Clear rate</th><th scope="col" class="num">Clean upstream too</th><th scope="col" class="num">In the address</th>
+          <th scope="col">Commonest</th><th scope="col">Now</th></tr></thead>
+        <tbody>${shown.map(rowHtml).join('')}</tbody></table></div>
+        ${rows.length > shown.length ? `<p><button class="btn" onclick="HealthFlips.all()">Show all ${num(rows.length)}</button></p>` : ''}`;
+    return table + eventsHtml();
   }
 
   function render() {
@@ -158,15 +187,6 @@ const HealthFlips = (() => {
     if (!S.rows) return head + '<p class="small">Asking the server for the bit flips…</p>';
     const flagged = S.findings.length
       ? `<p><b>${num(S.findings.length)} transmitter${S.findings.length === 1 ? '' : 's'} to look at first:</b> ${S.findings.slice(0, 3).map(f => esc(f.title)).join('; ')}${S.findings.length > 3 ? '; …' : ''}.</p>` : '';
-    const shown = S.more ? S.rows : S.rows.slice(0, PAGE);
-    const table = S.rows.length ? `<div class="table-wrap"><table class="hl-table hl-flip-table">
-        <caption class="sr-only">Each transmitter's corrupted copies over the last week, against what it sent: clear ones (as strong as the clean copy), the rate, how often the clean version reached us from upstream too, how many were wrong in the address, the commonest, and whether it stands out</caption>
-        <thead><tr><th scope="col">Sent by</th><th scope="col" class="num">Corrupted copies</th><th scope="col" class="num">Bursts it sent</th>
-          <th scope="col" class="num">Clear rate</th><th scope="col" class="num">Clean upstream too</th><th scope="col" class="num">In the address</th>
-          <th scope="col">Commonest</th><th scope="col">Now</th></tr></thead>
-        <tbody>${shown.map(rowHtml).join('')}</tbody></table></div>
-        ${S.rows.length > shown.length ? `<p><button class="btn" onclick="HealthFlips.all()">Show all ${num(S.rows.length)}</button></p>` : ''}`
-      : '<p class="small">No transmitter has been caught sending a corrupted copy yet.</p>';
     return head + flagged + overviewHtml() + `
       <p class="small hl-drift-sub">A corrupted copy is a burst one or two bits from a real reading, heard by the same base station within five
         seconds of it. Which of the two is wrong is decided by the first of: an address no station has; a station not otherwise heard for
@@ -178,13 +198,22 @@ const HealthFlips = (() => {
         repeater: the corruption entered at this transmitter — its own receiver, interference at its site, or its radio. A transmitter is
         flagged when five or more clear ones in a week make 2% of what it sent and three times the typical transmitter's rate. It narrows;
         it does not convict.</p>
-      ${table}
-      ${eventsHtml()}`;
+      ${S.rows.length ? `<div class="hl-filters">
+        <input type="search" class="hl-find" placeholder="Find a transmitter, or an address" aria-label="Find a transmitter by name or number, or an address and its station"
+               value="${escAttr(S.q)}" oninput="HealthFlips.find(this.value)"></div>` : ''}
+      <div id="hl-flips-body">${bodyHtml()}</div>`;
   }
 
   function redraw() {
     const el = document.getElementById('hl-flips');
     if (el) el.innerHTML = render();
+  }
+  // The table and the events painted again in place, so the find box keeps
+  // the keyboard.
+  function find(v) {
+    S.q = String(v || '');
+    const el = document.getElementById('hl-flips-body');
+    if (el) el.innerHTML = bodyHtml();
   }
 
   // ── The Bit Flipper's "Seen on the air" ───────────────────────────────────
@@ -264,5 +293,5 @@ const HealthFlips = (() => {
   function all() { S.more = true; redraw(); }
   function state_() { return { rows: S.rows, overview: S.overview, findings: S.findings, events: S.events, err: S.err }; }
 
-  return { render, load, events, all, seenHtml, seenChanged, state: state_ };
+  return { render, load, events, all, find, seenHtml, seenChanged, state: state_ };
 })();

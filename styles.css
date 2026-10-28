@@ -20097,6 +20097,28 @@ button.adm-danger:hover { border-color: var(--bad); }
    its night lows, and 12.2 V. */
 .hl-ss-sub { margin: .35rem 0 0; max-width: 80rem; }
 .hl-ss-find { flex: 1 1 14rem; min-width: 0; max-width: 22rem; }
+/* The other cards' find boxes (Needs attention, A station, Check signals,
+   Airtime, Bit flips, Receivers, Repeaters): the same width as the
+   sparklines' box, on the card's filter row. */
+.hl-find { flex: 1 1 14rem; min-width: 0; max-width: 22rem; }
+/* The station finder's matches, a chip each, wrapping beside the box. */
+.hl-stn-hits { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; }
+.hl-stn-hits:empty { display: none; }
+/* Repeaters: the evidence columns stay narrow, what it points to takes the
+   rest; each issue on a line of its own above the possibilities. */
+@media (min-width: 701px) { .table-wrap table.hl-reptable { min-width: 56rem; } }
+.hl-reptable td, .hl-reptable th { white-space: normal; }
+.hl-reptable .hl-rep-name { font-weight: 600; }
+.hl-rep-issue { display: block; }
+.hl-rep-narrow { display: none; }
+@media (max-width: 700px) {
+  .hl-rep-narrow { display: block; margin-top: .25rem; font-size: var(--fs-xs); font-weight: 400; color: var(--muted); white-space: normal; }
+}
+.hl-rep-issue + .hl-rep-issue { margin-top: .1rem; }
+.hl-words { display: grid; grid-template-columns: minmax(8rem, max-content) 1fr; gap: var(--sp-1) var(--sp-3); margin: var(--sp-2) 0 0; }
+.hl-words dt { font-weight: 600; color: var(--text); }
+.hl-words dd { margin: 0; }
+@media (max-width: 560px) { .hl-words { grid-template-columns: 1fr; } .hl-words dd { margin-bottom: var(--sp-2); } }
 .table-wrap table.hl-sstable { min-width: 54rem; }
 .hl-sstable td, .hl-sstable th { vertical-align: middle; }
 .hl-sstable .hl-ss-worst { white-space: normal; }
