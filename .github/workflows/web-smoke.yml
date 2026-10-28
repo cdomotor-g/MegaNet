@@ -748,6 +748,18 @@ jobs:
         working-directory: test
         run: npm run roadowners
 
+      # The hover names on a map stand one above another (map-tip-stack.js).
+      # A road's and a river's name at the pointer and a bridge's on its pin
+      # used to land on one spot, the last over the rest. The check opens them
+      # as their layers do and asserts no two boxes meet, the lowest stays on
+      # its point, each keeps its left-right place, the stack settles back as
+      # names go, through a zoom and past a pin's own name, permanent labels
+      # are left alone, and a real mouse on a radio path's sticky label stacks.
+      - name: Map hover names — stacked, not laid over each other
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run tipstack
+
       # The mobile coverage section on the What is here card and a station's
       # card (site-mobile.js), over flat ground and invented masts so every
       # figure has an answer on paper: the level summed as stated, the trees

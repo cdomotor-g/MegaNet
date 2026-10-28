@@ -47,6 +47,9 @@
   // A title's words above the pointer, where the pointer does not cover them,
   // in place of the browser's box under it (tooltips.js).
   Tooltips.start();
+  // And the map's hover names — a road's, a river's, a bridge's — stacked
+  // where they would land on each other (map-tip-stack.js).
+  MapTipStack.start();
   // A handle under every capped table and list, to make its card taller
   // (card-grip.js). Before the first render, so the tables that render draws
   // get theirs — and their remembered heights — before they are painted.
