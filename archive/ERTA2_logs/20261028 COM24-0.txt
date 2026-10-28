@@ -1,0 +1,3467 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2026.10.28 10:53:31 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: E
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: l
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	26-Aug-2026 17:45:05 UTC; Station Address: 9999
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: f
+
+		Firmware: v1.7 Sep 20 2024 17:32:50 : 10366
+		Host Bootloader: v1.3 - 9967:0:31:0:0
+		Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301) FI:6015
+
+Press any key..
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	26-Aug-2026 18:00:09 UTC; Station Address: 9999
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+	Timed out - Exiting
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	26-Aug-2026 19:32:54 UTC; Station Address: 9999
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: f
+
+		Firmware: v1.7 Sep 20 2024 17:32:50 : 10366
+		Host Bootloader: v1.3 - 9967:0:31:0:0
+		Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301) FI:6015
+
+Press any key..
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: h
+
+Update Device Firmware Menu:
+
+	a)	Update Bootloader (ERTA2-B)
+	b)	Update Main Firmware (ERTA2_)
+	c)	Load Firmware to Radio (ERTA2-R_app)
+	d)	Load FSK Image to radio (ERTA2-R_fi2)
+	e)	Load V23 Image to radio (ERTA2-R_fi6)
+
+		Select: a
+
+	This action will update the Boot-Loader with the file on USB
+		Continue? (y/n):y
+	This USB connection will go off-line for approximately 1 minute to 
+	connect to the USB drive. DIO4 LED indicates update is complete.
+	Wait for DIO4 LED to come on, then reconnect and press a key
+
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: h
+
+Update Device Firmware Menu:
+
+	a)	Update Bootloader (ERTA2-B)
+	b)	Update Main Firmware (ERTA2_)
+	c)	Load Firmware to Radio (ERTA2-R_app)
+	d)	Load FSK Image to radio (ERTA2-R_fi2)
+	e)	Load V23 Image to radio (ERTA2-R_fi6)
+
+		Select: b
+
+	This action will update the main firmware with the file on USB
+		Continue? (y/n):y
+	When all four DIO LEDs are on, remove the USB to restart the unit.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	26-Aug-2026 19:42:28 UTC; Station Address: 9999
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: f
+
+		Firmware: v1.7 Sep 20 2024 17:32:50 : 10366
+		Host Bootloader: v1.3 - 9967:0:0:1:0
+		Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301) FI:6015
+
+Press any key..
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: h
+
+Update Device Firmware Menu:
+
+	a)	Update Bootloader (ERTA2-B)
+	b)	Update Main Firmware (ERTA2_)
+	c)	Load Firmware to Radio (ERTA2-R_app)
+	d)	Load FSK Image to radio (ERTA2-R_fi2)
+	e)	Load V23 Image to radio (ERTA2-R_fi6)
+
+		Select: c
+	This USB connection will go off-line for approximately 1 minute to 
+	connect to the USB drive. DIO4 LED indicates loading is complete.
+	Wait for DIO4 LED to come on, then reconnect and press a key
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	26-Aug-2026 19:48:13 UTC; Station Address: 9999
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: h
+
+Update Device Firmware Menu:
+
+	a)	Update Bootloader (ERTA2-B)
+	b)	Update Main Firmware (ERTA2_)
+	c)	Load Firmware to Radio (ERTA2-R_app)
+	d)	Load FSK Image to radio (ERTA2-R_fi2)
+	e)	Load V23 Image to radio (ERTA2-R_fi6)
+
+		Select: e
+	This USB connection will go off-line for approximately 1 minute to 
+	connect to the USB drive. DIO4 LED indicates loading is complete.
+	Wait for DIO4 LED to come on, then reconnect and press a key
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	26-Aug-2026 19:52:07 UTC; Station Address: 9999
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: f
+
+		Firmware: v1.7 Sep 20 2024 17:32:50 : 10366
+		Host Bootloader: v1.3 - 9967:0:0:1:0
+		Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301) FI:6015
+
+Press any key..
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: a
+
+		Warming up Analog. Press a key to skip. ..........
+ 	DI1         DI2         DI3         DI4         AI1         
+Raw	0           100         1           Off         0.010 mA    Raw	0           100         1           Off         0.010 mA    Raw	0           100         1           Off         0.010 mA    Raw	0           100         1           Off         0.010 mA    Raw	0           100         1           Off         0.010 mA    Raw	0           100         1           Off         0.010 mA    Raw	0           100         1           Off         0.010 mA    Raw	0           100         1           Off         0.010 mA    Raw	0           100         1           Off         0.010 mA    
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: b
+
+Station		RSSI		Last Heard (hh:mm:ss)
+
+Press any key..
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: c
+SDI Sensors Status
+SDI-12 Manual Command Menu:
+
+	a)	Set Sensor Address to Use
+	b)	Query single attached Sensor Address - ?! 
+	c)	Acknowledge Active - a! 
+	d)	Get Sensor Identification - aI!
+	e)	Change Sensor Address - aAb!
+	f)	Start Measurement - aM!
+	g)	Start Measurement with CRC - aMC!
+	h)	Continuous Measurements - aR0!
+	i)	Continuous Measurements with CRC - aRC0! 
+	j)	Concurrent Measurements - aC!
+	k)	Concurrent Measurements with CRC - aCC! 
+
+		Select: a
+
+		Enter the Address (0-9 or ?): ?0
+SDI-12 Manual Command for sensor 0 Menu:
+
+	a)	Set Sensor Address to Use
+	b)	Query single attached Sensor Address - ?! 
+	c)	Acknowledge Active - a! 
+	d)	Get Sensor Identification - aI!
+	e)	Change Sensor Address - aAb!
+	f)	Start Measurement - aM!
+	g)	Start Measurement with CRC - aMC!
+	h)	Continuous Measurements - aR0!
+	i)	Continuous Measurements with CRC - aRC0! 
+	j)	Concurrent Measurements - aC!
+	k)	Concurrent Measurements with CRC - aCC! 
+
+		Select: b
+		Warming up the Sensor (any key to skip) ....................
+
+		No response from sensor
+SDI-12 Manual Command for sensor 0 Menu:
+
+	a)	Set Sensor Address to Use
+	b)	Query single attached Sensor Address - ?! 
+	c)	Acknowledge Active - a! 
+	d)	Get Sensor Identification - aI!
+	e)	Change Sensor Address - aAb!
+	f)	Start Measurement - aM!
+	g)	Start Measurement with CRC - aMC!
+	h)	Continuous Measurements - aR0!
+	i)	Continuous Measurements with CRC - aRC0! 
+	j)	Concurrent Measurements - aC!
+	k)	Concurrent Measurements with CRC - aCC! 
+
+		Select: 
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: f
+
+		Firmware: v1.7 Sep 20 2024 17:32:50 : 10366
+		Host Bootloader: v1.3 - 9967:0:0:1:0
+		Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301) FI:6015
+
+Press any key..
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: g
+
+		Hardware: Rev4.A 	Serial Number: 00052992
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	26-Aug-2026 20:02:42 UTC; Station Address: 9999
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: a
+		Station Address: 9999 8
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: c
+		Paralysis Time: (sec) 60 6
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: c
+		Paralysis Time: (sec) 66 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: d
+		Logging Format Selection:
+		a) 	ALERT2 ASCII
+		b)*	CSV on Change
+		c) 	CSV on Sample
+		d)	Cancel
+			Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: e
+		Battery Type Selection:
+		a) 	Built-in LiFePO4
+		b)*	External Lead-Acid
+		c)	Cancel
+			Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: f
+	ALERT2 I/O Quick Setup
+		Units Selection:
+		a)*	Metric
+		b) 	US Customary
+		c)	Cancel
+			Select: 
+		Configuring Rain ID 0
+		Configuring River Analog ID 7
+			Transducer Full Range (mm) 5000    15000
+			Analog Sample Time: (min) 15
+			Analog Warmup Time: (sec) 10
+			River Sensitivity (mm) 10  50
+			River Offset (mm) 0
+		Configuring Battery Voltage ID 8
+	Configuration Change Complete
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: g
+	ALERT(version 1) I/O Quick Setup
+		Setting Up Radio for ALERT v1
+		Units Selection:
+		a)*	Metric
+		b) 	US Customary
+		c)	Cancel
+			Select: 
+
+	Rain Sensor ID: -1
+		Configuring Rain ID 1. Increment 1 mm
+	River Sensor ID ('-' to disable): -2
+		River Level Input Selection:
+		a)*	Analogue
+		b) 	Incremental
+		c) 	Quadrature
+		d)	Cancel
+			Select: a
+			Transducer Full Range  (mm) 5000    15000
+			Analog Sample Time: (min) 1
+			Analog Warmup Time: (sec) 5
+			River Increment  (mm) 10  50
+			River Offset  (mm) 0
+		Configuring River Analog: ID 2. Increment 50 mm
+	Battery Sensor ID: -3
+		Configuring Battery: ID 3. Increment 0.1  V
+
+	Configuration Change Complete
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	26-Aug-2026 20:15:41 UTC; Station Address: 9998
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	26-Aug-2026 20:15:44 UTC; Station Address: 9998
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 543
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 Binary Protocol
+	r)	Comms Supply Mode => Always On
+
+		Select: a
+		Communication Mode Selection:
+		a) 	4G Modem Reporting
+		b) 	RS232 Reporting
+		c) 	RS232 Serial Menu
+		d)*	Integrated Radio Reporting
+		e) 	Satellite Modem
+		f)	Cancel
+			Selection:c
+Communication Menu:
+
+	a)	Communication Mode => RS232 Serial Menu
+
+		Select: a
+		Communication Mode Selection:
+		a) 	4G Modem Reporting
+		b) 	RS232 Reporting
+		c)*	RS232 Serial Menu
+		d) 	Integrated Radio Reporting
+		e) 	Satellite Modem
+		f)	Cancel
+			Selection:f
+Communication Menu:
+
+	a)	Communication Mode => RS232 Serial Menu
+
+		Select: a
+		Communication Mode Selection:
+		a) 	4G Modem Reporting
+		b) 	RS232 Reporting
+		c)*	RS232 Serial Menu
+		d) 	Integrated Radio Reporting
+		e) 	Satellite Modem
+		f)	Cancel
+			Selection:f
+Communication Menu:
+
+	a)	Communication Mode => RS232 Serial Menu
+
+		Select: a
+		Communication Mode Selection:
+		a) 	4G Modem Reporting
+		b) 	RS232 Reporting
+		c)*	RS232 Serial Menu
+		d) 	Integrated Radio Reporting
+		e) 	Satellite Modem
+		f)	Cancel
+			Selection:
+Communication Menu:
+
+	a)	Communication Mode => RS232 Serial Menu
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	26-Aug-2026 20:20:28 UTC; Station Address: 9998
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	26-Aug-2026 20:20:38 UTC; Station Address: 9998
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => RS232 Serial Menu
+
+		Select: 1
+		Communication Mode Selection:
+		a) 	4G Modem Reporting
+		b) 	RS232 Reporting
+		c)*	RS232 Serial Menu
+		d) 	Integrated Radio Reporting
+		e) 	Satellite Modem
+		f)	Cancel
+			Selection:d
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 543
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 Binary Protocol
+	r)	Comms Supply Mode => Always On
+
+		Select: e
+		Tx Power 1W
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 543
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 Binary Protocol
+	r)	Comms Supply Mode => Always On
+
+		Select: f
+		Report Format Selection:
+		a) 	ALERT2 Format
+		b)*	ALERT Binary
+		c) 	ALERT IFLOWS
+		d)	Cancel
+			Selection:b
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 543
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 Binary Protocol
+	r)	Comms Supply Mode => Always On
+
+		Select: i
+		Repeater Delay (mSec) 543 2
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 542
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 Binary Protocol
+	r)	Comms Supply Mode => Always On
+
+		Select: j
+		Address List Selection:
+		a)*	List 1
+		b) 	List 2
+		c) 	List 3
+		d) 	List 4
+		e)	Cancel
+			Selection:a
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 542
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 Binary Protocol
+	r)	Comms Supply Mode => Always On
+
+		Select: k
+		Address List Status Selection:
+		a) 	Disable
+		b)*	Enable
+		c)	Cancel
+			Selection:
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 542
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 Binary Protocol
+	r)	Comms Supply Mode => Always On
+
+		Select: l
+		Address List Action Selection:
+		a)*	Pass
+		b) 	Reject
+		c)	Cancel
+			Selection:
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 542
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 Binary Protocol
+	r)	Comms Supply Mode => Always On
+
+		Select: m
+Address List Entries Menu:
+
+	a)	Add Entry
+	b)	0     to  9999
+
+		Selection: 
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 542
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 Binary Protocol
+	r)	Comms Supply Mode => Always On
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	26-Aug-2026 20:22:46 UTC; Station Address: 9999
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	26-Aug-2026 20:23:01 UTC; Station Address: 9999
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Backhaul Mode : RS232 Reporting - ALERT2 Binary Protocol
+	Baud	Bits	Parity	Stop
+	9600	8	N	1
+Unit Type: Repeater Station	Station Address: 9999
+Tx Frequency MHz: 151.500000	Rx Frequency MHz: 151.500000
+Tx Power: 1W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 90min		Paralysis Time: 60sec
+Analog Sample Time: 1min	Analog Warmup Time: 5sec
+Data Log Format: CSV on Change	Comms Supply: Always On
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  
+Pass            Disabled        Disabled        Disabled        
+0     to  9999                                                  
+
+External Inputs:
+ 	DI3         AI1         
+Mode	Pulse       4-20mA      
+Raw	1           0.010 mA    
+ID	1           2           
+Format	U-2         U-2         
+Scale	1           300         
+Offset	0mm         0(0mm)      
+Sens	1mm         1(50mm)     
+Value	1mm         0mm         
+
+Internal Status:
+ 	Battery     
+ID	3           
+Format	U-2         
+Value	12.9 V      
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	26-Aug-2026 20:23:12 UTC; Station Address: 9999
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: h
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           100         1           
+
+ 	AI1         AI2         
+Value	0mm         -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 3
+		Enter value for Digital 3 : 1 2
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           100         2           
+
+ 	AI1         AI2         
+Value	0mm         -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	26-Aug-2026 20:23:32 UTC; Station Address: 9999
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: i
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: 

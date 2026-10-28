@@ -1,0 +1,10478 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.11.26 12:07:03 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: E
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: l
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: p
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: r
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: o
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:08:17 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Base Station Rcvr	Station Address: 1000
+Rx Frequency MHz: 151.500000	Receive Format: Binary/IFLOWS
+Agency ID: ELPRO
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 1min		Paralysis Time: 1sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+SDI-12 Operating Mode: Disabled
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:08:50 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:09:02 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT IFLOWS
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None
+	k)	Comms Supply Mode => On Demand
+
+		Select: f
+		Report Format Selection:
+		a) 	ALERT2 Format
+		b) 	ALERT Binary
+		c)*	ALERT IFLOWS
+		d)	Cancel
+			Selection:b
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None
+	k)	Comms Supply Mode => On Demand
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:09:38 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:09:41 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:09:43 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Base Station Rcvr	Station Address: 1000
+Rx Frequency MHz: 151.500000	Receive Format: Binary/IFLOWS
+Agency ID: ELPRO
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 1min		Paralysis Time: 1sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:09:51 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Base Station Rcvr	Station Address: 1000
+Rx Frequency MHz: 151.500000	Receive Format: Binary/IFLOWS
+Agency ID: ELPRO
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 1min		Paralysis Time: 1sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+SDI-12 Operating Mode: Disabled
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:10:02 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:12:36 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:12:37 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:12:37 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:12:38 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: i
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: =~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.11.26 12:16:01 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:17:16 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	RSSI: -35dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: b
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	Off         Off         0           Off         0.000 mA    0.000 mA    
+ID	-           -           -           -           -           -           
+Value	0           0           0           0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	-           -           -           -           -           
+Value	13.2 V      0 V         -35dBm      32 C        All OK      
+
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:17:27 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	RSSI: -35dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: d
+		Logging Format Selection:
+		a)*	ALERT2 ASCII
+		b) 	CSV on Change
+		c) 	CSV on Sample
+		d)	Cancel
+			Select: c
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: g
+	ALERT(version 1) I/O Quick Setup
+		Setting Up Radio for ALERT v1
+		Units Selection:
+		a)*	Metric
+		b) 	US Customary
+		c)	Cancel
+			Select: 
+
+	Rain Sensor ID: 1000
+		Configuring Rain ID 1000. Increment 1 mm
+	River Sensor ID ('-' to disable): 1001
+		River Level Input Selection:
+		a)*	Analogue
+		b) 	Incremental
+		c) 	Quadrature
+		d)	Cancel
+			Select: 
+			Transducer Full Range  (mm) 5000
+			Analog Sample Time: (min) 1
+			Analog Warmup Time: (sec) 5
+			River Increment  (mm) 10
+			River Offset  (mm) 0
+		Configuring River Analog: ID 1001. Increment 10 mm
+	Battery Sensor ID: 1002
+		Configuring Battery: ID 1002. Increment 0.1  V
+
+	Configuration Change Complete
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:18:19 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	RSSI: -35dBm
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None
+	k)	Comms Supply Mode => On Demand
+
+		Select: j
+		Secondary Communication Selection:
+		a)*	None
+		b) 	4G Modem Reporting
+		c) 	RS232 Reporting
+		d) 	Satellite Modem
+		e)	Cancel
+			Selection:c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => RS232 Reporting
+	k)	Serial Baud Rate => 9600
+	l)	Communication Protocol
+	m)	Comms Supply Mode => On Demand
+
+		Select: l
+		Communication Protocol Selection:
+		a) 	ALERT2 ASCII Protocol
+		b) 	ALERT2 Binary Protocol
+		c)	Cancel
+			Selection:c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => RS232 Reporting
+	k)	Serial Baud Rate => 9600
+	l)	Communication Protocol
+	m)	Comms Supply Mode => On Demand
+
+		Select: m
+		Comms Supply Mode Selection:
+		a)*	On Demand
+		b) 	Always On
+		c) 	Timed
+		d)	Cancel
+			Selection:b
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => RS232 Reporting
+	k)	Serial Baud Rate => 9600
+	l)	Communication Protocol
+	m)	Comms Supply Mode => Always On
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:19:39 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	RSSI: -35dBm
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Backhaul Mode : RS232 Reporting - ALERT2 ASCII Protocol
+	Baud	Bits	Parity	Stop
+	9600	8	N	1
+Unit Type: Base Station Rcvr	Station Address: 1000
+Rx Frequency MHz: 151.500000	Receive Format: Binary/IFLOWS
+Agency ID: ELPRO
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 1min		Paralysis Time: 1sec
+Analog Sample Time: 1min	Analog Warmup Time: 5sec
+Data Log Format: CSV on Sample	Comms Supply: Always On
+
+External Inputs:
+ 	DI3         AI1         
+Mode	Pulse       4-20mA      
+Raw	0           -0.005 mA   
+ID	1000        1001        
+Format	U-2         U-2         
+Scale	1           500         
+Offset	0mm         0(0mm)      
+Sens	1mm         1(10mm)     
+Value	0mm         0mm         
+
+Internal Status:
+ 	Battery     
+ID	1002        
+Format	U-2         
+Value	13.2 V      
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Aug-2025 08:20:09 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	RSSI: -35dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: i
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: =~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.11.26 12:37:04 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 00:28:38 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	924         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	185mm       
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	0.23        
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	4.6         
+
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 00:43:44 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+	Timed out - Exiting
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 00:54:31 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: f
+
+		Firmware: v1.7 Sep 20 2024 17:32:50 : 10366
+		Host Bootloader: v1.3 - 9967:0:9:1:0
+		Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301) FI:6015
+
+Press any key..
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: g
+
+		Hardware: Rev4.A 	Serial Number: 00027648
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 00:55:01 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+	Sending Update...
+2055419543:Generate ALERT2 frames:
+2055419545:
+================= GENERAL SENSOR REPORT ====================2055419547:
+  |==> ID=848; val=185
+2055419549:
+  |==> ID=850; val=135
+2055419551:
+  |==> ID=849; val=1089722123
+2055419555:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740E1A51030800520387005003B900
+2055419577:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2055425501:Generate ALERT2 frames:
+2055425503:
+================= GENERAL SENSOR REPORT ====================2055425505:
+  |==> ID=848; val=185
+2055425507:
+  |==> ID=850; val=135
+2055425509:
+  |==> ID=849; val=1089722123
+2055425513:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740E2051030800520387005003B900
+2055425535:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2055435239:Generate ALERT2 frames:
+2055435241:
+================= GENERAL SENSOR REPORT ====================2055435243:
+  |==> ID=848; val=185
+2055435245:
+  |==> ID=850; val=135
+2055435247:
+  |==> ID=849; val=1089722123
+2055435251:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740E2A51030800520387005003B900
+2055435273:ALERT2 transmission finished after 0 seconds awake
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:00:34 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:00:36 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Stop Radio Tones
+
+		Select: s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: 
+	Sending Update...
+2055474047:Generate ALERT2 frames:
+2055474049:
+================= GENERAL SENSOR REPORT ====================2055474051:
+  |==> ID=848; val=185
+2055474053:
+  |==> ID=850; val=135
+2055474055:
+  |==> ID=849; val=1093119508
+2055474059:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740E5151030A00520387005003B900
+2055474081:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2055517205:Generate ALERT2 frames:
+2055517207:
+================= GENERAL SENSOR REPORT ====================2055517209:
+  |==> ID=848; val=185
+2055517211:
+  |==> ID=850; val=135
+2055517213:
+  |==> ID=849; val=1095657062
+2055517217:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740E7C51030D00520387005003B900
+2055517239:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2055538298:Generate ALERT2 frames:
+2055538300:
+================= GENERAL SENSOR REPORT ====================2055538302:
+  |==> ID=848; val=185
+2055538304:
+  |==> ID=850; val=136
+2055538306:
+  |==> ID=849; val=1095657062
+2055538310:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740E9151030D00520388005003B900
+2055538332:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2055579941:Generate ALERT2 frames:
+2055579943:
+================= GENERAL SENSOR REPORT ====================2055579945:
+  |==> ID=848; val=185
+2055579947:
+  |==> ID=850; val=136
+2055579949:
+  |==> ID=849; val=1098278502
+2055579953:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740EBB51030F00520388005003B900
+2055579975:ALERT2 transmission finished after 0 seconds awake
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:03:02 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:03:06 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: r
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Normal
+	s)	Radio Tone Reversals
+
+		Select: r
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Stop Radio Tones
+
+		Select: s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: 
+	Sending Update...
+2055676334:Generate ALERT2 frames:
+2055676336:
+================= GENERAL SENSOR REPORT ====================2055676338:
+  |==> ID=848; val=185
+2055676340:
+  |==> ID=850; val=133
+2055676342:
+  |==> ID=849; val=1101728318
+2055676346:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740F1B51031500520385005003B900
+2055676360:errts_radio_tx_done: 414C4552543211010F740F1B51031500520385005003B900
+2055676368:ALERT2 transmission finished after 0 seconds awake
+s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Stop Radio Tones
+
+		Select: s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: 
+	Sending Update...
+2055850052:Generate ALERT2 frames:
+2055850054:
+================= GENERAL SENSOR REPORT ====================2055850056:
+  |==> ID=848; val=185
+2055850058:
+  |==> ID=850; val=140
+2055850060:
+  |==> ID=849; val=1104874045
+2055850064:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740FC951031B0052038C005003B900
+2055850086:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2055971675:Generate ALERT2 frames:
+2055971677:
+================= GENERAL SENSOR REPORT ====================2055971679:
+  |==> ID=848; val=185
+2055971681:
+  |==> ID=850; val=138
+2055971683:
+  |==> ID=849; val=1107993559
+2055971687:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F7410435103230052038A005003B900
+2055971709:ALERT2 transmission finished after 0 seconds awake
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:14:30 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: h
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967295  924         
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: c
+		Enter value for Digital 3 : 924   0
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967295  0           
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 
+	Sending Update...
+2056316483:Generate ALERT2 frames:
+2056316485:
+================= GENERAL SENSOR REPORT ====================2056316487:
+  |==> ID=848; val=0
+2056316489:
+  |==> ID=850; val=138
+2056316491:
+  |==> ID=849; val=1113613927
+2056316495:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F74119C5103380052038A0050030000
+2056316517:ALERT2 transmission finished after 0 seconds awake
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:15:27 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	0           
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	0mm         
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.7 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	2.99        
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	59.8        
+
+
+Press any key..g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:21:15 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	18          
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	4mm         
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	4.006       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	80.12       
+
+
+Press any key..
+	Sending Update...
+2056775516:Generate ALERT2 frames:
+2056775518:
+================= GENERAL SENSOR REPORT ====================2056775520:
+  |==> ID=848; val=4
+2056775522:
+  |==> ID=850; val=138
+2056775524:
+  |==> ID=849; val=1118835835
+2056775528:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F7413675103580052038A0050030400
+2056775550:ALERT2 transmission finished after 0 seconds awake
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:24:24 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	28          
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	6mm         
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.3 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	4.859       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	97.18       
+
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:26:18 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	47          
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	9mm         
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	5.069       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	101.38      
+
+
+Press any key..g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:26:32 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	47          
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	9mm         
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	5.284       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	105.68      
+
+
+Press any key..g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:27:02 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	54          
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	11mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	5.284       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	105.68      
+
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:35:41 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: h
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967295  103         
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: c
+		Enter value for Digital 3 : 103
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967295  103         
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:36:18 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	103         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	21mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	0.221       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	4.42        
+
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:36:40 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:36:41 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: h
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967295  103         
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: c
+		Enter value for Digital 3 : 103   0
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967295  0           
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:36:50 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+	Timed out - Exiting
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: 
+	Sending Update...
+2058700319:Generate ALERT2 frames:
+2058700321:
+================= GENERAL SENSOR REPORT ====================2058700323:
+  |==> ID=848; val=20
+2058700325:
+  |==> ID=850; val=138
+2058700327:
+  |==> ID=849; val=1058642329
+2058700331:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F741AED5103010052038A0050031400
+2058700348:errts_radio_tx_done: 414C4552543211010F741AED5103010052038A0050031400
+2058700353:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2058707537:Generate ALERT2 frames:
+2058707539:
+================= GENERAL SENSOR REPORT ====================2058707541:
+  |==> ID=848; val=20
+2058707543:
+  |==> ID=850; val=138
+2058707545:
+  |==> ID=849; val=1058642329
+2058707549:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F741AF45103010052038A0050031400
+2058707571:errts_radio_tx_done: 414C4552543211010F741AF45103010052038A0050031400
+ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2058715415:Generate ALERT2 frames:
+2058715417:
+================= GENERAL SENSOR REPORT ====================2058715419:
+  |==> ID=848; val=20
+2058715421:
+  |==> ID=850; val=138
+2058715423:
+  |==> ID=849; val=1058642329
+2058715427:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F741AFC5103010052038A0050031400
+2058715435:errts_radio_tx_done: 414C4552543211010F741AFC5103010052038A0050031400
+2058715450:ALERT2 transmission finished after 0 seconds awake
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:**    
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:55:38 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Stop Radio Tones
+
+		Select: s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: 
+	Sending Update...
+2058911363:Generate ALERT2 frames:
+2058911365:
+================= GENERAL SENSOR REPORT ====================2058911367:
+  |==> ID=848; val=20
+2058911369:
+  |==> ID=850; val=138
+2058911371:
+  |==> ID=849; val=1058977874
+2058911375:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F741BC05103010052038A0050031400
+2058911393:errts_radio_tx_done: 414C4552543211010F741BC05103010052038A0050031400
+2058911397:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2058931496:Generate ALERT2 frames:
+2058931498:
+================= GENERAL SENSOR REPORT ====================2058931500:
+  |==> ID=848; val=20
+2058931502:
+  |==> ID=850; val=138
+2058931504:
+  |==> ID=849; val=1059648962
+2058931508:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F741BD45103010052038A0050031400
+2058931530:ALERT2 transmission finished after 0 seconds awake
+g
+
+		Hardware: Rev4.A 	Serial Number: 00027648
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: g
+
+		Hardware: Rev4.A 	Serial Number: 00027648
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:59:52 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:59:53 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 01:59:54 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:00:02 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	0.033       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	0.66        
+
+
+Press any key..
+	Sending Update...
+2059092599:Generate ALERT2 frames:
+2059092601:
+================= GENERAL SENSOR REPORT ====================2059092603:
+  |==> ID=848; val=20
+2059092605:
+  |==> ID=850; val=138
+2059092607:
+  |==> ID=849; val=1059648962
+2059092611:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F741C765103010052038A0050031400
+2059092633:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2059178657:Generate ALERT2 frames:
+2059178659:
+================= GENERAL SENSOR REPORT ====================2059178661:
+  |==> ID=848; val=20
+2059178663:
+  |==> ID=850; val=138
+2059178665:
+  |==> ID=849; val=1059984508
+2059178669:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F741CCC5103010052038A0050031400
+2059178691:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2059293365:Generate ALERT2 frames:
+2059293367:
+================= GENERAL SENSOR REPORT ====================2059293369:
+  |==> ID=848; val=20
+2059293371:
+  |==> ID=850; val=138
+2059293373:
+  |==> ID=849; val=1059313419
+2059293377:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F7C1D3F5103010052038A0050031400
+2059293399:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2059298303:Generate ALERT2 frames:
+2059298305:
+================= GENERAL SENSOR REPORT ====================2059298307:
+  |==> ID=848; val=20
+2059298309:
+  |==> ID=850; val=138
+2059298311:
+  |==> ID=849; val=1059313419
+2059298315:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F741D435103010052038A0050031400
+2059298337:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2059318616:Generate ALERT2 frames:
+2059318618:
+================= GENERAL SENSOR REPORT ====================2059318620:
+  |==> ID=848; val=20
+2059318622:
+  |==> ID=850; val=138
+2059318624:
+  |==> ID=849; val=1059313419
+2059318628:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F741D585103010052038A0050031400
+2059318650:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2059386284:Generate ALERT2 frames:
+2059386286:
+================= GENERAL SENSOR REPORT ====================2059386288:
+  |==> ID=848; val=20
+2059386290:
+  |==> ID=850; val=138
+2059386292:
+  |==> ID=849; val=1059313419
+2059386296:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F741D9B5103010052038A0050031400
+2059386318:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2059393367:Generate ALERT2 frames:
+2059393369:
+================= GENERAL SENSOR REPORT ====================2059393371:
+  |==> ID=848; val=20
+2059393373:
+  |==> ID=850; val=138
+2059393375:
+  |==> ID=849; val=1059313419
+2059393379:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F741DA35103010052038A0050031400
+2059393401:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2059399745:Generate ALERT2 frames:
+2059399747:
+================= GENERAL SENSOR REPORT ====================2059399749:
+  |==> ID=848; val=20
+2059399751:
+  |==> ID=850; val=138
+2059399753:
+  |==> ID=849; val=1059313419
+2059399757:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F741DA95103010052038A0050031400
+2059399779:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+2059405163:Generate ALERT2 frames:
+2059405165:
+================= GENERAL SENSOR REPORT ====================2059405167:
+  |==> ID=848; val=20
+2059405169:
+  |==> ID=850; val=138
+2059405171:
+  |==> ID=849; val=1059313419
+2059405175:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F741DAE5103010052038A0050031400
+2059405197:ALERT2 transmission finished after 0 seconds awake
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:06:47 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Stop Radio Tones
+
+		Select: s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Stop Radio Tones
+
+		Select: s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Stop Radio Tones
+
+		Select: s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Stop Radio Tones
+
+		Select: s
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:21:05 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:21:06 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:21:07 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	-0.004      
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	-0.08       
+
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:24:30 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	19.922      
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	398.44      
+
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:24:48 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	14.999      
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	299.98      
+
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:26:49 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	10.185      
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	203.7       
+
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:27:10 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:27:27 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:27:31 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	9.99        
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	199.8       
+
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:28:31 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	4.978       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	99.56       
+
+
+Press any key..g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:29:35 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	2.668       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	53.36       
+
+
+Press any key..g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:30:32 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	2.512       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	50.24       
+
+
+Press any key..g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:31:38 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	0.873       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	17.46       
+
+
+Press any key..g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:31:46 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	0.873       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	17.46       
+
+
+Press any key..g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:32:02 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	0.873       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	17.46       
+
+
+Press any key..g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:32:30 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	0.873       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	17.46       
+
+
+Press any key..g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:33:37 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	0.999       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	19.98       
+
+
+Press any key..g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:34:23 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	0.999       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	19.98       
+
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:34:41 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	-0.003      
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	-0.06       
+
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:36:11 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	-0.009      
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	-0.18       
+
+
+Press any key..g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:37:53 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	102         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	20mm        
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	0.223       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	4.46        
+
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:38:05 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: h
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967295  102         
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: c
+		Enter value for Digital 3 : 102   924
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967295  924         
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:38:18 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:38:18 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: CSV on Change	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	924         
+ID	848         
+Format	U-2         
+Scale	0.2         
+Offset	0mm         
+Sens	1mm         
+Value	185mm       
+
+Internal Status:
+ 	Battery     
+ID	850         
+Format	U-2         
+Value	13.8 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 1min	SDI Warmup Time: 10sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 1 13HydrServWL31007.4P-119
+ 	Chan 0      
+Raw	0.223       
+ID	849         
+Scale	20          
+Offset	0           
+Sens	1           
+Value	4.46        
+
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	17-Nov-2025 02:38:49 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: i
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: 

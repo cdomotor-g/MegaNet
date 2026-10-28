@@ -1,0 +1,10134 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.11.21 12:50:27 =~=~=~=~=~=~=~=~=~=~=~=
+
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.11.21 12:51:31 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: B
+
+		Password:**    
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: B
+
+		Password:
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	03-Nov-2025 21:41:37 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: e
+		Battery Type Selection:
+		a)*	Built-in LiFePO4
+		b) 	External Lead-Acid
+		c)	Cancel
+			Select: c
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: d
+		Logging Format Selection:
+		a)*	ALERT2 ASCII
+		b) 	CSV on Change
+		c) 	CSV on Sample
+		d)	Cancel
+			Select: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	03-Nov-2025 21:45:50 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: b
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           2401        0           Off         0.000 mA    0.000 mA    
+ID	-           -           -           -           -           -           
+Value	0           2401        0           0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	1008        1009        1010        1011        1012        
+Value	14.2 V      23.9 V      0dBm        23 C        All OK      
+
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	Battery     
+ID	1008        
+Format	U-1         
+Value	14.2 V      
+
+Battery Voltage Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           2401        0           Off         0.000 mA    0.000 mA    
+ID	-           -           -           -           -           -           
+Value	0           2401        0           0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	1008        1009        1010        1011        1012        
+Value	14.2 V      23.9 V      0dBm        23 C        All OK      
+
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: h
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	Supply      
+ID	1009        
+Format	U-1         
+Value	23.9 V      
+
+Supply Voltage Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           2401        0           Off         0.000 mA    0.000 mA    
+ID	-           -           -           -           -           -           
+Value	0           2401        0           0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	1008        1009        1010        1011        1012        
+Value	14.2 V      23.9 V      0dBm        23 C        All OK      
+
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: =~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.11.21 13:00:29 =~=~=~=~=~=~=~=~=~=~=~=
+À¥
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:*********
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:*********
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.11.21 13:01:20 =~=~=~=~=~=~=~=~=~=~=~=
+À¥
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: b
+
+		Password:
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	03-Nov-2025 21:51:24 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: e
+		Battery Type Selection:
+		a)*	Built-in LiFePO4
+		b) 	External Lead-Acid
+		c)	Cancel
+			Select: 
+	Invalid Selection - Try Again		
+			Select: 
+	Invalid Selection - Try Again		
+			Select: c
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	03-Nov-2025 21:51:45 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: b
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           2500        0           Off         0.000 mA    0.000 mA    
+ID	-           -           -           -           -           -           
+Value	0           2500        0           0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	1008        1009        1010        1011        1012        
+Value	13 V        0 V         0dBm        23 C        All OK      
+
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: h
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	Supply      
+ID	1009        
+Format	U-1         
+Value	0 V         
+
+Supply Voltage Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           2500        0           Off         0.000 mA    0.000 mA    
+ID	-           -           -           -           -           -           
+Value	0           2500        0           0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	1008        1009        1010        1011        1012        
+Value	13 V        0 V         0dBm        23 C        All OK      
+
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: i
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	RSSI        
+ID	1010        
+Format	S-1         
+Value	0dBm        
+
+RSSI Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           2500        0           Off         0.000 mA    0.000 mA    
+ID	-           -           -           -           -           -           
+Value	0           2500        0           0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	1008        1009        1010        1011        1012        
+Value	13 V        0 V         0dBm        23 C        All OK      
+
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: c
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI3         
+Mode	Pulse       
+ID	-           
+Format	U-4         
+Scale	1           
+Offset	0           
+Sens	1           
+Display	            
+Value	0           
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: a
+
+		Sensor ID '-' to disable: -999    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI3         
+Mode	Pulse       
+ID	-           
+Format	U-4         
+Scale	1           
+Offset	0           
+Sens	1           
+Display	            
+Value	0           
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: a
+
+		Sensor ID '-' to disable: --
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI3         
+Mode	Pulse       
+ID	-           
+Format	U-4         
+Scale	1           
+Offset	0           
+Sens	1           
+Display	            
+Value	0           
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: a
+
+		Sensor ID '-' to disable: -9999
+
+			Enter a value between 0 and 8191 or '-' to disable: -
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI3         
+Mode	Pulse       
+ID	-           
+Format	U-4         
+Scale	1           
+Offset	0           
+Sens	1           
+Display	            
+Value	0           
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: a
+
+		Sensor ID '-' to disable: -
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI3         
+Mode	Pulse       
+ID	-           
+Format	U-4         
+Scale	1           
+Offset	0           
+Sens	1           
+Display	            
+Value	0           
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: a
+
+		Sensor ID '-' to disable: -8888
+
+			Enter a value between 0 and 8191 or '-' to disable: -
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI3         
+Mode	Pulse       
+ID	-           
+Format	U-4         
+Scale	1           
+Offset	0           
+Sens	1           
+Display	            
+Value	0           
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           2500        0           Off         0.000 mA    0.000 mA    
+ID	-           -           -           -           -           -           
+Value	0           2500        0           0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	1008        1009        1010        1011        1012        
+Value	14.2 V      23.9 V      0dBm        22 C        All OK      
+
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: c
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI3         
+Mode	Pulse       
+ID	-           
+Format	U-4         
+Scale	1           
+Offset	0           
+Sens	1           
+Display	            
+Value	0           
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: a
+
+		Sensor ID '-' to disable: -8888
+
+			Enter a value between 0 and 8191 or '-' to disable: -
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI3         
+Mode	Pulse       
+ID	-           
+Format	U-4         
+	1           
+0           
+Sens	1           
+Display	            
+Value	0           
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: c
+
+		Scaling (per count): 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI3         
+Mode	Pulse       
+ID	-           
+Format	U-4         
+Scale	1           
+Offset	0           
+Sens	1           
+Display	            
+Value	0           
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: c
+
+		Scaling (per count): 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI3         
+Mode	Pulse       
+ID	-           
+Format	U-4         
+Scale	1           
+Offset	0           
+Sens	1           
+Display	            
+Value	0           
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.11.21 14:08:56 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 12:29:31 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: =~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.11.21 14:18:09 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 12:38:20 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: h
+		This will replace the current configuration. Continue? (y/n):y
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 12:38:52 UTC; Station Address: 1
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 12:38:55 UTC; Station Address: 1
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: i
+		Unsaved Changes Selection:
+		a)*	Save Changes
+		b) 	Keep but don't save
+		c) 	Discard Changes
+		d)	Cancel
+		Option:
+
+		Configuration Saved!!
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 12:39:27 UTC; Station Address: 1
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: a
+		Station Address: 1 a
+
+		Invalid Format!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: b
+		Update Time: (min) 180
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: a
+		Station Address: 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: b
+		Update Time: (min) 180
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: c
+		Paralysis Time: (sec) 10
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: d
+		Logging Format Selection:
+		a)*	ALERT2 ASCII
+		b) 	CSV on Change
+		c) 	CSV on Sample
+		d)	Cancel
+			Select: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: e
+		Battery Type Selection:
+		a)*	Built-in LiFePO4
+		b) 	External Lead-Acid
+		c)	Cancel
+			Select: b
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: e
+		Battery Type Selection:
+		a) 	Built-in LiFePO4
+		b)*	External Lead-Acid
+		c)	Cancel
+			Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: e
+		Battery Type Selection:
+		a) 	Built-in LiFePO4
+		b)*	External Lead-Acid
+		c)	Cancel
+			Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: f
+	ALERT2 I/O Quick Setup
+		Units Selection:
+		a)*	Metric
+		b) 	US Customary
+		c)	Cancel
+			Select: a
+		Configuring Rain ID 0
+		Configuring River Analog ID 7
+			Transducer Full Range (mm) 5000
+			Analog Sample Time: (min) 15
+			Analog Warmup Time: (sec) 10
+			River Sensitivity (mm) 10
+			River Offset (mm) 0
+		Configuring Battery Voltage ID 8
+	Configuration Change Complete
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: f
+	ALERT2 I/O Quick Setup
+		Units Selection:
+		a)*	Metric
+		b) 	US Customary
+		c)	Cancel
+			Select: a
+		Configuring Rain ID 0
+		Configuring River Analog ID 7
+			Transducer Full Range (mm) 5000
+			Analog Sample Time: (min) 15
+			Analog Warmup Time: (sec) 10
+			River Sensitivity (mm) 10
+			River Offset (mm) 0
+		Configuring Battery Voltage ID 8
+	Configuration Change Complete
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: g
+	ALERT(version 1) I/O Quick Setup
+		Setting Up Radio for ALERT v1
+		Units Selection:
+		a)*	Metric
+		b) 	US Customary
+		c)	Cancel
+			Select: a
+
+	Rain Sensor ID: 2205    8888
+
+			Enter a value between 0 and 8191 or '-' to disable: 2205    8000
+		Configuring Rain ID 8000. Increment 1 mm
+	River Sensor ID ('-' to disable): 2206    8001
+		River Level Input Selection:
+		a)*	Analogue
+		b) 	Incremental
+		c) 	Quadrature
+		d)	Cancel
+			Select: 
+			Transducer Full Range  (mm) 5000
+			Analog Sample Time: (min) 1
+			Analog Warmup Time: (sec) 5
+			River Increment  (mm) 10
+			River Offset  (mm) 0
+		Configuring River Analog: ID 8001. Increment 10 mm
+	Battery Sensor ID: 2207    9002     
+		Configuring Battery: ID 2207. Increment 0.1  V
+
+	Configuration Change Complete
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 12:46:09 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: b
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967086  11          Off         -0.001 mA   0.000 mA    
+ID	-           -           8000        -           8001        -           
+Value	0           0           11mm        0           0mm         -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	2207        -           -           -           -           
+Value	13.1 V      0 V         0dBm        0 C         All OK      
+
+	Config NOT Saved
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+	n)	Analog Sampling
+
+		Select: k
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Status      
+ID	-           
+Format	#-#         
+Value	All OK      
+
+Status Sensor Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+
+		Select: a
+
+		Sensor ID '-' to disable : -8004
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Status      
+ID	8004        
+Format	#-#         
+Value	All OK      
+
+Status Sensor Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+
+		Select: b
+		Status Sensor Selection:
+		a) 	ALERT2 Default
+		b) 	ALERT2 Type & Length
+		c)	Cancel
+			Sensor Type: b
+		Report Data Format Selection:
+		a) 	Unsigned Integer
+		b) 	Signed Integer
+		c) 	Floating Point
+		d)	Cancel
+			Select: b
+		Report Data Length Selection:
+		a) 	1-Byte 
+		b) 	2-Byte 
+		c) 	3-Byte 
+		d) 	4-Byte 
+		e)	Cancel
+			Select: a
+	Report Type: 1-Byte Signed Integer
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Status      
+ID	8004        
+Format	S-1         
+Value	All OK      
+
+Status Sensor Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967086  11          Off         -0.001 mA   0.000 mA    
+ID	-           -           8000        -           8001        -           
+Value	0           0           11mm        0           0mm         -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	2207        -           -           -           8004        
+Value	13.1 V      0 V         0dBm        0 C         All OK      
+
+	Config NOT Saved
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+	n)	Analog Sampling
+
+		Select: l
+		Input mode Din1/Din2 Selection:
+		a) 	DI1 Pulse, DI2 On-Off
+		b) 	Both On-Off
+		c)*	Encoder DI1 Incr, DI2 Quad
+		d) 	Both Pulse
+		e)	Cancel
+			Select: e
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967086  11          Off         -0.001 mA   0.000 mA    
+ID	-           -           8000        -           8001        -           
+Value	0           0           11mm        0           0mm         -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	2207        -           -           -           8004        
+Value	13.1 V      0 V         0dBm        0 C         All OK      
+
+	Config NOT Saved
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+	n)	Analog Sampling
+
+		Select: m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+
+		Select: f
+		SDI Sampling Mode Selection:
+		a) 	Controller
+		b) 	Listener
+		c)*	Disabled
+		d)	Cancel
+			Mode:a
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+
+		Select: e
+		Default SDI Measurement CMD Selection:
+		a)*	Start Measurement (M!)
+		b) 	Start Measurement and Req CRC (MC!)
+		c) 	Continuous Measurements (R!)
+		d) 	Continuous Measurements Req CRC (RC!)
+		e) 	Concurrent Measurement (C!)
+		f) 	Concurrent Measurement and Req CRC (CC!)
+		g)	Cancel
+			Mode:
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+
+		Select: d
+		SDI Sample Time: (min) 30
+		SDI Warmup Time: (sec) 20
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+
+		Select: f
+		SDI Sampling Mode Selection:
+		a)*	Controller
+		b) 	Listener
+		c) 	Disabled
+		d)	Cancel
+			Mode:b
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+
+		Select: d
+		SDI Sample Time: (min) 30  1 1 5
+		SDI Warmup Time: (sec) 20  10
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+
+		Select: f
+		SDI Sampling Mode Selection:
+		a) 	Controller
+		b)*	Listener
+		c) 	Disabled
+		d)	Cancel
+			Mode:b
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967086  11          Off         -0.001 mA   0.000 mA    
+ID	-           -           8000        -           8001        -           
+Value	0           0           11mm        0           0mm         -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	2207        -           -           -           8004        
+Value	13.1 V      0 V         0dBm        0 C         All OK      
+
+	Config NOT Saved
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+	n)	Analog Sampling
+
+		Select: m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+
+		Select: b
+		Please connect the sensor to the data bus and power supply. Are you Ready to proceed?? (y/n):y
+
+		Enter the Address (0-9): 0
+
+		Sensor Not Added
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967086  11          Off         -0.001 mA   0.000 mA    
+ID	-           -           8000        -           8001        -           
+Value	0           0           11mm        0           0mm         -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	2207        -           -           -           8004        
+Value	13.1 V      0 V         0dBm        0 C         All OK      
+
+	Config NOT Saved
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+	n)	Analog Sampling
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:08:58 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+	Timed out - Exiting
+		Discarding Unsaved Config Changes...
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:18:49 UTC; Station Address: 1
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:19:09 UTC; Station Address: 1
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => RS232 Serial Menu
+
+		Select: a
+		Communication Mode Selection:
+		a) 	4G Modem Reporting
+		b) 	RS232 Reporting
+		c)*	RS232 Serial Menu
+		d) 	Integrated Radio Reporting
+		e) 	Satellite Modem
+		f)	Cancel
+			Selection:f
+Communication Menu:
+
+	a)	Communication Mode => RS232 Serial Menu
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:19:32 UTC; Station Address: 1
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: b
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967086  11          Off         -0.001 mA   0.000 mA    
+ID	-           -           -           -           -           -           
+Value	0           4.295e+09   11          0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	8           9           10          11          12          
+Value	13.1 V      0 V         0dBm        20 C        All OK      
+
+	Config NOT Saved
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+
+		Select: a
+		Warming up the Sensor (any key to skip) ....................
+
+		Getting SDI Params structure (address, time, variables,)....
+
+		Sending M! ...
+
+		Response return (atttn): 00014
+
+
+		Reading and mapping the sensor values....
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Addr: 0
+
+Model: 014CampbellCR300 011Std.11.02
+
+
+ 	Chan 0      Chan 1      Chan 2      Chan 3      
+ID	-           -           -           -           
+Format	F-4         F-4         F-4         F-4         
+Scale	0           0           0           0           
+Offset	0           0           0           0           
+Sens	0           0           0           0           
+Display	x0.00       x0.00       x0.00       x0.00       
+Value	0           4.295e+09   11          0           
+
+SDI SENSOR 014CampbellCR300 011Std.11.0 Menu:
+
+	a)	Channel 0
+	b)	Channel 1
+	c)	Channel 2
+	d)	Channel 3
+
+		Select: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 0      
+ID	-           
+Format	F-4         
+Scale	0           
+Offset	0           
+Sens	0           
+Display	x0.00       
+Value	0           
+
+Channel 1 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: f
+
+		Report Sensitivity :0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 0      
+ID	-           
+Format	F-4         
+Scale	0           
+Offset	0           
+Sens	0           
+Display	x0.00       
+Value	0           
+
+Channel 1 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+
+ 	Chan 0      Chan 1      Chan 2      Chan 3      
+ID	-           -           -           -           
+Format	F-4         F-4         F-4         F-4         
+Scale	0           0           0           0           
+Offset	0           0           0           0           
+Sens	0           0           0           0           
+Display	x0.00       x0.00       x0.00       x0.00       
+Value	0           4.295e+09   11          0           
+
+SDI SENSOR 014CampbellCR300 011Std.11.0 Menu:
+
+	a)	Channel 0
+	b)	Channel 1
+	c)	Channel 2
+	d)	Channel 3
+
+		Select: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 0      
+ID	-           
+Format	F-4         
+Scale	0           
+Offset	0           
+Sens	0           
+Display	x0.00       
+Value	0           
+
+Channel 1 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: a
+
+		Sensor ID: -8005
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 0      
+ID	8005        
+Format	F-4         
+Scale	0           
+Offset	0           
+Sens	0           
+Display	x0.00       
+Value	0           
+
+Channel 1 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: b
+	Report Type: 4-Byte Floating Point
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 0      
+ID	8005        
+Format	F-4         
+Scale	0           
+Offset	0           
+Sens	0           
+Display	x0.00       
+Value	0           
+
+Channel 1 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: b
+	Report Type: 4-Byte Floating Point
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 0      
+ID	8005        
+Format	F-4         
+Scale	0           
+Offset	0           
+Sens	0           
+Display	x0.00       
+Value	0           
+
+Channel 1 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: c
+
+		Zero / Offset: 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 0      
+ID	8005        
+Format	F-4         
+Scale	0           
+Offset	0           
+Sens	0           
+Display	x0.00       
+Value	0           
+
+Channel 1 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: d
+
+		Scaling: 0 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 0      
+ID	8005        
+Format	F-4         
+Scale	1           
+Offset	0           
+Sens	0           
+Display	x0.00       
+Value	0           
+
+Channel 1 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: e
+
+		Display Units : arbitrar y 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 0      
+ID	8005        
+Format	F-4         
+Scale	1           
+Offset	0arbitra    
+Sens	0arbitra    
+Display	0.00arbitra 
+Value	0arbitra    
+
+Channel 1 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: f
+
+		Report Sensitivity :0 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 0      
+ID	8005        
+Format	F-4         
+Scale	1           
+Offset	0arbitra    
+Sens	1arbitra    
+Display	0.00arbitra 
+Value	0arbitra    
+
+Channel 1 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Addr: 0
+
+Model: 014CampbellCR300 011Std.11.02
+
+
+ 	Chan 0      Chan 1      Chan 2      Chan 3      
+ID	8005        -           -           -           
+Format	F-4         F-4         F-4         F-4         
+Scale	1           0           0           0           
+Offset	0arbitra    0           0           0           
+Sens	1arbitra    0           0           0           
+Display	0.00arbitra x0.00       x0.00       x0.00       
+Value	0arbitra    4.295e+09   11          0           
+
+SDI SENSOR 014CampbellCR300 011Std.11.0 Menu:
+
+	a)	Channel 0
+	b)	Channel 1
+	c)	Channel 2
+	d)	Channel 3
+
+		Select: b
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 1      
+ID	-           
+Format	F-4         
+Scale	0           
+Offset	0           
+Sens	0           
+Display	x0.00       
+Value	4.295e+09   
+
+Channel 2 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: a
+
+		Sensor ID: -8006
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 1      
+ID	8006        
+Format	F-4         
+Scale	0           
+Offset	0           
+Sens	0           
+Display	x0.00       
+Value	4.295e+09   
+
+Channel 2 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: d
+
+		Scaling: 0 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 1      
+ID	8006        
+Format	F-4         
+Scale	1           
+Offset	0           
+Sens	0           
+Display	x0.00       
+Value	4.295e+09   
+
+Channel 2 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: e
+
+		Display Units : mv
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 1      
+ID	8006        
+Format	F-4         
+Scale	1           
+Offset	0mv         
+Sens	0mv         
+Display	0.00mv      
+Value	4.295e+09mv 
+
+Channel 2 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Addr: 0
+
+Model: 014CampbellCR300 011Std.11.02
+
+
+ 	Chan 0      Chan 1      Chan 2      Chan 3      
+ID	8005        8006        -           -           
+Format	F-4         F-4         F-4         F-4         
+Scale	1           1           0           0           
+Offset	0arbitra    0mv         0           0           
+Sens	1arbitra    0mv         0           0           
+Display	0.00arbitra 0.00mv      x0.00       x0.00       
+Value	0arbitra    4.295e+09mv 11          0           
+
+SDI SENSOR 014CampbellCR300 011Std.11.0 Menu:
+
+	a)	Channel 0
+	b)	Channel 1
+	c)	Channel 2
+	d)	Channel 3
+
+		Select: 
+
+		Sensor Added Successfully
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+	g)	Setup Sensor 0 014CampbellCR300 011Std.11.02
+
+		Select: d
+		SDI Sample Time: (min) 30  1
+		SDI Warmup Time: (sec) 20 
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+	g)	Setup Sensor 0 014CampbellCR300 011Std.11.02
+
+		Select: e
+		Default SDI Measurement CMD Selection:
+		a)*	Start Measurement (M!)
+		b) 	Start Measurement and Req CRC (MC!)
+		c) 	Continuous Measurements (R!)
+		d) 	Continuous Measurements Req CRC (RC!)
+		e) 	Concurrent Measurement (C!)
+		f) 	Concurrent Measurement and Req CRC (CC!)
+		g)	Cancel
+			Mode:a
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+	g)	Setup Sensor 0 014CampbellCR300 011Std.11.02
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967086  11          Off         -0.001 mA   0.000 mA    
+ID	-           -           -           -           -           -           
+Value	0           4.295e+09   11          0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	8           9           10          11          12          
+Value	13.1 V      0 V         0dBm        20 C        All OK      
+
+	Config NOT Saved
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:28:28 UTC; Station Address: 1
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: RS232 Serial Menu
+ALERT Protocol Mode: ALERT2 ASCII Protocol
+	Baud	Bits	Parity	Stop
+	9600	8	N	1
+Unit Type: Field Station	Station Address: 1
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII
+
+Internal Status:
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	8           9           10          11          12          
+Format	U-1         U-1         S-1         S-2         U-2         
+Value	13.1 V      0 V         0dBm        20 C        All OK      
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:28:44 UTC; Station Address: 1
+	
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: h
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967086  11          
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:28:57 UTC; Station Address: 1
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: b
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967086  11          Off         -0.001 mA   0.000 mA    
+ID	-           -           -           -           -           -           
+Value	0           4.295e+09   11          0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	8           9           10          11          12          
+Value	13.1 V      0 V         0dBm        20 C        All OK      
+
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         
+Mode	Incr        
+ID	-           
+Format	U-4         
+Scale	1           
+Offset	0           
+Sens	1           
+Display	            
+Value	0           
+
+Digital 1 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967086  11          Off         -0.001 mA   0.000 mA    
+ID	-           -           -           -           -           -           
+Value	0           4.295e+09   11          0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	8           9           10          11          12          
+Value	13.1 V      0 V         0dBm        20 C        All OK      
+
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:29:21 UTC; Station Address: 1
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: g
+	ALERT(version 1) I/O Quick Setup
+		Setting Up Radio for ALERT v1
+		Units Selection:
+		a)*	Metric
+		b) 	US Customary
+		c)	Cancel
+			Select: 
+
+	Rain Sensor ID: 2205    8000
+		Configuring Rain ID 8000. Increment 1 mm
+	River Sensor ID ('-' to disable): 2206    8001
+		River Level Input Selection:
+		a)*	Analogue
+		b) 	Incremental
+		c) 	Quadrature
+		d)	Cancel
+			Select: a
+			Transducer Full Range  (mm) 5000
+			Analog Sample Time: (min) 1
+			Analog Warmup Time: (sec) 5
+			River Increment  (mm) 10
+			River Offset  (mm) 0
+		Configuring River Analog: ID 8001. Increment 10 mm
+	Battery Sensor ID: 2207    8002
+		Configuring Battery: ID 8002. Increment 0.1  V
+
+	Configuration Change Complete
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:30:30 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 2205
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Analog Sample Time: 1min	Analog Warmup Time: 5sec
+Data Log Format: ALERT2 ASCII
+
+External Inputs:
+ 	DI3         AI1         
+Mode	Pulse       4-20mA      
+Raw	11          -0.001 mA   
+ID	8000        8001        
+Format	U-2         U-2         
+Scale	1           500         
+Offset	0mm         0(0mm)      
+Sens	1mm         1(10mm)     
+Value	11mm        0mm         
+
+Internal Status:
+ 	Battery     
+ID	8002        
+Format	U-2         
+Value	13.1 V      
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:30:52 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: b
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967086  11          Off         -0.001 mA   0.000 mA    
+ID	-           -           8000        -           8001        -           
+Value	0           0           11mm        0           0mm         -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	8002        -           -           -           -           
+Value	13.1 V      0 V         0dBm        0 C         All OK      
+
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+	n)	Analog Sampling
+
+		Select: m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+
+		Select: f
+		SDI Sampling Mode Selection:
+		a) 	Controller
+		b) 	Listener
+		c)*	Disabled
+		d)	Cancel
+			Mode:a
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+
+		Select: a
+		Warming up the Sensor (any key to skip) ..
+
+		Getting SDI Params structure (address, time, variables,)....
+
+		Sending M! ...
+
+		Response return (atttn): 00014
+
+
+		Reading and mapping the sensor values....
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Addr: 0
+
+Model: 014CampbellCR300 011Std.11.02
+
+
+ 	Chan 0      Chan 1      Chan 2      Chan 3      
+ID	-           -           -           -           
+Format	F-4         F-4         F-4         F-4         
+Scale	1           1           0           0           
+Offset	0arbitra    0mv         0           0           
+Sens	1arbitra    0mv         0           0           
+Display	0.00arbitra 0.00mv      x0.00       x0.00       
+Value	0arbitra    0mv         11          0           
+
+SDI SENSOR 014CampbellCR300 011Std.11.0 Menu:
+
+	a)	Channel 0
+	b)	Channel 1
+	c)	Channel 2
+	d)	Channel 3
+
+		Select: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 3      
+ID	-           
+Format	F-4         
+Scale	0           
+Offset	0           
+Sens	0           
+Display	x0.00       
+Value	0           
+
+Channel 4 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: a
+
+		Sensor ID: -8009
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 3      
+ID	8009        
+Format	F-4         
+Scale	0           
+Offset	0           
+Sens	0           
+Display	x0.00       
+Value	0           
+
+Channel 4 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Addr: 0
+
+Model: 014CampbellCR300 011Std.11.02
+
+
+ 	Chan 0      Chan 1      Chan 2      Chan 3      
+ID	-           -           -           8009        
+Format	F-4         F-4         F-4         F-4         
+Scale	1           1           0           0           
+Offset	0arbitra    0mv         0           0           
+Sens	1arbitra    0mv         0           0           
+Display	0.00arbitra 0.00mv      x0.00       x0.00       
+Value	0arbitra    0mv         11          0           
+
+SDI SENSOR 014CampbellCR300 011Std.11.0 Menu:
+
+	a)	Channel 0
+	b)	Channel 1
+	c)	Channel 2
+	d)	Channel 3
+
+		Select: c
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 2      
+ID	-           
+Format	F-4         
+Scale	0           
+Offset	0           
+Sens	0           
+Display	x0.00       
+Value	11          
+
+Channel 3 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: a
+
+		Sensor ID: -8008
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	Chan 2      
+ID	8008        
+Format	F-4         
+Scale	0           
+Offset	0           
+Sens	0           
+Display	x0.00       
+Value	11          
+
+Channel 3 Menu:
+
+	a)	Sensor ID
+	b)	Report Format
+	c)	Zero / Offset
+	d)	Scaling
+	e)	Display Units
+	f)	Report Sensitivity
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Addr: 0
+
+Model: 014CampbellCR300 011Std.11.02
+
+
+ 	Chan 0      Chan 1      Chan 2      Chan 3      
+ID	-           -           8008        8009        
+Format	F-4         F-4         F-4         F-4         
+Scale	1           1           0           0           
+Offset	0arbitra    0mv         0           0           
+Sens	1arbitra    0mv         0           0           
+Display	0.00arbitra 0.00mv      x0.00       x0.00       
+Value	0arbitra    0mv         11          0           
+
+SDI SENSOR 014CampbellCR300 011Std.11.0 Menu:
+
+	a)	Channel 0
+	b)	Channel 1
+	c)	Channel 2
+	d)	Channel 3
+
+		Select: 
+
+		Sensor Added Successfully
+SDI-12 config Menu:
+
+	a)	Scan for Device
+	b)	Manually add Device
+	c)	Send manual command 
+	d)	SDI Sampling Time
+	e)	Default SDI Measurement CMD
+	f)	SDI Sampling Mode
+	g)	Setup Sensor 0 014CampbellCR300 011Std.11.02
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967086  11          Off         -0.001 mA   0.000 mA    
+ID	-           -           8000        -           8001        -           
+Value	0           0           11mm        0           0mm         -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	8002        -           -           -           -           
+Value	13.1 V      0 V         0dBm        0 C         All OK      
+
+	Config NOT Saved
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+	n)	Analog Sampling
+
+		Select: l
+		Input mode Din1/Din2 Selection:
+		a) 	DI1 Pulse, DI2 On-Off
+		b) 	Both On-Off
+		c)*	Encoder DI1 Incr, DI2 Quad
+		d) 	Both Pulse
+		e)	Cancel
+			Select: e
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967086  11          Off         -0.001 mA   0.000 mA    
+ID	-           -           8000        -           8001        -           
+Value	0           0           11mm        0           0mm         -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	8002        -           -           -           -           
+Value	13.1 V      0 V         0dBm        0 C         All OK      
+
+	Config NOT Saved
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+	n)	Analog Sampling
+
+		Select: n
+		Analog Sample Time: (min) 1
+		Analog Warmup Time: (sec) 5
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967086  11          Off         -0.001 mA   0.000 mA    
+ID	-           -           8000        -           8001        -           
+Value	0           0           11mm        0           0mm         -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	8002        -           -           -           -           
+Value	13.1 V      0 V         0dBm        0 C         All OK      
+
+	Config NOT Saved
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+	n)	Analog Sampling
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:33:49 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: h
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967086  11          
+
+ 	AI1         AI2         
+Value	0mm         -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:34:21 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:34:22 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:34:23 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:34:24 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 2205
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Analog Sample Time: 1min	Analog Warmup Time: 5sec
+Data Log Format: ALERT2 ASCII
+
+External Inputs:
+ 	DI3         AI1         
+Mode	Pulse       4-20mA      
+Raw	11          -0.001 mA   
+ID	8000        8001        
+Format	U-2         U-2         
+Scale	1           500         
+Offset	0mm         0(0mm)      
+Sens	1mm         1(10mm)     
+Value	11mm        0mm         
+
+Internal Status:
+ 	Battery     
+ID	8002        
+Format	U-2         
+Value	13.1 V      
+
+SDI-12 Operating Mode: Controller
+SDI Sample Time: 30min	SDI Warmup Time: 20sec
+SDI Measurement CMD: Start Measurement (M!)
+
+SDI Sensors Status
+SDI Sensor 014CampbellCR300 011Std.11.02
+ 	Chan 2      Chan 3      
+ID	8008        8009        
+Format	F-4         F-4         
+Scale	0           0           
+Offset	0           0           
+Sens	0           0           
+Value	0           0           
+
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	22-Feb-2024 13:34:52 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: i
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: 

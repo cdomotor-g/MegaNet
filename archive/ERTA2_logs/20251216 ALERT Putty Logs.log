@@ -1,0 +1,4582 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.12.16 11:15:05 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 08:53:53 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: g
+	ALERT(version 1) I/O Quick Setup
+		Setting Up Radio for ALERT v1
+		Units Selection:
+		a)*	Metric
+		b) 	US Customary
+		c)	Cancel
+			Select: 
+
+	Rain Sensor ID: 2205    5306
+		Configuring Rain ID 5306. Increment 1 mm
+	River Sensor ID ('-' to disable): 2206    -
+	Battery Sensor ID: 2207    5307
+		Configuring Battery: ID 5307. Increment 0.1  V
+
+	Configuration Change Complete
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 08:55:17 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 2205
+Tx Frequency MHz: 151.500000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	11          
+ID	5306        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	11mm        
+
+Internal Status:
+ 	Battery     
+ID	5307        
+Format	U-2         
+Value	13.1 V      
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 08:55:37 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Field Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.950000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 08:55:48 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Field Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.950000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+
+		Select: b
+		Unit Type Selection:
+		a)*	Field Station
+		b) 	Base Station Rcvr
+		c) 	Repeater Station
+		d)	Cancel
+			Selection:c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.950000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (sec) => 1
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+
+		Select: d
+		Rx Frequency MHz 151.950000000 00 0    5
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (sec) => 1
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+
+		Select: m
+Address List Entries Menu:
+
+	a)	Add Entry
+	b)	2277  to  2278
+
+		Selection: a
+		Enter low address:0
+		Enter high address:0 9000
+Address List Entries Menu:
+
+	a)	Add Entry
+	b)	0     to  9000
+
+		Selection: 
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (sec) => 1
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 08:58:29 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Repeater Station	Station Address: 2205
+Tx Frequency MHz: 151.500000	Rx Frequency MHz: 151.500000
+Tx Power: 5W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  
+Pass            Disabled        Disabled        Disabled        
+0     to  9000                                                  
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	11          
+ID	5306        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	11mm        
+
+Internal Status:
+ 	Battery     
+ID	5307        
+Format	U-2         
+Value	13.1 V      
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 08:58:41 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Repeater Station	Station Address: 2205
+Tx Frequency MHz: 151.500000	Rx Frequency MHz: 151.500000
+Tx Power: 5W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  
+Pass            Disabled        Disabled        Disabled        
+0     to  9000                                                  
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	11          
+ID	5306        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	11mm        
+
+Internal Status:
+ 	Battery     
+ID	5307        
+Format	U-2         
+Value	13.1 V      
+
+SDI-12 Operating Mode: Disabled
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 08:59:29 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: i
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: =~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.12.16 11:25:03 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:03:44 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (sec) => 1
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:06:06 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:06:14 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Repeater Station	Station Address: 2205
+Tx Frequency MHz: 151.500000	Rx Frequency MHz: 151.500000
+Tx Power: 5W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  
+Pass            Disabled        Disabled        Disabled        
+0     to  9000                                                  
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	12          
+ID	5306        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	12mm        
+
+Internal Status:
+ 	Battery     
+ID	5307        
+Format	U-2         
+Value	13.1 V      
+
+SDI-12 Operating Mode: Disabled
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:10:11 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: c
+		Paralysis Time: (sec) 10  0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:10:29 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Repeater Station	Station Address: 2205
+Tx Frequency MHz: 151.500000	Rx Frequency MHz: 151.500000
+Tx Power: 5W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 0sec
+Data Log Format: ALERT2 ASCII
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  
+Pass            Disabled        Disabled        Disabled        
+0     to  9000                                                  
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	12          
+ID	5306        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	12mm        
+
+Internal Status:
+ 	Battery     
+ID	5307        
+Format	U-2         
+Value	13.1 V      
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:10:47 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:11:06 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:11:07 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:11:21 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: g
+	ALERT(version 1) I/O Quick Setup
+		Setting Up Radio for ALERT v1
+		Units Selection:
+		a)*	Metric
+		b) 	US Customary
+		c)	Cancel
+			Select: 
+	Invalid Selection - Try Again		
+			Select: 
+	Invalid Selection - Try Again		
+			Select: 
+	Cancelled
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:11:41 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: b
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967086  12          Off         -0.001 mA   0.000 mA    
+ID	-           -           5306        -           -           -           
+Value	0           0           12mm        0           -25.0063%   -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	5307        -           -           -           -           
+Value	13.1 V      0 V         0dBm        0 C         All OK      
+
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: 3
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI3         
+Mode	Pulse       
+ID	5306        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Display	mm          
+Value	12mm        
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: a
+
+		Sensor ID '-' to disable: 5306    1000     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI3         
+Mode	Pulse       
+ID	5306        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Display	mm          
+Value	12mm        
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: a
+
+		Sensor ID '-' to disable: 5306    -
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	DI3         
+Mode	Pulse       
+ID	-           
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Display	mm          
+Value	12mm        
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967086  12          Off         -0.001 mA   0.000 mA    
+ID	-           -           -           -           -           -           
+Value	0           0           12mm        0           -25.0063%   -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	5307        -           -           -           -           
+Value	13.1 V      0 V         0dBm        0 C         All OK      
+
+	Config NOT Saved
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:12:33 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Repeater Station	Station Address: 2205
+Tx Frequency MHz: 151.500000	Rx Frequency MHz: 151.500000
+Tx Power: 5W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 0sec
+Data Log Format: ALERT2 ASCII
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  
+Pass            Disabled        Disabled        Disabled        
+0     to  9000                                                  
+
+Internal Status:
+ 	Battery     
+ID	5307        
+Format	U-2         
+Value	13.1 V      
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:12:39 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:12:48 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (sec) => 1
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+
+		Select: m
+Address List Entries Menu:
+
+	a)	Add Entry
+	b)	0     to  9000
+
+		Selection: b
+		Delete Entry b) 0     to  9000? (y/n):y
+Address List Entries Menu:
+
+	a)	Add Entry
+
+		Selection: a
+		Enter low address:0 5305
+		Enter high address:5305 8
+Address List Entries Menu:
+
+	a)	Add Entry
+	b)	5305  to  5308
+
+		Selection: 
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (sec) => 1
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:14:23 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Repeater Station	Station Address: 2205
+Tx Frequency MHz: 151.500000	Rx Frequency MHz: 151.500000
+Tx Power: 5W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 0sec
+Data Log Format: ALERT2 ASCII
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  
+Pass            Disabled        Disabled        Disabled        
+5305  to  5308                                                  
+
+Internal Status:
+ 	Battery     
+ID	5307        
+Format	U-2         
+Value	13.1 V      
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:14:31 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Repeater Station	Station Address: 2205
+Tx Frequency MHz: 151.500000	Rx Frequency MHz: 151.500000
+Tx Power: 5W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 0sec
+Data Log Format: ALERT2 ASCII
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  
+Pass            Disabled        Disabled        Disabled        
+5305  to  5308                                                  
+
+Internal Status:
+ 	Battery     
+ID	5307        
+Format	U-2         
+Value	13.1 V      
+
+SDI-12 Operating Mode: Disabled
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:15:46 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (sec) => 1
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+
+		Select: i
+		Repeater Delay (sec) 1 0
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (sec) => 0
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:16:07 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Repeater Station	Station Address: 2205
+Tx Frequency MHz: 151.500000	Rx Frequency MHz: 151.500000
+Tx Power: 5W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 0sec
+Data Log Format: ALERT2 ASCII
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  
+Pass            Disabled        Disabled        Disabled        
+5305  to  5308                                                  
+
+Internal Status:
+ 	Battery     
+ID	5307        
+Format	U-2         
+Value	13.1 V      
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:16:12 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: =~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.12.16 12:11:42 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:*****               
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:50:35 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	RSSI: -54dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (sec) => 0
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:50:59 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	RSSI: -54dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Repeater Station	Station Address: 2205
+Tx Frequency MHz: 151.500000	Rx Frequency MHz: 151.500000
+Tx Power: 5W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 0sec
+Data Log Format: ALERT2 ASCII
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  
+Pass            Disabled        Disabled        Disabled        
+5305  to  5308                                                  
+
+Internal Status:
+ 	Battery     
+ID	5307        
+Format	U-2         
+Value	13.1 V      
+
+SDI-12 Operating Mode: Disabled
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:51:10 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	RSSI: -54dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:51:11 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	RSSI: -54dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:51:26 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	RSSI: -54dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: =~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2025.12.16 12:17:05 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 09:55:44 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	RSSI: -1dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Diagnostic Menu:
+
+	a)	Show I/O Values
+	b)	Show RSSI List
+	c)	SDI-12 value & Test
+	d)	Show Internal I/O
+	e)	Force Update Message
+	f)	Show Firmware Version
+	g)	Show Hardware Version
+	h)	Update Device Firmware
+	i)	Calibrate Analog Input 1
+	j)	Calibrate Analog Input 2
+	k)	Set Analog Default Calibration
+	l)	Upload Log to USB
+	m)	Erase Log Memory
+	n)	Factory Default Erase All
+	o)	Enable Debug Console Output
+	p)	Enable Rx Indication DO4
+	q)	Enable Maintenance Mode
+	r)	Communications Supply Force On
+	s)	Radio Tone Reversals
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	14-Mar-2024 10:01:29 UTC; Station Address: 2205
+	Firmware: v1.7	Hardware: Rev4.A
+	RSSI: -1dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 

@@ -1,0 +1,762 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2026.01.06 08:26:58 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	27-Apr-2024 00:34:01 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Field Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Comms Supply Mode => On Demand
+
+		Select: c
+		Tx Frequency MHz 151.5000000000 000 00 0      35
+
+			Invalid value!
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Field Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Comms Supply Mode => On Demand
+
+		Select: c
+		Tx Frequency MHz 151.5000000000 000 00 0     2
+
+			Invalid value!
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Field Station
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Comms Supply Mode => On Demand
+
+		Select: c
+		Tx Frequency MHz 151.5000000000 000 00 0     1.9
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Field Station
+	c)	Tx Frequency MHz => 151.900000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Comms Supply Mode => On Demand
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	27-Apr-2024 00:40:50 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	27-Apr-2024 00:40:55 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.900000	Tx Power: 1W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Analog Sample Time: 1min	Analog Warmup Time: 5sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         AI1         
+Mode	Pulse       4-20mA      
+Raw	23          -0.013 mA   
+ID	1000        1001        
+Format	U-2         U-2         
+Scale	1           500         
+Offset	0mm         0(0mm)      
+Sens	1mm         1(10mm)     
+Value	23mm        0mm         
+
+Internal Status:
+ 	Battery     
+ID	1002        
+Format	U-2         
+Value	12.1 V      
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	27-Apr-2024 00:41:16 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev4.A
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: i
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: 
+	Sending Update...
+625272:Generate ALERT2 frames:
+625274:
+================= GENERAL SENSOR REPORT ====================625276:
+  |==> ID=1000; val=23
+625294:
+  |==> ID=1001; val=0
+625312:
+  |==> ID=1002; val=121
+625331:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F7409B4EA037900E9030000E8031700
+625339:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+901260:Generate ALERT2 frames:
+901262:
+================= GENERAL SENSOR REPORT ====================901264:
+  |==> ID=1000; val=23
+901282:
+  |==> ID=1001; val=0
+901300:
+  |==> ID=1002; val=121
+901319:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740AC8EA037900E9030000E8031700
+901327:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+907098:Generate ALERT2 frames:
+907100:
+================= GENERAL SENSOR REPORT ====================907102:
+  |==> ID=1000; val=23
+907120:
+  |==> ID=1001; val=0
+907138:
+  |==> ID=1002; val=121
+907157:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740ACEEA037900E9030000E8031700
+907165:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+913461:Generate ALERT2 frames:
+913463:
+================= GENERAL SENSOR REPORT ====================913465:
+  |==> ID=1000; val=23
+913483:
+  |==> ID=1001; val=0
+913501:
+  |==> ID=1002; val=121
+913520:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740AD5EA037900E9030000E8031700
+913528:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+920199:Generate ALERT2 frames:
+920201:
+================= GENERAL SENSOR REPORT ====================920203:
+  |==> ID=1000; val=23
+920221:
+  |==> ID=1001; val=0
+920239:
+  |==> ID=1002; val=121
+920258:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740ADBEA037900E9030000E8031700
+920266:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+932277:Generate ALERT2 frames:
+932279:
+================= GENERAL SENSOR REPORT ====================932281:
+  |==> ID=1000; val=23
+932299:
+  |==> ID=1001; val=0
+932317:
+  |==> ID=1002; val=121
+932336:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740AE7EA037900E9030000E8031700
+932344:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+939915:Generate ALERT2 frames:
+939917:
+================= GENERAL SENSOR REPORT ====================939919:
+  |==> ID=1000; val=23
+939937:
+  |==> ID=1001; val=0
+939955:
+  |==> ID=1002; val=121
+939974:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740AEFEA037900E9030000E8031700
+939982:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+1119888:Generate ALERT2 frames:
+1119890:
+================= GENERAL SENSOR REPORT ====================1119892:
+  |==> ID=1000; val=23
+1119910:
+  |==> ID=1001; val=0
+1119928:
+  |==> ID=1002; val=121
+1119947:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740BA3EA037900E9030000E8031700
+1119955:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+1158231:Generate ALERT2 frames:
+1158233:
+================= GENERAL SENSOR REPORT ====================1158235:
+  |==> ID=1000; val=23
+1158253:
+  |==> ID=1001; val=0
+1158271:
+  |==> ID=1002; val=121
+1158290:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740BC9EA037900E9030000E8031700
+1158298:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+1173729:Generate ALERT2 frames:
+1173731:
+================= GENERAL SENSOR REPORT ====================1173733:
+  |==> ID=1000; val=23
+1173751:
+  |==> ID=1001; val=0
+1173769:
+  |==> ID=1002; val=121
+1173788:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740BD9EA037900E9030000E8031700
+1173796:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+1181067:Generate ALERT2 frames:
+1181069:
+================= GENERAL SENSOR REPORT ====================1181071:
+  |==> ID=1000; val=23
+1181089:
+  |==> ID=1001; val=0
+1181131:
+  |==> ID=1002; val=121
+1181150:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740BE0EA037900E9030000E8031700
+1181158:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+1185885:Generate ALERT2 frames:
+1185887:
+================= GENERAL SENSOR REPORT ====================1185889:
+  |==> ID=1000; val=23
+1185907:
+  |==> ID=1001; val=0
+1185925:
+  |==> ID=1002; val=121
+1185944:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740BE5EA037900E9030000E8031700
+1185952:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+1196703:Generate ALERT2 frames:
+1196705:
+================= GENERAL SENSOR REPORT ====================1196707:
+  |==> ID=1000; val=23
+1196725:
+  |==> ID=1001; val=0
+1196743:
+  |==> ID=1002; val=121
+1196762:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740BF0EA037900E9030000E8031700
+1196770:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+1209801:Generate ALERT2 frames:
+1209803:
+================= GENERAL SENSOR REPORT ====================1209805:
+  |==> ID=1000; val=23
+1209823:
+  |==> ID=1001; val=0
+1209841:
+  |==> ID=1002; val=121
+1209860:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740BFDEA037900E9030000E8031700
+1209868:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+1370664:Generate ALERT2 frames:
+1370666:
+================= GENERAL SENSOR REPORT ====================1370668:
+  |==> ID=1000; val=23
+1370686:
+  |==> ID=1001; val=0
+1370704:
+  |==> ID=1002; val=121
+1370723:sent - errts_send_to_radio: ALERT2B: 414C4552543211010F740C9EEA037900E9030000E8031700
+1370731:ALERT2 transmission finished after 0 seconds awake
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: 

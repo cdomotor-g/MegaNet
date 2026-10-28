@@ -1,0 +1,7737 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2026.09.02 10:36:41 =~=~=~=~=~=~=~=~=~=~=~=
+À¥
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 09:36:57 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.525000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	0           
+ID	4077        
+Format	U-4         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	0mm         
+
+Internal Status:
+ 	Battery     
+ID	4078        
+Format	U-2         
+Value	12.5 V      
+
+SDI-12 Operating Mode: Disabled
+
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2026.09.02 10:49:58 =~=~=~=~=~=~=~=~=~=~=~=
+À¥Technician
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 09:49:45 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Field Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Comms Supply Mode => On Demand
+
+		Select: b
+		Unit Type Selection:
+	a)*	
+		b) 	Base Station Rcvr
+		c) 	Repeater Station
+		d)	Cancel
+			Selection:cCommunication
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 5000
+	j)	Address List => List 1
+	k)	Address List Status => Disable
+	l)	Agency ID => ELPRO
+	m)	Secondary Communication => None
+	n)	Comms Supply Mode => On Demand
+
+		Select: i
+		Repeater Delay (mSec) 500010       
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 5000
+	j)	Address List => List 1
+	k)	Address List Status => Disable
+	l)	Agency ID => ELPRO
+	m)	Secondary Communication => None
+	n)	Comms Supply Mode => On Demand
+
+		Select: 1
+		Communication Mode Selection:
+		a) 	4G Modem Reporting
+		b) 	RS232 Reporting
+		c) 	RS232 Serial Menu
+		d)*	Integrated Radio Reporting
+		e) 	Satellite Modem
+		f)	Cancel
+			Selection:
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	Repeater Delay (mSec) => 5000
+	j)	Address List => List 1
+	k)	Address List Status => Disable
+	l)	Agency ID => ELPRO
+	m)	Secondary Communication => None
+	n)	Comms Supply Mode => On Demand
+
+		Select: i
+		Repeater Delay (mSec) 5000     
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 5000
+	j)	Address List => List 1
+	k)	Address List Status => Disable
+	l)	Agency ID => ELPRO
+	m)	Secondary Communication => None
+	n)	Comms Supply Mode => On Demand
+
+		Select: i
+		Repeater Delay (mSec) 500010000
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 35856
+	j)	Address List => List 1
+	k)	Address List Status => Disable
+	l)	Agency ID => ELPRO
+	m)	Secondary Communication => None
+	n)	Comms Supply Mode => On Demand
+
+		Select: i
+		Repeater Delay (mSec) 35856     1000
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 1000
+	j)	Address List => List 1
+	k)	Address List Status => Disable
+	l)	Agency ID => ELPRO
+	m)	Secondary Communication => None
+	n)	Comms Supply Mode => On Demand
+
+		Select: j
+		Address List Selection:
+		a)*	List 1
+	b) 	List 2
+		c) 	List 3
+		d) 	List 4
+		e)	Cancel
+			Selection:a
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 1000
+	j)	Address List => List 1
+	k)	Address List Status => Disable
+	l)	Agency ID => ELPRO
+	m)	Secondary Communication => None
+	n)	Comms Supply Mode => On Demand
+
+		Select: k
+		Address List Status Selection:
+		a)*	Disable
+		b) 	Enable
+		c)	Cancel
+			Selection:b
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 1000
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+	p)	Comms Supply Mode => On Demand
+
+	Select: m
+Address List Entries Menu:
+
+	a)	Add Entry
+
+		Selection:  
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 1000
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+	p)	Comms Supply Mode => On Demand
+
+		Select: o
+		Secondary Communication Selection:
+		a)*	None
+		b) 	4G Modem Reporting
+		c) 	RS232 Reporting
+		d) 	Satellite Modem
+		e)	Cancel
+			Selection:c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 1000
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 ASCII Protocol
+	r)	Comms Supply Mode => On Demand
+
+		Select: mAddress List Entries
+
+	a)	Add Entry
+
+		Selection: a
+		Enter low address:010000
+		Enter high address:100009999
+
+			Enter a value between 0 and 65535: 100006      9999
+		Error: High address must be greater than Low!
+Address List Entries Menu:
+
+	a)	Add Entry
+
+		Selection: a
+		Enter low address:0 1
+		Enter high address:1 9999
+Address List Entries Menu:
+
+	a)	Add Entry
+	b)	1     to  9999
+
+	Selection: 
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 1000
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 ASCII Protocol
+	r)	Comms Supply Mode => On Demand
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 09:54:29 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 1000
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 ASCII Protocol
+	r)	Comms Supply Mode => On Demand
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 09:54:45 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Backhaul Mode : RS232 Reporting - ALERT2 ASCII Protocol
+	Baud	Bits	Parity	Stop
+	9600	8	N	1
+Unit Type: Repeater Station	Station Address: 1000
+Tx Frequency MHz: 151.525000	Rx Frequency MHz: 151.525000
+Tx Power: 5W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+Repeater Pass/Reject Lists: 
+Address List 2  Address List 3  Address List 4  
+Pass            Disabled        Disabled        Disabled        
+1     to  9999                                                  
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	0           
+ID	4077        
+Format	U-4         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	0mm         
+
+Internal Status:
+ 	Battery     
+ID	4078        
+Format	U-2         
+Value	12.8 V      
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 09:54:59 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: i
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 09:55:46 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: a
+		Station Address: 1000
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 09:56:06 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -79dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: b
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967292  0           Off         0.000 mA    0.000 mA    
+ID	-           -           4077        -           -           -           
+Value	0           4.295e+09   0mm         0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	4078        -           -           -           -           
+Value	13.1 V      0 V         -79dBm      21 C        All OK      
+
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 09:56:25 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -79dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: g
+	ALERT(version 1) I/O Quick Setup
+		Setting Up Radio for ALERT v1
+		Units Selection:
+		a)*	Metric
+		b) 	US Customary
+		c)	Cancel
+			Select: 
+
+	Rain Sensor ID: 1000
+		Configuring Rain ID 1000. Increment 1 mm
+	River Sensor ID ('-' to disable): 1001-     -
+	Battery Sensor ID: 10024     4009
+		Configuring Battery: ID 4009. Increment 0.1  V
+
+	Configuration Change Complete
+
+Press any key..g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: g
+	ALERT(version 1) I/O Quick Setup
+		Setting Up Radio for ALERT v1
+		Units Selection:
+		a)*	Metric
+		b) 	US Customary
+		c)	Cancel
+			Select: 
+
+	Rain Sensor ID: 1000    -
+		Configuring Rain ID 8192. Increment 1 mm
+	River Sensor ID ('-' to disable): 1001    -
+	Battery Sensor ID: 1002    -
+		Configuring Battery: ID 8192. Increment 0.1  V
+
+	Configuration Change Complete
+
+Press any key..g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: g
+	ALERT(version 1) I/O Quick Setup
+		Setting Up Radio for ALERT v1
+		Units Selection:
+		a)*	Metric
+		b) 	US Customary
+		c)	Cancel
+			Select: 
+
+	Rain Sensor ID: 1000    4009
+		Configuring Rain ID 4009. Increment 1 mm
+	River Sensor ID ('-' to disable): 1001    -
+	Battery Sensor ID: 1002    -
+		Configuring Battery: ID 8192. Increment 0.1  V
+
+	Configuration Change Complete
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 10:01:43 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -113dBm
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Backhaul Mode : RS232 Reporting - ALERT2 ASCII Protocol
+	Baud	Bits	Parity	Stop
+	9600	8	N	1
+Unit Type: Repeater Station	Station Address: 1000
+Tx Frequency MHz: 151.525000	Rx Frequency MHz: 151.525000
+Tx Power: 5W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  Pass            Disabled        Disabled        Disabled        
+1     to  9999                                                  
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	0           
+ID	4009        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	0mm         
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 10:02:43 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -73dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Backhaul Mode : RS232 Reporting - ALERT2 ASCII Protocol
+	Baud	Bits	Parity	Stop
+	9600	8	N	1
+Unit Type: Repeater Station	Station Address: 1000
+Tx Frequency MHz: 151.525000	Rx Frequency MHz: 151.525000
+Tx Power: 5W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  
+Pass            Disabled        Disabled        Disabled        
+1     to  9999                                                  
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	0           
+ID	4009        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	0mm         
+
+SDI-12 Operating Mode: Disabled
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 10:08:10 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -103dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 1000
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 ASCII Protocol
+	r)	Comms Supply Mode => On Demand
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 10:14:41 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: 3dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: b
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967292  0           Off         0.000 mA    0.000 mA    
+ID	-           -           4009        -           -           -           
+Value	0           0           0mm         0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	-           -           -           -           -           
+Value	13.2 V      0 V         0dBm        0 C         All OK      
+
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: c
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI3         
+Mode	Pulse       
+ID	4009        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Display	mm          
+Value	0mm         
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: a
+
+		Sensor ID '-' to disable: 4009  11
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	DI3         
+Mode	Pulse       
+ID	4011        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Display	mm          
+Value	0mm         
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967292  0           Off         0.000 mA    0.000 mA    
+ID	-           -           4011        -           -           -           
+Value	0           0           0mm         0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	-           -           -           -           -           
+Value	13.2 V      0 V         0dBm        0 C         All OK      
+
+	Config NOT Saved
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 10:15:41 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: 3dBm
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Backhaul Mode : RS232 Reporting - ALERT2 ASCII Protocol
+	Baud	Bits	Parity	Stop
+	9600	8	N	1
+Unit Type: Repeater Station	Station Address: 1000
+Tx Frequency MHz: 151.525000	Rx Frequency MHz: 151.525000
+Tx Power: 5W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  Pass            Disabled        Disabled        Disabled        
+1     to  9999                                                  
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	0           
+ID	4011        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	0mm         
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 10:15:51 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: 3dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 1000
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 ASCII Protocol
+	r)	Comms Supply Mode => On Demand
+
+		Select: b
+		Unit Type Selection:
+		a) 	Field Station
+		b) 	Base Station Rcvr
+		c)*	Repeater Station
+		d)	Cancel
+			Selection:b
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => RS232 Reporting
+	k)	Serial Baud Rate => 9600
+	l)	Communication Protocol => ALERT2 ASCII Protocol
+	m)	Comms Supply Mode => On Demand
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 10:16:20 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -74dBm
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Backhaul Mode : RS232 Reporting - ALERT2 ASCII Protocol
+	Baud	Bits	Parity	Stop
+	9600	8	N	1
+Unit Type: Base Station Rcvr	Station Address: 1000
+Rx Frequency MHz: 151.525000	Receive Format: Binary/IFLOWS
+Agency ID: ELPRO
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	0           
+ID	4011        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	0mm         
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 10:16:25 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -79dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Backhaul Mode : RS232 Reporting - ALERT2 ASCII Protocol
+	Baud	Bits	Parity	Stop
+	9600	8	N	1
+Unit Type: Base Station Rcvr	Station Address: 1000
+Rx Frequency MHz: 151.525000	Receive Format: Binary/IFLOWS
+Agency ID: ELPRO
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	0           
+ID	4011        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	0mm         
+
+SDI-12 Operating Mode: Disabled
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 10:16:39 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -79dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 10:16:41 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -79dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: i
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2026.09.02 13:05:57 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 12:05:41 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -79dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: h
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967292  0           
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: c
+		Enter value for Digital 3 : 0 31
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967292  31          
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 12:06:08 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -79dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: g
+	ALERT(version 1) I/O Quick Setup
+		Setting Up Radio for ALERT v1
+		Units Selection:
+		a)*	Metric
+		b) 	US Customary
+		c)	Cancel
+			Select: 
+
+	Rain Sensor ID: 1000    4009
+		Configuring Rain ID 4009. Increment 1 mm
+	River Sensor ID ('-' to disable): 1001    -
+	Battery Sensor ID: 1002    -
+		Configuring Battery: ID 8192. Increment 0.1  V
+
+	Configuration Change Complete
+
+Press any key..
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 12:06:50 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -85dBm
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Backhaul Mode : RS232 Reporting - ALERT2 ASCII Protocol
+	Baud	Bits	Parity	Stop
+	9600	8	N	1
+Unit Type: Base Station Rcvr	Station Address: 1000
+Rx Frequency MHz: 151.525000	Receive Format: Binary/IFLOWS
+Agency ID: ELPRO
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	31          
+ID	4009        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	31mm        
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 12:07:13 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -85dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+	Sending Update...
+8586937:Generate ALERT2 frames:
+8586939:
+================= GENERAL SENSOR REPORT ====================8586941:
+  |==> ID=4009; val=31
+8586962:ALERT2 transmission finished after 0 seconds awake
+c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => RS232 Reporting
+	k)	Serial Baud Rate => 9600
+	l)	Communication Protocol => ALERT2 ASCII Protocol
+	m)	Comms Supply Mode => On Demand
+
+		Select: b
+		Unit Type Selection:
+		a) 	Field Station
+		b)*	Base Station Rcvr
+		c) 	Repeater Station
+		d)	Cancel
+			Selection:a
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Field Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Comms Supply Mode => On Demand
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 12:08:18 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -85dBm
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 12:08:20 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -85dBm
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.525000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	31          
+ID	4009        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	31mm        
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 12:08:24 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -85dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Field Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Comms Supply Mode => On Demand
+
+		Select: e
+		Tx Power 5W1
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Field Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Comms Supply Mode => On Demand
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 12:08:45 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -85dBm
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.525000	Tx Power: 1W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	31          
+ID	4009        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	31mm        
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 12:08:49 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -85dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 12:08:53 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -85dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+	Sending Update...
+8651576:Generate ALERT2 frames:
+8651578:
+================= GENERAL SENSOR REPORT ====================8651580:
+  |==> ID=4009; val=31
+8651600:sent - errts_send_to_radio: ALERT2B: 414C4552543209010774021BA90F1F00
+8651604:ALERT2 transmission finished after 0 seconds awake
+c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Field Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Comms Supply Mode => On Demand
+
+		Select: e
+		Tx Power 1W5
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Field Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Comms Supply Mode => On Demand
+
+		Select: g
+		GPS Update 1440
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Field Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Comms Supply Mode => On Demand
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 12:09:30 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -85dBm
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Field Station	Station Address: 1000
+Tx Frequency MHz: 151.525000	Tx Power: 5W
+Report Format: ALERT Binary
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	31          
+ID	4009        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	31mm        
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 12:09:38 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -85dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+	Sending Update...
+8694370:Generate ALERT2 frames:
+8694372:
+================= GENERAL SENSOR REPORT ====================8694374:
+  |==> ID=4009; val=31
+8694394:sent - errts_send_to_radio: ALERT2B: 414C45525432090107740246A90F1F00
+8694397:errts_radio_tx_done: 414C45525432090107740246A90F1F00
+8694399:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+8719099:Generate ALERT2 frames:
+8719101:
+================= GENERAL SENSOR REPORT ====================8719103:
+  |==> ID=4009; val=31
+8719123:sent - errts_send_to_radio: ALERT2B: 414C4552543209010774025FA90F1F00
+8719127:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+8726623:Generate ALERT2 frames:
+8726625:
+================= GENERAL SENSOR REPORT ====================8726627:
+  |==> ID=4009; val=31
+8726647:sent - errts_send_to_radio: ALERT2B: 414C45525432090107740266A90F1F00
+8726651:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+8854582:Generate ALERT2 frames:
+8854584:
+================= GENERAL SENSOR REPORT ====================8854586:
+  |==> ID=4009; val=31
+8854606:sent - errts_send_to_radio: ALERT2B: 414C455254320901077402E6A90F1F00
+8854610:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+8864521:Generate ALERT2 frames:
+8864523:
+================= GENERAL SENSOR REPORT ====================8864525:
+  |==> ID=4009; val=31
+8864545:sent - errts_send_to_radio: ALERT2B: 414C455254320901077402F0A90F1F00
+8864549:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+8867845:Generate ALERT2 frames:
+8867847:
+================= GENERAL SENSOR REPORT ====================8867849:
+  |==> ID=4009; val=31
+8867869:sent - errts_send_to_radio: ALERT2B: 414C455254320901077402F4A90F1F00
+8867873:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+8871424:Generate ALERT2 frames:
+8871426:
+================= GENERAL SENSOR REPORT ====================8871428:
+  |==> ID=4009; val=31
+8871448:sent - errts_send_to_radio: ALERT2B: 414C455254320901077402F7A90F1F00
+8871452:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+8875528:Generate ALERT2 frames:
+8875530:
+================= GENERAL SENSOR REPORT ====================8875532:
+  |==> ID=4009; val=31
+8875552:sent - errts_send_to_radio: ALERT2B: 414C455254320901077402FBA90F1F00
+8875556:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+8883547:Generate ALERT2 frames:
+8883549:
+================= GENERAL SENSOR REPORT ====================8883551:
+  |==> ID=4009; val=31
+8883571:sent - errts_send_to_radio: ALERT2B: 414C45525432090107740303A90F1F00
+8883575:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+8887471:Generate ALERT2 frames:
+8887473:
+================= GENERAL SENSOR REPORT ====================8887475:
+  |==> ID=4009; val=31
+8887495:sent - errts_send_to_radio: ALERT2B: 414C45525432090107740307A90F1F00
+8887499:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+8891710:Generate ALERT2 frames:
+8891712:
+================= GENERAL SENSOR REPORT ====================8891714:
+  |==> ID=4009; val=31
+8891734:sent - errts_send_to_radio: ALERT2B: 414C4552543209010774030BA90F1F00
+8891738:ALERT2 transmission finished after 0 seconds awake
+
+	Sending Update...
+8896474:Generate ALERT2 frames:
+8896476:
+================= GENERAL SENSOR REPORT ====================8896478:
+  |==> ID=4009; val=31
+8896498:sent - errts_send_to_radio: ALERT2B: 414C45525432090107740310A90F1F00
+8896502:ALERT2 transmission finished after 0 seconds awake
+
+
+	Timed out - Exiting
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:*********
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 12:35:01 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -85dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Field Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Comms Supply Mode => On Demand
+
+		Select: b
+		Unit Type Selection:
+		a)*	Field Station
+		b) 	Base Station Rcvr
+		c) 	Repeater Station
+		d)	Cancel
+			Selection:c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 1000
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+	p)	Comms Supply Mode => On Demand
+
+		Select: i
+		Repeater Delay (mSec) 1000    400
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 400
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+	p)	Comms Supply Mode => On Demand
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 12:35:57 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -85dBm
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Repeater Station	Station Address: 1000
+Tx Frequency MHz: 151.525000	Rx Frequency MHz: 151.525000
+Tx Power: 5W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  
+Pass            Disabled        Disabled        Disabled        
+1     to  9999                                                  
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	31          
+ID	4009        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	31mm        
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 12:36:03 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -85dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: =~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2026.09.02 14:54:15 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 13:53:58 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -105dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 13:54:15 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -105dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: h
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967292  31          
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: c
+		Enter value for Digital 3 : 31  0
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967292  0           
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 13:55:39 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -105dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: b
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967292  0           Off         0.000 mA    0.000 mA    
+ID	-           -           4009        -           -           -           
+Value	0           0           0mm         0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	-           -           -           -           -           
+Value	12.8 V      0 V         0dBm        0 C         All OK      
+
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: 3
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI3         
+Mode	Pulse       
+ID	4009        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Display	mm          
+Value	0mm         
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: 1
+
+		Sensor ID '-' to disable: 4009  32
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	Config NOT Saved
+
+ 	DI3         
+Mode	Pulse       
+ID	4032        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Display	mm          
+Value	0mm         
+
+Digital 3 Menu:
+
+	a)	Sensor ID '-' to disable
+	b)	Report Format
+	c)	Scaling (per count)
+	d)	Zero / Offset
+	e)	Display Units
+	f)	Display Scaling
+	g)	Report Sensitivity
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 	DI1         DI2         DI3         DI4         AI1         AI2         
+Raw	0           4294967292  0           Off         0.000 mA    0.000 mA    
+ID	-           -           4032        -           -           -           
+Value	0           0           0mm         0           -25%        -25%        
+
+
+ 	Battery     Supply      RSSI        Int Tmp     Status      
+ID	-           -           -           -           -           
+Value	12.8 V      0 V         0dBm        0 C         All OK      
+
+	Config NOT Saved
+
+I/O Setup Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Digital 4
+	e)	Analog 1
+	f)	Analog 2
+	g)	Battery Voltage
+	h)	Supply Voltage
+	i)	RSSI
+	j)	Internal Temp
+	k)	Status Sensor
+	l)	Input mode Din1/Din2
+	m)	SDI-12 Device config
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 13:57:06 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -105dBm
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Base Station Rcvr	Station Address: 1000
+Rx Frequency MHz: 151.525000	Receive Format: Binary/IFLOWS
+Agency ID: ELPRO
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	0           
+ID	4032        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	0mm         
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 13:57:20 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -107dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Unit Config Menu:
+
+	a)	Station Address
+	b)	Update Time
+	c)	Paralysis Time
+	d)	Data Log Format
+	e)	Battery Type
+	f)	ALERT2 I/O Quick Setup
+	g)	ALERT(version 1) I/O Quick Setup
+	h)	Restore Default Configuration
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 13:57:28 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -107dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None
+	k)	Comms Supply Mode => On Demand
+
+		Select: b
+		Unit Type Selection:
+		a) 	Field Station
+		b)*	Base Station Rcvr
+		c) 	Repeater Station
+		d)	Cancel
+			Selection:c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 400
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+	p)	Comms Supply Mode => On Demand
+
+		Select: e
+		Tx Power 5W1
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 400
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+	p)	Comms Supply Mode => On Demand
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 13:58:18 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -107dBm
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Repeater Station	Station Address: 1000
+Tx Frequency MHz: 151.525000	Rx Frequency MHz: 151.525000
+Tx Power: 1W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  
+Pass            Disabled        Disabled        Disabled        
+1     to  9999                                                  
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	0           
+ID	4032        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	0mm         
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 13:58:47 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -107dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+	Sending Update...
+12638211:Generate ALERT2 frames:
+12638213:
+================= GENERAL SENSOR REPORT ====================12638215:
+  |==> ID=4032; val=0
+12638234:sent - errts_send_to_radio: ALERT2B: 414C45525432090107741F21C00F0000
+12638239:ALERT2 transmission finished after 0 seconds awake
+
+
+	Timed out - Exiting
+		Exiting ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: =~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2026.09.02 15:18:39 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:
+
+		Invalid Password:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 14:18:25 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -95dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: h
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967292  0           
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 3
+		Enter value for Digital 3 : 0 3
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967292  3           
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 14:19:14 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -97dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 400
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+	p)	Comms Supply Mode => On Demand
+
+		Select: 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 14:19:23 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -108dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 400
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => None
+	p)	Comms Supply Mode => On Demand
+
+		Select: o
+		Secondary Communication Selection:
+		a)*	None
+		b) 	4G Modem Reporting
+		c) 	RS232 Reporting
+		d) 	Satellite Modem
+		e)	Cancel
+			Selection:c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 400
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 ASCII Protocol
+	r)	Comms Supply Mode => On Demand
+
+		Select: q
+		Communication Protocol Selection:
+		a)*	ALERT2 ASCII Protocol
+		b) 	ALERT2 Binary Protocol
+		c)	Cancel
+			Selection:b
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Repeater Station
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 1W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Repeater Delay (mSec) => 400
+	j)	Address List => List 1
+	k)	Address List Status => Enable
+	l)	Address List Action => Pass
+	m)	Address List Entries
+	n)	Agency ID => ELPRO
+	o)	Secondary Communication => RS232 Reporting
+	p)	Serial Baud Rate => 9600
+	q)	Communication Protocol => ALERT2 Binary Protocol
+	r)	Comms Supply Mode => On Demand
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 14:20:02 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -108dBm
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Backhaul Mode : RS232 Reporting - ALERT2 Binary Protocol
+	Baud	Bits	Parity	Stop
+	9600	8	N	1
+Unit Type: Repeater Station	Station Address: 1000
+Tx Frequency MHz: 151.525000	Rx Frequency MHz: 151.525000
+Tx Power: 1W			Agency ID: ELPRO
+Report Format: ALERT Binary	Receive Format: Binary/IFLOWS
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 180min		Paralysis Time: 10sec
+Data Log Format: ALERT2 ASCII	Comms Supply: On Demand
+
+Repeater Pass/Reject Lists: 
+Address List 1  Address List 2  Address List 3  Address List 4  
+Pass            Disabled        Disabled        Disabled        
+1     to  9999                                                  
+
+External Inputs:
+ 	DI3         
+Mode	Pulse       
+Raw	3           
+ID	4032        
+Format	U-2         
+Scale	1           
+Offset	0mm         
+Sens	1mm         
+Value	3mm         
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	31-Mar-2015 14:20:10 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.C
+	RSSI: -108dBm
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+	Sending Update...
+13086656:Generate ALERT2 frames:
+13086658:
+================= GENERAL SENSOR REPORT ====================13086660:
+  |==> ID=4032; val=3
+13086679:sent - errts_send_to_radio: ALERT2B: 414C455254320901077420E2C00F0300
+13086684:ALERT2 transmission finished after 0 seconds awake
+h
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967292  3           
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 3
+		Enter value for Digital 3 : 3 6
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967292  6           
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 3
+		Enter value for Digital 3 : 6 9
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967292  9           
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 3
+		Enter value for Digital 3 : 9 12
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967292  12          
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 3
+		Enter value for Digital 3 : 12 5
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967292  15          
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 3
+		Enter value for Digital 3 : 15 8
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967292  18          
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 
+	Sending Update...
+13257314:Generate ALERT2 frames:
+13257316:
+================= GENERAL SENSOR REPORT ====================13257318:
+  |==> ID=4032; val=18
+13257337:sent - errts_send_to_radio: ALERT2B: 414C4552543209010774218CC00F1200
+13257342:ALERT2 transmission finished after 0 seconds awake
+3
+		Enter value for Digital 3 : 18  21
+Current:
+ 	DI1         DI2         DI3         
+Mode	Incr        Quad        Pulse       
+Raw	0           4294967292  21          
+
+ 	AI1         AI2         
+Value	-25%        -25%        
+
+Set Accumulator Menu:
+
+	a)	Digital 1
+	b)	Digital 2
+	c)	Digital 3
+	d)	Analog 1
+	e)	Analog 2
+
+		Select: 
+	Sending Update...
+13359182:Generate ALERT2 frames:
+13359184:
+================= GENERAL SENSOR REPORT ====================13359186:
+  |==> ID=4032; val=21
+13359205:sent - errts_send_to_radio: ALERT2B: 414C455254320901077421F2C00F1500
+13359210:ALERT2 transmission finished after 0 seconds awake

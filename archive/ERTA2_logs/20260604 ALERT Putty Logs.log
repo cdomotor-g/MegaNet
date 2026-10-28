@@ -1,0 +1,1182 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2026.06.04 12:14:08 =~=~=~=~=~=~=~=~=~=~=~=
+Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+User Type: Menu:
+
+	a)	Engineer
+	b)	Technician
+
+		Select: a
+
+		Password:********
+
+		Login Successful!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	09-Feb-2026 14:59:46 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None
+	k)	Comms Supply Mode => Always On
+
+		Select: d
+		Rx Frequency MHz 151.52500000 0     00       
+
+			Invalid value!
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None
+	k)	Comms Supply Mode => Always On
+
+		Select: c
+		Tx Frequency MHz 151.525000151           
+
+			Invalid value!
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None
+	k)	Comms Supply Mode => Always On
+
+	Select: c
+		Tx Frequency MHz 151.52500000 0          
+
+			Invalid value!
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.525000
+	d)	Rx Frequency MHz => 151.525000
+	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None
+	k)	Comms Supply Mode => Always On
+
+		Select: c
+		 151.525000c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.000525
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None
+	k)	Comms Supply Mode => Always On
+
+		Select: c
+		Tx Frequency MHz 151.000525151.525
+Communication Menu:
+
+	a)	
+	b)	Unit Type => Base Station Rcvr
+
+Rx Frequency MHz => 151.525000
+
+
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None
+	k)	Comms Supply Mode => Always On
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	09-Feb-2026 15:01:01 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	09-Feb-2026 15:01:02 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	09-Feb-2026 15:01:02 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	09-Feb-2026 15:01:02 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.000525
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None
+	k)	Comms Supply Mode => Always On
+
+		Select: c
+		Tx Frequency MHz 151.000525           
+
+			Invalid value!
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.000525
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2026.06.04 12:16:27 =~=~=~=~=~=~=~=~=~=~=~=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	09-Feb-2026 15:01:55 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.000525
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None
+	k)	Comms Supply Mode => Always On
+
+		Select: c
+		Tx Frequency MHz 151.000525      500
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None
+	k)	Comms Supply Mode => Always On
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	09-Feb-2026 15:02:19 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Base Station Rcvr	Station Address: 1000
+Rx Frequency MHz: 151.525000	Receive Format: Binary/IFLOWS
+Agency ID: ELPRO
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 1min		Paralysis Time: 1sec
+Data Log Format: CSV on Sample	Comms Supply: Always On
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):n
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	09-Feb-2026 15:02:33 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: c
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.525000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None
+	k)	Comms Supply Mode => Always On
+
+		Select: d
+		Rx Frequency MHz 151.52500000 0    
+Communication Menu:
+
+	a)	Communication Mode => Integrated Radio Reporting
+	b)	Unit Type => Base Station Rcvr
+	c)	Tx Frequency MHz => 151.500000
+	d)	Rx Frequency MHz => 151.500000
+	e)	Tx Power => 5W
+	f)	Report Format => ALERT Binary
+	g)	GPS Update => 1440
+	h)	GPS Maximum On => 2
+	i)	Agency ID => ELPRO
+	j)	Secondary Communication => None
+	k)	Comms Supply Mode => Always On
+
+		Select: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	09-Feb-2026 15:02:48 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+	Config NOT Saved
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: g
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Current Configuration:
+======================
+
+Communication Mode: Integrated Radio Reporting
+Unit Type: Base Station Rcvr	Station Address: 1000
+Rx Frequency MHz: 151.500000	Receive Format: Binary/IFLOWS
+Agency ID: ELPRO
+GPS Update: 1440			GPS Maximum On: 2
+Update Time: 1min		Paralysis Time: 1sec
+Data Log Format: CSV on Sample	Comms Supply: Always On
+
+SDI-12 Operating Mode: Disabled
+Save Current Config? (y/n):y
+
+		Configuration Saved!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	09-Feb-2026 15:02:55 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	09-Feb-2026 15:02:57 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	09-Feb-2026 15:02:57 UTC; Station Address: 1000
+	Firmware: v1.7	Hardware: Rev3.B
+
+Main Menu:
+
+	a)	Unit Config
+	b)	I/O Setup
+	c)	Communication
+	d)	Unit Diagnostic
+	e)	Change Password
+	f)	Set Date & Time
+	g)	Show/Save Configuration
+	h)	Set Accumulators
+	i)	Exit
+
+		Selection: 

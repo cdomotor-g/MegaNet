@@ -1,0 +1,1202 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2026.04.16 10:50:28 =~=~=~=~=~=~=~=~=~=~=~=
+[2JERTP02+LG 2.43
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:a
+[2JCfg
+	a)	IDs
+	b)	Times
+	c)	Analog
+	d)	Rain Sc
+	e)	Rivr Sc
+	f)	Enc Type
+	g)	Protocol
+
+		Select:
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6240	1992
+Rivr	Disable	0
+Anlg	6243	0
+Batt	6241	128
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:e
+[2JTest
+	a)	Radio Tst
+	b)	Log Tst
+
+		Select:
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:d
+[2JEdit Acc
+	a)	Rain
+	b)	Rivr
+	c)	Anlg
+
+		Select:c
+[2JAnlg is 0 
+new val ():
+new val  0 [2JEdit Acc
+	a)	Rain
+	b)	Rivr
+	c)	Anlg
+
+		Select:
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6240	1992
+Rivr	Disable	0
+Anlg	6243	0
+Batt	6241	127
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:a
+[2JCfg
+	a)	IDs
+	b)	Times
+	c)	Analog
+	d)	Rain Sc
+	e)	Rivr Sc
+	f)	Enc Type
+	g)	Protocol
+
+		Select:
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6240	1992
+Rivr	Disable	0
+Anlg	6243	0
+Batt	6241	127
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:a
+[2JCfg
+	a)	IDs
+	b)	Times
+	c)	Analog
+	d)	Rain Sc
+	e)	Rivr Sc
+	f)	Enc Type
+	g)	Protocol
+
+		Select:a
+[2JIDs
+	a)	Rain
+	b)	Rivr
+	c)	Anlg
+	d)	Batt
+	e)	Rptr
+
+		Select:a
+[2JRain is 6240
+new val :6241
+new val  6241[2JIDs
+	a)	Rain
+	b)	Rivr
+	c)	Anlg
+	d)	Batt
+	e)	Rptr
+
+		Select:c
+[2JAnlg is 6243
+new val :6241
+new val  6241[2JIDs
+	a)	Rain
+	b)	Rivr
+	c)	Anlg
+	d)	Batt
+	e)	Rptr
+
+		Select:
+[2JCfg
+	a)	IDs
+	b)	Times
+	c)	Analog
+	d)	Rain Sc
+	e)	Rivr Sc
+	f)	Enc Type
+	g)	Protocol
+
+		Select:
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6241	1992
+Rivr	Disable	0
+Anlg	6241	0
+Batt	6241	127
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:a
+[2JCfg
+	a)	IDs
+	b)	Times
+	c)	Analog
+	d)	Rain Sc
+	e)	Rivr Sc
+	f)	Enc Type
+	g)	Protocol
+
+		Select:
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6241	1992
+Rivr	Disable	0
+Anlg	6241	0
+Batt	6241	127
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6241	1992
+Rivr	Disable	0
+Anlg	6241	200
+Batt	6241	127
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6241	1992
+Rivr	Disable	0
+Anlg	6241	150
+Batt	6241	127
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6241	1992
+Rivr	Disable	0
+Anlg	6241	100
+Batt	6241	127
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6241	1992
+Rivr	Disable	0
+Anlg	6241	50
+Batt	6241	127
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6241	1992
+Rivr	Disable	0
+Anlg	6241	20
+Batt	6241	127
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6241	1992
+Rivr	Disable	0
+Anlg	6241	10
+Batt	6241	127
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6241	1992
+Rivr	Disable	0
+Anlg	6241	5
+Batt	6241	127
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6241	1992
+Rivr	Disable	0
+Anlg	6241	2
+Batt	6241	127
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6241	1992
+Rivr	Disable	0
+Anlg	6241	0
+Batt	6241	127
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:a
+[2JCfg
+	a)	IDs
+	b)	Times
+	c)	Analog
+	d)	Rain Sc
+	e)	Rivr Sc
+	f)	Enc Type
+	g)	Protocol
+
+		Select:a
+[2JIDs
+	a)	Rain
+	b)	Rivr
+	c)	Anlg
+	d)	Batt
+	e)	Rptr
+
+		Select:a
+[2JRain is 6241
+new val :6240
+new val  6240[2JIDs
+	a)	Rain
+	b)	Rivr
+	c)	Anlg
+	d)	Batt
+	e)	Rptr
+
+		Select:c
+[2JAnlg is 6241
+new val :6243
+new val  6243[2JIDs
+	a)	Rain
+	b)	Rivr
+	c)	Anlg
+	d)	Batt
+	e)	Rptr
+
+		Select:
+[2JCfg
+	a)	IDs
+	b)	Times
+	c)	Analog
+	d)	Rain Sc
+	e)	Rivr Sc
+	f)	Enc Type
+	g)	Protocol
+
+		Select:c
+[2JAnalog
+	a)	Range
+	b)	Increment
+	c)	Sample Time
+	d)	Warmup Time
+
+		Select:
+[2JCfg
+	a)	IDs
+	b)	Times
+	c)	Analog
+	d)	Rain Sc
+	e)	Rivr Sc
+	f)	Enc Type
+	g)	Protocol
+
+		Select:
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6240	1992
+Rivr	Disable	0
+Anlg	6243	0
+Batt	6241	127
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:a
+[2JCfg
+	a)	IDs
+	b)	Times
+	c)	Analog
+	d)	Rain Sc
+	e)	Rivr Sc
+	f)	Enc Type
+	g)	Protocol
+
+		Select:c
+[2JAnalog
+	a)	Range
+	b)	Increment
+	c)	Sample Time
+	d)	Warmup Time
+
+		Select:a
+[2JRange is 10000 mm
+new val (mm):
+new val  10000 mm[2JAnalog
+	a)	Range
+	b)	Increment
+	c)	Sample Time
+	d)	Warmup Time
+
+		Select:b
+[2JIncrement is 50 mm
+new val (mm):
+new val  50 mm[2JAnalog
+	a)	Range
+	b)	Increment
+	c)	Sample Time
+	d)	Warmup Time
+
+		Select:
+[2JCfg
+	a)	IDs
+	b)	Times
+	c)	Analog
+	d)	Rain Sc
+	e)	Rivr Sc
+	f)	Enc Type
+	g)	Protocol
+
+		Select:
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6240	1992
+Rivr	Disable	0
+Anlg	6243	0
+Batt	6241	128
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2026.04.16 14:28:04 =~=~=~=~=~=~=~=~=~=~=~=
+ 
+[2JERTP02+LG 2.43
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6240	1992
+Rivr	Disable	0
+Anlg	6243	0
+Batt	6241	129
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6240	1992
+Rivr	Disable	0
+Anlg	6243	1
+Batt	6241	126
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+	ID	VAL
+Rain	6240	1992
+Rivr	Disable	0
+Anlg	6243	1
+Batt	6241	127
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Disabled [2JERTP02+LG 2.43
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:
+[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+DATA FAIL
+	ID	VAL
+Rain	6240	0
+Rivr	Disable	0
+Anlg	6243	1
+Batt	6241	124
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Startupc[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+DATA FAIL
+	ID	VAL
+Rain	6240	0
+Rivr	Disable	0
+Anlg	6243	0
+Batt	6241	124
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Startup[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+DATA FAIL
+	ID	VAL
+Rain	6240	0
+Rivr	Disable	0
+Anlg	6243	200
+Batt	6241	124
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Startup[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+DATA FAIL
+	ID	VAL
+Rain	6240	0
+Rivr	Disable	0
+Anlg	6243	50
+Batt	6241	124
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Startup[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+DATA FAIL
+	ID	VAL
+Rain	6240	0
+Rivr	Disable	0
+Anlg	6243	5
+Batt	6241	124
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Startup[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+DATA FAIL
+	ID	VAL
+Rain	6240	0
+Rivr	Disable	0
+Anlg	6243	2
+Batt	6241	124
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Startup[2JMain Menu
+	a)	Cfg
+	b)	Maint
+	c)	Show Cfg
+	d)	Edit Acc
+	e)	Test
+	f)	Tones
+	g)	Solar
+
+		Select:c
+[2J
+DATA FAIL
+	ID	VAL
+Rain	6240	0
+Rivr	Disable	0
+Anlg	6243	0
+Batt	6241	124
+Repeater	#1	#2	#3	#4	#5	#6	#7	#8
+Low Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+High Pass	Disable	Disable	Disable	Disable	Disable	Disable	Disable	Disable
+Paral 5 Sec
+Lead In 150 msec
+Check Time 3 hr
+Rptr Delay 200 msec
+Range 10000 mm
+Increment 50 mm
+Sample Time 60 Sec
+Warmup Time 1 Sec
+Rain Sc 1
+Rivr Sc 1
+Enc Type Quad
+Protocol Alert
+Maint off
+Logger status : Startup [ò
