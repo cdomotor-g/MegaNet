@@ -715,7 +715,7 @@ const Capabilities = (function () {
     const outside = every.filter(it => it.src);
     const groups = GROUPS.filter(g => every.some(it => it.group === g));
     return `
-    <div class="page cap-page" id="cap-page" style="--page-max:1100px">
+    <div class="page cap-page" id="cap-page" style="--page-max:1600px">
       <section class="panel cap-hero" aria-labelledby="cap-h">
         <h2 class="cap-title" id="cap-h"><span aria-hidden="true">📇</span> Capabilities</h2>
         <p class="cap-lede">Everything Flood-Net can do, a line each. <strong>Each name opens the place it is
@@ -764,10 +764,10 @@ const Capabilities = (function () {
   }
 
   function tagsHtml(it) {
-    let h = '';
-    if (it.who) h += `<span class="cap-tag cap-tag-${it.who} term-chip" title="${esc(WHO[it.who].meaning)}">${esc(WHO[it.who].label)}</span>`;
-    if (it.src) h += `<span class="cap-src term-chip" title="${esc(SOURCE_MEANING)}">${marked(it.src)}</span>`;
-    return h;
+    const h = [];
+    if (it.who) h.push(`<span class="cap-tag cap-tag-${it.who} term-chip" title="${esc(WHO[it.who].meaning)}">${esc(WHO[it.who].label)}</span>`);
+    if (it.src) h.push(`<span class="cap-src term-chip" title="${esc(SOURCE_MEANING)}">${marked(it.src)}</span>`);
+    return h.join(' ');
   }
 
   // The name: a link to the tab's address where there is a tab (so a
@@ -779,19 +779,20 @@ const Capabilities = (function () {
     return `<button type="button" class="link-btn cap-name" data-cap="${it.id}">${marked(it.name)}</button>`;
   }
 
-  function whereHtml(it) {
+  // The tab it is on, and nothing deeper: the row is one line, and where on
+  // the tab to look is said when the name is pressed (go()) and on hover
+  // here. A banner tool or a page of its own has no tab, so the first step of
+  // its `where` stands in — "the banner", "its own page".
+  function tabHtml(it) {
     const t = it.tabInfo;
-    if (!t) return marked(it.where || '');
-    return `<span aria-hidden="true">${t.icon}</span> ${esc(t.label)}${it.where ? ` <span aria-hidden="true">›</span> ${marked(it.where)}` : ''}`;
+    const where = t ? t.label + (it.where ? ' › ' + it.where : '') : (it.where || '');
+    const label = t ? `<span aria-hidden="true">${t.icon}</span> ${esc(t.label)}` : esc(where.split(' › ')[0]);
+    return `<span class="cap-tab"${where && where !== (t && t.label) ? ` title="${esc(where)}"` : ''}>${label}</span>`;
   }
 
   function itemHtml(it) {
     return `
-          <li class="cap-item" id="${it.id}">
-            <p class="cap-line">${nameHtml(it)} ${tagsHtml(it)}</p>
-            <p class="cap-what">${marked(it.what)}</p>
-            <p class="cap-where">${whereHtml(it)}</p>
-          </li>`;
+          <li class="cap-item" id="${it.id}">${[nameHtml(it), tagsHtml(it), tabHtml(it), `<span class="cap-what">${marked(it.what)}</span>`].filter(Boolean).join(' ')}</li>`;
   }
 
   function listHtml(items) {

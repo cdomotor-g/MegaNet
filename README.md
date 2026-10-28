@@ -5991,10 +5991,13 @@ Install, lists everything the app can do — about two hundred lines in ten broa
 groups: getting around, stations and the map, outside data on the map, radio
 planning, interference and decoding, monitoring and alerts, site visits and
 surveying, maps on paper and files out, learning, and admin and what runs
-behind the scenes (the agent API and MCP server among them). Each line is a
-name, a tag when it is for **admins only**, editors, approved accounts or
-anyone signed in, the outside organisation whose data it is where it is not
-Flood-Net's own, one sentence, and where it is.
+behind the scenes (the agent API and MCP server among them). Each is one compact
+line, with no rule between lines: the name, a tag when it is for **admins
+only**, editors, approved accounts or anyone signed in, the outside
+organisation whose data it is where it is not Flood-Net's own, the tab it is
+on, and one sentence. Where on the tab to look is on hover over the tab's name
+and in the note shown when the name is pressed; a line too long for the width
+wraps with its second line hung under the name.
 
 The name is the way there. A tab's name is a link to its `?tab=` address
 (Ctrl-click opens it in a browser tab of its own), and pressing it says where on

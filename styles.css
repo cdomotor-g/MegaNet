@@ -20995,7 +20995,9 @@ button.adm-danger:hover { border-color: var(--bad); }
 .cap-jump-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .cap-jump-n { color: var(--muted); font-weight: 400; }
 
-.cap-group-head h3 { margin: 0; font-size: var(--fs-lg); line-height: var(--lh-tight); scroll-margin-top: 7rem; }
+/* Clear of the search bar stuck over the top of the page when jumped to. */
+.cap-group { scroll-margin-top: 6.5rem; }
+.cap-group-head h3 { margin: 0; font-size: var(--fs-lg); line-height: var(--lh-tight); }
 .cap-group-n {
   margin-left: var(--sp-1);
   padding: 0 var(--sp-2);
@@ -21007,14 +21009,23 @@ button.adm-danger:hover { border-color: var(--bad); }
   vertical-align: middle;
 }
 .cap-group-blurb { margin: var(--sp-1) 0 0; max-width: 62rem; }
-.cap-list { list-style: none; margin: var(--sp-2) 0 0; padding: 0; }
-.cap-item { padding: var(--sp-2) 0; border-top: 1px solid var(--border); }
-.cap-item:first-child { border-top: 0; }
-.cap-item p { margin: 0; max-width: 62rem; }
-.cap-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-2); }
-.cap-name { font-weight: 700; }
-.cap-what { line-height: var(--lh-body); }
-.cap-where { color: var(--muted); font-size: var(--fs-sm); }
+.cap-list { list-style: none; margin: var(--sp-2) 0 0; padding: 0; font-size: var(--fs-sm); line-height: 1.45; }
+/* A line each, read left to right — name, tags, tab, sentence — with no rule
+   between them. Where a sentence is too long for the width and wraps, the
+   wrapped part hangs in under the name, so the next name still starts the
+   next line on its own and the list reads as a list without lines drawn. */
+.cap-item { padding: 1px 0 1px 1.25rem; text-indent: -1.25rem; }
+.cap-item > * { text-indent: 0; }
+.cap-name { font-weight: 600; }
+.cap-tab {
+  display: inline-block;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-pill);
+  background: var(--subtle);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
 
 /* Who it is for: a word in a ring of its colour, the page's ink inside, so the
    colour is a second channel and never has to carry the word. */
