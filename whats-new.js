@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 134, date: '2026-10-28', items: [
+      'New under <strong>Stations &amp; networks</strong>: ⏳ <strong>Repeater Delays</strong> — what each repeater\'s delay '
+        + 'should be, so repeaters relaying the same reading stop sending their copies on top of each other (the collisions '
+        + 'that come out as flipped bits). Group by group for every repeater in Queensland and northern New South Wales, '
+        + 'with how many collisions are left, what a delay longer than a second would clear, and a CSV to take to site.',
+      '🗺️ <strong>Radio Path Maps</strong> and 🖨️ the <strong>Map Generator</strong> have a group of their own, '
+        + '<strong>Printed maps</strong>, just below.',
+    ] },
     { n: 133, date: '2026-10-28', items: [
       'Hover any radio path on the Stations map — a field link, a backbone path between repeaters, or one to a base '
         + 'station — and its label says whether it is <strong>backbone</strong>, which station transmits (TX) and which '

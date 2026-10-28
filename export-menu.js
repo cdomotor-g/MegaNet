@@ -145,6 +145,18 @@ const ExportMenu = (function () {
         call: ['SignalRoutes.exportPassCsv'],
         ready: () => { const A = typeof SignalRoutes !== 'undefined' && SignalRoutes.state().A; return !A ? 'Nothing read yet — read the receptions, or show the demo.' : A.reps.length ? '' : 'No repeater\'s carrier was found in this period.'; } },
     ],
+    repdelays: () => {
+      const ready = () => {
+        const p = typeof RepeaterDelays !== 'undefined' && RepeaterDelays.current();
+        return !p ? 'The station register is not loaded yet.' : '';
+      };
+      return [
+        { label: 'The delays — CSV', sub: 'every repeater, group by group: its planned delay, the one it has now, its closest neighbour and how far apart their copies land, under the limit picked on the tab',
+          call: ['RepeaterDelays.exportCsv'], ready },
+        { label: 'The pairs — CSV', sub: 'every pair of repeaters that can put copies of one reading on top of each other: where they meet, how many readings, and how far apart on one delay and under the plan',
+          call: ['RepeaterDelays.exportPairsCsv'], ready },
+      ];
+    },
     passranges: () => [
       { label: 'The address grid — CSV', sub: 'every address of what the Address grid is showing — every hub together, a hub or a radio network: in use and by whom, set aside and for what, or free, and the repeaters that carry it',
         call: ['AddressSpace.exportCsv'], ready: gated },

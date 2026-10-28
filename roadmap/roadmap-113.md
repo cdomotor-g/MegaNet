@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-28** (revision 194 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-28** (revision 195 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -823,6 +823,17 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 195 — 2026-10-28: ⏳ Repeater Delays — what each repeater should wait
+
+The owner: *"add a new tab to the stations and network group … called something like repeater delays … make suggestions as to what we should be setting repeater delays to in the network … something we can refer to … I'm pretty sure most of the repeater delays are going to be all set to the same thing. And it's very likely causing some bit flipping that we're seeing due to collisions … focus on all of Queensland and Northern New South Wales."* No issue; this entry is its record. Opens and closes nothing.
+
+- **The plan** (`delay-plan.js`, new, pure and required under Node): every address every station sends, followed through the repeaters that pass it and hear it (80 km from a field station, 100 km between repeaters and to a base, up to four hops, channels agreeing, an unrecorded channel agreeing with any); a copy goes out a lead-in, a frame and the repeater's delay after the first copy it heard. Two copies on one channel collide where a base or a repeater that wants the reading hears both. Bands: **on top** under a 133 ms frame (the ghosts), **close** under a 300 ms lead-in and a frame, **clear** past 433 ms. Delays are 50 ms steps under a limit, searched group by group (annealing, then descent), deterministic, a recorded delay kept, a shared delay now changed as little as can be. Replaces `map-backbone.js`'s greedy colouring as the source of the repeater card's suggested delay and the Airtime panel's — a colouring at 150 ms slots that kept first hops apart could still land a second hop on a first.
+- **What it found**: 146 repeaters; 122 share readings with a neighbour in 20 groups (biggest: Brisbane / Logan–Albert 16, Fitzroy 14, Warrego / Paroo 13, Northern Rivers 11, with six Northern Rivers repeaters all relaying some of the same readings); 194 pairs. On one delay 157 pairs land on top. Under a second (the register's own limit, `0015`): 7 on top, 33 close, 154 clear; up to 1.5 s 0 / 15 / 179; 2 s 0 / 5 / 189; **3 s every pair clear**. 17 repeaters (Northern Rivers, Clarence, Bundamba) have no channel on record. Written up with the whole plan in `docs/repeater-delays.md`.
+- **The tab** (`repeater-delays.js`, new): ⏳ under Stations & networks beside Pass Ranges — the limit, the delay they share now, keep recorded; tiles; the answer in words; the plan group by group with each repeater's closest neighbour; the free repeaters; what a longer delay buys; every pair and where it meets; how it is worked out. CSV of the delays and of the pairs, on the tab and in ⤓ Export.
+- **The nav**: Stations & networks would have held seven, past `nav.mjs`'s ceiling, so **Radio Path Maps** and the **Map Generator** — the two map-sheet tabs, which name each other and Stations only — are a new group, **Printed maps**, straight after.
+- **For a person, offered not filed:** the repeaters' delay range and units and a lead-in timed off the air (they decide which column of the plan to use, and whether `0015`'s under-1000 check is raised); setting the delays group by group and recording each; the 17 missing channels.
+- **Checks:** `npm run delays` (new, in CI); `nav`, `views`, `help`, `exports`, `looks`, `tabs` (the new tab born converted), `smoke` (54 tabs), the cheap five.
 
 ### Revision 194 — 2026-10-28: 💾 A2 Firmware
 

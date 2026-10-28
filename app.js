@@ -546,6 +546,7 @@ function applyStationDoc(text, source) {
   state.repeaterIdx = null;         // so is the cached repeater-only subset
   state.passRelIdx  = null;         // and so is the pass-range relation
   state.backboneIdx = null;         // and the repeater backbone pairs built on it
+  state.delayPlans  = null;         // and the delay plans that walk those pairs
   state.blastIdx    = null;         // and the blast-radius analysis on top of both
   NetworkView.invalidate();         // every node in the graph was a row in the old file
   resetStationFilters();
@@ -3812,6 +3813,7 @@ function renderMain() {
     case 'home':       el.innerHTML = Home.render();          Home.init();         break;
     case 'maps':       el.innerHTML = Maps.render();          Maps.init();         break;
     case 'passranges': el.innerHTML = renderPassRangesHtml(); AddressSpace.init(); break;
+    case 'repdelays':  el.innerHTML = RepeaterDelays.render(); RepeaterDelays.init(); break;
     case 'rf':         el.innerHTML = renderRfHtml();        initRf();    break;
     case 'rfchanges':  el.innerHTML = RfChanges.render();    RfChanges.init();    break;
     case 'workbench':  el.innerHTML = Workbench.render();    Workbench.init();    break;
@@ -9347,6 +9349,7 @@ function refreshFilterOptions() {
   state.repeaterIdx = null;
   state.passRelIdx  = null;   // an edited pass range re-wires the relation
   state.backboneIdx = null;   // and with it which repeater pairs share a window
+  state.delayPlans  = null;   // and the delay plan, which reads the windows and the delays
   state.blastIdx    = null;   // and who would be stranded by a repeater's loss
   if (state.activeTab === 'stations') renderStationFilters();
 }

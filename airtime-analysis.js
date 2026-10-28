@@ -124,8 +124,9 @@ const AirtimeAnalysis = (() => {
   // can be filed across. Two stations further than this from a repeater are
   // not crowding each other there.
   const REP_HEAR_KM = 120;
-  // Two repeater delays closer than this re-send one frame together — the
-  // Backbone's own spacing (REPEATER_DELAY_STEP_MS).
+  // Two repeater delays closer than this re-send one frame together — a frame
+  // (133 ms) and a little: under it is Repeater Delays' "on top" band
+  // (delay-plan.js).
   const REP_SEP_MS = 150;
   // A move is offered only past this much clearance; less is said as such.
   const CLEAR_MS = 60000;
@@ -888,8 +889,8 @@ const AirtimeAnalysis = (() => {
   // ── from Station Health's result ────────────────────────────────────────────
 
   // A: HealthAnalysis.run()'s result (with .txs). opts:
-  //   suggestDelay(station) → ms or null — the Backbone's suggested delay
-  //                           (map-backbone.js suggestedRepeaterDelayMs)
+  //   suggestDelay(station) → ms or null — the suggested delay, Repeater
+  //                           Delays' plan (map-backbone.js suggestedRepeaterDelayMs)
   function fromHealth(A, opts) {
     const o = opts || {};
     if (!A || !A.stations) return analyse({});

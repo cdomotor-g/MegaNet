@@ -333,6 +333,16 @@ const SEED_BACKBONE = `async () => {
   await new Promise(r => setTimeout(r, 300));
 }`;
 
+// ⏳ Repeater Delays draws its plan from the register as it opens; the
+// comparison of limits is worked out a limit at a time when asked, so it is
+// asked for and waited on, and every fold opened.
+const SEED_REPDELAYS = `async () => {
+  RepeaterDelays.compare();
+  for (let i = 0; i < 200 && !RepeaterDelays.state().compare; i++) await new Promise(r => setTimeout(r, 50));
+  document.querySelectorAll('#main-content details').forEach(d => { d.open = true; });
+  await new Promise(r => setTimeout(r, 100));
+}`;
+
 const SEED_BITFLIPPER = `async () => {
   const addr = String(state.data.stations
     .flatMap(s => (s.sensors || []).map(x => x.alert_id))
@@ -936,6 +946,7 @@ const SEED_FW = `async () => {
 const CONVERTED = [
   { id: 'networks',   label: 'Networks',        issue: '#109 (proving ground) / #137' },
   { id: 'passranges', label: 'Pass Ranges',     issue: '#137' },
+  { id: 'repdelays',  label: 'Repeater Delays — the plan, every fold open', issue: 'born converted', seed: SEED_REPDELAYS },
   { id: 'maps',       label: 'Radio Path Maps', issue: '#137' },
   { id: 'arro',       label: 'ARRO Launcher',   issue: '#141', seed: SEED_ARRO_SEARCH },
   { id: 'arrodata',   label: 'ARRO Data',       issue: '#141', seed: seedSeries('arro') },

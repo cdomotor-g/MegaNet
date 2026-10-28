@@ -151,16 +151,35 @@ const TABS = [
   { group: 'Stations & networks', tabs: [
     { id: 'stations',   label: 'Stations',               icon: '📍',
       find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb site features ancillary pits outlets geojson relocate relocation move station new site rain gauge exposure canopy trees buildings shed latency data age stale freshness message animation pulse flash landing live' },
-    { id: 'maps',       label: 'Radio Path Maps',        icon: '🗺️',
-      find: 'network maps navigator pdf printed sheets radio path basin catchment region queensland' },
     { id: 'passranges', label: 'Pass Ranges',            icon: '🔗',
       find: 'hop chain orphans gaps alertid address window coverage base allocate allocation reserve set aside spare unused free addresses fullness full blocks address space grid new id' },
+    // ⏳ Repeater Delays (delay-plan.js, repeater-delays.js) sits beside Pass
+    // Ranges: the other setting programmed into every repeater, and the one
+    // that decides whether two repeaters passing the same address send their
+    // copies on top of each other. Its find words are what somebody chasing
+    // collisions types — "stagger", "simultaneous", "timing" — and never
+    // "collision" or "bit flip" alone, which the lessons and Bit-Flip Sources
+    // answer to and an earlier group would take from them.
+    { id: 'repdelays',  label: 'Repeater Delays',        icon: '⏳',
+      find: 'repeater delay delays stagger staggered staggering wait milliseconds ms timing simultaneous same time retransmit re-transmit relay copies on top overlap plan programme program setting settings recommend recommended suggestion' },
     { id: 'export',     label: 'Export',                 icon: '📤',
       find: 'csv radio mobile networks clusters download stations.json backup escape hatch data source' },
-    { id: 'mapgen',     label: 'Map Generator',          icon: '🖨️',
-      find: 'print paper a4 svg laser cut engrave k40 whisperer contour elevation layers billet plate title block scale bar graticule sheet' },
     { id: 'lookaround', label: 'Look Around',            icon: '🔭',
       find: 'ar augmented reality station finder which way direction directions nearby near me around bearing distance compass phone hold up turn facing horizon overlay sighting where is find stations' },
+  ] },
+  // ── Printed maps: Stations & networks, cut in two ──────────────────────────
+  // Stations & networks held six — nav.mjs's ceiling — until ⏳ Repeater
+  // Delays made it seven. The cut follows HELP[id].related: Pass Ranges and
+  // Export name each other, and the new tab is a repeater setting beside Pass
+  // Ranges; Radio Path Maps names only Stations, and the Map Generator names
+  // the Radio Path Maps — the two tabs about map sheets on paper, the bundled
+  // radio-path PDFs and the ones made to order. Filed straight after, so a
+  // find word they share with a later group still goes to them.
+  { group: 'Printed maps', tabs: [
+    { id: 'maps',       label: 'Radio Path Maps',        icon: '🗺️',
+      find: 'network maps navigator pdf printed sheets radio path basin catchment region queensland' },
+    { id: 'mapgen',     label: 'Map Generator',          icon: '🖨️',
+      find: 'print paper a4 svg laser cut engrave k40 whisperer contour elevation layers billet plate title block scale bar graticule sheet' },
   ] },
   { group: 'Interference', tabs: [
     { id: 'rf',         label: 'RF Environment',         icon: '📶',
@@ -1452,7 +1471,7 @@ const HELP = {
              + 'Two distant sites sharing one window is normal and is why the Stations map caps '
              + 'how long a drawn link may be.',
     },
-    related: ['stations', 'bitflipper', 'export'],
+    related: ['stations', 'bitflipper', 'export', 'repdelays'],
   },
 
   rf: {
@@ -2587,6 +2606,32 @@ const HELP = {
       { label: 'State of the backbone — what is gathered, how it is ranked, and how to read it', href: 'docs/backbone.md' },
     ],
     related: ['health', 'flipsources', 'signalroutes', 'passranges', 'basestations', 'review', 'investigations'],
+  },
+
+  repdelays: {
+    summary: '<strong>What each repeater\'s delay should be</strong>, so that repeaters relaying the same reading never send their '
+           + 'copies on top of each other — two repeaters on one delay that both pass an address and both hear its station '
+           + 'answer in the same instant, and every receiver hearing both gets the copies bit on bit: flipped bits and ghosts. '
+           + 'Worked out from the station register for every repeater on file (Queensland and northern New South Wales): each '
+           + 'reading followed from its station through the repeaters that would relay it, where two copies meet at a base or a '
+           + 'repeater that wants it, and the delays that keep them furthest apart — <strong>group by group</strong>, with how '
+           + 'many pairs are still <strong>on top</strong>, <strong>close</strong> or <strong>clear</strong>, and what a longer '
+           + 'delay than a second would buy.',
+    watch: [
+      'Hearing is a distance (80 km from a field station, 100 km between repeaters and to a base), not a coverage model: a '
+      + 'hill can make a pair that is not there, and a long path over water can leave one out. Check a group on the air '
+      + 'after it is set — Bit-Flip Sources and Station Health show whether its corrupted copies fall.',
+      'Clear means a lead-in and a frame apart: 433 ms on the app\'s 300 ms lead-in, a figure nobody has timed on these '
+      + 'repeaters. Under a second there is not room to clear the busiest groups; <em>What a longer delay buys</em> shows '
+      + 'how many pairs each limit leaves, if the repeaters take more.',
+      'A repeater with no channel on record is taken to share one with its neighbours. Recording the channels can free it.',
+      'Record each delay on its station as it is set (the repeater\'s card, <em>Repeater delay (ms)</em>) and the plan keeps '
+      + 'it from then on and plans the rest around it. Nothing on this tab writes to a station.',
+    ],
+    links: [
+      { label: 'Repeater delays — the assessment, the method and the plan as of October 2026', href: 'docs/repeater-delays.md' },
+    ],
+    related: ['passranges', 'stations', 'flipsources', 'propagation', 'biterrors'],
   },
 
   investigations: {
@@ -4203,6 +4248,7 @@ const state = {
   mapSearchTimer: null,    // debounce for the search box → marker rebuild
   passRelIdx:     null,    // both directions of the pass-range relation, per loaded file
   backboneIdx:    null,    // repeater backbone pairs + suggested delays, per loaded file
+  delayPlans:     null,    // Repeater Delays' plans, per loaded file and settings (repeater-delays.js)
   // The Stations tab's filters, open or shut (#165) — in the Stations card
   // since the filters and the list became one card. Remembered, and it is
   // the one collapsible on that tab that is: Path profile and Link budget are

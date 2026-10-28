@@ -156,6 +156,14 @@ const SiteMap = (function () {
         'Find orphans — stations no repeater covers',
       ],
     },
+    repdelays: {
+      what: 'What each repeater\'s delay should be, so repeaters relaying the same reading never send their copies on top of each other.',
+      use: [
+        'Look up the delay to program into a repeater on your next visit',
+        'See which repeaters share readings and need their delays set together',
+        'See how many collisions a longer delay than a second would clear',
+      ],
+    },
     export: {
       what: 'Builds the set of CSV files Radio Mobile needs, for the networks you tick.',
       use: [
@@ -475,7 +483,9 @@ const SiteMap = (function () {
     'Start here': { step: 'Getting set up',
       blurb: 'Before the work: getting a phone or laptop ready for a site with no signal, putting Flood-Net on its home screen, and choosing what the bar on the left lists.' },
     'Stations & networks': { step: 'What is out there',
-      blurb: 'The stations themselves, the radio paths between them, and the maps and files made from them. Most days start here.' },
+      blurb: 'The stations themselves, what each repeater passes on and how long it waits to do it, and the files made from them. Most days start here.' },
+    'Printed maps': { step: 'On paper',
+      blurb: 'The network on map sheets: the bundled radio-path PDFs to browse, and new sheets made to order for print or a laser cutter.' },
     'Interference': { step: 'What is stepping on it',
       blurb: 'For readings that go bad with nothing wrong on site: the licensed transmitters nearby, what changed on the air, a case worked through to the next check, who is corrupting the readings, and a bench to try what each cause does to the bits.' },
     'ALERT': { step: 'What it actually sent',
@@ -503,6 +513,7 @@ const SiteMap = (function () {
   const TASKS = [
     { text: 'Find a station and see it on the map',        tab: 'stations' },
     { text: 'Check a radio path will work',                tab: 'stations', icon: '〽️' },
+    { text: 'Look up the delay to set on a repeater',      tab: 'repdelays' },
     { text: 'See which stations need attention today',     tab: 'health' },
     { text: 'Watch for a test transmission to arrive',     tab: 'msglog' },
     { text: 'Chart a station\'s rainfall or river level',  tab: 'field' },

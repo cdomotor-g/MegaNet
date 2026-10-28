@@ -12,7 +12,8 @@
 //                              between them — cached on state.backboneIdx
 //                              until the file changes.
 //   backboneLinks(maxKm)       the pairs within a distance — the drawable list.
-//   suggestedRepeaterDelays()  repeater id → suggested delay in ms (< 1000).
+//   suggestedRepeaterDelays()  repeater id → suggested delay in ms, from
+//                              ⏳ Repeater Delays' plan (delay-plan.js).
 //   suggestedRepeaterDelayMs(station)
 //   repeaterDelayLabel(station)
 //   MapBackbone                the radio path on the profile card, the path
@@ -94,12 +95,11 @@ function windowOverlapCount(a, b) {
 //          both (may be empty — an overlap can sit on addresses nothing
 //          transmits on yet).
 //   cover: station id → Set of network ALERT addresses its windows carry.
-//   delays: the suggested-delay cache, filled lazily by suggestedRepeaterDelays.
 function backboneIndex() {
   if (state.backboneIdx) return state.backboneIdx;
   // Nothing loaded yet: answer empty without caching, so the index is still
   // built from the real file later — passRelationIndex's own convention.
-  if (!state.data) return { pairs: [], cover: new Map(), delays: null };
+  if (!state.data) return { pairs: [], cover: new Map() };
   const reps = repeaterList(state.data.stations);
   const bases = state.data.stations.filter(s => s.roles.includes('base'));
   const addresses = passRelationIndex().addresses;
@@ -152,7 +152,7 @@ function backboneIndex() {
                    shared: sharedAddrs(a.id, b.id) });
     }
   }
-  state.backboneIdx = { pairs, cover, delays: null };
+  state.backboneIdx = { pairs, cover };
   return state.backboneIdx;
 }
 
@@ -174,50 +174,18 @@ function backbonePairFor(aId, bId) {
 // ── Suggested repeater delay ─────────────────────────────────────────────────
 // Two repeaters with the same delay that both accept the same message will
 // re-transmit it at the same moment and collide at every receiver that can
-// hear both. The suggestion staggers them: the backbone pairs within the Max
-// TX distance form a conflict graph, greedy colouring (busiest repeater
-// first — the classic Welsh–Powell order, and deterministic, so the same file
-// always yields the same suggestions) assigns each repeater the lowest slot no
-// conflicting neighbour holds, and slots become milliseconds. 150 ms apart
-// while the budget allows, compressed to fit under 1000 ms when a dense
-// network needs more slots than 150 ms spacing can hold.
-
-const REPEATER_DELAY_STEP_MS = 150;
-const REPEATER_DELAY_MAX_MS  = 999;
+// hear both. The suggestion is ⏳ Repeater Delays' plan (delay-plan.js) at its
+// own settings — every reading followed from its station through the
+// repeaters that would relay it, and the delays that keep two copies furthest
+// apart wherever a receiver hears both — so the repeater's card, Station
+// Health's Airtime panel and that tab all give the same number. It was a
+// greedy colouring of the backbone pairs here, 150 ms a slot; a pair the
+// colouring kept apart could still land a second-hop copy on a first.
 
 function suggestedRepeaterDelays() {
-  const idx = backboneIndex();
-  const maxKm = state.mapMaxLinkKm;
-  if (idx.delays && idx.delays.maxKm === maxKm) return idx.delays.map;
-  const adj = new Map();
-  // Repeater pairs only: a base does not re-transmit, so a repeater–base path
-  // is not a collision to stagger and its base end is not a node that can hold
-  // a slot two repeaters then have to avoid.
-  for (const p of backboneLinks(maxKm)) {
-    if (p.kind !== 'repeater') continue;
-    if (!adj.has(p.a.id)) adj.set(p.a.id, []);
-    if (!adj.has(p.b.id)) adj.set(p.b.id, []);
-    adj.get(p.a.id).push(p.b.id);
-    adj.get(p.b.id).push(p.a.id);
-  }
-  const ids = [...adj.keys()].sort((x, y) =>
-    (adj.get(y).length - adj.get(x).length) || (x < y ? -1 : x > y ? 1 : 0));
-  const slot = new Map();
-  for (const id of ids) {
-    const used = new Set(adj.get(id).map(n => slot.get(n)).filter(v => v != null));
-    let c = 0;
-    while (used.has(c)) c++;
-    slot.set(id, c);
-  }
-  let slots = 0;
-  for (const c of slot.values()) if (c > slots) slots = c;
-  const step = slots === 0 ? 0
-    : Math.min(REPEATER_DELAY_STEP_MS, Math.floor(REPEATER_DELAY_MAX_MS / slots));
   const map = new Map();
-  if (state.data) {
-    for (const r of repeaterList(state.data.stations)) map.set(r.id, (slot.get(r.id) || 0) * step);
-  }
-  idx.delays = { maxKm, map };
+  if (typeof RepeaterDelays === 'undefined' || !state.data) return map;
+  for (const r of RepeaterDelays.planAtDefaults().repeaters) map.set(r.id, r.delay);
   return map;
 }
 

@@ -3434,7 +3434,8 @@ on a narrow window.
 | Group | Tabs |
 | --- | --- |
 | **Start here** | Site Map · Offline & Install · Views |
-| **Stations & networks** | Stations · Radio Path Maps · Pass Ranges · Export · Map Generator · Look Around |
+| **Stations & networks** | Stations · Pass Ranges · Repeater Delays · Export · Look Around |
+| **Printed maps** | Radio Path Maps · Map Generator |
 | **Interference** | RF Environment · RF Changes · Interference Workbench |
 | **ALERT** | Bit Flipper · Ghosting Graph · ALERT Packets · ALERT2 / ERT-A2 · HFEM Messages · Serial Monitor |
 | **Data** | ARRO Launcher · Plots · Field Data · Message Log |
@@ -5955,6 +5956,30 @@ wrong — the factory default that RESET-then-TEST becomes at five seconds, a
 terminal that lost its port, the RS-232 progress text, an Iridium unit's
 Epoch. Every frame is a pure function of the path, the step and the time, so
 the walkthrough and the written steps are the same list (`npm run a2firmware`).
+
+### 39. Repeater Delays (What Each Repeater Should Wait, So Copies Never Land Together)
+
+⏳ **Repeater Delays**, under **Stations & networks** beside Pass Ranges, says what
+each repeater's delay should be, so that repeaters relaying the same reading never
+send their copies on top of each other — on one delay, two repeaters that both pass
+an address and both hear its station answer in the same instant, and a receiver
+hearing both gets the copies bit on bit: flipped bits and ghosts. `delay-plan.js`
+follows every reading in the register from its station through the repeaters that
+would relay it (pass ranges, 80 km from a field station, 100 km between repeaters,
+up to four hops, channels agreeing), finds where two copies meet at a base or a
+repeater that wants the reading, and searches for the delays — whole 50 ms steps
+under the limit picked — that keep them furthest apart: **on top** (under a 133 ms
+frame), **close** (under a 300 ms lead-in and a frame) or **clear**. The tab shows
+the plan group by group with each repeater's closest neighbour, the repeaters with
+no neighbour on their readings, every pair and where it meets, and **what a longer
+delay buys** (under 1 s, 1.5, 2 or 3 s); a delay recorded on a station is kept and
+planned around, and a shared delay now can be given so the plan changes as few as
+it can. It downloads as CSV, and the repeater card's suggested delay and Station
+Health's Airtime panel read the same plan. The assessment of October 2026, with
+the plan and its assumptions, is [docs/repeater-delays.md](docs/repeater-delays.md).
+`npm run delays` holds it to small networks whose answer is known and to the
+register. Radio Path Maps and the Map Generator moved to a group of their own,
+**Printed maps**, to make room.
 
 ## Deployment Plan
 

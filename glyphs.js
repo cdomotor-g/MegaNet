@@ -110,6 +110,7 @@ const Glyphs = (() => {
     flag:      '<path d="M5 21V3.5"/><path d="M5 4h12l-2.5 4L17 12H5"/>',
     directions:'<path d="m3 11 18-8-8 18-2-8z"/>',
     search:    '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/>',
+    hourglass: '<path d="M6.5 3h11M6.5 21h11"/><path d="M7.5 3c0 4.5 4.5 6 4.5 9s-4.5 4.5-4.5 9M16.5 3c0 4.5-4.5 6-4.5 9s4.5 4.5 4.5 9"/><path d="M10 18.5h4"/>',
     casefile:  '<path d="M13 21H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h8l4 4v4"/><path d="M14 3v4h4"/><circle cx="16" cy="16" r="3"/><path d="m18.2 18.2 2.3 2.3"/>',
     user:      '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
     sparkle:   '<path d="M12 3c.6 4.2 2.8 6.4 7 7-4.2.6-6.4 2.8-7 7-.6-4.2-2.8-6.4-7-7 4.2-.6 6.4-2.8 7-7z"/><path d="M19 15.5v4M17 17.5h4"/>',
@@ -124,6 +125,7 @@ const Glyphs = (() => {
   const GROUP = {
     'Start here':          ['home',      'net'],
     'Stations & networks': ['repeater',  'net'],
+    'Printed maps':        ['print',     'net'],
     'Interference':        ['interfere', 'radio'],
     'ALERT':               ['decode',    'radio'],
     'Data':                ['data',      'data'],
@@ -140,7 +142,7 @@ const Glyphs = (() => {
   // a blank one — and `npm run looks` lists any that are missing.
   const TAB = {
     home: 'home', sitemap: 'signpost', offline: 'offline', views: 'sliders',
-    stations: 'map', maps: 'route', passranges: 'chain', export: 'download', mapgen: 'print', lookaround: 'look',
+    stations: 'map', maps: 'route', passranges: 'chain', repdelays: 'hourglass', export: 'download', mapgen: 'print', lookaround: 'look',
     rf: 'spectrum', rfchanges: 'trend', workbench: 'interfere', reception: 'drive', flipsources: 'search', bitbench: 'bits',
     bitflipper: 'flip', network: 'graph', packets: 'decode', alert2: 'packet', hfem: 'message', serial: 'plug',
     arro: 'launch', arrodata: 'data', field: 'level', msglog: 'inbox', health: 'health', signalroutes: 'routes',

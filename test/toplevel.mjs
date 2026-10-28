@@ -101,6 +101,15 @@ const ACCEPTED = {
          + 'is undefined, never runs it. Constrains nothing below it.',
     },
   ],
+  'delay-plan.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = DelayPlan;",
+      why: 'The Repeater Delays plan\'s CommonJS registration, required by test/delays.mjs '
+         + 'so the plan the tab shows is the plan the check holds to the register and to '
+         + 'networks built for it in Node. Guarded so the browser, where `module` is '
+         + 'undefined, never runs it. Constrains nothing below it.',
+    },
+  ],
   'airtime-analysis.js': [
     {
       match: "if (typeof module !== 'undefined' && module.exports) module.exports = AirtimeAnalysis;",

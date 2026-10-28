@@ -684,10 +684,15 @@ function editorForm(s) {
         ${(() => {
           // The suggestion is not explanation: it is this repeater's own figure,
           // so it stays on screen when the paragraph above it is folded.
-          const sug = suggestedRepeaterDelayMs(s);
-          return sug == null ? '' : `<div class="full small ef-hint">
-          Suggested: <strong>${sug} ms</strong> — staggered so repeaters within the backbone
-          distance whose windows share an address never hold the same delay.
+          const sug = typeof RepeaterDelays !== 'undefined' ? RepeaterDelays.suggestion(s) : null;
+          if (!sug) return '';
+          return sug.status === 'free' || !sug.cluster ? `<div class="full small ef-hint">
+          Suggested: <strong>any</strong> — no other repeater relays its readings to a receiver that hears both
+          (<button type="button" class="link-btn" onclick="switchTab('repdelays')">⏳ Repeater Delays</button>).
+        </div>` : `<div class="full small ef-hint">
+          Suggested: <strong>${sug.delay} ms</strong> — group ${sug.cluster} of the
+          <button type="button" class="link-btn" onclick="switchTab('repdelays')">⏳ Repeater Delays</button> plan, set so
+          the repeaters relaying the same readings never send their copies on top of each other.
         </div>`;
         })()}
         <!-- The repeater's own RX/TX pair first (ef-rx, ef-tx — what every path

@@ -2845,6 +2845,34 @@ td {
 .bk-links { margin-top: var(--sp-3); }
 .bk-minor summary, .bk-how summary { cursor: pointer; }
 .bk-inline-h { display: inline; margin: 0; font-size: var(--fs-md); }
+
+/* ⏳ Repeater Delays (repeater-delays.js). The tiles and the fold headings
+   are the Backbone's; the bands are chips in their colour with the text in
+   the page's own, so a warning colour never has to carry a word. */
+.rd-settings { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); align-items: flex-end; margin-top: var(--sp-3); }
+.rd-settings label { display: flex; flex-direction: column; gap: var(--sp-1); font-size: var(--fs-sm); min-width: 0; max-width: 100%; }
+.rd-settings select, .rd-settings input[type="number"] { max-width: 100%; }
+.rd-settings input[type="number"] { width: 9rem; }
+.rd-settings .rd-check { flex-direction: row; align-items: center; gap: var(--sp-2); }
+.rd-answer { margin-top: var(--sp-3); }
+.rd-answer p { margin: 0 0 var(--sp-2); }
+.rd-b { --c: var(--muted); display: inline-block; white-space: nowrap; padding: 0 .5em; border: 1px solid var(--c); border-radius: var(--r-pill);
+        background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--text); font-size: var(--fs-xs); line-height: 1.6; }
+.rd-b--ontop { --c: var(--bad); }
+.rd-b--close { --c: var(--warn); }
+.rd-b--clear { --c: var(--ok); }
+.rd-b--none  { --c: var(--border); white-space: normal; }
+.rd-table, .rd-pairs { font-size: var(--fs-sm); }
+.table-wrap table.rd-table { min-width: 46rem; }
+.table-wrap table.rd-pairs { min-width: 44rem; }
+.rd-table td, .rd-table th, .rd-pairs td, .rd-pairs th { vertical-align: top; }
+.rd-table tr.rd-group > th { background: color-mix(in srgb, var(--accent) 7%, transparent); font-weight: 600; padding-top: var(--sp-2); }
+.rd-delay { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rd-change { display: inline-block; padding: 0 .4em; border-radius: var(--r-sm); background: color-mix(in srgb, var(--accent) 14%, transparent); font-size: var(--fs-xs); }
+.rd-compare tr.is-selected > * { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.rd-fold { margin-top: var(--sp-3); }
+.rd-fold summary { cursor: pointer; }
+.rd-free { columns: 18rem auto; column-gap: var(--sp-4); padding-left: 1.2rem; }
 .bk-minor-list { columns: 22rem auto; column-gap: var(--sp-4); padding-left: 1.2rem; }
 
 .bf-td-match { text-align: center; }

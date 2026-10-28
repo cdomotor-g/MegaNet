@@ -511,6 +511,16 @@ jobs:
         working-directory: test
         run: npm run airtime
 
+      # Node-only and fast. ⏳ Repeater Delays' plan (delay-plan.js) on
+      # networks built for it — the bands, a pair heard together by a base,
+      # no pair without a common receiver or on two channels, three fitted
+      # under a second, a second hop's timing, recorded and current delays —
+      # and on the register itself.
+      - name: Repeater delays — the plan
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run delays
+
       # A station's health on its card and as its pin's colour (#218), against
       # the demo week through the strict PostgREST stub: last heard, the
       # battery's night lows and the findings, one request a card; each line a

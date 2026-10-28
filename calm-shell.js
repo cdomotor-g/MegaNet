@@ -80,6 +80,7 @@ const CalmShell = (() => {
   const GROUP_ICON = {
     'Start here':          'start',
     'Stations & networks': 'stations',
+    'Printed maps':        'map',
     'Interference':        'radio',
     'ALERT':               'code',
     'Data':                'activity',
