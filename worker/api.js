@@ -115,6 +115,7 @@ export const LIMITS = Object.freeze({
   readingsMax: 5000,
   latestDefault: 100,          // stations per page of /readings/latest — an agent's context, not the database, is the limit
   latestMax: 1000,             // …and "every gauge in one call" while no more than this many report
+  latestAddressMax: 15000,     // addresses one whole-network read of reading_latest takes (6,738 in October 2026)
   idsPerRead: 100,             // ids in one `in.(…)` list: a longer URL is one a proxy on the way may refuse
   windowMaxDays: Object.freeze({ raw: 7, hourly: 31, daily: 731 }),
   windowDefaultDays: Object.freeze({ raw: 1, hourly: 7, daily: 90 }),
@@ -1850,7 +1851,8 @@ async function dossierEndpoint(rc, rawId) {
 // ── GET /api/v1/stations/{id}/readings ───────────────────────────────────────
 
 const READING_SELECT = {
-  raw: 'addr,alert_id,station_number,channel,reading_ts,received_at,value_raw,value,unit,quality,path,dup_count',
+  raw: 'addr,alert_id,station_number,channel,reading_ts,received_at,value_raw,value,unit,quality,path,dup_count,'
+    + 'freq_mhz,rssi_dbm,level_dbfs,snr_db',
   hourly: 'addr,alert_id,channel,bucket,n,n_dup,unit,raw_min,raw_max,raw_mean,raw_last,val_min,val_max,val_mean,val_last,first_ts,last_ts',
   daily: 'addr,alert_id,channel,bucket,n,n_dup,unit,raw_min,raw_max,raw_mean,raw_last,val_min,val_max,val_mean,val_last,first_ts,last_ts',
 };
@@ -1941,7 +1943,8 @@ async function readingsEndpoint(rc, rawId, params) {
   }
   const shaped = rows.map(r => (resolution === 'raw'
     ? stripNulls({ t: r.reading_ts, addr: r.addr, value_raw: num(r.value_raw), value: num(r.value), unit: r.unit,
-        quality: r.quality, received_at: r.received_at, path: r.path, dup_count: r.dup_count || null })
+        quality: r.quality, received_at: r.received_at, path: r.path, dup_count: r.dup_count || null,
+        freq_mhz: num(r.freq_mhz), rssi_dbm: num(r.rssi_dbm), level_dbfs: num(r.level_dbfs), snr_db: num(r.snr_db) })
     : stripNulls({ t: r.bucket, addr: r.addr, n: r.n, raw_min: num(r.raw_min), raw_max: num(r.raw_max),
         raw_mean: num(r.raw_mean), raw_last: num(r.raw_last), val_min: num(r.val_min), val_max: num(r.val_max),
         val_mean: num(r.val_mean), val_last: num(r.val_last), unit: r.unit, first_ts: r.first_ts, last_ts: r.last_ts })));
@@ -1982,11 +1985,17 @@ async function readingsEndpoint(rc, rawId, params) {
 // is, optionally only one radio network, basin, kind or bounding box.
 //
 // The newest reading per address is DISTINCT ON, which PostgREST cannot say,
-// so it is a view, meganet.reading_latest (0057), that walks the primary key —
-// its cost is the number of addresses, not of readings. Until 0057 is applied
-// to the live database this route answers 503 naming it (ARRIVES_WITH).
+// so it is a view, meganet.reading_latest (0057). Since 0086 the view reads a
+// table a trigger on meganet.reading keeps — one row per address — rather
+// than walking every address on each read, which had grown to 3.2 s at 6,700
+// addresses, past anon's 3 s statement timeout, so the route timed out
+// whatever the filters. Until 0057 is applied to the live database this route
+// answers 503 naming it (ARRIVES_WITH).
 //
-// Two reads at pilot scale, and a bounded handful at the network's:
+// A filter that leaves at most three hundred stations (a box around a site, a
+// network) is four quick reads: those stations' ids; their addresses' newest
+// readings, by station id; how many addresses no station can be named for;
+// the page's stations. Otherwise, a bounded handful:
 //   1. every address's newest reading (a read per thousand addresses);
 //   2. the stations those belong to, live and matching the filters, asked for
 //      by id a hundred to a read — while that is at most three reads;
@@ -2104,13 +2113,35 @@ async function latestReadingsEndpoint(rc, params) {
       ['lon', `gte.${f.bbox.west}`], ['lon', `lte.${f.bbox.east}`]);
   }
 
-  // 1. Every address's newest reading, grouped by the station it was read for.
-  const latest = await rc.up.selectAll('reading_latest', [['select', LATEST_SELECT], ['order', 'addr.asc']],
-    LIMITS.candidateMax);
+  // 0. A filter that leaves few stations — a box around a site, a network —
+  //    asks for those stations' readings by id rather than reading every
+  //    address in the network to throw most of them away.
+  const filtered = filters.length > 1;                // stationFilterPairs always holds deleted_at
+  let few = null, live = null;
+  if (filtered) {
+    live = await rc.up.selectAll('station', [['select', 'id'], ...filters, ['order', 'id.asc']], LIMITS.candidateMax);
+    if (!live.truncated && live.rows.length <= LIMITS.idsPerRead * LATEST_INLINE_READS) few = live.rows.map(r => r.id);
+  }
+
+  // 1. The newest reading of each address — the few stations', or every one —
+  //    grouped by the station it was read for.
+  let latest, unattributed = 0;
+  if (few) {
+    const chunks = [];
+    for (let i = 0; i < few.length; i += LIMITS.idsPerRead) chunks.push(few.slice(i, i + LIMITS.idsPerRead));
+    const [got, loose] = await Promise.all([
+      Promise.all(chunks.map(c => rc.up.select('reading_latest', [['select', LATEST_SELECT], ['station_id', `in.${pgList(c)}`],
+        ['order', 'addr.asc']]))),
+      rc.up.select('reading_latest', [['select', 'addr'], ['station_id', 'is.null'], ['limit', '1']], { count: true }),
+    ]);
+    latest = { rows: got.flatMap(g => g.rows), truncated: false };
+    unattributed = loose.total != null ? loose.total : loose.rows.length;
+  } else {
+    latest = await rc.up.selectAll('reading_latest', [['select', LATEST_SELECT], ['order', 'addr.asc']], LIMITS.latestAddressMax);
+  }
   const byStation = new Map();
-  let unattributed = 0;
   for (const r of latest.rows) {
-    if (!r.station_id) { unattributed++; continue; }
+    if (!r.station_id) { if (!few) unattributed++; continue; }
     if (!byStation.has(r.station_id)) byStation.set(r.station_id, []);
     byStation.get(r.station_id).push(r);
   }
@@ -2118,11 +2149,13 @@ async function latestReadingsEndpoint(rc, params) {
 
   // 2. Which of them are live stations that match, and (3) the page's rows.
   let candidates, rowsById = null, exact = !latest.truncated;
-  if (heard.length <= LIMITS.idsPerRead * LATEST_INLINE_READS) {
+  if (few) {
+    candidates = heard;
+  } else if (heard.length <= LIMITS.idsPerRead * LATEST_INLINE_READS) {
     rowsById = byKey(await stationRowsByIds(rc, heard, LATEST_STATION_SELECT, filters));
     candidates = heard.filter(id => rowsById.has(id));
   } else {
-    const live = await rc.up.selectAll('station', [['select', 'id'], ...filters, ['order', 'id.asc']], LIMITS.candidateMax);
+    if (!live) live = await rc.up.selectAll('station', [['select', 'id'], ...filters, ['order', 'id.asc']], LIMITS.candidateMax);
     if (live.truncated) exact = false;
     const keep = new Set(live.rows.map(r => r.id));
     candidates = heard.filter(id => keep.has(id));
@@ -2138,7 +2171,7 @@ async function latestReadingsEndpoint(rc, params) {
     notes.push(`${unattributed} address(es) heard belong to no single live station — an ALERT address more than one station carries, or a station not in the register — so are in no row here. That count is the whole network's, whatever the filters.`);
   }
   if (latest.truncated) {
-    notes.push(`More than ${LIMITS.candidateMax} addresses have readings; this answer covers the first ${LIMITS.candidateMax} by address, and its total is a floor.`);
+    notes.push(`More than ${LIMITS.latestAddressMax} addresses have readings; this answer covers the first ${LIMITS.latestAddressMax} by address, and its total is a floor.`);
   }
   const total = candidates.length;
   const nextOffset = f.offset + stations.length;
@@ -3342,7 +3375,7 @@ export const MCP_TOOLS = Object.freeze([
   {
     name: 'get_readings',
     title: 'Get readings',
-    description: `Telemetry ingested into Flood-Net for one station: raw readings (window up to ${LIMITS.windowMaxDays.raw} days), hourly (${LIMITS.windowMaxDays.hourly} days) or daily rollups (${LIMITS.windowMaxDays.daily} days). Most stations report through the Bureau's own systems, so an empty answer is normal.`,
+    description: `Telemetry ingested into Flood-Net for one station: raw readings (window up to ${LIMITS.windowMaxDays.raw} days) — each with the path it came by and, where the receiver measured them, its freq_mhz, rssi_dbm, level_dbfs and snr_db — or hourly (${LIMITS.windowMaxDays.hourly} days) or daily rollups (${LIMITS.windowMaxDays.daily} days). Most stations report through the Bureau's own systems, so an empty answer is normal.`,
     inputSchema: { type: 'object', properties: {
       id: idArg,
       from: { type: 'string', maxLength: 40, description: 'Start, ISO 8601 date or date-time.' },

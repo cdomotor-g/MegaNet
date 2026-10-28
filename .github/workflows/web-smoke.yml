@@ -2026,7 +2026,8 @@ jobs:
       # The newest reading of every address (0057), which the agent API's
       # /api/v1/readings/latest reads: one row per address, by the device's
       # own time and the later received of a tie, agreeing with DISTINCT ON —
-      # and read by anon exactly as an editor reads it.
+      # kept by 0086's trigger through a newer reading, a duplicate, a station
+      # resolved later and a deletion — and read by anon exactly as an editor.
       - name: check_reading_latest.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_reading_latest.sql

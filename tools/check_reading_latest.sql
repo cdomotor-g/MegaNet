@@ -1,5 +1,6 @@
 -- check_reading_latest.sql — Prove 0057, the newest reading of every address,
--- against a real database.
+-- against a real database, and 0086, which keeps it in a table as readings
+-- arrive, change and go rather than working it out on every read.
 --
 --   psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_reading_latest.sql
 --
@@ -58,6 +59,16 @@ begin
     has_table_privilege('anon', 'meganet.reading_latest', 'select')
       and has_table_privilege('authenticated', 'meganet.reading_latest', 'select')
       and has_table_privilege('anon', 'meganet.reading', 'select'));
+
+  perform pg_temp.check_that('it reads meganet.reading_newest, a table kept by a trigger on meganet.reading (0086)',
+    to_regclass('meganet.reading_newest') is not null
+      and exists (select 1 from pg_trigger where tgrelid = 'meganet.reading'::regclass and tgname = 'reading_newest_keep')
+      and pg_get_viewdef('meganet.reading_latest'::regclass) ~ 'reading_newest');
+
+  perform pg_temp.check_that('nobody but the trigger writes the table',
+    not has_table_privilege('anon', 'meganet.reading_newest', 'insert,update,delete')
+      and not has_table_privilege('authenticated', 'meganet.reading_newest', 'insert,update,delete')
+      and not has_function_privilege('anon', 'meganet.reading_newest_redo(text)', 'execute'));
 
   perform pg_temp.check_that('nobody writes through it',
     not has_table_privilege('anon', 'meganet.reading_latest', 'insert,update,delete')
@@ -122,6 +133,63 @@ begin
   perform pg_temp.check_that('the view has exactly one row for every address meganet.reading holds',
     (select count(*) from meganet.reading_latest) = (select count(distinct addr) from meganet.reading)
       and not exists (select 1 from meganet.reading_latest group by addr having count(*) > 1));
+end
+$$;
+
+-- ── 2b. Kept as the readings change (0086) ───────────────────────────────────
+
+do $$
+declare
+  a jsonb;
+  n integer;
+begin
+  -- A newer reading takes the address's row at once.
+  a := meganet.ingest(format($j${"source":"http","protocol":"alert","readings":[
+        {"alert_id":64601,"reading_ts":"%1$s","value_raw":31,"rssi_dbm":-97.5,"snr_db":18.25,"freq_mhz":151.5375}]}$j$,
+        pg_temp.ts('10 minutes'))::jsonb);
+  perform pg_temp.check_that('a newer reading takes its address''s row the moment it is stored, its signal with it',
+    (select value_raw = 31 and reading_ts = pg_temp.ts('10 minutes')::timestamptz and rssi_dbm = -97.5 and snr_db = 18.25
+       and freq_mhz = 151.5375 from meganet.reading_latest where addr = 'a:64601'),
+    (select row_to_json(l)::text from meganet.reading_latest l where addr = 'a:64601'));
+
+  -- The same reading again, from another receiver: a duplicate, counted.
+  a := meganet.ingest(format($j${"source":"http","protocol":"alert","readings":[
+        {"alert_id":64601,"reading_ts":"%1$s","value_raw":31}]}$j$, pg_temp.ts('10 minutes'))::jsonb);
+  perform pg_temp.check_that('…a duplicate of it raises its count there too',
+    (select l.dup_count = r.dup_count and r.dup_count >= 1
+       from meganet.reading_latest l join meganet.reading r using (addr, reading_ts, value_raw)
+      where l.addr = 'a:64601'),
+    (select dup_count::text from meganet.reading_latest where addr = 'a:64601'));
+
+  -- A station named for it later, as resolve_readings() does.
+  update meganet.reading set station_id = '_check_later' where addr = 'a:64601' and value_raw = 31;
+  perform pg_temp.check_that('…a station resolved for it later shows at once',
+    (select station_id = '_check_later' from meganet.reading_latest where addr = 'a:64601'));
+  update meganet.reading set station_id = '_check_older' where addr = 'a:64601' and value_raw = 30;
+  perform pg_temp.check_that('…while a change to an older reading leaves the row as it was',
+    (select station_id = '_check_later' and value_raw = 31 from meganet.reading_latest where addr = 'a:64601'));
+
+  -- The newest gone — an editor's delete, or the archive releasing its day.
+  delete from meganet.reading where addr = 'a:64601' and value_raw = 31;
+  perform pg_temp.check_that('the newest reading deleted, the one before it is the newest again',
+    (select value_raw = 30 and reading_ts = pg_temp.ts('1 hour')::timestamptz and station_id = '_check_older'
+       from meganet.reading_latest where addr = 'a:64601'),
+    (select row_to_json(l)::text from meganet.reading_latest l where addr = 'a:64601'));
+  a := meganet.ingest(format($j${"source":"http","protocol":"alert","readings":[
+        {"alert_id":64604,"reading_ts":"%1$s","value_raw":5}]}$j$, pg_temp.ts('15 minutes'))::jsonb);
+  delete from meganet.reading where addr = 'a:64604';
+  perform pg_temp.check_that('…and an address with no reading left has no row',
+    not exists (select 1 from meganet.reading_latest where addr = 'a:64604'));
+
+  -- And all of it, against DISTINCT ON over the whole table.
+  select count(*) into n from (
+    (select distinct on (r.addr) r.addr, r.reading_ts, r.received_at, r.value_raw, r.station_id, r.dup_count
+       from meganet.reading r order by r.addr, r.reading_ts desc, r.received_at desc, r.value_raw desc)
+    except
+    (select l.addr, l.reading_ts, l.received_at, l.value_raw, l.station_id, l.dup_count from meganet.reading_latest l)) x;
+  perform pg_temp.check_that('every address in the table agrees with DISTINCT ON over meganet.reading, after all that',
+    n = 0 and (select count(*) from meganet.reading_latest) = (select count(distinct addr) from meganet.reading),
+    format('%s differ', n));
 end
 $$;
 

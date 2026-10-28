@@ -68,7 +68,7 @@ const COLUMNS = Object.fromEntries(Object.entries({
   sls_location: 'bureau_number name owner gauge_type data_type basin_no catchment_name class_minor class_moderate class_major prediction_type lead_time lead_time_hours trigger_height peak_accuracy priority schedules forecast_location information_location river_data_location bureau_owned bureau_assists bureau_colocated multi_schedule source_note station_id station_name catchment_id jurisdiction awrc_number gauge_datum classes_undefined fast_response interim_service',
   sls_doc: 'jurisdiction title version source place published url schedules loaded_at updated_by',
   station_health: 'station_key station_id station_name online since last_seen_at last_reading_at minutes_since_seen minutes_since_reading last_status reported_by updated_at',
-  reading: 'alert_id station_number channel addr station_id reading_ts received_at value_raw value unit conversion quality protocol source path dup_count dup_paths last_dup_at raw_id ingest_token_id',
+  reading: 'alert_id station_number channel addr station_id reading_ts received_at value_raw value unit conversion quality protocol source path dup_count dup_paths last_dup_at raw_id ingest_token_id a2_station a2_sensor freq_mhz rssi_dbm level_dbfs snr_db',
   reading_hourly: 'addr bucket alert_id station_number channel station_id unit n n_dup n_val raw_min raw_max raw_sum raw_last raw_mean val_min val_max val_sum val_last val_mean first_ts last_ts rolled_at',
   reading_daily: 'addr bucket alert_id station_number channel station_id unit n n_dup n_val raw_min raw_max raw_sum raw_last raw_mean val_min val_max val_sum val_last val_mean first_ts last_ts rolled_at',
   // The view 0057 makes: the reading's own columns, none of its bookkeeping.
@@ -816,8 +816,17 @@ section('Flood levels, SLS, readings');
     && r.json.total === 2 * 7 * 24, `${r.json.count} rows, total ${r.json.total}`);
   check('readings rows are in time order and label their channels', r.json.rows.every((x, i, a) => i === 0 || x.t >= a[i - 1].t)
     && r.json.channels[WL_ADDR] && r.json.channels[WL_ADDR].sensor_types);
+  // One reading as a base station's receiver gives it: its frequency and signal, and the path it came by.
+  const heardRaw = T.reading.filter(x => x.station_id === RICH.id && Date.parse(x.reading_ts) > NOW - 24 * hour)
+    .sort((a, b) => Date.parse(b.reading_ts) - Date.parse(a.reading_ts))[0];
+  Object.assign(heardRaw, { freq_mhz: 151.5375, rssi_dbm: -97.5, level_dbfs: -31.2, snr_db: 18.4, path: 'serial-monitor/rpi-test-sdr1' });
   const raw = await get(`/api/v1/stations/${RICH.id}/readings?resolution=raw&from=${encodeURIComponent(iso(NOW - 24 * hour))}`);
   check('raw readings over a day', raw.status === 200 && raw.json.count > 150 && raw.json.rows[0].value_raw != null, `${raw.json.count}`);
+  const sigRow = raw.json.rows.find(x => x.t === heardRaw.reading_ts && x.addr === heardRaw.addr);
+  check('…each with the frequency, signal and path the receiver gave, where it gave them, and none invented where it did not',
+    sigRow && sigRow.freq_mhz === 151.5375 && sigRow.rssi_dbm === -97.5 && sigRow.level_dbfs === -31.2 && sigRow.snr_db === 18.4
+      && sigRow.path === 'serial-monitor/rpi-test-sdr1'
+      && raw.json.rows.filter(x => x !== sigRow).every(x => !('rssi_dbm' in x) && !('snr_db' in x)), JSON.stringify(sigRow));
   const tooLongRaw = await get(`/api/v1/stations/${RICH.id}/readings?resolution=raw&from=${day(NOW - 8 * 24 * hour)}`);
   check('a raw window over 7 days is refused, pointing at hourly', tooLongRaw.status === 400 && /hourly/.test(tooLongRaw.json.detail));
   const tooLongHourly = await get(`/api/v1/stations/${RICH.id}/readings?resolution=hourly&from=${day(NOW - 32 * 24 * hour)}`);
@@ -940,6 +949,19 @@ const ageless = row => JSON.parse(JSON.stringify(row, (k, v) => (/^minutes_since
   check('bbox=west,south,east,north keeps the stations inside it, and none without a position', inside.status === 200
     && sameList(idsOf(inside), expectLatest(inBox(box))) && idsOf(inside).includes(RICH.id) && !idsOf(inside).includes(BATESON.id),
     `${inside.status} ${idsOf(inside).join(' ')} ${inside.json && inside.json.detail}`);
+  // A box around one site is the quick path: no read of the whole network.
+  const small = [RICH.lon - 0.01, RICH.lat - 0.01, RICH.lon + 0.01, RICH.lat + 0.01].map(x => Math.round(x * 1e4) / 1e4);
+  stub.requests = [];
+  api.resetApiState();
+  const site = await get(`/api/v1/readings/latest?bbox=${small.join(',')}`);
+  const latestReads = stub.requests.filter(q => /\/reading_latest\?/.test(q.url));
+  check('a small box asks for its stations\' readings by station id, never every address in the network — four quick reads',
+    site.status === 200 && sameList(idsOf(site), expectLatest(inBox(small))) && idsOf(site).includes(RICH.id)
+      && stub.requests.length <= 4 && latestReads.length === 2
+      && latestReads.every(q => /station_id=(in\.|is\.null)/.test(decodeURIComponent(q.url))),
+    `${stub.requests.length} reads: ${stub.requests.map(q => decodeURIComponent(new URL(q.url).pathname.split('/').pop() + new URL(q.url).search).slice(0, 90)).join(' | ')}`);
+  check('…and still counts the whole network\'s addresses no station can be named for',
+    site.json.unattributed_addresses === T.reading_latest.filter(x => !x.station_id).length, `${site.json.unattributed_addresses}`);
   const both = await get(`/api/v1/readings/latest?type=rain&bbox=${box.join(',')}&network=${net}`);
   check('filters combine', both.status === 200 && sameList(idsOf(both),
     expectLatest(s => inBox(box)(s) && api.stationKinds(s).includes('rain') && (s.radio_network_ids || []).includes(net))));

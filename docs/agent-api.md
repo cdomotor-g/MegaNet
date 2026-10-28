@@ -502,6 +502,20 @@ curl -s 'https://floodwarning.net/api/v1/stations/abergowrie_br_al/readings?reso
 }
 ```
 
+A **raw** row is one reading as it was received: `t` (the device's own time),
+`addr`, `value_raw` as transmitted, `value` and `unit` where Flood-Net had a
+conversion, `quality`, `received_at`, the `path` it came by (which receiver),
+`dup_count` (copies heard again) — and the frequency and signal the receiver
+gave: `freq_mhz`, `rssi_dbm`, `level_dbfs` and `snr_db`, each only where that
+receiver measures it (an SDR gives level and SNR, a radio its RSSI) and absent,
+never zero, where it does not. A real row, from 27 October 2026:
+
+```json
+{ "t": "2026-10-27T08:47:03+00:00", "addr": "a:5339", "value_raw": 117, "quality": 0,
+  "received_at": "2026-10-27T08:48:42.472815+00:00", "path": "serial-monitor/rpi-83071968-sdr1-151.5375",
+  "freq_mhz": 151.5375, "level_dbfs": -46.4, "snr_db": 18.3 }
+```
+
 ### `GET /api/v1/readings/latest`
 
 What every gauge is saying now, in one call: each station Flood-Net holds
@@ -571,10 +585,14 @@ curl -s 'https://floodwarning.net/api/v1/readings/latest?type=river&bbox=145.5,-
   into one, and the count is the whole network's whatever the filters say.
 - A station with no recorded position — the workshop test rigs — is a row in
   JSON; in GeoJSON it is named in `omitted_without_position`.
-- It reads `meganet.reading_latest`, a view that keeps one row per address
-  (migration `0057`). Until that migration is applied to the live database the
-  route answers **503** `"not available yet"`, naming the relation and the
-  migration (see [For the owner](#apply-0057-for-the-latest-readings)).
+- It reads `meganet.reading_latest`, one row per address (migration `0057`),
+  which since `0086` is a table a trigger keeps as readings arrive — so a
+  filter that leaves a few hundred stations or fewer (a box around a site, a
+  network) is answered in a handful of quick reads, and the whole network in
+  about one read per thousand addresses. Until `0057` is applied to a
+  database the route answers **503** `"not available yet"`, naming the
+  relation and the migration (see
+  [For the owner](#apply-0057-for-the-latest-readings)).
 
 ### `GET /api/v1/stations/{id}/flood-levels`
 
@@ -1090,7 +1108,10 @@ does not cover it; the same limits apply). GitHub Pages has no API.
 `meganet.reading_latest`, a view `db/migrations/0057_reading_latest.sql`
 creates. The Worker deploys on push; the migration lands only when somebody
 applies it, and until then the route answers 503 `"not available yet"` naming
-the migration. Nothing else in the API depends on it. To apply it:
+the migration. Nothing else in the API depends on it. `0086` then keeps that
+view's rows in a table as readings arrive; without it the view walks every
+address on each read, which passed anon's 3 s timeout at 6,700 addresses.
+Both are applied to the live database. To apply them to another:
 
 1. In the Supabase dashboard, open the Flood-Net project → **SQL Editor** →
    **New query**.
