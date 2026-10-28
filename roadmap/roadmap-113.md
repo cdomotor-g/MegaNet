@@ -832,6 +832,14 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 200 — 2026-10-28: 💾 The database's Disk IO cut back — 0087
+
+The owner, forwarding Supabase's warning that the project *"is depleting its Disk IO Budget"*: *"Can you assess the situation and do what you can to rectify in the short term and then come back to me with any big long-term recommendations?"* No issue; this entry is its record. **Opens and closes nothing.**
+
+- **Found** (pg_stat_statements, nine days from 2026-10-19; the instance has 224 MB of shared buffers and 2 MB of `work_mem` for a 902 MB database): the readings paged in time order by Station Health, the Reception Map, the latency map and `station-health.yml` — no index in that order, so each page re-sorted its whole twelve-hour chunk to disk, **26 GB of temporary files**; `roll_up_carriers()` rebuilding three UTC days every hour (42 s a run, 15 GB read and written); `roll_up()` joining hours by `date_trunc()`, which no index serves (18 s a run, 2.7 GB read).
+- **`0087`**: `reading_ts_idx (reading_ts, addr, value_raw)` — a page **2.3 s → 41 ms**, no sort; `roll_up()` finds each hour and day as a range on the primary keys — an hour's join **3.9 s → 24 ms**, the whole run **~18 s → 2.2 s**, the same rows written; `roll_up_carriers()` with no dates rebuilds today, yesterday too before 03:00 UTC and the day before at 03:xx (no reception has arrived later than three hours after its UTC day), about **a quarter of the work**; `meganet._check_0072_before` dropped (23 MB, revision 172). Applied by `db-migrate.yml` in 8 s; ingest answered 200 throughout. `core.js` `DB_SCHEMA_VERSION` 87.
+- **Checks:** every migration from zero on Postgres 16, then `check_ingest` (50, the rollups among them), `check_mqtt`, `check_ingest_points`, `check_ingest_token_admin`, `check_receptions`, `check_reception_rollups`, `check_reception_detail`, `check_archive`, `check_transmitter_drift`, `check_flip_fingerprints`, `check_station_snr`, `check_reading_signal`, `check_reading_latest`; the plans read again on the live database after the apply; the cheap five.
+
 ### Revision 199 — 2026-10-28: 🛣️ Route on map — EPIC #250 opened, #251 closed
 
 The owner: *"It would be nice to be able to bring in directions, as in road directions. How do I get to a station into FloodNet and put it on the map? Seem to vaguely remember Google not allowing that"* — and, after a look at what is possible: *"the user should be able to select the starting point but we should default to the phones location if we have it at the time of the request or from Pritchard Road Virginia for all Brisbane hub sites for everything else we should ask the user to select the starting location … this will be for editors only."* **Opens EPIC #250 with #251–#254; closes #251.**

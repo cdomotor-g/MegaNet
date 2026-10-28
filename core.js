@@ -3681,8 +3681,10 @@ const DB_SCHEMA = 'meganet';
 // transmitter signal (0083). 84: ALERT addresses set aside (0084). 85: each
 // station as Station Health shows it, for the agent API (0085). All six
 // applied together on 27 October 2026, bumped after. 86: each address's
-// newest reading kept by a trigger (0086), applied by hand, bumped after.
-const DB_SCHEMA_VERSION = 86;
+// newest reading kept by a trigger (0086), applied by hand, bumped after. 87:
+// readings in time order indexed, the roll-ups by range (0087), applied by
+// db-migrate.yml on 28 October 2026, bumped after.
+const DB_SCHEMA_VERSION = 87;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
