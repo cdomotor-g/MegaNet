@@ -251,7 +251,8 @@ try {
     const pillName = a => a.querySelector('.pill-lbl')?.textContent.replace(/\s+/g, ' ').trim();
     return { river: desc(rowOf('River')), rain: desc(rowOf('Rain')), slider: !!sec.querySelector('input[type=range].gplot-range'),
              dataHead: data?.querySelector('.stn-card-rhs-head')?.textContent.trim(),
-             dataArro: [...(data?.querySelectorAll('.stn-card-data-pills a.pill') || [])].map(pillName),
+             dataPills: [...(data?.querySelectorAll('.stn-card-data-pills .pill') || [])].map(pillName),
+             inApp: [...document.querySelectorAll('#stn-card .stn-card-group[aria-label="In Flood-Net"] .pill')].map(pillName),
              records: [...document.querySelectorAll('#stn-card .stn-card-group[aria-label="Records"] .pill')].map(pillName),
              afterHealth: !!sec.previousElementSibling, actionsStillRows: [...document.querySelectorAll('#stn-card .stn-card-actions > *')].every(g => g.classList.contains('pill-row')) };
   });
@@ -267,9 +268,10 @@ try {
     card.slider && card.rain && /Rain within 25 km/.test(card.rain.head) && /ARRO rain · \d+/.test(card.rain.arroText)
       && /\d+(\.\d+)? km\)/.test(card.rain.names), JSON.stringify(card.rain));
   ok('the actions below are still pill rows, nothing else among them', card.actionsStillRows);
-  ok('the plots are under Data, led by the station\'s ARRO admin pill — which Records no longer carries',
-    card.dataHead === 'Data' && card.dataArro.length === 1 && /ARRO admin/.test(card.dataArro[0])
-      && !card.records.some(n => /ARRO/.test(n || '')), JSON.stringify({ head: card.dataHead, arro: card.dataArro, records: card.records }));
+  ok('the plots are under Data, led by Field data and the station\'s ARRO admin pill — which Records no longer carries',
+    card.dataHead === 'Data' && card.dataPills.length === 2 && card.dataPills[0] === 'Field data' && /ARRO admin$/.test(card.dataPills[1] || '')
+      && !card.records.some(n => /ARRO/.test(n || '')), JSON.stringify({ head: card.dataHead, pills: card.dataPills, records: card.records }));
+  ok('…and Field data is still in In Flood-Net as well', card.inApp.includes('Field data'), JSON.stringify(card.inApp));
 
   const slid = await page.evaluate(id => {
     const before = document.querySelector(`#gplot-rain-${id} .gplot-fn`)?.textContent;

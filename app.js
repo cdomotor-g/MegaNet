@@ -7090,19 +7090,21 @@ function arroAdminPillHtml(s) {
            >${pillText('📊', `${pillLong('Open in ')}ARRO admin`, '↗')}</a>` : '';
 }
 
-// The station card's Data section: its ARRO admin page, then its neighbours
-// plotted with it (group-plots.js) — a river height gauge's river and a rain
-// gauge's surroundings. Either can be missing: a station with no ARRO site id
-// still has neighbours, and one with no level or rain gauge still has an
-// admin page. Nothing at all for a station with neither.
+// The station card's Data section: its readings on the Field Data tab and
+// its ARRO admin page, then its neighbours plotted with it (group-plots.js) —
+// a river height gauge's river and a rain gauge's surroundings. Field data →
+// is in In Flood-Net as well: it is both something the app does with the
+// station and the way into its data, and was asked for in both places. Any of
+// them can be missing — no arro-data.js, no ARRO site id, no level or rain
+// gauge — and the section is not drawn when all are.
 function stnCardDataHtml(s) {
-  const arro = arroAdminPillHtml(s);
+  const pills = fieldDataPillHtml(s) + arroAdminPillHtml(s);
   const rows = typeof GroupPlots !== 'undefined' ? GroupPlots.cardRowsHtml(s) : '';
-  if (!arro && !rows) return '';
+  if (!pills && !rows) return '';
   return `<div class="acma-sect stn-card-data" id="mn-data-card-${escAttr(String(s.id))}">
       <span class="small txt-muted stn-card-rhs-head"
-        title="This station's data: its admin page in ARRO, and its neighbours plotted with it — in ARRO on one graph, or out of the Flood-Net datastore a strip each">Data</span>
-      ${arro ? `<div class="pill-row stn-card-data-pills">${arro}</div>` : ''}
+        title="This station's data: its readings on the Field Data tab, its admin page in ARRO, and its neighbours plotted with it — in ARRO on one graph, or out of the Flood-Net datastore a strip each">Data</span>
+      ${pills ? `<div class="pill-row stn-card-data-pills">${pills}</div>` : ''}
       ${rows}
     </div>`;
 }
@@ -8538,7 +8540,7 @@ function stnCardHtml(s) {
          Nothing for a proposed station, which has nothing to have heard. The
          owner stays the card's first row, as it always is. -->
     ${HealthGlance.cardHtml(s)}
-    <!-- Data (stnCardDataHtml): its ARRO admin page, then its neighbours
+    <!-- Data (stnCardDataHtml): Field data → and its ARRO admin page, then its neighbours
          plotted with it (group-plots.js) — a river height gauge's river,
          every gauge along it, and a rain gauge's surroundings, within the
          distance its slider says, each in ARRO on one graph or out of the

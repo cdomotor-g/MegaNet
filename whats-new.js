@@ -25,6 +25,10 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 130, date: '2026-10-28', items: [
+      'The station card\'s <strong>Field data →</strong> is under <strong>Data</strong> too, beside '
+        + '<strong>ARRO admin</strong>, as well as where it was under <strong>In Flood-Net</strong>.',
+    ] },
     { n: 129, date: '2026-10-28', items: [
       'On a station\'s card, <strong>Plot with its neighbours</strong> is now <strong>Data</strong>, and the station\'s '
         + '<strong>ARRO admin</strong> pill has moved up into it from <strong>Records</strong>.',
