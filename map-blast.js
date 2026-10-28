@@ -177,7 +177,7 @@ const MapBlast = (function () {
         below have nowhere else to go
         (<span class="blast-swatch-ring" aria-hidden="true"></span> ring), ${ruleHtml(a.maxKm)}.
         Stations with no carrier at all today are not in this count: they are already orphaned
-        (see the Pass Ranges tab), and removing this repeater changes nothing for them.
+        (see the ALERT IDs tab), and removing this repeater changes nothing for them.
       </p>`;
 
     if (!a.carried.length) {

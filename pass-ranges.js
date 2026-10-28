@@ -96,7 +96,7 @@ function renderPassRangesHtml() {
   return `
     <div class="page as-page">
       <div class="panel">
-        <div class="panel-header"><h2>Pass Ranges</h2></div>
+        <div class="panel-header"><h2>ALERT IDs</h2></div>
         <div class="stats stats-row">
           <div>Repeaters with pass ranges: <strong>${repeaters.length}</strong></div>
           <div>Field stations with AlertID: <strong>${fields.length - noAid}</strong></div>

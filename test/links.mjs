@@ -239,7 +239,7 @@ async function main() {
     check('a tab picked from the nav is a step, and the address names it alone',
       w.search === '?tab=passranges' && w.push === w0.push + 1, J({ w, before: w0.push }));
     check('…and the title names it, so the back button\'s list tells the steps apart — set after the push, not before',
-      w0.title === 'Stations — Flood-Net' && w.title === 'Pass Ranges — Flood-Net' && w.left === w0.title, J({ w0: w0.title, w }));
+      w0.title === 'Stations — Flood-Net' && w.title === 'ALERT IDs — Flood-Net' && w.left === w0.title, J({ w0: w0.title, w }));
     await page.evaluate(() => history.back());
     await page.waitForFunction(() => state.activeTab === 'stations' && !!state.map, null, { timeout: 10_000 });
     await mapUp(page);
@@ -249,7 +249,7 @@ async function main() {
       && w.title === 'Stations — Flood-Net', J(w));
     await page.evaluate(() => history.forward());
     await page.waitForFunction(() => state.activeTab === 'passranges', null, { timeout: 10_000 });
-    check('forward goes to Pass Ranges again', (await where(page)).tab === 'passranges');
+    check('forward goes to ALERT IDs again', (await where(page)).tab === 'passranges');
     await page.evaluate(() => history.back());
     await page.waitForFunction(() => state.activeTab === 'stations' && !!state.map, null, { timeout: 10_000 });
     await mapUp(page);

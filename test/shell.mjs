@@ -568,7 +568,7 @@ try {
   check('but a switch from outside the shell does not move focus at all',
     fromNowhere.tab === 'passranges' && fromNowhere.stayed);
   check('and there the live region does say which tab, politely',
-    fromNowhere.polite === 'polite' && /Pass Ranges/.test(fromNowhere.said),
+    fromNowhere.polite === 'polite' && /ALERT IDs/.test(fromNowhere.said),
     JSON.stringify(fromNowhere.said));
 
   // ── 7. Reduced motion, and sideways scroll ────────────────────────────────

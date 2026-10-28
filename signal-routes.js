@@ -1268,7 +1268,7 @@ const SignalRoutes = (() => {
           passes, so one with too few of them heard that day, or one the register does not have, is not found — its relays then count as direct, or as copies
           no repeater explains. "Direct" means not on a found repeater's carrier. A Quansheng or ERT-A2 receiver measures no carrier.</p>
         <p class="small"><button class="link-btn" onclick="switchTab('health')">Station Health</button> ·
-          <button class="link-btn" onclick="switchTab('passranges')">Pass Ranges</button> ·
+          <button class="link-btn" onclick="switchTab('passranges')">ALERT IDs</button> ·
           <button class="link-btn" onclick="switchTab('flipsources')">Bit-Flip Sources</button> ·
           <button class="link-btn" onclick="switchTab('reception')">Reception Map</button></p>
       </div>` : ''}

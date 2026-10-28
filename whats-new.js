@@ -25,8 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 138, date: '2026-10-28', items: [
+      'The <strong>🔗 Pass Ranges</strong> tab is now called <strong>🔗 ALERT IDs</strong> — the same tab, in the same place under '
+        + '<strong>Stations &amp; networks</strong>. Searching the nav for “pass ranges” still finds it.',
+    ] },
     { n: 137, date: '2026-10-28', items: [
-      'In <strong>Pass Ranges</strong>, the <strong>Address grid</strong> is as wide as its card, its squares as big as that allows.',
+      'In <strong>ALERT IDs</strong>, the <strong>Address grid</strong> is as wide as its card, its squares as big as that allows.',
       'The grid and the <strong>All addresses</strong> wheel work together: press an address on either and it goes into the filter box '
         + 'at the top — marked on both, kept on the wheel, and the page filtered to it — and an address typed in the filter box is kept '
         + 'on both. They show the same hub or network, so changing <strong>Show</strong> on one changes the other, and a block or a gap '

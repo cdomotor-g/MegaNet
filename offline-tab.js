@@ -427,7 +427,7 @@ const OfflineTab = (function () {
                 search, the filters and each station's details.</li>
               <li><strong>Inspections</strong> and <strong>Site Maintenance</strong>: start a sheet and save its
                 draft on this device.</li>
-              <li>Tools that work from the station list or from what you paste: <strong>Pass Ranges</strong>,
+              <li>Tools that work from the station list or from what you paste: <strong>ALERT IDs</strong>,
                 <strong>Bit Flipper</strong>, <strong>ALERT Packets</strong>, <strong>HFEM Messages</strong>.</li>
               <li>The <strong>Site Map</strong>, and every tab's ❔ Help.</li>
             </ul>

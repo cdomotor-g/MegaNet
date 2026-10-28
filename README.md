@@ -2844,7 +2844,7 @@ with an accuracy ring and a cone pointing the way the phone is facing, taken
 from the compass where the browser exposes one (iOS asks for permission on the
 first tap) and from GPS course otherwise. Leaving the Stations tab stops the watch.
 
-### 3. Pass Ranges
+### 3. ALERT IDs (was Pass Ranges)
 - For any station, identify which repeaters have a pass range covering its AlertIDs
 - The full hop chain, field → repeater(s) → base station, is drawn on the
   Stations map rather than listed here: a pass-range link from the station to
@@ -3434,7 +3434,7 @@ on a narrow window.
 | Group | Tabs |
 | --- | --- |
 | **Start here** | Site Map · Offline & Install · Views |
-| **Stations & networks** | Stations · Pass Ranges · Repeater Delays · Export · Look Around |
+| **Stations & networks** | Stations · ALERT IDs · Repeater Delays · Export · Look Around |
 | **Printed maps** | Radio Path Maps · Map Generator |
 | **Interference** | RF Environment · RF Changes · Interference Workbench |
 | **ALERT** | Bit Flipper · Ghosting Graph · ALERT Packets · ALERT2 / ERT-A2 · HFEM Messages · Serial Monitor |

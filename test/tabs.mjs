@@ -952,7 +952,7 @@ const SEED_FW = `async () => {
 
 const CONVERTED = [
   { id: 'networks',   label: 'Networks',        issue: '#109 (proving ground) / #137' },
-  { id: 'passranges', label: 'Pass Ranges',     issue: '#137' },
+  { id: 'passranges', label: 'ALERT IDs',       issue: '#137' },
   { id: 'repdelays',  label: 'Repeater Delays — the plan, every fold open', issue: 'born converted', seed: SEED_REPDELAYS },
   { id: 'maps',       label: 'Radio Path Maps', issue: '#137' },
   { id: 'arro',       label: 'ARRO Launcher',   issue: '#141', seed: SEED_ARRO_SEARCH },

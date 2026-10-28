@@ -151,8 +151,8 @@ const TABS = [
   { group: 'Stations & networks', tabs: [
     { id: 'stations',   label: 'Stations',               icon: '📍',
       find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb site features ancillary pits outlets geojson relocate relocation move station new site rain gauge exposure canopy trees buildings shed latency data age stale freshness message animation pulse flash landing live' },
-    { id: 'passranges', label: 'Pass Ranges',            icon: '🔗',
-      find: 'hop chain orphans gaps alertid address window coverage base allocate allocation reserve set aside spare unused free addresses fullness full blocks address space grid new id' },
+    { id: 'passranges', label: 'ALERT IDs',              icon: '🔗',
+      find: 'pass ranges pass range alert id ids alertids hop chain orphans gaps alertid address window coverage base allocate allocation reserve set aside spare unused free addresses fullness full blocks address space grid new id' },
     // ⏳ Repeater Delays (delay-plan.js, repeater-delays.js) sits beside Pass
     // Ranges: the other setting programmed into every repeater, and the one
     // that decides whether two repeaters passing the same address send their
