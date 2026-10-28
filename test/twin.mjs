@@ -1002,14 +1002,20 @@ try {
     ok('the twin\'s station is the tower, its mast 3 m (the 3.0 m default) and Ø0.300 m with its foot at the origin',
       tm && tm.structure === 'tower' && near(d.pole.h, 3, 1e-9) && near(d.pole.r, 0.15, 1e-9) && near(d.pole.baseY, 0, 1e-6), JSON.stringify({ structure: tm && tm.structure, pole: d.pole }));
     const rungs = tm ? tm.parts.filter(n => n === 'ladder rung').length : 0;
+    // Rungs every 300 mm: 10 on the base section, then the fly's from 2.15 m up
+    // to 0.1 m short of the stiles' top — so how many depends on the ground.
+    const wantRungs = tm && tm.ladder ? (() => {
+      const rise = 3.05 - tm.ladder.y, len = Math.hypot(rise, rise * 0.25) + 1.0;
+      return 10 + Math.floor((len - 0.1 - 2.15) / 0.3 + 1e-9) + 1;
+    })() : 0;
     // The ladder's feet are past the 2100 footing (its south edge 1.05 m out),
     // on the ground there — however far below the slab that is.
     ok('the platform, its rails, an extension ladder leaning on the south edge at 1 in 4 down to the ground past the footing, rungs every 300 mm, the gauge and the antenna mast are there',
       tm && tm.deck && near(tm.deck.top, 3.05, 1e-9) && near(tm.deck.half, 0.9, 1e-9) && tm.ladder && near(tm.ladder.run, 0.25, 1e-9)
-        && near(tm.ladder.foot, 1.005 + (3.05 - tm.ladder.y) * 0.25, 1e-9) && tm.ladder.foot > 1.05 && Math.abs(tm.ladder.footY - tm.ladder.y) < 0.3 && rungs >= 16 && tm.parts.includes('platform grating') && tm.parts.filter(n => n === 'handrail').length === 10
+        && near(tm.ladder.foot, 1.005 + (3.05 - tm.ladder.y) * 0.25, 1e-9) && tm.ladder.foot > 1.05 && Math.abs(tm.ladder.footY - tm.ladder.y) < 0.3 && rungs === wantRungs && tm.parts.includes('platform grating') && tm.parts.filter(n => n === 'handrail').length === 10
         && tm.parts.includes('ladder stile') && tm.parts.includes('ladder guide bracket') && !tm.parts.includes('ladder bracket')
         && tm.parts.includes('rain gauge') && tm.parts.includes('antenna mast') && tm.parts.includes('solar panel'),
-      JSON.stringify({ deck: tm && tm.deck, ladder: tm && tm.ladder, rungs, rails: tm && tm.parts.filter(n => n === 'handrail').length }));
+      JSON.stringify({ deck: tm && tm.deck, ladder: tm && tm.ladder, rungs, wantRungs, rails: tm && tm.parts.filter(n => n === 'handrail').length }));
     ok('the tower stands on a foundation slab 100 mm proud of the ground, a staff gauge up its mast reading the gauge where its zero is AHD',
       tm && tm.parts.includes('foundation slab') && tm.parts.includes('gauge board') && tm.parts.includes('gauge board graduations')
         && tm.towerStaff && isFinite(tm.towerStaff.base)
