@@ -79,7 +79,7 @@ for (const file of SCRIPTS) {
 // ── Pages and agent files ────────────────────────────────────────────────────
 
 const PAGES = ['index.html', 'about.html', 'api.html', 'privacy.html', 'terms.html', 'investigations/index.html',
-  'investigations/2026-10-corrupted-relay-copies.html', 'llms.txt', 'robots.txt', 'docs/agent-api.md',
+  'investigations/2026-10-corrupted-relay-copies.html', 'investigations/2026-10-toowoomba-quiet-week.html', 'llms.txt', 'robots.txt', 'docs/agent-api.md',
   'AGENTS.md', 'GEMINI.md', '.github/copilot-instructions.md', '.cursor/rules/floodnet-api.mdc'];
 for (const file of PAGES) {
   let text = fs.readFileSync(repo(file), 'utf8');
