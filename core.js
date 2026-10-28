@@ -1196,6 +1196,15 @@ const HELP = {
       + 'shape says its kind — a ringed dot the outlet, a crossed square a pit, a bullseye a benchmark, a '
       + 'staff a board — and a click says what it is. Signed-in editors only, as the levels are: where a '
       + 'benchmark is, is not for the open internet.',
+      '<strong>🛣️ Route on map</strong>, beside Directions on a station\'s card and in its editor, draws the '
+      + 'drive to the station on this map: by road to where the station\'s mapped <em>access track</em> starts, '
+      + 'then along the track to the gauge, with the distance, the time and the turns on a panel at the bottom '
+      + 'left. A stretch no road or track reaches is dotted, and the panel says how long. The drive starts '
+      + 'where your phone is. Without a position it starts from Pritchard Road, Virginia for a Brisbane-hub '
+      + 'station, and for any other station the panel asks: where you are, the depot, a click on the map, or a '
+      + 'town, a station or a coordinate typed in. <em>Change</em> picks another start. The roads are '
+      + 'OpenStreetMap\'s, through the Valhalla router, so traffic, closures and floods are not taken into '
+      + 'account. Signed-in editors only, as the access tracks are.',
       'The two <strong>document searches</strong> do not send the station\'s name as written. A '
       + 'library search box requires <em>every</em> term to match, so a site filed as "Upper Sandy '
       + 'Ck" would be unreachable from a search that said "Creek" — the wrong half of the pair '

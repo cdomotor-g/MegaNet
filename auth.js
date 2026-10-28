@@ -16,7 +16,8 @@
 // only); to network-review.js for NetworkReview.authChanged (administrators
 // only) and alert2-plan.js for Alert2Plan.authChanged (the plan's list, 0076);
 // to station-history.js for StationHistory.authChanged (0056, editors only);
-// to site-features.js for SiteFeatures.authChanged (0061, editors only); to
+// to site-features.js for SiteFeatures.authChanged (0061, editors only) and
+// map-drive.js for MapDrive.authChanged (a route is an editor's, #251); to
 // address-space.js for AddressSpace.authChanged (0084: the ALERT addresses set
 // aside, approved accounts read them and editors make them); to
 // nav-views.js for NavViews.authChanged (0062: an account's own views); to
@@ -956,6 +957,7 @@ const Auth = (function () {
                        typeof Alert2Plan !== 'undefined' ? Alert2Plan : null,
                        typeof StationHistory !== 'undefined' ? StationHistory : null,
                        typeof SiteFeatures !== 'undefined' ? SiteFeatures : null,
+                       typeof MapDrive    !== 'undefined' ? MapDrive    : null,
                        typeof HealthAgent !== 'undefined' ? HealthAgent : null,
                        typeof SignalRoutes !== 'undefined' ? SignalRoutes : null,
                        typeof Backbone    !== 'undefined' ? Backbone    : null,

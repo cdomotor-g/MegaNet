@@ -1818,6 +1818,18 @@ jobs:
         working-directory: test
         run: npm run report
 
+      # Route on map (#251): /api/drive (worker/drive.js) and the map's
+      # 🛣️ (map-drive.js). What fails in silence: a route for somebody who is
+      # not an editor, the router asked with the caller's session or faster
+      # than FOSSGIS's one a second, a failure kept in the cache — and in the
+      # app, a drive started anywhere but where the owner's rule says, or an
+      # access track drawn the wrong way round. Offline: the router, the
+      # cache, the database and the gazetteer are stand-ins.
+      - name: Route on map — editors only, FOSSGIS's terms kept, the start by the rule, the track the right way round
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run drive
+
       # The third server-side door: /api/v1 and /api/mcp (worker/api.js), public
       # and read-only, for AI agents and scripts. What it must never do fails in
       # silence — forward a caller's token, read a private relation, write

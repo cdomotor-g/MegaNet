@@ -27,6 +27,7 @@ import path from 'node:path';
 import { repo } from './lib/paths.mjs';
 import * as api from '../worker/api.js';
 import { REPORT_RATE } from '../worker/report.js';
+import { DRIVE_RATE } from '../worker/drive.js';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const results = [];
@@ -157,8 +158,13 @@ const report = blocks.find(x => x.name === REPORT_RATE.binding);
 check(`wrangler.toml declares ${REPORT_RATE.binding} as ${REPORT_RATE.limit} / ${REPORT_RATE.period} s`,
   report && report.limit === REPORT_RATE.limit && report.period === REPORT_RATE.period,
   report ? `${report.limit} / ${report.period}` : 'not declared');
+// …and Route on map's (worker/drive.js), the brake on FOSSGIS's router.
+const drive = blocks.find(x => x.name === DRIVE_RATE.binding);
+check(`wrangler.toml declares ${DRIVE_RATE.binding} as ${DRIVE_RATE.limit} / ${DRIVE_RATE.period} s`,
+  drive && drive.limit === DRIVE_RATE.limit && drive.period === DRIVE_RATE.period,
+  drive ? `${drive.limit} / ${drive.period}` : 'not declared');
 check('wrangler.toml declares no rate limit the code does not read',
-  blocks.every(b => b.name === REPORT_RATE.binding || api.RATE_LIMITS.some(r => r.binding === b.name)),
+  blocks.every(b => b.name === REPORT_RATE.binding || b.name === DRIVE_RATE.binding || api.RATE_LIMITS.some(r => r.binding === b.name)),
   blocks.map(b => b.name).join(', '));
 check('each rate limit period is one Cloudflare accepts (10 or 60)', blocks.every(b => b.period === 10 || b.period === 60));
 check('each namespace_id is a distinct positive integer',

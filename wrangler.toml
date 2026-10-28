@@ -119,6 +119,21 @@ namespace_id = "1104"
   limit = 3
   period = 60
 
+# Route on map (worker/drive.js, /api/drive, #251): the routes asked of
+# FOSSGIS's Valhalla, on one key for everybody — FOSSGIS allows this
+# application a request a second, and this keeps it to half that a minute per
+# location, with the isolate's own one-a-second spacing under it. DRIVE_RATE
+# in worker/drive.js holds the same numbers; test/agent-docs.mjs checks that
+# they agree.
+
+[[ratelimits]]
+name = "DRIVE_RATE_LIMIT"
+namespace_id = "1105"
+
+  [ratelimits.simple]
+  limit = 30
+  period = 60
+
 # The administrators' notifications (worker/push.js, 0066): every minute the
 # Worker's scheduled() asks the database which devices have something to hear
 # and sends it through Apple's, Google's, Mozilla's or Microsoft's push

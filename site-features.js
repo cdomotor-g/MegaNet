@@ -1925,6 +1925,21 @@ const SiteFeatures = (function () {
 
     refresh() { if (map) sync(); },
     active() { return !!(layer && drawnKinds.length); },
+
+    // A station's access tracks (0067), latitude first, for Route on map
+    // (map-drive.js), which drives to where one begins and draws it from
+    // there. Read as the card reads them — the same cache, the same two
+    // minutes — and resolving, never rejecting: { rows: [{ id, name, pts }],
+    // error }. Signed out, no rows and nothing asked.
+    accessTracks(id) {
+      return load([id]).then(() => {
+        const c = cache[id];
+        const rows = ((c && c.rows) || []).filter(r => r.kind === 'access_track')
+          .map(r => ({ id: r.id, name: r.name || '', pts: ptsOf(r) }))
+          .filter(r => r.pts.length >= 2);
+        return { rows, error: (c && c.error) || '' };
+      });
+    },
     noteHtml,
     legendHtml,
 

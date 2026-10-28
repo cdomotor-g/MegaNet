@@ -1034,6 +1034,10 @@ const Places = (function () {
   return {
     parse,
     parseSingle,
+    // The gazetteer's places for a name, through the same throttle and cache
+    // as the box's own lookups: { ok, list: [{ name, where, kind, lat, lon }],
+    // error }. For Route on map's typed start (map-drive.js).
+    find: text => ask(String(text || ''), null),
     readPaste,
     coordRole,
     // Called once from init.js: one listener on the document serves every

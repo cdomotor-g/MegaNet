@@ -6162,6 +6162,7 @@ function stopStationsMap() {
   MapLocate.detach();
   MapMovePin.detach();
   SiteFeatures.detach();
+  MapDrive.detach();
   MapArrows.detach();
   MapElevation.detach();
   MapHere.detach();
@@ -6293,6 +6294,10 @@ function initMap() {
   // 16, and the mode that places them — which, unlike Move pin's, outlives
   // the rebuild, so a line half clicked out is put back on the new map.
   SiteFeatures.attach(state.map);
+  // A drive to a station (map-drive.js): nothing on the map until a station
+  // card's 🛣️ is pressed, and a route asked for before the rebuild is drawn
+  // again on the new map.
+  MapDrive.attach(state.map);
   // Before the first refresh: refreshMapLayers ends by scheduling a redraw of
   // the arrow canvas, and a schedule with no canvas to draw on is a no-op that
   // never comes back.
@@ -7087,10 +7092,12 @@ function stationActionGroups(s, { editor = false } = {}) {
       fieldPhotosPillHtml(s),
       MapBlast.popupLinkHtml(s, { editor }),
     ] },
-    // The position handed over, driven to (#225), and moved.
+    // The position handed over, driven to (#225) — or the drive drawn on the
+    // map, for an editor (map-drive.js, #251) — and moved.
     { label: 'Position', pills: [
       copyLatLonPillHtml(s, { live: editor }),
       directionsPillHtml(s, { live: editor }),
+      typeof MapDrive !== 'undefined' ? MapDrive.pillHtml(s, { editor }) : '',
       editor ? MapMovePin.editorButtonHtml(s) : MapMovePin.popupLinkHtml(s),
       // Where the station's outlet, pits, benchmarks and boards are, and its
       // orifice run (site-features.js, 0061) — signed-in editors only.

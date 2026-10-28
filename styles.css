@@ -6293,6 +6293,119 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
    on one pill in a row that wraps anyway. */
 .mn-copy-latlon { min-width: 18ch; justify-content: center; }
 
+/* ── Route on map (map-drive.js, #251) ─────────────────────────────────────── */
+
+/* Bottom left, with Move pin's panel: the two stack if both are up. Wider than
+   Move pin's for the turn-by-turn list, and never taller than most of the map
+   — the list scrolls inside it. */
+.mn-drive-panel {
+  min-width: 16rem;
+  max-width: 21rem;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .22);
+  font-size: .85rem;
+}
+
+.mn-drive-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-1);
+}
+
+.mn-drive-btns {
+  display: flex;
+  flex: none;
+  gap: var(--sp-1);
+}
+
+.mn-drive-line { margin: 0; }
+
+.mn-drive-x {
+  flex: none;
+  min-width: 2rem;
+  min-height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* Label / value pairs, as Move pin's read-out. */
+.mn-drive-read {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: .15rem var(--sp-2);
+  margin: 0 0 var(--sp-2);
+}
+
+.mn-drive-read dt { color: var(--muted); }
+
+.mn-drive-read dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.mn-drive-why { margin: 0 0 var(--sp-2); }
+
+.mn-drive-starts { margin-bottom: var(--sp-2); }
+
+.mn-drive-typed { margin: 0 0 var(--sp-2); }
+
+.mn-drive-typed label {
+  display: block;
+  margin-bottom: .2rem;
+  color: var(--muted);
+}
+
+.mn-drive-typed-row {
+  display: flex;
+  gap: var(--sp-1);
+}
+
+.mn-drive-typed-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.mn-drive-fold { margin: 0 0 var(--sp-2); }
+
+.mn-drive-fold > summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.mn-drive-steps {
+  margin: var(--sp-1) 0 0;
+  padding-left: 1.4rem;
+}
+
+.mn-drive-steps li { margin-bottom: .2rem; }
+
+.mn-drive-words {
+  margin: var(--sp-1) 0 0;
+}
+
+.mn-drive-words dt { font-weight: 600; }
+
+.mn-drive-words dd {
+  margin: 0 0 var(--sp-1);
+  color: var(--muted);
+}
+
+.mn-drive-credit { margin: var(--sp-1) 0 0; }
+
+/* Picking the start: the click has to reach the ground, and the cursor says so. */
+.leaflet-container.mn-drive-picking { cursor: crosshair; }
+
 /* ── Draw & measure ──────────────────────────────────────────────────────── */
 
 /* While a tool is armed the click has to reach the map: station pins and ACMA

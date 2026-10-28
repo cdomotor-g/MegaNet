@@ -65,6 +65,11 @@
 // opens one and kept only in the edge cache — public, read-only, and only the
 // addresses in that catalog. worker/cameras.js, docs/council-cameras.md.
 //
+// A ninth: /api/drive, a drive by road between two points for the Stations
+// map's Route on map (#251) — OpenStreetMap's roads through Valhalla on
+// FOSSGIS's server, for editors, a request a second at most, and the answer
+// kept in the edge cache. worker/drive.js, docs/drive.md.
+//
 // And one that is not a door at all: scheduled() below, every minute
 // (wrangler.toml's [triggers]), sends the administrators' notifications —
 // worker/push.js, db/migrations/0066_push_notifications.sql. Nothing a
@@ -76,6 +81,7 @@ import { isArchivePath, handleArchive } from './archive.js';
 import { isBriefingPath, handleBriefing } from './briefing.js';
 import { isReportPath, handleReport } from './report.js';
 import { isCameraPath, handleCameras } from './cameras.js';
+import { isDrivePath, handleDrive } from './drive.js';
 import { runPush } from './push.js';
 
 export { BriefingLedger } from './briefing.js';
@@ -495,6 +501,11 @@ export default {
     // cameras in the committed catalog, the council asked at most once a
     // minute per location whoever is looking.
     if (isCameraPath(url.pathname)) return handleCameras(request, env, ctx);
+
+    // A drive by road to a station (worker/drive.js): an editor's session, two
+    // coordinates, OpenStreetMap's roads through FOSSGIS's router — one
+    // request a second at most, whoever is asking.
+    if (isDrivePath(url.pathname)) return handleDrive(request, env, ctx);
 
     // Everything else is a static asset, and assets are served before this runs.
     // A request that gets here for any other path is a path that does not exist.

@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 150, date: '2026-10-28', items: [
+      '🛣️ <strong>Route on map</strong>, on a station card beside 🚗 Directions, for editors: the drive to the station drawn on '
+        + 'the Stations map. It goes by road to where the station\'s mapped <em>access track</em> starts, then along the track to the '
+        + 'gauge, with the distance, the time and the turns. A stretch no road or track reaches is dotted, and the panel says how '
+        + 'long it is. The drive starts where your phone is. Without a position it starts from Pritchard Road, Virginia for a '
+        + 'Brisbane-hub station, and for any other station it asks: where you are, the depot, a click on the map, or a town, a '
+        + 'station or a coordinate typed in. <em>Change</em> picks another start. The roads are OpenStreetMap\'s, with a link on the '
+        + 'panel to report a map error. 🚗 Directions is still the one for driving with voice guidance.',
+    ] },
     { n: 149, date: '2026-10-28', items: [
       'In ⏱️ Latency\'s <strong>Messages landing</strong> on the Stations map, the pulse now says what is known of each hop. '
         + '<strong>Green</strong> is a hop the base stations\' receivers heard: an ALERT2 message names every hop it took, and a '
