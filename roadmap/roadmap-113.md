@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-27** (revision 192 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-28** (revision 193 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -411,6 +411,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 > ~~**⚠️** These were originally listed as "independent — no sequencing dependency." They are logically independent but **mechanically serialised**~~ — **resolved the easy way: one agent did both in sequence**, #121 read #120's pane comment instead of picking a z-index blind, and the `MemMeter` third of the table had already been obsoleted by #144 (layers are counted generically off `liveMaps()`).
 
 ## Standalone issues
+- **#249** `[Standalone]` `[Human]` — **OPEN, opened revision 193** — the db-migrate workflow's `SUPABASE_DB_URL` secret fails (`password authentication failed for user "postgres"`): replace it with a fresh session-pooler URI and the current database password, then run db-migrate as a dry run. Until then every migration is pasted into the SQL Editor by hand (`0080`–`0086` were). Depends on nothing; blocks nothing outright.
 - **#248** `[Standalone]` `[Human]` — CI doctor: Refresh ACMA RRL data finds no working download URL (cdn.acma.gov.au 404); someone copies ACMA's current extract link into `ACMA_ZIP_URLS`; depends on nothing, blocks nothing.
 - **#246** `[Standalone]` `[Opus5/High]` — CI doctor: `npm run twin` fails 5 checks (horizon sheets, imagery fallbacks, tower ladder rung count); depends on nothing, blocks nothing.
 - **#247** `[Standalone]` `[Opus5/Med]` — **OPEN, opened revision 191 — a maybe, parked by the owner** — carrier outages (Telstra, Iridium, Inmarsat BGAN) on Station Health below *Receivers and repeaters*, and a one-sentence mention in the Network Weather bulletins when one overlaps the period. **Blocked on the owner choosing a source:** none of the four publishes a public outage feed — Telstra's official route is its paid IoT Outage API (the page's own internal API is off limits), and Iridium's and Inmarsat's advisories go out by email, so the likely shape is an inbox on floodwarning.net through an Email Worker. Gates nothing.
@@ -734,7 +735,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### Human
 | Issues |
 |---|
-| #66, #156, #157, #158, #166, #185, #207, #210, #233, #234, #235, #236, #237, #239 |
+| #66, #156, #157, #158, #166, #185, #207, #210, #233, #234, #235, #236, #237, #239, #249 |
 
 > **The Human column shrank for a reason worth recording.** #145 was `[Human]` because applying a migration and creating a Storage bucket "needs the dashboard and the database password". That is no longer true: #149 applied `0010` and created the bucket from an agent session over the Supabase MCP connection, and verified both with read-only queries afterwards. **Before allocating anything else to a human on the grounds that it touches the live database, check whether that connection is available.** #146 and #148 were both allocated partly on that assumption, were re-noted at revision 15, and at revision 16 were done that way: `0011` applied over the same connection and verified with read-only queries. **Two migrations applied by an agent now, so this is a settled fact rather than one project's luck.** The Human column is #66, #156 and #157 — and each is `[Human]` for the right reason rather than the dashboard one: #156 is a product decision (which suggested features to want), and **#157 is the first one on this board that is `[Human]` because of the *toolchain*, not the credentials.** CRBasic Editor is Windows-only and Campbell's, and every `campbellsci.com` host is unreachable from the agent environment's egress policy, so a datalogger program cannot be compiled — or its instruction reference read — by any session, however it is allocated. That is a new category, and it is worth naming: the test above ("check whether that connection is available") does not dispose of it, because no connection would help.
 >
@@ -822,6 +823,14 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 193 — 2026-10-28: 🩺 Station Health per station in the agent API, a quick latest reading, and #249
+
+A field team (IRM, building a field app) asked for the Station Health tab's per-station findings through the agent API, then reported `readings/latest` timing out on a box around one site. **Opens #249; closes nothing.**
+
+- **`0085`** — each station as the tab shows it when opened: the server's Station Health run (`tools/health/report.mjs`, now reading a fortnight) writes a card per station heard for the tab's 3, 7 and 14 days (`tools/health/cards.mjs`) — every finding with evidence and action, the learned check schedule day by day, the battery's night lows. The agent API serves them: `GET /api/v1/stations/{id}/health` and `GET /api/v1/health/findings` (by owner, station ids, network, basin, kind, box, severity), MCP tools `get_station_health` and `get_health_findings`. `tools/check_health_cards.sql`.
+- **`0086`** — `meganet.reading_latest` reads a table a trigger keeps (`reading_newest`), one row per address, instead of walking every address on each read: 3.2 s at 6,738 addresses, past anon's 3 s timeout, so the route answered 503 on and off whatever the filters, and stopped at 5,000 addresses. A box around a site is now two round trips; raw readings carry `freq_mhz`, `rssi_dbm`, `level_dbfs` and `snr_db`. `tools/check_reading_latest.sql` (23 checks).
+- **#249** (`[Human]`): `0080`–`0086` were pasted into the SQL Editor because db-migrate cannot log in. `DB_SCHEMA_VERSION` is 86.
 
 ### Revision 192 — 2026-10-27: 🎥 The councils' flood and road cameras on the map, and QLDTraffic's
 
