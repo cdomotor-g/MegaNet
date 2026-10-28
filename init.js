@@ -51,6 +51,10 @@
   // (card-grip.js). Before the first render, so the tables that render draws
   // get theirs — and their remembered heights — before they are painted.
   CardGrip.start();
+  // …and one on the edge of each card over a map, to make it wider
+  // (card-width.js). Before the first render too, for the same reason: the
+  // cards it draws come up at their remembered widths.
+  CardWidth.start();
   applyTheme({ repaint: false });
   // The views an account keeps (nav-views.js), from this device's copy of
   // them, before the bar is drawn — so a view picked here does not open on

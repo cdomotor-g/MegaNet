@@ -1266,6 +1266,16 @@ jobs:
         working-directory: test
         run: npm run grip
 
+      # A map card made wider by the handle on its edge (card-width.js): on the
+      # edge facing the map at the card's height and z-index, the drag, the
+      # floor and the cap, the width kept through a repaint, a full render and
+      # a reload, the keyboard, the ACMA card's other edge, none on a phone —
+      # and, with real scrollbars, the app's 10 px gutter on the card.
+      - name: Card width — a map card made wider, and the app's scrollbar
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run cardwidth
+
       # The same drift the claim step's note describes, found again while
       # adding the one above: `mapfade` has been in `npm run all` with no step
       # here, so it has run for whoever typed it and on no push at all. A check

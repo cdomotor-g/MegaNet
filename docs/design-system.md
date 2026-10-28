@@ -663,6 +663,34 @@ to write it down rather than let each of them re-derive a different half.
     `SCROLLERS` — not the pickers under a search box, which are a choice made
     and gone.
 
+15. **Every card over a map has a handle on the edge facing the map**
+    *(card-width.js)*. The station card, What is here and the ACMA card
+    (`.acma-card`) get a vertical separator laid over that edge that drags the
+    card wider or narrower, from MIN (280 px) to the card's own max-width (82 %
+    of what it floats over). Double-click — or Enter — puts it back; ← → move
+    the edge 20 px, PageUp and PageDown widen and narrow by 100, Home and End
+    go to the narrowest and the widest. The width is kept on the device per
+    card (`mn-card-w`) as the custom property `--mn-card-w`, so a phone's sheet
+    can go on ignoring it. Which edge is the stylesheet's to say, beside each
+    card's anchoring: `--mn-card-grip` is `right`, `left` or `none`.
+
+    Unlike pattern 14's handle it cannot sit after the scroller in the flow —
+    the card floats — and it cannot sit inside: the card is its own scroller,
+    and a handle in it would scroll away, be clipped where it is over the map
+    and be under the scrollbar where it is not. So it is the card's next
+    sibling, placed over the edge from the card's own box (3 px over the
+    border, the rest over the map, clear of the scrollbar's thumb) and given
+    the card's z-index.
+
+16. **One scrollbar, the app's own** *(styles.css, Scrollbars)*. Every scroller
+    draws a slim rounded thumb in its surface's `--muted` ink on no track — a
+    10 px gutter with a 6 px thumb, 8 px and darker under the pointer, the
+    accent while held — through the `::-webkit-scrollbar` parts where there is
+    a mouse, and Firefox's thin bar in the same ink. Nothing else sets
+    `scrollbar-width` or `scrollbar-color`: Chromium drops the parts for an
+    element given either, so the one allowed is `scrollbar-width: none`, on a
+    scroller that hides its bar on purpose.
+
 **An implementation note that bit #138, and will bit anything that puts a
 `.sr-only` in a table cell.** `overflow` clips a descendant only when the scroll
 container is that descendant's **containing block**, and an absolutely

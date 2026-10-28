@@ -823,6 +823,67 @@ body {
   color: var(--text);
 }
 
+/* ── Scrollbars ──────────────────────────────────────────────────────────────
+   Every scroller in the app — the page, the side panel, the cards over the
+   map, a capped table — draws the same bar: a slim rounded thumb in the
+   theme's muted ink on no track at all, darker under the pointer and the
+   accent while it is held. Before this each was the browser's own, which on
+   Windows is a grey bar with arrows at both ends, as pale on the dark theme's
+   cards as on the light one's. The ink is mixed where the bar is drawn, from
+   that surface's --muted and --accent, so a surface that re-inks itself (the
+   instrument look's dark bars) gets a bar in its own ink; the sunlight
+   theme's is heavier, as everything else in that theme is.
+
+   Chromium and Safari take the ::-webkit-scrollbar parts: a 10 px gutter —
+   the width the side panel's strip was built round (--mn-help-rail) — with a
+   6 px thumb in it, 8 under the pointer, and no arrows. Only where there is a
+   mouse: on a touch screen the bar floats over what it scrolls and is left to
+   the system. Firefox has no such parts and takes the standard properties, a
+   thin bar in the same ink. Never both in one browser: Chromium drops the
+   parts for any element given scrollbar-color or scrollbar-width, so neither
+   is set for Chromium anywhere — except `scrollbar-width: none`, on the few
+   scrollers that hide their bar on purpose. */
+:root { --sb-ink: 42%; }
+[data-theme="sunlight"] { --sb-ink: 70%; }
+
+@media (hover: hover) and (pointer: fine) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    min-width: 2rem;
+    min-height: 2rem;
+    border: 2px solid transparent;
+    border-radius: var(--r-pill, 999px);
+    background: color-mix(in srgb, var(--muted) var(--sb-ink), transparent) padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    border-width: 1px;
+    background-color: color-mix(in srgb, var(--muted) 78%, transparent);
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    border-width: 1px;
+    background-color: var(--accent);
+  }
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--muted) var(--sb-ink), transparent) transparent;
+  }
+}
+
 /* Links had no rule at all, so they fell back to the browser's #0000EE and, once
    followed, #551A8B — two shades of near-black against a dark panel. Visited
    keeps the accent: which ARRO page you have already opened is not worth a
@@ -7824,7 +7885,11 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   top: .9rem;
   right: .9rem;
   bottom: .9rem;
-  width: 370px;
+  /* The operator's width when its edge has been dragged (card-width.js), and
+     the edge that handle goes on: the one facing the map, the card being
+     anchored at the right. */
+  width: var(--mn-card-w, 370px);
+  --mn-card-grip: left;
   max-width: 82%;
   overflow-y: auto;
   z-index: 1100;            /* above leaflet panes and controls */
@@ -7947,7 +8012,10 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   right: auto;
   bottom: 1.2rem;
   left: .9rem;
-  width: 340px;
+  /* Dragged wider or narrower from its right edge, which faces the map
+     (card-width.js); 340 until it is. */
+  width: var(--mn-card-w, 340px);
+  --mn-card-grip: right;
   /* It grows until it is just shy of the zoom buttons, which are the only
      thing above it in this corner. The clearance is measured rather than
      guessed: .map-panel's own --sp-2 padding (8 px) puts the map's top edge
@@ -8292,10 +8360,96 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   box-shadow: inset 0 2px 0 var(--map-leader);
 }
 
+/* The width handle on a map card's edge (card-width.js) — the edge that faces
+   the map, which --mn-card-grip names beside each card's anchoring above. A
+   strip laid over that edge, 3 px of it over the card's border and the rest
+   over the map, so it takes nothing from the card and nothing from its
+   scrollbar's thumb; placed and sized by the script from the card's own box,
+   and given the card's z-index, so it is over what the card is over and under
+   what the card is under. A pill across the border at mid-height says it is
+   there; under the pointer the pill and the whole edge light in the accent.
+   Focusable, and it keeps the shared focus ring, as the side panel's handle
+   does. */
+.mn-cardw {
+  position: absolute;
+  width: 12px;
+  cursor: col-resize;
+  touch-action: none;    /* the pointer drag is ours, not the map's pan */
+}
+
+.mn-cardw::before,
+.mn-cardw::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border-radius: var(--r-pill);
+  transition: background-color var(--motion-fast) var(--ease), opacity var(--motion-fast) var(--ease);
+}
+
+/* The pill: 6 px, centred on the card's border. */
+.mn-cardw::before {
+  top: 50%;
+  width: 6px;
+  height: 2.75rem;
+  margin-top: -1.375rem;
+  background: color-mix(in srgb, var(--muted) 60%, var(--panel));
+  box-shadow: 0 0 0 1px var(--panel), 0 1px 4px rgba(0, 0, 0, .3);
+  z-index: 1;
+}
+
+/* The edge, lit: 2 px over the border, short of the card's rounded corners. */
+.mn-cardw::after {
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--accent);
+  opacity: 0;
+}
+
+.mn-cardw[data-side="right"]::before { left: 0; }
+.mn-cardw[data-side="right"]::after  { left: 2px; }
+.mn-cardw[data-side="left"]::before  { right: 0; }
+.mn-cardw[data-side="left"]::after   { right: 2px; }
+
+.mn-cardw:hover::before,
+.mn-cardw:focus-visible::before,
+.mn-cardw.is-dragging::before {
+  background: var(--accent);
+}
+
+.mn-cardw:hover::after,
+.mn-cardw:focus-visible::after,
+.mn-cardw.is-dragging::after {
+  opacity: .6;
+}
+
+/* A finger's worth on a touch screen: the strip reaches further over the map,
+   and the pill is bigger. */
+@media (pointer: coarse) {
+  .mn-cardw { width: 24px; }
+  .mn-cardw::before { width: 8px; height: 3.5rem; margin-top: -1.75rem; }
+  .mn-cardw[data-side="right"]::before { left: -1px; }
+  .mn-cardw[data-side="left"]::before  { right: -1px; }
+}
+
+/* While the edge is being dragged the pointer is over the map and anything
+   else it is pulled across, and none of them should be selecting text or
+   fighting for the cursor. */
+body.mn-cardw-dragging {
+  cursor: col-resize;
+  user-select: none;
+}
+
 /* On a phone the card is a bottom sheet: the map's full width, capped so the
    part of the map the tapped pin is on stays visible above it. 560 is
    BREAKPOINTS.xs — the same width isPhoneNav() reads. */
 @media (max-width: 560px) {
+  /* No width handle on a phone (card-width.js): the station card is a sheet
+     as wide as the map, and the ACMA card has too little map beside it to
+     give. */
+  .acma-card {
+    --mn-card-grip: none;
+  }
   .stn-card {
     left: .5rem;
     right: .5rem;
@@ -9852,7 +10006,8 @@ details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
 
    It scrolls, and on the Stations tab it has to: the map's thirteen controls and
    the side panel's own three are ~750 px of column, and a laptop's window below
-   the banner is less than that. The scrollbar is the thin one and the rail is
+   the banner is less than that. The scrollbar is the app's slim one (the
+   Scrollbars rules near the top: 10 px, or Firefox's thin bar) and the rail is
    wide enough to hold it beside the buttons (--mn-help-rail), so a bar that
    appears pushes nothing under itself; `overflow-x: hidden` is what a browser
    with only the wide bar gets instead of a sideways scroller of its own. */
@@ -9869,7 +10024,6 @@ details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
 }
 
 /* One group of buttons: the side panel's own three, then one per group the map's
