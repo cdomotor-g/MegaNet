@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 147, date: '2026-10-28', items: [
+      'On the 📊 <strong>Plots</strong> and 🌡️ <strong>Field Data</strong> charts, every date along the bottom now has its day '
+        + 'under it — MON, TUE and so on — and a heavier line marks where each week starts, at Monday midnight. Zoom out until the '
+        + 'weeks crowd together and the lines switch to the start of each month, named along the top, then to the start of each '
+        + 'year; the key under the chart says which is which. Day and hour labels now sit on local midnight and whole hours, and '
+        + 'the reading you hover over says its day.',
+    ] },
     { n: 146, date: '2026-10-28', items: [
       'The <strong>minimap</strong> now stays in the corner of the Stations map in ⛰️ <strong>3-D</strong>. It stays flat, '
         + 'follows the camera as you move, and outlines in red the ground the camera can see — a wedge that widens away from '

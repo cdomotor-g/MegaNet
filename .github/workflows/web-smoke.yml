@@ -1580,6 +1580,18 @@ jobs:
         working-directory: test
         run: npm run adnav
 
+      # The calendar on the Plots and Field Data time axis: the day under every
+      # date, and a heavier line where each week, month and year starts. Both
+      # are only worth having on the right instant, and the axis counted its
+      # ticks from 1970 in UTC — a day's tick at 10:00 here, a week's on a
+      # Thursday — so the ticks are walked on the local calendar and this holds
+      # them to it in Brisbane and across Sydney's clock change, then reads the
+      # drawn chart back: each label's day, each line on a Monday or a 1st.
+      - name: Plots calendar — the day under each date, and week, month and year lines
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run adcal
+
       # The Data Quality codes an export arrives with. The tab read them from the
       # first import — table, callout, both export CSVs, editable by hand — and
       # `runFilter()` looked at the timestamps and the values and nothing else,

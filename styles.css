@@ -14445,6 +14445,14 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 }
 .ad-read-hover, .ad-stats { display: flex; flex-wrap: wrap; gap: .35rem .9rem; align-items: center; font-size: .8rem; }
 .ad-read-item, .ad-stat { display: flex; align-items: center; gap: .3rem; }
+/* The key to the week, month and year lines: each swatch an upright stroke as
+   heavy and as faint as the line it names on the chart (calKeyHtml()). */
+.ad-cal-key { cursor: help; }
+.ad-cal-sw {
+  display: inline-block; width: 0; height: 1em; margin-left: .3rem;
+  border-left: var(--w, 2px) solid var(--muted); opacity: var(--op, .6);
+}
+.ad-cal-sw:first-child { margin-left: 0; }
 
 /* The pinned reading: everything the export said about one row, plus why the
    filter reached the verdict it did. */

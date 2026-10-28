@@ -1664,22 +1664,51 @@ const ArroData = (function () {
                       AD_DAY, 2 * AD_DAY, 7 * AD_DAY, 14 * AD_DAY, 30 * AD_DAY, 91 * AD_DAY,
                       182 * AD_DAY, 365 * AD_DAY];
 
+  // Steps of an hour and up are walked on the local calendar rather than counted
+  // in milliseconds from 1970. Counted, a day's tick fell on UTC midnight — ten
+  // in the morning here — so "28/10 · WED" sat ten hours right of the line
+  // where Wednesday starts, and a week's tick fell on a Thursday, the day 1970
+  // began on. Walked, a day's tick is local midnight, an hour's is a whole
+  // local hour (through a daylight-saving change too), a week's is Monday, and
+  // a quarter's or a year's is the month a quarter or a year starts in.
   function timeTicks(t0, t1, want) {
     const span = t1 - t0;
     let step = TIME_STEPS[TIME_STEPS.length - 1];
     for (const s of TIME_STEPS) if (span / s <= want) { step = s; break; }
     const out = [];
+    const d = new Date(t0);
+    const y = d.getFullYear(), m = d.getMonth(), dd = d.getDate();
     if (step >= 30 * AD_DAY) {
       // Month-aligned, so a long window labels the first of the month rather
       // than an arbitrary 30-day drift.
       const months = Math.max(1, Math.round(step / (30 * AD_DAY)));
-      const d = new Date(t0);
-      let y = d.getFullYear(), m = d.getMonth();
-      for (let i = 0; i < 400; i++) {
-        const tt = new Date(y, m, 1).getTime();
+      let mm = m;
+      while ((y * 12 + mm) % months) mm++;
+      for (; out.length < 400; mm += months) {
+        const tt = new Date(y, mm, 1).getTime();
         if (tt > t1) break;
         if (tt >= t0) out.push(tt);
-        m += months; while (m > 11) { m -= 12; y++; }
+      }
+    } else if (step >= AD_DAY) {
+      // Whole days, on a day number that does not move as the window pans:
+      // Mondays for a week or a fortnight, even days for two.
+      const days = Math.round(step / AD_DAY);
+      let k = dd + (new Date(y, m, dd).getTime() < t0 ? 1 : 0);
+      k += (((days % 7 ? 0 : AD_MONDAY) - calDayNo(y, m, k)) % days + days) % days;
+      for (; out.length < 400; k += days) {
+        const tt = new Date(y, m, k).getTime();
+        if (tt > t1) break;
+        out.push(tt);
+      }
+    } else if (step >= 36e5) {
+      // Whole hours from local midnight. Where a clock goes back, two hours
+      // name the same instant and the second is dropped.
+      const hrs = Math.round(step / 36e5);
+      for (let h = 0, last = -Infinity; out.length < 400; h += hrs) {
+        const tt = new Date(y, m, dd, h).getTime();
+        if (tt > t1) break;
+        if (tt >= t0 && tt > last) out.push(tt);
+        last = tt;
       }
     } else {
       const first = Math.ceil(t0 / step) * step;
@@ -1687,6 +1716,12 @@ const ArroData = (function () {
     }
     return { ticks: out, step };
   }
+
+  // A calendar date as a whole number of days since 1 January 1970, which was
+  // a Thursday — so a Monday is the day number 4 more than a multiple of 7.
+  // Out-of-range days and months roll over the way Date's own do.
+  const AD_MONDAY = 4;
+  const calDayNo = (y, m, d) => Math.round(Date.UTC(y, m, d) / AD_DAY);
 
   const P2 = n => String(n).padStart(2, '0');
 
@@ -1700,10 +1735,119 @@ const ArroData = (function () {
     return String(d.getFullYear());
   }
 
+  // The day, on a second line under each time label, while the labels are days
+  // or less apart. At a month or more a tick is the 1st, and which weekday the
+  // 1st fell on is nothing anybody reading the chart wants.
+  const AD_DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const fmtTickDay = (t, step) => (step < 30 * AD_DAY ? AD_DAY_NAMES[new Date(t).getDay()] : '');
+
   function fmtFull(t) {
     const d = new Date(t);
     return `${d.getFullYear()}-${P2(d.getMonth() + 1)}-${P2(d.getDate())} `
          + `${P2(d.getHours())}:${P2(d.getMinutes())}:${P2(d.getSeconds())}`;
+  }
+  // …with the day in front, where one reading's moment is quoted on its own.
+  const fmtFullDay = t => `${AD_DAY_NAMES[new Date(t).getDay()]} ${fmtFull(t)}`;
+
+  // One time label under the plot: the date or time at `y`, and the day a line
+  // under it, a size smaller. One <text> with a <tspan>, so the pair moves as
+  // one and an export carries both.
+  function xTickText(t, step, px, y, size, c) {
+    const day = fmtTickDay(t, step);
+    return `<text class="ad-xtick" data-t="${t}" x="${px.toFixed(1)}" y="${y}" font-size="${size}"
+                  text-anchor="middle" fill="${c.muted}">${esc(fmtTick(t, step))}${day ? `<tspan
+                  class="ad-xtick-day" x="${px.toFixed(1)}" dy="${size + 2}" font-size="${size - 1}">${day}</tspan>` : ''}</text>`;
+  }
+
+  // ── where the calendar turns over ──
+  // A heavier upright line where a week starts (Monday 00:00), a heavier one
+  // where a month does (the 1st) and the heaviest where a year does, so a
+  // reading can be placed in its week or month without counting labels. Weeks
+  // while they are at least AD_CAL_MIN_PX apart on the plot; zoomed out past
+  // that, months and years only, then years only — a year's readings drawn
+  // behind fifty-two bars is a hatching, not a reference. A line is the
+  // coarsest boundary it is: 1 January is a year's line, not a week's as well.
+  const AD_CAL_MIN_PX = 40;
+  const AD_CAL_KINDS = ['week', 'month', 'year'];
+  const AD_CAL_SPAN = { week: 7 * AD_DAY, month: 30.44 * AD_DAY, year: 365.25 * AD_DAY };
+  // As heavy as each line is drawn, and the key under the chart draws the same.
+  const AD_CAL_PAINT = { week: { w: 1.5, op: .45 }, month: { w: 2.5, op: .6 }, year: { w: 3.5, op: .7 } };
+  const AD_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const AD_MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+                          'August', 'September', 'October', 'November', 'December'];
+  const AD_DAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  // The finest boundary drawn for a window `pw` plot pixels wide, and every
+  // line in it, oldest first: { level, lines: [{ t, kind }] }.
+  function calBounds(t0, t1, pw) {
+    const lines = [];
+    if (!(t1 > t0) || !(pw > 0)) return { level: null, lines };
+    const level = AD_CAL_KINDS.find(k => AD_CAL_SPAN[k] / (t1 - t0) * pw >= AD_CAL_MIN_PX) || null;
+    if (!level) return { level, lines };
+    const d = new Date(t0);
+    const y = d.getFullYear(), m = d.getMonth();
+    const kindAt = day => (day.getDate() !== 1 ? 'week' : day.getMonth() ? 'month' : 'year');
+    // Every day for weeks (Mondays and 1sts are both wanted), every 1st for
+    // months, every 1 January for years. A few hundred steps at most: weeks
+    // stop at a window of pw / AD_CAL_MIN_PX weeks.
+    const next = level === 'week' ? i => new Date(y, m, d.getDate() + i)
+               : level === 'month' ? i => new Date(y, m + i, 1)
+               : i => new Date(y + i, 0, 1);
+    for (let i = 0; i < 5000; i++) {
+      const day = next(i), t = day.getTime();
+      if (t > t1) break;
+      if (t < t0) continue;
+      const kind = kindAt(day);
+      if (kind === 'week' && day.getDay() !== 1) continue;
+      lines.push({ t, kind });
+    }
+    return { level, lines };
+  }
+
+  // What a calendar line says on hover, and over the plot for a month or year.
+  function calTitle(l) {
+    const d = new Date(l.t);
+    const date = `${AD_DAYS_LONG[d.getDay()]} ${d.getDate()} ${AD_MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}`;
+    return l.kind === 'week' ? `A week starts — ${date}, 00:00`
+         : l.kind === 'month' ? `${AD_MONTHS_LONG[d.getMonth()]} starts — ${date}, 00:00`
+         : `${d.getFullYear()} starts — ${date}, 00:00`;
+  }
+  const calLabel = l => (l.kind === 'year' ? String(new Date(l.t).getFullYear())
+                       : l.kind === 'month' ? AD_MONTHS[new Date(l.t).getMonth()] : '');
+
+  // The lines themselves, top to bottom of a plot, for any chart that has an
+  // x(t). With `labelY`, a month's or a year's is named just right of its line
+  // at that height — the band above the plot on the main chart, which is empty
+  // but for ↺ and ⛶ in its far corner.
+  function calSvg(cal, x, top, bot, c, labelY, right) {
+    return cal.lines.map(l => {
+      const px = x(l.t), p = AD_CAL_PAINT[l.kind];
+      const name = labelY == null ? '' : calLabel(l);
+      const end = px > right - 26;
+      return `<line class="ad-cal ad-cal--${l.kind}" data-t="${l.t}" x1="${px.toFixed(1)}" y1="${top}"
+                    x2="${px.toFixed(1)}" y2="${bot}" stroke="${c.muted}" stroke-width="${p.w}"
+                    opacity="${p.op}"><title>${esc(calTitle(l))}</title></line>${name ? `
+              <text class="ad-cal-label" data-t="${l.t}" x="${(px + (end ? -4 : 4)).toFixed(1)}" y="${labelY}"
+                    font-size="9" text-anchor="${end ? 'end' : 'start'}" fill="${c.muted}">${esc(name)}</text>` : ''}`;
+    }).join('');
+  }
+
+  // The key to those lines, in the strip under the chart that is its legend —
+  // hover never reaches a finger, so what each weight means is written there
+  // too. Only the kinds actually on the chart.
+  function calKeyHtml(cal) {
+    const kinds = AD_CAL_KINDS.filter(k => cal.lines.some(l => l.kind === k));
+    if (!kinds.length) return '';
+    const word = { week: 'week starts (Mon 00:00)', month: 'month starts (the 1st)', year: 'year starts (1 Jan)' };
+    const how = cal.level === 'week' ? 'Weeks are drawn while they are at least '
+                + `${AD_CAL_MIN_PX} px apart; zoomed out further, only months, then only years.`
+              : cal.level === 'month' ? 'Zoomed in far enough for weeks to be '
+                + `${AD_CAL_MIN_PX} px apart, each Monday gets a line too.`
+              : 'Zoomed in, each month and then each Monday gets a line too.';
+    return `<span class="ad-stat ad-cal-key" title="${escAttr('The heavier upright lines on the chart mark where the '
+             + 'calendar turns over: the heavier the line, the longer the period starting there. ' + how)}">${
+      kinds.map(k => `<span class="ad-cal-sw" style="--w:${AD_CAL_PAINT[k].w}px;--op:${AD_CAL_PAINT[k].op}"></span>`
+                   + `<span class="small">${word[k]}</span>`).join('')}</span>`;
   }
 
   function niceTicks(lo, hi, want) {
@@ -5366,7 +5510,7 @@ const ArroData = (function () {
     if (ad.hover && ad.hover.rows.length) {
       return `
         <div class="ad-read-hover">
-          <b>${esc(fmtFull(ad.hover.t))}</b>
+          <b>${esc(fmtFullDay(ad.hover.t))}</b>
           ${ad.hover.rows.map(r => `
             <span class="ad-read-item">
               <span class="ad-dot" style="--dot:${escAttr(r.color)}"></span>
@@ -5523,7 +5667,7 @@ const ArroData = (function () {
                   aria-label="Close the pinned reading" title="Close">✕</button>
         </div>
         <div class="ad-pin-grid">
-          <div><span>Reading</span><b>${esc(fmtFull(s.t[i]))}</b></div>
+          <div><span>Reading</span><b>${esc(fmtFullDay(s.t[i]))}</b></div>
           <div><span>${esc(s.prov && s.prov.res !== 'raw' ? 'Last in bucket' : 'Received')}</span><b>${esc(fmtFull(s.tr[i]))}${
               // The delay between reading and receipt is worth flagging on a
               // real reading. On a rollup the two are an hour apart by
@@ -5568,7 +5712,7 @@ const ArroData = (function () {
           <span class="small">${cnt.toLocaleString()} in view${cnt ? ` · ${fmtVal(lo)}–${fmtVal(hi)} ${esc(s.unit)}
             · ${ad.transform === 'value' ? 'net' : 'total'} ${fmtVal(net)}` : ''}</span>
         </span>${fl ? floodLegendHtml(fl, g) : ''}`;
-    }).join('')}</div>`;
+    }).join('')}${calKeyHtml(calBounds(v.t0, v.t1, ad.w - PADL - padRNow()))}</div>`;
   }
 
   // ── drawing ────────────────────────────────────────────────────────────────
@@ -5655,8 +5799,9 @@ const ArroData = (function () {
 
   // PADT is the band ▲ sits in at the top of the vertical navigator, whose
   // track has to start exactly where the plot does; ↺ and ⛶ share it, so they
-  // no longer sit on the data. PADB is the same for ▼, beside the time labels.
-  const PADL = 64, PADR = 18, PADT = 36, PADB = 30;
+  // no longer sit on the data. PADB is the same for ▼, beside the time labels,
+  // which are two lines deep: the date or time, and under it the day.
+  const PADL = 64, PADR = 18, PADT = 36, PADB = 38;
   // The right margin when a second axis is drawn in it — wide enough for a
   // column of tick labels, which PADR at 18 px is not (#191).
   const PADR2 = 58;
@@ -5945,8 +6090,11 @@ const ArroData = (function () {
     out += ticks.map(t => `
       <line x1="${g.x(t).toFixed(1)}" y1="${PADT}" x2="${g.x(t).toFixed(1)}" y2="${g.h - PADB}"
             stroke="${c.border}" stroke-width="1" opacity=".7"/>
-      <text x="${g.x(t).toFixed(1)}" y="${g.h - PADB + 14}" font-size="10" text-anchor="middle"
-            fill="${c.muted}">${esc(fmtTick(t, step))}</text>`).join('');
+      ${xTickText(t, step, g.x(t), g.h - PADB + 14, 10, c)}`).join('');
+
+    // Where a week, a month or a year starts — see calBounds(). With the
+    // gridlines, under the curves: a ruler to read the readings against.
+    out += calSvg(calBounds(g.v.t0, g.v.t1, g.pw), g.x, PADT, g.h - PADB, c, PADT - 5, g.w - g.padR);
 
     // Rollover seams sit under the curves — they explain a step, they are not
     // a reading in their own right. One path for all of them, capped like the
@@ -6359,7 +6507,7 @@ const ArroData = (function () {
 
   // ── side-by-side comparison ────────────────────────────────────────────────
 
-  const CMP_PADL = 46, CMP_PADR = 10, CMP_PADT = 10, CMP_PADB = 20;
+  const CMP_PADL = 46, CMP_PADR = 10, CMP_PADT = 10, CMP_PADB = 30;
   // …and the right margin when a second axis puts two figures in it (#191).
   const CMP_PADR2 = 40;
 
@@ -6467,8 +6615,10 @@ const ArroData = (function () {
     out += ticks.map(t => `
       <line x1="${x(t).toFixed(1)}" y1="${CMP_PADT}" x2="${x(t).toFixed(1)}" y2="${h - CMP_PADB}"
             stroke="${c.border}" stroke-width="1" opacity=".6"/>
-      <text x="${x(t).toFixed(1)}" y="${h - CMP_PADB + 12}" font-size="9" text-anchor="middle"
-            fill="${c.muted}">${esc(fmtTick(t, step))}</text>`).join('');
+      ${xTickText(t, step, x(t), h - CMP_PADB + 12, 9, c)}`).join('');
+    // The calendar's lines as the main chart draws them, without the names:
+    // ten pixels over these panes is no room for a word.
+    out += calSvg(calBounds(v.t0, v.t1, pw), x, CMP_PADT, h - CMP_PADB, c, null, w - padR);
 
     let body = '';
     for (const s of shown()) {
@@ -6632,7 +6782,7 @@ const ArroData = (function () {
     const tip = document.getElementById('ad-tip');
     const stage = document.getElementById('ad-stage');
     if (!tip || !stage || !ad.hover || !ad.hover.rows.length) { if (tip) tip.hidden = true; return; }
-    tip.innerHTML = `<div class="ad-tip-t">${esc(fmtFull(ad.hover.t))}</div>`
+    tip.innerHTML = `<div class="ad-tip-t">${esc(fmtFullDay(ad.hover.t))}</div>`
       + ad.hover.rows.slice(0, 6).map(r => `
         <div class="ad-tip-r"><span class="ad-dot" style="--dot:${escAttr(r.color)}"></span>
           ${esc(r.label)} <b>${esc(fmtVal(r.y))}</b> ${esc(r.unit)}</div>
@@ -8161,6 +8311,8 @@ const ArroData = (function () {
     fieldAddrs, fieldNoAddr, fieldChannelId,
     // the series boundary both sources cross
     seriesData, adoptSeries,
+    // the time axis's calendar — its ticks, and where weeks, months and years start
+    timeTicks, calBounds,
     undo, redo,
   };
   return wrapUndoable(api);
