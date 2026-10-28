@@ -6022,9 +6022,21 @@ layers and sections drawn from other organisations' data. Every line is on the
 page at once, so the browser's own Ctrl+F finds them too. ⤓ Export saves the
 list as shown, as CSV or Markdown.
 
+At the foot, **🌐 Where the data comes from** is the lay of the land: every
+organisation whose data the app draws on (the Bureau, ACMA, the Queensland
+Government, Geoscience Australia's ELVIS, councils' cameras, OpenStreetMap,
+Esri and the rest), each tagged by how it arrives — **Live** as you look,
+**Copied on a schedule**, a **Kept copy**, or a **Link out** — with a count of
+the capabilities that use it, which narrows the list to them when pressed;
+the services Flood-Net runs on (Supabase, Cloudflare, GitHub, Anthropic and
+others); and Flood-Net's own records — the register, readings, receptions,
+health, visits, photos and surveys — with where each is kept.
+
 The list is written by hand in `capabilities.js`. `npm run nav` fails a tab
-with no line on it, a line naming a tab that has gone, and a line that goes
-nowhere — so a new tab is added to the list when it is added to the nav.
+with no line on it, a line naming a tab that has gone, a line that goes
+nowhere, and a line whose outside source is missing from *Where the data
+comes from* — so a new tab or a new source is added here when it is added to
+the app.
 
 ## Deployment Plan
 

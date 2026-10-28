@@ -293,7 +293,7 @@ const Capabilities = (function () {
           src: 'Councils, QLDTraffic', find: 'webcam' },
         { name: 'Mobile coverage', tab: 'stations', where: 'map › 🗺️ Layers', open: L('mobile coverage'),
           what: 'One carrier\'s 4G coverage or the best of three, outdoors or with an external antenna.',
-          src: 'Telstra, Optus and TPG via the ACCC', find: 'phone reception 4g' },
+          src: 'ACCC (Telstra, Optus and TPG)', find: 'phone reception 4g' },
         { name: 'Licensed transmitters', tab: 'stations', where: 'map › 🗺️ Layers › ACMA licences', open: L('acma'),
           what: 'Licensed transmitters near the network, filtered by how they could interfere; press one for its licence.',
           src: 'ACMA', find: 'interference licence register' },
@@ -481,7 +481,8 @@ const Capabilities = (function () {
         { name: 'Nearby', tab: 'nearby',
           what: 'The stations nearest you, with distance and direction, each one press from an inspection, photos or directions.' },
         { name: 'Look Around', tab: 'lookaround',
-          what: 'Hold up a phone and the stations each way are pinned over the camera\'s view.', find: 'ar augmented reality compass' },
+          what: 'Hold up a phone and the stations each way are pinned over the camera\'s view.', src: 'World Magnetic Model',
+          find: 'ar augmented reality compass' },
         { name: 'Inspection form', tab: 'inspections',
           what: 'One form shaped to the station, covering the six paper sheets, with drafts kept when there is no signal.' },
         { name: 'Save an inspection', tab: 'inspections', who: 'editor',
@@ -493,8 +494,8 @@ const Capabilities = (function () {
         { name: 'Inspection History', tab: 'history', who: 'editor',
           what: 'Every past inspection and council form in the paper layout; print on A4 or save as CSV.' },
         { name: 'Field Camera', tab: 'camera',
-          what: 'Photos stamped with heading, position, height, station and time, the way Solocator stamps them.',
-          find: 'photo picture' },
+          what: 'Photos stamped with heading, position, height, town, station and time, the way Solocator stamps them.',
+          src: 'World Magnetic Model, OpenStreetMap, Geoscience Australia (ELVIS)', find: 'photo picture' },
         { name: 'Photos that upload themselves', tab: 'camera', who: 'editor',
           what: 'Photos wait on the phone where there is no signal, then go to Field Photos on their own.' },
         { name: 'Field Photos', tab: 'photos', who: 'member',
@@ -564,7 +565,8 @@ const Capabilities = (function () {
         { name: 'ERT-A2 Simulator', tab: 'a2firmware',
           what: 'An A2\'s console from real units\' logs: its menus to explore, and its settings changed step by step.' },
         { name: 'ERT-A2 firmware upgrade', tab: 'a2firmware',
-          what: 'The upgrade walked through, the parts a unit needs from its versions, and the USB stick made ready.' },
+          what: 'The upgrade walked through, the parts a unit needs from its versions, and the USB stick made ready.',
+          src: 'ELPRO' },
         { name: 'Staff Simulator', tab: 'kbstaff',
           what: 'Practise reading a levelling staff through heat haze, wind and a rocking staff.', src: 'Mallee HydroTech' },
         { name: 'Survey Logbook', tab: 'kblogbook',
@@ -637,8 +639,132 @@ const Capabilities = (function () {
       ] },
   ];
 
+  // ── Where the data comes from ─────────────────────────────────────────────
+  // The lay of the land under the list: every organisation whose data the app
+  // draws on, the services it runs on, and Flood-Net's own records. Written by
+  // hand like GROUPS. An outside source's `match` names it the way the lines
+  // above write it in `src` (the parts of a src, parentheses off, split at
+  // commas and "and"), so each source counts the lines that use it and its
+  // button narrows the list to them — and `npm run nav` fails a line whose
+  // src names a source that is not listed here.
+  //
+  // how: live | sched | kept | link | runs (HOW below). url: their own page.
+  const HOW = {
+    live:  { label: 'Live',
+      meaning: 'Fetched from them as you look, so it is as current as they keep it — and it needs a signal.' },
+    sched: { label: 'Copied on a schedule',
+      meaning: 'Copied into Flood-Net on a schedule (the sentence says how often), so it works with no signal and is as current as the last copy.' },
+    kept:  { label: 'Kept copy',
+      meaning: 'A copy kept with the app, brought in once and replaced by hand when they publish a new one; it works with no signal.' },
+    link:  { label: 'Link out',
+      meaning: 'Flood-Net opens their site or app, or reads a file of theirs you load yourself; nothing is fetched from them on its own.' },
+    runs:  { label: 'Runs on',
+      meaning: 'A service Flood-Net itself runs on: what passes through it is Flood-Net\'s own data, not theirs.' },
+  };
+  const KEPT = {
+    db:     { label: 'Database',
+      meaning: 'Flood-Net\'s own database: read as you look, written by signed-in editors, by the base stations and by jobs on the server.' },
+    store:  { label: 'Photo store',
+      meaning: 'Flood-Net\'s own file storage, beside the database: the photos themselves, and each night\'s readings archived.' },
+    repo:   { label: 'With the app',
+      meaning: 'Files kept with the app\'s code and served with it, so they are there with no signal.' },
+    device: { label: 'This device',
+      meaning: 'Read in your browser and kept there; nothing is sent to Flood-Net or anyone else.' },
+  };
+  const SOURCES = {
+    outside: [
+      { key: 'bom', name: 'Bureau of Meteorology', url: 'https://www.bom.gov.au', how: 'kept', match: ['Bureau of Meteorology'],
+        what: 'The Station List — flood classes, forecast roles, owners — the river network and catchments (Geofabric), the maintenance hubs, and the ALERT and HFEM message formats.' },
+      { key: 'acma', name: 'ACMA', url: 'https://www.acma.gov.au', how: 'sched', match: ['ACMA'],
+        what: 'The register of radio licences, copied every week: the transmitters near the network, their channels, and the mobile carriers\' sites.' },
+      { key: 'qld', name: 'Queensland Government', url: 'https://qldspatial.information.qld.gov.au', how: 'live', match: ['Queensland Government'],
+        what: 'Lots and road reserves, LiDAR contours, survey marks, land tenure, tidal and coastal limits, acid sulfate soils, aerial photos and the drainage basins.' },
+      { key: 'qldtraffic', name: 'Transport and Main Roads (QLDTraffic)', url: 'https://qldtraffic.qld.gov.au', how: 'live', match: ['QLDTraffic'],
+        what: 'Who manages each road and bridge, and the QLDTraffic cameras.' },
+      { key: 'councils', name: 'Councils\' flood cameras', how: 'sched', match: ['Councils'],
+        what: 'About 600 cameras on councils\' disaster dashboards: the list copied every week, each picture fetched when it is opened.' },
+      { key: 'ga', name: 'Geoscience Australia (ELVIS)', url: 'https://elevation.fsdf.org.au', how: 'live', match: ['Geoscience Australia'],
+        what: '5 m LiDAR and other elevation data — ground heights, path profiles, where surveys exist — and AUSGeoid2020 for heights in AHD.' },
+      { key: 'nsw', name: 'NSW Spatial Services', url: 'https://maps.six.nsw.gov.au', how: 'live', match: ['NSW Spatial Services'],
+        what: 'New South Wales aerial photography, under the Satellite base map.' },
+      { key: 'accc', name: 'ACCC', url: 'https://data.gov.au', how: 'kept', match: ['ACCC'],
+        what: 'Telstra\'s, Optus\'s and TPG\'s 4G coverage as the ACCC publishes it on data.gov.au, kept as map tiles.' },
+      { key: 'aws', name: 'AWS Terrain Tiles', url: 'https://registry.opendata.aws/terrain-tiles/', how: 'live', match: ['AWS Terrain Tiles'],
+        what: 'Ground heights everywhere (SRTM and others) for elevation shading, line of sight, path profiles and 3-D.' },
+      { key: 'osm', name: 'OpenStreetMap', url: 'https://www.openstreetmap.org', how: 'live', match: ['OpenStreetMap'],
+        what: 'The street map, town names and place search, and river, road and building shapes for the Map Generator, the twin and the relocation finder.' },
+      { key: 'otm', name: 'OpenTopoMap', url: 'https://opentopomap.org', how: 'live', match: ['OpenTopoMap'],
+        what: 'The topographic base map.' },
+      { key: 'esri', name: 'Esri', url: 'https://www.esri.com', how: 'live', match: ['Esri'],
+        what: 'Satellite imagery, the light and dark base maps and their labels, and 10 m land cover and tree height from Sentinel-2.' },
+      { key: 'wmm', name: 'World Magnetic Model', url: 'https://www.ncei.noaa.gov/products/world-magnetic-model', how: 'kept', match: ['World Magnetic Model'],
+        what: 'How far magnetic north is from true north, so Look Around and the Field Camera point true.' },
+      { key: 'standards', name: 'Standards Australia (AS/NZS 1170.2)', how: 'kept', match: ['AS/NZS 1170.2'],
+        what: 'The wind regions of the structural design standard.' },
+      { key: 'contrail', name: 'Contrail (ARRO)', url: 'https://onerain.com', how: 'link', match: ['Contrail'],
+        what: 'ARRO\'s own pages, opened from Flood-Net, and its CSV exports, which you load into Plots yourself.' },
+      { key: 'google', name: 'Google and Apple', how: 'link', match: ['Google', 'Apple'],
+        what: 'Street View, Google Earth, Apple Maps and directions: links that open their apps.' },
+      { key: 'drive', name: 'Dropbox and Google Drive', how: 'sched', match: ['Dropbox', 'Google Drive'],
+        what: 'Field photos dropped in linked folders, brought in every 15 minutes.' },
+      { key: 'mallee', name: 'Mallee HydroTech', url: 'https://malleehydrotech.com.au', how: 'kept', match: ['Mallee HydroTech'],
+        what: 'The open hydrographic training tools re-told in Field training, credited on each.' },
+      { key: 'makers', name: 'Equipment makers', how: 'kept', match: ['Makers\' manuals', 'ELPRO'],
+        what: 'ELPRO, Campbell Scientific and the rest: pinouts and the ERT-A2\'s firmware steps from their manuals.' },
+      { key: 'anthropic', name: 'Anthropic (Claude)', url: 'https://www.anthropic.com', how: 'runs', match: ['Anthropic'],
+        what: 'The AI briefing on Station Health, and the Network Weather bulletins written each morning.' },
+      { key: 'elevenlabs', name: 'ElevenLabs', url: 'https://elevenlabs.io', how: 'runs', match: ['ElevenLabs'],
+        what: 'The bulletins\' voices.' },
+      { key: 'supabase', name: 'Supabase', url: 'https://supabase.com', how: 'runs',
+        what: 'The database every record below is kept in, and sign-in.' },
+      { key: 'cloudflare', name: 'Cloudflare', url: 'https://www.cloudflare.com', how: 'runs',
+        what: 'The site itself, the gate in front of it, the agent API, and storage for photos and the nightly readings archive.' },
+      { key: 'github', name: 'GitHub', url: 'https://github.com', how: 'runs',
+        what: 'The app\'s code, the weekly copy of the station register, the scheduled jobs, and bug reports.' },
+      { key: 'mqtt', name: 'HiveMQ Cloud and Fly.io', how: 'runs',
+        what: 'The MQTT broker and bridge that readings can come in through.' },
+      { key: 'resend', name: 'Resend', url: 'https://resend.com', how: 'runs',
+        what: 'Account emails to administrators and new users, and emailed bug reports.' },
+      { key: 'push', name: 'Browser push services', how: 'runs',
+        what: 'Apple\'s, Google\'s, Mozilla\'s and Microsoft\'s, carrying notifications to administrators\' devices.' },
+      { key: 'cdn', name: 'unpkg and jsDelivr', how: 'runs',
+        what: 'The code libraries the app loads: the maps (Leaflet, MapLibre), 3-D (three.js) and reading text off photos (Tesseract).' },
+    ],
+    own: [
+      { name: 'Station register', tab: 'stations', kept: 'db',
+        what: 'Every station, its ALERT IDs, radios and networks: brought in from the network\'s unit and repeater lists, kept up by editors, copied weekly as stations.json.' },
+      { name: 'Pass ranges and reserved addresses', tab: 'passranges', kept: 'db',
+        what: 'What each repeater passes on, and the addresses set aside for new sites.' },
+      { name: 'Readings', tab: 'msglog', kept: 'db',
+        what: 'Every reading the base stations and loggers send in: kept two years, summarised hourly and daily for good, archived each night.' },
+      { name: 'Receptions', tab: 'reception', kept: 'db',
+        what: 'Each copy of a reading a Flood-Net receiver heard, with its carrier and signal — what Bit-Flip Sources, Signal Routes and the Backbone are worked out from.' },
+      { name: 'Base station check-ins', tab: 'basestations', kept: 'db',
+        what: 'Every receiving station\'s heartbeat: its receivers, uplink, power and temperature.' },
+      { name: 'Station health', tab: 'health', kept: 'db',
+        what: 'Worked out from the readings on the server every 15 minutes; the bulletins are written from it.' },
+      { name: 'Inspections and council forms', tab: 'history', kept: 'db',
+        what: 'Visits recorded on the forms, and older visits brought in from the paper sheets.' },
+      { name: 'Field photos', tab: 'photos', kept: 'store',
+        what: 'From the Field Camera, bulk imports and the linked folders, each placed at its station.' },
+      { name: 'Level surveys and two-peg tests', tab: 'levels', kept: 'db',
+        what: 'Booked on phones in the field and sent when there is signal.' },
+      { name: 'Site features, equipment and changes', tab: 'stations', kept: 'db',
+        what: 'Features mapped by editors, equipment read from photos and approved, and every change made to a station.' },
+      { name: 'Accounts, roles and views', tab: 'admin', kept: 'db',
+        what: 'Who may sign in and what each may do, and each account\'s own views of the bar.' },
+      { name: 'Reference files', tab: 'maps', kept: 'repo',
+        what: 'The radio-path map sheets, the 2021 national ALERT address list, the investigations, demo data and the lessons\' material.' },
+      { name: 'Files you load', tab: 'arrodata', kept: 'device',
+        what: 'ARRO exports, PuTTY logs and pasted messages are read in your browser and never uploaded.' },
+    ],
+  };
+  // The parts of a line's src, as SOURCES' `match` names them.
+  const srcParts = src => String(src || '').replace(/\s*\([^)]*\)/g, '').split(/,\s*|\s+and\s+/).map(x => x.trim()).filter(Boolean);
+  const usesSource = (it, s) => !!s.match && srcParts(it.src).some(p => s.match.includes(p));
+
   // ── State ──────────────────────────────────────────────────────────────────
-  const S = { q: '', who: '', outside: false };
+  const S = { q: '', who: '', outside: false, src: '' };   // src: a SOURCES key, or ''
   const WHO_PICKS = [
     { v: '',         label: 'Anyone at all' },
     { v: 'open',     label: 'Open to everyone' },
@@ -687,10 +813,33 @@ const Capabilities = (function () {
     }
   }
 
+  const sourceOf = key => SOURCES.outside.find(x => x.key === key) || null;
+
   function shown() {
     const ts = terms(S.q);
-    return all().filter(it => whoOk(it) && (!S.outside || it.src)
+    const pick = S.src ? sourceOf(S.src) : null;
+    return all().filter(it => whoOk(it) && (!S.outside || it.src) && (!pick || usesSource(it, pick))
       && ts.every(t => startsWord(haystack(it), t)));
+  }
+
+  // The sources' three lists as the search leaves them. Not shown while the
+  // list is narrowed to who a line is for or to one source: both are
+  // questions about the capabilities. "Outside sources only" leaves out
+  // Flood-Net's own.
+  function sourceLists() {
+    if (S.who || S.src) return [];
+    const ts = terms(S.q);
+    const ok = (x, tag, head) => ts.every(t => startsWord([x.name, x.what, tag, head, 'source sources data'].join(' '), t));
+    const lists = [
+      { key: 'data', head: 'From other organisations', kind: 'outside',
+        rows: SOURCES.outside.filter(x => x.how !== 'runs') },
+      { key: 'runs', head: 'Services Flood-Net runs on', kind: 'outside',
+        rows: SOURCES.outside.filter(x => x.how === 'runs') },
+      { key: 'own', head: 'Flood-Net\'s own', kind: 'own',
+        rows: S.outside ? [] : SOURCES.own.filter(x => tabShown(tabOf(x.tab))) },
+    ];
+    return lists.map(l => ({ ...l, rows: l.rows.filter(x => ok(x, l.kind === 'own' ? KEPT[x.kept].label : HOW[x.how].label, l.head)) }))
+      .filter(l => l.rows.length);
   }
 
   // Text, escaped, with the searched-for word starts marked.
@@ -712,7 +861,7 @@ const Capabilities = (function () {
 
   function render() {
     const every = all();
-    const outside = every.filter(it => it.src);
+    const orgs = SOURCES.outside.filter(x => x.how !== 'runs').length;
     const groups = GROUPS.filter(g => every.some(it => it.group === g));
     return `
     <div class="page cap-page" id="cap-page" style="--page-max:1600px">
@@ -725,7 +874,7 @@ const Capabilities = (function () {
         <ul class="cap-facts" aria-label="At a glance">
           <li><strong>${every.length}</strong> capabilities</li>
           <li><strong>${groups.length}</strong> groups</li>
-          <li><strong>${outside.length}</strong> from outside sources</li>
+          <li><button type="button" class="link-btn" data-cap-jump="sources"><strong>${orgs}</strong> outside sources</button></li>
           <li><strong>${every.filter(it => it.who === 'admin').length}</strong> admin only</li>
         </ul>
       </section>
@@ -742,6 +891,7 @@ const Capabilities = (function () {
         <label class="check-label cap-outside"><input type="checkbox" id="cap-outside"${S.outside ? ' checked' : ''}>
           <span>Outside sources only</span></label>
         <p class="cap-count small" id="cap-count"></p>
+        <p class="cap-srcpick small" id="cap-srcpick" hidden></p>
       </div>
       <nav class="cap-jump" aria-label="Groups on this page" id="cap-jump"></nav>
       <div id="cap-list"></div>
@@ -795,6 +945,49 @@ const Capabilities = (function () {
           <li class="cap-item" id="${it.id}">${[nameHtml(it), tagsHtml(it), tabHtml(it), `<span class="cap-what">${marked(it.what)}</span>`].filter(Boolean).join(' ')}</li>`;
   }
 
+  function sourceRowHtml(x, kind) {
+    if (kind === 'own') {
+      const t = tabOf(x.tab);
+      return `
+          <li class="cap-item">${[
+            `<a class="cap-name" href="?tab=${encodeURIComponent(t.id)}" data-cap-tab="${t.id}">${marked(x.name)}</a>`,
+            `<span class="cap-tag cap-kept term-chip" title="${esc(KEPT[x.kept].meaning)}">${esc(KEPT[x.kept].label)}</span>`,
+            `<span class="cap-tab"><span aria-hidden="true">${t.icon}</span> ${esc(t.label)}</span>`,
+            `<span class="cap-what">${marked(x.what)}</span>`].join(' ')}</li>`;
+    }
+    const n = x.match ? all().filter(it => usesSource(it, x)).length : 0;
+    return `
+          <li class="cap-item">${[
+            x.url ? `<a class="cap-name" href="${esc(x.url)}" target="_blank" rel="noopener">${marked(x.name)}</a>`
+                  : `<strong class="cap-name">${marked(x.name)}</strong>`,
+            `<span class="cap-tag cap-how-${x.how} term-chip" title="${esc(HOW[x.how].meaning)}">${esc(HOW[x.how].label)}</span>`,
+            n ? `<button type="button" class="cap-used" data-cap-src="${x.key}">${n} capabilit${n === 1 ? 'y' : 'ies'}</button>` : '',
+            `<span class="cap-what">${marked(x.what)}</span>`].filter(Boolean).join(' ')}</li>`;
+  }
+
+  function sourcesHtml(lists) {
+    if (!lists.length) return '';
+    return `
+      <section class="panel cap-group cap-sources" id="cap-g-sources" aria-labelledby="cap-g-h-sources">
+        <div class="cap-group-head">
+          <h3 id="cap-g-h-sources" tabindex="-1"><span aria-hidden="true">🌐</span> Where the data comes from</h3>
+          <p class="cap-group-blurb small txt-muted">Flood-Net's own records — the stations, the readings, the visits — sit beside
+            data other organisations publish. Here is every outside source, the services Flood-Net runs on, and what is its own.
+            Press a source's count to see the capabilities that use it.</p>
+        </div>
+        ${lists.map(l => `
+        <h4 class="cap-sub-h">${esc(l.head)} <span class="cap-group-n">${l.rows.length}</span></h4>
+        <ul class="cap-list">${l.rows.map(x => sourceRowHtml(x, l.kind)).join('')}</ul>`).join('')}
+      </section>`;
+  }
+
+  function noneHtml() {
+    return `<div class="panel cap-none"><p><strong>Nothing matches.</strong> Try fewer words, or the start of a
+        word rather than the middle of one${S.who || S.outside || S.src ? ', or show everything again' : ''}.</p>
+        <div class="button-group"><button type="button" data-cap-act="clear">Clear the search</button></div>
+        <p class="small txt-muted"><kbd>Ctrl</kbd>+<kbd>K</kbd> searches the stations, places and tabs as well.</p></div>`;
+  }
+
   function listHtml(items) {
     if (!items.length) {
       return `<div class="panel cap-none"><p><strong>Nothing matches.</strong> Try fewer words, or the start of a
@@ -817,8 +1010,9 @@ const Capabilities = (function () {
     }).join('');
   }
 
-  function jumpHtml(items) {
+  function jumpHtml(items, lists) {
     const counts = GROUPS.map(g => ({ g, n: items.filter(it => it.group === g).length })).filter(x => x.n);
+    if (lists.length) counts.push({ g: { key: 'sources', icon: '🌐', name: 'Where the data comes from' }, n: lists.reduce((a, l) => a + l.rows.length, 0) });
     if (counts.length < 2) return '';
     return `<ul class="cap-jump-list">${counts.map(({ g, n }) =>
       `<li><button type="button" class="pill" data-cap-jump="${g.key}"><span aria-hidden="true">${g.icon}</span> ${esc(g.name)} <span class="cap-jump-n">${n}</span></button></li>`).join('')}</ul>`;
@@ -832,9 +1026,17 @@ const Capabilities = (function () {
     const jump = document.getElementById('cap-jump');
     const count = document.getElementById('cap-count');
     if (!list) return;
-    list.innerHTML = listHtml(items);
-    if (jump) jump.innerHTML = jumpHtml(items);
-    const filtered = S.q.trim() || S.who || S.outside;
+    const lists = sourceLists();
+    list.innerHTML = items.length || lists.length ? (items.length ? listHtml(items) : '') + sourcesHtml(lists) : noneHtml();
+    if (jump) jump.innerHTML = jumpHtml(items, lists);
+    const pick = document.getElementById('cap-srcpick');
+    const src = S.src ? sourceOf(S.src) : null;
+    if (pick) {
+      pick.hidden = !src;
+      pick.innerHTML = src ? `Only what uses <strong>${esc(src.name)}</strong>
+        <button type="button" class="link-btn" data-cap-act="allsrc">✕ every source</button>` : '';
+    }
+    const filtered = S.q.trim() || S.who || S.outside || S.src;
     const text = filtered ? `${items.length} of ${total} match` : `All ${total} shown`;
     if (count) count.textContent = text;
     if (say) {
@@ -907,8 +1109,21 @@ const Capabilities = (function () {
     h.focus({ preventScroll: true });
   }
 
+  // A source's count pressed: the list narrowed to the capabilities that use
+  // it, from the top, with the bar saying so and a way back.
+  function pickSource(key) {
+    if (!sourceOf(key)) return;
+    S.src = key;
+    paint(true);
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const page = document.getElementById('cap-page');
+    if (page) page.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'start' });
+    const back = document.querySelector('#cap-srcpick button');
+    if (back) back.focus({ preventScroll: true });
+  }
+
   function clear() {
-    S.q = ''; S.who = ''; S.outside = false;
+    S.q = ''; S.who = ''; S.outside = false; S.src = '';
     const q = document.getElementById('cap-q');
     const w = document.getElementById('cap-who');
     const o = document.getElementById('cap-outside');
@@ -939,9 +1154,19 @@ const Capabilities = (function () {
       }
       const j = e.target.closest('[data-cap-jump]');
       if (j) { jumpTo(j.dataset.capJump); return; }
+      const tb = e.target.closest('a[data-cap-tab]');
+      if (tb) {
+        if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        switchTab(tb.dataset.capTab);
+        return;
+      }
+      const sp = e.target.closest('[data-cap-src]');
+      if (sp) { pickSource(sp.dataset.capSrc); return; }
       const act = e.target.closest('[data-cap-act]');
       if (!act) return;
       if (act.dataset.capAct === 'clear') clear();
+      else if (act.dataset.capAct === 'allsrc') { S.src = ''; paint(true); }
       else if (act.dataset.capAct === 'bug' && typeof BugReport !== 'undefined') BugReport.open();
       else if (act.dataset.capAct === 'sitemap') switchTab('sitemap');
     });
@@ -966,6 +1191,16 @@ const Capabilities = (function () {
         }
         lines.push('');
       }
+      const lists = sourceLists();
+      if (lists.length) lines.push('## Where the data comes from', '');
+      for (const l of lists) {
+        lines.push(`### ${l.head}`, '');
+        for (const x of l.rows) {
+          const tag = l.kind === 'own' ? KEPT[x.kept].label : HOW[x.how].label;
+          lines.push(`- **${x.name}** _(${tag})_ — ${x.what}${x.url ? ` <${x.url}>` : ''}`);
+        }
+        lines.push('');
+      }
       dlText('capabilities.md', lines.join('\n'), 'text/markdown');
       return;
     }
@@ -975,7 +1210,17 @@ const Capabilities = (function () {
   }
 
   return {
-    render, init, shown, exportFile, go, clear,
+    render, init, shown, exportFile, go, clear, pickSource,
+    // For `npm run nav`: a line's src that names no listed source, and an
+    // outside source that names a match no line uses.
+    sourceCheck: () => {
+      const named = new Set(SOURCES.outside.flatMap(x => x.match || []));
+      return {
+        unlisted: [...new Set(GROUPS.flatMap(g => g.items.flatMap(it => srcParts(it.src))).filter(p => !named.has(p)))],
+        unused: SOURCES.outside.filter(x => x.match && !GROUPS.some(g => g.items.some(it => usesSource(it, x)))).map(x => x.name),
+        ownTabs: SOURCES.own.map(x => x.tab).filter(id => !TAB_LIST.some(t => t.id === id)),
+      };
+    },
     // For `npm run nav`: every line's tab, and every tab's lines.
     lines: () => GROUPS.flatMap(g => g.items.map(it => ({
       group: g.key, name: it.name, tab: it.tab || '', act: it.act || '', href: it.href || '', who: it.who || '',

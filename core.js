@@ -550,7 +550,9 @@ const HELP = {
            + 'maps and the outside sources they come from, what happens behind the scenes, and the ways in for '
            + 'scripts and AI agents. Each <strong>name</strong> opens the place it is done, and says where on that '
            + 'tab to look; a tag says when it is for <strong>admins only</strong>, for editors, or needs you signed '
-           + 'in. Type in the <strong>search box</strong> to narrow the list as you go, or pick who it is for.',
+           + 'in. Type in the <strong>search box</strong> to narrow the list as you go, or pick who it is for. At the foot, '
+           + '<strong>Where the data comes from</strong> lists every outside organisation the app draws on — how each '
+           + 'reaches it, live or copied — the services it runs on, and Flood-Net\'s own records and where they are kept.',
     watch: [
       'The search matches the start of words in a name, its description, where it is and its source, and keeps '
       + 'a line only when every word typed is on it. <kbd>Ctrl</kbd>+<kbd>F</kbd> works too: every line is on the '
@@ -559,7 +561,9 @@ const HELP = {
       + 'they are for administrators once opened. A tab kept to a list of people is left off this page for anyone '
       + 'not on it, as it is left out of the bar.',
       'Ctrl+click or middle-click a name to open it in a new browser tab.',
-      'Export, in the banner, saves the list as shown — CSV for a spreadsheet, or Markdown to paste into a document.',
+      'A source\'s count, under Where the data comes from, narrows the list to the capabilities that draw on it; '
+      + '<em>✕ every source</em> in the search bar puts them all back.',
+      'Export, in the banner, saves the list as shown — CSV for a spreadsheet, or Markdown (with the sources) to paste into a document.',
     ],
     related: ['sitemap', 'home', 'stations'],
     links: [

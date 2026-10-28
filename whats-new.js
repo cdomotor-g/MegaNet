@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 145, date: '2026-10-28', items: [
+      '<strong>📇 Capabilities</strong> is a line a capability now, and at its foot <strong>Where the data comes from</strong> '
+        + 'lists every organisation Flood-Net draws on — the Bureau, ACMA, the Queensland Government, ELVIS, councils\' cameras, '
+        + 'OpenStreetMap and more — how each arrives, live or copied, and Flood-Net\'s own records beside them. Press a source\'s '
+        + 'count to see the capabilities that use it.',
+    ] },
     { n: 144, date: '2026-10-28', items: [
       'In the <strong>💾 ERT-A2 Simulator</strong>\'s demos, every key press now shows. A key the unit answers — a menu letter, '
         + 'Enter, y — appears on its prompt, lit, with the option it picks lit too, and waits a moment before the screen moves on; '

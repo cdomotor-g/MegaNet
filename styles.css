@@ -21044,7 +21044,33 @@ button.adm-danger:hover { border-color: var(--bad); }
 .cap-tag-member { border-color: var(--ok);     color: var(--ok); }
 .cap-tag-signin,
 .cap-tag-list   { border-color: var(--warn);   color: var(--warn); }
-.cap-src { border-style: dashed; color: var(--muted); font-weight: 400; }
+/* A source can name three organisations; on a phone it wraps inside its ring
+   rather than pushing the page sideways. */
+.cap-src { border-style: dashed; color: var(--muted); font-weight: 400; white-space: normal; max-width: 100%; }
+
+/* Where the data comes from: how each outside source reaches the app, and
+   where Flood-Net keeps its own — the same ring as the tags above, in the
+   page's quieter colours, since none of them says who may use anything. */
+.cap-sub-h { margin: var(--sp-3) 0 0; font-size: var(--fs-md); }
+.cap-how-live  { border-color: var(--ok);     color: var(--ok); }
+.cap-how-sched { border-color: var(--accent); color: var(--accent); }
+.cap-how-kept,
+.cap-kept      { color: var(--text); }
+.cap-how-link,
+.cap-how-runs  { border-style: dashed; color: var(--muted); }
+.cap-used {
+  min-height: 0;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-pill);
+  font: inherit;
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--accent);
+  cursor: pointer;
+}
+.cap-used:hover { border-color: var(--accent); background: var(--subtle); }
+.cap-srcpick { flex-basis: 100%; margin: 0; }
 
 .cap-none p { margin: 0 0 var(--sp-2); }
 .cap-words summary { cursor: pointer; }

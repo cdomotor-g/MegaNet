@@ -381,8 +381,8 @@ try {
       panelOff: lines.filter(l => l.panel && l.tab !== 'stations').map(l => l.name),
       badWho: lines.filter(l => !['', 'signin', 'member', 'editor', 'admin', 'list'].includes(l.who)).map(l => l.name),
       twice: names.filter((x, i) => names.indexOf(x) !== i),
-      rendered: document.querySelectorAll('#cap-list .cap-item').length,
-      links: [...document.querySelectorAll('#cap-list a.cap-name')].filter(a => /[?&]tab=[a-z0-9]+/.test(a.getAttribute('href'))).length,
+      rendered: document.querySelectorAll('#cap-list .cap-item[id]').length,
+      links: [...document.querySelectorAll('#cap-list .cap-item[id] a.cap-name')].filter(a => /[?&]tab=[a-z0-9]+/.test(a.getAttribute('href'))).length,
     };
   });
   check(`every tab has at least one line (${caps.n} lines)`, caps.bare.length === 0, `no line for: ${caps.bare.join(', ')}`);
@@ -393,12 +393,35 @@ try {
   check('no line is written twice in one group', caps.twice.length === 0, caps.twice.join(', '));
   check('the page draws every line, each tab\'s name a link to its address', caps.rendered === caps.n && caps.links === caps.tabbed,
     `${caps.rendered} drawn of ${caps.n}; ${caps.links} linked of ${caps.tabbed}`);
+  // Where the data comes from: every outside organisation a line names is in
+  // the list of sources, every source listed with a name to match is used by
+  // a line, and its count narrows the list to exactly those lines.
+  const srcs = await page.evaluate(() => {
+    const c = Capabilities.sourceCheck();
+    const btn = document.querySelector('#cap-g-sources .cap-used');
+    const n = btn ? parseInt(btn.textContent, 10) : -1;
+    if (btn) btn.click();
+    const shown = document.querySelectorAll('#cap-list .cap-item[id]').length;
+    const said = document.getElementById('cap-srcpick');
+    const r = { ...c, n, shown, said: !!said && !said.hidden, section: !!document.getElementById('cap-g-sources') };
+    Capabilities.clear();
+    r.back = !!document.getElementById('cap-g-sources');
+    return r;
+  });
+  check('every outside source a line names is in the list of where the data comes from', srcs.unlisted.length === 0,
+    `not listed: ${srcs.unlisted.join(', ')}`);
+  check('every source listed is used by a line, and each of Flood-Net\'s own opens a real tab',
+    srcs.unused.length === 0 && srcs.ownTabs.length === 0, `unused: ${srcs.unused.join(', ')}; tabs: ${srcs.ownTabs.join(', ')}`);
+  check('a source\'s count narrows the list to that many lines, and says so', srcs.n > 0 && srcs.shown === srcs.n && srcs.said && !srcs.section,
+    JSON.stringify(srcs));
+  check('  …and clearing brings the sources back', srcs.back);
+
   const narrowed = await page.evaluate(() => {
     const q = document.getElementById('cap-q');
     q.value = 'lidar profile';
     q.dispatchEvent(new Event('input'));
     return {
-      shown: document.querySelectorAll('#cap-list .cap-item').length,
+      shown: document.querySelectorAll('#cap-list .cap-item[id]').length,
       marks: document.querySelectorAll('#cap-list mark.hit').length,
       count: document.getElementById('cap-count').textContent,
     };
@@ -406,7 +429,7 @@ try {
   check('two words narrow the list to the lines carrying both, marked where they matched',
     narrowed.shown > 0 && narrowed.shown < caps.n && narrowed.marks > 0, JSON.stringify(narrowed));
   const went = await page.evaluate(() => {
-    const a = document.querySelector('#cap-list a.cap-name');
+    const a = document.querySelector('#cap-list .cap-item[id] a.cap-name');
     const want = new URL(a.href).searchParams.get('tab');
     a.click();
     return { want, now: state.activeTab };
