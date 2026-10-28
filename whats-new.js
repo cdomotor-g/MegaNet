@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 141, date: '2026-10-28', items: [
+      'The Knowledge base\'s <strong>💾 A2 Firmware</strong> is now the <strong>💾 ERT-A2 Simulator</strong>, rebuilt from PuTTY logs '
+        + 'of real units: its terminal is the A2\'s own console — the login, every menu with the unit\'s letters, the prompts holding '
+        + 'their value, the firmware loads taking the USB link off-line. Two modes. <strong>Demo</strong> shows a job done: the firmware '
+        + 'upgrade, or a setting changed from the menus — the station address, the update and paralysis times, the channel and power, '
+        + 'a repeater and its delay, ALERT2, the log to a USB stick. <strong>Interactive</strong> hands you the console to explore: '
+        + 'type, or tap a menu line; plug the stick in, press RESET, reconnect. The laptop is drawn as Windows, the terminal as PuTTY.',
+    ] },
     { n: 140, date: '2026-10-28', items: [
       'On the maps, when the pointer is on more than one thing at once — a road, a river, a bridge — their names stand '
         + 'one above another instead of one on top of the other.',

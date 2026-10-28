@@ -18550,7 +18550,7 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   }
 
   .as-pin { animation: none; }
-  .fw-pane.is-active, .fw-ledchip-dot, .tm-cur, .fw-key { animation: none; }
+  .fw-pane.is-active, .fw-ledchip-dot, .fw-keys .fw-key { animation: none; }
   .fw-ledchip-dot { background: #ffe35a; }
 
   /* The loading card's logo (#212's card, its detailed mark brought to life):
@@ -22210,6 +22210,7 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
   --fw-prep: #5b6b7a;
   --fw-check: #2f6f4f;
   --fw-done: #2e7d32;
+  --fw-set: #4a52c9;
 }
 [data-theme="dark"] .fw-page {
   --fw-hand: #ffa552;
@@ -22221,6 +22222,7 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
   --fw-prep: #a3b3c2;
   --fw-check: #7fd1a8;
   --fw-done: #86cf8a;
+  --fw-set: #a3abff;
 }
 [data-theme="sunlight"] .fw-page {
   --fw-hand: #8a3d00;
@@ -22265,28 +22267,31 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
 .fw-chip--prep, .fw-dot--prep, .fw-part--prep { --fw-c: var(--fw-prep); }
 .fw-chip--check, .fw-dot--check, .fw-part--check { --fw-c: var(--fw-check); }
 .fw-chip--done, .fw-dot--done, .fw-part--done { --fw-c: var(--fw-done); }
+.fw-chip--set, .fw-dot--set, .fw-part--set { --fw-c: var(--fw-set); }
 
 /* 1 · The walkthrough: the paths, the stage, the controls, the caption. */
 .fw-player { display: grid; gap: var(--sp-3); min-width: 0; }
-.fw-paths { display: grid; grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr)); gap: var(--sp-2); }
+.fw-paths { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: var(--sp-1); }
 .fw-path {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   column-gap: var(--sp-2);
   align-items: center;
   text-align: left;
-  padding: var(--sp-2) var(--sp-3);
+  padding: .35rem var(--sp-2);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   background: var(--panel);
   color: var(--text);
   font: inherit;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 .fw-path:hover { border-color: var(--accent); }
+.fw-page p.fw-path-about { margin: 0; font-size: var(--fs-sm); }
 .fw-path.is-on { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
-.fw-path-i { grid-row: span 2; font-size: 1.3rem; }
-.fw-path-n { font-weight: 700; }
+.fw-path-i { font-size: 1.1rem; }
+.fw-path-n { font-weight: 700; line-height: 1.25; }
 .fw-path-a { color: var(--muted); font-size: var(--fs-sm); line-height: 1.3; }
 
 .fw-stage {
@@ -22340,6 +22345,40 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
 .fw-unit-wrap, .fw-pc-wrap { min-width: 0; display: grid; align-items: center; }
 .fw-unit { display: block; width: 100%; height: auto; max-height: 440px; }
 
+/* Demo or Interactive: two big switches over the player. */
+.fw-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
+.fw-mode {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--sp-2);
+  align-items: center;
+  text-align: left;
+  padding: var(--sp-2) var(--sp-3);
+  border: 2px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.fw-mode:hover { border-color: var(--accent); }
+.fw-mode.is-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); box-shadow: inset 0 0 0 1px var(--accent); }
+.fw-mode-i { grid-row: span 2; font-size: 1.5rem; }
+.fw-mode-n { font-weight: 800; font-size: var(--fs-md); }
+.fw-mode-a { color: var(--muted); font-size: var(--fs-sm); line-height: 1.3; }
+.fw-pathset { display: grid; gap: var(--sp-2); }
+.fw-page .fw-paths-h { margin: 0 0 var(--sp-1); font-size: var(--fs-sm); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.fw-live-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+#fw-live-recon.is-due { animation: fw-due 1.2s var(--ease) infinite; }
+@keyframes fw-due { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 35%, transparent); } }
+.fw-live-in { display: grid; gap: var(--sp-1); margin-bottom: var(--sp-2); }
+.fw-live-row { display: flex; flex-wrap: wrap; gap: var(--sp-1); align-items: center; }
+.fw-live-text { flex: 1 1 12rem; min-width: 8rem; font-family: var(--font-mono); }
+.fw-player[data-mode="live"] .fw-term .tm-m { cursor: pointer; border-radius: 2px; }
+.fw-player[data-mode="live"] .fw-term .tm-m:hover { background: rgba(243, 227, 90, .16); }
+.fw-player[data-mode="live"] #fw-stick, .fw-player[data-mode="live"] #fw-reset-cap { cursor: pointer; }
+.fw-offline { padding: .3rem .6rem; background: #fff4ce; color: #4d3a00; border-top: 1px solid #e8d48a; font-family: "Segoe UI", system-ui, sans-serif; font-size: var(--fs-sm); font-weight: 600; text-align: center; }
+
 /* The board. */
 .fw-pcb { fill: #1f63b4; }
 .fw-pcb-edge { fill: none; stroke: #123f78; stroke-width: 3; }
@@ -22389,16 +22428,24 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
 .fw-win {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  min-height: 21rem;
-  border: 1px solid #3b4652;
-  border-radius: var(--r-md);
+  min-height: 27rem;
+  border: 1px solid #8f9399;
+  border-radius: 8px;
   overflow: hidden;
   background: #ffffff;
-  color: #1b2430;
+  color: #1b1b1b;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .22);
 }
-.fw-win-bar { display: flex; align-items: center; gap: var(--sp-2); padding: .35rem .6rem; background: #dfe6ee; color: #1b2430; font-size: var(--fs-sm); font-weight: 600; border-bottom: 1px solid #b8c4d0; }
-.fw-win-dots { width: 2.4rem; height: .7rem; background: radial-gradient(circle at .35rem 50%, #e5534b .3rem, transparent .32rem), radial-gradient(circle at 1.2rem 50%, #d9a325 .3rem, transparent .32rem), radial-gradient(circle at 2.05rem 50%, #3fa34d .3rem, transparent .32rem); }
+/* Windows 11's title bar: light, the icon and name on the left, minimise, maximise and close on the right. */
+.fw-win-bar { display: flex; align-items: center; gap: .5rem; min-height: 2rem; padding: 0 0 0 .6rem; background: #f3f3f3; color: #1b1b1b;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; font-size: .75rem; font-weight: 400; border-bottom: 1px solid #dcdcdc; }
+.fw-win-ico { display: inline-grid; place-items: center; width: 16px; height: 16px; flex: none; }
+.fw-win-ico:empty { display: none; }
 .fw-win-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.fw-win-ctl { display: flex; align-self: stretch; flex: none; }
+.fw-win-ctl > span { display: grid; place-items: center; width: 2.6rem; font-size: .7rem; color: #1b1b1b; }
+.fw-win-x { border-top-right-radius: 7px; }
+@media (max-width: 560px) { .fw-win-ctl > span { width: 1.9rem; } }
 .fw-sim { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: .05rem .4rem; border-radius: var(--r-pill); background: #1b2430; color: #ffffff; }
 .fw-win-idle { display: grid; place-items: center; padding: var(--sp-4); color: #5b6b7a; }
 .fw-files { display: grid; align-content: start; font-size: var(--fs-sm); }
@@ -22421,39 +22468,53 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
 .fw-fbtn { padding: .2rem .9rem; border: 1px solid #8a99a8; border-radius: 3px; background: #f3f6f9; }
 .fw-fbtn.is-hot { outline: 3px solid var(--fw-key); background: #cfe2ff; transform: translateY(1px); }
 
-/* The terminal: drawn after the screenshots in ELPRO's sheet, yellow on black. */
-.fw-win--term { background: #050607; border-color: #2a2f35; }
+/* The terminal: PuTTY on Windows as its defaults draw it — Courier New, grey
+   on black, the cursor a steady green block, tab stops every eight columns,
+   a scroll bar down the right. The colours beyond grey are PuTTY's bright
+   ANSI ones, a reading aid the unit itself does not send. */
+.fw-win--term { background: #000000; container-type: inline-size; }
+.fw-putty { display: grid; grid-template-columns: minmax(0, 1fr) auto; min-height: 0; background: #000000; }
 .fw-term {
   margin: 0;
-  padding: .55rem .7rem;
+  padding: .3rem .35rem;
   min-height: 0;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  font-family: var(--font-mono);
-  font-size: .78rem;
-  line-height: 1.38;
-  color: #f3e35a;
-  background: #050607;
+  font-family: "Courier New", Courier, var(--font-mono);
+  /* 80 columns across what the scroll bar and the padding leave: Courier New is .6em a column. */
+  font-size: clamp(.5rem, calc((100cqi - 1.9rem) / 48.5), .86rem);
+  line-height: 1.32;
+  tab-size: 8;
+  color: #bbbbbb;
+  background: #000000;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   overflow: hidden;
 }
-.fw-term .tm { display: block; min-height: 1.38em; }
+.fw-sb { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: .95rem; background: #f0f0f0; border-left: 1px solid #e3e3e3; color: #858585; font-size: .55rem; line-height: 1; text-align: center; }
+.fw-sb-up, .fw-sb-dn { padding: .2rem 0; }
+.fw-sb-thumb { align-self: end; height: 55%; margin: 0 .2rem; border-radius: 3px; background: #c1c1c1; }
+.fw-term .tm { display: block; min-height: 1.32em; }
+/* Too narrow for 80 columns (a phone): tab stops every four, so fewer lines wrap. */
+@container (max-width: 30rem) { .fw-term { tab-size: 4; } }
 .tm-h { color: #ffffff; font-weight: 700; }
-.tm-dim { color: #8f9aa5; }
-.tm-p, .tm-q { color: #ffffff; }
-.tm-ok { color: #9fe870; }
-.tm-err { color: #ff7a6b; }
+.tm-dim { color: #8a8a8a; }
+.tm-p, .tm-q { color: #bbbbbb; }
+.tm-ok { color: #55ff55; }
+.tm-err { color: #ff5555; }
 .tm-host { box-shadow: inset 3px 0 0 #ff3b30; padding-left: .35rem; }
 .tm-boot { box-shadow: inset 3px 0 0 #ffd60a; padding-left: .35rem; }
 .tm-radio { box-shadow: inset 3px 0 0 #32d2f5; padding-left: .35rem; }
 .tm-fi { outline: 2px solid #d590f2; outline-offset: 1px; color: #ffffff; padding: 0 .15rem; }
 .tm-pick { background: #f3e35a; color: #050607; border-radius: 2px; padding: 0 .1rem; }
-.tm-cur { color: #f3e35a; animation: fw-cur 1s steps(1) infinite; }
-@keyframes fw-cur { 50% { opacity: 0; } }
-.fw-keys { min-height: 2.1rem; display: flex; justify-content: flex-end; align-items: center; gap: .4rem; padding: .25rem .6rem; background: #0e1114; }
-.fw-key { display: inline-block; min-width: 1.8rem; padding: .1rem .5rem; border: 1px solid #c9d1d9; border-bottom-width: 3px; border-radius: 5px; background: #f6f8fa; color: #1b2430; font-family: var(--font-mono); font-size: .8rem; font-weight: 700; text-align: center; animation: fw-key .5s var(--ease); }
+.tm-cur { color: #00ff00; }
+.tm-cur-on { background: #00ff00; color: #000000; }
+.tm-warn { color: #ffff55; }
+.fw-term .tm.is-picked { background: none; }
+/* The keys pressed, on a tray under PuTTY's window rather than in it. */
+.fw-keys { min-height: 2.1rem; display: flex; justify-content: flex-end; align-items: center; gap: .4rem; padding: .25rem .6rem; background: #e9e9e9; border-top: 1px solid #d0d0d0; }
+.fw-keys .fw-key { display: inline-block; min-width: 1.8rem; padding: .1rem .5rem; border: 1px solid #c9d1d9; border-bottom-width: 3px; border-radius: 5px; background: #f6f8fa; color: #1b2430; font-family: var(--font-mono); font-size: .8rem; font-weight: 700; text-align: center; animation: fw-key .5s var(--ease); }
 @keyframes fw-key { 0% { transform: translateY(-6px); opacity: 0; } 40% { transform: translateY(2px); opacity: 1; } 100% { transform: none; } }
 
 /* The controls. */
@@ -22517,6 +22578,7 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
 .fw-term--shot .fw-box-hl--boot { outline-color: #ffd60a; }
 .fw-term--shot .fw-box-hl--radio { outline-color: #32d2f5; }
 .fw-term--shot .fw-box-hl--fi { outline-color: #d590f2; }
+.fw-term--shot .fw-box-hl--fi .fw-box-tag { left: auto; right: 0; }
 .fw-box-tag { position: absolute; left: 0; top: -1.45em; font-size: .62rem; line-height: 1; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #ffffff; white-space: nowrap; }
 .fw-checker { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-3) var(--sp-4); align-items: start; }
 .fw-checker-in { display: grid; gap: var(--sp-1); min-width: 0; }

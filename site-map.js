@@ -108,8 +108,9 @@ const SiteMap = (function () {
       ],
     },
     a2firmware: {
-      what: 'ELPRO\'s ERT-A2 firmware upgrade, walked through: the unit and the laptop\'s terminal side by side, a step at a time, with every step written out below.',
+      what: 'An ERT-A2 on the bench, simulated from real units\' logs: demos of its firmware upgrade and of settings changed from its menus, and its console to explore yourself.',
       use: [
+        'Explore the A2\'s menus before you are at one, and change things without breaking a station',
         'Watch the whole upgrade, or just the host, the bootloader or the radio, before doing it on site',
         'Paste a unit\'s versions and see which parts it needs',
         'Get a USB stick ready: the four files and a FAT32 format',
@@ -544,6 +545,7 @@ const SiteMap = (function () {
     { text: 'Make sense of an SWR meter\'s readings',      tab: 'swr' },
     { text: 'Look up which pin is which on a connector',   tab: 'pinouts' },
     { text: 'Upgrade an ERT-A2\'s firmware',               tab: 'a2firmware' },
+    { text: 'Try out an ERT-A2\'s menus',                   tab: 'a2firmware' },
     { text: 'Practise reading a levelling staff',          tab: 'kbstaff' },
     { text: 'Walk through a routine river station visit',  tab: 'kbriver' },
   ];

@@ -278,9 +278,11 @@ MegaNet/
 │                             on a face, the 4–20 mA arithmetic; pure
 ├── pinouts.js              ← Pinouts — the 🪛 Pinouts tab: faces and tables, cables to
 │                             buzz out, the loop calculator, RF connectors
-├── a2-firmware.js          ← A2Firmware — the 💾 A2 Firmware tab: ELPRO's ERT-A2 firmware
-│                             upgrade walked through, the unit beside the laptop's terminal,
-│                             the version checker, every step written out
+├── a2-terminal.js          ← A2Terminal — the ERT-A2's console, simulated from PuTTY logs of
+│                             real units: login, menus, prompts, loads; pure
+├── a2-firmware.js          ← A2Firmware — the 💾 ERT-A2 Simulator tab: demos of the firmware
+│                             upgrade and of settings, the console to explore, the version
+│                             checker, every step written out
 ├── owner-logos.js          ← OwnerLogos — each station owner's logo beside its name
 │                             on the station card and in the editor (the marks in assets/owners/)
 ├── health-bulletin.js      ← HealthBulletin — 📺 Network Weather at the top of Station
@@ -5576,7 +5578,7 @@ tabs on a phone-sized page, a real OCR read included, and
 ### 29. Knowledge base and Field training (Lessons, and Mallee HydroTech's Training Tools)
 
 Two groups hold lessons rather than tools. **📚 Knowledge base** is Flood-Net's
-own: 🎓 Radio Propagation, ⚡ Bit Errors (§34), 📟 the SWR Meter (§35), 🪛 Pinouts and 💾 A2 Firmware (§38). **Field training**, straight
+own: 🎓 Radio Propagation, ⚡ Bit Errors (§34), 📟 the SWR Meter (§35), 🪛 Pinouts and 💾 the ERT-A2 Simulator (§38). **Field training**, straight
 after Surveying, holds five lessons adapted
 with permission from [Mallee HydroTech](https://malleehydrotech.com.au/)'s open
 training tools (one group until Bit Errors made it seven, past the nav's six;
@@ -5929,60 +5931,46 @@ itself again every fifteen minutes. The ranking downloads as CSV and the
 summary as text ([docs/backbone.md](docs/backbone.md)). `npm run backbone` holds
 it to a planted month on the real station file.
 
-### 38. A2 Firmware (ELPRO's ERT-A2 Upgrade, Walked Through)
+### 38. ERT-A2 Simulator (the A2's Console, Its Firmware and Its Settings)
 
-💾 **A2 Firmware**, in the **Knowledge base**, re-tells ELPRO Technologies'
-*ERT-A2 Complete Firmware Upgrade* (Release G, 24-4-26) a step at a time. The
-four parts go in from a USB stick in ELPRO's order: the **host firmware** (RESET
-tapped, then TEST held within a second until D1 lights), the **bootloader**, the
-**radio's firmware** and the radio's **function image** (each from the A2's
-Unit Diagnostic → Update Device Firmware menu, over the USB B lead at 9600 8N1).
+💾 **ERT-A2 Simulator**, in the **Knowledge base**, is an ELPRO ERT-A2 on the
+bench. Its console is `a2-terminal.js` (`A2Terminal`): a pure state machine
+written from PuTTY logs of real units (`archive/ERTA2_logs/`, November 2025 to
+October 2026, host v1.7) — the login, the header, every menu with its own
+letters, tabs and punctuation, the choice lists with the current setting
+starred, the value prompts, the y/n questions, "Press any key..", and the
+loads that take the USB link off-line. An option the logs never show used is
+listed and says so when picked, rather than inventing what the unit prints.
 
-The **walkthrough** at the top draws the board on the left — the SERIAL DB9, D1
-to D4 over the DIO terminals, and down the right-hand edge RESET, USB B, USB A
-and TEST — and the laptop's screen on the right (File Explorer, the format
-dialog, the terminal, all marked Simulated), with a ring round whichever one the
-hands are on. Pick the whole upgrade, one part, a check of the versions or a USB
-stick made ready, and it plays: the stick going in, the screwdriver on RESET, a
-finger holding TEST, D1 to D4 counting the load in, the menu options picked.
-⏸ pauses it, ◀ and ▶ (or ← and →) step, the dots jump to any step and a
-scrubber moves through one; a device asking for reduced motion starts still.
+**Demo** plays a job done, a step at a time, with the board drawn on the left —
+the SERIAL DB9, D1 to D4 over the DIO terminals, and down the right-hand edge
+RESET, USB B, USB A and TEST — and the laptop's screen on the right, drawn as
+Windows 11 (File Explorer, the format dialog, and the terminal as PuTTY: grey
+Courier on black, a green block cursor, eight-column tabs, "(inactive)" in its
+title while the link is down), and a ring round whichever one the hands are on. The firmware demos re-tell ELPRO's *ERT-A2 Complete Firmware
+Upgrade* (Release G, 24-4-26): the whole upgrade, the host by RESET and TEST
+or from the menu (a host already at v1.7), the bootloader, the radio, the
+function image, a check of the versions, a USB stick made ready. The settings
+demos change things from the menus. ⏸ pauses, ◀ and ▶ (or ← and →) step,
+the dots jump and a scrubber moves through a step; reduced motion starts
+still. Every frame is a pure function of the path, the step and the time — the
+terminal is the console replayed with the step's keys — so the demos and the
+written steps are one list.
 
-Below it: the kit, the four files and the stick's FAT32 format; what RESET,
+**Interactive** hands over the console: type, or tap a menu line; a field
+station, a repeater or a base station's receiver to start from; the stick in
+or out, RESET, and Restart Session (PuTTY's reconnect) when a load or a
+restart has taken the link down, with D1 to D4 lighting on the board.
+`test/a2firmware.mjs` replays the first 1,098 lines of the 28 Oct 2026 log
+through the console, line for line (`test/lib/a2-replay.mjs`).
+
+Below: the kit, the four files and the stick's FAT32 format; what RESET,
 USB B, USB A, TEST, D1–D4 and the DB9 are for; how to read **Show Firmware
-Version** in both its formats, with a **checker** that reads a pasted screen
-against Release G, says which parts that unit needs (and stops at a radio of
-V1.2 or a host under v1.4) and makes a walkthrough of just those; every step
-written out with ▶ Show me and a tick box, and saved as a text checklist;
-what the LEDs mean if they stop short of D4; and what to do when it goes
-wrong — the factory default that RESET-then-TEST becomes at five seconds, a
-terminal that lost its port, the RS-232 progress text, an Iridium unit's
-Epoch. Every frame is a pure function of the path, the step and the time, so
-the walkthrough and the written steps are the same list (`npm run a2firmware`).
-
-### 39. Repeater Delays (What Each Repeater Should Wait, So Copies Never Land Together)
-
-⏳ **Repeater Delays**, under **Stations & networks** beside Pass Ranges, says what
-each repeater's delay should be, so that repeaters relaying the same reading never
-send their copies on top of each other — on one delay, two repeaters that both pass
-an address and both hear its station answer in the same instant, and a receiver
-hearing both gets the copies bit on bit: flipped bits and ghosts. `delay-plan.js`
-follows every reading in the register from its station through the repeaters that
-would relay it (pass ranges, 80 km from a field station, 100 km between repeaters,
-up to four hops, channels agreeing), finds where two copies meet at a base or a
-repeater that wants the reading, and searches for the delays — whole 50 ms steps
-under the limit picked — that keep them furthest apart: **on top** (under a 133 ms
-frame), **close** (under a 300 ms lead-in and a frame) or **clear**. The tab shows
-the plan group by group with each repeater's closest neighbour, the repeaters with
-no neighbour on their readings, every pair and where it meets, and **what a longer
-delay buys** (under 1 s, 1.5, 2 or 3 s); a delay recorded on a station is kept and
-planned around, and a shared delay now can be given so the plan changes as few as
-it can. It downloads as CSV, and the repeater card's suggested delay and Station
-Health's Airtime panel read the same plan. The assessment of October 2026, with
-the plan and its assumptions, is [docs/repeater-delays.md](docs/repeater-delays.md).
-`npm run delays` holds it to small networks whose answer is known and to the
-register. Radio Path Maps and the Map Generator moved to a group of their own,
-**Printed maps**, to make room.
+Version**, with a **checker** that reads a pasted screen against Release G,
+says which parts that unit needs (and stops at a radio of V1.2 or a host under
+v1.4) and makes a walkthrough of just those; every firmware step written out
+with ▶ Show me and a tick box, saved as a text checklist; the LEDs; and what to
+do when it goes wrong (`npm run a2firmware`).
 
 ## Deployment Plan
 

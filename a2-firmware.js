@@ -78,61 +78,27 @@ const A2Firmware = (function () {
     radio: { name: 'Radio firmware', short: 'Radio', icon: '📻' },
     fi:    { name: 'Radio function image', short: 'Function image', icon: '🧩' },
     done:  { name: 'Finish', short: 'Finish', icon: '✅' },
+    set:   { name: 'Settings', short: 'Settings', icon: '⚙️' },
   };
 
   // ── What the laptop shows ──────────────────────────────────────────────────
-  // The login, the Main Menu and the Unit Diagnostic menu as the screenshots
-  // in ELPRO's manual (Sept 2025, pp. 18–19 and 31) have them, letters and
-  // all — set two to a line here so they fit. The Update Device Firmware menu
-  // is in no screenshot: its three options are named in the text (pp. 32–33)
-  // and its letters are drawn. MENU_NOTE says so on the page.
-  const MENU = {
-    login: { title: 'User Type: Menu:', prompt: 'Select: ', rows: [[['a', 'Engineer']], [['b', 'Technician']]] },
-    main: { title: 'Main Menu:', prompt: 'Selection: ', head: true, rows: [
-      [['a', 'Unit Config'], ['b', 'I/O Setup'], ['c', 'Communication'], ['d', 'Unit Diagnostic']],
-      [['e', 'Change Password'], ['f', 'Set Date & Time'], ['g', 'Show/Save Configuration']],
-      [['h', 'Set Accumulators'], ['i', 'Exit']],
-    ] },
-    diag: { title: 'Unit Diagnostic Menu:', prompt: 'Select: ', cols: 31, rows: [
-      [['a', 'Show I/O Values'], ['b', 'Show RSSI List']],
-      [['c', 'SDI-12 value & Test'], ['d', 'Show Internal I/O']],
-      [['e', 'Force Update Message'], ['f', 'Show Firmware Version']],
-      [['g', 'Show Hardware Version'], ['h', 'Update Device Firmware']],
-      [['i', 'Calibrate Analog Input 1'], ['j', 'Calibrate Analog Input 2']],
-      [['k', 'Set Analog Default Calibration'], ['l', 'Upload Log to USB']],
-      [['m', 'Erase Log Memory'], ['n', 'Factory Default Erase All']],
-      [['o', 'Enable Debug Console Output'], ['p', 'Enable Rx Indication DO4']],
-      [['q', 'Enable Maintenance Mode'], ['r', 'Communications Supply Force On']],
-      [['s', 'Radio Tone Reversals']],
-    ] },
-    update: { title: 'Update Device Firmware:', prompt: 'Select: ', rows: [
-      [['a', 'Update Bootloader']],
-      [['b', 'Load firmware to Radio (ERTA2-R_app)']],
-      [['c', 'Load V23 Image to radio (ERTA2-R_fi6)']],
-    ] },
-  };
-  const MENU_NOTE = 'The login, the Main Menu and the Unit Diagnostic menu are drawn after the screenshots in ELPRO\'s manual. The Update Device Firmware menu is in none of them: its options\' names are ELPRO\'s, but their letters here are drawn — pick them by name on the unit.';
+  // The terminal is A2Terminal (a2-terminal.js): the unit's own menus, from
+  // PuTTY logs of real ERT-A2s, driven by the keys each step presses. So the
+  // walkthrough, the demos and the interactive terminal print one set of
+  // screens, the real one.
+  const MENU_NOTE = 'The menus, their letters and their messages are the unit\'s own, from PuTTY logs of real ERT-A2s on host v1.7. The dates, station addresses and build numbers on the simulated screens are illustrations.';
 
-  // The unit's versions as the walkthrough's laptop prints them: where each
-  // path starts, and what each part leaves.
-  const FW_OLD = {
-    host: 'v1.6 Aug 25 2022 14:43:29 : 9814',
-    boot: 'v1.1 - 8708:261:33:0:0',
-    radio: '1.0,ELPRO,ERT-A2,FW1.4,9869',
-  };
-  const FW_NEW = {
-    host: 'v1.7 Sep 20 2024 17:32:50 : 10366',
-    boot: 'v1.3 - 9967:0:15:2:0',
-    radio: 'v1.4 [Apr 24 2026 11:52:00] (10848)',
-  };
+  // Where each path starts the unit's versions (A2Terminal.FW names them).
   const START = {
     all:   { host: 'old', boot: 'old', radio: 'old', fi: '' },
     host:  { host: 'old', boot: 'old', radio: 'old', fi: '' },
+    hostmenu: { host: 'new', boot: 'new', radio: 'mid', fi: '6015' },
     check: { host: 'old', boot: 'old', radio: 'old', fi: '' },
     boot:  { host: 'new', boot: 'old', radio: 'old', fi: '' },
-    radio: { host: 'new', boot: 'new', radio: 'old', fi: '' },
+    radio: { host: 'new', boot: 'new', radio: 'mid', fi: '6015' },
     fi:    { host: 'new', boot: 'new', radio: 'new', fi: '6013' },
     usb:   { host: 'old', boot: 'old', radio: 'old', fi: '' },
+    set:   { host: 'new', boot: 'new', radio: 'mid', fi: '6015' },
   };
 
   // ── The steps ──────────────────────────────────────────────────────────────
@@ -140,9 +106,11 @@ const A2Firmware = (function () {
   // side: where the hands are — 'unit' (the A2 itself) or 'pc' (the laptop).
   // dur: seconds at 1×. still: the telling moment a still picture shows.
   // unit: what happens to the unit, as timed events (applyUnit). pc: the
-  // laptop's window and what appears in it (pcFrame). fw: the version this
-  // step leaves a part at. do/watch/warn/tip: the words, the same in the
-  // walkthrough and the written list.
+  // laptop's window — a folder, the format dialog, or the terminal and the
+  // keys pressed into it (keys). eng: what the unit does that the terminal
+  // hears of (a restart, a reconnect). fw: the version this step leaves a part
+  // at. do/watch/warn/tip: the words, the same in the walkthrough and the
+  // written list.
 
   const tw = (k, at, dur, to) => ({ e: 'tw', k, at, dur, to });
   const lights = (at, dur, from = 0) => ({ e: 'leds', at, dur, from });
@@ -153,64 +121,18 @@ const A2Firmware = (function () {
   const blink = (at, dur) => ({ e: 'blink', at, dur });
   const reboot = at => ({ e: 'reboot', at, dur: 1.6 });
 
-  // Terminal lines: { at, t, c (a class: what it is), type (seconds to type it
-  // out), pk (the part of the line that is the option picked) and sel (when),
-  // echo (a key the prompt shows typed, and when), dyn (a line written from
-  // the unit's versions) }. key: a key pressed at `at`.
-  const L = (at, t, c = '', more = {}) => ({ at, t, c, ...more });
+  // Keys for the terminal: one at `at`; a string typed a key at a time; a
+  // password, shown as stars; and what the unit or PuTTY does meanwhile.
   const K = (at, key) => ({ at, key });
-  // A menu printed at `at`; with `pick` (an option's letter), that option lit
-  // at pickAt and its letter typed just after.
-  function menu(at, which, pick, pickAt) {
-    const m = MENU[which];
-    const out = [];
-    let k = 0;
-    const nextAt = () => at + 0.05 * k++;
-    if (m.head) {
-      out.push(L(nextAt(), '', 'tm-dim', { dyn: 'clock' }));
-      out.push(L(nextAt(), '', 'tm-dim', { dyn: 'head' }));
-    }
-    out.push(L(nextAt(), m.title, 'tm-h'));
-    for (const row of m.rows) {
-      const cells = row.map(([key, label], j) => {
-        const s = `${key}) ${label}`;
-        return m.cols && j < row.length - 1 ? s.padEnd(m.cols) : s;
-      });
-      const hit = row.find(([key]) => key === pick);
-      out.push(L(nextAt(), cells.join(m.cols ? ' ' : '  '), 'tm-m', hit ? { pk: `${hit[0]}) ${hit[1]}`, sel: pickAt } : {}));
-    }
-    out.push(L(nextAt(), m.prompt, 'tm-p', pick ? { echo: { at: pickAt + 0.3, ch: pick } } : {}));
-    if (pick) out.push(K(pickAt + 0.3, pick));
-    return out;
-  }
-  // The login: Engineer, and a password typed as stars.
-  const login = at => [
-    ...menu(at, 'login', 'a', at + 0.7),
-    L(at + 1.3, 'Password: ', 'tm-p', { echo: { at: at + 1.6, ch: '********' } }),
-    K(at + 2.2, 'Enter'),
-  ];
-  // The version screen, from the versions the path has the unit at.
-  function versionLines(at, fw) {
-    const out = [
-      L(at, `Firmware: ${fw.host === 'new' ? FW_NEW.host : FW_OLD.host}`, 'tm-host'),
-      L(at + 0.15, `Host Bootloader: ${fw.boot === 'new' ? FW_NEW.boot : FW_OLD.boot}`, 'tm-boot'),
-    ];
-    if (fw.radio === 'old' && fw.boot === 'new') {
-      out.push(L(at + 0.3, 'ERROR: Could not read parameter value', 'tm-err'));
-      out.push(L(at + 0.4, `Radio Firmware: ${FW_OLD.radio}`, 'tm-radio'));
-      out.push(L(at + 0.5, '        ** Old version - Update Recommended **', 'tm-err'));
-    } else if (fw.radio === 'old') {
-      out.push(L(at + 0.3, `Radio Firmware: ${FW_OLD.radio}`, 'tm-radio'));
-    } else {
-      out.push(L(at + 0.3, `Radio Firmware: ${FW_NEW.radio}`, 'tm-radio', fw.fi ? { fi: `FI:${fw.fi}` } : {}));
-    }
-    return out;
-  }
-  // Back from whatever was on the screen to the Unit Diagnostic menu.
-  const toDiag = at => [K(at, 'Enter'), ...menu(at + 0.25, 'diag')];
-  const TT = 'COM16 - Tera Term VT';
+  const W = (at, s, gap = 0.09) => [...String(s)].map((ch, i) => ({ at: at + i * gap, key: ch }));
+  // A key n times — Backspace over the value a prompt already holds, say.
+  const N = (at, key, n, gap = 0.07) => Array.from({ length: n }, (_, i) => ({ at: at + i * gap, key }));
+  const PW = at => W(at, 'password', 0.07).map(k => ({ ...k, mask: true }));
+  const O = (at, op, text = '') => ({ at, op, text });
+  const login = at => [K(at, 'a'), ...PW(at + 0.5), K(at + 1.2, 'Enter')];
+  const TT = 'COM16 - PuTTY';
 
-  const STEPS = {
+  const FW_STEPS = {
     // ── Get the USB stick ready (on the laptop) ──
     get: {
       part: 'prep', side: 'pc', dur: 5, still: 5,
@@ -246,45 +168,40 @@ const A2Firmware = (function () {
       unit: [tw('cable', 0.5, 1.3, 1)],
     },
     term: {
-      part: 'check', side: 'pc', dur: 7, still: 7,
+      part: 'check', side: 'pc', dur: 5.5, still: 5.5,
       title: 'Open the terminal at 9600 8N1, and log in',
       do: `Windows sees the A2 as a <strong>USB Serial Device (COM<em>n</em>)</strong> — Device Manager lists it under Ports (COM &amp; LPT); the first time,
-        give it a minute or two to install its driver. Open Tera Term, PuTTY or the like on that port at <strong>9600 baud, 8 data bits,
-        no parity, 1 stop bit, no flow control</strong>, and press <strong>Enter</strong>. Log in as <strong>a) Engineer</strong>, with your network's password:
-        the Technician login is for viewing and basic diagnostics.`,
-      watch: 'The Main Menu, with the host\'s version under the date.',
-      pc: { win: 'term', title: TT, clear: true, lines: [
-        L(0.3, '[ Tera Term: COM16, 9600 8N1, no flow control ]', 'tm-dim'),
-        K(1.1, 'Enter'),
-        ...login(1.4),
-        ...menu(4.0, 'main'),
+        give it a minute or two to install its driver. In PuTTY pick <strong>Serial</strong>, put that port in <strong>Serial line</strong> and
+        <strong>9600</strong> in <strong>Speed</strong>; under <strong>Connection → Serial</strong>, <strong>8 data bits, 1 stop bit, parity None,
+        flow control None</strong> (PuTTY's own default is XON/XOFF). <strong>Open</strong> it and press <strong>Enter</strong>. At <strong>User Type</strong> press <strong>a</strong> for Engineer and give
+        your network's password: the Technician login is for viewing and basic diagnostics.`,
+      watch: '"Login Successful!", then the date, the station\'s address, the host\'s version and the Main Menu.',
+      pc: { win: 'term', title: TT, keys: [
+        O(0.3, 'note', 'PuTTY: Serial, COM16, 9600, 8 N 1, flow control None'),
+        K(1.0, 'Enter'),
+        ...login(1.7),
       ] },
     },
     ver: {
-      part: 'check', side: 'pc', dur: 7, still: 7,
+      part: 'check', side: 'pc', dur: 5, still: 5,
       title: 'Unit Diagnostic → Show Firmware Version: note the three lines',
       do: `Press <strong>d</strong> for <strong>Unit Diagnostic</strong>, then <strong>f</strong> for <strong>Show Firmware Version</strong>.
         Write down all three lines — <span class="fw-c fw-c--host">Firmware</span> (the host),
         <span class="fw-c fw-c--boot">Host Bootloader</span> and <span class="fw-c fw-c--radio">Radio Firmware</span> — so that at the end
         you can tell the upgrade took. The checker below reads them, and says which parts this unit needs.`,
       warn: 'Radio Firmware V1.2 or lower? Stop here: this procedure cannot update that radio. Contact ELPRO Technologies for the options.',
-      pc: { win: 'term', title: TT, versions: 3.4, lines: [
-        ...menu(0, 'main', 'd', 0.8),
-        ...menu(1.6, 'diag', 'f', 2.6),
-      ] },
+      pc: { win: 'term', title: TT, keys: [K(0.8, 'd'), K(2.4, 'f')] },
     },
     save: {
-      part: 'check', side: 'pc', dur: 6, still: 6, opt: 'Flood-Net\'s advice: ELPRO\'s documents do not say whether the configuration survives an upgrade',
+      part: 'check', side: 'pc', dur: 5, still: 5, opt: 'Flood-Net\'s advice: ELPRO\'s documents do not say whether the configuration survives an upgrade',
       title: 'Keep a copy of the configuration',
-      do: `Turn on the terminal's log to a file (Tera Term: <strong>File → Log…</strong>; PuTTY: <strong>Session → Logging</strong>), go back to the
-        Main Menu and press <strong>g</strong> for <strong>Show/Save Configuration</strong>, which prints the whole configuration. Then the unit
-        can be put back as it was, whatever the upgrade does to it.`,
-      pc: { win: 'term', title: TT, lines: [
-        L(0.2, '[ Tera Term: logging to A2-config-before.log ]', 'tm-dim'),
-        K(0.8, 'Enter'),
-        ...menu(1.1, 'main', 'g', 2.1),
-        L(2.9, '… the whole configuration prints here …', 'tm-dim', { type: 1.4 }),
-        L(4.6, '[ log saved ]', 'tm-dim'),
+      do: `Turn on PuTTY's log to a file — right-click its title bar, <strong>Change Settings…</strong>, <strong>Session → Logging</strong>,
+        <strong>All session output</strong>, a file name, <strong>Apply</strong> — go back to the
+        Main Menu (a key, then Enter) and press <strong>g</strong> for <strong>Show/Save Configuration</strong>, which prints the whole configuration.
+        Then the unit can be put back as it was, whatever the upgrade does to it.`,
+      pc: { win: 'term', title: TT, keys: [
+        O(0.2, 'note', 'PuTTY: logging all session output to A2-config-before.log'),
+        K(0.8, 'Enter'), K(1.5, 'Enter'), K(2.4, 'g'),
       ] },
     },
 
@@ -302,7 +219,9 @@ const A2Firmware = (function () {
         then <strong>within one second</strong> press and hold <strong>TEST</strong>, and keep holding it until <strong>D1</strong> lights.`,
       watch: 'D1 comes on: let go of TEST.',
       warn: 'Have the stick in first. RESET then TEST held for 5 seconds is also ELPRO\'s factory default, which wipes the I/O setup, the timings and the passwords — and ELPRO does not say how the A2 tells the two apart. If D1 has not lit within a few seconds, let go before five.',
+      tip: 'On a unit whose host is already v1.7, the host can be loaded from the menu instead — Update Main Firmware (ERTA2_) — with no RESET or TEST: the "Host, from the menu" walkthrough.',
       unit: [tw('drv', 0.2, 0.9, 1), tap('drv', 1.2, 0.4), tw('drv', 1.65, 0.6, 0), tw('fin', 1.45, 0.55, 1), hold(2.0, 2.45), led(0, 4.45), tw('fin', 4.8, 0.7, 0)],
+      eng: [O(1.3, 'reset')],
     },
     'h-leds': {
       part: 'host', side: 'unit', dur: 6, still: 6, job: 'host',
@@ -319,18 +238,46 @@ const A2Firmware = (function () {
       unit: [tw('stick', 0.5, 1.1, 0), reboot(1.8)],
     },
     'h-ver': {
-      part: 'host', side: 'pc', dur: 8.5, still: 8.5,
+      part: 'host', side: 'pc', dur: 7.5, still: 7.5,
       title: 'Reconnect, log in, and check: host v1.7',
-      do: `The A2 restarted, so the terminal has probably lost its port: close the connection and open it again, press <strong>Enter</strong> and log in.
+      do: `The A2 restarted, so PuTTY has lost its port — its title bar says <strong>(inactive)</strong>. Right-click the title bar and pick
+        <strong>Restart Session</strong>, press <strong>Enter</strong> and log in.
         Then <strong>d</strong> Unit Diagnostic, <strong>f</strong> Show Firmware Version: the first line should now read <strong>v1.7</strong>
         (with Release G, <strong>: 10366</strong> at its end).`,
-      pc: { win: 'term', title: TT, clear: true, versions: 5.6, lines: [
-        L(0.2, '[ Tera Term: reconnected to COM16 ]', 'tm-dim'),
-        K(0.7, 'Enter'),
-        ...login(0.9),
-        ...menu(3.3, 'main', 'd', 3.9),
-        ...menu(4.3, 'diag', 'f', 5.1),
+      pc: { win: 'term', title: TT, keys: [
+        O(0.2, 'reconnect'), O(0.25, 'note', 'PuTTY: Restart Session — COM16 open again'),
+        K(0.8, 'Enter'), ...login(1.5), K(4.2, 'd'), K(5.6, 'f'),
       ] },
+    },
+
+    // ── Host firmware, from the menu (a host already at v1.7) ──
+    'm-in': {
+      part: 'host', side: 'unit', dur: 2.8, still: 2.8,
+      title: 'Plug the stick into the USB A socket',
+      do: 'Plug the USB stick holding the files into the A2\'s <strong>USB A</strong> socket.',
+      unit: [tw('stick', 0.4, 1.2, 1)],
+    },
+    'm-menu': {
+      part: 'host', side: 'pc', dur: 6, still: 6,
+      title: 'Update Device Firmware → b) Update Main Firmware, then y',
+      do: `From Show Firmware Version press a key for the <strong>Unit Diagnostic</strong> menu, <strong>h</strong> for <strong>Update Device Firmware</strong>,
+        <strong>b</strong> for <strong>Update Main Firmware (ERTA2_)</strong>, and <strong>y</strong> to continue. The unit says what to do next.`,
+      watch: '"When all four DIO LEDs are on, remove the USB to restart the unit."',
+      pc: { win: 'term', title: TT, keys: [K(0.4, 'Enter'), K(1.6, 'h'), K(2.9, 'b'), K(3.9, 'y')] },
+    },
+    'm-leds': {
+      part: 'host', side: 'unit', dur: 6, still: 6, job: 'host',
+      title: 'D1, D2, D3, D4 light in turn',
+      do: 'The four DIO LEDs light one after another as the host firmware loads. Leave it alone until all four are on.',
+      watch: 'All four LEDs on.',
+      unit: [lights(0.4, 4.6)],
+    },
+    'm-out': {
+      part: 'host', side: 'unit', dur: 4.5, still: 2.4, fw: { host: 'new' },
+      title: 'All four on: pull the stick out',
+      do: 'With all four on, take the stick out, as the unit said: it restarts on the new host firmware.',
+      unit: [tw('stick', 0.5, 1.1, 0), reboot(1.8)],
+      eng: [O(1.8, 'reset')],
     },
 
     // ── Bootloader (from the menu) ──
@@ -342,35 +289,28 @@ const A2Firmware = (function () {
     },
     'b-menu': {
       part: 'boot', side: 'pc', dur: 6.5, still: 6.5,
-      title: 'Update Device Firmware → Update Bootloader, then Y',
-      do: `In <strong>Unit Diagnostic</strong>, press <strong>h</strong> for <strong>Update Device Firmware</strong>, then pick
-        <strong>Update Bootloader</strong>. Press <strong>Y</strong> to continue.`,
-      warn: 'From here until all four LEDs are on, do not pull the stick or the power. Interrupting the bootloader can leave the A2 unable to start.',
-      pc: { win: 'term', title: TT, lines: [
-        ...toDiag(0),
-        ...menu(0.25, 'diag', 'h', 1.2),
-        ...menu(1.8, 'update', 'a', 2.6),
-        L(3.4, 'Update Bootloader - Continue (Y/N)? ', 'tm-q', { echo: { at: 4.1, ch: 'Y' } }),
-        K(4.1, 'Y'),
-        L(4.6, 'Updating bootloader ...', 'tm-ok', { type: 1.2 }),
-      ] },
+      title: 'Update Device Firmware → a) Update Bootloader, then y',
+      do: `Press a key for the <strong>Unit Diagnostic</strong> menu, <strong>h</strong> for <strong>Update Device Firmware</strong>, <strong>a</strong> for
+        <strong>Update Bootloader (ERTA2-B)</strong>, and <strong>y</strong> to continue. The USB link goes off-line for about a minute.`,
+      warn: 'From here until DIO4 lights, do not pull the stick or the power. Interrupting the bootloader can leave the A2 unable to start.',
+      pc: { win: 'term', title: TT, keys: [K(0.4, 'Enter'), K(1.6, 'h'), K(2.9, 'a'), K(4.1, 'y')] },
     },
     'b-leds': {
       part: 'boot', side: 'unit', dur: 6.2, still: 6.2, fw: { boot: 'new' }, job: 'boot',
-      title: 'D1 to D4 light in turn — leave it alone',
-      do: 'D1, D2, D3 and D4 light one after another as the bootloader goes in. Touch nothing — not the stick, not the power — until all four are on.',
+      title: 'D1 to D4 light in turn — wait for DIO4',
+      do: 'D1, D2, D3 and D4 light one after another as the bootloader goes in; <strong>DIO4</strong> coming on says it is done. Touch nothing — not the stick, not the power — until then.',
       warn: 'Never interrupt the bootloader.',
       unit: [lights(0.4, 5)],
     },
     'b-ver': {
-      part: 'boot', side: 'pc', dur: 5, still: 5,
-      title: 'Check: bootloader v1.3 (an ERROR line is expected)',
-      do: `<strong>f</strong> Show Firmware Version again. <strong>Host Bootloader</strong> should now read <strong>v1.3 - 9967</strong>.
-        An <strong>ERROR: Could not read parameter value</strong> above the radio's line, and <strong>Old version - Update Recommended</strong> under it,
-        are expected: the radio's firmware is still the old one. They go when the radio is done.`,
-      pc: { win: 'term', title: TT, versions: 2.0, lines: [
-        ...toDiag(0),
-        ...menu(0.25, 'diag', 'f', 1.3),
+      part: 'boot', side: 'pc', dur: 5.5, still: 5.5,
+      title: 'Reconnect, press a key, and check: bootloader v1.3',
+      do: `Restart PuTTY's session — right-click its title bar, <strong>Restart Session</strong> — and press a key: the A2 comes back at the <strong>Unit Diagnostic</strong> menu. <strong>f</strong> Show Firmware Version:
+        <strong>Host Bootloader</strong> should read <strong>v1.3 - 9967</strong>. On a unit whose radio is still old, an
+        <strong>ERROR: Could not read parameter value</strong> above the radio's line and <strong>Old version - Update Recommended</strong> under it
+        are expected — they go when the radio is done.`,
+      pc: { win: 'term', title: TT, keys: [
+        O(0.2, 'reconnect'), O(0.25, 'note', 'PuTTY: Restart Session — COM16 open again'), K(0.9, 'Enter'), K(2.3, 'f'),
       ] },
     },
 
@@ -383,48 +323,34 @@ const A2Firmware = (function () {
     },
     'r-menu': {
       part: 'radio', side: 'pc', dur: 5.5, still: 5.5,
-      title: 'Update Device Firmware → Load firmware to Radio (ERTA2-R_app)',
-      do: `In <strong>Unit Diagnostic</strong>, press <strong>h</strong> for <strong>Update Device Firmware</strong>, then pick
-        <strong>Load firmware to Radio (ERTA2-R_app)</strong>.`,
-      pc: { win: 'term', title: TT, lines: [
-        ...toDiag(0),
-        ...menu(0.25, 'diag', 'h', 1.2),
-        ...menu(1.8, 'update', 'b', 2.7),
-        L(3.6, 'Loading firmware to radio ...', 'tm-ok', { type: 1 }),
-      ] },
+      title: 'Update Device Firmware → c) Load Firmware to Radio',
+      do: `Press a key for the <strong>Unit Diagnostic</strong> menu, <strong>h</strong> for <strong>Update Device Firmware</strong>, and <strong>c</strong> for
+        <strong>Load Firmware to Radio (ERTA2-R_app)</strong>. It does not ask: the USB link goes off-line straight away.`,
+      pc: { win: 'term', title: TT, keys: [K(0.4, 'Enter'), K(1.6, 'h'), K(2.9, 'c')] },
     },
     'r-leds': {
       part: 'radio', side: 'unit', dur: 7, still: 6.3, job: 'radio',
       title: 'The stick\'s light flashes; D1 to D4 light in turn',
-      do: 'The USB stick\'s own light flashes (if it is an ELPRO stick), and D1, D2, D3 and D4 light one after another as the radio\'s firmware loads. The terminal may go quiet meanwhile.',
+      do: 'The USB stick\'s own light flashes (if it is an ELPRO stick), and D1, D2, D3 and D4 light one after another as the radio\'s firmware loads. <strong>DIO4</strong> says it is done.',
       watch: 'It should take no more than a minute.',
       tip: 'Slow, or not answering? Press RESET, take the stick out and put it back, and try again. Still no good: format the stick (Get the USB stick ready), and call ELPRO.',
       unit: [blink(0.2, 5.8), lights(0.6, 5)],
     },
-    'r-enter': {
-      part: 'radio', side: 'pc', dur: 6, still: 6, fw: { radio: 'new', fi: '6013' },
-      title: 'All four on: press Enter a few times',
-      do: 'With all four LEDs on, press <strong>Enter</strong> a few times to step through and finish. The screen should end like this.',
-      pc: { win: 'term', title: TT, lines: [
-        K(0.4, 'Enter'),
-        L(0.7, 'Firmware Loaded to Radio', 'tm-ok'),
-        K(1.3, 'Enter'),
-        L(1.6, 'Activating Radio Firmware', 'tm-ok'),
-        L(2.1, 'Firmware Image: E2_155 radio application 1.4 10848 20260424', 'tm-ok', { type: 0.8 }),
-        K(3.2, 'Enter'),
-        L(3.5, 'applying ...', 'tm-ok', { type: 0.6 }),
-        L(4.6, 'Firmware Loaded to Radio', 'tm-ok'),
+    'r-back': {
+      part: 'radio', side: 'pc', dur: 5, still: 5, fw: { radio: 'new' },
+      title: 'DIO4 on: reconnect, press a key, log in',
+      do: 'Restart PuTTY\'s session (right-click its title bar, <strong>Restart Session</strong>) and press a key: the A2 starts again at the <strong>User Type</strong> login. Log in as Engineer.',
+      tip: 'An older host instead prints "Firmware Loaded to Radio … Activating Radio Firmware … applying …" (ELPRO\'s sheet): press Enter a few times to step through it.',
+      pc: { win: 'term', title: TT, keys: [
+        O(0.2, 'reconnect'), O(0.25, 'note', 'PuTTY: Restart Session — COM16 open again'), K(0.9, 'Enter'), ...login(1.6),
       ] },
     },
     'r-ver': {
-      part: 'radio', side: 'pc', dur: 5, still: 5,
+      part: 'radio', side: 'pc', dur: 4.5, still: 4.5,
       title: 'Check: the radio line now ends with FI:',
-      do: `<strong>f</strong> Show Firmware Version. The radio line now reads <strong>v1.4</strong> with its build in brackets, and ends with an
-        <span class="fw-c fw-c--fi">FI:</span> number not shown before: the version of the radio's <em>function image</em>, which is next.`,
-      pc: { win: 'term', title: TT, versions: 2.0, lines: [
-        ...toDiag(0),
-        ...menu(0.25, 'diag', 'f', 1.3),
-      ] },
+      do: `<strong>d</strong> Unit Diagnostic, <strong>f</strong> Show Firmware Version. The radio line now reads <strong>v1.4</strong> with its build in brackets, and ends with an
+        <span class="fw-c fw-c--fi">FI:</span> number: the version of the radio's <em>function image</em>, which is next.`,
+      pc: { win: 'term', title: TT, keys: [K(0.6, 'd'), K(2.0, 'f')] },
     },
 
     // ── Radio function image ──
@@ -436,36 +362,25 @@ const A2Firmware = (function () {
     },
     'f-menu': {
       part: 'fi', side: 'pc', dur: 5.5, still: 5.5,
-      title: 'Update Device Firmware → Load V23 Image to radio (ERTA2-R_fi6)',
-      do: `In <strong>Unit Diagnostic</strong>, press <strong>h</strong> for <strong>Update Device Firmware</strong>, then pick
-        <strong>Load V23 Image to radio (ERTA2-R_fi6)</strong>.`,
-      pc: { win: 'term', title: TT, lines: [
-        ...toDiag(0),
-        ...menu(0.25, 'diag', 'h', 1.2),
-        ...menu(1.8, 'update', 'c', 2.7),
-        L(3.6, 'Loading image to radio ...', 'tm-ok', { type: 1 }),
-      ] },
+      title: 'Update Device Firmware → e) Load V23 Image to radio',
+      do: `Press a key for the <strong>Unit Diagnostic</strong> menu, <strong>h</strong> for <strong>Update Device Firmware</strong>, and <strong>e</strong> for
+        <strong>Load V23 Image to radio (ERTA2-R_fi6)</strong> — Release G's <code>…fi6015…</code> file. Leave <strong>d) Load FSK Image to radio (ERTA2-R_fi2)</strong>
+        alone: Release G has no fi2 file.`,
+      pc: { win: 'term', title: TT, keys: [K(0.4, 'Enter'), K(1.6, 'h'), K(2.9, 'e')] },
     },
     'f-leds': {
       part: 'fi', side: 'unit', dur: 6.4, still: 6, job: 'fi',
       title: 'The stick\'s light flashes; D1 to D4 light in turn',
-      do: 'Again the stick\'s light flashes and D1 to D4 light one after another, as the function image goes in.',
+      do: 'Again the stick\'s light flashes and D1 to D4 light one after another, as the function image goes in. <strong>DIO4</strong> says it is done.',
       watch: 'All four LEDs on.',
       unit: [blink(0.2, 5.4), lights(0.5, 4.8)],
     },
-    'f-enter': {
-      part: 'fi', side: 'pc', dur: 6, still: 6, fw: { fi: '6015' },
-      title: 'All four on: press Enter a few times',
-      do: 'With all four LEDs on, press <strong>Enter</strong> a few times to step through and finish. The screen should end like this.',
-      pc: { win: 'term', title: TT, lines: [
-        K(0.4, 'Enter'),
-        L(0.7, 'Firmware Loaded to Radio', 'tm-ok'),
-        K(1.3, 'Enter'),
-        L(1.6, 'Activating Radio Firmware', 'tm-ok'),
-        L(2.1, 'Firmware Image: E2_155 FI6 for 1.4 10252 20240703', 'tm-ok', { type: 0.8 }),
-        K(3.2, 'Enter'),
-        L(3.5, 'applying ...', 'tm-ok', { type: 0.6 }),
-        L(4.6, 'Firmware Loaded to Radio', 'tm-ok'),
+    'f-back': {
+      part: 'fi', side: 'pc', dur: 5, still: 5, fw: { fi: '6015' },
+      title: 'DIO4 on: reconnect, press a key, log in',
+      do: 'Restart PuTTY\'s session, press a key and log in as Engineer again.',
+      pc: { win: 'term', title: TT, keys: [
+        O(0.2, 'reconnect'), O(0.25, 'note', 'PuTTY: Restart Session — COM16 open again'), K(0.9, 'Enter'), ...login(1.6),
       ] },
     },
     'f-out': {
@@ -475,15 +390,12 @@ const A2Firmware = (function () {
       unit: [dark(0.3), tw('stick', 0.5, 1.1, 0)],
     },
     'f-ver': {
-      part: 'fi', side: 'pc', dur: 5, still: 5,
+      part: 'fi', side: 'pc', dur: 4.5, still: 4.5,
       title: 'Check: FI:6015 (FI:2044 on ALERT2 report format)',
-      do: `<strong>f</strong> Show Firmware Version once more. The function image's number should now be the latest,
+      do: `<strong>d</strong> Unit Diagnostic, <strong>f</strong> Show Firmware Version once more. The function image's number should now be the latest,
         <span class="fw-c fw-c--fi">FI:6015</span> — the first number in its file's name, <code>ERT-A2-R_fi<strong>6015</strong>_v1-4_10252.wrap</code>.`,
       watch: 'A unit set for the ALERT2 report format shows FI:2044 instead. That is right for it, not a failure.',
-      pc: { win: 'term', title: TT, versions: 2.0, lines: [
-        ...toDiag(0),
-        ...menu(0.25, 'diag', 'f', 1.3),
-      ] },
+      pc: { win: 'term', title: TT, keys: [K(0.6, 'd'), K(2.0, 'f')] },
     },
 
     // ── Finish ──
@@ -500,15 +412,18 @@ const A2Firmware = (function () {
   const CHECK = ['cable', 'term', 'ver'];
   const SEQ = {
     host: ['h-in', 'h-press', 'h-leds', 'h-out', 'h-ver'],
+    hostmenu: ['m-in', 'm-menu', 'm-leds', 'm-out', 'h-ver'],
     boot: ['b-in', 'b-menu', 'b-leds', 'b-ver'],
-    radio: ['r-in', 'r-menu', 'r-leds', 'r-enter', 'r-ver'],
-    fi: ['f-in', 'f-menu', 'f-leds', 'f-enter', 'f-out', 'f-ver'],
+    radio: ['r-in', 'r-menu', 'r-leds', 'r-back', 'r-ver'],
+    fi: ['f-in', 'f-menu', 'f-leds', 'f-back', 'f-out', 'f-ver'],
   };
-  const PATHS = {
+  const FW_PATHS = {
     all:   { label: 'The whole upgrade', icon: '⭐', about: 'Stick, host, bootloader, radio and function image, in ELPRO\'s order.',
       steps: [...PREP, ...CHECK, 'save', ...SEQ.host, ...SEQ.boot, ...SEQ.radio, ...SEQ.fi, 'done'] },
-    host:  { label: 'Host firmware', icon: '🧠', about: 'The USB stick, RESET and TEST. Always first: it is what lets the USB take more than one file.',
+    host:  { label: 'Host firmware', icon: '🧠', about: 'The USB stick, RESET and TEST — from any host. Always first: it is what lets the USB take more than one file.',
       steps: [...CHECK, 'save', ...SEQ.host, 'done'] },
+    hostmenu: { label: 'Host, from the menu', icon: '📟', about: 'On a host already at v1.7: Update Main Firmware (ERTA2_), no RESET or TEST.',
+      steps: [...CHECK, ...SEQ.hostmenu, 'done'] },
     boot:  { label: 'Bootloader', icon: '🥾', about: 'From the menu. Only on a unit whose host is already v1.7.',
       steps: [...CHECK, ...SEQ.boot, 'done'] },
     radio: { label: 'Radio firmware', icon: '📻', about: 'The radio\'s application, from the menu. Host v1.7 and bootloader v1.3 first.',
@@ -521,9 +436,150 @@ const A2Firmware = (function () {
       steps: [...PREP] },
   };
 
+  // ── The settings demos ─────────────────────────────────────────────────────
+  // Each logs in (cable, term), changes one thing from the menus, and saves —
+  // the keys pressed into A2Terminal, so every screen is the unit's own.
+  const SAVE = at => [K(at, 'Enter'), K(at + 1.2, 'g'), K(at + 3.6, 'y')];
+  const SET_STEPS = {
+    's-cfg': {
+      part: 'set', side: 'pc', dur: 2.6, still: 2.6,
+      title: 'a) Unit Config',
+      do: 'From the Main Menu press <strong>a</strong> for <strong>Unit Config</strong>: the station itself — its address, its timings, how it logs.',
+      pc: { win: 'term', title: TT, keys: [K(0.8, 'a')] },
+    },
+    's-addr': {
+      part: 'set', side: 'pc', dur: 5.4, still: 3.2,
+      title: 'a) Station Address: Backspace, type it, Enter',
+      do: `<strong>a</strong> for <strong>Station Address</strong>. The prompt holds the address now, with the cursor after it: <strong>Backspace</strong> it away,
+        type the new one and press <strong>Enter</strong> (Enter on its own keeps it). A letter in it is an <strong>Invalid Format!</strong>
+        Back at the menu, the unit says <strong>Config NOT Saved</strong> — true until it is saved.`,
+      pc: { win: 'term', title: TT, keys: [K(0.6, 'a'), ...N(1.4, 'Backspace', 4), ...W(2.0, '2205', 0.18), K(3.4, 'Enter')] },
+    },
+    's-times': {
+      part: 'set', side: 'pc', dur: 7, still: 5.1,
+      title: 'b) Update Time and c) Paralysis Time',
+      do: `<strong>b</strong> for <strong>Update Time (min)</strong> — how often the station sends its readings even when nothing has changed — then
+        <strong>c</strong> for <strong>Paralysis Time (sec)</strong>, how long it waits after sending before it may send again. Each prompt holds the
+        time now: Backspace it, type the new one, Enter.`,
+      pc: { win: 'term', title: TT, keys: [K(0.6, 'b'), ...N(1.3, 'Backspace', 3), ...W(1.7, '60', 0.2), K(2.4, 'Enter'),
+        K(3.4, 'c'), ...N(4.1, 'Backspace', 2), ...W(4.4, '30', 0.2), K(5.3, 'Enter')] },
+    },
+    's-save': {
+      part: 'set', side: 'pc', dur: 7, still: 3.9,
+      title: 'Back to the Main Menu: g) Show/Save Configuration, then y',
+      do: `Enter goes back up to the <strong>Main Menu</strong>. <strong>g</strong> prints the whole configuration — on a real terminal, scroll back up it to check the change is there — and,
+        with something unsaved, asks <strong>Save Current Config? (y/n)</strong>. <strong>y</strong>: the unit says <strong>Configuration Saved!!</strong>
+        and clears to the Main Menu, its <strong>Config NOT Saved</strong> line gone. (With nothing unsaved it just ends <strong>Press any key..</strong>)`,
+      warn: 'Not saved, a change is lost when the console times out ("Discarding Unsaved Config Changes...").',
+      pc: { win: 'term', title: TT, keys: SAVE(0.5) },
+    },
+    's-comm': {
+      part: 'set', side: 'pc', dur: 2.6, still: 2.6,
+      title: 'c) Communication',
+      do: 'From the Main Menu press <strong>c</strong> for <strong>Communication</strong>: the radio. Each item shows its setting after <strong>=&gt;</strong>.',
+      pc: { win: 'term', title: TT, keys: [K(0.8, 'c')] },
+    },
+    's-freq': {
+      part: 'set', side: 'pc', dur: 7.6, still: 7.6,
+      title: 'c) Tx Frequency and d) Rx Frequency, in MHz',
+      do: `<strong>c</strong> for <strong>Tx Frequency MHz</strong>. The prompt holds the channel now, <code>151.500000</code>, the cursor at its end:
+        <strong>←</strong> five times to put it after <code>151.5</code>, type <code>25</code> over the zeros, and Enter — <code>151.525000</code>.
+        (Backspacing it all and typing <code>151.525</code> does the same.) Then <strong>d</strong> for <strong>Rx Frequency MHz</strong>.
+        A frequency the radio will not take — 135 and 152 in the logs — or an emptied one is an <strong>Invalid value!</strong>`,
+      pc: { win: 'term', title: TT, keys: [K(0.6, 'c'), ...N(1.3, 'ArrowLeft', 5, 0.12), ...W(2.1, '25', 0.25), K(2.9, 'Enter'),
+        K(4.0, 'd'), ...N(4.7, 'ArrowLeft', 5, 0.12), ...W(5.5, '25', 0.25), K(6.3, 'Enter')] },
+    },
+    's-power': {
+      part: 'set', side: 'pc', dur: 3.6, still: 3.6,
+      title: 'e) Tx Power: 1 or 5 (watts)',
+      do: '<strong>e</strong> for <strong>Tx Power</strong>, then one key, <strong>1</strong> or <strong>5</strong> — no Enter: it goes over the 5 of 5W and the menu comes straight back, showing 1W.',
+      pc: { win: 'term', title: TT, keys: [K(0.6, 'e'), K(1.8, '1')] },
+    },
+    's-type': {
+      part: 'set', side: 'pc', dur: 4.4, still: 4.4,
+      title: 'b) Unit Type → c) Repeater Station',
+      do: `<strong>b</strong> for <strong>Unit Type</strong>: a list with the current one starred. <strong>c</strong> for <strong>Repeater Station</strong> — and
+        the menu grows: a repeater has a delay, address lists, an agency and a secondary link. The letters after Unit Type move to make room.`,
+      pc: { win: 'term', title: TT, keys: [K(0.6, 'b'), K(2.0, 'c')] },
+    },
+    's-delay': {
+      part: 'set', side: 'pc', dur: 4.8, still: 4.8,
+      title: 'i) Repeater Delay (mSec)',
+      do: `<strong>i</strong> for <strong>Repeater Delay (mSec)</strong>: how long the repeater waits, in milliseconds, before sending on what it heard.
+        Backspace the delay there now, type the new one and Enter. Keep it under 65536: the unit takes a bigger number without a word and wraps it round.
+        (⏳ Repeater Delays, in Flood-Net, works out what each repeater should wait.)`,
+      pc: { win: 'term', title: TT, keys: [K(0.6, 'i'), ...N(1.3, 'Backspace', 3), ...W(1.7, '400', 0.2), K(2.6, 'Enter')] },
+    },
+    's-format': {
+      part: 'set', side: 'pc', dur: 4.4, still: 4.4,
+      title: 'f) Report Format → a) ALERT2 Format',
+      do: `<strong>f</strong> for <strong>Report Format</strong> — <strong>ALERT2 Format</strong>, <strong>ALERT Binary</strong> or <strong>ALERT IFLOWS</strong> —
+        and <strong>a</strong> for ALERT2.`,
+      pc: { win: 'term', title: TT, keys: [K(0.6, 'f'), K(2.0, 'a')] },
+    },
+    's-fi': {
+      part: 'set', side: 'pc', dur: 6, still: 6,
+      title: 'Show Firmware Version: now FI:2044',
+      do: `Up to the Main Menu (Enter), <strong>d</strong> Unit Diagnostic, <strong>f</strong> Show Firmware Version: on ALERT2 format the radio runs its FSK
+        function image, and the line ends <span class="fw-c fw-c--fi">FI:2044</span> in place of FI:6015 — as ELPRO's sheet says.`,
+      pc: { win: 'term', title: TT, keys: [K(0.5, 'Enter'), K(1.8, 'd'), K(3.2, 'f')] },
+    },
+    's-exit': {
+      part: 'set', side: 'pc', dur: 6.5, still: 3.4,
+      title: 'Or: i) Exit, and a) Save Changes',
+      do: `Leaving with a change not saved, <strong>i) Exit</strong> asks first: <strong>a) Save Changes</strong>, <strong>b) Keep but don't save</strong>,
+        <strong>c) Discard Changes</strong> or <strong>d) Cancel</strong>, at <strong>Option:</strong>. <strong>a</strong>, and it saves, exits and goes back to the login.`,
+      pc: { win: 'term', title: TT, keys: [K(0.4, 'Enter'), K(1.2, 'Enter'), K(2.4, 'i'), K(4.0, 'a')] },
+    },
+    's-stick': {
+      part: 'set', side: 'unit', dur: 2.8, still: 2.8,
+      title: 'Plug a stick into USB A',
+      do: 'Plug an empty USB stick into the <strong>USB A</strong> socket.',
+      unit: [tw('stick', 0.4, 1.2, 1)],
+    },
+    's-log': {
+      part: 'set', side: 'pc', dur: 5, still: 5,
+      title: 'd) Unit Diagnostic → l) Upload Log to USB',
+      do: `<strong>d</strong> for <strong>Unit Diagnostic</strong>, <strong>l</strong> for <strong>Upload Log to USB</strong>. The USB link goes off-line while the unit
+        writes its log to the stick; the DIO LEDs show the progress.`,
+      tip: 'Holding TEST for 5 seconds with a stick in does the same, without the laptop.',
+      pc: { win: 'term', title: TT, keys: [K(0.6, 'd'), K(2.2, 'l')] },
+    },
+    's-logleds': {
+      part: 'set', side: 'unit', dur: 6, still: 6,
+      title: 'Watch the DIO LEDs until they are done',
+      do: 'The LEDs light in turn as the log is written. When they are done, restart PuTTY\'s session and press a key, and take the stick out.',
+      unit: [blink(0.2, 5), lights(0.4, 4.6)],
+    },
+    's-logback': {
+      part: 'set', side: 'pc', dur: 3, still: 3,
+      title: 'Reconnect and press a key',
+      do: 'Restart PuTTY\'s session (right-click its title bar, <strong>Restart Session</strong>) and press a key: the unit comes back at the Main Menu, still logged in.',
+      pc: { win: 'term', title: TT, keys: [O(0.2, 'reconnect'), O(0.25, 'note', 'PuTTY: Restart Session — COM16 open again'), K(0.9, 'Enter')] },
+    },
+  };
+  const STEPS = { ...FW_STEPS, ...SET_STEPS };
+  const LOGIN = ['cable', 'term'];
+  const SET_PATHS = {
+    'set-addr': { group: 'set', label: 'Change the station address', icon: '🏷️', about: 'Unit Config → Station Address, then save.',
+      steps: [...LOGIN, 's-cfg', 's-addr', 's-save', 'done'] },
+    'set-times': { group: 'set', label: 'Set the update and paralysis times', icon: '⏱️', about: 'Unit Config → Update Time and Paralysis Time, then save.',
+      steps: [...LOGIN, 's-cfg', 's-times', 's-save', 'done'] },
+    'set-radio': { group: 'set', label: 'Set the channel and the power', icon: '📡', about: 'Communication → Tx and Rx Frequency, Tx Power, then save.',
+      steps: [...LOGIN, 's-comm', 's-freq', 's-power', 's-save', 'done'] },
+    'set-repeater': { group: 'set', label: 'Make it a repeater, with its delay', icon: '🔁', about: 'Communication → Unit Type → Repeater Station, Repeater Delay, then save.',
+      steps: [...LOGIN, 's-comm', 's-type', 's-delay', 's-save', 'done'] },
+    'set-format': { group: 'set', label: 'Switch it to ALERT2', icon: '🔀', about: 'Communication → Report Format → ALERT2 Format; the function image says FI:2044.',
+      steps: [...LOGIN, 's-comm', 's-format', 's-fi', 's-exit', 'done'] },
+    'set-log': { group: 'set', label: 'Copy the log to a USB stick', icon: '🗃️', about: 'Unit Diagnostic → Upload Log to USB, the LEDs, reconnect.',
+      steps: [...LOGIN, 's-stick', 's-log', 's-logleds', 's-logback', 'done'] },
+  };
+  const PATHS = { ...FW_PATHS, ...SET_PATHS };
+
   // ── The session ────────────────────────────────────────────────────────────
   const S = {
     path: 'all', i: 0, t: 0, playing: true, speed: 1, fresh: true,
+    mode: 'demo',               // 'demo' (the walkthroughs) | 'live' (the terminal, interactive)
     mine: null,                 // { parts: [...], steps: [...] } — a path made by the checker
     before: '', after: '',
     ticks: {},
@@ -544,7 +600,7 @@ const A2Firmware = (function () {
     return PATHS[id] || PATHS.all;
   }
   const stepsOf = (id = S.path) => pathDef(id).steps;
-  const startOf = id => START[id === 'mine' ? (S.mine && S.mine.start) || 'all' : id] || START.all;
+  const startOf = id => START[id === 'mine' ? (S.mine && S.mine.start) || 'all' : id] || (pathDef(id).group === 'set' ? START.set : START.all);
 
   // ── A frame: the unit ──────────────────────────────────────────────────────
 
@@ -616,53 +672,55 @@ const A2Firmware = (function () {
 
   // ── A frame: the laptop ────────────────────────────────────────────────────
 
-  // The window a pc step shows at time t, from the screen the steps before it
-  // left. A unit step shows the last pc step's final screen, set aside.
-  function pcAt(prev, step, t, fw) {
-    const pc = step.pc;
-    if (!pc) return prev ? { ...prev, keys: [] } : null;
-    if (pc.win !== 'term') return { win: pc.win, title: pc.title, pc, t, keys: [] };
-    // What was on the screen stays, its picks no longer lit.
-    let lines = !pc.clear && prev && prev.win === 'term' ? prev.lines.map(ln => ({ ...ln, picked: false })) : [];
-    const keys = [];
-    for (const ln of pc.lines || []) {
-      if (ln.key) { if (t >= ln.at && t < ln.at + 0.75) keys.push(ln.key); continue; }
-      if (t < ln.at) continue;
-      let text = ln.dyn ? dynLine(ln.dyn, fw) : ln.t;
-      if (ln.type) text = text.slice(0, Math.max(1, Math.round(text.length * clamp((t - ln.at) / ln.type))));
-      if (ln.echo && t >= ln.echo.at) text += ln.echo.ch;
-      lines.push({ t: text, c: ln.c, pk: ln.pk, picked: ln.sel != null && t >= ln.sel, fi: ln.fi });
-    }
-    if (pc.versions != null && t >= pc.versions) {
-      for (const ln of versionLines(pc.versions, fw)) if (t >= ln.at) lines.push({ t: ln.t, c: ln.c, fi: ln.fi });
-    }
-    if (lines.length > TERM_ROWS) lines = lines.slice(lines.length - TERM_ROWS);
-    return { win: 'term', title: pc.title, lines, keys, t };
+  // The unit's console at time t in a step: the console as the steps before
+  // left it, with this step's keys and the unit's own doings (a restart, the
+  // terminal reconnected, a note) applied in time order.
+  function engAt(e0, step, t) {
+    const e = A2Terminal.clone(e0);
+    const evs = [...(step.eng || []), ...((step.pc && step.pc.keys) || [])].filter(x => x.at <= t).sort((a, b) => a.at - b.at);
+    for (const x of evs) apply(e, x);
+    return e;
   }
-  const TERM_ROWS = 18;
-  // The Main Menu's two lines above its title, as the manual's screenshot has
-  // them: the clock and the station's address, then the host's version.
-  function dynLine(k, fw) {
-    if (k === 'clock') return '01-May-2026 09:14:05 UTC; Station Address: 1000';
-    if (k === 'head') return `Firmware: ${fw.host === 'new' ? 'v1.7' : 'v1.6'}  Hardware: Rev3.B`;
-    return '';
+  function apply(e, x) {
+    if (x.op === 'reconnect') A2Terminal.reconnect(e);
+    else if (x.op === 'reset') A2Terminal.reset(e);
+    else if (x.op === 'note') A2Terminal.note(e, x.text);
+    else if (x.key) A2Terminal.key(e, x.key);
   }
 
-  // Every step's start on a path: the unit, the laptop's screen and the
-  // versions, carried from the steps before. Kept per path.
+  // The window a pc step shows at time t. A unit step shows the last pc
+  // step's screen, set aside.
+  function pcAt(prev, step, t, s0) {
+    const pc = step.pc;
+    if (!pc) return prev ? { ...prev, keys: [], pickNow: 0 } : null;
+    if (pc.win !== 'term') return { win: pc.win, title: pc.title, pc, t, keys: [] };
+    const e = engAt(s0.eng, step, t);
+    const keys = (pc.keys || []).filter(k => k.key && t >= k.at && t < k.at + 0.75).map(k => (k.mask ? '•' : keyCap(k.key)));
+    return { win: 'term', title: pc.title, lines: A2Terminal.screen(e, TERM_ROWS), keys, t,
+      pickNow: e.pick > s0.eng.pick ? e.pick : 0, offline: !e.link };
+  }
+  const TERM_ROWS = 24;
+  // A key as its keycap shows it.
+  const CAPS = { Backspace: '⌫', ArrowLeft: '←', Delete: 'Del', Escape: 'Esc' };
+  const keyCap = k => CAPS[k] || k;
+
+  // Every step's start on a path: the unit, the laptop's screen, the unit's
+  // console and its versions, carried from the steps before. Kept per path.
   const memo = new Map();
   function starts(id = S.path) {
     const key = id === 'mine' ? `mine:${(S.mine && S.mine.steps.join(',')) || ''}` : id;
     if (memo.has(key)) return memo.get(key);
     const list = [];
     let u = unitZero(), pc = null;
-    const fw = { ...startOf(id) };
+    let e = A2Terminal.create({ fw: { ...startOf(id) }, profile: pathDef(id).profile || 'field' });
     for (const sid of stepsOf(id)) {
       const st = STEPS[sid];
-      list.push({ unit: cloneUnit(u), pc, fw: { ...fw } });
+      const s0 = { unit: cloneUnit(u), pc, eng: e };
+      list.push(s0);
       u = settleUnit(unitAt(u, st, Infinity));
-      if (st.pc) pc = pcAt(pc, st, Infinity, fw);
-      if (st.fw) Object.assign(fw, st.fw);
+      if (st.pc) pc = pcAt(pc, st, Infinity, s0);
+      e = engAt(e, st, Infinity);
+      if (st.fw) Object.assign(e.fw, st.fw);
     }
     memo.set(key, list);
     return list;
@@ -674,7 +732,7 @@ const A2Firmware = (function () {
     const k = Math.max(0, Math.min(ids.length - 1, i));
     const st = STEPS[ids[k]];
     const s0 = starts(id)[k];
-    return { id: ids[k], step: st, unit: unitAt(s0.unit, st, t), pc: pcAt(s0.pc, st, t, s0.fw), fw: s0.fw };
+    return { id: ids[k], step: st, unit: unitAt(s0.unit, st, t), pc: pcAt(s0.pc, st, t, s0), fw: s0.eng.fw };
   }
 
   // ── Drawing the unit ───────────────────────────────────────────────────────
@@ -842,12 +900,23 @@ const A2Firmware = (function () {
     { n: TARGET.fi.file, d: TARGET.fi.date, ty: 'WRAP File', kb: TARGET.fi.kb },
   ];
 
+  // A title bar's icon: PuTTY's two terminals and the bolt between them, File
+  // Explorer's folder, a drive for the Format dialog.
+  const ICONS = {
+    putty: '<svg viewBox="0 0 16 16" width="16" height="16"><rect x="1" y="1.5" width="8" height="6.5" rx=".6" fill="#d8dde3" stroke="#56606b"/><rect x="2.2" y="2.7" width="5.6" height="4.1" fill="#123a73"/>'
+      + '<rect x="7" y="8" width="8" height="6.5" rx=".6" fill="#d8dde3" stroke="#56606b"/><rect x="8.2" y="9.2" width="5.6" height="4.1" fill="#123a73"/>'
+      + '<path d="M10.6 1.2 7.4 6.3h2.2L6.2 11.8l5.6-6.6H9.5l2.4-4z" fill="#ffd60a" stroke="#8a6d00" stroke-width=".5"/></svg>',
+    folder: '<svg viewBox="0 0 16 16" width="16" height="16"><path d="M1 3.5h5l1.4 1.5H15v8.5H1z" fill="#f4b73d"/><path d="M1 6h14v7.5H1z" fill="#ffd66b"/></svg>',
+    drive: '<svg viewBox="0 0 16 16" width="16" height="16"><rect x="1.5" y="5" width="13" height="6" rx="1" fill="#c7ced6" stroke="#56606b"/><circle cx="12" cy="8" r=".9" fill="#2f9e44"/></svg>',
+    none: '',
+  };
+
   function pcHtml(w) {
-    if (!w) {
-      return `<div class="fw-win fw-win--idle"><div class="fw-win-bar"><span class="fw-win-dots" aria-hidden="true"></span><span class="fw-win-title">Laptop</span></div>
-        <div class="fw-win-idle">Nothing to do on the laptop yet.</div></div>`;
-    }
-    const bar = title => `<div class="fw-win-bar"><span class="fw-win-dots" aria-hidden="true"></span><span class="fw-win-title">${esc(title)}</span><span class="fw-sim">Simulated</span></div>`;
+    // Windows 11's title bar: the program's icon and name, its buttons on the right.
+    const bar = (title, ico = 'folder', ctl = 'all') => `<div class="fw-win-bar"><span class="fw-win-ico" aria-hidden="true">${ICONS[ico]}</span>
+      <span class="fw-win-title">${esc(title)}</span>${ico === 'none' ? '' : '<span class="fw-sim">Simulated</span>'}
+      <span class="fw-win-ctl" aria-hidden="true">${ctl === 'all' ? '<span>&#x2500;</span><span>&#x2610;</span>' : ''}<span class="fw-win-x">&#x2715;</span></span></div>`;
+    if (!w) return `<div class="fw-win fw-win--idle">${bar('Laptop', 'none')}<div class="fw-win-idle">Nothing to do on the laptop yet.</div></div>`;
     if (w.win === 'files') {
       const pc = w.pc;
       const shown = pc.rows.filter(at => w.t >= at).length;
@@ -868,7 +937,7 @@ const A2Firmware = (function () {
       const quickHot = w.t >= pc.quick - 0.5 && w.t < pc.quick + 0.9;
       const startHot = w.t >= pc.start && w.t < pc.start + 0.5;
       const fill = clamp((w.t - pc.fill[0]) / (pc.fill[1] - pc.fill[0]));
-      return `<div class="fw-win fw-win--format">${bar('Format FIRMWARE (D:)')}
+      return `<div class="fw-win fw-win--format">${bar('Format FIRMWARE (D:)', 'drive', 'close')}
         <div class="fw-form">
           <div class="fw-field"><span>Capacity:</span><span class="fw-sel">1.87 GB</span></div>
           <div class="fw-field${fsHot ? ' is-hot' : ''}"><span>File system:</span><span class="fw-sel">${w.t >= pc.fs + 0.4 ? 'FAT32' : 'exFAT'} ▾</span></div>
@@ -879,35 +948,52 @@ const A2Firmware = (function () {
           <div class="fw-form-btns"><span class="fw-fbtn${startHot ? ' is-hot' : ''}">Start</span><span class="fw-fbtn">Close</span></div>
         </div></div>`;
     }
-    const lines = w.lines.map(ln => {
-      const fi = ln.fi ? ` <span class="tm-fi">${esc(ln.fi)}</span>` : '';
+    const spans = w.lines.map((ln, i) => {
       let body = esc(ln.t);
-      // The option picked, lit within its line.
-      if (ln.picked && ln.pk && ln.t.includes(ln.pk)) {
-        const at = ln.t.indexOf(ln.pk);
-        body = `${esc(ln.t.slice(0, at))}<mark class="tm-pick">${esc(ln.pk)}</mark>${esc(ln.t.slice(at + ln.pk.length))}`;
-      }
-      return `<span class="tm ${ln.c || ''}">${body}${fi}</span>`;
-    }).join('\n');
-    const cursor = '<span class="tm-cur" aria-hidden="true">▌</span>';
-    return `<div class="fw-win fw-win--term">${bar(w.title)}
-      <pre class="fw-term">${lines}${cursor}</pre>
+      // At a value prompt the cursor can sit on a character (after ←): drawn over it.
+      const on = i === w.lines.length - 1 && !w.offline && ln.open && ln.cur != null && ln.cur < ln.t.length;
+      if (on) body = `${esc(ln.t.slice(0, ln.cur))}<span class="tm-cur-on">${esc(ln.t[ln.cur])}</span>${esc(ln.t.slice(ln.cur + 1))}`;
+      // The function image's number, boxed as ELPRO boxes it.
+      if (ln.fi && ln.t.endsWith(ln.fi)) body = `${esc(ln.t.slice(0, -ln.fi.length))}<span class="tm-fi">${esc(ln.fi)}</span>`;
+      const picked = w.pickNow && ln.pick === w.pickNow;
+      return `<span class="tm ${ln.c || ''}${picked ? ' is-picked' : ''}">${picked ? `<mark class="tm-pick">${body}</mark>` : body}`;
+    });
+    const cursor = '<span class="tm-cur" aria-hidden="true">█</span>';
+    // The cursor sits where the unit is waiting: at the end of the last line,
+    // unless it is on a character of it.
+    const last = w.lines[w.lines.length - 1];
+    const atEnd = !w.offline && !(last && last.open && last.cur != null && last.cur < last.t.length);
+    const lines = spans.map((sp, i) => `${sp}${i === spans.length - 1 && atEnd ? cursor : ''}</span>`).join('\n');
+    // PuTTY: its title says "(inactive)" once the port has gone; the scroll
+    // bar sits at the bottom of the scroll-back, as it does while a unit talks.
+    return `<div class="fw-win fw-win--term${w.offline ? ' is-offline' : ''}">${bar(w.offline ? `${w.title} (inactive)` : w.title, 'putty')}
+      <div class="fw-putty"><pre class="fw-term">${lines || (w.offline ? '' : cursor)}</pre>
+        <span class="fw-sb" aria-hidden="true"><span class="fw-sb-up">&#x25B4;</span><span class="fw-sb-thumb"></span><span class="fw-sb-dn">&#x25BE;</span></span></div>
+      ${w.offline ? '<div class="fw-offline" aria-hidden="true">USB link off-line — the unit is busy</div>' : ''}
       <div class="fw-keys" aria-hidden="true">${(w.keys || []).map(k => `<kbd class="fw-key">${esc(k)}</kbd>`).join('')}</div>
     </div>`;
   }
 
   // ── The walkthrough ────────────────────────────────────────────────────────
 
+  // The demos to pick from, in two groups: the firmware, and the settings
+  // changed from the menus.
+  const GROUPS = [
+    ['fw', 'Firmware'],
+    ['set', 'Settings, from the menus'],
+  ];
   function pathsHtml() {
-    const ids = Object.keys(PATHS);
-    const mine = S.mine ? `<button type="button" class="fw-path${S.path === 'mine' ? ' is-on' : ''}" aria-pressed="${S.path === 'mine'}" onclick="A2Firmware.path('mine')">
-        <span class="fw-path-i" aria-hidden="true">🎯</span><span class="fw-path-n">What this unit needs</span><span class="fw-path-a">${esc(S.mine.about)}</span></button>` : '';
-    return `<div class="fw-paths" role="group" aria-label="What to walk through">${ids.map(id => {
-      const p = PATHS[id];
-      return `<button type="button" class="fw-path${S.path === id ? ' is-on' : ''}" aria-pressed="${S.path === id}" onclick="A2Firmware.path('${id}')">
-        <span class="fw-path-i" aria-hidden="true">${p.icon}</span><span class="fw-path-n">${esc(p.label)}</span><span class="fw-path-a">${esc(p.about)}</span></button>`;
-    }).join('')}${mine}</div>`;
+    const btn = (id, p) => `<button type="button" class="fw-path${S.path === id ? ' is-on' : ''}" aria-pressed="${S.path === id}" title="${escAttr(p.about)}" onclick="A2Firmware.path('${id}')">
+        <span class="fw-path-i" aria-hidden="true">${p.icon}</span><span class="fw-path-n">${esc(p.label)}</span></button>`;
+    const mine = S.mine ? btn('mine', { icon: '🎯', label: 'What this unit needs', about: S.mine.about }) : '';
+    return `<div class="fw-pathset">${GROUPS.map(([g, name]) => {
+      const ids = Object.keys(PATHS).filter(id => (PATHS[id].group || 'fw') === g);
+      if (!ids.length) return '';
+      return `<div class="fw-paths-g"><h4 class="fw-paths-h" id="fw-paths-${g}">${esc(name)}</h4>
+        <div class="fw-paths" role="group" aria-labelledby="fw-paths-${g}">${ids.map(id => btn(id, PATHS[id])).join('')}${g === 'fw' ? mine : ''}</div></div>`;
+    }).join('')}<p class="fw-path-about" id="fw-path-about">${aboutLine()}</p></div>`;
   }
+  const aboutLine = () => { const p = pathDef(); return `<strong>${esc(p.label)}:</strong> ${esc(p.about)} <span class="fw-muted">${stepsOf().length} steps.</span>`; };
 
   function dotsHtml() {
     const ids = stepsOf();
@@ -946,21 +1032,35 @@ const A2Firmware = (function () {
     </div>`;
   }
 
+  function modesHtml() {
+    const b = (m, icon, name, sub) => `<button type="button" class="fw-mode${S.mode === m ? ' is-on' : ''}" aria-pressed="${S.mode === m}" onclick="A2Firmware.mode('${m}')">
+      <span class="fw-mode-i" aria-hidden="true">${icon}</span><span class="fw-mode-n">${name}</span><span class="fw-mode-a">${sub}</span></button>`;
+    return `<div class="fw-modes" role="group" aria-label="Watch, or try it yourself">
+      ${b('demo', '▶️', 'Demo', 'Watch it done, a step at a time: the firmware, or a setting changed.')}
+      ${b('live', '⌨️', 'Interactive', 'The A2\'s own menus, yours to explore. Type, or tap a menu line.')}
+    </div>`;
+  }
+
   function playerHtml() {
     const ids = stepsOf();
     const st = STEPS[ids[S.i]];
-    return `<div class="fw-player" id="fw-player" data-side="${st.side}">
-      ${pathsHtml()}
-      <div class="fw-stage" id="fw-stage" role="region" aria-label="Walkthrough: the unit and the laptop" tabindex="0" onkeydown="A2Firmware.key(event)">
-        <figure class="fw-pane fw-pane--unit${st.side === 'unit' ? ' is-active' : ''}" id="fw-pane-unit">
-          <figcaption class="fw-pane-tag"><span aria-hidden="true">✋</span> On the unit<span class="fw-now">${st.side === 'unit' ? ' — now' : ''}</span></figcaption>
-          <div class="fw-unit-wrap" id="fw-unit-wrap">${unitSvg()}</div>
+    const live = S.mode === 'live';
+    const side = live ? liveSide() : st.side;
+    return `<div class="fw-player" id="fw-player" data-side="${side}" data-mode="${S.mode}">
+      ${modesHtml()}
+      <div id="fw-demo-top"${live ? ' hidden' : ''}>${pathsHtml()}</div>
+      <div id="fw-live-top"${live ? '' : ' hidden'}>${liveTopHtml()}</div>
+      <div class="fw-stage" id="fw-stage" role="region" aria-label="The unit and the laptop" tabindex="0" onkeydown="A2Firmware.key(event)">
+        <figure class="fw-pane fw-pane--unit${side === 'unit' ? ' is-active' : ''}" id="fw-pane-unit">
+          <figcaption class="fw-pane-tag"><span aria-hidden="true">✋</span> On the unit<span class="fw-now">${side === 'unit' ? ' — now' : ''}</span></figcaption>
+          <div class="fw-unit-wrap" id="fw-unit-wrap" onclick="A2Firmware.board(event)">${unitSvg()}</div>
         </figure>
-        <figure class="fw-pane fw-pane--pc${st.side === 'pc' ? ' is-active' : ''}" id="fw-pane-pc">
-          <figcaption class="fw-pane-tag"><span aria-hidden="true">⌨️</span> On the laptop<span class="fw-now">${st.side === 'pc' ? ' — now' : ''}</span></figcaption>
-          <div class="fw-pc-wrap" id="fw-pc"></div>
+        <figure class="fw-pane fw-pane--pc${side === 'pc' ? ' is-active' : ''}" id="fw-pane-pc">
+          <figcaption class="fw-pane-tag"><span aria-hidden="true">⌨️</span> On the laptop<span class="fw-now">${side === 'pc' ? ' — now' : ''}</span></figcaption>
+          <div class="fw-pc-wrap" id="fw-pc" onclick="A2Firmware.tapLine(event)"></div>
         </figure>
       </div>
+      <div id="fw-demo-foot"${live ? ' hidden' : ''}>
       <div class="fw-transport" role="group" aria-label="Walkthrough controls">
         <button type="button" class="btn" onclick="A2Firmware.step(0)" aria-label="Back to the first step">⏮</button>
         <button type="button" class="btn" id="fw-back" onclick="A2Firmware.back()"${S.i === 0 ? ' disabled' : ''}>◀ Back</button>
@@ -976,7 +1076,270 @@ const A2Firmware = (function () {
       <div id="fw-dots-wrap">${dotsHtml()}</div>
       <div id="fw-cap">${captionHtml()}</div>
       <p class="fw-keyhint">With the walkthrough focused: <kbd>←</kbd> <kbd>→</kbd> step, <kbd>Space</kbd> play or pause.</p>
+      </div>
+      <div id="fw-live-foot"${live ? '' : ' hidden'}>${liveFootHtml()}</div>
     </div>`;
+  }
+
+  // ── Interactive: the A2's console, live ────────────────────────────────────
+  //
+  // The same A2Terminal as the demos, fed the keys typed (or a menu line
+  // tapped), with the board answering what the unit does: a load lights D1 to
+  // D4 (quicker than the real minute), the host's asks for the stick out, a
+  // restart drops the USB link, and Reconnect brings the terminal back.
+  // Nothing here reaches a real unit; the settings changed last only while the
+  // tab is open.
+
+  const LOAD_SECS = 5;
+  const LIVE_FW = { host: 'new', boot: 'new', radio: 'mid', fi: '6015' };
+  let LV = null;           // { e, u0, anim, wait, profile, keys, keysAt }
+
+  function liveStart(profile = 'field') {
+    const e = A2Terminal.create({ profile, fw: { ...LIVE_FW }, stick: false });
+    A2Terminal.note(e, 'PuTTY: Serial, COM16, 9600, 8 N 1, flow control None — press Enter');
+    LV = { e, u0: { ...unitZero(), cable: 1 }, anim: null, wait: '', profile, keys: [], keysAt: 0 };
+  }
+
+  // Which pane wants the hands: the unit while it is loading, restarting or
+  // waiting for the stick to come out; the laptop the rest of the time.
+  function liveSide() {
+    if (!LV) return 'pc';
+    return LV.anim || LV.wait === 'pull' ? 'unit' : 'pc';
+  }
+
+  function liveTopHtml() {
+    const prof = LV ? LV.profile : 'field';
+    return `<div class="fw-live-ctl" role="group" aria-label="The simulated unit">
+      <label class="fw-speed">Unit <select id="fw-live-prof" onchange="A2Firmware.liveReset(this.value)">
+        ${Object.entries(A2Terminal.PROFILES).map(([k, p]) => `<option value="${k}"${k === prof ? ' selected' : ''}>${esc(p.label)}</option>`).join('')}
+      </select></label>
+      <button type="button" class="btn" onclick="A2Firmware.liveReset()">↺ Start over</button>
+      <button type="button" class="btn" id="fw-live-stick" onclick="A2Firmware.liveStick()"></button>
+      <button type="button" class="btn" id="fw-live-reset" onclick="A2Firmware.liveRestart()">Press RESET</button>
+      <button type="button" class="btn btn-primary" id="fw-live-recon" onclick="A2Firmware.liveReconnect()">🔌 Restart Session (reconnect)</button>
+    </div>`;
+  }
+
+  function liveFootHtml() {
+    return `<form class="fw-live-in" onsubmit="A2Firmware.send(event)">
+        <label class="fw-lbl" for="fw-live-text">Type into the terminal</label>
+        <span class="fw-live-row">
+          <input type="text" id="fw-live-text" class="fw-live-text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="a letter, or a value then Send">
+          <button type="submit" class="btn btn-primary">Send ⏎</button>
+          <button type="button" class="btn" onclick="A2Firmware.press('Enter')">Enter</button>
+          <button type="button" class="btn" onclick="A2Firmware.press('y')">y</button>
+          <button type="button" class="btn" onclick="A2Firmware.press('n')">n</button>
+          <button type="button" class="btn" onclick="A2Firmware.press('Backspace')" aria-label="Backspace">⌫</button>
+        </span>
+      </form>
+      <div class="fw-cap fw-cap--pc fw-live-help" id="fw-live-help" aria-live="polite"></div>`;
+  }
+
+  // What the unit is waiting for, in words, and what this menu is for.
+  const ABOUT = {
+    main: 'The top of the A2\'s menus. Unit Config is the station: its address, timings and logging. I/O Setup is the sensors on its inputs. Communication is the radio: channel, power, report format, and a repeater\'s delay and lists. Unit Diagnostic is the checks, the versions and the firmware loads. i) Exit asks about unsaved changes.',
+    unitcfg: 'The station itself: its ALERT address, how often it sends an update, the paralysis time, how it logs, its battery, and the quick set-ups that configure a rain gauge, a river sensor and the battery in one go.',
+    io: 'Each input on the board. The table above the menu is what each one reads now; pick one to give it an ALERT sensor ID ("-" turns it off), a report format and its scaling.',
+    comm: 'The radio. Its items change with the Unit Type: a repeater gets its delay and its pass/reject address lists; RS-232 reporting adds the serial port\'s baud rate and protocol.',
+    diag: 'Checks and maintenance: what the inputs read, the stations heard (RSSI list), a forced update, the firmware and hardware versions, the firmware loads, the log to a USB stick, and the toggles — each says what picking it would do.',
+    update: 'The firmware loads. Each takes the USB link off-line while the unit reads the stick: watch D1 to D4 on the board, then reconnect and press a key.',
+    accum: 'Set an accumulator — a rain gauge\'s running total, say — to a value.',
+  };
+  function liveHelpHtml() {
+    const e = LV.e;
+    const a = e.at;
+    let now;
+    if (!e.link) {
+      now = LV.anim ? 'The unit is busy: watch the board. The terminal is off-line until it is done.'
+        : LV.wait === 'pull' ? 'All four DIO LEDs are on: take the stick out (the button above, or the stick on the board) to restart the unit.'
+          : 'The USB link is off-line and PuTTY says (inactive). Press <strong>🔌 Restart Session</strong>, then a key.';
+    } else if (a.k === 'asleep') now = 'Press <strong>Enter</strong> (or Send) to wake the console.';
+    else if (a.k === 'login') now = 'Log in: <strong>a</strong> for Engineer.';
+    else if (a.k === 'password') now = 'Type a password and Enter. The simulator takes any but an empty one; a real unit takes your network\'s.';
+    else if (a.k === 'menu') now = `${ABOUT[a.id] || ''} Press a letter, or tap a line in the terminal; Enter goes back up a menu.`;
+    else if (a.k === 'choose') now = 'A choice: the one starred is the current setting. Press its letter, or the last one to cancel.';
+    else if (a.k === 'value') now = 'The prompt holds the value now. Type the new one in the box and Send: it replaces it. Or edit it at the terminal as on the unit — Backspace, Delete, ← — and Enter; Enter on its own keeps it.';
+    else if (a.k === 'onekey') now = 'One key, no Enter: <strong>1</strong> for 1 W, <strong>5</strong> for 5 W.';
+    else if (a.k === 'stream') now = 'The inputs as they read now. Press a key to stop and go back to the menu.';
+    else if (a.k === 'offline-wait') now = 'Reconnected. Press a key: the unit carries on where it said it would.';
+    else if (a.k === 'yn') now = 'Answer <strong>y</strong> or <strong>n</strong>.';
+    else if (a.k === 'any') now = 'Press any key to carry on.';
+    else now = '';
+    const dirty = e.dirty ? '<p class="fw-cap-warn"><span aria-hidden="true">💾</span> Changed and not saved: the unit asks about it at <strong>i) Exit</strong> from the Main Menu.</p>' : '';
+    return `<p class="fw-cap-meta"><span class="fw-side fw-side--${liveSide()}"><span aria-hidden="true">${sideIcon(liveSide())}</span> ${sideWord(liveSide())}</span>
+        <span class="fw-cap-n">Interactive — a simulated ${esc(A2Terminal.PROFILES[LV.profile].label.toLowerCase())}; nothing here reaches a real unit</span></p>
+      <p class="fw-cap-do">${now}</p>${dirty}`;
+  }
+
+  function paintLive() {
+    if (!LV || S.mode !== 'live') return;
+    const e = LV.e;
+    const recent = LV.keys.filter(k => k.at > performance.now() / 1000 - 0.75).map(k => k.k);
+    const html = pcHtml({ win: 'term', title: TT, lines: A2Terminal.screen(e, TERM_ROWS), keys: recent, pickNow: e.pick, offline: !e.link, live: true });
+    if (html !== lastPc) { const el = $('fw-pc'); if (el) el.innerHTML = html; lastPc = html; }
+    if (!LV.anim) paintUnit(LV.u0, null);
+    const side = liveSide();
+    sidePanes(side);
+    const help = $('fw-live-help');
+    if (help) help.innerHTML = liveHelpHtml();
+    const stick = $('fw-live-stick');
+    if (stick) stick.textContent = LV.u0.stick > 0.5 ? '⏏ Take the stick out' : '💾 Plug the stick in';
+    const recon = $('fw-live-recon');
+    if (recon) { recon.disabled = e.link || !!LV.anim || LV.wait === 'pull'; recon.classList.toggle('is-due', !e.link && !LV.anim && LV.wait !== 'pull'); }
+  }
+  function sidePanes(side) {
+    const pl = $('fw-player');
+    if (pl) pl.dataset.side = side;
+    for (const sd of ['unit', 'pc']) {
+      const pane = $(`fw-pane-${sd}`);
+      if (!pane) continue;
+      pane.classList.toggle('is-active', side === sd);
+      const now = pane.querySelector('.fw-now');
+      if (now) now.textContent = side === sd ? ' — now' : '';
+    }
+  }
+
+  // The board answering the unit: a load's LEDs, a restart's flash.
+  function liveAnim(kind, stickIn) {
+    const evs = [];
+    let dur = 2;
+    if (kind === 'reboot') { evs.push(reboot(0)); dur = 1.8; }
+    else if (stickIn) {
+      if (kind === 'radio' || kind === 'fi' || kind === 'fsk' || kind === 'log') evs.push(blink(0.1, LOAD_SECS));
+      evs.push(dark(0), lights(0.4, LOAD_SECS - 0.6));
+      dur = LOAD_SECS + 0.3;
+    } else {
+      A2Terminal.note(LV.e, 'Simulator: there is no stick in USB A, so nothing loads');
+      dur = 1.5;
+    }
+    const job = kind === 'fsk' ? 'fi' : kind === 'log' ? '' : kind === 'reboot' ? '' : kind;
+    LV.anim = { t0: performance.now() / 1000, step: { unit: evs, dur, job }, kind, stickIn };
+    LV.wait = '';
+    scheduleLive();
+  }
+  function liveEvents() {
+    for (const ev of A2Terminal.takeEvents(LV.e)) {
+      if (ev.k === 'load') liveAnim(ev.job, ev.stick);
+      else if (ev.k === 'reboot') liveAnim('reboot', true);
+    }
+  }
+  function liveTick() {
+    if (!LV || !LV.anim) return;
+    const a = LV.anim;
+    const t = performance.now() / 1000 - a.t0;
+    paintUnit(unitAt(LV.u0, a.step, t), a.step);
+    if (t >= a.step.dur) {
+      LV.u0 = settleUnit(unitAt(LV.u0, a.step, Infinity));
+      if (a.kind === 'reboot') LV.u0.d = [0, 0, 0, 0];
+      LV.anim = null;
+      LV.wait = a.kind === 'host' && a.stickIn ? 'pull' : 'reconnect';
+      paintLive();
+    }
+  }
+  function scheduleLive() {
+    if (!live || !LV) return;
+    if (!live.raf) live.raf = requestAnimationFrame(loop);
+  }
+
+  // The controls.
+  function liveKey(k) {
+    if (!LV) return;
+    if (!LV.e.link) { paintLive(); return; }
+    // A password's keys show as dots: decided before the key moves the unit on.
+    const cap = LV.e.at.k === 'password' && k.length === 1 ? '•' : keyCap(k);
+    A2Terminal.key(LV.e, k);
+    LV.keys.push({ k: cap, at: performance.now() / 1000 });
+    LV.keys = LV.keys.slice(-6);
+    liveEvents();
+    paintLive();
+    scheduleLive();
+  }
+  function press(k) { liveKey(k); focusStage(); }
+  // The text box: each character as a key; a password then Enter. At a value
+  // prompt the box's text replaces the value the prompt holds, then Enter.
+  function send(ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    const box = $('fw-live-text');
+    const text = box ? box.value : '';
+    if (box) box.value = '';
+    if (!LV) return;
+    if (!text) { liveKey('Enter'); return; }
+    if (LV.e.link && LV.e.at.k === 'value') {
+      A2Terminal.type(LV.e, text);
+      LV.keys.push({ k: `${text} ⏎`, at: performance.now() / 1000 });
+      liveEvents();
+      paintLive();
+      scheduleLive();
+    } else {
+      for (const ch of text) liveKey(ch);
+      if (LV.e.link && LV.e.at.k === 'password') liveKey('Enter');
+    }
+    if (box) box.focus();
+  }
+  // A menu line tapped: its letter, as if typed.
+  function tapLine(ev) {
+    if (S.mode !== 'live' || !LV) return;
+    const line = ev.target && ev.target.closest && ev.target.closest('.tm-m');
+    if (!line) return;
+    const m = /^\s*([a-z])\)/.exec(line.textContent || '');
+    if (m && (LV.e.at.k === 'menu' || LV.e.at.k === 'choose' || LV.e.at.k === 'login')) liveKey(m[1]);
+  }
+  // The stick on the drawing, tapped.
+  function board(ev) {
+    if (S.mode !== 'live') return;
+    const hit = ev.target && ev.target.closest && ev.target.closest('#fw-stick, #fw-reset-cap');
+    if (!hit) return;
+    if (hit.id === 'fw-stick') liveStick();
+    else liveRestart();
+  }
+  function liveStick() {
+    if (!LV || LV.anim) return;
+    const out = LV.u0.stick > 0.5;
+    if (out) A2Terminal.unplug(LV.e); else A2Terminal.plug(LV.e);
+    A2Terminal.takeEvents(LV.e);
+    LV.u0.stick = out ? 0 : 1;
+    if (out && LV.wait === 'pull') { A2Terminal.reset(LV.e); liveEvents(); }
+    paintLive();
+  }
+  function liveRestart() {
+    if (!LV || LV.anim) return;
+    A2Terminal.reset(LV.e);
+    liveEvents();
+    paintLive();
+  }
+  function liveReconnect() {
+    if (!LV || LV.e.link || LV.anim) return;
+    A2Terminal.reconnect(LV.e);
+    A2Terminal.note(LV.e, 'PuTTY: Restart Session — COM16 open again; press a key');
+    LV.wait = '';
+    paintLive();
+    focusStage();
+  }
+  function liveReset(profile) {
+    liveStart(profile || (LV ? LV.profile : 'field'));
+    lastPc = '';
+    paintLive();
+    announce(`A fresh ${A2Terminal.PROFILES[LV.profile].label.toLowerCase()}: press Enter to wake its console.`);
+  }
+  function focusStage() { const s = $('fw-stage'); if (s) s.focus({ preventScroll: true }); }
+
+  function mode(m) {
+    if (m !== 'demo' && m !== 'live') return;
+    S.mode = m;
+    if (m === 'live' && !LV) liveStart('field');
+    if (m === 'live' && S.playing) { S.playing = false; paintPlay(); }
+    for (const [id, show] of [['fw-demo-top', m === 'demo'], ['fw-demo-foot', m === 'demo'], ['fw-live-top', m === 'live'], ['fw-live-foot', m === 'live']]) {
+      const el = $(id); if (el) el.hidden = !show;
+    }
+    document.querySelectorAll('.fw-mode').forEach(b => {
+      const on = b.getAttribute('onclick').includes(`'${m}'`);
+      b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', String(on));
+    });
+    const pl = $('fw-player'); if (pl) pl.dataset.mode = m;
+    lastPc = '';
+    if (m === 'live') { paintLive(); focusStage(); announce('Interactive: the A2\'s console. Press Enter to wake it, then type or tap the menu lines.'); }
+    else { paintStep(false); paint(); }
+    schedule();
   }
 
   // ── 2 · Before you start ───────────────────────────────────────────────────
@@ -990,7 +1353,7 @@ const A2Firmware = (function () {
             <li><span aria-hidden="true">💾</span> <strong>A USB 2.0 stick</strong> known to have loaded firmware into an A2 before, with nothing else on it — ELPRO's 2021 manual says firmware wants USB 2.0, not USB 3.0. Some sticks come formatted in a way the A2 cannot read and need a full format first (below).</li>
             <li><span aria-hidden="true">📦</span> <strong>The firmware files</strong> — ELPRO's Release G pack, from <a href="${ZIP}" target="_blank" rel="noopener">ELPRO's resource link</a> or from ELPRO Technical Support.</li>
             <li><span aria-hidden="true">💻</span> <strong>A Windows laptop</strong>, to format the stick and copy the files onto it.</li>
-            <li><span aria-hidden="true">⌨️</span> <strong>A terminal program</strong> — Tera Term (what ELPRO uses), PuTTY, RealTerm or HyperTerminal — at 9600 baud, 8N1, no flow control, to reach the A2's menus and check each part took.</li>
+            <li><span aria-hidden="true">⌨️</span> <strong>A terminal program</strong> — PuTTY (what the logs behind this simulator come from), Tera Term (what ELPRO's sheet shows), RealTerm or the like — at 9600 baud, 8N1, flow control None, to reach the A2's menus and check each part took.</li>
             <li><span aria-hidden="true">🔑</span> <strong>The Engineer password</strong> for the A2: the Technician login is for viewing and basic diagnostics.</li>
             <li><span aria-hidden="true">🔌</span> <strong>A USB A-to-B lead</strong> (a printer lead), laptop to the A2's USB B socket.</li>
             <li><span aria-hidden="true">🪛</span> <strong>Something long and thin</strong>, like a small screwdriver, for RESET down its hole.</li>
@@ -1277,6 +1640,7 @@ ${box('radio', 'Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301)', 'radio')} 
   const TROUBLE = [
     ['The LEDs will not all come on (the host)', 'Take the stick out, plug it back in and start the host again from RESET. Still no good: format the stick FAT32 with Quick Format off, copy the files again, or try another stick.'],
     ['Holding TEST does nothing', 'TEST has to be pressed within a second of RESET. Tap RESET again and go straight to TEST, and keep holding until D1 lights.'],
+    ['The terminal went quiet after a load', 'Expected: every load takes the USB link off-line while the unit reads the stick ("This USB connection will go off-line for approximately 1 minute"). Wait for DIO4, reconnect the terminal (PuTTY: right-click the title bar, Restart Session) and press a key. After the bootloader it comes back at the Unit Diagnostic menu; after the host, the radio or an image, at the User Type login.'],
     ['The terminal stopped answering', 'The A2 restarts after the host loads, and the laptop\'s port can go with it: close the terminal\'s connection and open it again, and log in. Check the COM port in Device Manager (USB Serial Device), and the settings: 9600, 8N1, no flow control.'],
     ['No menu at all on the laptop', 'Press Enter. The first time, Windows takes a minute or two to install the A2\'s driver; then pick the USB Serial Device\'s COM port, not another one.'],
     ['TEST held a long while and D1 never lit', 'Let go. RESET then TEST held for 5 seconds is also the factory default, which wipes the I/O setup, timings and passwords. Check the stick is in and readable, and start again.'],
@@ -1310,10 +1674,12 @@ ${box('radio', 'Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301)', 'radio')} 
           (rev. 1.0, 2021) — USB 2.0 sticks, the host's few minutes, and the RS-232 progress text (p. 43).</li>
         <li>ELPRO Technologies, <a href="https://elprotech.com/wp-content/uploads/2026/10/ERT-A2-ERT-A2_Iridium_Satellite-Epoch_Instruction_1.0-.pdf" target="_blank" rel="noopener">ERT-A2 Iridium satellite Epoch instruction</a>
           (1.0) — the Epoch setting put back by re-applied firmware.</li>
+        <li>PuTTY logs of ERT-A2s in the field, November 2025 to October 2026 (firmware v1.7, hardware Rev3.B and Rev4.A), kept in Flood-Net's repository —
+          the menus, their letters and their messages, word for word, and the loads from the Update Device Firmware menu (28 Oct 2026).</li>
         <li>ELPRO's <a href="https://elprotech.com/resourcehub-category/firmware/" target="_blank" rel="noopener">firmware downloads</a>, for a release newer than G.</li>
       </ul>
-      <p class="fw-aside">Rewritten for Flood-Net: ELPRO's steps split one action to a step, put in the order they are done, and drawn — the board and the screens
-        after the ones in ELPRO's sheet, not photographs of them. ELPRO's sheet and ELPRO Technical Support are the authority; where this page and the unit
+      <p class="fw-aside">Rewritten for Flood-Net: ELPRO's steps split one action to a step, put in the order they are done, and drawn — the board after the one
+        in ELPRO's sheet, not a photograph of it, and the terminal's screens the unit's own, from the logs. ELPRO's sheet and ELPRO Technical Support are the authority; where this page and the unit
         disagree, believe the unit. ELPRO does not endorse Flood-Net.</p>
       <p class="fw-aside">The 🪛 <button type="button" class="btn-link" onclick="A2Firmware.tab('pinouts')">Pinouts</button> tab has the A2's connectors pin by pin; the
         📟 <button type="button" class="btn-link" onclick="A2Firmware.tab('swr')">SWR Meter</button> tab, its TEST button and the meters that read it.</p>`;
@@ -1337,7 +1703,7 @@ ${box('radio', 'Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301)', 'radio')} 
     const facts = [
       ['🧠', '4 parts', 'host, bootloader, radio, function image', 'In that order. The host first: it lets the USB take more than one file.'],
       ['✋', 'RESET + TEST', 'the host, on the unit', 'Tap RESET, and within a second press and hold TEST until D1 lights — not 5 s: that is a factory default.'],
-      ['⌨️', 'the menu', 'everything after the host', 'Unit Diagnostic → Update Device Firmware, over the USB B lead.'],
+      ['⌨️', 'd → h', 'the firmware menu', 'Unit Diagnostic → Update Device Firmware: a) bootloader, b) host, c) radio, e) V23 image.'],
       ['💡', 'D1 → D4', 'the progress bar', 'All four on: that part is in.'],
       ['⏱️', '≤ 1 min', 'a radio part', 'Longer, or not answering: RESET, re-seat the stick, try again.'],
       ['⛔', 'V1.2', 'radio at or below', 'Cannot be updated this way. Contact ELPRO.'],
@@ -1357,14 +1723,15 @@ ${box('radio', 'Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301)', 'radio')} 
     return `
     <div class="page fw-page" id="fw-page" style="--page-max:1240px">
       <div class="fw-hero">
-        <h2 class="fw-title" id="fw-h"><span aria-hidden="true">💾</span> Upgrading an ERT-A2's firmware</h2>
-        <p class="fw-lede">The four parts of an ELPRO ERT-A2's firmware — the host, its bootloader, the radio's application and the radio's function image —
-          loaded from a USB stick, from ELPRO's Release G procedure. Pick the whole upgrade or one part, and watch it done: the unit on the left,
-          the laptop on the right, and a ring round whichever one your hands are on.</p>
+        <h2 class="fw-title" id="fw-h"><span aria-hidden="true">💾</span> The ERT-A2 simulator: firmware and settings</h2>
+        <p class="fw-lede">An ELPRO ERT-A2 on the bench, simulated from the PuTTY logs of real units. <strong>Demo</strong> shows a job done: the four parts
+          of its firmware loaded from a USB stick (ELPRO's Release G procedure), or a setting changed from its menus — the unit on the left, the laptop's
+          terminal on the right, and a ring round whichever one your hands are on. <strong>Interactive</strong> hands you its console: log in and
+          explore every menu, change things, load firmware and watch the board answer.</p>
         ${factsHtml()}
         ${tocHtml()}
       </div>
-      ${sec('fw-walk', `${head('fw-walk', 1, '▶️', 'The walkthrough', 'Pick what to do; ▶ plays it, ◀ and ▶ step through it, and the dots jump to any step.')}${playerHtml()}`)}
+      ${sec('fw-walk', `${head('fw-walk', 1, '▶️', 'The simulator', '<strong>Demo</strong> plays a job done — the firmware, or a setting changed from the menus: ▶ plays it, ◀ and ▶ step, the dots jump. <strong>Interactive</strong> hands you the A2\'s console to explore.')}${playerHtml()}`)}
       ${sec('fw-prep', `${head('fw-prep', 2, '🧰', 'Before you start', 'The kit, the files, and the stick — mostly done at the desk, before the trip.')}${prepHtml()}`)}
       ${sec('fw-ver', `${head('fw-ver', 3, '🔎', 'Reading the versions, and what the unit needs', '')}${screensHtml()}`)}
       ${sec('fw-list', `${head('fw-list', 4, '📋', 'Every step, written out', '')}${listHtml()}`)}
@@ -1381,7 +1748,7 @@ ${box('radio', 'Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301)', 'radio')} 
 
   let lastPc = '';
   function paint() {
-    if (!live) return;
+    if (!live || S.mode === 'live') return;
     const f = frame();
     paintUnit(f.unit, f.step);
     const html = pcHtml(f.pc);
@@ -1392,6 +1759,7 @@ ${box('radio', 'Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301)', 'radio')} 
 
   // Everything that says which step it is: the rings, the caption, the dots.
   function paintStep(say) {
+    if (S.mode === 'live') return;
     const ids = stepsOf();
     const st = STEPS[ids[S.i]];
     const pl = $('fw-player');
@@ -1428,6 +1796,7 @@ ${box('radio', 'Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301)', 'radio')} 
   function loop(ts) {
     if (!live) return;
     live.raf = 0;
+    if (S.mode === 'live') { liveTick(); if (LV && LV.anim) live.raf = requestAnimationFrame(loop); return; }
     const dt = live.last ? Math.min(0.1, (ts - live.last) / 1000) : 0;
     live.last = ts;
     const st = STEPS[stepsOf()[S.i]];
@@ -1441,7 +1810,7 @@ ${box('radio', 'Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301)', 'radio')} 
   }
   function schedule() {
     if (!live) return;
-    const want = S.playing && live.vis && !!$('fw-page');
+    const want = S.mode === 'live' ? !!(LV && LV.anim) : S.playing && live.vis && !!$('fw-page');
     if (want && !live.raf) live.raf = requestAnimationFrame(loop);
     if (!want) { if (live.raf) cancelAnimationFrame(live.raf); live.raf = 0; live.last = 0; }
   }
@@ -1462,6 +1831,7 @@ ${box('radio', 'Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301)', 'radio')} 
     if (!S.playing && S.fresh) S.t = stillAt(STEPS[stepsOf()[S.i]]);
     paintStep(false);
     paint();
+    if (S.mode === 'live') { lastPc = ''; paintLive(); }
     const stage = $('fw-stage');
     if (stage && typeof IntersectionObserver !== 'undefined') {
       live.io = new IntersectionObserver(es => { for (const e of es) live.vis = e.isIntersecting; schedule(); });
@@ -1524,6 +1894,7 @@ ${box('radio', 'Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301)', 'radio')} 
   function path(id, scroll) {
     if (id !== 'mine' && !PATHS[id]) return;
     if (id === 'mine' && !S.mine) return;
+    if (S.mode !== 'demo') mode('demo');
     S.path = id;
     writeLS();
     S.i = 0;
@@ -1539,6 +1910,8 @@ ${box('radio', 'Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301)', 'radio')} 
     paintStep(false);
     paint();
     schedule();
+    const ab = $('fw-path-about');
+    if (ab) ab.innerHTML = aboutLine();
     announce(`${pathDef().label}: ${stepsOf().length} steps.`);
     if (scroll) go('fw-walk');
   }
@@ -1572,6 +1945,14 @@ ${box('radio', 'Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301)', 'radio')} 
 
   function key(e) {
     if (!e || e.target !== e.currentTarget) return;
+    if (S.mode === 'live') {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const k = ['Enter', 'Backspace', 'Delete', 'Escape', 'ArrowLeft'].includes(e.key) ? e.key : e.key && e.key.length === 1 ? e.key : '';
+      if (!k) return;
+      e.preventDefault();
+      liveKey(k);
+      return;
+    }
     if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); back(); }
     else if (e.key === ' ' || e.key === 'k') { e.preventDefault(); play(); }
@@ -1649,11 +2030,14 @@ ${box('radio', 'Radio Firmware: v1.4 [Jul 26 2024 17:27:44] (10301)', 'radio')} 
 
   function state() {
     return { path: S.path, i: S.i, t: S.t, playing: S.playing, speed: S.speed, fresh: S.fresh, steps: stepsOf().slice(),
-      step: stepsOf()[S.i], side: STEPS[stepsOf()[S.i]].side, mine: S.mine && { ...S.mine }, running: !!(live && live.raf) };
+      step: stepsOf()[S.i], side: STEPS[stepsOf()[S.i]].side, mine: S.mine && { ...S.mine }, running: !!(live && live.raf), mode: S.mode,
+      live: LV && { at: LV.e.at.k, menu: LV.e.at.id || '', link: LV.e.link, wait: LV.wait, busy: !!LV.anim, dirty: LV.e.dirty, cfg: { ...LV.e.cfg },
+        text: A2Terminal.screen(LV.e, 40).map(l => l.t).join('\n'), log: LV.e.lines.slice(-80).map(l => l.t).join('\n') } };
   }
 
   return {
     render, init, path, mine, step, show, next, back, play, replay, seek, speed, go, key, tab, tick,
+    mode, send, press, tapLine, board, liveReset, liveStick, liveRestart, liveReconnect,
     check, example, parse, advise, exportTxt, checklistText, frame, state, PATHS, STEPS, PARTS, TARGET,
   };
 })();

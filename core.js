@@ -352,16 +352,18 @@ const TABS = [
     // "council", which nav.mjs's and palette.mjs's hold for others.
     { id: 'pinouts',    label: 'Pinouts',                icon: '🪛',
       find: 'pinout pinouts pin pins wiring wire wires colours colors connector plug socket male female gender changer db9 db-9 de9 de-9 db25 db-25 db15 da15 d-sub dsub rs232 rs-232 rs485 rs-485 null modem straight through loopback dte dce txd rxd rts cts dtr dsr dcd mil milspec mil-spec circular terminal terminals block sdi-12 sdi12 4-20 4-20ma milliamp current loop shunt resistor 250 ohm hs40 wl3100 kisters bubbler al200x al200 al205 campbell cr300 cr310 cr1000x cs i/o maxon sd125 sd-125 ritron rf320 beam 9602n iridium sbd satcom modem ert-a2 canister ve.direct victron tipping bucket ptt continuity buzz out multimeter n-type bnc tnc sma rp-sma' },
-    // 💾 A2 Firmware (a2-firmware.js): ELPRO's ERT-A2 firmware upgrade — the
-    // host, the bootloader, the radio and its function image — walked through
-    // with the unit drawn beside the laptop's screen. Filed beside Pinouts and
-    // the SWR Meter, the other two things a site visit does to an A2. Its find
+    // 💾 ERT-A2 Simulator (a2-terminal.js, a2-firmware.js): the A2's console,
+    // simulated from PuTTY logs of real units — demos of its firmware upgrade
+    // (the host, the bootloader, the radio and its function image) and of its
+    // settings changed from the menus, with the unit drawn beside the laptop's
+    // screen, and the console itself to explore. Filed beside Pinouts and the
+    // SWR Meter, the other two things a site visit does to an A2. Its find
     // words are the parts by name, the files, the buttons and the menus —
     // never "elpro", "com", "port", "serial", "usb", "install", "guide",
     // "signal", "the", "bit", "theme" or "network", which nav.mjs's and
     // palette.mjs's probes hold for other tabs.
-    { id: 'a2firmware', label: 'A2 Firmware',            icon: '💾',
-      find: 'firmware upgrade update upgrading updating flash flashing reflash ert-a2 erta2 a2 host bootloader boot loader radio application function image fi fi6015 fi2044 v23 wrap bin release g rel g 10366 9967 10848 reset button test button d1 d2 d3 d4 progress leds stick thumb drive flash drive fat32 format tera term teraterm putty hyperterminal realterm terminal menu unit diagnostic update device firmware show firmware version version versions repeater tx lockup' },
+    { id: 'a2firmware', label: 'ERT-A2 Simulator',       icon: '💾',
+      find: 'firmware upgrade update upgrading updating flash flashing reflash ert-a2 erta2 a2 host bootloader boot loader radio application function image fi fi6015 fi2044 v23 wrap bin release g rel g 10366 9967 10848 reset button test button d1 d2 d3 d4 progress leds stick thumb drive flash drive fat32 format tera term teraterm putty hyperterminal realterm terminal menu unit diagnostic update device firmware show firmware version version versions repeater tx lockup simulator emulator console menus unit config communication i/o setup station address login engineer technician tx frequency tx power report format unit type accumulators settings configuration interactive demo' },
   ] },
   // Last, so it sits at the foot of the nav: nobody's daily work, and the one
   // group whose tab the header's load buttons and the Export tab's Data source
@@ -676,22 +678,28 @@ const HELP = {
     related: ['swr', 'inspections', 'serial', 'alert2'],
   },
   a2firmware: {
-    summary: 'ELPRO\'s ERT-A2 firmware upgrade (Release G), walked through. The four parts — the <strong>host firmware</strong>, '
-           + 'its <strong>bootloader</strong>, the <strong>radio\'s firmware</strong> and the radio\'s <strong>function image</strong> — '
-           + 'go in from a USB stick in that order: the host by RESET and TEST on the unit, the rest from the A2\'s menu over a USB lead. '
-           + 'Pick the whole upgrade or one part and the <strong>walkthrough</strong> plays it: the board drawn on the left (the stick going in, '
-           + 'RESET tapped, TEST held, D1 to D4 lighting), the laptop\'s terminal on the right, and a ring round whichever one your hands are on. '
-           + 'Pause it, step back and forward, or jump to a step. Below it: the kit and the four files; how to read <strong>Show Firmware '
-           + 'Version</strong>, with a <strong>checker</strong> that reads a pasted one and makes a walkthrough of just the parts that unit '
-           + 'needs; every step written out with ▶ Show me and a tick box; what the LEDs mean if they stop; and what to do when it goes wrong.',
+    summary: 'An ELPRO ERT-A2 on the bench, simulated from the PuTTY logs of real units: its console\'s login, menus, letters, prompts '
+           + 'and messages are the unit\'s own. <strong>Demo</strong> plays a job done, a step at a time — the board drawn on the left '
+           + '(the stick going in, RESET tapped, TEST held, D1 to D4 lighting), the laptop\'s terminal on the right, and a ring round '
+           + 'whichever one your hands are on. The firmware demos re-tell ELPRO\'s Release G upgrade: the whole thing, or the '
+           + '<strong>host</strong> (by RESET and TEST, or from the menu on a v1.7 host), the <strong>bootloader</strong>, the '
+           + '<strong>radio</strong> or its <strong>function image</strong>. The settings demos change things from the menus: the station '
+           + 'address, the update and paralysis times, the channel and power, a repeater and its delay, ALERT2 format, the log to a stick. '
+           + 'Pause, step, or jump to any step. <strong>Interactive</strong> hands you the console — type, or tap a menu line — with the '
+           + 'board answering a load or a restart, and Reconnect when the USB link drops. Below: the kit and the four files; how to read '
+           + '<strong>Show Firmware Version</strong>, with a <strong>checker</strong> that makes a walkthrough of just what a unit needs; '
+           + 'every firmware step written out with ▶ Show me and a tick box; the LEDs; and what to do when it goes wrong.',
     watch: [
       'The <strong>host goes first</strong>: it is what lets the A2\'s USB take more than one file. A radio at <strong>V1.2 or lower</strong> '
       + 'cannot be updated this way — contact ELPRO.',
       '<strong>Never pull the stick or the power while a part is loading</strong>, the bootloader above all: it can leave the A2 unable to start.',
       'RESET then TEST held for <strong>5 seconds</strong> is also ELPRO\'s factory default. Have the stick in, and let go once D1 lights.',
-      'The board and the screens are drawn after the ones in ELPRO\'s documents, and the screens are marked Simulated: their dates and build '
-      + 'numbers are illustrations. The Update Device Firmware menu\'s letters are drawn too — pick its options by name.',
-      'The versions pasted into the checker and the tick boxes stay only while the tab is open; ⤓ saves the steps as a text checklist.',
+      'Each load takes the USB link off-line: wait for DIO4, reconnect the terminal (PuTTY: Restart Session) and press a key. After the bootloader the unit comes '
+      + 'back at Unit Diagnostic; after the host, the radio or an image, at the login.',
+      'The screens are marked Simulated: the dates, addresses and build numbers on them are illustrations. An option the logs never '
+      + 'show used is listed, and says so when picked. The simulator takes any password but an empty one.',
+      'Nothing here reaches a real unit. The settings changed in Interactive, the versions pasted into the checker and the tick boxes '
+      + 'stay only while the tab is open; ⤓ saves the firmware steps as a text checklist.',
       'A device set to reduce motion starts every step still, on its telling moment; ▶ Play runs it.',
     ],
     related: ['pinouts', 'swr', 'inspections', 'serial'],

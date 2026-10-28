@@ -1,4 +1,15 @@
-// The 💾 A2 Firmware tab (a2-firmware.js), Node then Chromium.
+// The 💾 ERT-A2 Simulator tab (a2-firmware.js) and its console
+// (a2-terminal.js), Node then Chromium.
+//
+//   The console held to the PuTTY logs in archive/ERTA2_logs/: the first
+//   1,098 lines of the 28 Oct 2026 log replayed through it, line for line;
+//   the login, a value prompt holding its value (Enter keeps it, Backspace
+//   and ← edit it, a letter refused), Tx Power's one key, a frequency to six
+//   places and 152 refused, the repeater delay wrapping at 65536, Show/Save
+//   ending "Press any key.." with nothing unsaved and asking with something
+//   unsaved, Exit's Unsaved Changes, the timeout discarding, the format change
+//   restarting the radio and FI:2044, a load taking the link off-line and an
+//   option no log shows saying so.
 //
 //   The steps held to themselves: every path's steps exist and run in
 //   ELPRO's order (the stick, the check, host, bootloader, radio, function
@@ -20,7 +31,9 @@
 //   the dots, the keys and the scrubber; a path picked; a pasted screen
 //   making a walkthrough of just what that unit needs; ▶ Show me from the
 //   written steps; the checklist saved and ⤓ Export offering it; the loop
-//   stopped on the way out; a phone's width in the dark.
+//   stopped on the way out; a phone's width in the dark. The settings demos
+//   each ending with the change made and saved. Interactive: typed and
+//   tapped, a load lighting the board, Reconnect.
 //
 // Run:  npm run a2firmware
 //       npm run a2firmware -- -v    also print what passed
@@ -31,6 +44,7 @@ import { repo } from './lib/paths.mjs';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
+import { cleanLog, replay } from './lib/a2-replay.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const LOAD_TIMEOUT = Number(process.env.SMOKE_LOAD_TIMEOUT || 60_000);
@@ -45,12 +59,85 @@ const J = v => JSON.stringify(v);
 // ── Node: the module on its own ──────────────────────────────────────────────
 const ctx = { console, esc: s => String(s ?? ''), escAttr: s => String(s ?? ''), window: undefined };
 vm.createContext(ctx);
+vm.runInContext(fs.readFileSync(repo('a2-terminal.js'), 'utf8') + '\n;globalThis.A2Terminal = A2Terminal;', ctx, { filename: 'a2-terminal.js' });
 vm.runInContext(fs.readFileSync(repo('a2-firmware.js'), 'utf8') + '\n;globalThis.A2Firmware = A2Firmware;', ctx, { filename: 'a2-firmware.js' });
 const F = ctx.A2Firmware;
+const T = ctx.A2Terminal;
+
+console.log('\nThe console, against the logs\n');
+{
+  // The whole of the 28 Oct 2026 log up to where its unit's address changes
+  // off the record: a repeater on RS-232 backhaul, logged in, every menu.
+  const log = cleanLog(fs.readFileSync(repo('archive/ERTA2_logs/20261028 COM24-0.txt')));
+  const r = replay(T, log, { stop: 1098, create: { profile: 'repeater', cfg: { rssiDbm: 0, heard: [], battery: 'External Lead-Acid' } } });
+  ok('the 28 Oct 2026 log: its first 1,098 lines printed line for line', r.ok && r.n >= 1090, J(r));
+
+  const text = e => e.lines.map(l => l.t).join('\n');
+  const scr = e => T.screen(e, 40).map(l => l.t).join('\n');
+  const openLine = e => (e.lines[e.lines.length - 1] || {}).t;
+  const up = () => { const e = T.create(); T.key(e, 'Enter'); T.key(e, 'a'); T.type(e, 'secret'); return e; };
+  let e = up();
+  ok('Enter wakes it; a) Engineer, a password as stars, Login Successful! and the header over the Main Menu',
+    /Password:\*{6}/.test(text(e)) && /Login Successful!/.test(text(e)) && /UTC; Station Address: 1000/.test(scr(e)) && e.at.id === 'main', scr(e));
+  T.key(e, 'a'); T.key(e, 'a');
+  ok('a value prompt holds the value now, the cursor after it', openLine(e) === '\t\tStation Address: 1000' && e.at.k === 'value', J(openLine(e)));
+  T.key(e, 'Enter');
+  ok('…Enter on its own keeps it, and nothing is unsaved', e.cfg.address === 1000 && !e.dirty && !/Config NOT Saved/.test(scr(e)));
+  T.key(e, 'a'); T.type(e, '22x5');
+  ok('a letter in it: Invalid Format!', /\t\tInvalid Format!/.test(text(e)) && e.cfg.address === 1000);
+  T.key(e, 'a'); T.type(e, '2205');
+  ok('Backspaced and typed: the new address, and Config NOT Saved', e.cfg.address === 2205 && e.dirty && /\tConfig NOT Saved/.test(scr(e)), scr(e));
+  T.key(e, 'Enter'); T.key(e, 'c'); T.key(e, 'c');
+  for (let i = 0; i < 5; i++) T.key(e, 'ArrowLeft');
+  T.key(e, '2'); T.key(e, '5'); T.key(e, 'Enter');
+  ok('← five times and 25 over the zeros: 151.525000, as the log of 2 Jun 2026', e.cfg.txMHz === '151.525000' && /c\)\tTx Frequency MHz => 151\.525000/.test(scr(e)), e.cfg.txMHz);
+  T.key(e, 'd'); T.type(e, '152');
+  ok('152: Invalid value!, the frequency kept', /\t\t\tInvalid value!/.test(text(e)) && e.cfg.rxMHz === '151.500000');
+  T.key(e, 'e');
+  ok('Tx Power: one key over the 5 of 5W', /\t\tTx Power 5W$/.test(openLine(e)) && e.at.k === 'onekey');
+  T.key(e, '1');
+  ok('…1, and the menu straight back with 1W', e.cfg.txPower === '1W' && /e\)\tTx Power => 1W/.test(scr(e)) && e.at.id === 'comm');
+  T.key(e, 'b'); T.key(e, 'c'); T.key(e, 'i'); T.type(e, '500010000');
+  ok('a repeater\'s delay past 65535 wraps without a word, as the log of 2 Sep 2026: 35856', e.cfg.repDelayMs === 35856 && /i\)\tRepeater Delay \(mSec\) => 35856/.test(scr(e)), e.cfg.repDelayMs);
+  T.key(e, 'Enter'); T.key(e, 'e');
+  ok('an option no log shows used says so, rather than make it up', text(e).includes(T.NOT_LOGGED) && e.at.id === 'main');
+  T.key(e, 'g');
+  ok('Show/Save with changes unsaved: Save Current Config? (y/n):', /Save Current Config\? \(y\/n\):$/.test(openLine(e)));
+  T.key(e, 'x');
+  ok('…another key: Please Respond Y or N', /Please Respond Y or N/.test(scr(e)) && e.at.k === 'yn');
+  T.key(e, 'y');
+  ok('…y: Configuration Saved!!, then the header with no Config NOT Saved', /Configuration Saved!!/.test(text(e)) && !e.dirty && e.at.id === 'main' && !/Config NOT Saved/.test(scr(e)));
+  T.key(e, 'g');
+  ok('Show/Save with nothing unsaved ends Press any key..', openLine(e) === 'Press any key..');
+  T.key(e, 'Enter'); T.key(e, 'a'); T.key(e, 'b'); T.type(e, '60'); T.key(e, 'Enter'); T.key(e, 'i');
+  ok('Exit with a change unsaved: Unsaved Changes Selection, Save Changes starred, at Option:',
+    /Unsaved Changes Selection:\n\t\ta\)\*\tSave Changes\n\t\tb\) \tKeep but don't save\n\t\tc\) \tDiscard Changes\n\t\td\)\tCancel\n\t\t\tOption:$/.test(text(e)), scr(e).slice(-200));
+  T.key(e, 'd');
+  ok('…d) Cancel: back at the Main Menu, still unsaved', e.at.id === 'main' && e.dirty);
+  T.timeout(e);
+  ok('left at the Main Menu: Timed out - Exiting, the change discarded, the login', /\tTimed out - Exiting\n\t\tDiscarding Unsaved Config Changes\.\.\./.test(text(e)) && e.cfg.updateMin === 180 && e.at.k === 'login');
+
+  e = up();
+  T.key(e, 'c'); T.key(e, 'f'); T.key(e, 'a'); T.key(e, 'Enter'); T.key(e, 'g'); T.key(e, 'y');
+  ok('the report format changed and saved: ALERT Report Format changed. Restarting Radio....', /Configuration Saved!!\n\t\tALERT Report Format changed\. Restarting Radio\.\.\.\./.test(text(e)));
+  T.key(e, 'd'); T.key(e, 'f');
+  ok('…and on ALERT2 format the radio\'s function image is FI:2044', /Radio Firmware: v1\.4 .* FI:2044$/m.test(scr(e)), scr(e).slice(-160));
+  T.key(e, 'Enter'); T.key(e, 'h'); T.key(e, 'c');
+  const ev = T.takeEvents(e);
+  ok('Load Firmware to Radio: no question, the link off-line, a load on the board', !e.link && ev.length === 1 && ev[0].k === 'load' && ev[0].job === 'radio', J(ev));
+  T.key(e, 'Enter');
+  ok('…keys go nowhere while it is off-line', !e.link && e.at.k === 'offline-wait');
+  T.reconnect(e); T.key(e, 'Enter');
+  ok('…reconnected and a key: the login, as the log of 28 Oct 2026', e.link && e.at.k === 'login');
+
+  e = T.create({ profile: 'repeater', awake: true });
+  T.key(e, 'a'); T.type(e, 'secret'); T.key(e, 'c');
+  ok('a repeater\'s Communication Menu: its delay at i), its lists, its agency and its RS-232 link', /i\)\tRepeater Delay \(mSec\) => 543/.test(scr(e)) && /Address List Entries/.test(scr(e)) && /Serial Baud Rate => 9600/.test(scr(e)), scr(e));
+}
 
 console.log('\nThe steps\n');
 {
-  const ORDER = ['prep', 'check', 'host', 'boot', 'radio', 'fi', 'done'];
+  const ORDER = ['prep', 'check', 'host', 'boot', 'radio', 'fi', 'set', 'done'];
   const bad = [];
   for (const [id, p] of Object.entries(F.PATHS)) {
     const missing = p.steps.filter(s => !F.STEPS[s]);
@@ -60,8 +147,9 @@ console.log('\nThe steps\n');
   }
   ok('every path\'s steps exist, in ELPRO\'s order', !bad.length, bad.join('; '));
   const all = F.PATHS.all.steps;
-  ok('the whole upgrade holds every step once', new Set(all).size === all.length && Object.keys(F.STEPS).every(s => all.includes(s)),
-    J(Object.keys(F.STEPS).filter(s => !all.includes(s))));
+  const used = new Set(Object.values(F.PATHS).flatMap(p => p.steps));
+  ok('the whole upgrade holds no step twice, and every step is on some path', new Set(all).size === all.length && Object.keys(F.STEPS).every(s => used.has(s)),
+    J(Object.keys(F.STEPS).filter(s => !used.has(s))));
   const shape = Object.entries(F.STEPS).filter(([, s]) => !(
     (s.side === 'unit' || s.side === 'pc') && s.title && s.do && s.dur > 0 && s.still >= 0 && s.still <= s.dur
     && (s.side === 'unit' ? (s.unit || []).length > 0 : !!s.pc))).map(([k]) => k);
@@ -84,14 +172,33 @@ console.log('\nThe frames\n');
   const out = at('h-out', 99).unit;
   ok('the stick out and the LEDs dark after the restart', out.stick === 0 && out.d.every(x => x === 0), J(out));
   ok('re-seated: out half-way through, in at the end', at('r-in', 1.3).unit.stick < 0.05 && at('r-in', 99).unit.stick === 1);
-  const txt = f => (f.pc && f.pc.lines ? f.pc.lines.map(l => l.t + (l.fi ? ' ' + l.fi : '')).join('\n') : '');
+  const txt = f => (f.pc && f.pc.lines ? f.pc.lines.map(l => l.t).join('\n') : '');
   ok('the first check reads host v1.6', /Firmware: v1\.6 Aug 25 2022 14:43:29 : 9814/.test(txt(at('ver', 99))), txt(at('ver', 99)));
   const b = txt(at('b-ver', 99));
   ok('after the bootloader: v1.3 - 9967, and the old radio\'s ERROR', /Host Bootloader: v1\.3 - 9967/.test(b) && /ERROR: Could not read parameter value/.test(b) && /Old version - Update Recommended/.test(b), b);
   ok('after the function image: FI:6015 at the end of the radio\'s line', /Radio Firmware: v1\.4 .*\(10848\) FI:6015/.test(txt(at('f-ver', 99))), txt(at('f-ver', 99)));
-  const picked = at('ver', 1.2).pc.lines.filter(l => l.picked).map(l => l.pk);
-  ok('the option picked is lit within its line: d) Unit Diagnostic', J(picked) === J(['d) Unit Diagnostic']), J(picked));
+  const fv = at('b-menu', 3.0).pc;
+  const picked = fv.lines.filter(l => fv.pickNow && l.pick === fv.pickNow).map(l => l.t.trim());
+  ok('the option picked is lit: a) Update Bootloader (ERTA2-B), the unit\'s own letter', J(picked) === J(['a)\tUpdate Bootloader (ERTA2-B)']), J(picked));
   ok('a unit step leaves the laptop\'s screen as it was', txt(at('h-in', 2)) === txt(at('save', 99)));
+}
+
+console.log('\nThe settings demos\n');
+{
+  // Each demo's screen where its last laptop step ends.
+  const end = (id, sid) => { const k = F.PATHS[id].steps.indexOf(sid); const f = F.frame(id, k, 99); return f.pc.lines.map(l => l.t).join('\n'); };
+  ok('the address: Backspaced, 2205 typed, saved — the header says 2205, nothing unsaved',
+    /Station Address: 2205/.test(end('set-addr', 's-save')) && !/Config NOT Saved/.test(end('set-addr', 's-save')), end('set-addr', 's-save'));
+  const k = F.PATHS['set-addr'].steps.indexOf('s-addr');
+  ok('…its still picture the prompt with 2205 in it', /\t\tStation Address: 2205$/.test(F.frame('set-addr', k, F.STEPS['s-addr'].still).pc.lines.map(l => l.t).join('\n')));
+  const ts = F.PATHS['set-times'].steps.indexOf('s-save');
+  ok('the times: 60 min and 30 sec in the configuration printed before the save',
+    /Update Time: 60min\t\tParalysis Time: 30sec/.test(F.frame('set-times', ts, F.STEPS['s-save'].still).pc.lines.map(l => l.t).join('\n')));
+  const radio = end('set-radio', 's-power');
+  ok('the channel and the power: 151.525000 both ways, 1W', /Tx Frequency MHz => 151\.525000/.test(radio) && /Rx Frequency MHz => 151\.525000/.test(radio) && /Tx Power => 1W/.test(radio), radio);
+  ok('the repeater: Unit Type Repeater Station, its delay 400', /Unit Type => Repeater Station/.test(end('set-repeater', 's-delay')) && /Repeater Delay \(mSec\) => 400/.test(end('set-repeater', 's-delay')));
+  ok('ALERT2: FI:2044, then Exit saving it, back at the login', /FI:2044/.test(end('set-format', 's-fi')) && /User Type: Menu:/.test(end('set-format', 's-exit')));
+  ok('the log to USB: off-line, then reconnected, back at the Main Menu', F.frame('set-log', F.PATHS['set-log'].steps.indexOf('s-log'), 99).pc.offline && /Main Menu:/.test(end('set-log', 's-logback')));
 }
 
 console.log('\nThe checker, on ELPRO\'s examples\n');
@@ -154,14 +261,16 @@ try {
   const shape = await page.evaluate(() => ({
     group: TABS.find(g => g.tabs.some(t => t.id === 'a2firmware')).group,
     secs: ['fw-walk', 'fw-prep', 'fw-ver', 'fw-list', 'fw-leds', 'fw-trouble', 'fw-src'].filter(id => document.getElementById(id)).length,
-    paths: document.querySelectorAll('.fw-path').length,
+    paths: document.querySelectorAll('.fw-path').length, nPaths: Object.keys(A2Firmware.PATHS).length,
     dots: document.querySelectorAll('.fw-dot').length,
     listed: document.querySelectorAll('.fw-step').length,
     named: [...document.querySelectorAll('#fw-page svg[role="img"]')].every(s => !!(s.querySelector('title') || {}).textContent),
   }));
-  ok('in the Knowledge base: seven sections, seven paths, a dot for each of the whole upgrade\'s steps and each written out',
-    shape.group === 'Knowledge base' && shape.secs === 7 && shape.paths === 7 && shape.dots === shape.listed && shape.dots > 20, J(shape));
+  ok('in the Knowledge base: seven sections, a button for every path, a dot for each of the whole upgrade\'s steps and each written out',
+    shape.group === 'Knowledge base' && shape.secs === 7 && shape.paths === shape.nPaths && shape.dots === shape.listed && shape.dots > 20, J(shape));
   ok('the board is named', shape.named);
+  // It plays while it is on screen: scrolled to, as somebody reading would.
+  await page.evaluate(() => document.getElementById('fw-stage').scrollIntoView({ block: 'center' }));
   await page.waitForTimeout(700);
   let s = await look(page);
   ok('it plays as it opens: the first step running, the laptop ringed', s.playing && s.running && s.t > 0.2 && s.pcOn && !s.unitOn, J(s));
@@ -236,6 +345,42 @@ try {
   const offers = await page.evaluate(() => ExportMenu.offers('a2firmware').map(o => o.label));
   ok('⤓ Export offers it', J(offers) === J(['These steps, as a checklist — TXT']), J(offers));
 
+  // Interactive: the unit's console, live.
+  await page.click('.fw-mode[onclick*="live"]');
+  let lv = await page.evaluate(() => ({ mode: A2Firmware.state().mode, demoHidden: document.getElementById('fw-demo-foot').hidden, liveShown: !document.getElementById('fw-live-foot').hidden }));
+  ok('Interactive swaps the demo\'s controls for the terminal\'s', lv.mode === 'live' && lv.demoHidden && lv.liveShown, J(lv));
+  await page.focus('#fw-stage');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('a');
+  await page.keyboard.type('anything');
+  await page.keyboard.press('Enter');
+  lv = await page.evaluate(() => A2Firmware.state().live);
+  ok('typed: Enter wakes it, a) Engineer, a password as stars, Login Successful! and the Main Menu',
+    /Login Successful!/.test(lv.log) && /Password:\*{8}/.test(lv.log) && lv.menu === 'main', lv.log.slice(-300));
+  await page.keyboard.press('a');
+  await page.keyboard.press('a');
+  await page.fill('#fw-live-text', '2205');
+  await page.click('.fw-live-in button[type="submit"]');
+  lv = await page.evaluate(() => A2Firmware.state().live);
+  ok('a value sent from the box replaces the one the prompt held', lv.cfg.address === 2205 && lv.dirty && lv.menu === 'unitcfg', J({ a: lv.cfg.address, menu: lv.menu }));
+  await page.focus('#fw-stage');
+  await page.keyboard.press('Enter');
+  await page.evaluate(() => A2Firmware.liveStick());
+  for (const k of ['d', 'h', 'a', 'y']) await page.keyboard.press(k);
+  lv = await page.evaluate(() => A2Firmware.state().live);
+  ok('d, h, a, y with the stick in: the bootloader\'s own words, and the link off-line while the board is busy',
+    /This action will update the Boot-Loader with the file on USB/.test(lv.text) && !lv.link && lv.busy && await page.evaluate(() => document.getElementById('fw-pane-unit').classList.contains('is-active')), J({ link: lv.link, busy: lv.busy }));
+  await until(page, () => !A2Firmware.state().live.busy && document.getElementById('fw-led-3').getAttribute('opacity') === '1.000', null, 15_000);
+  ok('…D1 to D4 lit on the board, then Reconnect asked for', await page.evaluate(() => !document.getElementById('fw-live-recon').disabled));
+  await page.click('#fw-live-recon');
+  await page.keyboard.press('Enter');
+  lv = await page.evaluate(() => A2Firmware.state().live);
+  ok('reconnected and a key: back at the Unit Diagnostic menu, as the unit does after a bootloader', lv.link && lv.menu === 'diag', J(lv.menu));
+  await page.click('#fw-pc .tm-m:text("Show Firmware Version")');
+  lv = await page.evaluate(() => A2Firmware.state().live);
+  ok('a menu line tapped is its letter: f) Show Firmware Version', /Host Bootloader: v1\.3 - 9967/.test(lv.text) && lv.at === 'any', lv.text.slice(-200));
+  await page.click('.fw-mode[onclick*="demo"]');
+
   // Out of the tab, the loop stops.
   await page.evaluate(() => switchTab('home'));
   ok('leaving the tab stops the animation', !(await page.evaluate(() => A2Firmware.state().running)));
@@ -264,4 +409,4 @@ try {
 
 console.log(`\n${passes + failures} assertion(s), ${failures} failed.`);
 if (failures) process.exit(1);
-console.log('PASS — the A2 Firmware steps, its checker, and the tab.');
+console.log('PASS — the ERT-A2 Simulator: its console against the logs, the steps, the demos, the checker and the tab.');
