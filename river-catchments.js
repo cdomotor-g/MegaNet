@@ -357,6 +357,7 @@ const RiverCatchments = (function () {
     shown = { kind, key, title, status: 'loading' };
     clearDrawn();
     rerenderMapLegend();
+    syncCards();
     try {
       const ix = await ensureIndex();
       const row = kind === 'river' ? (ix.rivers || [])[key] : (ix.stations || {})[key];
@@ -398,6 +399,7 @@ const RiverCatchments = (function () {
     shown = null;
     clearDrawn();
     rerenderMapLegend();
+    syncCards();
   }
 
   // ── The station card ──────────────────────────────────────────────────────
@@ -416,8 +418,30 @@ const RiverCatchments = (function () {
     return `${head}
       <div class="acma-row"><span>Above the gauge</span><span><strong>${fmtInt(row[0])} km²</strong>
         <span class="mn-pop-note">${how}</span></span></div>
-      <div class="pill-row"><button type="button" class="pill" data-id="${escAttr(s.id)}"
-        onclick="RiverCatchments.showStation(this.dataset.id)">Show the catchment on the map</button></div>`;
+      <div class="pill-row mn-catch-pills" data-id="${escAttr(String(s.id))}">${pillsHtml(String(s.id))}</div>`;
+  }
+
+  // Show, and — while this station's catchment is the one on the map — the
+  // pill filled and an × beside it that takes it off again. Show stays
+  // pressable while it is on: it takes the map back to the catchment.
+  function pillsHtml(id) {
+    const on = !!shown && shown.kind === 'station' && shown.key === id;
+    return `<button type="button" class="pill mn-catch-show${on ? ' is-on' : ''}" aria-pressed="${on}" data-id="${escAttr(id)}"
+        onclick="RiverCatchments.showStation(this.dataset.id)"
+        title="${on ? 'On the map — press to take the map back to it' : 'Outline the land that drains to this station on the map, shaded by its own ground, and go there'}"
+        >${on ? 'The catchment is on the map' : 'Show the catchment on the map'}</button>${on
+      ? `<button type="button" class="pill mn-catch-off" onclick="RiverCatchments.clear()"
+        aria-label="Take the catchment off the map" title="Take the catchment off the map"><span aria-hidden="true">×</span></button>` : ''}`;
+  }
+
+  // Every card's pills, after what is on the map changes — a river selected
+  // in its place, 🧹, the × — keeping the keyboard on Show if it was in the row.
+  function syncCards() {
+    for (const el of document.querySelectorAll('.mn-catch-pills[data-id]')) {
+      const had = el.contains(document.activeElement);
+      el.innerHTML = pillsHtml(el.dataset.id);
+      if (had) el.querySelector('.mn-catch-show')?.focus({ preventScroll: true });
+    }
   }
 
   // Only a station a catchment could belong to gets the section: one on a

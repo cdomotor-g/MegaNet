@@ -7073,14 +7073,38 @@ function stationActionGroups(s, { editor = false } = {}) {
     ] },
     // Two pairs (stationImageryPills). No coordinates, no group.
     { label: 'Imagery and terrain', pills: stationImageryPills(s) },
-    { label: 'Records', pills: [
-      arroUrl ? `<a class="pill" href="${esc(arroUrl)}" target="_blank" rel="noopener"
-           title="ARRO site ${esc(arroSiteId(s))} — the telemetry admin page for this station"
-           >${pillText('📊', `${pillLong('Open in ')}ARRO admin`, '↗')}</a>` : '',
-      ...docSearchPills(s),
-    ] },
+    // The paperwork. ARRO admin is not here: on the station card it leads the
+    // Data section (stnCardDataHtml), beside the plots it is the admin side
+    // of, and the editor has its own in its ARRO section.
+    { label: 'Records', pills: docSearchPills(s) },
   ].map(g => ({ label: g.label, pills: g.pills.filter(Boolean) }))
    .filter(g => g.pills.length);
+}
+
+// "ARRO admin ↗": the station's site page in ARRO. Empty for a station with no
+// ARRO site id — 390 of them, the ones missing from ARRO's sensor export.
+function arroAdminPillHtml(s) {
+  const arroUrl = arroSiteUrl(arroSiteId(s));
+  return arroUrl ? `<a class="pill" href="${esc(arroUrl)}" target="_blank" rel="noopener"
+           title="ARRO site ${esc(arroSiteId(s))} — the telemetry admin page for this station"
+           >${pillText('📊', `${pillLong('Open in ')}ARRO admin`, '↗')}</a>` : '';
+}
+
+// The station card's Data section: its ARRO admin page, then its neighbours
+// plotted with it (group-plots.js) — a river height gauge's river and a rain
+// gauge's surroundings. Either can be missing: a station with no ARRO site id
+// still has neighbours, and one with no level or rain gauge still has an
+// admin page. Nothing at all for a station with neither.
+function stnCardDataHtml(s) {
+  const arro = arroAdminPillHtml(s);
+  const rows = typeof GroupPlots !== 'undefined' ? GroupPlots.cardRowsHtml(s) : '';
+  if (!arro && !rows) return '';
+  return `<div class="acma-sect stn-card-data" id="mn-data-card-${escAttr(String(s.id))}">
+      <span class="small txt-muted stn-card-rhs-head"
+        title="This station's data: its admin page in ARRO, and its neighbours plotted with it — in ARRO on one graph, or out of the Flood-Net datastore a strip each">Data</span>
+      ${arro ? `<div class="pill-row stn-card-data-pills">${arro}</div>` : ''}
+      ${rows}
+    </div>`;
 }
 
 // "Digital twin →": the station's own patch of ground in three dimensions, in
@@ -8514,13 +8538,14 @@ function stnCardHtml(s) {
          Nothing for a proposed station, which has nothing to have heard. The
          owner stays the card's first row, as it always is. -->
     ${HealthGlance.cardHtml(s)}
-    <!-- Its neighbours plotted with it (group-plots.js): a river height
-         gauge's river — every gauge along it — and a rain gauge's
-         surroundings, within the distance its slider says, each in ARRO on one
-         graph or out of the datastore a strip each. Filled again by
+    <!-- Data (stnCardDataHtml): its ARRO admin page, then its neighbours
+         plotted with it (group-plots.js) — a river height gauge's river,
+         every gauge along it, and a rain gauge's surroundings, within the
+         distance its slider says, each in ARRO on one graph or out of the
+         datastore a strip each. The river row is filled again by
          GroupPlots.cardAsk once the rivers around it have arrived. Nothing
-         for a station with neither kind of sensor. -->
-    ${typeof GroupPlots !== 'undefined' ? GroupPlots.cardHtml(s) : ''}
+         for a station with no ARRO site id and neither kind of sensor. -->
+    ${stnCardDataHtml(s)}
     <div class="acma-sect">
       ${acmaCardRow('Stn #', s.station_number ? esc(s.station_number)
         : s.proposed ? '<span class="txt-muted">none yet — proposed</span>' : null)}

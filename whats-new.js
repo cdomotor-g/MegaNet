@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 129, date: '2026-10-28', items: [
+      'On a station\'s card, <strong>Plot with its neighbours</strong> is now <strong>Data</strong>, and the station\'s '
+        + '<strong>ARRO admin</strong> pill has moved up into it from <strong>Records</strong>.',
+      'Once <strong>Show the catchment on the map</strong> is on, the pill fills in and an <strong>×</strong> sits beside it — '
+        + 'press it to take the catchment off the map again.',
+    ] },
     { n: 128, date: '2026-10-27', items: [
       'The map\'s <strong>Legend</strong> is laid out like <strong>Layers</strong> now: a heading for the station pins, '
         + 'the links, the overlay layers and the ACMA licences, and each key in a box of its own. In both panels the '

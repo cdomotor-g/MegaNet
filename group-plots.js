@@ -19,7 +19,8 @@
 // ArroData.fieldChannelId and ArroData.fieldOpenGroup, the dialog's door.
 // All at call time; nothing here runs at load (`npm run toplevel`).
 // map-river-lines.js places riverHtml() in a river's callout; app.js places
-// cardHtml() on the station card and calls cardAsk() once it is painted.
+// cardRowsHtml() in the station card's Data section and calls cardAsk() once
+// it is painted.
 //
 // ── What a group is ─────────────────────────────────────────────────────────
 //
@@ -409,18 +410,12 @@ const GroupPlots = (function () {
     </div>`;
   }
 
-  function sectionInner(st) {
-    const rows = riverRowHtml(st) + rainRowHtml(st);
-    if (!rows) return '';
-    return `<span class="small txt-muted stn-card-rhs-head"
-        title="This station's neighbours plotted with it — in ARRO on one graph, or out of the Flood-Net datastore a strip each">Plot with its neighbours</span>${rows}`;
-  }
-
-  function cardHtml(st) {
+  // The rows only: the section and its "Data" heading, with the ARRO admin
+  // pill above these, are the card's (stnCardDataHtml, app.js).
+  function cardRowsHtml(st) {
     if (!st || (!gaugesOf(st, 'level').length && !gaugesOf(st, 'rain').length)) return '';
-    const inner = sectionInner(st);
-    return inner ? `<div class="acma-sect stn-card-gplots" id="mn-gplots-card-${escAttr(String(st.id))}"
-      data-mn-gplots="${escAttr(String(st.id))}">${inner}</div>` : '';
+    const rows = riverRowHtml(st) + rainRowHtml(st);
+    return rows ? `<div class="stn-card-gplots">${rows}</div>` : '';
   }
 
   // Once the card is painted: the rivers and the tiles around the gauge, and
@@ -924,7 +919,7 @@ const GroupPlots = (function () {
   }
 
   return {
-    riverHtml, cardHtml, cardAsk, setKm,
+    riverHtml, cardRowsHtml, cardAsk, setKm,
     plot, dlgKm, setWin, retry, point, unpoint, key, toField, toStation,
     // for test/groupplots.mjs
     gaugesOf, streamGroup, rainGroup, groupOf, arroOf, stripsOf, KM, WINS,

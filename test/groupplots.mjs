@@ -247,7 +247,12 @@ try {
       fn: r.querySelector('button.pill.gplot-fn')?.textContent.replace(/\s+/g, ' ').trim() || '',
       names: r.querySelector('.gplot-names')?.textContent.replace(/\s+/g, ' ').trim() || '',
     };
+    const data = sec.closest('.stn-card-data');
+    const pillName = a => a.querySelector('.pill-lbl')?.textContent.replace(/\s+/g, ' ').trim();
     return { river: desc(rowOf('River')), rain: desc(rowOf('Rain')), slider: !!sec.querySelector('input[type=range].gplot-range'),
+             dataHead: data?.querySelector('.stn-card-rhs-head')?.textContent.trim(),
+             dataArro: [...(data?.querySelectorAll('.stn-card-data-pills a.pill') || [])].map(pillName),
+             records: [...document.querySelectorAll('#stn-card .stn-card-group[aria-label="Records"] .pill')].map(pillName),
              afterHealth: !!sec.previousElementSibling, actionsStillRows: [...document.querySelectorAll('#stn-card .stn-card-actions > *')].every(g => g.classList.contains('pill-row')) };
   });
   if (VERBOSE) console.log(card);
@@ -262,6 +267,9 @@ try {
     card.slider && card.rain && /Rain within 25 km/.test(card.rain.head) && /ARRO rain · \d+/.test(card.rain.arroText)
       && /\d+(\.\d+)? km\)/.test(card.rain.names), JSON.stringify(card.rain));
   ok('the actions below are still pill rows, nothing else among them', card.actionsStillRows);
+  ok('the plots are under Data, led by the station\'s ARRO admin pill — which Records no longer carries',
+    card.dataHead === 'Data' && card.dataArro.length === 1 && /ARRO admin/.test(card.dataArro[0])
+      && !card.records.some(n => /ARRO/.test(n || '')), JSON.stringify({ head: card.dataHead, arro: card.dataArro, records: card.records }));
 
   const slid = await page.evaluate(id => {
     const before = document.querySelector(`#gplot-rain-${id} .gplot-fn`)?.textContent;

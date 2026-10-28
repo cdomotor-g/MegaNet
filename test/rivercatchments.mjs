@@ -197,6 +197,22 @@ try {
     st.shown && st.shown.kind === 'station' && st.shown.key === String(gStation.id) && st.inView, JSON.stringify(st));
   const legend2 = await page.evaluate(() => document.getElementById('map-legend')?.textContent.replace(/\s+/g, ' ') || '');
   check('…and the legend calls it the catchment above the station', legend2.includes(`Catchment above ${gStation.name}`), legend2.slice(0, 200));
+  const onPills = await page.evaluate((id) => {
+    const row = document.querySelector(`#mn-catch-card-${id} .mn-catch-pills`);
+    return { pressed: row?.querySelector('.mn-catch-show')?.getAttribute('aria-pressed'), off: !!row?.querySelector('.mn-catch-off') };
+  }, String(gStation.id));
+  check('while it is on, its pill is pressed and an × sits beside it', onPills.pressed === 'true' && onPills.off, JSON.stringify(onPills));
+  await page.click(`#mn-catch-card-${gStation.id} .mn-catch-off`);
+  const offPills = await page.evaluate((id) => {
+    const row = document.querySelector(`#mn-catch-card-${id} .mn-catch-pills`);
+    return { shown: RiverCatchments.shown(), pressed: row?.querySelector('.mn-catch-show')?.getAttribute('aria-pressed'),
+             off: !!row?.querySelector('.mn-catch-off'), edge: document.querySelectorAll('.leaflet-mnCatchLine-pane path.mn-catch-edge').length };
+  }, String(gStation.id));
+  check('…and the × takes it off the map, and itself away',
+    offPills.shown === null && offPills.pressed === 'false' && !offPills.off && offPills.edge === 0, JSON.stringify(offPills));
+  await page.click(`#mn-catch-card-${gStation.id} .mn-catch-show`);
+  await page.waitForFunction(() => { const s = RiverCatchments.shown(); return s && s.kind === 'station' && s.status !== 'loading'; },
+    null, { timeout: 30_000 }).catch(() => {});
   await page.evaluate(() => clearStationsMapMarks());
   check('🧹 puts a gauge\'s catchment down too', await page.evaluate(() => RiverCatchments.shown() === null));
 
