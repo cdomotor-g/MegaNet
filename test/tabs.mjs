@@ -685,6 +685,15 @@ const PHOTO_FIXTURE = {
 // 📲 Offline & Install with the browser's install prompt held (a stand-in
 // for Chromium's beforeinstallprompt), the other browsers' steps unfolded and
 // Get ready's four steps on the page — every surface the tab draws at once.
+// 📇 Capabilities, searched: a word that leaves lines in more than one group,
+// marked where it matched, and the fold of the page's words open.
+const SEED_CAPS = `async () => {
+  const q = document.getElementById('cap-q');
+  q.value = 'station';
+  q.dispatchEvent(new Event('input'));
+  document.querySelectorAll('#cap-page details').forEach(d => { d.open = true; });
+}`;
+
 const SEED_OFFLINE = `async () => {
   const e = new Event('beforeinstallprompt', { cancelable: true });
   e.prompt = async () => {};
@@ -1025,6 +1034,8 @@ const CONVERTED = [
   { id: 'health',     label: 'Station Health — the demo week\'s board', issue: 'born converted', seed: SEED_HEALTH },
   { id: 'health',     label: 'Station Health — a station open, a missed check in context', issue: 'born converted', seed: SEED_HEALTH_STATION },
   { id: 'sitemap',    label: 'Site Map',        issue: 'born converted' },
+  { id: 'capabilities', label: 'Capabilities — as it opens', issue: 'born converted' },
+  { id: 'capabilities', label: 'Capabilities — searched, and the words open', issue: 'born converted', seed: SEED_CAPS },
   { id: 'views',      label: 'Views — as it opens, on All', issue: 'born converted' },
   { id: 'views',      label: 'Views — Field open, signed out', issue: 'born converted', seed: SEED_VIEWS },
   { id: 'offline',    label: 'Offline & Install — as it opens', issue: 'born converted' },

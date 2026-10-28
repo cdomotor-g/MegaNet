@@ -102,6 +102,8 @@ const Glyphs = (() => {
     backbone:  '<path d="M4.5 21 7 12l2.5 9M5.6 17.5h2.8"/><path d="M14.5 21l2.5-9 2.5 9M15.6 17.5h2.8"/><circle cx="7" cy="10" r="1.2"/><circle cx="17" cy="10" r="1.2"/><path d="M8.8 8.6c2-1.8 4.4-1.8 6.4 0"/><path d="M7 4.6c3.2-2.6 6.8-2.6 10 0"/>',
     // Signal Routes: three stations on the left flowing through one relay to a base.
     routes:    '<circle cx="4" cy="5" r="1.8"/><circle cx="4" cy="12" r="1.8"/><circle cx="4" cy="19" r="1.8"/><path d="M5.8 5c4 0 4 7 6.2 7M5.8 19c4 0 4-7 6.2-7M5.8 12H12"/><circle cx="13.5" cy="12" r="1.5"/><path d="M15 12h4"/><rect x="19" y="9" width="3" height="6" rx=".8"/>',
+    // Capabilities: a list, each line ticked.
+    checklist: '<path d="M10 6h10M10 12h10M10 18h10"/><path d="m3.5 6 1.5 1.5L8 4.5M3.5 12l1.5 1.5L8 10.5M3.5 18l1.5 1.5L8 16.5"/>',
     signpost:  '<path d="M12 2.5v19"/><path d="M5 5.5h11l3 2.75-3 2.75H5z"/><path d="M19 13.5H8l-3 2.75L8 19h11z"/>',
     sliders:   '<path d="M4 6h9M18 6h2M4 12h3M12 12h8M4 18h11M19 18h1"/><circle cx="15.5" cy="6" r="2"/><circle cx="9.5" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
     offline:   '<path d="M7 18a4.5 4.5 0 0 1 .5-9A5.5 5.5 0 0 1 18 10.5 3.8 3.8 0 0 1 17.5 18z"/><path d="m9.5 13.5 2 2 3.5-3.5"/>',
@@ -141,7 +143,7 @@ const Glyphs = (() => {
   // its group's (tab(), below), so a missing line is a plainer button, never
   // a blank one — and `npm run looks` lists any that are missing.
   const TAB = {
-    home: 'home', sitemap: 'signpost', offline: 'offline', views: 'sliders',
+    home: 'home', sitemap: 'signpost', capabilities: 'checklist', offline: 'offline', views: 'sliders',
     stations: 'map', maps: 'route', passranges: 'chain', repdelays: 'hourglass', export: 'download', mapgen: 'print', lookaround: 'look',
     rf: 'spectrum', rfchanges: 'trend', workbench: 'interfere', reception: 'drive', flipsources: 'search', bitbench: 'bits',
     bitflipper: 'flip', network: 'graph', packets: 'decode', alert2: 'packet', hfem: 'message', serial: 'plug',

@@ -20952,6 +20952,105 @@ button.adm-danger:hover { border-color: var(--bad); }
   font-size: var(--fs-sm);
 }
 
+/* ── 📇 Capabilities (capabilities.js) ────────────────────────────────────────
+   A long list meant to be scanned and searched: a line per capability, the
+   name a link, its tags beside it, one sentence under it and where it is
+   under that. The search bar sticks to the top of the page's scroller so it
+   is there half-way down the list. */
+.cap-page { gap: var(--sp-3); }
+.cap-hero { display: grid; gap: var(--sp-2); }
+.cap-title { margin: 0; font-size: var(--fs-xl); line-height: var(--lh-tight); }
+.cap-lede { margin: 0; max-width: 62rem; line-height: var(--lh-body); }
+.cap-facts { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.cap-facts li {
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.cap-facts strong { color: var(--text); font-size: var(--fs-md); }
+
+.cap-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-2) var(--sp-4);
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+.cap-bar > label:not(.check-label) { display: grid; gap: var(--sp-1); font-size: var(--fs-sm); color: var(--muted); }
+.cap-bar input, .cap-bar select { color: var(--text); }
+.cap-q { flex: 1 1 18rem; min-width: 0; }
+.cap-who { flex: 0 1 13rem; }
+.cap-outside { padding-bottom: var(--sp-2); }
+.cap-count { margin: 0 0 var(--sp-2) auto; color: var(--muted); white-space: nowrap; }
+
+.cap-jump-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.cap-jump-n { color: var(--muted); font-weight: 400; }
+
+.cap-group-head h3 { margin: 0; font-size: var(--fs-lg); line-height: var(--lh-tight); scroll-margin-top: 7rem; }
+.cap-group-n {
+  margin-left: var(--sp-1);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-pill);
+  background: var(--subtle);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  vertical-align: middle;
+}
+.cap-group-blurb { margin: var(--sp-1) 0 0; max-width: 62rem; }
+.cap-list { list-style: none; margin: var(--sp-2) 0 0; padding: 0; }
+.cap-item { padding: var(--sp-2) 0; border-top: 1px solid var(--border); }
+.cap-item:first-child { border-top: 0; }
+.cap-item p { margin: 0; max-width: 62rem; }
+.cap-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-2); }
+.cap-name { font-weight: 700; }
+.cap-what { line-height: var(--lh-body); }
+.cap-where { color: var(--muted); font-size: var(--fs-sm); }
+
+/* Who it is for: a word in a ring of its colour, the page's ink inside, so the
+   colour is a second channel and never has to carry the word. */
+.cap-tag, .cap-src {
+  display: inline-block;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.cap-tag-admin  { border-color: var(--bad);    color: var(--bad); }
+.cap-tag-editor { border-color: var(--accent); color: var(--accent); }
+.cap-tag-member { border-color: var(--ok);     color: var(--ok); }
+.cap-tag-signin,
+.cap-tag-list   { border-color: var(--warn);   color: var(--warn); }
+.cap-src { border-style: dashed; color: var(--muted); font-weight: 400; }
+
+.cap-none p { margin: 0 0 var(--sp-2); }
+.cap-words summary { cursor: pointer; }
+.cap-words-h { display: inline; margin: 0; font-size: var(--fs-md); }
+.cap-words-dl { display: grid; grid-template-columns: minmax(8rem, max-content) 1fr; gap: var(--sp-1) var(--sp-3); margin: var(--sp-2) 0 0; font-size: var(--fs-sm); }
+.cap-words-dl dt { font-weight: 600; }
+.cap-words-dl dd { margin: 0; }
+.cap-more h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-lg); }
+.cap-more p { margin: 0 0 var(--sp-3); max-width: 62rem; line-height: var(--lh-body); }
+
+@media (max-width: 560px) {
+  .cap-bar { position: static; }
+  .cap-count { margin-left: 0; }
+  .cap-words-dl { grid-template-columns: 1fr; }
+  .cap-words-dl dd { margin-bottom: var(--sp-2); }
+}
+
 /* ── Network Review tab (network-review.js) ──────────────────────────────────
    The hub picker and the proposed-site form as rows of fields that wrap on a
    narrow screen; the chosen hubs as a plain list; the matrix as an admin table

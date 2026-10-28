@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 143, date: '2026-10-28', items: [
+      'A new tab under <strong>Start here</strong>: <strong>📇 Capabilities</strong> lists everything Flood-Net can do, a line each — '
+        + 'the tools on every tab, every map layer and whose data it is, and what runs behind the scenes. Each name takes you to '
+        + 'where it is done (a map layer opens the Layers panel at its own switch), a tag says when it is for admins only or '
+        + 'editors, and a search box narrows the list as you type.',
+    ] },
     { n: 142, date: '2026-10-28', items: [
       'On the Stations map in ⛰️ <strong>3-D</strong>, the radio paths and backbone paths can be seen again: they are drawn '
         + 'stronger and wider than on the flat map, over a white edge, so they read over the rising water and on tilted ground. '

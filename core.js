@@ -143,6 +143,15 @@ const TABS = [
       find: 'front page start launcher dashboard tiles shortcuts most used everything all tools at a glance network now overview' },
     { id: 'sitemap',    label: 'Site Map',               icon: '🗂️',
       find: 'guide overview tour index directory contents orientation beginner introduction getting started help what does each every tab do explained' },
+    // 📇 Capabilities (capabilities.js), straight after the Site Map: the
+    // Site Map is a card per tab, this is a line per thing the app can do —
+    // the layers, the outside sources, the tools buried inside a tab — each
+    // naming where it is done, with a box to search them. Its find words are
+    // what somebody asking "can it do…" types, and none the Site Map, Home or
+    // Offline & Install answer to ("guide", "help", "everything", "install"),
+    // nor any nav.mjs's probes hold for other tabs ("maps", "view", "network").
+    { id: 'capabilities', label: 'Capabilities',         icon: '📇',
+      find: 'capability capabilities features feature list functions functionality abilities possible catalogue catalog inventory layers overlays outside external sources datasets feeds admin only' },
     { id: 'offline',    label: 'Offline & Install',      icon: '📲',
       find: 'offline no signal no reception flight mode airplane mode install app add to home screen homescreen icon pwa progressive web app phone tablet saved cache ready set up device update new version' },
     { id: 'views',      label: 'Views',                  icon: '🎛️',
@@ -535,6 +544,27 @@ const HELP = {
       + 'the other places the same job is usually carried on. Point at one and the line goes to it.',
     ],
     related: ['stations', 'health', 'admin'],
+  },
+  capabilities: {
+    summary: 'Everything Flood-Net can do, on one page, a line each: the tools on every tab, the layers on the '
+           + 'maps and the outside sources they come from, what happens behind the scenes, and the ways in for '
+           + 'scripts and AI agents. Each <strong>name</strong> opens the place it is done, and says where on that '
+           + 'tab to look; a tag says when it is for <strong>admins only</strong>, for editors, or needs you signed '
+           + 'in. Type in the <strong>search box</strong> to narrow the list as you go, or pick who it is for.',
+    watch: [
+      'The search matches the start of words in a name, its description, where it is and its source, and keeps '
+      + 'a line only when every word typed is on it. <kbd>Ctrl</kbd>+<kbd>F</kbd> works too: every line is on the '
+      + 'page, none folded away.',
+      'A tag is about who may use it, not who may look: most tabs show their admin parts to everyone and say '
+      + 'they are for administrators once opened. A tab kept to a list of people is left off this page for anyone '
+      + 'not on it, as it is left out of the bar.',
+      'Ctrl+click or middle-click a name to open it in a new browser tab.',
+      'Export, in the banner, saves the list as shown — CSV for a spreadsheet, or Markdown to paste into a document.',
+    ],
+    related: ['sitemap', 'home', 'stations'],
+    links: [
+      { label: 'Capabilities — how the list works (README)', href: 'README.md#39-capabilities-everything-flood-net-can-do-a-line-each' },
+    ],
   },
   offline: {
     summary: 'Flood-Net keeps a copy of itself on the device, so it opens where there is no signal — and '

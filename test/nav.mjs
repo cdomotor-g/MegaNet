@@ -361,6 +361,60 @@ try {
   check('every job under "I want to…" opens a real tab', sm.jobs.length === 0, sm.jobs.join(', '));
   check('the journey has a stop for every group', sm.stops === sm.groups, `${sm.stops} for ${sm.groups}`);
 
+  // 📇 Capabilities is written by hand, a line per thing the app can do, so it
+  // is held to the nav the way the Site Map is: a tab added with no line on
+  // it, or a line left pointing at a tab that has gone, fails here.
+  console.log('\nCapabilities — a line for every tab, each opening a real one, and a search that narrows\n');
+  await page.evaluate(() => switchTab('capabilities'));
+  await page.waitForTimeout(150);
+  const caps = await page.evaluate(() => {
+    const lines = Capabilities.lines();
+    const ids = TAB_LIST.map(t => t.id);
+    const covered = new Set(lines.map(l => l.tab));
+    const names = lines.map(l => l.group + '/' + l.name);
+    return {
+      n: lines.length,
+      tabbed: lines.filter(l => l.tab).length,
+      bare: ids.filter(id => !covered.has(id)),
+      gone: lines.filter(l => l.tab && !ids.includes(l.tab)).map(l => `${l.name} → ${l.tab}`),
+      nowhere: lines.filter(l => [l.tab, l.act, l.href].filter(Boolean).length !== 1 || !l.acts).map(l => l.name),
+      panelOff: lines.filter(l => l.panel && l.tab !== 'stations').map(l => l.name),
+      badWho: lines.filter(l => !['', 'signin', 'member', 'editor', 'admin', 'list'].includes(l.who)).map(l => l.name),
+      twice: names.filter((x, i) => names.indexOf(x) !== i),
+      rendered: document.querySelectorAll('#cap-list .cap-item').length,
+      links: [...document.querySelectorAll('#cap-list a.cap-name')].filter(a => /[?&]tab=[a-z0-9]+/.test(a.getAttribute('href'))).length,
+    };
+  });
+  check(`every tab has at least one line (${caps.n} lines)`, caps.bare.length === 0, `no line for: ${caps.bare.join(', ')}`);
+  check('every line names a tab that is there', caps.gone.length === 0, caps.gone.join('; '));
+  check('every line goes one place — a tab, a banner tool the page knows, or a page', caps.nowhere.length === 0, caps.nowhere.join(', '));
+  check('a line that opens a map panel is a Stations line', caps.panelOff.length === 0, caps.panelOff.join(', '));
+  check('every line says who it is for in a word the page knows', caps.badWho.length === 0, caps.badWho.join(', '));
+  check('no line is written twice in one group', caps.twice.length === 0, caps.twice.join(', '));
+  check('the page draws every line, each tab\'s name a link to its address', caps.rendered === caps.n && caps.links === caps.tabbed,
+    `${caps.rendered} drawn of ${caps.n}; ${caps.links} linked of ${caps.tabbed}`);
+  const narrowed = await page.evaluate(() => {
+    const q = document.getElementById('cap-q');
+    q.value = 'lidar profile';
+    q.dispatchEvent(new Event('input'));
+    return {
+      shown: document.querySelectorAll('#cap-list .cap-item').length,
+      marks: document.querySelectorAll('#cap-list mark.hit').length,
+      count: document.getElementById('cap-count').textContent,
+    };
+  });
+  check('two words narrow the list to the lines carrying both, marked where they matched',
+    narrowed.shown > 0 && narrowed.shown < caps.n && narrowed.marks > 0, JSON.stringify(narrowed));
+  const went = await page.evaluate(() => {
+    const a = document.querySelector('#cap-list a.cap-name');
+    const want = new URL(a.href).searchParams.get('tab');
+    a.click();
+    return { want, now: state.activeTab };
+  });
+  check('pressing a name opens its tab', went.now === went.want, JSON.stringify(went));
+  await page.evaluate(() => { Capabilities.clear(); switchTab('sitemap'); });
+  await page.waitForTimeout(150);
+
   // What the line is doing, read off the page: the svg up, the one element it
   // lit, and whether the ring drawn round that element actually encloses it.
   const lead = () => page.evaluate(() => {

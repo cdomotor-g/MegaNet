@@ -251,6 +251,17 @@ const ExportMenu = (function () {
         ready: () => (typeof NetworkReview !== 'undefined' && NetworkReview.matrix()) ? ''
           : 'No matrix yet — add a repeater or base and press Compute margins.' },
     ],
+    capabilities: () => {
+      const n = typeof Capabilities !== 'undefined' ? Capabilities.shown().length : 0;
+      const ready = () => n ? '' : 'Nothing matches the search — clear it first.';
+      const which = `the ${n.toLocaleString()} capabilit${n === 1 ? 'y' : 'ies'} shown`;
+      return [
+        { label: 'The capabilities — CSV', sub: `${which}: group, name, who it is for, where it is, source and description`,
+          call: ['Capabilities.exportFile', 'csv'], ready },
+        { label: 'The capabilities — Markdown', sub: `${which}, as a list to paste into a document or an issue`,
+          call: ['Capabilities.exportFile', 'md'], ready },
+      ];
+    },
   };
 
   function arroOffers(what) {

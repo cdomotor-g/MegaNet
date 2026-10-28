@@ -1,6 +1,6 @@
 // 📲 Offline & Install (offline-tab.js, and pwa.js's half of it), in Chromium.
 //
-//   1. **Where it is** — under Start here, after the Site Map; ?tab=offline
+//   1. **Where it is** — under Start here, after the Site Map and Capabilities; ?tab=offline
 //      opens it; it draws with no station list loaded (it is about the
 //      device, and most wanted on one that has none yet).
 //   2. **Which browser** — detect() against a table of real user-agent
@@ -152,8 +152,8 @@ async function main() {
       // 🎛️ Views joined Start here after it (0062): what the bar lists is
       // set up before the work too. 🏠 Home heads the group since the looks
       // in pictures made it their front page.
-      check('📲 Offline & Install is under Start here, after the Site Map, and has its button in the nav',
-        nav.group === 'Start here' && J(nav.order) === J(['home', 'sitemap', 'offline', 'views']) && nav.button, J(nav));
+      check('📲 Offline & Install is under Start here, after the Site Map and Capabilities, and has its button in the nav',
+        nav.group === 'Start here' && J(nav.order) === J(['home', 'sitemap', 'capabilities', 'offline', 'views']) && nav.button, J(nav));
       check('?tab=offline opens it', nav.active === 'offline' && /Offline & install/.test(nav.heading || ''), J(nav));
       const bare = await page.evaluate(() => {
         const had = state.data;

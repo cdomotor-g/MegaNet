@@ -5984,6 +5984,38 @@ v1.4) and makes a walkthrough of just those; every firmware step written out
 with ▶ Show me and a tick box, saved as a text checklist; the LEDs; and what to
 do when it goes wrong (`npm run a2firmware`).
 
+### 39. Capabilities (Everything Flood-Net Can Do, a Line Each)
+
+📇 **Capabilities**, under *Start here* between the Site Map and Offline &
+Install, lists everything the app can do — about two hundred lines in ten broad
+groups: getting around, stations and the map, outside data on the map, radio
+planning, interference and decoding, monitoring and alerts, site visits and
+surveying, maps on paper and files out, learning, and admin and what runs
+behind the scenes (the agent API and MCP server among them). Each line is a
+name, a tag when it is for **admins only**, editors, approved accounts or
+anyone signed in, the outside organisation whose data it is where it is not
+Flood-Net's own, one sentence, and where it is.
+
+The name is the way there. A tab's name is a link to its `?tab=` address
+(Ctrl-click opens it in a browser tab of its own), and pressing it says where on
+that tab to look; a map layer opens the 🗺️ **Layers** panel with its own find
+box filled in, so the one switch is on screen, and a map tool or side-panel
+pane opens itself. Tools in the banner (search, share, export, theme, report a
+bug) run from the line; the API, About, Privacy and the other pages of their
+own open in a new browser tab.
+
+The **search box** keeps a line only when every word typed starts a word
+somewhere on it — its name, sentence, place, source, group or tag — and marks
+the matches; **Who it is for** narrows to what is open to everyone, needs an
+account, is for editors or admins only; and **Outside sources only** leaves the
+layers and sections drawn from other organisations' data. Every line is on the
+page at once, so the browser's own Ctrl+F finds them too. ⤓ Export saves the
+list as shown, as CSV or Markdown.
+
+The list is written by hand in `capabilities.js`. `npm run nav` fails a tab
+with no line on it, a line naming a tab that has gone, and a line that goes
+nowhere — so a new tab is added to the list when it is added to the nav.
+
 ## Deployment Plan
 
 The plan the consolidation was built to, kept as the record of it. **Every

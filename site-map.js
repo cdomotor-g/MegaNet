@@ -65,6 +65,14 @@ const SiteMap = (function () {
         'Get to the map, Nearby, Station Health, an inspection, the camera or Look Around in one press',
       ],
     },
+    capabilities: {
+      what: 'Everything Flood-Net can do, a line each — every tool, map layer and outside source, and who each one is for — with a box to search them and a link to where each is done.',
+      use: [
+        'Find out whether Flood-Net can do something, and where',
+        'See which map layers come from outside sources, and whose',
+        'See which tools are for admins or editors only',
+      ],
+    },
     offline: {
       what: 'Flood-Net with no signal: what this device has saved, a button that saves the rest, and how to put it on your home screen.',
       use: [
@@ -482,7 +490,7 @@ const SiteMap = (function () {
   // site"; `step` is that sentence, cut at the commas.
   const GROUPS = {
     'Start here': { step: 'Getting set up',
-      blurb: 'Before the work: getting a phone or laptop ready for a site with no signal, putting Flood-Net on its home screen, and choosing what the bar on the left lists.' },
+      blurb: 'Before the work: everything Flood-Net can do on one list, getting a phone or laptop ready for a site with no signal, putting Flood-Net on its home screen, and choosing what the bar on the left lists.' },
     'Stations & networks': { step: 'What is out there',
       blurb: 'The stations themselves, what each repeater passes on and how long it waits to do it, and the files made from them. Most days start here.' },
     'Printed maps': { step: 'On paper',
@@ -513,6 +521,7 @@ const SiteMap = (function () {
   // the job is one corner of a big tab (〽️ is the Stations path tools' button).
   const TASKS = [
     { text: 'Find a station and see it on the map',        tab: 'stations' },
+    { text: 'Find out whether Flood-Net can do something', tab: 'capabilities' },
     { text: 'Check a radio path will work',                tab: 'stations', icon: '〽️' },
     { text: 'Look up the delay to set on a repeater',      tab: 'repdelays' },
     { text: 'See which stations need attention today',     tab: 'health' },
