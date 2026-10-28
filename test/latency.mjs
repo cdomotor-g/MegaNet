@@ -30,14 +30,24 @@
 //      the log is asked for what landed since (`received_at=gt.`, oldest
 //      first); a message landing flares its station green on the pulse canvas
 //      and runs a leg along its drawn link to its repeater, which flares as the
-//      leg ends; a typed-in reading is not played and an address no station
-//      carries is counted, not drawn; unticked, the log is not asked and the
-//      colours stay; ⏻ turns the colours and the animation off together and
-//      on again, the focus kept on it; the view turned on from all off brings
-//      the animation back; ⏱️ in the strip beating green behind its icon
-//      while the animation is on; and once the pulse has played, the station
-//      and its link still glowing green on the canvas, for a minute — and
-//      going with the station when it is moved, the spot it left clear.
+//      leg ends — assumed, signed out, so blue; a typed-in reading is not
+//      played and an address no station carries is counted, not drawn;
+//      unticked, the log is not asked and the colours stay; ⏻ turns the
+//      colours and the animation off together and on again, the focus kept on
+//      it; the view turned on from all off brings the animation back; ⏱️ in
+//      the strip beating green behind its icon while the animation is on; and
+//      once the pulse has played, the station still glowing green and its
+//      link blue on the canvas, for a minute — and going with the station when
+//      it is moved, the spot it left clear.
+//   5c. **Which way it came** — the receivers' copies laid in (_hear): a
+//      repeater's carrier found in a receiver's window of bursts from the
+//      stations only it passes; a station's burst on its own carrier heard
+//      direct — its hop to the base station green, its link to that repeater
+//      red for exactly as long, no blue — and on the repeater's carrier the
+//      way to the repeater blue, the repeater heard, its hop to the base
+//      station green; red read off the canvas, dotted, while the green runs and
+//      in the afterglow; a message no copy matches all blue; signed out, the
+//      card says every hop is blue and why, and the receptions are not asked.
 //   6. **One colouring at a time** — Colour pins by health turns latency off,
 //      and latency turns health off; the 🔑 legend carries whichever is on.
 //   7. **No data, honestly** — a datastore that cannot be reached: the pane
@@ -76,6 +86,7 @@ const browser = await launchBrowser();
 const errors  = [];
 
 let asked = [];
+const paths = [];      // every relation the page asked the datastore for
 const count = kind => asked.filter(a => a.kind === kind).length;
 let MODE = 'ok';
 let stub = null;
@@ -85,6 +96,7 @@ async function standIn(page) {
     const req = route.request();
     const url = req.url();
     const rel = new URL(url).pathname.replace(/^.*\/rest\/v1\//, '');
+    paths.push(rel);
     if (rel !== 'reading' && rel !== 'station_health') return route.fallback();
     // The last-heard batch; a card's readings; the window's pages.
     const kind = rel === 'station_health' ? 'network'
@@ -389,9 +401,10 @@ try {
     check('the message plays: its station flares — white-hot at the core, green round it — on a canvas over the pins that takes no clicks',
       got.fresh.includes(pick.id) && got.centre[3] > 120 && got.halo[3] > 0 && got.halo[1] > got.halo[0] + 40
         && got.pane === 'none' && got.z === '407', J({ fresh: got.fresh, centre: got.centre, halo: got.halo, pane: got.pane, z: got.z }));
-    check('…and runs along its link to the repeater, which flares as the leg lands on it',
+    check('…and runs along its link to the repeater, which flares as the leg lands on it — blue, assumed: nothing heard says so',
       got.route && got.route.legs.length >= 1 && got.route.legs[0].to === pick.rpt && got.route.legs[0].start === 0
-        && got.route.nodes.some(n => n.id === pick.rpt && n.start === got.route.legs[0].dur) && got.route.nodes[0].id === pick.id,
+        && got.route.nodes.some(n => n.id === pick.rpt && n.start === got.route.legs[0].dur) && got.route.nodes[0].id === pick.id
+        && got.route.legs.every(l => l.kind === 'assumed') && !got.route.proved && got.route.nodes[0].kind === 'heard',
       J(got.route));
     check('a reading typed in is not played, and an address no station carries is counted, not drawn',
       !got.fresh.includes(pick.other) && got.batch && got.batch.n === 2 && got.batch.lost === 1, J({ fresh: got.fresh, batch: got.batch }));
@@ -418,14 +431,17 @@ try {
       const q = state.map.latLngToContainerPoint(l.getLatLngs()[1]);
       const px = (x, y) => Array.from(cv.getContext('2d').getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data);
       const R = m.options.radius + 3;
-      const f = Math.max(0.3, (R + 16) / Math.hypot(q.x - p.x, q.y - p.y));
+      // A stretch of the link, not a point: an assumed hop glows dashed.
+      const len = Math.hypot(q.x - p.x, q.y - p.y);
+      const link = [];
+      for (let d = R + 10; d <= R + 30; d += 2) link.push(px(p.x + (q.x - p.x) * d / len, p.y + (q.y - p.y) * d / len));
       return { glowing: MapLatency._live().glowing.includes(id), anim: MapLatency._live().pulses,
-               ring: px(p.x + R, p.y), inside: px(p.x, p.y),
-               link: px(p.x + (q.x - p.x) * f, p.y + (q.y - p.y) * f) };
+               ring: px(p.x + R, p.y), inside: px(p.x, p.y), link };
     }, pick.id);
     const green = c => c[3] > 60 && c[1] > c[0] + 60 && c[1] > c[2];
-    check('once the pulse has played, its station keeps a green ring — the pin inside it left clear — and its link a green glow',
-      glow.glowing && green(glow.ring) && glow.inside[3] < 40 && green(glow.link), J(glow));
+    const blue = c => c[3] > 60 && c[2] > c[0] + 60 && c[2] > c[1];
+    check('once the pulse has played, its station keeps a green ring — the pin inside it left clear — and its link a blue glow',
+      glow.glowing && green(glow.ring) && glow.inside[3] < 40 && glow.link.some(blue) && !glow.link.some(green), J(glow));
     // Moved while it glows — Move pin's save rebuilds the map with the station
     // somewhere else: the ring and the link's glow go with the pin, and the
     // spot it left is clear. Across the link, so the new one misses the old spot.
@@ -445,15 +461,16 @@ try {
       const m = state.mapMarkers.find(x => x.mnStationId === id);
       const p = state.map.latLngToContainerPoint([s.lat, s.lon]);
       const R = m.options.radius + 3;
-      const f = Math.max(0.3, (R + 16) / Math.hypot(q.x - p.x, q.y - p.y));
-      const out = { ring: px(p.x + R, p.y), old: px(p0.x + R, p0.y), oldOther: px(p0.x - R, p0.y),
-                    link: px(p.x + (q.x - p.x) * f, p.y + (q.y - p.y) * f) };
+      const len = Math.hypot(q.x - p.x, q.y - p.y);
+      const link = [];
+      for (let d = R + 10; d <= R + 30; d += 2) link.push(px(p.x + (q.x - p.x) * d / len, p.y + (q.y - p.y) * d / len));
+      const out = { ring: px(p.x + R, p.y), old: px(p0.x + R, p0.y), oldOther: px(p0.x - R, p0.y), link };
       s.lat = was[0]; s.lon = was[1];
       refreshMapLayers({ skipFit: true });
       return out;
     }, pick.id);
     check('…and a station moved while it glows takes its ring and its link\'s glow with it, leaving the old spot clear',
-      green(moved.ring) && green(moved.link) && moved.old[3] < 40 && moved.oldOther[3] < 40, J(moved));
+      green(moved.ring) && moved.link.some(blue) && moved.old[3] < 40 && moved.oldOther[3] < 40, J(moved));
     check('…held, then faded: a minute after the animation ends', got.route && got.route.life - got.route.anim === 60000,
       J(got.route && { anim: got.route.anim, life: got.route.life }));
   }
@@ -497,6 +514,156 @@ try {
     return { off, on: MapLatency.on(), anim: MapLatency.anim() };
   });
   check('the colours turned on from all off bring the animation with them', back1.off && back1.on && back1.anim, J(back1));
+
+  // ── 5c. Which way it came ─────────────────────────────────────────────
+  log('\n5c. Which way it came: heard, assumed, missed\n');
+  const signedOut = await page.evaluate(() => ({ rx: MapLatency._rx(),
+    card: document.getElementById('lat-live-status').textContent.replace(/\s+/g, ' '),
+    key: [...document.querySelectorAll('#map-latency-panel .lat-hop-key li')].map(li => li.textContent.replace(/\s+/g, ' ').trim()),
+    terms: [...document.querySelectorAll('#map-latency-panel .lat-hop-key .term')].map(t => [t.textContent, t.title]) }));
+  check('signed out: the receivers\' copies are not asked for, and the card says every hop is blue and why',
+    signedOut.rx.status === 'off' && !paths.includes('reception') && !paths.includes('ingest_point_latest')
+      && /Every hop is blue/.test(signedOut.card) && /for editors/.test(signedOut.card), J(signedOut));
+  check('the card keys the three kinds of hop, each word with its meaning on hover and in words beside it',
+    signedOut.key.length === 3 && /^Heard — /.test(signedOut.key[0]) && /^Assumed — /.test(signedOut.key[1]) && /^Missed — /.test(signedOut.key[2])
+      && signedOut.terms.length === 3 && signedOut.terms.every(([w, m]) => m.length > 40 && !m.startsWith(w)), J(signedOut.key));
+  // A repeater whose pass ranges alone hold six field stations' addresses —
+  // only it could relay them — one of them with its link to the repeater
+  // drawn; and a base station on the map, where the receiver is.
+  const way = await page.evaluate(() => {
+    const reg = SignalRoutes.register();
+    const onMap = id => state.mapMarkers.some(m => m.mnStationId === id);
+    const drawn = new Set(state.mapLines.filter(l => l.mnLinkRole === 'core' && l.mnArrowDir)
+      .map(l => l.mnLinkStationId + '>' + l.mnLinkRepeaterId));
+    const only = new Map();
+    for (const s of reg.list) {
+      if (!(s.roles || []).includes('field') || s.lat == null) continue;
+      const a = reg.idsOf(s).find(x => (reg.addrSt.get(x) || []).length === 1 && reg.cands(x).length === 1 && !reg.cands(x)[0].own);
+      if (a == null) continue;
+      const rid = reg.cands(a)[0].rid;
+      if (!only.has(rid)) only.set(rid, []);
+      only.get(rid).push({ st: s.id, a });
+    }
+    for (const [rid, list] of only) {
+      if (list.length < 6 || !onMap(rid)) continue;
+      const s = list.find(x => drawn.has(x.st + '>' + rid) && onMap(x.st));
+      const base = state.data.stations.find(b => (b.roles || []).includes('base') && b.id !== rid && onMap(b.id));
+      if (!s || !base) continue;
+      // Close on the station and the repeater, so the link between them is
+      // long enough to read; the base station may be off the edge.
+      const at = id => { const x = state.data.stations.find(y => y.id === id); return [x.lat, x.lon]; };
+      state.map.fitBounds([at(s.st), at(rid)], { padding: [120, 120], maxZoom: 15, animate: false });
+      return { rid, st: s.st, a: s.a, others: list.filter(x => x !== s).slice(0, 5).map(x => x.a), base: base.id };
+    }
+    return null;
+  });
+  check('a repeater only it can relay six stations through, one linked to it on the map, and a base station', !!way, J(way));
+  if (way) {
+    const PT = { ingest_token_id: 99, point_id: 'demo-pi-sdr1', host_station_id: way.base };
+    const now = Date.now();
+    let id = 1000;
+    const burst = (a, cfo, ago) => ({ id: id++, ingest_token_id: 99, point_id: 'demo-pi-sdr1', heard_at: new Date(now - ago).toISOString(),
+      protocol: 'alert', alert_id: a, cfo_hz: cfo, a2_duplicate: false, a2_source: null, a2_path: null });
+    // Its five other stations relayed on its carrier, twice each, over the hours before.
+    const warm = way.others.flatMap((a, i) => [burst(a, 249 + i % 3, 3 * 3600e3 + i * 60e3), burst(a, 251 - i % 3, 2 * 3600e3 + i * 60e3)]);
+    const heard = await page.evaluate(({ PT, warm, live, st, a, rid, base }) => {
+      const fed = MapLatency._hear({ points: [PT], warm, live });
+      return { fed, direct: MapLatency._route(st, { keys: ['a:' + a] }), none: MapLatency._route(st) };
+    }, { PT, warm, live: [burst(way.a, 96, 2000)], st: way.st, a: way.a, rid: way.rid, base: way.base });
+    const kept = heard.fed.kept.find(([pk]) => pk === '99|demo-pi-sdr1');
+    check('the receiver\'s window finds the repeater\'s carrier, and the station\'s burst off it is its own',
+      kept && kept[1].includes(way.rid) && heard.fed.how[0] && heard.fed.how[0].how === 'own', J(heard.fed));
+    const d = heard.direct;
+    const hop = d && d.legs.find(l => l.from === way.st && l.to === way.base);
+    const miss = d && d.legs.find(l => l.from === way.st && l.to === way.rid);
+    check('heard direct: its hop to the base station green, its link to the repeater red for exactly as long, nothing blue',
+      d && d.proved && hop && hop.kind === 'heard' && miss && miss.kind === 'missed'
+        && miss.start === hop.start && miss.dur === hop.dur && miss.tail === hop.tail
+        && !d.legs.some(l => l.kind === 'assumed') && !d.nodes.some(n => n.id === way.rid)
+        && d.nodes.some(n => n.id === way.base && n.kind === 'heard'), J(d));
+    check('a message no copy matches runs the way the map draws, all of it blue',
+      heard.none && !heard.none.proved && heard.none.legs.length >= 1 && heard.none.legs.every(l => l.kind === 'assumed'), J(heard.none));
+    // Played, and read off the canvas: the red while the green runs, then both glowing.
+    const red = c => c[3] > 60 && c[0] > c[1] + 80 && c[0] > c[2] + 80;
+    const green = c => c[3] > 60 && c[1] > c[0] + 60 && c[1] > c[2];
+    const seen = await page.evaluate(async ({ st, rid, base, a }) => {
+      const cv = document.querySelector('.lat-pulse-canvas');
+      const dpr = window.devicePixelRatio || 1;
+      const px = (x, y) => Array.from(cv.getContext('2d').getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data);
+      const pt = id => { const s = state.data.stations.find(x => x.id === id); return state.map.latLngToContainerPoint([s.lat, s.lon]); };
+      // Along the middle of a link, a pixel at a time — a dotted line is
+      // mostly gaps — and along the start of the hop to the base station,
+      // clear of the station's own ring.
+      const mid = (ia, ib) => {
+        const p = pt(ia), q = pt(ib), out = [];
+        for (let k = -8; k <= 8; k++) {
+          const f = 0.5 + k / Math.max(40, Math.hypot(q.x - p.x, q.y - p.y));
+          out.push(px(p.x + (q.x - p.x) * f, p.y + (q.y - p.y) * f));
+        }
+        return out;
+      };
+      const near = (ia, ib) => {
+        const p = pt(ia), q = pt(ib), len = Math.hypot(q.x - p.x, q.y - p.y), out = [];
+        for (let d = 30; d <= 46; d++) out.push(px(p.x + (q.x - p.x) * d / len, p.y + (q.y - p.y) * d / len));
+        return out;
+      };
+      await new Promise(r => setTimeout(r, 300));
+      MapLatency._fire(st, { keys: ['a:' + a] });
+      await new Promise(r => setTimeout(r, 160));
+      const running = { missed: mid(st, rid) };
+      const t0 = performance.now();
+      while (!MapLatency._live().glowing.includes(st) && performance.now() - t0 < 6000) await new Promise(r => setTimeout(r, 25));
+      await new Promise(r => setTimeout(r, 700));
+      return { running, after: { missed: mid(st, rid), heard: near(st, base) }, apart: Math.hypot(pt(rid).x - pt(st).x, pt(rid).y - pt(st).y) };
+    }, way);
+    check('on the canvas: the missed link lit red while the heard hop runs, and both glowing after — red, and green',
+      seen.running.missed.some(red) && seen.after.missed.some(red) && seen.after.heard.some(green) && !seen.after.heard.some(red),
+      J({ apart: seen.apart, running: seen.running.missed.filter(red).length, missed: seen.after.missed.filter(red).length, heard: seen.after.heard.filter(green).length }));
+    const via = await page.evaluate(({ PT, warm, live, st, a }) => {
+      MapLatency._hear({ points: [PT], warm, live });
+      return MapLatency._route(st, { keys: ['a:' + a] });
+    }, { PT, warm, live: [burst(way.a, 250, 2000)], st: way.st, a: way.a });
+    const toRep = via && via.legs.find(l => l.from === way.st && l.to === way.rid);
+    const fromRep = via && via.legs.find(l => l.from === way.rid && l.to === way.base);
+    check('on the repeater\'s carrier: the way to the repeater blue, the repeater heard, its hop to the base station green, nothing red',
+      via && via.proved && toRep && toRep.kind === 'assumed' && !toRep.straight && fromRep && fromRep.kind === 'heard'
+        && fromRep.start === toRep.start + toRep.dur + 120 && via.nodes.some(n => n.id === way.rid && n.kind === 'heard')
+        && !via.legs.some(l => l.kind === 'missed'), J(via));
+    const card = await page.evaluate(() => document.getElementById('lat-live-status').textContent.replace(/\s+/g, ' '));
+    check('…and the card says what the copies found', /1 repeater carrier found on 1 receiver over the last 12 h/.test(card), card);
+    // A message landing before its copies: it waits for the next ask of them,
+    // and plays then with what came.
+    const newest = stub.tables.reading.reduce((x, r) => (r.received_at > x ? r.received_at : x), '');
+    const at = new Date(Math.max(Date.now(), Date.parse(newest)) + 2000);
+    stub.tables.reading.push(Object.assign({}, W.rows[0], {
+      addr: 'a:' + way.a, alert_id: way.a, a2_station: null, a2_sensor: null, station_number: null, channel: '',
+      station_id: way.st, reading_ts: new Date(at - 1500).toISOString(), received_at: at.toISOString(),
+      value_raw: 9, source: 5, path: 'serial-monitor/demo-pi-sdr1', dup_count: 0, dup_paths: null,
+    }));
+    const wait = await page.evaluate(async ({ PT, warm, st }) => {
+      MapLatency._hear({ points: [PT], warm });
+      const n0 = MapLatency._live().firedN;
+      await MapLatency._askNow();
+      await new Promise(r => setTimeout(r, 300));
+      const live = MapLatency._live();
+      return { held: live.held, fired: live.fired.slice(live.fired.length - (live.firedN - n0)) };
+    }, { PT, warm, st: way.st });
+    const later = await page.evaluate(async ({ PT, warm, live, st }) => {
+      MapLatency._hear({ points: [PT], warm, live });
+      const n0 = MapLatency._live().firedN;
+      await MapLatency._askNow();
+      const t0 = performance.now();
+      while (!MapLatency._live().fired.slice(-(MapLatency._live().firedN - n0) || 1e9).includes(st) && performance.now() - t0 < 4000) {
+        await new Promise(r => setTimeout(r, 15));
+      }
+      const l = MapLatency._live();
+      return { held: l.held, fired: l.fired.slice(l.fired.length - (l.firedN - n0)), rx: MapLatency._rx() };
+    }, { PT, warm, live: [burst(way.a, 96, 1000)], st: way.st });
+    check('a message whose copies are not in yet waits for the next ask of them, then plays with them',
+      wait.held.includes(way.st) && !wait.fired.includes(way.st)
+        && later.fired.includes(way.st) && !later.held.includes(way.st) && later.rx.played === 1 && later.rx.matched === 1,
+      J({ wait, later }));
+  }
 
   // ── 6. One colouring at a time ────────────────────────────────────────
   log('\n6. One colouring of the pins at a time\n');

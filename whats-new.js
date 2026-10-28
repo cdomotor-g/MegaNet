@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 149, date: '2026-10-28', items: [
+      'In ⏱️ Latency\'s <strong>Messages landing</strong> on the Stations map, the pulse now says what is known of each hop. '
+        + '<strong>Green</strong> is a hop the base stations\' receivers heard: an ALERT2 message names every hop it took, and a '
+        + 'legacy ALERT burst\'s carrier names the transmitter the base station heard — the station itself, or the repeater that '
+        + 'passed it on. <strong>Dashed blue</strong> is a hop assumed from the pass ranges, as every hop was before. A station '
+        + 'heard direct lights only its own hop, and any link to a repeater that the same receiver can hear but did not hear pass '
+        + 'the message on is lit <strong>dotted red</strong> for as long. The receivers\' copies are for editors: signed out, '
+        + 'every hop is blue. The card keys the three colours.',
+    ] },
     { n: 148, date: '2026-10-28', items: [
       '🚦 <strong>Station Health</strong> has a <strong>Repeaters</strong> card, under Receivers: each repeater the week\'s readings '
         + 'reach, with the stations heard behind it and how many of their checks got through, its own site\'s station and battery, and '

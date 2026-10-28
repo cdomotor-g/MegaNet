@@ -307,10 +307,18 @@ Sized up from the logo for a map: the trail 34 px, the strokes 4 px or more, the
 halo a little wider than the pin's own ring. It is drawn on a canvas in a pane of
 its own just over the arrows' (407), so it lights the pins and stays under their
 names, and it takes no clicks. Under reduced motion nothing runs or grows: the
-station and its links are lit, still, for a moment. Then an **afterglow**, so a
-flash somebody looked away from is not lost: a green ring just outside the pin,
+station and its links are lit, still, for a moment. **A hop says what is known
+of it**, in colour and in pattern so the colour is never the only channel:
+green and solid where a receiver's copy proves it (the carrier it came on, or an
+ALERT2 path), blue and dashed where it is only assumed from the pass ranges,
+and red and dotted along a link to a repeater that was heard *not* passing the
+message on — lit, not run, for as long as the hop that was heard. The station's
+own flare is always green: its message did land. The card keys the three, each
+word with its meaning on hover and in words beside it, and the 🔑 legend
+repeats them. Then an **afterglow**, so a
+flash somebody looked away from is not lost: a ring just outside the pin,
 leaving the pin's own colour clear inside it, and the link lit along its length
-short of both pins. It is held 20 s and faded over 40, and a station heard again
+short of both pins, each in its hop's colour. It is held 20 s and faded over 40, and a station heard again
 starts it again. It never replaces a pin's colour — a flash is an event, not a
 class — so it runs under any colouring. While it is on, ⏱️ in the side panel's
 strip beats behind its icon with the card's green node, to the logo's 2.4 s.

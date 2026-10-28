@@ -1837,15 +1837,29 @@ the missed ones listed, its delay dot by dot on a log scale, and the receivers
 that carried it, with a door into Station Health. Its **Messages landing** card
 plays the log on the map: every 15 s it asks `reading` for what has landed since
 the last ask (`received_at=gt.`, oldest first, a page of 1,000 at most), and a
-beat later each message's station flares green and a green pulse runs along its
-links — its pass-range links to its repeaters, then the fewest backbone hops to a
-base — the loading screen's logo pulsing through the network itself, drawn on a
-canvas of its own over the pins. The way it runs is the way the map draws the
-network, not the hops the message took (the log keeps the receiver, not the
-path), and a typed-in or backfilled reading is not played. Once a station's
-pulse has played, the station keeps a green ring round its pin and its links stay
-lit: held for 20 s, faded over the next 40, started again if it reports again,
-and drawn a few times a second rather than every frame. While the animation is
+beat later each message's station flares green and a pulse runs along its links,
+the loading screen's logo pulsing through the network itself, drawn on a canvas of
+its own over the pins; a typed-in or backfilled reading is not played. The pulse
+says what is known of each hop. **Blue, dashed — assumed**: the way the map draws
+the network (its pass-range links to its repeaters, then the fewest backbone hops
+to a base), the likeliest way in but not a record of it, since the log keeps the
+receiver and not the path. Signed in as an editor, the receivers' own copies
+(`reception`, read beside the log by id; a message whose copies are not in yet
+waits one more ask for them, since a base station posts them in batches of their
+own) say more. **Green, solid — heard**: an
+ALERT2 copy's path names every hop, and a legacy burst's carrier offset names the
+transmitter the base station heard — each receiver's repeater carriers found over
+its last 12 h of bursts by the same rule as Signal Routes (0077), again as bursts
+land. A burst on a repeater's carrier lights the hop from that repeater to the
+base station green and the way to the repeater blue; one on no repeater's carrier
+was heard direct, and lights only the station's own hop to the base station.
+**Red, dotted — missed**: heard direct by a receiver that hears a repeater the
+station has a pass-range link to, and nothing heard that repeater pass it on — the
+link is lit red for as long as the hop that was heard. A hop proved but not drawn
+on the map runs straight, pin to pin. Once a station's pulse has played, the
+station keeps a green ring round its pin and its links stay lit in their colours:
+held for 20 s, faded over the next 40, started again if it reports again, and
+drawn a few times a second rather than every frame. While the animation is
 on, ⏱️ in the side panel's strip beats green behind its icon. It comes on with the
 view, has its own box, stops while the tab or the page is out of sight, and is
 still under reduced motion; **⏻ Latency view** at the head of the pane turns the

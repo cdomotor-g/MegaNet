@@ -1500,6 +1500,9 @@ const SignalRoutes = (() => {
   }
   function state_() { return { days: S.days, phase: S.phase, mode: S.mode, pick: S.pick, rep: S.rep, demo: S.demo, err: S.err, A: S.A }; }
 
+  // register() and attribute() are also ⏱️ Latency's (map-latency.js): it puts
+  // each copy of a message landing live to the transmitter whose carrier it
+  // came on, by the same rule.
   return { render, init, load, loadDays, demo, setDays, setMode, pick, pickNode, pickRep, setGaps, showAll, scrollTo, authChanged,
-    exportRoutesCsv, exportPassCsv, adopt, analyse, attribute, state: state_ };
+    exportRoutesCsv, exportPassCsv, adopt, analyse, attribute, register, state: state_ };
 })();

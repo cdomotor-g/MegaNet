@@ -868,8 +868,11 @@ const HELP = {
       + 'by health</strong> take turns. Its pane counts the stations in view as the map moves; pick a station and it '
       + 'shows that station\'s checks slot by slot, its delay reading by reading and the receivers that carried it. '
       + 'Its <strong>Messages landing</strong> card animates the map as messages land in the log — the station '
-      + 'flashes green and a green pulse runs along its links to its repeater and on to a base, as the loading '
-      + 'screen\'s logo does, and the station and its links keep a green glow for a minute after; ⏱️ in the strip '
+      + 'flashes green and a pulse runs along its links to its repeater and on to a base, as the loading '
+      + 'screen\'s logo does, and the station and its links keep a glow for a minute after. The pulse is green '
+      + 'along a hop the receivers heard (an editor\'s view: a legacy burst\'s carrier names the transmitter the '
+      + 'base station heard, an ALERT2 path every hop), dashed blue along one assumed from the pass ranges, and '
+      + 'dotted red along a link to a repeater that was heard not passing the message on; ⏱️ in the strip '
       + 'beats green while it is on. It comes on with the view, with a box of its own to turn it off; <strong>⏻ Latency view</strong> '
       + 'at the top of the pane turns the colours and the animation off together.',
       '<strong>The minimap</strong>, in the map\'s bottom-right corner, is the same map further out — four '

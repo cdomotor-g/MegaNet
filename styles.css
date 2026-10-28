@@ -4367,6 +4367,23 @@ hr {
   30%      { opacity: .6; transform: none; }
 }
 .lat-pulse-canvas { pointer-events: none; }
+/* What is known of a hop (map-latency.js, HOPS): the card's key and the 🔑
+   legend's, a short stretch of line in the pulse's colour and pattern — heard
+   solid green, assumed dashed blue, missed dotted red. Literals, for the
+   logo's reason, and the pattern so the colour is not the only channel. */
+.lat-hop-key { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
+.lat-hop-key li { display: flex; align-items: baseline; gap: var(--sp-2); }
+.lat-hop {
+  display: inline-block; flex: none; width: 22px; height: 4px; border-radius: 2px;
+  vertical-align: middle; position: relative; top: -1px;
+}
+.lat-hop--heard { background: #1fd35a; box-shadow: 0 0 4px rgba(30, 235, 95, .8); }
+.lat-hop--assumed {
+  background: repeating-linear-gradient(90deg, #2f8cff 0 7px, transparent 7px 11px);
+}
+.lat-hop--missed {
+  background: radial-gradient(circle, #ff3b3b 0 1.6px, transparent 2px) 0 50% / 6px 4px repeat-x;
+}
 
 /* ⏱️ Latency in the side panel's rail while the messages are animated
    (map-latency.js sets data-lat-anim on the root): a green ring goes out from
