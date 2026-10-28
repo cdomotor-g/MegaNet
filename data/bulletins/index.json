@@ -1,7 +1,15 @@
 {
  "format": "floodnet-bulletin-index/1",
- "updated_at": "2026-10-26T18:35:18.078Z",
+ "updated_at": "2026-10-28T18:34:31.211Z",
  "daily": [
+  {
+   "id": "daily-2026-10-29",
+   "file": "data/bulletins/daily/2026-10-29.json",
+   "issued_at": "2026-10-28T18:31:55.707Z",
+   "headline": "Hillcrest and its neighbours are reporting again, but the Lockyer behind Toowoomba is still mostly dark, five days on.",
+   "sky": "stormy",
+   "presenter": "turbo"
+  },
   {
    "id": "daily-2026-10-27",
    "file": "data/bulletins/daily/2026-10-27.json",
