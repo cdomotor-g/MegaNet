@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 133, date: '2026-10-28', items: [
+      'Hover any radio path on the Stations map — a field link, a backbone path between repeaters, or one to a base '
+        + 'station — and its label says whether it is <strong>backbone</strong>, which station transmits (TX) and which '
+        + 'receives (RX), and the frequency. A repeater-to-repeater path lists both ways, and says so when the receiving '
+        + 'repeater listens on a different channel. Backbone paths showed nothing on hover before.',
+    ] },
     { n: 132, date: '2026-10-28', items: [
       'New in the Knowledge base: <strong>💾 A2 Firmware</strong> — ELPRO\'s ERT-A2 firmware upgrade, walked through. Pick the '
         + 'whole upgrade or just the host, the bootloader, the radio or its function image, and watch it done: the stick going in, '

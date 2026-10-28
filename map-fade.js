@@ -261,12 +261,12 @@ const MapFade = (function () {
     // Coalesced to one redraw a frame, so a sweep of three thousand margins
     // landing over a minute costs one redraw per frame, not per margin.
     MapArrows.schedule();
-    // The figure itself, on hover. A colour says which of three buckets; the
-    // number is what anybody who cares about the colour asks next.
-    if (typeof line.bindTooltip === 'function' && margin != null) {
-      line.bindTooltip(`Fade margin ${margin > 0 ? '+' : ''}${margin.toFixed(1)} dB`,
-        { sticky: true, direction: 'top', offset: [0, -10] });
-    }
+    // The figure itself is on hover: a colour says which of three buckets, and
+    // the number is what anybody who cares about the colour asks next. It goes
+    // on the path's hover label (MapBackbone.hoverHtml), which every line of
+    // the path shares and builds when it opens, so a margin that lands after
+    // the map was drawn is in it.
+    if (line.mnTip) line.mnTip.fadeMargin = margin;
   }
 
   // ── the local cache ──

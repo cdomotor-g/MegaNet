@@ -56,6 +56,11 @@
 //      of the fold at `lg` — the width being the one thing that decides it —
 //      and by the map object surviving the crossing, the whole reason it is a
 //      move rather than a re-render.
+//  13. **Every path says on hover what it is.** Backbone or not, each way it
+//      carries traffic as transmitter → receiver, and the channel on the air
+//      that way — hovered with a real pointer, because a backbone path's label
+//      sat on the core under its dash overlay, where the canvas never sends
+//      the pointer. Checked after 5, while the map is still at its view.
 //
 // Everything runs against the bundled `stations.json` on loopback with the
 // network policy in force: none of it needs a tile, a terrain fetch or the
@@ -310,6 +315,114 @@ try {
                            && state.mapLines.length > 0));
   await page.evaluate(() => MapArrows.setEnabled(true));
   await page.waitForTimeout(300);
+
+  // ── 13. Every path says on hover what it is ──────────────────────────────
+  // Hovered with a real pointer, because the bug was where the label sat, not
+  // what it said: on a backbone path's core, under the dash overlay the canvas
+  // hands the pointer to, so `getTooltip()` on the core answered and nobody
+  // hovering ever saw it. Up to a dozen paths of the kind are taken in turn:
+  // the map is centred on a point along one, the point hovered if it is clear
+  // of every pin and on the map's own canvas, and the label read must name
+  // that path's two ends — another line crossing there would name its own.
+  const hoverAt = async (kind) => {
+    const n = await page.evaluate((k) => state.mapLines.filter((l) => l.mnTip && l.mnTip.kind === k
+      && (l.mnLinkRole === 'core' || l.mnLinkRole === 'backbone')).length, kind);
+    const skipped = { pin: 0, covered: 0, label: 0 };
+    for (let i = 0; i < Math.min(n, 12); i++) {
+      for (const t of [0.5, 0.35, 0.65]) {
+        const s = await page.evaluate(([k, i, n, t]) => {
+          const lines = state.mapLines.filter((l) => l.mnTip && l.mnTip.kind === k
+            && (l.mnLinkRole === 'core' || l.mnLinkRole === 'backbone'));
+          const l = lines[Math.floor(i * lines.length / Math.min(n, 12))];
+          const [p, q] = l.getLatLngs();
+          const at = [p.lat + (q.lat - p.lat) * t, p.lng + (q.lng - p.lng) * t];
+          state.map.setView(at, 11, { animate: false });
+          return { at, a: l.mnTip.a.name, b: l.mnTip.b.name };
+        }, [kind, i, n, t]);
+        await page.waitForTimeout(150);
+        const pt = await page.evaluate((at) => {
+          const map = state.map;
+          const box = document.getElementById('leaflet-map').getBoundingClientRect();
+          const c = map.latLngToContainerPoint(at);
+          const pin = state.mapMarkers.some((m) =>
+            map.latLngToContainerPoint(m.getLatLng()).distanceTo(c) < 18);
+          const el = document.elementFromPoint(box.left + c.x, box.top + c.y);
+          return { x: box.left + c.x, y: box.top + c.y, pin,
+                   canvas: !!el && el.tagName === 'CANVAS' && !!el.closest('.leaflet-overlay-pane') };
+        }, s.at);
+        if (pt.pin) { skipped.pin++; continue; }
+        if (!pt.canvas) { skipped.covered++; continue; }
+        await page.mouse.move(pt.x - 3, pt.y);
+        await page.mouse.move(pt.x, pt.y);
+        await page.waitForTimeout(120);
+        const text = await page.evaluate(() => {
+          const el = document.querySelector('.leaflet-tooltip.mn-link-tip');
+          return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
+        });
+        if (text.includes(s.a) && text.includes(s.b)) return { a: s.a, b: s.b, text };
+        skipped.label++;
+      }
+    }
+    return { text: '', paths: n, skipped };
+  };
+  const tipRep = await hoverAt('repeater');
+  check('hovering a repeater-to-repeater path shows its label — it is backbone, both ways',
+    /^Backbone — repeater to repeater, both ways/.test(tipRep.text), JSON.stringify(tipRep));
+  check('…with each way as transmitter → receiver on a frequency',
+    tipRep.text.includes(`TX ${tipRep.a} → RX ${tipRep.b} · `)
+      && tipRep.text.includes(`TX ${tipRep.b} → RX ${tipRep.a} · `)
+      && (tipRep.text.match(/\d MHz/g) || []).length >= 2, tipRep.text);
+  const tipBase = await hoverAt('base');
+  check('hovering a repeater-to-base path: backbone, repeater transmitting, base receiving, a frequency',
+    /^Backbone — repeater to base station/.test(tipBase.text)
+      && new RegExp(`TX ${tipBase.a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} → RX .* · \\d[\\d.]* MHz`).test(tipBase.text),
+    JSON.stringify(tipBase));
+  const tipField = await hoverAt('field');
+  check('hovering a field link: not backbone, station transmitting to its repeater, a frequency',
+    /^Field link — not backbone/.test(tipField.text)
+      && tipField.text.includes(`TX ${tipField.a} → RX ${tipField.b} · `) && /\d MHz/.test(tipField.text),
+    JSON.stringify(tipField));
+
+  // The channel each way is the one on the air: a repeater sends on its TX,
+  // and one whose TX is not the RX of the repeater it sends to says so.
+  const hops = await page.evaluate(() => {
+    const mhz = (v) => (v == null ? null : parseFloat(v));
+    let odd = null, even = null, base = null, field = null;
+    for (const p of backboneLinks(Infinity)) {
+      const h = MapFreq.hops(p.kind, p.a, p.b);
+      const ta = p.a.repeater && p.a.repeater.tx_mhz, rb = p.b.repeater && p.b.repeater.rx_mhz;
+      if (p.kind === 'base' && !base && ta) base = { got: mhz(h[0].label), want: ta, n: h.length };
+      if (p.kind !== 'repeater' || !ta || !rb) continue;
+      const row = { got: mhz(h[0].label), want: ta, listens: mhz(h[0].listens), rx: rb, n: h.length };
+      if (ta !== rb && !odd) odd = row;
+      if (ta === rb && !even) even = row;
+    }
+    const l = passRangeLinks(state.data.stations).find((x) => x.r.repeater && x.r.repeater.rx_mhz);
+    if (l) field = { got: mhz(MapFreq.hops('field', l.s, l.r)[0].label), want: l.r.repeater.rx_mhz };
+    return { odd, even, base, field };
+  });
+  check('a repeater-to-repeater hop is on the sender\'s TX, both ways listed',
+    !!hops.even && hops.even.got === hops.even.want && hops.even.listens == null && hops.even.n === 2,
+    JSON.stringify(hops.even));
+  check('…and a receiver listening elsewhere is named with its own RX',
+    !!hops.odd && hops.odd.got === hops.odd.want && hops.odd.listens === hops.odd.rx,
+    JSON.stringify(hops.odd));
+  check('a repeater-to-base hop is one way, on the repeater\'s TX',
+    !!hops.base && hops.base.got === hops.base.want && hops.base.n === 1, JSON.stringify(hops.base));
+  check('a field link is on its repeater\'s RX',
+    !!hops.field && hops.field.got === hops.field.want, JSON.stringify(hops.field));
+
+  // Every mouseover, not only while links are coloured by frequency.
+  await page.evaluate(() => setMapLinkColour('plain'));
+  await page.waitForTimeout(400);
+  const tipPlain = await hoverAt('repeater');
+  check('with plain link colours the backbone label still shows, frequency and all',
+    /^Backbone/.test(tipPlain.text) && /\d MHz/.test(tipPlain.text), JSON.stringify(tipPlain));
+  await page.evaluate(() => setMapLinkColour('freq'));
+  await page.waitForTimeout(400);
+  await page.mouse.move(5, 5);
+  await page.evaluate((v) => { state.map.setView([v.lat, v.lon], v.zoom, { animate: false }); }, VIEW);
+  await page.waitForTimeout(400);
 
   // ── 6. Clear filters clears the repeater focus ───────────────────────────
   const rptId = await page.evaluate(

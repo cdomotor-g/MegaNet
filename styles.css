@@ -4422,6 +4422,16 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 }
 .leaflet-tooltip.mn-bridge-label::before { display: none; }
 
+/* A radio path's hover label (MapBackbone.hoverHtml): backbone or not, then a
+   line for each way the path carries traffic, transmitter to receiver and the
+   channel. Leaflet's own white tooltip, which holds over every base map, so the
+   muted ink is a fixed one rather than the theme's. */
+.leaflet-tooltip.mn-link-tip { font-size: .75rem; line-height: 1.45; }
+.mn-link-tip-head { font-weight: 700; }
+.mn-link-tip-k,
+.mn-link-tip-note { color: #4f6478; }
+.mn-link-tip-k { font-size: .65rem; font-weight: 700; letter-spacing: .03em; }
+
 /* The bridge pin: a deck with an arch under it, filled with the owner's colour
    (maroon for Transport and Main Roads, slate for everybody else) and drawn in
    white over it. The colours are the module's literals, inline in the SVG, so

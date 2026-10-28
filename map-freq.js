@@ -44,10 +44,15 @@
 // `station.repeater.rx_mhz`. A field station has no frequency of its own — it
 // transmits on whatever its carrier listens on — so a pass-range link takes the
 // repeater's, and that is not an approximation, it is the definition. A
-// backbone path between two repeaters takes the first end's and names both in
-// the tooltip when they differ, which is a pair worth noticing rather than a
-// pair to average away. A repeater–base path takes the repeater's: a base opens
-// no channel of its own.
+// backbone path between two repeaters takes the first end's, and a
+// repeater–base path takes the repeater's: a base opens no channel of its own.
+//
+// The hover label (MapBackbone.hoverHtml) asks a different question — what is
+// on the air each way — so it reads hops() rather than the colour: a field
+// station sends on its repeater's RX, and a repeater sends on its own TX, to
+// the next repeater or to the base. A repeater whose TX is not the RX of the
+// one it is sending to is named in the label, a pair worth noticing rather
+// than one to average away.
 //
 // A link with no frequency anywhere on it keeps the plain link colour. There
 // are none in this network today — all 88 repeaters have an rx_mhz — but a
@@ -113,6 +118,13 @@ const MapFreq = (function () {
     return r && r.rx_mhz > 0 ? Number(r.rx_mhz) : null;
   }
 
+  // What a repeater re-transmits on, or null: the channel a backbone hop out
+  // of it is on, whoever hears it.
+  function txMhz(s) {
+    const r = s && s.repeater;
+    return r && r.tx_mhz > 0 ? Number(r.tx_mhz) : null;
+  }
+
   function pairMhz(a, b) {
     const fa = endMhz(a);
     return fa != null ? fa : endMhz(b);
@@ -135,6 +147,27 @@ const MapFreq = (function () {
       if (f == null) return null;
       const fa = endMhz(a), fb = endMhz(b);
       return { mhz: f, label: fmt(f), far: fa != null && fb != null && fa !== fb ? fmt(fb) : null };
+    },
+
+    // Each way a drawn path carries traffic, transmitter first, with the
+    // channel on the air that way — for the hover label. `kind` is the path's:
+    // 'field' (a to its repeater b), 'base' (repeater a to base b) or
+    // 'repeater' (a and b, both ways). `label` is null where nothing is
+    // recorded; `listens` is the receiving repeater's RX when it is not the
+    // channel sent on. Not asked of a base: the radio it listens with is not
+    // the repeater row a base that is also a repeater carries.
+    hops(kind, a, b) {
+      if (kind === 'field') {
+        const f = endMhz(b);
+        return [{ from: a, to: b, label: f != null ? fmt(f) : null, listens: null }];
+      }
+      const way = (tx, rx) => {
+        const f = txMhz(tx);
+        const heard = kind === 'repeater' ? endMhz(rx) : null;
+        return { from: tx, to: rx, label: f != null ? fmt(f) : null,
+                 listens: f != null && heard != null && heard !== f ? fmt(heard) : null };
+      };
+      return kind === 'base' ? [way(a, b)] : [way(a, b), way(b, a)];
     },
 
     // Which colouring the operator has chosen. Both this and MapFade.active()
@@ -161,11 +194,6 @@ const MapFreq = (function () {
       // so it moves with the colour — MapLos's lesson, and the same reason.
       line.mnBaseColor = hit.colour;
       if (!line.mnBlastRed) line.setStyle({ color: hit.colour });
-      if (typeof line.bindTooltip === 'function') {
-        const other = endMhz(a) != null && endMhz(b) != null && endMhz(a) !== endMhz(b)
-          ? ` (far end ${fmt(endMhz(b))})` : '';
-        line.bindTooltip(`${fmt(f)}${other}`, { sticky: true, direction: 'top', offset: [0, -10] });
-      }
     },
 
     // What the legend lists: every channel in the loaded file, in the order the

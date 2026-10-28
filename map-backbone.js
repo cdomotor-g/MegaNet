@@ -565,6 +565,33 @@ const MapBackbone = (function () {
       else open('field', l.mnLinkStationId, l.mnLinkRepeaterId);
     },
 
+    // The label a path on the Stations map shows on hover: whether it is
+    // backbone, then each way it carries traffic — transmitter → receiver, on
+    // the channel on the air that way (MapFreq.hops) — then the fade margin
+    // once the sweep has one. `tip` is { kind: 'field' | 'repeater' | 'base',
+    // a, b, fadeMargin }, one per path and shared by every line drawn for it;
+    // MapFade sets the margin when it paints. It holds no line: a line that
+    // pointed at another through it made the map an object no test could
+    // hand back from the page. Built when the label opens, so it is never
+    // older than the colouring under it.
+    hoverHtml(tip) {
+      if (!tip || !tip.a || !tip.b) return '';
+      const { kind, a, b } = tip;
+      const head = kind === 'field' ? 'Field link — not backbone'
+        : kind === 'base' ? 'Backbone — repeater to base station'
+        : 'Backbone — repeater to repeater, both ways';
+      const hops = MapFreq.hops(kind, a, b).map(h => `
+        <div class="mn-link-tip-hop"><span class="mn-link-tip-k">TX</span> ${esc(h.from.name)}
+          → <span class="mn-link-tip-k">RX</span> ${esc(h.to.name)} ·
+          ${h.label ? `<strong>${esc(h.label)}</strong>` : 'frequency not recorded'}${h.listens
+            ? ` <span class="mn-link-tip-note">(${esc(h.to.name)} listens on ${esc(h.listens)})</span>` : ''}</div>`).join('');
+      const m = tip.fadeMargin;
+      const fade = m != null && isFinite(m)
+        ? `<div class="mn-link-tip-note">Fade margin ${m > 0 ? '+' : ''}${m.toFixed(1)} dB${
+            kind === 'repeater' ? `, ${esc(a.name)} → ${esc(b.name)}` : ''}</div>` : '';
+      return `<div class="mn-link-tip-head">${head}</div>${hops}${fade}`;
+    },
+
     // The Network View mini-map has no profile or budget panel to open, so its
     // paths get a popup with the same figures and a hand-off to the Stations
     // tab, where the full treatment — the path on the profile card, at the head

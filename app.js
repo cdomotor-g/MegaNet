@@ -6511,6 +6511,13 @@ const MAP_BACKBONE_CORE_W   = 2.5;
 // coloured line with specks on it, and long enough at 2.5 px of weight to be
 // two distinguishable things at the zoom a backbone hop is looked at.
 const MAP_BACKBONE_DASH = '9,9';
+// Every path's hover label (MapBackbone.hoverHtml), bound on every line drawn
+// for it rather than on the core alone. A backbone path's dash overlay is
+// drawn last, so it is the line under the pointer, and the label used to be on
+// the core beneath it where no pointer could reach it; the casing is the edge
+// of the click target, so it says the same.
+const MAP_LINK_TIP = { sticky: true, direction: 'top', offset: [0, -10], className: 'mn-link-tip' };
+function mapLinkTipHtml(layer) { return MapBackbone.hoverHtml(layer.mnTip); }
 
 // `skipFit` clears the fit for this refresh while still recording the extent it
 // would have fitted, so the map holds the operator's pan and zoom and the next
@@ -6621,9 +6628,10 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
 
   // Every casing first, then every core: pairing them per link would let one
   // link's white casing paint over another link's coloured line where they cross.
+  const fieldTips = links.map(l => ({ kind: 'field', a: l.s, b: l.r, fadeMargin: null }));
   for (const pass of ['casing', 'core']) {
     const casing = pass === 'casing';
-    for (const l of links) {
+    for (const [i, l] of links.entries()) {
       const lineOp = casing ? casingOp : coreOp;
       const line = L.polyline([[l.s.lat, l.s.lon], [l.r.lat, l.r.lon]], {
         color:   casing ? '#ffffff' : lineColor,
@@ -6643,6 +6651,8 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
       // carries it — the casing under it would draw a second set on top.
       if (!casing) line.mnArrowDir = 'fwd';
       line.on('click', MapBackbone.onLineClick);
+      line.mnTip = fieldTips[i];
+      line.bindTooltip(mapLinkTipHtml, MAP_LINK_TIP);
       state.mapLines.push(line);
       // The frequency first — it is the base colouring, recorded rather than
       // computed, and it paints synchronously — then LOS, then the margin: all
@@ -6673,10 +6683,11 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   // was.
   const backboneColor = getComputedStyle(document.documentElement)
     .getPropertyValue('--map-backbone').trim() || '#000000';
+  const backboneTips = backbone.map(p => ({ kind: p.kind, a: p.a, b: p.b, fadeMargin: null }));
   for (const pass of ['casing', 'core', 'dash']) {
     const casing = pass === 'casing';
     const dash   = pass === 'dash';
-    for (const p of backbone) {
+    for (const [i, p] of backbone.entries()) {
       const lineOp = casing ? casingOp : coreOp;
       const line = L.polyline([[p.a.lat, p.a.lon], [p.b.lat, p.b.lon]], {
         color:   casing ? '#ffffff' : backboneColor,
@@ -6695,6 +6706,8 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
       // overlay and the casing carry no arrows: one set per path.
       if (pass === 'core') line.mnArrowDir = p.kind === 'base' ? 'fwd' : 'both';
       line.on('click', MapBackbone.onLineClick);
+      line.mnTip = backboneTips[i];
+      line.bindTooltip(mapLinkTipHtml, MAP_LINK_TIP);
       state.mapLines.push(line);
       if (pass === 'core') {
         MapFreq.classify(line, p.a, p.b);
