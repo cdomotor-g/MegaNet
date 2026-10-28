@@ -1110,8 +1110,9 @@ creates. The Worker deploys on push; the migration lands only when somebody
 applies it, and until then the route answers 503 `"not available yet"` naming
 the migration. Nothing else in the API depends on it. `0086` then keeps that
 view's rows in a table as readings arrive; without it the view walks every
-address on each read, which passed anon's 3 s timeout at 6,700 addresses.
-Both are applied to the live database. To apply them to another:
+address on each read, which passed anon's 3 s timeout at 6,700 addresses —
+the route then answers 503 `"database unavailable"` (57014) on and off,
+whatever the filters. To apply them:
 
 1. In the Supabase dashboard, open the Flood-Net project → **SQL Editor** →
    **New query**.
