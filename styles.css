@@ -2718,6 +2718,9 @@ td {
 .as-radios { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-4); }
 .as-radios [role="radiogroup"] { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); }
 .as-nets td, .as-nets th { vertical-align: top; }
+/* The grid is as wide as its card (drawGrid sizes it to the scroller and
+   sets --gw and --gh); it scrolls sideways only where its smallest cells do
+   not fit, on a phone. */
 .as-grid-wrap { margin-top: var(--sp-2); }
 .as-grid-box { position: relative; width: max-content; }
 .as-grid-wrap canvas { display: block; width: var(--gw, 760px); height: var(--gh, 600px); cursor: crosshair; }
@@ -2804,6 +2807,13 @@ td {
 .as-bubble.as-f-high { background: var(--bad); }
 .as-bubble.is-one { border: 2px solid var(--panel); }
 .as-bubble-key { display: inline-block; width: .9em; height: .9em; border-radius: 50%; margin-right: .3em; vertical-align: -1px; background: currentColor; }
+/* The Allocate card, folded shut until it is wanted (allocHtml): its header
+   the summary, the heading carrying the twisty the other folding cards do. */
+.as-alloc > summary { cursor: pointer; list-style: none; }
+.as-alloc > summary::-webkit-details-marker { display: none; }
+.as-alloc > summary h2::before { content: '▸'; display: inline-block; width: 1em; color: var(--muted); }
+.as-alloc[open] > summary h2::before { content: '▾'; }
+.as-alloc[open] > summary { margin-bottom: var(--sp-2); }
 .as-form { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); align-items: flex-end; margin: var(--sp-2) 0; }
 .as-form > label { display: grid; gap: var(--sp-1); min-width: 0; max-width: 100%; }
 .as-form .as-where select { max-width: 100%; min-width: min(22rem, 100%); }

@@ -8,24 +8,27 @@
 // shared addresses is red.
 //
 //   0. **The cards** — All addresses, the Address grid and the Address map a
-//      card each, above Address space and its two buttons.
+//      card each, above Address space and its two buttons; the Allocate card
+//      folded shut to start, its heading opening it.
 //   1. **The figures** — the busiest repeaters drawn first, each repeater's
 //      in-use, free and longest free run as the oracle has them; a network's
 //      addresses counted once across its repeaters, a lane a repeater; the
 //      Brisbane Hub's grid every address the hub's stations hold.
 //   2. **The filter box** — an address typed draws exactly the repeaters
 //      that carry it, each marked where it is.
-//   3. **The grid** — an address looked up names its station; a free one
-//      pointed at with the mouse offers itself to the Allocate card. **The
-//      wheel** — as wide as the card; a wedge counted as the station file has
+//   3. **The grid** — as wide as its card, and wider with it; an address
+//      looked up names its station and goes into the filter box, kept on the
+//      wheel; a free one pressed with the mouse the same, offering itself to
+//      the Allocate card, which opens. **The wheel** — as wide as the card; a wedge counted as the station file has
 //      it, every repeater carrying any of it called out when its inner bar is
 //      pointed at and kept when it is pressed, the arrow keys stepping round;
 //      the outer ring pointed at address by address, the callout naming the
 //      station on it and drawing its block a cell an address, pressed kept
-//      with its wedge, Shift and an arrow an address on; an address in the
-//      filter box marked with a glowing ring and its number, and said under
-//      the wheel, as the grid marks it; the biggest gap first, and
-//      kept, it takes its first free address to the grid. **Every hub
+//      with its wedge and put in the filter box and the grid's Address, Shift
+//      and an arrow an address on; an address in the filter box kept, marked
+//      with a glowing ring and its number, and said under the wheel, as the
+//      grid marks it; the biggest gap first, and kept, it takes its first
+//      free address to the grid. Show set on the grid sets the wheel. **Every hub
 //      together** — in use when any hub's station holds it, two hubs on one
 //      address reuse and not a clash, the gaps the addresses nobody anywhere
 //      is on, and a wedge's repeaters from every hub, each named with its hub.
@@ -171,6 +174,16 @@ try {
   ok('…which keeps its two buttons, Each repeater and Each radio network', J(cards.buttons) === J(['Each repeater', 'Each radio network']), J(cards.buttons));
   ok('…and the wheel, the grid and the map are drawn when the tab opens', await page.evaluate(() => document.getElementById('as-wheel').width > 0
     && document.getElementById('as-grid').width > 0 && !!AddressSpace.state().map));
+  const fold = await page.evaluate(() => { const d = document.getElementById('as-alloc');
+    return { tag: d.tagName, open: d.open, h: (d.querySelector(':scope > summary h2') || {}).id, form: document.getElementById('as-where').checkVisibility() }; });
+  ok('the Allocate card is folded shut to start, its heading the fold\'s summary', fold.tag === 'DETAILS' && !fold.open && fold.h === 'as-alloc-h' && !fold.form, J(fold));
+  // The toggle event is a task after the press: wait for it rather than race it.
+  const soon = fn => until(page, fn, null, 3000).then(() => true, () => false);
+  await page.click('#as-alloc > summary');
+  ok('…and pressing the heading opens it', await soon(() => document.getElementById('as-alloc').open && AddressSpace.state().allocOpen
+    && document.getElementById('as-where').checkVisibility()));
+  await page.click('#as-alloc > summary');
+  ok('…and folds it again', await soon(() => !document.getElementById('as-alloc').open && !AddressSpace.state().allocOpen));
 
   // ── 1. the figures ────────────────────────────────────────────────────────
   console.log('\nThe figures, against the station file\n');
@@ -237,23 +250,41 @@ try {
   // ── 3. the grid ───────────────────────────────────────────────────────────
   console.log('\nThe grid\n');
   await page.locator('#as-grid').scrollIntoViewIfNeeded();
+  const sizeOf = () => page.evaluate(() => { const w = document.querySelector('#as-grid-body .as-grid-wrap');
+    return { g: AddressSpace.grid(), drawn: document.getElementById('as-grid').getBoundingClientRect().width, card: w.getBoundingClientRect().width, over: w.scrollWidth - w.clientWidth }; });
+  const gs = await sizeOf();
+  ok(`the grid is as wide as its card (${Math.round(gs.drawn)} of ${Math.round(gs.card)} px), its cells as big as that allows (${gs.g.cell} px), nothing to scroll sideways`,
+    Math.abs(gs.drawn - gs.card) <= 1 && gs.over <= 0 && gs.g.cell >= Math.floor((gs.card - 200) / 100), J(gs));
+  // The page stops widening at its own max width, a little past 1,600 px.
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await until(page, w => { const g = AddressSpace.grid(); return g && g.avail > w + 50; }, gs.g.avail);
+  const gs2 = await sizeOf();
+  ok(`…and grows with it, wider and taller, when the window widens (${Math.round(gs2.drawn)} px, ${gs2.g.cell} px cells)`,
+    Math.abs(gs2.drawn - gs2.card) <= 1 && gs2.over <= 0 && gs2.g.cell > gs.g.cell && gs2.g.H > gs.g.H, J({ gs, gs2 }));
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await until(page, w => { const g = AddressSpace.grid(); return g && g.avail === w; }, gs.g.avail);
+  await page.locator('#as-grid').scrollIntoViewIfNeeded();
   await page.fill('#as-look', String(HELD));
-  ok(`an address looked up names the station holding it (${HELD}, ${HELD_BY.name})`,
-    await page.evaluate(n => document.getElementById('as-readout').textContent.includes(n), HELD_BY.name));
+  const lk = await page.evaluate(() => ({ text: document.getElementById('as-readout').textContent, box: document.getElementById('pr-filter').value, sel: AddressSpace.wheel().sel }));
+  ok(`an address looked up names the station holding it (${HELD}, ${HELD_BY.name}), goes into the filter box and is kept on the wheel`,
+    lk.text.includes(HELD_BY.name) && lk.box === String(HELD) && lk.sel && lk.sel.addr === HELD, J(lk));
   const FREE = R.t.runs[0].lo;
-  const gw = await page.evaluate(() => document.getElementById('as-grid').getBoundingClientRect().width);
-  const cell = (gw - 146) / 100, row = Math.floor(FREE / 100), col = FREE % 100;
-  await page.locator('#as-grid').click({ position: { x: 46 + col * cell + cell / 2, y: 14 + row * cell + Math.floor(row / 10) * 3 + cell / 2 } });
-  const ro = await page.evaluate(() => ({ pick: AddressSpace.state().pickAddr, text: document.getElementById('as-readout').textContent }));
-  ok(`a free address pointed at in the grid is picked, and offers itself (${FREE})`, ro.pick === FREE && new RegExp(`free.*Allocate ${FREE}`).test(ro.text), J(ro));
+  const gg = await page.evaluate(() => AddressSpace.grid());
+  const row = Math.floor(FREE / 100), col = FREE % 100;
+  await page.locator('#as-grid').click({ position: { x: gg.x0 + col * gg.cell + gg.cell / 2, y: gg.top + row * gg.cell + Math.floor(row / 10) * gg.rg + gg.cell / 2 } });
+  const ro = await page.evaluate(() => ({ pick: AddressSpace.state().pickAddr, text: document.getElementById('as-readout').textContent, box: document.getElementById('pr-filter').value,
+    look: document.getElementById('as-look').value, sel: AddressSpace.wheel().sel, out: document.getElementById('as-wheel-out').textContent }));
+  ok(`a free address pressed in the grid is picked, and offers itself (${FREE})`, ro.pick === FREE && new RegExp(`free.*Allocate ${FREE}`).test(ro.text), J(ro));
+  ok('…into the filter box and the grid\'s Address, kept on the wheel and said under it', ro.box === String(FREE) && ro.look === String(FREE)
+    && ro.sel && ro.sel.addr === FREE && ro.out.includes(`${FREE} —`), J(ro));
   await page.click('#as-readout .link-btn:last-of-type');
-  const formed = await page.evaluate(() => AddressSpace.state().form);
-  ok('…to the Allocate card: the repeater that carries it, that address, one of it', formed.first === String(FREE) && formed.count === 1
+  const formed = await page.evaluate(() => Object.assign(AddressSpace.state().form, { open: document.getElementById('as-alloc').open }));
+  ok('…to the Allocate card, opened: the repeater that carries it, that address, one of it', formed.open && formed.first === String(FREE) && formed.count === 1
     && REPS.find(r => 'rep:' + r.id === formed.where)?.carried.includes(FREE), J(formed));
 
   // ── 3b. the wheel ─────────────────────────────────────────────────────────
   console.log('\nAll addresses: the wheel\n');
-  ok('the wheel starts on the busiest hub, as the grid does', (await page.evaluate(() => AddressSpace.state().wheelScope)) === 'hub:brisbane');
+  ok('the wheel starts on the busiest hub, as the grid does', (await page.evaluate(() => document.querySelector('#as-wheel-body select').value)) === 'hub:brisbane');
   const WG = Math.floor(HELD / 100), wlo = Math.max(1, WG * 100), whi = WG * 100 + 99;
   const wantReps = REPS.filter(r => r.hub === 'brisbane' && r.carried.some(a => a >= wlo && a <= whi)).map(r => r.id).sort();
   let wantHeld = 0;
@@ -289,9 +320,11 @@ try {
   const mid = await page.evaluate(() => { const w = AddressSpace.wheel(); return { ring: w.ring, addr: w.addr, text: document.getElementById('as-wheel-tip').textContent, lit: document.querySelector('.as-ring-row.is-on')?.dataset.ring }; });
   ok('…and the middle ring the same, said to be the repeaters carrying it', mid.ring === 'cover' && mid.lit === 'cover' && Math.abs(mid.addr - HELD) <= 1 && /Middle ring/.test(mid.text), J(mid));
   await page.mouse.click(ax, ay);
-  const keptA = await page.evaluate(() => ({ sel: AddressSpace.wheel().sel, text: document.getElementById('as-wheel-out').textContent }));
+  const keptA = await page.evaluate(() => ({ sel: AddressSpace.wheel().sel, text: document.getElementById('as-wheel-out').textContent,
+    box: document.getElementById('pr-filter').value, look: document.getElementById('as-look').value }));
   ok('…an address pressed is kept with its wedge, as near as a pixel of the ring allows', keptA.sel && Math.abs(keptA.sel.addr - HELD) <= 4
     && keptA.sel.wedge === Math.floor(keptA.sel.addr / 100) && keptA.text.includes(String(keptA.sel.addr)), J(keptA));
+  ok('…and goes into the filter box and the grid\'s Address', keptA.box === String(keptA.sel.addr) && keptA.look === keptA.box, J(keptA));
   // Under the wheel, the kept block drawn wide enough to press any one address.
   await page.locator('#as-wheel-out .as-strip-pick svg').scrollIntoViewIfNeeded();
   const sbox = await page.locator('#as-wheel-out .as-strip-pick svg').boundingBox();
@@ -316,12 +349,13 @@ try {
   await page.waitForTimeout(300);
   const pins = await page.evaluate(() => ({ wheel: document.querySelectorAll('#as-wheel-pins .as-pin').length, tag: document.querySelector('#as-wheel-pins .as-pin-tag')?.textContent,
     grid: document.querySelectorAll('#as-grid-pins .as-pin').length, anim: getComputedStyle(document.querySelector('#as-wheel-pins .as-pin') || document.body).animationName,
-    out: document.getElementById('as-wheel-out').textContent }));
-  ok(`an address in the filter box (${HELD}) is ringed and tagged on the wheel, ringed on the grid, and said under the wheel`, pins.wheel === 1 && pins.tag === String(HELD)
-    && pins.grid === 2 && pins.anim === 'as-pin-glow' && pins.out.includes('In the filter box') && pins.out.includes(HELD_BY.name), J(pins));
+    out: document.getElementById('as-wheel-out').textContent, sel: (AddressSpace.wheel().sel || {}).addr }));
+  ok(`an address in the filter box (${HELD}) is kept, ringed and tagged on the wheel, ringed on the grid, and said under the wheel`, pins.wheel === 1 && pins.tag === String(HELD)
+    && pins.grid === 1 && pins.sel === HELD && pins.anim === 'as-pin-glow' && pins.out.includes('In the filter box') && pins.out.includes(HELD_BY.name), J(pins));
   await page.fill('#pr-filter', '');
   await page.waitForTimeout(200);
-  ok('…and the marks go when the filter box is emptied', await page.evaluate(() => !document.querySelector('#as-wheel-pins .as-pin') && !/In the filter box/.test(document.getElementById('as-wheel-out').textContent)));
+  ok('…and the marks go when the filter box is emptied, and the wheel lets it go', await page.evaluate(() => !document.querySelector('#as-wheel-pins .as-pin')
+    && !/In the filter box/.test(document.getElementById('as-wheel-out').textContent) && !AddressSpace.wheel().sel));
   const gap0 = figuresOf(Array.from({ length: MAX }, (_, i) => i + 1), ['brisbane']).runs.slice().sort((a, b) => (b.n - a.n) || (a.lo - b.lo))[0];
   const chip = await page.evaluate(() => { const b = document.querySelector('.as-gaps .pill'); return b && { lo: Number(b.dataset.lo), text: b.textContent }; });
   ok(`the biggest gap first under the wheel (${gap0.lo}–${gap0.hi}, ${gap0.n})`, chip && chip.lo === gap0.lo && chip.text.includes(`${gap0.lo}–${gap0.hi}`), J(chip));
@@ -355,13 +389,12 @@ try {
   ok(`Every hub together: in use where any hub's station holds it (${eUse}), two only inside one hub (${eClash}), the longest gap ${eLong.lo}–${eLong.hi}`,
     every.n === MAX && every.use === eUse && every.clash === eClash && every.longest.lo === eLong.lo && every.longest.hi === eLong.hi,
     J({ n: every.n, use: every.use, clash: every.clash, longest: every.longest && [every.longest.lo, every.longest.hi] }));
-  await page.evaluate(() => AddressSpace.setScope('all'));
+  await page.selectOption('#as-grid-body select', 'all');
   await page.fill('#as-look', String(REUSED));
   const ro2 = await page.evaluate(() => document.getElementById('as-readout').innerHTML);
   ok(`…on the grid, an address ${hubsAt(REUSED).length} hubs reuse is in use in each, not held by two (${REUSED})`,
     ro2.includes(`in use in ${hubsAt(REUSED).length} hubs`) && !/txt-bad/.test(ro2), ro2.slice(0, 300));
-  ok('…the grid and the wheel each keep their own', (await page.evaluate(() => AddressSpace.state().wheelScope)) === 'hub:brisbane');
-  await page.evaluate(() => AddressSpace.setWheelScope('all'));
+  ok('…Show set on the grid sets the wheel too', (await page.evaluate(() => document.querySelector('#as-wheel-body select').value)) === 'all');
   const chip2 = await page.evaluate(() => ({ scope: document.querySelector('#as-wheel-body select').value, grid: AddressSpace.state().scope, lo: Number((document.querySelector('.as-gaps .pill') || {}).dataset?.lo) }));
   ok('…on the wheel, its biggest gap the one nobody anywhere is on', chip2.scope === 'all' && chip2.grid === 'all' && chip2.lo === eLong.lo, J(chip2));
   const W2 = Array.from({ length: 82 }, (_, i) => i).find(w => new Set(REPS.filter(r => r.carried.some(a => a >= Math.max(1, w * 100) && a <= w * 100 + 99)).map(r => r.hub)).size >= 2);
@@ -381,7 +414,8 @@ try {
   const hubNames = [...new Set(st2.reps.slice(0, 8).map(x => DOC.hubs.find(h => h.id === REPS.find(r => r.id === x.id).hub).name))];
   ok(`…and the callout says each one's hub (${hubNames.join(', ')})`, hubNames.every(n => tip2.includes(`(${n})`)), tip2.slice(0, 300));
   await page.mouse.move(wbox2.x + 2, wbox2.y + 2);
-  await page.evaluate(() => { AddressSpace.setScope('hub:brisbane'); AddressSpace.setWheelScope('hub:brisbane'); });
+  await page.evaluate(() => AddressSpace.setScope('hub:brisbane'));
+  await page.fill('#pr-filter', '');
 
   // ── 4. the map ────────────────────────────────────────────────────────────
   console.log('\nThe map\n');

@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 137, date: '2026-10-28', items: [
+      'In <strong>Pass Ranges</strong>, the <strong>Address grid</strong> is as wide as its card, its squares as big as that allows.',
+      'The grid and the <strong>All addresses</strong> wheel work together: press an address on either and it goes into the filter box '
+        + 'at the top — marked on both, kept on the wheel, and the page filtered to it — and an address typed in the filter box is kept '
+        + 'on both. They show the same hub or network, so changing <strong>Show</strong> on one changes the other, and a block or a gap '
+        + 'kept on the wheel is outlined on the grid.',
+      '<strong>Allocate an ALERT address</strong> starts folded away: press its heading to open it. An <em>Allocate</em> button on '
+        + 'the wheel, the grid or the map opens it for you.',
+    ] },
     { n: 136, date: '2026-10-28', items: [
       'On ⏳ <strong>Repeater Delays</strong>, rest the pointer on a heading, a chip or a figure with a dotted underline — '
         + '<em>Apart</em>, <em>Clear</em>, <em>Readings shared</em> — and it says what that word means there. '

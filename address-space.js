@@ -1,7 +1,8 @@
 // MegaNet — address-space.js
 //
 //   AddressSpace   the Pass Ranges tab's pictures of the ALERT address space,
-//                  a card each, and its Allocate card:
+//                  a card each, and its Allocate card, folded shut until it is
+//                  opened (or a figure's Allocate opens it):
 //                    * Allocate an ALERT address — pick where a new station
 //                      will report through (a repeater, anywhere in a radio
 //                      network, or straight to a base in a hub), how many
@@ -30,12 +31,15 @@
 //                      the repeaters that carry any of it. For a hub, a radio
 //                      network, or every hub together.
 //                    * Address grid — all 8,191 addresses, a hundred to a row,
-//                      for a hub, a radio network or every hub together, each
-//                      row with how full that block of a hundred is. Point at
-//                      one to say whose it is.
-//                  On both, the addresses in the filter box — and on the grid
-//                  the one looked up — are marked in the filter matches' amber
-//                  (--hit-ring), with a ring round each that glows and fades.
+//                      as wide as its card, each row with how full that block
+//                      of a hundred is. Point at one to say whose it is.
+//                  The two show one hub, radio network or every hub together
+//                  between them, and are linked through the filter box: an
+//                  address pressed on either goes into it, and an address
+//                  typed into it is kept on both — marked in the filter
+//                  matches' amber (--hit-ring), with a ring round each that
+//                  glows and fades. A block or a gap kept on the wheel is
+//                  outlined on the grid.
 //                    * Address map — the repeaters as numbered circles: the free
 //                      addresses they carry, counted once however many of them
 //                      carry each. Circles merge as you zoom out, so the number
@@ -86,9 +90,8 @@ const AddressSpace = (() => {
     sort: 'busiest',       // busiest | fullest | freest | name
     shown: PAGE,
     only: null,            // a repeater shown on its own (from the map)
-    scope: null,           // the grid's: 'all' | 'hub:<id>' | 'net:<id>'
-    wheelScope: null,      // the wheel's, the same
-    pickAddr: null,        // the grid's picked address
+    scope: null,           // the wheel's and the grid's, one between them: 'all' | 'hub:<id>' | 'net:<id>'
+    boxAddr: null,         // the filter box's address, as last followed onto the wheel
     hoverAddr: null,
     wheelSel: null,        // the wheel's kept stretch: { lo, hi, wedge } or { lo, hi, gap }
     wheelHover: null,      // the wedge pointed at
@@ -97,10 +100,12 @@ const AddressSpace = (() => {
     mapCount: 'free',      // free | use | alloc
     hubLines: true,
     alloc: { phase: 'idle', rows: [], err: '' },   // idle | loading | ready | signedout | denied | missing | error
+    allocOpen: false,      // the Allocate card, folded shut until somebody opens it
     form: { where: '', count: 2, first: '', purpose: '', station: '' },
     busy: false,
     msg: null,             // { ok, text }
     map: null, layer: null, hubLayer: null, hubData: null, fitted: false,
+    ro: null,              // redraws the grid and the wheel when their cards change width
     idx: null, idxKey: null, idxData: null, idxRows: null,
   };
 
@@ -314,6 +319,39 @@ const AddressSpace = (() => {
     if (typeof prepareSearch !== 'function' || typeof state === 'undefined' || !state.prFilter) return [];
     try { return prepareSearch(state.prFilter).nums.map(Number).filter(a => a >= 1 && a <= MAX); } catch (_) { return []; }
   }
+  // The address the grid and the wheel keep: the filter box's, when it holds
+  // one address and nothing else.
+  function picked() {
+    if (typeof prepareSearch !== 'function' || typeof state === 'undefined' || !state.prFilter) return null;
+    try {
+      const p = prepareSearch(state.prFilter), a = Number(p.nums[0]);
+      return p.terms.length === 1 && p.nums.length === 1 && !p.ranges.length && a >= 1 && a <= MAX ? a : null;
+    } catch (_) { return null; }
+  }
+  // An address pressed on the grid or the wheel, or typed into the grid's
+  // Address: into the filter box at the top, which marks it on both, keeps it
+  // on the wheel and filters the page to it, as typing it there would. null
+  // takes the box's address back out (only was, when it is given), and leaves
+  // anything else typed there alone. Whether the box was written.
+  function pick(a, was) {
+    const now = picked();
+    if (a == null && (now == null || (was != null && now !== was))) return false;
+    const text = a == null ? '' : String(a);
+    const box = document.getElementById('pr-filter');
+    if (box) box.value = text;
+    if (typeof onPassRangeFilter === 'function') onPassRangeFilter(text);
+    else { if (typeof state !== 'undefined') state.prFilter = text; onFilter(); }
+    return true;
+  }
+  // The box's address followed onto the wheel: kept there when it changes,
+  // let go there when it leaves the box.
+  function follow() {
+    const a = picked(), was = S.boxAddr;
+    if (a === was) return;
+    S.boxAddr = a;
+    if (a != null) S.wheelSel = keepAt(a);
+    else if (S.wheelSel && S.wheelSel.addr != null && S.wheelSel.addr === was) S.wheelSel = null;
+  }
 
   // The address space a scope's ranges cover, squeezed as Signal Routes
   // squeezes a repeater's (rulerHtml there): each run of carried addresses a
@@ -488,19 +526,17 @@ const AddressSpace = (() => {
 
   // ── The address grid ──────────────────────────────────────────────────────
 
-  // The grid's and the wheel's scope, each its own: the hub with the most
-  // repeaters until another is picked.
-  function pickScope(I, key) {
-    let sc = S[key] && I.scopes.get(S[key]);
+  // The wheel's and the grid's scope, one between them so the two always
+  // show the same: the hub with the most repeaters until another is picked.
+  function shownScope(I) {
+    let sc = S.scope && I.scopes.get(S.scope);
     if (!sc || sc.kind === 'rep') {
       const h = I.hubList.slice().sort((a, b) => I.reps.filter(r => r.hub === b).length - I.reps.filter(r => r.hub === a).length)[0];
       sc = I.scopes.get('hub:' + h) || I.groups[0];
-      S[key] = sc ? sc.id : null;
+      S.scope = sc ? sc.id : null;
     }
     return sc;
   }
-  function gridScope(I) { return pickScope(I, 'scope'); }
-  function wheelScope(I) { return pickScope(I, 'wheelScope'); }
 
   function blockRows(I, sc) {
     const out = [];
@@ -524,10 +560,11 @@ const AddressSpace = (() => {
     return out;
   }
 
-  // The grid's and the wheel's Show: every hub together, a hub, a network.
-  function scopeSelectHtml(I, sc, setter) {
+  // The wheel's and the grid's Show: every hub together, a hub, a network.
+  // Either sets both.
+  function scopeSelectHtml(I, sc) {
     const opt = s => `<option value="${escAttr(s.id)}"${s.id === sc.id ? ' selected' : ''}>${esc(s.name)}</option>`;
-    return `<label>Show <select onchange="AddressSpace.${setter}(this.value)">
+    return `<label>Show <select onchange="AddressSpace.setScope(this.value)">
           <optgroup label="All hubs — an address in use in any of them">${opt(I.scopes.get('all'))}</optgroup>
           <optgroup label="Hubs — every address">${I.hubList.map(h => opt(I.scopes.get('hub:' + h))).join('')}</optgroup>
           <optgroup label="Radio networks — the addresses their repeaters carry">${I.groups.map(opt).join('')}</optgroup>
@@ -556,18 +593,20 @@ const AddressSpace = (() => {
   }
 
   function gridHtml(I) {
-    const sc = gridScope(I);
+    const sc = shownScope(I);
     if (!sc) return '<p class="small">No hub or radio network to draw.</p>';
     const t = tally(I, sc), all = whole(sc);
     const blocks = blockRows(I, sc);
     return `<div class="control-row as-controls">
-        ${scopeSelectHtml(I, sc, 'setScope')}
-        <label>Address <input type="number" id="as-look" class="field-num" min="1" max="${MAX}" inputmode="numeric" value="${S.pickAddr ?? ''}"
+        ${scopeSelectHtml(I, sc)}
+        <label>Address <input type="number" id="as-look" class="field-num" min="1" max="${MAX}" inputmode="numeric" value="${picked() ?? ''}"
           oninput="AddressSpace.lookup(this.value)" placeholder="5740"></label>
       </div>
       <p class="small">${esc(captionText(I, sc))}. A row is a block of a hundred — 4000 to 4099 — and the bar at its end how much of the block is taken${all ? '' : ' of what the network carries in it'}.
-        Point at an address to see whose it is; pick a free one to allocate it.</p>
-      <p class="small sr-keys">${statusKeysHtml(sc)}<span class="sr-key"><span class="as-hit-sw" aria-hidden="true"></span>looked up, or in the filter box</span></p>
+        Point at an address to see whose it is. Press one, or type it in Address, and it goes into the filter box at the top: marked here and on the
+        All addresses wheel, and the rest of the page filtered to it. Pick a free one to allocate it. The wheel and the grid show the same hub or network
+        — change Show on either and both follow — and a block or a gap kept on the wheel is outlined here.</p>
+      <p class="small sr-keys">${statusKeysHtml(sc)}<span class="sr-key"><span class="as-hit-sw" aria-hidden="true"></span>in the filter box</span></p>
       <div class="chart-scroll as-grid-wrap" role="region" tabindex="0" aria-label="${escAttr(`${sc.name}: the address grid — scroll sideways for the whole of it`)}">
         <div class="as-grid-box">
           <canvas id="as-grid" role="img" aria-label="${escAttr(`Every ALERT address in ${sc.name}, a hundred to a row. ${captionText(I, sc)}. The table under the grid holds the same, block by block.`)}"
@@ -575,7 +614,7 @@ const AddressSpace = (() => {
           <div id="as-grid-pins" class="as-pins" aria-hidden="true"></div>
         </div>
       </div>
-      <div id="as-readout" class="small as-readout" aria-live="polite">${readoutHtml(I, sc, S.pickAddr)}</div>
+      <div id="as-readout" class="small as-readout" aria-live="polite">${gridOutHtml(I, sc)}</div>
       <details class="sr-fold"><summary>Block by block — the same as a table</summary>
         <div class="table-wrap tall" role="region" tabindex="0" aria-label="${escAttr(`${sc.name}, block by block`)}">
         <table class="hl-table"><caption class="sr-only">${esc(sc.name)}: each block of a hundred addresses, how many ${all ? 'are' : 'the network carries,'} in use, set aside and free</caption>
@@ -615,6 +654,14 @@ const AddressSpace = (() => {
     return `<b>${a}</b> — ${what} · ${carriers}${sc.kind === 'net' && !sc.set.has(a) ? ' · outside this network\'s ranges' : ''}`;
   }
 
+  // Under the grid: the address pointed at, else the filter box's — the one
+  // it holds, or the first few of a list.
+  function gridOutHtml(I, sc) {
+    const a = S.hoverAddr ?? picked(), ids = searchIds();
+    if (a != null || !ids.length) return readoutHtml(I, sc, a);
+    return `<span class="as-hit-sw" aria-hidden="true"></span>In the filter box: ${ids.slice(0, 3).map(x => readoutHtml(I, sc, x)).join('; ')}${ids.length > 3 ? `; and ${num(ids.length - 3)} more` : ''}`;
+  }
+
   let GRID = null;   // the drawn grid's geometry, for pointing at it
 
   function cssColour(name, dflt) {
@@ -633,26 +680,37 @@ const AddressSpace = (() => {
     const cv = document.getElementById('as-grid');
     const I = index();
     if (!cv || !I) return;
-    const sc = gridScope(I);
-    const wrap = cv.parentElement;
-    const avail = Math.max(320, (wrap && wrap.clientWidth) || 760);
-    const LAB = 40, BAR = 60, PADR = 34, TOP = 14, GAP = 6;
-    const cell = Math.max(4, Math.min(9, Math.floor((avail - LAB - BAR - PADR - 2 * GAP) / ROW)));
+    const sc = shownScope(I);
+    // As wide as the card. The cells as big as the width allows and square,
+    // so the grid grows taller with them; the type and the margins grow with
+    // the cells, and the bars at the rows' ends take what whole cells leave
+    // over. Measured on the scroller: the box round the canvas is only as
+    // wide as the last drawing, which held the grid at its first width.
+    const wrap = cv.closest('.as-grid-wrap');
+    const avail = Math.max(320, Math.floor((wrap && wrap.getBoundingClientRect().width) || 760));
+    const GAP = 6, BAR0 = 60;
+    const fit = (lab, padr) => Math.max(4, Math.floor((avail - lab - GAP - GAP - BAR0 - padr) / ROW));
+    const fs = Math.max(9, Math.min(13, Math.round(fit(40, 34) * 0.85))), font = `${fs}px system-ui, sans-serif`;
+    const g = cv.getContext('2d');
+    g.font = font;
+    const LAB = Math.max(40, Math.ceil(g.measureText('8000').width) + 10), PADR = Math.max(34, Math.ceil(g.measureText('100%').width) + 8);
+    const cell = fit(LAB, PADR);
+    const BAR = Math.max(BAR0, avail - (LAB + GAP + cell * ROW + GAP + PADR));
     const W = LAB + GAP + cell * ROW + GAP + BAR + PADR;
-    const yOf = r => TOP + r * cell + Math.floor(r / 10) * 3;
+    const TOP = fs + 5, RG = Math.max(3, Math.round(cell / 4));
+    const yOf = r => TOP + r * cell + Math.floor(r / 10) * RG;
     const H = yOf(ROWS) + 4;
     const dpr = window.devicePixelRatio || 1;
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     cv.style.setProperty('--gw', W + 'px'); cv.style.setProperty('--gh', H + 'px');
-    const g = cv.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);
     const col = cellColours();
     const text = cssColour('--muted', '#7a8794'), ink = cssColour('--text', '#16202a');
-    const inner = cell >= 5 ? cell - 1 : cell;
-    g.font = '9px system-ui, sans-serif';
+    const inner = cell - (cell >= 12 ? 2 : cell >= 5 ? 1 : 0);
+    g.font = font;
     g.fillStyle = text; g.textBaseline = 'middle';
-    for (let c = 0; c < ROW; c += 10) g.fillText(String(c).padStart(2, '0'), LAB + GAP + c * cell, 6);
+    for (let c = 0; c < ROW; c += 10) g.fillText(String(c).padStart(2, '0'), LAB + GAP + c * cell, Math.round(TOP / 2) - 1);
     const blocks = blockRows(I, sc);
     for (let r = 0; r < ROWS; r++) {
       const y = yOf(r);
@@ -673,19 +731,35 @@ const AddressSpace = (() => {
         const wu = (bw * b.use) / b.den, wa = (bw * b.alloc) / b.den;
         g.globalAlpha = 1; g.fillStyle = col.use[0]; g.fillRect(bx, y, wu, inner);
         g.fillStyle = col.alloc[0]; g.fillRect(bx + wu, y, wa, inner);
-        if (cell >= 6) { g.fillStyle = text; g.fillText(`${pct(b.use + b.alloc, b.den)}%`, bx + bw + 4, y + cell / 2); }
+        if (cell >= 8) { g.fillStyle = text; g.fillText(`${pct(b.use + b.alloc, b.den)}%`, bx + bw + 4, y + cell / 2); }
       }
     }
-    // The pointed-at in a hairline of ink; the looked-up and those in the
-    // filter box in the filter matches' amber, cased in the ink so it holds on
-    // either theme, each with a mark in the margin by its row and over its
-    // column, and a ring over the canvas that glows and fades (.as-pin).
+    // The pointed-at in a hairline of ink, and the block or the gap kept on
+    // the wheel outlined in ink a row at a time; those in the filter box in
+    // the filter matches' amber, cased in the ink so it holds on either
+    // theme, each with a mark in the margin by its row and over its column,
+    // and a ring over the canvas that glows and fades (.as-pin).
     g.globalAlpha = 1;
     const at = a => (a == null || a < 1 || a > MAX ? null : { x: LAB + GAP + (a % ROW) * cell, y: yOf(Math.floor(a / ROW)) });
     const hov = at(S.hoverAddr);
     if (hov) { g.strokeStyle = ink; g.lineWidth = 1; g.strokeRect(hov.x - 1, hov.y - 1, inner + 2, inner + 2); }
+    const s = S.wheelSel;
+    if (s && s.addr == null) {
+      // One outline round the stretch: its first row from where it starts,
+      // its last to where it ends, every row between whole.
+      const r0 = Math.floor(s.lo / ROW), r1 = Math.min(ROWS - 1, Math.floor(s.hi / ROW)), c0 = s.lo - r0 * ROW, c1 = Math.min(s.hi, r1 * ROW + ROW - 1) - r1 * ROW;
+      const xl = c => LAB + GAP + c * cell - 1.5, xr = c => LAB + GAP + c * cell + inner + 1.5, yt = r => yOf(r) - 1.5, yb = r => yOf(r) + inner + 1.5;
+      g.strokeStyle = ink; g.lineWidth = 1.5;
+      g.beginPath();
+      if (r0 === r1) g.rect(xl(c0), yt(r0), xr(c1) - xl(c0), yb(r0) - yt(r0));
+      else {
+        g.moveTo(xl(c0), yt(r0)); g.lineTo(xr(ROW - 1), yt(r0)); g.lineTo(xr(ROW - 1), yb(r1 - 1)); g.lineTo(xr(c1), yb(r1 - 1));
+        g.lineTo(xr(c1), yb(r1)); g.lineTo(xl(0), yb(r1)); g.lineTo(xl(0), yt(r0 + 1)); g.lineTo(xl(c0), yt(r0 + 1)); g.closePath();
+      }
+      g.stroke();
+    }
     const hit = cssColour('--hit-ring', '#e8a000'), cas = cssColour('--map-leader-ink', '#1d1402');
-    const marked = [...new Set([S.pickAddr, ...searchIds()])].filter(a => at(a));
+    const marked = searchIds();
     g.lineJoin = 'round';
     marked.slice(0, 200).forEach(a => {
       const p = at(a), mx = p.x + inner / 2;
@@ -700,7 +774,7 @@ const AddressSpace = (() => {
       pins.dataset.pins = key;
       pins.innerHTML = marked.slice(0, 12).map(a => { const p = at(a); return `<span class="as-pin is-cell" style="--x:${p.x + inner / 2}px;--y:${p.y + inner / 2}px;--s:${inner + 14}px"></span>`; }).join('');
     }
-    GRID = { LAB, GAP, cell, yOf, sc: sc.id };
+    GRID = { LAB, GAP, cell, yOf, TOP, RG, W, H, avail, sc: sc.id };
   }
 
   function gridAddr(ev) {
@@ -719,23 +793,27 @@ const AddressSpace = (() => {
     const a = gridAddr(ev);
     if (a === S.hoverAddr) return;
     S.hoverAddr = a;
-    const I = index(), out = document.getElementById('as-readout');
-    if (out && I) out.innerHTML = readoutHtml(I, gridScope(I), a ?? S.pickAddr);
+    showGridOut();
     drawGrid();
   }
+  function showGridOut() {
+    const I = index(), out = document.getElementById('as-readout');
+    if (out && I) out.innerHTML = gridOutHtml(I, shownScope(I));
+  }
+  // An address pressed on the grid is looked up: into the filter box, and
+  // kept on the wheel.
   function gridClick(ev) {
     const a = gridAddr(ev);
-    if (a == null) return;
-    lookup(a);
-    const look = document.getElementById('as-look');
-    if (look) look.value = a;
+    if (a != null) pick(a);
   }
+  // The grid's Address, typed: into the filter box the same, and emptied,
+  // the box's address taken back out. A number that is no ALERT address is
+  // said to be so here and left out of the box.
   function lookup(v) {
     const a = v === '' || v == null ? null : Math.round(Number(v));
-    S.pickAddr = Number.isFinite(a) ? a : null;
+    if (a == null || (a >= 1 && a <= MAX)) { pick(a); return; }
     const I = index(), out = document.getElementById('as-readout');
-    if (out && I) out.innerHTML = readoutHtml(I, gridScope(I), S.pickAddr);
-    drawGrid();
+    if (out && I) out.innerHTML = readoutHtml(I, shownScope(I), a);
   }
 
   // ── All addresses: the wheel ──────────────────────────────────────────────
@@ -858,19 +936,20 @@ const AddressSpace = (() => {
   }
 
   function wheelHtml(I) {
-    const sc = wheelScope(I);
+    const sc = shownScope(I);
     if (!sc) return '<p class="small">No hub or radio network to draw.</p>';
     const every = sc.kind === 'all', hub = whole(sc);
     const t = tally(I, sc), W = wedges(I, sc);
     const gaps = t.runs.slice().sort((a, b) => (b.n - a.n) || (a.lo - b.lo)).slice(0, 10);
     const sel = S.wheelSel;
     return `<div class="control-row as-controls">
-        ${scopeSelectHtml(I, sc, 'setWheelScope')}
+        ${scopeSelectHtml(I, sc)}
       </div>
       <p class="small">${esc(captionText(I, sc))}. Every address, from 1 at the top clockwise to ${num(MAX)}; a wedge is a block of a hundred, a row
         of the address grid. ${every ? `The hubs reuse addresses, so here an address is in use when a station in any of the ${num(sc.hubs.length)} hubs holds it, shaded
         by how many do, and free only when none does — the gaps are the addresses nobody anywhere is on. ` : ''}Point at the outer two rings to go address by address,
-        at the inner bars for a block; press to keep it here. An address typed in the filter box is marked in amber, with a ring that glows.</p>
+        at the inner bars for a block; press to keep it here. An address pressed goes into the filter box at the top, and onto the address grid; one typed
+        there is kept here, marked in amber with a ring that glows. The wheel and the grid show the same hub or network — change Show on either and both follow.</p>
       ${ringKeyHtml(sc)}
       <div class="as-wheel-wrap">
         <div class="as-wheel-box">
@@ -900,13 +979,15 @@ const AddressSpace = (() => {
     if (!s) return null;
     return s.wedge != null ? wedges(I, sc)[s.wedge] : Object.assign(stretch(I, sc, s.lo, s.hi), { gap: true });
   }
-  // Under the wheel: the address kept, if one is, then its stretch; and
-  // whatever is in the filter box, said in the grid's words.
+  // Under the wheel: the address kept, if one is — the filter box's, when
+  // it holds one — then its stretch; and whatever else is in the filter box,
+  // said in the grid's words.
   function wheelReadoutHtml(I, sc) {
-    const s = S.wheelSel, c = selStretch(I, sc), ids = searchIds();
+    const s = S.wheelSel, c = selStretch(I, sc), all = searchIds(), ids = all.filter(a => !(s && s.addr === a));
     const hits = ids.length ? `<p class="as-hit-line"><span class="as-hit-sw" aria-hidden="true"></span>In the filter box: ${ids.slice(0, 3).map(a => readoutHtml(I, sc, a)).join('; ')}${ids.length > 3 ? `; and ${num(ids.length - 3)} more` : ''}</p>` : '';
-    if (!c) return `<p>Point at the outer two rings to go address by address, or at the inner bars for a block of a hundred; press one — or a gap below — to keep it here. With the wheel focused, the arrow keys step a block at a time, and with Shift an address.</p>${hits}`;
-    const one = s.addr != null ? `<p>${readoutHtml(I, sc, s.addr)} · <button type="button" class="link-btn" onclick="AddressSpace.toGrid(${s.addr})">On the address grid</button></p>` : '';
+    if (!c) return `<p>Point at the outer two rings to go address by address, or at the inner bars for a block of a hundred; press one — or a gap below — to keep it here. An address pressed goes into the filter box, and onto the address grid. With the wheel focused, the arrow keys step a block at a time, and with Shift an address.</p>${hits}`;
+    const box = s.addr != null && all.includes(s.addr) ? '<span class="as-hit-sw" aria-hidden="true"></span>In the filter box: ' : '';
+    const one = s.addr != null ? `<p${box ? ' class="as-hit-line"' : ''}>${box}${readoutHtml(I, sc, s.addr)} · <button type="button" class="link-btn" onclick="AddressSpace.toGrid(${s.addr})">On the address grid</button></p>` : '';
     // A wedge kept, its block drawn wide enough to press any one address of.
     const pick = s.wedge != null ? `<div class="as-strip as-strip-pick"><p class="small">Press an address in the block to keep it:</p>${stripHtml(I, sc, Math.max(1, s.lo), false, s.addr, true)}</div>` : '';
     return `${one}${pick}${stretchHtml(I, sc, c, true)}${hits}`;
@@ -932,7 +1013,7 @@ const AddressSpace = (() => {
     if (!box || !box.width) return;
     const a = Math.max(1, Math.min(MAX, b0 + Math.min(ROW - 1, Math.floor(((ev.clientX - box.left) / box.width) * ROW))));
     S.wheelSel = keepAt(a);
-    showPick();
+    pick(a);
   }
 
   // An address on one of the wheel's outer two rings: what the grid says of
@@ -1082,7 +1163,7 @@ const AddressSpace = (() => {
     const cv = document.getElementById('as-wheel');
     const I = index();
     if (!cv || !I) return;
-    const sc = wheelScope(I);
+    const sc = shownScope(I);
     const body = document.getElementById('as-wheel-body');
     // As wide as the card, up to 1,240 px across.
     const D = Math.round(Math.max(240, Math.min(1240, (body && body.clientWidth) || 560)));
@@ -1165,7 +1246,7 @@ const AddressSpace = (() => {
     const tip = document.getElementById('as-wheel-tip');
     if (w !== S.wheelHover || ring !== S.wheelRing || a !== S.wheelAddr) {
       S.wheelHover = w; S.wheelRing = ring; S.wheelAddr = a;
-      const I = index(), sc = I && wheelScope(I);
+      const I = index(), sc = I && shownScope(I);
       if (tip && sc && w != null) {
         tip.innerHTML = a != null ? addrTipHtml(I, sc, a, ring)
           : `<p class="as-tip-ring">Inner bars — how much of each block is taken</p>${stretchHtml(I, sc, wedges(I, sc)[w], false)}`;
@@ -1184,22 +1265,27 @@ const AddressSpace = (() => {
     tip.style.setProperty('--tip-x', `${Math.round(left)}px`);
     tip.style.setProperty('--tip-y', `${Math.round(top)}px`);
   }
+  // What is kept, said under the wheel and drawn on it, and on the grid,
+  // which outlines a block or a gap kept.
   function showPick() {
     const I = index(), out = document.getElementById('as-wheel-out');
-    if (out && I) out.innerHTML = wheelReadoutHtml(I, wheelScope(I));
+    if (out && I) out.innerHTML = wheelReadoutHtml(I, shownScope(I));
     const s = S.wheelSel;
     document.querySelectorAll('.as-gaps .pill').forEach(b => b.setAttribute('aria-pressed', String(!!(s && s.gap && Number(b.dataset.lo) === s.lo))));
     drawWheel(true);
+    drawGrid();
   }
   // A wedge pressed is kept, and pressed again let go; on the outer two
-  // rings, the address pressed is kept with its wedge.
+  // rings, the address pressed is kept with its wedge and goes into the
+  // filter box, and pressed again comes back out of it.
   const keepAt = (a, w = Math.floor(a / ROW)) => ({ lo: w * ROW, hi: w * ROW + ROW - 1, wedge: w, addr: a });
   function wheelClick(ev) {
     const p = wheelAt(ev);
     if (!p) return;
     const a = p.ring === 'block' ? null : p.a, s = S.wheelSel;
-    S.wheelSel = s && s.wedge === p.w && (s.addr ?? null) === a ? null : keepAt(a, p.w);
-    showPick();
+    const off = !!(s && s.wedge === p.w && (s.addr ?? null) === a);
+    S.wheelSel = off ? null : keepAt(a, p.w);
+    if (!(a != null && pick(off ? null : a, a))) showPick();
   }
   function wheelPick(lo, hi) {
     S.wheelSel = lo == null ? null : { lo: Number(lo), hi: Number(hi ?? lo), gap: true };
@@ -1214,7 +1300,7 @@ const AddressSpace = (() => {
       ev.preventDefault();
       const a = s && s.addr != null ? (fwd ? (s.addr % MAX) + 1 : ((s.addr + MAX - 2) % MAX) + 1) : s ? Math.max(1, s.lo) : fwd ? 1 : MAX;
       S.wheelSel = keepAt(a);
-      showPick();
+      pick(a);
       return;
     }
     let w;
@@ -1225,14 +1311,15 @@ const AddressSpace = (() => {
     else if (ev.key === 'Escape' && s) w = null;
     else return;
     ev.preventDefault();
+    // Escape lets go, and takes a kept address back out of the filter box.
     S.wheelSel = w == null ? null : keepAt(null, w);
-    showPick();
+    if (!(w == null && s.addr != null && pick(null, s.addr))) showPick();
   }
-  // From the wheel's readout: the same address on the grid, in the wheel's
-  // scope, and the grid brought into view.
+  // From the wheel's readout: the same address looked up on the grid (into
+  // the filter box), and the grid brought into view.
   function toGrid(a) {
-    S.scope = S.wheelScope; S.pickAddr = a; S.hoverAddr = null;
-    refreshGrid();
+    S.hoverAddr = null;
+    pick(a);
     scrollTo('as-grid-card');
   }
 
@@ -1269,7 +1356,7 @@ const AddressSpace = (() => {
     S.map = null; S.layer = null; S.hubLayer = null;
   }
   function initMap() {
-    if (typeof registerTabTeardown === 'function') registerTabTeardown('AddressSpace', stopMap);
+    if (typeof registerTabTeardown === 'function') registerTabTeardown('AddressSpace', stop);
     stopMap();
     const el = document.getElementById('as-map');
     if (!el || typeof L === 'undefined' || !index()) return;
@@ -1384,6 +1471,7 @@ const AddressSpace = (() => {
     return fn(I);
   }
   function panelHtml() {
+    follow();
     return cardHtml('wheel', 'All addresses', 'every ALERT address round one wheel — where the gaps are', bodyOr(wheelHtml))
       + cardHtml('grid', 'Address grid', 'every ALERT address, a hundred to a row', bodyOr(gridHtml))
       + cardHtml('map', 'Address map', 'what each region has left', bodyOr(mapHtml))
@@ -1424,9 +1512,11 @@ const AddressSpace = (() => {
 
   // ── The Allocate card ─────────────────────────────────────────────────────
 
+  // Folded shut until somebody opens it, or a figure's Allocate opens it
+  // (allocateIn); open or shut, it stays so while the tab is redrawn.
   function allocHtml() {
-    return `<div class="panel as-alloc" id="as-alloc">
-        <div class="panel-header"><h2 id="as-alloc-h">Allocate an ALERT address</h2><span class="small">set addresses aside for a new station</span></div>
+    return `<details class="panel as-alloc" id="as-alloc"${S.allocOpen ? ' open' : ''} ontoggle="AddressSpace.allocToggle(this.open)">
+        <summary class="panel-header"><h2 id="as-alloc-h">Allocate an ALERT address</h2><span class="small">set addresses aside for a new station</span></summary>
         <p class="small">Pick where the new station will report through, how many addresses it needs — a rain gauge is usually two, its rainfall and its
           battery — and what they are for. The card suggests the smallest free run that fits, keeping big blocks for stations that need them; type a first
           address to choose your own. <b>Free</b> means no station in the hub holds it and nobody has set it aside. Setting one aside puts it in the
@@ -1444,8 +1534,9 @@ const AddressSpace = (() => {
         <p id="as-msg" class="small" role="status">${S.msg ? `<span class="${S.msg.ok ? 'txt-ok' : 'txt-bad'}">${esc(S.msg.text)}</span>` : ''}</p>
         <h3 class="sr-sub" id="as-list-h">Set aside</h3>
         <div id="as-list">${listHtml()}</div>
-      </div>`;
+      </details>`;
   }
+  function allocToggle(open) { S.allocOpen = !!open; }
 
   function whereOptions() {
     const I = index();
@@ -1612,7 +1703,7 @@ const AddressSpace = (() => {
   }
 
   // From a figure, the map or the grid: the card set to a place (and an
-  // address), and brought into view.
+  // address), opened, and brought into view.
   function allocateIn(where, first) {
     S.form.where = where;
     S.form.first = first == null ? '' : String(first);
@@ -1620,6 +1711,8 @@ const AddressSpace = (() => {
     S.msg = null;
     const card = document.getElementById('as-alloc');
     if (!card) return;
+    S.allocOpen = true;
+    card.open = true;
     const sel = document.getElementById('as-where');
     if (sel) { sel.innerHTML = whereOptions(); sel.value = where; }
     const f = document.getElementById('as-first'); if (f) f.value = S.form.first;
@@ -1715,26 +1808,60 @@ const AddressSpace = (() => {
   function more(all) { S.shown = all ? Infinity : S.shown + PAGE; refreshView(); }
   function showAll() { S.only = null; S.shown = PAGE; refreshView(); }
   function showRep(id) { S.only = id; setView('repeaters'); scrollTo('as-h'); }
-  function setScope(id) { S.scope = id; S.pickAddr = null; S.hoverAddr = null; refreshGrid(); }
-  function setWheelScope(id) { S.wheelScope = id; S.wheelSel = null; refreshWheel(); }
+  // Show, on the wheel or the grid: both, the filter box's address kept on
+  // the wheel in the new scope.
+  function setScope(id) {
+    S.scope = id; S.hoverAddr = null;
+    const a = picked();
+    S.wheelSel = a != null ? keepAt(a) : null;
+    refreshWheel();
+    refreshGrid();
+  }
   function setMapCount(v) { S.mapCount = ['free', 'use', 'alloc'].includes(v) ? v : 'free'; drawMap(); }
   function setHubLines(on) { S.hubLines = !!on; drawHubs(); }
   function scrollTo(id) { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
-  // The filter box changed: the repeaters drawn follow it, and the grid and
-  // the wheel mark what it searched for, the wheel's readout saying whose.
+  // The filter box changed: the repeaters drawn follow it, its address is
+  // kept on the wheel and shown in the grid's Address (unless that is being
+  // typed in), and the grid and the wheel mark what it searched for, their
+  // readouts saying whose.
   function onFilter() {
     if (S.view === 'repeaters') { S.shown = PAGE; refreshView(); }
-    drawGrid();
-    drawWheel(true);
-    const I = index(), out = document.getElementById('as-wheel-out');
-    if (out && I) out.innerHTML = wheelReadoutHtml(I, wheelScope(I));
+    follow();
+    const look = document.getElementById('as-look');
+    if (look && look !== document.activeElement) look.value = picked() ?? '';
+    showGridOut();
+    showPick();
+  }
+
+  // The wheel and the grid as wide as their cards: drawn again when a card's
+  // width changes — the window, the nav folded — and not for its height,
+  // which every readout moves.
+  function watchWidth() {
+    if (S.ro) S.ro.disconnect();
+    S.ro = null;
+    const els = ['as-wheel-body', 'as-grid-body'].map(id => document.getElementById(id)).filter(Boolean);
+    if (!els.length || typeof ResizeObserver === 'undefined') return;
+    const wide = new Map();
+    S.ro = new ResizeObserver(es => es.forEach(e => {
+      const w = Math.round(e.contentRect.width), seen = wide.has(e.target);
+      if (wide.get(e.target) === w) return;
+      wide.set(e.target, w);
+      if (!seen) return;
+      if (e.target.id === 'as-grid-body') drawGrid(); else drawWheel(true);
+    }));
+    els.forEach(el => S.ro.observe(el));
+  }
+  function stop() {
+    stopMap();
+    if (S.ro) { S.ro.disconnect(); S.ro = null; }
   }
 
   function init() {
     drawWheel();
     drawGrid();
     initMap();
+    watchWidth();
     if (!signedIn()) { S.alloc = { phase: 'signedout', rows: [], err: '' }; refreshCard(); }
     else if (S.alloc.phase !== 'ready' && S.alloc.phase !== 'loading') load();
   }
@@ -1754,7 +1881,7 @@ const AddressSpace = (() => {
   function exportCsv() {
     const I = index();
     if (!I) return;
-    const sc = gridScope(I);
+    const sc = shownScope(I);
     if (!sc) return;
     const lines = [['address', 'status', 'stations', 'station_ids', 'set_aside_for', 'set_aside_by', 'carried_by'].join(',')];
     // Every hub together, each name says its hub: the same address is a
@@ -1783,7 +1910,7 @@ const AddressSpace = (() => {
   }
 
   // For the tests and the export menu.
-  function state_() { return { view: S.view, sort: S.sort, shown: S.shown, only: S.only, scope: S.scope, wheelScope: S.wheelScope, pickAddr: S.pickAddr, alloc: S.alloc, form: { ...S.form }, msg: S.msg, map: S.map }; }
+  function state_() { return { view: S.view, sort: S.sort, shown: S.shown, only: S.only, scope: S.scope, pickAddr: picked(), allocOpen: S.allocOpen, alloc: S.alloc, form: { ...S.form }, msg: S.msg, map: S.map }; }
   function figures(id) {
     const I = index(), sc = I && I.scopes.get(id);
     return sc ? Object.assign({ id: sc.id, kind: sc.kind, name: sc.name, hubs: sc.hubs.slice() }, tally(I, sc)) : null;
@@ -1791,10 +1918,14 @@ const AddressSpace = (() => {
   function clustersAt() { const I = index(); return S.map && I ? clusters(I).map(c => ({ reps: c.reps.map(r => r.id), ...c.t })) : []; }
   // The wheel's view of a stretch of its scope, and what it keeps.
   function stretchAt(lo, hi) {
-    const I = index(), sc = I && wheelScope(I);
+    const I = index(), sc = I && shownScope(I);
     if (!sc) return null;
     const c = stretch(I, sc, lo, hi);
     return Object.assign({}, c, { reps: c.reps.map(x => ({ id: x.r.id, n: x.part.length })) });
+  }
+  // The grid as drawn: where its cells are, in CSS pixels on the canvas.
+  function grid() {
+    return GRID && { x0: GRID.LAB + GRID.GAP, top: GRID.TOP, cell: GRID.cell, rg: GRID.RG, W: GRID.W, H: GRID.H, avail: GRID.avail };
   }
   function wheel() {
     return { sel: S.wheelSel, hover: S.wheelHover, ring: S.wheelRing, addr: S.wheelAddr,
@@ -1803,9 +1934,9 @@ const AddressSpace = (() => {
 
   return {
     allocHtml, panelHtml, init, onFilter, authChanged, load,
-    setView, setSort, more, showAll, showRep, setScope, setWheelScope, setMapCount, setHubLines, scrollTo,
+    setView, setSort, more, showAll, showRep, setScope, setMapCount, setHubLines, scrollTo,
     gridHover, gridClick, lookup, wheelHover, wheelClick, wheelPick, wheelKey, stripPick, toGrid,
-    formChanged, useRun, allocateIn, allocate, release,
-    exportCsv, exportAllocCsv, state: state_, index, figures, plan, clusters: clustersAt, bestFit, stretch: stretchAt, wheel,
+    allocToggle, formChanged, useRun, allocateIn, allocate, release,
+    exportCsv, exportAllocCsv, state: state_, index, figures, plan, clusters: clustersAt, bestFit, stretch: stretchAt, grid, wheel,
   };
 })();
