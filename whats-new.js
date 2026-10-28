@@ -25,6 +25,17 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 135, date: '2026-10-28', items: [
+      'In <strong>Pass Ranges</strong>, the <strong>All addresses</strong> wheel is twice the size — as wide as its card — with a key '
+        + 'over it saying what each of its three rings is: the <strong>outer ring</strong> each address and who holds it, the '
+        + '<strong>middle ring</strong> how many repeaters pass each address on, and the <strong>inner bars</strong> how full each '
+        + 'block of a hundred is — and what the outer two mean read together.',
+      'Point at the wheel\'s outer two rings and it goes <strong>address by address</strong>: the callout names the station on it and '
+        + 'draws its block of a hundred a cell an address. Press to keep one; under the wheel, press any address in that block, or '
+        + 'use Shift and the arrow keys, to step one at a time.',
+      'An address typed in the filter box is marked in amber on the wheel and the <strong>Address grid</strong>, with a ring round it '
+        + 'that glows and fades and its number beside it on the wheel — and the address you look up on the grid is marked the same way.',
+    ] },
     { n: 134, date: '2026-10-28', items: [
       'New under <strong>Stations &amp; networks</strong>: ⏳ <strong>Repeater Delays</strong> — what each repeater\'s delay '
         + 'should be, so repeaters relaying the same reading stop sending their copies on top of each other (the collisions '

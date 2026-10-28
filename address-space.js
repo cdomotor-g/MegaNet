@@ -23,13 +23,19 @@
 //                    * All addresses — the 8,191 addresses round one wheel, 1 at
 //                      the top and clockwise, a wedge a block of a hundred: each
 //                      address to scale, how many repeaters carry it, and how
-//                      full each block is, so a gap shows as a gap. Point at a
-//                      wedge for the repeaters that carry any of it. For a hub,
-//                      a radio network, or every hub together.
+//                      full each block is, so a gap shows as a gap. The two
+//                      outer rings are pointed at address by address, the
+//                      callout drawing that address's block of a hundred one
+//                      cell an address; the inner bars a block at a time, for
+//                      the repeaters that carry any of it. For a hub, a radio
+//                      network, or every hub together.
 //                    * Address grid — all 8,191 addresses, a hundred to a row,
 //                      for a hub, a radio network or every hub together, each
 //                      row with how full that block of a hundred is. Point at
 //                      one to say whose it is.
+//                  On both, the addresses in the filter box — and on the grid
+//                  the one looked up — are marked in the filter matches' amber
+//                  (--hit-ring), with a ring round each that glows and fades.
 //                    * Address map — the repeaters as numbered circles: the free
 //                      addresses they carry, counted once however many of them
 //                      carry each. Circles merge as you zoom out, so the number
@@ -86,6 +92,8 @@ const AddressSpace = (() => {
     hoverAddr: null,
     wheelSel: null,        // the wheel's kept stretch: { lo, hi, wedge } or { lo, hi, gap }
     wheelHover: null,      // the wedge pointed at
+    wheelRing: null,       // the ring it is pointed at on: addr | cover | block
+    wheelAddr: null,       // on the outer two, the address pointed at
     mapCount: 'free',      // free | use | alloc
     hubLines: true,
     alloc: { phase: 'idle', rows: [], err: '' },   // idle | loading | ready | signedout | denied | missing | error
@@ -559,10 +567,13 @@ const AddressSpace = (() => {
       </div>
       <p class="small">${esc(captionText(I, sc))}. A row is a block of a hundred — 4000 to 4099 — and the bar at its end how much of the block is taken${all ? '' : ' of what the network carries in it'}.
         Point at an address to see whose it is; pick a free one to allocate it.</p>
-      <p class="small sr-keys">${statusKeysHtml(sc)}</p>
+      <p class="small sr-keys">${statusKeysHtml(sc)}<span class="sr-key"><span class="as-hit-sw" aria-hidden="true"></span>looked up, or in the filter box</span></p>
       <div class="chart-scroll as-grid-wrap" role="region" tabindex="0" aria-label="${escAttr(`${sc.name}: the address grid — scroll sideways for the whole of it`)}">
-        <canvas id="as-grid" role="img" aria-label="${escAttr(`Every ALERT address in ${sc.name}, a hundred to a row. ${captionText(I, sc)}. The table under the grid holds the same, block by block.`)}"
-          onmousemove="AddressSpace.gridHover(event)" onmouseleave="AddressSpace.gridHover(null)" onclick="AddressSpace.gridClick(event)"></canvas>
+        <div class="as-grid-box">
+          <canvas id="as-grid" role="img" aria-label="${escAttr(`Every ALERT address in ${sc.name}, a hundred to a row. ${captionText(I, sc)}. The table under the grid holds the same, block by block.`)}"
+            onmousemove="AddressSpace.gridHover(event)" onmouseleave="AddressSpace.gridHover(null)" onclick="AddressSpace.gridClick(event)"></canvas>
+          <div id="as-grid-pins" class="as-pins" aria-hidden="true"></div>
+        </div>
       </div>
       <div id="as-readout" class="small as-readout" aria-live="polite">${readoutHtml(I, sc, S.pickAddr)}</div>
       <details class="sr-fold"><summary>Block by block — the same as a table</summary>
@@ -575,8 +586,9 @@ const AddressSpace = (() => {
             <td class="num">${pct(b.use + b.alloc, b.den)}%</td></tr>`).join('')}</tbody></table></div></details>`;
   }
 
-  // What one address is, in a scope, and what can be done with it.
-  function readoutHtml(I, sc, a) {
+  // What one address is, in a scope, and what can be done with it. Plain, for
+  // a callout the pointer cannot reach into: the same words, no buttons.
+  function readoutHtml(I, sc, a, plain) {
     if (a == null || !sc) return 'Point at an address, or type one above.';
     if (!(a >= 1 && a <= MAX)) return `${esc(String(a))} is not an ALERT address — they run from 1 to ${num(MAX)}.`;
     const hs = holders(I, sc.hubs, a), al = allocOf(I, sc.hubs, a), every = sc.kind === 'all';
@@ -584,7 +596,7 @@ const AddressSpace = (() => {
     const repName = r => esc(every ? `${r.name} (${hubName(I, r.hub)})` : r.name);
     const carriers = by.length ? `carried by ${by.map(repName).join(', ')}`
       : every ? 'no repeater carries it' : `no repeater in ${esc(sc.hubs.map(h => hubName(I, h)).join(' or '))} carries it`;
-    const open = s => (typeof goToStation === 'function'
+    const open = s => (!plain && typeof goToStation === 'function'
       ? `<button type="button" class="link-btn" onclick="goToStation(${escAttr(JSON.stringify(s.id))})">${esc(s.name)}</button>` : esc(s.name));
     let what;
     if (every && hs.length) {
@@ -598,7 +610,7 @@ const AddressSpace = (() => {
       // Every hub together, an address is allocated in a hub: through the
       // repeater that carries it, or not offered here.
       const where = by.length ? 'rep:' + by[0].id : sc.kind === 'hub' ? sc.id : every ? null : 'hub:' + sc.hubs[0];
-      what = `<b class="as-f-low">free${every ? ' in every hub' : ''}</b>${where ? ` <button type="button" class="link-btn" onclick="AddressSpace.allocateIn(${escAttr(JSON.stringify(where))}, ${a})">Allocate ${a}</button>` : ''}`;
+      what = `<b class="as-f-low">free${every ? ' in every hub' : ''}</b>${where && !plain ? ` <button type="button" class="link-btn" onclick="AddressSpace.allocateIn(${escAttr(JSON.stringify(where))}, ${a})">Allocate ${a}</button>` : ''}`;
     }
     return `<b>${a}</b> — ${what} · ${carriers}${sc.kind === 'net' && !sc.set.has(a) ? ' · outside this network\'s ranges' : ''}`;
   }
@@ -664,17 +676,30 @@ const AddressSpace = (() => {
         if (cell >= 6) { g.fillStyle = text; g.fillText(`${pct(b.use + b.alloc, b.den)}%`, bx + bw + 4, y + cell / 2); }
       }
     }
-    // The searched, the pointed-at and the picked.
+    // The pointed-at in a hairline of ink; the looked-up and those in the
+    // filter box in the filter matches' amber, cased in the ink so it holds on
+    // either theme, each with a mark in the margin by its row and over its
+    // column, and a ring over the canvas that glows and fades (.as-pin).
     g.globalAlpha = 1;
-    const ring = (a, colour, w) => {
-      if (a == null || a < 1 || a > MAX) return;
-      const r = Math.floor(a / ROW), c = a % ROW;
-      g.strokeStyle = colour; g.lineWidth = w;
-      g.strokeRect(LAB + GAP + c * cell - 1, yOf(r) - 1, inner + 2, inner + 2);
-    };
-    searchIds().forEach(a => ring(a, ink, 1.5));
-    ring(S.hoverAddr, ink, 1);
-    ring(S.pickAddr, ink, 2);
+    const at = a => (a == null || a < 1 || a > MAX ? null : { x: LAB + GAP + (a % ROW) * cell, y: yOf(Math.floor(a / ROW)) });
+    const hov = at(S.hoverAddr);
+    if (hov) { g.strokeStyle = ink; g.lineWidth = 1; g.strokeRect(hov.x - 1, hov.y - 1, inner + 2, inner + 2); }
+    const hit = cssColour('--hit-ring', '#e8a000'), cas = cssColour('--map-leader-ink', '#1d1402');
+    const marked = [...new Set([S.pickAddr, ...searchIds()])].filter(a => at(a));
+    g.lineJoin = 'round';
+    marked.slice(0, 200).forEach(a => {
+      const p = at(a), mx = p.x + inner / 2;
+      g.strokeStyle = cas; g.lineWidth = 4; g.strokeRect(p.x - 2, p.y - 2, inner + 4, inner + 4);
+      g.strokeStyle = hit; g.lineWidth = 2; g.strokeRect(p.x - 2, p.y - 2, inner + 4, inner + 4);
+      g.fillStyle = hit; g.strokeStyle = cas; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(LAB + 1, p.y - 1); g.lineTo(LAB + GAP, p.y + inner / 2); g.lineTo(LAB + 1, p.y + inner + 1); g.closePath(); g.fill(); g.stroke();
+      g.beginPath(); g.moveTo(mx - 4, TOP - 7); g.lineTo(mx + 4, TOP - 7); g.lineTo(mx, TOP - 1); g.closePath(); g.fill(); g.stroke();
+    });
+    const pins = document.getElementById('as-grid-pins'), key = `${cell}|${marked.join(',')}`;
+    if (pins && pins.dataset.pins !== key) {
+      pins.dataset.pins = key;
+      pins.innerHTML = marked.slice(0, 12).map(a => { const p = at(a); return `<span class="as-pin is-cell" style="--x:${p.x + inner / 2}px;--y:${p.y + inner / 2}px;--s:${inner + 14}px"></span>`; }).join('');
+    }
     GRID = { LAB, GAP, cell, yOf, sc: sc.id };
   }
 
@@ -804,27 +829,56 @@ const AddressSpace = (() => {
     return `<p>${head} · ${counts}${act}</p>${reps}`;
   }
 
+  // The three rings, a row each of the key over the wheel: a little wheel
+  // with that ring drawn in, what it says, and its colours. The row of the
+  // ring the pointer is on is lit (wheelHover).
+  function ringIcon(id) {
+    return `<svg class="as-ring-ico" viewBox="0 0 24 24" aria-hidden="true">${[['addr', 10], ['cover', 6.6], ['block', 3.4]]
+      .map(([x, r]) => `<circle cx="12" cy="12" r="${r}"${x === id ? ' class="is-this"' : ''}/>`).join('')}</svg>`;
+  }
+  function ringKeyHtml(sc) {
+    const k = (cls, text) => `<span class="sr-key"><span class="sr-sw ${cls}" aria-hidden="true"></span>${text}</span>`;
+    const every = sc.kind === 'all', hub = sc.kind === 'hub';
+    const row = (id, head, text, keys) => `<div class="as-ring-row" data-ring="${id}">${ringIcon(id)}
+        <div><p><b>${head}</b> — ${text}</p><p class="small sr-keys">${keys}</p></div></div>`;
+    const together = every
+      ? 'Free on the outer ring over a coloured middle ring is an address no station in any hub holds that a repeater already passes on: the easiest to allocate. In use over bare track is a station that reports straight to a base.'
+      : hub
+        ? 'In use on the outer ring over bare track — the paler in-use colour — is a station no repeater in the hub passes on: it reports straight to a base. Free over a coloured middle ring is an address a repeater here already passes on: the easiest to allocate, with no repeater to reprogram.'
+        : 'Every address the network\'s repeaters pass on is coloured on the middle ring, and the outer ring says which of them are taken; outside the network\'s ranges both are bare. Two or three on the middle ring is where its repeaters overlap.';
+    return `<div class="as-ring-key">
+        ${row('addr', 'Outer ring: each address', 'a sliver an address, to scale, coloured by who holds it, so a gap is as wide as it is long. Point at it to go address by address.',
+          `${statusKeysHtml(sc)}<span class="sr-key"><span class="as-hit-sw" aria-hidden="true"></span>in the filter box</span>`)}
+        ${row('cover', 'Middle ring: the repeaters', `how many ${every ? 'repeaters, in any hub,' : `of the ${hub ? 'hub' : 'network'}'s repeaters`} have each address in their pass ranges, whether a station is on it yet or not. Bare track is an address no repeater passes on.`,
+          `${k('as-c-cov1', 'one')}${k('as-c-cov2', 'two')}${k('as-c-cov3', 'three or more')}`)}
+        ${row('block', 'Inner bars: each block of a hundred', 'a bar a wedge, as long as the block is taken. A wedge is a row of the address grid; point at its bar for the repeaters that carry any of it.',
+          `${k('as-c-use', 'in use')}${k('as-c-alloc', 'set aside')}`)}
+      </div>
+      <p class="small as-ring-why"><b>The outer two together.</b> ${together}</p>`;
+  }
+
   function wheelHtml(I) {
     const sc = wheelScope(I);
     if (!sc) return '<p class="small">No hub or radio network to draw.</p>';
     const every = sc.kind === 'all', hub = whole(sc);
     const t = tally(I, sc), W = wedges(I, sc);
     const gaps = t.runs.slice().sort((a, b) => (b.n - a.n) || (a.lo - b.lo)).slice(0, 10);
-    const k = (cls, text) => `<span class="sr-key"><span class="sr-sw ${cls}" aria-hidden="true"></span>${text}</span>`;
     const sel = S.wheelSel;
     return `<div class="control-row as-controls">
         ${scopeSelectHtml(I, sc, 'setWheelScope')}
       </div>
       <p class="small">${esc(captionText(I, sc))}. Every address, from 1 at the top clockwise to ${num(MAX)}; a wedge is a block of a hundred, a row
         of the address grid. ${every ? `The hubs reuse addresses, so here an address is in use when a station in any of the ${num(sc.hubs.length)} hubs holds it, shaded
-        by how many do, and free only when none does — the gaps are the addresses nobody anywhere is on. ` : ''}Point at a wedge to see which repeaters carry it; press it to keep it here.</p>
-      <p class="small sr-keys"><span class="sr-key"><b>Outer ring</b>, each address:</span>${statusKeysHtml(sc)}</p>
-      <p class="small sr-keys"><span class="sr-key"><b>Middle ring</b>, repeaters carrying it:</span>${k('as-c-cov1', 'one')}${k('as-c-cov2', 'two')}${k('as-c-cov3', 'three or more')}
-        <span class="sr-key"><b>Inner bars</b>: how much of each block is taken</span></p>
+        by how many do, and free only when none does — the gaps are the addresses nobody anywhere is on. ` : ''}Point at the outer two rings to go address by address,
+        at the inner bars for a block; press to keep it here. An address typed in the filter box is marked in amber, with a ring that glows.</p>
+      ${ringKeyHtml(sc)}
       <div class="as-wheel-wrap">
-        <canvas id="as-wheel" tabindex="0" role="img" aria-describedby="as-wheel-out"
-          aria-label="${escAttr(`Every ALERT address in ${sc.name} round a wheel, a wedge a block of a hundred. ${captionText(I, sc)}. The arrow keys step from wedge to wedge; the table under the wheel holds the same.`)}"
-          onpointermove="AddressSpace.wheelHover(event)" onpointerleave="AddressSpace.wheelHover(null)" onclick="AddressSpace.wheelClick(event)" onkeydown="AddressSpace.wheelKey(event)"></canvas>
+        <div class="as-wheel-box">
+          <canvas id="as-wheel" tabindex="0" role="img" aria-describedby="as-wheel-out"
+            aria-label="${escAttr(`Every ALERT address in ${sc.name} round a wheel, a wedge a block of a hundred. ${captionText(I, sc)}. The arrow keys step from wedge to wedge, and with Shift from address to address; the table under the wheel holds the same.`)}"
+            onpointermove="AddressSpace.wheelHover(event)" onpointerleave="AddressSpace.wheelHover(null)" onclick="AddressSpace.wheelClick(event)" onkeydown="AddressSpace.wheelKey(event)"></canvas>
+          <div id="as-wheel-pins" class="as-pins" aria-hidden="true"></div>
+        </div>
         <div id="as-wheel-tip" class="as-wheel-tip small" hidden></div>
       </div>
       <div id="as-wheel-out" class="small as-readout" aria-live="polite">${wheelReadoutHtml(I, sc)}</div>
@@ -846,11 +900,66 @@ const AddressSpace = (() => {
     if (!s) return null;
     return s.wedge != null ? wedges(I, sc)[s.wedge] : Object.assign(stretch(I, sc, s.lo, s.hi), { gap: true });
   }
+  // Under the wheel: the address kept, if one is, then its stretch; and
+  // whatever is in the filter box, said in the grid's words.
   function wheelReadoutHtml(I, sc) {
-    const c = selStretch(I, sc);
-    return c ? stretchHtml(I, sc, c, true)
-      : 'Point at a wedge for the repeaters that carry it, or press one — or a gap below — to keep it here. With the wheel focused, the arrow keys step round it.';
+    const s = S.wheelSel, c = selStretch(I, sc), ids = searchIds();
+    const hits = ids.length ? `<p class="as-hit-line"><span class="as-hit-sw" aria-hidden="true"></span>In the filter box: ${ids.slice(0, 3).map(a => readoutHtml(I, sc, a)).join('; ')}${ids.length > 3 ? `; and ${num(ids.length - 3)} more` : ''}</p>` : '';
+    if (!c) return `<p>Point at the outer two rings to go address by address, or at the inner bars for a block of a hundred; press one — or a gap below — to keep it here. With the wheel focused, the arrow keys step a block at a time, and with Shift an address.</p>${hits}`;
+    const one = s.addr != null ? `<p>${readoutHtml(I, sc, s.addr)} · <button type="button" class="link-btn" onclick="AddressSpace.toGrid(${s.addr})">On the address grid</button></p>` : '';
+    // A wedge kept, its block drawn wide enough to press any one address of.
+    const pick = s.wedge != null ? `<div class="as-strip as-strip-pick"><p class="small">Press an address in the block to keep it:</p>${stripHtml(I, sc, Math.max(1, s.lo), false, s.addr, true)}</div>` : '';
+    return `${one}${pick}${stretchHtml(I, sc, c, true)}${hits}`;
   }
+
+  // A block of a hundred, a cell an address, as the outer ring colours them
+  // or (cover) the middle ring; the address at marked in ink, those in the
+  // filter box in amber. Pressable, under the wheel: an address at a time.
+  function stripHtml(I, sc, at, cover, mark, press) {
+    const n = coverOf(I, sc), b0 = Math.floor(at / ROW) * ROW, hits = searchIds().filter(x => x >= b0 && x < b0 + ROW);
+    let cells = '';
+    for (let x = Math.max(1, b0); x < b0 + ROW && x <= MAX; x++) {
+      const cls = cover ? (n[x] ? `as-c-cov${Math.min(3, n[x])}` : 'as-c-bare') : `as-c-${cellStatus(I, sc, x)}`;
+      cells += `<rect class="${cls}" x="${x - b0}" y="1" width="0.82" height="8"/>`;
+    }
+    const box = (cls, x, pad) => `<rect class="${cls}" x="${(x - b0 - pad).toFixed(2)}" y="${(1 - pad).toFixed(2)}" width="${(0.82 + 2 * pad).toFixed(2)}" height="${(8 + 2 * pad).toFixed(2)}"/>`;
+    const marks = hits.map(x => box('as-strip-hit', x, 0.5)).join('') + (mark != null && mark >= b0 && mark < b0 + ROW ? box('as-strip-at', mark, 0.3) : '');
+    return `<svg viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"${press ? ` onclick="AddressSpace.stripPick(event, ${b0})"` : ''}>${cells}${marks}</svg>
+        <span class="as-strip-ends"><span>${Math.max(1, b0)}</span><span>${Math.min(MAX, b0 + ROW - 1)}</span></span>`;
+  }
+  function stripPick(ev, b0) {
+    const box = ev && ev.currentTarget && ev.currentTarget.getBoundingClientRect();
+    if (!box || !box.width) return;
+    const a = Math.max(1, Math.min(MAX, b0 + Math.min(ROW - 1, Math.floor(((ev.clientX - box.left) / box.width) * ROW))));
+    S.wheelSel = keepAt(a);
+    showPick();
+  }
+
+  // An address on one of the wheel's outer two rings: what the grid says of
+  // it; its block of a hundred drawn a cell an address, as the outer ring or
+  // the middle one colours it, with it marked — the detail the ring is too
+  // fine to show; and the run of its kind it sits in.
+  function addrTipHtml(I, sc, a, ring) {
+    const cover = ring === 'cover', n = coverOf(I, sc);
+    const kind = cover ? x => n[x] : x => cellStatus(I, sc, x);
+    const v = kind(a);
+    let lo = a, hi = a;
+    while (lo > 1 && kind(lo - 1) === v) lo--;
+    while (hi < MAX && kind(hi + 1) === v) hi++;
+    const strip = `<div class="as-strip">${stripHtml(I, sc, a, cover, a, false)}</div>`;
+    const what = cover ? (v ? `carried by ${plural(v, 'repeater')}` : 'no repeater passes on') : WORD[v];
+    const run = hi > lo ? `<p class="small">In a run of ${num(hi - lo + 1)} ${what}: ${lo}–${hi}</p>` : '';
+    const w = wedges(I, sc)[Math.floor(a / ROW)];
+    return `<p class="as-tip-ring">${cover ? 'Middle ring — the repeaters carrying each address' : 'Outer ring — each address'}</p>
+      <p>${readoutHtml(I, sc, a, true)}</p>${strip}${run}
+      <p class="small">Block ${w.lo}–${w.hi}: <b class="${fullCls(w.full)}">${w.full}% taken</b> · ${plural(w.reps.length, 'repeater')} carrying some of it</p>`;
+  }
+
+  // An address's state in the middle of the wheel, in a word or two.
+  const SHORT = {
+    use: 'in use', clash: 'held by two', alloc: 'set aside', free: 'free', direct: 'in use', open: 'free', out: 'outside the ranges',
+    hub1: 'in use in 1 hub', hub2: 'in use in 2 hubs', hub3: 'in use in 3+ hubs',
+  };
 
   // The rings that do not move with the pointer, drawn once to a canvas of
   // their own; the pointed-at and the kept, and the words in the middle, over
@@ -860,7 +969,9 @@ const AddressSpace = (() => {
     base.width = Math.round(D * dpr); base.height = Math.round(D * dpr);
     const g = base.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const cx = D / 2, cy = D / 2, R = D / 2 - 36;
+    // A margin for the numbers round the outside and the filter box's tags.
+    const big = D >= 700, M = big ? 48 : 40, fs = big ? 12 : 10;
+    const cx = D / 2, cy = D / 2, R = D / 2 - M;
     const rA0 = R * 0.8, rB1 = R * 0.765, rB0 = R * 0.69, rC1 = R * 0.655, rC0 = R * 0.38;
     const col = cellColours();
     const cov = cssColour('--accent', '#0b5cab'), text = cssColour('--muted', '#7a8794'), ink = cssColour('--text', '#16202a');
@@ -908,28 +1019,63 @@ const AddressSpace = (() => {
       if (lu) { g.fillStyle = col.use[0]; sector(a0, a1, rC0, rC0 + lu); g.fill(); }
       if (la) { g.fillStyle = col.alloc[0]; sector(a0, a1, rC0 + lu, rC0 + lu + la); g.fill(); }
     });
-    // Ticks a block, longer a thousand, numbered round the outside.
+    // Ticks a block, longer a thousand, numbered round the outside — but not
+    // under the tag of an address in the filter box (wheelPins), which sits
+    // at the same radius.
     g.globalAlpha = 1; g.strokeStyle = text; g.lineWidth = 1;
-    g.font = '10px system-ui, sans-serif'; g.textBaseline = 'middle';
+    g.font = `${fs}px system-ui, sans-serif`; g.textBaseline = 'middle';
+    const tagged = searchIds().slice(0, 8).map(a => ang(a + 0.5));
     for (let r = 0; r < ROWS; r++) {
       const a = ang(r * ROW), ux = Math.cos(a), uy = Math.sin(a), len = r % 10 === 0 ? 7 : 3;
       g.beginPath(); g.moveTo(cx + ux * (R + 2), cy + uy * (R + 2)); g.lineTo(cx + ux * (R + 2 + len), cy + uy * (R + 2 + len)); g.stroke();
       // 8000 is dropped where it would run into the 8191 at the top.
-      const x = cx + ux * (R + 22), lab = String(r * ROW);
+      const x = cx + ux * (R + 12 + fs), lab = String(r * ROW);
       if (r === 80 && x + g.measureText(lab).width / 2 > cx - 10 - g.measureText(String(MAX)).width) continue;
-      if (r && r % 10 === 0) { g.fillStyle = text; g.textAlign = 'center'; g.fillText(lab, x, cy + uy * (R + 19)); }
+      if (tagged.some(t => Math.abs(t - a) * (R + 12 + fs) < 48)) continue;
+      if (r && r % 10 === 0) { g.fillStyle = text; g.textAlign = 'center'; g.fillText(lab, x, cy + uy * (R + 9 + fs)); }
     }
-    g.fillStyle = ink; g.textAlign = 'left'; g.fillText('1', cx + 4, cy - R - 14);
-    g.fillStyle = text; g.textAlign = 'right'; g.fillText(String(MAX), cx - 4, cy - R - 14);
-    // The addresses in the filter box, a mark pointing in at each.
-    g.fillStyle = ink;
-    searchIds().forEach(a => {
-      const t = ang(a + 0.5), ux = Math.cos(t), uy = Math.sin(t), px = -uy * 4, py = ux * 4;
-      g.beginPath(); g.moveTo(cx + ux * (R + 1), cy + uy * (R + 1));
-      g.lineTo(cx + ux * (R + 10) + px, cy + uy * (R + 10) + py); g.lineTo(cx + ux * (R + 10) - px, cy + uy * (R + 10) - py);
-      g.closePath(); g.fill();
+    g.fillStyle = ink; g.textAlign = 'left'; g.fillText('1', cx + 4, cy - R - 4 - fs);
+    g.fillStyle = text; g.textAlign = 'right'; g.fillText(String(MAX), cx - 4, cy - R - 4 - fs);
+    // The addresses in the filter box, in the filter matches' amber cased in
+    // the ink so it holds on either theme: each boxed across the outer two
+    // rings, and a pin pointing in at it from outside. The ring that glows
+    // round it, and its number, are the page's, over the canvas (wheelPins).
+    const hit = cssColour('--hit-ring', '#e8a000'), cas = cssColour('--map-leader-ink', '#1d1402');
+    g.lineJoin = 'round';
+    searchIds().slice(0, 200).forEach(a => {
+      const m = ang(a + 0.5), h = Math.max(ang(a + 1) - ang(a), 5 / R) / 2;
+      sector(m - h, m + h, rB0 - 2, R + 2);
+      g.strokeStyle = cas; g.lineWidth = 4; g.stroke();
+      g.strokeStyle = hit; g.lineWidth = 2; g.stroke();
+      const ux = Math.cos(m), uy = Math.sin(m), px = -uy * 6, py = ux * 6, r0 = R + 3, r1 = R + 3 + (big ? 18 : 14);
+      g.beginPath(); g.moveTo(cx + ux * r0, cy + uy * r0);
+      g.lineTo(cx + ux * r1 + px, cy + uy * r1 + py); g.lineTo(cx + ux * r1 - px, cy + uy * r1 - py);
+      g.closePath();
+      g.fillStyle = hit; g.fill();
+      g.strokeStyle = cas; g.lineWidth = 1.5; g.stroke();
     });
-    return { base, D, dpr, cx, cy, R, rC0, ink, text, I, sc: sc.id, q: searchIds().join(',') };
+    return { base, D, dpr, M, cx, cy, R, rA0, rB0, rB1, rC0, rC1, ink, text, I, sc: sc.id, q: searchIds().join(',') };
+  }
+
+  // Over the wheel, for each address in the filter box: a ring on the outer
+  // ring that glows and fades, and its number in an amber tag outside the
+  // rim. Page elements rather than paint so the glow runs in CSS without
+  // redrawing the wheel, and is set again only when what is marked moves —
+  // a move of the pointer must not restart it.
+  function wheelPins() {
+    const el = document.getElementById('as-wheel-pins');
+    if (!el || !WHEEL) return;
+    const { D, M, cx, cy, R, rA0 } = WHEEL, ids = searchIds().slice(0, 8);
+    const key = `${D}|${ids.join(',')}`;
+    if (el.dataset.pins === key) return;
+    el.dataset.pins = key;
+    const pc = v => `${((100 * v) / D).toFixed(3)}%`, rm = (rA0 + R) / 2, rt = R + M - 20;
+    el.innerHTML = ids.map(a => {
+      const t = ang(a + 0.5), ux = Math.cos(t), uy = Math.sin(t);
+      const tx = Math.max(26, Math.min(D - 26, cx + ux * rt)), ty = Math.max(11, Math.min(D - 11, cy + uy * rt));
+      return `<span class="as-pin" style="--x:${pc(cx + ux * rm)};--y:${pc(cy + uy * rm)};--s:${Math.round(R - rA0 + 12)}px"></span>`
+        + `<span class="as-pin-tag" style="--x:${pc(tx)};--y:${pc(ty)}">${a}</span>`;
+    }).join('');
   }
 
   function drawWheel(quick) {
@@ -938,37 +1084,52 @@ const AddressSpace = (() => {
     if (!cv || !I) return;
     const sc = wheelScope(I);
     const body = document.getElementById('as-wheel-body');
-    const D = Math.round(Math.max(240, Math.min(620, (body && body.clientWidth) || 560)));
+    // As wide as the card, up to 1,240 px across.
+    const D = Math.round(Math.max(240, Math.min(1240, (body && body.clientWidth) || 560)));
     const dpr = window.devicePixelRatio || 1;
     if (!quick || !WHEEL || WHEEL.I !== I || WHEEL.sc !== sc.id || WHEEL.D !== D || WHEEL.dpr !== dpr || WHEEL.q !== searchIds().join(',')) {
       WHEEL = wheelBase(I, sc, D, dpr);
       cv.width = WHEEL.base.width; cv.height = WHEEL.base.height;
-      cv.style.setProperty('--ww', D + 'px');
+      if (cv.parentElement) cv.parentElement.style.setProperty('--ww', D + 'px');
     }
-    const { cx, cy, R, rC0, ink, text } = WHEEL;
+    wheelPins();
+    const { cx, cy, R, rA0, rB0, rB1, rC0, rC1, ink, text } = WHEEL;
     const g = cv.getContext('2d');
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.globalAlpha = 1;
     g.clearRect(0, 0, cv.width, cv.height);
     g.drawImage(WHEEL.base, 0, 0);
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // The kept stretch and the pointed-at wedge, outlined across the rings.
-    const outline = (lo, hi, w) => {
+    // The ring the pointer is on, edged.
+    const ringAt = { addr: [rA0, R], cover: [rB0, rB1], block: [rC0, rC1] }[S.wheelRing];
+    if (ringAt) {
+      g.globalAlpha = 0.45; g.strokeStyle = ink; g.lineWidth = 1;
+      [ringAt[0] - 1.5, ringAt[1] + 1.5].forEach(r => { g.beginPath(); g.arc(cx, cy, r, 0, 2 * Math.PI); g.stroke(); });
+    }
+    // The kept stretch and the pointed-at wedge outlined across the rings; an
+    // address, a needle across all three, so what each ring says of it reads
+    // straight down.
+    const outline = (lo, hi, w, wash = 0.1) => {
       let a0 = ang(lo), a1 = ang(hi + 1);
       if ((a1 - a0) * R < 3) { const m = (a0 + a1) / 2; a0 = m - 1.5 / R; a1 = m + 1.5 / R; }
       g.beginPath(); g.arc(cx, cy, R + 1, a0, a1); g.arc(cx, cy, rC0 - 3, a1, a0, true); g.closePath();
-      g.globalAlpha = 0.1; g.fillStyle = ink; g.fill();
+      g.globalAlpha = wash; g.fillStyle = ink; g.fill();
       g.globalAlpha = 0.95; g.strokeStyle = ink; g.lineWidth = w; g.stroke();
     };
-    const s = S.wheelSel, h = S.wheelHover;
-    if (s) outline(s.lo, s.hi, 2);
-    if (h != null && !(s && s.wedge === h)) outline(h * ROW, h * ROW + ROW - 1, 1);
-    // In the middle: what is pointed at or kept, else the scope's figures.
-    const c = h != null ? wedges(I, sc)[h] : selStretch(I, sc);
-    const t = tally(I, sc);
-    const lines = c ? [c.lo === c.hi ? String(c.lo) : `${c.lo}–${c.hi}`, `${c.full}% taken`, `${num(c.free + c.open)} free · ${plural(c.reps.length, 'repeater')}`]
-      : [sc.name, `${num(t.free)} free`, `of ${num(t.n)} · ${t.full}% taken`];
-    const big = Math.round(Math.max(15, Math.min(28, R * 0.1))), small = Math.round(Math.max(10, Math.min(13, R * 0.046)));
+    const s = S.wheelSel, h = S.wheelHover, kept = s && s.addr != null ? s.addr : null;
+    if (s) outline(s.lo, s.hi, kept != null ? 1 : 2, kept != null ? 0.04 : 0.1);
+    if (kept != null) outline(kept, kept, 2);
+    if (h != null && S.wheelAddr != null) outline(S.wheelAddr, S.wheelAddr, 1.5);
+    else if (h != null && !(s && s.wedge === h && kept == null)) outline(h * ROW, h * ROW + ROW - 1, 1);
+    // In the middle: the address or the stretch pointed at or kept, else the
+    // scope's figures.
+    const pa = h != null ? S.wheelAddr : kept;
+    const c = pa != null ? null : h != null ? wedges(I, sc)[h] : selStretch(I, sc);
+    const t = tally(I, sc), nc = pa != null ? coverOf(I, sc)[pa] : 0;
+    const lines = pa != null ? ['Address', String(pa), `${SHORT[cellStatus(I, sc, pa)]} · ${nc ? plural(nc, 'repeater') : 'no repeater'}`]
+      : c ? [c.lo === c.hi ? String(c.lo) : `${c.lo}–${c.hi}`, `${c.full}% taken`, `${num(c.free + c.open)} free · ${plural(c.reps.length, 'repeater')}`]
+        : [sc.name, `${num(t.free)} free`, `of ${num(t.n)} · ${t.full}% taken`];
+    const big = Math.round(Math.max(15, Math.min(36, R * 0.1))), small = Math.round(Math.max(10, Math.min(15, R * 0.046)));
     const room = (rC0 - 8) * 1.8;
     const fit = s0 => {
       let s1 = s0;
@@ -981,6 +1142,8 @@ const AddressSpace = (() => {
     g.font = `${small}px system-ui, sans-serif`; g.fillStyle = text; g.fillText(fit(lines[2]), cx, cy + big * 0.95);
   }
 
+  // Where on the wheel the pointer is: the wedge, the ring, and — on the
+  // outer two, where it is drawn to scale — the address.
   function wheelAt(ev) {
     const cv = document.getElementById('as-wheel');
     if (!ev || !cv || !WHEEL) return null;
@@ -988,19 +1151,26 @@ const AddressSpace = (() => {
     if (!box.width) return null;
     const k = WHEEL.D / box.width;
     const x = (ev.clientX - box.left) * k - WHEEL.cx, y = (ev.clientY - box.top) * k - WHEEL.cy;
-    const d = Math.hypot(x, y);
-    if (d < WHEEL.rC0 - 3 || d > WHEEL.R + 12) return null;
+    const d = Math.hypot(x, y), { R, rA0, rB0, rB1, rC0, rC1 } = WHEEL;
+    if (d < rC0 - 3 || d > R + 12) return null;
     let t = Math.atan2(y, x) + Math.PI / 2;
     if (t < 0) t += 2 * Math.PI;
-    return Math.min(ROWS - 1, Math.floor((t / (2 * Math.PI)) * ROWS));
+    const slot = Math.floor((t / (2 * Math.PI)) * SLOTS);
+    const ring = d > (rA0 + rB1) / 2 ? 'addr' : d > (rB0 + rC1) / 2 ? 'cover' : 'block';
+    return { w: Math.min(ROWS - 1, Math.floor(slot / ROW)), ring, a: Math.max(1, Math.min(MAX, slot)) };
   }
   function wheelHover(ev) {
-    const w = wheelAt(ev);
+    const p = wheelAt(ev);
+    const w = p ? p.w : null, ring = p ? p.ring : null, a = p && ring !== 'block' ? p.a : null;
     const tip = document.getElementById('as-wheel-tip');
-    if (w !== S.wheelHover) {
-      S.wheelHover = w;
-      const I = index();
-      if (tip && I && w != null) tip.innerHTML = stretchHtml(I, wheelScope(I), wedges(I, wheelScope(I))[w], false);
+    if (w !== S.wheelHover || ring !== S.wheelRing || a !== S.wheelAddr) {
+      S.wheelHover = w; S.wheelRing = ring; S.wheelAddr = a;
+      const I = index(), sc = I && wheelScope(I);
+      if (tip && sc && w != null) {
+        tip.innerHTML = a != null ? addrTipHtml(I, sc, a, ring)
+          : `<p class="as-tip-ring">Inner bars — how much of each block is taken</p>${stretchHtml(I, sc, wedges(I, sc)[w], false)}`;
+      }
+      document.querySelectorAll('#as-wheel-body .as-ring-row').forEach(r => r.classList.toggle('is-on', r.dataset.ring === ring));
       drawWheel(true);
     }
     if (!tip) return;
@@ -1021,28 +1191,41 @@ const AddressSpace = (() => {
     document.querySelectorAll('.as-gaps .pill').forEach(b => b.setAttribute('aria-pressed', String(!!(s && s.gap && Number(b.dataset.lo) === s.lo))));
     drawWheel(true);
   }
-  // A wedge pressed is kept, and pressed again let go.
+  // A wedge pressed is kept, and pressed again let go; on the outer two
+  // rings, the address pressed is kept with its wedge.
+  const keepAt = (a, w = Math.floor(a / ROW)) => ({ lo: w * ROW, hi: w * ROW + ROW - 1, wedge: w, addr: a });
   function wheelClick(ev) {
-    const w = wheelAt(ev);
-    if (w == null) return;
-    S.wheelSel = S.wheelSel && S.wheelSel.wedge === w ? null : { lo: w * ROW, hi: w * ROW + ROW - 1, wedge: w };
+    const p = wheelAt(ev);
+    if (!p) return;
+    const a = p.ring === 'block' ? null : p.a, s = S.wheelSel;
+    S.wheelSel = s && s.wedge === p.w && (s.addr ?? null) === a ? null : keepAt(a, p.w);
     showPick();
   }
   function wheelPick(lo, hi) {
     S.wheelSel = lo == null ? null : { lo: Number(lo), hi: Number(hi ?? lo), gap: true };
     showPick();
   }
+  // The arrows a wedge at a time; with Shift, an address at a time from the
+  // one kept, or from the start of the stretch kept.
   function wheelKey(ev) {
     const s = S.wheelSel, cur = s ? Math.floor(s.lo / ROW) : null;
+    const fwd = ev.key === 'ArrowRight' || ev.key === 'ArrowDown', back = ev.key === 'ArrowLeft' || ev.key === 'ArrowUp';
+    if (ev.shiftKey && (fwd || back)) {
+      ev.preventDefault();
+      const a = s && s.addr != null ? (fwd ? (s.addr % MAX) + 1 : ((s.addr + MAX - 2) % MAX) + 1) : s ? Math.max(1, s.lo) : fwd ? 1 : MAX;
+      S.wheelSel = keepAt(a);
+      showPick();
+      return;
+    }
     let w;
-    if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') w = cur == null ? 0 : (cur + 1) % ROWS;
-    else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') w = cur == null ? ROWS - 1 : (cur + ROWS - 1) % ROWS;
+    if (fwd) w = cur == null ? 0 : (cur + 1) % ROWS;
+    else if (back) w = cur == null ? ROWS - 1 : (cur + ROWS - 1) % ROWS;
     else if (ev.key === 'Home') w = 0;
     else if (ev.key === 'End') w = ROWS - 1;
     else if (ev.key === 'Escape' && s) w = null;
     else return;
     ev.preventDefault();
-    S.wheelSel = w == null ? null : { lo: w * ROW, hi: w * ROW + ROW - 1, wedge: w };
+    S.wheelSel = w == null ? null : keepAt(null, w);
     showPick();
   }
   // From the wheel's readout: the same address on the grid, in the wheel's
@@ -1220,7 +1403,7 @@ const AddressSpace = (() => {
   function refreshWheel() {
     const el = document.getElementById('as-wheel-body');
     if (!el) return;
-    S.wheelHover = null;
+    S.wheelHover = null; S.wheelRing = null; S.wheelAddr = null;
     el.innerHTML = bodyOr(wheelHtml);
     drawWheel();
   }
@@ -1539,11 +1722,13 @@ const AddressSpace = (() => {
   function scrollTo(id) { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
   // The filter box changed: the repeaters drawn follow it, and the grid and
-  // the wheel mark what it searched for.
+  // the wheel mark what it searched for, the wheel's readout saying whose.
   function onFilter() {
     if (S.view === 'repeaters') { S.shown = PAGE; refreshView(); }
     drawGrid();
     drawWheel(true);
+    const I = index(), out = document.getElementById('as-wheel-out');
+    if (out && I) out.innerHTML = wheelReadoutHtml(I, wheelScope(I));
   }
 
   function init() {
@@ -1611,12 +1796,15 @@ const AddressSpace = (() => {
     const c = stretch(I, sc, lo, hi);
     return Object.assign({}, c, { reps: c.reps.map(x => ({ id: x.r.id, n: x.part.length })) });
   }
-  function wheel() { return { sel: S.wheelSel, hover: S.wheelHover, geom: WHEEL && { D: WHEEL.D, cx: WHEEL.cx, cy: WHEEL.cy, R: WHEEL.R, rC0: WHEEL.rC0 } }; }
+  function wheel() {
+    return { sel: S.wheelSel, hover: S.wheelHover, ring: S.wheelRing, addr: S.wheelAddr,
+      geom: WHEEL && { D: WHEEL.D, cx: WHEEL.cx, cy: WHEEL.cy, R: WHEEL.R, rA0: WHEEL.rA0, rB0: WHEEL.rB0, rB1: WHEEL.rB1, rC0: WHEEL.rC0, rC1: WHEEL.rC1 } };
+  }
 
   return {
     allocHtml, panelHtml, init, onFilter, authChanged, load,
     setView, setSort, more, showAll, showRep, setScope, setWheelScope, setMapCount, setHubLines, scrollTo,
-    gridHover, gridClick, lookup, wheelHover, wheelClick, wheelPick, wheelKey, toGrid,
+    gridHover, gridClick, lookup, wheelHover, wheelClick, wheelPick, wheelKey, stripPick, toGrid,
     formChanged, useRun, allocateIn, allocate, release,
     exportCsv, exportAllocCsv, state: state_, index, figures, plan, clusters: clustersAt, bestFit, stretch: stretchAt, wheel,
   };

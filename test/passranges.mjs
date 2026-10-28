@@ -17,9 +17,14 @@
 //      that carry it, each marked where it is.
 //   3. **The grid** — an address looked up names its station; a free one
 //      pointed at with the mouse offers itself to the Allocate card. **The
-//      wheel** — a wedge counted as the station file has it, every repeater
-//      carrying any of it called out when it is pointed at and kept when it
-//      is pressed, the arrow keys stepping round; the biggest gap first, and
+//      wheel** — as wide as the card; a wedge counted as the station file has
+//      it, every repeater carrying any of it called out when its inner bar is
+//      pointed at and kept when it is pressed, the arrow keys stepping round;
+//      the outer ring pointed at address by address, the callout naming the
+//      station on it and drawing its block a cell an address, pressed kept
+//      with its wedge, Shift and an arrow an address on; an address in the
+//      filter box marked with a glowing ring and its number, and said under
+//      the wheel, as the grid marks it; the biggest gap first, and
 //      kept, it takes its first free address to the grid. **Every hub
 //      together** — in use when any hub's station holds it, two hubs on one
 //      address reuse and not a clash, the gaps the addresses nobody anywhere
@@ -259,20 +264,64 @@ try {
   await page.locator('#as-wheel').scrollIntoViewIfNeeded();
   const geo = await page.evaluate(() => AddressSpace.wheel().geom);
   const wbox = await page.locator('#as-wheel').boundingBox();
-  const th = -Math.PI / 2 + (2 * Math.PI * (WG * 100 + 50)) / 8200, kk = wbox.width / geo.D;
-  const px = wbox.x + (geo.cx + Math.cos(th) * geo.R * 0.9) * kk, py = wbox.y + (geo.cy + Math.sin(th) * geo.R * 0.9) * kk;
+  const cardW = await page.evaluate(() => document.getElementById('as-wheel-body').clientWidth);
+  ok(`the wheel is as wide as its card, up to 1,240 px (${Math.round(wbox.width)} of ${cardW})`, Math.abs(wbox.width - Math.min(1240, cardW)) <= 2, J({ w: wbox.width, cardW }));
+  const kk = wbox.width / geo.D;
+  const onWheel = (a, r) => { const th = -Math.PI / 2 + (2 * Math.PI * a) / 8200; return [wbox.x + (geo.cx + Math.cos(th) * r) * kk, wbox.y + (geo.cy + Math.sin(th) * r) * kk]; };
+  // The inner bars: a block at a time.
+  const [px, py] = onWheel(WG * 100 + 50, (geo.rC0 + geo.rC1) / 2);
   await page.mouse.move(px, py);
   const firstRep = REPS.find(r => r.id === st.reps[0].id);
-  const tip = await page.evaluate(() => { const t = document.getElementById('as-wheel-tip'); return { shown: !t.hidden, text: t.textContent, hover: AddressSpace.wheel().hover }; });
-  ok(`pointing at the wedge calls out the repeaters carrying it (${firstRep.name}, …)`, tip.shown && tip.hover === WG && tip.text.includes(`${wlo}–${whi}`) && tip.text.includes(firstRep.name), J(tip));
+  const tip = await page.evaluate(() => { const t = document.getElementById('as-wheel-tip'); const w = AddressSpace.wheel(); return { shown: !t.hidden, text: t.textContent, hover: w.hover, ring: w.ring, lit: document.querySelector('.as-ring-row.is-on')?.dataset.ring }; });
+  ok(`pointing at a wedge's inner bar calls out the repeaters carrying it (${firstRep.name}, …), its row of the key lit`, tip.shown && tip.hover === WG && tip.ring === 'block' && tip.lit === 'block'
+    && tip.text.includes(`${wlo}–${whi}`) && tip.text.includes(firstRep.name), J(tip));
   await page.mouse.click(px, py);
   const kept = await page.evaluate(() => ({ sel: AddressSpace.wheel().sel, text: document.getElementById('as-wheel-out').textContent }));
-  ok('…pressing it keeps it, the readout naming them', kept.sel && kept.sel.wedge === WG && kept.text.includes(firstRep.name) && /On the address grid/.test(kept.text), J(kept));
-  await page.mouse.move(wbox.x + 2, wbox.y + 2);
+  ok('…pressing it keeps it, the readout naming them', kept.sel && kept.sel.wedge === WG && kept.sel.addr == null && kept.text.includes(firstRep.name) && /On the address grid/.test(kept.text), J(kept));
+  // The outer ring: an address at a time — the one a station holds.
+  const [ax, ay] = onWheel(HELD + 0.5, (geo.rA0 + geo.R) / 2);
+  await page.mouse.move(ax, ay);
+  const pt = await page.evaluate(() => { const t = document.getElementById('as-wheel-tip'); const w = AddressSpace.wheel(); return { text: t.textContent, ring: w.ring, addr: w.addr, cells: t.querySelectorAll('.as-strip rect[class^="as-c-"]').length, mark: !!t.querySelector('.as-strip-at') }; });
+  ok(`pointing at the outer ring goes address by address — ${HELD}, ${HELD_BY.name}'s, its block drawn a cell an address`, pt.ring === 'addr' && Math.abs(pt.addr - HELD) <= 1
+    && pt.text.includes(String(pt.addr)) && (pt.addr !== HELD || pt.text.includes(HELD_BY.name)) && pt.cells === (WG === 0 ? 99 : 100) && pt.mark, J(pt));
+  const [bx, by] = onWheel(HELD + 0.5, (geo.rB0 + geo.rB1) / 2);
+  await page.mouse.move(bx, by);
+  const mid = await page.evaluate(() => { const w = AddressSpace.wheel(); return { ring: w.ring, addr: w.addr, text: document.getElementById('as-wheel-tip').textContent, lit: document.querySelector('.as-ring-row.is-on')?.dataset.ring }; });
+  ok('…and the middle ring the same, said to be the repeaters carrying it', mid.ring === 'cover' && mid.lit === 'cover' && Math.abs(mid.addr - HELD) <= 1 && /Middle ring/.test(mid.text), J(mid));
+  await page.mouse.click(ax, ay);
+  const keptA = await page.evaluate(() => ({ sel: AddressSpace.wheel().sel, text: document.getElementById('as-wheel-out').textContent }));
+  ok('…an address pressed is kept with its wedge, as near as a pixel of the ring allows', keptA.sel && Math.abs(keptA.sel.addr - HELD) <= 4
+    && keptA.sel.wedge === Math.floor(keptA.sel.addr / 100) && keptA.text.includes(String(keptA.sel.addr)), J(keptA));
+  // Under the wheel, the kept block drawn wide enough to press any one address.
+  await page.locator('#as-wheel-out .as-strip-pick svg').scrollIntoViewIfNeeded();
+  const sbox = await page.locator('#as-wheel-out .as-strip-pick svg').boundingBox();
+  const KB = Math.floor(keptA.sel.addr / 100) * 100;
+  const T = Array.from({ length: 100 }, (_, i) => KB + i).find(a => a >= 1 && a !== keptA.sel.addr && (held.get(`brisbane|${a}`) || []).length === 1);
+  const T_BY = DOC.stations.find(x => x.id === held.get(`brisbane|${T}`)[0]);
+  await page.mouse.click(sbox.x + ((T - KB + 0.5) / 100) * sbox.width, sbox.y + sbox.height / 2);
+  const keptS = await page.evaluate(() => ({ sel: AddressSpace.wheel().sel, text: document.getElementById('as-wheel-out').textContent }));
+  ok(`…and its block under the wheel picks the very one: ${T}, ${T_BY.name}`, keptS.sel && keptS.sel.addr === T && keptS.text.includes(T_BY.name), J(keptS));
+  await page.locator('#as-wheel').scrollIntoViewIfNeeded();
+  const wb3 = await page.locator('#as-wheel').boundingBox();
+  await page.mouse.move(wb3.x + 2, wb3.y + 2);
   ok('…and the callout goes when the pointer leaves the rings', await page.evaluate(() => document.getElementById('as-wheel-tip').hidden && AddressSpace.wheel().hover === null));
   await page.focus('#as-wheel');
+  await page.keyboard.press('Shift+ArrowRight');
+  ok('Shift and an arrow step to the next address', (await page.evaluate(() => AddressSpace.wheel().sel)).addr === T + 1);
   await page.keyboard.press('ArrowRight');
-  ok('the arrow keys step to the next wedge', (await page.evaluate(() => AddressSpace.wheel().sel)).wedge === (WG + 1) % 82);
+  ok('the arrow keys step to the next wedge', (await page.evaluate(() => AddressSpace.wheel().sel)).wedge === (Math.floor((T + 1) / 100) + 1) % 82);
+  // The filter box: the address marked on the wheel and the grid, with a
+  // ring that glows over each and its number, and said under the wheel.
+  await page.fill('#pr-filter', String(HELD));
+  await page.waitForTimeout(300);
+  const pins = await page.evaluate(() => ({ wheel: document.querySelectorAll('#as-wheel-pins .as-pin').length, tag: document.querySelector('#as-wheel-pins .as-pin-tag')?.textContent,
+    grid: document.querySelectorAll('#as-grid-pins .as-pin').length, anim: getComputedStyle(document.querySelector('#as-wheel-pins .as-pin') || document.body).animationName,
+    out: document.getElementById('as-wheel-out').textContent }));
+  ok(`an address in the filter box (${HELD}) is ringed and tagged on the wheel, ringed on the grid, and said under the wheel`, pins.wheel === 1 && pins.tag === String(HELD)
+    && pins.grid === 2 && pins.anim === 'as-pin-glow' && pins.out.includes('In the filter box') && pins.out.includes(HELD_BY.name), J(pins));
+  await page.fill('#pr-filter', '');
+  await page.waitForTimeout(200);
+  ok('…and the marks go when the filter box is emptied', await page.evaluate(() => !document.querySelector('#as-wheel-pins .as-pin') && !/In the filter box/.test(document.getElementById('as-wheel-out').textContent)));
   const gap0 = figuresOf(Array.from({ length: MAX }, (_, i) => i + 1), ['brisbane']).runs.slice().sort((a, b) => (b.n - a.n) || (a.lo - b.lo))[0];
   const chip = await page.evaluate(() => { const b = document.querySelector('.as-gaps .pill'); return b && { lo: Number(b.dataset.lo), text: b.textContent }; });
   ok(`the biggest gap first under the wheel (${gap0.lo}–${gap0.hi}, ${gap0.n})`, chip && chip.lo === gap0.lo && chip.text.includes(`${gap0.lo}–${gap0.hi}`), J(chip));
@@ -326,8 +375,8 @@ try {
   await page.locator('#as-wheel').scrollIntoViewIfNeeded();
   const geo2 = await page.evaluate(() => AddressSpace.wheel().geom);
   const wbox2 = await page.locator('#as-wheel').boundingBox();
-  const th2 = -Math.PI / 2 + (2 * Math.PI * (W2 * 100 + 50)) / 8200, k2 = wbox2.width / geo2.D;
-  await page.mouse.move(wbox2.x + (geo2.cx + Math.cos(th2) * geo2.R * 0.9) * k2, wbox2.y + (geo2.cy + Math.sin(th2) * geo2.R * 0.9) * k2);
+  const th2 = -Math.PI / 2 + (2 * Math.PI * (W2 * 100 + 50)) / 8200, k2 = wbox2.width / geo2.D, r2 = (geo2.rC0 + geo2.rC1) / 2;
+  await page.mouse.move(wbox2.x + (geo2.cx + Math.cos(th2) * r2) * k2, wbox2.y + (geo2.cy + Math.sin(th2) * r2) * k2);
   const tip2 = await page.evaluate(() => document.getElementById('as-wheel-tip').textContent);
   const hubNames = [...new Set(st2.reps.slice(0, 8).map(x => DOC.hubs.find(h => h.id === REPS.find(r => r.id === x.id).hub).name))];
   ok(`…and the callout says each one's hub (${hubNames.join(', ')})`, hubNames.every(n => tip2.includes(`(${n})`)), tip2.slice(0, 300));
@@ -351,6 +400,9 @@ try {
   // ── 5. signed out ─────────────────────────────────────────────────────────
   console.log('\nThe Allocate card, signed out\n');
   await page.evaluate(id => AddressSpace.allocateIn(id), 'rep:' + R.r.id);
+  // Allocate puts the caret in What for a moment later: wait for it, or a
+  // field filled meanwhile can lose its typing to it.
+  await until(page, () => document.activeElement && document.activeElement.id === 'as-purpose');
   await page.fill('#as-count', '2');
   await page.fill('#as-first', '');
   await page.fill('#as-purpose', 'New rain gauge at Check Flat');
@@ -376,6 +428,9 @@ try {
   ok('the repeater counts the one waiting as set aside', fig.alloc === 1 && fig.free === R.t.free - 1, J({ alloc: fig.alloc, free: fig.free }));
   // The form outlives the reload; the suggestion steps round what is set aside.
   await page.evaluate(id => AddressSpace.allocateIn(id), 'rep:' + R.r.id);
+  // Allocate puts the caret in What for a moment later: wait for it, or a
+  // field filled meanwhile can lose its typing to it.
+  await until(page, () => document.activeElement && document.activeElement.id === 'as-purpose');
   await page.fill('#as-count', '2');
   await page.fill('#as-purpose', 'New rain gauge at Check Flat');
   const alloc1 = new Set([`brisbane|${want0.lo}`]);

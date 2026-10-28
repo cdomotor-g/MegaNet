@@ -2719,6 +2719,7 @@ td {
 .as-radios [role="radiogroup"] { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); }
 .as-nets td, .as-nets th { vertical-align: top; }
 .as-grid-wrap { margin-top: var(--sp-2); }
+.as-grid-box { position: relative; width: max-content; }
 .as-grid-wrap canvas { display: block; width: var(--gw, 760px); height: var(--gh, 600px); cursor: crosshair; }
 .as-readout { min-height: 2.6em; margin: var(--sp-1) 0; }
 /* All addresses: the wheel. Its middle ring is the rulers' pass-range tint
@@ -2731,12 +2732,65 @@ td {
 .as-c-cov1 { --c: color-mix(in srgb, var(--accent) 30%, transparent); }
 .as-c-cov2 { --c: color-mix(in srgb, var(--accent) 60%, transparent); }
 .as-c-cov3 { --c: var(--accent); }
+.as-c-bare { --c: color-mix(in srgb, var(--muted) 10%, transparent); }
+/* The key over the wheel: a row a ring, its little wheel with that ring drawn
+   in, lit while the pointer is on the ring. */
+.as-ring-key { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: var(--sp-2); margin: var(--sp-2) 0; }
+.as-ring-row { display: flex; gap: var(--sp-2); align-items: flex-start; min-width: 0; padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--border); border-radius: var(--r-md); transition: background-color .15s, border-color .15s; }
+.as-ring-row p { margin: 0 0 var(--sp-1); }
+.as-ring-row.is-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.as-ring-ico { flex: none; width: 2.4rem; height: 2.4rem; }
+.as-ring-ico circle { fill: none; stroke: color-mix(in srgb, var(--muted) 35%, transparent); stroke-width: 2.2; }
+.as-ring-ico .is-this { stroke: var(--accent); stroke-width: 3; }
+.as-ring-why { margin: 0 0 var(--sp-2); }
+/* The wheel is as wide as the card, up to 1,240 px (drawWheel sets --ww). */
 .as-wheel-wrap { position: relative; margin-top: var(--sp-2); }
-.as-wheel-wrap canvas { display: block; width: var(--ww, 560px); max-width: 100%; height: auto; aspect-ratio: 1 / 1; margin: 0 auto; cursor: pointer; border-radius: 50%; }
-.as-wheel-wrap canvas:focus-visible { outline: var(--focus-width) solid var(--focus); outline-offset: 2px; }
+.as-wheel-box { position: relative; width: var(--ww, 560px); max-width: 100%; margin: 0 auto; }
+.as-wheel-box canvas { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; cursor: pointer; border-radius: 50%; }
+.as-wheel-box canvas:focus-visible { outline: var(--focus-width) solid var(--focus); outline-offset: 2px; }
+/* The addresses in the filter box (and the grid's looked-up one): the filter
+   matches' amber (--hit-ring), as the station table and the map mark a match,
+   cased in the near-black ink so it holds on a light card, with a ring that
+   glows and fades over the canvas. Still, with reduced motion: the glow
+   stays, lit. */
+.as-pins { position: absolute; inset: 0; pointer-events: none; }
+.as-pin {
+  position: absolute; left: var(--x); top: var(--y); width: var(--s, 22px); height: var(--s, 22px);
+  transform: translate(-50%, -50%); border: 3px solid var(--hit-ring); border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--map-leader-ink), inset 0 0 0 1px var(--map-leader-ink), 0 0 14px 5px var(--hit-glow);
+  animation: as-pin-glow 1.8s ease-in-out infinite;
+}
+.as-pin.is-cell { border-radius: 4px; }
+.as-pin-tag {
+  position: absolute; left: var(--x); top: var(--y); transform: translate(-50%, -50%); padding: 0 .4em; border-radius: 999px;
+  background: var(--hit-ring); color: var(--map-leader-ink); font-weight: 700; font-size: var(--fs-sm); line-height: 1.5;
+  font-variant-numeric: tabular-nums; white-space: nowrap; box-shadow: 0 0 0 1px var(--map-leader-ink), 0 0 8px 2px var(--hit-glow);
+}
+@keyframes as-pin-glow {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 1px var(--map-leader-ink), inset 0 0 0 1px var(--map-leader-ink), 0 0 14px 5px var(--hit-glow); }
+  50% { opacity: .6; box-shadow: 0 0 0 1px var(--map-leader-ink), inset 0 0 0 1px var(--map-leader-ink), 0 0 2px 0 var(--hit-glow); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .as-pin { animation: none; }
+}
+.as-hit-sw { display: inline-block; width: .8em; height: .8em; margin-right: .35em; vertical-align: -1px; border: 2px solid var(--hit-ring); border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--map-leader-ink), 0 0 5px 1px var(--hit-glow); }
+.as-hit-line { margin-top: var(--sp-1); }
+/* The callout's strip: the pointed-at address's block of a hundred, a cell
+   an address, as the ring it is pointed at on colours them. */
+.as-strip { margin: var(--sp-1) 0; }
+.as-strip svg { display: block; width: 100%; height: 1.1rem; }
+.as-strip-at { fill: none; stroke: var(--text); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.as-strip-hit { fill: none; stroke: var(--hit-ring); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.as-strip-pick { max-width: 56rem; }
+.as-strip-pick p { margin: 0 0 var(--sp-1); }
+.as-strip-pick svg { height: 1.6rem; cursor: pointer; }
+.as-strip-ends { display: flex; justify-content: space-between; color: var(--muted); font-size: .85em; font-variant-numeric: tabular-nums; }
+.as-tip-ring { color: var(--muted); font-size: .85em; text-transform: uppercase; letter-spacing: .04em; }
 .as-wheel-tip {
   position: absolute; left: var(--tip-x, 0px); top: var(--tip-y, 0px); z-index: 4;
-  width: max-content; max-width: min(20rem, calc(100% - 8px)); padding: var(--sp-1) var(--sp-2);
+  width: max-content; min-width: min(16rem, calc(100% - 8px)); max-width: min(22rem, calc(100% - 8px)); padding: var(--sp-1) var(--sp-2);
   background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md);
   box-shadow: var(--shadow-2); pointer-events: none;
 }
