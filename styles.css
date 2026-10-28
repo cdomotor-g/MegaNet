@@ -2897,6 +2897,14 @@ td {
 .bk-minor summary, .bk-how summary { cursor: pointer; }
 .bk-inline-h { display: inline; margin: 0; font-size: var(--fs-md); }
 
+/* A word that means something particular here (core.js termHtml): underlined
+   the way an abbreviation is, its meaning in the title tooltips.js draws. The
+   same look as the Bit-Flip Sources verdicts and the SLS marks before it. */
+.term { text-decoration: underline dotted; text-decoration-thickness: 1px; text-underline-offset: 2px; cursor: help; }
+/* A status chip says what it means on hover too; the chip is the cue, so no
+   underline inside the pill. */
+.term-chip[title] { cursor: help; }
+
 /* ⏳ Repeater Delays (repeater-delays.js). The tiles and the fold headings
    are the Backbone's; the bands are chips in their colour with the text in
    the page's own, so a warning colour never has to carry a word. */
@@ -2924,6 +2932,10 @@ td {
 .rd-fold { margin-top: var(--sp-3); }
 .rd-fold summary { cursor: pointer; }
 .rd-free { columns: 18rem auto; column-gap: var(--sp-4); padding-left: 1.2rem; }
+.rd-words { display: grid; grid-template-columns: minmax(8rem, max-content) 1fr; gap: var(--sp-1) var(--sp-3); margin: var(--sp-2) 0 0; font-size: var(--fs-sm); }
+.rd-words dt { font-weight: 600; }
+.rd-words dd { margin: 0; }
+@media (max-width: 560px) { .rd-words { grid-template-columns: 1fr; } .rd-words dd { margin-bottom: var(--sp-2); } }
 .bk-minor-list { columns: 22rem auto; column-gap: var(--sp-4); padding-left: 1.2rem; }
 
 .bf-td-match { text-align: center; }

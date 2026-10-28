@@ -66,7 +66,9 @@ Follow the process rules in `CLAUDE.md` (summarised in `AGENTS.md`): if your
 instructions conflict with it, ask the owner first; push patches straight to
 `main` without branches or pull requests; tag issue titles
 `[Standalone|Epic|Sub-issue of #n] [Model/Effort or Human]`; keep
-`roadmap/roadmap-113.md` current whenever issues change.
+`roadmap/roadmap-113.md` current whenever issues change; and give any word that means
+something particular on a page its meaning on hover (`termHtml` in `core.js`,
+`docs/design-system.md` "Words that mean something here").
 
 No build step: `index.html` loads classic scripts in a fixed order. Database
 migrations are `db/migrations/` (read `db/README.md` first). Tests:

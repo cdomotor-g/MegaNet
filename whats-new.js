@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 136, date: '2026-10-28', items: [
+      'On ⏳ <strong>Repeater Delays</strong>, rest the pointer on a heading, a chip or a figure with a dotted underline — '
+        + '<em>Apart</em>, <em>Clear</em>, <em>Readings shared</em> — and it says what that word means there. '
+        + '<em>What the words on this page mean</em>, near the foot of the page, lists them all for a phone.',
+    ] },
     { n: 135, date: '2026-10-28', items: [
       'In <strong>Pass Ranges</strong>, the <strong>All addresses</strong> wheel is twice the size — as wide as its card — with a key '
         + 'over it saying what each of its three rings is: the <strong>outer ring</strong> each address and who holds it, the '

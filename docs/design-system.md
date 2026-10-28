@@ -712,6 +712,45 @@ a colgroup. `.table-wrap col { width: auto !important }` below `md` is what make
 it happen, and it is in the responsive block at the foot of `styles.css`. The
 proportions still apply above `md`, where they are right.
 
+### Words that mean something here — `.term`
+
+Most pages have a few words that carry a meaning of their own on that page: a
+band ("Clear", "Close", "On top"), a measure ("Apart", "Readings shared", "Fade
+margin"), a state ("Free", "Recorded"), an abbreviation ("AHD", "AMTD"). Somebody
+who has not read the code cannot guess them, and a table heading is the worst
+place to leave one unexplained. So:
+
+- **Mark the word and give its meaning on hover**:
+  `termHtml(text, meaning)` (`core.js`) draws
+  `<span class="term" title="…">text</span>` — a dotted underline, the help
+  cursor, and the meaning in the title, which `tooltips.js` draws above the
+  pointer. A status chip that is a word of this kind takes the `term-chip`
+  class and the same title, without the underline (the chip is the cue).
+  An abbreviation can stay an `<abbr title="…">`.
+- **Where**: table headings first, then status chips and pills, the labels of
+  figures and tiles, settings whose effect is not obvious, and the first use of
+  the word in the page's own text. Not every occurrence — once in a heading
+  covers the column under it.
+- **The meaning**: plain words, a sentence or two, for somebody who knows the
+  network but not the code — what it means *here*, and the numbers that decide
+  it when there are any ("433 ms or more apart"). Not the word again, not a
+  restatement of the label, no internal names. When the number comes from a
+  setting, build the sentence from the setting.
+- **One list per page**: keep a page's meanings in one place in its module (a
+  glossary object), so a heading and the chip under it never explain the same
+  word two ways.
+- **Say it without hover too**: a finger and a keyboard never hover. The page
+  also lists its words with their meanings somewhere a reader can reach — a
+  key under the table, or a *What the words on this page mean* fold built from
+  the same list. ⏳ Repeater Delays (`repeater-delays.js`, `words()` and
+  `glossaryHtml()`) is the worked example.
+- **Checked**: `npm run tabs` fails a `.term` or `.term-chip` whose title is
+  missing, shorter than a sentence, or the word again. Whether a word needs
+  one at all is the author's call, which `CLAUDE.md` ("Plain words") asks for
+  on every new or changed page. The Bit-Flip Sources verdicts (`.fs-verdict`),
+  the SLS marks (`.mn-sls-mark`) and the Workbench's education terms
+  (`.wb-term`) came before the shared class and look the same.
+
 ### Charts, canvas and maps — the house answer
 
 The map, the Ghosting Graph, the RF Changes timeline and the ARRO chart have no

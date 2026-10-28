@@ -15,7 +15,7 @@
 // that list, which is the point: the check grows tab by tab with the epic, and
 // a tab nobody has converted yet does not fail a check for work nobody has done.
 //
-// Eight things are checked per tab:
+// Nine things are checked per tab:
 //
 //   Inline styles.  None, except a `--token: value` override (that *is* the
 //                   system — see .page's --page-max) and a <col> width, which
@@ -55,6 +55,13 @@
 //                   of <main> in the DOM, so a tab opening at h3 followed an h2
 //                   and passed. Three of the four tabs #141 converted were doing
 //                   exactly that, and this check said nothing about any of them.
+//
+//   Terms.          A word underlined as meaning something particular here
+//                   (core.js termHtml, `.term`) or a status chip that explains
+//                   itself (`.term-chip`) carries its meaning as a title — a
+//                   sentence, not blank and not the word again. Whether a word
+//                   *needs* one is a judgment for the person writing the page
+//                   (CLAUDE.md, "Plain words"); this holds the ones marked.
 //
 //   Scope.          Every check above reads #main-content **plus the side
 //                   panel's pane on screen**, if one is. Since the side panel
@@ -1173,7 +1180,17 @@ try {
         if (levels[i] > levels[i - 1] + 1) skips.push(`h${levels[i - 1]} → h${levels[i]}`);
       }
 
+      // A word that means something particular on the page (core.js termHtml,
+      // and a status chip that says what it means) carries that meaning: a
+      // title of a sentence, not empty and not the word again.
+      const terms = all('.term, .term-chip');
+      const bareTerms = terms.filter(el => {
+        const t = (el.getAttribute('title') || '').trim();
+        return t.length < 20 || t.toLowerCase() === el.textContent.trim().toLowerCase();
+      }).map(el => el.textContent.trim().slice(0, 30));
+
       return {
+        terms: terms.length, bareTerms,
         inline, unwrapped: unwrapped.length, uncaptioned: uncaptioned.length,
         unscoped: unscoped.length, tables: tables.length,
         capped: capped.length, unregioned: unregioned.length,
@@ -1198,6 +1215,8 @@ try {
       found.unnamed.length === 0, [...new Set(found.unnamed)].slice(0, 5).join(', '));
     check(`${tab.label}: headings step by one`,
       found.skips.length === 0, `${found.skips.join(', ')} (${found.levels})`);
+    check(`${tab.label}: every term says what it means (${found.terms})`,
+      found.bareTerms.length === 0, [...new Set(found.bareTerms)].slice(0, 5).join(', '));
   }
 
   // ── No sideways scroll, per tab, per width, per theme ──────────────────────

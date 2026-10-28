@@ -2625,6 +2625,8 @@ const HELP = {
       + 'repeaters. Under a second there is not room to clear the busiest groups; <em>What a longer delay buys</em> shows '
       + 'how many pairs each limit leaves, if the repeaters take more.',
       'A repeater with no channel on record is taken to share one with its neighbours. Recording the channels can free it.',
+      'A word with a dotted underline — a heading such as <em>Apart</em>, or a chip such as <em>Clear</em> — says what it means '
+      + 'when the pointer rests on it; <em>What the words on this page mean</em>, near the foot, lists them all.',
       'Record each delay on its station as it is set (the repeater\'s card, <em>Repeater delay (ms)</em>) and the plan keeps '
       + 'it from then on and plans the rest around it. Nothing on this tab writes to a station.',
     ],
@@ -4983,6 +4985,18 @@ function escAttr(s) {
     .replace(/\\/g, '\\\\').replace(/'/g, "\\'")
     .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
     .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// A word that means something particular on this page — "Clear", "Apart",
+// "Readings shared" — that somebody new would not guess: drawn with a dotted
+// underline and its meaning in its title, which tooltips.js shows above the
+// pointer. `text` is shown as written (escaped); `meaning` is the plain-words
+// explanation, a sentence or two. Hover is a convenience for a mouse — a
+// finger and a keyboard never see it — so the page says the same somewhere a
+// reader can reach (a key, or its "how it is worked out"): see
+// docs/design-system.md, "Words that mean something here".
+function termHtml(text, meaning) {
+  return meaning ? `<span class="term" title="${esc(meaning)}">${esc(text)}</span>` : esc(text);
 }
 
 function csvEscape(s) {

@@ -44,6 +44,13 @@
 - The repository keeps its earlier name, MegaNet, and so do identifiers nobody reads as a name: the `meganet` schema, storage keys, MQTT topics, the Worker and R2 bucket, the Pi's service names and the Quansheng station-table tag. Code comments still say MegaNet; don't copy it into a string.
 - `npm run brand` (in the cheap checks above) fails on a string literal, page or agent file that says MegaNet.
 
+## Plain words — explain the jargon on hover
+- Whenever you build or change anything a person reads in the app, look for words that mean something particular in that context and that the average user would not guess — a band ("Clear", "Close", "On top"), a measure ("Apart", "Fade margin", "Readings shared"), a state, an abbreviation. Give each one its meaning on hover.
+- Table headings first, then status chips, figure and tile labels, settings whose effect is not obvious, and the word's first use in the page's text. Once in a heading covers the column.
+- Use `termHtml(text, meaning)` (`core.js`; a chip takes `class="term-chip"` and a `title`). The meaning is a plain sentence or two: what it means here and the numbers that decide it — not the word again, not internal names. Keep a page's meanings in one list in its module.
+- Hover never reaches a finger or a keyboard, so the page also lists the same meanings where they can be read: a key, or a *What the words on this page mean* fold built from the same list.
+- `docs/design-system.md` ("Words that mean something here") has the pattern; ⏳ Repeater Delays is the worked example. `npm run tabs` fails a marked term with no real meaning; spotting the words that need one is up to you.
+
 ## Private data — landholders, site codes and the inspection archive
 - Flood-Net holds **no landholder contact details** — no names, phone numbers or email addresses of the people who own the land at a site, in the database, forms, data files, docs, issues or commit messages. They stay with the Bureau and its contractors (`0063`).
 - **Site codes** (gate combinations, padlock and logger codes, key numbers) live only in the database's inspection records: approved accounts read them, editors write them (`0064`). Never quote one in a doc, issue, commit message, test fixture or anything public.

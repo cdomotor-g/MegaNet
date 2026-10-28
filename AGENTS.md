@@ -160,6 +160,16 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   `[Standalone] [Sonnet5/Med] Fix flaky login test`) or `[Human]` for work that
   needs credentials, physical access or a person's judgment. Restate the
   recommendation on the body's first line (`Recommended: Sonnet5 / Med`).
+- **Plain words:** in anything a person reads in the app, give every word
+  that means something particular there — a band like "Clear", a measure
+  like "Apart", a state, an abbreviation — its meaning on hover: table
+  headings first, then chips, figure labels, unclear settings and the first
+  use in the text. `termHtml(text, meaning)` in `core.js` (a chip: class
+  `term-chip` and a `title`); a plain sentence or two, not the word again;
+  one list of meanings per page, also shown without hover (a key or a
+  *What the words on this page mean* fold). Pattern in
+  `docs/design-system.md` ("Words that mean something here"); `npm run tabs`
+  fails a marked term with no real meaning.
 - **Private data:** Flood-Net holds no landholder contact details (names,
   phones, emails) anywhere — they stay with the Bureau and its contractors.
   Site codes (gates, padlocks, loggers, key numbers) live only in the
@@ -215,5 +225,7 @@ agent files to the API's real URLs and limits). `test/README.md` lists them all;
 - Comments explain *why*, at the length the decision needs.
 - Help text in `core.js` (`HELP`) is checked by `npm run help`: real content, and
   links to files that exist.
+- Words that mean something particular on a page carry their meaning on hover
+  (`termHtml`, `.term`) — see *Plain words* above.
 - Keep `docs/agent-api.md` and these agent files in step with `worker/api.js`;
   `npm run agentdocs` fails when they drift.

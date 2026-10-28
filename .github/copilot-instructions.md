@@ -42,6 +42,10 @@ See [`docs/agent-api.md`](../docs/agent-api.md).
   update `roadmap/roadmap-113.md` whenever issues change; and every app change
   bumps the `?v=` version stamp in `index.html`, `about.html`, `privacy.html`
   and `terms.html`, or the service worker keeps serving the old files.
+- Any word that means something particular on a page ("Clear", "Apart", a
+  state, an abbreviation) gets its meaning on hover — `termHtml(text, meaning)`
+  in `core.js`, a plain sentence — and the page lists the same meanings without
+  hover too (`docs/design-system.md`, "Words that mean something here").
 - No build step: classic scripts loaded in a fixed order by `index.html`; only
   `init.js` runs at load. Migrations in `db/migrations/` are forward-only (see
   `db/README.md`). The Worker is `worker/` and deploys with `wrangler.toml`.

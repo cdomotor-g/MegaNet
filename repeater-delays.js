@@ -51,6 +51,64 @@ const RepeaterDelays = (function () {
     'nothing-passed': 'Passes nothing',
   };
 
+  // ── The words this page uses in its own sense ──────────────────────────────
+  // Every heading, chip and figure whose word means something particular here
+  // carries its meaning on hover (core.js termHtml), from this one list, so a
+  // heading and the chip under it never explain the same word two ways. The
+  // timings follow the settings, so they are worked out with them. The same
+  // meanings are said in words under "How it is worked out", for a finger or
+  // a keyboard, which never hover.
+  function words(o) {
+    const f = ms(o.frameMs), c = ms(o.clearMs), l = ms(o.leadMs);
+    return {
+      delay: 'How long the repeater waits, after it has heard a reading, before sending it on. It is set in the repeater itself; Flood-Net only records it.',
+      channel: 'The frequency the repeater listens on, then the one it sends on, in MHz — one number when they are the same. Two repeaters can only collide on the same sending channel.',
+      now: 'The delay the repeater has today: the one recorded on its station, or the one entered above as what they all share. "change" means the plan asks for something different.',
+      neighbour: 'The other repeater whose copies of a shared reading land nearest in time to this one\'s under the plan — with its planned delay, how far away it is, and how many readings the two both send on.',
+      apart: `How far apart in time the two repeaters start sending their copies of the same reading, at the closest. Under ${f} the copies overlap bit on bit; ${c} or more and they are clear of each other.`,
+      state: 'How this repeater comes out against its closest neighbour under the plan: on top, close or clear.',
+      readings: 'How many readings this repeater sends on that another repeater also sends on, to a receiver that hears both — how much rides on getting its delay right. A reading here is one station\'s one ALERT address, such as a rain gauge\'s rainfall.',
+      reading: 'One station\'s one ALERT address — a rain gauge\'s rainfall, a river gauge\'s height, a battery. Each is sent on its own, and each can be relayed by more than one repeater.',
+      ontop: `The two copies start less than one frame (${f}) apart, so their bits overlap. A receiver hearing both often decodes a mix of the two: flipped bits, and readings filed under the wrong address (ghosts). This is the one to get rid of.`,
+      close: `The copies start a frame (${f}) or more apart, but less than a lead-in and a frame (${c}). The later repeater comes on the air while the earlier one is still sending its data, so that earlier copy is spoilt wherever the two arrive about equally strong — usually lost rather than turned into a ghost.`,
+      clear: `The copies start at least a lead-in and a frame (${c}) apart, so neither touches the other and both arrive clean.`,
+      frame: `The ALERT message itself: 40 bits at 300 baud, ${f} on the air.`,
+      leadin: `The time from a transmitter switching on to its first data bit — the radio settling and the tone receivers lock on to. Taken as ${l}, the app's own figure; nobody has timed it on these repeaters yet.`,
+      pair: 'Two repeaters that both send on at least one of the same readings, and are both heard by a base station or a repeater that wants that reading — so their copies can collide.',
+      group: 'Repeaters joined by pairs, directly or through each other. Moving one repeater\'s delay can move the problem onto another in the same group, so set a group\'s delays together.',
+      where: 'The base stations and repeaters that would hear both copies — within reach of both, on their sending channel, and wanting the reading. This is where the two collide.',
+      oneDelay: 'How far apart the two copies land if every repeater has the same delay — which is thought to be the case now.',
+      planned: 'How far apart the two copies land with the delays in this plan.',
+      used: 'How many different delay values the plan needs, and the longest of them.',
+      limit: 'The longest delay the repeaters\' own settings accept. Flood-Net\'s register can only record up to 999 ms today, so a longer plan cannot be written down yet.',
+      current: 'If every repeater is known to be set to the same delay now, enter it: the plan then leaves as many as it can on that value, so fewer sites need a visit.',
+      keep: 'Treat a delay already recorded on a station as set in the field and fixed, and plan the other repeaters around it. Untick to plan every repeater afresh.',
+      recorded: 'This delay is recorded on the repeater\'s station, so the plan keeps it as it is.',
+      change: 'The plan asks for a different delay from the one this repeater has now — a site visit.',
+      free: 'No other repeater sends on the same readings to a receiver that hears both, so this repeater\'s delay cannot cause a collision. Leave it as it is.',
+      km: 'Straight-line distance between the two repeaters, in kilometres.',
+      linked: 'Repeaters that send on at least one reading another repeater also sends on, to a receiver hearing both — the ones whose delays matter.',
+      pairReadings: 'How many readings both repeaters send on — each one station\'s one ALERT address.',
+      unknownChannel: 'No channel is on record for this repeater, so the plan assumes it shares one with its neighbours — which errs towards a collision rather than away from one.',
+      unplaced: 'This repeater has no position on record, so the plan cannot tell what it hears.',
+      nothingPassed: 'Its pass ranges let no address through, so it relays nothing the plan can place.',
+    };
+  }
+  // Worked out on first use and again by each render(), from the settings in
+  // force — never at load.
+  let W = null;
+  const word = key => (W || (W = words(opts())))[key];
+  const term = (key, text) => termHtml(text, word(key));
+  // The words, in the order the glossary fold lists them, with the label each
+  // is shown under there.
+  const GLOSSARY = [
+    ['delay', 'Delay'], ['reading', 'Reading'], ['pair', 'Pair'], ['group', 'Group'], ['ontop', 'On top'], ['close', 'Close'],
+    ['clear', 'Clear'], ['apart', 'Apart'], ['frame', 'Frame'], ['leadin', 'Lead-in'], ['channel', 'Channel'], ['now', 'Now'],
+    ['neighbour', 'Closest neighbour'], ['state', 'State'], ['readings', 'Readings shared'], ['where', 'Heard together at'],
+    ['oneDelay', 'On one delay'], ['planned', 'Planned'], ['used', 'Delays used'], ['free', 'No neighbour on its readings'],
+    ['recorded', 'Recorded'], ['change', 'Change'],
+  ];
+
   const S = { opts: null, compare: null, comparing: false, timer: null };
 
   const num = n => (n == null || !Number.isFinite(Number(n)) ? '—' : Number(n).toLocaleString());
@@ -121,14 +179,15 @@ const RepeaterDelays = (function () {
 
   function bandHtml(b) {
     const B = BAND[b];
-    return B ? `<span class="rd-b ${B.cls}">${esc(B.label)}</span>` : '';
+    return B ? `<span class="rd-b ${B.cls} term-chip" title="${esc(word(b))}">${esc(B.label)}</span>` : '';
   }
   function statusHtml(s) {
     if (BAND[s]) return bandHtml(s);
-    return `<span class="rd-b rd-b--none">${esc(STATUS[s] || s)}</span>`;
+    const why = { free: word('free'), unplaced: word('unplaced'), 'nothing-passed': word('nothingPassed') }[s];
+    return `<span class="rd-b rd-b--none${why ? ' term-chip" title="' + esc(why) : ''}">${esc(STATUS[s] || s)}</span>`;
   }
   function chan(r) {
-    if (r.rx == null && r.tx == null) return '<span class="txt-muted">not recorded</span>';
+    if (r.rx == null && r.tx == null) return `<span class="txt-muted">${term('unknownChannel', 'not recorded')}</span>`;
     return r.rx === r.tx ? `${esc(mhz(r.rx))}` : `${esc(mhz(r.rx))} → ${esc(mhz(r.tx))}`;
   }
   function stationBtn(id, name) {
@@ -138,28 +197,30 @@ const RepeaterDelays = (function () {
   function settingsHtml(o) {
     const limit = LIMITS.find(l => l.ms === o.maxMs);
     return `<form class="rd-settings" onsubmit="return false" aria-label="What the plan assumes">
-      <label>Longest delay the repeaters take
+      <label><span>${term('limit', 'Longest delay the repeaters take')}</span>
         <select id="rd-max" onchange="RepeaterDelays.set('maxMs', +this.value)">
           ${LIMITS.map(l => `<option value="${l.ms}"${l.ms === o.maxMs ? ' selected' : ''}>${esc(l.label)}${l.note ? ` — ${esc(l.note)}` : ''}</option>`).join('')}
           ${limit ? '' : `<option value="${o.maxMs}" selected>${esc(ms(o.maxMs))}</option>`}
         </select></label>
-      <label>The delay they are on now, if they share one
+      <label><span>${term('current', 'The delay they are on now, if they share one')}</span>
         <input type="number" id="rd-now" min="0" max="60000" step="1" inputmode="numeric" placeholder="not known"
           value="${o.currentMs == null ? '' : o.currentMs}" onchange="RepeaterDelays.set('currentMs', this.value)"></label>
       <label class="rd-check"><input type="checkbox" id="rd-keep"${o.keepRecorded ? ' checked' : ''}
-          onchange="RepeaterDelays.set('keepRecorded', this.checked)"> Keep the delays recorded on stations</label>
+          onchange="RepeaterDelays.set('keepRecorded', this.checked)"> ${term('keep', 'Keep the delays recorded on stations')}</label>
     </form>`;
   }
 
   function tilesHtml(p) {
     const c = p.counts;
-    const tile = (n, label, cls) => `<div class="bk-tile"><span class="bk-tile-n${cls ? ' ' + cls : ''}">${esc(n)}</span> <span class="bk-tile-l">${esc(label)}</span></div>`;
+    // `label` is markup: its terms are termHtml's, everything else escaped here.
+    const tile = (n, label, cls) => `<div class="bk-tile"><span class="bk-tile-n${cls ? ' ' + cls : ''}">${esc(n)}</span> <span class="bk-tile-l">${label}</span></div>`;
+    const pairs = term('pair', 'pairs');
     return `<div class="bk-tiles">
-      ${tile(num(c.linked), `of the ${num(c.repeaters)} repeaters share readings with a neighbour, in ${plural(p.clusters.length, 'group')}`)}
-      ${tile(`${num(c.ontopSame)} → ${num(c.ontop)}`, 'pairs sending copies on top of each other: all on one delay → this plan', c.ontop ? 'stat-bad' : '')}
-      ${tile(num(c.close), 'pairs still close — a key-up on the other\'s frame', c.close ? 'txt-warn' : '')}
-      ${tile(num(c.clear), `pairs clear, of ${num(c.pairs)}`, '')}
-      ${tile(num(c.free), 'repeaters with no neighbour on their readings — any delay will do', '')}
+      ${tile(num(c.linked), `of the ${num(c.repeaters)} repeaters ${term('linked', 'share readings with a neighbour')}, in ${num(p.clusters.length)} ${term('group', p.clusters.length === 1 ? 'group' : 'groups')}`)}
+      ${tile(`${num(c.ontopSame)} → ${num(c.ontop)}`, `${pairs} sending copies ${term('ontop', 'on top of each other')}: ${term('oneDelay', 'all on one delay')} → ${term('planned', 'this plan')}`, c.ontop ? 'stat-bad' : '')}
+      ${tile(num(c.close), `${pairs} still ${term('close', 'close')} — a key-up on the other's frame`, c.close ? 'txt-warn' : '')}
+      ${tile(num(c.clear), `${pairs} ${term('clear', 'clear')}, of ${num(c.pairs)}`, '')}
+      ${tile(num(c.free), `repeaters with ${term('free', 'no neighbour on their readings')} — any delay will do`, '')}
     </div>`;
   }
 
@@ -167,13 +228,14 @@ const RepeaterDelays = (function () {
     const c = p.counts, o = p.settings;
     const steps = c.delaysUsed.length;
     const parts = [];
-    parts.push(`Set each repeater to the <strong>Delay</strong> in the table below. With every repeater on one delay,
-      <strong>${plural(c.ontopSame, 'pair')}</strong> of repeaters send their copies of the same reading on top of each other at a
-      receiver that hears both — the collisions that come out as flipped bits. With these delays
-      ${c.ontop ? `<strong>${num(c.ontop)}</strong> still do` : '<strong>none</strong> do'}, ${num(c.close)} ${c.close === 1 ? 'is' : 'are'} close, and
-      ${num(c.clear)} ${c.clear === 1 ? 'is' : 'are'} clear.`);
+    parts.push(`Set each repeater to the <strong>${term('delay', 'Delay')}</strong> in the table below. With every repeater on one delay,
+      <strong>${num(c.ontopSame)}</strong> ${term('pair', c.ontopSame === 1 ? 'pair' : 'pairs')} of repeaters send their copies of the same
+      ${term('reading', 'reading')} ${term('ontop', 'on top of each other')} at a receiver that hears both — the collisions that come out as
+      flipped bits. With these delays ${c.ontop ? `<strong>${num(c.ontop)}</strong> still do` : '<strong>none</strong> do'}, ${num(c.close)}
+      ${c.close === 1 ? 'is' : 'are'} ${term('close', 'close')}, and ${num(c.clear)} ${c.clear === 1 ? 'is' : 'are'} ${term('clear', 'clear')}.`);
     parts.push(`The plan uses ${plural(steps, 'different delay')} between ${ms(c.delaysUsed[0] || 0)} and ${ms(c.delaysUsed[steps - 1] || 0)};
-      two copies are clear of each other ${ms(o.clearMs)} apart (a ${ms(o.leadMs)} lead-in and a ${ms(o.frameMs)} frame).`);
+      two copies are clear of each other ${ms(o.clearMs)} apart (a ${ms(o.leadMs)} ${term('leadin', 'lead-in')} and a ${ms(o.frameMs)}
+      ${term('frame', 'frame')}).`);
     if (o.maxMs < 1000 && (c.ontop || c.close)) {
       parts.push(`Under a second there is not room to clear every pair: the busiest groups need their copies spread over more than a
         second. If the repeaters take longer delays, pick the limit above and the plan follows — see <em>What a longer delay buys</em>.`);
@@ -195,10 +257,11 @@ const RepeaterDelays = (function () {
       : `<div class="table-wrap" role="region" tabindex="0" aria-labelledby="rd-h-compare">
         <table class="hl-table rd-compare">
           <caption class="sr-only">Each limit on the delay, and how many repeater pairs it leaves on top of each other, close and clear</caption>
-          <thead><tr><th scope="col">Longest delay</th><th scope="col" class="num">On top</th><th scope="col" class="num">Close</th>
-            <th scope="col" class="num">Clear</th><th scope="col">Delays used</th></tr></thead>
+          <thead><tr><th scope="col">${term('limit', 'Longest delay')}</th><th scope="col" class="num">${term('ontop', 'On top')}</th>
+            <th scope="col" class="num">${term('close', 'Close')}</th><th scope="col" class="num">${term('clear', 'Clear')}</th>
+            <th scope="col">${term('used', 'Delays used')}</th></tr></thead>
           <tbody>
-            <tr><th scope="row">Every repeater on one delay</th><td class="num">${num(rows[0].counts.ontopSame)}</td>
+            <tr><th scope="row">Every repeater ${term('oneDelay', 'on one delay')}</th><td class="num">${num(rows[0].counts.ontopSame)}</td>
               <td class="num">${num(rows[0].counts.closeSame)}</td><td class="num">${num(rows[0].counts.clearSame)}</td><td>one</td></tr>
             ${rows.map(p => `<tr${p.settings.maxMs === opts().maxMs ? ' class="is-selected"' : ''}>
               <th scope="row">${esc((LIMITS.find(l => l.ms === p.settings.maxMs) || { label: ms(p.settings.maxMs) }).label)}</th>
@@ -218,26 +281,28 @@ const RepeaterDelays = (function () {
     const cols = showNow ? 8 : 7;
     const rows = p.clusters.map(c => {
       const head = `<tr class="rd-group"><th scope="rowgroup" colspan="${cols}" id="rd-g-${c.n}">
-        Group ${c.n} · ${esc(c.name)} <span class="small txt-muted">— ${plural(c.repeaters.length, 'repeater')}, ${plural(c.pairs, 'pair')};
-        on one delay ${esc(BAND[c.worstSame].label.toLowerCase())}, planned ${esc(BAND[c.worst].label.toLowerCase())}</span></th></tr>`;
+        ${term('group', `Group ${c.n}`)} · ${esc(c.name)} <span class="small txt-muted">— ${plural(c.repeaters.length, 'repeater')},
+        ${num(c.pairs)} ${term('pair', c.pairs === 1 ? 'pair' : 'pairs')}; ${term('oneDelay', 'on one delay')} ${esc(BAND[c.worstSame].label.toLowerCase())},
+        ${term('planned', 'planned')} ${esc(BAND[c.worst].label.toLowerCase())}</span></th></tr>`;
       return head + c.repeaters.map(id => rowHtml(byId.get(id), showNow)).join('');
     }).join('');
     return `<div class="table-wrap" role="region" tabindex="0" aria-labelledby="rd-h-table">
       <table class="hl-table rd-table">
         <caption class="sr-only">Each repeater's planned delay, group by group: its channel, its closest neighbour under the plan and how far apart their copies land, and how many readings it shares</caption>
-        <thead><tr><th scope="col">Repeater</th><th scope="col">Channel, MHz</th><th scope="col" class="num">Delay</th>
-          ${showNow ? '<th scope="col" class="num">Now</th>' : ''}
-          <th scope="col">Closest neighbour</th><th scope="col" class="num">Apart</th><th scope="col">State</th>
-          <th scope="col" class="num">Readings shared</th></tr></thead>
+        <thead><tr><th scope="col">Repeater</th><th scope="col">${term('channel', 'Channel, MHz')}</th>
+          <th scope="col" class="num">${term('delay', 'Delay')}</th>
+          ${showNow ? `<th scope="col" class="num">${term('now', 'Now')}</th>` : ''}
+          <th scope="col">${term('neighbour', 'Closest neighbour')}</th><th scope="col" class="num">${term('apart', 'Apart')}</th>
+          <th scope="col">${term('state', 'State')}</th><th scope="col" class="num">${term('readings', 'Readings shared')}</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>`;
   }
 
   function rowHtml(r, showNow) {
     const n = r.neighbours[0];
-    const now = r.baseline == null ? '—' : `${ms(r.baseline)}${r.change ? ' <span class="rd-change">change</span>' : ''}`;
+    const now = r.baseline == null ? '—' : `${ms(r.baseline)}${r.change ? ` <span class="rd-change term-chip" title="${esc(word('change'))}">change</span>` : ''}`;
     return `<tr id="rd-r-${escAttr(r.id)}">
-      <th scope="row">${stationBtn(r.id, r.name)}${r.fixed ? ' <span class="small txt-muted">recorded</span>' : ''}</th>
+      <th scope="row">${stationBtn(r.id, r.name)}${r.fixed ? ` <span class="small txt-muted">${term('recorded', 'recorded')}</span>` : ''}</th>
       <td>${chan(r)}</td>
       <td class="num rd-delay">${ms(r.delay)}</td>
       ${showNow ? `<td class="num">${now}</td>` : ''}
@@ -266,8 +331,9 @@ const RepeaterDelays = (function () {
       <div class="table-wrap tall" role="region" tabindex="0" aria-labelledby="rd-h-pairs">
       <table class="hl-table rd-pairs">
         <caption class="sr-only">Every pair of repeaters that can put copies of one reading on top of each other: how far apart, how many readings, where they meet, and how far apart their copies land on one delay and under the plan</caption>
-        <thead><tr><th scope="col">Repeaters</th><th scope="col" class="num">km</th><th scope="col" class="num">Readings</th>
-          <th scope="col">Heard together at</th><th scope="col">On one delay</th><th scope="col">Planned</th></tr></thead>
+        <thead><tr><th scope="col">Repeaters</th><th scope="col" class="num">${term('km', 'km')}</th>
+          <th scope="col" class="num">${term('pairReadings', 'Readings')}</th><th scope="col">${term('where', 'Heard together at')}</th>
+          <th scope="col">${term('oneDelay', 'On one delay')}</th><th scope="col">${term('planned', 'Planned')}</th></tr></thead>
         <tbody>${p.pairs.map(x => `<tr>
           <th scope="row">${esc(x.aName)} &amp; ${esc(x.bName)}</th>
           <td class="num">${num(Math.round(x.km))}</td><td class="num">${num(x.weight)}</td>
@@ -276,6 +342,14 @@ const RepeaterDelays = (function () {
           <td>${bandHtml(x.band)} <span class="small">${ms(x.sepMs)}</span></td>
         </tr>`).join('')}</tbody>
       </table></div></details>`;
+  }
+
+  // Every word above with a meaning on hover, listed with it: hover is for a
+  // mouse, and this is the same explanation for a finger or a keyboard.
+  function glossaryHtml() {
+    return `<details class="rd-fold" data-k="words"><summary><h3 class="bk-inline-h" id="rd-h-words">What the words on this page mean</h3></summary>
+      <dl class="rd-words">${GLOSSARY.map(([k, label]) => `<dt>${esc(label)}</dt><dd>${esc(word(k))}</dd>`).join('')}</dl>
+    </details>`;
   }
 
   function howHtml(p) {
@@ -319,6 +393,7 @@ const RepeaterDelays = (function () {
 
   function render() {
     const o = opts();
+    W = words(o);
     const p = current();
     const body = !p
       ? '<p class="small" role="status">The station register is not loaded yet.</p>'
@@ -344,6 +419,7 @@ const RepeaterDelays = (function () {
         ${freeHtml(p)}
         ${compareHtml()}
         ${pairsHtml(p)}
+        ${glossaryHtml()}
         ${howHtml(p)}
       </div>` : ''}
     </div>`;
