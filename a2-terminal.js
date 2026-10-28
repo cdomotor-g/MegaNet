@@ -205,7 +205,7 @@ const A2Terminal = (function () {
   // A value prompt, the current value already in it and the cursor at its end
   // — so Enter on its own keeps it, and changing it starts with Backspace. A
   // placeholder ('-', '?') sits under the cursor for the first key to replace.
-  function prompt(st, text, value, then, opt = {}) {
+  function askValue(st, text, value, then, opt = {}) {
     const v = String(value);
     const ph = v === '-' || v === '?';
     ask(st, `${text}${v}`);
@@ -561,9 +561,9 @@ const A2Terminal = (function () {
   // Unit Config's entries in the tables: see fill().
   function unitConfigEntries() {
     MENUS.unitcfg = () => ({ title: 'Unit Config Menu', items: [
-      item('Station Address', st => prompt(st, `${T}${T}Station Address: `, st.cfg.address, 'ucAddr')),
-      item('Update Time', st => prompt(st, `${T}${T}Update Time: (min) `, st.cfg.updateMin, 'ucUpd')),
-      item('Paralysis Time', st => prompt(st, `${T}${T}Paralysis Time: (sec) `, st.cfg.paralysisSec, 'ucPar')),
+      item('Station Address', st => askValue(st, `${T}${T}Station Address: `, st.cfg.address, 'ucAddr')),
+      item('Update Time', st => askValue(st, `${T}${T}Update Time: (min) `, st.cfg.updateMin, 'ucUpd')),
+      item('Paralysis Time', st => askValue(st, `${T}${T}Paralysis Time: (sec) `, st.cfg.paralysisSec, 'ucPar')),
       item('Data Log Format', st => choose(st, 'Logging Format', ['ALERT2 ASCII', 'CSV on Change', 'CSV on Sample'], st.cfg.logFormat, 'ucLog', 'toUnitcfg')),
       item('Battery Type', st => choose(st, 'Battery Type', ['Built-in LiFePO4', 'External Lead-Acid'], st.cfg.battery, 'ucBatt', 'toUnitcfg')),
       item('ALERT2 I/O Quick Setup', st => qs2(st)),
@@ -591,12 +591,12 @@ const A2Terminal = (function () {
       say(st, `${T}${T}Configuring Rain ID 0`);
       say(st, `${T}${T}Configuring River Analog ID 7`);
       st.fv = {};
-      prompt(st, `${T}${T}${T}Transducer Full Range (mm) `, 5000, 'qs2Range');
+      askValue(st, `${T}${T}${T}Transducer Full Range (mm) `, 5000, 'qs2Range');
     };
-    DONE.qs2Range = (st, v) => { st.fv.range = num(v, 5000); prompt(st, `${T}${T}${T}Analog Sample Time: (min) `, 15, 'qs2Samp'); };
-    DONE.qs2Samp = (st, v) => { st.fv.samp = num(v, 15); prompt(st, `${T}${T}${T}Analog Warmup Time: (sec) `, 10, 'qs2Warm'); };
-    DONE.qs2Warm = (st, v) => { st.fv.warm = num(v, 10); prompt(st, `${T}${T}${T}River Sensitivity (mm) `, 10, 'qs2Sens'); };
-    DONE.qs2Sens = (st, v) => { st.fv.sens = num(v, 10); prompt(st, `${T}${T}${T}River Offset (mm) `, 0, 'qs2Off'); };
+    DONE.qs2Range = (st, v) => { st.fv.range = num(v, 5000); askValue(st, `${T}${T}${T}Analog Sample Time: (min) `, 15, 'qs2Samp'); };
+    DONE.qs2Samp = (st, v) => { st.fv.samp = num(v, 15); askValue(st, `${T}${T}${T}Analog Warmup Time: (sec) `, 10, 'qs2Warm'); };
+    DONE.qs2Warm = (st, v) => { st.fv.warm = num(v, 10); askValue(st, `${T}${T}${T}River Sensitivity (mm) `, 10, 'qs2Sens'); };
+    DONE.qs2Sens = (st, v) => { st.fv.sens = num(v, 10); askValue(st, `${T}${T}${T}River Offset (mm) `, 0, 'qs2Off'); };
     DONE.qs2Off = (st, v) => {
       const f = st.fv, c = st.cfg;
       f.off = num(v, 0);
@@ -610,17 +610,17 @@ const A2Terminal = (function () {
       blank(st);
       anyKey(st, 'toUnitcfg');
     };
-    DONE.qs1Go = st => { st.fv = {}; blank(st); prompt(st, `${T}Rain Sensor ID: `, st.cfg.address, 'qs1Rain'); };
+    DONE.qs1Go = st => { st.fv = {}; blank(st); askValue(st, `${T}Rain Sensor ID: `, st.cfg.address, 'qs1Rain'); };
     DONE.qs1Rain = (st, v) => {
       const id = v === '' ? String(st.cfg.address) : sensorId(v);
-      if (id === null) { blank(st); prompt(st, RETRY, st.cfg.address, 'qs1Rain'); return; }
+      if (id === null) { blank(st); askValue(st, RETRY, st.cfg.address, 'qs1Rain'); return; }
       st.fv.rain = id;
       say(st, `${T}${T}Configuring Rain ID ${id === '-' ? 8192 : id}. Increment 1 mm`);
-      prompt(st, `${T}River Sensor ID ('-' to disable): `, st.cfg.address + 1, 'qs1River');
+      askValue(st, `${T}River Sensor ID ('-' to disable): `, st.cfg.address + 1, 'qs1River');
     };
     DONE.qs1River = (st, v) => {
       const id = v === '' ? String(st.cfg.address + 1) : sensorId(v);
-      if (id === null) { blank(st); prompt(st, RETRY, st.cfg.address + 1, 'qs1River'); return; }
+      if (id === null) { blank(st); askValue(st, RETRY, st.cfg.address + 1, 'qs1River'); return; }
       st.fv.river = id;
       if (id === '-') { DONE.qs1BattAsk(st); return; }
       choose(st, 'River Level Input', ['Analogue', 'Incremental', 'Quadrature'], 'Analogue', 'qs1Input', 'qs1InputOut');
@@ -628,21 +628,21 @@ const A2Terminal = (function () {
     DONE.qs1InputOut = (st, cancel) => (cancel === null ? DONE.qs1BattAsk(st) : DONE.qs1Input(st, 'Analogue'));
     DONE.qs1Input = (st, v) => {
       if (v !== 'Analogue') { note(st, NOT_LOGGED); st.fv.river = '-'; DONE.qs1BattAsk(st); return; }
-      prompt(st, `${T}${T}${T}Transducer Full Range  (mm) `, 5000, 'qs1Range');
+      askValue(st, `${T}${T}${T}Transducer Full Range  (mm) `, 5000, 'qs1Range');
     };
-    DONE.qs1Range = (st, v) => { st.fv.range = num(v, 5000); prompt(st, `${T}${T}${T}Analog Sample Time: (min) `, 1, 'qs1Samp'); };
-    DONE.qs1Samp = (st, v) => { st.fv.samp = num(v, 1); prompt(st, `${T}${T}${T}Analog Warmup Time: (sec) `, 5, 'qs1Warm'); };
-    DONE.qs1Warm = (st, v) => { st.fv.warm = num(v, 5); prompt(st, `${T}${T}${T}River Increment  (mm) `, 10, 'qs1Inc'); };
-    DONE.qs1Inc = (st, v) => { st.fv.inc = num(v, 10) || 10; prompt(st, `${T}${T}${T}River Offset  (mm) `, 0, 'qs1Off'); };
+    DONE.qs1Range = (st, v) => { st.fv.range = num(v, 5000); askValue(st, `${T}${T}${T}Analog Sample Time: (min) `, 1, 'qs1Samp'); };
+    DONE.qs1Samp = (st, v) => { st.fv.samp = num(v, 1); askValue(st, `${T}${T}${T}Analog Warmup Time: (sec) `, 5, 'qs1Warm'); };
+    DONE.qs1Warm = (st, v) => { st.fv.warm = num(v, 5); askValue(st, `${T}${T}${T}River Increment  (mm) `, 10, 'qs1Inc'); };
+    DONE.qs1Inc = (st, v) => { st.fv.inc = num(v, 10) || 10; askValue(st, `${T}${T}${T}River Offset  (mm) `, 0, 'qs1Off'); };
     DONE.qs1Off = (st, v) => {
       st.fv.off = num(v, 0);
       say(st, `${T}${T}Configuring River Analog: ID ${st.fv.river}. Increment ${st.fv.inc} mm`);
       DONE.qs1BattAsk(st);
     };
-    DONE.qs1BattAsk = st => prompt(st, `${T}Battery Sensor ID: `, st.cfg.address + 2, 'qs1Batt');
+    DONE.qs1BattAsk = st => askValue(st, `${T}Battery Sensor ID: `, st.cfg.address + 2, 'qs1Batt');
     DONE.qs1Batt = (st, v) => {
       const id = v === '' ? String(st.cfg.address + 2) : sensorId(v);
-      if (id === null) { blank(st); prompt(st, RETRY, st.cfg.address + 2, 'qs1Batt'); return; }
+      if (id === null) { blank(st); askValue(st, RETRY, st.cfg.address + 2, 'qs1Batt'); return; }
       const f = st.fv, c = st.cfg;
       say(st, `${T}${T}Configuring Battery: ID ${id === '-' ? 8192 : id}. Increment 0.1  V`);
       Object.assign(c.inputs.DI3, { id: f.rain, fmt: 'U-2', scale: '1', offset: '0mm', sens: '1mm' });
@@ -679,7 +679,7 @@ const A2Terminal = (function () {
   function idInto(st, v, obj, again, back) {
     if (v === '') { go(st, back); return; }
     const id = sensorId(v);
-    if (id === null) { blank(st); prompt(st, RETRY, obj.id, again); return; }
+    if (id === null) { blank(st); askValue(st, RETRY, obj.id, again); return; }
     if (obj.id !== id) { obj.id = id; st.dirty = true; }
     go(st, back);
   }
@@ -722,7 +722,7 @@ const A2Terminal = (function () {
         item('SDI-12 Device config', s => { clear(s); showMenu(s, 'sdi'); }),
       ];
       // Analog Sampling only once an analog input has an ID.
-      if (c.inputs.AI1.id !== '-' || c.inputs.AI2.id !== '-') items.push(item('Analog Sampling', s => prompt(s, `${T}${T}Analog Sample Time: (min) `, s.cfg.analogSampleMin, 'ioSamp')));
+      if (c.inputs.AI1.id !== '-' || c.inputs.AI2.id !== '-') items.push(item('Analog Sampling', s => askValue(s, `${T}${T}Analog Sample Time: (min) `, s.cfg.analogSampleMin, 'ioSamp')));
       return { title: 'I/O Setup Menu', items };
     };
     PARENT.io = 'main';
@@ -732,13 +732,13 @@ const A2Terminal = (function () {
       st.cfg.inputs.DI1.mode = modes[0]; st.cfg.inputs.DI2.mode = modes[1];
       ioTables(st);
     };
-    DONE.ioSamp = (st, v) => { if (isInt(v)) set(st, 'analogSampleMin', +v); prompt(st, `${T}${T}Analog Warmup Time: (sec) `, st.cfg.analogWarmSec, 'ioWarm'); };
+    DONE.ioSamp = (st, v) => { if (isInt(v)) set(st, 'analogSampleMin', +v); askValue(st, `${T}${T}Analog Warmup Time: (sec) `, st.cfg.analogWarmSec, 'ioWarm'); };
     DONE.ioWarm = (st, v) => { if (isInt(v)) set(st, 'analogWarmSec', +v); ioTables(st); };
     THEN.dig = st => digital(st, st.fv.dig);
     MENUS.dig = st => ({ title: `Digital ${st.fv.dig + 1} Menu`, items: [
-      item('Sensor ID \'-\' to disable', s => { blank(s); prompt(s, `${T}${T}Sensor ID '-' to disable: `, s.cfg.inputs[DIG[s.fv.dig]].id, 'digId'); }),
+      item('Sensor ID \'-\' to disable', s => { blank(s); askValue(s, `${T}${T}Sensor ID '-' to disable: `, s.cfg.inputs[DIG[s.fv.dig]].id, 'digId'); }),
       item('Report Format', notLogged('dig')),
-      item('Scaling (per count)', s => { blank(s); prompt(s, `${T}${T}Scaling (per count): `, s.cfg.inputs[DIG[s.fv.dig]].scale, 'digScale'); }),
+      item('Scaling (per count)', s => { blank(s); askValue(s, `${T}${T}Scaling (per count): `, s.cfg.inputs[DIG[s.fv.dig]].scale, 'digScale'); }),
       item('Zero / Offset', notLogged('dig')),
       item('Display Units', notLogged('dig')),
       item('Display Scaling', notLogged('dig')),
@@ -753,7 +753,7 @@ const A2Terminal = (function () {
     };
     THEN.int = st => internal(st, st.fv.int);
     MENUS.int = st => ({ title: `${INTERNAL[st.fv.int][1]} Menu`, items: [
-      item('Sensor ID \'-\' to disable', s => { blank(s); prompt(s, `${T}${T}Sensor ID '-' to disable : `, s.cfg.internal[INTERNAL[s.fv.int][0]].id, 'intId'); }),
+      item('Sensor ID \'-\' to disable', s => { blank(s); askValue(s, `${T}${T}Sensor ID '-' to disable : `, s.cfg.internal[INTERNAL[s.fv.int][0]].id, 'intId'); }),
       item('Report Format', s => choose(s, INTERNAL[s.fv.int][1], ['ALERT2 Default', 'ALERT2 Type & Length'], null, 'intFmt', 'int', 'Sensor Type: ')),
     ] });
     PARENT.int = 'io';
@@ -770,16 +770,16 @@ const A2Terminal = (function () {
       item('Scan for Device', s => { note(s, 'Simulator: this unit has no SDI-12 sensor on its bus to find'); showMenu(s, 'sdi'); }),
       item('Manually add Device', s => yesno(s, `${T}${T}Please connect the sensor to the data bus and power supply. Are you Ready to proceed??`, 'sdiAdd', 'sdiM')),
       item('Send manual command ', notLogged('sdi')),
-      item('SDI Sampling Time', s => prompt(s, `${T}${T}SDI Sample Time: (min) `, s.cfg.sdiSampleMin, 'sdiSamp')),
+      item('SDI Sampling Time', s => askValue(s, `${T}${T}SDI Sample Time: (min) `, s.cfg.sdiSampleMin, 'sdiSamp')),
       item('Default SDI Measurement CMD', s => choose(s, 'Default SDI Measurement CMD', ['Start Measurement (M!)', 'Start Measurement and Req CRC (MC!)', 'Continuous Measurements (R!)',
         'Continuous Measurements Req CRC (RC!)', 'Concurrent Measurement (C!)', 'Concurrent Measurement and Req CRC (CC!)'], s.cfg.sdiCmd, 'sdiCmd', 'sdiM', 'Mode:')),
       item('SDI Sampling Mode', s => choose(s, 'SDI Sampling Mode', ['Controller', 'Listener', 'Disabled'], s.cfg.sdiMode, 'sdiMode', 'sdiM', 'Mode:')),
     ] });
     PARENT.sdi = 'io';
     DONE.sdiM = st => showMenu(st, 'sdi');
-    DONE.sdiAdd = st => { blank(st); prompt(st, `${T}${T}Enter the Address (0-9): `, 0, 'sdiAddr'); };
+    DONE.sdiAdd = st => { blank(st); askValue(st, `${T}${T}Enter the Address (0-9): `, 0, 'sdiAddr'); };
     DONE.sdiAddr = st => { blank(st); say(st, `${T}${T}Sensor Not Added`); showMenu(st, 'sdi'); };
-    DONE.sdiSamp = (st, v) => { if (isInt(v)) set(st, 'sdiSampleMin', +v); prompt(st, `${T}${T}SDI Warmup Time: (sec) `, st.cfg.sdiWarmSec, 'sdiWarm'); };
+    DONE.sdiSamp = (st, v) => { if (isInt(v)) set(st, 'sdiSampleMin', +v); askValue(st, `${T}${T}SDI Warmup Time: (sec) `, st.cfg.sdiWarmSec, 'sdiWarm'); };
     DONE.sdiWarm = (st, v) => { if (isInt(v)) set(st, 'sdiWarmSec', +v); showMenu(st, 'sdi'); };
     DONE.sdiCmd = (st, v) => { set(st, 'sdiCmd', v); showMenu(st, 'sdi'); };
     DONE.sdiMode = (st, v) => { set(st, 'sdiMode', v); showMenu(st, 'sdi'); };
@@ -820,7 +820,7 @@ const A2Terminal = (function () {
       const v = (label, val) => `${label} => ${val}`;
       const ch = field => item(v(LISTS[field][0], listField(st, field)),
         s => choose(s, LISTS[field][0], LISTS[field][1], listField(s, field), `pick_${field}`, 'commBack', 'Selection:'));
-      const val = field => item(v(COMM_VALUE[field], c[field]), s => { s.fv = { field }; prompt(s, `${T}${T}${COMM_VALUE[field]} `, s.cfg[field], 'commVal'); });
+      const val = field => item(v(COMM_VALUE[field], c[field]), s => { s.fv = { field }; askValue(s, `${T}${T}${COMM_VALUE[field]} `, s.cfg[field], 'commVal'); });
       const items = [ch('commMode')];
       if (c.commMode === 'RS232 Reporting') {
         items.push(val('baud'), ch('protocol'), ch('unitType'));
@@ -887,7 +887,7 @@ const A2Terminal = (function () {
       const l = listOf(st);
       const ents = (l && l.entries) || [];
       return { title: 'Address List Entries Menu', prompt: 'Selection', items: [
-        item('Add Entry', s => prompt(s, `${T}${T}Enter low address:`, 0, 'entLow')),
+        item('Add Entry', s => askValue(s, `${T}${T}Enter low address:`, 0, 'entLow')),
         ...ents.map(([a, b], i) => item(`${String(a).padEnd(6)}to  ${b}`, s => {
           s.fv = { del: i };
           yesno(s, `${T}${T}Delete Entry ${L(i + 1)}) ${String(a).padEnd(6)}to  ${b}?`, 'entDel', 'entries');
@@ -897,10 +897,10 @@ const A2Terminal = (function () {
     PARENT.entries = 'comm';
     DONE.entries = st => showMenu(st, 'entries');
     DONE.entDel = st => { const l = listOf(st); if (l) { l.entries.splice(st.fv.del, 1); st.dirty = true; } showMenu(st, 'entries'); };
-    DONE.entLow = (st, v) => { st.fv = { low: isInt(v) ? +v : 0 }; prompt(st, `${T}${T}Enter high address:`, st.fv.low, 'entHigh'); };
+    DONE.entLow = (st, v) => { st.fv = { low: isInt(v) ? +v : 0 }; askValue(st, `${T}${T}Enter high address:`, st.fv.low, 'entHigh'); };
     DONE.entHigh = (st, v) => {
       const hi = isInt(v) ? +v : st.fv.low;
-      if (hi > 65535) { blank(st); prompt(st, `${T}${T}${T}Enter a value between 0 and 65535: `, st.fv.low, 'entHigh'); return; }
+      if (hi > 65535) { blank(st); askValue(st, `${T}${T}${T}Enter a value between 0 and 65535: `, st.fv.low, 'entHigh'); return; }
       if (hi < st.fv.low) { say(st, `${T}${T}Error: High address must be greater than Low!`, 'tm-err'); showMenu(st, 'entries'); return; }
       const l = listOf(st);
       if (l) { l.entries.push([st.fv.low, hi]); st.dirty = true; }
@@ -1013,7 +1013,7 @@ const A2Terminal = (function () {
     DONE.logBack = st => { say(st, T); header(st); };
     MENUS.sdicmd = st => ({ title: st.fv.sdiAddr == null ? 'SDI-12 Manual Command Menu' : `SDI-12 Manual Command for sensor ${st.fv.sdiAddr} Menu`,
       items: SDI_CMDS.map((label, i) => item(label, s => {
-        if (i === 0) { blank(s); prompt(s, `${T}${T}Enter the Address (0-9 or ?): `, s.fv.sdiAddr == null ? '?' : s.fv.sdiAddr, 'sdiSet'); return; }
+        if (i === 0) { blank(s); askValue(s, `${T}${T}Enter the Address (0-9 or ?): `, s.fv.sdiAddr == null ? '?' : s.fv.sdiAddr, 'sdiSet'); return; }
         say(s, `${T}${T}Warming up the Sensor (any key to skip) ....................`);
         blank(s);
         say(s, `${T}${T}No response from sensor`);
@@ -1170,7 +1170,7 @@ const A2Terminal = (function () {
     MENUS.accum = () => ({ title: 'Set Accumulator Menu', items: ACC.map(([label, n]) => item(label, s => {
       if (n[0] === 'A') { note(s, NOT_LOGGED); accumTables(s); showMenu(s, 'accum'); return; }
       s.fv = { acc: n };
-      prompt(s, `${T}${T}Enter value for ${label} : `, s.cfg.inputs[n].raw, 'accSet');
+      askValue(s, `${T}${T}Enter value for ${label} : `, s.cfg.inputs[n].raw, 'accSet');
     })) });
     PARENT.accum = 'main';
     // An accumulator set is a count, not a configuration change: no "Config NOT Saved".

@@ -199,6 +199,9 @@ const CardWidth = (() => {
   // which goes with it.
   function onMutations(records) {
     for (const r of records) {
+      // A card shown or hidden in place: its handle goes with it now, not on
+      // a resize that a card of unchanged size never sends.
+      if (r.type === 'attributes') { if (cards.has(r.target)) sync(r.target); continue; }
       for (const n of r.addedNodes) {
         if (n.nodeType !== 1 || n.classList.contains('mn-cardw')) continue;
         if (n.matches(CARDS)) attach(n);
@@ -306,7 +309,7 @@ const CardWidth = (() => {
     if (started || typeof MutationObserver === 'undefined' || typeof ResizeObserver === 'undefined') return;
     started = true;
     ro = new ResizeObserver(onResize);
-    new MutationObserver(onMutations).observe(document.body, { childList: true, subtree: true });
+    new MutationObserver(onMutations).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
     window.addEventListener('resize', later);
     document.querySelectorAll(CARDS).forEach(attach);
   }
