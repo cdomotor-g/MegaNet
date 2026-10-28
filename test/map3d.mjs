@@ -981,6 +981,12 @@ const hudNow = () => page.evaluate(() => {
     mouse: viewMoveWords(false), touch: viewMoveWords(true),
   };
 });
+// The minimap is put away for this section. Over its one button the credits
+// still come down into the hint's way, as they did over the bare corner, and
+// that is what is held here; over the minimap open the hint stands beside it
+// (6c).
+await page.evaluate(() => document.querySelector('.mn-map-mini-fold').click());
+await page.waitForTimeout(200);
 let H = await hudNow();
 ok('minutes after 3-D opened, the hint has folded by itself to its "?", which says so',
    H.inHost && H.folded && !H.shown && H.q && H.q.shown && H.q.expanded === 'false' && H.q.name === 'How to move the view',
@@ -1031,6 +1037,155 @@ ok('"?" pressed while the hint is up puts it away, and pressed again brings it b
 ok('…for its few seconds, after which it folds to the "?", which says so',
    H.folded && !H.shown && H.q.shown && H.q.expanded === 'false', JSON.stringify({ folded: H.folded, shown: H.shown, q: H.q }));
 await page.evaluate(() => Map3D._hud(null));
+
+// ── 6c. the minimap over the 3-D view ───────────────────────────────────────
+// The Stations map's minimap (map-mini.js) stays up in 3-D, and each way it
+// can be wrong still looks like a minimap. Under the canvas it is simply gone
+// (it was, until it was lifted over it); over it, MapLibre's zoom, compass and
+// credits are lost under it unless they stand on it; and following the 2-D
+// map under the canvas it stands still for the whole of a camera move, jumps
+// when the camera stops, and outlines a rectangle the tilted camera is not
+// looking at. So: what is under the pointer at its middle; the corner
+// measured standing on it; its centre against the camera's in the middle of
+// an ease, while the 2-D map is still where the ease began; and its outline
+// against MapLibre's own unproject of the canvas's foot.
+console.log('\nThe minimap stays up over the 3-D view, and follows the camera');
+await page.evaluate(() => document.querySelector('.mn-map-mini-open').click());
+await page.evaluate(() => Map3D._map().jumpTo({ center: [152.6, -27.3], zoom: 9, pitch: 62, bearing: 35 }));
+await page.waitForTimeout(400);
+const miniNow = () => page.evaluate(() => {
+  const b = el => { if (!el) return null; const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; };
+  const wrap = MapMini.element(), host = document.getElementById('map3d');
+  const wb = b(wrap);
+  const under = wb ? document.elementFromPoint((wb.left + wb.right) / 2, (wb.top + wb.bottom) / 2) : null;
+  const m = Map3D._map(), c = m.getCenter(), mm = MapMini.map(), mc = mm ? mm.getCenter() : null, lc = state.map.getCenter();
+  const cv = m.getContainer();
+  const at = (x, y) => { const ll = m.unproject([x, y]); return [ll.lat, ll.lng]; };
+  return {
+    wrap: wb, onTop: !!under && wrap.contains(under), host: b(host), hasMini: host.classList.contains('has-mini'),
+    nav: b(document.querySelector('#map3d .maplibregl-ctrl-bottom-right .maplibregl-ctrl-group')),
+    attrib: b(document.querySelector('#map3d .maplibregl-ctrl-attrib')),
+    hud: b(document.getElementById('map3d-hud')), q: b(document.getElementById('map3d-hud-q')),
+    openBtn: b(document.querySelector('.mn-map-mini-open')),
+    cam: { lat: c.lat, lng: c.lng, z: m.getZoom(), bearing: m.getBearing() }, lf: { lat: lc.lat, lng: lc.lng },
+    mini: mc ? { lat: mc.lat, lng: mc.lng, z: mm.getZoom() } : null,
+    out: MapMini.settings().out, drawn: MapMini.drawn(),
+    // The canvas's foot, right then left: the outline's third and fourth corners.
+    foot: [at(cv.clientWidth, cv.clientHeight), at(0, cv.clientHeight)],
+  };
+});
+// A pixel of the minimap in degrees of longitude at its zoom; ground distance
+// in degrees of latitude; and the bearing from one corner to another.
+const miniPx = z => 360 / (256 * 2 ** z);
+const deg = (a, b) => Math.hypot(a[0] - b[0], (a[1] - b[1]) * Math.cos(a[0] * Math.PI / 180));
+const heading = (a, b) => (Math.atan2((b[1] - a[1]) * Math.cos(a[0] * Math.PI / 180), b[0] - a[0]) * 180 / Math.PI + 360) % 360;
+let MN = await miniNow();
+ok('the minimap is over the 3-D canvas, in its bottom-right corner: the thing under the pointer at its middle',
+   MN.onTop && !!MN.wrap && MN.wrap.right <= MN.host.right && MN.host.right - MN.wrap.right < 30
+     && MN.wrap.bottom <= MN.host.bottom && MN.host.bottom - MN.wrap.bottom < 40,
+   JSON.stringify({ wrap: MN.wrap, host: MN.host, onTop: MN.onTop }));
+ok('…MapLibre’s zoom, compass and credits standing on it rather than under it',
+   MN.hasMini && !!MN.nav && !!MN.attrib && MN.nav.bottom <= MN.wrap.top + 0.5 && MN.attrib.bottom <= MN.wrap.top + 0.5,
+   JSON.stringify({ wrap: MN.wrap, nav: MN.nav, attrib: MN.attrib }));
+ok('…and the hint and its "?" clear of it',
+   !!MN.hud && !!MN.q && (MN.hud.right <= MN.wrap.left + 0.5 || MN.hud.bottom <= MN.wrap.top + 0.5) && MN.q.right <= MN.wrap.left,
+   JSON.stringify({ wrap: MN.wrap, hud: MN.hud, q: MN.q }));
+ok('it follows the camera: centred on the point the camera looks at, four levels further out on the 2-D map’s scale',
+   MN.drawn.camera && !!MN.mini && near(MN.mini.lat, MN.cam.lat, miniPx(MN.mini.z)) && near(MN.mini.lng, MN.cam.lng, miniPx(MN.mini.z))
+     && MN.mini.z === Math.round(MN.cam.z + 1) - MN.out,
+   JSON.stringify({ cam: MN.cam, mini: MN.mini, out: MN.out }));
+const OL = MN.drawn.outline || [];
+const olTol = MN.mini ? miniPx(MN.mini.z) : 0;
+ok('its outline is the ground the camera sees: the canvas’s foot where MapLibre puts it, to the minimap’s pixel, and a far edge wider than the near — a wedge',
+   OL.length === 4 && near(OL[2][0], MN.foot[0][0], olTol) && near(OL[2][1], MN.foot[0][1], olTol)
+     && near(OL[3][0], MN.foot[1][0], olTol) && near(OL[3][1], MN.foot[1][1], olTol)
+     && deg(OL[0], OL[1]) > 1.5 * deg(OL[3], OL[2]),
+   JSON.stringify({ outline: OL, foot: MN.foot }));
+const nearEdge = OL.length === 4 ? heading(OL[3], OL[2]) : null;
+ok('…turned with the camera: its near edge runs at the heading plus a right angle, not east–west',
+   near(nearEdge, (MN.cam.bearing + 90 + 360) % 360, 3), JSON.stringify({ nearEdge, bearing: MN.cam.bearing }));
+// Frame by frame: the middle of an ease, where the 2-D map under the canvas
+// is still where the camera set off from (it follows when the camera stops,
+// map-3d.js onCameraEnd) — and a minimap following it would be too. The ease
+// goes half-way in its first tenth and holds there until its last, so it is
+// read standing still mid-move however slowly SwiftShader draws: the minimap
+// has had frames to catch up, and is held to the camera's pixel.
+const MID = await page.evaluate(() => new Promise(res => {
+  const m = Map3D._map(), lf0 = state.map.getCenter();
+  const easing = t => (t < 0.1 ? t * 5 : t < 0.9 ? 0.5 : 0.5 + (t - 0.9) * 5);
+  m.easeTo({ center: [154.6, -27.3], duration: 6000, easing, freezeElevation: true });
+  setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+    const c = m.getCenter(), mm = MapMini.map(), mc = mm.getCenter(), lc = state.map.getCenter();
+    res({ moving: m.isMoving(), cam: [c.lat, c.lng], mini: [mc.lat, mc.lng], z: mm.getZoom(),
+          lf: [lc.lat, lc.lng], lf0: [lf0.lat, lf0.lng] });
+  })), 1800);
+}));
+ok('…frame by frame: mid-way through a camera move it is with the camera, while the 2-D map under the canvas has not moved',
+   MID.moving && deg(MID.lf, MID.lf0) < 1e-9 && deg(MID.cam, MID.lf) > 0.5
+     && near(MID.mini[0], MID.cam[0], miniPx(MID.z)) && near(MID.mini[1], MID.cam[1], miniPx(MID.z)),
+   JSON.stringify(MID));
+await page.waitForFunction(() => !Map3D._map().isMoving(), null, { timeout: 10_000 }).catch(() => {});
+await page.waitForTimeout(300);
+// A click sends the camera to the point clicked, through the 2-D map, which
+// the camera follows — the minimap's own way, unchanged. To two of the
+// minimap's pixels: when the camera stops it seats its centre on the ground
+// (MapLibre's freezeElevation, map-3d.js follow), which moves it by the lie
+// of the land under it.
+const seatPx = 2;
+const mbox = await page.locator('.mn-minimap-map').boundingBox();
+const cpx = { x: Math.round(mbox.width * 0.3), y: Math.round(mbox.height * 0.7) };
+const ctarget = await page.evaluate(p => { const ll = MapMini.map().containerPointToLatLng([p.x, p.y]); return [ll.lat, ll.lng, MapMini.map().getZoom()]; }, cpx);
+await page.mouse.click(mbox.x + cpx.x, mbox.y + cpx.y);
+await page.waitForFunction(t => {
+  const m = Map3D._map(), c = m.getCenter();
+  return !m.isMoving() && Math.abs(c.lat - t[0]) < 1e-3 && Math.abs(c.lng - t[1]) < 1e-3;
+}, ctarget, { timeout: 8000 }).catch(() => {});
+MN = await miniNow();
+ok('a click on it sends the camera to the point clicked',
+   near(MN.cam.lat, ctarget[0], seatPx * miniPx(ctarget[2])) && near(MN.cam.lng, ctarget[1], seatPx * miniPx(ctarget[2])),
+   JSON.stringify({ cam: MN.cam, target: ctarget }));
+// A drag takes the camera along when it is let go — and the minimap stays
+// where it was dragged to while the camera catches up, rather than going back
+// to the camera's old place and coming forward with it. A short drag, so the
+// place is still in the camera's view and it eases there rather than jumping
+// (map-3d.js follow): the catching up is what is watched.
+const dc0 = [MN.mini.lat, MN.mini.lng];
+await page.mouse.move(mbox.x + mbox.width / 2, mbox.y + mbox.height / 2);
+await page.mouse.down();
+for (let i = 1; i <= 8; i++) {
+  await page.mouse.move(mbox.x + mbox.width / 2 - 2 * i, mbox.y + mbox.height / 2 - i);
+  await page.waitForTimeout(16);
+}
+await page.mouse.up();
+const dragged = await page.evaluate(() => { const c = MapMini.map().getCenter(); return [c.lat, c.lng, MapMini.map().getZoom()]; });
+const dseen = [];
+for (let i = 0; i < 10; i++) {
+  await page.waitForTimeout(100);
+  dseen.push(await page.evaluate(() => { const c = MapMini.map().getCenter(); return { mini: [c.lat, c.lng], moving: Map3D._map().isMoving() }; }));
+}
+await page.waitForFunction(() => !Map3D._map().isMoving(), null, { timeout: 8000 }).catch(() => {});
+await page.waitForTimeout(200);
+MN = await miniNow();
+const dTol = seatPx * miniPx(dragged[2]);
+ok('a drag on it takes the camera along, and it does not snap back while the camera catches up',
+   deg(dragged, dc0) > 2 * dTol && dseen.some(x => x.moving)
+     && dseen.every(x => near(x.mini[0], dragged[0], dTol) && near(x.mini[1], dragged[1], dTol))
+     && near(MN.cam.lat, dragged[0], dTol) && near(MN.cam.lng, dragged[1], dTol),
+   JSON.stringify({ from: dc0, dragged, seen: dseen.map(x => `${x.mini[0].toFixed(4)},${x.mini[1].toFixed(4)}${x.moving ? '*' : ''}`), cam: MN.cam }));
+// Put away and brought back.
+await page.evaluate(() => document.querySelector('.mn-map-mini-fold').click());
+await page.waitForTimeout(300);
+const MF = await miniNow();
+await page.evaluate(() => document.querySelector('.mn-map-mini-open').click());
+await page.waitForTimeout(400);
+MN = await miniNow();
+ok('put away, the zoom, compass and credits stand on its one button',
+   MF.hasMini && !MF.mini && !!MF.openBtn && MF.nav.bottom <= MF.openBtn.top + 0.5 && MF.attrib.bottom <= MF.openBtn.top + 0.5,
+   JSON.stringify({ openBtn: MF.openBtn, nav: MF.nav, attrib: MF.attrib }));
+ok('…and brought back, it opens on the camera, with them standing on it again',
+   MN.drawn.camera && !!MN.mini && near(MN.mini.lat, MN.cam.lat, miniPx(MN.mini.z)) && near(MN.mini.lng, MN.cam.lng, miniPx(MN.mini.z))
+     && MN.nav.bottom <= MN.wrap.top + 0.5 && MN.attrib.bottom <= MN.wrap.top + 0.5,
+   JSON.stringify({ cam: MN.cam, mini: MN.mini, wrap: MN.wrap, nav: MN.nav }));
 
 // ── 7. a pin clicked in 3-D paints a card that is on screen (#193) ──────────
 // The section above asks whether the *controls* survive the canvas. This asks
@@ -2605,6 +2760,10 @@ ok('…with MapLibre’s credits, scale bar, zoom and compass standing on it',
    C1.hasWater && C1.nav && C1.attrib && C1.bar && C1.nav.bottom <= C1.caveat.top + 0.5
      && C1.attrib.bottom <= C1.caveat.top + 0.5 && C1.bar.bottom <= C1.caveat.top + 0.5,
    JSON.stringify({ caveat: C1.caveat, nav: C1.nav, attrib: C1.attrib, bar: C1.bar }));
+const C1mini = await page.evaluate(() => { const r = MapMini.element().getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; });
+ok('…and the minimap standing on it too, with the zoom and compass on the minimap',
+   !!C1.caveat && C1mini.bottom <= C1.caveat.top + 0.5 && C1.nav.bottom <= C1mini.top + 0.5,
+   JSON.stringify({ caveat: C1.caveat, mini: C1mini, nav: C1.nav }));
 ok('…and taking no pointer: a drag that starts on it is a drag of the map',
    /maplibregl-canvas/.test(C1.under || ''), String(C1.under));
 ok('the 3-D panel says it too', /rising water is not flood\s+modelling/i.test(C1.note), C1.note.replace(/\s+/g, ' ').slice(0, 160));
@@ -2673,16 +2832,19 @@ await page.waitForTimeout(200);
 const waterOff = await page.evaluate(() => {
   const m = Map3D._map(), host = document.getElementById('map3d');
   const br = document.querySelector('#map3d .maplibregl-ctrl-bottom-right').getBoundingClientRect();
+  // Where it stood before the water: on the minimap while that is there (6c),
+  // at the foot otherwise.
+  const stand = host.classList.contains('has-mini') ? MapMini.element().getBoundingClientRect().top : host.getBoundingClientRect().bottom;
   return { w: Map3D._water(), src: !!m.getSource('mn-water-dem'), scale: !!document.getElementById('map3d-water-scale'),
            caveat: !!document.getElementById('map3d-water-caveat'), hasWater: host.classList.contains('has-water'),
-           foot: Math.abs(br.bottom - host.getBoundingClientRect().bottom), stored: localStorage.getItem('mn-3d-water'),
+           foot: Math.abs(br.bottom - stand), stored: localStorage.getItem('mn-3d-water'),
            note: (document.getElementById('map-3d-note') || {}).textContent || '' };
 });
 ok('Rising water off takes the layer, its source, the scale and the caveat away',
    !waterOff.w.on && !waterOff.w.layer && !waterOff.src && !waterOff.scale && !waterOff.caveat && !waterOff.hasWater && !waterOff.w.looping
      && !/not flood\s+modelling/i.test(waterOff.note),
    JSON.stringify(waterOff));
-ok('…puts MapLibre’s furniture back at the foot, and is remembered', waterOff.foot <= 1 && waterOff.stored === 'off',
+ok('…puts MapLibre’s furniture back where it stood — on the minimap, or at the foot — and is remembered', waterOff.foot <= 1 && waterOff.stored === 'off',
    JSON.stringify({ foot: waterOff.foot, stored: waterOff.stored }));
 await page.evaluate(() => Map3D._waterClock(null));
 
@@ -2703,6 +2865,18 @@ const in1 = await page.evaluate(() => dockShowing());
 await btn3d.click();
 await flat3d();
 const out1 = await page.evaluate(() => ({ showing: dockShowing(), stored: localStorage.getItem('mn-dock-tab') }));
+// The minimap let go of the camera with it: back on the 2-D map, its outline
+// that map's view again.
+const flatMini = await page.evaluate(() => {
+  const d = MapMini.drawn(), b = state.map.getBounds();
+  const lats = (d.outline || []).map(p => p[0]), lngs = (d.outline || []).map(p => p[1]);
+  return { camera: d.camera, corners: lats.length,
+           outline: lats.length ? [Math.min(...lats), Math.min(...lngs), Math.max(...lats), Math.max(...lngs)] : null,
+           bounds: [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()] };
+});
+ok('leaving 3-D puts the minimap back on the 2-D map, outlining its view',
+   !flatMini.camera && flatMini.corners === 4 && flatMini.outline && flatMini.outline.every((v, i) => near(v, flatMini.bounds[i], 1e-9)),
+   JSON.stringify(flatMini));
 ok('⛰️ from the legend: the 3-D settings while tilted, the legend again when flat',
    in1 === 'map-3d' && out1.showing === 'map-legend' && out1.stored === 'map-legend', JSON.stringify({ in1, out1 }));
 await page.evaluate(() => shutDock());

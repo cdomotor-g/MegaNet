@@ -8184,10 +8184,10 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
    The Stations map's second map, bottom right in the stage. 680 is the whole
    of where it goes: over the map (the map pane is z 400 in this same context)
    and under everything drawn over the map on purpose — the station card (690),
-   the 3-D canvas (750) with its compass in this corner, the twin (755),
-   Leaflet's corners (1000) and the ACMA card (1100) — so it gives way to each
-   without being told. Positioned with a z-index, it is a stacking context of
-   its own, which keeps the panes of the map inside it inside it.
+   the twin (755), Leaflet's corners (1000) and the ACMA card (1100) — so it
+   gives way to each without being told. The 3-D canvas (750) is the one thing
+   it stands over, below. Positioned with a z-index, it is a stacking context
+   of its own, which keeps the panes of the map inside it inside it.
 
    Its height is capped short of ↺ at the top of the stage and its width short
    of the stage's sides, so a large one on a small map is as large as fits —
@@ -8287,6 +8287,26 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   .mn-minimap-btn { width: 36px; height: 36px; }
   .mn-minimap.is-folded .mn-map-mini-open { width: 44px; height: 44px; }
 }
+
+/* Over the 3-D view (map-mini.js, "Over the 3-D view"): 752, over the canvas
+   (750) and still under the twin (755), the station card as 3-D lifts it
+   (760) and Leaflet's corners (1000). With the rising water up it stands on
+   the caveat along the foot — 1.5rem, #map3d's --twin-caveat-h — as
+   MapLibre's furniture does.
+
+   MapLibre's bottom-right corner — the zoom, the compass and the credits'
+   ⓘ — would be under it, so it stands on it instead: `--map3d-mini` is how
+   far up the minimap reaches and `--map3d-mini-w` how far in from the right,
+   both measured by map-3d.js (placeHud), which adds `has-mini` while the
+   minimap is there. The rising water's scale stands on that corner already,
+   so it moves up with it. The hint keeps clear of its side while it stands
+   beside it (`hud-beside-mini`), and not once it stands above it.
+   `.is-on` for the weight: the corner's has-water rule is #map3d plus two
+   classes, and comes later. */
+.mn-map-stage:has(#map3d.is-on) .mn-minimap { z-index: 752; }
+.mn-map-stage:has(#map3d.is-on.has-water) .mn-minimap { bottom: calc(1.5rem + .6rem); }
+#map3d.is-on.has-mini .maplibregl-ctrl-bottom-right { bottom: var(--map3d-mini, 0px); }
+#map3d.is-on.hud-beside-mini .map3d-hud { right: max(3.6rem, calc(var(--map3d-mini-w, 0px) + var(--sp-2))); }
 
 /* Its settings, in the dialog (MapMini.openSettings). */
 .mmini-lede { margin-top: 0; }

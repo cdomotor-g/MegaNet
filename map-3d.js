@@ -22,7 +22,8 @@
 // station card's leader (MapLeader.sync, reveal), to flood-stages.js for the
 // twin's rise (FloodStages.cycle, RISE_S, HOLD_S, DRAIN_S), to site-features.js
 // for the stations' site features (SiteFeatures.drawn, LOOK, MIN_ZOOM,
-// glyphSvg, popupHtml, refresh; SITE_FEATURE_KINDS' dashes), and to app.js for
+// glyphSvg, popupHtml, refresh; SITE_FEATURE_KINDS' dashes), to map-mini.js
+// for the minimap (MapMini.camera, element), and to app.js for
 // showStationCard, primaryRole and the base-map choice. Every one of those is called from
 // inside this file's own functions, so its position among the modules is free.
 //
@@ -3365,6 +3366,10 @@ const Map3D = (function () {
       if (box) hudRo.observe(box);
       const offer = document.getElementById('map-twin-offer');
       if (offer) hudRo.observe(offer);
+      // …and the zoom, compass and credits stand on the minimap, which is
+      // re-measured when it is put away, brought back or resized.
+      const mini = miniBox();
+      if (mini) hudRo.observe(mini);
     }
     placeHud();
     // Its few seconds start once there is a map to read it over: a slow
@@ -3373,17 +3378,50 @@ const Map3D = (function () {
     if (map) map.once('load', () => { if (hudTimer === -1) hudShow(); });
   }
 
+  // The Stations map's minimap (map-mini.js), which the stylesheet lifts over
+  // this canvas: its element, or null.
+  function miniBox() {
+    return typeof MapMini !== 'undefined' && MapMini.element ? MapMini.element() : null;
+  }
+
   // How far up the foot's furniture reaches, as `--map3d-foot` on the host,
   // which the stylesheet stands the hint and its "?" on.
+  //
+  // First, the minimap in the bottom-right corner, over this canvas: how far
+  // up it reaches (`--map3d-mini`) and in from the right (`--map3d-mini-w`),
+  // with `has-mini` while it is there. The stylesheet stands MapLibre's
+  // bottom-right corner — the zoom, the compass and the credits' ⓘ — on it,
+  // where they would otherwise be under it, and keeps the hint clear of its
+  // side (`hud-beside-mini`) while the hint is beside it rather than above it.
+  // Set before anything is measured, since the corner moves with it.
   function placeHud() {
     if (!host) return;
     const hb = host.getBoundingClientRect();
+    const mini = miniBox();
+    const mb = mini ? mini.getBoundingClientRect() : null;
+    const hasMini = !!(mb && mb.width && mb.height && mb.left < hb.right && mb.top < hb.bottom);
+    const reach = hasMini ? Math.max(0, Math.round(hb.bottom - mb.top)) : 0;
+    host.classList.toggle('has-mini', hasMini);
+    host.classList.toggle('hud-beside-mini', hasMini);
+    host.style.setProperty('--map3d-mini', `${reach}px`);
+    host.style.setProperty('--map3d-mini-w', `${hasMini ? Math.max(0, Math.round(hb.right - mb.left)) : 0}px`);
     let top = hb.bottom;
-    for (const el of host.querySelectorAll('.maplibregl-ctrl-attrib, .maplibregl-ctrl-scale')) {
-      const r = el.getBoundingClientRect();
-      if (r.height) top = Math.min(top, r.top);
-    }
-    host.style.setProperty('--map3d-foot', `${Math.max(0, Math.round(hb.bottom - top))}px`);
+    const scale = host.querySelector('.maplibregl-ctrl-scale');
+    const sr = scale ? scale.getBoundingClientRect() : null;
+    if (sr && sr.height) top = sr.top;
+    // The credits, lifted onto the minimap with the corner, are the foot's
+    // only while they still come down into the hint's way — as they do over
+    // a minimap put away, which is one button high. The hint's height, and
+    // its gap (--sp-2, 8 px) under it and over it.
+    const credits = host.querySelector('.maplibregl-ctrl-attrib');
+    const cr = credits ? credits.getBoundingClientRect() : null;
+    const hud = document.getElementById('map3d-hud');
+    const clear = hb.bottom - top + (hud ? hud.offsetHeight : 0) + 16;
+    if (cr && cr.height && (!hasMini || hb.bottom - cr.bottom < clear)) top = Math.min(top, cr.top);
+    const foot = Math.max(0, Math.round(hb.bottom - top));
+    host.style.setProperty('--map3d-foot', `${foot}px`);
+    // Stood on the credits above the minimap, the hint has the width back.
+    if (hasMini && foot >= reach) host.classList.remove('hud-beside-mini');
     // …and on the right, how far up the zoom and compass reach, which the
     // rising water's scale stands on.
     const br = host.querySelector('.maplibregl-ctrl-bottom-right');
@@ -3907,7 +3945,10 @@ const Map3D = (function () {
             moves the same way, and the ? at the foot of the view says it again.<br>
             Mouse: ${esc(viewMoveWords(false))}<br>
             Touch: ${esc(viewMoveWords(true))}<br>
-            Keys, once the view is clicked: ${esc(viewKeyWords())}</p>
+            Keys, once the view is clicked: ${esc(viewKeyWords())}<br>
+            The minimap stays in the bottom-right corner, flat, with the ground the
+            camera sees outlined on it in red; click it or drag it to send the camera
+            there.</p>
           <p class="filter-note">The base map is the one Layers has on — the most
             opaque of them, if several are blended — and the
             pins and links are the ones the 2-D map has drawn — the same filters, the same
@@ -4039,6 +4080,9 @@ const Map3D = (function () {
       host.classList.remove('is-loading');
       host.classList.add('is-on');
       build();
+      // The minimap follows this camera, and outlines what it sees, until
+      // close() takes it back (map-mini.js, "Over the 3-D view").
+      if (typeof MapMini !== 'undefined' && MapMini.camera) MapMini.camera(map);
       holdLeaflet();
       repaintPanel();
       addHud();
@@ -4099,6 +4143,8 @@ const Map3D = (function () {
     water.rangeTimer = 0;
     water.lo = water.hi = water.level = null;
     water.scale = null;
+    // The minimap back on the 2-D map before this one goes.
+    if (map && typeof MapMini !== 'undefined' && MapMini.camera) MapMini.camera(null);
     if (map) { try { map.remove(); } catch (_) {} }
     map = null;
     ready = false;

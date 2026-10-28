@@ -879,7 +879,9 @@ const HELP = {
       + 'settings: its own base map and place names, which stations it draws, the backbone paths, the outline, '
       + 'whether it follows the map or stays where you leave it, and its size — kept on this device. The arrow '
       + 'beside ⚙ puts it away to one button in the corner, and that button brings it back; on a phone it '
-      + 'starts put away. It steps aside for the station card, the 3-D view and the digital twin.',
+      + 'starts put away. It steps aside for the station card and the digital twin. In the 3-D view it stays, '
+      + 'flat, in the same corner: it follows the camera, the outline on it is the ground the camera can see — '
+      + 'a wedge widening away from you when the view is tilted — and a click or a drag on it sends the camera there.',
       '<strong>From zoom 17 the map offers the station\'s digital twin</strong> — the ground to '
       + '1 m where the State holds LiDAR, the aerial imagery, the station as built and the radio paths '
       + 'as this map colours them — whenever a station is under the view: the one on the card, the '

@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 146, date: '2026-10-28', items: [
+      'The <strong>minimap</strong> now stays in the corner of the Stations map in ⛰️ <strong>3-D</strong>. It stays flat, '
+        + 'follows the camera as you move, and outlines in red the ground the camera can see — a wedge that widens away from '
+        + 'you when the view is tilted and turns as you turn. Click it or drag it to send the camera there. The zoom and compass '
+        + 'buttons now sit just above it.',
+    ] },
     { n: 145, date: '2026-10-28', items: [
       '<strong>📇 Capabilities</strong> is a line a capability now, and at its foot <strong>Where the data comes from</strong> '
         + 'lists every organisation Flood-Net draws on — the Bureau, ACMA, the Queensland Government, ELVIS, councils\' cameras, '

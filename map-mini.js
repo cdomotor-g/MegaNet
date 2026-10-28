@@ -12,8 +12,9 @@
 // makeBaseLayers and makeBaseLabels, to app.js for primaryRole and
 // isPhoneNav, to map-symbols.js for the owner choice and the pin colours, and
 // to map-backbone.js for the backbone paths and to modal.js for its dialog —
-// all from inside its own functions. The IIFE body only defines, so its position among the modules is
-// free.
+// all from inside its own functions. map-3d.js hands it the 3-D view's camera
+// (camera()) and asks for its element to stand that view's controls on. The
+// IIFE body only defines, so its position among the modules is free.
 //
 // ── Why its settings are a dialog, not a pane ────────────────────────────────
 // Every other control the Stations map has went into the side panel's rail
@@ -27,14 +28,26 @@
 // ── Where it lives ───────────────────────────────────────────────────────────
 // In the map's stage (.mn-map-stage), beside the cards, rather than in a
 // Leaflet corner. A corner is z 1000, over everything drawn over the map — the
-// station card, the 3-D view's canvas and the compass it keeps in this same
-// corner, the digital twin — and a minimap over any of those is in the way of
-// the thing somebody is actually looking at. At 680 in the stage it is over
-// the map and under all of them, which is where an overview belongs: on a
+// station card, the digital twin — and a minimap over any of those is in the
+// way of the thing somebody is actually looking at. At 680 in the stage it is
+// over the map and under all of them, which is where an overview belongs: on a
 // narrow map the station card (690) covers it rather than the other way round,
-// and opening 3-D or a twin puts it away without either having to be told.
-// Being outside the main map's container is also what keeps its wheel and its
-// drags its own: nothing that happens on it reaches the map underneath.
+// and opening a twin puts it away without having to be told. Being outside the
+// main map's container is also what keeps its wheel and its drags its own:
+// nothing that happens on it reaches the map underneath.
+//
+// ── Over the 3-D view ────────────────────────────────────────────────────────
+// The 3-D view is the same map tilted, and a tilted camera is where an
+// overview earns its keep: from a slant it is hard to say where you are. So
+// while the canvas is up the stylesheet lifts the minimap over it (752, still
+// under the twin and the cards), and map-3d.js stands MapLibre's zoom, compass
+// and credits on it rather than under it (placeHud). It stays flat. What it
+// follows is the camera (camera()), frame by frame, since the 2-D map under
+// the canvas only catches up when the camera stops; and what it outlines is
+// the ground the camera sees — a wedge widening away from the camera when it
+// is tilted, turned with its heading — rather than the 2-D map's rectangle.
+// A click or a drag on it still moves the 2-D map, which the camera follows
+// (map-3d.js, "One view"), so 3-D needs no way in of its own.
 //
 // ── How it moves ─────────────────────────────────────────────────────────────
 // Following (the default), it is centred on the main map and `out` zoom levels
@@ -72,6 +85,7 @@ const MapMini = (function () {
 
   let cfg = { ...DEFAULTS };
   let main = null, mini = null;       // the Stations map, and this one
+  let cam = null;                     // the 3-D view's MapLibre map while it is up
   let wrap = null;                    // the stage's child holding both halves
   let base = null, baseOn = null, labels = [], credit = null;
   let dots = null, dotsKey = null, dotsFor = null;
@@ -79,7 +93,7 @@ const MapMini = (function () {
   let frame = null, frameCase = null, aim = null, boxRenderer = null;
   let syncing = false;                // a move this file made, not the operator
   let leading = false;                // the main map is going where the minimap was dragged
-  let raf = 0;
+  let raf = 0, camRaf = 0;
   let baseNames = null;
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -126,6 +140,40 @@ const MapMini = (function () {
     try { fn(); } finally { syncing = false; }
   }
 
+  // ── The view it follows ────────────────────────────────────────────────────
+  // The main map's, or the 3-D camera's while that is up. The camera's zoom on
+  // Leaflet's scale: MapLibre's number for the same ground is one less
+  // (map-3d.js, build()).
+  function viewCentre() {
+    if (!cam) return main.getCenter();
+    const c = cam.getCenter();
+    return L.latLng(c.lat, c.lng);
+  }
+
+  const viewZoom = () => (cam ? cam.getZoom() + 1 : main.getZoom());
+
+  // The ground the camera sees, as four corners: the canvas's foot, and its
+  // top brought down to the horizon when the camera is tilted far enough to
+  // see sky. MapLibre's own getBounds() draws to the same line, but answers
+  // with the box round it, which loses the wedge and its heading; and the
+  // horizon itself is not public, so it is worked out here as MapLibre works
+  // it out (getMercatorHorizon: 85 % of the way to the true horizon, and
+  // never past 89.25° of tilt). Null if any corner will not unproject.
+  function camRing() {
+    const box = cam.getContainer();
+    const w = box.clientWidth, h = box.clientHeight;
+    if (!w || !h) return null;
+    const rad = d => d * Math.PI / 180;
+    const fov = typeof cam.getVerticalFieldOfView === 'function' ? cam.getVerticalFieldOfView() : 36.87;
+    const pitch = cam.getPitch();
+    const toCentre = 0.5 / Math.tan(rad(fov) / 2) * h;
+    const horizon = toCentre * Math.min(Math.tan(rad(90 - pitch)) * 0.85, Math.tan(rad(89.25 - pitch)));
+    const top = Math.max(0, h / 2 - horizon);
+    const ring = [[0, top], [w, top], [w, h], [0, h]].map(p => cam.unproject(p));
+    if (!ring.every(ll => ll && Number.isFinite(ll.lat) && Number.isFinite(ll.lng))) return null;
+    return ring.map(ll => L.latLng(ll.lat, ll.lng));
+  }
+
   // ── Following ──────────────────────────────────────────────────────────────
   // Following, its zoom limits are the distances it may sit at: one to eight
   // levels out, and no further out than the continent — unless the map is out
@@ -134,29 +182,53 @@ const MapMini = (function () {
   // setMinZoom/setMaxZoom, which move the map; the next setView keeps to them.
   // The wheel stops at a limit rather than going past it and bouncing back.
   function limits() {
-    const z = main.getZoom();
+    const z = viewZoom();
     const floor = Math.max(0, Math.min(FLOOR, z - OUT_MIN));
     mini.options.minZoom = cfg.follow ? Math.max(z - OUT_MAX, floor) : 0;
     mini.options.maxZoom = cfg.follow ? Math.max(z - OUT_MIN, 0) : TOP;
   }
 
-  const wantZoom = () => clamp(main.getZoom() - cfg.out, mini.getMinZoom(), mini.getMaxZoom());
+  const wantZoom = () => clamp(viewZoom() - cfg.out, mini.getMinZoom(), mini.getMaxZoom());
 
   function follow() {
     if (!mini || !main || !cfg.follow || leading) return;
     limits();
-    quietly(() => mini.setView(main.getCenter(), wantZoom(), { animate: false }));
+    quietly(() => mini.setView(viewCentre(), wantZoom(), { animate: false }));
   }
 
   // The main map moving: once a frame at most, however many `move` events a
-  // drag or a zoom animation raises.
+  // drag or a zoom animation raises. Not while the 3-D camera is the view:
+  // the main map under it only moves to follow the camera, or to be followed
+  // by it, and the camera's own moves are the ones to draw (onCamMove).
   function onMainMove() {
-    if (!mini || raf) return;
+    if (!mini || raf || cam) return;
     raf = requestAnimationFrame(() => { raf = 0; follow(); drawBox(); });
   }
 
   function onMainSettled() {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    if (cam) {
+      // A drag of the minimap has moved the main map, and the camera is on
+      // its way there now (map-3d.js, follow) — so the minimap goes on leading
+      // until the camera arrives (onCamSettled), or lets go now if the camera
+      // is not going anywhere. Asked after this event has reached map-3d.js's
+      // own listener, which is the one that sets the camera off.
+      if (leading) setTimeout(() => { if (cam && leading && !cam.isMoving()) onCamSettled(); }, 0);
+      return;
+    }
+    leading = false;
+    follow();
+    drawBox();
+  }
+
+  // The camera moving, once a frame at most; and stopped.
+  function onCamMove() {
+    if (!mini || camRaf) return;
+    camRaf = requestAnimationFrame(() => { camRaf = 0; follow(); drawBox(); });
+  }
+
+  function onCamSettled() {
+    if (camRaf) { cancelAnimationFrame(camRaf); camRaf = 0; }
     leading = false;
     follow();
     drawBox();
@@ -172,7 +244,9 @@ const MapMini = (function () {
   function onMiniZoom() {
     if (syncing || !main) return;
     if (cfg.follow) {
-      cfg.out = clamp(main.getZoom() - mini.getZoom(), OUT_MIN, OUT_MAX);
+      // Whole levels: the camera's zoom is not a whole number, as the main
+      // map's is.
+      cfg.out = clamp(Math.round(viewZoom() - mini.getZoom()), OUT_MIN, OUT_MAX);
       follow();
       label();
     }
@@ -298,10 +372,12 @@ const MapMini = (function () {
     ]).addTo(mini);
   }
 
-  // The main map's view. In a pane of its own over everything else drawn on
-  // the minimap and on an SVG renderer of its own, so moving it every frame of
-  // a drag repaints one rectangle rather than the canvas the dots are on. Far
-  // enough out that the rectangle is a speck, a ring marks where it is.
+  // The main map's view — or, in 3-D, the ground the camera sees (camRing),
+  // the same two shapes with their corners set one by one. In a pane of its
+  // own over everything else drawn on the minimap and on an SVG renderer of
+  // its own, so moving it every frame of a drag repaints one shape rather than
+  // the canvas the dots are on. Far enough out that the shape is a speck, a
+  // ring marks where it is — in 3-D, the point the camera is looking at.
   function drawBox() {
     if (!mini || !main) return;
     if (!cfg.box) {
@@ -309,17 +385,17 @@ const MapMini = (function () {
       frameCase = frame = aim = null;
       return;
     }
-    const b = main.getBounds();
+    const ring = cam ? camRing() : null;
+    const b = ring ? L.latLngBounds(ring) : main.getBounds();
+    const at = ring ? viewCentre() : b.getCenter();
     if (!frame) {
       const o = { renderer: boxRenderer, interactive: false };
       frameCase = L.rectangle(b, { ...o, color: '#ffffff', weight: 4, opacity: .85, fill: false }).addTo(mini);
       frame = L.rectangle(b, { ...o, color: BOX, weight: 2, opacity: 1, fillColor: BOX, fillOpacity: .1 }).addTo(mini);
-      aim = L.circleMarker(b.getCenter(), { ...o, radius: 6, color: BOX, weight: 2, fill: false });
-    } else {
-      frameCase.setBounds(b);
-      frame.setBounds(b);
-      aim.setLatLng(b.getCenter());
+      aim = L.circleMarker(at, { ...o, radius: 6, color: BOX, weight: 2, fill: false });
     }
+    for (const l of [frameCase, frame]) { if (ring) l.setLatLngs(ring); else l.setBounds(b); }
+    aim.setLatLng(at);
     const sw = mini.latLngToContainerPoint(b.getSouthWest());
     const ne = mini.latLngToContainerPoint(b.getNorthEast());
     const speck = Math.abs(ne.x - sw.x) < 10 && Math.abs(sw.y - ne.y) < 10;
@@ -374,6 +450,7 @@ const MapMini = (function () {
 
   function drop() {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    if (camRaf) { cancelAnimationFrame(camRaf); camRaf = 0; }
     dropBase();
     mini = removeMap(mini);
     dots = paths = frame = frameCase = aim = boxRenderer = pathsRenderer = null;
@@ -551,10 +628,26 @@ const MapMini = (function () {
       main.off('moveend', onMainSettled);
       main.off('mnbasechange', onMainBase);
     }
+    camera(null);
     drop();
     if (wrap) wrap.remove();
     wrap = null;
     main = null;
+  }
+
+  // ── The 3-D camera ─────────────────────────────────────────────────────────
+  // map-3d.js hands over its MapLibre map once it is built, and null as it
+  // takes it down. Kept while the minimap is put away, so it opens on the
+  // camera. Let go, the minimap is back on the main map, which by then is
+  // where the camera last stopped (map-3d.js, onCameraEnd).
+  function camera(m) {
+    if (m === cam) return;
+    if (cam) { cam.off('move', onCamMove); cam.off('moveend', onCamSettled); }
+    if (camRaf) { cancelAnimationFrame(camRaf); camRaf = 0; }
+    cam = m || null;
+    leading = false;
+    if (cam) { cam.on('move', onCamMove); cam.on('moveend', onCamSettled); }
+    if (mini && main) { follow(); drawBox(); }
   }
 
   // Called from refreshMapLayers (app.js): the stations and paths again, if
@@ -568,7 +661,10 @@ const MapMini = (function () {
   }
 
   return {
-    attach, detach, refresh, openSettings,
+    attach, detach, refresh, openSettings, camera,
+    // For map-3d.js, which stands its zoom, compass and credits on it: the
+    // minimap's element in the stage, or null when there is none.
+    element: () => wrap,
     // For checks: the minimap's map, a copy of its settings, and what is
     // drawn on it, counted rather than read off the pixels.
     map: () => mini,
@@ -578,6 +674,9 @@ const MapMini = (function () {
       dots: dots ? dots.getLayers().length : 0,
       paths: paths ? paths.getLayers().length / 2 : 0,
       box: !!frame, aim: !!(aim && mini && mini.hasLayer(aim)),
+      // The outline's corners, and whether they are the 3-D camera's.
+      outline: frame ? frame.getLatLngs()[0].map(ll => [ll.lat, ll.lng]) : null,
+      camera: !!cam,
     }),
   };
 })();
