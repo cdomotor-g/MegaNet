@@ -11,7 +11,9 @@
 //   restarting the radio and FI:2044, a load taking the link off-line and an
 //   option no log shows saying so.
 //
-//   The steps held to themselves: every path's steps exist and run in
+//   The keys: one the unit answers held, lit, on its prompt with its option
+//   lit, before the answer; a digit lit as it is typed; the keycaps; every
+//   terminal step settling before it ends. The steps held to themselves: every path's steps exist and run in
 //   ELPRO's order (the stick, the check, host, bootloader, radio, function
 //   image, finish), the whole upgrade holding each step once; every step says
 //   which side the hands are on and has the drawing to show it — a unit step
@@ -181,6 +183,36 @@ console.log('\nThe frames\n');
   const picked = fv.lines.filter(l => fv.pickNow && l.pick === fv.pickNow).map(l => l.t.trim());
   ok('the option picked is lit: a) Update Bootloader (ERTA2-B), the unit\'s own letter', J(picked) === J(['a)\tUpdate Bootloader (ERTA2-B)']), J(picked));
   ok('a unit step leaves the laptop\'s screen as it was', txt(at('h-in', 2)) === txt(at('save', 99)));
+
+  // A key the unit answers is held on its prompt before the answer comes.
+  const dAt = F.STEPS.ver.pc.keys.find(k => k.key === 'd').at;
+  const mid = at('ver', dAt + 0.3).pc, after = at('ver', dAt + 0.9).pc;
+  const last = f => f.lines[f.lines.length - 1].t;
+  ok('d pressed: held on the Main Menu\'s prompt, the d lit and d) Unit Diagnostic picked, before the menu changes',
+    /Selection: d$/.test(last(mid)) && J(mid.mark) === J([13, 14]) && mid.lines.some(l => l.pick === mid.pickNow && /d\)\tUnit Diagnostic/.test(l.t)) && /Unit Diagnostic Menu:/.test(txt({ pc: after })),
+    J({ last: last(mid), mark: mid.mark }));
+  ok('…its keycap in the tray, pressed down, then up and still there a second later',
+    mid.keys.length === 1 && mid.keys[0].cap === 'd' && at('ver', dAt + 0.1).pc.keys[0].age < 0.28 && at('ver', dAt + 1.2).pc.keys.some(k => k.cap === 'd'), J(mid.keys));
+  const sa = F.PATHS['set-addr'].steps.indexOf('s-addr');
+  const two = F.STEPS['s-addr'].pc.keys.find(k => k.key === '2').at;
+  const typing = F.frame('set-addr', sa, two + 0.1).pc;
+  ok('a digit typed into a value shows at once, lit', /Station Address: 2$/.test(last(typing)) && typing.mark && last(typing).slice(...typing.mark) === '2', J({ last: last(typing), mark: typing.mark }));
+  // Every terminal step has finished answering its keys with time to see the answer.
+  const tight = [];
+  for (const [id, p] of Object.entries(F.PATHS)) {
+    p.steps.forEach((sid, i) => {
+      const st = F.STEPS[sid];
+      if (!st.pc || st.pc.win !== 'term') return;
+      let lastChange = 0, prev = '';
+      for (let t = 0; t <= st.dur + 2; t += 0.1) {
+        const f = F.frame(id, i, t).pc;
+        const sig = f.lines.map(l => l.t).join('\n') + J(f.mark) + f.pickNow;
+        if (sig !== prev) { lastChange = t; prev = sig; }
+      }
+      if (lastChange > st.dur - 0.5) tight.push(`${id}/${sid} ${lastChange.toFixed(1)} of ${st.dur}`);
+    });
+  }
+  ok('every terminal step settles at least half a second before it ends', !tight.length, tight.join('; '));
 }
 
 console.log('\nThe settings demos\n');
@@ -315,6 +347,16 @@ try {
   ok('half-way through the hold: the finger on TEST, its ring filling, the badge saying why', hold.fin === '1' && hold.ring > 1 && hold.ring < 163 && /Hold TEST until D1/.test(hold.badge), J(hold));
   const term = await page.evaluate(() => { A2Firmware.step(A2Firmware.state().steps.indexOf('ver')); A2Firmware.seek(1);
     return { text: document.querySelector('#fw-pc .fw-term').textContent, sim: !!document.querySelector('#fw-pc .fw-sim') }; });
+  const stick = await page.evaluate(() => {
+    const k = A2Firmware.state().steps.indexOf('h-in');
+    const tr = () => document.getElementById('fw-stick').getAttribute('transform');
+    A2Firmware.step(k); A2Firmware.seek(0); const out = tr();
+    A2Firmware.seek(1); const into = tr();
+    return { out, into, plug: document.getElementById('fw-stick-plug').getAttribute('opacity') };
+  });
+  const xy = t => (/translate\(([-\d.]+) ([-\d.]+)\)/.exec(t) || []).slice(1).map(Number);
+  ok('the stick comes straight out of its socket towards you — up and to the right — and sits on it, its metal hidden, once in',
+    xy(stick.out)[0] > 30 && xy(stick.out)[1] < -20 && J(xy(stick.into)) === J([0, 0]) && stick.plug === '0.000', J(stick));
   ok('the laptop\'s terminal shows the version screen, marked Simulated', /Host Bootloader: v1\.1 - 8708/.test(term.text) && term.sim, term.text.slice(-200));
 
   // A path.

@@ -480,7 +480,7 @@ const A2Firmware = (function () {
       pc: { win: 'term', title: TT, keys: [K(0.8, 'c')] },
     },
     's-freq': {
-      part: 'set', side: 'pc', dur: 7.6, still: 7.6,
+      part: 'set', side: 'pc', dur: 8.4, still: 8.4,
       title: 'c) Tx Frequency and d) Rx Frequency, in MHz',
       do: `<strong>c</strong> for <strong>Tx Frequency MHz</strong>. The prompt holds the channel now, <code>151.500000</code>, the cursor at its end:
         <strong>←</strong> five times to put it after <code>151.5</code>, type <code>25</code> over the zeros, and Enter — <code>151.525000</code>.
@@ -688,16 +688,78 @@ const A2Firmware = (function () {
     else if (x.key) A2Terminal.key(e, x.key);
   }
 
+  // How a key reads on the screen. A key that only types — a digit into a
+  // value, a star into the password — shows at once. A key the unit answers
+  // (a menu letter, Enter, y) is held on its prompt, lit, with the option it
+  // picks lit too, for HOLD seconds before the answer comes: the eye sees
+  // what was pressed before the screen moves on. Keys after a held one move
+  // along by as much. Each key's cap stays in the tray under the window for
+  // CAP_FOR seconds; a character typed stays lit for LIT_FOR.
+  const HOLD = 0.7;
+  const CAP_FOR = 1.6;
+  const LIT_FOR = 1.1;
+
+  // A step's keys and doings, timed and played once (kept per step start):
+  // when each is pressed (at), when the unit has answered it (done), the
+  // console after it (e), and for a held key the screen while it is held.
+  const plans = new WeakMap();
+  function plan(s0, step) {
+    if (plans.has(s0)) return plans.get(s0);
+    const evs = [...(step.eng || []), ...((step.pc && step.pc.keys) || [])].sort((a, b) => a.at - b.at);
+    const out = [];
+    let e = s0.eng, shift = 0, free = 0;
+    for (const x of evs) {
+      let at = x.at + shift;
+      if (at < free) { shift += free - at; at = free; }
+      const after = A2Terminal.clone(e);
+      if (!x.key) { apply(after, x); out.push({ x, at, done: at, e: after }); e = after; free = at; continue; }
+      const last = after.lines[after.lines.length - 1];
+      const ao = last && last.open ? last : null;
+      const n0 = after.lines.length, k0 = after.at.k, link0 = after.link, pick0 = after.pick;
+      const t0 = ao ? ao.t : '';
+      apply(after, x);
+      const echoOnly = !!ao && after.lines.length === n0 && after.lines[n0 - 1] === ao && ao.open && after.at.k === k0 && after.link === link0;
+      const ev = { x, at, done: echoOnly ? at : at + HOLD, e: after };
+      if (echoOnly) {
+        // The character just typed: the one before the cursor.
+        const c = ao.cur != null ? ao.cur : ao.t.length;
+        if (x.key.length === 1 && c > 0) ev.mark = [c - 1, c];
+      } else if (ao) {
+        // Held: the screen as it was, the key echoed on its prompt.
+        const upto = after.lines.indexOf(ao);
+        if (upto >= 0) {
+          const lines = A2Terminal.screen({ lines: after.lines.slice(0, upto + 1) }, TERM_ROWS).slice();
+          lines[lines.length - 1] = { ...ao, open: true, cur: undefined };
+          ev.held = { lines, pick: after.pick > pick0 ? after.pick : 0, mark: ao.t.length > t0.length ? [t0.length, ao.t.length] : null };
+        }
+      }
+      out.push(ev);
+      e = after;
+      free = ev.done;
+    }
+    plans.set(s0, out);
+    return out;
+  }
+
   // The window a pc step shows at time t. A unit step shows the last pc
   // step's screen, set aside.
   function pcAt(prev, step, t, s0) {
     const pc = step.pc;
-    if (!pc) return prev ? { ...prev, keys: [], pickNow: 0 } : null;
+    if (!pc) return prev ? { ...prev, keys: [], pickNow: 0, mark: null } : null;
     if (pc.win !== 'term') return { win: pc.win, title: pc.title, pc, t, keys: [] };
-    const e = engAt(s0.eng, step, t);
-    const keys = (pc.keys || []).filter(k => k.key && t >= k.at && t < k.at + 0.75).map(k => (k.mask ? '•' : keyCap(k.key)));
-    return { win: 'term', title: pc.title, lines: A2Terminal.screen(e, TERM_ROWS), keys, t,
-      pickNow: e.pick > s0.eng.pick ? e.pick : 0, offline: !e.link };
+    const evs = plan(s0, step);
+    let now = null, held = null;
+    for (const ev of evs) {
+      if (ev.done <= t) now = ev;
+      else { if (ev.at <= t && ev.held) held = ev; break; }
+    }
+    const e = now ? now.e : s0.eng;
+    const keys = evs.filter(ev => ev.x.key && t >= ev.at && t < ev.at + CAP_FOR)
+      .map(ev => ({ cap: ev.x.mask ? '•' : keyCap(ev.x.key), age: t - ev.at }));
+    const w = { win: 'term', title: pc.title, keys, t, offline: !e.link };
+    if (held) return { ...w, lines: held.held.lines, pickNow: held.held.pick, mark: held.held.mark };
+    const lit = now && now.x.key && now.mark && t - now.at < LIT_FOR ? now.mark : null;
+    return { ...w, lines: A2Terminal.screen(e, TERM_ROWS), pickNow: e.pick > s0.eng.pick ? e.pick : 0, mark: lit };
   }
   const TERM_ROWS = 24;
   // A key as its keycap shows it.
@@ -736,107 +798,164 @@ const A2Firmware = (function () {
   }
 
   // ── Drawing the unit ───────────────────────────────────────────────────────
-  // A 640 × 400 drawing, after the board in ELPRO's sheet and the callouts on
-  // its installation guide: the SERIAL DB9 at the top left, D1 to D4 in a row
-  // under it (D1 the left-most) over the GND DIO1–DIO4 GND terminals, and down
-  // the right-hand edge RESET (down its hole), the square USB B socket for the
-  // laptop, the narrow upright USB A socket for the stick, and TEST. Drawn in
-  // the board's own colours, which do not change with the theme.
+  // The ERT-A2's front panel, after photographs of a unit in its case and the
+  // callouts on ELPRO's installation guide, upright as it sits in the case:
+  // a deep blue board under a fine grid. Across the top the options ticked
+  // off (GPS fitted, serial RS485, external battery, primary cell), the
+  // antenna's lead coming in at the top and CHARGER beside it; RESET down its
+  // hole at the top right. The ELPRO mark, ERT-A2 · FLOOD WARNING and the
+  // STATION and FREQ boxes to write on across the middle. Down the right-hand
+  // edge, on the main board showing through, USB B for the laptop's lead
+  // over the upright USB A for the stick — both open towards you, so the
+  // lead and the stick are drawn coming straight out of the board at a slant
+  // — then TEST, over its HTR SOL GND BAT terminals. At the bottom left
+  // SERIAL, D1 to D4 in a row (D1 the left-most) over the GND DIO1–DIO4 GND
+  // terminals; the analog and comms terminals along the bottom. Drawn in the
+  // board's own colours, which do not change with the theme. 540 × 640.
   const B = {
-    reset: [452, 66], usbB: [490, 134], usbA: [490, 236], test: [452, 326],
-    led: [[84, 172], [124, 172], [164, 172], [204, 172]],
+    reset: [378, 170], usbB: [370, 337], usbA: [377, 393], test: [376, 447],
+    led: [[104, 506], [127, 506], [150, 506], [173, 506]],
   };
-  const STICK_OUT = 52;                 // how far an unplugged stick sits from its socket
+  // Out of the board, towards you, drawn up and to the right.
+  const OUT = [0.866, -0.5];
+  const STICK_OUT = 56;                 // how far an unplugged stick sits out of its socket
+  const CABLE_OUT = 60;
+  const HOLD_C = 2 * Math.PI * 17;      // the hold ring round TEST
   const JOB = { host: 'host firmware', boot: 'bootloader', radio: 'radio firmware', fi: 'function image' };
+
+  // A box coming out of the board: its back on (0, 0), w × h across, len
+  // deep — the right and top faces, then the near end.
+  function prism(w, h, len, cls) {
+    const [dx, dy] = [OUT[0] * len, OUT[1] * len];
+    const x0 = -w / 2, y0 = -h / 2, x1 = w / 2, y1 = h / 2;
+    const P = pts => pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+    return `<polygon points="${P([[x1, y0], [x1 + dx, y0 + dy], [x1 + dx, y1 + dy], [x1, y1]])}" class="${cls}-r"/>
+      <polygon points="${P([[x0, y0], [x0 + dx, y0 + dy], [x1 + dx, y0 + dy], [x1, y0]])}" class="${cls}-t"/>
+      <rect x="${(x0 + dx).toFixed(1)}" y="${(y0 + dy).toFixed(1)}" width="${w}" height="${h}" rx="2" class="${cls}-f"/>`;
+  }
 
   function unitSvg() {
     const leds = B.led.map(([x, y], i) => `
       <g class="fw-led">
-        <text class="fw-silk fw-silk--sm" x="${x}" y="${y - 20}" text-anchor="middle">D${i + 1}</text>
-        <circle cx="${x}" cy="${y}" r="11" class="fw-led-ring"/>
-        <circle cx="${x}" cy="${y}" r="8" class="fw-led-off"/>
-        <circle id="fw-led-g${i}" cx="${x}" cy="${y}" r="20" class="fw-led-glow" opacity="0" filter="url(#fw-blur)"/>
-        <circle id="fw-led-${i}" cx="${x}" cy="${y}" r="8" class="fw-led-on" opacity="0"/>
+        <text class="fw-silk fw-silk--led" x="${x}" y="${y - 13}" text-anchor="middle">D${i + 1}</text>
+        <circle cx="${x}" cy="${y}" r="9.5" class="fw-led-ring"/>
+        <circle cx="${x}" cy="${y}" r="6.5" class="fw-led-off"/>
+        <circle id="fw-led-g${i}" cx="${x}" cy="${y}" r="18" class="fw-led-glow" opacity="0" filter="url(#fw-blur)"/>
+        <circle id="fw-led-${i}" cx="${x}" cy="${y}" r="6.5" class="fw-led-on" opacity="0"/>
       </g>`).join('');
-    const terms = ['GND', 'DIO1', 'DIO2', 'DIO3', 'DIO4', 'GND'].map((n, i) => {
-      const x = 64 + i * 32;
-      return `<rect x="${x - 13}" y="218" width="26" height="34" rx="3" class="fw-tb-cell"/>
-        <circle cx="${x}" cy="230" r="7" class="fw-screw"/><path d="M${x - 4} 230h8" class="fw-slot"/>
-        <text class="fw-silk fw-silk--xs" x="${x}" y="270" text-anchor="middle">${n}</text>`;
-    }).join('');
-    const db9 = [0, 1, 2, 3, 4].map(k => `<circle cx="${88 + k * 22}" cy="86" r="3.6" class="fw-db9-pin"/>`).join('')
-      + [0, 1, 2, 3].map(k => `<circle cx="${99 + k * 22}" cy="102" r="3.6" class="fw-db9-pin"/>`).join('');
+    // A row of push-in terminals: a black block, a white mouth to each wire.
+    const block = (x, y, n, cw, names, caption) => `<rect x="${x}" y="${y}" width="${n * cw}" height="22" rx="2" class="fw-tb"/>
+      ${Array.from({ length: n }, (_, i) => `<rect x="${x + i * cw + 2}" y="${y + 3}" width="${cw - 4}" height="10" rx="1" class="fw-tb-cell"/><rect x="${x + i * cw + cw / 2 - 2}" y="${y + 6}" width="4" height="4" class="fw-tb-hole"/>`).join('')}
+      ${names ? names.map((t, i) => `<text class="fw-silk fw-silk--pin" x="${x + i * cw + cw / 2}" y="${y + 33}" text-anchor="middle">${t}</text>`).join('') : ''}
+      ${caption ? `<text class="fw-silk fw-silk--pin" x="${x + n * cw / 2}" y="${y + 33}" text-anchor="middle">${caption}</text>` : ''}`;
+    const db9 = [0, 1, 2, 3, 4].map(k => `<circle cx="${48 + k * 10}" cy="466" r="2.2" class="fw-db9-pin"/>`).join('')
+      + [0, 1, 2, 3].map(k => `<circle cx="${53 + k * 10}" cy="476" r="2.2" class="fw-db9-pin"/>`).join('');
+    const ticks = ['GPS FITTED', 'SERIAL RS485', 'EXTERNAL BATT', 'PRIMARY CELL'].map((t, i) => `<rect x="118" y="${48 + i * 18.5}" width="9" height="9" class="fw-tick"/>
+      <text class="fw-silk fw-silk--tick" x="133" y="${56 + i * 18.5}">${t}</text>`).join('');
     const [rx, ry] = B.reset, [tx, ty] = B.test, [ax, ay] = B.usbA, [bx, by] = B.usbB;
-    const label = (x, y, t, sub) => `<text class="fw-silk fw-silk--sm" x="${x}" y="${y}" text-anchor="end">${t}</text>
-      ${sub ? `<text class="fw-silk fw-silk--xs" x="${x}" y="${y + 13}" text-anchor="end">${sub}</text>` : ''}`;
-    return `<svg class="fw-unit" id="fw-unit" viewBox="0 0 640 400" role="img" aria-labelledby="fw-unit-t fw-unit-d" focusable="false">
-      <title id="fw-unit-t">The ERT-A2's board</title>
-      <desc id="fw-unit-d">The SERIAL DB9 at the top left, D1 to D4 in a row under it over the DIO terminals; down the right-hand edge RESET in its hole, the USB B socket for the laptop's lead, the USB A socket for the stick, and TEST.</desc>
+    return `<svg class="fw-unit" id="fw-unit" viewBox="0 0 540 640" role="img" aria-labelledby="fw-unit-t fw-unit-d" focusable="false">
+      <title id="fw-unit-t">The ERT-A2's front panel</title>
+      <desc id="fw-unit-d">Upright, as in its case: RESET in its hole at the top right; down the right-hand edge the USB B socket for the laptop's lead over the upright USB A socket for the stick, then TEST; at the bottom left the SERIAL port, then D1 to D4 in a row over the DIO terminals.</desc>
       <defs>
-        <filter id="fw-blur" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="5"/></filter>
-        <linearGradient id="fw-metal" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#eef1f4"/><stop offset="1" stop-color="#9aa4ae"/></linearGradient>
+        <filter id="fw-blur" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4"/></filter>
+        <pattern id="fw-grid" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M9 0H0V9" class="fw-grid-l"/></pattern>
+        <linearGradient id="fw-metal" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#eef1f4"/><stop offset="1" stop-color="#9aa4ae"/></linearGradient>
       </defs>
-      <rect x="16" y="20" width="474" height="360" rx="16" class="fw-pcb"/>
-      <rect x="16" y="20" width="474" height="360" rx="16" class="fw-pcb-edge"/>
-      ${[[38, 42], [38, 358]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="7" class="fw-hole"/>`).join('')}
-      <text class="fw-silk fw-silk--lg" x="56" y="330">ERT-A2</text>
-      <text class="fw-silk fw-silk--sm" x="56" y="350">ALERT2 transmitter</text>
-      <text class="fw-silk fw-silk--sm" x="76" y="60">SERIAL</text>
-      <path d="M68 70h134l-10 44H78z" class="fw-db9"/>
-      ${db9}
-      ${leds}
-      <rect x="44" y="212" width="204" height="46" rx="5" class="fw-tb"/>
-      ${terms}
+      <rect x="16" y="14" width="380" height="612" rx="10" class="fw-pcb"/>
+      <rect x="16" y="14" width="380" height="612" rx="10" fill="url(#fw-grid)"/>
+      <rect x="16" y="14" width="380" height="612" rx="10" class="fw-pcb-edge"/>
+      ${[[28, 26], [384, 26], [28, 614], [384, 614], [109, 425], [325, 425]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" class="fw-hole"/>`).join('')}
+
+      ${ticks}
+      <text class="fw-silk fw-silk--sm" x="333" y="122" text-anchor="end">CHARGER</text>
+      ${[[346, 'FAULT'], [373, 'CHARGE']].map(([x, t]) => `<circle cx="${x}" cy="118" r="3" class="fw-chg"/><text class="fw-silk fw-silk--pin" x="${x}" y="108" text-anchor="middle">${t}</text>`).join('')}
+
+      <g class="fw-mark" transform="translate(88 232)">
+        <circle r="40" class="fw-mark-w"/>
+        <path d="M-40 0H40M0 -40V0" class="fw-mark-b"/>
+        <path d="M0 0H26A26 26 0 0 1 0 26z" class="fw-mark-f"/>
+      </g>
+      <text class="fw-brand" x="140" y="249">ELPRO</text>
+      <text class="fw-brand fw-brand--sub" x="143" y="276">Technologies</text>
+      <text class="fw-brand fw-brand--model" x="223" y="318" text-anchor="middle">ERT-A2</text>
+      <text class="fw-silk fw-silk--flood" x="223" y="340" text-anchor="middle">FLOOD WARNING</text>
+      <text class="fw-silk fw-silk--md" x="24" y="370">STATION</text>
+      <rect x="110" y="352" width="190" height="24" rx="2" class="fw-write"/>
+      <text class="fw-silk fw-silk--md" x="24" y="402">FREQ</text>
+      <rect x="110" y="384" width="190" height="24" rx="2" class="fw-write"/>
+
+      <path d="M281 32C286 110 298 200 278 258C252 326 120 330 16 340" class="fw-coax"/>
+      <circle cx="281" cy="22" r="11" class="fw-gland"/><circle cx="281" cy="22" r="5" class="fw-gland-in"/>
 
       <g id="fw-badge" class="fw-badge" opacity="0">
-        <rect x="228" y="158" width="192" height="30" rx="15" class="fw-badge-r"/>
-        <text id="fw-badge-t" x="324" y="177.5" text-anchor="middle" class="fw-badge-t"></text>
+        <rect x="96" y="132" width="220" height="28" rx="14" class="fw-badge-r"/>
+        <text id="fw-badge-t" x="206" y="150.5" text-anchor="middle" class="fw-badge-t"></text>
       </g>
 
-      ${label(rx - 24, ry + 4, 'RESET', 'reboot')}
-      <circle cx="${rx}" cy="${ry}" r="17" class="fw-pad"/>
-      <circle cx="${rx}" cy="${ry}" r="11" class="fw-pit"/>
-      <circle id="fw-reset-cap" cx="${rx}" cy="${ry}" r="5.5" class="fw-reset"/>
-      <circle id="fw-rip-drv" cx="${rx}" cy="${ry}" r="18" class="fw-rip" opacity="0"/>
+      <text class="fw-silk fw-silk--sm" x="${rx - 15}" y="${ry + 4}" text-anchor="end">RESET</text>
+      <g id="fw-reset-hit">
+        <circle cx="${rx}" cy="${ry}" r="16" class="fw-hit"/>
+        <circle cx="${rx}" cy="${ry}" r="9" class="fw-pad"/>
+        <circle cx="${rx}" cy="${ry}" r="6" class="fw-pit"/>
+        <circle id="fw-reset-cap" cx="${rx}" cy="${ry}" r="3.5" class="fw-reset"/>
+      </g>
+      <circle id="fw-rip-drv" cx="${rx}" cy="${ry}" r="12" class="fw-rip" opacity="0"/>
 
-      ${label(bx - 66, by + 2, 'USB B', 'laptop')}
-      <rect x="${bx - 58}" y="${by - 28}" width="58" height="56" rx="3" class="fw-sock"/>
-      <path d="M${bx - 48} ${by - 18}h40v36h-40l-0 -28z" class="fw-sock-in"/>
-      <rect x="${bx - 40}" y="${by - 9}" width="30" height="18" rx="2" class="fw-tongue"/>
+      <rect x="336" y="304" width="64" height="124" rx="3" class="fw-main"/>
+      <text class="fw-silk fw-silk--pin fw-silk--up" transform="translate(343 ${by}) rotate(-90)" text-anchor="middle">USB B</text>
+      <text class="fw-silk fw-silk--pin fw-silk--up" transform="translate(343 ${ay}) rotate(-90)" text-anchor="middle">USB A</text>
+      <path d="M${bx - 22} ${by + 19}V${by - 9}l8 -10h28l8 10V${by + 19}z" class="fw-sock"/>
+      <path d="M${bx - 15} ${by + 13}V${by - 6}l5 -6h20l5 6V${by + 13}z" class="fw-sock-in"/>
+      <rect x="${bx - 9}" y="${by - 4}" width="18" height="10" rx="1.5" class="fw-tongue"/>
+      <rect x="${ax - 13}" y="${ay - 25}" width="26" height="50" rx="2" class="fw-sock"/>
+      <rect x="${ax - 9}" y="${ay - 21}" width="18" height="42" rx="1" class="fw-sock-in"/>
+      <rect x="${ax - 6}" y="${ay - 18}" width="6" height="36" rx="1" class="fw-tongue"/>
 
-      ${label(ax - 64, ay + 2, 'USB A', 'stick')}
-      <rect x="${ax - 56}" y="${ay - 38}" width="56" height="76" rx="3" class="fw-sock"/>
-      <rect x="${ax - 50}" y="${ay - 30}" width="50" height="60" rx="2" class="fw-sock-in"/>
-      <rect x="${ax - 50}" y="${ay - 4}" width="44" height="12" rx="1.5" class="fw-tongue"/>
+      <text class="fw-silk fw-silk--md" x="${tx - 16}" y="${ty + 5}" text-anchor="end">TEST</text>
+      <circle id="fw-hold" cx="${tx}" cy="${ty}" r="17" class="fw-holdring" stroke-dasharray="${HOLD_C.toFixed(1)}" stroke-dashoffset="${HOLD_C.toFixed(1)}" transform="rotate(-90 ${tx} ${ty})"/>
+      <circle cx="${tx}" cy="${ty}" r="11" class="fw-btn-base"/>
+      <circle id="fw-test-cap" cx="${tx}" cy="${ty}" r="8" class="fw-btn"/>
+      <circle id="fw-rip-fin" cx="${tx}" cy="${ty}" r="14" class="fw-rip" opacity="0"/>
+      ${block(322, 468, 4, 15, ['HTR', 'SOL', 'GND', 'BAT'])}
 
-      ${label(tx - 30, ty + 4, 'TEST')}
-      <circle id="fw-hold" cx="${tx}" cy="${ty}" r="26" class="fw-holdring" stroke-dasharray="163.4" stroke-dashoffset="163.4" transform="rotate(-90 ${tx} ${ty})"/>
-      <circle cx="${tx}" cy="${ty}" r="18" class="fw-btn-base"/>
-      <circle id="fw-test-cap" cx="${tx}" cy="${ty}" r="13" class="fw-btn"/>
-      <circle id="fw-rip-fin" cx="${tx}" cy="${ty}" r="20" class="fw-rip" opacity="0"/>
+      <text class="fw-silk fw-silk--md" x="36" y="448">SERIAL</text>
+      <path d="M36 456h64l-6 30H42z" class="fw-db9"/>
+      <path d="M41 459h54l-5 24H46z" class="fw-db9-in"/>
+      ${db9}
+      <circle cx="198" cy="458" r="20" class="fw-cap"/><circle cx="198" cy="458" r="13" class="fw-cap-top"/>
+      ${leds}
+      ${block(40, 518, 6, 20, ['GND', 'DIO1', 'DIO2', 'DIO3', 'DIO4', 'GND'])}
+      ${block(200, 518, 6, 15, null, 'AIN1 · AIN2 · +24V LOOP')}
+      ${block(296, 518, 6, 15, null, 'COMMS · RS485 · SDI-12')}
+      <text class="fw-silk fw-silk--pin fw-silk--dim" x="206" y="602" text-anchor="middle">Copyright 2019 ELPRO Technologies</text>
 
-      <g id="fw-cable" class="fw-cable-g" opacity=".35" transform="translate(60 0)">
-        <path d="M${bx + 52} ${by}C${bx + 90} ${by} ${bx + 100} ${by + 40} 640 ${by + 44}" class="fw-lead"/>
-        <rect x="${bx - 44}" y="${by - 14}" width="46" height="28" rx="2" fill="url(#fw-metal)" class="fw-plug-m"/>
-        <rect x="${bx + 2}" y="${by - 20}" width="52" height="40" rx="6" class="fw-plug-b"/>
-        <text x="${bx + 66}" y="${by + 68}" class="fw-silk fw-silk--xs fw-lead-t">to the laptop ›</text>
+      <g id="fw-cable" class="fw-cable-g" opacity=".35" transform="translate(${(CABLE_OUT * OUT[0]).toFixed(1)} ${(CABLE_OUT * OUT[1]).toFixed(1)})">
+        <g transform="translate(${bx} ${by})">
+          <g id="fw-cable-plug" opacity="1"><g transform="translate(${(-12 * OUT[0]).toFixed(1)} ${(-12 * OUT[1]).toFixed(1)})">${prism(24, 20, 12, 'fw-pm')}</g></g>
+          ${prism(36, 30, 22, 'fw-plug')}
+          <path d="M${(22 * OUT[0]).toFixed(1)} ${(22 * OUT[1]).toFixed(1)}C60 -40 110 -58 210 -70" class="fw-lead"/>
+        </g>
+        <text x="452" y="250" class="fw-silk fw-silk--xs fw-lead-t">to the laptop ›</text>
       </g>
 
-      <g id="fw-stick" class="fw-stick-g" opacity=".5" transform="translate(${STICK_OUT} 0)">
-        <rect x="${ax - 48}" y="${ay - 25}" width="56" height="50" rx="2" fill="url(#fw-metal)" class="fw-stick-m"/>
-        <rect x="${ax - 40}" y="${ay - 16}" width="10" height="8" class="fw-stick-hole"/><rect x="${ax - 40}" y="${ay + 8}" width="10" height="8" class="fw-stick-hole"/>
-        <rect x="${ax + 6}" y="${ay - 30}" width="88" height="60" rx="10" class="fw-stick-body"/>
-        <text x="${ax + 50}" y="${ay + 5}" text-anchor="middle" class="fw-stick-t">FIRMWARE</text>
-        <circle id="fw-usbled" cx="${ax + 82}" cy="${ay - 18}" r="4" class="fw-usbled" opacity=".25"/>
+      <g id="fw-stick" class="fw-stick-g" opacity=".5" transform="translate(${(STICK_OUT * OUT[0]).toFixed(1)} ${(STICK_OUT * OUT[1]).toFixed(1)})">
+        <g transform="translate(${ax} ${ay})">
+          <g id="fw-stick-plug" opacity="1"><g transform="translate(${(-14 * OUT[0]).toFixed(1)} ${(-14 * OUT[1]).toFixed(1)})">${prism(10, 34, 14, 'fw-pm')}</g></g>
+          ${prism(24, 46, 64, 'fw-sb2')}
+          <text class="fw-stick-t" transform="matrix(${OUT[0]} ${OUT[1]} 0 1 ${(12 + 8 * OUT[0]).toFixed(1)} ${(3 + 8 * OUT[1]).toFixed(1)})">FIRMWARE</text>
+          <circle id="fw-usbled" cx="${(64 * OUT[0]).toFixed(1)}" cy="${(64 * OUT[1] - 15).toFixed(1)}" r="3" class="fw-usbled" opacity=".25"/>
+        </g>
       </g>
 
       <g id="fw-drv" class="fw-drv-g" opacity="0">
-        <path d="M0 0l58 -58" class="fw-drv-shaft"/>
-        <path d="M54 -54l40 -40" class="fw-drv-handle"/>
+        <path d="M0 0l46 -46" class="fw-drv-shaft"/>
+        <path d="M43 -43l32 -32" class="fw-drv-handle"/>
       </g>
       <g id="fw-fin" class="fw-fin-g" opacity="0">
-        <path d="M-15 6C-17 -12 -8 -22 4 -21C16 -20 21 -10 19 6L30 74H-6z" class="fw-finger"/>
-        <path d="M-8 -6C-8 -15 -1 -18 5 -17C11 -16 13 -10 12 -4C5 -1 -2 -1 -8 -6z" class="fw-nail"/>
+        <g transform="scale(.72)">
+          <path d="M-15 6C-17 -12 -8 -22 4 -21C16 -20 21 -10 19 6L30 74H-6z" class="fw-finger"/>
+          <path d="M-8 -6C-8 -15 -1 -18 5 -17C11 -16 13 -10 12 -4C5 -1 -2 -1 -8 -6z" class="fw-nail"/>
+        </g>
       </g>
     </svg>`;
   }
@@ -858,30 +977,35 @@ const A2Firmware = (function () {
       set(`fw-led-${i}`, 'opacity', u.d[i].toFixed(3));
       set(`fw-led-g${i}`, 'opacity', (u.d[i] * 0.85).toFixed(3));
     }
-    set('fw-stick', 'transform', `translate(${((1 - u.stick) * STICK_OUT).toFixed(1)} 0)`);
+    // The stick and the lead come straight out of the board, towards you; the
+    // metal of each plug shows only while it is out of its socket.
+    const out = (k, far) => `translate(${((1 - u[k]) * far * OUT[0]).toFixed(1)} ${((1 - u[k]) * far * OUT[1]).toFixed(1)})`;
+    set('fw-stick', 'transform', out('stick', STICK_OUT));
     set('fw-stick', 'opacity', (0.5 + 0.5 * u.stick).toFixed(3));
+    set('fw-stick-plug', 'opacity', Math.min(1, (1 - u.stick) * 4).toFixed(3));
     set('fw-usbled', 'opacity', (u.usb || 0.25).toFixed(2));
-    set('fw-cable', 'transform', `translate(${((1 - u.cable) * 60).toFixed(1)} 0)`);
+    set('fw-cable', 'transform', out('cable', CABLE_OUT));
     set('fw-cable', 'opacity', (0.35 + 0.65 * u.cable).toFixed(3));
+    set('fw-cable-plug', 'opacity', Math.min(1, (1 - u.cable) * 4).toFixed(3));
     // The screwdriver comes in from the top right, down RESET's hole.
     const [rx, ry] = B.reset;
     const da = ease(u.drv);
-    const dx = rx + (1 - da) * 150 - u.drvP * 5, dy = ry - (1 - da) * 150 + u.drvP * 5;
+    const dx = rx + (1 - da) * 150 - u.drvP * 4, dy = ry - (1 - da) * 150 + u.drvP * 4;
     set('fw-drv', 'transform', `translate(${dx.toFixed(1)} ${dy.toFixed(1)})`);
     set('fw-drv', 'opacity', u.drv > 0.01 ? '1' : '0');
     // The finger from below, onto TEST.
     const [tx, ty] = B.test;
     const fa = ease(u.fin);
-    const fx = tx + 6 + (1 - fa) * 120, fy = ty + 4 + (1 - fa) * 130 + u.finP * 3;
+    const fx = tx + 4 + (1 - fa) * 110, fy = ty + 3 + (1 - fa) * 120 + u.finP * 2.5;
     set('fw-fin', 'transform', `translate(${fx.toFixed(1)} ${fy.toFixed(1)}) rotate(-18)`);
     set('fw-fin', 'opacity', u.fin > 0.01 ? '1' : '0');
-    set('fw-test-cap', 'r', (13 - u.finP * 2).toFixed(2));
-    set('fw-reset-cap', 'r', (5.5 - u.drvP * 1.5).toFixed(2));
-    set('fw-hold', 'stroke-dashoffset', (163.4 * (1 - (u.finP > 0 ? u.hold : 0))).toFixed(1));
+    set('fw-test-cap', 'r', (8 - u.finP * 1.6).toFixed(2));
+    set('fw-reset-cap', 'r', (3.5 - u.drvP * 1.2).toFixed(2));
+    set('fw-hold', 'stroke-dashoffset', (HOLD_C * (1 - (u.finP > 0 ? u.hold : 0))).toFixed(1));
     for (const k of ['drv', 'fin']) {
       const r = u.rip[k];
       set(`fw-rip-${k}`, 'opacity', r >= 0 ? (1 - r).toFixed(3) : '0');
-      set(`fw-rip-${k}`, 'r', ((k === 'drv' ? 14 : 18) + (r >= 0 ? r : 0) * 22).toFixed(1));
+      set(`fw-rip-${k}`, 'r', ((k === 'drv' ? 10 : 13) + (r >= 0 ? r : 0) * 18).toFixed(1));
     }
     const bt = badgeText(st, u);
     const tEl = $('fw-badge-t');
@@ -948,29 +1072,41 @@ const A2Firmware = (function () {
           <div class="fw-form-btns"><span class="fw-fbtn${startHot ? ' is-hot' : ''}">Start</span><span class="fw-fbtn">Close</span></div>
         </div></div>`;
     }
+    // The last line is where the unit waits: the cursor on it (over a
+    // character, after ←, or past the end), and the key just typed lit.
+    const lastLine = ln => {
+      const t = ln.t, cur = !w.offline && ln.open ? (ln.cur != null ? ln.cur : t.length) : -1;
+      const [m0, m1] = w.mark || [-1, -1];
+      let out = '';
+      for (let j = 0; j < t.length; j++) {
+        const ch = esc(t[j]);
+        if (j === cur) out += `<span class="tm-cur-on">${ch}</span>`;
+        else if (j >= m0 && j < m1) out += `<span class="tm-lit">${ch}</span>`;
+        else out += ch;
+      }
+      return { body: out, end: cur >= t.length };
+    };
+    let atEnd = false;
     const spans = w.lines.map((ln, i) => {
       let body = esc(ln.t);
-      // At a value prompt the cursor can sit on a character (after ←): drawn over it.
-      const on = i === w.lines.length - 1 && !w.offline && ln.open && ln.cur != null && ln.cur < ln.t.length;
-      if (on) body = `${esc(ln.t.slice(0, ln.cur))}<span class="tm-cur-on">${esc(ln.t[ln.cur])}</span>${esc(ln.t.slice(ln.cur + 1))}`;
+      if (i === w.lines.length - 1) { const r = lastLine(ln); body = r.body; atEnd = r.end; }
       // The function image's number, boxed as ELPRO boxes it.
       if (ln.fi && ln.t.endsWith(ln.fi)) body = `${esc(ln.t.slice(0, -ln.fi.length))}<span class="tm-fi">${esc(ln.fi)}</span>`;
       const picked = w.pickNow && ln.pick === w.pickNow;
       return `<span class="tm ${ln.c || ''}${picked ? ' is-picked' : ''}">${picked ? `<mark class="tm-pick">${body}</mark>` : body}`;
     });
     const cursor = '<span class="tm-cur" aria-hidden="true">█</span>';
-    // The cursor sits where the unit is waiting: at the end of the last line,
-    // unless it is on a character of it.
-    const last = w.lines[w.lines.length - 1];
-    const atEnd = !w.offline && !(last && last.open && last.cur != null && last.cur < last.t.length);
     const lines = spans.map((sp, i) => `${sp}${i === spans.length - 1 && atEnd ? cursor : ''}</span>`).join('\n');
+    // The keys pressed, newest on the right: each pressed down as it goes,
+    // then fading out of the tray.
+    const caps = (w.keys || []).map((k, i, all) => `<kbd class="fw-key${k.age < 0.28 ? ' is-down' : ''}${i === all.length - 1 ? ' is-new' : ''}${k.age > CAP_FOR - 0.45 ? ' is-going' : ''}${k.cap.length > 2 ? ' fw-key--wide' : ''}">${esc(k.cap)}</kbd>`).join('');
     // PuTTY: its title says "(inactive)" once the port has gone; the scroll
     // bar sits at the bottom of the scroll-back, as it does while a unit talks.
     return `<div class="fw-win fw-win--term${w.offline ? ' is-offline' : ''}">${bar(w.offline ? `${w.title} (inactive)` : w.title, 'putty')}
       <div class="fw-putty"><pre class="fw-term">${lines || (w.offline ? '' : cursor)}</pre>
         <span class="fw-sb" aria-hidden="true"><span class="fw-sb-up">&#x25B4;</span><span class="fw-sb-thumb"></span><span class="fw-sb-dn">&#x25BE;</span></span></div>
       ${w.offline ? '<div class="fw-offline" aria-hidden="true">USB link off-line — the unit is busy</div>' : ''}
-      <div class="fw-keys" aria-hidden="true">${(w.keys || []).map(k => `<kbd class="fw-key">${esc(k)}</kbd>`).join('')}</div>
+      <div class="fw-keys" aria-hidden="true"><span class="fw-keys-l">${caps ? '⌨ Pressed' : '⌨ Keys pressed show here'}</span>${caps}</div>
     </div>`;
   }
 
@@ -1174,8 +1310,13 @@ const A2Firmware = (function () {
   function paintLive() {
     if (!LV || S.mode !== 'live') return;
     const e = LV.e;
-    const recent = LV.keys.filter(k => k.at > performance.now() / 1000 - 0.75).map(k => k.k);
-    const html = pcHtml({ win: 'term', title: TT, lines: A2Terminal.screen(e, TERM_ROWS), keys: recent, pickNow: e.pick, offline: !e.link, live: true });
+    const now = performance.now() / 1000;
+    const recent = LV.keys.filter(k => now - k.at < CAP_FOR).map(k => ({ cap: k.k, age: now - k.at }));
+    const o = e.lines[e.lines.length - 1];
+    const typed = LV.keys.length && now - LV.keys[LV.keys.length - 1].at < LIT_FOR && LV.lit && o === LV.lit.line ? LV.lit.mark : null;
+    const html = pcHtml({ win: 'term', title: TT, lines: A2Terminal.screen(e, TERM_ROWS), keys: recent, pickNow: e.pick, offline: !e.link, live: true, mark: typed });
+    // The tray empties, and a typed character dims, on their own.
+    if (recent.length && !LV.fade) LV.fade = setTimeout(() => { LV.fade = 0; paintLive(); }, 120);
     if (html !== lastPc) { const el = $('fw-pc'); if (el) el.innerHTML = html; lastPc = html; }
     if (!LV.anim) paintUnit(LV.u0, null);
     const side = liveSide();
@@ -1249,6 +1390,10 @@ const A2Firmware = (function () {
     const cap = LV.e.at.k === 'password' && k.length === 1 ? '•' : keyCap(k);
     A2Terminal.key(LV.e, k);
     LV.keys.push({ k: cap, at: performance.now() / 1000 });
+    // A character typed into the line the unit is still waiting on: lit a moment.
+    const o = LV.e.lines[LV.e.lines.length - 1];
+    const c = o && o.open ? (o.cur != null ? o.cur : o.t.length) : 0;
+    LV.lit = o && o.open && k.length === 1 && c > 0 ? { line: o, mark: [c - 1, c] } : null;
     LV.keys = LV.keys.slice(-6);
     liveEvents();
     paintLive();
@@ -1287,7 +1432,7 @@ const A2Firmware = (function () {
   // The stick on the drawing, tapped.
   function board(ev) {
     if (S.mode !== 'live') return;
-    const hit = ev.target && ev.target.closest && ev.target.closest('#fw-stick, #fw-reset-cap');
+    const hit = ev.target && ev.target.closest && ev.target.closest('#fw-stick, #fw-reset-hit');
     if (!hit) return;
     if (hit.id === 'fw-stick') liveStick();
     else liveRestart();
@@ -1400,15 +1545,15 @@ const A2Firmware = (function () {
       </div>
       <h4>Know the unit</h4>
       <div class="table-wrap"><table class="fw-table">
-        <caption>What the upgrade uses on the A2, down its right-hand edge and on the board (ELPRO's installation guide and manual)</caption>
+        <caption>What the upgrade uses on the A2's front panel, with the case open (ELPRO's installation guide and manual, and photographs of a unit)</caption>
         <thead><tr><th scope="col">Part</th><th scope="col">Where</th><th scope="col">What it does</th><th scope="col">In the upgrade</th></tr></thead>
         <tbody>
-          <tr><th scope="row">RESET</th><td>Top of the right-hand edge, down a small hole</td><td>Reboots the unit (its I/O values kept)</td><td>Tapped with a small screwdriver to start the host's load</td></tr>
-          <tr><th scope="row">USB B</th><td>Under RESET: the square socket</td><td>Configuration and diagnostics — the menus</td><td>The laptop's lead, for the whole upgrade</td></tr>
-          <tr><th scope="row">USB A</th><td>Under USB B: the narrow upright socket</td><td>Logged data out, firmware in</td><td>The stick with the four files</td></tr>
-          <tr><th scope="row">TEST</th><td>Bottom of the right-hand edge</td><td>A short press sends an input data message; a long one (5 s) puts the logged data on a stick</td><td>Held after RESET until D1 lights, to load the host</td></tr>
-          <tr><th scope="row">D1–D4</th><td>In a row under the SERIAL DB9, D1 on the left</td><td>The digital inputs, while the menu is active (D3 flashes for a rain tip)</td><td>The progress bar: one more lit for each check passed</td></tr>
-          <tr><th scope="row">SERIAL (DB9)</th><td>Top left of the board</td><td>RS-232</td><td>Optional: during an update the A2 writes what it is doing, and any error, here at 9600 8N1 — not over USB</td></tr>
+          <tr><th scope="row">RESET</th><td>Top right of the panel, down a small hole beside its label</td><td>Reboots the unit (its I/O values kept)</td><td>Tapped with a small screwdriver to start the host's load</td></tr>
+          <tr><th scope="row">USB B</th><td>Halfway down the right-hand edge: the square socket, open towards you</td><td>Configuration and diagnostics — the menus</td><td>The laptop's lead, for the whole upgrade</td></tr>
+          <tr><th scope="row">USB A</th><td>Just under USB B: the narrow upright socket, open towards you</td><td>Logged data out, firmware in</td><td>The stick with the four files</td></tr>
+          <tr><th scope="row">TEST</th><td>Lower right, over a row of four terminals</td><td>A short press sends an input data message; a long one (5 s) puts the logged data on a stick</td><td>Held after RESET until D1 lights, to load the host</td></tr>
+          <tr><th scope="row">D1–D4</th><td>Lower left: a row just under and right of the SERIAL port, over the DIO terminals, D1 on the left</td><td>The digital inputs, while the menu is active (D3 flashes for a rain tip)</td><td>The progress bar: one more lit for each check passed</td></tr>
+          <tr><th scope="row">SERIAL (DB9)</th><td>Lower left of the panel, labelled SERIAL</td><td>RS-232</td><td>Optional: during an update the A2 writes what it is doing, and any error, here at 9600 8N1 — not over USB</td></tr>
         </tbody>
       </table></div>`;
   }

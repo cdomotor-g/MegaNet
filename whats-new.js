@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 144, date: '2026-10-28', items: [
+      'In the <strong>💾 ERT-A2 Simulator</strong>\'s demos, every key press now shows. A key the unit answers — a menu letter, '
+        + 'Enter, y — appears on its prompt, lit, with the option it picks lit too, and waits a moment before the screen moves on; '
+        + 'a digit typed into a value lights as it goes in; and each key pops up as a keycap under PuTTY\'s window, pressed down, '
+        + 'for a second and a half. The unit is redrawn from photographs of a real one: the ELPRO front panel as it sits in its case, '
+        + 'with the stick and the laptop\'s lead coming straight out of their sockets towards you, as they do.',
+    ] },
     { n: 143, date: '2026-10-28', items: [
       'A new tab under <strong>Start here</strong>: <strong>📇 Capabilities</strong> lists everything Flood-Net can do, a line each — '
         + 'the tools on every tab, every map layer and whose data it is, and what runs behind the scenes. Each name takes you to '

@@ -18550,7 +18550,7 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   }
 
   .as-pin { animation: none; }
-  .fw-pane.is-active, .fw-ledchip-dot, .fw-keys .fw-key { animation: none; }
+  .fw-pane.is-active, .fw-ledchip-dot { animation: none; }
   .fw-ledchip-dot { background: #ffe35a; }
 
   /* The loading card's logo (#212's card, its detailed mark brought to life):
@@ -22453,7 +22453,7 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
 .fw-pane.is-active .fw-pane-tag { color: var(--panel); background: var(--fw-ring); border-color: var(--fw-ring); }
 [data-theme="dark"] .fw-pane.is-active .fw-pane-tag { color: #0f1720; }
 .fw-unit-wrap, .fw-pc-wrap { min-width: 0; display: grid; align-items: center; }
-.fw-unit { display: block; width: 100%; height: auto; max-height: 440px; }
+.fw-unit { display: block; width: 100%; height: auto; max-height: 470px; }
 
 /* Demo or Interactive: two big switches over the player. */
 .fw-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
@@ -22486,53 +22486,80 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
 .fw-live-text { flex: 1 1 12rem; min-width: 8rem; font-family: var(--font-mono); }
 .fw-player[data-mode="live"] .fw-term .tm-m { cursor: pointer; border-radius: 2px; }
 .fw-player[data-mode="live"] .fw-term .tm-m:hover { background: rgba(243, 227, 90, .16); }
-.fw-player[data-mode="live"] #fw-stick, .fw-player[data-mode="live"] #fw-reset-cap { cursor: pointer; }
+.fw-player[data-mode="live"] #fw-stick, .fw-player[data-mode="live"] #fw-reset-hit { cursor: pointer; }
 .fw-offline { padding: .3rem .6rem; background: #fff4ce; color: #4d3a00; border-top: 1px solid #e8d48a; font-family: "Segoe UI", system-ui, sans-serif; font-size: var(--fs-sm); font-weight: 600; text-align: center; }
 
-/* The board. */
-.fw-pcb { fill: #1f63b4; }
-.fw-pcb-edge { fill: none; stroke: #123f78; stroke-width: 3; }
-.fw-hole { fill: #0d2a52; stroke: #d6a93a; stroke-width: 3; }
-.fw-silk { fill: #eef4ff; font-family: var(--font-mono); font-weight: 700; letter-spacing: .04em; }
-.fw-silk--lg { font-size: 30px; letter-spacing: .08em; }
-.fw-silk--sm { font-size: 13px; }
+/* The board: the ERT-A2's front panel, deep blue under a fine grid, white
+   print — its own colours in every theme. */
+.fw-pcb { fill: #1d3c8c; }
+.fw-grid-l { fill: none; stroke: #3a62b6; stroke-width: .7; opacity: .55; }
+.fw-pcb-edge { fill: none; stroke: #102559; stroke-width: 3; }
+.fw-hole { fill: #0b1530; stroke: #8b97ad; stroke-width: 2; }
+.fw-silk { fill: #eef4ff; font-family: "Arial", "Helvetica Neue", sans-serif; font-weight: 700; letter-spacing: .03em; }
+.fw-silk--md { font-size: 13px; }
+.fw-silk--sm { font-size: 10px; }
 .fw-silk--xs { font-size: 10px; font-weight: 600; }
-.fw-db9 { fill: #b7bfc8; stroke: #5d6772; stroke-width: 2; }
-.fw-db9-pin { fill: #2b3139; }
-.fw-led-ring { fill: #d7dde3; }
-.fw-led-off { fill: #5d5326; }
+.fw-silk--led { font-size: 9px; }
+.fw-silk--tick { font-size: 9.5px; letter-spacing: .05em; }
+.fw-silk--pin { font-size: 6.4px; font-weight: 600; letter-spacing: 0; }
+.fw-silk--flood { font-size: 13px; letter-spacing: .14em; font-family: var(--font-mono); }
+.fw-silk--dim { opacity: .7; }
+.fw-brand { fill: #ffffff; font-family: "Arial", "Helvetica Neue", sans-serif; font-weight: 800; font-size: 54px; letter-spacing: .01em; }
+.fw-brand--sub { font-size: 23px; font-weight: 700; }
+.fw-brand--model { font-size: 36px; }
+.fw-mark-w { fill: #ffffff; }
+.fw-mark-b { fill: none; stroke: #1d3c8c; stroke-width: 7; }
+.fw-mark-f { fill: #1d3c8c; }
+.fw-tick { fill: #ffffff; }
+.fw-chg { fill: #3a3f2a; stroke: #8b97ad; stroke-width: .8; }
+.fw-write { fill: #eef2f7; }
+.fw-coax { fill: none; stroke: #c99c7b; stroke-width: 3; stroke-linecap: round; opacity: .9; }
+.fw-gland { fill: #c3c8cf; stroke: #6f7782; stroke-width: 1.5; }
+.fw-gland-in { fill: #2b3139; }
+.fw-main { fill: #25603f; stroke: #163d28; stroke-width: 1.5; }
+.fw-db9 { fill: #b7bfc8; stroke: #5d6772; stroke-width: 1.5; }
+.fw-db9-in { fill: #49525c; }
+.fw-db9-pin { fill: #e7d38a; }
+.fw-cap { fill: #2346c0; stroke: #5a7ae6; stroke-width: 2; }
+.fw-cap-top { fill: #c9ced6; stroke: #8b939d; stroke-width: 1; }
+.fw-led-ring { fill: #c9a43c; }
+.fw-led-off { fill: #4a4320; }
 .fw-led-on { fill: #ffe35a; }
 .fw-led-glow { fill: #ffd21f; }
-.fw-tb { fill: #1f8a4c; stroke: #145c33; stroke-width: 2; }
-.fw-tb-cell { fill: #27a35c; stroke: #145c33; stroke-width: 1; }
-.fw-screw { fill: #c9d0d6; stroke: #707a84; stroke-width: 1.2; }
-.fw-slot { stroke: #59626b; stroke-width: 2; stroke-linecap: round; }
+.fw-tb { fill: #15181c; stroke: #000000; stroke-width: 1; }
+.fw-tb-cell { fill: #e9e9e6; }
+.fw-tb-hole { fill: #15181c; }
 .fw-badge-r { fill: #0b2547; stroke: #ffd21f; stroke-width: 1.5; }
 .fw-badge-t { fill: #fff6c6; font-size: 11.5px; font-weight: 700; font-family: var(--font-mono); }
-.fw-pad { fill: #d6a93a; }
-.fw-pit { fill: #0c1c33; }
-.fw-reset { fill: #e2662a; }
-.fw-rip { fill: none; stroke: #ffffff; stroke-width: 3; }
-.fw-sock { fill: #c4ccd4; stroke: #6c7782; stroke-width: 2; }
+.fw-hit { fill: transparent; }
+.fw-pad { fill: #8d9bb3; }
+.fw-pit { fill: #0b1220; }
+.fw-reset { fill: #59606b; }
+.fw-rip { fill: none; stroke: #ffffff; stroke-width: 2.5; }
+.fw-sock { fill: #c4ccd4; stroke: #6c7782; stroke-width: 1.5; }
 .fw-sock-in { fill: #1b2129; }
 .fw-tongue { fill: #f3f3f0; }
-.fw-holdring { fill: none; stroke: #ffd21f; stroke-width: 5; stroke-linecap: round; }
-.fw-btn-base { fill: #23272d; }
-.fw-btn { fill: #f2c21b; stroke: #8f6f00; stroke-width: 2; }
-.fw-lead { fill: none; stroke: #2a2e33; stroke-width: 9; stroke-linecap: round; }
-.fw-plug-b { fill: #2a2e33; }
-.fw-plug-m { stroke: #6c7782; stroke-width: 1; }
+.fw-holdring { fill: none; stroke: #ffd21f; stroke-width: 4; stroke-linecap: round; }
+.fw-btn-base { fill: #0e1a36; stroke: #8b97ad; stroke-width: 1.2; }
+.fw-btn { fill: #cfd8e3; stroke: #6f7b8c; stroke-width: 1.5; }
+.fw-lead { fill: none; stroke: #2a2e33; stroke-width: 8; stroke-linecap: round; }
+.fw-plug-r { fill: #1d2024; }
+.fw-plug-t { fill: #3a3f46; }
+.fw-plug-f { fill: #2a2e33; }
+.fw-pm-r { fill: #8f99a4; }
+.fw-pm-t { fill: #dfe4e9; }
+.fw-pm-f { fill: #b9c1ca; }
 .fw-lead-t { fill: var(--muted); }
-.fw-stick-m { stroke: #6c7782; stroke-width: 1; }
-.fw-stick-hole { fill: #59626b; }
-.fw-stick-body { fill: #14325d; stroke: #0a1c36; stroke-width: 2; }
-.fw-stick-t { fill: #dbe8ff; font-size: 12px; font-weight: 700; font-family: var(--font-mono); letter-spacing: .05em; }
+.fw-sb2-r { fill: #0e2546; }
+.fw-sb2-t { fill: #2a5596; }
+.fw-sb2-f { fill: #14325d; stroke: #0a1c36; stroke-width: 1.5; }
+.fw-stick-t { fill: #dbe8ff; font-size: 8px; font-weight: 700; font-family: var(--font-mono); letter-spacing: .06em; }
 .fw-usbled { fill: #4dff88; }
-.fw-drv-shaft { stroke: #b9c2cb; stroke-width: 5; stroke-linecap: round; }
-.fw-drv-handle { stroke: #d3302f; stroke-width: 16; stroke-linecap: round; }
+.fw-drv-shaft { stroke: #b9c2cb; stroke-width: 4; stroke-linecap: round; }
+.fw-drv-handle { stroke: #d3302f; stroke-width: 13; stroke-linecap: round; }
 .fw-finger { fill: #e7b48f; stroke: #a8754f; stroke-width: 2; }
 .fw-nail { fill: #f7dccb; stroke: #c7957a; stroke-width: 1; }
-.fw-unit.is-booting .fw-pcb { fill: #184f91; }
+.fw-unit.is-booting .fw-pcb { fill: #16306f; }
 
 /* The laptop's windows. */
 .fw-win {
@@ -22623,9 +22650,19 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
 .tm-warn { color: #ffff55; }
 .fw-term .tm.is-picked { background: none; }
 /* The keys pressed, on a tray under PuTTY's window rather than in it. */
-.fw-keys { min-height: 2.1rem; display: flex; justify-content: flex-end; align-items: center; gap: .4rem; padding: .25rem .6rem; background: #e9e9e9; border-top: 1px solid #d0d0d0; }
-.fw-keys .fw-key { display: inline-block; min-width: 1.8rem; padding: .1rem .5rem; border: 1px solid #c9d1d9; border-bottom-width: 3px; border-radius: 5px; background: #f6f8fa; color: #1b2430; font-family: var(--font-mono); font-size: .8rem; font-weight: 700; text-align: center; animation: fw-key .5s var(--ease); }
-@keyframes fw-key { 0% { transform: translateY(-6px); opacity: 0; } 40% { transform: translateY(2px); opacity: 1; } 100% { transform: none; } }
+/* The keys pressed, on a tray under PuTTY's window: the newest biggest and
+   ringed, each pressed down as it goes in and fading as it leaves — all
+   worked out from the frame's time, so a redraw never restarts them. */
+.fw-keys { min-height: 3rem; display: flex; justify-content: flex-end; align-items: center; gap: .45rem; padding: .3rem .6rem; background: #e9e9e9; border-top: 1px solid #d0d0d0; }
+.fw-keys-l { margin-right: auto; font-family: "Segoe UI", system-ui, sans-serif; font-size: .72rem; color: #4a4a4a; white-space: nowrap; }
+.fw-keys .fw-key { display: inline-grid; place-items: center; min-width: 2rem; height: 1.9rem; padding: 0 .5rem; border: 1px solid #b9c0c8; border-bottom-width: 4px; border-radius: 6px;
+  background: #ffffff; color: #1b2430; font-family: var(--font-mono); font-size: .85rem; font-weight: 700; line-height: 1; transition: none; }
+.fw-keys .fw-key.is-new { min-width: 2.6rem; height: 2.3rem; font-size: 1.05rem; border-color: var(--fw-key); box-shadow: 0 0 0 3px color-mix(in srgb, var(--fw-key) 30%, transparent); }
+.fw-keys .fw-key.is-down { transform: translateY(3px); border-bottom-width: 1px; background: #dbe9ff; }
+.fw-keys .fw-key.is-going { opacity: .35; }
+.fw-keys .fw-key--wide { padding: 0 .65rem; }
+/* The character just typed, lit on the line the unit is waiting on. */
+.tm-lit { background: #f3e35a; color: #000000; border-radius: 1px; }
 
 /* The controls. */
 .fw-transport { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }

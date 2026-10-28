@@ -709,9 +709,10 @@ const HELP = {
   },
   a2firmware: {
     summary: 'An ELPRO ERT-A2 on the bench, simulated from the PuTTY logs of real units: its console\'s login, menus, letters, prompts '
-           + 'and messages are the unit\'s own. <strong>Demo</strong> plays a job done, a step at a time — the board drawn on the left '
-           + '(the stick going in, RESET tapped, TEST held, D1 to D4 lighting), the laptop\'s terminal on the right, and a ring round '
-           + 'whichever one your hands are on. The firmware demos re-tell ELPRO\'s Release G upgrade: the whole thing, or the '
+           + 'and messages are the unit\'s own. <strong>Demo</strong> plays a job done, a step at a time — the A2\'s front panel drawn on '
+           + 'the left after photographs of a unit (the stick going in, RESET tapped, TEST held, D1 to D4 lighting), the laptop\'s PuTTY on '
+           + 'the right with each key shown as it is pressed and held a moment before the unit answers, and a ring round whichever one '
+           + 'your hands are on. The firmware demos re-tell ELPRO\'s Release G upgrade: the whole thing, or the '
            + '<strong>host</strong> (by RESET and TEST, or from the menu on a v1.7 host), the <strong>bootloader</strong>, the '
            + '<strong>radio</strong> or its <strong>function image</strong>. The settings demos change things from the menus: the station '
            + 'address, the update and paralysis times, the channel and power, a repeater and its delay, ALERT2 format, the log to a stick. '

@@ -5954,12 +5954,19 @@ starred, the value prompts, the y/n questions, "Press any key..", and the
 loads that take the USB link off-line. An option the logs never show used is
 listed and says so when picked, rather than inventing what the unit prints.
 
-**Demo** plays a job done, a step at a time, with the board drawn on the left —
-the SERIAL DB9, D1 to D4 over the DIO terminals, and down the right-hand edge
-RESET, USB B, USB A and TEST — and the laptop's screen on the right, drawn as
+**Demo** plays a job done, a step at a time, with the A2's front panel drawn on
+the left after photographs of a unit in its case — RESET at the top right;
+down the right-hand edge USB B over the upright USB A, both open towards you,
+so the laptop's lead and the stick are drawn coming straight out of them;
+TEST under them; SERIAL and D1 to D4 over the DIO terminals at the bottom left
+— and the laptop's screen on the right, drawn as
 Windows 11 (File Explorer, the format dialog, and the terminal as PuTTY: grey
 Courier on black, a green block cursor, eight-column tabs, "(inactive)" in its
-title while the link is down), and a ring round whichever one the hands are on. The firmware demos re-tell ELPRO's *ERT-A2 Complete Firmware
+title while the link is down), and a ring round whichever one the hands are on.
+A key the unit answers is held on its prompt, lit, with the option it picks
+lit too, for a moment before the answer comes; a character typed is lit as it
+goes in; and every key shows as a keycap, pressed down, in a tray under the
+window for a second and a half. The firmware demos re-tell ELPRO's *ERT-A2 Complete Firmware
 Upgrade* (Release G, 24-4-26): the whole upgrade, the host by RESET and TEST
 or from the menu (a host already at v1.7), the bootloader, the radio, the
 function image, a check of the versions, a USB stick made ready. The settings
