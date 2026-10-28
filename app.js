@@ -6155,6 +6155,7 @@ function stopStationsMap() {
   // The pill over the map's stage goes with the stage; the trail is kept.
   StationTrail.detach();
   MapSpider.detach();
+  MapStack.detach();
   MapLeader.detach();
   MapLocate.detach();
   MapMovePin.detach();
@@ -6276,6 +6277,8 @@ function initMap() {
   // the class is already on the panel, renderStationsHtml() emitted it.
   syncMapFullEsc();
   MapSpider.attach(state.map);
+  // Before the layers whose pins it stacks, which hand them over as they draw.
+  MapStack.attach(state.map);
   // The line from the station card to its pin. Before the first refresh and
   // the card's repaint below, both of which ask it to redraw.
   MapLeader.attach(state.map);
@@ -6609,6 +6612,7 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   updateMapLinkNote();
   if (!stations.length) {
     MapSpider.setPins('stations', []);
+    MapStack.setPins('stations', []);
     state.mapMatchLabels = new Set();
     MapLeader.sync();                     // its pin went with the rest
     return;
@@ -6847,6 +6851,8 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   // first, then again when it lands (MapSymbols.askSls — once a session).
   if (state.mapPinManual || state.mapPinSls) MapSymbols.askSls();
   MapSpider.setPins('stations', state.mapMarkers);
+  // What every other layer's pins make room for (map-stack.js).
+  MapStack.setPins('stations', state.mapMarkers);
   // The 3-D view mirrors the lines and pins this function has just drawn rather
   // than deriving its own, so a rebuild of them is a rebuild of it — and it goes
   // *here*, after the selection and focus styles, because those change the

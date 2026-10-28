@@ -129,6 +129,7 @@ const MapSurvey = (function () {
   let drawnKey = null;       // which cache entry is on the map, so a pan is not a redraw
   let drawnPoints = [];      // what draw() put there — the map-level hit test reads these
   let projected = null;      // drawnPoints in layer space, rebuilt on zoom
+  let pinOf = new Map();     // point → its marker, for how far MapStack moved it
   let hoverTip = null, cursorSet = false, moveRaf = null;
   let popup = null;          // the open callout, if any — ours to close on clear
   let popupMark = null;      // which mark that callout is about
@@ -388,9 +389,11 @@ const MapSurvey = (function () {
     drawnKey = null;
     drawnPoints = [];
     projected = null;
+    pinOf = new Map();
     if (!layer) return;
     layer.remove();
     layer = null;
+    MapStack.setPins('survey', []);
     if (map && map.attributionControl) map.attributionControl.removeAttribution(ATTRIBUTION);
     rerenderMapLegend();
   }
@@ -735,9 +738,12 @@ const MapSurvey = (function () {
       // the map (the header, and MapRivers' pointer conventions), so a
       // tooltip or popup bound here would be unreachable. The hover name and
       // the callout ride the map-level hit test below instead.
-      L.marker([p.lat, p.lon], { pane: PANE, icon, interactive: false, keyboard: false }).addTo(layer);
+      pinOf.set(p, L.marker([p.lat, p.lon], { pane: PANE, icon, interactive: false, keyboard: false }).addTo(layer));
     }
     drawnPoints = points;
+    // Over a station's ring or a photo's badge rather than under it, and under
+    // a bridge or a camera (map-stack.js). The hit test and the labels follow.
+    MapStack.setPins('survey', [...pinOf.values()]);
     reproject();
     rerenderMapLegend();
   }
@@ -753,11 +759,15 @@ const MapSurvey = (function () {
     projected = drawnPoints.map(p => ({ p, pt: map.latLngToLayerPoint([p.lat, p.lon]) }));
   }
 
+  // Where MapStack stood a mark's pin, as a move from its point in px.
+  function shiftOf(p) { return MapStack.shift(pinOf.get(p)); }
+
   function markAtPoint(layerPt) {
     if (!projected) return null;
     let best = null, bestD = HIT_PX * HIT_PX;
     for (const m of projected) {
-      const dx = m.pt.x - layerPt.x, dy = m.pt.y - layerPt.y;
+      const s = shiftOf(m.p);
+      const dx = m.pt.x + s.x - layerPt.x, dy = m.pt.y + s.y - layerPt.y;
       const d = dx * dx + dy * dy;
       if (d <= bestD) { bestD = d; best = m.p; }
     }
@@ -850,7 +860,8 @@ const MapSurvey = (function () {
     // own popup.update() calls it again and re-lays-out and re-positions the
     // callout in one step. Writing into the open popup's DOM instead would be
     // undone by the next update() Leaflet does for its own reasons.
-    const mine = popup = L.popup({ maxWidth: 300, minWidth: 240 })
+    const s = shiftOf(p);
+    const mine = popup = L.popup({ maxWidth: 300, minWidth: 240, offset: [s.x, 7 + s.y] })
       .setLatLng([p.lat, p.lon])
       .setContent(() => calloutHtml(p, status))
       .openOn(map);
@@ -892,11 +903,13 @@ const MapSurvey = (function () {
       cursorSet = true;
       // Anchored on the mark itself rather than the pointer, so the name
       // floats over the pin the way the old marker-bound tooltip meant to.
+      const s = shiftOf(p), offset = [s.x, s.y - 10];
       if (!hoverTip) {
         hoverTip = L.tooltip({ className: 'mn-survey-label', direction: 'top',
-                               offset: [0, -10], interactive: false })
+                               offset, interactive: false })
           .setContent(esc(markLabel(p))).setLatLng([p.lat, p.lon]).addTo(map);
       } else {
+        hoverTip.options.offset = offset;
         hoverTip.setLatLng([p.lat, p.lon]).setContent(esc(markLabel(p)));
       }
     });

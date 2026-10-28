@@ -18280,6 +18280,36 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 }
 .legend-photo { display: inline-block; width: 1.2rem; text-align: center; }
 
+/* ── Pins stood one above the other (map-stack.js) ──
+   The leg from a pin that has made room to what it stands for: a short tick
+   onto the pin under it, or down (or up) to its own point, with a dot there.
+   Near-black cased in white, the pins' own two-layer trick, because it crosses
+   imagery as often as a street map; fixed rather than themed for the same
+   reason. Inside the pin's own element, so it moves with the pin and sits in
+   its pane, and takes no pointer: the pin is the target, not the leg. */
+.mn-stack-leg {
+  position: absolute;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: #1f2a36;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .85);
+  pointer-events: none;
+}
+.mn-stack-leg.is-point::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: #1f2a36;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .85);
+}
+.mn-stack-leg.is-above::after { top: -3px; bottom: auto; }
+
 /* ── The councils' cameras on the Stations map (map-cameras.js) ──
    A tile centred on the camera's point — where a field photo's dot sits on its
    point and its badge stands off it, this is the whole pin — with the stripe

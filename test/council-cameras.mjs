@@ -27,7 +27,12 @@
 // to be old; the Worker refusing and the council's own address used, saying
 // it cannot tell the age; two cameras on one pin, a camera with three views;
 // the station card naming the camera at Thornton and nothing for a station
-// with none; and switching off.
+// with none; and switching off. And room made (map-stack.js): the camera 3 m
+// from the Thornton gauge standing over the gauge's pin rather than on it,
+// and with Clarks Bridge drawn there too (the bridge register stood in) the
+// three in a column — gauge, bridge, camera — the bridge hovered where it is
+// drawn and not where it was, and the column down to two again when the
+// bridges go.
 //
 // Run:  npm run councilcams
 //       npm run councilcams -- -v    also print what passed
@@ -54,6 +59,15 @@ function check(name, pass, detail = '') {
   else if (VERBOSE) console.log(`  ✓ ${name}`);
 }
 const J = v => JSON.stringify(v);
+
+// Clarks Bridge on the Laidley – Plainland Road, where the council's camera
+// lockyer-valley-814 stands, 3 m from the Thornton (School Rd) gauge.
+const CLARKS_BRIDGE = { type: 'Feature', geometry: { type: 'Point', coordinates: [152.372773, -27.7983] },
+  properties: { name: 'Clarks Bridge', struc_id: 2601, struc_type: 'Bridge', cons_type: 'Deck Unit',
+                cons_mtrl: 'Concrete', rsect_name: 'Laidley - Plainland Road', road_code: 'ON' } };
+const GAUGE = 'thornton_school_roa';
+// A 1×1 transparent PNG, for the roads' image.
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 
 // A real JPEG, 64 × 40: grass, water, a grey bridge.
 const JPEG = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAAoAEADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDFooorjPKCirdlpl5qO/7JD5nl43fMBjOcdT7GrX/CM6x/z5/+RE/xp2bKUZPVIyqK1f8AhGdY/wCfP/yIn+NV7zR7/T4RLdQeWhbaDvU89ex9qOV9gcJLdFKiiikSFFR729aN7etev/Y9fuvx/wAieZHXeCf+X3/tn/7NXVV5vpWuXWkeb5CRP5uM+YCcYz0wR61of8JtqX/PC1/74b/4qtFlleKtoddOvCMUmdxXP+Mv+QRF/wBdx/6C1Y//AAm2pf8APC1/74b/AOKqnqfiO81W2WCeOFFVw4MakHOCO5PrQ8trtW0HPEQcWkZ9FR729aN7etZ/2PX7r8f8jj5kNooor6czCiiigAooooAKKKKAP//Z', 'base64');
@@ -369,6 +383,19 @@ try {
     if (how === 'stale') headers['X-Camera-Stale'] = 'the camera\'s server did not answer within 10 s';
     return route.fulfill({ status: 200, headers, body: JPEG });
   });
+  // The State's bridge register, answering Clarks Bridge on the camera's point
+  // at Thornton: the bridge, the camera and the gauge in one place, for the
+  // room-made checks. Its other services answer nothing.
+  await page.route(/spatial-gis\.information\.qld\.gov\.au\/arcgis\/rest\/services\/Transportation\//, route => {
+    const u = new URL(route.request().url());
+    const m = u.pathname.match(/Transportation\/(RoadsAndTracks|StateRoadInformation)\/MapServer(?:\/(\d+|export)(?:\/query)?)?$/);
+    const json = body => route.fulfill({ status: 200, contentType: 'application/json', body: J(body) });
+    if (!m) return route.fulfill({ status: 404, body: 'not found' });
+    if (!m[2]) return json({ layers: m[1] === 'StateRoadInformation' ? [{ id: 9, name: 'State controlled bridge' }]
+                                                                    : [{ id: 24, name: 'Bridges' }, { id: 11, name: 'Roads and tracks' }] });
+    if (m[2] === 'export') return route.fulfill({ status: 200, contentType: 'image/png', body: PNG });
+    return json({ type: 'FeatureCollection', features: m[1] === 'StateRoadInformation' && m[2] === '9' ? [CLARKS_BRIDGE] : [] });
+  });
   // A camera's own server, for the fallback.
   await page.route(/^https:\/\/www\.envault\.com\.au\//, route => {
     direct.push({ url: route.request().url(), referer: route.request().headers().referer || '' });
@@ -501,6 +528,59 @@ try {
   check('a picture five hours old is said to be, in the warning line', /This picture is 5 hours old — the camera may be offline/.test(ov.warn), ov.warn);
   check('… and the station it stands at named as that', /At station Thornton \(School Rd\) AL \(540789\) — 3 m away/.test(ov.facts), ov.facts);
   await closeModal();
+
+  // ── Room made: the camera, the bridge and the gauge ─────────────────────────
+  // Boxes in page pixels: the gauge's ring (the canvas has no DOM to ask, so
+  // from its marker), the camera's tile and the bridge's pin as drawn, and
+  // the legs MapStack hangs under them.
+  const column = () => page.evaluate(id => {
+    const box = el => { if (!el) return null; const r = el.getBoundingClientRect();
+      return { x: r.left + r.width / 2, top: r.top, bottom: r.bottom }; };
+    const m = state.mapMarkers.find(k => k.mnStationId === id);
+    const c = state.map.getContainer().getBoundingClientRect();
+    const p = state.map.latLngToContainerPoint(m.getLatLng());
+    const r = m.options.radius + m.options.weight / 2;
+    const cam = [...document.querySelectorAll('.leaflet-mnCameras-pane .mn-cam-icon')]
+      .find(el => /^Laidley Creek, Clarks Bridge/.test(el.getAttribute('title') || ''));
+    const bridge = document.querySelector('.leaflet-mnBridges-pane .mn-bridge-div');
+    const leg = el => { const l = el && el.querySelector('.mn-stack-leg'); return l ? { cls: l.className, h: l.offsetHeight } : null; };
+    return { gauge: { x: c.left + p.x, top: c.top + p.y - r, y: c.top + p.y },
+             cam: box(cam && cam.querySelector('.mn-cam-pin')), camLeg: leg(cam),
+             bridge: box(bridge && bridge.querySelector('.mn-bridge-pin')), bridgeLeg: leg(bridge) };
+  }, GAUGE);
+  const alone = await column();
+  check('a camera 3 m from a gauge stands over the gauge\'s pin, centred on it, not on it',
+    alone.cam && Math.abs(alone.cam.x - alone.gauge.x) <= 1.5 && alone.cam.bottom < alone.gauge.top, J(alone));
+  check('… on a tick down to the pin, not a leg to a point of its own',
+    alone.camLeg && !/is-point/.test(alone.camLeg.cls) && alone.camLeg.h > 0 && alone.camLeg.h <= 6, J(alone.camLeg));
+
+  await page.evaluate(() => MapRoadOwners.setEnabled(true));
+  await page.waitForFunction(() => !!document.querySelector('.leaflet-mnBridges-pane .mn-bridge-div'), null, { timeout: 15_000 });
+  await page.waitForTimeout(300);
+  const col = await column();
+  check('with Clarks Bridge there too, the three stand in a column: gauge, bridge, camera',
+    col.bridge && col.cam && Math.abs(col.bridge.x - col.gauge.x) <= 1.5 && Math.abs(col.cam.x - col.gauge.x) <= 1.5
+      && col.bridge.bottom < col.gauge.top && col.cam.bottom < col.bridge.top, J(col));
+  // Hovered by the map's own pointer events (the bridges take none of their
+  // own), so fired at the map as MapRoadOwners hears them.
+  const hoverAt = (x, y) => page.evaluate(([px, py]) => {
+    const c = state.map.getContainer().getBoundingClientRect();
+    const cp = L.point(px - c.left, py - c.top);
+    state.map.fire('mousemove', { containerPoint: cp, layerPoint: state.map.containerPointToLayerPoint(cp),
+                                  latlng: state.map.containerPointToLatLng(cp) });
+  }, [x, y]).then(() => page.waitForTimeout(350))   // a label going fades for 200 ms first
+    .then(() => page.evaluate(() => (document.querySelector('.leaflet-tooltip.mn-bridge-label') || {}).textContent || ''));
+  const onPin = await hoverAt(col.bridge.x, (col.bridge.top + col.bridge.bottom) / 2);
+  check('the bridge is hovered where it is drawn, its name and whose it is',
+    /^Clarks Bridge — Transport and Main Roads/.test(onPin), onPin);
+  const onPoint = await hoverAt(col.gauge.x, col.gauge.y);
+  check('… and not on its own point, which is the gauge\'s now', onPoint === '', onPoint);
+
+  await page.evaluate(() => MapRoadOwners.setEnabled(false));
+  await page.waitForTimeout(300);
+  const back = await column();
+  check('the bridges off: the camera back down onto the gauge\'s pin',
+    !back.bridge && back.cam && Math.abs(back.cam.top - alone.cam.top) <= 1.5 && Math.abs(back.cam.x - alone.cam.x) <= 1.5, J({ back, alone }));
 
   // ── No Last-Modified; stale ────────────────────────────────────────────────
   mode['lockyer-valley-813'] = 'nolm';

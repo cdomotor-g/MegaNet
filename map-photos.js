@@ -79,6 +79,7 @@ const MapPhotos = (function () {
     if (layer) { layer.remove(); layer = null; }
     const had = drawn.length > 0;
     drawn = [];
+    MapStack.setPins('photos', []);
     if (had) tell3d();
   }
 
@@ -153,16 +154,29 @@ const MapPhotos = (function () {
     FieldPhotos.openSpot(g.ids, null, `${g.n} photo${g.n === 1 ? '' : 's'} taken here`);
   }
 
+  // The room a pin takes, in px round its point, for the pins of other layers
+  // that make room for it (map-stack.js): the dot and the badge standing up
+  // and right off it (styles.css), the badge as wide as its count. The cones
+  // are see-through and are not counted.
+  function roomOf(g) {
+    return [-4, -24, 32 + 7 * String(g.n).length, 7];
+  }
+
   function draw(groups) {
     if (layer) layer.remove();
     layer = L.layerGroup([], { pane: PANE });
+    const room = new Map();
     for (const g of groups) {
-      L.marker([g.lat, g.lon], { icon: icon(g), pane: PANE, keyboard: true, riseOnHover: true,
-                                 title: titleOf(g), alt: titleOf(g), bubblingMouseEvents: false })
+      const m = L.marker([g.lat, g.lon], { icon: icon(g), pane: PANE, keyboard: true, riseOnHover: true,
+                                           title: titleOf(g), alt: titleOf(g), bubblingMouseEvents: false })
         .on('click', () => open(g))
         .addTo(layer);
+      room.set(m, roomOf(g));
     }
     layer.addTo(map);
+    // Never moved — the dot is the photo's exact point and the cones are drawn
+    // from it — but a survey mark, a bridge or a camera stands clear of it.
+    MapStack.setPins('photos', [...room.keys()], m => room.get(m));
     drawn = groups.map(g => ({ lat: g.lat, lon: g.lon, ids: g.ids.slice(), n: g.n, cones: g.cones.slice(),
                                title: titleOf(g) }));
     tell3d();

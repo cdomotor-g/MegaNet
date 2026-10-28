@@ -45,6 +45,8 @@
 // photo's 📷 stands up off its point in yellow, so the two never read as one
 // thing. Cameras closer than MERGE_PX on screen are one tile with a count; a
 // tile of LIST_MAX or fewer opens them all in the viewer, one of more zooms in.
+// A tile that would cover a station's pin, a bridge or a survey mark stands
+// over it instead, on a short leg to its point (map-stack.js).
 // 2-D only: the tilted map does not draw these yet.
 const MapCameras = (function () {
   const CATALOG_URL = 'data/council-cameras.json';
@@ -139,6 +141,7 @@ const MapCameras = (function () {
   const GLYPH = '<svg class="mn-cam-glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">'
     + '<path d="M2 4.5h7.5A1.5 1.5 0 0 1 11 6v4a1.5 1.5 0 0 1-1.5 1.5H2A1.5 1.5 0 0 1 .5 10V6A1.5 1.5 0 0 1 2 4.5z'
     + 'M11.75 7.25 15.5 5v6l-3.75-2.25z"/></svg>';
+  const CAM_BOX = [-12, -12, 12, 12];   // .mn-cam-pin round its point, px
   function pinHtml(kind, n) {
     return `<span class="mn-cam-pin mn-cam-pin--${kind}">${GLYPH}${n > 1 ? `<b class="mn-cam-count">${n}</b>` : ''}</span>`;
   }
@@ -181,19 +184,25 @@ const MapCameras = (function () {
   function clear() {
     if (layer) { layer.remove(); layer = null; }
     drawn = [];
+    MapStack.setPins('cameras', []);
   }
 
   function draw(groups) {
     if (layer) layer.remove();
     layer = L.layerGroup([], { pane: PANE });
+    const pins = [];
     for (const g of groups) {
       const icon = L.divIcon({ className: 'mn-cam-icon', html: pinHtml(g.kind, g.n), iconSize: [0, 0], iconAnchor: [0, 0] });
-      L.marker([g.lat, g.lon], { icon, pane: PANE, keyboard: true, riseOnHover: true,
-                                 title: titleOf(g), alt: titleOf(g), bubblingMouseEvents: false })
+      pins.push(L.marker([g.lat, g.lon], { icon, pane: PANE, keyboard: true, riseOnHover: true,
+                                           title: titleOf(g), alt: titleOf(g), bubblingMouseEvents: false })
         .on('click', () => press(g))
-        .addTo(layer);
+        .addTo(layer));
     }
     layer.addTo(map);
+    // The tallest pin on the map, so it is the one that stands over a bridge,
+    // a survey mark or a station's ring rather than covering it (map-stack.js).
+    // Its box is the tile's, which styles.css draws round a zero-sized icon.
+    MapStack.setPins('cameras', pins, () => CAM_BOX);
     drawn = groups.map(g => ({ lat: g.lat, lon: g.lon, n: g.n, kind: g.kind, ids: g.cams.map(c => c.id) }));
   }
 

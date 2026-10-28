@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 139, date: '2026-10-28', items: [
+      'Pins on the <strong>Stations</strong> map no longer pile on one another. Where a council\'s flood camera, a bridge, a survey '
+        + 'mark and a gauge share a spot, they <strong>stand in a column</strong> — the gauge at the foot, the camera on top — '
+        + 'joined by a short tick; a pin that only clipped its neighbour steps just clear of it, on a leg down to a dot on its own '
+        + 'point. Hover or click a pin where you see it.',
+    ] },
     { n: 138, date: '2026-10-28', items: [
       'The <strong>🔗 Pass Ranges</strong> tab is now called <strong>🔗 ALERT IDs</strong> — the same tab, in the same place under '
         + '<strong>Stations &amp; networks</strong>. Searching the nav for “pass ranges” still finds it.',

@@ -98,6 +98,9 @@ MegaNet/
 ├── river-catchments.js     ← RiverCatchments — a selected river's or a gauge's
 │                             catchment, outlined and shaded by its own ground
 ├── map-spider.js           ← MapSpider — fans overlapping pins out on leader lines
+├── map-stack.js            ← MapStack — other layers' pins that would land on one
+│                             another (a camera on a bridge, a bridge on a gauge)
+│                             stood one above the other on short legs
 ├── map-locate.js           ← MapLocate — GPS dot, accuracy ring, compass cone
 ├── map-move-pin.js         ← MapMovePin — drag one station's pin to where the
 │                             station is, and save the coordinates

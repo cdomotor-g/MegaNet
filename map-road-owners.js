@@ -101,7 +101,9 @@
 // ── Pointer conventions ─────────────────────────────────────────────────────
 // MapSurvey's, for MapSurvey's reason: the shared pins-and-links canvas sits
 // above both panes and owns every DOM event, so nothing here is interactive and
-// the bridge pins are hit-tested from the map's own mousemove and click. The
+// the bridge pins are hit-tested from the map's own mousemove and click —
+// where MapStack stood them, which is over a station's ring or a survey mark
+// rather than on its point when the two would overlap (map-stack.js). The
 // roads take no pointer at all — they are an image, and a road is a target the
 // length of the map. "Who manages this road?" at a point is What is here
 // (map-here.js), whose card carries site-roads.js's section.
@@ -236,6 +238,7 @@ const MapRoadOwners = (function () {
   // The bridges.
   let bridgeLayer = null, bridgeSeq = 0, bridgeFailedAt = 0, drawnKey = null;
   let drawn = [], projected = null, hoverTip = null, moveRaf = null, cursorSet = false;
+  let pinOf = new Map();            // bridge → its marker, for how far MapStack moved it
   let popup = null, popupBridge = null;
   // { kind: 'zoom'|'loading'|'ok'|'fail', entry }
   let bridges = { kind: 'zoom', entry: null };
@@ -604,9 +607,11 @@ const MapRoadOwners = (function () {
     drawn = [];
     projected = null;
     drawnKey = null;
+    pinOf = new Map();
     if (!bridgeLayer) return;
     bridgeLayer.remove();
     bridgeLayer = null;
+    MapStack.setPins('bridges', []);
     syncAttribution();
     rerenderMapLegend();
   }
@@ -616,6 +621,7 @@ const MapRoadOwners = (function () {
     const had = !!bridgeLayer;
     if (bridgeLayer) bridgeLayer.remove();
     bridgeLayer = L.layerGroup([], { pane: BPANE }).addTo(map);
+    pinOf = new Map();
     for (const b of list) {
       const icon = L.divIcon({
         className: 'mn-bridge-div',
@@ -625,10 +631,13 @@ const MapRoadOwners = (function () {
       });
       // Non-interactive with nothing bound, as the header says: the map-level
       // hit test below is the only way a pointer reaches a bridge.
-      L.marker([b.lat, b.lon], { pane: BPANE, icon, interactive: false, keyboard: false }).addTo(bridgeLayer);
+      pinOf.set(b, L.marker([b.lat, b.lon], { pane: BPANE, icon, interactive: false, keyboard: false }).addTo(bridgeLayer));
     }
     drawn = list;
     drawnKey = key;
+    // Over a station's ring or a survey mark rather than under it; under a
+    // camera (map-stack.js). The hit test and the labels below follow it.
+    MapStack.setPins('bridges', [...pinOf.values()]);
     reproject();
     if (!had) syncAttribution();
     rerenderMapLegend();
@@ -688,11 +697,15 @@ const MapRoadOwners = (function () {
     projected = drawn.map(b => ({ b, pt: map.latLngToLayerPoint([b.lat, b.lon]) }));
   }
 
+  // Where MapStack stood a pin, as a move from its point in px.
+  function shiftOf(b) { return MapStack.shift(pinOf.get(b)); }
+
   function bridgeAtPoint(layerPt) {
     if (!projected) return null;
     let best = null, bestD = HIT_PX * HIT_PX;
     for (const m of projected) {
-      const dx = m.pt.x - layerPt.x, dy = m.pt.y - layerPt.y;
+      const s = shiftOf(m.b);
+      const dx = m.pt.x + s.x - layerPt.x, dy = m.pt.y + s.y - layerPt.y;
       const d = dx * dx + dy * dy;
       if (d <= bestD) { bestD = d; best = m.b; }
     }
@@ -736,10 +749,12 @@ const MapRoadOwners = (function () {
       if (!b) { clearHover(); return; }
       map.getContainer().style.cursor = 'pointer';
       cursorSet = true;
+      const s = shiftOf(b), offset = [s.x, s.y - 8];
       if (!hoverTip) {
-        hoverTip = L.tooltip({ className: 'mn-bridge-label', direction: 'top', offset: [0, -8], interactive: false })
+        hoverTip = L.tooltip({ className: 'mn-bridge-label', direction: 'top', offset, interactive: false })
           .setContent(esc(bridgeLabel(b))).setLatLng([b.lat, b.lon]).addTo(map);
       } else {
+        hoverTip.options.offset = offset;
         hoverTip.setLatLng([b.lat, b.lon]).setContent(esc(bridgeLabel(b)));
       }
     });
@@ -880,7 +895,8 @@ const MapRoadOwners = (function () {
     let c = 'loading';
     // Content as a function, MapSurvey's reason: when the lookup lands,
     // Leaflet's own update() calls it again and re-lays the callout out.
-    popup = L.popup({ maxWidth: 320, minWidth: 240, className: 'mn-bridge-popup' })
+    const s = shiftOf(b);
+    popup = L.popup({ maxWidth: 320, minWidth: 240, className: 'mn-bridge-popup', offset: [s.x, 7 + s.y] })
       .setLatLng([b.lat, b.lon])
       .setContent(() => calloutHtml(b, c))
       .openOn(map);
