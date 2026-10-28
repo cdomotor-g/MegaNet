@@ -113,7 +113,11 @@
 //               repeater's carrier was that repeater's — the hop from it to the
 //               base station heard, the way from the station to it assumed —
 //               and one on no repeater's carrier is the station's own, heard
-//               direct.
+//               direct, unless its carrier is one many other addresses share
+//               at that receiver (onShared): a relay nobody could name — two
+//               repeaters with the same ranges on one carrier, which 0077
+//               leaves unnamed, or a transmitter the register does not know —
+//               which proves nothing of the way.
 //
 // A base station posts its copies in batches of their own, often a beat after
 // its readings, so while they are read a message whose copies are not in yet
@@ -213,6 +217,17 @@ const MapLatency = (() => {
   const RX_MATCH = 3 * MIN, RX_KEEP = 6 * MIN;
   const RX_SELECT = 'id,ingest_token_id,point_id,heard_at,protocol,alert_id,cfo_hz,a2_duplicate,a2_source,a2_path';
   const RX_WARM_SELECT = 'id,ingest_token_id,point_id,heard_at,alert_id,cfo_hz,a2_duplicate';
+  // A burst no named repeater claims is called heard direct only when its
+  // carrier is not one many addresses share at that receiver: SHARED_MIN other
+  // addresses or more within SHARED_HZ of it, over SHARED_MS either side, and
+  // at least SHARED_SHARE of every address heard then. Stations' own carriers
+  // spread over hundreds of hertz, so a 60 Hz window holds about a tenth of
+  // them by chance; a crowded one is a relay — two repeaters 0077 cannot tell
+  // apart on one carrier, or a transmitter the register does not know. When
+  // this was written that was 62% of one receiver's bursts and all but two of
+  // another's. The time window is short because a receiver's dongle drifts
+  // 70 – 130 Hz over a day, and a relay's carrier with it.
+  const SHARED_HZ = 30, SHARED_MS = 90 * MIN, SHARED_MIN = 4, SHARED_SHARE = 0.3;
   // A leg of a pulse, by what is known of it (see the header): its words and
   // their meanings for the card, the 🔑 legend and the hover, and its colours on
   // the canvas — literals, for the logo's reason. Heard is the logo's green.
@@ -1813,8 +1828,22 @@ const MapLatency = (() => {
     // station's other address may be in a range this one is not.
     const passes = () => new Set((b.cands || []).filter(x => !x.own).map(x => x.rid));
     if (b.how === 'repeater') return b.rid === id ? { pk: c.pk, host, direct: true, passes: passes() } : { pk: c.pk, host, via: b.rid };
-    if (b.how === 'own') return { pk: c.pk, host, direct: true, passes: passes() };
+    // No named repeater's: the station's own only off a crowded carrier — on
+    // one, a relay nobody could name, which proves nothing of the way.
+    if (b.how === 'own') return onShared(c.pk, b) ? null : { pk: c.pk, host, direct: true, passes: passes() };
     return null;
+  }
+
+  // Whether a burst sits on a carrier many other addresses share at its
+  // receiver around then (SHARED_*): a relay, named or not.
+  function onShared(pk, b) {
+    const all = new Set(), near = new Set();
+    for (const x of RX.bursts.get(pk) || []) {
+      if (x.a === b.a || Math.abs(x.t - b.t) > SHARED_MS) continue;
+      all.add(x.a);
+      if (Math.abs(x.cfo - b.cfo) <= SHARED_HZ) near.add(x.a);
+    }
+    return near.size >= SHARED_MIN && near.size >= SHARED_SHARE * all.size;
   }
 
   // ── Messages landing: the pulse ───────────────────────────────────────────

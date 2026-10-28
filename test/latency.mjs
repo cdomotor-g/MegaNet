@@ -46,7 +46,9 @@
 //      red for exactly as long, no blue — and on the repeater's carrier the
 //      way to the repeater blue, the repeater heard, its hop to the base
 //      station green; red read off the canvas, dotted, while the green runs and
-//      in the afterglow; a message no copy matches all blue; signed out, the
+//      in the afterglow; a burst on a carrier many addresses share that no
+//      repeater is named for not heard direct, so all blue and nothing red;
+//      a message no copy matches all blue; signed out, the
 //      card says every hop is blue and why, and the receptions are not asked.
 //   6. **One colouring at a time** — Colour pins by health turns latency off,
 //      and latency turns health off; the 🔑 legend carries whichever is on.
@@ -553,7 +555,14 @@ try {
       // long enough to read; the base station may be off the edge.
       const at = id => { const x = state.data.stations.find(y => y.id === id); return [x.lat, x.lon]; };
       state.map.fitBounds([at(s.st), at(rid)], { padding: [120, 120], maxZoom: 15, animate: false });
-      return { rid, st: s.st, a: s.a, others: list.filter(x => x !== s).slice(0, 5).map(x => x.a), base: base.id };
+      // Six addresses no repeater passes, for a carrier nobody can be named for.
+      const free = [];
+      for (const x of reg.list) {
+        const f = reg.idsOf(x).find(y => (reg.addrSt.get(y) || []).length === 1 && !reg.cands(y).length);
+        if (f != null && x.id !== s.st) free.push(f);
+        if (free.length >= 6) break;
+      }
+      return { rid, st: s.st, a: s.a, others: list.filter(x => x !== s).slice(0, 5).map(x => x.a), base: base.id, free };
     }
     return null;
   });
@@ -629,6 +638,20 @@ try {
       via && via.proved && toRep && toRep.kind === 'assumed' && !toRep.straight && fromRep && fromRep.kind === 'heard'
         && fromRep.start === toRep.start + toRep.dur + 120 && via.nodes.some(n => n.id === way.rid && n.kind === 'heard')
         && !via.legs.some(l => l.kind === 'missed'), J(via));
+    // A carrier six addresses no repeater passes share in the last hour — a
+    // relay nobody can be named for — and the station's burst on it: not
+    // called direct, so nothing missed and the way the map draws, blue.
+    const crowd = way.free.flatMap((a, i) => [burst(a, 498 + i % 5, 20 * 60e3 + i * 30e3), burst(a, 503 - i % 5, 50 * 60e3 + i * 30e3)]);
+    const shared = await page.evaluate(({ PT, warm, live, st, a }) => {
+      const fed = MapLatency._hear({ points: [PT], warm, live });
+      return { fed, route: MapLatency._route(st, { keys: ['a:' + a] }) };
+    }, { PT, warm: warm.concat(crowd), live: [burst(way.a, 501, 2000)], st: way.st, a: way.a });
+    check('on a carrier many addresses share that no repeater is named for: a relay, not heard direct — nothing red, all blue',
+      way.free.length === 6 && shared.fed.how[0] && shared.fed.how[0].how === 'own' && shared.route && !shared.route.proved
+        && shared.route.legs.length >= 1 && shared.route.legs.every(l => l.kind === 'assumed'), J({ free: way.free.length, shared }));
+    {
+      await page.evaluate(({ PT, warm }) => MapLatency._hear({ points: [PT], warm }), { PT, warm });
+    }
     const card = await page.evaluate(() => document.getElementById('lat-live-status').textContent.replace(/\s+/g, ' '));
     check('…and the card says what the copies found', /1 repeater carrier found on 1 receiver over the last 12 h/.test(card), card);
     // A message landing before its copies: it waits for the next ask of them,

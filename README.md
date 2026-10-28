@@ -1852,7 +1852,11 @@ transmitter the base station heard — each receiver's repeater carriers found o
 its last 12 h of bursts by the same rule as Signal Routes (0077), again as bursts
 land. A burst on a repeater's carrier lights the hop from that repeater to the
 base station green and the way to the repeater blue; one on no repeater's carrier
-was heard direct, and lights only the station's own hop to the base station.
+was heard direct, and lights only the station's own hop to the base station —
+unless its carrier is one many other addresses share at that receiver within an
+hour and a half (four or more, and 30% of all heard): that is a relay nobody could
+name (two repeaters with the same ranges on one carrier, or a transmitter the
+register does not know), and the pulse runs blue.
 **Red, dotted — missed**: heard direct by a receiver that hears a repeater the
 station has a pass-range link to, and nothing heard that repeater pass it on — the
 link is lit red for as long as the hop that was heard. A hop proved but not drawn
