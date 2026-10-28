@@ -401,9 +401,29 @@ class Upstream {
 
   // Every row of a filtered read, a page at a time, trusting the counted total
   // rather than a short page — the server's max-rows is not ours to assume.
-  async selectAll(relation, pairs, cap, { ttl = 0 } = {}) {
+  //
+  // `parallel`: the first page, then every other page at once — two round
+  // trips however many pages, each a page as long as the server's first answer
+  // was (its max-rows, if lower than ours). Each trip to the database's region
+  // costs more than the read itself does.
+  async selectAll(relation, pairs, cap, { ttl = 0, parallel = false } = {}) {
     const rows = [];
     let total = null;
+    if (parallel) {
+      const first = await this.select(relation, [...pairs, ['limit', LIMITS.upstreamPageRows], ['offset', 0]], { count: true, ttl });
+      total = first.total;
+      rows.push(...first.rows);
+      const stride = first.rows.length;
+      if (stride && total != null && total > stride) {
+        const offsets = [];
+        for (let o = stride; o < Math.min(total, cap); o += stride) offsets.push(o);
+        const pages = await Promise.all(offsets.map(o =>
+          this.select(relation, [...pairs, ['limit', stride], ['offset', o]], { ttl })));
+        pages.forEach(p => rows.push(...p.rows));
+      }
+      const truncated = rows.length > cap || (total != null && total > Math.min(rows.length, cap));
+      return { rows: rows.slice(0, cap), total, truncated };
+    }
     for (let page = 0; ; page++) {
       const got = await this.select(relation,
         [...pairs, ['limit', LIMITS.upstreamPageRows], ['offset', rows.length]], { count: page === 0, ttl });
@@ -2113,56 +2133,66 @@ async function latestReadingsEndpoint(rc, params) {
       ['lon', `gte.${f.bbox.west}`], ['lon', `lte.${f.bbox.east}`]);
   }
 
-  // 0. A filter that leaves few stations — a box around a site, a network —
-  //    asks for those stations' readings by id rather than reading every
-  //    address in the network to throw most of them away.
+  // Each step is as few round trips as it can be: the reads themselves take
+  // milliseconds, the trip to the database's region a good deal longer.
+  //   A filter that leaves at most three hundred stations (a box around a
+  //   site, a network): 1. their ids; 2. side by side — their addresses'
+  //   newest readings by station id, their rows, and how many addresses no
+  //   station can be named for.
+  //   Anything else: 1. side by side — which station each address was read
+  //   for (the station id alone, every page at once), the live stations the
+  //   filters keep, and the unattributed count; 2. side by side — the page's
+  //   stations' newest readings and rows.
   const filtered = filters.length > 1;                // stationFilterPairs always holds deleted_at
-  let few = null, live = null;
-  if (filtered) {
-    live = await rc.up.selectAll('station', [['select', 'id'], ...filters, ['order', 'id.asc']], LIMITS.candidateMax);
-    if (!live.truncated && live.rows.length <= LIMITS.idsPerRead * LATEST_INLINE_READS) few = live.rows.map(r => r.id);
-  }
-
-  // 1. The newest reading of each address — the few stations', or every one —
-  //    grouped by the station it was read for.
-  let latest, unattributed = 0;
-  if (few) {
+  const liveIds = () => rc.up.selectAll('station', [['select', 'id'], ...filters, ['order', 'id.asc']],
+    LIMITS.candidateMax, { parallel: true });
+  const looseCount = () => rc.up.select('reading_latest', [['select', 'addr'], ['station_id', 'is.null'], ['limit', '1']],
+    { count: true }).then(r => (r.total != null ? r.total : r.rows.length));
+  const readingsOf = async ids => {
     const chunks = [];
-    for (let i = 0; i < few.length; i += LIMITS.idsPerRead) chunks.push(few.slice(i, i + LIMITS.idsPerRead));
-    const [got, loose] = await Promise.all([
-      Promise.all(chunks.map(c => rc.up.select('reading_latest', [['select', LATEST_SELECT], ['station_id', `in.${pgList(c)}`],
-        ['order', 'addr.asc']]))),
-      rc.up.select('reading_latest', [['select', 'addr'], ['station_id', 'is.null'], ['limit', '1']], { count: true }),
-    ]);
-    latest = { rows: got.flatMap(g => g.rows), truncated: false };
-    unattributed = loose.total != null ? loose.total : loose.rows.length;
+    for (let i = 0; i < ids.length; i += LIMITS.idsPerRead) chunks.push(ids.slice(i, i + LIMITS.idsPerRead));
+    const got = await Promise.all(chunks.map(c => rc.up.select('reading_latest',
+      [['select', LATEST_SELECT], ['station_id', `in.${pgList(c)}`], ['order', 'addr.asc']])));
+    return got.flatMap(g => g.rows);
+  };
+  const pageOf = list => list.slice(f.offset, f.offset + f.limit);
+  const live = filtered ? await liveIds() : null;
+  const few = live && !live.truncated && live.rows.length <= LIMITS.idsPerRead * LATEST_INLINE_READS
+    ? live.rows.map(r => r.id) : null;
+
+  let candidates, rows, rowsById, unattributed, exact = true;
+  if (few) {
+    const [got, stRows, loose] = await Promise.all([readingsOf(few),
+      stationRowsByIds(rc, few, LATEST_STATION_SELECT, [['deleted_at', 'is.null']]), looseCount()]);
+    const heardHere = new Set(got.map(r => r.station_id));
+    rows = got;
+    rowsById = byKey(stRows);
+    candidates = few.filter(id => heardHere.has(id) && rowsById.has(id));
+    unattributed = loose;
   } else {
-    latest = await rc.up.selectAll('reading_latest', [['select', LATEST_SELECT], ['order', 'addr.asc']], LIMITS.latestAddressMax);
+    const [owned, keep, loose] = await Promise.all([
+      rc.up.selectAll('reading_latest', [['select', 'station_id'], ['station_id', 'not.is.null'], ['order', 'addr.asc']],
+        LIMITS.latestAddressMax, { parallel: true }),
+      live || liveIds(),
+      looseCount(),
+    ]);
+    exact = !owned.truncated && !keep.truncated;
+    const liveSet = new Set(keep.rows.map(r => r.id));
+    candidates = [...new Set(owned.rows.map(r => r.station_id))].filter(id => liveSet.has(id)).sort();
+    unattributed = loose;
+    const ids = pageOf(candidates);
+    const [got, stRows] = await Promise.all([readingsOf(ids),
+      ids.length ? stationRowsByIds(rc, ids, LATEST_STATION_SELECT, [['deleted_at', 'is.null']]) : []]);
+    rows = got;
+    rowsById = byKey(stRows);
   }
   const byStation = new Map();
-  for (const r of latest.rows) {
-    if (!r.station_id) { if (!few) unattributed++; continue; }
+  for (const r of rows) {
     if (!byStation.has(r.station_id)) byStation.set(r.station_id, []);
     byStation.get(r.station_id).push(r);
   }
-  const heard = [...byStation.keys()].sort();
-
-  // 2. Which of them are live stations that match, and (3) the page's rows.
-  let candidates, rowsById = null, exact = !latest.truncated;
-  if (few) {
-    candidates = heard;
-  } else if (heard.length <= LIMITS.idsPerRead * LATEST_INLINE_READS) {
-    rowsById = byKey(await stationRowsByIds(rc, heard, LATEST_STATION_SELECT, filters));
-    candidates = heard.filter(id => rowsById.has(id));
-  } else {
-    if (!live) live = await rc.up.selectAll('station', [['select', 'id'], ...filters, ['order', 'id.asc']], LIMITS.candidateMax);
-    if (live.truncated) exact = false;
-    const keep = new Set(live.rows.map(r => r.id));
-    candidates = heard.filter(id => keep.has(id));
-  }
-  const pageIds = candidates.slice(f.offset, f.offset + f.limit);
-  if (!rowsById) rowsById = byKey(await stationRowsByIds(rc, pageIds, LATEST_STATION_SELECT, [['deleted_at', 'is.null']]));
-  const stations = pageIds.map(id => rowsById.get(id)).filter(Boolean)
+  const pageIds = pageOf(candidates);
+  const stations = pageIds.map(id => rowsById.get(id)).filter(st => st && byStation.has(st.id))
     .map(st => latestRow(st, byStation.get(st.id), rc.now));
 
   notes.push('Telemetry ingested into Flood-Net only. Most stations report through the Bureau\'s own systems and so are not here — which says nothing about whether they work.');
@@ -2170,8 +2200,8 @@ async function latestReadingsEndpoint(rc, params) {
   if (unattributed) {
     notes.push(`${unattributed} address(es) heard belong to no single live station — an ALERT address more than one station carries, or a station not in the register — so are in no row here. That count is the whole network's, whatever the filters.`);
   }
-  if (latest.truncated) {
-    notes.push(`More than ${LIMITS.latestAddressMax} addresses have readings; this answer covers the first ${LIMITS.latestAddressMax} by address, and its total is a floor.`);
+  if (!exact) {
+    notes.push(`More than ${LIMITS.latestAddressMax} addresses, or ${LIMITS.candidateMax} stations, to weigh; this answer covers the first of them, and its total is a floor.`);
   }
   const total = candidates.length;
   const nextOffset = f.offset + stations.length;

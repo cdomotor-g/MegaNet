@@ -884,7 +884,11 @@ const ageless = row => JSON.parse(JSON.stringify(row, (k, v) => (/^minutes_since
   check('GET /api/v1/readings/latest answers every live station with a reading, in id order, in one call', r.status === 200
     && sameList(idsOf(r), heardIds) && j.total === heardIds.length && j.count === heardIds.length && j.total_exact === true
     && heardIds.length >= 5, `${r.status} ${idsOf(r).join(' ')} ${j.detail || ''}`);
-  check('…in two database reads at this size: the view, and those stations by id', reads === 2, `${reads} reads`);
+  const fullReads = stub.requests.filter(q => /\/reading_latest\?/.test(q.url) && /select=addr%2Calert_id|select=addr,alert_id/.test(q.url));
+  const stationPages = Math.ceil(liveById.size / 1000);
+  check('…in a handful of reads in two round trips: each address\'s station, the live stations and the unattributed count side by side, then the page\'s readings and rows',
+    reads <= 1 + stationPages + 1 + 2 && fullReads.length >= 1
+      && fullReads.every(q => /station_id=in\./.test(decodeURIComponent(q.url))), `${reads} reads, ${fullReads.length} full`);
   check('…never the deleted twin, though its address has the newest reading of all', !idsOf(r).includes(deletedTwin.id));
   const unattributed = T.reading_latest.filter(x => !x.station_id).length;
   check('…and counts the addresses no single station can be named for, rather than guessing',
@@ -1015,7 +1019,8 @@ const ageless = row => JSON.parse(JSON.stringify(row, (k, v) => (/^minutes_since
     check('past a few hundred stations, the same answer by the second path', r.status === 200 && sameList(idsOf(r), wantIds)
       && r.json.total === wantIds.length && r.json.unattributed_addresses === 1 && r.json.total_exact === true,
       `${r.status} ${r.json && (r.json.total ?? r.json.detail)}`);
-    const bound = 1 + Math.ceil(liveById.size / 1000) + Math.ceil(wantIds.length / api.LIMITS.idsPerRead);
+    const bound = Math.ceil(manyReadings.length / 1000) + Math.ceil(liveById.size / 1000) + 1
+      + 2 * Math.ceil(wantIds.length / api.LIMITS.idsPerRead);
     check('…in a bounded number of reads, however many stations there are', reads <= bound && reads <= api.LIMITS.upstreamPerRequest,
       `${reads} reads, bound ${bound}`);
     const longest = Math.max(...manyStub.requests.map(q => ((new URL(q.url).searchParams.get('id') || '').match(/","/g) || []).length + 1));
@@ -1025,6 +1030,13 @@ const ageless = row => JSON.parse(JSON.stringify(row, (k, v) => (/^minutes_since
       && sameList(idsOf(rain), wantIds.filter(id => api.stationKinds(liveById.get(id)).includes('rain'))));
     const page = await get('/api/v1/readings/latest?limit=100&offset=100');
     check('…and paging', page.status === 200 && sameList(idsOf(page), wantIds.slice(100, 200)) && /offset=200/.test(page.json.next));
+    manyStub.maxRows = 300;
+    api.resetApiState();
+    const short = await get('/api/v1/readings/latest?limit=1000&offset=0&client=short-pages');
+    manyStub.maxRows = 1000;
+    check('…and pages read side by side still get every row from a server whose max-rows is below the page asked for',
+      short.status === 200 && sameList(idsOf(short), wantIds) && short.json.total === wantIds.length && short.json.total_exact === true,
+      `${short.status} ${short.json && short.json.total}`);
   } finally {
     globalThis.fetch = (input, init) => stub.fetch(input, init);
     api.resetApiState();
@@ -1038,8 +1050,9 @@ const ageless = row => JSON.parse(JSON.stringify(row, (k, v) => (/^minutes_since
   try {
     api.resetApiState();
     const r = await get('/api/v1/readings/latest?format=geojson');
-    check('no readings anywhere is an empty answer in one read, not an error', r.status === 200 && r.json.total === 0
-      && r.json.count === 0 && r.json.features.length === 0 && r.json.next === null && quietStub.requests.length === 1
+    check('no readings anywhere is an empty answer, not an error, and no reading asked for by station', r.status === 200 && r.json.total === 0
+      && r.json.count === 0 && r.json.features.length === 0 && r.json.next === null
+      && !quietStub.requests.some(q => /station_id=in\./.test(decodeURIComponent(q.url)))
       && r.json.unattributed_addresses === 0, `${r.status} ${quietStub.requests.length} reads`);
   } finally {
     globalThis.fetch = (input, init) => stub.fetch(input, init);

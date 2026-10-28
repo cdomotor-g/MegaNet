@@ -588,8 +588,8 @@ curl -s 'https://floodwarning.net/api/v1/readings/latest?type=river&bbox=145.5,-
 - It reads `meganet.reading_latest`, one row per address (migration `0057`),
   which since `0086` is a table a trigger keeps as readings arrive — so a
   filter that leaves a few hundred stations or fewer (a box around a site, a
-  network) is answered in a handful of quick reads, and the whole network in
-  about one read per thousand addresses. Until `0057` is applied to a
+  network) is answered in two round trips to the database, and the whole
+  network, or a page of it, in three. Until `0057` is applied to a
   database the route answers **503** `"not available yet"`, naming the
   relation and the migration (see
   [For the owner](#apply-0057-for-the-latest-readings)).
