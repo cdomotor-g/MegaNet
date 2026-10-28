@@ -922,6 +922,17 @@ const SEED_HEALTH_STATION = `async () => {
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 }`;
 
+// 💾 A2 Firmware: ELPRO's second example pasted into the checker, its own
+// walkthrough made from what it needs and stepped to the laptop's terminal,
+// a step ticked off — every part of the page that is not there as it opens.
+const SEED_FW = `async () => {
+  A2Firmware.example('v17');
+  A2Firmware.mine();
+  A2Firmware.step(2);
+  A2Firmware.tick('ver', true);
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+}`;
+
 const CONVERTED = [
   { id: 'networks',   label: 'Networks',        issue: '#109 (proving ground) / #137' },
   { id: 'passranges', label: 'Pass Ranges',     issue: '#137' },
@@ -983,6 +994,8 @@ const CONVERTED = [
   { id: 'swr',        label: 'SWR Meter — your readings, the needle meter on SWR', issue: 'born converted', seed: SEED_SWR },
   { id: 'pinouts',    label: 'Pinouts — as it opens', issue: 'born converted' },
   { id: 'pinouts',    label: 'Pinouts — a radio\'s DB9 from the back, a pin picked, a hook-up ticked', issue: 'born converted', seed: SEED_PO },
+  { id: 'a2firmware', label: 'A2 Firmware — as it opens', issue: 'born converted' },
+  { id: 'a2firmware', label: 'A2 Firmware — a unit\'s versions checked, its own walkthrough at the laptop', issue: 'born converted', seed: SEED_FW },
   { id: 'health',     label: 'Station Health — the demo week\'s board', issue: 'born converted', seed: SEED_HEALTH },
   { id: 'health',     label: 'Station Health — a station open, a missed check in context', issue: 'born converted', seed: SEED_HEALTH_STATION },
   { id: 'sitemap',    label: 'Site Map',        issue: 'born converted' },

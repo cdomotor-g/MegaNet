@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 132, date: '2026-10-28', items: [
+      'New in the Knowledge base: <strong>💾 A2 Firmware</strong> — ELPRO\'s ERT-A2 firmware upgrade, walked through. Pick the '
+        + 'whole upgrade or just the host, the bootloader, the radio or its function image, and watch it done: the stick going in, '
+        + 'RESET and TEST pressed and D1 to D4 lighting on the unit, the menus picked in the laptop\'s terminal, with a ring round '
+        + 'whichever one your hands are on. Pause, step back and forward, or jump to any step. Paste a unit\'s '
+        + '<strong>Show Firmware Version</strong> and it says which parts that unit needs — and makes a walkthrough of just those. '
+        + 'Every step is written out below it, with a checklist to save.',
+    ] },
     { n: 131, date: '2026-10-28', items: [
       'The cards over the map — a station\'s card, <strong>What is here</strong> and the ACMA licence card — can be made '
         + 'wider: drag the edge that faces the map (the small handle halfway down it). The card keeps its width on this '

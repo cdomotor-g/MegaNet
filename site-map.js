@@ -107,6 +107,15 @@ const SiteMap = (function () {
         'Check a 4–20 mA loop has the voltage to drive the sensor',
       ],
     },
+    a2firmware: {
+      what: 'ELPRO\'s ERT-A2 firmware upgrade, walked through: the unit and the laptop\'s terminal side by side, a step at a time, with every step written out below.',
+      use: [
+        'Watch the whole upgrade, or just the host, the bootloader or the radio, before doing it on site',
+        'Paste a unit\'s versions and see which parts it needs',
+        'Get a USB stick ready: the four files and a FAT32 format',
+        'Work out where it stopped from D1 to D4',
+      ],
+    },
     propagation: {
       what: 'A lesson in how radio carries a reading from a gauge to a base — waves, shadows, trees, echoes, collisions and repeater delays — in pictures that move.',
       use: [
@@ -523,6 +532,7 @@ const SiteMap = (function () {
     { text: 'Learn why bits go wrong, and how to tell the causes apart', tab: 'biterrors' },
     { text: 'Make sense of an SWR meter\'s readings',      tab: 'swr' },
     { text: 'Look up which pin is which on a connector',   tab: 'pinouts' },
+    { text: 'Upgrade an ERT-A2\'s firmware',               tab: 'a2firmware' },
     { text: 'Practise reading a levelling staff',          tab: 'kbstaff' },
     { text: 'Walk through a routine river station visit',  tab: 'kbriver' },
   ];

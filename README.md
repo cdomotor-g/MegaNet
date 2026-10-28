@@ -275,6 +275,9 @@ MegaNet/
 │                             on a face, the 4–20 mA arithmetic; pure
 ├── pinouts.js              ← Pinouts — the 🪛 Pinouts tab: faces and tables, cables to
 │                             buzz out, the loop calculator, RF connectors
+├── a2-firmware.js          ← A2Firmware — the 💾 A2 Firmware tab: ELPRO's ERT-A2 firmware
+│                             upgrade walked through, the unit beside the laptop's terminal,
+│                             the version checker, every step written out
 ├── owner-logos.js          ← OwnerLogos — each station owner's logo beside its name
 │                             on the station card and in the editor (the marks in assets/owners/)
 ├── health-bulletin.js      ← HealthBulletin — 📺 Network Weather at the top of Station
@@ -5569,7 +5572,7 @@ tabs on a phone-sized page, a real OCR read included, and
 ### 29. Knowledge base and Field training (Lessons, and Mallee HydroTech's Training Tools)
 
 Two groups hold lessons rather than tools. **📚 Knowledge base** is Flood-Net's
-own: 🎓 Radio Propagation, ⚡ Bit Errors (§34) and 📟 the SWR Meter (§35). **Field training**, straight
+own: 🎓 Radio Propagation, ⚡ Bit Errors (§34), 📟 the SWR Meter (§35), 🪛 Pinouts and 💾 A2 Firmware (§38). **Field training**, straight
 after Surveying, holds five lessons adapted
 with permission from [Mallee HydroTech](https://malleehydrotech.com.au/)'s open
 training tools (one group until Bit Errors made it seven, past the nav's six;
@@ -5921,6 +5924,37 @@ Sources and Signal Routes already find — all public but the last — and reads
 itself again every fifteen minutes. The ranking downloads as CSV and the
 summary as text ([docs/backbone.md](docs/backbone.md)). `npm run backbone` holds
 it to a planted month on the real station file.
+
+### 38. A2 Firmware (ELPRO's ERT-A2 Upgrade, Walked Through)
+
+💾 **A2 Firmware**, in the **Knowledge base**, re-tells ELPRO Technologies'
+*ERT-A2 Complete Firmware Upgrade* (Release G, 24-4-26) a step at a time. The
+four parts go in from a USB stick in ELPRO's order: the **host firmware** (RESET
+tapped, then TEST held within a second until D1 lights), the **bootloader**, the
+**radio's firmware** and the radio's **function image** (each from the A2's
+Unit Diagnostic → Update Device Firmware menu, over the USB B lead at 9600 8N1).
+
+The **walkthrough** at the top draws the board on the left — the SERIAL DB9, D1
+to D4 over the DIO terminals, and down the right-hand edge RESET, USB B, USB A
+and TEST — and the laptop's screen on the right (File Explorer, the format
+dialog, the terminal, all marked Simulated), with a ring round whichever one the
+hands are on. Pick the whole upgrade, one part, a check of the versions or a USB
+stick made ready, and it plays: the stick going in, the screwdriver on RESET, a
+finger holding TEST, D1 to D4 counting the load in, the menu options picked.
+⏸ pauses it, ◀ and ▶ (or ← and →) step, the dots jump to any step and a
+scrubber moves through one; a device asking for reduced motion starts still.
+
+Below it: the kit, the four files and the stick's FAT32 format; what RESET,
+USB B, USB A, TEST, D1–D4 and the DB9 are for; how to read **Show Firmware
+Version** in both its formats, with a **checker** that reads a pasted screen
+against Release G, says which parts that unit needs (and stops at a radio of
+V1.2 or a host under v1.4) and makes a walkthrough of just those; every step
+written out with ▶ Show me and a tick box, and saved as a text checklist;
+what the LEDs mean if they stop short of D4; and what to do when it goes
+wrong — the factory default that RESET-then-TEST becomes at five seconds, a
+terminal that lost its port, the RS-232 progress text, an Iridium unit's
+Epoch. Every frame is a pure function of the path, the step and the time, so
+the walkthrough and the written steps are the same list (`npm run a2firmware`).
 
 ## Deployment Plan
 

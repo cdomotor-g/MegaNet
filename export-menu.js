@@ -187,6 +187,10 @@ const ExportMenu = (function () {
         call: ['Pinouts.exportCsv', 'one'] },
       { label: 'Every connector — CSV', sub: 'the whole library, a row a pin, to print or keep with the field kit', call: ['Pinouts.exportCsv', 'all'] },
     ],
+    a2firmware: () => [
+      { label: 'These steps, as a checklist — TXT', sub: 'the walkthrough picked, a step a line with a box to tick, and the versions pasted into the checker — to print or take to the site',
+        call: ['A2Firmware.exportTxt'] },
+    ],
     history: () => [
       { label: 'The records listed — CSV', sub: 'the inspection and maintenance records, as filtered', call: ['History.exportList'],
         empty: 'There are no records listed.' },

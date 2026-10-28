@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-10-28** (revision 193 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-10-28** (revision 194 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -823,6 +823,15 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 194 — 2026-10-28: 💾 A2 Firmware
+
+The owner, with ELPRO's *ERT-A2 Complete Firmware Upgrade Rel G* attached: *"create a new page in the knowledge base covering these instructions. Try and do a better job than this PDF … separate things a bit better visually … animate the LEDs and where we have to press a button … an animation of USB going in and then a button being pressed … a simulated terminal … a highlight band around the animation … highlight the terminal, just go back and forth … down below … everything listed out … I just want to do the radio firmware, or I just want to do the bootloader, I want to do the whole process … pause … step through the steps with a forward and back arrow."* **Opens and closes nothing.**
+
+- **`a2-firmware.js`** (`A2Firmware`) — 💾 the tab, the Knowledge base's fifth: ELPRO's procedure split one action to a step (28 for the whole upgrade). The walkthrough draws the board (SERIAL DB9, D1–D4 over the DIO terminals, and down the right-hand edge RESET, USB B, USB A and TEST, after ELPRO's installation guide) beside the laptop's screen — File Explorer, the format dialog, the terminal, marked Simulated — and rings the side the hands are on. Seven paths (the whole upgrade, each part, a check, the stick); play, pause, Back/Next, ←/→, the dots and a scrubber; reduced motion starts still. Every frame is a pure function of path, step and time, so the walkthrough and the written steps below it are one list.
+- **From the web, beyond ELPRO's sheet** (ELPRO's Sept 2025 manual, installation guide, 2021 configuration manual and Iridium Epoch instruction, all linked on the tab): the menu is **Unit Diagnostic** (singular) with lettered options (d, then f / h); the terminal is 9600 8N1 on a "USB Serial Device", behind an Engineer login (no password printed); **RESET then TEST held 5 s is the factory default**, so the host step says to let go once D1 lights; USB 2.0 sticks; the RS-232 port's progress text; re-applied firmware putting an Iridium unit's Epoch back — so the checker never offers a part that is already current. The Update Device Firmware menu is in no screenshot: its options' letters are drawn and the page says so.
+- **The checker** reads a pasted Show Firmware Version (both formats) against Release G (host v1.7 : 10366, bootloader v1.3 - 9967, radio 1.4 build 10848, FI:6015 or FI:2044), stops a radio at V1.2 or a host under v1.4, and makes a walkthrough of just the parts that unit needs. ⤓ Export saves the steps as a text checklist.
+- **Checks:** `npm run a2firmware` (new, in CI: 52); `smoke` (54 tabs), `tabs` (born converted, two views), `nav`, `help`, `exports`, `looks`, `palette`, `registry` and the cheap five. `tabs`' four Stations failures (an inline style on the map cards' new drag handle, `card-width.js`, 1670bdf) were there before this and are not this change's.
 
 ### Revision 193 — 2026-10-28: 🩺 Station Health per station in the agent API, a quick latest reading, and #249
 

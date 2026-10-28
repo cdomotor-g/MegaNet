@@ -601,6 +601,18 @@ jobs:
         working-directory: test
         run: npm run pinouts
 
+      # 💾 A2 Firmware (a2-firmware.js): the steps held to ELPRO's order and
+      # to their drawings, every frame pure, the terminal's version screens
+      # and the checker against ELPRO's own examples; then the tab in Chromium
+      # — playing as it opens, the ring moving between the unit and the
+      # laptop, Back, Next, the dots, the keys and the scrubber, a pasted
+      # screen's own walkthrough, the checklist saved, reduced motion and a
+      # phone.
+      - name: A2 Firmware
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run a2firmware
+
       # ⏱️ Latency (map-latency.js), against the demo week through the strict
       # PostgREST stub: the bands' edges; off until asked for; the first
       # opening of the pane turns it on; every pin a band or said otherwise,
