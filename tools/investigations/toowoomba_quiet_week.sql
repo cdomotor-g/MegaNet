@@ -7,15 +7,15 @@
 -- export names a receiver, a base station or a token: every row is a channel,
 -- a time, an address or a carrier offset. Times are Brisbane (UTC+10).
 --
--- Legacy ALERT only (protocol 'alert'), on the two channels Flood-Net's
--- receiver heard throughout: 151.500 MHz (Hillcrest's) and 151.525 MHz
--- (Toowoomba's). The receiver's other channels changed during the fortnight
--- (152.400 dropped on 24 October, 151.575 added on 22 October), so they are
--- left out rather than compared across the change.
+-- Legacy ALERT only (protocol 'alert'). Toowoomba's channel is 151.525 MHz;
+-- 151.500 MHz, the only other channel Flood-Net's receiver heard throughout
+-- and one Toowoomba doesn't use, is the comparison. The receiver's other
+-- channels changed during the fortnight (152.400 dropped on 24 October,
+-- 151.575 added on 22 October), so they are left out rather than compared
+-- across the change.
 --
--- An address's group is the repeater whose pass ranges, in stations.json,
--- hold it: toowoomba (4000–4099, 6526–6527, and its own gauge 6598),
--- hillcrest (1900–2200, 4151–4199, 4800–4899, 5304–5399, 6200–6274), else
+-- An address is in group toowoomba when Toowoomba AL's pass ranges in
+-- stations.json hold it (4000–4099, 6526–6527, and its own gauge 6598), else
 -- other. A decoded burst is grouped by its address, a corrupted copy by its
 -- true address.
 
@@ -33,8 +33,6 @@ with cuts(t) as (
 blocks as (select a, z from (select t as a, lead(t) over (order by t) as z from cuts) s where z is not null),
 grp as (select x, case
     when x between 4000 and 4099 or x in (6526, 6527, 6598) then 'toowoomba'
-    when x between 1900 and 2200 or x between 4151 and 4199 or x between 4800 and 4899
-      or x between 5304 and 5399 or x between 6200 and 6274 then 'hillcrest'
     else 'other' end g from generate_series(0, 8191) x),
 dec as (select b.a, round(r.freq_mhz::numeric, 3) ch, grp.g, count(*) n
   from blocks b join meganet.reception r on r.heard_at >= b.a and r.heard_at < b.z
@@ -50,7 +48,7 @@ bad as (select b.a, round(r.freq_mhz::numeric, 3) ch, grp.g, count(*) n,
   group by 1, 2, 3),
 rows as (select b.a, b.z, c.ch, g.g, coalesce(d.n, 0) dn, coalesce(x.n, 0) xn, coalesce(x.clear, 0) xc
   from blocks b cross join (values (151.500), (151.525)) c(ch)
-  cross join (values ('toowoomba'), ('hillcrest'), ('other')) g(g)
+  cross join (values ('toowoomba'), ('other')) g(g)
   left join dec d on d.a = b.a and d.ch = c.ch and d.g = g.g
   left join bad x on x.a = b.a and x.ch = c.ch and x.g = g.g)
 select 'start,end,channel_mhz,group,decoded,corrupted,clear' || chr(10) || string_agg(
@@ -62,26 +60,25 @@ from rows;
 
 -- ── carriers.csv ─────────────────────────────────────────────────────────────
 -- Carrier offsets, recorded from 22:02 on 21 October: every decoded burst on
--- each channel in 20 Hz bins, before and after 04:35 on 25 October, with how
--- many were in Toowoomba's ranges, Toowoomba's own gauge (6598) or Hillcrest's
--- own (6200–6201), and how many corrupted copies came on a carrier in the bin.
--- Bins with fewer than three bursts are left out.
+-- Toowoomba's channel in 20 Hz bins, before and after 04:35 on 25 October,
+-- with how many were in Toowoomba's ranges or from its own gauge (6598), and
+-- how many corrupted copies came on a carrier in the bin. Bins with fewer
+-- than three bursts are left out.
 with r as (select r.id, r.heard_at, round(r.freq_mhz::numeric, 3) ch, r.alert_id,
     (floor(r.cfo_hz / 20) * 20)::int bin,
     case when r.heard_at < '2026-10-25 04:35+10' then 'before' else 'after' end per
   from meganet.reception r
   where r.protocol = 'alert' and r.ok and r.cfo_hz is not null
-    and round(r.freq_mhz::numeric, 3) in (151.500, 151.525)
+    and round(r.freq_mhz::numeric, 3) = 151.525
     and r.heard_at >= '2026-10-21 22:00+10' and r.heard_at < '2026-10-29 00:00+10'),
 dec as (select ch, per, bin, count(*) n,
     count(*) filter (where alert_id between 4000 and 4099 or alert_id in (6526, 6527, 6598)) tw,
-    count(*) filter (where alert_id = 6598) tw_own,
-    count(*) filter (where alert_id in (6200, 6201)) hc_own
+    count(*) filter (where alert_id = 6598) tw_own
   from r group by 1, 2, 3),
 bad as (select r.ch, r.per, r.bin, count(*) n from meganet.flip_event f join r on r.id = f.bad_reception_id group by 1, 2, 3)
-select 'channel_mhz,period,carrier_hz,decoded,toowoomba_range,toowoomba_own,hillcrest_own,corrupted' || chr(10) || string_agg(
+select 'channel_mhz,period,carrier_hz,decoded,toowoomba_range,toowoomba_own,corrupted' || chr(10) || string_agg(
     to_char(d.ch, 'FM999.000') || ',' || d.per || ',' || d.bin || ',' || d.n || ',' || d.tw || ',' || d.tw_own || ',' ||
-    d.hc_own || ',' || coalesce(b.n, 0), chr(10) order by d.ch, d.per desc, d.bin) as csv
+    coalesce(b.n, 0), chr(10) order by d.ch, d.per desc, d.bin) as csv
 from dec d left join bad b using (ch, per, bin)
 where d.n >= 3;
 
@@ -100,11 +97,12 @@ where protocol = 'alert' and ok and alert_id = 6598 and round(freq_mhz::numeric,
 
 
 -- ── transmitters.csv ─────────────────────────────────────────────────────────
--- meganet.flip_summary as refresh_transmitter_findings() last judged it: each
--- legacy transmitter's last 7 days, by the carrier its bursts came on. Public.
+-- meganet.flip_summary as refresh_transmitter_findings() last judged it:
+-- Toowoomba's and Mt Glorious's last 7 days, by the carrier their bursts came
+-- on, and the typical transmitter's rate. Public.
 select 'tx,station_id,bursts,corrupted,clear,clean_upstream,fleet_rate,judged_at' || chr(10) || string_agg(
     tx || ',' || coalesce(station_id, '') || ',' || bursts || ',' || flips || ',' || clear || ',' || clean_upstream || ',' ||
     round(fleet_rate::numeric, 5) || ',' || to_char(judged_at at time zone 'Australia/Brisbane', 'YYYY-MM-DD HH24:MI'),
     chr(10) order by flips desc, tx) as csv
 from meganet.flip_summary
-where flips >= 10;
+where tx in ('st:toowoomba_al', 'st:mt_glorious_al_rptr');

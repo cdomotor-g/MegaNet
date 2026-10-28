@@ -1,19 +1,3 @@
 tx,station_id,bursts,corrupted,clear,clean_upstream,fleet_rate,judged_at
-st:hillcrest_wine_glass,hillcrest_wine_glass,188,109,108,6,0.00387,2026-10-29 05:13
-a:1782,,5265,105,105,0,0.00387,2026-10-29 05:13
 st:toowoomba_al,toowoomba_al,327,85,85,9,0.00387,2026-10-29 05:13
 st:mt_glorious_al_rptr,mt_glorious_al_rptr,1879,75,75,13,0.00387,2026-10-29 05:13
-a:1773,,2712,48,48,0,0.00387,2026-10-29 05:13
-st:schultz_lookout_aler,schultz_lookout_aler,959,41,37,3,0.00387,2026-10-29 05:13
-a:1783,,3674,40,40,0,0.00387,2026-10-29 05:13
-a:1772,,3620,37,37,0,0.00387,2026-10-29 05:13
-st:thomson_river_d_s_of_thomson_dam,thomson_river_d_s_of_thomson_dam,327,30,30,0,0.00387,2026-10-29 05:13
-a:1776,,2365,23,23,0,0.00387,2026-10-29 05:13
-st:moggill_aitchenson,moggill_aitchenson,398,16,16,0,0.00387,2026-10-29 05:13
-st:yarras_mountain,yarras_mountain,33,16,16,0,0.00387,2026-10-29 05:13
-st:brassall_hancocks_b,brassall_hancocks_b,243,15,15,0,0.00387,2026-10-29 05:13
-st:lower_mt_walker_aler,lower_mt_walker_aler,164,15,15,0,0.00387,2026-10-29 05:13
-st:murderers_hill,murderers_hill,366,15,15,0,0.00387,2026-10-29 05:13
-st:hendra_al,hendra_al,438,13,13,0,0.00387,2026-10-29 05:13
-st:jindalee_boat_ramp_park_al_b,jindalee_boat_ramp_park_al_b,686,11,11,0,0.00387,2026-10-29 05:13
-st:marburg_al,marburg_al,272,11,10,0,0.00387,2026-10-29 05:13

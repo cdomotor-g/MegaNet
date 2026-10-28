@@ -15,9 +15,10 @@ computed here from the exports.
 The test
 ────────
 Toowoomba AL's repeater (151.525 MHz) last transmitted at 04:35 on 25 October.
-Flood-Net's receiver heard its channel and Hillcrest's (151.500 MHz)
-throughout, so each channel's corrupted copies per 1,000 bursts decoded can be
-compared before and after, and the two channels against each other. The rate
+Flood-Net's receiver heard its channel throughout, so the channel's corrupted
+copies per 1,000 bursts decoded can be compared before and after. 151.500 MHz,
+the receiver's only other channel all fortnight and one Toowoomba doesn't use,
+is the comparison: a fall there too would be something at our end. The rate
 is taken over windows: early October; 15–21 October, when it rose; the storm
 of 22–24 October; the 17 hours between our receiver's software update (11:16
 on 24 October) and Toowoomba's silence; and the days since.
@@ -34,7 +35,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 DATA = os.path.join(ROOT, 'data', 'investigations', '2026-10-toowoomba-quiet-week')
 OUT = os.path.join(ROOT, 'investigations', '2026-10-toowoomba-quiet-week.html')
 
-TW, HC = '151.525', '151.500'                        # Toowoomba's channel, Hillcrest's
+TW, CMP = '151.525', '151.500'                       # Toowoomba's channel; the comparison
 START = datetime(2026, 10, 7)
 ONSET = datetime(2026, 10, 15)                       # the rate on 151.525 rises
 STORM = datetime(2026, 10, 22)
@@ -88,7 +89,7 @@ def load():
                    g=r['group'], dec=int(r['decoded']), bad=int(r['corrupted']), clear=int(r['clear']))
               for r in rows('blocks.csv')]
     carriers = [dict(ch=r['channel_mhz'], per=r['period'], hz=int(r['carrier_hz']), dec=int(r['decoded']),
-                     tw=int(r['toowoomba_range']), tw_own=int(r['toowoomba_own']), hc_own=int(r['hillcrest_own']),
+                     tw=int(r['toowoomba_range']), tw_own=int(r['toowoomba_own']),
                      bad=int(r['corrupted']))
                 for r in rows('carriers.csv')]
     own = [dict(t=datetime.fromisoformat(r['heard']), v=int(r['value']),
@@ -145,7 +146,7 @@ def term(text, key=None):
 
 def rate_chart(blocks):
     """Figure 1: corrupted copies per 1,000 decoded, each day (25 October cut at
-    Toowoomba's silence, 24 October at our update), on each channel."""
+    Toowoomba's silence, 24 October at our update), on Toowoomba's channel and the comparison."""
     W, h, L, R, T, B = 720, 190, 40, 10, 34, 22
     pw, ph = W - L - R, h - T - B
     span = (END - START).total_seconds()
@@ -153,8 +154,8 @@ def rate_chart(blocks):
     top = 80
     Y = lambda v: T + ph * (1 - min(v, top) / top)
     out = [f'<svg class="fig" viewBox="0 0 {W} {h}" role="img" aria-label="Corrupted copies per 1,000 decoded, each '
-           'day from 7 to 28 October, on Toowoomba\'s channel and on Hillcrest\'s; Toowoomba\'s falls when it goes '
-           'quiet on 25 October, Hillcrest\'s does not">']
+           'day from 7 to 28 October, on Toowoomba\'s channel and on our receiver\'s other channel; Toowoomba\'s '
+           'falls when it goes quiet on 25 October, the other does not">']
     out.append(f'<rect class="quiet" x="{X(QUIET):.1f}" y="{T}" width="{X(END) - X(QUIET):.1f}" height="{ph}"/>')
     for v in range(0, top + 1, 20):
         out.append(f'<line class="grid" x1="{L}" x2="{W - R}" y1="{Y(v):.1f}" y2="{Y(v):.1f}"/>'
@@ -179,7 +180,7 @@ def rate_chart(blocks):
         k = (x['ch'], x['a'], x['z'])
         by[k][0] += x['dec']
         by[k][1] += x['bad']
-    for ch, cls, name in ((HC, 'line hc', 'Hillcrest\'s channel, 151.500'), (TW, 'line tw', 'Toowoomba\'s channel, 151.525')):
+    for ch, cls, name in ((CMP, 'line cmp', 'Comparison channel, 151.500'), (TW, 'line tw', 'Toowoomba\'s channel, 151.525')):
         segs = sorted((a, z, v) for (c, a, z), v in by.items() if c == ch)
         d_path, dots = [], []
         for i, (a, z, (dec, bad)) in enumerate(segs):
@@ -192,7 +193,7 @@ def rate_chart(blocks):
         out.append(f'<path class="{cls}" d="{"".join(d_path)}"/>')
         out.extend(dots)
     lx = L + 8
-    for cls, text in (('tw', 'Toowoomba\'s channel, 151.525 MHz'), ('hc', 'Hillcrest\'s channel, 151.500 MHz')):
+    for cls, text in (('tw', 'Toowoomba\'s channel, 151.525 MHz'), ('cmp', 'Comparison, 151.500 MHz')):
         out.append(f'<line class="line {cls}" x1="{lx}" x2="{lx + 16}" y1="{T + 9}" y2="{T + 9}"/>'
                    f'<text class="key" x="{lx + 21}" y="{T + 12.5}">{esc(text)}</text>')
         lx += 36 + len(text) * 5.5
@@ -277,13 +278,13 @@ def slot_strip(days):
 
 
 def window_chart(rates):
-    """Figure 4: each window's rate, both channels side by side."""
+    """Figure 4: each window's rate, Toowoomba's channel beside the comparison."""
     W, h, L, R, T, B = 380, 184, 30, 4, 30, 34
     pw, ph = W - L - R, h - T - B
     top = 60
     Y = lambda v: T + ph * (1 - v / top)
     out = [f'<svg class="fig" viewBox="0 0 {W} {h}" role="img" aria-label="Corrupted copies per 1,000 decoded in '
-           'each window, Toowoomba\'s channel beside Hillcrest\'s">']
+           'each window, Toowoomba\'s channel beside the comparison channel">']
     for v in range(0, top + 1, 20):
         out.append(f'<line class="grid" x1="{L}" x2="{W - R}" y1="{Y(v):.1f}" y2="{Y(v):.1f}"/>'
                    f'<text class="tick" x="{L - 5}" y="{Y(v) + 3.5:.1f}" text-anchor="end">{v}</text>')
@@ -294,7 +295,7 @@ def window_chart(rates):
         cx = L + slot * (i + 0.5)
         if key == 'quiet':
             out.append(f'<rect class="quiet" x="{cx - slot / 2 + 2:.1f}" y="{T}" width="{slot - 4:.1f}" height="{ph}"/>')
-        for k, (ch, cls) in enumerate(((TW, 'tw'), (HC, 'hc'))):
+        for k, (ch, cls) in enumerate(((TW, 'tw'), (CMP, 'cmp'))):
             r = rates[key][ch]
             x0 = cx + (k - 1) * (bw + 2) + 1
             y0, y1 = Y(0), Y(r['rate'])
@@ -309,7 +310,7 @@ def window_chart(rates):
             out.append(f'<text class="tick" x="{cx:.1f}" y="{Y(0) + 12 + k * 10:.1f}" text-anchor="middle">{esc(part)}</text>')
     out.append(f'<line class="axis" x1="{L}" x2="{W - R}" y1="{Y(0):.1f}" y2="{Y(0):.1f}"/>')
     lx = L + 40
-    for cls, text in (('tw', '151.525 (Toowoomba)'), ('hc', '151.500 (Hillcrest)')):
+    for cls, text in (('tw', '151.525 (Toowoomba)'), ('cmp', '151.500 (comparison)')):
         out.append(f'<rect class="bar {cls}" x="{lx}" y="{T - 27}" width="9" height="9" rx="2"/>'
                    f'<text class="key" x="{lx + 13}" y="{T - 19}">{esc(text)}</text>')
         lx += 30 + len(text) * 5.8
@@ -321,15 +322,11 @@ def window_chart(rates):
 
 def main():
     blocks, carriers, own, tx = load()
-    rates = {k: {ch: window(blocks, ch, a, b) for ch in (TW, HC)} for k, _, a, b in WINDOWS}
-    before = {ch: window(blocks, ch, ONSET, QUIET) for ch in (TW, HC)}       # 15 Oct to the silence
+    rates = {k: {ch: window(blocks, ch, a, b) for ch in (TW, CMP)} for k, _, a, b in WINDOWS}
+    before = {ch: window(blocks, ch, ONSET, QUIET) for ch in (TW, CMP)}      # 15 Oct to the silence
     quiet = rates['quiet']
     tw_grp = {k: window(blocks, TW, a, b, {'toowoomba'}) for k, _, a, b in WINDOWS}
-    tw_oth = {k: window(blocks, TW, a, b, {'other', 'hillcrest'}) for k, _, a, b in WINDOWS}
-    hc_share = window(blocks, HC, START, END, {'hillcrest'})
-    hc_all = window(blocks, HC, START, END)
-    hc_early = window(blocks, HC, START, ONSET, {'hillcrest'})
-    hc_quiet = window(blocks, HC, QUIET, END, {'hillcrest'})
+    tw_oth = {k: window(blocks, TW, a, b, {'other'}) for k, _, a, b in WINDOWS}
     clear_tw = window(blocks, TW, ONSET, QUIET)
 
     r, lo, hi = ratio_ci(quiet[TW]['bad'], quiet[TW]['dec'], before[TW]['bad'], before[TW]['dec'])
@@ -340,9 +337,6 @@ def main():
     mg_b, mg_a = carrier(carriers, TW, 'before', MT_GLORIOUS_BINS['before']), carrier(carriers, TW, 'after', MT_GLORIOUS_BINS['after'])
     th_b, th_a = carrier(carriers, TW, 'before', THIRD_BINS['before']), carrier(carriers, TW, 'after', THIRD_BINS['after'])
     tw_before_all = sum(c['bad'] for c in carriers if c['ch'] == TW and c['per'] == 'before')
-    hc_before = [c for c in carriers if c['ch'] == HC and c['per'] == 'before']
-    hc_peak = max(hc_before, key=lambda c: c['dec'])['hz']
-    hc_main = sum(c['dec'] for c in hc_before if abs(c['hz'] - hc_peak) <= 60) / sum(c['dec'] for c in hc_before)
     own_total = sum(c['tw_own'] for c in carriers if c['ch'] == TW and c['per'] == 'before')
 
     days = slots(own)
@@ -357,13 +351,12 @@ def main():
     after_quiet = [x for x in own if x['t'] > QUIET]
     last_any = carrier(carriers, TW, 'after', TOOWOOMBA_BINS)
 
-    hcx, twx = tx['st:hillcrest_wine_glass'], tx['st:toowoomba_al']
-    fleet = hcx['fleet']
+    twx = tx['st:toowoomba_al']
 
     print(f'151.525: early {rates["early"][TW]["rate"]:.1f}, risen {rates["rise"][TW]["rate"]:.1f}, storm '
           f'{rates["storm"][TW]["rate"]:.1f}, update {rates["update"][TW]["rate"]:.1f}, quiet {quiet[TW]["rate"]:.1f}; '
           f'ratio {r:.2f} ({lo:.2f}–{hi:.2f})')
-    print(f'151.500: ' + ', '.join(f'{k} {rates[k][HC]["rate"]:.1f}' for k, *_ in WINDOWS))
+    print(f'151.500: ' + ', '.join(f'{k} {rates[k][CMP]["rate"]:.1f}' for k, *_ in WINDOWS))
     print(f'Toowoomba carrier before: {tc}; after {tc_after}; Mt Glorious {mg_b["share"]:.1f}% → {mg_a["share"]:.1f}%; '
           f'third {th_b["share"]:.1f}% → {th_a["share"]:.1f}%')
     print(f'missed three-hourly reports: before 15 Oct {pre_onset_missed}, 15 Oct {onset_missed}, 15–18 Oct {rise_missed}')
@@ -394,15 +387,11 @@ def main():
         TWG_QUIET=f'{tw_grp["quiet"]["rate"]:.0f}', OTH_RISE=f'{tw_oth["rise"]["rate"]:.0f}',
         OTH_EARLY=f'{tw_oth["early"]["rate"]:.0f}', OTH_QUIET=f'{tw_oth["quiet"]["rate"]:.0f}',
         CLEAR_PCT=f'{100 * clear_tw["clear"] / clear_tw["bad"]:.0f}',
-        HC_EARLY=f'{rates["early"][HC]["rate"]:.0f}', HC_RISE=f'{rates["rise"][HC]["rate"]:.0f}',
-        HC_UPD=f'{rates["update"][HC]["rate"]:.0f}', HC_QUIET=f'{quiet[HC]["rate"]:.0f}',
-        HC_SHARE_DEC=f'{100 * hc_share["dec"] / hc_all["dec"]:.0f}',
-        HC_SHARE_BAD=f'{100 * hc_share["bad"] / hc_all["bad"]:.0f}',
-        HC_PD_EARLY=per_day(hc_early), HC_PD_QUIET=per_day(hc_quiet),
-        HC_TX_BAD=hcx['bad'], HC_TX_BURSTS=hcx['bursts'], HC_TX_PCT=f'{100 * hcx["bad"] / hcx["bursts"]:.0f}',
-        TW_TX_PCT=f'{100 * twx["bad"] / twx["bursts"]:.0f}', FLEET=f'{100 * fleet:.2f}', JUDGED=hcx['judged'][11:],
+        CMP_UPD=f'{rates["update"][CMP]["rate"]:.0f}', CMP_QUIET=f'{quiet[CMP]["rate"]:.0f}',
+        TW_TX_BAD=twx['bad'], TW_TX_BURSTS=twx['bursts'], TW_TX_PCT=f'{100 * twx["bad"] / twx["bursts"]:.0f}',
+        FLEET=f'{100 * twx["fleet"]:.2f}', JUDGED=twx['judged'][11:],
         TC_DEC=fmt(tc['dec']), TC_TW=f'{100 * tc["tw"] / tc["dec"]:.0f}', TC_OWN=tc['own'], OWN_TOTAL=own_total,
-        TC_BAD=tc['bad'], HC_MAIN=f'{100 * hc_main:.0f}', TC_SHARE=f'{tc["share"]:.1f}', TC_OF=f'{100 * tc["bad"] / tw_before_all:.0f}',
+        TC_BAD=tc['bad'], TC_SHARE=f'{tc["share"]:.1f}', TC_OF=f'{100 * tc["bad"] / tw_before_all:.0f}',
         TC_AFTER={0: 'no burst', 1: 'one burst'}.get(last_any['tw'], f"{last_any['tw']} bursts"),
         MG_B=f'{mg_b["share"]:.1f}', MG_A=f'{mg_a["share"]:.1f}', TH_B=f'{th_b["share"]:.1f}', TH_A=f'{th_a["share"]:.1f}',
         DAYS_B=f'{days_before:.1f}', DAYS_A=f'{days_after:.1f}',
@@ -410,8 +399,7 @@ def main():
         RESET_AT=f'{reset["t"]:%H:%M}', RESET_FROM=fmt(before_reset['v']), LAST_AT=f'{QUIET:%H:%M}',
         LAST_OWN_AT=f'{last["t"]:%H:%M}', PRE_SLOTS=8 * (ONSET - START).days,
         LAST_V=last['v'], LAST_MIN=round((QUIET - reset['t']).total_seconds() / 60),
-        STRAY_AT=f'{after_quiet[0]["t"]:%d %B at %H:%M}'.lstrip('0'), STRAY_V=after_quiet[0]['v'],
-        STRAY_HZ=after_quiet[0]['hz'],
+        STRAY_AT=f'{after_quiet[0]["t"]:%d %B, %H:%M}'.lstrip('0'), STRAY_V=after_quiet[0]['v'],
     ).items():
         page = page.replace('{{' + k + '}}', str(v))
     assert '{{' not in page, page[page.index('{{'):page.index('{{') + 40]
@@ -426,7 +414,7 @@ TEMPLATE = r'''<!doctype html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Toowoomba's quiet week — Flood-Net investigation 02</title>
-  <meta name="description" content="A before-and-after test of who corrupts readings on the Brisbane network: when Toowoomba AL's repeater went off air on 25 October 2026, corrupted copies on its channel fell to a third; on Hillcrest's channel they did not.">
+  <meta name="description" content="A before-and-after test of Toowoomba AL's repeater: when it went off air on 25 October 2026, corrupted copies of readings on its channel fell to a third, back to the early-October level.">
   <link rel="canonical" href="https://floodwarning.net/investigations/2026-10-toowoomba-quiet-week">
   <link rel="icon" type="image/svg+xml" href="../assets/icon-small.svg">
   <!-- Generated by tools/investigations/toowoomba_quiet_week.py from the four
@@ -504,9 +492,9 @@ TEMPLATE = r'''<!doctype html>
     .mark { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
     .quiet { fill: var(--quiet); }
     .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-    .line.tw { stroke: var(--s2); } .line.hc { stroke: var(--s1); }
+    .line.tw { stroke: var(--s2); } .line.cmp { stroke: var(--muted); stroke-width: 1.5; }
     .hit { fill: transparent; }
-    .bar { fill: var(--s1); } .bar.tw { fill: var(--s2); } .bar.hc { fill: var(--s1); }
+    .bar { fill: var(--s1); } .bar.tw { fill: var(--s2); } .bar.cmp { fill: var(--muted); }
     .cell.ok { fill: var(--s1); } .cell.miss { fill: var(--miss); }
     .sheet + .sheet { margin-top: 1.4rem; padding-top: 1rem; border-top: 1px solid var(--line); }
     @page { size: A4; margin: 9mm 10mm; }
@@ -543,9 +531,8 @@ TEMPLATE = r'''<!doctype html>
 <section class="sheet">
   <p class="crumb"><a href="./">Investigations</a> · <a href="../">Flood-Net</a></p>
   <h1>Toowoomba's quiet week: what changed when its repeater went off air</h1>
-  <p class="meta">Investigation 02 · 29 October 2026 · Toowoomba AL (540162, repeater on 151.525 MHz) and Hillcrest
-    AL (Wine Glass) (540235, repeater on 151.500 MHz), Brisbane hub ·
-    <span class="pill">Open: Toowoomba implicated, Hillcrest still to separate</span></p>
+  <p class="meta">Investigation 02 · 29 October 2026 · Toowoomba AL (540162, rain 6598), repeater on 151.525 MHz,
+    Brisbane hub · <span class="pill">Open: Toowoomba implicated, site fault not yet found</span></p>
 
   <div class="tldr">
     <ul>
@@ -557,24 +544,24 @@ TEMPLATE = r'''<!doctype html>
       <li><strong>Toowoomba was sending some of the damage itself.</strong> {{TC_SHARE}}% of the bursts on its
         carrier were corrupted copies, about twice the share on the other two repeaters on its channel. Mt Glorious,
         which relays the same addresses, went from {{MG_B}}% to {{MG_A}}% once Toowoomba stopped.</li>
-      <li><strong>Hillcrest is a separate fault.</strong> Its channel didn't improve when Toowoomba stopped. It got
-        worse, {{HC_RISE}} to {{HC_QUIET}} per 1,000. So Toowoomba isn't behind it.</li>
+      <li><strong>It looks to have been failing since 15 October.</strong> That day the corruption on its channel
+        tripled, and its own {{T_SLOT}} began going missing.</li>
     </ul>
   </div>
 
-  <h2>The test: one channel cleared, the other didn't</h2>
+  <h2>The test: the channel cleared when Toowoomba stopped</h2>
   <figure>
     <div class="scroll">{{FIG1}}</div>
-    <figcaption>Figure 1. Corrupted copies per 1,000 decoded, each day, on the two channels our receiver heard
-      throughout. The green band is Toowoomba's silence; 24 and 25 October are cut at our update and at Toowoomba's
-      last transmission. Hover a day for its counts.</figcaption>
+    <figcaption>Figure 1. Corrupted copies per 1,000 decoded, each day. Orange: Toowoomba's channel. Grey: 151.500
+      MHz, our receiver's only other channel all fortnight, which Toowoomba doesn't use. Green: Toowoomba's silence.
+      Hover a day for its counts.</figcaption>
   </figure>
   <p>On Toowoomba's channel the rate ran at {{EARLY}} per 1,000 in early October and rose to {{RISE}} from 15 October,
-    with no change in traffic (about {{PD_EARLY}} and {{PD_RISE}} bursts a day). It stayed high through the storm of
-    22–24 October. When Toowoomba went quiet it dropped to {{QUIETR}}, still on about {{PD_QUIET}} bursts a day:
+    with no change in traffic (about {{PD_EARLY}} and {{PD_RISE}} bursts a day). When Toowoomba went quiet it dropped to {{QUIETR}}, still on about {{PD_QUIET}} bursts a day:
     {{Q_BAD}} corrupted copies in {{Q_DEC}}, against {{B_BAD}} in {{B_DEC}} from 15 October up to the silence. That's
-    {{RATIO}} times the earlier rate (95% range {{RLO}}–{{RHI}}), too large a drop for chance. {{CLEAR_PCT}}% of the
-    corrupted copies on this channel were {{T_CLEAR}}: as strong as the clean copy, so wrong when they were sent, not
+    {{RATIO}} times the earlier rate (95% range {{RLO}}–{{RHI}}), too large a drop for chance. The comparison channel
+    didn't drop at {{LAST_AT}}, so the fall wasn't something at our end. {{CLEAR_PCT}}% of the corrupted copies on
+    Toowoomba's channel were {{T_CLEAR}}: as strong as the clean copy, so wrong when they were sent, not
     misheard.</p>
 
   <h2>What went quiet at {{LAST_AT}} on 25 October</h2>
@@ -592,16 +579,15 @@ TEMPLATE = r'''<!doctype html>
     </figure>
     <div>
       <p>The tall peak near +560 Hz is Toowoomba. {{TC_TW}}% of its {{TC_DEC}} bursts were addresses in Toowoomba's
-        {{T_PASS}}, and all {{TC_OWN}} reports from its own gauge came on it. After {{LAST_AT}} on 25 October, {{TC_AFTER}}
-        from its ranges arrived anywhere near that offset. The Mt Glorious peak carries addresses
-        only Mt Glorious relays, and it's still there.</p>
+        {{T_PASS}}, and all {{TC_OWN}} reports from its own gauge came on it. After {{LAST_AT}} on 25 October,
+        {{TC_AFTER}} from its ranges arrived anywhere near that offset. The Mt Glorious peak carries addresses only Mt
+        Glorious relays, and it's still there.</p>
       <p>Before 15 October almost every one of its three-hourly reports arrived ({{PRE_MISSED}} of {{PRE_SLOTS}}
         missed). On the 15th, the day the corruption rose, {{ONSET_MISSED}} of 8 went missing, and {{RISE_MISSED}} by the
         18th. On 25 October its count read {{RESET_FROM}}, then 0 at {{RESET_AT}}, then 1 to {{LAST_V}} by
         {{LAST_OWN_AT}} as it rained. Its carrier was last heard at {{LAST_AT}}, {{LAST_MIN}} minutes after the
-        reset. The one copy of its address since, on {{STRAY_AT}}, came on Mt Glorious's
-        carrier (+{{STRAY_HZ}} Hz) with a count of {{STRAY_V}} that doesn't follow Toowoomba's. That one is another
-        gauge, not Toowoomba.</p>
+        reset. The one copy of its address since ({{STRAY_AT}}) came on Mt Glorious's carrier with a count of
+        {{STRAY_V}}: another gauge, not Toowoomba.</p>
     </div>
   </div>
 </section>
@@ -611,16 +597,12 @@ TEMPLATE = r'''<!doctype html>
     <div>
       <h2>Before and after, side by side</h2>
       <p>Each window is a stretch of the fortnight. The orange bars stay high through the storm and through our
-        receiver's update, 17 hours before the silence ({{UPD_BAD}} corrupted in {{UPD_DEC}}, {{UPD}} per 1,000).
-        The update didn't help Hillcrest's channel either.</p>
+        receiver's update, 17 hours before the silence ({{UPD_BAD}} corrupted in {{UPD_DEC}}, {{UPD}} per 1,000). They
+        drop only when Toowoomba stops. The grey bars, on the comparison channel, don't drop then: {{CMP_UPD}} per
+        1,000 just before, {{CMP_QUIET}} after.</p>
       <p>Toowoomba's own addresses, which now reach us only through the repeaters that share its ranges, went from
-        {{TWG_RISE}} to {{TWG_QUIET}} per 1,000 ({{TWG_EARLY}} in early October). Addresses outside its ranges went from {{OTH_RISE}} to
-        {{OTH_QUIET}} ({{OTH_EARLY}} early), so it was spoiling traffic it doesn't list as well. Either it relays more
-        than its {{T_PASS}} say, or its transmissions were colliding with other repeaters' bursts.</p>
-      <p>From 21 October, when carriers were first recorded, to the silence, {{TC_BAD}} corrupted copies came on
-        Toowoomba's carrier: {{TC_OF}}% of all those on the channel. Mt Glorious's share fell from {{MG_B}}% to {{MG_A}}% when Toowoomba stopped. It relays Toowoomba's
-        addresses onward, so some of its damage was Toowoomba's, passed on. The third repeater stayed about where it
-        was ({{TH_B}}% to {{TH_A}}%).</p>
+        {{TWG_RISE}} to {{TWG_QUIET}} per 1,000 ({{TWG_EARLY}} in early October). Addresses outside its ranges went from
+        {{OTH_RISE}} to {{OTH_QUIET}} ({{OTH_EARLY}} early), so it was spoiling traffic it doesn't list as well.</p>
     </div>
     <figure>
       {{FIG4}}
@@ -629,37 +611,37 @@ TEMPLATE = r'''<!doctype html>
     </figure>
   </div>
 
-  <h2>Hillcrest: a fault of its own</h2>
-  <p>{{HC_SHARE_DEC}}% of the bursts on 151.500, and {{HC_SHARE_BAD}}% of its corrupted copies, are addresses Hillcrest
-    passes. That channel ran at {{HC_EARLY}} per 1,000 in early October and {{HC_RISE}} from 15 October. It went up, not
-    down, to {{HC_QUIET}} after Toowoomba stopped, on less traffic (about {{HC_PD_QUIET}} of Hillcrest's bursts a day,
-    against {{HC_PD_EARLY}} in early October). Whatever corrupts Hillcrest's traffic, Toowoomba isn't part of it.</p>
-  <p>Hillcrest and Constitution Hill pass the same ranges on the same channel. {{HC_MAIN}}% of what we hear on 151.500
-    arrives on one carrier, which also brings Hillcrest's own gauge. So the carrier can't yet say which of the two does the
-    damage. Flood-Net's transmitter table, as judged at {{JUDGED}} on 29 October, puts {{HC_TX_BAD}} corrupted copies
-    on Hillcrest against {{HC_TX_BURSTS}} bursts ({{HC_TX_PCT}}%), and {{TW_TX_PCT}}% on Toowoomba, against a typical
-    {{FLEET}}%. Those shares are too high. The table divides by the bursts it pinned to the repeater itself, not
-    everything on its carrier. It also gave most of Toowoomba's carrier to Mt Glorious, which relays the same
-    addresses. Measured on the whole carrier, Toowoomba's share is {{TC_SHARE}}%.</p>
+  <h2>Where the damage came from</h2>
+  <p>From 21 October, when carriers were first recorded, to the silence, {{TC_BAD}} corrupted copies came on
+    Toowoomba's carrier: {{TC_OF}}% of all those on the channel, and {{TC_SHARE}}% of what that carrier brought. The
+    other two repeaters on the channel ran at {{MG_B}}% (Mt Glorious) and {{TH_B}}% (the third). Once Toowoomba
+    stopped, Mt Glorious's share fell to {{MG_A}}%. It relays Toowoomba's addresses onward, so some of its damage was
+    Toowoomba's, passed on. The third repeater stayed about where it was ({{TH_A}}%).</p>
+  <p>Flood-Net's transmitter table, as judged at {{JUDGED}} on 29 October, puts {{TW_TX_BAD}} corrupted copies on
+    Toowoomba against {{TW_TX_BURSTS}} bursts ({{TW_TX_PCT}}%), against a typical {{FLEET}}%. That overstates it. The
+    table divides by the bursts it pinned to Toowoomba itself, not everything on its carrier, and it gave most of
+    Toowoomba's carrier to Mt Glorious, which relays the same addresses. Measured on the whole carrier, Toowoomba's
+    share is the {{TC_SHARE}}% above.</p>
 
   <div class="two">
     <div>
       <h2>What we know</h2>
       <p><b>Established.</b> Toowoomba's transmitter stopped at {{LAST_AT}} on 25 October. On its channel, corrupted
-        copies fell from {{BEFORE}} to {{QUIETR}} per 1,000 at that moment, on the same traffic, and our receiver's
-        update didn't cause it. Hillcrest's channel didn't improve.</p>
+        copies fell from {{BEFORE}} to {{QUIETR}} per 1,000 at that moment, on the same traffic. Neither our
+        receiver's update nor anything else at our end caused it: the comparison channel didn't drop.</p>
       <p><b>Likely.</b> Toowoomba was failing for ten days before it died, and sending corrupted copies the whole
-        time. Some went out again through Mt Glorious. A counter reset, then silence {{LAST_MIN}} minutes later in rain, points
-        at power: battery, charger or supply.</p>
-      <p><b>Open.</b> What failed on 15 October. Whether Hillcrest or Constitution Hill corrupts 151.500.</p>
+        time. Some went out again through Mt Glorious. A counter reset, then silence {{LAST_MIN}} minutes later in
+        rain, points at power: battery, charger or supply.</p>
+      <p><b>Open.</b> What failed on 15 October. Why traffic outside Toowoomba's ranges was damaged too: it may relay
+        more than its {{T_PASS}} say, or its transmissions may have been colliding with other repeaters' bursts.</p>
     </div>
     <div>
       <h2>Next</h2>
       <ol>
-        <li>Visit Toowoomba AL: power first (battery, charger, solar, supply), then the radio. When it's back, watch
-          Figure 1: if the orange line climbs again, it's confirmed.</li>
-        <li>Run the same test on Hillcrest. Ask the maintainer when Hillcrest or Constitution Hill will next be off
-          air, and compare 151.500 before and after.</li>
+        <li>Visit Toowoomba AL: power first (battery, charger, solar, supply), then the radio. Ask whether anything was
+          done at the site around 15 October.</li>
+        <li>When it's back on air, watch Figure 1's orange line. If it stays near {{QUIETR}} per 1,000, the fault went
+          with the repair; if it climbs back towards {{BEFORE}}, it didn't.</li>
         <li>Fix the transmitter table so it uses the whole carrier as the denominator, and so a repeater can't be
           credited with another's carrier. The Bit-Flip Sources tab and the bulletins read from it.</li>
       </ol>
@@ -667,11 +649,11 @@ TEMPLATE = r'''<!doctype html>
   </div>
 
   <footer class="small">
-    <p>Method: Flood-Net's receiver, legacy ALERT bursts on 151.500 and 151.525 MHz, 7–28 October (Brisbane time). A
-      corrupted copy is one Flood-Net's checks found: a burst one or two bits from a real one, on the same receiver
-      within five seconds. Rates are corrupted copies over bursts decoded. An address belongs to Toowoomba or
-      Hillcrest if it is in that repeater's pass ranges in the station register. The receiver's other channels changed
-      during the fortnight, so they are left out. Data, queries and script:
+    <p>Method: Flood-Net's receiver, legacy ALERT bursts on 151.525 MHz (Toowoomba's channel) and 151.500 MHz (the
+      comparison), 7–28 October (Brisbane time). A corrupted copy is one Flood-Net's checks found: a burst one or two
+      bits from a real one, on the same receiver within five seconds. Rates are corrupted copies over bursts decoded.
+      An address is Toowoomba's if it is in Toowoomba AL's pass ranges in the station register. The receiver's other
+      channels changed during the fortnight, so they are left out. Data, queries and script:
       <code>data/investigations/2026-10-toowoomba-quiet-week/</code>,
       <code>tools/investigations/toowoomba_quiet_week.sql</code>,
       <code>tools/investigations/toowoomba_quiet_week.py</code>.</p>
