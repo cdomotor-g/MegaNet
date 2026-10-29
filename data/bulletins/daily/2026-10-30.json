@@ -1,0 +1,469 @@
+{
+ "format": "floodnet-bulletin/1",
+ "kind": "daily",
+ "id": "daily-2026-10-30",
+ "issued_at": "2026-10-29T18:32:26.853Z",
+ "period": {
+  "from": "2026-10-28T18:32:26.853Z",
+  "to": "2026-10-29T18:32:26.853Z",
+  "label": "24 hours to 4:32 am Friday"
+ },
+ "presenter": "nitwit",
+ "cohost": "tech-wizard",
+ "outlook": {
+  "sky": "unsettled",
+  "label": "Unsettled"
+ },
+ "headline": "The Lockyer is back: Toowoomba returned Thursday morning and its stations with it. Eight new quiet ones, on the Gold Coast and in the Northern Rivers.",
+ "stats": [
+  {
+   "label": "stations heard",
+   "value": 1076,
+   "tone": "neutral"
+  },
+  {
+   "label": "checks received",
+   "value": 76,
+   "unit": "%",
+   "was": 72,
+   "tone": "warn"
+  },
+  {
+   "label": "quiet, keep a schedule",
+   "value": 8,
+   "tone": "warn"
+  },
+  {
+   "label": "critical findings",
+   "value": 12,
+   "tone": "bad"
+  }
+ ],
+ "scenes": [
+  {
+   "type": "title",
+   "title": "Good morning",
+   "secs": 20,
+   "say": "Righto, morning all, Nitto here, I got this! Clearing in the west today. Checks received are up to seventy-six percent, from seventy-two, and we heard over a thousand stations, a lot more than yesterday. Eight that keep a schedule went quiet, in two small groups down south."
+  },
+  {
+   "type": "map",
+   "title": "Clearing over the Lockyer",
+   "sub": "Toowoomba back from 6:26 am Thursday",
+   "sev": "ok",
+   "secs": 20,
+   "say": "Best news first. The Toowoomba repeater came back at 6:26 on Thursday morning, after four days quiet. Withcott had started late on Wednesday, then Fifteen Mile, Upper Tenthill, Bill Gunn Dam, and Gatton and Helidon by ten to eleven. Toowoomba itself is still light, seven reports in the day.",
+   "stations": [
+    "toowoomba_al",
+    "gatton_al",
+    "helidon_al",
+    "fifteen_mile_al",
+    "upper_tenthill_al",
+    "bill_gunn_dam_al",
+    "withcott_al"
+   ],
+   "marks": [
+    {
+     "id": "toowoomba_al",
+     "kind": "repeater",
+     "sev": "ok",
+     "label": "Toowoomba AL"
+    },
+    {
+     "id": "gatton_al",
+     "kind": "ok",
+     "sev": "ok"
+    },
+    {
+     "id": "helidon_al",
+     "kind": "ok",
+     "sev": "ok"
+    },
+    {
+     "id": "fifteen_mile_al",
+     "kind": "ok",
+     "sev": "ok"
+    },
+    {
+     "id": "upper_tenthill_al",
+     "kind": "ok",
+     "sev": "ok"
+    },
+    {
+     "id": "bill_gunn_dam_al",
+     "kind": "ok",
+     "sev": "ok"
+    },
+    {
+     "id": "withcott_al",
+     "kind": "ok",
+     "sev": "ok"
+    }
+   ],
+   "links": [
+    {
+     "from": "gatton_al",
+     "to": "toowoomba_al",
+     "style": "clean"
+    },
+    {
+     "from": "helidon_al",
+     "to": "toowoomba_al",
+     "style": "clean"
+    },
+    {
+     "from": "fifteen_mile_al",
+     "to": "toowoomba_al",
+     "style": "clean"
+    },
+    {
+     "from": "upper_tenthill_al",
+     "to": "toowoomba_al",
+     "style": "clean"
+    },
+    {
+     "from": "bill_gunn_dam_al",
+     "to": "toowoomba_al",
+     "style": "clean"
+    },
+    {
+     "from": "withcott_al",
+     "to": "toowoomba_al",
+     "style": "clean"
+    }
+   ],
+   "focus": {
+    "lat": -27.5,
+    "lon": 152.2,
+    "km": 55
+   }
+  },
+  {
+   "type": "map",
+   "title": "Showers down south",
+   "sub": "two small groups, each sharing a path",
+   "sev": "warn",
+   "secs": 25,
+   "say": "Now the new quiet ones. On the northern Gold Coast, Hotham Creek, Stewarts Road and Natural Bridge went quiet from Thursday night, and they share the same few repeaters. Kingsholme has missed twenty-four in a row, so that one's older. In the Northern Rivers, Murwillumbah, Terania Creek, Nashua and Pottsville went quiet together from 6:36 on Thursday evening. Together points at a shared path, not four sites.",
+   "stations": [
+    "hotham_creek_al",
+    "stewarts_rd_al",
+    "kingsholme_montego_hills_res_al",
+    "natural_bridge_al",
+    "murwillumbah_sewera",
+    "terania_ck",
+    "nashua_wilsons_rive",
+    "cudgera_ck_potts"
+   ],
+   "marks": [
+    {
+     "id": "hotham_creek_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "stewarts_rd_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "kingsholme_montego_hills_res_al",
+     "kind": "silent",
+     "sev": "critical"
+    },
+    {
+     "id": "natural_bridge_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "murwillumbah_sewera",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "terania_ck",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "nashua_wilsons_rive",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "cudgera_ck_potts",
+     "kind": "silent",
+     "sev": "warn"
+    }
+   ],
+   "areas": [
+    {
+     "lat": -27.81,
+     "lon": 153.27,
+     "km": 20,
+     "sev": "warn",
+     "label": "northern Gold Coast"
+    },
+    {
+     "lat": -28.4,
+     "lon": 153.35,
+     "km": 30,
+     "sev": "warn",
+     "label": "Northern Rivers"
+    }
+   ],
+   "focus": {
+    "lat": -28.1,
+    "lon": 153.3,
+    "km": 70
+   }
+  },
+  {
+   "type": "receivers",
+   "title": "Our end of the line",
+   "presenter": "tech-wizard",
+   "sev": "info",
+   "secs": 13,
+   "say": "Alex Chen. Our receivers ran all day and no settings changed. 152.400 is still not being listened to. The second base station is still checking in with no receiver set up.",
+   "items": [
+    {
+     "name": "rpi-83071968 stick 1",
+     "up": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "note": "up all day; settings unchanged"
+    },
+    {
+     "name": "rpi-83071968 stick 2",
+     "up": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0.5,
+      0,
+      0.33,
+      1,
+      0.67,
+      0,
+      0.17,
+      1,
+      1,
+      1,
+      0.83,
+      0.33,
+      1,
+      1,
+      1,
+      0.33,
+      1
+     ],
+     "note": "up all day; settings unchanged"
+    }
+   ]
+  },
+  {
+   "type": "battery",
+   "title": "Batteries",
+   "presenter": "seasoned-hydrographer",
+   "sev": "critical",
+   "secs": 18,
+   "say": "Graham Watts on power. Kunghur's last low was 9.5 volts; it got four reports out on Thursday. Dunbible Creek is flat at 9.8. Eungella keeps climbing, now 10.8. And Lake Orr Weir isn't charging: it sits at 12.7 with no daily climb.",
+   "items": [
+    {
+     "id": "kunghur_the_junction",
+     "name": "Kunghur (The Junction)",
+     "v": 9.5,
+     "nights": [
+      9.5
+     ],
+     "note": "Battery critical — 9.5 V"
+    },
+    {
+     "id": "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+     "name": "Dunbible Creek at Dunbible Creek Rail Trail Bridge",
+     "v": 9.8,
+     "nights": [
+      10,
+      10,
+      9.9,
+      9.8,
+      9.8
+     ],
+     "note": "Battery critical — 9.8 V"
+    },
+    {
+     "id": "eungella_oxley_rive",
+     "name": "Eungella (Oxley River)",
+     "v": 10.8,
+     "nights": [
+      10.2,
+      10.3,
+      10.6,
+      10.6,
+      10.6,
+      10.8
+     ],
+     "note": "Battery critical — 10.8 V"
+    },
+    {
+     "id": "lake_orr_weir_tw_al",
+     "name": "Lake Orr Weir TW AL",
+     "v": 12.7,
+     "nights": [
+      12.8,
+      12.8,
+      12.8,
+      12.8,
+      12.7,
+      12.7
+     ],
+     "note": "No daily charge — battery flat-lining at 12.8 V"
+    }
+   ],
+   "stations": [
+    "kunghur_the_junction",
+    "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+    "eungella_oxley_rive",
+    "lake_orr_weir_tw_al"
+   ]
+  },
+  {
+   "type": "checks",
+   "title": "Check signals",
+   "secs": 8,
+   "sev": "warn",
+   "say": "The New Recruit. Should I be writing this down? Mulgowie, Blackstone Bridge and Priestdale missed every check in the period.",
+   "stations": [
+    "mulgowie_al",
+    "blackstone_br_al",
+    "priestdale_al",
+    "kunghur_the_junction",
+    "kingsholme_montego_hills_res_al"
+   ],
+   "items": [
+    {
+     "id": "mulgowie_al",
+     "name": "Mulgowie AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Missed checks rising — 100% in the last 24 h"
+    },
+    {
+     "id": "blackstone_br_al",
+     "name": "Blackstone Br AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Missed checks rising — 100% in the last 24 h"
+    },
+    {
+     "id": "priestdale_al",
+     "name": "Priestdale AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 30 checks"
+    },
+    {
+     "id": "kunghur_the_junction",
+     "name": "Kunghur (The Junction)",
+     "strip": "MMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 34 checks"
+    },
+    {
+     "id": "kingsholme_montego_hills_res_al",
+     "name": "Kingsholme (Montego Hills Res) AL",
+     "strip": "MMMMMMMMMMMMMMMMMMMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 24 checks"
+    }
+   ],
+   "presenter": "new-recruit"
+  },
+  {
+   "type": "list",
+   "title": "Worth a look today",
+   "secs": 17,
+   "say": "So, worth a look: the Northern Rivers path, and the Gold Coast group. Kunghur and Lake Orr Weir on power. And good news: a hundred and fifty-three stations the server had called silent were heard again, the Lockyer among them.",
+   "stations": [
+    "murwillumbah_sewera",
+    "hotham_creek_al",
+    "kunghur_the_junction",
+    "lake_orr_weir_tw_al",
+    "gatton_al"
+   ],
+   "items": [
+    {
+     "sev": "warn",
+     "id": "murwillumbah_sewera",
+     "text": "Northern Rivers: 4 stations quiet together from 6:36 pm Thursday."
+    },
+    {
+     "sev": "warn",
+     "id": "hotham_creek_al",
+     "text": "Northern Gold Coast: Hotham Creek, Stewarts Rd, Natural Bridge quiet; Kingsholme 24 checks missed."
+    },
+    {
+     "sev": "critical",
+     "id": "kunghur_the_junction",
+     "text": "Kunghur (The Junction): 9.5 V low."
+    },
+    {
+     "sev": "warn",
+     "id": "lake_orr_weir_tw_al",
+     "text": "Lake Orr Weir TW AL: no daily charge."
+    },
+    {
+     "sev": "ok",
+     "id": "gatton_al",
+     "text": "Heard again: 153 stations, the Lockyer behind Toowoomba among them."
+    }
+   ]
+  },
+  {
+   "type": "signoff",
+   "title": "That’s the network",
+   "secs": 6,
+   "say": "That's the network: one repeater back, two small patches to watch. Billy's up! Back tomorrow.",
+   "line": "Billy’s up! Tea?"
+  }
+ ],
+ "sources": {
+  "readings": 24220,
+  "stations_heard": 1076,
+  "gathered_at": "2026-10-29T18:32:26.853Z"
+ },
+ "caveats": [
+  "Why Toowoomba came back is not in the data: no command or settings change was recorded.",
+  "About fifteen southern stations show an 8 dB fall on the first stick, but their copies' own signal held near 18 to 20 dB, so it is left out.",
+  "Which repeater the Gold Coast and Northern Rivers groups share could not be pinned: each has several candidates."
+ ],
+ "author": "Claude Code, from the bulletin draft and read-only queries"
+}

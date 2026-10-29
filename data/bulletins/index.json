@@ -1,7 +1,15 @@
 {
  "format": "floodnet-bulletin-index/1",
- "updated_at": "2026-10-28T18:34:31.211Z",
+ "updated_at": "2026-10-29T18:35:49.708Z",
  "daily": [
+  {
+   "id": "daily-2026-10-30",
+   "file": "data/bulletins/daily/2026-10-30.json",
+   "issued_at": "2026-10-29T18:32:26.853Z",
+   "headline": "The Lockyer is back: Toowoomba returned Thursday morning and its stations with it. Eight new quiet ones, on the Gold Coast and in the Northern Rivers.",
+   "sky": "unsettled",
+   "presenter": "nitwit"
+  },
   {
    "id": "daily-2026-10-29",
    "file": "data/bulletins/daily/2026-10-29.json",
