@@ -214,6 +214,19 @@ function fakeDb() {
   check('without the secret key it does nothing and says so', noKey.code === 'nokey');
   const unbound = await archive({ env: ENV, fetch: project({}, fakeDb()) }).catch(e => e);
   check('with no bucket bound it stops at the first day and says so', unbound.unbound === true);
+
+  // One table's list timing out, as submissions' did on 2026-10-28 (57014).
+  const env2 = { ARCHIVE: bucket() };
+  const db2 = fakeDb();
+  const due = db2.archive_due;
+  db2.archive_due = (b) => {
+    if (b.p_table === 'reading_raw') throw Object.assign(new Error('canceling statement due to statement timeout'), { code: '57014' });
+    return due(b);
+  };
+  const r6 = await archive({ env: ENV, fetch: project(env2, db2) });
+  check('a table whose days cannot be listed is a failure, and the other tables are still archived',
+    r6.failed === 1 && r6.archived === 2 && /timeout/.test(r6.tables.reading_raw.error)
+      && db2.manifest.length === 2 && db2.manifest.every(m => m.table_name !== 'reading_raw'), JSON.stringify(r6));
 }
 
 // ── Report ────────────────────────────────────────────────────────────────────

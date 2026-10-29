@@ -98,6 +98,17 @@ begin
   v := meganet.archive_due('reading_raw', 1000);
   perform pg_temp.check_that('a row that came after its day was archived makes the day due again, as version 2',
     v @> jsonb_build_array(jsonb_build_object('day', t.raw_late, 'rows', 2, 'version', 2)), left(v::text, 300));
+
+  -- … once the day is past its horizon, where retain() would release it
+  -- (0088): an archived submission day inside it is not counted every night.
+  insert into meganet.app_meta (key, value) values ('retain_reading_raw_days', '500')
+  on conflict (key) do update set value = excluded.value;
+  v := meganet.archive_due('reading_raw', 1000);
+  perform pg_temp.check_that('… but an archived submission day inside its horizon waits for it before it is counted again (0088)',
+    not (v @> jsonb_build_array(jsonb_build_object('day', t.raw_late))), left(v::text, 300));
+  perform pg_temp.check_that('… while a submission day never archived is due wherever it is',
+    v @> jsonb_build_array(jsonb_build_object('day', t.raw_unarch, 'rows', 1, 'version', 1)), left(v::text, 300));
+  update meganet.app_meta set value = '30' where key = 'retain_reading_raw_days';
 end
 $$;
 

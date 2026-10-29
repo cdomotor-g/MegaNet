@@ -102,7 +102,18 @@ export async function archive({ env = {}, fetch = globalThis.fetch, log = () => 
   const out = { archived: 0, rows: 0, bytes: 0, again: 0, failed: 0, left: 0, tables: {} };
 
   for (const table of tables) {
-    const due = await db.rpc('archive_due', { p_table: table, p_limit: 1000 });
+    let due;
+    try {
+      due = await db.rpc('archive_due', { p_table: table, p_limit: 1000 });
+    } catch (err) {
+      // A table whose days cannot be listed (a statement timeout, as on
+      // 2026-10-28) is a failure, but not the other tables'.
+      if (err.status === 401 || err.status === 403) throw err;
+      out.failed += 1;
+      out.tables[table] = { due: 0, archived: 0, rows: 0, bytes: 0, error: err.message };
+      log(`  ${table}: the days due could not be listed — ${err.message}`);
+      continue;
+    }
     const t = out.tables[table] = { due: due.length, archived: 0, rows: 0, bytes: 0 };
     for (const [i, d] of due.entries()) {
       if (dry || i >= maxDays || now() > until) { out.left += 1; continue; }
@@ -187,7 +198,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const mb = b => `${(b / 1048576).toFixed(1)} MB`;
   try {
     const r = await archive({ env: process.env, log: s => console.log(s) });
-    for (const [t, x] of Object.entries(r.tables)) console.log(`${t}: ${x.due} day(s) due, ${x.archived} archived (${x.rows} rows, ${mb(x.bytes)})`);
+    for (const [t, x] of Object.entries(r.tables)) {
+      console.log(x.error ? `${t}: not listed — ${x.error}` : `${t}: ${x.due} day(s) due, ${x.archived} archived (${x.rows} rows, ${mb(x.bytes)})`);
+    }
     if (process.env.DRY_RUN) console.log(`Dry run: ${r.left} day(s) would be archived.`);
     else console.log(`Archived ${r.archived} day(s), ${r.rows} rows, ${mb(r.bytes)}; ${r.again} to try again; ${r.failed} failed; ${r.left} left for the next run.`);
     if (r.failed) process.exitCode = 1;

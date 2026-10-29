@@ -20,7 +20,11 @@ it as NDJSON, puts it through the Worker (`PUT /api/archive/<table>/<yyyy>/<mm>/
 create-only, R2 checking the SHA-256 on the way in), **reads it back** and checks it, and
 only then records it in `meganet.archive_day`. A row that arrives after its day was
 archived makes the day due again; it is written as the next version beside the first.
-Nothing is ever overwritten.
+Nothing is ever overwritten. Submission days are counted only when that can change
+something (`0088`): a day never archived, and an archived day once it is past its 30
+days, the night before `retain()` would release it. So a late submission is archived
+when its day reaches the horizon, still before anything is deleted. Counting every kept
+day every night ran past the database's 8-second limit.
 
 ## How a day is deleted
 
