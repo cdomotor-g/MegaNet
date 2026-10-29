@@ -3684,7 +3684,7 @@ const DB_SCHEMA = 'meganet';
 // newest reading kept by a trigger (0086), applied by hand, bumped after. 87:
 // readings in time order indexed, the roll-ups by range (0087), applied by
 // db-migrate.yml on 28 October 2026, bumped after.
-const DB_SCHEMA_VERSION = 87;
+const DB_SCHEMA_VERSION = 88;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
