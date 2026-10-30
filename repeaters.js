@@ -421,7 +421,8 @@ const Repeaters = (() => {
   // under it whichever the other is, so the two can be set side by side.
   function actualHtml(r) {
     const g = r.gap;
-    const turn = g ? `<span class="small txt-muted">${num(Math.round(g.ms))} ms turnaround</span>` : '';
+    // How many pairs it rests on, said beside it: one pair is a hint, not a measurement.
+    const turn = g ? `<span class="small ${g.n < 3 ? 'txt-warn' : 'txt-muted'}">${num(Math.round(g.ms))} ms turnaround · ${plural(g.n, 'pair')}</span>` : '';
     if (r.delayRec != null) {
       return `${num(r.delayRec)} ms <span class="small txt-muted">recorded</span>${g ? `<br>${turn}` : ''}`;
     }
