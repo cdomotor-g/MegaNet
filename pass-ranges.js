@@ -42,6 +42,15 @@
 // literals. The filter box also got an sr-only role="status": the two badges
 // say "12 of 34" to anyone who can see them, and said nothing at all otherwise.
 
+// ── By Repeater moved out ────────────────────────────────────────────────────
+// The By Repeater card — each repeater's networks, addresses, pass ranges and
+// its first ten stations — became the 🔁 Repeaters tab in October 2026
+// (repeaters.js), with a map of the links, the pass ranges as heard, the
+// carrier offset and a row that opens to every station. What stays here is
+// the address view: the filter box, the Allocate card and the address cards,
+// and the orphans. passRangeMatch, passRangeRepeaterMatch and passRangesHtml
+// stay too: the new tab's filter and its range column run on them.
+
 // ── Address space and the Allocate card ──────────────────────────────────────
 // Between the filter and the tables, cards from address-space.js
 // (AddressSpace): the Allocate card — set ALERT addresses aside for a new
@@ -112,8 +121,11 @@ function renderPassRangesHtml() {
                  oninput="onPassRangeFilter(this.value)">
         </label>
         <p class="small">
-          Click any row — or press Enter on the station's name — to open it on the
-          Stations tab.
+          Each repeater's pass ranges, what it is heard relaying and the stations it
+          passes on are on the
+          <button type="button" class="link-btn" onclick="switchTab('repeaters')">🔁 Repeaters</button> tab.
+          Click an orphaned station's row — or press Enter on its name — to open it on
+          the Stations tab.
         </p>
         <p id="pr-found" class="sr-only" role="status" aria-live="polite">${esc(passRangeFoundText())}</p>
       </div>
@@ -191,21 +203,13 @@ function passRangeRowOpen(station, labelHtml) {
                   title="Open ${escAttr(station.name)} on the Stations tab">${labelHtml}</button>`;
 }
 
-// Dynamic half — recomputed into #pr-tables on every keystroke in the filter box.
+// Dynamic half — recomputed into #pr-tables on every keystroke in the filter box:
+// the orphans, now that By Repeater is the 🔁 Repeaters tab.
 function passRangeTablesHtml() {
-  const all       = state.data.stations;
   const q         = state.prFilter;
-  const repeaters = all.filter(s => s.roles.includes('repeater') && s.repeater);
   // The same prepared terms the filter itself ran on, so every mark below sits
-  // where the match was actually made — as on the Stations tab. The numeric
-  // terms are the addresses the range column is asked about, so they are
-  // converted once here rather than once per range per repeater.
+  // where the match was actually made — as on the Stations tab.
   const { terms, nums, ranges, res } = prepareSearch(q);
-  const searchIds = nums.map(Number);
-
-  const rptData = repeaters
-    .map(r => ({ r, matched: findStationMatches(r) }))
-    .filter(({ r, matched }) => passRangeRepeaterMatch(r, matched, q));
 
   const allOrphans = passRangeOrphans();
   const orphans    = allOrphans.filter(s => passRangeMatch(s, q));
@@ -213,57 +217,7 @@ function passRangeTablesHtml() {
   const of = (shown, total) => shown === total ? `${total}` : `${shown} of ${total}`;
   const noMatch = msg => `<p class="small table-empty">${msg}</p>`;
 
-  // A repeater usually survives the filter because one of the ~100 stations it
-  // carries matched — and that station is as likely to be 84th in the list as
-  // 4th, so a cell showing the first ten would mark nothing and the row would
-  // look like it matched for no reason. The matches go to the front; the order
-  // is otherwise untouched, and the "+N more" count behind it is unchanged.
-  const firstTen = matched => {
-    if (!q) return matched;
-    const hit = [], rest = [];
-    for (const s of matched) (passRangeMatch(s, q) ? hit : rest).push(s);
-    return hit.concat(rest);
-  };
-
   return `
-      <div class="panel">
-        <div class="panel-header"><h2 id="pr-rpt-h">By Repeater</h2>
-          <span class="badge">${of(rptData.length, repeaters.length)}</span>
-        </div>
-        <div class="table-wrap tall" role="region" tabindex="0" aria-labelledby="pr-rpt-h">
-          ${!rptData.length ? noMatch('No repeater matches this filter.') : `
-          <table>
-            <caption class="sr-only">
-              Repeaters with pass ranges — ${of(rptData.length, repeaters.length)} of them, with
-              the addresses each carries and the field stations it matches.
-            </caption>
-            <colgroup>
-              <col style="width:18%"><col style="width:14%"><col style="width:10%"><col style="width:8%">
-              <col style="width:16%"><col style="width:34%">
-            </colgroup>
-            <thead><tr>
-              <th scope="col">Repeater</th>
-              <th scope="col" class="col-optional">Network</th>
-              <th scope="col">Addresses</th>
-              <th scope="col">Matched</th>
-              <th scope="col">Pass ranges</th>
-              <th scope="col">Stations (first 10)</th>
-            </tr></thead>
-            <tbody>
-              ${rptData.map(({ r, matched }) => `
-                <tr class="row-link" onclick="goToStation('${escAttr(r.id)}')">
-                  <td>${passRangeRowOpen(r, markHits(r.name, terms, res))}</td>
-                  <td class="small col-optional">${r.radio_network_ids.map(id => esc(netName(id))).join(', ')}</td>
-                  <td><span class="badge" title="ALERT addresses carried, post-exclusion">${repeaterPassingCount(r) ?? 0}</span></td>
-                  <td><span class="badge" title="Field stations matched">${matched.length}</span></td>
-                  <td class="small">${passRangesHtml(r.repeater, searchIds, ranges)}</td>
-                  <td class="small">${firstTen(matched).slice(0, 10).map(s => markHits(s.name, terms, res)).join(', ')}${matched.length > 10 ? ` +${matched.length - 10} more` : ''}</td>
-                </tr>`).join('')}
-            </tbody>
-          </table>`}
-        </div>
-      </div>
-
       ${allOrphans.length ? `
         <div class="panel">
           <div class="panel-header">

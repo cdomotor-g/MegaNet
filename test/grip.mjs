@@ -94,10 +94,10 @@ async function main() {
 
     // ── 1. A table taller than its card ──────────────────────────────────────
     log('\n1. A handle under a table taller than its card\n');
-    await page.evaluate(() => switchTab('passranges'));
+    await page.evaluate(() => switchTab('repeaters'));
     await page.waitForTimeout(500);
     const t0 = await readTable(page);
-    check('Pass Ranges has a capped table with more rows than it shows', !!t0, J(t0));
+    check('Repeaters has a capped table with more rows than it shows', !!t0, J(t0));
     if (!t0) throw new Error('no capped table to test against');
     check('the handle is the next element after the table, and showing', !!t0.grip && !t0.grip.hidden, J(t0.grip));
     check('it is a focusable, named separator with a value',
@@ -168,7 +168,7 @@ async function main() {
     check('dragged down 160 px, the table is 160 px taller', near(t1.h, t0.h + 160, 3), J({ before: t0.h, after: t1.h }));
     check('the handle stays on its bottom edge', t1.grip.top < t1.bottom && t1.grip.bottom > t1.bottom, J(t1.grip));
     const s1 = await stored(page);
-    const key = Object.keys(s1).find(k => k.startsWith('passranges'));
+    const key = Object.keys(s1).find(k => k.startsWith('repeaters'));
     check('the height is kept on this device, under the tab', !!key && near(s1[key], t1.h, 3), J(s1));
     await drag(page, await inView(page), -600);
     const tMin = await readTable(page);
@@ -180,14 +180,14 @@ async function main() {
     const tSet = await readTable(page);
     await page.evaluate(() => switchTab('export'));
     await page.waitForTimeout(300);
-    await page.evaluate(() => switchTab('passranges'));
+    await page.evaluate(() => switchTab('repeaters'));
     await page.waitForTimeout(500);
     const tBack = await readTable(page);
     check('a new table, drawn at the height it was left at', tBack && near(tBack.h, tSet.h, 2), J({ set: tSet.h, back: tBack && tBack.h }));
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations),
       null, { timeout: LOAD_TIMEOUT });
-    await page.evaluate(() => switchTab('passranges'));
+    await page.evaluate(() => switchTab('repeaters'));
     await page.waitForTimeout(500);
     const tReload = await readTable(page);
     check('and after the app is opened again', tReload && near(tReload.h, tSet.h, 2), J({ set: tSet.h, reload: tReload && tReload.h }));

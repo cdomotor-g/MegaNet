@@ -836,6 +836,14 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 203 — 2026-10-30: 🔁 Repeaters — the By Repeater card, grown into a tab
+
+The owner, on ALERT IDs' *By Repeater* card: an export to CSV, the pass ranges *as heard* through the carrier fingerprinting, the carrier offset, a way to open the card to its full list, rows that open to list their stations (each obviously a link to the Stations tab), sortable headings and the station number — then *"move this card to its own tab… put a map there as well, and draw repeater links."* **Opens nothing; closes nothing.**
+
+- **🔁 Repeaters** (`repeaters.js`), under Stations & networks beside ALERT IDs (the group's sixth): tiles; a map of the backbone links between repeaters and on to the bases in reach, at a link distance on a slider, a repeater linked to nothing in amber, one pressed picking out its links; and the table, every heading a sort — repeater, Stn #, network, channel, addresses, stations, links, pass ranges set, pass ranges heard (Signal Routes' analysis, editors, on a button press; runs over the addresses on file, off-record runs amber), carrier offset (`transmitter_summary`, public) and delay (recorded, or ⏳ Repeater Delays' plan). A row opens in place to every station it passes on, its links, what it was heard relaying and not, its carrier and its delay. *Open the full list* draws every row; ⤓ Export CSV (and the banner's Export) saves what the filter leaves, signed in.
+- **ALERT IDs** keeps the filter, the address cards and the orphans, with a pointer to the new tab.
+- **Checks:** `smoke` 57 tabs; `tabs` converts the new tab with two rows open and every fold; `grip` drags the new tab's table.
+
 ### Revision 202 — 2026-10-30: 💾 The hourly roll-ups and the station cards writing less — 0089; the reception identity index rebuilt
 
 The owner, on revision 200's follow-ups: *"I don't think you need to raise agent issues. Just start tackling them in this chat here, please. Go for it."* No issue; this entry is its record. **Opens and closes nothing.**

@@ -162,6 +162,16 @@ const TABS = [
       find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb site features ancillary pits outlets geojson relocate relocation move station new site rain gauge exposure canopy trees buildings shed latency data age stale freshness message animation pulse flash landing live snr signal strength noise signal bars' },
     { id: 'passranges', label: 'ALERT IDs',              icon: '🔗',
       find: 'pass ranges pass range alert id ids alertids hop chain orphans gaps alertid address window coverage base allocate allocation reserve set aside spare unused free addresses fullness full blocks address space grid new id' },
+    // 🔁 Repeaters (repeaters.js) beside ALERT IDs, whose By Repeater card it
+    // grew out of (October 2026): every repeater, a map of the links between
+    // them, and a table of each one's pass ranges set against what it is heard
+    // relaying, its carrier and the stations it passes on. Its find words are
+    // the questions asked of one repeater — "what does it relay", "which
+    // stations does it carry", "its neighbours" — and never "carrier",
+    // "offset" or "fingerprint", which RF Environment and Bit-Flip Sources
+    // answer to and this earlier group would take from them.
+    { id: 'repeaters',  label: 'Repeaters',              icon: '🔁',
+      find: 'repeater repeaters by repeater relay relays relaying really heard on air links between neighbours neighbors which stations carries carried passes on station number stn sort expand' },
     // ⏳ Repeater Delays (delay-plan.js, repeater-delays.js) sits beside Pass
     // Ranges: the other setting programmed into every repeater, and the one
     // that decides whether two repeaters passing the same address send their
@@ -1452,11 +1462,11 @@ const HELP = {
   },
 
   passranges: {
-    summary: 'Which repeaters have a pass range covering a station\'s AlertIDs, and which stations '
-           + 'each repeater carries. Stations no repeater covers are flagged as orphans. The chain on '
-           + 'from a repeater to its base is drawn on the Stations map rather than listed here. One '
-           + 'filter box drives both tables, and takes a name, a station number, an address or a '
-           + 'pasted list of them. <strong>Allocate an ALERT address</strong> sets addresses aside for a '
+    summary: 'Which repeaters have a pass range covering a station\'s AlertIDs. Stations no repeater '
+           + 'covers are flagged as orphans. Each repeater\'s own list — its pass ranges, what it is heard '
+           + 'relaying and the stations it carries — is the 🔁 Repeaters tab, beside this one. The filter '
+           + 'box takes a name, a station number, an address or a pasted list of them, and the address '
+           + 'cards and the orphans follow it. <strong>Allocate an ALERT address</strong> sets addresses aside for a '
            + 'new station, in the datastore for everybody, so two people planning two sites cannot pick '
            + 'the same one. Under it, a card each draws how full the addresses are: <strong>All '
            + 'addresses</strong>, every address of a hub — or of every hub together — round one wheel '
@@ -1521,9 +1531,9 @@ const HELP = {
         'A repeater forwards an address only if that address falls <strong>inside one of its '
         + 'windows</strong>, and outside every one of its exclusions. Nothing else decides it — '
         + 'not distance, not which network the station is on.',
-        'So the hop chain is arithmetic over intervals: put an address in the filter box and the '
-        + 'row that comes back is every repeater whose windows contain it, with the covering '
-        + 'window marked.',
+        'So the hop chain is arithmetic over intervals: put an address in the filter box here or on '
+        + 'the 🔁 Repeaters tab and what comes back is every repeater whose windows contain it, with '
+        + 'the covering window marked.',
         'An address covered by no window anywhere is <strong>orphaned</strong> — the red mark. '
         + 'That is the tab\'s headline count, and the caveat above is what it usually means.',
       ],
@@ -1531,7 +1541,7 @@ const HELP = {
              + 'Two distant sites sharing one window is normal and is why the Stations map caps '
              + 'how long a drawn link may be.',
     },
-    related: ['stations', 'bitflipper', 'export', 'repdelays'],
+    related: ['stations', 'repeaters', 'bitflipper', 'export', 'repdelays'],
   },
 
   rf: {
@@ -2667,7 +2677,32 @@ const HELP = {
     links: [
       { label: 'State of the backbone — what is gathered, how it is ranked, and how to read it', href: 'docs/backbone.md' },
     ],
-    related: ['health', 'flipsources', 'signalroutes', 'passranges', 'basestations', 'review', 'investigations'],
+    related: ['health', 'repeaters', 'flipsources', 'signalroutes', 'passranges', 'basestations', 'review', 'investigations'],
+  },
+
+  repeaters: {
+    summary: '<strong>Every repeater in one place.</strong> A map of the <strong>links</strong> between them — two repeaters whose '
+           + 'pass ranges share an address and that are close enough to hear each other — and from each to the base stations in '
+           + 'reach; then a table of each repeater\'s station number, network, channel, the addresses and field stations its pass '
+           + 'ranges carry, its pass ranges <strong>set</strong> beside what the base stations hear it relaying (<strong>as '
+           + 'heard</strong>, found by its carrier), its <strong>carrier offset</strong> and its delay. Press a heading to sort by '
+           + 'it; open a row to list the stations it passes on, each a link to the Stations tab; save the list as a CSV.',
+    watch: [
+      'A link is a distance, set over the map (100 km to start, the Stations map\'s own <em>Max TX distance</em>), not a coverage '
+      + 'model: a hill can break one drawn here, and a long clear path can make one it leaves out. <em>Linked to nothing</em> is a '
+      + 'repeater with no neighbour and no base within that distance.',
+      '<strong>As heard</strong> needs the receptions, which editors can read; a week of them takes a minute, and the button above '
+      + 'the table reads them — or the column fills at once if Signal Routes or Backbone read them earlier. A run of addresses ends '
+      + 'where one was heard coming in another way; <em>off record</em> is heard on its carrier but in no pass range on record — the '
+      + 'record or the radio wants correcting.',
+      'The carrier offset is against the rest of the transmitters the same base stations hear, over the last week — 0 is "like the '
+      + 'rest", not "exactly on frequency". Past ±2.5 ppm decodes suffer; Station Health\'s <em>Transmitter frequency</em> panel has '
+      + 'each one\'s days.',
+      'A delay not recorded on the station is ⏳ Repeater Delays\' plan, marked planned. Nothing on this tab writes to a station.',
+      'A word with a dotted underline says what it means when the pointer rests on it; <em>What the words on this page mean</em>, '
+      + 'at the foot, lists them all.',
+    ],
+    related: ['passranges', 'repdelays', 'backbone', 'signalroutes', 'stations', 'flipsources'],
   },
 
   repdelays: {
@@ -2695,7 +2730,7 @@ const HELP = {
     links: [
       { label: 'Repeater delays — the assessment, the method and the plan as of October 2026', href: 'docs/repeater-delays.md' },
     ],
-    related: ['passranges', 'stations', 'flipsources', 'propagation', 'biterrors'],
+    related: ['passranges', 'repeaters', 'stations', 'flipsources', 'propagation', 'biterrors'],
   },
 
   investigations: {

@@ -16,6 +16,7 @@
 // only); to network-review.js for NetworkReview.authChanged (administrators
 // only) and alert2-plan.js for Alert2Plan.authChanged (the plan's list, 0076);
 // to station-history.js for StationHistory.authChanged (0056, editors only);
+// to repeaters.js for Repeaters.authChanged (the receptions are an editor's);
 // to site-features.js for SiteFeatures.authChanged (0061, editors only) and
 // map-drive.js for MapDrive.authChanged (a route is an editor's, #251); to
 // address-space.js for AddressSpace.authChanged (0084: the ALERT addresses set
@@ -961,6 +962,7 @@ const Auth = (function () {
                        typeof HealthAgent !== 'undefined' ? HealthAgent : null,
                        typeof SignalRoutes !== 'undefined' ? SignalRoutes : null,
                        typeof Backbone    !== 'undefined' ? Backbone    : null,
+                       typeof Repeaters   !== 'undefined' ? Repeaters   : null,
                        typeof AddressSpace !== 'undefined' ? AddressSpace : null,
                        typeof NavViews    !== 'undefined' ? NavViews    : null,
                        typeof Push        !== 'undefined' ? Push        : null]) {

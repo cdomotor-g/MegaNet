@@ -144,7 +144,7 @@ const Glyphs = (() => {
   // a blank one — and `npm run looks` lists any that are missing.
   const TAB = {
     home: 'home', sitemap: 'signpost', capabilities: 'checklist', offline: 'offline', views: 'sliders',
-    stations: 'map', maps: 'route', passranges: 'chain', repdelays: 'hourglass', export: 'download', mapgen: 'print', lookaround: 'look',
+    stations: 'map', maps: 'route', passranges: 'chain', repeaters: 'repeater', repdelays: 'hourglass', export: 'download', mapgen: 'print', lookaround: 'look',
     rf: 'spectrum', rfchanges: 'trend', workbench: 'interfere', reception: 'drive', flipsources: 'search', bitbench: 'bits',
     bitflipper: 'flip', network: 'graph', packets: 'decode', alert2: 'packet', hfem: 'message', serial: 'plug',
     arro: 'launch', arrodata: 'data', field: 'level', msglog: 'inbox', health: 'health', signalroutes: 'routes',

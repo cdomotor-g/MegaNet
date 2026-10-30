@@ -167,6 +167,10 @@ const ExportMenu = (function () {
         call: ['AddressSpace.exportAllocCsv'],
         ready: () => { const a = typeof AddressSpace !== 'undefined' && AddressSpace.state().alloc; return !a || a.phase !== 'ready' ? 'Sign in to read the allocations.' : a.rows.length ? '' : 'Nothing is set aside.'; } },
     ],
+    repeaters: () => [
+      { label: 'The repeaters — CSV', sub: 'every repeater the filter leaves, in the table\'s order: its number, network, channel, pass ranges set and as heard, links, carrier offset, delay, position and the stations it passes on',
+        call: ['Repeaters.exportCsv'], ready: gated },
+    ],
     backbone: () => {
       const ready = () => {
         const A = typeof Backbone !== 'undefined' && Backbone.state().A;

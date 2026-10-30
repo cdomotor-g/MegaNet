@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 156, date: '2026-10-30', items: [
+      'New under <strong>Stations &amp; networks</strong>: 🔁 <strong>Repeaters</strong> — the <em>By Repeater</em> card from ALERT IDs, '
+        + 'grown into a tab. A <strong>map of the links</strong> between repeaters (and from each to the base stations in reach), with '
+        + 'the link distance on a slider; then every repeater in a table you can <strong>sort by any heading</strong>: station number, '
+        + 'network, channel, addresses, stations, links, its <strong>pass ranges set</strong> beside its <strong>pass ranges as '
+        + 'heard</strong> — what the base stations hear it relaying on its own carrier — its <strong>carrier offset</strong> and its '
+        + 'delay. <strong>Open a row</strong> to list every station it passes on, each a link to the Stations tab. '
+        + '<strong>Open the full list</strong> at the foot of the card shows every row at once, and <strong>⤓ Export CSV</strong> '
+        + 'saves what the filter leaves.',
+    ] },
     { n: 155, date: '2026-10-30', items: [
       '🗺️ <strong>Show only some kinds of station.</strong> In 🗺️ Layers on the Stations map, <em>Stations &amp; links</em> now starts '
         + 'with <strong>Show these stations</strong>: a tick box each for <em>Field stations</em>, <em>Repeaters</em> and '

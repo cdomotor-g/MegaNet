@@ -2915,17 +2915,36 @@ first tap) and from GPS course otherwise. Leaving the Stations tab stops the wat
 - Pass-range exclusions (reserved for future equipment) sit under the inclusions
   in the station editor's repeater block, and every match on this tab and on the
   map honours them; no repeater in `stations.json` has one
-- One filter box across both tables, taking a station number, an AlertID, part
-  of a station name, or a pasted list of them — a repeater is kept when it
-  matches, when a station it serves matches, or when its pass ranges cover any
-  AlertID in the box
-- Matches are marked in place, the same way the Stations tab marks them: the
-  repeater name, the station names it serves, and — on an AlertID search — the
-  one pass range that actually covers the address, which is what answers *which
-  range picked this station up*. Stations that matched are pulled to the front
-  of the "first 10" so the mark is visible on rows that were kept because of a
-  station 80-odd names down the list
-- Every row links through to that station on the Stations tab
+- One filter box, taking a station number, an AlertID, part of a station name,
+  or a pasted list of them; the address cards and the orphans follow it
+- Every orphan row links through to that station on the Stations tab
+- The *By Repeater* table that was here is the 🔁 Repeaters tab now (below)
+
+#### 🔁 Repeaters
+
+Every repeater on file, beside ALERT IDs (October 2026; `repeaters.js`):
+
+- **A map of the links** between repeaters — two whose pass ranges share an
+  address and that are within the link distance (a slider, 100 km to start, the
+  Stations map's own *Max TX distance*) — dashed on to every base station in
+  reach. A repeater linked to nothing is drawn amber. Press one to pick out its
+  links and open its row.
+- **A table, sortable by any heading**: repeater, station number, network,
+  channel, addresses and field stations its pass ranges carry, links (and
+  whether a base is in reach), **pass ranges set** (on record, exclusions
+  under them), **pass ranges heard** (what the base stations heard it relaying
+  on its own carrier — Signal Routes' analysis of a week of receptions,
+  editors only, read on a button press — written as runs of addresses on file,
+  with anything off record in amber), **carrier offset** (the public
+  `transmitter_summary`, its last week against the fleet) and its delay
+  (recorded, or ⏳ Repeater Delays' plan, marked *planned*).
+- **A row opens in place** to list every station the repeater passes on, each a
+  link to the Stations tab, with its linked repeaters, the bases in reach, what
+  it was heard relaying and not, its carrier and its delay.
+- The card is capped like every long table, with a handle on its edge; **Open the
+  full list** at its foot draws every row at once. **⤓ Export CSV** saves the
+  rows the filter leaves, in the table's order (signed in, as Export's rule
+  asks).
 
 A station is only treated as a repeater when it carries pass ranges saying which
 AlertIDs it forwards; entries flagged `repeater` with no pass-range block at all
@@ -3495,7 +3514,7 @@ on a narrow window.
 | Group | Tabs |
 | --- | --- |
 | **Start here** | Site Map · Offline & Install · Views |
-| **Stations & networks** | Stations · ALERT IDs · Repeater Delays · Export · Look Around |
+| **Stations & networks** | Stations · ALERT IDs · Repeaters · Repeater Delays · Export · Look Around |
 | **Printed maps** | Radio Path Maps · Map Generator |
 | **Interference** | RF Environment · RF Changes · Interference Workbench |
 | **ALERT** | Bit Flipper · Ghosting Graph · ALERT Packets · ALERT2 / ERT-A2 · HFEM Messages · Serial Monitor |

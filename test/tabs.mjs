@@ -340,6 +340,24 @@ const SEED_BACKBONE = `async () => {
   await new Promise(r => setTimeout(r, 300));
 }`;
 
+// 🔁 Repeaters: its heard column needs receptions, which this harness cannot
+// read, so Signal Routes' demo analysis stands in — its demo flag taken off
+// so the tab takes it. The delay plan is waited for, the row heard on the air
+// and the busiest row opened, and every fold.
+const SEED_REPEATERS = `async () => {
+  SignalRoutes.demo();
+  const A = SignalRoutes.state().A;
+  if (A) A.demo = false;
+  for (let i = 0; i < 100 && !Repeaters.state().planReady; i++) await new Promise(r => setTimeout(r, 50));
+  Repeaters.refresh();
+  const M = Repeaters.model();
+  const heard = M.rows.find(r => r.heard);
+  const busy = M.rows.slice().sort((a, b) => b.carried.length - a.carried.length)[0];
+  for (const r of new Set([heard, busy])) if (r) Repeaters.toggle(r.id);
+  document.querySelectorAll('#main-content details').forEach(d => { d.open = true; });
+  await new Promise(r => setTimeout(r, 100));
+}`;
+
 // ⏳ Repeater Delays draws its plan from the register as it opens; the
 // comparison of limits is worked out a limit at a time when asked, so it is
 // asked for and waited on, and every fold opened.
@@ -969,6 +987,7 @@ const SEED_FW_LIVE = `async () => {
 const CONVERTED = [
   { id: 'networks',   label: 'Networks',        issue: '#109 (proving ground) / #137' },
   { id: 'passranges', label: 'ALERT IDs',       issue: '#137' },
+  { id: 'repeaters',  label: 'Repeaters — two rows open, every fold open', issue: 'born converted', seed: SEED_REPEATERS },
   { id: 'repdelays',  label: 'Repeater Delays — the plan, every fold open', issue: 'born converted', seed: SEED_REPDELAYS },
   { id: 'maps',       label: 'Radio Path Maps', issue: '#137' },
   { id: 'arro',       label: 'ARRO Launcher',   issue: '#141', seed: SEED_ARRO_SEARCH },

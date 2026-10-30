@@ -159,10 +159,18 @@ const SiteMap = (function () {
       ],
     },
     passranges: {
-      what: 'Which repeaters pass each station\'s ALERT addresses on, and which stations no repeater covers.',
+      what: 'Which repeaters pass each station\'s ALERT addresses on, which stations no repeater covers, and how full the addresses are.',
       use: [
-        'See which repeaters carry a station\'s addresses, and which stations each repeater carries',
+        'Type a station or an address to see which repeaters carry it',
         'Find orphans — stations no repeater covers',
+      ],
+    },
+    repeaters: {
+      what: 'Every repeater: a map of the links between them, and a table of each one\'s pass ranges beside what it is heard relaying, its carrier and the stations it passes on.',
+      use: [
+        'See which stations a repeater passes on, and open any of them on the Stations tab',
+        'Check a repeater\'s pass ranges on record against what the base stations hear it relay',
+        'Sort the repeaters by carrier offset, addresses or links, and save the list as a CSV',
       ],
     },
     repdelays: {
@@ -523,6 +531,7 @@ const SiteMap = (function () {
     { text: 'Find a station and see it on the map',        tab: 'stations' },
     { text: 'Find out whether Flood-Net can do something', tab: 'capabilities' },
     { text: 'Check a radio path will work',                tab: 'stations', icon: '〽️' },
+    { text: 'See which stations a repeater passes on',     tab: 'repeaters' },
     { text: 'Look up the delay to set on a repeater',      tab: 'repdelays' },
     { text: 'See which stations need attention today',     tab: 'health' },
     { text: 'Watch for a test transmission to arrive',     tab: 'msglog' },

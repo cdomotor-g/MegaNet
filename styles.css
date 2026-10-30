@@ -2963,6 +2963,49 @@ td {
 @media (max-width: 560px) { .rd-words { grid-template-columns: 1fr; } .rd-words dd { margin-bottom: var(--sp-2); } }
 .bk-minor-list { columns: 22rem auto; column-gap: var(--sp-4); padding-left: 1.2rem; }
 
+/* 🔁 Repeaters (repeaters.js): the map of links, its key, and the table whose
+   rows open in place to list a repeater's stations. The table keeps the
+   shared cap (.table-wrap.tall) and its handle until "Open the full list"
+   draws it without one. A station's name in an opened row is a link and
+   looks like one — the accent, underlined — because that is what it does. */
+.rptr-map { height: 440px; border-radius: var(--r-md); margin-top: var(--sp-2); }
+@media (max-width: 700px) { .rptr-map { height: 320px; } }
+.rptr-km { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--muted); }
+.rptr-km input { width: 10rem; max-width: 40vw; }
+.rptr-km output { min-width: 4.5em; color: var(--text); font-variant-numeric: tabular-nums; }
+.rptr-pick { margin: var(--sp-2) 0 0; }
+.rptr-key { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); list-style: none; padding: 0; margin: var(--sp-2) 0 0; color: var(--muted); }
+.rptr-key li { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.rptr-k { display: inline-block; width: 1.6rem; height: 0; }
+.rptr-k-rr { border-top: 3px solid var(--map-backbone); }
+.rptr-k-rb { border-top: 3px dashed var(--map-backbone); }
+.rptr-k-dot { width: .75rem; height: .75rem; border-radius: 50%; background: var(--role-repeater); }
+.rptr-k-iso { background: var(--warn); }
+.rptr-k-base { color: var(--text); }
+.rptr-air { margin: var(--sp-2) 0; }
+.table-wrap table.rptr-table { min-width: 62rem; }
+.rptr-table td, .rptr-table th { vertical-align: top; }
+.rptr-open { display: inline-flex; align-items: baseline; gap: .35em; font-weight: 600; }
+.rptr-chev { display: inline-block; color: var(--muted); transition: transform var(--motion-fast, .15s); }
+.rptr-row.is-open .rptr-chev { transform: rotate(90deg); }
+.rptr-row.is-open > td, .rptr-detail > td { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.rptr-row.is-picked > td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.rptr-detail > td { padding-top: 0; }
+.rptr-d-body { padding: var(--sp-1) var(--sp-1) var(--sp-3) 1.4rem; }
+.rptr-d-h { margin: var(--sp-2) 0 var(--sp-1); }
+.rptr-d-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0 var(--sp-4); }
+.rptr-d-grid p { margin: 0 0 var(--sp-1); }
+.rptr-stns { columns: 15rem auto; column-gap: var(--sp-4); list-style: none; padding: 0; margin: 0 0 var(--sp-2); }
+.rptr-stns li { break-inside: avoid; padding: .12rem 0; }
+.rptr-dl { list-style: none; padding: 0; margin: 0 0 var(--sp-1); font-size: var(--fs-sm); }
+.rptr-dl li { padding: .08rem 0; }
+a.rptr-stn { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+a.rptr-stn:hover { text-decoration-thickness: 2px; }
+.rptr-d-acts { margin-top: var(--sp-2); }
+.rptr-chip { display: inline-block; padding: 0 .4em; border-radius: var(--r-sm); background: color-mix(in srgb, var(--role-base) 18%, transparent); font-size: var(--fs-xs); }
+.rptr-off { font-weight: 600; }
+.rptr-foot { display: flex; justify-content: center; margin: var(--sp-2) 0 0; }
+
 .bf-td-match { text-align: center; }
 
 /* Role and station-of-interest pills inside the map popups. The hue arrives as
