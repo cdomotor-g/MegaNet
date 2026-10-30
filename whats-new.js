@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 154, date: '2026-10-30', items: [
+      '✏️ <strong>A card for the stations you select.</strong> Draw a circle or a rectangle in <strong>Draw &amp; measure</strong> on the '
+        + 'Stations map and press <em>Select inside</em>: a <strong>Selected stations</strong> card now opens under Draw &amp; measure and '
+        + 'stays there, instead of a count that disappeared after a few seconds. It says how many stations there are and of which kind, '
+        + 'the lowest and highest of them, how many are reporting on time and which radio networks they are on. Below that it lists '
+        + 'each one with its number, height, distance and bearing from the centre of your shape, and when it was last heard. Sort the '
+        + 'list nearest first, A–Z or highest first, or press a role to list only those. Press a name to open the station; ✕ takes it '
+        + 'out of the selection. <em>Zoom to these</em>, <em>Export CSV</em>, <em>Copy names</em> and <em>Clear</em> are on the card. '
+        + 'Shift- or Ctrl-clicking a pin adds it to the same card.',
+    ] },
     { n: 153, date: '2026-10-30', items: [
       '⏳ <strong>Repeater Delays says where each figure comes from.</strong> A short key under the settings marks each kind: '
         + '<em>on record</em> (in the station register), <em>assumed</em> (taken as given, such as the 300 ms lead-in), '

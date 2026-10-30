@@ -866,6 +866,7 @@ const MapChrome = (function () {
       // unless somebody is in it.
       if (panel) el.classList.remove('is-open', 'is-shut');
       el.classList.add('is-docked');
+      if (home.after) el.appendChild(home.after);
       const to = host.adopt(el, { ...info, reason: home.built ? 'back' : 'build' });
       return to || had;
     }
@@ -877,6 +878,7 @@ const MapChrome = (function () {
     // otherwise come back to the corner as an open flyout over the map that
     // nobody asked for. `had` puts is-open back for the one case that wants it.
     if (panel) el.classList.remove('is-open', 'is-shut');
+    if (home.after) home.content.appendChild(home.after);
     const tabHad = !!host.release(el, info);
     place(home.map, el, home.opts);
     if (!panel) return had;
@@ -1100,6 +1102,15 @@ const MapChrome = (function () {
     //             own in the strip, opened by another control instead — the
     //             3-D settings, which ⛰️ opens as it tilts the map (app.js,
     //             toggleStations3d). In a corner it is drawn as ever
+    //   after     optional, { id, html }: a second card under the panel's
+    //             own, for what the panel has *made* rather than what it is
+    //             set with — Draw & measure's selected stations (map-draw.js).
+    //             A card of its own in the side panel; the foot of the flyout
+    //             in the corner, where a second box beside the first would
+    //             have nowhere to stand (relocate moves it between the two).
+    //             `id` is how its owner finds it to repaint it, and it is
+    //             hidden while it is empty, so `html` answers '' when there is
+    //             nothing to say
     //
     // Returns the wrapper element. It was the Leaflet control until the corner
     // became a bar; no caller ever used it, and there is no control of its own
@@ -1138,6 +1149,15 @@ const MapChrome = (function () {
 
       const content = L.DomUtil.create('div', 'mn-mapctl-content', body);
       content.innerHTML = typeof opts.html === 'function' ? opts.html() : (opts.html || '');
+
+      // The second card (opts.after), built at the flyout's foot; relocate()
+      // stands it under the panel instead once the side panel takes it.
+      let after = null;
+      if (opts.after) {
+        after = L.DomUtil.create('div', 'mn-mapctl-after', content);
+        after.id = opts.after.id;
+        after.innerHTML = opts.after.html();
+      }
 
       // Click to open, click again to shut. This is the whole of the control
       // on a touch screen, where there is no pointer to hover with, and it is
@@ -1251,7 +1271,7 @@ const MapChrome = (function () {
       // document yet, so anything it looked up by id found nothing — Map
       // display's find term, re-applied from there on every rebuild of the
       // map, was re-applied to no rows at all.
-      homes.set(wrap, { map, opts, kind: 'panel', built: false });
+      homes.set(wrap, { map, opts, kind: 'panel', built: false, content, after });
       (map._mnItems || (map._mnItems = [])).push(wrap);
       relocate(wrap);
       if (typeof opts.onMount === 'function') opts.onMount(content);

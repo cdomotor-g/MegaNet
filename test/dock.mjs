@@ -969,6 +969,65 @@ try {
   await page.evaluate(() => { MapDraw.setTool(''); state.draw.shapes = []; state.draw.selectedId = null; MapDraw.render(); MapDraw.rerenderPanel(); });
   await page.waitForTimeout(200);
 
+  // Select inside on a circle: the stations it holds get a card of their own
+  // under Draw & measure, in the same pane — after the panel's card, not a
+  // box inside it (MapChrome's `after`) — and nothing at all before they do.
+  // Taking a station out shortens the list and keeps focus in the card;
+  // Clear takes the card off the page with focus on something that is on it.
+  await page.click('#help-panel .dock-tab[data-dock="map-draw"]');
+  await page.waitForTimeout(250);
+  const selBefore = await page.evaluate(() => {
+    const el = document.getElementById('map-draw-sel');
+    return { n: document.querySelectorAll('#map-draw-sel').length, empty: !!el && el.innerHTML === '', shown: !!el && el.checkVisibility() };
+  });
+  check('with nothing selected, the ✏️ pane has an empty selection card that is not on screen',
+    selBefore.n === 1 && selBefore.empty && !selBefore.shown, JSON.stringify(selBefore));
+  await page.evaluate(() => {
+    const s = state.mapMarkers.find(m => m.mnStation && m.mnStation.lat != null).mnStation;
+    MapDraw.setTool('circle');
+    document.getElementById('dr-lat').value = String(s.lat);
+    document.getElementById('dr-lon').value = String(s.lon);
+    document.getElementById('dr-radius').value = '15';
+    MapDraw.addFromForm();
+    MapDraw.setTool('circle');
+  });
+  await page.click('#map-draw-panel .draw-pick');
+  await page.waitForTimeout(300);
+  const sel = await page.evaluate(() => {
+    const el = document.getElementById('map-draw-sel');
+    const km = [...el.querySelectorAll('.dsel-meta')].map(m => { const x = /([\d.]+) (k?m) @/.exec(m.textContent); return x ? Number(x[1]) / (x[2] === 'm' ? 1000 : 1) : null; });
+    return {
+      size: state.mapSelection.size,
+      rows: el.querySelectorAll('.dsel-row').length,
+      title: el.querySelector('h3')?.textContent,
+      shown: el.checkVisibility(),
+      afterBody: !!el.previousElementSibling && el.previousElementSibling.classList.contains('mn-mapctl-body')
+        && el.parentElement.matches('.dock-pane > .mn-mapctl[data-panel="draw"]'),
+      nearestFirst: km.length > 0 && km.every(k => k != null) && km.every((k, i) => !i || k >= km[i - 1] - 0.01),
+    };
+  });
+  check('Select inside opens a Selected stations card under Draw & measure, listing the stations nearest the centre first',
+    sel.size > 0 && sel.rows === Math.min(sel.size, 50) && sel.title === 'Selected stations' && sel.shown && sel.afterBody && sel.nearestFirst,
+    JSON.stringify(sel));
+  await page.focus('#map-draw-sel .dsel-del');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(200);
+  const took = await page.evaluate(() => ({ size: state.mapSelection.size,
+    inCard: !!document.activeElement && document.getElementById('map-draw-sel').contains(document.activeElement) }));
+  check('✕ on a row takes that station out of the selection, and focus stays in the card',
+    took.size === sel.size - 1 && (took.size === 0 || took.inCard), JSON.stringify(took));
+  if (took.size) await page.click('#map-draw-sel [data-k="act:clear"]');
+  await page.waitForTimeout(200);
+  const cleared = await page.evaluate(() => {
+    const el = document.getElementById('map-draw-sel'), a = document.activeElement;
+    return { size: state.mapSelection.size, empty: el.innerHTML === '', shown: el.checkVisibility(),
+             focusSeen: !!(a && a !== document.body && a.getClientRects().length) };
+  });
+  check('Clear on the card empties the selection and takes the card away, with focus on something on screen',
+    cleared.size === 0 && cleared.empty && !cleared.shown && cleared.focusSeen, JSON.stringify(cleared));
+  await page.evaluate(() => { MapDraw.setTool(''); state.draw.shapes = []; state.draw.selectedId = null; MapDraw.render(); MapDraw.rerenderPanel(); });
+  await page.waitForTimeout(200);
+
   // A radio path clicked on the map: the profile card — the first of the path
   // tools, not a card over the map — becomes the path's card, titled for it.
   // The click brings 〽️ up whatever was showing, puts focus on the card, and

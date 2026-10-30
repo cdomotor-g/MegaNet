@@ -4780,6 +4780,10 @@ function stationsMapPanels(map) {
     id: 'draw', icon: '✏️', dockIcon: Glyphs.rail('draw'), title: 'Draw & measure',
     group: 'tools', order: 10,
     html: () => `<div id="map-draw-panel">${MapDraw.panelHtml()}</div>`,
+    // The stations a drawn shape's Select inside picked — or a ctrl-click on
+    // a pin — as a card of their own under this one (map-draw.js, "The
+    // selection's card"). Empty, and so not there, while nothing is picked.
+    after: { id: 'map-draw-sel', html: () => MapDraw.selectionHtml() },
   });
   // 📡 Polar radio coverage is tools/20 — MapPolar.attach(), which runs later —
   // 🗼 Repeater site finder tools/25, from MapSites.attach() after it, and
@@ -6952,7 +6956,8 @@ function updateMapAltName(pins, links, backbone, matched, related) {
 // is the single station the editor card is on, and this is the operator's own
 // pick. While it is non-empty it overrides what the table lists — a display
 // override, not a filter mutation, so clearing it hands the list straight back
-// to the filter.
+// to the filter. It is summed up on a card of its own under Draw & measure,
+// beside the map that made it (map-draw.js, "The selection's card").
 //
 // Session state, like the drawings: nothing is saved and nothing goes in the URL.
 
@@ -6987,6 +6992,7 @@ function mapSelectionChanged() {
   applyMapSelectionStyles();
   applyMapFocusStyles();
   rerenderStations();
+  MapDraw.selectionChanged();          // …and its card under Draw & measure
 }
 
 function toggleMapSelection(id) {
@@ -7979,6 +7985,7 @@ function selectStationState(s) {
     if (!state.mapSelection.has(s.id)) {
       state.mapSelection.add(s.id);
       applyMapSelectionStyles();
+      MapDraw.selectionChanged();
     }
     return false;
   }

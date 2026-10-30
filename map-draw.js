@@ -12,7 +12,11 @@
 // fmtKm, kmPerDegLon, KM_PER_DEG_LAT and acmaHaversineKm — four of which this
 // module hosted for the rest of the app until M1 (#132) moved them, which is
 // why it can now leave without taking them with it. Across to app.js for
-// mapNote and addToMapSelection, to export.js for downloadDrawingKml (the
+// mapNote and addToMapSelection — and, for the selected stations' card under
+// the panel, selectedStations, toggleMapSelection, clearMapSelection,
+// exportMapSelection, selectStation, primaryRole, setStationsListOpen and
+// dockReveal — to health-glance.js for when each was last heard (HealthGlance),
+// to export.js for downloadDrawingKml (the
 // panel's Google Earth button, #183), and sideways to path-profile.js for
 // PathProfile, which reaches back here for MapDraw, and to map-3d.js for
 // Map3D, which draws what this file drew on its terrain and hands its own
@@ -987,18 +991,28 @@ const MapDraw = (function () {
   }
 
   // Additive, so two boxes combine; shift replaces instead, for starting again
-  // without going via Clear.
+  // without going via Clear. The shape is remembered as the one the selection
+  // was last picked with, which is what its card measures "from the centre"
+  // from — and the card is brought into view, since it is what the press was
+  // for and on a short pane it starts below the fold.
   function selectInside(id, ev) {
     const sh = D().shapes.find(s => s.id === id);
     if (!sh) return;
     const ids = stationsInside(sh);
     if (!ids.length) { mapNote('No stations inside that shape', 3000); return; }
     if (ev && ev.shiftKey) state.mapSelection.clear();
+    D().pickedWith = sh.id;
+    D().selRole = '';
+    D().selAll = false;
     const added = addToMapSelection(ids);
     const total = state.mapSelection.size;
     mapNote(added
       ? `${added} station${added === 1 ? '' : 's'} added — ${total} selected`
       : `Already in the selection — ${total} selected`, 3500);
+    const card = document.getElementById('map-draw-sel');
+    if (card && card.firstElementChild && card.getClientRects().length) {
+      card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
   }
 
   function updateFinishButton() {
@@ -1091,7 +1105,7 @@ const MapDraw = (function () {
           </button>
           ${canPick ? `
             <button class="draw-pick"
-                    title="Select the stations inside this shape into the Stations list (shift-click to replace the current selection)"
+                    title="Select the stations inside this shape — they are listed on the Selected stations card under this one, and in the Stations list (shift-click to replace the current selection)"
                     onclick="MapDraw.selectInside('${escAttr(sh.id)}',event)">Select inside</button>` : ''}
           ${sh.kind === 'line' ? `
             <button class="draw-flip" title="Flip direction — swap which end is A and which is B"
@@ -1186,6 +1200,349 @@ const MapDraw = (function () {
     // it has to hear the circle land — and its list of drawn shapes to take
     // stations from goes stale with every add and delete, for the same reason.
     if (typeof MapSites !== 'undefined') MapSites.drawingChanged();
+    // The selection's card measures from the shape it was picked with, so a
+    // shape moved, resized or deleted changes it too.
+    rerenderSelection();
+  }
+
+  // ── the selection's card ──
+  // Select inside hands a shape's stations to the map selection, and until
+  // October 2026 all it had to show for it was a note over the map for three
+  // and a half seconds: the count over the station list is in another pane
+  // beside the map. So the selection has a card of its own, under this one in
+  // the same pane (MapChrome's `after`, asked for in app.js): how many there
+  // are and of what kind, how high they stand, how they are reporting and on
+  // which networks, then each of them — how far from the middle of the shape
+  // and when it was last heard — with the ways on from there.
+  //
+  // It is the map selection's card rather than a shape's. state.mapSelection
+  // is the one set the pins, the station list and the CSV all read, and a
+  // second idea here of "what is inside" would part company with it the first
+  // time two boxes were combined or a pin was ctrl-clicked out of it. What
+  // this module adds is the geometry: the distances are from the centre of
+  // the shape the stations were last picked with, for as long as it is drawn.
+
+  // Rows drawn before "Show all": a box over a catchment can hold hundreds.
+  const SEL_ROWS = 50;
+  // The chips' short names, and what their tooltips call the stations in them.
+  const SEL_ROLES = {
+    field:    ['Field', 'field stations'],
+    repeater: ['Repeater', 'repeaters'],
+    base:     ['Base', 'base stations'],
+    satcom:   ['Satcom', 'satcom stations'],
+  };
+
+  // The words on the card that mean something particular here — one list, for
+  // the hover on each and the fold at the card's foot (CLAUDE.md, "Plain words").
+  const SEL_WORDS = {
+    selected:  'Stations picked off the map, with Select inside on a drawn circle or rectangle or by shift-, Ctrl- or ⌘-clicking a pin. Until the pick is cleared the station list beside the map lists only these. Nothing is saved: a reload clears it.',
+    height:    'Height above sea level, in metres on the Australian Height Datum (AHD), as recorded for the station. Modelled means it was read off a terrain model rather than surveyed at the site.',
+    reporting: 'How many of the stations Flood-Net’s receivers are hearing as often as their checks say they should. Watch (⚠) is quiet for two of its checks and at least an hour and a half; fault (⛔) is quiet for four of its checks or a day, whichever comes first. Proposed stations are left out, since they are not built yet.',
+    networks:  'The radio networks the stations are on, and how many of them are on each. A station on two networks counts on both.',
+    centre:    'The straight-line distance from the centre of the circle or rectangle the stations were picked with, and the compass bearing from that centre to the station: 000° is north, 090° east.',
+    heard:     'How long ago any of Flood-Net’s receivers last heard the station, as in the station list’s Last heard column.',
+    proposed:  'A station that is planned but not built yet. It is drawn hollow on the map.',
+  };
+  const SEL_GLOSSARY = [
+    ['selected', 'Selected'], ['height', 'Height (m AHD)'], ['reporting', 'Reporting'],
+    ['networks', 'Networks'], ['centre', 'From the centre'], ['heard', 'Last heard'], ['proposed', 'Proposed'],
+  ];
+
+  // A station's recorded height as a number, or null — never a blank read as 0 m.
+  function elevOf(s) {
+    if (s.elevation_ahd == null || s.elevation_ahd === '') return null;
+    const v = Number(s.elevation_ahd);
+    return isFinite(v) ? v : null;
+  }
+
+  // The shape the selection was last picked with, while it is still drawn.
+  function pickedShape() {
+    const sh = D().shapes.find(s => s.id === D().pickedWith);
+    return sh && (sh.kind === 'circle' || sh.kind === 'rect') ? sh : null;
+  }
+
+  // Each selected station with its distance and bearing from that shape's
+  // centre (null without one), in the order the card lists them.
+  function selRows(all, from) {
+    const rows = all.map(s => {
+      const on = from && s.lat != null && s.lon != null;
+      return { s, km: on ? acmaHaversineKm(from.lat, from.lon, s.lat, s.lon) : null,
+               brg: on ? bearingDeg(from.lat, from.lon, s.lat, s.lon) : null };
+    });
+    const sort = selSortNow(from);
+    const byName = (a, b) => String(a.s.name || '').localeCompare(String(b.s.name || ''));
+    if (sort === 'near') rows.sort((a, b) => (a.km ?? Infinity) - (b.km ?? Infinity) || byName(a, b));
+    else if (sort === 'high') rows.sort((a, b) => (elevOf(b.s) ?? -Infinity) - (elevOf(a.s) ?? -Infinity) || byName(a, b));
+    else rows.sort(byName);
+    return rows;
+  }
+
+  // Nearest-first needs a centre to be nearest to.
+  function selSortNow(from) {
+    const k = D().selSort;
+    return k === 'near' && !from ? 'name' : (k || 'name');
+  }
+
+  function selMatches(s, role) {
+    return !role || (role === 'proposed' ? !!s.proposed : s.roles.includes(role));
+  }
+
+  function selTile(label, value, sub, cls) {
+    return `<div class="adm-kpi dsel-kpi${cls ? ' ' + cls : ''}"><div class="adm-kpi-label">${label}</div>
+      <div class="adm-kpi-value">${value}</div><div class="adm-kpi-sub">${sub}</div></div>`;
+  }
+
+  function selTilesHtml(all, from) {
+    const n = all.length;
+    const proposed = all.filter(s => s.proposed).length;
+    const fromText = from ? `picked with ${DRAW_TOOLS[from.kind].icon} ${esc(rowText(from))}` : 'picked off the map';
+    const picked = selTile(termHtml('Selected', SEL_WORDS.selected), n.toLocaleString(),
+      fromText + (proposed ? ` · ${proposed} ${termHtml('proposed', SEL_WORDS.proposed)}` : ''));
+
+    const high = all.filter(s => elevOf(s) != null);
+    let height;
+    if (!high.length) {
+      height = selTile(termHtml('Height', SEL_WORDS.height), '—', 'no heights recorded');
+    } else {
+      const lo = high.reduce((a, s) => elevOf(s) < elevOf(a) ? s : a);
+      const hi = high.reduce((a, s) => elevOf(s) > elevOf(a) ? s : a);
+      const f = s => Math.round(elevOf(s)).toLocaleString();
+      const modelled = high.filter(s => s.elevation_source).length;
+      height = selTile(termHtml('Height', SEL_WORDS.height),
+        `${lo === hi ? f(hi) : `${f(lo)}–${f(hi)}`} <small>m AHD</small>`,
+        `highest ${esc(hi.name)}` + (modelled ? ` · ${modelled} modelled` : '')
+          + (high.length < n ? ` · ${n - high.length} not recorded` : ''));
+    }
+
+    const built = all.filter(s => !s.proposed);
+    let reporting;
+    const hg = typeof HealthGlance !== 'undefined' && HealthGlance.counts ? HealthGlance.counts() : null;
+    if (!built.length) {
+      reporting = selTile(termHtml('Reporting', SEL_WORDS.reporting), '—', 'none of them is built yet');
+    } else if (!hg || (!hg.okAt && hg.status !== 'error')) {
+      reporting = selTile(termHtml('Reporting', SEL_WORDS.reporting), '…', 'asking when each was last heard');
+    } else if (!hg.okAt) {
+      reporting = selTile(termHtml('Reporting', SEL_WORDS.reporting), '—',
+        hg.denied ? 'this browser may not read when stations were heard' : 'the datastore could not be asked');
+    } else {
+      const t = { ok: 0, watch: 0, fault: 0, nodata: 0 };
+      built.forEach(s => { t[HealthGlance.classOf(s.id)] = (t[HealthGlance.classOf(s.id)] || 0) + 1; });
+      const bits = [t.watch ? `⚠ ${t.watch} watch` : '', t.fault ? `⛔ ${t.fault} fault` : '',
+                    t.nodata ? `${t.nodata} not heard` : ''].filter(Boolean);
+      reporting = selTile(termHtml('Reporting', SEL_WORDS.reporting),
+        `${t.ok.toLocaleString()} <small>of ${built.length.toLocaleString()}</small>`,
+        bits.length ? bits.join(' · ') : 'every one on time',
+        t.watch || t.fault ? 'adm-kpi--warn' : t.ok === built.length ? 'adm-kpi--ok' : '');
+    }
+
+    const nets = new Map();
+    all.forEach(s => (s.radio_network_ids || []).forEach(id => nets.set(id, (nets.get(id) || 0) + 1)));
+    const top = [...nets.entries()].sort((a, b) => b[1] - a[1]);
+    const none = all.filter(s => !(s.radio_network_ids || []).length).length;
+    const networks = selTile(termHtml('Networks', SEL_WORDS.networks), top.length ? top.length.toLocaleString() : '—',
+      top.length
+        ? top.slice(0, 3).map(([id, k]) => `${esc(netName(id))} ${k}`).join(' · ') + (top.length > 3 ? ` · +${top.length - 3} more` : '')
+          + (none ? ` · ${none} on none` : '')
+        : 'on no radio network');
+
+    return `<div class="adm-kpis dsel-kpis">${picked}${height}${reporting}${networks}</div>`;
+  }
+
+  // The roles as chips that narrow the list to one of them — and say how many
+  // of each there are while they are at it.
+  function selRolesHtml(all) {
+    const role = D().selRole;
+    const chip = (k, label, what, n, dot) => `
+      <button type="button" class="dsel-chip${role === k ? ' is-on' : ''}" aria-pressed="${role === k}"
+              data-k="role:${escAttr(k)}" onclick="MapDraw.selRole('${escAttr(k)}')"
+              title="${escAttr(k ? `List only the ${what} — press again for all of them` : 'List every selected station')}"
+              >${dot ? `<span class="legend-dot" style="--dot:${dot}" aria-hidden="true"></span>` : ''}${esc(label)} <b>${n.toLocaleString()}</b></button>`;
+    const chips = [chip('', 'All', '', all.length, '')];
+    for (const [r, [label, what]] of Object.entries(SEL_ROLES)) {
+      const n = all.filter(s => s.roles.includes(r)).length;
+      if (n) chips.push(chip(r, label, what, n, roleVar(r)));
+    }
+    const p = all.filter(s => s.proposed).length;
+    if (p) chips.push(chip('proposed', 'Proposed', 'proposed stations', p, ''));
+    return `<div class="dsel-chips" role="group" aria-label="Which of the selected stations to list">${chips.join('')}</div>`;
+  }
+
+  function selSortHtml(from) {
+    const cur = selSortNow(from);
+    const items = [
+      from ? ['near', 'Nearest', 'Nearest the centre of the shape first'] : null,
+      ['name', 'A–Z', 'By name'],
+      ['high', 'Highest', 'Highest above sea level first'],
+    ].filter(Boolean);
+    return `<span class="dsel-sort" role="group" aria-label="Sort the list">${items.map(([k, label, title]) => `
+      <button type="button" class="dsel-chip${cur === k ? ' is-on' : ''}" aria-pressed="${cur === k}"
+              data-k="sort:${k}" title="${escAttr(title)}" onclick="MapDraw.selSort('${k}')">${esc(label)}</button>`).join('')}
+    </span>`;
+  }
+
+  function selRowHtml({ s, km, brg }) {
+    const dots = s.roles.map(r => `<span class="legend-dot" style="--dot:${roleVar(r)}"></span>`).join('');
+    const heard = typeof HealthGlance !== 'undefined' ? HealthGlance.heardCellHtml(s) : '';
+    const meta = [
+      s.station_number ? `#${esc(s.station_number)}` : '',
+      elevOf(s) != null ? `${Math.round(elevOf(s))} m${s.elevation_source ? ' (modelled)' : ''}` : '',
+      km != null ? `${fmtKm(km)} @ ${String(Math.round(brg) % 360).padStart(3, '0')}°` : '',
+      heard ? `last heard ${heard}` : '',
+    ].filter(Boolean).join(' · ');
+    const on = state.selectedId === s.id;
+    return `
+      <li class="dsel-row${on ? ' sel' : ''}">
+        <span class="dsel-dots" aria-hidden="true">${dots}</span>
+        <span class="dsel-name">
+          <button type="button" class="dsel-open stn-name role-${primaryRole(s)}" aria-pressed="${on}"
+                  data-k="open:${escAttr(s.id)}" title="Show it on the map and open its card"
+                  onclick="MapDraw.openSelected('${escAttr(s.id)}')">${esc(s.name)}</button>${
+            s.proposed ? ` ${proposedTagHtml(s, { short: true })}` : ''}
+          ${meta ? `<span class="dsel-meta">${meta}</span>` : ''}
+        </span>
+        <button type="button" class="dsel-del" data-k="del:${escAttr(s.id)}"
+                title="Take it out of the selection" aria-label="Take ${escAttr(s.name)} out of the selection"
+                onclick="MapDraw.unselect('${escAttr(s.id)}')">✕</button>
+      </li>`;
+  }
+
+  function selWordsHtml() {
+    return `
+      <details class="dsel-words">
+        <summary>What the words on this card mean</summary>
+        <dl>${SEL_GLOSSARY.map(([k, label]) => `<dt>${esc(label)}</dt><dd>${esc(SEL_WORDS[k])}</dd>`).join('')}</dl>
+      </details>`;
+  }
+
+  function selectionHtml() {
+    const all = typeof selectedStations === 'function' ? selectedStations() : [];
+    if (!all.length) {
+      // An empty pick has nothing to measure from: the next one starts afresh.
+      D().pickedWith = null;
+      return '';
+    }
+    watchHeard();
+    const from = pickedShape();
+    // A role whose last station has been taken out lists them all again.
+    if (!all.some(s => selMatches(s, D().selRole))) D().selRole = '';
+    const role = D().selRole;
+    const rows = selRows(all.filter(s => selMatches(s, role)), from);
+    const shown = D().selAll ? rows : rows.slice(0, SEL_ROWS);
+    const n = all.length;
+    return `
+      <div class="mn-mapctl-head">
+        <h3 class="mn-mapctl-title" id="dsel-h" tabindex="-1">Selected stations</h3>
+        <span class="dsel-count" aria-hidden="true">${n.toLocaleString()}</span>
+      </div>
+      <p class="filter-hint dsel-note">${n.toLocaleString()} station${n === 1 ? '' : 's'} picked off the map — listed
+        here and in the station list until cleared. Not saved, and not part of the filter.</p>
+      ${selTilesHtml(all, from)}
+      <div class="dsel-actions">
+        <button type="button" data-k="act:zoom" onclick="MapDraw.zoomToSelection()"
+                title="Fit the map to the selected stations">Zoom to these</button>
+        <button type="button" data-k="act:list" onclick="MapDraw.listSelection()"
+                title="Open the station list beside the map, which lists only these while they are selected">Station list</button>
+        <button type="button" data-k="act:csv" onclick="exportMapSelection()"
+                title="Download every selected station as a CSV — name, number, roles, networks, ALERT IDs, position and height">Export CSV</button>
+        <button type="button" data-k="act:copy" onclick="MapDraw.copySelection()"
+                title="Copy the names in the list below, one to a line, in the order shown">Copy names</button>
+        <button type="button" class="filter-reset" data-k="act:clear" onclick="clearMapSelection()"
+                title="Clear the selection — the station list goes back to the filter result. The drawings stay.">Clear</button>
+      </div>
+      ${selRolesHtml(all)}
+      <div class="dsel-list-head">
+        <span class="small">${[
+          rows.length === n ? '' : `${rows.length.toLocaleString()} of ${n.toLocaleString()}`,
+          from ? `distance and bearing ${termHtml('from the centre', SEL_WORDS.centre)}` : '',
+        ].filter(Boolean).join(' · ')}</span>
+        ${selSortHtml(from)}
+      </div>
+      <ul class="dsel-list" aria-labelledby="dsel-h">${shown.map(selRowHtml).join('')}</ul>
+      ${shown.length < rows.length ? `
+        <button type="button" class="dsel-more" data-k="act:more" onclick="MapDraw.selShowAll()">Show all ${rows.length.toLocaleString()}</button>` : ''}
+      ${selWordsHtml()}`;
+  }
+
+  // Repaint the card in place. Every press on it repaints it, and the button
+  // that was pressed goes with the old markup — so focus is found again by
+  // what it was on (data-k), or, for a row just taken out, the row that took
+  // its place; failing both, the card's heading, or with the card gone, a
+  // shape's Select inside (or, with nothing drawn, the first tool).
+  function rerenderSelection() {
+    const el = document.getElementById('map-draw-sel');
+    if (!el) return;
+    const a = document.activeElement;
+    const had = a && el.contains(a) ? a : null;
+    const key = had && had.dataset ? had.dataset.k : null;
+    const dels = had ? [...el.querySelectorAll('.dsel-del')] : [];
+    const at = had ? dels.indexOf(had) : -1;
+    el.innerHTML = selectionHtml();
+    if (!had) return;
+    let to = key ? el.querySelector(`[data-k="${CSS.escape(key)}"]`) : null;
+    if (!to && at >= 0) {
+      const now = el.querySelectorAll('.dsel-del');
+      to = now[Math.min(at, now.length - 1)] || null;
+    }
+    if (!to) to = el.querySelector('#dsel-h') || document.querySelector('#map-draw-panel .draw-pick')
+               || document.querySelector('#map-draw-panel .draw-tool');
+    if (to) to.focus({ preventScroll: true });
+  }
+
+  // When stations were last heard comes from HealthGlance's batch, asked once
+  // in its fifteen minutes however often this is called; the card repaints
+  // when it lands, as the station list's column does.
+  let heardHooked = false, heardTimer = null;
+  function watchHeard() {
+    if (typeof HealthGlance === 'undefined' || !HealthGlance.askNet) return;
+    if (!heardHooked) {
+      heardHooked = true;
+      HealthGlance.onHeard(() => {
+        if (!state.mapSelection.size || heardTimer) return;
+        heardTimer = setTimeout(() => { heardTimer = null; rerenderSelection(); }, 50);
+      });
+    }
+    HealthGlance.askNet();
+  }
+
+  function zoomToSelection() {
+    const pts = selectedStations().filter(s => s.lat != null && s.lon != null).map(s => [s.lat, s.lon]);
+    if (!map || !pts.length) return;
+    if (pts.length === 1) map.setView(pts[0], Math.max(map.getZoom(), 14));
+    else map.fitBounds(L.latLngBounds(pts), { padding: [32, 32], maxZoom: 15 });
+  }
+
+  // The station list lists the selection while there is one, so "show me them
+  // in the list" is opening the list and bringing its pane up.
+  function listSelection() {
+    if (typeof setStationsListOpen === 'function') setStationsListOpen(true);
+    const wrap = document.getElementById('stations-table-wrap');
+    if (!wrap) return;
+    if (typeof dockReveal === 'function') dockReveal(wrap);
+    wrap.scrollIntoView({ block: 'start' });
+  }
+
+  // What the list shows — narrowed and sorted as it is, every row of it.
+  function copySelection() {
+    const all = selectedStations();
+    const from = pickedShape();
+    const names = selRows(all.filter(s => selMatches(s, D().selRole)), from).map(r => r.s.name);
+    copyToClipboard(names.join('\n')).then(ok => {
+      const msg = ok ? `${names.length} name${names.length === 1 ? '' : 's'} copied` : 'Could not copy — the browser refused';
+      mapNote(msg, 2500);
+      announce(msg);
+    });
+  }
+
+  // A row: the station list's own click — the card, the editor, the map flown
+  // to it — and the card repainted, so the row that is now the selected
+  // station says so.
+  function openSelected(id) {
+    selectStation(id);
+    rerenderSelection();
+  }
+
+  function unselect(id) {
+    if (state.mapSelection.has(id)) toggleMapSelection(id);
   }
 
   return {
@@ -1223,6 +1580,25 @@ const MapDraw = (function () {
     panelHtml, rerenderPanel, render, setTool, select, remove, clearAll,
     finishLine, addFromForm, applyEdit, useMapCentre, toggleLabels, measure,
     setColour, toggleSnap, selectInside, lineKm, flipLine,
+
+    // The selection's card: its markup for MapChrome's `after` (app.js), the
+    // repaint mapSelectionChanged() asks for, and what its buttons press.
+    selectionHtml, zoomToSelection, listSelection, copySelection, openSelected, unselect,
+    selectionChanged() { rerenderSelection(); },
+    selRole(k) {
+      D().selRole = !k || D().selRole === k ? '' : k;
+      D().selAll = false;
+      rerenderSelection();
+    },
+    selSort(k) { D().selSort = k; rerenderSelection(); },
+    // The press goes with the button, so focus goes to the first row it
+    // brought on rather than back up to the heading.
+    selShowAll() {
+      D().selAll = true;
+      rerenderSelection();
+      const next = document.querySelectorAll('#map-draw-sel .dsel-open')[SEL_ROWS];
+      if (next) next.focus({ preventScroll: true });
+    },
 
     // Everything drawn, reduced to ground truth: where each shape is, what it
     // is called, what colour it was drawn in, and which stations it holds.

@@ -6751,6 +6751,164 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   border-color: var(--accent);
 }
 
+/* ── The selected stations' card, under Draw & measure (map-draw.js) ── */
+.dsel-count {
+  flex: 0 0 auto;
+  min-width: 1.6rem;
+  padding: .05rem .45rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--panel);
+  font-weight: 700;
+  text-align: center;
+}
+
+.dsel-note {
+  margin: 0 0 var(--sp-2);
+}
+
+.dsel-kpis {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-1);
+}
+.dsel-kpi { padding: .4rem .5rem; }
+.dsel-kpi .adm-kpi-label { font-size: .66rem; }
+.dsel-kpi .adm-kpi-value { font-size: 1.15rem; }
+.dsel-kpi .adm-kpi-sub { font-size: .7rem; }
+
+.dsel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+  margin: var(--sp-2) 0;
+}
+
+.dsel-actions button {
+  padding: .25rem .55rem;
+  font-size: .78rem;
+}
+
+.dsel-chips,
+.dsel-sort {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.dsel-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  border: 1px solid var(--ctl-border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  padding: .12rem .55rem;
+  font: inherit;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.dsel-chip:hover { background: var(--subtle); }
+.dsel-chip.is-on,
+.dsel-chip.is-on:hover { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+.dsel-chip .legend-dot { width: 8px; height: 8px; }
+
+.dsel-list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-1) var(--sp-2);
+  margin: var(--sp-2) 0 var(--sp-1);
+  color: var(--muted);
+}
+
+.dsel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.dsel-row {
+  display: flex;
+  align-items: flex-start;
+  gap: .4rem;
+  padding: .3rem .2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.dsel-row.sel {
+  background: var(--subtle);
+}
+
+/* As wide as three roles' dots, so a name lines up whatever its station is. */
+.dsel-dots {
+  flex: 0 0 28px;
+  display: inline-flex;
+  gap: 2px;
+  padding-top: .35rem;
+}
+
+.dsel-dots .legend-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.dsel-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.dsel-open {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dsel-open:hover {
+  text-decoration: underline;
+}
+
+.dsel-meta {
+  display: block;
+  color: var(--muted);
+  font-size: .7rem;
+  overflow-wrap: anywhere;
+}
+
+/* the delete button's quiet look (.draw-del): out of the selection, not off the map */
+.dsel-del {
+  flex: 0 0 auto;
+  border: none;
+  background: none;
+  color: var(--muted);
+  padding: .1rem .35rem;
+  font-size: .8rem;
+}
+
+.dsel-del:hover {
+  color: var(--bad);
+}
+
+.dsel-more {
+  margin-top: var(--sp-1);
+  padding: .25rem .6rem;
+  font-size: .78rem;
+}
+
+.dsel-words {
+  margin-top: var(--sp-2);
+}
+.dsel-words > summary { cursor: pointer; color: var(--muted); }
+.dsel-words dl { margin: var(--sp-1) 0 0; }
+.dsel-words dt { font-weight: 600; margin-top: var(--sp-1); }
+.dsel-words dd { margin: 0 0 0 1.2rem; color: var(--muted); }
+
 /* colour picker: six presets that hold up on street, topo and satellite tiles,
    with the native control behind them for anything else */
 .draw-colour {
@@ -10972,6 +11130,29 @@ body.mn-dock-dragging {
 .dock-pane > .mn-mapctl .mn-mapctl-content {
   max-height: none;
   overflow: visible;
+}
+
+/* A panel's second card (MapChrome's `after`) — Draw & measure's selected
+   stations. Nothing at all while it has nothing to say; in the corner, the
+   foot of the flyout under a rule; here, a card of its own under the panel's,
+   in the panel's own dress. */
+.mn-mapctl-after:empty {
+  display: none;
+}
+
+.mn-mapctl-content > .mn-mapctl-after {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--border);
+}
+
+.dock-pane > .mn-mapctl > .mn-mapctl-after {
+  margin-top: var(--sp-2);
+  padding: var(--sp-3);
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
 }
 .help-body {
   padding: 0 .35rem;

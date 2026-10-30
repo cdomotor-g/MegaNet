@@ -4461,6 +4461,14 @@ const state = {
     // --draw is". The choice is worth keeping across a reload even though the
     // shapes themselves deliberately are not.
     colour:     localStorage.getItem('mn-draw-colour') || '',
+    // The selected stations' card under the panel (MapDraw.selectionHtml):
+    // the shape they were last picked with — what "from the centre" is
+    // measured from — how its list is sorted, which role it is narrowed to,
+    // and whether it shows every row past the first SEL_ROWS.
+    pickedWith: null,
+    selSort:    'near',    // 'near' | 'name' | 'high'
+    selRole:    '',        // '' | a role | 'proposed'
+    selAll:     false,
   },
   // The radio at each end of a path, one set for every card that prices one —
   // the link budget, the elevation profile and the radio-path card — so a TX
