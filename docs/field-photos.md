@@ -685,6 +685,14 @@ does not exist yet: a Postgres role for agents, granted `propose_equipment` and
 nothing else. Which of those an agent gets, where its key lives and who can
 revoke it are for the owner to choose.
 
+**The first agent through it is the photo reader** (0089,
+[`docs/photo-reader.md`](photo-reader.md)): a Claude Code session, every night,
+proposing as `agent:photo-reader` through `meganet.record_photo_readings()` —
+called over the owner's own Supabase connector, as a direct connection — and
+filling the station's logger details (`meganet.station_lpu`) where nobody has.
+It is given no key to the photos: the fetch workflow, which holds the syncs'
+key, encrypts them to a key the session makes for each run.
+
 ---
 
 ## Who can see them

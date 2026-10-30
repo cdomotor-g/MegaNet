@@ -18628,6 +18628,52 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 .stn-card-equip:empty { display: none; }
 .stn-card-equip-h { display: block; margin-bottom: .25rem; }
 
+/* A station's logger (station-lpu.js, 0089). On the card, gone when nothing is
+   recorded, as the Equipment section under it is. In the editor, a value the
+   photo reader read wears a chip in the warning's tint until a person says it
+   is right, then the ok's; the chip carries a word, so the colour never has to.
+   The type box's question is a panel with the accent down its side, and is not
+   there at all while there is nothing to ask. */
+.stn-card-lpu:empty { display: none; }
+.lpu-chip {
+  display: inline-block;
+  padding: 0 .45rem;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--warn) 16%, var(--panel));
+  color: var(--text);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.lpu-chip.is-checked { background: color-mix(in srgb, var(--ok) 16%, var(--panel)); }
+.lpu-prov { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); margin-top: .25rem; }
+.lpu-prov .check-label { margin: 0; }
+.lpu-differs { margin-top: .25rem; }
+.lpu-differs .term { color: var(--warn); font-weight: 600; }
+.ef-lpu-ask:empty { display: none; }
+.lpu-ask, .lpu-new {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+}
+.lpu-ask p { margin: 0 0 var(--sp-1); }
+.lpu-caution { color: var(--warn); }
+.lpu-picks { list-style: none; margin: 0 0 var(--sp-1); padding: 0; display: grid; gap: var(--sp-1); }
+.lpu-picks li { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2); }
+.lpu-add { display: grid; gap: var(--sp-1); margin: var(--sp-1) 0 0; padding: var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-sm); min-width: 0; }
+.lpu-add label { display: grid; gap: .15rem; }
+.lpu-add input, .lpu-add select { max-width: 100%; }
+.lpu-a2 { margin: var(--sp-1) 0 0; }
+.lpu-a2.is-behind strong { color: var(--warn); }
+.lpu-history ul { margin: var(--sp-1) 0 0; padding-left: 1.1rem; }
+.lpu-history li + li { margin-top: .2rem; }
+.lpu-words dl { margin: var(--sp-1) 0 0; }
+.lpu-words dt { font-weight: 600; margin-top: var(--sp-1); }
+.lpu-words dd { margin: 0; }
+
 /* The station card's History (station-history.js, 0056): a disclosure, shut
    until opened, a change to an entry — what kind, when, who — and under it the
    fields that moved, was over became, each with its Restore. Was and became are

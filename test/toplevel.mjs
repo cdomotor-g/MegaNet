@@ -193,6 +193,17 @@ const ACCEPTED = {
          + 'Constrains nothing below it.',
     },
   ],
+  'lpu-types.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = LpuTypes;",
+      why: 'The LPU type matcher\'s CommonJS registration: test/lputypes.mjs requires this '
+         + 'same file to hold its did-you-mean against real slips and real different loggers, '
+         + 'and its matchKey() to the database\'s lpu_match_key() on the same inputs, so the '
+         + 'editor and the database cannot disagree about which spellings are one type. '
+         + 'Guarded so the browser, where `module` is undefined, never runs it. '
+         + 'Constrains nothing below it.',
+    },
+  ],
   'quansheng.js': [
     {
       match: "if (typeof module !== 'undefined' && module.exports) module.exports = Quansheng;",

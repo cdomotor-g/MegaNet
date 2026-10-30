@@ -133,6 +133,29 @@ export function client(fetch, { url, key, store = null, log = () => {} }) {
       const res = await fetch(`${STORAGE}/object/${BUCKET}/${path}`, { method: 'DELETE', headers: { ...auth } });
       return answer(res, `remove ${path} from Supabase Storage`);
     },
+    // Signed view links for paths the store holds, and the paths it does not
+    // (still in Supabase Storage, until the move carries them over) — what the
+    // photo reader's fetch (fetch-for-reader.mjs) reads the bytes through. The
+    // store signs for the secret key as it does for a member (worker/photos.js).
+    // No store, or one not bound: every path is Supabase's.
+    async signStore(paths, expiresIn = 3600) {
+      if (!store) return { urls: {}, missing: paths.slice() };
+      const res = await fetch(`${store.replace(/\/+$/, '')}/sign`, {
+        method: 'POST', redirect: 'manual',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bucket: BUCKET, paths, expiresIn }),
+      });
+      const type = res.headers.get('content-type') || '';
+      if (!/json/i.test(type)) {
+        throw new SupabaseError(`the photo store answered HTTP ${res.status} with no JSON — is /api/photos behind Cloudflare Access? (docs/field-photos.md)`, { status: res.status });
+      }
+      if (res.status === 503) {
+        const body = await res.clone().json().catch(() => null);
+        if (body && body.unbound) return { urls: {}, missing: paths.slice() };
+      }
+      const body = await answer(res, 'sign photo links');
+      return { urls: (body && body.urls) || {}, missing: (body && body.missing) || [] };
+    },
     async putStore(path, bytes, contentType) {
       if (!store) throw new SupabaseError('no photo store configured');
       const res = await fetch(`${store.replace(/\/+$/, '')}/${BUCKET}/${path}`, {

@@ -8325,6 +8325,8 @@ function repaintStnCard() {
   MapCameras.ask(`mn-cams-card-${s.id}`, s);
   // …and the catchment above its gauge, from a 75 KB index read once.
   RiverCatchments.ask(`mn-catch-card-${s.id}`, s);
+  // The logger's details, for an approved account, on the same terms.
+  if (typeof StationLpu !== 'undefined') StationLpu.cardAsk(s);
   // The equipment register, for a signed-in editor, on the same terms.
   if (typeof PhotoReview !== 'undefined') PhotoReview.cardAsk(s);
   // …and its site features (site-features.js), kept per station for two
@@ -8762,6 +8764,11 @@ function stnCardHtml(s) {
          the way the wind region line is. -->
     <div class="acma-sect" id="${escAttr(slsId)}"
          data-mn-sls="${escAttr(s.station_number || '')}">${sls.html}</div>
+    <!-- The logger at the site — its LPU type, serial number and versions
+         (0089, station-lpu.js): approved accounts, filled after the fetch by
+         StationLpu.cardAsk, values the photo reader read marked 📷, and not
+         drawn at all when nothing is recorded. -->
+    ${typeof StationLpu !== 'undefined' ? StationLpu.cardHtml(s) : ''}
     <!-- The equipment fitted here, as the station's register says once an
          administrator has approved it (0036, photo-review.js): signed-in
          editors only, filled after the fetch by PhotoReview.cardAsk, and
@@ -8849,6 +8856,9 @@ function renderStationEditorCard() {
 // out, goToStation) is filled like a row click, not left with empty sparklines.
 function stationEditorCardDrawn() {
   if (!document.getElementById('stations-editor-card')) return;
+  // The logger's boxes get back what a refused save of theirs left in them
+  // (station-lpu.js), before the gilt is worked out.
+  if (typeof StationLpu !== 'undefined') StationLpu.applyDrafts();
   // A fresh card is the saved station: no gilt, and teal again.
   editorUnsavedRefresh();
   // The slots this station's relayed ALERT2 address has actually been heard on

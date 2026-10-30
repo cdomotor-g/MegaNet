@@ -38,6 +38,9 @@
 // river-details.js for RiverDetails — the Bureau's flood warning lists above
 // the ARRO block (0031, 0032) and the AEP flood levels with them (0033), which
 // editorReadForm() reads back and editorSave() asks formProblem() about first;
+// and to station-lpu.js for StationLpu — the station's logger (0089), drawn
+// under the telemetry pick-list, asked about first (formProblem), saved after
+// the station (save) and put back by Undo (discard);
 // and to frequencies.js for Frequencies — the RX/TX rows in the Repeater
 // Configuration and a base station's own section (0033), read back and asked
 // about the same way; and to health-glance.js for HealthGlance — when the
@@ -618,6 +621,10 @@ function editorForm(s) {
         pre-selects its form from this. “Not recorded” means nobody has said yet, and the form
         asks rather than guesses; leave it that way unless you know the site's telemetry.
       </div>
+      <!-- The logger at the site — its LPU type, serial number and versions
+           (0089, station-lpu.js) — kept in a table of its own, read by
+           approved accounts, and saved by editorSave() after the station. -->
+      ${typeof StationLpu !== 'undefined' ? StationLpu.editorHtml(s) : ''}
       <label>RM System ID<input type="number" id="ef-rmsys" value="${s.rm_system_id || 1}"></label>
       ${efFieldHtml({ id: 'ef-bucket', caption: 'TBRG bucket size (mm/tip)', hint: 'ef-h-bucket',
         control: `<input type="number" step="0.1" min="0" id="ef-bucket" value="${s.TBRGbucketSize ?? ''}" placeholder="not recorded">` })}
@@ -1166,7 +1173,8 @@ async function editorSave() {
 
   // A figure the browser could not read reads back as empty, and would be
   // dropped from the save without a word; say which one instead.
-  const unreadable = RiverDetails.formProblem() || Frequencies.formProblem();
+  const unreadable = RiverDetails.formProblem() || Frequencies.formProblem()
+    || (typeof StationLpu !== 'undefined' ? StationLpu.formProblem() : '');
   if (unreadable) {
     setEditorStatus({ kind: 'error', text: unreadable });
     return;
@@ -1208,6 +1216,15 @@ async function editorSave() {
     return;                      // the form, and everything typed into it, stands
   }
 
+  // The logger's details (0089, station-lpu.js) go after the station — a
+  // station that is new has its id only now — and before the card is drawn
+  // again, while its boxes still hold what was typed. A refusal of theirs
+  // leaves the station saved and their edits in the boxes the redraw makes.
+  let lpuSaved = '', lpuError = null;
+  if (typeof StationLpu !== 'undefined') {
+    try { lpuSaved = await StationLpu.save(result.station.id); } catch (err) { lpuError = err; }
+  }
+
   state.editorBusy = false;
 
   // Memory from what came back. The saved record carries whatever the database
@@ -1237,10 +1254,14 @@ async function editorSave() {
   // A new proposal is shown where it was proposed, with its card up: the
   // first sight of it is the hollow pin and the band saying it is proposed.
   if (result.created && saved.proposed && state.map) focusStationOnMap(saved);
+  if (lpuError) {
+    setEditorStatus({ kind: 'error', text: StationLpu.saveErrorText(lpuError) });
+    return;
+  }
   setEditorStatus({
     kind: 'ok',
-    text: `${result.created ? (saved.proposed ? 'Proposed' : 'Created') : 'Saved'} at ${new Date().toLocaleTimeString()}`
-        + ` as ${result.updated_by || 'you'} — in the database, not just this tab.`,
+    text: `${result.created ? (saved.proposed ? 'Proposed' : 'Created') : 'Saved'}${lpuSaved ? `, with ${lpuSaved},` : ''}`
+        + ` at ${new Date().toLocaleTimeString()} as ${result.updated_by || 'you'} — in the database, not just this tab.`,
   });
 }
 
@@ -1539,6 +1560,7 @@ function editorUndo() {
   if (s) state.editorDraft = JSON.parse(JSON.stringify(s));
   const back = state.editorId ? 'back to what the database holds' : 'the form as it opened';
   state.editorMsg = { kind: 'info', text: `Undid ${n} unsaved change${n === 1 ? '' : 's'} — ${back}.` };
+  if (typeof StationLpu !== 'undefined') StationLpu.discard();
   rerenderStationEditorCard();
   document.getElementById(first || 'ef-name')?.focus({ preventScroll: true });
   announce(state.editorMsg.text);

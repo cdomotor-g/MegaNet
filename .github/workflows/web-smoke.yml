@@ -1117,6 +1117,18 @@ jobs:
         if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run stationhistory
+      # A station's logger (0089): the LPU type matcher under Node — the
+      # database's own match pattern, lifted out of the migration, agreeing
+      # with lpu-types.js; a lookalike, a swap or a letter a slip, a digit or a
+      # letter on the end never — then the station editor's Logger section
+      # against a stand-in: signed out it asks nothing; a photo's value marked
+      # and its Right box; a type off the list asked about before the save,
+      # picked or added as new; the station saved first, then only what
+      # changed; a refusal leaving the edits in their boxes; the card.
+      - name: A station's logger — did you mean, a new type only when meant, saved with the station
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run lputypes
 
       # What the Stations filter box *selects*. `npm run smoke` opens the tab
       # and asserts a clean console; a search box handing back the wrong
@@ -2182,6 +2194,15 @@ jobs:
       - name: check_station_features.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_station_features.sql
+      # A station's logger and the photo reader (0089): one type however it is
+      # spelt, a new one only when confirmed and never a duplicate, editors
+      # writing with the stamp they read and members reading, and the reader
+      # filling only what nobody recorded — never over a person's value, a
+      # photo's unchecked value giving way only to a later photo — proposing
+      # the rest for the register, a key number refused.
+      - name: check_station_lpu.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_station_lpu.sql
       # Proposed stations (0039): what a proposal has to say, the station
       # document gaining nothing for a station that is not one, and who may
       # propose, add outright and establish — signed up through 0005's own

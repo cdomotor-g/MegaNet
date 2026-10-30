@@ -1,0 +1,118 @@
+# The photo reader's fetch: the field photos the nightly photo reader (a
+# Claude Code session, .claude/skills/photo-reader/SKILL.md) has still to read,
+# fetched with the secret key this repository already holds for the Dropbox and
+# Drive syncs, encrypted to a public key the session made for this one run, and
+# left as an artifact for a day. docs/photo-reader.md says why it is done this
+# way rather than by giving the session a key to the photos.
+#
+# Never on a push or a schedule: the session asks, with `gh workflow run
+# photo-reader-fetch.yml --ref main -f recipient=age1… -f nonce=…`, and finds
+# its run by the nonce in the run's name. The photos are private (0035): what
+# leaves this job is a file only the holder of the matching private key can
+# open — and that key never left the session — and the log says how many
+# photos, never which.
+
+name: Photo reader — fetch
+
+run-name: Photo reader fetch ${{ inputs.nonce }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      recipient:
+        description: 'The age public key (age1…) the photos are encrypted to — made by the session asking'
+        required: true
+        type: string
+      select:
+        description: 'unread — the next photos the reader has not read — or ids'
+        type: choice
+        options: [unread, ids]
+        default: unread
+      ids:
+        description: 'Photo ids, comma-separated, when select is ids'
+        type: string
+        default: ''
+      size:
+        description: 'full, thumb, or the longest side in pixels (320–4000)'
+        type: string
+        default: '1600'
+      limit:
+        description: 'At most this many photos (1–1000)'
+        type: string
+        default: '200'
+      reader_version:
+        description: 'The reader''s version: photos it has read at this version or later are not fetched again'
+        type: string
+        default: '1'
+      nonce:
+        description: 'Letters, digits, - and _: how the session asking finds its run'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: photo-reader-fetch-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Inputs reach the shell as environment variables, never pasted into a
+    # script, and are checked before anything uses them.
+    env:
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      RECIPIENT: ${{ inputs.recipient }}
+      SELECT: ${{ inputs.select }}
+      IDS: ${{ inputs.ids }}
+      SIZE: ${{ inputs.size }}
+      LIMIT: ${{ inputs.limit }}
+      READER_VERSION: ${{ inputs.reader_version }}
+      NONCE: ${{ inputs.nonce }}
+    steps:
+      - name: The inputs are what they say they are
+        run: |
+          [[ "$RECIPIENT" =~ ^age1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{58}$ ]] \
+            || { echo "::error::recipient is not an age public key (age1 and 58 more)"; exit 1; }
+          [[ "$NONCE" =~ ^[A-Za-z0-9_-]{0,64}$ ]] || { echo "::error::nonce is letters, digits, - and _"; exit 1; }
+          [[ "$LIMIT" =~ ^[0-9]{1,4}$ ]] || { echo "::error::limit is a number"; exit 1; }
+          [[ "$READER_VERSION" =~ ^[0-9]{1,3}$ ]] || { echo "::error::reader_version is a number"; exit 1; }
+          [[ "$SIZE" =~ ^(full|thumb|[0-9]{3,4})$ ]] || { echo "::error::size is full, thumb or a number of pixels"; exit 1; }
+          [[ "$IDS" =~ ^[0-9a-fA-F,\ -]*$ ]] || { echo "::error::ids is photo ids, comma-separated"; exit 1; }
+          [ -n "$SUPABASE_SECRET_KEY" ] || { echo "::error::SUPABASE_SECRET_KEY is not set — docs/field-photos.md"; exit 1; }
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # age to encrypt with; ImageMagick to make the photos smaller, which the
+      # fetch does without (and says so) if this step is ever slow to fail.
+      - name: age and ImageMagick
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends age imagemagick >/dev/null
+
+      # No npm install: the fetch uses nothing but fetch and ImageMagick.
+      - name: Fetch
+        working-directory: tools/field-photos
+        env:
+          OUT: ${{ runner.temp }}/reader-out
+        run: node fetch-for-reader.mjs
+
+      - name: Encrypt to the session's key
+        run: |
+          tar -C "$RUNNER_TEMP/reader-out" -cf - . | age -r "$RECIPIENT" -o "$RUNNER_TEMP/photos.tar.age"
+          rm -rf "$RUNNER_TEMP/reader-out"
+          echo "Encrypted: $(stat -c %s "$RUNNER_TEMP/photos.tar.age") bytes" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: photo-reader-${{ github.run_id }}
+          path: ${{ runner.temp }}/photos.tar.age
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
