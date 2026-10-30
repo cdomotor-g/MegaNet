@@ -25,6 +25,19 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 158, date: '2026-10-30', items: [
+      '📟 <strong>Each station\'s logger, recorded.</strong> <em>Station details → Telemetry</em> has a <strong>Logger (LPU)</strong> '
+        + 'section: the logger\'s type — ELPRO ERT-A2, Campbell CR300, CR310, CR350, CR1000 and the rest — its serial number, and the '
+        + 'versions that matter for it: an ERT-A2\'s firmware, bootloader and radio firmware, a Campbell logger\'s OS version and program. '
+        + 'A type not on the list is checked first: a slip such as <em>CR3OO</em> asks <em>did you mean the CR300?</em>, while a digit '
+        + 'different, such as <em>CR320</em>, is never corrected for you — a CR300, a CR310 and a CR350 are three different loggers — and '
+        + 'only then can an editor add it as a new type. The station card shows the logger too, and whether an ERT-A2 is at ELPRO\'s '
+        + 'Release G.',
+      '📷 <strong>A photo reader goes through the field photos every night</strong> and fills in what it can read — a version screen '
+        + 'on a laptop, a logger\'s label — wherever nobody has. A value it filled is marked <em>📷 From a photo</em> until somebody ticks '
+        + '<strong>Right</strong> or types the right one, and it never writes over what a person entered. The serial numbers it reads '
+        + 'off radios, modems and regulators wait in <em>Field Photos → Review</em> for an administrator.',
+    ] },
     { n: 157, date: '2026-10-30', items: [
       '📸 <strong>The Field Camera comes back after the phone takes it away.</strong> A call, the lock screen, another app or '
         + 'Safari\'s download prompt can take the camera from Flood-Net, and the picture used to stay black until the tab was left '

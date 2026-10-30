@@ -3724,8 +3724,10 @@ const DB_SCHEMA = 'meganet';
 // db-migrate.yml on 28 October 2026, bumped after. 88: submission days found
 // a probe a day for the archive (0088). 89: the hourly roll-ups and the station
 // cards writing less (0089), applied by db-migrate.yml on 30 October 2026,
-// bumped after. Neither changes a shape the app reads.
-const DB_SCHEMA_VERSION = 89;
+// bumped after. Neither changes a shape the app reads. 90: a station's logger
+// and the photo reader's readings (0090), applied by db-migrate.yml on 30
+// October 2026, bumped after.
+const DB_SCHEMA_VERSION = 90;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

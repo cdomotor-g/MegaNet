@@ -71,7 +71,7 @@ OUT="$WORK/out-$RUN"
 rm -rf "$DL" "$OUT"
 gh run download "$RUN" --repo "$REPO" -n "photo-reader-$RUN" -D "$DL" >&2
 mkdir -p "$OUT"
-age -d -i "$KEY" "$DL/photos.tar.age" | tar -C "$OUT" -xf -
+age -d -i "$KEY" "$DL/photos.tar.age" | tar --no-same-owner -C "$OUT" -xf -
 rm -rf "$DL"
 
 # Nobody can open it without the key, and it would be gone in a day; gone now.

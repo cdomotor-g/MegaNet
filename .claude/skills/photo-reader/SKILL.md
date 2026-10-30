@@ -70,6 +70,24 @@ read only the failing step's log tail
 More than 200 waiting: run it again after recording these (step 3) — each run
 fetches the next ones not yet read.
 
+**If `gh auth status` says gh is not signed in**, ask through the GitHub
+connector instead (the `mcp__github__*` tools; load them with ToolSearch):
+
+1. `bash tools/photo-reader/open.sh "$S/photo-reader" --key` makes the run's
+   key and prints its public half.
+2. `mcp__github__actions_run_trigger`: `run_workflow`, owner `cdomotor-g`, repo
+   `MegaNet`, workflow_id `photo-reader-fetch.yml`, ref `main`, inputs
+   `{recipient: <the age1… line>, select: "unread", size: "1600", limit: "200",
+   reader_version: "1", nonce: <pr- and the time>}`.
+3. `mcp__github__actions_list` (`list_workflow_runs`, workflow
+   `photo-reader-fetch.yml`) until the run whose name has your nonce is
+   `completed` — then its artifact (`list_workflow_run_artifacts`) and that
+   artifact's download link (`mcp__github__actions_get`,
+   `download_workflow_run_artifact`).
+4. `curl -sSL -o "$S/photo-reader/dl.zip" '<link>'`, then
+   `bash tools/photo-reader/open.sh "$S/photo-reader" "$S/photo-reader/dl.zip"`
+   — its last line is the manifest's path.
+
 ## 2. Look
 
 Use the list of LPU types and the register's kinds:
