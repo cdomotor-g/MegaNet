@@ -143,11 +143,35 @@ themselves, from the skill: `tools/photo-reader/fetch.sh <scratch dir> unread
 1600 200`, look, write the readings, `python3 -I tools/photo-reader/sql.py
 results.json`, and run what it prints through the Supabase connector.
 
-### Turning it off
+### The first run
 
-Pause or delete the **Flood-Net photo reader** scheduled task (claude.ai →
-Code → Scheduled tasks). Nothing else runs it. The fetch workflow does nothing
-unless asked.
+30 October 2026, by hand from a session, over every photo there was: 945 live
+photos read — 339 showed something, 31 a label too worn, hidden or blurred to
+read, 575 nothing to read (contact sheets first, then 399 close looks at full
+size). Logger details were filled at 29 stations: 17 ERT-A2s, 4 CR300s, 4
+CR310s, and 4 whose model is not on the list yet — among them an ELPRO ERTP-02
+and ELPRO's older Field Station 2R43 canisters, which a person can add as
+types. 20 serial numbers; one ERT-A2's three versions, at Release G; two
+Campbell loggers' OS and program. 318 other pieces of equipment wait in
+**Field Photos → Review** for an administrator. Nothing disagreed with a
+person's value — nobody had entered one yet.
+
+### The nightly task
+
+**Flood-Net photo reader**, a scheduled Claude Code task on the owner's
+account: every night at 3:40 am Brisbane time, a fresh session that attaches
+this repository, then runs the skill. 3:40 because the readings are in before
+the working day, and the hours either side of midnight in Brisbane are the
+busiest for scheduled sessions.
+
+It records through the **Supabase connector**, so the sessions it starts need
+that connector. A scheduled task created from inside a session cannot be given
+one in this organisation; it is added to the task on claude.ai (the task's
+connectors), or the task is made there with it. Without it the night's session
+says so in one line and stops — nothing is read.
+
+To turn it off, pause or delete the task on claude.ai. Nothing else runs it,
+and the fetch workflow does nothing unless asked.
 
 ## Checks
 

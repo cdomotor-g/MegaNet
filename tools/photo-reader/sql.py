@@ -18,9 +18,10 @@ Prints one statement per --chunk readings, to run through the Supabase
 connector (execute_sql) as they are. Refuses — and says which photo — what the
 database would refuse, and two things it cannot see:
 
-  * a site code: a gate combination, a padlock or logger code, a password, a
-    key number. Those live only in the inspection records (CLAUDE.md, 0064),
-    and a reading that mentions one is rewritten without it, not recorded.
+  * a site code or a secret: a gate combination, a padlock or logger code, a
+    password, a key number, a Wi-Fi key, a SIM card's or a phone's number.
+    Site codes live only in the inspection records (CLAUDE.md, 0064), and a
+    reading that mentions one is rewritten without it, not recorded.
   * a word the connector stops a statement for (drop, delete, truncate), which
     it would hold for a confirmation nobody is there to give. Say it another
     way: "removed", "taken off", "cleared".
@@ -41,7 +42,8 @@ KINDS = {'canister', 'ert_a2', 'logger', 'mace', 'modem', 'antenna', 'sim', 'rec
          'water_level_sensor', 'river_sensor', 'shaft_encoder', 'pressure_transmitter', 'bubble_unit', 'gas_druck',
          'solar_panel', 'solar_regulator', 'power_supply', 'pha', 'other'}
 STOP_WORDS = re.compile(r'\b(drop|dropped|dropping|delete|deleted|deleting|truncate)\b', re.I)
-CODES = re.compile(r'\b(combination|(gate|lock|padlock|access|door|pin)\s*(code|number|no\b\.?)|passcode|password|key\s*(no\b\.?|number|#))', re.I)
+CODES = re.compile(r'\b(combination|(gate|lock|padlock|access|door|pin)\s*(code|number|no\b\.?)|passcode|password|passphrase'
+                   r'|key\s*(no\b\.?|number|#)|wi-?fi\s*key|iccid|msisdn|sim\s*(card\s*)?(no\b\.?|number)|phone\s*(no\b\.?|number))', re.I)
 CODES_CASED = re.compile(r'\bPIN\b')
 
 

@@ -22,11 +22,13 @@ is the why behind every step here.
 - **The photos are private** (0035). Keep them in the session's scratchpad and
   nowhere else: never in the repository, an issue, a commit, a log or a
   message. Delete them when the run ends.
-- **Never record a site code** — a gate combination, a padlock or logger code,
-  a password or PIN, a key number — nor a landholder's name, phone number or
+- **Never record a site code or a secret** — a gate combination, a padlock or
+  logger code, a password or PIN (a Sierra Wireless modem's label prints a
+  "Default Password": never write any of it), a key number, a Wi-Fi key, a SIM
+  card's number or a phone number — nor a landholder's name, phone number or
   email, nor who is in a photo. If a photo shows one, the reading leaves it out
-  and says only "a lock", "a label on the gate". `tools/photo-reader/sql.py`
-  refuses text that looks like one; rewrite it, never work around it.
+  and says only "a lock", "modem label". `tools/photo-reader/sql.py` refuses
+  text that looks like one; rewrite it, never work around it.
 - **Only `meganet.record_photo_readings()` writes.** Never call
   `save_station_lpu`, `propose_equipment` or `decide_equipment_suggestion`
   yourself, and never insert, update or remove rows directly. The function
@@ -141,11 +143,15 @@ the width and height) or `look.py tiles <file> --grid 3`.
   (`CR300.Std.10.03`), program as `ProgName` with its version, the logger's
   serial as `SerialNumber` or its label.
 - **The logger's serial number** — off its label: `S/N`, `Serial`.
-- **Everything else in view with a legible label** — a radio (ELPRO 905U,
-  115E), a modem (Beam's Iridium RST…), a solar regulator (Victron SmartSolar
-  MPPT…), a rain gauge, a level sensor, a bubbler: an `equipment` entry each,
-  with the register's kind, and the make, model and serial number as legible.
-  The logger itself goes in `lpu`, not here.
+- **Everything else in view with a legible label** — an `equipment` entry
+  each, with the register's kind, and the make, model and serial number as
+  legible: `modem` for a radio (ELPRO 905U, 115E), a cellular router (Sierra
+  Wireless RV50X) or a satellite modem (Beam Iridium RST…) — a modem's IMEI is
+  its serial when it has no S/N; `bubble_unit` (Kisters HS40); `solar_regulator`
+  (Victron SmartSolar MPPT…); `solar_panel`; `power_supply`; `tbrg`;
+  `water_level_sensor`; `pressure_transmitter`; `antenna`; `other`. The logger
+  itself goes in `lpu`, not here. An ELPRO radio is not the logger, and nor is
+  a Kisters HS40.
 - **Confidence**, 0 to 1, as you rate the whole of what you send for that
   photo: 0.9 and over read clearly; 0.6–0.85 legible but small, angled or
   partly hidden; under 0.5 is kept with the reading and applied to nothing.
