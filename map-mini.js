@@ -58,6 +58,27 @@
 // the main map to the point clicked. Not following, it stays where it is left —
 // dragged and scrolled on its own, its view remembered — and the outline moves
 // about inside it.
+//
+// ── While it is dragged ──────────────────────────────────────────────────────
+// Following, a drag is a way of choosing where the main map goes, so the red
+// outline is where it will go: it stays in the middle of the minimap, the
+// shape and size of the view, while the ground slides under it. Where the view
+// is now goes with the ground, in grey — the same outline, re-coloured, so it
+// is the main map's view to the pixel. Let go, the grey one slides into the
+// red one as the main map (or the 3-D camera) catches up, and goes. The red one
+// is drawn on a sheet of its own over the minimap (`.mn-minimap-next`), in the
+// minimap's own pixels rather than on the map: a drag moves everything on the
+// map, and Leaflet only redraws its shapes once the drag has ended, so a shape
+// on the map cannot be held still under the pointer.
+//
+// ── Its size ─────────────────────────────────────────────────────────────────
+// Small, medium or large from ⚙, or any size by its top-left corner — the one
+// corner that moves, since the other three stand on the map's edges. The grip
+// there drags it (or nudges it with the arrow keys); the size it ends at is
+// kept on this device as `own`, in pixels, and picking a named size again in ⚙
+// goes back to that. What is kept is what was measured, after the stylesheet's
+// caps to the map's rectangle, so a corner dragged past them does not leave a
+// size the minimap never reaches.
 
 const MapMini = (function () {
   const STORE = 'mn-minimap';
@@ -68,17 +89,23 @@ const MapMini = (function () {
   const OUT_MIN = 1, OUT_MAX = 8;     // zoom levels out from the main map
   const TOP = 18;                     // its nearest, not following
   const BOX = '#d50000';              // the main map's view: red, cased in white
+  const NOW = '#5f6368';              // …and, while a drag chooses the next, grey
+  const MIN_W = 128, MIN_H = 96;      // its smallest, by its corner
+  const MAX_PX = 4000;                // a kept size past any screen is not one
+  const NUDGE = 16;                   // an arrow key on the corner, in pixels
   const STATIONS = { all: 'Every station', repeaters: 'Repeaters and base stations', none: 'None' };
   const DEFAULTS = {
     open: true, size: 'm', base: 'same', names: true,
     stations: 'all', backbone: false, box: true,
     out: 4, follow: true, jump: true, view: null,
+    w: null, h: null,                 // its size by the corner (size 'own')
   };
 
   // 24-unit line drawings in currentColor (styles.css, .mn-minimap-ico).
   const ICO = {
     gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
     fold: '<path d="M7 7l10 10"/><path d="M17 9v8H9"/>',
+    grip: '<path d="M5 17L17 5"/><path d="M5 11l6-6"/>',
     open: '<rect x="3" y="4" width="18" height="16" rx="2"/><rect x="11.5" y="11.5" width="6.5" height="5.5" rx="1"/>',
   };
   const ico = d => `<svg class="mn-minimap-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${d}</svg>`;
@@ -91,9 +118,12 @@ const MapMini = (function () {
   let dots = null, dotsKey = null, dotsFor = null;
   let paths = null, pathsKey = null, pathsFor = null, pathsRenderer = null;
   let frame = null, frameCase = null, aim = null, boxRenderer = null;
+  let grey = false;                   // the outline is the grey one, a drag choosing the next
   let syncing = false;                // a move this file made, not the operator
+  let dragging = false;               // the operator is dragging it, following
   let leading = false;                // the main map is going where the minimap was dragged
-  let raf = 0, camRaf = 0;
+  let sizing = null;                  // its corner, while it is dragged
+  let raf = 0, camRaf = 0, sizeRaf = 0;
   let baseNames = null;
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -118,6 +148,14 @@ const MapMini = (function () {
       if (typeof saved[k] === 'boolean') c[k] = saved[k];
     }
     if (SIZES[saved.size]) c.size = saved.size;
+    else if (saved.size === 'own') {
+      const w = Math.round(Number(saved.w)), h = Math.round(Number(saved.h));
+      if (Number.isFinite(w) && Number.isFinite(h)) {
+        c.size = 'own';
+        c.w = clamp(w, MIN_W, MAX_PX);
+        c.h = clamp(h, MIN_H, MAX_PX);
+      }
+    }
     if (STATIONS[saved.stations]) c.stations = saved.stations;
     if (typeof saved.base === 'string') c.base = saved.base;   // checked against the set when drawn
     const out = Math.round(Number(saved.out));
@@ -191,7 +229,7 @@ const MapMini = (function () {
   const wantZoom = () => clamp(viewZoom() - cfg.out, mini.getMinZoom(), mini.getMaxZoom());
 
   function follow() {
-    if (!mini || !main || !cfg.follow || leading) return;
+    if (!mini || !main || !cfg.follow || leading || dragging) return;
     limits();
     quietly(() => mini.setView(viewCentre(), wantZoom(), { animate: false }));
   }
@@ -268,8 +306,17 @@ const MapMini = (function () {
 
   // Following, a drag is a way of moving the main map: it goes to where the
   // minimap was dragged to, and the minimap stays there rather than snapping
-  // back to the old centre for the length of the pan (`leading`).
+  // back to the old centre for the length of the pan (`leading`). From the
+  // drag's start to the main map's arrival the outline is grey and the red one
+  // stands in the middle ("While it is dragged").
+  function onMiniDragStart() {
+    if (!cfg.follow || !main) return;
+    dragging = true;
+    drawBox();
+  }
+
   function onMiniDragged() {
+    dragging = false;
     if (!cfg.follow || !main) return;
     leading = true;
     main.panTo(mini.getCenter());
@@ -384,6 +431,8 @@ const MapMini = (function () {
     if (!cfg.box) {
       for (const l of [frameCase, frame, aim]) if (l) l.remove();
       frameCase = frame = aim = null;
+      grey = false;
+      drawNext(null);
       return;
     }
     const ring = cam ? camRing() : null;
@@ -394,6 +443,7 @@ const MapMini = (function () {
       frameCase = L.rectangle(b, { ...o, color: '#ffffff', weight: 4, opacity: .85, fill: false }).addTo(mini);
       frame = L.rectangle(b, { ...o, color: BOX, weight: 2, opacity: 1, fillColor: BOX, fillOpacity: .1 }).addTo(mini);
       aim = L.circleMarker(at, { ...o, radius: 6, color: BOX, weight: 2, fill: false });
+      grey = false;
     }
     for (const l of [frameCase, frame]) { if (ring) l.setLatLngs(ring); else l.setBounds(b); }
     aim.setLatLng(at);
@@ -401,6 +451,37 @@ const MapMini = (function () {
     const ne = mini.latLngToContainerPoint(b.getNorthEast());
     const speck = Math.abs(ne.x - sw.x) < 10 && Math.abs(sw.y - ne.y) < 10;
     if (speck !== mini.hasLayer(aim)) { if (speck) aim.addTo(mini); else aim.remove(); }
+    const ahead = cfg.follow && (dragging || leading);
+    if (ahead !== grey) {
+      grey = ahead;
+      const ink = grey ? NOW : BOX;
+      frame.setStyle({ color: ink, fillColor: ink, dashArray: grey ? '5 4' : null });
+      aim.setStyle({ color: ink, dashArray: grey ? '3 3' : null });
+    }
+    drawNext(ahead ? (ring || [b.getNorthWest(), b.getNorthEast(), b.getSouthEast(), b.getSouthWest()]) : null, speck);
+  }
+
+  // The red outline while a drag chooses the next view: the view's shape, as
+  // the outline has it now, stood in the middle of the minimap — which is
+  // where the main map's centre goes when the drag is let go (the minimap's
+  // centre, onMiniDragged). Its corners in the minimap's pixels, from the
+  // view's centre at the minimap's zoom, so a 3-D wedge keeps its shape and
+  // its heading. Null takes it away.
+  function drawNext(ring, speck) {
+    const sheet = wrap && wrap.querySelector('.mn-minimap-next');
+    if (!sheet) return;
+    if (!ring || !mini) { sheet.classList.remove('is-on'); return; }
+    const z = mini.getZoom();
+    const c = mini.project(viewCentre(), z);
+    const o = mini.getSize().divideBy(2);
+    const pts = ring.map(ll => mini.project(ll, z).subtract(c).add(o));
+    const d = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    for (const el of sheet.querySelectorAll('polygon')) el.setAttribute('points', d);
+    const ringEl = sheet.querySelector('circle');
+    ringEl.setAttribute('cx', o.x);
+    ringEl.setAttribute('cy', o.y);
+    ringEl.style.display = speck ? '' : 'none';
+    sheet.classList.add('is-on');
   }
 
   // Said to a screen reader on the group's name. The map itself is hidden
@@ -445,6 +526,7 @@ const MapMini = (function () {
     drawBox();
     mini.on('zoomend', onMiniZoom);
     mini.on('moveend', onMiniMoved);
+    mini.on('dragstart', onMiniDragStart);
     mini.on('dragend', onMiniDragged);
     mini.on('click', onMiniClick);
   }
@@ -456,13 +538,17 @@ const MapMini = (function () {
     mini = removeMap(mini);
     dots = paths = frame = frameCase = aim = boxRenderer = pathsRenderer = null;
     dotsKey = pathsKey = dotsFor = pathsFor = null;
-    leading = false;
+    leading = dragging = grey = false;
+    drawNext(null);
   }
 
   function apply() {
     if (!wrap) return;
     wrap.classList.toggle('is-folded', !cfg.open);
     wrap.dataset.size = cfg.size;
+    for (const [k, v] of [['--mmini-w', cfg.w], ['--mmini-h', cfg.h]]) {
+      if (cfg.size === 'own' && v) wrap.style.setProperty(k, `${v}px`); else wrap.style.removeProperty(k);
+    }
     label();
     if (!cfg.open) { drop(); return; }
     if (!mini) { build(); return; }
@@ -480,6 +566,58 @@ const MapMini = (function () {
     // The button pressed has just gone; its opposite number takes the focus.
     const to = wrap && wrap.querySelector(open ? '.mn-map-mini-fold' : '.mn-map-mini-open');
     if (to) to.focus({ preventScroll: true });
+  }
+
+  // ── Its size, by its corner ────────────────────────────────────────────────
+  // Asked for, then measured ("Its size"): the bottom-right corner stays put,
+  // so a corner dragged up and left is a larger minimap. The map inside is
+  // re-measured about its centre, which following is still the main map's.
+  function setSize(w, h) {
+    if (!wrap) return;
+    wrap.style.setProperty('--mmini-w', `${Math.round(clamp(w, MIN_W, MAX_PX))}px`);
+    wrap.style.setProperty('--mmini-h', `${Math.round(clamp(h, MIN_H, MAX_PX))}px`);
+    wrap.dataset.size = cfg.size = 'own';
+    cfg.w = wrap.offsetWidth;
+    cfg.h = wrap.offsetHeight;
+    if (!mini) return;
+    quietly(() => mini.invalidateSize({ animate: false }));
+    follow();
+    drawBox();
+  }
+
+  function onGripDown(e) {
+    if (!wrap || e.button !== 0 || sizing) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    sizing = { id: e.pointerId, x: e.clientX, y: e.clientY, w: wrap.offsetWidth, h: wrap.offsetHeight, to: null };
+    wrap.classList.add('is-sizing');
+  }
+
+  // Once a frame at most, however many moves the pointer makes.
+  function onGripMove(e) {
+    if (!sizing || e.pointerId !== sizing.id) return;
+    sizing.to = [sizing.w + sizing.x - e.clientX, sizing.h + sizing.y - e.clientY];
+    if (!sizeRaf) sizeRaf = requestAnimationFrame(() => { sizeRaf = 0; if (sizing && sizing.to) setSize(...sizing.to); });
+  }
+
+  function onGripUp(e) {
+    if (!sizing || e.pointerId !== sizing.id) return;
+    if (sizeRaf) { cancelAnimationFrame(sizeRaf); sizeRaf = 0; }
+    const to = sizing.to;
+    sizing = null;
+    if (wrap) wrap.classList.remove('is-sizing');
+    if (!to) return;                  // pressed and let go: nothing moved
+    setSize(...to);
+    save();
+  }
+
+  // The arrow keys move the corner, as a drag would: left and up larger.
+  function onGripKey(e) {
+    const d = { ArrowLeft: [NUDGE, 0], ArrowRight: [-NUDGE, 0], ArrowUp: [0, NUDGE], ArrowDown: [0, -NUDGE] }[e.key];
+    if (!d || !wrap) return;
+    e.preventDefault();
+    setSize(wrap.offsetWidth + d[0], wrap.offsetHeight + d[1]);
+    save();
   }
 
   // ── Its settings ───────────────────────────────────────────────────────────
@@ -522,7 +660,9 @@ const MapMini = (function () {
           <span class="mmini-val" aria-hidden="true">${esc(outText())}</span>
         </div>
         ${check('jump', 'Click the minimap to send the map there')}
-        <fieldset class="mmini-set mmini-set--row"><legend>Size</legend>${radios('size', SIZES)}</fieldset>
+        <fieldset class="mmini-set mmini-set--row"><legend>Size</legend>${radios('size',
+          cfg.size === 'own' ? { ...SIZES, own: `Yours (${cfg.w} × ${cfg.h})` } : SIZES)}</fieldset>
+        <p class="filter-note">Or drag the minimap's top-left corner to any size.</p>
         <p class="filter-note">Scrolling over the minimap zooms the minimap, not the map. Following,
           that is how far out it sits; the next move of the map keeps it.</p>
         <div class="modal-foot">
@@ -546,8 +686,9 @@ const MapMini = (function () {
       cfg.base = t.value;
       setBase();
     } else if (k === 'stations' || k === 'size') {
-      if (!t.checked) return;
+      if (!t.checked || t.value === 'own') return;
       cfg[k] = t.value;
+      if (k === 'size') cfg.w = cfg.h = null;
       if (k === 'stations') drawStations(true); else apply();
     } else {
       cfg[k] = !!t.checked;
@@ -597,6 +738,13 @@ const MapMini = (function () {
     wrap.setAttribute('role', 'group');
     wrap.innerHTML = `
       <div class="mn-minimap-map" aria-hidden="true"></div>
+      <svg class="mn-minimap-next" aria-hidden="true" focusable="false">
+        <polygon fill="none" stroke="#ffffff" stroke-width="4" stroke-opacity=".85" stroke-linejoin="round"/>
+        <polygon fill="${BOX}" fill-opacity=".1" stroke="${BOX}" stroke-width="2" stroke-linejoin="round"/>
+        <circle r="6" fill="none" stroke="${BOX}" stroke-width="2"/>
+      </svg>
+      <button type="button" class="mn-minimap-grip" aria-label="Resize the minimap — drag, or use the arrow keys"
+              title="Drag to make the minimap bigger or smaller">${ico(ICO.grip)}</button>
       <div class="mn-minimap-tools">
         <button type="button" class="mn-minimap-btn mn-map-mini-gear" aria-haspopup="dialog"
                 title="Minimap settings — what it shows and how it moves" aria-label="Minimap settings">${ico(ICO.gear)}</button>
@@ -609,6 +757,12 @@ const MapMini = (function () {
     wrap.querySelector('.mn-map-mini-gear').addEventListener('click', openSettings);
     wrap.querySelector('.mn-map-mini-fold').addEventListener('click', () => setOpen(false));
     wrap.querySelector('.mn-map-mini-open').addEventListener('click', () => setOpen(true));
+    const grip = wrap.querySelector('.mn-minimap-grip');
+    grip.addEventListener('pointerdown', onGripDown);
+    grip.addEventListener('pointermove', onGripMove);
+    grip.addEventListener('pointerup', onGripUp);
+    grip.addEventListener('pointercancel', onGripUp);
+    grip.addEventListener('keydown', onGripKey);
     // A resize moves the outline as a pan does. The minimap's own size, which
     // the stylesheet caps to the main map's, is re-measured with every other
     // live map's (invalidateMapSizes), not from here: once is the rule.
@@ -631,6 +785,8 @@ const MapMini = (function () {
     }
     camera(null);
     drop();
+    if (sizeRaf) { cancelAnimationFrame(sizeRaf); sizeRaf = 0; }
+    sizing = null;
     if (wrap) wrap.remove();
     wrap = null;
     main = null;
@@ -646,7 +802,7 @@ const MapMini = (function () {
     if (cam) { cam.off('move', onCamMove); cam.off('moveend', onCamSettled); }
     if (camRaf) { cancelAnimationFrame(camRaf); camRaf = 0; }
     cam = m || null;
-    leading = false;
+    leading = dragging = false;
     if (cam) { cam.on('move', onCamMove); cam.on('moveend', onCamSettled); }
     if (mini && main) { follow(); drawBox(); }
   }
@@ -675,6 +831,13 @@ const MapMini = (function () {
       dots: dots ? dots.getLayers().length : 0,
       paths: paths ? paths.getLayers().length / 2 : 0,
       box: !!frame, aim: !!(aim && mini && mini.hasLayer(aim)),
+      // While a drag chooses the next view: the outline grey, and the red
+      // one's corners in the minimap's pixels, standing in its middle.
+      grey,
+      next: (() => {
+        const sheet = wrap && wrap.querySelector('.mn-minimap-next.is-on polygon');
+        return sheet ? sheet.getAttribute('points').split(' ').map(p => p.split(',').map(Number)) : null;
+      })(),
       // The outline's corners, and whether they are the 3-D camera's.
       outline: frame ? frame.getLatLngs()[0].map(ll => [ll.lat, ll.lng]) : null,
       camera: !!cam,

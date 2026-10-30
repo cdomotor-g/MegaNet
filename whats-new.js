@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 160, date: '2026-10-30', items: [
+      '🗺️ <strong>The minimap can be any size.</strong> Drag its top-left corner to make it bigger or smaller — or, with the '
+        + 'corner focused, use the arrow keys. This device keeps the size; <em>Small</em>, <em>Medium</em> and <em>Large</em> in its '
+        + '<strong>⚙</strong> still put it back to one of those.',
+      '🗺️ <strong>Dragging the minimap shows where the map will go.</strong> The red outline now stays in the middle of the '
+        + 'minimap while you drag — that is where the map\'s view will be when you let go — and a grey outline moves with the '
+        + 'ground to show where the view is now.',
+    ] },
     { n: 159, date: '2026-10-30', items: [
       '📸 <strong>A Field Camera photo is only filed once.</strong> If your phone also saved a Field Camera photo into its photo '
         + 'library, and that library is later added in <strong>Field Photos</strong> (from an iCloud zip, say, or a Dropbox or Google '

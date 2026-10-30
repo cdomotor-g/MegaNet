@@ -8555,7 +8555,9 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 
    Its height is capped short of ↺ at the top of the stage and its width short
    of the stage's sides, so a large one on a small map is as large as fits —
-   map-mini.js re-measures it when the main map changes size. */
+   map-mini.js re-measures it when the main map changes size. A size set by
+   its corner is the two variables inline on it (map-mini.js, "Its size"),
+   under the same caps. */
 .mn-minimap {
   --mmini-w: 232px;
   --mmini-h: 174px;
@@ -8583,6 +8585,54 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   position: absolute;
   inset: 0;
 }
+
+/* The red outline while a drag chooses the next view (map-mini.js, "While it
+   is dragged"): a sheet over the minimap's panes — the map pane is 400 in
+   here — drawn in its pixels, taking no pointer, so the drag under it goes on
+   being the map's. */
+.mn-minimap-next {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 500;
+  pointer-events: none;
+  display: none;
+}
+
+.mn-minimap-next.is-on { display: block; }
+
+/* Its corner, top left inside it: the one corner that moves, since the other
+   three stand on the map's edges. A grip rather than a button the size of ⚙
+   and fold — it is grabbed, not pressed — on a tab of the frame's colour. */
+.mn-minimap-grip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1001;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 0 0 var(--r-sm, 6px) 0;
+  background: var(--panel);
+  color: var(--muted);
+  opacity: .9;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.mn-minimap-grip:hover,
+.mn-minimap.is-sizing .mn-minimap-grip { color: var(--text); opacity: 1; }
+.mn-minimap-grip:focus-visible { outline-offset: -2px; }
+.mn-minimap-grip .mn-minimap-ico { width: 14px; height: 14px; }
+
+/* While it is being sized, nothing on it is selected or hovered. */
+.mn-minimap.is-sizing { user-select: none; }
+.mn-minimap.is-sizing .mn-minimap-map { pointer-events: none; }
 
 /* ⚙ and fold, top right inside it — over the minimap's own panes and its own
    Leaflet corners, which it has none of. */
@@ -8632,6 +8682,8 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 }
 
 .mn-minimap.is-folded .mn-minimap-map,
+.mn-minimap.is-folded .mn-minimap-next,
+.mn-minimap.is-folded .mn-minimap-grip,
 .mn-minimap.is-folded .mn-minimap-tools { display: none; }
 
 .mn-minimap.is-folded .mn-map-mini-open {
@@ -8649,6 +8701,8 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 /* A finger's worth on a touch screen. */
 @media (pointer: coarse) {
   .mn-minimap-btn { width: 36px; height: 36px; }
+  .mn-minimap-grip { width: 32px; height: 32px; }
+  .mn-minimap-grip .mn-minimap-ico { width: 18px; height: 18px; }
   .mn-minimap.is-folded .mn-map-mini-open { width: 44px; height: 44px; }
 }
 

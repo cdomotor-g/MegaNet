@@ -234,7 +234,7 @@ const Capabilities = (function () {
         { name: 'Station trail', tab: 'stations', where: 'map › 📍 in the top row',
           what: 'The stations you have looked at this session, to go back to any of them.', find: 'recent history' },
         { name: 'Minimap', tab: 'stations', where: 'map › 🗺️ Layers › Show the minimap', open: L('minimap'),
-          what: 'A small overview showing where the main view is — in 3-D, the ground the camera sees.' },
+          what: 'A small overview showing where the main view is — in 3-D, the ground the camera sees. Drag its top-left corner to resize it.' },
         { name: 'Full screen, clear and reset', tab: 'stations', where: 'map › ⛶, 🧹 and ↺',
           what: 'The map filling the window; 🧹 clears picks and drawings, ↺ the filters as well.' },
         { name: '3-D view', tab: 'stations', where: 'map › 3-D view',

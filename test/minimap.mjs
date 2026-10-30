@@ -9,7 +9,12 @@
 //   3. **The wheel** — over the minimap it zooms the minimap and not the map,
 //      and how far out it was left is how far out it stays as the map moves.
 //   4. **Drag and click** — a drag takes the map along when it is let go and
-//      the minimap does not snap back; a click sends the map to the point.
+//      the minimap does not snap back; while it is held, the outline is grey
+//      and moves with the ground, and a red one of the view's size stands in
+//      the middle; a click sends the map to the point.
+//   4b. **Its corner** — the grip top left resizes it with a real mouse, the
+//      bottom-right corner staying put; the arrow keys nudge it; it stops at
+//      its smallest and at the map's caps, and keeps the size it was left at.
 //   5. **⚙** — the dialog's every setting applies as it is changed and is
 //      remembered: the base (its credit in the map's credit line), place
 //      names, which stations, the backbone, the outline, following, how far
@@ -77,6 +82,22 @@ async function settle(page) {
   }, null, { timeout: 10_000 });
   await page.waitForTimeout(200);
 }
+
+// The outline as drawn on the minimap: its colour, and its corners in the
+// minimap's pixels (left, top, right, bottom) — where the main map's view is.
+const outlineNow = `(() => {
+  const n = MapMini.map(), b = state.map.getBounds();
+  let color = null;
+  n.eachLayer(l => { if (l instanceof L.Rectangle && l.options.fillOpacity > 0) color = l.options.color; });
+  const nw = n.latLngToContainerPoint(b.getNorthWest()), se = n.latLngToContainerPoint(b.getSouthEast());
+  const sheet = document.querySelector('.mn-minimap-next');
+  const d = MapMini.drawn();
+  return { color, box: [nw.x, nw.y, se.x, se.y], size: [n.getSize().x, n.getSize().y],
+           grey: d.grey, next: d.next, sheet: !!sheet && getComputedStyle(sheet).display !== 'none' };
+})()`;
+// A polygon's box, [left, top, right, bottom].
+const boxOf = pts => [Math.min(...pts.map(p => p[0])), Math.min(...pts.map(p => p[1])),
+                      Math.max(...pts.map(p => p[0])), Math.max(...pts.map(p => p[1]))];
 
 // The two maps' views, the outline's bounds, the box the minimap stands in.
 const read = `(() => {
@@ -201,6 +222,17 @@ async function main() {
     await page.mouse.move(c.x, c.y);
     await page.mouse.down();
     for (let i = 1; i <= 8; i++) await page.mouse.move(c.x - 5 * i, c.y);
+    // Held: Leaflet moves its pane on the next frame.
+    await page.waitForTimeout(100);
+    const held = await page.evaluate(outlineNow);
+    const nb = held.next ? boxOf(held.next) : null;
+    const gw = held.box[2] - held.box[0], gh = held.box[3] - held.box[1];
+    check('held mid-drag: the outline turns grey and moves with the ground — still the map\'s view, 40 px west',
+      held.grey && held.color === '#5f6368' && near((held.box[0] + held.box[2]) / 2, held.size[0] / 2 - 40, 2)
+        && near((held.box[1] + held.box[3]) / 2, held.size[1] / 2, 2), J(held));
+    check('…and a red one of the same size stands in the middle of the minimap, where the map will go',
+      held.sheet && !!nb && near((nb[0] + nb[2]) / 2, held.size[0] / 2, 1) && near((nb[1] + nb[3]) / 2, held.size[1] / 2, 1)
+        && near(nb[2] - nb[0], gw, 1) && near(nb[3] - nb[1], gh, 1), J({ next: nb, grey: held.box, size: held.size }));
     await page.mouse.up();
     await page.waitForTimeout(500);
     await settle(page);
@@ -209,6 +241,10 @@ async function main() {
       S.main.lng > before.lng + 0.5 && near(S.main.lat, before.lat, 0.05), J({ before, after: S.main }));
     check('…and the minimap is where it was dragged to, centred on the map again',
       centred(S) && S.mini.z === 5, J({ main: S.main, mini: S.mini }));
+    const after = await page.evaluate(outlineNow);
+    check('…the outline red again, in the middle, and the grey one and the sheet gone',
+      !after.grey && after.color === '#d50000' && !after.next && !after.sheet
+        && near((after.box[0] + after.box[2]) / 2, after.size[0] / 2, 1.5), J(after));
 
     const target = await page.evaluate(({ x, y }) => {
       const n = MapMini.map(), b = n.getContainer().getBoundingClientRect();
@@ -222,6 +258,57 @@ async function main() {
     const tol = lngPx(S.mini.z, 2);
     check('a click on the minimap sends the map to the point clicked', near(S.main.lat, target.lat, tol) && near(S.main.lng, target.lng, tol),
       J({ target, main: S.main, tol }));
+
+    // ── Its corner ──────────────────────────────────────────────────────────────
+    log('\nIts corner\n');
+    S = await g();
+    const gripAt = () => page.evaluate(() => {
+      const el = document.querySelector('.mn-minimap-grip'), r = el.getBoundingClientRect();
+      return { left: r.left, top: r.top, width: r.width, height: r.height, cursor: getComputedStyle(el).cursor };
+    });
+    let grip = await gripAt();
+    check('a grip in its top-left corner, the resize cursor over it',
+      near(grip.left, S.wrap.left, 3) && near(grip.top, S.wrap.top, 3) && grip.width >= 20 && grip.cursor === 'nwse-resize',
+      J({ grip, wrap: S.wrap }));
+    const dragGrip = async (dx, dy, to) => {
+      grip = await gripAt();
+      const gx = grip.left + grip.width / 2, gy = grip.top + grip.height / 2;
+      await page.mouse.move(gx, gy);
+      await page.mouse.down();
+      for (let i = 1; i <= 10; i++) {
+        await page.mouse.move(to ? gx + (to.x - gx) * i / 10 : gx + dx * i / 10, to ? gy + (to.y - gy) * i / 10 : gy + dy * i / 10);
+      }
+      await page.mouse.up();
+      await page.waitForTimeout(150);
+      await settle(page);
+      return g();
+    };
+    const w0 = S.wrap;
+    S = await dragGrip(-100, -60);
+    check('dragged up and left 100 × 60, it is 100 × 60 larger, its bottom-right corner where it was',
+      near(S.wrap.width, w0.width + 100, 1) && near(S.wrap.height, w0.height + 60, 1)
+        && near(S.wrap.right, w0.right, .5) && near(S.wrap.bottom, w0.bottom, .5), J({ before: w0, after: S.wrap }));
+    check('…the map inside re-measured, still centred on the map and as far out as it was',
+      near(S.mapBox.width, S.wrap.width - 4, 1) && await page.evaluate(() => MapMini.map().getSize().x) === Math.round(S.mapBox.width)
+        && centred(S) && S.mini.z === S.main.z - 5, J({ mapBox: S.mapBox, main: S.main, mini: S.mini }));
+    check('…and kept on this device as its own size',
+      S.saved.size === 'own' && S.saved.w === Math.round(S.wrap.width) && S.saved.h === Math.round(S.wrap.height), J(S.saved));
+    const w1 = S.wrap;
+    await page.focus('.mn-minimap-grip');
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowDown');
+    await settle(page);
+    S = await g();
+    check('the arrow keys on the grip move the corner: left 16 px wider, down 16 px shorter',
+      near(S.wrap.width, w1.width + 16, 1) && near(S.wrap.height, w1.height - 16, 1) && S.saved.w === Math.round(S.wrap.width),
+      J({ before: w1, after: S.wrap }));
+    S = await dragGrip(600, 600);
+    check('dragged far down and right, it stops at its smallest, 128 × 96', near(S.wrap.width, 128, 1) && near(S.wrap.height, 96, 1)
+      && near(S.wrap.right, w0.right, .5), J(S.wrap));
+    S = await dragGrip(0, 0, { x: 2, y: 2 });
+    check('dragged to the window\'s corner, it stops inside the map, and what is kept is what it reached',
+      S.wrap.left >= S.stage.left && S.wrap.top >= S.stage.top + 40 && S.wrap.width > 400
+        && S.saved.w === Math.round(S.wrap.width) && S.saved.h === Math.round(S.wrap.height), J({ wrap: S.wrap, stage: S.stage, saved: S.saved }));
 
     // ── ⚙ ───────────────────────────────────────────────────────────────────────
     log('\n⚙ Minimap settings\n');
@@ -280,10 +367,14 @@ async function main() {
     check('…a speck of an outline, ringed', S.drawn.aim, J(S.drawn));
     await set('#mmini-out', 4);
 
+    check('Size: the corner\'s size is offered as Yours, and picked',
+      await page.evaluate(() => { const r = document.querySelector('#mmini-settings [data-mmini="size"][value="own"]');
+        return !!r && r.checked && /Yours \(\d+ × \d+\)/.test(r.parentNode.textContent); }));
     await set('[data-mmini="size"][value="l"]', true);
     S = await g();
-    check('Size → Large: 320 × 240, the map inside re-measured', near(S.wrap.width, 320, 1) && near(S.wrap.height, 240, 1)
-      && await page.evaluate(() => MapMini.map().getSize().x > 300), J(S.wrap));
+    check('Size → Large: 320 × 240 — the corner\'s size let go — the map inside re-measured',
+      near(S.wrap.width, 320, 1) && near(S.wrap.height, 240, 1) && S.saved.size === 'l' && S.saved.w === null
+      && await page.evaluate(() => MapMini.map().getSize().x > 300), J({ wrap: S.wrap, saved: S.saved }));
 
     await set('[data-mmini="follow"]', false);
     check('Follow off: How far out stands down', await page.evaluate(() => document.getElementById('mmini-out').disabled));
@@ -308,6 +399,16 @@ async function main() {
     check('…a wheel zooms only the minimap, about the pointer, and where it was left is remembered',
       S.mini.z === fixed.z + 1 && S.mini.lng > fixed.lng && S.saved.view && S.saved.view.z === S.mini.z
         && S.main.z === 10, J({ mini: S.mini, saved: S.saved.view, main: S.main.z }));
+    await page.mouse.move(c.x, c.y);
+    await page.mouse.down();
+    for (let i = 1; i <= 6; i++) await page.mouse.move(c.x - 5 * i, c.y - 3 * i);
+    await page.waitForTimeout(100);
+    const loose = await page.evaluate(outlineNow);
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    check('…a drag, not following, moves only the minimap: the outline stays red and goes with it, nothing in the middle',
+      !loose.grey && loose.color === '#d50000' && !loose.next && !loose.sheet, J(loose));
+    S = await g();
     const main0 = S.main;
     await page.mouse.click(c.x - 40, c.y + 20);
     await page.waitForTimeout(400);
@@ -386,6 +487,8 @@ async function main() {
     await pp.waitForTimeout(300);
     S = await pp.evaluate(read);
     check('tapped, it is the small one', !S.folded && !!S.mini && near(S.wrap.width, 168, 1), J(S.wrap));
+    const pgrip = await pp.evaluate(() => { const r = document.querySelector('.mn-minimap-grip').getBoundingClientRect(); return { width: r.width, height: r.height }; });
+    check('…its corner\'s grip a finger\'s worth', pgrip.width >= 32 && pgrip.height >= 32, J(pgrip));
     await phone.close();
 
     check('nothing threw for the whole run', errors.length === 0, errors.slice(0, 3).join(' | '));
