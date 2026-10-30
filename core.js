@@ -3686,8 +3686,11 @@ const DB_SCHEMA = 'meganet';
 // applied together on 27 October 2026, bumped after. 86: each address's
 // newest reading kept by a trigger (0086), applied by hand, bumped after. 87:
 // readings in time order indexed, the roll-ups by range (0087), applied by
-// db-migrate.yml on 28 October 2026, bumped after.
-const DB_SCHEMA_VERSION = 88;
+// db-migrate.yml on 28 October 2026, bumped after. 88: submission days found
+// a probe a day for the archive (0088). 89: the hourly roll-ups and the station
+// cards writing less (0089), applied by db-migrate.yml on 30 October 2026,
+// bumped after. Neither changes a shape the app reads.
+const DB_SCHEMA_VERSION = 89;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

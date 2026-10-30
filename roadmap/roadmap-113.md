@@ -836,6 +836,21 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 202 — 2026-10-30: 💾 The hourly roll-ups and the station cards writing less — 0089; the reception identity index rebuilt
+
+The owner, on revision 200's follow-ups: *"I don't think you need to raise agent issues. Just start tackling them in this chat here, please. Go for it."* No issue; this entry is its record. **Opens and closes nothing.**
+
+- **Since `0087`**: `roll_up_carriers()` averaged 9 s an hour, down from 42 s (3 s just after midnight UTC, 13 s by its end, 25 s at 03:11); `roll_up()` 2.8 s, down from 18 s. Next heaviest: `roll_up_receptions()` at 5.4 s an hour.
+- **`0089`** (each change measured on the live database, each giving the same rows):
+  - `roll_up_carriers_day()`: the join pairing a receiver's bursts within 5 s said its lower bound only inside an OR, so every burst scanned the receiver's day up to itself, and the cost grew with the square of the day. With `y.t >= x.t` said on its own it runs **2.6 s → 26 ms** with the same 3,383 pairs. The split bursts are counted in one pass instead of one per receiver (1.2 s), and `carrier_tx()` is asked once for each side of a pair instead of up to five times (1.7 s). Against the old forms on yesterday's data, 0 of 976 pair rows and 0 receivers' split counts differ. A full day **~11–13 s → 6.3 s**.
+  - `roll_up_receptions()`: `reception_detail()` once a row, not 13 times a statement. An hour **1.4 s → 0.18 s**; the run **5.4 s → 0.5 s**. The groups, counts, minima and maxima are identical, and the sums of doubles agree to 1e-11.
+  - `report_station_cards()`: an unchanged card (three in four each run) is passed over before the upsert, whose on-conflict row lock was a write. 677 MB of WAL in nine days before this.
+  - `ingest_token_id()`: `last_used_at` is stamped at most once a minute instead of on every post (~20,000 updates a day).
+  - **Numbered `0089`, not `0088`**: revision 201's `0088_archive_due_raw.sql` went live first, so the first push as `0088` applied nothing and the file was renumbered. Applied by `db-migrate.yml` in 5 s.
+- **`reception_identity` rebuilt** (`reindex … concurrently`, from the session; no schema change): **130 MB → 72 MB**. Its entries are ~74 bytes, so the rest was bloat from `0072`'s rewrite of every row, not a wide key. One `report_receptions` post timed out during the rebuild's final swap (04:10:59 UTC). The sender retried it: that minute's receptions are all there, 4 of them stored after the timeout.
+- **Not done, and why**: keyset paging for Station Health. Since `0087`'s index, a 12-hour chunk's 11 pages cost 0.50 s by offset against 0.26 s by keyset, all from cache, about 50 s of database time a day; not worth changing three clients. `health_apply()` still rewrites every open finding on each run (its `last_seen` is in the agent API), and `refresh_base_station_findings()` still creates two temporary tables every five minutes; both left as they are.
+- **Checks:** every migration from zero on Postgres 16 with both `0088` and `0089`, then `check_ingest` (50), `check_mqtt` (79), `check_receptions`, `check_reception_rollups` (21), `check_archive` (23), `check_transmitter_drift` (42), `check_flip_fingerprints` (27), `check_station_snr` (32), `check_health_cards` (19), `check_base_stations` (60), and before the renumbering also `check_ingest_points`, `check_ingest_token_admin`, `check_reception_detail`, `check_reading_signal`, `check_reading_latest`, `check_ingest_token_requests`, `check_base_station_links`, `check_base_station_channels`, `check_health_findings`; the old and new forms compared on live data; the cheap five. `core.js` `DB_SCHEMA_VERSION` 89.
+
 ### Revision 201 — 2026-10-29: 💾 The nightly archive back under the time limit — 0088
 
 The owner, forwarding GitHub's *"Data archive into R2: All jobs have failed"*: *"This looks bad. Please fix?"* **Opens nothing; closes nothing; #243 stays open for its one check.**
