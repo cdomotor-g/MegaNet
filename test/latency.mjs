@@ -67,6 +67,20 @@
 //      repeater is named for not heard direct, so all blue and nothing red;
 //      a message no copy matches all blue; signed out, the
 //      card says every hop is blue and why, and the receptions are not asked.
+//   5d. **Activity only, and a replay** — ticked, every pane over the base
+//      map hidden (the pins and links, their names) and the tiles and the
+//      pulse canvas left, not remembered; a message lights its station, drawn
+//      on the canvas in its own fill, and a station nobody heard from is not
+//      there at all; unticked, the map is back; ticked with the animation off
+//      it turns it on. Replay the last 1 h: its readings asked for by
+//      reading_ts in order, the log not watched while it is loaded, the 🔑
+//      legend saying so, a station's transmissions one message each; at 60×
+//      the pulses run with a glow cut to a second and a half; + and − step the
+//      speed, the focus kept; paused, the clock and the canvas stop; dragged
+//      along its bar, the clock is put there; at full speed under Activity
+//      only, played to the end — each message lit at once, its station drawn
+//      on the canvas, and every one of them gone from it two seconds later; ■
+//      hands back to the log; ⏻ stops a replay and Activity only with it.
 //   6. **One colouring at a time** — Colour pins by health turns latency off,
 //      and latency turns health off; the 🔑 legend carries whichever is on;
 //      the signal bars stay beside the pins under health's colours.
@@ -121,6 +135,7 @@ async function standIn(page) {
     // The last-heard batch; a card's readings; the window's pages.
     const kind = rel === 'station_health' ? 'network'
       : /[?&]received_at=gt\./.test(url) ? 'live'
+      : /[?&]reading_ts=gte\./.test(url) && /[?&]select=[^&]*\bsource\b/.test(url) ? 'replay'
       : /[?&]or=/.test(url) || /[?&]station_id=eq\./.test(url) ? 'card' : 'window';
     asked.push({ kind, url: decodeURIComponent(url) });
     if (MODE === 'down') return route.abort('connectionrefused');
@@ -931,6 +946,165 @@ try {
         && later.fired.includes(way.st) && !later.held.includes(way.st) && later.rx.played === 1 && later.rx.matched === 1,
       J({ wait, later }));
   }
+
+  // ── 5d. Activity only, and a replay ───────────────────────────────────
+  log('\n5d. Activity only, and a replay\n');
+  // The canvas cleared of what 5b and 5c lit, the animation on.
+  await page.evaluate(() => { MapLatency.setAnim(false, { quiet: true }); MapLatency.setAnim(true, { quiet: true }); });
+  const solo0 = await page.evaluate(async () => {
+    const box = () => document.querySelector('#map-latency-panel [data-lat-f="solo"]');
+    const had = box().checked;
+    box().click();
+    await new Promise(r => setTimeout(r, 50));
+    const c = state.map.getContainer();
+    const vis = sel => { const el = c.querySelector(sel); return el ? getComputedStyle(el).visibility : null; };
+    return { had, ticked: box().checked, cls: c.classList.contains('lat-solo'), solo: MapLatency.solo(),
+             overlay: vis('.leaflet-overlay-pane'), tooltip: vis('.leaflet-tooltip-pane'),
+             tiles: vis('.leaflet-tile-pane'), pulse: vis('.leaflet-mnLatPulse-pane'),
+             stored: Object.keys(localStorage).filter(k => /solo/.test(k)) };
+  });
+  check('Activity only, ticked: every pane over the base map hidden — the pins and links, their names — the tiles and the pulse canvas left, and not remembered',
+    !solo0.had && solo0.ticked && solo0.cls && solo0.solo && solo0.overlay === 'hidden' && solo0.tooltip === 'hidden'
+      && solo0.tiles === 'visible' && solo0.pulse === 'visible' && solo0.stored.length === 0, J(solo0));
+  if (pick) {
+    const lit = await page.evaluate(async id => {
+      const s = state.data.stations.find(x => x.id === id);
+      state.map.setView([s.lat, s.lon], 11, { animate: false });
+      await new Promise(r => setTimeout(r, 300));
+      MapLatency._fire(id, { keys: [] });
+      const t0 = performance.now();
+      while (!MapLatency._live().glowing.includes(id) && performance.now() - t0 < 6000) await new Promise(r => setTimeout(r, 25));
+      await new Promise(r => setTimeout(r, 400));
+      const cv = document.querySelector('.lat-pulse-canvas');
+      const dpr = window.devicePixelRatio || 1;
+      const px = (x, y) => Array.from(cv.getContext('2d').getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data);
+      const m = state.mapMarkers.find(x => x.mnStationId === id);
+      const p = state.map.latLngToContainerPoint(m.getLatLng());
+      // A pin in view that no pulse has lit, well clear of every lit one.
+      const lit = new Set(MapLatency._replay().pulses.flatMap(q => q.nodes));
+      const at = lit.size ? [...lit].map(x => state.mapMarkers.find(k => k.mnStationId === x)).filter(Boolean)
+        .map(k => state.map.latLngToContainerPoint(k.getLatLng())) : [];
+      const size = state.map.getSize();
+      const other = state.mapMarkers.map(k => ({ k, q: state.map.latLngToContainerPoint(k.getLatLng()) }))
+        .find(({ k, q }) => !lit.has(k.mnStationId) && q.x > 20 && q.y > 20 && q.x < size.x - 20 && q.y < size.y - 20
+          && at.every(a => Math.hypot(a.x - q.x, a.y - q.y) > 40));
+      return { inside: px(p.x, p.y), fill: m.options.fillColor, glowing: MapLatency._live().glowing.includes(id),
+               other: other ? px(other.q.x, other.q.y) : null };
+    }, pick.id);
+    const rgb = h => { const v = parseInt(String(h).replace('#', ''), 16); return [v >> 16 & 255, v >> 8 & 255, v & 255]; };
+    const near = (a, b) => a.slice(0, 3).every((x, i) => Math.abs(x - b[i]) <= 4);
+    check('…a message lights its station: drawn on the pulse canvas, inside its glow, in its own fill — and a station nobody heard from is not there',
+      lit.glowing && lit.inside[3] > 240 && near(lit.inside, rgb(lit.fill)) && lit.other && lit.other[3] < 10, J(lit));
+  }
+  const solo1 = await page.evaluate(() => {
+    MapLatency.setSolo(false);
+    const c = state.map.getContainer();
+    const out = { cls: c.classList.contains('lat-solo'), overlay: getComputedStyle(c.querySelector('.leaflet-overlay-pane')).visibility };
+    MapLatency.setAnim(false, { quiet: true });
+    MapLatency.setSolo(true);
+    Object.assign(out, { anim: MapLatency.anim(), cls2: c.classList.contains('lat-solo') });
+    return out;
+  });
+  check('unticked, the map is back; ticked with the animation off, it turns the animation on',
+    !solo1.cls && solo1.overlay === 'visible' && solo1.anim && solo1.cls2, J(solo1));
+
+  // Replay: the last hour of the demo week.
+  const lastHour = stub.tables.reading.filter(r => Date.parse(r.reading_ts) >= Date.now() - 3600e3
+    && ![3, 4].includes(Number(r.source))).length;
+  const rp0 = count('replay');
+  await page.evaluate(() => { MapLatency.setSolo(false); state.map.setZoom(8, { animate: false }); });
+  await page.click('#map-latency-panel [data-lat-f="replay:1h"]');
+  const rpLoaded = await waitTrue(page, () => MapLatency._replay().loaded && MapLatency._replay().pulses.length > 0);
+  const r1 = await page.evaluate(() => Object.assign(MapLatency._replay(), {
+    watching: MapLatency._live().watching, strip: document.documentElement.hasAttribute('data-lat-anim'),
+    card: document.getElementById('lat-rp-status').textContent.replace(/\s+/g, ' '),
+    legend: /Replaying the last 1 h/.test(document.getElementById('map-legend').textContent) }));
+  const rpAsked = asked.filter(a => a.kind === 'replay');
+  check('Replay the last 1 h: its readings asked for by when they were taken, in order — and the log not watched while it is loaded, the legend saying so',
+    rpLoaded && r1.on && r1.span === '1h' && count('replay') > rp0
+      && rpAsked.every(a => /reading_ts=gte\./.test(a.url) && /reading_ts=lt\./.test(a.url) && /order=reading_ts\.asc/.test(a.url))
+      && !r1.watching && !r1.strip && r1.legend && /Replaying|Paused|Played/.test(r1.card),
+    J({ on: r1.on, span: r1.span, asked: count('replay') - rp0, watching: r1.watching, strip: r1.strip, legend: r1.legend, card: r1.card }));
+  check('…a station\'s transmissions one message each: some, and no more than the hour\'s readings',
+    r1.msgs > 0 && r1.msgs <= lastHour, J({ msgs: r1.msgs, readings: lastHour }));
+  check('…at 60× the pulses run, their glow a second and a half on the screen',
+    r1.speed === 60 && r1.pulses.length > 0 && r1.pulses.every(p => !p.still && p.hold === 500 && p.fade === 1000 && p.life - p.anim === 1500),
+    J(r1.pulses.slice(0, 3)));
+  await page.click('#map-latency-panel [data-lat-f="rp-faster"]');
+  const sp1 = await page.evaluate(() => ({ a: MapLatency._replay().speed,
+    word: document.querySelector('#map-latency-panel .lat-rp-speed').textContent }));
+  await page.click('#map-latency-panel [data-lat-f="rp-slower"]');
+  const sp = await page.evaluate(sp1 => Object.assign(sp1, { b: MapLatency._replay().speed,
+    focus: document.activeElement && document.activeElement.dataset.latF }), sp1);
+  check('+ and − step the speed, saying it, the focus kept', sp.a === 120 && sp.word === '120×' && sp.b === 60 && sp.focus === 'rp-slower', J(sp));
+  const ps = await page.evaluate(async () => {
+    document.querySelector('#map-latency-panel [data-lat-f="rp-play"]').click();
+    const a = MapLatency._replay();
+    await new Promise(r => setTimeout(r, 400));
+    const b = MapLatency._replay();
+    MapLatency.replaySeek(0.5);
+    const c = MapLatency._replay();
+    return { playing: a.playing, held: a.held, still: a.clock === b.clock, label: document.querySelector('#map-latency-panel [data-lat-f="rp-play"]').getAttribute('aria-label'),
+             half: Math.abs(c.clock - (c.t0 + (c.t1 - c.t0) / 2)) < 1000, heldAfter: c.held, idx: c.idx, msgs: c.msgs };
+  });
+  check('⏸ pauses it: its clock and the canvas stop; dragged along its bar, the clock is put there, still paused',
+    !ps.playing && ps.held && ps.still && /Play the replay/.test(ps.label) && ps.half && ps.heldAfter && ps.idx <= ps.msgs, J(ps));
+  // At full speed, under Activity only, to the end.
+  const fast = await page.evaluate(async () => {
+    MapLatency.setSolo(true);
+    for (let i = 0; i < 20; i++) MapLatency.replayFaster();
+    // From its start, what the seek lit at 60× gone, with every station on the map in view.
+    state.map.fitBounds(L.latLngBounds(state.mapMarkers.map(k => k.getLatLng())), { animate: false });
+    await new Promise(r => setTimeout(r, 200));
+    MapLatency.replaySeek(0);
+    document.querySelector('#map-latency-panel [data-lat-f="rp-play"]').click();
+    const t0 = performance.now();
+    while (!MapLatency._replay().done && performance.now() - t0 < 8000) await new Promise(r => requestAnimationFrame(r));
+    const at = MapLatency._replay();
+    const cv = document.querySelector('.lat-pulse-canvas');
+    const dpr = window.devicePixelRatio || 1;
+    const ctx = cv.getContext('2d');
+    const size = state.map.getSize();
+    // A lit station in view, read on the canvas while it glows.
+    const shown = at.pulses.map(p => state.mapMarkers.find(k => k.mnStationId === p.id)).filter(Boolean)
+      .map(k => state.map.latLngToContainerPoint(k.getLatLng()))
+      .filter(q => q.x > 2 && q.y > 2 && q.x < size.x - 2 && q.y < size.y - 2)
+      .map(q => ctx.getImageData(Math.round(q.x * dpr), Math.round(q.y * dpr), 1, 1).data[3]);
+    await new Promise(r => setTimeout(r, 2200));
+    const all = ctx.getImageData(0, 0, cv.width, cv.height).data;
+    let left = 0;
+    for (let i = 3; i < all.length; i += 4) if (all[i]) left++;
+    const after = MapLatency._replay();
+    return { done: at.done, speed: at.speed, idx: at.idx, msgs: at.msgs, solo: at.solo, n: at.pulses.length,
+             flash: at.pulses.every(p => p.still && p.hold === 500 && p.fade === 1000), shown: shown.length, drawn: shown.filter(a => a > 240).length,
+             left, pulsesAfter: after.pulses.length,
+             card: document.getElementById('lat-rp-status').textContent.replace(/\s+/g, ' ') };
+  });
+  check('at full speed under Activity only, played to the end: each message lit at once, its station drawn on the canvas',
+    fast.done && fast.speed === 14400 && fast.idx === fast.msgs && fast.solo && fast.n > 0 && fast.flash
+      && fast.shown > 0 && fast.drawn === fast.shown && /Played to the end/.test(fast.card), J(fast));
+  check('…and every one of them faded to nothing two seconds later — the canvas empty', fast.left === 0 && fast.pulsesAfter === 0, J({ left: fast.left, pulses: fast.pulsesAfter }));
+  const stop = await page.evaluate(async () => {
+    document.querySelector('#map-latency-panel [data-lat-f="rp-stop"]').click();
+    await new Promise(r => setTimeout(r, 100));
+    return { on: MapLatency._replay().on, watching: MapLatency._live().watching, focus: !!document.activeElement,
+             legend: /Replaying/.test(document.getElementById('map-legend').textContent),
+             bar: !!document.getElementById('lat-rp-seek') };
+  });
+  check('■ hands back to the log: watched again, the replay\'s controls and legend gone', !stop.on && stop.watching && !stop.legend && !stop.bar, J(stop));
+  const pw2 = await page.evaluate(async () => {
+    MapLatency.replay('1h');
+    const a = { on: MapLatency._replay().on, solo: MapLatency._replay().solo };
+    document.querySelector('#map-latency-panel .lat-power').click();
+    const b = { replay: MapLatency._replay().on, solo: MapLatency.solo(), anim: MapLatency.anim(), on: MapLatency.on(),
+                cls: state.map.getContainer().classList.contains('lat-solo') };
+    document.querySelector('#map-latency-panel .lat-power').click();
+    await new Promise(r => setTimeout(r, 100));
+    return { a, b, again: { on: MapLatency.on(), anim: MapLatency.anim(), solo: MapLatency.solo() } };
+  });
+  check('⏻ stops a replay and Activity only with it, and on again brings neither back',
+    pw2.a.on && pw2.a.solo && !pw2.b.replay && !pw2.b.solo && !pw2.b.anim && !pw2.b.on && !pw2.b.cls
+      && pw2.again.on && pw2.again.anim && !pw2.again.solo, J(pw2));
 
   // ── 6. One colouring at a time ────────────────────────────────────────
   log('\n6. One colouring of the pins at a time\n');

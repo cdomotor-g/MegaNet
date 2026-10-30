@@ -185,13 +185,54 @@
 // map — a station heard direct by a base station, a repeater heard by one with
 // no backbone path between them — is drawn straight, pin to pin.
 //
+// ── Activity only ────────────────────────────────────────────────────────────
+// A box under the animation's: the map down to its base map and, on it, only
+// the stations a message has just lit. Every pane over the tiles but the base
+// map's place names, the pulse's own and the popups' is hidden (styles.css,
+// .lat-solo) — the pins, the links, their arrows and labels, the overlays —
+// and each station a pulse lights is drawn on the pulse canvas as the map
+// draws it (MapSymbols.drawPin): from the moment the spark reaches it, held
+// through its glow and faded with it, so the stations that just reported are
+// on the map and nothing else is. The station, the repeaters that carried it
+// and the base that heard it, each when the pulse gets there; the links glow
+// between them. The pulses run along the links even where 🗺️ Layers hides
+// them (wantsHiddenLinks), so a message still shows its way. The session's
+// only, and off with ⏻: a map that came back empty after a reload would look
+// broken. Ticked with the animation off, it turns the animation on — there is
+// nothing to show without it.
+//
+// ── Replay ───────────────────────────────────────────────────────────────────
+// The last hour, day or week of the log played again on the map, faster. The
+// readings are asked for by when they were taken (reading_ts), RP_CHUNK at a
+// time and four at once, and played as they come, in order, while the rest
+// arrive — a week is a couple of hundred pages. A station's readings within
+// RP_MERGE of each other are one transmission, played once; a typed-in or
+// backfilled reading, or one no station is sure of, is not played, as live.
+// While it is loaded the log is not watched — a live message among replayed
+// ones would be read as history — and ■ hands back to it.
+//
+// The speed is how much of the log goes by each second; each span starts at
+// the one that plays it in a minute or three, and − and + step through
+// RP_SPEEDS while it plays. Up to RP_RUN_MAX the pulses run as they do live;
+// faster, a message's station, the way and the base it reached are lit at once
+// for RP_FLASH, then glow — a pulse that ran would be over before it read, and
+// hundreds at once would each cost the frame. The glow is live's minute of the
+// log played at the speed, never under RP_GLOW_MIN on the screen, so a fast
+// replay is a map of who is talking, not a smear. Paused, the canvas stops
+// where it is (the pulses' own clock, PC, stops with it); dragged along its
+// bar, it shows what was glowing at that moment — each message played back
+// dated, as far into its fade as it would be. With Activity only ticked it is
+// the network's traffic alone over the base map. There are no receivers'
+// copies in a replay: every hop runs the way the map draws, blue.
+//
 // Exposes: attach, detach, reset, shown, opened, showBars, follow, pinStyle, barsFor,
 //          legendHtml, liveLegendHtml, barsLegendHtml, altText, barsAltText,
-//          noteText, on, anim, hidden, bars, setOn, setAnim, setThroughHidden,
-//          setBars, power, wantsHiddenLinks, hiddenLinks, setMode, setWin,
-//          setScope, pickBand, back, focus, refresh, yieldTo, protoColumn,
-//          protoCellHtml, and the rules for test/latency.mjs (classifyValue,
-//          quantile, BANDS).
+//          activityAltText, noteText, on, anim, hidden, solo, bars, setOn, setAnim,
+//          setThroughHidden, setSolo, setBars, power, wantsHiddenLinks, hiddenLinks,
+//          setMode, setWin, setScope, pickBand, back, focus, refresh, yieldTo,
+//          replay, replayPlay, replayStop, replayFaster, replaySlower, replaySeek,
+//          protoColumn, protoCellHtml, and the rules for test/latency.mjs
+//          (classifyValue, quantile, BANDS).
 const MapLatency = (() => {
   const SEC = 1000, MIN = 60000, HOUR = 3600000, DAY = 86400000;
 
@@ -257,6 +298,22 @@ const MapLatency = (() => {
   // Just over MapArrows' pane (405), so a flare is over the pins and the
   // arrows on the shared canvas, and under the name labels (650).
   const PULSE_PANE = 'mnLatPulse', PULSE_Z = 407;
+  // Activity only (see the header): a station drawn on the canvas comes up
+  // over this long as the spark reaches it.
+  const SOLO_IN = 120;
+
+  // Replay (see the header): [key, label, span, the speed it starts at].
+  const REPLAYS = [
+    ['1h', '1 h', HOUR, 60],
+    ['1d', '24 h', DAY, 900],
+    ['7d', '7 days', 7 * DAY, 3600],
+  ];
+  const RP_SPEEDS = [1, 2, 5, 10, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400];
+  const RP_CHUNK = 2 * HOUR, RP_PARALLEL = 4, RP_PAGE = 1000;
+  const RP_MERGE = 30 * SEC;
+  const RP_RUN_MAX = 60, RP_FLASH = 450, RP_GLOW_MIN = 1500;
+  // The bar's position is in thousandths of the span.
+  const RP_STEPS = 1000;
 
   // What the receivers heard (see the header). A receiver's carriers are found
   // over this many hours of its legacy bursts — about 4,000 rows when this was
@@ -390,10 +447,17 @@ const MapLatency = (() => {
   };
   // Where decodes stop, in dB over the noise (0083, backbone.js SNR_FLOOR).
   const SNR_FLOOR = 8.5;
-  // The words the SNR half of the pane uses that mean something here, and
-  // what each means — on hover where it is used, and in words in the pane's
-  // fold (wordsHtml). One list, so a chip and the fold never say it two ways.
+  // The words the pane uses that mean something here, and what each means — on
+  // hover where it is used, and in words in the pane: the SNR half's in its
+  // fold (wordsHtml), the messages card's in its own lines. One list, so a
+  // chip and the words beside it never say it two ways.
   const WORDS = {
+    'Activity only': 'Hides every pin, line and layer on the map but the base map, and draws only the stations a message '
+      + 'has just lit — the station, the repeaters that carried it and the base station that heard it — each held through '
+      + 'its glow and faded out with it: a minute after it reported, live; in a replay, that minute of the log at the '
+      + 'replay’s speed, never under a second and a half.',
+    Speed: 'How much of the log goes by each second of the replay: 60× is a minute of it a second, 3,600× an hour. '
+      + 'Up to 60× each message’s pulse runs along its links as it does live; faster, its way is lit at once and glows.',
     SNR: 'Signal-to-noise ratio: how far a station’s signal stood above the base station receiver’s own background '
       + 'noise, in decibels (dB) — the SNR column of the Message Log. Every 3 dB is twice the power; decodes stop at '
       + `about ${SNR_FLOOR} dB. A station’s figure is the median over the window, each transmission’s strongest copy. `
@@ -473,6 +537,7 @@ const MapLatency = (() => {
     on: onAtLoad,
     anim: stored('mn-latency-anim', ['on', 'off'], onAtLoad ? 'on' : 'off') === 'on',
     hidden: stored('mn-latency-hidden', ['on', 'off'], 'off') === 'on',   // run along hidden links too
+    solo: false,             // Activity only — the session's, never remembered (see the header)
     bars: stored('mn-latency-bars', ['on', 'off'], onAtLoad ? 'on' : 'off') === 'on',
     mode: stored('mn-latency-mode', MODE_KEYS, 'age'),
     win: stored('mn-latency-win', WINDOWS.map(w => w[0]), '1d'),
@@ -533,6 +598,19 @@ const MapLatency = (() => {
   let unseen = { field: [], backbone: [] };
   let pinIdx = null, pinIdxFor = null, pinIdxN = 0;
   let visHooked = false;
+  // The pulses' own clock: performance.now(), less the time a replay has spent
+  // paused, and held where it stopped while it is (pulseNow).
+  const PC = { at: null, off: 0 };
+
+  // The replay (see the header): its span and speed, whether it is playing,
+  // its clock between t0 and t1, and the messages fetched so far in the order
+  // they were sent — { t, id } — with the next to play (idx), how far the
+  // readings are in (loadedTo, loaded), and what it has played.
+  const RP = {
+    on: false, span: null, speed: 60, playing: false, done: false, t0: 0, t1: 0, clock: 0,
+    msgs: [], idx: 0, loadedTo: 0, loaded: false, fetched: 0, error: '', seq: 0,
+    raf: null, timer: null, last: 0, paintAt: 0, played: 0, ids: new Set(), lastAt: new Map(),
+  };
 
   const now_ = () => Date.now();
   const num = n => (n == null ? '—' : Number(n).toLocaleString());
@@ -822,7 +900,7 @@ const MapLatency = (() => {
     U.anim = !!on;
     keep('mn-latency-anim', U.anim ? 'on' : 'off');
     liveSync();
-    if (U.hidden) refreshForHidden();
+    if (U.hidden || U.solo) refreshForHidden();
     if (!opts.quiet) {
       announce(U.anim ? 'Messages flash on the map as they land in the log.' : 'Messages are no longer animated on the map.');
     }
@@ -845,13 +923,42 @@ const MapLatency = (() => {
       refreshMapLayers({ skipFit: true });
     }
   }
-  // For refreshMapLayers: whether to hand over the links it is not drawing,
-  // and the handing over — a pass-range link { s, r } per field station and
-  // repeater, a backbone path { a, b, kind } per pair.
-  const wantsHiddenLinks = () => !!(U.anim && U.hidden);
+  // Something is being animated: the log watched, or a replay loaded.
+  const animating = () => !!(U.anim || RP.on);
+  // For refreshMapLayers: whether to hand over the links it is not drawing —
+  // asked for, or Activity only's, whose map draws none — and the handing
+  // over: a pass-range link { s, r } per field station and repeater, a
+  // backbone path { a, b, kind } per pair.
+  const wantsHiddenLinks = () => !!(animating() && (U.hidden || U.solo));
   function hiddenLinks(field, backbone) {
     unseen = { field: field || [], backbone: backbone || [] };
     graph = null;
+  }
+
+  // Activity only (see the header): on while there is something animated to
+  // show, and off with it — the map's own panes hidden by a class on its
+  // container, the lit stations drawn on the canvas.
+  const soloActive = () => !!(U.solo && map && animating());
+  function soloSync() {
+    if (!map) return;
+    const c = map.getContainer();
+    const on = soloActive();
+    if (c.classList.contains('lat-solo') === on) return;
+    c.classList.toggle('lat-solo', on);
+    drawPulses(pulseNow());
+  }
+  // Its box. Ticked with nothing animated, it turns the animation on: there is
+  // nothing to show without it.
+  function setSolo(on) {
+    U.solo = !!on;
+    const animToo = U.solo && !animating();
+    if (animToo) { U.anim = true; keep('mn-latency-anim', 'on'); }
+    liveSync();
+    refreshForHidden();
+    announce(U.solo ? `Activity only: the map shows its base map and only the stations that just reported, each fading out with its glow.${animToo ? ' Messages are animated as they land.' : ''}`
+                    : 'The map shows every station again.');
+    if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
+    paint();
   }
 
   // The signal bars' own box. They colour nothing, so they sit under the
@@ -871,13 +978,15 @@ const MapLatency = (() => {
   }
 
   // ⏻ at the head of the pane: everything off at once — the pins' colours,
-  // the signal bars and the animation — or, from all off, the view on with all
-  // three.
+  // the signal bars and the animation, a replay and Activity only with it — or,
+  // from all off, the view on with the first three.
   function power() {
     U.autoOn = true;
-    if (!U.on && !U.anim && !U.bars) { setOn(true); return; }
+    if (!U.on && !U.anim && !U.bars && !RP.on) { setOn(true); return; }
     U.anim = false;
     keep('mn-latency-anim', 'off');
+    U.solo = false;
+    if (RP.on) replayStop({ quiet: true });
     liveSync();
     const hadBars = U.bars;
     U.bars = false;
@@ -1175,10 +1284,11 @@ const MapLatency = (() => {
     + '<path d="M5 3.4a5.6 5.6 0 1 0 6 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>'
     + '<path d="M8 1.6v5.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
   function powerHtml() {
-    const any = U.on || U.anim || U.bars;
+    const any = U.on || U.anim || U.bars || RP.on;
     const what = !any ? 'Everything here is off'
       : [U.on ? 'Pins coloured' : 'Pins in their own colours', U.bars ? 'signal bars' : '',
-         U.anim ? 'messages animated' : 'animation off'].filter(Boolean).join(' · ');
+         RP.on ? 'replaying' : U.anim ? 'messages animated' : 'animation off',
+         soloActive() ? 'activity only' : ''].filter(Boolean).join(' · ');
     return `
       <div class="lat-power-row">
         <button type="button" class="lat-power${any ? ' is-on' : ''}" aria-pressed="${any}" data-lat-f="power"
@@ -1242,7 +1352,7 @@ const MapLatency = (() => {
 
   function liveHtml() {
     return `
-      <section class="lat-live${U.anim ? ' is-on' : ''}" aria-labelledby="lat-h-live">
+      <section class="lat-live${animating() ? ' is-on' : ''}" aria-labelledby="lat-h-live">
         <div class="lat-live-head"><span class="lat-live-dot" aria-hidden="true"></span>
           <h4 class="lat-h" id="lat-h-live">Messages landing</h4></div>
         <label class="filter-check lat-switch"
@@ -1250,12 +1360,20 @@ const MapLatency = (() => {
           <input type="checkbox" data-lat-f="anim" ${U.anim ? 'checked' : ''} onchange="MapLatency.setAnim(this.checked)">
           Animate messages on the map
         </label>
-        <label class="filter-check filter-sub${U.anim ? '' : ' is-off'}"
+        <label class="filter-check filter-sub${animating() ? '' : ' is-off'}"
                title="Run the pulses along the radio links even when Show radio paths or Backbone links/paths is off in 🗺️ Layers — the lines stay off the map, and each message lights its way as it travels">
-          <input type="checkbox" data-lat-f="hidden" ${U.hidden ? 'checked' : ''} ${U.anim ? '' : 'disabled'}
+          <input type="checkbox" data-lat-f="hidden" ${U.hidden ? 'checked' : ''} ${animating() ? '' : 'disabled'}
                  onchange="MapLatency.setThroughHidden(this.checked)">
           Animate along hidden links
         </label>
+        <label class="filter-check filter-sub${animating() ? '' : ' is-off'}" title="${escAttr(WORDS['Activity only'])}">
+          <input type="checkbox" data-lat-f="solo" ${U.solo ? 'checked' : ''} onchange="MapLatency.setSolo(this.checked)">
+          Activity only
+        </label>
+        <p class="small txt-muted lat-live-what lat-solo-what">${termHtml('Activity only', WORDS['Activity only'])} hides every
+          pin, line and layer but the base map, and draws only the stations that just reported — the station, the
+          repeater and the base that carried its message — each fading out with its glow.</p>
+        ${replayHtml()}
         <p class="small txt-muted lat-live-what">As a message lands in the log its station flashes green, and a pulse
           runs along its links — to the repeater that carries it, then on to a base station. Each keeps a glow for a
           minute after, so a station that just reported can still be picked out. Its colour says what is known of
@@ -1294,6 +1412,7 @@ const MapLatency = (() => {
 
   function liveStatusHtml() {
     if (!U.anim) return 'Off — the log is not being watched.';
+    if (RP.on) return 'Not watched while a replay is loaded — ■ beside it goes back to the messages landing now.';
     const still = calm() ? ' Shown still: this device asks for less motion.' : '';
     if (LV.status === 'error') {
       return `<span class="txt-warn">The log could not be read (${esc(LV.error)})</span> — asking again shortly.${still}`;
@@ -1313,6 +1432,83 @@ const MapLatency = (() => {
         + (lost ? ` · ${num(lost)} not on the map` : '')
       : `Nothing has landed ${since}`;
     return `${head}. Asked at ${esc(fmtHms(LV.at))}, every ${LIVE_MS / SEC} s.${still}<br>${rxStatusHtml()}`;
+  }
+
+  // ── The replay's controls ──
+
+  const speedText = S => `${Number(S).toLocaleString()}×`;
+  // A speed in words: how much of the log a second of the replay is.
+  function speedWords(S) {
+    if (S === 1) return 'as it happened';
+    if (S < 60) return `${S} s of the log a second`;
+    if (S < 3600) return `${S / 60} min of the log a second`;
+    return `${S / 3600} h of the log a second`;
+  }
+  // Where the replay's clock is, as the bar and the status say it — to the
+  // second over an hour, to the minute over a day or a week.
+  const rpWhen = t => `${fmtDay(t)}, ${RP.t1 - RP.t0 <= HOUR ? fmtHms(t) : fmtHm(t)}`;
+  const replayPos = () => (RP.on && RP.t1 > RP.t0 ? Math.round(RP_STEPS * (RP.clock - RP.t0) / (RP.t1 - RP.t0)) : 0);
+
+  function replayHtml() {
+    const r = RP.on ? rpOf(RP.span) : null;
+    const play = RP.on && RP.playing;
+    return `
+      <div class="lat-replay${RP.on ? ' is-on' : ''}">
+        <div class="lat-row"><span class="lat-row-h" aria-hidden="true">Replay</span>
+          ${seg('Replay the last', REPLAYS.map(([k, label]) => [k, label, `Play the last ${label} of the log again on the map, faster — from its start`]), RP.on ? RP.span : null, 'replay')}</div>
+        ${r ? `
+        <div class="lat-row lat-rp-ctl">
+          <button type="button" class="lat-chip lat-rp-btn${play ? ' is-on' : ''}" data-lat-f="rp-play" onclick="MapLatency.replayPlay()"
+                  aria-label="${play ? 'Pause the replay' : RP.done ? 'Play the replay again from its start' : 'Play the replay'}"
+                  title="${play ? 'Pause — the map stops where it is' : RP.done ? 'Play it again from its start' : 'Play'}">${play ? '⏸' : '▶'}</button>
+          <button type="button" class="lat-chip lat-rp-btn" data-lat-f="rp-stop" onclick="MapLatency.replayStop()"
+                  aria-label="Stop the replay" title="Stop the replay — back to the messages landing now">■</button>
+          <span class="lat-rp-h">${termHtml('Speed', WORDS.Speed)}</span>
+          <button type="button" class="lat-chip lat-rp-btn" data-lat-f="rp-slower" onclick="MapLatency.replaySlower()"
+                  ${RP.speed <= RP_SPEEDS[0] ? 'disabled' : ''} aria-label="Slower" title="Slower">−</button>
+          <span class="lat-rp-speed" title="${escAttr(speedWords(RP.speed))}">${esc(speedText(RP.speed))}</span>
+          <button type="button" class="lat-chip lat-rp-btn" data-lat-f="rp-faster" onclick="MapLatency.replayFaster()"
+                  ${RP.speed >= RP_SPEEDS[RP_SPEEDS.length - 1] ? 'disabled' : ''} aria-label="Faster" title="Faster">+</button>
+        </div>
+        <input type="range" class="lat-rp-seek" id="lat-rp-seek" data-lat-f="rp-seek" min="0" max="${RP_STEPS}" step="1"
+               value="${replayPos()}" aria-label="Where the replay is, from ${escAttr(rpWhen(RP.t0))} to ${escAttr(rpWhen(RP.t1))}"
+               aria-valuetext="${escAttr(rpWhen(RP.clock))}" oninput="MapLatency.replaySeek(this.value / ${RP_STEPS})">
+        <div class="lat-rp-ends small txt-muted" aria-hidden="true"><span>${esc(rpWhen(RP.t0))}</span><span>${esc(rpWhen(RP.t1))}</span></div>` : ''}
+        <p class="small lat-rp-status" id="lat-rp-status">${replayStatusHtml()}</p>
+      </div>`;
+  }
+
+  function replayStatusHtml() {
+    if (!RP.on) {
+      return 'Plays the last hour, day or week of the log again on the map, faster. The messages landing now wait while it is loaded.';
+    }
+    const r = rpOf(RP.span);
+    const whole = `${speedText(RP.speed)}: ${speedWords(RP.speed)} — the whole ${r[1]} in ${fmtDelay((RP.t1 - RP.t0) / RP.speed / SEC)}.`;
+    const count = `${num(RP.idx)} message${RP.idx === 1 ? '' : 's'} played of ${num(RP.msgs.length)}${RP.loaded ? '' : ' fetched so far'}.`;
+    const fetching = RP.loaded ? '' : RP.error ? '' : ` Fetching the readings: ${num(RP.fetched)} in.`;
+    const err = RP.error
+      ? ` <span class="txt-warn">The rest of the readings could not be fetched (${esc(RP.error)})</span> — it plays what came.` : '';
+    if (RP.done) {
+      return `Played to the end: ${num(RP.msgs.length)} message${RP.msgs.length === 1 ? '' : 's'} over the last ${esc(r[1])}. `
+        + `▶ plays it again; ■ goes back to the messages landing now.${err}`;
+    }
+    const where = `<strong>${esc(rpWhen(RP.clock))}</strong>`;
+    const head = !RP.playing ? `Paused at ${where}.`
+      : RP.waiting ? `Waiting for the readings at ${where}…` : `Replaying: ${where}.`;
+    return `${head} ${esc(whole)} ${esc(count)}${fetching}${err} Every hop runs blue, the way the map draws: a replay has no receivers’ copies.`;
+  }
+
+  // The status and the bar again, in place, a few times a second while it
+  // plays — not the pane, whose repaint would take the bar out from under a
+  // finger dragging it.
+  function paintReplay() {
+    const el = document.getElementById('lat-rp-status');
+    if (el) el.innerHTML = replayStatusHtml();
+    const bar = document.getElementById('lat-rp-seek');
+    if (bar && RP.on) {
+      if (!bar.matches(':active')) bar.value = String(replayPos());
+      bar.setAttribute('aria-valuetext', rpWhen(RP.clock));
+    }
   }
 
   // ── The summary ──
@@ -1914,7 +2110,9 @@ const MapLatency = (() => {
 
   // Only while somebody could see it: the box ticked, the Stations map up and
   // the page in view.
-  const liveWanted = () => !!(U.anim && map && state.activeTab === 'stations'
+  // Not while a replay is loaded: a live message among replayed ones would be
+  // read as history.
+  const liveWanted = () => !!(U.anim && !RP.on && map && state.activeTab === 'stations'
     && (typeof document === 'undefined' || document.visibilityState !== 'hidden'));
 
   // Start watching or stop, whichever is wanted; safe to call any time.
@@ -1924,7 +2122,8 @@ const MapLatency = (() => {
     // ⏱️ in the side panel's strip glows while the animation is on
     // (styles.css, html[data-lat-anim]) — on the root, because the strip's
     // buttons are made and kept by app.js, not here.
-    if (typeof document !== 'undefined') document.documentElement.toggleAttribute('data-lat-anim', !!U.anim);
+    // Not while a replay has the canvas: it is not live.
+    if (typeof document !== 'undefined') document.documentElement.toggleAttribute('data-lat-anim', !!(U.anim && !RP.on));
     if (liveWanted()) {
       ensureCanvas();
       if (!LV.since) LV.since = now_();
@@ -1934,8 +2133,11 @@ const MapLatency = (() => {
       LV.seq++;
       Object.assign(LV, { status: 'idle', cursor: null, at: 0, since: 0, error: '', fails: 0, batches: [], held: new Map() });
       rxPause();
-      clearPulses();
+      // A replay's pulses are its own: only the plays still to come from the
+      // log go.
+      if (RP.on) { liveTimers.forEach(h => clearTimeout(h)); liveTimers.clear(); } else clearPulses();
     }
+    soloSync();
     paintLive();
   }
 
@@ -2043,6 +2245,228 @@ const MapLatency = (() => {
       const h = setTimeout(() => { liveTimers.delete(h); fire(id, m); }, d);
       liveTimers.add(h);
     }
+  }
+
+  // ── Replay ────────────────────────────────────────────────────────────────
+
+  const rpOf = k => REPLAYS.find(r => r[0] === k) || null;
+  // A replayed message's glow on the screen: live's minute of the log at the
+  // speed, never under RP_GLOW_MIN. Faster than RP_RUN_MAX its way is lit at
+  // once rather than run.
+  const rpGlow = () => Math.max(RP_GLOW_MIN, (GLOW_HOLD + GLOW_FADE) / RP.speed);
+  const rpFlash = () => RP.speed > RP_RUN_MAX || calm();
+  // The first message sent at or after `t`.
+  function rpIndex(t) {
+    let lo = 0, hi = RP.msgs.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (RP.msgs[mid].t < t) lo = mid + 1; else hi = mid; }
+    return lo;
+  }
+
+  // The last `k` of the log (REPLAYS) from its start, at the speed that plays
+  // it in a minute or three. What was lit goes, and the log stops being
+  // watched while it is loaded (liveSync).
+  function replay(k) {
+    const r = rpOf(k);
+    if (!r || !map) return;
+    replayHalt();
+    const seq = ++RP.seq;
+    const t1 = now_(), t0 = t1 - r[2];
+    const linksToo = !U.anim && (U.hidden || U.solo);
+    Object.assign(RP, {
+      on: true, span: k, speed: r[3], playing: true, done: false, waiting: true, t0, t1, clock: t0,
+      msgs: [], idx: 0, loadedTo: t0, loaded: false, fetched: 0, error: '', last: 0, lastAt: new Map(),
+    });
+    liveSync();
+    clearPulses();
+    ensureCanvas();
+    if (linksToo) refreshForHidden();
+    replayFetch(seq);
+    replayKick(true);
+    announce(`Replaying the last ${r[1]} of the log at ${speedText(RP.speed)}, ${speedWords(RP.speed)}. `
+      + 'The messages landing now wait until it is stopped.');
+    if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
+    paint();
+  }
+
+  // ▶ and ⏸: pause where it is — the canvas held with it — or play on; at
+  // the end, play it again from its start.
+  function replayPlay() {
+    if (!RP.on) return;
+    if (RP.playing) {
+      RP.playing = false;
+      replayHalt();
+      pulsesHold();
+      announce(`Replay paused at ${rpWhen(RP.clock)}.`);
+    } else {
+      if (RP.done) {
+        Object.assign(RP, { done: false, clock: RP.t0, idx: 0 });
+        clearPulses();
+      }
+      RP.playing = true;
+      pulsesGo();
+      replayKick(true);
+      announce(`Replay playing from ${rpWhen(RP.clock)}.`);
+    }
+    paint();
+  }
+
+  // ■: the replay gone, and the log watched again if its box is ticked.
+  function replayStop(opts = {}) {
+    if (!RP.on) return;
+    RP.seq++;
+    replayHalt();
+    const linksToo = !U.anim && (U.hidden || U.solo);
+    Object.assign(RP, { on: false, playing: false, done: false, waiting: false, msgs: [], idx: 0, lastAt: new Map() });
+    clearPulses();
+    liveSync();
+    if (linksToo) refreshForHidden();
+    if (!opts.quiet) announce(U.anim ? 'Replay stopped — back to the messages landing now.' : 'Replay stopped.');
+    if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
+    paint();
+  }
+
+  // − and +: a step along RP_SPEEDS, for the messages played from now on.
+  function replaySpeed(dir) {
+    if (!RP.on) return;
+    const i = RP_SPEEDS.indexOf(RP.speed);
+    const j = Math.max(0, Math.min(RP_SPEEDS.length - 1, (i < 0 ? RP_SPEEDS.findIndex(x => x >= RP.speed) : i) + dir));
+    if (RP_SPEEDS[j] === RP.speed) return;
+    RP.speed = RP_SPEEDS[j];
+    announce(`${speedText(RP.speed)}: ${speedWords(RP.speed)}.`);
+    paint();
+  }
+
+  // The bar dragged: the clock put there, and what was glowing at that moment
+  // lit again, each message as far into its fade as it would be (fire's `ago`).
+  function replaySeek(f) {
+    if (!RP.on) return;
+    const x = Math.max(0, Math.min(1, Number(f) || 0));
+    RP.clock = RP.t0 + x * (RP.t1 - RP.t0);
+    RP.done = false;
+    clearPulses();
+    if (!RP.playing) pulsesHold();
+    RP.idx = rpIndex(RP.clock - (rpGlow() + 4 * SEC) * RP.speed);
+    replayStep();
+    paintReplay();
+  }
+
+  // Every message sent by the replay's clock and not yet played, played —
+  // dated by how long before the clock it was sent, at the speed.
+  function replayStep() {
+    const o = { replay: true, flash: rpFlash(), glow: rpGlow() };
+    while (RP.idx < RP.msgs.length && RP.msgs[RP.idx].t <= RP.clock) {
+      const m = RP.msgs[RP.idx++];
+      o.ago = (RP.clock - m.t) / RP.speed;
+      fire(m.id, null, o);
+    }
+  }
+
+  // A frame of the replay: the clock on by the time since the last, at the
+  // speed — held where the readings are not in yet, and not moved while the
+  // Stations map is not the tab on the screen.
+  function replayTick(now) {
+    RP.raf = null; RP.timer = null;
+    if (!RP.on || !RP.playing) return;
+    const dt = RP.last ? Math.min(250, now - RP.last) : 0;
+    RP.last = now;
+    const looking = !!map && state.activeTab === 'stations';
+    if (looking) {
+      const want = RP.clock + dt * RP.speed;
+      const edge = RP.loaded ? RP.t1 : RP.loadedTo;
+      RP.waiting = !RP.loaded && want > edge;
+      RP.clock = Math.min(RP.t1, Math.max(RP.clock, Math.min(want, edge)));
+      replayStep();
+      if (RP.loaded && RP.clock >= RP.t1 && RP.idx >= RP.msgs.length) { replayDone(); return; }
+    }
+    if (now - RP.paintAt > 250) { RP.paintAt = now; paintReplay(); }
+    replayKick(looking);
+  }
+  // Every frame while the map is on the screen; twice a second, to see
+  // whether it is back, while it is not.
+  function replayKick(looking) {
+    if (!RP.on || !RP.playing || RP.raf || RP.timer) return;
+    if (looking) RP.raf = requestAnimationFrame(replayTick);
+    else RP.timer = setTimeout(() => replayTick(performance.now()), 500);
+  }
+  function replayHalt() {
+    if (RP.raf) { cancelAnimationFrame(RP.raf); RP.raf = null; }
+    if (RP.timer) { clearTimeout(RP.timer); RP.timer = null; }
+    RP.last = 0;
+  }
+  function replayDone() {
+    RP.playing = false;
+    RP.done = true;
+    replayHalt();
+    announce(`Replay played to the end: ${num(RP.msgs.length)} messages over the last ${rpOf(RP.span)[1]}.`);
+    paint();
+  }
+
+  // The readings, RP_CHUNK of the span at a time and RP_PARALLEL chunks at
+  // once, each paged in order, and handed over in order as each one before it
+  // is in — so the replay plays from its start while the rest arrive.
+  async function replayFetch(seq) {
+    const chunks = [];
+    for (let a = RP.t0; a < RP.t1; a += RP_CHUNK) chunks.push([a, Math.min(RP.t1, a + RP_CHUNK)]);
+    const got = new Array(chunks.length).fill(null);
+    let next = 0, done = 0;
+    const worker = async () => {
+      while (next < chunks.length) {
+        const i = next++;
+        const [a, b] = chunks[i];
+        const rows = [];
+        for (let off = 0; ; off += RP_PAGE) {
+          if (seq !== RP.seq) return;
+          const page = await dbSelect(`reading?select=${LIVE_SELECT}&reading_ts=gte.${iso(a)}&reading_ts=lt.${iso(b)}`
+            + `&order=reading_ts.asc,addr.asc,value_raw.asc&limit=${RP_PAGE}&offset=${off}`);
+          if (seq !== RP.seq) return;
+          rows.push(...page);
+          RP.fetched += page.length;
+          if (page.length < RP_PAGE) break;
+        }
+        got[i] = { rows, to: b };
+        while (done < chunks.length && got[done]) {
+          const c = got[done];
+          got[done++] = null;
+          replayAdopt(c.rows, c.to);
+        }
+      }
+    };
+    try {
+      await Promise.all(Array.from({ length: RP_PARALLEL }, worker));
+    } catch (err) {
+      if (seq !== RP.seq) return;
+      RP.seq++;                      // the other chunks stop, and it plays what came
+      RP.error = errText(err);
+      RP.loaded = true;
+      RP.t1 = Math.max(RP.t0, RP.loadedTo);
+      if (RP.clock > RP.t1) RP.clock = RP.t1;
+      paint();
+    }
+  }
+
+  // A chunk of readings in: each to its station, as land() puts them, and one
+  // station's within RP_MERGE of each other one transmission. In the order
+  // they were sent — the rows came in that order.
+  function replayAdopt(rows, to) {
+    const list = rows.filter(r => !LIVE_SKIP_SOURCE.has(Number(r.source)));
+    if (list.length) {
+      const resolve = SensorValues.resolver(list);
+      for (const r of list) {
+        const got = resolve(r);
+        const st = got && got.st && LIVE_SURE.has(got.conf) ? got.st : null;
+        const t = Date.parse(r.reading_ts);
+        if (!st || !isFinite(t)) continue;
+        const prev = RP.lastAt.get(st.id);
+        if (prev != null && t - prev < RP_MERGE) continue;
+        RP.lastAt.set(st.id, t);
+        RP.msgs.push({ t, id: st.id });
+      }
+    }
+    RP.loadedTo = to;
+    RP.loaded = to >= RP.t1;
+    // Paused, or dragged ahead of the readings: what this chunk adds by the
+    // clock plays at once.
+    if (!RP.playing && !RP.done) replayStep();
   }
 
   // ── Messages landing: the receivers' copies ───────────────────────────────
@@ -2407,7 +2831,7 @@ const MapLatency = (() => {
   // Times are from the start. Where each part is drawn is looked up again
   // every frame (pinAt, legAt): a pan or a zoom mid-pulse keeps it on its
   // links, and a station moved since keeps its glow.
-  function route(id, copies) {
+  function route(id, copies, o = {}) {
     const g = graphNow();
     const m = pinFor(id);
     if (!m || !map) return null;
@@ -2525,12 +2949,16 @@ const MapLatency = (() => {
       if (HOPS[l.kind].rank > HOPS[n.kind].rank) n.kind = l.kind;
     }
     nodes.forEach(n => { if (named.has(n.id)) n.kind = 'heard'; });
-    const still = calm();
+    // Lit at once, not run: with less motion asked for, or a replay's flash.
+    const still = !!o.flash || calm();
+    const stillMs = o.flash ? RP_FLASH : STILL_MS;
     // Where each part's animation ends, and its afterglow begins.
-    nodes.forEach(n => { n.end = still ? STILL_MS : n.start + FLARE_MS; });
-    legs.forEach(l => { l.end = still ? STILL_MS : l.start + l.dur + l.tail; });
-    const anim = Math.max(still ? STILL_MS : FLARE_MS, ...nodes.map(n => n.end), ...legs.map(l => l.end));
-    return { id, nodes, legs, anim, life: anim + GLOW_HOLD + GLOW_FADE, still, proved: proofs.length > 0 };
+    nodes.forEach(n => { n.end = still ? stillMs : n.start + FLARE_MS; });
+    legs.forEach(l => { l.end = still ? stillMs : l.start + l.dur + l.tail; });
+    const anim = Math.max(still ? stillMs : FLARE_MS, ...nodes.map(n => n.end), ...legs.map(l => l.end));
+    // The glow live's minute — a third held, the rest fading — or a replay's.
+    const hold = o.glow ? o.glow / 3 : GLOW_HOLD, fade = o.glow ? o.glow - hold : GLOW_FADE;
+    return { id, nodes, legs, anim, life: anim + hold + fade, hold, fade, still, stillMs, proved: proofs.length > 0 };
   }
 
   // Where a pulse's station or link is drawn now, or null once it is not. A
@@ -2546,23 +2974,31 @@ const MapLatency = (() => {
     return a && b ? { key: l.fromId + '>' + l.to, fromId: l.fromId, toId: l.to, from: a, to: b } : null;
   }
 
-  function fire(id, msg) {
+  // `o`, a replay's: `flash` its way lit at once rather than run, `glow` how
+  // long its afterglow is on the screen, and `ago` how long since it played —
+  // a replay dragged along its bar lights what was glowing then, each as far
+  // into its fade as it would be.
+  function fire(id, msg, o = {}) {
     if (!pctx || !map) return;
-    const t = performance.now();
-    if (pulses.filter(p => t - p.t0 < p.anim).length >= PULSES_MAX) return;
+    const t = pulseNow();
+    const t0 = t - Math.max(0, o.ago || 0);
+    // A flash costs a frame no more than its glow does.
+    if (!o.flash && pulses.filter(p => t - p.t0 < p.anim).length >= PULSES_MAX) return;
     // Still flaring from its last message: not flared again on top of it.
-    if (pulses.some(p => p.id === id && t - p.t0 < FLARE_MS)) return;
-    const p = route(id, copiesOf(msg));
-    if (!p) return;
+    if (pulses.some(p => p.id === id && Math.abs(t0 - p.t0) < FLARE_MS)) return;
+    const p = route(id, copiesOf(msg), o);
+    if (!p || t - t0 >= p.life) return;
     if (msg && RX.status === 'ok') { RX.played++; if (p.proved) RX.matched++; }
-    p.t0 = t;
+    p.t0 = t0;
     // Its last message's glow gives way to this one's, which starts afresh.
     pulses = pulses.filter(q => q.id !== id || t - q.t0 < q.anim);
     if (pulses.length >= GLOWS_MAX) pulses.shift();
     pulses.push(p);
-    LV.fired.push(id);
-    LV.firedN++;
-    if (LV.fired.length > 50) LV.fired.shift();
+    if (!o.replay) {
+      LV.fired.push(id);
+      LV.firedN++;
+      if (LV.fired.length > 50) LV.fired.shift();
+    }
     kick();
   }
 
@@ -2570,6 +3006,7 @@ const MapLatency = (() => {
     liveTimers.forEach(h => clearTimeout(h));
     liveTimers.clear();
     pulses = [];
+    PC.at = null; PC.off = 0;
     if (praf) { cancelAnimationFrame(praf); praf = null; }
     if (glowTimer) { clearTimeout(glowTimer); glowTimer = null; }
     drawPulses(0);
@@ -2617,27 +3054,50 @@ const MapLatency = (() => {
     porigin = map.containerPointToLayerPoint([0, 0]);
     L.DomUtil.setPosition(pcanvas, porigin);
     pcanvas.style.visibility = '';
-    drawPulses(performance.now());
+    drawPulses(pulseNow());
+  }
+
+  // The pulses' clock (PC): held while a replay is paused, so the canvas stops
+  // where it is, and on from there when it plays again.
+  const pulseNow = (t = performance.now()) => (PC.at != null ? PC.at : t) - PC.off;
+  function pulsesHold() { if (PC.at == null) PC.at = performance.now(); }
+  function pulsesGo() {
+    if (PC.at == null) return;
+    PC.off += performance.now() - PC.at;
+    PC.at = null;
+    kick();
   }
 
   function kick() {
     if (glowTimer) { clearTimeout(glowTimer); glowTimer = null; }
     if (!praf && pulses.length && pctx) praf = requestAnimationFrame(frame);
   }
+  // One drawing while the clock is held, and nothing asked for after it.
   function frame(t) {
     praf = null;
-    drawPulses(t);
-    if (!pulses.length) return;
-    if (pulses.some(p => t - p.t0 < p.anim)) praf = requestAnimationFrame(frame);
+    const now = pulseNow(t);
+    drawPulses(now);
+    if (!pulses.length || PC.at != null) return;
+    if (pulses.some(p => now - p.t0 < p.anim)) praf = requestAnimationFrame(frame);
     else glowTimer = setTimeout(() => { glowTimer = null; praf = requestAnimationFrame(frame); }, GLOW_TICK);
   }
 
   // How bright a part's afterglow is, ms after its animation ended: up over
-  // GLOW_IN, held, then down to nothing.
-  function glowAt(e) {
-    if (e < 0 || e >= GLOW_HOLD + GLOW_FADE) return 0;
+  // GLOW_IN, held, then down to nothing — over the pulse's own hold and fade,
+  // live's minute or a replay's.
+  function glowAt(e, p) {
+    if (e < 0 || e >= p.hold + p.fade) return 0;
     const up = Math.min(1, e / GLOW_IN);
-    return e < GLOW_HOLD ? up : up * (1 - (e - GLOW_HOLD) / GLOW_FADE);
+    return e < p.hold ? up : up * (1 - (e - p.hold) / p.fade);
+  }
+  // Activity only: how much of a station's pin is drawn, `e` ms after the
+  // spark reached it — up over SOLO_IN, held through its own animation and
+  // its glow's hold, and faded with the glow, to nothing as the glow goes.
+  function shownAt(e, lit, p) {
+    if (e < 0) return 0;
+    const up = Math.min(1, e / SOLO_IN);
+    if (e < lit + p.hold) return up;
+    return up * Math.max(0, 1 - (e - lit - p.hold) / p.fade);
   }
 
   // CSS's ease-out, near enough for a flare.
@@ -2671,16 +3131,22 @@ const MapLatency = (() => {
     // the line drawn for it now, so one lit before a rebuild and again after
     // it glows once.
     const legGlow = new Map(), nodeGlow = new Map();
+    const solo = soloActive(), shown = new Map();
     for (const p of pulses) {
       const e0 = t - p.t0;
       for (const l of p.legs) {
-        const g = glowAt(e0 - l.end);
+        const g = glowAt(e0 - l.end, p);
         const e = g > 0 ? legAt(l) : null;
         if (e && g > (legGlow.has(e.key) ? legGlow.get(e.key).g : 0)) legGlow.set(e.key, { e, g, kind: l.kind });
       }
       for (const n of p.nodes) {
-        const g = glowAt(e0 - n.end);
+        const g = glowAt(e0 - n.end, p);
         if (g > (nodeGlow.has(n.id) ? nodeGlow.get(n.id).g : 0)) nodeGlow.set(n.id, { n, g, kind: n.kind });
+        if (solo) {
+          const from = p.still ? 0 : n.start;
+          const a = shownAt(e0 - from, n.end - from, p);
+          if (a > (shown.get(n.id) || 0)) shown.set(n.id, a);
+        }
       }
     }
     // Off the pins and links as they are now: a rebuild since can have hidden
@@ -2697,6 +3163,17 @@ const MapLatency = (() => {
       if (len > 1) fn(ax, ay, bx, by, len, ra + 3, len - rb - 3);
     };
     legGlow.forEach(({ e, g, kind }) => span(e, (ax, ay, bx, by, len, a, b) => stroke(ax, ay, bx, by, len, a, b, 'glow', g, kind)));
+    // Activity only: the map's own pins are hidden, and each station a pulse
+    // has lit is drawn here as the map draws it, under its ring and its flare.
+    if (solo) {
+      pctx.shadowBlur = 0;
+      shown.forEach((a, id) => {
+        const m = pinFor(id);
+        if (!m || a <= 0) return;
+        const [x, y] = at(m.getLatLng());
+        MapSymbols.drawPin(pctx, x, y, m.options, a);
+      });
+    }
     nodeGlow.forEach(({ n, g, kind }) => {
       const r = radius(n.id);
       if (r == null) return;
@@ -2707,7 +3184,7 @@ const MapLatency = (() => {
     // missed link does not run: it is lit, pin to pin, for its time.
     for (const p of pulses) {
       const e0 = t - p.t0;
-      if (p.still && e0 >= STILL_MS) continue;
+      if (p.still && e0 >= p.stillMs) continue;
       for (const l of p.legs) {
         const e = p.still ? 0 : e0 - l.start;
         if (e < 0 || e > l.dur + l.tail) continue;
@@ -2728,7 +3205,7 @@ const MapLatency = (() => {
     for (const p of pulses) {
       const e0 = t - p.t0;
       for (const n of p.nodes) {
-        const f = p.still ? (e0 >= 0 && e0 < STILL_MS ? [0.9, 1] : null) : flareAt(e0 - n.start);
+        const f = p.still ? (e0 >= 0 && e0 < p.stillMs ? [0.9, 1] : null) : flareAt(e0 - n.start);
         if (!f) continue;
         const [x, y] = at(pinAt(n.id) || n.ll);
         flare(x, y, n.r, f[0], f[1], n.kind);
@@ -2766,34 +3243,63 @@ const MapLatency = (() => {
     pctx.stroke();
   }
 
+  // Each flare and ring is drawn once, off the screen, and stamped where it
+  // goes (drawImage): two gradients, a shadow and a clip per station per frame
+  // were most of a frame once a replay had hundreds lit at once. Keyed by what
+  // is known of the node, the pin's radius and the screen's pixel ratio; a
+  // flare at its full size, stamped smaller or larger as it grows and settles.
+  const sprites = new Map();
+  function sprite(key, half, draw) {
+    const dpr = window.devicePixelRatio || 1;
+    const k = key + '|' + dpr;
+    let c = sprites.get(k);
+    if (!c) {
+      if (sprites.size > 200) sprites.clear();
+      c = document.createElement('canvas');
+      c.width = c.height = Math.ceil(2 * half * dpr);
+      const x = c.getContext('2d');
+      x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(x, half);
+      sprites.set(k, c);
+    }
+    return c;
+  }
+  function stamp(c, x, y, half, alpha) {
+    pctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+    pctx.shadowBlur = 0;
+    pctx.drawImage(c, x - half, y - half, 2 * half, 2 * half);
+  }
+
   // A node's flare over a pin of radius r: the logo's halo and hot core
   // (.load-logo i::before, ::after), sized to the pin as the logo sizes them to
-  // its node, in the colours of what is known of it.
+  // its node, in the colours of what is known of it — at opacity `op` and
+  // scale `sc`.
   function flare(x, y, r, op, sc, tone) {
     const T = HOPS[tone] && HOPS[tone].halo ? HOPS[tone] : HOPS.heard;
     const s = Math.max(14, 2 * r + 2);
-    const halo = 2.4 * s * sc, core = 0.62 * s * sc;
-    pctx.globalAlpha = Math.max(0, Math.min(1, op));
-    pctx.shadowBlur = 0;
-    let g = pctx.createRadialGradient(x, y, 0, x, y, halo);
-    g.addColorStop(0, T.halo[0]);
-    g.addColorStop(0.12, T.halo[0]);
-    g.addColorStop(0.24, T.halo[1]);
-    g.addColorStop(0.42, T.halo[2]);
-    g.addColorStop(0.68, T.halo[3]);
-    pctx.fillStyle = g;
-    pctx.beginPath(); pctx.arc(x, y, halo, 0, 2 * Math.PI); pctx.fill();
-    g = pctx.createRadialGradient(x, y, 0, x, y, core);
-    g.addColorStop(0, '#ffffff');
-    g.addColorStop(0.22, '#ffffff');
-    g.addColorStop(0.45, T.core[0]);
-    g.addColorStop(0.8, T.core[1]);
-    g.addColorStop(1, T.core[1]);
-    pctx.fillStyle = g;
-    pctx.shadowColor = T.glow;
-    pctx.shadowBlur = 8;
-    pctx.beginPath(); pctx.arc(x, y, core, 0, 2 * Math.PI); pctx.fill();
-    pctx.shadowBlur = 0;
+    const halo = 2.4 * s, core = 0.62 * s;
+    const half = Math.ceil(Math.max(halo, core + 12));
+    const c = sprite(`f|${tone}|${s}`, half, (ctx, h) => {
+      let g = ctx.createRadialGradient(h, h, 0, h, h, halo);
+      g.addColorStop(0, T.halo[0]);
+      g.addColorStop(0.12, T.halo[0]);
+      g.addColorStop(0.24, T.halo[1]);
+      g.addColorStop(0.42, T.halo[2]);
+      g.addColorStop(0.68, T.halo[3]);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(h, h, halo, 0, 2 * Math.PI); ctx.fill();
+      g = ctx.createRadialGradient(h, h, 0, h, h, core);
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(0.22, '#ffffff');
+      g.addColorStop(0.45, T.core[0]);
+      g.addColorStop(0.8, T.core[1]);
+      g.addColorStop(1, T.core[1]);
+      ctx.fillStyle = g;
+      ctx.shadowColor = T.glow;
+      ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(h, h, core, 0, 2 * Math.PI); ctx.fill();
+    });
+    stamp(c, x, y, half * sc, op);
   }
 
   // A node's afterglow: a ring round the pin with a soft halo outside it, the
@@ -2803,29 +3309,28 @@ const MapLatency = (() => {
   function ring(x, y, r, g, tone) {
     const T = HOPS[tone] && HOPS[tone].ring ? HOPS[tone] : HOPS.heard;
     const R = r + 3;
-    pctx.save();
-    pctx.beginPath();
-    pctx.rect(0, 0, pctx.canvas.width, pctx.canvas.height);
-    pctx.arc(x, y, R - 1.2, 0, 2 * Math.PI);
-    pctx.clip('evenodd');
-    pctx.globalAlpha = g;
-    pctx.shadowBlur = 0;
-    pctx.setLineDash([]);
-    const h = pctx.createRadialGradient(x, y, R - 1, x, y, R + 11);
-    h.addColorStop(0, T.ring[0]);
-    h.addColorStop(0.35, T.ring[1]);
-    h.addColorStop(1, T.ring[2]);
-    pctx.fillStyle = h;
-    pctx.beginPath();
-    pctx.arc(x, y, R + 11, 0, 2 * Math.PI);
-    pctx.arc(x, y, R - 1, 0, 2 * Math.PI, true);
-    pctx.fill();
-    pctx.strokeStyle = T.trail;
-    pctx.lineWidth = 2.4;
-    pctx.shadowColor = T.glow;
-    pctx.shadowBlur = 8;
-    pctx.beginPath(); pctx.arc(x, y, R, 0, 2 * Math.PI); pctx.stroke();
-    pctx.restore();
+    const half = Math.ceil(R + 12);
+    const c = sprite(`r|${tone}|${r}`, half, (ctx, h) => {
+      ctx.beginPath();
+      ctx.rect(0, 0, 2 * h, 2 * h);
+      ctx.arc(h, h, R - 1.2, 0, 2 * Math.PI);
+      ctx.clip('evenodd');
+      const q = ctx.createRadialGradient(h, h, R - 1, h, h, R + 11);
+      q.addColorStop(0, T.ring[0]);
+      q.addColorStop(0.35, T.ring[1]);
+      q.addColorStop(1, T.ring[2]);
+      ctx.fillStyle = q;
+      ctx.beginPath();
+      ctx.arc(h, h, R + 11, 0, 2 * Math.PI);
+      ctx.arc(h, h, R - 1, 0, 2 * Math.PI, true);
+      ctx.fill();
+      ctx.strokeStyle = T.trail;
+      ctx.lineWidth = 2.4;
+      ctx.shadowColor = T.glow;
+      ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(h, h, R, 0, 2 * Math.PI); ctx.stroke();
+    });
+    stamp(c, x, y, half, g);
   }
 
   // The card's line again, in place — a repaint of the pane would take the
@@ -2920,20 +3425,27 @@ const MapLatency = (() => {
       </span>`;
   }
 
-  // The animation's line in the 🔑 legend, while it runs — with the pins in
-  // their roles' colours, health's or latency's alike.
+  // The animation's line in the 🔑 legend, while it runs or a replay is
+  // loaded — and Activity only's, while the map is down to it.
   function liveLegendHtml() {
-    if (!U.anim) return '';
-    return `
+    if (!animating()) return '';
+    const r = RP.on ? rpOf(RP.span) : null;
+    return (r ? `
+      <span class="legend-item legend-lat-h"><span class="small"><strong>⏱️ Replaying the last ${esc(r[1])} of the log</strong> — not live</span></span>` : '') + `
       <span class="legend-item">
         <span class="lat-live-dot" aria-hidden="true"></span>
-        <span class="small">Flashing green: a message from it just landed in the log${calm() ? '' : ', a pulse running along its links'};
-          glowing green: it reported in the last minute</span>
+        <span class="small">${r ? 'Flashing green: a message from it in the replay, its way lit'
+          : `Flashing green: a message from it just landed in the log${calm() ? '' : ', a pulse running along its links'}`};
+          glowing green: it reported ${r ? 'just before, in the replay' : 'in the last minute'}</span>
       </span>` + HOP_KEYS.map(k => `
       <span class="legend-item">
         <span class="lat-hop lat-hop--${k}" aria-hidden="true"></span>
         <span class="small">${termHtml(HOPS[k].word, HOPS[k].meaning)} ${k === 'heard' ? 'hop (solid)' : k === 'assumed' ? 'hop (dashed)' : 'link (dotted)'}</span>
-      </span>`).join('');
+      </span>`).join('') + (soloActive() ? `
+      <span class="legend-item legend-off">
+        <span class="small txt-muted">${termHtml('Activity only', WORDS['Activity only'])}: every other pin, line and layer is
+          hidden — a station is on the map only while it glows.</span>
+      </span>` : '');
   }
 
   // A clause for the map's accessible name while the pins wear it.
@@ -2948,6 +3460,15 @@ const MapLatency = (() => {
     if (!U.bars) return '';
     if (!W.A) return 'signal bars beside the pins once the readings are in';
     return `signal bars beside the pins — ${snrSummaryText().replace(/\.$/, '')}`;
+  }
+
+  // …and one for what the animation has done to the map: a replay, and the
+  // map down to the stations that just reported.
+  function activityAltText() {
+    const bits = [];
+    if (RP.on) bits.push(`replaying the last ${rpOf(RP.span)[1]} of the log`);
+    if (soloActive()) bits.push('every other pin and line hidden, only the stations that just reported drawn (Activity only)');
+    return bits.join(', ');
   }
 
   // What Map display's health switch says while this view has the pins.
@@ -2998,6 +3519,11 @@ const MapLatency = (() => {
     if (resizeObs) resizeObs.disconnect();
     // The log stops being watched with the map gone (liveWanted), and every
     // pulse with it.
+    if (RP.on) {
+      RP.seq++;
+      replayHalt();
+      Object.assign(RP, { on: false, playing: false, done: false, msgs: [], idx: 0, lastAt: new Map() });
+    }
     dropCanvas();
     map = null;
     liveSync();
@@ -3009,7 +3535,7 @@ const MapLatency = (() => {
 
   return {
     attach, detach, reset, shown, opened, showBars, follow, pinStyle, barsFor,
-    legendHtml, liveLegendHtml, barsLegendHtml, altText, barsAltText, noteText,
+    legendHtml, liveLegendHtml, barsLegendHtml, altText, barsAltText, activityAltText, noteText,
     // the station list's Protocol column, while the pins are coloured by protocol
     protoColumn, protoCellHtml, protoWord: () => WORDS.Protocol,
     // …and the station card's Protocol line (frequencies.js)
@@ -3017,10 +3543,14 @@ const MapLatency = (() => {
     on: () => U.on,
     anim: () => U.anim,
     hidden: () => U.hidden,
+    solo: () => U.solo,
     bars: () => U.bars,
     mode: () => U.mode,
     wantsHiddenLinks, hiddenLinks,
-    setOn, setAnim, setThroughHidden, setBars, power, setMode, setWin, setScope, pickBand, back, focus, refresh, openHealth, yieldTo,
+    setOn, setAnim, setThroughHidden, setSolo, setBars, power, setMode, setWin, setScope, pickBand, back, focus, refresh, openHealth, yieldTo,
+    replay, replayPlay, replayStop, replaySeek,
+    replayFaster: () => replaySpeed(1),
+    replaySlower: () => replaySpeed(-1),
     // The rules, for test/latency.mjs.
     classifyValue, quantile, BANDS, SPECIAL, fmtDelay,
     classOf: (id, mode) => { const s = stationById(id); return s ? classOf(s, mode) : null; },
@@ -3030,7 +3560,7 @@ const MapLatency = (() => {
     // for test/latency.mjs — the canvas has nothing else to ask.
     _live: () => ({ status: LV.status, watching: !!LV.timer, cursor: LV.cursor, fired: LV.fired.slice(), firedN: LV.firedN,
                     pulses: pulses.length, canvas: !!pcanvas, held: [...LV.held.keys()],
-                    glowing: pulses.filter(p => performance.now() - p.t0 >= p.anim).map(p => p.id),
+                    glowing: pulses.filter(p => pulseNow() - p.t0 >= p.anim).map(p => p.id),
                     batches: LV.batches.map(b => ({ n: b.n, ids: b.ids.length, lost: b.lost })) }),
     // A route for a message — { keys: ['a:<address>' | 'a2:<address>'], t } —
     // and the copies a test lays in place of the receivers' (warm: the window
@@ -3057,6 +3587,13 @@ const MapLatency = (() => {
     _rx: () => ({ status: RX.status, cursor: RX.cursor, copies: RX.copies.length, played: RX.played, matched: RX.matched,
                   kept: [...RX.kept].map(([pk, k]) => [pk, [...k.keys()]]) }),
     _askNow: () => livePoll(),
+    // The replay as it stands, and the stations Activity only has drawn on the
+    // canvas this frame, for test/latency.mjs.
+    _replay: () => ({ on: RP.on, span: RP.span, speed: RP.speed, playing: RP.playing, done: RP.done, waiting: !!RP.waiting,
+                      t0: RP.t0, t1: RP.t1, clock: RP.clock, msgs: RP.msgs.length, idx: RP.idx, loaded: RP.loaded,
+                      fetched: RP.fetched, error: RP.error, held: PC.at != null, solo: soloActive(),
+                      pulses: pulses.map(p => ({ id: p.id, still: p.still, anim: p.anim, life: p.life, hold: p.hold, fade: p.fade,
+                                                 nodes: p.nodes.map(n => n.id) })) }),
     _fire: (id, msg) => fire(id, testMsg(msg)),
   };
 })();

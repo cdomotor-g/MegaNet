@@ -25,6 +25,17 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 164, date: '2026-10-30', items: [
+      '⏱️ <strong>Activity only</strong>, in Latency\'s <em>Messages landing</em> on the Stations map. Tick it and the map goes '
+        + 'down to its base map: every pin, line and layer is hidden, and a station shows only when a message from it has just '
+        + 'landed — with the repeater and the base station that carried it — fading away to nothing with its glow, a minute '
+        + 'later. Ticking it turns <em>Animate messages on the map</em> on if it was off.',
+      '⏱️ <strong>Replay</strong>, in the same card: play the last <em>1 h</em>, <em>24 h</em> or <em>7 days</em> of messages '
+        + 'again on the map, faster. ▶ and ⏸ play and pause it (paused, the map holds still), ■ goes back to the messages '
+        + 'landing now, <em>−</em> and <em>+</em> change the speed — from as it happened up to 4 hours of the log a second — and '
+        + 'the bar under them takes it to any moment. With <em>Activity only</em> ticked it is the network\'s traffic alone, '
+        + 'over the base map.',
+    ] },
     { n: 163, date: '2026-10-30', items: [
       '🔁 <strong>Repeaters</strong>: <strong>Pass ranges (heard)</strong> now fills by itself as the tab opens, for everybody. The server '
         + 'works out every hour which addresses each repeater was heard relaying over the last week, so the tab reads one small list '

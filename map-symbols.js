@@ -124,7 +124,7 @@
 // as the owner: the map's only, session-only, said on the match line. drawn()
 // is the two together, and the one question the map asks of a station.
 //
-// Exposes: kind, pin, radius, marker, reset, ownersReady, askSls, slsFailed,
+// Exposes: kind, pin, radius, marker, drawPin, reset, ownersReady, askSls, slsFailed,
 //          drawn, roleDrawn, linkDrawn, hiding, drawingPhrase, drawnNoteShort, ownerDrawn,
 //          ownerHiding, ownerPhrase, ownerParties, sectionHtml, ownerHtml,
 //          rolesHtml, noteHtml, legendHtml, legendOff, setShapes, setManual,
@@ -420,6 +420,52 @@ const MapSymbols = (function () {
   function marker(latlng, options) {
     const P = pinClass();
     return new P(latlng, options);
+  }
+
+  // A pin drawn as the map draws it — its outline, its shape in its fill and
+  // ring, its bars — on a canvas of somebody else's, at `alpha` of its own
+  // opacity, off the marker's `options`. ⏱️ Latency's Activity only hides the
+  // map's own pins and draws the stations that just reported this way, on its
+  // pulse canvas (map-latency.js). The ring and the fill as the canvas
+  // renderer's _fillStroke paints them.
+  function drawPin(ctx, x, y, o, alpha) {
+    const a = alpha == null ? 1 : alpha;
+    const op = a * (o.opacity == null ? 1 : o.opacity);
+    const tri = o.mnShape === 'triangle';
+    const r = Math.max(o.radius || 1, 1);
+    ctx.save();
+    ctx.shadowBlur = 0;
+    if (o.mnOutline && o.stroke !== false) {
+      ctx.beginPath();
+      if (tri) triPath(ctx, x, y, outlineR(r, o.weight, true));
+      else ctx.arc(x, y, outlineR(r, o.weight, false), 0, Math.PI * 2, false);
+      ctx.setLineDash(o.mnOutlineDash || []);
+      ctx.globalAlpha = op;
+      ctx.lineWidth = OUTLINE_W;
+      ctx.strokeStyle = o.mnOutline;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'butt';
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    if (tri) triPath(ctx, x, y, r);
+    else ctx.arc(x, y, Math.max(Math.round(r), 1), 0, Math.PI * 2, false);
+    if (o.fill !== false) {
+      ctx.globalAlpha = a * (o.fillOpacity == null ? 1 : o.fillOpacity);
+      ctx.fillStyle = o.fillColor || o.color;
+      ctx.fill('evenodd');
+    }
+    if (o.stroke !== false && o.weight) {
+      ctx.setLineDash(o.dashArray ? String(o.dashArray).split(/[ ,]+/).map(Number).filter(n => n >= 0) : []);
+      ctx.globalAlpha = op;
+      ctx.lineWidth = o.weight;
+      ctx.strokeStyle = o.color;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    }
+    if (o.mnBars && o.mnBars.n) drawBars(ctx, { x, y }, r, { weight: o.weight, opacity: op, mnBars: o.mnBars });
+    ctx.restore();
   }
 
   // ── The SLS, sent for when something here needs it ────────────────────────
@@ -931,7 +977,7 @@ const MapSymbols = (function () {
 
   return {
     FORECAST, INFORMATION, INFORMATION_DASH, MANUAL, TM, TRI_SCALE,
-    kind, pin, radius, marker, reset,
+    kind, pin, radius, marker, drawPin, reset,
     ownersReady, askSls, drawn, roleDrawn, linkDrawn, hiding, drawingPhrase, drawnNoteShort,
     ownerDrawn, ownerHiding, ownerPhrase, ownerParties,
     sectionHtml, ownerHtml, rolesHtml, legendHtml, legendOff, noteHtml,

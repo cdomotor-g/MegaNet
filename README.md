@@ -1893,7 +1893,32 @@ drawn a few times a second rather than every frame. While the animation is
 on, ⏱️ in the side panel's strip beats green behind its icon. It comes on with the
 view, has its own box, stops while the tab or the page is out of sight, and is
 still under reduced motion; **⏻ Latency view** at the head of the pane turns the
-colouring and the animation off together, or both on.
+colouring and the animation off together, or both on. The flares and rings are
+drawn once each off the screen and stamped where they go, so hundreds lit at once
+still draw at the screen's own rate.
+
+**Activity only**, a box under the animation's, takes the map down to its base
+map: every pane over the tiles but the base map's place names, the pulse canvas
+and the popups is hidden (`.lat-solo` on the map's container — hidden, not
+removed, so nothing is rebuilt and a click passes through), and each station a
+pulse lights — the station, the repeaters that carried it and the base that heard
+it — is drawn on the pulse canvas as the map draws it (`MapSymbols.drawPin`),
+from the moment the spark reaches it, held through its glow and faded out with
+it. The pulses run along the links even where 🗺️ Layers hides them. It is the
+session's only, ⏻ turns it off, and ticked with the animation off it turns the
+animation on.
+
+**Replay** plays the last hour, 24 h or 7 days of the log again on the map. Its
+readings are asked for by `reading_ts`, two hours at a time and four at once, and
+handed over in order so it plays from its start while the rest arrive; one
+station's readings within 30 s are one transmission. While a replay is loaded the
+log is not watched, and ■ hands back to it. Each span starts at the speed that
+plays it in a minute or three (60×, 900×, 3,600×), and − and + step from 1× to
+14,400×. Up to 60× the pulses run as they do live; faster, a message's way is lit
+at once and glows. The glow is live's minute of the log at the speed, never under
+1.5 s on the screen. ⏸ holds the canvas where it is; the bar drags the clock to
+any moment and lights what was glowing then, each as far into its fade as it would
+be. A replay has no receivers' copies, so every hop runs blue.
 
 **The trail of stations looked at (`station-trail.js`).** Closing the card is a
 decision that holds, and nothing brought it back short of finding the pin again

@@ -4461,6 +4461,30 @@ hr {
   30%      { opacity: .6; transform: none; }
 }
 .lat-pulse-canvas { pointer-events: none; }
+/* Activity only (map-latency.js): the base map, and over it only what the
+   pulse canvas draws — every other pane hidden: the pins and links on the
+   shared canvas, their arrows, names and tooltips, the overlays. The base
+   map's own place names stay with it, and a popup somebody opened. Hidden,
+   not removed, so nothing is rebuilt and a click on an empty spot passes
+   through to the map rather than landing on a pin nobody can see. */
+.leaflet-container.lat-solo .leaflet-map-pane > .leaflet-pane:not(.leaflet-tile-pane):not(.leaflet-mnBaseLabels-pane):not(.leaflet-mnLatPulse-pane):not(.leaflet-popup-pane) {
+  visibility: hidden;
+}
+/* Replay, in the messages card: the spans to play, then while one is loaded
+   its ▶ ⏸ and ■, its speed, and the bar it can be dragged along. */
+.lat-replay {
+  display: flex; flex-direction: column; gap: var(--sp-1);
+  padding-top: var(--sp-1); border-top: 1px solid var(--border);
+}
+.lat-rp-ctl { gap: 3px var(--sp-1); }
+.lat-rp-btn { min-width: 2.1rem; padding: .15rem .45rem; text-align: center; }
+.lat-rp-btn:disabled { opacity: .45; cursor: default; }
+.lat-rp-btn:disabled:hover { background: var(--panel); }
+.lat-rp-h { color: var(--muted); margin-left: var(--sp-2); }
+.lat-rp-speed { min-width: 3.6rem; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+.lat-rp-seek { width: 100%; margin: 0; accent-color: var(--accent); }
+.lat-rp-ends { display: flex; justify-content: space-between; gap: var(--sp-2); margin-top: -2px; }
+.lat-rp-status { margin: 0; }
 /* What is known of a hop (map-latency.js, HOPS): the card's key and the 🔑
    legend's, a short stretch of line in the pulse's colour and pattern — heard
    solid green, assumed dashed blue, missed dotted red. Literals, for the

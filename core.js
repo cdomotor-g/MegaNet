@@ -897,7 +897,11 @@ const HELP = {
       + 'base station heard, an ALERT2 path every hop), dashed blue along one assumed from the pass ranges, and '
       + 'dotted red along a link to a repeater that was heard not passing the message on; ⏱️ in the strip '
       + 'beats green while it is on. It and the signal bars come on with the view, each with a box of its own to turn it '
-      + 'off; <strong>⏻ Latency view</strong> at the top of the pane turns the colours, the bars and the animation off together.',
+      + 'off; <strong>⏻ Latency view</strong> at the top of the pane turns the colours, the bars and the animation off together. '
+      + '<strong>Activity only</strong>, under the animation, hides every pin, line and layer but the base map and shows only '
+      + 'the stations that just reported — each fading out with its glow, a minute after. <strong>Replay</strong> plays the '
+      + 'last hour, 24 h or 7 days of the log again on the map, faster: ▶ and ⏸, ■ to go back to the messages landing now, '
+      + '− and + for the speed, and a bar to drag it to any moment.',
       '<strong>The minimap</strong>, in the map\'s bottom-right corner, is the same map further out — four '
       + 'zoom levels to begin with — with the map\'s view outlined on it in red. Scroll over it to zoom the '
       + 'minimap rather than the map; that is how far out it then stays as the map moves. Drag it and the '

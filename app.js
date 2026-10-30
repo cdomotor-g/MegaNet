@@ -6973,6 +6973,10 @@ function updateMapAltName(pins, links, backbone, matched, related) {
   // …and the signal bars beside them, under any colouring.
   const signal = MapLatency.barsAltText();
   if (signal) bits.push(signal);
+  // …and a replay on the map, or the map down to the stations that just
+  // reported (⏱️ Latency's Activity only).
+  const activity = MapLatency.activityAltText();
+  if (activity) bits.push(activity);
   // And whose stations they are, and which kinds, when Map display is drawing
   // only some.
   if (MapSymbols.hiding()) bits.push(MapSymbols.drawingPhrase());
