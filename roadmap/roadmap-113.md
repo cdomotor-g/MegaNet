@@ -836,6 +836,15 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 204 — 2026-10-30: 🔁 Repeaters — what was heard kept by the server (0092), the delay measured, the map full screen
+
+The owner, on the new tab: the heard column to load as it opens (*"if there's a smarter way… less I/O or less database calls… I'll rely on your sage advice"*), a delay that is *"some sort of actual, whether it's measured or recorded"* beside the plan, the map to zoom with the wheel, half as tall again, and full screen. **Opens nothing; closes nothing.**
+
+- **`0092`**: `roll_up_carriers_day()` already put every legacy burst down to its transmitter each hour and kept only counts. It now keeps the answer: `relay_daily` (a day, a repeater, an address: relayed / off record / heard only another way; its own sensors not counted as relays) and `relay_gap_daily` (each gap from a station's own burst to the repeater's copy at one receiver — its turnaround, on one clock). `roll_up_carriers()` ends with `refresh_relay_summary()`: **`relay_summary`, a row a repeater, the last seven days, public.** The tab reads ~150 rows in one request where Signal Routes' way read ~65,000 receptions (sixty-odd pages, a minute) per open, editors only. Before `0092` the tab falls back to that, at once for an editor. On the live receptions: ~300 direct-then-relayed pairs a day, 0.5–3 s apart, mostly 1.3–1.4 s.
+- **Delay (actual)** — recorded, else measured (turnaround less the 133 ms frame and an assumed 300 ms key-up) — and **Delay (planned)**, with *change* where they differ by 50 ms or more; a row gives all three with the turnaround's quartiles and pairs.
+- **The map**: 660 px (from 440), the wheel zooms it, ⛶ Full screen opens it in the dialog shell over the window.
+- **Checks:** `tools/check_repeater_heard.sql` (20, new, in CI's db-checks; it caught a repeater's own sensor being counted as relayed); every migration from zero on Postgres 16 and every CI SQL check after it; `tabs`, `grip`, `help`.
+
 ### Revision 203 — 2026-10-30: 🔁 Repeaters — the By Repeater card, grown into a tab
 
 The owner, on ALERT IDs' *By Repeater* card: an export to CSV, the pass ranges *as heard* through the carrier fingerprinting, the carrier offset, a way to open the card to its full list, rows that open to list their stations (each obviously a link to the Stations tab), sortable headings and the station number — then *"move this card to its own tab… put a map there as well, and draw repeater links."* **Opens nothing; closes nothing.**

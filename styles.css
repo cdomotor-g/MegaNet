@@ -2968,8 +2968,21 @@ td {
    shared cap (.table-wrap.tall) and its handle until "Open the full list"
    draws it without one. A station's name in an opened row is a link and
    looks like one — the accent, underlined — because that is what it does. */
-.rptr-map { height: 440px; border-radius: var(--r-md); margin-top: var(--sp-2); }
-@media (max-width: 700px) { .rptr-map { height: 320px; } }
+.rptr-map { height: 660px; border-radius: var(--r-md); margin-top: var(--sp-2); }
+@media (max-width: 700px) { .rptr-map { height: 480px; } }
+/* The map full screen: the dialog shell's wide card made the window less a
+   margin, as the elevation profile's (#path-full), and the map the room left
+   under its bar. On a phone the card is the page already. */
+.rptr-full { display: flex; flex-direction: column; gap: var(--sp-2); height: 100%; min-height: 0; }
+.rptr-full-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); }
+.rptr-mapfull { flex: 1 1 auto; min-height: 70vh; border-radius: var(--r-md); }
+.rptr-full .rptr-key, .rptr-full .rptr-pick { margin: 0; }
+@media (min-width: 561px) {
+  .modal-overlay:has(#rptr-mapfull) { padding: 1.5vh 1.5vw; }
+  .modal-card--wide:has(#rptr-mapfull) { max-width: none; width: 100%; height: 97vh; display: flex; flex-direction: column; }
+  .modal-card--wide:has(#rptr-mapfull) .modal-body { flex: 1 1 auto; min-height: 0; max-height: none; display: flex; flex-direction: column; }
+  .rptr-mapfull { min-height: 0; }
+}
 .rptr-km { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--muted); }
 .rptr-km input { width: 10rem; max-width: 40vw; }
 .rptr-km output { min-width: 4.5em; color: var(--text); font-variant-numeric: tabular-nums; }
@@ -2983,7 +2996,7 @@ td {
 .rptr-k-iso { background: var(--warn); }
 .rptr-k-base { color: var(--text); }
 .rptr-air { margin: var(--sp-2) 0; }
-.table-wrap table.rptr-table { min-width: 62rem; }
+.table-wrap table.rptr-table { min-width: 74rem; }
 .rptr-table td, .rptr-table th { vertical-align: top; }
 .rptr-open { display: inline-flex; align-items: baseline; gap: .35em; font-weight: 600; }
 .rptr-chev { display: inline-block; color: var(--muted); transition: transform var(--motion-fast, .15s); }

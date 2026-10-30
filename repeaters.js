@@ -48,14 +48,19 @@
 
 const Repeaters = (() => {
 
-  const REFRESH_MS = 15 * 60e3;    // carriers read again after this, if the tab is opened
-  const AIR_DAYS = 7;              // the receptions read for the pass ranges as heard
+  const REFRESH_MS = 15 * 60e3;    // carriers and what was heard read again after this, if the tab is opened
+  const AIR_DAYS = 7;              // the receptions read for the pass ranges as heard, before 0092
   const KM_DEFAULT = 100;          // the Stations map's Max TX distance default
   const KM_MAX = 300;
   const WARN_PPM = 2.5;            // the server's off-channel line (tx_offset_warn_ppm)
   const RUNS_SHOWN = 8;            // heard runs in a cell; the rest when the row opens
   const LIST_SHOWN = 24;           // addresses listed in a detail line before "and N more"
   const LS_SORT = 'mn-rpt-sort', LS_FULL = 'mn-rpt-full', LS_KM = 'mn-rpt-km';
+  // The frame and the transmitter's coming up, the Repeater Delays plan's own
+  // figures (delay-plan.js), taken off a measured turnaround to leave the delay.
+  const FRAME_MS = 133, LEAD_MS = 300;
+  const frameMs = () => (typeof DelayPlan !== 'undefined' && DelayPlan.DEFAULTS ? DelayPlan.DEFAULTS.frameMs : FRAME_MS);
+  const leadMs = () => (typeof DelayPlan !== 'undefined' && DelayPlan.DEFAULTS ? DelayPlan.DEFAULTS.leadMs : LEAD_MS);
 
   // ── The words this page uses in its own sense ──────────────────────────────
   // Every heading, chip and figure whose word means something particular here
@@ -73,19 +78,23 @@ const Repeaters = (() => {
       stations: 'Field stations with at least one ALERT address inside this repeater\'s pass ranges — the stations it should pass on. Open the row to list them.',
       links: `Other repeaters within ${km} whose pass ranges let through at least one of the same ALERT addresses, so one would pass on what the other sends. "base" means a base station is within ${km} as well.`,
       set: 'The ALERT address windows on record for this repeater — what it should be programmed to pass on. Exclusions on record are taken out of them.',
-      heard: 'The addresses the base stations heard this repeater relaying, on its own carrier, in the receptions read — written as runs of addresses on file, a run ending where an address was heard coming in another way. Set it beside the pass ranges on record.',
+      heard: 'The addresses the base stations heard this repeater relaying, on its own carrier, over the last week — written as runs of addresses on file, a run ending where an address was heard coming in another way. Set it beside the pass ranges on record. Worked out hourly from every burst the base stations decode.',
       offrec: 'Heard relayed on this repeater\'s carrier, but in none of its pass ranges on record: the record or the radio wants correcting.',
       elsewhere: 'In its pass ranges on record, and heard on days its carrier was found, but never on its carrier: it does not seem to relay these.',
-      notFound: 'Its carrier was not picked out at any base station in the receptions read. It may have been quiet, out of the receivers\' reach, or relaying too few addresses to pick out.',
+      notFound: 'Its carrier was not picked out at any base station over the last week. It may have been quiet, out of the receivers\' reach, or relaying too few addresses to pick out.',
       cfo: `How far this repeater's transmitter frequency sits from the other transmitters the same base stations hear, over the last week: the median of every burst it relayed, in hertz and parts per million. 0 is "like the rest", not "exactly on frequency"; past ±${WARN_PPM} ppm decodes start to suffer. Sorted by its size, either side of the rest.`,
-      delay: 'How long the repeater waits after hearing a reading before sending it on: the one recorded on its station, or else the one ⏳ Repeater Delays plans for it, marked planned.',
-      planned: 'No delay is recorded on this station; this is the delay ⏳ Repeater Delays plans for it.',
+      actual: `How long the repeater really waits after hearing a reading before sending it on: the delay recorded on its station when there is one, else measured — its turnaround (below) less the ${frameMs()} ms frame and the ${leadMs()} ms the app takes its transmitter to need to come up, which nobody has timed on these radios.`,
+      recorded: 'The delay recorded on the repeater\'s station, as it was set in the field.',
+      turnaround: 'Measured on the air: how long after a station\'s own burst the same base station hears this repeater\'s copy of it — the same address and value, the receiver\'s clock the same for both. The median over the last week, with the middle half of the gaps and how many there were. It is the repeater\'s delay, its transmitter coming up and the frame.',
+      measuredDelay: `Its turnaround less the ${frameMs()} ms frame and an assumed ${leadMs()} ms for its transmitter to come up: what is left is its delay, give or take how long this radio really takes to key up.`,
+      plan: 'The delay ⏳ Repeater Delays plans for this repeater, so repeaters relaying the same reading do not send their copies on top of each other. A plan, not what it is set to.',
       linkKm: 'How far apart two sites may be and still count as hearing each other. A distance, not a coverage model: a hill can break a link drawn here, and a long clear path can make one it leaves out.',
       rrLink: `Two repeaters within ${km} of each other whose pass ranges both let at least one ALERT address through — a message one sends on, the other would take and send on again.`,
       baseLink: `A repeater within ${km} of a base station: where what it relays can be received.`,
       isolated: `No repeater within ${km} shares an address with it and no base station is within ${km}: what it relays may have nowhere to go — or its real link is longer than ${km}.`,
       measured: 'Repeaters whose carrier the base stations measured in the last week, against the fleet — the server judges it hourly.',
-      found: 'Repeaters whose carrier was picked out in the receptions read, so what they relay is known.',
+      found: 'Repeaters whose carrier was picked out at a base station over the last week, so what they relay is known.',
+      timed: 'Repeaters whose turnaround was measured over the last week: a station\'s own burst and the repeater\'s copy of it, both heard at one base station.',
     };
   }
   let W = null;
@@ -95,7 +104,8 @@ const Repeaters = (() => {
     ['repeater', 'Repeater'], ['stn', 'Stn #'], ['network', 'Network'], ['channel', 'Channel'], ['addresses', 'Addresses'],
     ['stations', 'Stations'], ['links', 'Links'], ['set', 'Pass ranges (set)'], ['heard', 'Pass ranges (heard)'],
     ['offrec', 'Off record'], ['elsewhere', 'Only another way'], ['notFound', 'Not picked out'], ['cfo', 'Carrier offset'],
-    ['delay', 'Delay'], ['planned', 'Planned'], ['linkKm', 'Link distance'], ['rrLink', 'Repeater to repeater'],
+    ['actual', 'Delay (actual)'], ['recorded', 'Recorded'], ['turnaround', 'Turnaround'], ['measuredDelay', 'Measured'],
+    ['plan', 'Delay (planned)'], ['linkKm', 'Link distance'], ['rrLink', 'Repeater to repeater'],
     ['baseLink', 'Repeater to base station'], ['isolated', 'Linked to nothing'],
   ];
 
@@ -103,20 +113,21 @@ const Repeaters = (() => {
   // the first press, the rest biggest first), whether a phone drops it, and
   // its share of the width (the shared table is laid out fixed on a desk).
   const COLS = [
-    { key: 'name',    label: 'Repeater',            w: 'repeater',  text: true, pc: 15 },
+    { key: 'name',    label: 'Repeater',            w: 'repeater',  text: true, pc: 13 },
     { key: 'num',     label: 'Stn #',               w: 'stn',       text: true, opt: true, pc: 6 },
-    { key: 'net',     label: 'Network',             w: 'network',   text: true, opt: true, pc: 9 },
-    { key: 'chan',    label: 'Channel',             w: 'channel',   opt: true, pc: 6 },
+    { key: 'net',     label: 'Network',             w: 'network',   text: true, opt: true, pc: 8 },
+    { key: 'chan',    label: 'Channel',             w: 'channel',   opt: true, pc: 7 },
     { key: 'addr',    label: 'Addresses',           w: 'addresses', pc: 8 },
-    { key: 'stns',    label: 'Stations',            w: 'stations',  pc: 8 },
-    { key: 'links',   label: 'Links',               w: 'links',     opt: true, pc: 6 },
-    { key: 'ranges',  label: 'Pass ranges (set)',   w: 'set',       pc: 13 },
-    { key: 'heard',   label: 'Pass ranges (heard)', w: 'heard',     pc: 13 },
-    { key: 'cfo',     label: 'Carrier offset',      w: 'cfo',       pc: 9 },
-    { key: 'delay',   label: 'Delay',               w: 'delay',     opt: true, pc: 7 },
+    { key: 'stns',    label: 'Stations',            w: 'stations',  pc: 7 },
+    { key: 'links',   label: 'Links',               w: 'links',     opt: true, pc: 5 },
+    { key: 'ranges',  label: 'Pass ranges (set)',   w: 'set',       pc: 12 },
+    { key: 'heard',   label: 'Pass ranges (heard)', w: 'heard',     pc: 12 },
+    { key: 'cfo',     label: 'Carrier offset',      w: 'cfo',       pc: 8 },
+    { key: 'delay',   label: 'Delay (actual)',      w: 'actual',    opt: true, pc: 7 },
+    { key: 'plan',    label: 'Delay (planned)',     w: 'plan',      opt: true, pc: 7 },
   ];
   const SORT_SAID = { name: 'name', num: 'station number', net: 'network', chan: 'channel', addr: 'addresses', stns: 'stations',
-    links: 'links', ranges: 'pass ranges', heard: 'addresses heard', cfo: 'size of carrier offset', delay: 'delay' };
+    links: 'links', ranges: 'pass ranges', heard: 'addresses heard', cfo: 'size of carrier offset', delay: 'actual delay', plan: 'planned delay' };
 
   const S = {
     q: '',
@@ -127,9 +138,13 @@ const Repeaters = (() => {
     km: KM_DEFAULT,
     read: false,         // this device's settings read
     tsum: null, tsumPhase: 'idle', tsumErr: '', tsumAt: 0,
+    // relay_summary (0092): what each repeater was heard relaying and its
+    // turnaround, a row a repeater. `missing` is a database before 0092.
+    relay: null, relayPhase: 'idle', relayErr: '', relayAt: 0, relayMissing: false,
     air: '',             // '' | 'loading'
     planReady: false, planTimer: null,
     map: null, layer: null, fitted: false,
+    fmap: null, flayer: null,   // the map full screen, while it is open
     M: null, key: null,
   };
 
@@ -161,6 +176,44 @@ const Repeaters = (() => {
   }
 
   // ── What is known ─────────────────────────────────────────────────────────
+
+  // What was heard, the server's way (0092): relay_summary's row, put in the
+  // shape Signal Routes' analysis gives a repeater, so one drawing serves
+  // both. Its off-record addresses are weighed as Signal Routes weighs them —
+  // two copies or more on its carrier is it relaying the address; one copy,
+  // or nearly every burst of it on its carrier, may be; less is a stray.
+  function relayX(row) {
+    const arr = k => (Array.isArray(row[k]) ? row[k].map(Number) : []);
+    const relayed = arr('relayed'), rn = arr('relayed_n');
+    const off = arr('off_record'), dup = arr('off_dup'), own = arr('off_own'), all = arr('off_all');
+    const offrec = off.map((a, i) => {
+      const d = dup[i] || 0, o = own[i] || 0, n = all[i] || 0;
+      const evidence = d >= 2 ? 'copies' : d === 1 || (o >= 3 && o >= 0.8 * Math.max(1, n)) ? 'possible' : 'stray';
+      return { a, dup: d, own: o, all: n, evidence };
+    }).filter(o => o.evidence !== 'stray');
+    return {
+      confirmed: new Map(relayed.map((a, i) => [a, rn[i] || 0])),
+      offrec,
+      elsewhere: new Map(arr('elsewhere').map(a => [a, { n: 0 }])),
+      days: fin(row.days) || 0,
+      n: fin(row.bursts) || 0,
+    };
+  }
+
+  // The turnaround measured on the air (0092), or null.
+  function gapOf(row) {
+    if (!row || !fin(row.gap_n) || fin(row.gap_ms) == null) return null;
+    return { ms: fin(row.gap_ms), lo: fin(row.gap_lo_ms), hi: fin(row.gap_hi_ms), n: fin(row.gap_n), days: fin(row.gap_days) };
+  }
+
+  // Where the heard column comes from: the server's week when the database
+  // keeps it, else Signal Routes' analysis of the receptions read in the
+  // browser, for a database before 0092.
+  function heardSource() {
+    if (S.relay) return { kind: 'server' };
+    const A = air();
+    return A ? { kind: 'air', A } : null;
+  }
 
   // Signal Routes' analysis of the receptions, when one has been read this
   // session and is real (its demo is made up, and never stands in here).
@@ -232,8 +285,9 @@ const Repeaters = (() => {
     if (typeof state === 'undefined' || !state.data) return null;
     const rel = passRelationIndex();
     const bb = backboneIndex();
-    const A = air();
-    const key = [state.data, rel, bb, A, S.tsum, S.km, S.planReady ? (state.delayPlans || 1) : 0];
+    const src = heardSource();
+    const A = src && src.kind === 'air' ? src.A : null;
+    const key = [state.data, rel, bb, S.relay, A, S.tsum, S.km, S.planReady ? (state.delayPlans || 1) : 0];
     if (S.M && S.key && key.every((v, i) => v === S.key[i])) return S.M;
     const pairs = backboneLinks(S.km).filter(p => placed(p.a) && placed(p.b));
     const links = linkIndex(pairs);
@@ -243,7 +297,10 @@ const Repeaters = (() => {
     const rows = stations().filter(isRep).map(st => {
       const rep = st.repeater;
       const L = links.get(st.id) || { reps: [], bases: [] };
-      const x = A ? A.repById.get(st.id) : null;
+      const rrow = S.relay ? S.relay.get(st.id) || null : null;
+      const x = S.relay ? (rrow && (rrow.relayed || []).length + (rrow.off_record || []).length ? relayX(rrow) : null)
+        : A ? A.repById.get(st.id) : null;
+      const gap = gapOf(rrow);
       const t = S.tsum ? S.tsum.get('st:' + st.id) || null : null;
       const carried = findStationMatches(st);
       const ranges = (rep.pass_ranges || []).map(p => ({ low: Number(p.low), high: Number(p.high) }));
@@ -258,9 +315,15 @@ const Repeaters = (() => {
         cfo: t && fin(t.w_ppm) != null ? { ppm: fin(t.w_ppm), hz: fin(t.w_hz), days: fin(t.w_days), freq: fin(t.freq_mhz) } : null,
         tsumRow: t,
         delayRec: fin(rep.delay_ms), delayPlan: planned ? planned.get(st.id) ?? null : null,
+        gap, delayMeas: gap ? Math.round(gap.ms - frameMs() - leadMs()) : null,
       };
     });
-    S.M = { rows, byId: new Map(rows.map(r => [r.id, r])), pairs, A, addrSt };
+    const R = S.relay ? [...S.relay.values()][0] || null : null;
+    S.M = { rows, byId: new Map(rows.map(r => [r.id, r])), pairs, addrSt,
+            src: src ? src.kind : null, A,
+            // The period what was heard covers, whichever source said it.
+            heardFrom: R ? R.window_from : A ? A.from : null, heardDays: R ? fin(R.window_days) : A ? A.days : null,
+            heardAt: R ? R.judged_at : A ? A.to : null };
     S.key = key;
     return S.M;
   }
@@ -282,7 +345,8 @@ const Repeaters = (() => {
       case 'ranges': return r.ranges.length ? Math.min(...r.ranges.map(p => p.low)) : null;
       case 'heard':  return r.heard ? r.heard.inRange + r.heard.off.length : null;
       case 'cfo':    return r.cfo ? Math.abs(r.cfo.ppm) : null;
-      case 'delay':  return r.delayRec ?? r.delayPlan;
+      case 'delay':  return r.delayRec ?? r.delayMeas;
+      case 'plan':   return r.delayPlan;
       default:       return null;
     }
   }
@@ -330,7 +394,7 @@ const Repeaters = (() => {
   }
 
   function heardHtml(r, searchIds) {
-    if (!S.M.A) return '<span class="txt-muted">—</span>';
+    if (!S.M.src) return `<span class="txt-muted">${S.relayPhase === 'loading' ? '…' : '—'}</span>`;
     const h = r.heard;
     if (!h) return `<span class="txt-muted">${term('notFound', 'not picked out')}</span>`;
     const runs = h.runs.slice(0, RUNS_SHOWN).map(x => runHtml(x, searchIds)).join(', ')
@@ -353,11 +417,27 @@ const Repeaters = (() => {
     return `<span class="${off ? 'txt-warn rptr-cfo-off' : ''}">${off ? '<span aria-hidden="true">⚠ </span>' : ''}${main}</span><br><span class="small txt-muted">${sub}</span>`;
   }
 
-  function delayHtml(r) {
-    if (r.delayRec != null) return `${num(r.delayRec)} ms`;
+  // What it is set to: recorded on its station, or measured on the air — and
+  // under it whichever the other is, so the two can be set side by side.
+  function actualHtml(r) {
+    const g = r.gap;
+    const turn = g ? `<span class="small txt-muted">${num(Math.round(g.ms))} ms turnaround</span>` : '';
+    if (r.delayRec != null) {
+      return `${num(r.delayRec)} ms <span class="small txt-muted">recorded</span>${g ? `<br>${turn}` : ''}`;
+    }
+    if (g) {
+      const d = r.delayMeas;
+      return `${d >= 0 ? `≈ ${num(d)} ms` : '≈ 0 ms'} <span class="small txt-muted">measured</span><br>${turn}`;
+    }
+    if (S.relayPhase === 'loading' && !S.relay) return '<span class="txt-muted">…</span>';
+    return '<span class="txt-muted">not known</span>';
+  }
+  function planHtml(r) {
     if (!S.planReady) return '<span class="txt-muted">…</span>';
     if (r.delayPlan == null) return '<span class="txt-muted">—</span>';
-    return `<span class="txt-muted">${num(r.delayPlan)} ms planned</span>`;
+    const now = r.delayRec ?? r.delayMeas;
+    const off = now != null && Math.abs(now - r.delayPlan) >= 50;
+    return `${num(r.delayPlan)} ms${off ? `<br><span class="small txt-warn term-chip" title="${escAttr('The plan asks for a different delay from the one it has now — at least 50 ms out, the plan\'s own step.')}">change</span>` : ''}`;
   }
 
   function linksHtml(r) {
@@ -397,7 +477,8 @@ const Repeaters = (() => {
         <td class="small">${setHtml(r, searchIds, ranges)}</td>
         <td class="small">${heardHtml(r, searchIds)}</td>
         <td class="small">${cfoHtml(r)}</td>
-        <td${opt('delay')}><span class="small">${delayHtml(r)}</span></td>
+        <td${opt('delay')}><span class="small">${actualHtml(r)}</span></td>
+        <td${opt('plan')}><span class="small">${planHtml(r)}</span></td>
       </tr>${open ? detailHtml(r, P) : ''}`;
   }
 
@@ -429,8 +510,8 @@ const Repeaters = (() => {
       ? `<ul class="rptr-dl">${r.links.bases.map(n => `<li>${stationLink(n.st, esc(n.st.name))} <span class="small txt-muted">${num(Math.round(n.km))} km</span></li>`).join('')}</ul>`
       : `<p class="small txt-muted">None within ${num(S.km)} km.</p>`;
     let airLines;
-    if (!M.A) airLines = '<p class="small txt-muted">The receptions have not been read — see above the table.</p>';
-    else if (!r.heard) airLines = `<p class="small">${term('notFound', 'Not picked out')} in the ${plural(M.A.days, 'day')} read.</p>`;
+    if (!M.src) airLines = '<p class="small txt-muted">Not read — see above the table.</p>';
+    else if (!r.heard) airLines = `<p class="small">${term('notFound', 'Not picked out')} in the last ${plural(M.heardDays, 'day')}.</p>`;
     else {
       const h = r.heard;
       const lines = [`Found on its carrier on ${plural(h.days, 'day')}, relaying ${plural(h.bursts, 'burst')}: ${plural(h.inRange, 'address', 'addresses')} in its ranges.`];
@@ -445,8 +526,15 @@ const Repeaters = (() => {
       ? `<p class="small">${c.hz != null ? `${sgn(c.hz, 0)} Hz, ` : ''}${sgn(c.ppm, 2)} ppm against the rest over the last week${c.days != null ? ` (${plural(c.days, 'day')} measured)` : ''}${
           c.freq != null ? `, heard on ${esc(String(c.freq))} MHz` : ''}.${Math.abs(c.ppm) >= WARN_PPM ? ' <span class="txt-warn">Past the ±2.5 ppm line: decodes suffer.</span>' : ''}</p>`
       : `<p class="small txt-muted">${t ? 'Not measured in the last week.' : S.tsum ? 'Never measured.' : 'Not read.'}</p>`;
-    const delay = r.delayRec != null ? `${num(r.delayRec)} ms, recorded on its station.`
-      : r.delayPlan != null ? `None recorded; ⏳ Repeater Delays plans ${num(r.delayPlan)} ms.` : 'None recorded.';
+    // Every figure there is for its delay, each said for what it is.
+    const g = r.gap;
+    const delay = [
+      r.delayRec != null ? `${term('recorded', 'Recorded')}: ${num(r.delayRec)} ms.` : `${term('recorded', 'Recorded')}: none on its station.`,
+      g ? `${term('turnaround', 'Turnaround')}: ${num(Math.round(g.ms))} ms${g.lo != null && g.hi != null ? ` (middle half ${num(Math.round(g.lo))}–${num(Math.round(g.hi))} ms)` : ''},
+           from ${plural(g.n, 'pair')} on ${plural(g.days, 'day')} — ${term('measuredDelay', 'a delay of about')} ${num(Math.max(0, r.delayMeas))} ms.`
+        : `${term('turnaround', 'Turnaround')}: ${S.relay ? 'not measured this week — no station of its was heard direct and through it at one base station.' : S.relayMissing ? 'not kept by this database yet (0092).' : 'not read.'}`,
+      r.delayPlan != null ? `${term('plan', 'Planned')}: ${num(r.delayPlan)} ms, by ⏳ Repeater Delays.` : `${term('plan', 'Planned')}: none.`,
+    ];
     return `
       <tr class="rptr-detail" id="rptr-d-${escAttr(r.id)}"><td colspan="${COLS.length}">
         <div class="rptr-d-body">
@@ -457,7 +545,7 @@ const Repeaters = (() => {
             <div><p class="rptr-d-h"><strong>${term('baseLink', 'Base stations in reach')}</strong></p>${bases}</div>
             <div><p class="rptr-d-h"><strong>${term('heard', 'On the air')}</strong></p>${airLines}</div>
             <div><p class="rptr-d-h"><strong>${term('cfo', 'Carrier')}</strong></p>${carrier}
-              <p class="rptr-d-h"><strong>${term('delay', 'Delay')}</strong></p><p class="small">${delay}</p></div>
+              <p class="rptr-d-h"><strong>${term('actual', 'Delay')}</strong></p>${delay.map(l => `<p class="small">${l}</p>`).join('')}</div>
           </div>
           <div class="button-group rptr-d-acts">
             <button type="button" class="btn" onclick="Repeaters.openStation(null,'${escAttr(r.id)}')">Open ${esc(r.name)} on the Stations tab</button>
@@ -482,13 +570,25 @@ const Repeaters = (() => {
       tile(num(iso), `${term('isolated', 'linked to nothing')}`, iso ? 'txt-warn' : ''),
     ];
     if (S.tsum) out.push(tile(num(rows.filter(r => r.cfo).length), `with their ${term('measured', 'carrier measured')} this week`));
-    if (M.A) out.push(tile(num(rows.filter(r => r.heard).length), `${term('found', 'found on the air')} in the receptions read`));
+    if (M.src) out.push(tile(num(rows.filter(r => r.heard).length), `${term('found', 'found on the air')} this week`));
+    if (S.relay) out.push(tile(num(rows.filter(r => r.gap).length), `with their ${term('timed', 'turnaround measured')}`));
     return `<div class="bk-tiles">${out.join('')}</div>`;
   }
 
   function airHtml(M) {
     const s = airState();
     const busy = S.air || (s && s.phase === 'loading');
+    if (M.src === 'server') {
+      const found = M.rows.filter(r => r.heard).length, timed = M.rows.filter(r => r.gap).length;
+      const from = M.heardFrom ? new Date(String(M.heardFrom).slice(0, 10) + 'T00:00:00Z') : null;
+      return `<p class="small rptr-air"><b>${term('heard', 'Pass ranges as heard')}</b> and the measured delays: the base stations' last
+        ${plural(M.heardDays, 'day')}${from ? ` (from ${esc(from.toLocaleDateString([], { day: 'numeric', month: 'short', timeZone: 'UTC' }))})` : ''},
+        worked out every hour from every burst they decode — ${plural(found, 'repeater')} found on ${found === 1 ? 'its carrier' : 'their carriers'},
+        ${num(timed)} with ${term('turnaround', 'a turnaround measured')}.${M.heardAt ? ` Last worked out ${esc(clock(M.heardAt))}.` : ''}</p>`;
+    }
+    if (S.relayPhase === 'loading' && !S.relayMissing) {
+      return `<p class="small txt-muted rptr-air" role="status">Reading what the base stations heard each repeater relay…</p>`;
+    }
     if (M.A) {
       const A = M.A;
       return `<p class="small rptr-air"><b>${term('heard', 'Pass ranges as heard')}:</b> from ${plural(A.days, 'day')} of receptions
@@ -510,8 +610,10 @@ const Repeaters = (() => {
   }
 
   function carriersNote() {
-    if (S.tsumPhase === 'error') return `<p class="small txt-muted">The carrier offsets could not be read (${esc(S.tsumErr)}).</p>`;
-    return '';
+    const out = [];
+    if (S.tsumPhase === 'error') out.push(`The carrier offsets could not be read (${esc(S.tsumErr)}).`);
+    if (S.relayPhase === 'error' && !S.relayMissing) out.push(`What each repeater was heard relaying could not be read (${esc(S.relayErr)}).`);
+    return out.map(t => `<p class="small txt-muted">${t}</p>`).join('');
   }
 
   function tableHtml(M) {
@@ -538,7 +640,7 @@ const Repeaters = (() => {
 
   function pickHtml(M) {
     const r = S.pick ? M.byId.get(S.pick) : null;
-    if (!r) return '<p class="small txt-muted rptr-pick">Press a repeater on the map to pick out its links and open its row below.</p>';
+    if (!r) return '<p class="small txt-muted rptr-pick">Press a repeater on the map to pick out its links and open its row in the table. Scroll to zoom.</p>';
     const said = r.isolated ? 'linked to nothing' : `${plural(r.linked, 'linked repeater')}${r.base ? `, ${plural(r.links.bases.length, 'base station')} in reach` : ', no base station in reach'}`;
     return `<p class="small rptr-pick"><strong>${esc(r.name)}</strong> — ${said}.
       <button type="button" class="link-btn" onclick="Repeaters.goTo('${escAttr(r.id)}')">Show its row</button> ·
@@ -570,14 +672,22 @@ const Repeaters = (() => {
         <li><strong>Links.</strong> Two repeaters are linked when both pass ranges let at least one address through and they are within the
           distance set over the map; a repeater is linked to a base station within that distance. The Stations map draws the same paths with its
           own <em>Max TX distance</em>. A distance is not a coverage model: check a link that matters with the elevation profile there.</li>
-        <li><strong>Pass ranges as heard.</strong> From the receptions the base stations decode, each burst put down to the transmitter that
-          sent it by its carrier — the fingerprint every burst a repeater relays carries — as
-          <button type="button" class="link-btn" onclick="switchTab('signalroutes')">🛤️ Signal Routes</button> does it. Receptions are for
-          editors, and a week of them takes a minute to read.</li>
+        <li><strong>Pass ranges as heard.</strong> From every burst the base stations decode, each put down to the transmitter that sent it
+          by its carrier — the fingerprint every burst a repeater relays carries. The server does it every hour and keeps, for each repeater,
+          the addresses on its carrier over the last week, so this tab reads a row a repeater (the same rules as
+          <button type="button" class="link-btn" onclick="switchTab('signalroutes')">🛤️ Signal Routes</button>, which reads the receptions
+          themselves). A run of addresses ends where one was heard coming in another way.</li>
         <li><strong>Carrier offset.</strong> The server's hourly judgement of every transmitter against the fleet the same receivers hear,
           each receiver's own error taken out (Station Health's <em>Transmitter frequency</em> panel). Public, so it shows signed out.</li>
-        <li><strong>Delay.</strong> Recorded on the station when it is known; otherwise the plan from
-          <button type="button" class="link-btn" onclick="switchTab('repdelays')">⏳ Repeater Delays</button>, marked planned. What is wrong
+        <li><strong>Delay (actual).</strong> Recorded on the station when it is known. Otherwise measured: when a base station hears a
+          station's own burst and then this repeater's copy of it, the gap between the two is the repeater's turnaround — its delay, its
+          transmitter coming up and the ${frameMs()} ms frame — on that receiver's own clock, so no clock has to be right. The median over the
+          week, less the frame and the ${leadMs()} ms the app takes a transmitter to need to come up, is its delay. That ${leadMs()} ms nobody
+          has timed on these radios: a repeater whose delay is recorded and measured both would time it. A repeater whose stations are never
+          heard direct where its copies are has no measurement.</li>
+        <li><strong>Delay (planned).</strong> What
+          <button type="button" class="link-btn" onclick="switchTab('repdelays')">⏳ Repeater Delays</button> plans for it, so repeaters
+          relaying one reading do not send on top of each other; <em>change</em> where that is 50 ms or more from the actual. What is wrong
           with each repeater over a period, ranked, is on
           <button type="button" class="link-btn" onclick="switchTab('backbone')">🗼 Backbone</button>.</li>
       </ul>
@@ -608,10 +718,10 @@ const Repeaters = (() => {
 
       <div class="panel">
         <div class="panel-header"><h3 id="rptr-map-h">Links between repeaters</h3>
-          <label class="rptr-km">${term('linkKm', 'Link distance')}
-            <input type="range" id="rptr-km" min="10" max="${KM_MAX}" step="10" value="${S.km}" aria-valuetext="${S.km} kilometres"
-                   oninput="Repeaters.kmShow(this.value)" onchange="Repeaters.setKm(this.value)">
-            <output id="rptr-km-val" for="rptr-km">${num(S.km)} km</output></label>
+          <div class="button-group">
+            ${kmHtml('rptr-km')}
+            <button type="button" class="btn" onclick="Repeaters.openFull()" title="Open the map full screen (Esc closes it)">⛶ Full screen</button>
+          </div>
         </div>
         <div id="rptr-map" class="rptr-map" role="region" aria-label="Map of the repeaters, the links between them and the base stations in reach"></div>
         <div id="rptr-pick-line">${pickHtml(M)}</div>
@@ -634,6 +744,15 @@ const Repeaters = (() => {
     </div>`;
   }
 
+  // The link distance, over the map and again over it full screen; both
+  // follow the one setting.
+  function kmHtml(id) {
+    return `<label class="rptr-km">${term('linkKm', 'Link distance')}
+      <input type="range" id="${id}" min="10" max="${KM_MAX}" step="10" value="${S.km}" aria-valuetext="${S.km} kilometres"
+             oninput="Repeaters.kmShow(this.value)" onchange="Repeaters.setKm(this.value)">
+      <output class="rptr-km-val" for="${id}">${num(S.km)} km</output></label>`;
+  }
+
   function foundText(T) {
     return S.q ? `${T.of} repeaters` : '';
   }
@@ -652,6 +771,7 @@ const Repeaters = (() => {
     set('rptr-air', airHtml(M));
     set('rptr-carriers', carriersNote());
     set('rptr-pick-line', pickHtml(M));
+    set('rptr-full-pick', pickHtml(M));
     const wrap = document.getElementById('rptr-wrap');
     const scroll = wrap ? wrap.scrollTop : 0;
     set('rptr-table', T.html);
@@ -675,20 +795,60 @@ const Repeaters = (() => {
 
   // ── The map ───────────────────────────────────────────────────────────────
 
+  // Two maps at most: the one on the page, and the same drawn full screen in
+  // the dialog shell (modal.js) while that is open. The wheel zooms both —
+  // a map that only zoomed with its buttons was the complaint.
   function stopMap() {
+    closeFull();
     if (S.map) { try { removeMap(S.map); } catch (_) { /* gone */ } }
     S.map = null; S.layer = null;
+  }
+  function newMap(id) {
+    const map = L.map(id, { scrollWheelZoom: true, wheelPxPerZoomLevel: 90 }).setView([-25.5, 151.5], 6);
+    if (typeof addBaseLayers === 'function') addBaseLayers(map);
+    return { map, layer: L.layerGroup().addTo(map) };
   }
   function initMap() {
     stopMap();
     const el = document.getElementById('rptr-map');
     if (!el || typeof L === 'undefined' || !S.M) return;
-    S.map = L.map('rptr-map', { scrollWheelZoom: false }).setView([-25.5, 151.5], 6);
+    ({ map: S.map, layer: S.layer } = newMap('rptr-map'));
     if (typeof registerLiveMap === 'function') registerLiveMap('Repeaters', () => S.map);
-    if (typeof addBaseLayers === 'function') addBaseLayers(S.map);
-    S.layer = L.layerGroup().addTo(S.map);
     S.fitted = false;
     drawMap();
+  }
+
+  // Full screen: the dialog shell made the window less a margin (styles.css,
+  // #rptr-mapfull), a map of its own in it at the page map's view, the link
+  // distance and the picked repeater under it. Esc, × or the backdrop close it
+  // and hand focus back to the button.
+  function openFull() {
+    if (typeof Modal === 'undefined' || typeof L === 'undefined' || !S.M) return;
+    Modal.open({
+      title: 'Links between repeaters',
+      wide: true,
+      onClose: () => {
+        if (S.fmap) { try { removeMap(S.fmap); } catch (_) { /* gone */ } }
+        S.fmap = null; S.flayer = null;
+      },
+      html: `<div class="rptr-full">
+        <div class="rptr-full-bar">${kmHtml('rptr-km-full')}</div>
+        <div id="rptr-mapfull" class="rptr-mapfull" role="region" aria-label="Map of the repeaters, full screen"></div>
+        <div id="rptr-full-pick">${pickHtml(S.M)}</div>
+        ${keyHtml()}
+      </div>`,
+    });
+    ({ map: S.fmap, layer: S.flayer } = newMap('rptr-mapfull'));
+    drawMap();
+    // At the page map's view once the card has its size.
+    requestAnimationFrame(() => {
+      if (!S.fmap) return;
+      S.fmap.invalidateSize();
+      if (S.map) S.fmap.fitBounds(S.map.getBounds(), { animate: false });
+    });
+  }
+  function closeFull() {
+    if (S.fmap && typeof Modal !== 'undefined') Modal.close();
   }
 
   function linkTip(p) {
@@ -698,9 +858,13 @@ const Repeaters = (() => {
   }
 
   function drawMap() {
+    if (S.map && S.layer) drawOn(S.map, S.layer, true);
+    if (S.fmap && S.flayer) drawOn(S.fmap, S.flayer, false);
+  }
+  function drawOn(map, layer, fit) {
     const M = S.M;
-    if (!S.map || !S.layer || !M) return;
-    S.layer.clearLayers();
+    if (!M) return;
+    layer.clearLayers();
     const shown = S.q ? new Set(filtered(M).map(r => r.id)) : null;
     const ink = cssVar('--map-backbone', '#000000'), acc = cssVar('--accent', '#0b5cab'), warn = cssVar('--warn', '#9e5e00');
     const repC = cssVar('--role-repeater', '#0b5cab');
@@ -718,12 +882,12 @@ const Repeaters = (() => {
           interactive: pass === 'core',
         });
         if (pass === 'core') line.bindTooltip(linkTip(p), { sticky: true });
-        line.addTo(S.layer);
+        line.addTo(layer);
       }
     }
     stations().filter(s => (s.roles || []).includes('base') && placed(s)).forEach(s => {
       L.marker([s.lat, s.lon], { icon: L.divIcon({ className: 'bk-base-icon', html: '◆', iconSize: [14, 14] }), keyboard: false })
-        .bindTooltip(`${esc(s.name)} (base station)`).addTo(S.layer);
+        .bindTooltip(`${esc(s.name)} (base station)`).addTo(layer);
     });
     const pts = [];
     M.rows.filter(r => placed(r.st)).forEach(r => {
@@ -734,10 +898,10 @@ const Repeaters = (() => {
         fillOpacity: on ? 0.85 : 0.2, opacity: on ? 1 : 0.3 });
       m.bindTooltip(`${esc(r.name)} — ${r.isolated ? 'linked to nothing' : `${plural(r.linked, 'linked repeater')}${r.base ? ', base in reach' : ''}`}`);
       m.on('click', () => pickRep(r.id));
-      m.addTo(S.layer);
+      m.addTo(layer);
       pts.push([r.st.lat, r.st.lon]);
     });
-    if (pts.length && !S.fitted) { try { S.map.fitBounds(pts, { padding: [20, 20], maxZoom: 9 }); S.fitted = true; } catch (_) { /* one point */ } }
+    if (fit && pts.length && !S.fitted) { try { map.fitBounds(pts, { padding: [20, 20], maxZoom: 9 }); S.fitted = true; } catch (_) { /* one point */ } }
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
@@ -781,15 +945,16 @@ const Repeaters = (() => {
     if (foot) foot.focus({ preventScroll: true });
   }
   function kmShow(v) {
-    const out = document.getElementById('rptr-km-val');
-    if (out) out.textContent = `${num(Number(v))} km`;
+    document.querySelectorAll('.rptr-km-val').forEach(out => { out.textContent = `${num(Number(v))} km`; });
   }
   function setKm(v) {
     const km = Math.max(10, Math.min(KM_MAX, Math.round(Number(v) / 10) * 10 || KM_DEFAULT));
     S.km = km;
     writeLS(LS_KM, String(km));
-    const input = document.getElementById('rptr-km');
-    if (input) input.setAttribute('aria-valuetext', `${km} kilometres`);
+    ['rptr-km', 'rptr-km-full'].forEach(id => {
+      const input = document.getElementById(id);
+      if (input) { input.value = km; input.setAttribute('aria-valuetext', `${km} kilometres`); }
+    });
     kmShow(km);
     refresh();
   }
@@ -804,6 +969,7 @@ const Repeaters = (() => {
   function goTo(id) {
     const M = S.M;
     if (!M || !M.byId.has(id)) return;
+    closeFull();
     if (S.q && !filtered(M).some(r => r.id === id)) {
       S.q = '';
       const box = document.getElementById('rptr-filter');
@@ -852,6 +1018,32 @@ const Repeaters = (() => {
     refresh();
   }
 
+  // What each repeater was heard relaying, and its turnaround (0092): a row a
+  // repeater, the server's week, one request — public, so it fills signed out
+  // too. A database before 0092 has no such table (PostgREST's 404, or 42P01
+  // through it): then the receptions are read in the browser as Signal Routes
+  // reads them, at once for an editor, which is what the column did before.
+  const missingTable = err => !!err && (err.status === 404 || /does not exist|Could not find the table|PGRST205|42P01/.test(String(err.message || err)));
+  async function readRelay() {
+    if (S.relayPhase === 'loading' || typeof dbSelect !== 'function') return;
+    S.relayPhase = 'loading';
+    refresh();
+    try {
+      const rows = await dbSelect('relay_summary?select=*&order=station_id.asc&limit=1000');
+      S.relay = new Map(rows.map(r => [r.station_id, r]));
+      S.relayPhase = 'ready';
+      S.relayErr = '';
+      S.relayMissing = false;
+      S.relayAt = Date.now();
+    } catch (err) {
+      S.relayPhase = 'error';
+      S.relayErr = (err && err.message) || String(err);
+      S.relayMissing = missingTable(err);
+    }
+    refresh();
+    if (!S.relay && S.relayMissing && signedIn() && !air() && active()) readAir();
+  }
+
   async function readAir() {
     if (typeof SignalRoutes === 'undefined' || !signedIn() || S.air) return;
     S.air = 'loading';
@@ -888,10 +1080,14 @@ const Repeaters = (() => {
     footFits();
     wantPlan();
     if (S.tsumPhase !== 'loading' && (!S.tsum || Date.now() - S.tsumAt > REFRESH_MS)) readCarriers();
+    if (S.relayPhase !== 'loading' && (!S.relay || Date.now() - S.relayAt > REFRESH_MS)) readRelay();
   }
 
   // Signing in or out changes who may read the receptions.
-  function authChanged() { refresh(); }
+  function authChanged() {
+    refresh();
+    if (S.relayMissing && signedIn() && !air() && active()) readAir();
+  }
 
   // ── The CSV ───────────────────────────────────────────────────────────────
 
@@ -909,7 +1105,8 @@ const Repeaters = (() => {
     const head = ['repeater', 'station_id', 'station_number', 'networks', 'rx_mhz', 'tx_mhz', 'addresses', 'field_stations',
       'linked_repeaters', 'base_stations_in_reach', 'link_distance_km', 'pass_ranges', 'exclusions',
       'pass_ranges_heard', 'heard_in_range', 'heard_off_record', 'in_range_heard_only_another_way', 'carrier_found_days',
-      'carrier_offset_hz', 'carrier_offset_ppm', 'carrier_days_measured', 'delay_ms_recorded', 'delay_ms_planned',
+      'carrier_offset_hz', 'carrier_offset_ppm', 'carrier_days_measured', 'delay_ms_recorded', 'turnaround_ms_measured',
+      'turnaround_ms_q1', 'turnaround_ms_q3', 'turnaround_pairs', 'delay_ms_measured', 'delay_ms_planned',
       'lat', 'lon', 'stations'];
     const lines = [head.join(',')];
     for (const r of list) {
@@ -920,12 +1117,14 @@ const Repeaters = (() => {
         h ? h.runs.map(x => (x.kind === 'off' ? '!' : '') + (x.lo === x.hi ? `${x.lo}` : `${x.lo}–${x.hi}`)).join('; ') : '',
         h ? h.inRange : '', h ? h.off.map(o => o.a).join('; ') : '', h ? h.elsewhere.join('; ') : '', h ? h.days : '',
         r.cfo && r.cfo.hz != null ? Math.round(r.cfo.hz) : '', r.cfo ? r.cfo.ppm.toFixed(2) : '', r.cfo && r.cfo.days != null ? r.cfo.days : '',
-        r.delayRec ?? '', r.delayPlan ?? '', r.st.lat ?? '', r.st.lon ?? '',
+        r.delayRec ?? '', r.gap ? Math.round(r.gap.ms) : '', r.gap && r.gap.lo != null ? Math.round(r.gap.lo) : '',
+        r.gap && r.gap.hi != null ? Math.round(r.gap.hi) : '', r.gap ? r.gap.n : '', r.delayMeas != null ? Math.max(0, r.delayMeas) : '',
+        r.delayPlan ?? '', r.st.lat ?? '', r.st.lon ?? '',
         r.carried.map(s => s.name).sort((a, b) => a.localeCompare(b)).join('; ')].map(csvEscape).join(','));
     }
     dlText(`repeaters-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n') + '\n');
   }
 
-  return { render, init, refresh, authChanged, toggle, sort, filter, setFull, kmShow, setKm, pick: pickRep, goTo, showOnMap,
+  return { render, init, refresh, authChanged, toggle, sort, filter, setFull, kmShow, setKm, pick: pickRep, goTo, showOnMap, openFull, closeFull,
            openStation, readAir, exportCsv, model, state: () => S };
 })();

@@ -2928,16 +2928,20 @@ Every repeater on file, beside ALERT IDs (October 2026; `repeaters.js`):
   address and that are within the link distance (a slider, 100 km to start, the
   Stations map's own *Max TX distance*) — dashed on to every base station in
   reach. A repeater linked to nothing is drawn amber. Press one to pick out its
-  links and open its row.
+  links and open its row. The wheel zooms it; **⛶ Full screen** opens it over
+  the whole window.
 - **A table, sortable by any heading**: repeater, station number, network,
   channel, addresses and field stations its pass ranges carry, links (and
   whether a base is in reach), **pass ranges set** (on record, exclusions
   under them), **pass ranges heard** (what the base stations heard it relaying
-  on its own carrier — Signal Routes' analysis of a week of receptions,
-  editors only, read on a button press — written as runs of addresses on file,
-  with anything off record in amber), **carrier offset** (the public
-  `transmitter_summary`, its last week against the fleet) and its delay
-  (recorded, or ⏳ Repeater Delays' plan, marked *planned*).
+  on its own carrier over the last week, written as runs of addresses on file,
+  with anything off record in amber — kept hourly by the server in the public
+  `relay_summary`, `0092`, so it fills as the tab opens), **carrier offset**
+  (the public `transmitter_summary`, its last week against the fleet),
+  **delay (actual)** — recorded on the station, or *measured*: the median gap
+  from a station's own burst to the repeater's copy at one base station, less
+  the 133 ms frame and an assumed 300 ms key-up — and **delay (planned)**,
+  ⏳ Repeater Delays' plan.
 - **A row opens in place** to list every station the repeater passes on, each a
   link to the Stations tab, with its linked repeaters, the bases in reach, what
   it was heard relaying and not, its carrier and its delay.

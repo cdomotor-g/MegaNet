@@ -25,6 +25,17 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 163, date: '2026-10-30', items: [
+      '🔁 <strong>Repeaters</strong>: <strong>Pass ranges (heard)</strong> now fills by itself as the tab opens, for everybody. The server '
+        + 'works out every hour which addresses each repeater was heard relaying over the last week, so the tab reads one small list '
+        + 'instead of a week of receptions — no button, no minute\'s wait.',
+      'The delay is two columns now. <strong>Delay (actual)</strong> is the delay recorded on the station or, where none is, '
+        + '<strong>measured</strong> on the air: how long after a station\'s own burst the same base station hears the repeater\'s copy '
+        + '(its <em>turnaround</em>), less the frame and the time its transmitter takes to come up. <strong>Delay (planned)</strong> is '
+        + 'Repeater Delays\' plan, marked <em>change</em> where it differs. Open a row for all three figures.',
+      'The map is half as tall again, <strong>zooms with the mouse wheel</strong>, and <strong>⛶ Full screen</strong> opens it over the '
+        + 'whole window (Esc closes it).',
+    ] },
     { n: 162, date: '2026-10-30', items: [
       '⚖️ <strong>Methodology, in Network health.</strong> A new tab that explains how the network is judged: what Station Health, '
         + 'Bit-Flip Sources and the Backbone look for, the data each reads, and the rule each decides by, with its numbers. Bit flips '

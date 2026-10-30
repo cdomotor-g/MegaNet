@@ -2697,20 +2697,25 @@ const HELP = {
            + 'pass ranges share an address and that are close enough to hear each other — and from each to the base stations in '
            + 'reach; then a table of each repeater\'s station number, network, channel, the addresses and field stations its pass '
            + 'ranges carry, its pass ranges <strong>set</strong> beside what the base stations hear it relaying (<strong>as '
-           + 'heard</strong>, found by its carrier), its <strong>carrier offset</strong> and its delay. Press a heading to sort by '
-           + 'it; open a row to list the stations it passes on, each a link to the Stations tab; save the list as a CSV.',
+           + 'heard</strong>, found by its carrier), its <strong>carrier offset</strong>, its delay as it really is (<strong>actual</strong>: '
+           + 'recorded, or measured on the air) and as planned. Press a heading to sort by it; open a row to list the stations it passes '
+           + 'on, each a link to the Stations tab; save the list as a CSV. The map zooms with the wheel, and ⛶ opens it full screen.',
     watch: [
       'A link is a distance, set over the map (100 km to start, the Stations map\'s own <em>Max TX distance</em>), not a coverage '
       + 'model: a hill can break one drawn here, and a long clear path can make one it leaves out. <em>Linked to nothing</em> is a '
       + 'repeater with no neighbour and no base within that distance.',
-      '<strong>As heard</strong> needs the receptions, which editors can read; a week of them takes a minute, and the button above '
-      + 'the table reads them — or the column fills at once if Signal Routes or Backbone read them earlier. A run of addresses ends '
-      + 'where one was heard coming in another way; <em>off record</em> is heard on its carrier but in no pass range on record — the '
-      + 'record or the radio wants correcting.',
+      '<strong>As heard</strong> is the base stations\' last seven days, worked out by the server every hour from every burst they '
+      + 'decode, so it fills as the tab opens, signed in or not. A run of addresses ends where one was heard coming in another way; '
+      + '<em>off record</em> is heard on its carrier but in no pass range on record — the record or the radio wants correcting.',
+      '<strong>Delay (actual)</strong> is the delay recorded on the station, or else <em>measured</em>: the gap between a station\'s own '
+      + 'burst and the repeater\'s copy of it at one base station (its <em>turnaround</em>), less the 133 ms frame and the 300 ms the app '
+      + 'takes a transmitter to need to come up — a figure nobody has timed on these radios, so read the measured delay as close, not '
+      + 'exact. A repeater none of whose stations is heard direct where its copies are has no measurement.',
       'The carrier offset is against the rest of the transmitters the same base stations hear, over the last week — 0 is "like the '
       + 'rest", not "exactly on frequency". Past ±2.5 ppm decodes suffer; Station Health\'s <em>Transmitter frequency</em> panel has '
       + 'each one\'s days.',
-      'A delay not recorded on the station is ⏳ Repeater Delays\' plan, marked planned. Nothing on this tab writes to a station.',
+      '<strong>Delay (planned)</strong> is ⏳ Repeater Delays\' plan; <em>change</em> marks one 50 ms or more from the actual. Nothing '
+      + 'on this tab writes to a station.',
       'A word with a dotted underline says what it means when the pointer rests on it; <em>What the words on this page mean</em>, '
       + 'at the foot, lists them all.',
     ],

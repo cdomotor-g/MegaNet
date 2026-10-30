@@ -2087,6 +2087,14 @@ jobs:
       - name: check_station_snr.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_station_snr.sql
+      # What each repeater is heard relaying (0092): the carrier roll-up keeps,
+      # a day at a time, the addresses on its carrier (its own sensors not
+      # among them), those off its record and those heard only another way,
+      # and its turnaround from a station's burst to its copy; the summary is
+      # the last week a row a repeater, anybody's to read.
+      - name: check_repeater_heard.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_repeater_heard.sql
       # A reading's frequency and signal (0050): stored from the reading or
       # its envelope, readable by anon like the rest of it, the first copy's
       # kept on a duplicate — and a bad one stored as null, never a refusal.
