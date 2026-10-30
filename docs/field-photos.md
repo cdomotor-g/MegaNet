@@ -73,7 +73,12 @@ The ticks then go, so the next lot can be ticked for the next station.
 refused before it is read further. Already in Flood-Net, the upload asks the
 database by hash first and sends nothing: *Already in Flood-Net — added by …
 on …*, with *Show it*. If two people race, the database's own unique index
-refuses the second and the objects it sent are taken down again.
+refuses the second and the objects it sent are taken down again. A Field
+Camera photo the phone saved into its library is the same photo too, though
+the phone wrote it afresh and its hash is new: the database knows it by the
+camera's signature, its second and its spot (within five metres), and refuses
+it — *Already in Flood-Net — the phone saved this Field Camera photo again*
+(0091). Two photos the camera sent itself in one second are both kept.
 
 **HEIC.** A HEIC is converted to a JPEG before it goes up — a photo stored as
 something Chrome cannot show is a photo half the crew cannot see. Safari draws
@@ -710,7 +715,8 @@ a private bucket a guess away from public. Writes go through three
 `security definer` functions (`add_field_photo`, `update_field_photo`,
 `remove_field_photo`), not a grant: they enforce the path, the type and size
 against `meganet.attachment_type`, one live photo per SHA-256, one row per
-Dropbox file (tombstones included), and stamp who did it. The bytes go up
+Dropbox file (tombstones included), one live photo per Field Camera shot
+however often the phone saved it again (0091), and stamp who did it. The bytes go up
 first, then the row that points at them, and a refused row takes its bytes
 down again.
 
@@ -1200,7 +1206,10 @@ Check it: open a photo on the Field Photos tab and look at the image's address
 - **`tools/check_field_photos.sql`** — 0035's own rules against a real
   Postgres: the path and type rules, one live photo per hash, one row per
   Dropbox file, the nearest station and when it is picked again, who may read
-  what (an editor, a stranger, anonymous, the secret key).
+  what (an editor, a stranger, anonymous, the secret key) — and 0091's: a Field
+  Camera photo the phone saved again refused (either way round), two presses
+  of the shutter in one second kept, as are another camera's photo, one 30 m
+  away or 3 s later, and the copy of a removed photo.
 - **`tools/check_photo_review.sql`** — 0036's: who is an administrator (an
   editor made one, one taken off the editors list, a stranger, anonymous, the
   secret key); the log's rules, all or nothing; proposing, and each collision

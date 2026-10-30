@@ -1024,7 +1024,11 @@ const FieldPhotos = (function () {
       try { await dbRemoveObject(BUCKET, path); } catch (_) { /* swept later */ }
       if (thumb) { try { await dbRemoveObject(BUCKET, thumb); } catch (_) { /* swept later */ } }
       if (err && err.status === 409) {
-        const e = new Error('Already in Flood-Net — somebody added the same photo a moment ago.');
+        // A Field Camera photo the phone saved into its library and gave back
+        // with new bytes (0091) says so; anything else raced another upload.
+        const e = new Error(/Field Camera photo again/.test(err.message || '')
+          ? `Already in Flood-Net — ${err.message}.`
+          : 'Already in Flood-Net — somebody added the same photo a moment ago.');
         e.already = err.details || true;
         throw e;
       }

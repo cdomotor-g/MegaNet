@@ -1208,8 +1208,11 @@ const FieldCamera = (function () {
         await takeDown(path, thumbPath);
         path = null;
         if (err && err.status === 409) {
-          await finished(shot, 'already', err.details || null, 'Already in Flood-Net — somebody added the same photo a moment ago.');
-          return { log: logRow(shot, 'duplicate', null) };
+          // A copy of it the phone saved and somebody added first (0091) says so.
+          const why = /Field Camera photo again/.test(err.message || '') ? err.message : '';
+          await finished(shot, 'already', err.details || null,
+            why ? `Already in Flood-Net — ${why}.` : 'Already in Flood-Net — somebody added the same photo a moment ago.');
+          return { log: logRow(shot, 'duplicate', null, why) };
         }
         throw err;
       }

@@ -530,6 +530,63 @@ begin
 end
 $$;
 
+-- ── 10. A Field Camera photo the phone saved again (0091) ────────────────────
+-- A phone that saves a Field Camera photo into its library writes new bytes,
+-- so the hash rule above does not see it. What the copy keeps — the camera's
+-- signature, the second and the spot — does. Each claim at its own point in
+-- the Tasman, more than a kilometre from the fixtures' stations.
+
+do $$
+declare
+  v_cam   jsonb := '{"camera": {"software": "Flood-Net Field Camera"}, "capture": {"source": "camera"}}';
+  v_file  jsonb := '{"camera": {"software": "Flood-Net Field Camera"}}';
+  v_at    text  := '2026-10-29T02:31:25.932Z';
+  v_orig  jsonb;
+  v_state text;
+  v_det   text;
+begin
+  v_orig := meganet.add_field_photo(pg_temp.photo(jsonb_build_object(
+    'taken_at', v_at, 'lat', -31.5, 'lon', 161.0, 'placement', 'exif', 'meta', v_cam)));
+  begin
+    perform meganet.add_field_photo(pg_temp.photo(jsonb_build_object('title', 'IMG_3693.JPG',
+      'taken_at', '2026-10-29T02:31:25Z', 'lat', -31.5, 'lon', 161.0000004, 'placement', 'exif', 'meta', v_file)));
+    v_state := 'ok';
+  exception when others then
+    get stacked diagnostics v_state = returned_sqlstate, v_det = pg_exception_detail;
+  end;
+  perform pg_temp.check_that('a Field Camera photo the phone saved again (new bytes, its second and its spot) is refused, naming the original',
+    v_state = '23505' and v_det = v_orig ->> 'id', v_state || ' / ' || coalesce(v_det, ''));
+
+  perform pg_temp.check_that('…and the other way round: the camera''s own upload after the copy is the copy''s duplicate',
+    pg_temp.state_of(format('select meganet.add_field_photo(%L::jsonb)', pg_temp.photo(jsonb_build_object(
+      'taken_at', '2026-10-29T03:00:00Z', 'lat', -31.6, 'lon', 161.0, 'placement', 'exif', 'meta', v_file))))
+      || pg_temp.state_of(format('select meganet.add_field_photo(%L::jsonb)', pg_temp.photo(jsonb_build_object(
+      'taken_at', '2026-10-29T03:00:00.400Z', 'lat', -31.6, 'lon', 161.0, 'placement', 'exif', 'meta', v_cam)))) = 'ok23505');
+
+  perform pg_temp.check_that('two presses of the shutter in one second, both from the camera''s own outbox, are both kept',
+    pg_temp.state_of(format('select meganet.add_field_photo(%L::jsonb)', pg_temp.photo(jsonb_build_object(
+      'taken_at', '2026-10-29T02:31:25.990Z', 'lat', -31.5, 'lon', 161.0, 'placement', 'exif', 'meta', v_cam)))) = 'ok');
+
+  perform pg_temp.check_that('another camera''s photo at that second and spot is kept',
+    pg_temp.state_of(format('select meganet.add_field_photo(%L::jsonb)', pg_temp.photo(jsonb_build_object(
+      'taken_at', '2026-10-29T02:31:25Z', 'lat', -31.5, 'lon', 161.0, 'placement', 'exif',
+      'meta', '{"camera": {"software": "Solocator"}}'::jsonb)))) = 'ok');
+
+  perform pg_temp.check_that('a Field Camera file 30 m away, or 3 s later, is another photo',
+    pg_temp.state_of(format('select meganet.add_field_photo(%L::jsonb)', pg_temp.photo(jsonb_build_object(
+      'taken_at', '2026-10-29T02:31:25Z', 'lat', -31.5 + 30 / 110574.0, 'lon', 161.0, 'placement', 'exif', 'meta', v_file))))
+      || pg_temp.state_of(format('select meganet.add_field_photo(%L::jsonb)', pg_temp.photo(jsonb_build_object(
+      'taken_at', '2026-10-29T02:31:28.5Z', 'lat', -31.5, 'lon', 161.0, 'placement', 'exif', 'meta', v_file)))) = 'okok');
+
+  v_orig := meganet.add_field_photo(pg_temp.photo(jsonb_build_object(
+    'taken_at', '2026-10-29T04:00:00Z', 'lat', -31.7, 'lon', 161.0, 'placement', 'exif', 'meta', v_cam)));
+  perform meganet.remove_field_photo((v_orig ->> 'id')::uuid);
+  perform pg_temp.check_that('a removed photo stops nothing: its copy can go in',
+    pg_temp.state_of(format('select meganet.add_field_photo(%L::jsonb)', pg_temp.photo(jsonb_build_object(
+      'taken_at', '2026-10-29T04:00:00Z', 'lat', -31.7, 'lon', 161.0, 'placement', 'exif', 'meta', v_file)))) = 'ok');
+end
+$$;
+
 -- ── The verdict ──────────────────────────────────────────────────────────────
 
 select lpad(ord::text, 2) as "#",

@@ -334,7 +334,12 @@ export async function run({
         // word MegaNet does not have: an origin before the migration that adds
         // it. Every photo after this one would be refused the same way, so the
         // run stops here and says why.
-        if (err && err.status === 409 && err.code !== '23503') return { result: 'skipped', outcome: 'duplicate', reason: 'already in Flood-Net (the database said so)', id: err.details || null };
+        // A Field Camera photo the phone saved again (0091) says so.
+        if (err && err.status === 409 && err.code !== '23503') {
+          const resaved = /Field Camera photo again/.test(err.message || '');
+          return { result: 'skipped', outcome: 'duplicate', id: err.details || null,
+                   reason: resaved ? `already in Flood-Net — ${err.message.replace(/^[^:]*: /, '')}` : 'already in Flood-Net (the database said so)' };
+        }
         if (err && err.code === '23503') err.fatal = err.refused = true;
         else if (err && err.status === 400) err.refused = true;
         throw err;

@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 159, date: '2026-10-30', items: [
+      '📸 <strong>A Field Camera photo is only filed once.</strong> If your phone also saved a Field Camera photo into its photo '
+        + 'library, and that library is later added in <strong>Field Photos</strong> (from an iCloud zip, say, or a Dropbox or Google '
+        + 'Drive folder), the copy is no longer filed a second time. It is listed as <em>Already in Flood-Net — the phone saved this '
+        + 'Field Camera photo again</em>. Flood-Net knows it by the camera\'s name in the file, the second it was taken and where '
+        + '(within 5 m). Two photos the camera took itself in the same second are still both kept.',
+    ] },
     { n: 158, date: '2026-10-30', items: [
       '📟 <strong>Each station\'s logger, recorded.</strong> <em>Station details → Telemetry</em> has a <strong>Logger (LPU)</strong> '
         + 'section: the logger\'s type — ELPRO ERT-A2, Campbell CR300, CR310, CR350, CR1000 and the rest — its serial number, and the '
