@@ -1,7 +1,15 @@
 {
  "format": "floodnet-bulletin-index/1",
- "updated_at": "2026-10-29T18:35:49.708Z",
+ "updated_at": "2026-10-30T18:34:46.493Z",
  "daily": [
+  {
+   "id": "daily-2026-10-31",
+   "file": "data/bulletins/daily/2026-10-31.json",
+   "issued_at": "2026-10-30T18:32:26.593Z",
+   "headline": "Fair: eighty percent of checks in and only four quiet stations. One to watch below Clarrie Hall Dam, where the dam gauge beside it is talking fine.",
+   "sky": "fair",
+   "presenter": "know-it-all"
+  },
   {
    "id": "daily-2026-10-30",
    "file": "data/bulletins/daily/2026-10-30.json",

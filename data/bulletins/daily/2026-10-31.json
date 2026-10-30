@@ -1,0 +1,426 @@
+{
+ "format": "floodnet-bulletin/1",
+ "kind": "daily",
+ "id": "daily-2026-10-31",
+ "issued_at": "2026-10-30T18:32:26.593Z",
+ "period": {
+  "from": "2026-10-29T18:32:26.593Z",
+  "to": "2026-10-30T18:32:26.593Z",
+  "label": "24 hours to 4:32 am Saturday"
+ },
+ "presenter": "know-it-all",
+ "cohost": "tech-wizard",
+ "outlook": {
+  "sky": "fair",
+  "label": "Fair"
+ },
+ "headline": "Fair: eighty percent of checks in and only four quiet stations. One to watch below Clarrie Hall Dam, where the dam gauge beside it is talking fine.",
+ "stats": [
+  {
+   "label": "stations heard",
+   "value": 1209,
+   "tone": "neutral"
+  },
+  {
+   "label": "checks received",
+   "value": 80,
+   "unit": "%",
+   "was": 75,
+   "tone": "warn"
+  },
+  {
+   "label": "quiet, keep a schedule",
+   "value": 4,
+   "tone": "warn"
+  },
+  {
+   "label": "critical findings",
+   "value": 11,
+   "tone": "bad"
+  }
+ ],
+ "scenes": [
+  {
+   "type": "title",
+   "title": "Good morning",
+   "secs": 15,
+   "say": "Good morning. The Know-It-All here, and as I predicted, a fair day. Eighty percent of checks came in, up from seventy-five, and we heard over twelve hundred stations. Only four that keep a schedule are quiet."
+  },
+  {
+   "type": "map",
+   "title": "A small low over the Tweed",
+   "sub": "one gauge quiet beside a busy one",
+   "sev": "warn",
+   "secs": 25,
+   "say": "The one that stands out is the gauge below Clarrie Hall Dam: thirty-four reports the day before, four in the last day, the last at 11:17 on Friday morning. The dam gauge beside it got a hundred and three through, so the area's path works. That points at the station itself: power, radio or aerial. On the Gold Coast, Stewarts Road and Natural Bridge are quiet again.",
+   "stations": [
+    "clarrie_hall_dam_d_s",
+    "clarrie_hall_dam",
+    "stewarts_rd_al",
+    "natural_bridge_al",
+    "kingsholme_montego_hills_res_al"
+   ],
+   "marks": [
+    {
+     "id": "clarrie_hall_dam_d_s",
+     "kind": "silent",
+     "sev": "critical",
+     "label": "Clarie Hall Dam D/S"
+    },
+    {
+     "id": "clarrie_hall_dam",
+     "kind": "ok",
+     "sev": "ok",
+     "label": "Clarrie Hall Dam"
+    },
+    {
+     "id": "stewarts_rd_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "natural_bridge_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "kingsholme_montego_hills_res_al",
+     "kind": "silent",
+     "sev": "critical"
+    }
+   ],
+   "focus": {
+    "lat": -28.1,
+    "lon": 153.3,
+    "km": 60
+   }
+  },
+  {
+   "type": "trend",
+   "title": "The week so far",
+   "secs": 16,
+   "say": "Here's the week. Checks received bottomed out at sixty-three percent on Tuesday, with the Lockyer and Hillcrest both out, and climbed back to seventy-nine by Friday. Both repeaters are still talking today: Toowoomba sent ten reports, Hillcrest six.",
+   "series": [
+    {
+     "label": "Checks received",
+     "unit": "%",
+     "tone": "warn",
+     "points": [
+      [
+       "Sat",
+       85
+      ],
+      [
+       "Sun",
+       75
+      ],
+      [
+       "Mon",
+       71
+      ],
+      [
+       "Tue",
+       63
+      ],
+      [
+       "Wed",
+       78
+      ],
+      [
+       "Thu",
+       79
+      ],
+      [
+       "Fri",
+       79
+      ]
+     ]
+    },
+    {
+     "label": "Corrupted copies a day",
+     "tone": "neutral",
+     "points": [
+      [
+       "Sat",
+       391
+      ],
+      [
+       "Sun",
+       503
+      ],
+      [
+       "Mon",
+       465
+      ],
+      [
+       "Tue",
+       208
+      ],
+      [
+       "Wed",
+       291
+      ],
+      [
+       "Thu",
+       543
+      ],
+      [
+       "Fri",
+       568
+      ]
+     ]
+    }
+   ],
+   "sev": "ok",
+   "stations": [
+    "toowoomba_al",
+    "hillcrest_wine_glass"
+   ]
+  },
+  {
+   "type": "receivers",
+   "title": "Our end of the line",
+   "presenter": "tech-wizard",
+   "sev": "info",
+   "secs": 18,
+   "say": "Alex Chen on the radio. Both receivers ran all day, no settings changed, and the noise floor is steady. Our busiest channel carried sixty-eight thousand bursts on Friday, double early in the week, now the Lockyer's back. 152.400 still isn't being listened to.",
+   "items": [
+    {
+     "name": "rpi-83071968 stick 1",
+     "up": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "note": "up all day; settings unchanged"
+    },
+    {
+     "name": "rpi-83071968 stick 2",
+     "up": [
+      1,
+      0.33,
+      1,
+      0.17,
+      0.5,
+      1,
+      1,
+      0.33,
+      0.17,
+      0.33,
+      1,
+      0.5,
+      0,
+      0.33,
+      1,
+      1,
+      1,
+      0.5,
+      0.33,
+      1,
+      0.83,
+      0,
+      1,
+      0.83
+     ],
+     "note": "up all day; settings unchanged"
+    }
+   ]
+  },
+  {
+   "type": "battery",
+   "title": "Batteries",
+   "presenter": "new-recruit",
+   "sev": "critical",
+   "secs": 19,
+   "say": "The New Recruit. Is it supposed to do that? Bundamba School sat at 13.2 volts for five nights, then 9.1, then 9.5. Two low nights in a row makes a bad reading less likely. It's still reporting. Kunghur stays at 9.5, Dunbible Creek at 9.8.",
+   "items": [
+    {
+     "id": "bundamba_school_aler",
+     "name": "Bundamba School AL",
+     "v": 9.5,
+     "nights": [
+      13.2,
+      13.2,
+      13.2,
+      13.2,
+      13.2,
+      9.1,
+      9.5
+     ],
+     "note": "Battery critical — 9.5 V"
+    },
+    {
+     "id": "kunghur_the_junction",
+     "name": "Kunghur (The Junction)",
+     "v": 9.5,
+     "nights": [
+      9.5
+     ],
+     "note": "Battery critical — 9.5 V"
+    },
+    {
+     "id": "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+     "name": "Dunbible Creek at Dunbible Creek Rail Trail Bridge",
+     "v": 9.8,
+     "nights": [
+      10,
+      10,
+      9.9,
+      9.8,
+      9.8
+     ],
+     "note": "Battery critical — 9.8 V"
+    },
+    {
+     "id": "numinbah_valley_al",
+     "name": "Numinbah Valley AL",
+     "v": 12.2,
+     "nights": [
+      13.1,
+      13.1,
+      13,
+      13.1,
+      13.1,
+      13.1,
+      12.2
+     ],
+     "note": "Battery low — 12.2 V"
+    }
+   ],
+   "stations": [
+    "bundamba_school_aler",
+    "kunghur_the_junction",
+    "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+    "numinbah_valley_al"
+   ]
+  },
+  {
+   "type": "checks",
+   "title": "Check signals",
+   "secs": 10,
+   "sev": "warn",
+   "say": "Turbo, quick lap! Blackstone Bridge, Bray Park Weir and Priestdale missed every check in the period. Personal best for Kingsholme, sadly: forty-eight in a row.",
+   "stations": [
+    "blackstone_br_al",
+    "bray_park_weir",
+    "kunghur_the_junction",
+    "kingsholme_montego_hills_res_al",
+    "cooyar_ck_al"
+   ],
+   "items": [
+    {
+     "id": "blackstone_br_al",
+     "name": "Blackstone Br AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Missed checks rising — 100% in the last 24 h"
+    },
+    {
+     "id": "bray_park_weir",
+     "name": "Bray Park Weir",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Missed checks rising — 100% in the last 24 h"
+    },
+    {
+     "id": "kunghur_the_junction",
+     "name": "Kunghur (The Junction)",
+     "strip": "MMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 42 checks"
+    },
+    {
+     "id": "kingsholme_montego_hills_res_al",
+     "name": "Kingsholme (Montego Hills Res) AL",
+     "strip": "MMMMMMMMMMMMMMMMMMMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 48 checks"
+    },
+    {
+     "id": "cooyar_ck_al",
+     "name": "Cooyar Ck AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Missed checks rising — 100% in the last 24 h"
+    }
+   ],
+   "presenter": "turbo"
+  },
+  {
+   "type": "list",
+   "title": "Worth a look today",
+   "secs": 13,
+   "say": "So, worth a look: the gauge below Clarrie Hall Dam, Bundamba School's battery, and Kingsholme. And good news: a hundred and six stations the server had called silent were heard again.",
+   "stations": [
+    "clarrie_hall_dam_d_s",
+    "bundamba_school_aler",
+    "kingsholme_montego_hills_res_al",
+    "hotham_creek_al"
+   ],
+   "items": [
+    {
+     "sev": "warn",
+     "id": "clarrie_hall_dam_d_s",
+     "text": "Clarie Hall Dam D/S: 4 reports in a day, last 11:17 am Friday; the dam gauge beside it is fine."
+    },
+    {
+     "sev": "critical",
+     "id": "bundamba_school_aler",
+     "text": "Bundamba School AL: 9.1 V then 9.5 V after steady 13.2 V."
+    },
+    {
+     "sev": "warn",
+     "id": "kingsholme_montego_hills_res_al",
+     "text": "Kingsholme: 48 checks missed in a row."
+    },
+    {
+     "sev": "info",
+     "text": "152.400 still not listened to."
+    },
+    {
+     "sev": "ok",
+     "id": "hotham_creek_al",
+     "text": "Heard again: 106 stations the server had called silent."
+    }
+   ]
+  },
+  {
+   "type": "signoff",
+   "title": "That’s the network",
+   "secs": 5,
+   "say": "That's the network: fair, and getting fairer. I knew it would. Back tomorrow.",
+   "line": "It’s obvious."
+  }
+ ],
+ "sources": {
+  "readings": 24440,
+  "stations_heard": 1209,
+  "gathered_at": "2026-10-30T18:32:26.593Z"
+ },
+ "caveats": [
+  "The per-stick figures show about seventy stations a few decibels weaker, but the channel's median signal and noise floor held steady, so it is left out.",
+  "Bundamba School's power could not be checked beyond its own battery reports."
+ ],
+ "author": "Claude Code, from the bulletin draft and read-only queries"
+}
