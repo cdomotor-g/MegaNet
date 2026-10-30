@@ -1,4 +1,4 @@
--- 0088_fewer_writes.sql — The hourly jobs and the reports doing the same work
+-- 0089_fewer_writes.sql — The hourly jobs and the reports doing the same work
 -- with less: the carrier roll-up's pairs found by range, the reception
 -- roll-up putting each detail together once, unchanged station cards left
 -- alone, and an ingest token stamped once a minute.
@@ -6,7 +6,7 @@
 -- Forward-only, idempotent, no begin/commit — see db/README.md:
 --
 --   psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction \
---        -f db/migrations/0088_fewer_writes.sql
+--        -f db/migrations/0089_fewer_writes.sql
 --
 -- Why this file exists
 -- ────────────────────
@@ -109,7 +109,7 @@ begin
       from _fb x
       -- y.t >= x.t is implied by the line under it; said on its own it is a
       -- range the index (tok, rx, t) answers, five seconds of a receiver's
-      -- bursts rather than its whole day up to x.t (0088: 2.6 s -> 26 ms).
+      -- bursts rather than its whole day up to x.t (0089: 2.6 s -> 26 ms).
       join _fb y on y.tok = x.tok and y.rx = x.rx and y.t <= x.t + interval '5 seconds' and y.t >= x.t
                 and (y.t > x.t or (y.t = x.t and y.id > x.id))
      where x.w <> y.w
@@ -361,7 +361,7 @@ begin
     from _fp f
     join _fb b on b.id = case when f.bad = 'x' then f.xid else f.yid end
     join _fb g on g.id = case when f.bad = 'x' then f.yid else f.xid end
-    -- Each carrier asked once a pair, not five times (0088).
+    -- Each carrier asked once a pair, not five times (0089).
     cross join lateral (
       select case when b.cfo is not null then meganet.carrier_tx(p_day, b.tok, b.rx, g.a, b.cfo) end as bt,
              case when g.cfo is not null then meganet.carrier_tx((g.t at time zone 'UTC')::date, g.tok, g.rx, g.a, g.cfo) end as gt
@@ -370,7 +370,7 @@ begin
    order by b.id, pg_catalog.abs(extract(epoch from b.t - g.t)), g.id
   on conflict do nothing;
 
-  -- The day's split bursts, counted once for every receiver (0088): a count
+  -- The day's split bursts, counted once for every receiver (0089): a count
   -- each, over the whole day's receptions, was one pass a receiver.
   drop table if exists pg_temp._split;
   create temporary table _split on commit drop as
@@ -417,7 +417,7 @@ end;
 $$;
 
 comment on function meganet.roll_up_carriers_day(date) is
-  'Rebuilds one UTC day from its receptions (0077, 0078, 0083): the corrupted copies first (flip_event) — left out of the carriers — then each legacy burst put down to its station or the register repeater whose shared carrier it sits on, ALERT2 to its path''s last address (carrier_daily, with the SNR of the same bursts), then each corrupted copy put down to the transmitter whose carrier it came on. Idempotent; a day whose receptions are gone is skipped. Pairs found by range, split bursts counted in one pass, each carrier asked once (0088). The service key''s.';
+  'Rebuilds one UTC day from its receptions (0077, 0078, 0083): the corrupted copies first (flip_event) — left out of the carriers — then each legacy burst put down to its station or the register repeater whose shared carrier it sits on, ALERT2 to its path''s last address (carrier_daily, with the SNR of the same bursts), then each corrupted copy put down to the transmitter whose carrier it came on. Idempotent; a day whose receptions are gone is skipped. Pairs found by range, split bursts counted in one pass, each carrier asked once (0089). The service key''s.';
 
 -- ── 2. roll_up_receptions() ──────────────────────────────────────────────────
 
@@ -537,7 +537,7 @@ begin
                r.heard_at
           from meganet.reception r
           -- The detail put back together once a reception, not once for each
-          -- key read from it (0088: an hour 1.4 s -> 0.18 s).
+          -- key read from it (0089: an hour 1.4 s -> 0.18 s).
           cross join lateral (select meganet.reception_detail(r) as d offset 0) d
          where r.heard_at >= v_hour and r.heard_at < v_hour + interval '1 hour'
       ) x
@@ -596,7 +596,7 @@ end;
 $$;
 
 comment on function meganet.roll_up_receptions(integer) is
-  'Rebuild reception_hourly for up to p_max_hours hours that new receptions touched (oldest first), and reception_daily for their days (0071, #241); each reception''s detail put together once (0088). Idempotent; never touches an hour past retain_reception_days. Returns hours, days, skipped, pending and the watermark. pg_cron hourly (meganet-roll-up-receptions); editors and the service key.';
+  'Rebuild reception_hourly for up to p_max_hours hours that new receptions touched (oldest first), and reception_daily for their days (0071, #241); each reception''s detail put together once (0089). Idempotent; never touches an hour past retain_reception_days. Returns hours, days, skipped, pending and the watermark. pg_cron hourly (meganet-roll-up-receptions); editors and the service key.';
 
 -- ── 3. report_station_cards() ────────────────────────────────────────────────
 
@@ -673,7 +673,7 @@ begin
     end if;
     -- A card that has not changed is left alone before the upsert, not by
     -- its where: an insert ... on conflict locks the row it finds, and the
-    -- lock is a write too — three in four cards, every fifteen minutes (0088).
+    -- lock is a write too — three in four cards, every fifteen minutes (0089).
     if exists (select 1 from meganet.health_card hc
                 where hc.days = v_days and hc.station_id = c ->> 'station_id'
                   and hc.card is not distinct from c -> 'card'
@@ -715,7 +715,7 @@ end;
 $$;
 
 comment on function meganet.report_station_cards(jsonb) is
-  'What health-analysis.js worked out about each station heard over one of Station Health''s windows, reported a batch at a time by .github/workflows/station-health.yml (0085): upserts the cards that changed — an unchanged card is not touched at all (0088) — removes those of stations a complete run no longer heard, refuses a batch from a run older than the last accepted. The secret key only.';
+  'What health-analysis.js worked out about each station heard over one of Station Health''s windows, reported a batch at a time by .github/workflows/station-health.yml (0085): upserts the cards that changed — an unchanged card is not touched at all (0089) — removes those of stations a complete run no longer heard, refuses a batch from a run older than the last accepted. The secret key only.';
 
 -- ── 4. ingest_token_id() ─────────────────────────────────────────────────────
 
@@ -758,7 +758,7 @@ begin
   -- that errors after this point rolls the stamp back with it — last_used_at
   -- records the last *successful* use, which is still the answer "has this
   -- credential stopped being used" needs, just with failed attempts invisible.
-  -- At most once a minute (0088): every post stamped it, ~20,000 a day, each
+  -- At most once a minute (0089): every post stamped it, ~20,000 a day, each
   -- an update and a dead row; what reads it says "last posted 3 min ago".
   update meganet.ingest_token set last_used_at = pg_catalog.now()
    where id = v_id and (last_used_at is null or last_used_at < pg_catalog.now() - interval '1 minute');
@@ -768,7 +768,7 @@ end;
 $$;
 
 comment on function meganet.ingest_token_id() is
-  'Check the X-Ingest-Token header against meganet.ingest_token and return its id, or raise PT401; last_used_at stamped at most once a minute (0088). The token check 0007 does inline, factored out for 0008''s endpoints.';
+  'Check the X-Ingest-Token header against meganet.ingest_token and return its id, or raise PT401; last_used_at stamped at most once a minute (0089). The token check 0007 does inline, factored out for 0008''s endpoints.';
 
 -- ── Proof it took ────────────────────────────────────────────────────────────
 
@@ -779,19 +779,19 @@ begin
   f := pg_catalog.pg_get_functiondef('meganet.roll_up_carriers_day(date)'::regprocedure);
   if pg_catalog.strpos(f, 'and y.t >= x.t') = 0 or pg_catalog.strpos(f, 'pg_temp._split') = 0
      or pg_catalog.strpos(f, 'end as bt,') = 0 then
-    raise exception '0088 did not take: roll_up_carriers_day() is the old one';
+    raise exception '0089 did not take: roll_up_carriers_day() is the old one';
   end if;
   if pg_catalog.strpos(pg_catalog.pg_get_functiondef('meganet.roll_up_receptions(integer)'::regprocedure),
                        'select meganet.reception_detail(r) as d offset 0') = 0 then
-    raise exception '0088 did not take: roll_up_receptions() still puts the detail together for each key';
+    raise exception '0089 did not take: roll_up_receptions() still puts the detail together for each key';
   end if;
   if pg_catalog.strpos(pg_catalog.pg_get_functiondef('meganet.report_station_cards(jsonb)'::regprocedure),
                        'hc.card is not distinct from c -> ''card''') = 0 then
-    raise exception '0088 did not take: report_station_cards() still upserts unchanged cards';
+    raise exception '0089 did not take: report_station_cards() still upserts unchanged cards';
   end if;
   if pg_catalog.strpos(pg_catalog.pg_get_functiondef('meganet.ingest_token_id()'::regprocedure),
                        'last_used_at < pg_catalog.now() - interval ''1 minute''') = 0 then
-    raise exception '0088 did not take: ingest_token_id() still stamps every call';
+    raise exception '0089 did not take: ingest_token_id() still stamps every call';
   end if;
 end
 $$;
@@ -800,6 +800,6 @@ $$;
 -- core.js DB_SCHEMA_VERSION follows once this is live.
 
 insert into meganet.app_meta (key, value)
-values ('schema_version', '88')
+values ('schema_version', '89')
 on conflict (key) do update set value = excluded.value
   where meganet.app_meta.value::integer < excluded.value::integer;
