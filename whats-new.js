@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 157, date: '2026-10-30', items: [
+      '📸 <strong>The Field Camera comes back after the phone takes it away.</strong> A call, the lock screen, another app or '
+        + 'Safari\'s download prompt can take the camera from Flood-Net, and the picture used to stay black until the tab was left '
+        + 'and opened again. Now the camera starts again by itself as soon as Flood-Net is back on the screen. If it will not come back, '
+        + 'the picture says the camera stopped and gives you a <strong>Start the camera again</strong> button. Pressing the shutter while '
+        + 'the camera has stopped restarts it instead of saving a black photo. On an iPhone or iPad, <em>Also save a copy of each photo</em> '
+        + 'no longer opens Safari\'s download prompt after every photo. Each photo keeps a <strong>Save a copy</strong> button in '
+        + '<em>On this device</em> until you press it.',
+    ] },
     { n: 156, date: '2026-10-30', items: [
       'New under <strong>Stations &amp; networks</strong>: 🔁 <strong>Repeaters</strong> — the <em>By Repeater</em> card from ALERT IDs, '
         + 'grown into a tab. A <strong>map of the links</strong> between repeaters (and from each to the base stations in reach), with '

@@ -36,6 +36,10 @@
 //      of its EXIF as Messages would strip it, read back by the real OCR
 //      engine into the same place, heading, ±, height, time and station. The
 //      town asked of OpenStreetMap once, and not at all when switched off.
+//      The camera taken back by the phone — the track ended, stopped without a
+//      word, its frames gone, out of sight — asked for again by itself, twice
+//      at most; a shutter on a stopped camera keeping no black photo; a copy
+//      not downloaded over the camera on an iPhone, but kept for a press.
 //      Leaving the tab letting the camera, the GPS and the compass go;
 //      coming back taking them up again; a re-render keeping the picture.
 //
@@ -705,6 +709,134 @@ try {
   check('the project line is this device\'s own', (await page.evaluate(() => FieldCamera._facts().project)) === 'Lockyer 2026'
     && JSON.parse(await page.evaluate(() => localStorage.getItem('mn-camera'))).project === 'Lockyer 2026');
   await context.setGeolocation({ latitude: HERE.lat, longitude: HERE.lon, accuracy: 4 });
+
+  // ── When the phone takes the camera back ─────────────────────────────────
+  // 29 Oct 2026, an iPhone at Pohlmans Range: one photo, then a black picture
+  // that nothing brought back. A call, the lock screen, another app or
+  // Safari's download sheet takes the camera; the track ends, goes quiet, or
+  // its frames stop. The tab asks for it again by itself.
+  section('When the phone takes the camera back');
+  const gumN = () => page.evaluate(() => window.__gum);
+  const camBack = () => page.waitForFunction(() => FieldCamera._debug().cam === 'on'
+    && document.getElementById('cam-video').videoWidth > 0 && !document.getElementById('cam-video').paused, null, { timeout: 20_000 });
+  const endTrack = say => page.evaluate(s => {
+    const t = document.getElementById('cam-video').srcObject.getVideoTracks()[0];
+    t.stop();
+    if (s) t.dispatchEvent(new Event('ended'));
+  }, say);
+  await camBack();
+  check('the picture\'s frames are watched, where the browser can say so', (await dbg(page)).frameWatch === true);
+  let gum0 = await gumN();
+  await endTrack(true);
+  await camBack();
+  check('another app takes the camera (the track ends): asked for again by itself, and said',
+    (await gumN()) === gum0 + 1 && /has been started again/.test(await text(page, '#cam-msg')), await text(page, '#cam-msg'));
+  gum0 = await gumN();
+  await endTrack(false);
+  await page.waitForFunction(g => window.__gum > g, gum0, { timeout: 5_000 }).catch(() => {});
+  await camBack();
+  check('a track that stops without a word: found within a second or two and asked for again', (await gumN()) === gum0 + 1);
+
+  const kept0 = (await dbg(page)).shots.length;
+  gum0 = await gumN();
+  await page.evaluate(() => { document.getElementById('cam-video').srcObject.getVideoTracks()[0].stop(); FieldCamera.shoot(); });
+  await camBack();
+  await settle(page);
+  check('the shutter on a camera that has stopped starts it again, and keeps no black photo',
+    (await dbg(page)).shots.length === kept0 && (await gumN()) === gum0 + 1);
+
+  // Out of sight: nothing is asked of a hidden page; back in view, it is.
+  await page.evaluate(() => Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }));
+  gum0 = await gumN();
+  await endTrack(true);
+  await page.waitForTimeout(400);
+  d = await dbg(page);
+  check('the camera taken while the page is out of sight: it waits, and the picture says it stopped',
+    d.cam === 'lost' && (await gumN()) === gum0 && /The camera stopped/.test(await text(page, '#cam-idle'))
+      && !!(await page.$('.cam-start')), J({ cam: d.cam }));
+  await page.evaluate(() => { delete document.visibilityState; document.dispatchEvent(new Event('visibilitychange')); });
+  await camBack();
+  check('…and the page back in view takes it up again without a press', (await gumN()) === gum0 + 1);
+
+  // Frames that stop with no word at all: the stall clock, which runs only
+  // while the picture is in view. The <video> drawn afresh with its frames
+  // unseen stands in for a picture gone black.
+  const below = await page.evaluate(() => {
+    const real = HTMLVideoElement.prototype.requestVideoFrameCallback;
+    HTMLVideoElement.prototype.requestVideoFrameCallback = function () { return 0; };
+    renderMain();
+    HTMLVideoElement.prototype.requestVideoFrameCallback = real;
+    document.getElementById('cam-out-panel').scrollIntoView({ block: 'end' });
+    window.scrollTo(0, document.documentElement.scrollHeight);
+    return document.getElementById('cam-video').getBoundingClientRect().bottom;
+  });
+  gum0 = await gumN();
+  await page.waitForTimeout(5_500);
+  check('no frames while the picture is scrolled out of view is not taken for a stopped camera',
+    below <= 0 && (await gumN()) === gum0, J({ below }));
+  await page.evaluate(() => document.getElementById('cam-stage').scrollIntoView({ block: 'center' }));
+  await page.waitForFunction(g => window.__gum > g, gum0, { timeout: 10_000 }).catch(() => {});
+  await camBack();
+  check('…in view, no new frame for four seconds: asked for again', (await gumN()) === gum0 + 1);
+
+  // A camera that keeps stopping is asked for twice, then the tab says so.
+  await page.evaluate(() => {
+    FieldCamera.start();   // a press: the count of restarts starts again
+    const md = navigator.mediaDevices;
+    window.__gumReal = md.getUserMedia;
+    md.getUserMedia = c => window.__gumReal.call(md, c).then(s => {
+      setTimeout(() => { const t = s.getVideoTracks()[0]; t.stop(); t.dispatchEvent(new Event('ended')); }, 500);
+      return s;
+    });
+  });
+  gum0 = await gumN();
+  await endTrack(true);
+  await page.waitForFunction(() => FieldCamera._debug().cam === 'lost', null, { timeout: 15_000 }).catch(() => {});
+  check('a camera that keeps stopping is asked for twice, then the tab says so and offers Start again',
+    (await dbg(page)).cam === 'lost' && (await gumN()) === gum0 + 2 && !!(await page.$('.cam-start'))
+      && /would not start again/.test(await text(page, '#cam-msg')), J({ cam: (await dbg(page)).cam, asked: (await gumN()) - gum0 }));
+  await page.evaluate(() => { navigator.mediaDevices.getUserMedia = window.__gumReal; });
+  await page.tap('.cam-start');
+  await camBack();
+  check('…and Start the camera again brings it back', (await dbg(page)).cam === 'on');
+
+  // Save a copy: downloaded as each photo is taken — but not on an iPhone or
+  // an iPad, where Safari asks over the camera before every download.
+  await page.evaluate(() => {
+    window.__downloads = [];
+    const click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () { if (this.download) { window.__downloads.push(this.download); return undefined; } return click.call(this); };
+    FieldCamera.setPref('copy', true);
+  });
+  let n0 = (await dbg(page)).shots.length;
+  await page.tap('#cam-shutter');
+  await page.waitForFunction(n => FieldCamera._debug().shots.length > n, n0, { timeout: 20_000 });
+  await settle(page);
+  d = await dbg(page);
+  check('a copy saved as the photo is taken', (await page.evaluate(() => window.__downloads)).length === 1
+    && (await page.evaluate(() => window.__downloads[0])) === d.shots[0].name && d.shots[0].copy === null);
+  await page.evaluate(() => Object.defineProperty(navigator, 'userAgent', { configurable: true,
+    get: () => 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' }));
+  n0 = (await dbg(page)).shots.length;
+  await page.tap('#cam-shutter');
+  await page.waitForFunction(n => FieldCamera._debug().shots.length > n && FieldCamera._debug().shots[0].status === 'done', n0, { timeout: 20_000 });
+  await settle(page);
+  d = await dbg(page);
+  const iShot = d.shots[0];
+  const bytesHeld = id => page.evaluate(i => new Promise(res => {
+    const r = indexedDB.open('mn-field-camera');
+    r.onsuccess = () => { const g = r.result.transaction('bytes').objectStore('bytes').get(i); g.onsuccess = () => res(g.result !== undefined); };
+  }), id);
+  check('on an iPhone: no download over the camera — uploaded, its bytes kept, and its line says Save a copy',
+    (await page.evaluate(() => window.__downloads)).length === 1 && iShot.copy === 'wanted' && (await bytesHeld(iShot.id))
+      && /Save a copy/.test(await text(page, `#cam-item-${iShot.id}`)) && /still to be saved as a copy/.test(await text(page, '#cam-out')),
+    J({ copy: iShot.copy, status: iShot.status }));
+  await page.evaluate(id => FieldCamera.saveCopy(id), iShot.id);
+  await page.waitForFunction(id => FieldCamera._debug().shots.find(s => s.id === id).copy === 'saved', iShot.id, { timeout: 5_000 }).catch(() => {});
+  check('…Save a copy saves it, then lets its bytes go',
+    (await page.evaluate(() => window.__downloads.at(-1))) === iShot.name && !(await bytesHeld(iShot.id))
+      && !/Save a copy/.test(await text(page, `#cam-item-${iShot.id}`)) && !/still to be saved/.test(await text(page, '#cam-out')));
+  await page.evaluate(() => { delete navigator.userAgent; FieldCamera.setPref('copy', false); });
 
   // ── Leaving, and coming back ─────────────────────────────────────────────
   section('Leaving the tab, coming back, and drawn afresh');

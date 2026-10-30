@@ -88,6 +88,19 @@
 // Field photos are editors' (0035): signed out, the camera still works and
 // the photos wait on the device, and the tab says so.
 //
+// ── When the phone takes the camera back ─────────────────────────────────────
+// A call, the lock screen, another app (Solocator, the phone's own camera) or
+// Safari's download sheet can take the camera from the page at any moment. The
+// track then ends, or goes quiet (muted), or simply stops sending frames, and
+// the picture stays black until the stream is asked for again — which is what
+// the tab does by itself, the moment the page is in view: twice in a row at
+// most, then it says the camera stopped and offers Start again. A shutter
+// pressed on a camera that has stopped starts it again rather than keeping a
+// black photo. And on an iPhone or an iPad, where Safari asks before every
+// download, the setting that saves a copy of each photo does not download it as
+// it is taken: the photo's bytes are kept past its upload, and its line says
+// Save a copy until it is pressed.
+//
 // Issue: the Field Photos epic. Schema: db/migrations/0035_field_photos.sql,
 // 0036_photo_review.sql. The rest: docs/field-photos.md, "Taking photos in
 // Flood-Net".
@@ -116,6 +129,10 @@ const FieldCamera = (function () {
   const GROUND_M = 25;           // …this far: ask the ground's height again
   const DECL_KM = 5;             // …this far: ask the magnetic model again
   const SENSOR_WAIT_MS = 2500;   // how long to wait for a compass before saying there is none
+  const STALL_MS = 4000;         // no new frame this long, on screen and in view: the picture has stopped
+  const MUTE_MS = 1500;          // a camera silenced (muted) this long is asked for again
+  const REVIVE_MAX = 2;          // …by itself this many times in a row, before the tab asks
+  const REVIVED_MS = 10000;      // frames for this long after a restart: the count starts again
   const SMOOTH = 0.25;           // station-ar.js's smoothing, for the same compass
   const OFFSET_SMOOTH = 0.05;
   const UPRIGHT_U = 0.7;
@@ -135,8 +152,11 @@ const FieldCamera = (function () {
   let settings = null;
   let booted = false;
   let wanted = false;            // the camera was on when the tab was left: put it back on return
-  let stream = null, track = null, cam = 'off';   // 'off' | 'asking' | 'on' | 'denied' | 'none'
+  let stream = null, track = null, cam = 'off';   // 'off' | 'asking' | 'on' | 'lost' | 'denied' | 'none'
   let camWhy = '';               // why 'none', in words
+  let frameAt = 0, frameWatch = false, lastCheck = 0;   // the last frame seen, and whether frames can be seen
+  let framesOf = null, checkedAt = 0;                   // the stream frames have been seen from; the last check
+  let revives = 0, revived = false, liveAt = 0;         // restarts in a row; one under way; when the stream last came
   let torch = false;
   let watchId = null, gps = null, gpsError = '';
   let compass = 'off';           // 'off' | 'waiting' | 'absolute' | 'ios' | 'relative' | 'none'
@@ -207,6 +227,14 @@ const FieldCamera = (function () {
       const part = zoneFmt.formatToParts(d).find(x => x.type === 'timeZoneName');
       return part ? part.value : '';
     } catch (_) { return ''; }
+  }
+
+  // Safari on an iPhone or an iPad asks before every download, over the page,
+  // and the camera can stop while it asks. (An iPad's Safari says it is a Mac;
+  // its touch screen gives it away.)
+  function asksBeforeDownload() {
+    const ua = navigator.userAgent || '';
+    return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
   }
 
   // ── Settings ───────────────────────────────────────────────────────────────
@@ -417,6 +445,7 @@ const FieldCamera = (function () {
   // GPS and the camera.
   function start() {
     wanted = true;
+    revives = 0;
     startCompass();
     startGps();
     startCamera();
@@ -435,14 +464,18 @@ const FieldCamera = (function () {
     // MAX_PX along its long side, and a phone's 4:3 is the shape a photo is.
     md.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 4032 }, height: { ideal: 3024 } } })
       .then(s => {
-        if (!wanted || state.activeTab !== 'camera') { s.getTracks().forEach(t => t.stop()); cam = 'off'; return; }
+        if (!wanted || state.activeTab !== 'camera') { s.getTracks().forEach(t => t.stop()); cam = 'off'; revived = false; return; }
         stream = s;
         track = s.getVideoTracks()[0] || null;
         torch = false;
         cam = 'on';
+        liveAt = performance.now();
+        watchTrack(track);
         attach();
-        announce('Camera on. Your position, heading and station are printed on each photo.');
+        if (revived) { revived = false; say('The camera stopped, and has been started again.', 'ok'); }
+        else announce('Camera on. Your position, heading and station are printed on each photo.');
       }, err => {
+        revived = false;
         const name = err && err.name;
         cam = name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'none';
         camWhy = name === 'NotFoundError' || name === 'OverconstrainedError' ? 'This device has no camera the browser can use.'
@@ -464,13 +497,19 @@ const FieldCamera = (function () {
       v.srcObject = stream;
       v.addEventListener('loadedmetadata', fitStage);
       v.addEventListener('resize', fitStage);
+      watchFrames(v);
     }
     v.hidden = false;
-    const played = v.play();
-    if (played && played.catch) played.catch(() => {});
+    replay();
     fitStage();
     paintStage();
     loop();
+  }
+  function replay() {
+    const v = $('cam-video');
+    if (!v || !stream) return;
+    const played = v.play();
+    if (played && played.catch) played.catch(() => {});
   }
 
   function stopCamera() {
@@ -478,9 +517,94 @@ const FieldCamera = (function () {
     stream = null; track = null; torch = false;
     const v = $('cam-video');
     if (v) { v.srcObject = null; v.hidden = true; }
-    if (cam === 'on' || cam === 'asking') cam = 'off';
+    if (cam === 'on' || cam === 'asking' || cam === 'lost') cam = 'off';
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
+  }
+
+  // ── When the phone takes the camera back ───────────────────────────────────
+  // The track ends (another app has the camera), goes quiet (Safari silences
+  // a page it has covered), or its frames simply stop. Each is the same black
+  // picture, and each is put right the same way: the stream asked for again.
+
+  function watchTrack(t) {
+    if (!t) return;
+    t.addEventListener('ended', () => { if (t === track) lost(); });
+    t.addEventListener('mute', () => setTimeout(() => {
+      if (t === track && t.muted && document.visibilityState === 'visible') lost();
+    }, MUTE_MS));
+    t.addEventListener('unmute', () => { if (t === track) { frameAt = performance.now(); replay(); } });
+  }
+  // Each frame the picture shows, where the browser can say so — the clock
+  // the stall is measured on.
+  function watchFrames(v) {
+    frameAt = performance.now();
+    frameWatch = typeof v.requestVideoFrameCallback === 'function';
+    if (!frameWatch) return;
+    const s = stream;
+    const seen = () => {
+      if (!v.isConnected || v.srcObject !== s || stream !== s) return;
+      frameAt = performance.now();
+      framesOf = s;
+      if (revives && frameAt - liveAt > REVIVED_MS) revives = 0;
+      v.requestVideoFrameCallback(seen);
+    };
+    v.requestVideoFrameCallback(seen);
+  }
+  function onScreen(el) {
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < window.innerHeight && r.left < window.innerWidth;
+  }
+  // Once a second, from the preview's loop. The stall clock runs only while
+  // the picture is in view: a browser draws no frames for a video scrolled
+  // off the screen or a page out of sight, and that is not a camera stopping.
+  // Nor is a page that was too busy to look (a gap between checks), or a
+  // browser that has never said it drew a frame of this stream.
+  function checkPicture() {
+    const v = $('cam-video');
+    if (cam !== 'on' || !v) return;
+    const now = performance.now();
+    const gap = now - checkedAt;
+    checkedAt = now;
+    if (gap > 2500 || document.visibilityState !== 'visible' || !onScreen(v)) { frameAt = now; return; }
+    if (!track || track.readyState === 'ended') { lost(); return; }
+    if (v.paused) replay();
+    if (frameWatch && framesOf === stream && now - frameAt > STALL_MS) lost();
+  }
+  // The camera has gone: asked for again now if the page is in view, or when
+  // it comes back into view (resume) if not.
+  function lost() {
+    if (!wanted || state.activeTab !== 'camera' || cam !== 'on') return;
+    if (document.visibilityState === 'visible') { revive(); return; }
+    stopCamera();
+    cam = 'lost';
+    paintStage();
+  }
+  function revive() {
+    if (!wanted || state.activeTab !== 'camera' || cam === 'asking') return;
+    stopCamera();
+    if (revives >= REVIVE_MAX) {
+      cam = 'lost';
+      revived = false;
+      say('The camera stopped and would not start again by itself — press Start the camera again.', 'warn');
+      paintStage();
+      return;
+    }
+    revives++;
+    revived = true;
+    say('The camera stopped — starting it again…', 'warn');
+    startCamera();
+  }
+  // The page back in view with the camera wanted: the picture played again,
+  // or asked for again where the phone ended it, or still has it silenced.
+  function resume() {
+    if (!wanted || state.activeTab !== 'camera' || cam === 'asking' || cam === 'denied' || cam === 'none') return;
+    revives = 0;
+    frameAt = performance.now();
+    if (cam === 'lost' || !stream || !track || track.readyState === 'ended') { revive(); return; }
+    replay();
+    const t = track;
+    if (t.muted) setTimeout(() => { if (t === track && t.muted && document.visibilityState === 'visible') lost(); }, MUTE_MS);
   }
 
   // Everything the tab started, let go — the camera, the GPS, the compass, the
@@ -553,6 +677,8 @@ const FieldCamera = (function () {
       if (cam !== 'on' || !$('cam-overlay')) return;
       if (t - lastPaint >= PREVIEW_MS) { lastPaint = t; paintPreview(); }
       if (t - lastRead >= 500) { lastRead = t; paintReadout(); }
+      if (t - lastCheck >= 1000) { lastCheck = t; checkPicture(); }
+      if (cam !== 'on') return;
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -712,6 +838,13 @@ const FieldCamera = (function () {
   async function shoot() {
     const v = $('cam-video');
     if (shooting || cam !== 'on' || !v || !v.videoWidth) return;
+    // A camera the phone has taken back gives a black photo: started again
+    // instead, and the photo left to be taken once the picture is back.
+    if (!track || track.readyState !== 'live' || track.muted) {
+      revives = 0;
+      revive();
+      return;
+    }
     shooting = true;
     paintControls();
     const when = new Date();
@@ -885,12 +1018,14 @@ const FieldCamera = (function () {
       caption: f.caption || '', lat: f.lat, lon: f.lon, accuracy: f.accuracy, heading: f.heading,
       record, status: 'waiting', tries: 0, next: 0, note: '', rowId: null, doneAt: null,
       icon: icon.buffer.slice(icon.byteOffset, icon.byteOffset + icon.byteLength),
+      // A copy Safari would ask about, over the camera: kept for a press instead.
+      copy: prefs().copy && asksBeforeDownload() ? 'wanted' : null,
     };
     await putShot(shot, { jpeg, thumb });
     shots.unshift(shot);
     if (st) lastId = st.id;
     persistStorage();
-    if (prefs().copy) saveCopy(shot.id);
+    if (prefs().copy && shot.copy !== 'wanted') saveCopy(shot.id);
     paintOutbox();
     paintControls();
     const where = st ? `filed under ${st.name}` : 'not filed under a station';
@@ -1137,7 +1272,8 @@ const FieldCamera = (function () {
     shot.doneAt = Date.now();
     shot.next = 0;
     await saveShot(shot);
-    await dropBytes(shot.id);
+    // Its bytes stay while a copy of it is still to be saved.
+    if (shot.copy !== 'wanted') await dropBytes(shot.id);
     paintShot(shot);
   }
 
@@ -1220,6 +1356,12 @@ const FieldCamera = (function () {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+    if (s.copy === 'wanted') {
+      s.copy = 'saved';
+      await saveShot(s);
+      if (s.status === 'done' || s.status === 'already') await dropBytes(s.id);
+      paintOutbox();
+    }
   }
   function openShot(id) {
     const s = shots.find(x => x.id === id);
@@ -1249,8 +1391,11 @@ const FieldCamera = (function () {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'visible') return;
       pump();
-      if (wanted && state.activeTab === 'camera') holdWake();
+      if (wanted && state.activeTab === 'camera') { holdWake(); resume(); }
     });
+    // A page brought back from the browser's history cache has had its camera
+    // taken away while it was kept.
+    window.addEventListener('pageshow', e => { if (e.persisted) resume(); });
   }
 
   function authChanged() {
@@ -1312,7 +1457,8 @@ const FieldCamera = (function () {
         <label class="cam-check small"><input type="checkbox" id="cam-auto" ${s.auto ? 'checked' : ''}
           onchange="FieldCamera.setPref('auto', this.checked)"> Upload each photo by itself as soon as it can</label>
         <label class="cam-check small"><input type="checkbox" id="cam-copy" ${s.copy ? 'checked' : ''}
-          onchange="FieldCamera.setPref('copy', this.checked)"> Also save a copy of each photo on this device</label>
+          onchange="FieldCamera.setPref('copy', this.checked)"> Also save a copy of each photo on this device${asksBeforeDownload()
+            ? ' — on an iPhone or iPad, by pressing Save a copy in the list below once the photos are taken' : ''}</label>
         <label class="cam-check small"><input type="checkbox" id="cam-place" ${s.place ? 'checked' : ''}
           onchange="FieldCamera.setPref('place', this.checked)"> Print the town or locality (asks OpenStreetMap where you are)</label>
       </details>
@@ -1354,6 +1500,13 @@ const FieldCamera = (function () {
     if (cam === 'none') {
       return `<p class="cam-idle-text">${esc(camWhy || 'This browser cannot show the camera here.')}
         <button type="button" class="pill" onclick="FieldCamera.start()">Try again</button> ${pickBtn}</p>`;
+    }
+    if (cam === 'lost') {
+      return `<div class="cam-idle-text">
+        <p>The camera stopped — the phone gave it to something else: a call, another app, the lock screen or a download.</p>
+        <button type="button" class="primary cam-start" onclick="FieldCamera.start()">📸 Start the camera again</button>
+        ${pickBtn}
+      </div>`;
     }
     return `<div class="cam-idle-text">
         <button type="button" class="primary cam-start" onclick="FieldCamera.start()">📸 Start the camera</button>
@@ -1504,8 +1657,12 @@ const FieldCamera = (function () {
         ? '<p class="small txt-warn">Adding photos to Flood-Net is for editors — Bureau staff, and the people an administrator adds. The photos below stay on this device; Save a copy keeps any of them.</p>'
         : '';
     const kept = shots.filter(s => s.status !== 'done' && s.status !== 'already').reduce((n, s) => n + (s.bytes || 0), 0);
+    const copies = shots.filter(s => s.copy === 'wanted').length;
     return `${head}${signed}
       ${kept ? `<p class="small txt-muted">${mb(kept)} of photos waiting on this device.</p>` : ''}
+      ${copies ? `<p class="small txt-muted">${copies === 1 ? 'One photo is' : `${copies} photos are`} still to be saved as a copy —
+        press <em>Save a copy</em> on each once you have finished taking photos. Safari on an iPhone or iPad asks before every
+        download and the camera can stop while it asks, so copies are not saved as the photos are taken.</p>` : ''}
       <ul class="cam-list" aria-label="Photos taken on this device">${shots.map(shotHtml).join('')}</ul>`;
   }
   function shotHtml(s) {
@@ -1517,7 +1674,7 @@ const FieldCamera = (function () {
     if (s.rowId) acts.push(`<button type="button" class="pill" onclick="FieldCamera.openShot('${escAttr(s.id)}')">Show it</button>`);
     if (s.status === 'failed' || s.status === 'refused') acts.push(`<button type="button" class="pill" onclick="FieldCamera.retry('${escAttr(s.id)}')">Try again</button>`);
     if (s.status === 'refused' && s.record && s.record.station_id) acts.push(`<button type="button" class="pill" onclick="FieldCamera.sendUnfiled('${escAttr(s.id)}')">Send it filed under no station</button>`);
-    if (s.status !== 'done' && s.status !== 'already') acts.push(`<button type="button" class="pill" onclick="FieldCamera.saveCopy('${escAttr(s.id)}')">Save a copy</button>`);
+    if ((s.status !== 'done' && s.status !== 'already') || s.copy === 'wanted') acts.push(`<button type="button" class="pill" onclick="FieldCamera.saveCopy('${escAttr(s.id)}')">Save a copy</button>`);
     acts.push(`<button type="button" class="pill" onclick="FieldCamera.removeShot('${escAttr(s.id)}')" aria-label="Remove ${esc(s.name)}">Remove</button>`);
     return `<li class="cam-item" id="cam-item-${esc(s.id)}">
         ${url ? `<img class="cam-item-img" src="${esc(url)}" alt="" width="80" height="60">` : '<span class="cam-item-img" aria-hidden="true"></span>'}
@@ -1616,8 +1773,9 @@ const FieldCamera = (function () {
       suggestions: suggestions.map(x => ({ id: x.s.id, m: Math.round(x.m), b: Math.round(x.b), why: x.why })),
       locality: locality ? locality.name : null, ground: ground ? { ...ground } : null,
       memOnly, pumping, caption, settings: { ...prefs() },
+      frameWatch, revives,
       shots: shots.map(s => ({ id: s.id, name: s.name, status: s.status, note: s.note, rowId: s.rowId, station: s.station ? s.station.id : null,
-                               sha: s.sha, bytes: s.bytes, tries: s.tries, record: s.record })),
+                               sha: s.sha, bytes: s.bytes, tries: s.tries, record: s.record, copy: s.copy || null })),
     }),
     _facts: () => facts(new Date()),
   };

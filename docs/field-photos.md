@@ -247,8 +247,12 @@ device's list was loaded can be sent **filed under no station** (the stamp
 keeps the name; the viewer's *File under…* puts it right), and an account that
 is not on the editors list is told so. *Save a copy* downloads a waiting photo
 — stamp and EXIF and all — as `floodnet-<station>-<date>-<time>.jpg`; Settings
-can do that for every photo as it is taken. The tab asks the browser to keep
-its storage through a clear-out (`navigator.storage.persist`).
+can do that for every photo as it is taken. On an iPhone or an iPad, where
+Safari asks before every download and the camera can stop while it asks, that
+setting does not download each photo as it is taken: the photo's bytes are kept
+past its upload, and its line says *Save a copy* until it is pressed. The tab
+asks the browser to keep its storage through a clear-out
+(`navigator.storage.persist`).
 
 ### From the phone's camera app
 
@@ -269,7 +273,16 @@ The browser's permission for the **camera** and for **location** (and on an
 iPhone, the **compass**, asked the first time Start is pressed); the screen is
 kept awake while the camera is up. Leaving the tab lets the camera, the GPS and
 the compass go; coming back takes them up again, and ✕ stops them until Start
-is pressed again. A HEIC from the camera app is drawn by the browser where it
+is pressed again.
+
+The phone can take the camera back at any moment — a call, the lock screen,
+another app (Solocator, the phone's own camera) or Safari's download sheet —
+and the picture goes black. The tab notices (the camera's track ends or goes
+quiet, or no new frame is drawn for four seconds while the picture is on the
+screen) and asks for the camera again by itself as soon as the page is in view.
+If it stops twice in a row without coming back, the picture says so and offers
+*Start the camera again*. The shutter on a camera that has stopped starts it
+again rather than keeping a black photo. A HEIC from the camera app is drawn by the browser where it
 can (Safari) — in Chrome or Firefox choose *Settings → Camera → Formats → Most
 Compatible* on the iPhone.
 
