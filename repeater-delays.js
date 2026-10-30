@@ -60,13 +60,20 @@ const RepeaterDelays = (function () {
   // a keyboard, which never hover.
   function words(o) {
     const f = ms(o.frameMs), c = ms(o.clearMs), l = ms(o.leadMs);
+    const nowIs = o.currentMs == null ? 'what they are set to now is not known'
+      : `every repeater is on ${ms(o.currentMs)} now, as entered above`;
     return {
-      delay: 'How long the repeater waits, after it has heard a reading, before sending it on. It is set in the repeater itself; Flood-Net only records it.',
-      channel: 'The frequency the repeater listens on, then the one it sends on, in MHz — one number when they are the same. Two repeaters can only collide on the same sending channel.',
-      now: 'The delay the repeater has today: the one recorded on its station, or the one entered above as what they all share. "change" means the plan asks for something different.',
-      neighbour: 'The other repeater whose copies of a shared reading land nearest in time to this one\'s under the plan — with its planned delay, how far away it is, and how many readings the two both send on.',
-      apart: `How far apart in time the two repeaters start sending their copies of the same reading, at the closest. Under ${f} the copies overlap bit on bit; ${c} or more and they are clear of each other.`,
-      state: 'How this repeater comes out against its closest neighbour under the plan: on top, close or clear.',
+      onRecord: 'In the station register: each repeater\'s position, channels and pass ranges — and its delay, once somebody records it after setting it on site.',
+      assumed: `Taken as given, not measured: a repeater hears a field station up to ${num(o.fieldKm)} km away and a repeater or base up to ${num(o.linkKm)} km, in a straight line; a lead-in lasts ${l}, not yet timed on these repeaters; and ${nowIs}.`,
+      suggested: 'A delay this plan asks for. Not what the repeater is set to now, and not written to any station.',
+      predicted: 'Worked out from what is on record and what is assumed, not seen on the air: how far apart two copies land, on top, close or clear, and every count of pairs.',
+      measured: 'Nothing on this page. What the receivers actually decode is on Bit-Flip Sources and Station Health — check a group there once its delays are set.',
+      delay: 'The delay this plan suggests: how long the repeater should wait, after it has heard a reading, before sending it on. A suggestion, not what it is set to now — unless marked on record. It is set in the repeater itself; Flood-Net only records it.',
+      channel: 'The frequency the repeater listens on, then the one it sends on, in MHz — one number when they are the same — as recorded in the station register. Two repeaters can only collide on the same sending channel.',
+      now: 'What the repeater is set to today: on record when its station has a delay recorded, assumed when it is the one delay entered above. "change" means the suggested delay is different — a site visit.',
+      neighbour: 'The other repeater whose copies of a shared reading land nearest in time to this one\'s with the suggested delays — with its own delay, how far away it is, and how many readings the two both send on.',
+      apart: `How far apart in time the two repeaters start sending their copies of the same reading, at the closest — predicted, not measured. Under ${f} the copies overlap bit on bit; ${c} or more and they are clear of each other.`,
+      state: 'How this repeater is predicted to come out against its closest neighbour with the suggested delays: on top, close or clear.',
       readings: 'How many readings this repeater sends on that another repeater also sends on, to a receiver that hears both — how much rides on getting its delay right. A reading here is one station\'s one ALERT address, such as a rain gauge\'s rainfall.',
       reading: 'One station\'s one ALERT address — a rain gauge\'s rainfall, a river gauge\'s height, a battery. Each is sent on its own, and each can be relayed by more than one repeater.',
       ontop: `The two copies start less than one frame (${f}) apart, so their bits overlap. A receiver hearing both often decodes a mix of the two: flipped bits, and readings filed under the wrong address (ghosts). This is the one to get rid of.`,
@@ -77,14 +84,15 @@ const RepeaterDelays = (function () {
       pair: 'Two repeaters that both send on at least one of the same readings, and are both heard by a base station or a repeater that wants that reading — so their copies can collide.',
       group: 'Repeaters joined by pairs, directly or through each other. Moving one repeater\'s delay can move the problem onto another in the same group, so set a group\'s delays together.',
       where: 'The base stations and repeaters that would hear both copies — within reach of both, on their sending channel, and wanting the reading. This is where the two collide.',
-      oneDelay: 'How far apart the two copies land if every repeater has the same delay — which is thought to be the case now.',
-      planned: 'How far apart the two copies land with the delays in this plan.',
+      oneDelay: `How far apart the two copies would land if every repeater had the same delay — assumed, since ${nowIs}. Predicted, not measured.`,
+      planned: 'How far apart the two copies would land with the suggested delays — predicted, not measured.',
       used: 'How many different delay values the plan needs, and the longest of them.',
-      limit: 'The longest delay the repeaters\' own settings accept. Flood-Net\'s register can only record up to 999 ms today, so a longer plan cannot be written down yet.',
-      current: 'If every repeater is known to be set to the same delay now, enter it: the plan then leaves as many as it can on that value, so fewer sites need a visit.',
+      limit: 'The longest delay the repeaters\' own settings accept — your pick, not something on record. Flood-Net\'s register can only record up to 999 ms today, so a longer plan cannot be written down yet.',
+      current: 'If you know every repeater is set to the same delay now, enter it: the plan then leaves as many as it can on that value, so fewer sites need a visit. Leave it blank if nobody knows.',
       keep: 'Treat a delay already recorded on a station as set in the field and fixed, and plan the other repeaters around it. Untick to plan every repeater afresh.',
-      recorded: 'This delay is recorded on the repeater\'s station, so the plan keeps it as it is.',
-      change: 'The plan asks for a different delay from the one this repeater has now — a site visit.',
+      recorded: 'This delay is recorded on the repeater\'s station, so the plan keeps it as it is rather than suggesting another.',
+      nowAssumed: 'Nothing is recorded on this repeater\'s station; this is the one delay entered above as what they all share.',
+      change: 'The suggested delay is different from the one this repeater has now — a site visit.',
       free: 'No other repeater sends on the same readings to a receiver that hears both, so this repeater\'s delay cannot cause a collision. Leave it as it is.',
       km: 'Straight-line distance between the two repeaters, in kilometres.',
       linked: 'Repeaters that send on at least one reading another repeater also sends on, to a receiver hearing both — the ones whose delays matter.',
@@ -102,11 +110,18 @@ const RepeaterDelays = (function () {
   // The words, in the order the glossary fold lists them, with the label each
   // is shown under there.
   const GLOSSARY = [
-    ['delay', 'Delay'], ['reading', 'Reading'], ['pair', 'Pair'], ['group', 'Group'], ['ontop', 'On top'], ['close', 'Close'],
-    ['clear', 'Clear'], ['apart', 'Apart'], ['frame', 'Frame'], ['leadin', 'Lead-in'], ['channel', 'Channel'], ['now', 'Now'],
+    ['delay', 'Suggested delay'], ['reading', 'Reading'], ['pair', 'Pair'], ['group', 'Group'], ['ontop', 'On top'], ['close', 'Close'],
+    ['clear', 'Clear'], ['apart', 'Apart'], ['frame', 'Frame'], ['leadin', 'Lead-in'], ['channel', 'Channel'], ['now', 'Set now'],
     ['neighbour', 'Closest neighbour'], ['state', 'State'], ['readings', 'Readings shared'], ['where', 'Heard together at'],
-    ['oneDelay', 'On one delay'], ['planned', 'Planned'], ['used', 'Delays used'], ['free', 'No neighbour on its readings'],
-    ['recorded', 'Recorded'], ['change', 'Change'],
+    ['oneDelay', 'All on one delay'], ['planned', 'Suggested delays'], ['used', 'Delays used'], ['free', 'No neighbour on its readings'],
+    ['recorded', 'On record'], ['change', 'Change'],
+  ];
+  // Where a figure comes from, each with the pill it is marked with. The key
+  // under the settings lists them in words; a pill beside a figure carries
+  // the same meaning on hover.
+  const SOURCES = [
+    ['record', 'On record', 'onRecord'], ['assumed', 'Assumed', 'assumed'], ['suggested', 'Suggested', 'suggested'],
+    ['predicted', 'Predicted', 'predicted'], ['measured', 'Measured', 'measured'],
   ];
 
   const S = { opts: null, compare: null, comparing: false, timer: null };
@@ -181,6 +196,12 @@ const RepeaterDelays = (function () {
     const B = BAND[b];
     return B ? `<span class="rd-b ${B.cls} term-chip" title="${esc(word(b))}">${esc(B.label)}</span>` : '';
   }
+  // A pill saying where a figure comes from; `meaning` for one that says more
+  // than the source's own words (a delay on record says why it is kept).
+  function srcHtml(kind, text, meaning) {
+    const s = SOURCES.find(x => x[0] === kind);
+    return `<span class="rd-src rd-src--${kind} term-chip" title="${esc(meaning || word(s[2]))}">${esc(text || s[1].toLowerCase())}</span>`;
+  }
   function statusHtml(s) {
     if (BAND[s]) return bandHtml(s);
     const why = { free: word('free'), unplaced: word('unplaced'), 'nothing-passed': word('nothingPassed') }[s];
@@ -210,14 +231,34 @@ const RepeaterDelays = (function () {
     </form>`;
   }
 
+  // Where the figures come from, in words a finger or a keyboard can read —
+  // the same meanings the pills carry on hover. How many delays are on record
+  // is the one thing the register can answer outright, so it is said here.
+  function sourcesHtml(p) {
+    const c = p && p.counts;
+    const extra = {
+      record: !c ? '' : c.recorded
+        ? ` ${num(c.recorded)} of the ${num(c.repeaters)} repeaters have a delay recorded.`
+        : ` None of the ${num(c.repeaters)} repeaters has a delay recorded yet.`,
+    };
+    const tab = (id, name) => `<button class="link-btn" onclick="switchTab('${id}')">${name}</button>`;
+    const text = k => k === 'measured'
+      ? esc(word(k)).replace('Bit-Flip Sources', tab('flipsources', 'Bit-Flip Sources')).replace('Station Health', tab('health', 'Station Health'))
+      : esc(word(k));
+    return `<p class="small rd-key-h"><strong>Where the figures come from</strong></p>
+      <dl class="rd-key">${SOURCES.map(([kind, label, k]) =>
+        `<dt><span class="rd-src rd-src--${kind}">${esc(label)}</span></dt><dd>${text(k)}${esc(extra[kind] || '')}</dd>`).join('')}</dl>`;
+  }
+
   function tilesHtml(p) {
     const c = p.counts;
     // `label` is markup: its terms are termHtml's, everything else escaped here.
     const tile = (n, label, cls) => `<div class="bk-tile"><span class="bk-tile-n${cls ? ' ' + cls : ''}">${esc(n)}</span> <span class="bk-tile-l">${label}</span></div>`;
     const pairs = term('pair', 'pairs');
-    return `<div class="bk-tiles">
+    return `<p class="small rd-tiles-h">${srcHtml('predicted', 'Predicted')} from the register and the assumptions — not measured on the air</p>
+      <div class="bk-tiles">
       ${tile(num(c.linked), `of the ${num(c.repeaters)} repeaters ${term('linked', 'share readings with a neighbour')}, in ${num(p.clusters.length)} ${term('group', p.clusters.length === 1 ? 'group' : 'groups')}`)}
-      ${tile(`${num(c.ontopSame)} → ${num(c.ontop)}`, `${pairs} sending copies ${term('ontop', 'on top of each other')}: ${term('oneDelay', 'all on one delay')} → ${term('planned', 'this plan')}`, c.ontop ? 'stat-bad' : '')}
+      ${tile(`${num(c.ontopSame)} → ${num(c.ontop)}`, `${pairs} sending copies ${term('ontop', 'on top of each other')}: ${term('oneDelay', 'all on one delay')} → ${term('planned', 'suggested delays')}`, c.ontop ? 'stat-bad' : '')}
       ${tile(num(c.close), `${pairs} still ${term('close', 'close')} — a key-up on the other's frame`, c.close ? 'txt-warn' : '')}
       ${tile(num(c.clear), `${pairs} ${term('clear', 'clear')}, of ${num(c.pairs)}`, '')}
       ${tile(num(c.free), `repeaters with ${term('free', 'no neighbour on their readings')} — any delay will do`, '')}
@@ -228,14 +269,20 @@ const RepeaterDelays = (function () {
     const c = p.counts, o = p.settings;
     const steps = c.delaysUsed.length;
     const parts = [];
-    parts.push(`Set each repeater to the <strong>${term('delay', 'Delay')}</strong> in the table below. With every repeater on one delay,
-      <strong>${num(c.ontopSame)}</strong> ${term('pair', c.ontopSame === 1 ? 'pair' : 'pairs')} of repeaters send their copies of the same
-      ${term('reading', 'reading')} ${term('ontop', 'on top of each other')} at a receiver that hears both — the collisions that come out as
-      flipped bits. With these delays ${c.ontop ? `<strong>${num(c.ontop)}</strong> still do` : '<strong>none</strong> do'}, ${num(c.close)}
-      ${c.close === 1 ? 'is' : 'are'} ${term('close', 'close')}, and ${num(c.clear)} ${c.clear === 1 ? 'is' : 'are'} ${term('clear', 'clear')}.`);
+    // What the comparison starts from: the delay entered above, or — nothing
+    // being known — every repeater on one delay, said as the assumption it is.
+    const from = o.currentMs != null
+      ? `With every repeater on ${ms(o.currentMs)}, as ${term('assumed', 'assumed')} above, the plan`
+      : `${c.recorded ? `Only ${num(c.recorded)} of the ${num(c.repeaters)} repeaters ${c.recorded === 1 ? 'has its' : 'have their'} delay` : 'No repeater has its delay'} on record,
+        so the plan ${term('assumed', 'assumes')} they are all on one delay today; that way it`;
+    parts.push(`Set each repeater to its <strong>${term('delay', 'suggested delay')}</strong> in the table below. ${from}
+      ${term('predicted', 'predicts')} <strong>${num(c.ontopSame)}</strong> ${term('pair', c.ontopSame === 1 ? 'pair' : 'pairs')} of repeaters
+      sending their copies of the same ${term('reading', 'reading')} ${term('ontop', 'on top of each other')} at a receiver that hears both —
+      the collisions that come out as flipped bits. With the suggested delays it predicts ${c.ontop ? `<strong>${num(c.ontop)}</strong> still do` : '<strong>none</strong> do'},
+      ${num(c.close)} ${c.close === 1 ? 'is' : 'are'} ${term('close', 'close')}, and ${num(c.clear)} ${c.clear === 1 ? 'is' : 'are'} ${term('clear', 'clear')}.`);
     parts.push(`The plan uses ${plural(steps, 'different delay')} between ${ms(c.delaysUsed[0] || 0)} and ${ms(c.delaysUsed[steps - 1] || 0)};
-      two copies are clear of each other ${ms(o.clearMs)} apart (a ${ms(o.leadMs)} ${term('leadin', 'lead-in')} and a ${ms(o.frameMs)}
-      ${term('frame', 'frame')}).`);
+      two copies are clear of each other ${ms(o.clearMs)} apart (a ${ms(o.leadMs)} ${term('leadin', 'lead-in')}, assumed and not yet timed on
+      these repeaters, and a ${ms(o.frameMs)} ${term('frame', 'frame')}).`);
     if (o.maxMs < 1000 && (c.ontop || c.close)) {
       parts.push(`Under a second there is not room to clear every pair: the busiest groups need their copies spread over more than a
         second. If the repeaters take longer delays, pick the limit above and the plan follows — see <em>What a longer delay buys</em>.`);
@@ -244,7 +291,7 @@ const RepeaterDelays = (function () {
       parts.push(`${plural(c.channelUnknown, 'repeater has', 'repeaters have')} no channel on record, so each is assumed to share one with
         its neighbours — recording the channels may free some of them.`);
     }
-    if (c.recorded) parts.push(`${plural(c.recorded, 'repeater has a delay', 'repeaters have delays')} recorded on ${c.recorded === 1 ? 'its station' : 'their stations'}${o.keepRecorded ? ', kept as recorded' : ', planned afresh'}.`);
+    if (c.recorded) parts.push(`${plural(c.recorded, 'repeater has a delay', 'repeaters have delays')} recorded on ${c.recorded === 1 ? 'its station' : 'their stations'}${o.keepRecorded ? ', kept as recorded and marked on record' : ', planned afresh'}.`);
     if (o.currentMs != null) parts.push(`Starting from ${ms(o.currentMs)} on every repeater, ${plural(c.changes, 'repeater needs', 'repeaters need')} changing; the rest can stay as they are.`);
     return parts.map(t => `<p>${t}</p>`).join('');
   }
@@ -269,8 +316,8 @@ const RepeaterDelays = (function () {
               <td>${num(p.counts.delaysUsed.length)}, up to ${ms(p.counts.delaysUsed[p.counts.delaysUsed.length - 1] || 0)}</td></tr>`).join('')}
           </tbody>
         </table></div>
-        <p class="small txt-muted">A delay over 999 ms cannot be recorded on a station yet — the register's limit (0015). Check the
-          repeaters' own limit before planning past a second.</p>`;
+        <p class="small txt-muted">Every count here is predicted, from the same register and assumptions. A delay over 999 ms cannot be
+          recorded on a station yet — the register's limit (0015). Check the repeaters' own limit before planning past a second.</p>`;
     return `<details class="rd-fold" data-k="compare"><summary><h3 class="bk-inline-h" id="rd-h-compare">What a longer delay buys</h3></summary>
       ${body}</details>`;
   }
@@ -282,31 +329,37 @@ const RepeaterDelays = (function () {
     const rows = p.clusters.map(c => {
       const head = `<tr class="rd-group"><th scope="rowgroup" colspan="${cols}" id="rd-g-${c.n}">
         ${term('group', `Group ${c.n}`)} · ${esc(c.name)} <span class="small txt-muted">— ${plural(c.repeaters.length, 'repeater')},
-        ${num(c.pairs)} ${term('pair', c.pairs === 1 ? 'pair' : 'pairs')}; ${term('oneDelay', 'on one delay')} ${esc(BAND[c.worstSame].label.toLowerCase())},
-        ${term('planned', 'planned')} ${esc(BAND[c.worst].label.toLowerCase())}</span></th></tr>`;
-      return head + c.repeaters.map(id => rowHtml(byId.get(id), showNow)).join('');
+        ${num(c.pairs)} ${term('pair', c.pairs === 1 ? 'pair' : 'pairs')}; ${term('oneDelay', 'all on one delay')} ${esc(BAND[c.worstSame].label.toLowerCase())},
+        ${term('planned', 'suggested delays')} ${esc(BAND[c.worst].label.toLowerCase())}</span></th></tr>`;
+      return head + c.repeaters.map(id => rowHtml(byId.get(id), showNow, byId)).join('');
     }).join('');
     return `<div class="table-wrap" role="region" tabindex="0" aria-labelledby="rd-h-table">
       <table class="hl-table rd-table">
-        <caption class="sr-only">Each repeater's planned delay, group by group: its channel, its closest neighbour under the plan and how far apart their copies land, and how many readings it shares</caption>
+        <caption class="sr-only">Each repeater's suggested delay, group by group: its channel, its closest neighbour with the suggested delays and how far apart their copies are predicted to land, and how many readings it shares</caption>
         <thead><tr><th scope="col">Repeater</th><th scope="col">${term('channel', 'Channel, MHz')}</th>
-          <th scope="col" class="num">${term('delay', 'Delay')}</th>
-          ${showNow ? `<th scope="col" class="num">${term('now', 'Now')}</th>` : ''}
-          <th scope="col">${term('neighbour', 'Closest neighbour')}</th><th scope="col" class="num">${term('apart', 'Apart')}</th>
-          <th scope="col">${term('state', 'State')}</th><th scope="col" class="num">${term('readings', 'Readings shared')}</th></tr></thead>
+          <th scope="col" class="num">${term('delay', 'Suggested delay')}</th>
+          ${showNow ? `<th scope="col" class="num">${term('now', 'Set now')}</th>` : ''}
+          <th scope="col">${term('neighbour', 'Closest neighbour')}</th><th scope="col" class="num">${term('apart', 'Apart, predicted')}</th>
+          <th scope="col">${term('state', 'State, predicted')}</th><th scope="col" class="num">${term('readings', 'Readings shared')}</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>`;
   }
 
-  function rowHtml(r, showNow) {
+  // Every delay in a row says where it comes from: the suggestion bare (the
+  // column says so), one on record marked, and what it is set to now marked
+  // on record or assumed — "—" when nobody knows.
+  function rowHtml(r, showNow, byId) {
     const n = r.neighbours[0];
-    const now = r.baseline == null ? '—' : `${ms(r.baseline)}${r.change ? ` <span class="rd-change term-chip" title="${esc(word('change'))}">change</span>` : ''}`;
+    const other = n && byId ? byId.get(n.id) : null;
+    const now = r.baseline == null ? `<span class="txt-muted">not known</span>`
+      : `${ms(r.baseline)} ${r.recorded != null ? srcHtml('record', 'on record', word('recorded')) : srcHtml('assumed', 'assumed', word('nowAssumed'))}`
+        + `${r.change ? ` <span class="rd-change term-chip" title="${esc(word('change'))}">change</span>` : ''}`;
     return `<tr id="rd-r-${escAttr(r.id)}">
-      <th scope="row">${stationBtn(r.id, r.name)}${r.fixed ? ` <span class="small txt-muted">${term('recorded', 'recorded')}</span>` : ''}</th>
+      <th scope="row">${stationBtn(r.id, r.name)}</th>
       <td>${chan(r)}</td>
-      <td class="num rd-delay">${ms(r.delay)}</td>
+      <td class="num"><span class="rd-delay">${ms(r.delay)}</span>${r.fixed ? ` ${srcHtml('record', 'on record', word('recorded'))}` : ''}</td>
       ${showNow ? `<td class="num">${now}</td>` : ''}
-      <td>${n ? `${esc(n.name)} <span class="small txt-muted">${ms(n.otherDelay)} · ${num(Math.round(n.km))} km · ${plural(n.weight, 'reading')} together</span>` : '—'}</td>
+      <td>${n ? `${esc(n.name)} <span class="small txt-muted">${other && other.fixed ? 'on record' : 'suggested'} ${ms(n.otherDelay)} · ${num(Math.round(n.km))} km away · ${plural(n.weight, 'reading')} together</span>` : '—'}</td>
       <td class="num">${n ? ms(n.sepMs) : '—'}</td>
       <td>${statusHtml(r.status)}</td>
       <td class="num">${num(r.readings)}</td>
@@ -326,14 +379,15 @@ const RepeaterDelays = (function () {
   function pairsHtml(p) {
     if (!p.pairs.length) return '';
     return `<details class="rd-fold" data-k="pairs"><summary><h3 class="bk-inline-h" id="rd-h-pairs">Every pair, busiest first (${num(p.pairs.length)})</h3></summary>
-      <p class="small">Two repeaters that relay the same reading and are heard together by a base station or a repeater that wants it. <em>Apart</em> is the
-        closest their copies come — two copies of one reading, through any number of hops — on one delay and under the plan.</p>
+      <p class="small">Two repeaters that relay the same reading and are heard together by a base station or a repeater that wants it. The last two
+        columns are the closest their copies come — two copies of one reading, through any number of hops — predicted with every repeater on one
+        delay and with the suggested delays.</p>
       <div class="table-wrap tall" role="region" tabindex="0" aria-labelledby="rd-h-pairs">
       <table class="hl-table rd-pairs">
-        <caption class="sr-only">Every pair of repeaters that can put copies of one reading on top of each other: how far apart, how many readings, where they meet, and how far apart their copies land on one delay and under the plan</caption>
+        <caption class="sr-only">Every pair of repeaters that can put copies of one reading on top of each other: how far apart, how many readings, where they meet, and how far apart their copies are predicted to land with every repeater on one delay and with the suggested delays</caption>
         <thead><tr><th scope="col">Repeaters</th><th scope="col" class="num">${term('km', 'km')}</th>
           <th scope="col" class="num">${term('pairReadings', 'Readings')}</th><th scope="col">${term('where', 'Heard together at')}</th>
-          <th scope="col">${term('oneDelay', 'On one delay')}</th><th scope="col">${term('planned', 'Planned')}</th></tr></thead>
+          <th scope="col">${term('oneDelay', 'All on one delay')}</th><th scope="col">${term('planned', 'Suggested delays')}</th></tr></thead>
         <tbody>${p.pairs.map(x => `<tr>
           <th scope="row">${esc(x.aName)} &amp; ${esc(x.bName)}</th>
           <td class="num">${num(Math.round(x.km))}</td><td class="num">${num(x.weight)}</td>
@@ -385,7 +439,7 @@ const RepeaterDelays = (function () {
           <button class="link-btn" onclick="switchTab('health')">Station Health</button> tabs show whether the corrupted copies fall once a
           group is set.</li>
         <li><strong>Recording it.</strong> Record each delay on its station as it is set — the Stations tab, the repeater's card, <em>Repeater
-          delay (ms)</em> — and the plan keeps it from then on. The register takes up to 999 ms.</li>
+          delay (ms)</em> — and from then on it shows here as on record and the plan keeps it. The register takes up to 999 ms.</li>
       </ul>
       <p><button class="btn" onclick="RepeaterDelays.reset()">Put the settings back</button></p>
     </details>`;
@@ -404,8 +458,10 @@ const RepeaterDelays = (function () {
         <div class="panel-header"><h2>Repeater delays</h2></div>
         <p class="small txt-muted">The delay each repeater should wait before sending on what it heard, so that repeaters relaying the same
           reading never send their copies on top of each other — worked out from the station register for every repeater on file,
-          Queensland and northern New South Wales. A plan, not a record: nothing here is written to a station.</p>
+          Queensland and northern New South Wales. A plan, not a record: every delay here is a suggestion, not one read off a repeater,
+          and nothing here is written to a station.</p>
         ${settingsHtml(o)}
+        ${sourcesHtml(p)}
         ${body}
       </div>
       ${p ? `
@@ -413,8 +469,9 @@ const RepeaterDelays = (function () {
         <div class="panel-header"><h3 id="rd-h-table">The delays, group by group</h3>
           <button class="btn" onclick="RepeaterDelays.exportCsv()">Save as CSV</button></div>
         <p class="small">Repeaters in a group relay some of the same readings and are heard together somewhere, so set a group's delays
-          together. Busiest group first; in each, the repeater sharing the most readings first. <em>Apart</em> is how close its copies come to
-          its closest neighbour's under the plan.</p>
+          together. Busiest group first; in each, the repeater sharing the most readings first. <em>Apart</em> is how close its copies are
+          predicted to come to its closest neighbour's with the suggested delays.${p.repeaters.some(r => r.baseline != null) ? ''
+            : ' No repeater\'s delay is on record, so what each is set to now is not known — every delay in this table is a suggestion.'}</p>
         ${tableHtml(p)}
         ${freeHtml(p)}
         ${compareHtml()}
@@ -471,8 +528,12 @@ const RepeaterDelays = (function () {
   function exportCsv() {
     const p = current();
     if (!p) return;
-    const head = ['group', 'group_name', 'repeater', 'station_id', 'hub', 'rx_mhz', 'tx_mhz', 'delay_ms', 'now_ms', 'change',
-      'recorded_kept', 'closest_neighbour', 'neighbour_delay_ms', 'apart_ms', 'state', 'readings_shared', 'limit_ms', 'lead_in_ms'];
+    // Named for where each figure comes from, as the page marks them: now_ms
+    // with now_source (recorded, or assumed from the delay entered), the
+    // suggestion, and what it is predicted to give.
+    const head = ['group', 'group_name', 'repeater', 'station_id', 'hub', 'rx_mhz', 'tx_mhz', 'suggested_delay_ms', 'now_ms', 'now_source',
+      'change', 'recorded_kept', 'closest_neighbour', 'neighbour_delay_ms', 'predicted_apart_ms', 'predicted_state', 'readings_shared',
+      'limit_ms', 'lead_in_ms_assumed'];
     const groupName = new Map(p.clusters.map(c => [c.n, c.name]));
     const order = p.clusters.flatMap(c => c.repeaters).concat(p.repeaters.filter(r => !r.linked).map(r => r.id));
     const byId = new Map(p.repeaters.map(r => [r.id, r]));
@@ -481,24 +542,25 @@ const RepeaterDelays = (function () {
       const r = byId.get(id);
       const n = r.neighbours[0];
       lines.push([r.cluster || '', r.cluster ? groupName.get(r.cluster) : '', r.name, r.id, r.hub, r.rx ?? '', r.tx ?? '', r.delay,
-        r.baseline ?? '', r.change == null ? '' : r.change ? 'yes' : 'no', r.fixed ? 'yes' : 'no',
+        r.baseline ?? '', r.recorded != null ? 'recorded' : r.baseline != null ? 'assumed' : 'not known',
+        r.change == null ? '' : r.change ? 'yes' : 'no', r.fixed ? 'yes' : 'no',
         n ? n.name : '', n ? n.otherDelay : '', n ? n.sepMs : '', STATUS[r.status] || r.status, r.readings,
         p.settings.maxMs, p.settings.leadMs].map(csvEscape).join(','));
     }
-    dlText(`repeater-delays-${p.settings.maxMs}ms.csv`, lines.join('\n') + '\n');
+    dlText(`floodnet-repeater-delays-${p.settings.maxMs}ms.csv`, lines.join('\n') + '\n');
   }
 
   function exportPairsCsv() {
     const p = current();
     if (!p || !p.pairs.length) return;
-    const head = ['repeater_a', 'repeater_b', 'km', 'readings_shared', 'heard_together_at', 'apart_on_one_delay_ms', 'on_one_delay',
-      'apart_planned_ms', 'planned', 'example_stations'];
+    const head = ['repeater_a', 'repeater_b', 'km', 'readings_shared', 'heard_together_at', 'predicted_apart_on_one_delay_ms', 'on_one_delay',
+      'predicted_apart_suggested_ms', 'with_suggested_delays', 'example_stations'];
     const lines = [head.join(',')];
     for (const x of p.pairs) {
       lines.push([x.aName, x.bName, x.km, x.weight, x.where.map(w => w.name).join('; '), x.sepSameMs, BAND[x.bandSame].label,
         x.sepMs, BAND[x.band].label, x.sources.map(s => `${s.name} (${s.address})`).join('; ')].map(csvEscape).join(','));
     }
-    dlText(`repeater-delay-pairs-${p.settings.maxMs}ms.csv`, lines.join('\n') + '\n');
+    dlText(`floodnet-repeater-delay-pairs-${p.settings.maxMs}ms.csv`, lines.join('\n') + '\n');
   }
 
   return { render, init, set: setOpt, reset, compare, openStation, exportCsv, exportPairsCsv, current, suggestion, planAtDefaults,

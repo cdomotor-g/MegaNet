@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 153, date: '2026-10-30', items: [
+      '⏳ <strong>Repeater Delays says where each figure comes from.</strong> A short key under the settings marks each kind: '
+        + '<em>on record</em> (in the station register), <em>assumed</em> (taken as given, such as the 300 ms lead-in), '
+        + '<em>suggested</em> (what the plan asks for) and <em>predicted</em> (what those delays should give). Nothing on the page '
+        + 'is measured. The table\'s <strong>Suggested delay</strong> column is the plan\'s suggestion, not what a repeater is set to. '
+        + 'No repeater has its delay recorded yet. Once one does, its delay shows an <em>on record</em> pill and the plan keeps it.',
+    ] },
     { n: 152, date: '2026-10-30', items: [
       '📶 <strong>SNR on the Stations map.</strong> ⏱️ Latency in the side panel is now <strong>⏱️ Latency &amp; signal</strong>. '
         + 'Its <em>Colour by</em> row has a fourth choice, <strong>SNR</strong>: each pin coloured by how strongly the base stations '

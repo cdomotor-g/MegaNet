@@ -2937,6 +2937,21 @@ td {
 .rd-table td, .rd-table th, .rd-pairs td, .rd-pairs th { vertical-align: top; }
 .rd-table tr.rd-group > th { background: color-mix(in srgb, var(--accent) 7%, transparent); font-weight: 600; padding-top: var(--sp-2); }
 .rd-delay { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Where a figure comes from. Solid for what is on record, dashed for what
+   is assumed, suggested or predicted — firm or not at a glance, with the
+   word inside so the edge never has to carry it alone. */
+.rd-src { display: inline-block; white-space: nowrap; padding: 0 .4em; border: 1px solid var(--border); border-radius: var(--r-sm);
+          color: var(--text); font-size: var(--fs-xs); font-weight: 400; line-height: 1.5; }
+.rd-src--record { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.rd-src--assumed, .rd-src--predicted { border-style: dashed; border-color: var(--muted); }
+.rd-src--suggested { border-style: dashed; border-color: var(--accent); }
+.rd-src--measured { border-color: var(--ok); }
+.rd-key-h { margin: var(--sp-3) 0 var(--sp-1); }
+.rd-key { display: grid; grid-template-columns: max-content 1fr; gap: var(--sp-1) var(--sp-3); margin: 0; font-size: var(--fs-sm); align-items: baseline; }
+.rd-key dt, .rd-key dd { margin: 0; }
+.rd-tiles-h { margin: var(--sp-3) 0 0; }
+.rd-tiles-h + .bk-tiles { margin-top: var(--sp-1); }
+@media (max-width: 560px) { .rd-key { grid-template-columns: 1fr; } .rd-key dd { margin-bottom: var(--sp-2); } }
 .rd-change { display: inline-block; padding: 0 .4em; border-radius: var(--r-sm); background: color-mix(in srgb, var(--accent) 14%, transparent); font-size: var(--fs-xs); }
 .rd-compare tr.is-selected > * { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .rd-fold { margin-top: var(--sp-3); }
