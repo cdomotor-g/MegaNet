@@ -475,6 +475,33 @@ try {
       green(moved.ring) && moved.link.some(blue) && moved.old[3] < 40 && moved.oldOther[3] < 40, J(moved));
     check('…held, then faded: a minute after the animation ends', got.route && got.route.life - got.route.anim === 60000,
       J(got.route && { anim: got.route.anim, life: got.route.life }));
+    // Links hidden in 🗺️ Layers leave a pulse nothing to run along — its
+    // station flares and that is all — until Animate along hidden links is
+    // ticked: then it runs the link the map would draw, and still none is drawn.
+    const hid = await page.evaluate(id => {
+      const was = [state.mapShowLinks, state.mapShowBackbone];
+      state.mapShowLinks = false; state.mapShowBackbone = false;
+      refreshMapLayers({ skipFit: true });
+      const bare = MapLatency._route(id);
+      const box = () => document.querySelector('#map-latency-panel [data-lat-f="hidden"]');
+      const ticked0 = box() && box().checked;
+      box().click();
+      const ran = MapLatency._route(id);
+      const out = { bare: bare && bare.legs.length, ticked0, ticked: box().checked, enabled: !box().disabled,
+                    stored: localStorage.getItem('mn-latency-hidden'),
+                    ran: ran && ran.legs.map(l => ({ to: l.to, straight: l.straight, kind: l.kind })),
+                    drawn: state.mapLines.filter(l => /^(core|backbone)$/.test(l.mnLinkRole)).length };
+      box().click();
+      out.after = MapLatency._route(id).legs.length;
+      out.stored2 = localStorage.getItem('mn-latency-hidden');
+      state.mapShowLinks = was[0]; state.mapShowBackbone = was[1];
+      refreshMapLayers({ skipFit: true });
+      return out;
+    }, pick.id);
+    check('links hidden in Layers: the pulse has no link to run along; Animate along hidden links, ticked, runs it along the link unseen',
+      hid.bare === 0 && !hid.ticked0 && hid.ticked && hid.enabled && hid.stored === 'on' && hid.drawn === 0
+        && hid.ran && hid.ran.length >= 1 && hid.ran[0].to === pick.rpt && !hid.ran[0].straight && hid.ran[0].kind === 'assumed'
+        && hid.after === 0 && hid.stored2 === 'off', J({ hid, rpt: pick.rpt }));
   }
   const liveOn = count('live');
   const off1 = await page.evaluate(async () => {

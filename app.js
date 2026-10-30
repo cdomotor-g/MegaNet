@@ -5186,7 +5186,7 @@ function mapDisplayControlsHtml() {
              oninput="document.getElementById('link-opacity-val').textContent=Math.round(this.value*100)+'%';this.setAttribute('aria-valuetext',Math.round(this.value*100)+' per cent')"
              onchange="setMapLinkOpacity(+this.value)">
     </label>
-    <label class="filter-check">
+    <label class="filter-check mapd-join">
       <input type="checkbox" ${on ? 'checked' : ''}
              onchange="state.mapKillSpaghetti=this.checked;rerenderMapDisplayControls();refreshMapLayers()">
       Limit link/path length
@@ -5199,7 +5199,7 @@ function mapDisplayControlsHtml() {
              oninput="document.getElementById('max-tx-val').textContent=this.value+' km';this.setAttribute('aria-valuetext',this.value+' kilometres')"
              onchange="state.mapMaxLinkKm=+this.value;refreshMapLayers()">
     </label>
-    <label class="filter-check">
+    <label class="filter-check mapd-join">
       <input type="checkbox" ${state.mapShowBackbone ? 'checked' : ''}
              onchange="setMapBackbone(this.checked)">
       Backbone links/paths (repeater &amp; base)
@@ -5215,9 +5215,12 @@ function mapDisplayControlsHtml() {
          colour of the core line, and a green line that might be 15 dB of
          headroom or might be 151.95 MHz is worse than either on its own.
          Line of sight is not in the group and does not need to be — it paints
-         crimson over whichever colouring is running, and says one thing. -->
-    <div class="map-display-h">Link colour</div>
+         crimson over whichever colouring is running, and says one thing.
+         A card under Stations & links rather than a heading of its own: it is
+         about the same lines the switches above it draw. The card has no
+         switch to name it, so it carries its own title. -->
     <div role="radiogroup" aria-label="What the link colours mean">
+      <div class="mapd-card-title">Link colour</div>
       ${[['freq',  'By frequency',   'The channel the hop runs on, off the repeater at its end — recorded, so every link has one the moment the file loads'],
          ['fade',  'By fade margin', 'Green, yellow or red by how many decibels of headroom the path has. Computed per link by the link budget card\'s model, and saved to the datastore'],
          ['plain', 'Plain',          'One colour for every link, as the map drew them before either colouring existed']].map(([v, label, hint]) => `
@@ -5584,7 +5587,9 @@ function mapDisplayRows(root) {
 // radio group, the owner block and the look's note each start a card; a
 // heading ends one; anything else joins the card above it. Two exceptions say
 // so on the row itself — .mapd-join is a switch that belongs with the one above
-// (the four pin styles, Include related repeaters) — or by what they are: the
+// (the four pin styles, Include related repeaters, and Limit link/path length
+// and Backbone links/paths under Show radio paths, since all three decide
+// which link lines are drawn) — or by what they are: the
 // base maps are one stack, so consecutive base rows are one card.
 //
 // The cards are worked out over the whole list and then drawn over the rows the
@@ -6612,6 +6617,19 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   const allBackbone = state.mapShowBackbone ? backboneLinks(state.mapMaxLinkKm) : [];
   const backbone = shownIds
     ? allBackbone.filter(p => shownIds.has(p.a.id) && shownIds.has(p.b.id)) : allBackbone;
+  // ⏱️ Latency's pulses run along the lines drawn here. With Animate along
+  // hidden links ticked, the links a switch above is hiding are worked out the
+  // same way — the same stations, length limit and cut — and handed over for
+  // the pulses to run along unseen; nothing is drawn for them (map-latency.js).
+  const unseen = MapLatency.wantsHiddenLinks();
+  const hiddenField = unseen && !state.mapShowLinks
+    ? passRangeLinks(active ? matched.concat(related) : located)
+        .filter(l => l.km <= maxKm && (!shownIds || (shownIds.has(l.s.id) && shownIds.has(l.r.id))))
+    : [];
+  const hiddenBackbone = unseen && !state.mapShowBackbone
+    ? backboneLinks(state.mapMaxLinkKm).filter(p => !shownIds || (shownIds.has(p.a.id) && shownIds.has(p.b.id)))
+    : [];
+  MapLatency.hiddenLinks(hiddenField, hiddenBackbone);
   state.mapLinkCount = { drawn: links.length, culled: allLinks.length - inRange.length,
                          hidden: inRange.length - links.length,
                          backbone: backbone.length,

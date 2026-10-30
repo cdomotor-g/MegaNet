@@ -4353,6 +4353,8 @@ hr {
 .lat-live-head { display: flex; align-items: center; gap: var(--sp-2); }
 .lat-live-head .lat-h { margin: 0; }
 .lat-live-what, .lat-live-status { margin: 0; }
+/* Animate along hidden links: the animation's own sub-switch, close under it. */
+.lat-live .filter-sub { margin-top: 0; }
 .lat-live-dot {
   display: inline-block; flex: none; vertical-align: -1px;
   width: 11px; height: 11px; border-radius: 50%;
@@ -9154,6 +9156,21 @@ body.mn-cardw-dragging {
 /* The switch that names a card is its title; a sub-switch, a slider's label
    and a note are what it holds. */
 #map-display-block > .filter-check.mapd-card:not(.filter-sub) {
+  font-weight: 600;
+}
+
+/* A switch joined to the card after a slider (Limit link/path length and
+   Backbone links/paths, under Show radio paths) starts a new part of the card,
+   so it stands a little clear of the slider above it. */
+#map-display-block > .filter-range.mapd-card + .mapd-join.mapd-card {
+  padding-top: .5rem;
+}
+
+/* A card with no switch to name it (Link colour) says what it is in a row of
+   the same weight. */
+.mapd-card-title {
+  margin: .3rem 0;
+  font-size: .87rem;
   font-weight: 600;
 }
 

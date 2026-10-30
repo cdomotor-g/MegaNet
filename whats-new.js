@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 151, date: '2026-10-30', items: [
+      'In ⏱️ Latency\'s <strong>Messages landing</strong> on the Stations map, a new box under <em>Animate messages on the map</em>: '
+        + '<strong>Animate along hidden links</strong>. Tick it and each message\'s pulse runs along its radio links even with '
+        + '<em>Show radio paths</em> or <em>Backbone links/paths</em> turned off in 🗺️ Layers, so a dense network can keep its lines '
+        + 'off the map and still watch each message travel. They are the links the map would draw, cut by the same length limit and filters.',
+      'In 🗺️ Layers on the Stations map, <em>Show radio paths</em>, <em>Limit link/path length</em> and <em>Backbone links/paths</em> '
+        + 'now share one card, and <strong>Link colour</strong> is a card under <em>Stations &amp; links</em> rather than a heading of its own.',
+    ] },
     { n: 150, date: '2026-10-28', items: [
       '🛣️ <strong>Route on map</strong>, on a station card beside 🚗 Directions, for editors: the drive to the station drawn on '
         + 'the Stations map. It goes by road to where the station\'s mapped <em>access track</em> starts, then along the track to the '

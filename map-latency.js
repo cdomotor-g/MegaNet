@@ -93,6 +93,15 @@
 // animation off together. A typed-in or backfilled reading was not sent by
 // anybody just now, and is not played.
 //
+// A pulse runs along the lines the map draws, so with Show radio paths or
+// Backbone links/paths off in 🗺️ Layers it has nothing to run on. Animate
+// along hidden links (a box of its own under the animation's, off until
+// ticked) has refreshMapLayers hand over the links it would have drawn
+// (wantsHiddenLinks, hiddenLinks), and the pulses run along those unseen — a
+// dense network can keep its lines off the map and still watch each message
+// travel. They are the same links the switches would draw: the length limit,
+// the owner choice and the filters cut them the same way.
+//
 // ── Which way it came: heard, assumed, missed ────────────────────────────────
 // The log keeps the receiver, not the hops through the air. So by itself the
 // pulse runs the way the map draws — the station's pass-range links to its
@@ -137,8 +146,9 @@
 // no backbone path between them — is drawn straight, pin to pin.
 //
 // Exposes: attach, detach, reset, shown, opened, follow, pinStyle, legendHtml,
-//          liveLegendHtml, altText, noteText, on, anim, setOn, setAnim, power,
-//          setMode, setWin, setScope, pickBand, back, focus, refresh, yieldTo,
+//          liveLegendHtml, altText, noteText, on, anim, hidden, setOn, setAnim,
+//          setThroughHidden, power, wantsHiddenLinks, hiddenLinks, setMode,
+//          setWin, setScope, pickBand, back, focus, refresh, yieldTo,
 //          and the rules for test/latency.mjs (classifyValue, quantile, BANDS).
 const MapLatency = (() => {
   const SEC = 1000, MIN = 60000, HOUR = 3600000, DAY = 86400000;
@@ -349,6 +359,7 @@ const MapLatency = (() => {
   const U = {
     on: onAtLoad,
     anim: stored('mn-latency-anim', ['on', 'off'], onAtLoad ? 'on' : 'off') === 'on',
+    hidden: stored('mn-latency-hidden', ['on', 'off'], 'off') === 'on',   // run along hidden links too
     mode: stored('mn-latency-mode', MODE_KEYS, 'age'),
     win: stored('mn-latency-win', WINDOWS.map(w => w[0]), '1d'),
     scope: 'view',           // 'view' | 'all'
@@ -404,6 +415,9 @@ const MapLatency = (() => {
   let pulses = [];
   let pcanvas = null, pctx = null, praf = null, porigin = null, glowTimer = null;
   let graph = null, graphFor = null;
+  // The links the map would draw but is hiding, from refreshMapLayers, while
+  // the pulses are to run along them (hiddenLinks).
+  let unseen = { field: [], backbone: [] };
   let pinIdx = null, pinIdxFor = null, pinIdxN = 0;
   let visHooked = false;
 
@@ -639,11 +653,36 @@ const MapLatency = (() => {
     U.anim = !!on;
     keep('mn-latency-anim', U.anim ? 'on' : 'off');
     liveSync();
+    if (U.hidden) refreshForHidden();
     if (!opts.quiet) {
       announce(U.anim ? 'Messages flash on the map as they land in the log.' : 'Messages are no longer animated on the map.');
     }
     if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
     paint();
+  }
+
+  // Animate along hidden links: the map is rebuilt so it hands over the links
+  // it is hiding (or stops), when there are any.
+  function setThroughHidden(on) {
+    U.hidden = !!on;
+    keep('mn-latency-hidden', U.hidden ? 'on' : 'off');
+    refreshForHidden();
+    announce(U.hidden ? 'Messages run along the links even where the map hides them.'
+                      : 'Messages run only along the links the map draws.');
+    paint();
+  }
+  function refreshForHidden() {
+    if ((!state.mapShowLinks || !state.mapShowBackbone) && state.map && typeof refreshMapLayers === 'function') {
+      refreshMapLayers({ skipFit: true });
+    }
+  }
+  // For refreshMapLayers: whether to hand over the links it is not drawing,
+  // and the handing over — a pass-range link { s, r } per field station and
+  // repeater, a backbone path { a, b, kind } per pair.
+  const wantsHiddenLinks = () => !!(U.anim && U.hidden);
+  function hiddenLinks(field, backbone) {
+    unseen = { field: field || [], backbone: backbone || [] };
+    graph = null;
   }
 
   // ⏻ at the head of the pane: everything off at once — the pins' colours and
@@ -956,6 +995,12 @@ const MapLatency = (() => {
                title="Flash each station green on the map as a message from it lands in the log, with a pulse along its links">
           <input type="checkbox" data-lat-f="anim" ${U.anim ? 'checked' : ''} onchange="MapLatency.setAnim(this.checked)">
           Animate messages on the map
+        </label>
+        <label class="filter-check filter-sub${U.anim ? '' : ' is-off'}"
+               title="Run the pulses along the radio links even when Show radio paths or Backbone links/paths is off in 🗺️ Layers — the lines stay off the map, and each message lights its way as it travels">
+          <input type="checkbox" data-lat-f="hidden" ${U.hidden ? 'checked' : ''} ${U.anim ? '' : 'disabled'}
+                 onchange="MapLatency.setThroughHidden(this.checked)">
+          Animate along hidden links
         </label>
         <p class="small txt-muted lat-live-what">As a message lands in the log its station flashes green, and a pulse
           runs along its links — to the repeater that carries it, then on to a base station. Each keeps a glow for a
@@ -1863,7 +1908,9 @@ const MapLatency = (() => {
   // pass-range link to each repeater, drawn station end first; a backbone path
   // to a base, drawn repeater end first; and a repeater-to-repeater path, either
   // way. Built off the lines refreshMapLayers drew, once per rebuild — a link
-  // the map is not drawing is not one a pulse can be seen on.
+  // the map is not drawing is not one a pulse can be seen on — and, with
+  // Animate along hidden links ticked, off the links it handed over instead
+  // (hiddenLinks): no line, so keyed by their ends.
   function graphNow() {
     const lines = state.mapLines || [];
     if (graph && graphFor === lines && graph.n === lines.length) return graph;
@@ -1881,6 +1928,16 @@ const MapLatency = (() => {
         if (l.mnArrowDir === 'both') add(bb, b, { line: l, fromId: b, toId: a, from: ll[1], to: ll[0] });
         else base.add(b);
       }
+    }
+    const at = s => L.latLng(s.lat, s.lon);
+    for (const { s, r } of unseen.field) {
+      add(field, s.id, { line: null, key: 'h:' + s.id + '>' + r.id, fromId: s.id, toId: r.id, from: at(s), to: at(r) });
+    }
+    for (const { a, b, kind } of unseen.backbone) {
+      const key = 'h:' + a.id + '>' + b.id;
+      add(bb, a.id, { line: null, key, fromId: a.id, toId: b.id, from: at(a), to: at(b) });
+      if (kind === 'base') base.add(b.id);
+      else add(bb, b.id, { line: null, key, fromId: b.id, toId: a.id, from: at(b), to: at(a) });
     }
     graph = { field, bb, base, n: lines.length };
     graphFor = lines;
@@ -1941,7 +1998,7 @@ const MapLatency = (() => {
   function edgeOf(g, a, b) {
     for (const e of (g.field.get(a) || []).concat(g.bb.get(a) || [])) if (e.toId === b) return e;
     for (const e of (g.field.get(b) || []).concat(g.bb.get(b) || [])) {
-      if (e.toId === a) return { line: e.line, fromId: a, toId: b, from: e.to, to: e.from };
+      if (e.toId === a) return Object.assign({}, e, { fromId: a, toId: b, from: e.to, to: e.from });
     }
     return null;
   }
@@ -1973,7 +2030,7 @@ const MapLatency = (() => {
         if (HOPS[kind].rank > HOPS[had.kind].rank) had.kind = kind;
         return had.start + had.dur;
       }
-      if (legs.length >= LEGS_MAX || (e && !(e.line.options.opacity > 0.06))) return null;
+      if (legs.length >= LEGS_MAX || (e && e.line && !(e.line.options.opacity > 0.06))) return null;
       const from = e ? e.from : pinAt(a), to = e ? e.to : pinAt(b);
       if (!from || !to) return null;
       const px = map.latLngToLayerPoint(from).distanceTo(map.latLngToLayerPoint(to));
@@ -2487,8 +2544,10 @@ const MapLatency = (() => {
     legendHtml, liveLegendHtml, altText, noteText,
     on: () => U.on,
     anim: () => U.anim,
+    hidden: () => U.hidden,
     mode: () => U.mode,
-    setOn, setAnim, power, setMode, setWin, setScope, pickBand, back, focus, refresh, openHealth, yieldTo,
+    wantsHiddenLinks, hiddenLinks,
+    setOn, setAnim, setThroughHidden, power, setMode, setWin, setScope, pickBand, back, focus, refresh, openHealth, yieldTo,
     // The rules, for test/latency.mjs.
     classifyValue, quantile, BANDS, SPECIAL, fmtDelay,
     classOf: id => { const s = stationById(id); return s ? classOf(s) : null; },

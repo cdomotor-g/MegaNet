@@ -533,9 +533,10 @@ try {
   const whole = await panel();
   // Five since the base maps moved in from a panel of their own, at the top,
   // and six since the station pins' shapes, grey and outlines took a section
-  // of their own under them (map-symbols.js).
-  check('the panel is six groups when nothing is typed, base maps first',
-    whole.heads.join('|') === 'Base maps|Station pins|Stations & links|Link colour|Overlay layers|Labels & export',
+  // of their own under them (map-symbols.js), and five again since Link
+  // colour became a card under Stations & links.
+  check('the panel is five groups when nothing is typed, base maps first',
+    whole.heads.join('|') === 'Base maps|Station pins|Stations & links|Overlay layers|Labels & export',
     whole.heads.join(' | '));
 
   await page.fill('#map-display-find', 'contour');

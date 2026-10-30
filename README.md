@@ -1839,7 +1839,12 @@ plays the log on the map: every 15 s it asks `reading` for what has landed since
 the last ask (`received_at=gt.`, oldest first, a page of 1,000 at most), and a
 beat later each message's station flares green and a pulse runs along its links,
 the loading screen's logo pulsing through the network itself, drawn on a canvas of
-its own over the pins; a typed-in or backfilled reading is not played. The pulse
+its own over the pins; a typed-in or backfilled reading is not played. With
+*Show radio paths* or *Backbone links/paths* off in 🗺️ Layers the pulse has no
+line to run along, unless **Animate along hidden links** (under the animation's
+own box) is ticked: then `refreshMapLayers` hands it the links it would have
+drawn, cut by the same length limit and filters, and the pulse runs along them
+unseen. The pulse
 says what is known of each hop. **Blue, dashed — assumed**: the way the map draws
 the network (its pass-range links to its repeaters, then the fewest backbone hops
 to a base), the likeliest way in but not a record of it, since the log keeps the

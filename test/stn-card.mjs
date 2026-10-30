@@ -1135,9 +1135,10 @@ async function main() {
     // became one of three radio buttons and the frequency colouring the default
     // — five since the base maps stopped being a panel of their own and became
     // the first section of this one, and six since the station pins' shapes,
-    // grey and outlines took a section under them (map-symbols.js).
-    check('the 🗺️ flyout is grouped under six headings, base maps first',
-      legend.heads.join('|') === 'Base maps|Station pins|Stations & links|Link colour|Overlay layers|Labels & export',
+    // grey and outlines took a section under them (map-symbols.js) — and five
+    // again since Link colour became a card under Stations & links.
+    check('the 🗺️ flyout is grouped under five headings, base maps first',
+      legend.heads.join('|') === 'Base maps|Station pins|Stations & links|Overlay layers|Labels & export',
       legend.heads.join(' | '));
     await fresh.context.close();
 
