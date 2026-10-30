@@ -23,8 +23,8 @@
 // free (`npm run toplevel`). Nothing runs at load: initMap() attaches it,
 // refreshMapLayers() calls reset() once per rebuild and pinStyle() per pin,
 // renderDock() calls shown() when its pane comes into view, the strip's ⏱️
-// calls opened() when it is pressed open, and the station card calls follow()
-// with the station it is on.
+// calls opened() when it is pressed open, 🗺️ Layers' pointer calls showBars(),
+// and the station card calls follow() with the station it is on.
 //
 // ── What "latency" means here ────────────────────────────────────────────────
 // Three measures, because "how late is this station's data" is three
@@ -168,7 +168,7 @@
 // map — a station heard direct by a base station, a repeater heard by one with
 // no backbone path between them — is drawn straight, pin to pin.
 //
-// Exposes: attach, detach, reset, shown, opened, follow, pinStyle, barsFor,
+// Exposes: attach, detach, reset, shown, opened, showBars, follow, pinStyle, barsFor,
 //          legendHtml, liveLegendHtml, barsLegendHtml, altText, barsAltText,
 //          noteText, on, anim, hidden, bars, setOn, setAnim, setThroughHidden,
 //          setBars, power, wantsHiddenLinks, hiddenLinks, setMode, setWin,
@@ -947,7 +947,7 @@ const MapLatency = (() => {
   function scopeList() {
     const b = U.scope === 'view' && map ? map.getBounds() : null;
     return stations().filter(s => s.lat != null && s.lon != null && !s.proposed
-      && (!MapSymbols.ownerDrawn || MapSymbols.ownerDrawn(s))
+      && (!MapSymbols.drawn || MapSymbols.drawn(s))
       && (!b || b.contains([s.lat, s.lon])));
   }
 
@@ -1754,6 +1754,32 @@ const MapLatency = (() => {
     if (U.autoOn) return;
     U.autoOn = true;
     if (!U.on) setOn(true, { auto: true });
+  }
+
+  // From the pointer in 🗺️ Layers (app.js): this pane brought up — the side
+  // panel's pane on a wide screen, the flyout in the map's corner otherwise, as
+  // 📇 Capabilities opens one — and focus put on Signal bars beside the pins,
+  // ticked or not: the choice stays theirs. Not opened(): a jump to one switch
+  // is not asking for the pins coloured.
+  function showBars() {
+    const wrap = document.querySelector('.mn-mapctl[data-panel="latency"]');
+    if (!wrap || wrap.classList.contains('is-docked')) {
+      if (typeof setDockTab === 'function') setDockTab('map-latency');
+    } else if (!wrap.classList.contains('is-open')) {
+      const btn = wrap.querySelector('.mn-mapctl-btn');
+      if (btn) btn.click();
+    }
+    let tries = 0;
+    const step = () => {
+      const box = document.querySelector('#map-latency-panel input[data-lat-f="bars"]');
+      if (box && box.getClientRects().length) {
+        box.closest('label').scrollIntoView({ block: 'nearest' });
+        box.focus();
+        return;
+      }
+      if (++tries < 20) setTimeout(step, 50);
+    };
+    setTimeout(step, 0);
   }
 
   // ── Messages landing: the log ─────────────────────────────────────────────
@@ -2806,7 +2832,7 @@ const MapLatency = (() => {
   }
 
   return {
-    attach, detach, reset, shown, opened, follow, pinStyle, barsFor,
+    attach, detach, reset, shown, opened, showBars, follow, pinStyle, barsFor,
     legendHtml, liveLegendHtml, barsLegendHtml, altText, barsAltText, noteText,
     on: () => U.on,
     anim: () => U.anim,

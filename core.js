@@ -4282,6 +4282,10 @@ const state = {
   // over a choice made today reads as data that has gone.
   mapOwner:       '',
   mapOwnerMode:   'only',
+  // Which kinds of station the map draws (map-symbols.js): the roles —
+  // 'field', 'repeater', 'base' — whose box is unticked. Empty draws every
+  // pin. Session-only, for mapOwner's reason.
+  mapRolesOff:    new Set(),
   // Where green stops being green and yellow stops being yellow, in dB of fade
   // margin. Higher than the link budget card's own bands (10 / 3) on purpose:
   // the card asks "would this link work", the map asks "which of these would I

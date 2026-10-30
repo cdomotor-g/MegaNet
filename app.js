@@ -5149,7 +5149,22 @@ function mapDisplayControlsHtml() {
          station, a solid pink outline for the Bureau's forecast locations and
          a dashed one for its information locations. -->
     ${MapSymbols.sectionHtml()}
+    <!-- Signal bars beside the pins is ⏱️ Latency & signal's switch, not one of
+         these — it needs the readings that pane fetches — but it is a thing
+         drawn beside a pin, and this panel is where people look for one. So a
+         pointer rather than a second switch: it takes them to the one there
+         and puts focus on it (MapLatency.showBars). -->
+    <div class="mapd-goto"
+         title="Signal bars beside the pins: each station's SNR — how strongly the base stations hear it, its signal over the receiver's noise — as a small phone-style signal strength icon at the right of its pin, four bars strong down to one marginal. The switch is in ⏱️ Latency &amp; signal, in the side panel.">
+      <button type="button" class="link-btn" onclick="MapLatency.showBars()">Signal bars beside the pins →</button>
+      <p class="filter-note">Each station's signal strength (SNR) beside its pin. The switch is in ⏱️ Latency &amp; signal: this takes you to it.</p>
+    </div>
     <div class="map-display-h">Stations &amp; links</div>
+    <!-- Field stations, repeaters, base stations: which kinds of pin the map
+         draws, all ticked to begin with (map-symbols.js). First under this
+         heading because it is the broadest of the choices about which pins are
+         drawn; the owner, the same question asked another way, is below. -->
+    ${MapSymbols.rolesHtml()}
     <label class="filter-check"
            title="Takes the non-matching pins off the map, and the link lines that run to them with them. Tick &quot;Include related repeaters&quot; to keep the carriers and their lines.">
       <input type="checkbox" ${state.mapHideOthers ? 'checked' : ''}
@@ -5208,7 +5223,9 @@ function mapDisplayControlsHtml() {
              onchange="setMapBackbone(this.checked)">
       Backbone links/paths (repeater &amp; base)
     </label>
-    <label class="filter-check"
+    <!-- Arrows joins the links' card: it is one more thing about the lines the
+         switches above it draw. -->
+    <label class="filter-check mapd-join"
            title="Arrowheads along every drawn link, showing which way the traffic runs — a field station reports in to its repeater, a repeater hands off to a base. A repeater-to-repeater path runs both ways and is drawn with a head at each end.">
       <input type="checkbox" ${state.mapArrows ? 'checked' : ''}
              onchange="MapArrows.setEnabled(this.checked)">
@@ -5620,7 +5637,7 @@ function markMapDisplayCards(root = document.getElementById('map-display-block')
     const starts = !prev
       || (base ? !prev.classList.contains('mn-base-row')
                : !el.classList.contains('mapd-join')
-                 && el.matches('.filter-check:not(.filter-sub), [role="radiogroup"], .mapd-owner, .mapd-calm'));
+                 && el.matches('.filter-check:not(.filter-sub), [role="radiogroup"], .mapd-owner, .mapd-roles, .mapd-goto, .mapd-calm'));
     if (starts) n++;
     card.set(el, n);
     prev = el;
@@ -5871,7 +5888,7 @@ function mapLegendHtml() {
     ${latency ? MapLatency.legendHtml() : health ? HealthGlance.legendHtml() : Object.entries(ROLE_LABEL).map(([k, v]) => `
       <span class="legend-item">
         <span class="legend-dot" style="--dot:${roleVar(k)}"></span>
-        <span class="small">${v}</span>
+        <span class="small">${v}${state.mapRolesOff.has(k) ? ' — not drawn (Layers › Show these stations)' : ''}</span>
       </span>`).join('')}
     ${MapSymbols.legendHtml({ health })}
     ${MapLatency.barsLegendHtml()}
@@ -6477,13 +6494,14 @@ function mapFilterActive() {
   return anyStationFilterActive();
 }
 
-// The owner choice in Map display (MapSymbols.ownerNoteShort) is said here
-// too, after whatever the filters are doing: it is the other thing that takes
-// pins off the map, and this line is where the station count is read.
+// The owner choice and the Show these stations boxes in Map display
+// (MapSymbols.drawnNoteShort) are said here too, after whatever the filters
+// are doing: they are the other things that take pins off the map, and this
+// line is where the station count is read.
 function mapMatchNoteHtml() {
   if (!state.data) return '';
   const total = state.data.stations.length;
-  const owner = MapSymbols.ownerNoteShort();
+  const owner = MapSymbols.drawnNoteShort();
   if (!mapFilterActive()) return `Showing all <strong>${total}</strong> stations${owner}.`;
   const matched = filteredStations();
   if (!matched.length) return `No stations match — all pins shown unhighlighted${owner}.`;
@@ -6572,12 +6590,13 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   // colours or the link distance have moved (map-mini.js).
   MapMini.refresh();
 
-  // The owner choice in Map display (MapSymbols.ownerDrawn) comes first and
-  // takes a station off the map entirely — its pin, its links, its place in
-  // the fit — as if it had no position: it is the map being told which
-  // network to draw, before any filter asks which of it matches.
+  // The owner choice and the Show these stations boxes in Map display
+  // (MapSymbols.drawn) come first and take a station off the map entirely —
+  // its pin, its links, its place in the fit — as if it had no position: it
+  // is the map being told which network to draw, before any filter asks which
+  // of it matches.
   const located  = state.data.stations.filter(s => s.lat != null && s.lon != null
-                                                 && MapSymbols.ownerDrawn(s));
+                                                 && MapSymbols.drawn(s));
   const active   = mapFilterActive();
   const matchIds = active ? new Set(filteredStations().map(s => s.id)) : null;
   const matched  = active ? located.filter(s => matchIds.has(s.id)) : [];
@@ -6607,9 +6626,14 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   // Links follow the highlight: with a filter running, only the matched and
   // related stations draw theirs, so the lines don't bury the pins they're meant
   // to explain — and in hide mode a link needs BOTH ends on the map to be drawn
-  // at all.
+  // at all. A link to a repeater or a base whose box is unticked under Show
+  // these stations goes with its pin, field links and backbone alike, and the
+  // field links all go with Field stations (MapSymbols.linkDrawn): the boxes
+  // are asked for to see one kind of station on its own, and a line running
+  // off to a pin that is not there is the clutter they take away.
+  const kindsDrawn = MapSymbols.linkDrawn;
   const allLinks = state.mapShowLinks
-    ? passRangeLinks(active ? matched.concat(related) : located) : [];
+    ? passRangeLinks(active ? matched.concat(related) : located).filter(kindsDrawn) : [];
   const maxKm = state.mapKillSpaghetti ? state.mapMaxLinkKm : Infinity;
   const inRange = allLinks.filter(l => l.km <= maxKm);
   const links = shownIds
@@ -6619,7 +6643,7 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   // is no culled remainder to count. Hide mode cuts them the same way as the
   // field links: a repeater-to-repeater path with one repeater hidden is a line
   // to nowhere, which is the whole complaint.
-  const allBackbone = state.mapShowBackbone ? backboneLinks(state.mapMaxLinkKm) : [];
+  const allBackbone = state.mapShowBackbone ? backboneLinks(state.mapMaxLinkKm).filter(kindsDrawn) : [];
   const backbone = shownIds
     ? allBackbone.filter(p => shownIds.has(p.a.id) && shownIds.has(p.b.id)) : allBackbone;
   // ⏱️ Latency's pulses run along the lines drawn here. With Animate along
@@ -6629,10 +6653,10 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   const unseen = MapLatency.wantsHiddenLinks();
   const hiddenField = unseen && !state.mapShowLinks
     ? passRangeLinks(active ? matched.concat(related) : located)
-        .filter(l => l.km <= maxKm && (!shownIds || (shownIds.has(l.s.id) && shownIds.has(l.r.id))))
+        .filter(l => l.km <= maxKm && kindsDrawn(l) && (!shownIds || (shownIds.has(l.s.id) && shownIds.has(l.r.id))))
     : [];
   const hiddenBackbone = unseen && !state.mapShowBackbone
-    ? backboneLinks(state.mapMaxLinkKm).filter(p => !shownIds || (shownIds.has(p.a.id) && shownIds.has(p.b.id)))
+    ? backboneLinks(state.mapMaxLinkKm).filter(p => kindsDrawn(p) && (!shownIds || (shownIds.has(p.a.id) && shownIds.has(p.b.id))))
     : [];
   MapLatency.hiddenLinks(hiddenField, hiddenBackbone);
   state.mapLinkCount = { drawn: links.length, culled: allLinks.length - inRange.length,
@@ -6943,8 +6967,9 @@ function updateMapAltName(pins, links, backbone, matched, related) {
   // …and the signal bars beside them, under any colouring.
   const signal = MapLatency.barsAltText();
   if (signal) bits.push(signal);
-  // And whose stations they are, when Map display is drawing only some.
-  if (MapSymbols.ownerHiding()) bits.push(MapSymbols.ownerPhrase());
+  // And whose stations they are, and which kinds, when Map display is drawing
+  // only some.
+  if (MapSymbols.hiding()) bits.push(MapSymbols.drawingPhrase());
   el.setAttribute('aria-label', 'Station map — ' + bits.join(', ')
     + '. The same stations are listed in the table below.');
 }

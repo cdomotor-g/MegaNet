@@ -1393,6 +1393,13 @@ owner's stations alone, or everyone's but theirs. It takes the others off the
 map — pins, links and all — and leaves the station list and the filters as they
 were; the line under the filters says how many it is not drawing. It lasts the
 session, as *Hide stations that don't match* does.
+**Which kinds are drawn** is *Show these stations*, at the head of *Stations &
+links*: a box each for field stations, repeaters and base stations, all ticked
+to begin with. A station counts as the kind its pin's colour shows, so a field
+station that also repeats is a repeater there. Unticking a kind takes its pins
+off the map and the links that run to them — every pass-range link goes with
+*Field stations* — on the owner choice's terms: the map's only, said on the
+line under the filters, and gone after a reload.
 The filter box **highlights instead of hiding**: all pins stay on the map,
 matches get an amber ring, their names appear underneath, and the map zooms to
 the extent of the matches so every one of them is on screen. Typing narrows the

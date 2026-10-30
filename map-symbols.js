@@ -6,7 +6,8 @@
 //                rest. Grey is a gauge read by hand, black a TM station (a data
 //                logger and modem, not an ALERT radio). A solid pink outline is
 //                the Bureau's forecast location and a dashed one its information
-//                location. And whose stations the map draws at all.
+//                location. And whose stations, and which kinds, the map
+//                draws at all.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js (state, esc, escAttr, announce, FILTER_NONE,
@@ -117,10 +118,17 @@
 // network, over a choice made today, reads as data that has gone. The note
 // under the Filters' match line says how many it is not drawing.
 //
+// Beside it, which kinds: a box each for field stations, repeaters and base
+// stations, all ticked to begin with, so the field pins can come off and leave
+// the repeater network on its own — or the other way round. On the same terms
+// as the owner: the map's only, session-only, said on the match line. drawn()
+// is the two together, and the one question the map asks of a station.
+//
 // Exposes: kind, pin, radius, marker, reset, ownersReady, askSls, slsFailed,
-//          ownerDrawn, ownerHiding, ownerNoteShort, ownerPhrase, ownerParties,
-//          sectionHtml, ownerHtml, noteHtml, legendHtml, legendOff, setShapes,
-//          setManual, setTm, setOutlines, setOwner, setOwnerMode, the colours
+//          drawn, roleDrawn, linkDrawn, hiding, drawingPhrase, drawnNoteShort, ownerDrawn,
+//          ownerHiding, ownerPhrase, ownerParties, sectionHtml, ownerHtml,
+//          rolesHtml, noteHtml, legendHtml, legendOff, setShapes, setManual,
+//          setTm, setOutlines, setOwner, setOwnerMode, setRole, the colours
 //          FORECAST, INFORMATION, MANUAL and TM, the information outline's
 //          INFORMATION_DASH and the triangle's TRI_SCALE.
 const MapSymbols = (function () {
@@ -468,22 +476,126 @@ const MapSymbols = (function () {
     return state.mapOwnerMode === 'except' ? `every owner's stations but ${v}'s` : `only ${v}'s stations`;
   }
 
-  function hiddenCount() {
-    if (!state.mapOwner || !state.data) return 0;
+  // Stations with a position the map leaves off: by the owner choice and the
+  // kinds together, unless asked about one of them.
+  function hiddenCount(isDrawn = drawn) {
+    if (!hiding() || !state.data) return 0;
     let n = 0;
     for (const s of state.data.stations) {
-      if (s.lat != null && s.lon != null && !ownerDrawn(s)) n++;
+      if (s.lat != null && s.lon != null && !isDrawn(s)) n++;
     }
     return n;
+  }
+
+  // ── Which kinds of station the map draws ───────────────────────────────────
+  // A station is the kind its pin's colour says (primaryRole), as the AR
+  // finder counts them: a field station that also repeats is a repeater here,
+  // a repeater that is also a base a base — so a pin is never left on the map
+  // in the colour of a box that is unticked. A station with no role on record,
+  // or a satcom one, is a field station, as its green pin says.
+  const ROLES = ['field', 'repeater', 'base'];
+  const ROLE_NAME = { field: 'Field stations', repeater: 'Repeaters', base: 'Base stations' };
+  const ROLE_MEANING = {
+    field:    'A station at a site that measures — a river height or a rain gauge — and sends its readings out by radio. Green pins (grey if read by hand, black if a TM station); nearly the whole network.',
+    repeater: 'A radio station on high ground that hears field stations and passes their messages on, towards a base station they could not reach on their own. Blue pins, drawn bigger. A field station that also repeats counts as a repeater here.',
+    base:     'Where the radio messages end up: a receiving station that hears the repeaters, and any field station near enough, and hands the readings on to the people who use them. Orange pins.',
+  };
+
+  function roleOf(s) {
+    return typeof primaryRole === 'function' && Array.isArray(s.roles) ? primaryRole(s) : 'field';
+  }
+
+  function roleDrawn(s) {
+    const off = state.mapRolesOff;
+    return !off || !off.size || !off.has(roleOf(s));
+  }
+
+  function rolesHiding() {
+    return !!(state.mapRolesOff && state.mapRolesOff.size);
+  }
+
+  // "only repeaters and base stations" / "no stations at all".
+  function rolesPhrase() {
+    const on = ROLES.filter(r => !state.mapRolesOff.has(r)).map(r => ROLE_NAME[r].toLowerCase());
+    return on.length ? `only ${on.join(' and ')}` : 'no stations at all';
+  }
+
+  // What the map asks of a link before it draws one: both ends on the map. A
+  // pass-range link ({ s, r }) is a field station reporting in, so it goes
+  // with Field stations unticked even from a station that is also a repeater —
+  // its pin stays, as the repeater it is drawn as, without its own reports'
+  // lines. A backbone path ({ a, b }) needs only its two ends.
+  function linkDrawn(l) {
+    if (!rolesHiding()) return true;
+    if (l.s) return !state.mapRolesOff.has('field') && roleDrawn(l.s) && roleDrawn(l.r);
+    return roleDrawn(l.a) && roleDrawn(l.b);
+  }
+
+  // What the map asks of every station before it draws one.
+  function drawn(s) {
+    return ownerDrawn(s) && roleDrawn(s);
+  }
+
+  function hiding() {
+    return ownerHiding() || rolesHiding();
+  }
+
+  // The owner and the kinds in one phrase, for the match line and the map's
+  // accessible name: "only Seqwater's stations, and of those only repeaters".
+  function drawingPhrase() {
+    if (!rolesHiding()) return ownerPhrase();
+    if (!ownerHiding()) return rolesPhrase();
+    return ROLES.every(r => state.mapRolesOff.has(r))
+      ? rolesPhrase() : `${ownerPhrase()}, and of those ${rolesPhrase()}`;
   }
 
   // The Filters' match line's half: said wherever the station count is said,
   // because a map missing pins with nothing on screen saying why reads as a
   // file that failed to load.
-  function ownerNoteShort() {
-    if (!state.mapOwner) return '';
+  function drawnNoteShort() {
+    if (!hiding()) return '';
     const n = hiddenCount();
-    return ` · the map is drawing ${esc(ownerPhrase())} — <strong>${n.toLocaleString()}</strong> not drawn (Layers)`;
+    return ` · the map is drawing ${esc(drawingPhrase())} — <strong>${n.toLocaleString()}</strong> not drawn (Layers)`;
+  }
+
+  function roleCounts() {
+    const out = { field: 0, repeater: 0, base: 0 };
+    if (!state.data) return out;
+    for (const s of state.data.stations) {
+      if (s.lat == null || s.lon == null) continue;
+      const r = roleOf(s);
+      if (r in out) out[r]++;
+    }
+    return out;
+  }
+
+  function rolesNoteHtml() {
+    if (!rolesHiding()) {
+      return 'Field stations measure, repeaters pass their messages on, base stations receive them. '
+        + 'A station that is two of these counts as the one its pin’s colour shows.';
+    }
+    const n = hiddenCount(roleDrawn);
+    return `Drawing ${esc(rolesPhrase())}: <strong>${n.toLocaleString()}</strong> station${
+      n === 1 ? '' : 's'} not drawn, and the links that run to them${state.mapRolesOff.has('field')
+      ? ' — with every field station’s link to its repeater' : ''}. The list and the filters are as they were.`;
+  }
+
+  // A card of its own at the head of Stations & links: three boxes under a
+  // title, as Link colour's radios are. The counts are pins — stations with a
+  // position — so they add up to what the map can draw.
+  function rolesHtml() {
+    const c = roleCounts();
+    return `
+    <div role="group" class="mapd-roles" id="map-roles-block" aria-labelledby="map-roles-h">
+      <div class="mapd-card-title" id="map-roles-h">Show these stations</div>
+      ${ROLES.map(r => `
+      <label class="filter-check" title="${escAttr(ROLE_MEANING[r])}">
+        <input type="checkbox" data-map-role="${r}" ${state.mapRolesOff.has(r) ? '' : 'checked'}
+               onchange="MapSymbols.setRole('${r}', this.checked)">
+        ${ROLE_NAME[r]} <span class="txt-muted">(${c[r].toLocaleString()})</span>
+      </label>`).join('')}
+    </div>
+    <p class="filter-note" id="map-roles-note">${rolesNoteHtml()}</p>`;
   }
 
   function ownerOptions() {
@@ -538,7 +650,7 @@ const MapSymbols = (function () {
         ? 'The Service Level Specification did not load, so only the owners recorded on stations are listed.'
         : 'Every owner’s stations are drawn.';
     }
-    const n = hiddenCount();
+    const n = hiddenCount(ownerDrawn);
     return `Drawing ${esc(ownerPhrase())}: <strong>${n.toLocaleString()}</strong> station${
       n === 1 ? '' : 's'} not drawn. The list and the filters are as they were.`;
   }
@@ -627,6 +739,8 @@ const MapSymbols = (function () {
     if (el) el.innerHTML = noteHtml();
     const own = document.getElementById('map-owner-note');
     if (own) own.innerHTML = ownerNoteHtml();
+    const roles = document.getElementById('map-roles-note');
+    if (roles) roles.innerHTML = rolesNoteHtml();
   }
 
   // ── The legend ─────────────────────────────────────────────────────────────
@@ -752,8 +866,24 @@ const MapSymbols = (function () {
     if (typeof updateMapMatchNote === 'function') updateMapMatchNote();
     if (state.map && typeof refreshMapLayers === 'function') refreshMapLayers({ skipFit: true });
     announce(state.mapOwner
-      ? `The map is drawing ${ownerPhrase()}: ${hiddenCount().toLocaleString()} stations not drawn.`
+      ? `The map is drawing ${ownerPhrase()}: ${hiddenCount(ownerDrawn).toLocaleString()} stations not drawn.`
       : 'The map is drawing every owner’s stations.');
+  }
+
+  // A box ticked or unticked: the pins and their links, the note under the
+  // boxes, the match line and the legend. The boxes themselves are left
+  // standing — one of them is under the pointer that just clicked it.
+  function setRole(role, on) {
+    if (!ROLES.includes(role)) return;
+    if (on) state.mapRolesOff.delete(role);
+    else state.mapRolesOff.add(role);
+    paintNotes();
+    if (typeof updateMapMatchNote === 'function') updateMapMatchNote();
+    if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
+    if (state.map && typeof refreshMapLayers === 'function') refreshMapLayers({ skipFit: true });
+    announce(rolesHiding()
+      ? `The map is drawing ${rolesPhrase()}: ${hiddenCount(roleDrawn).toLocaleString()} stations not drawn.`
+      : 'The map is drawing every kind of station.');
   }
 
   function setOwner(v) {
@@ -775,9 +905,10 @@ const MapSymbols = (function () {
   return {
     FORECAST, INFORMATION, INFORMATION_DASH, MANUAL, TM, TRI_SCALE,
     kind, pin, radius, marker, reset,
-    ownersReady, askSls, ownerDrawn, ownerHiding, ownerNoteShort, ownerPhrase, ownerParties,
-    sectionHtml, ownerHtml, legendHtml, legendOff, noteHtml,
-    setShapes, setManual, setTm, setOutlines, setOwner, setOwnerMode,
+    ownersReady, askSls, drawn, roleDrawn, linkDrawn, hiding, drawingPhrase, drawnNoteShort,
+    ownerDrawn, ownerHiding, ownerPhrase, ownerParties,
+    sectionHtml, ownerHtml, rolesHtml, legendHtml, legendOff, noteHtml,
+    setShapes, setManual, setTm, setOutlines, setOwner, setOwnerMode, setRole,
     slsFailed: () => slsFailed,
   };
 })();

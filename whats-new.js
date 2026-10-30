@@ -25,6 +25,17 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 155, date: '2026-10-30', items: [
+      '🗺️ <strong>Show only some kinds of station.</strong> In 🗺️ Layers on the Stations map, <em>Stations &amp; links</em> now starts '
+        + 'with <strong>Show these stations</strong>: a tick box each for <em>Field stations</em>, <em>Repeaters</em> and '
+        + '<em>Base stations</em>, all ticked to begin with. Untick <em>Field stations</em> to see the repeaters and base stations '
+        + 'on their own with the backbone between them, or untick the other two to see only field stations. A station that is two '
+        + 'kinds counts as the one its pin\'s colour shows. The list and the filters are unchanged, and every station is back the '
+        + 'next time the page opens.',
+      'In the same panel, <strong>Arrows along the links</strong> is now in the links\' card with <em>Show radio paths</em> and '
+        + '<em>Backbone links/paths</em>, and <strong>Signal bars beside the pins →</strong> under <em>Station pins</em> takes you '
+        + 'to that switch in ⏱️ Latency &amp; signal.',
+    ] },
     { n: 154, date: '2026-10-30', items: [
       '✏️ <strong>A card for the stations you select.</strong> Draw a circle or a rectangle in <strong>Draw &amp; measure</strong> on the '
         + 'Stations map and press <em>Select inside</em>: a <strong>Selected stations</strong> card now opens under Draw &amp; measure and '

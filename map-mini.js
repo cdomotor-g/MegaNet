@@ -316,14 +316,15 @@ const MapMini = (function () {
 
   // The stations as dots in their pins' colours — the role's, or the grey
   // and black Layers gives stations read by hand and TM stations — on the
-  // main map's owner choice, so the minimap draws the same network the map
-  // does. Repeaters and bases over the field stations, a size up and ringed.
+  // main map's owner choice and its Show these stations boxes, so the minimap
+  // draws the same network the map does. Repeaters and bases over the field stations, a size up and ringed.
   // Rebuilt only when something it is drawn from has moved: the main map
   // refreshes on every filter keystroke, and ~5,000 dots are not redrawn for
   // a filter the minimap does not show.
   function drawStations(force) {
     const list = state.data && state.data.stations;
     const key = [cfg.stations, state.mapOwner || '', state.mapOwnerMode || '',
+                 state.mapRolesOff ? [...state.mapRolesOff].sort().join(',') : '',
                  !!state.mapPinManual, !!state.mapPinTm, list ? list.length : 0].join('|');
     if (!force && key === dotsKey && list === dotsFor) return;
     dotsKey = key;
@@ -332,7 +333,7 @@ const MapMini = (function () {
     if (!list || cfg.stations === 'none') return;
     const fields = [], hubs = [];
     for (const s of list) {
-      if (s.lat == null || s.lon == null || !MapSymbols.ownerDrawn(s)) continue;
+      if (s.lat == null || s.lon == null || !MapSymbols.drawn(s)) continue;
       const role = primaryRole(s);
       if (role !== 'field') hubs.push([s, role]);
       else if (cfg.stations === 'all') fields.push([s, role]);

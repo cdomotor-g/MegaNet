@@ -31,6 +31,12 @@
 //     but theirs, says how many it is not drawing, leaves the list alone, and
 //     is gone after a reload — it takes stations off the map, and a map that
 //     opens missing most of the network reads as data that has gone.
+//   * Show these stations draws only the kinds of station ticked — a station
+//     the kind its pin's colour says, so a field station that also repeats is
+//     a repeater — takes the links to an unticked kind with them, says how
+//     many it is not drawing, and is gone after a reload, as the owner is.
+//     Arrows along the links shares the links' card, and the pointer to
+//     Signal bars beside the pins lands on ⏱️ Latency & signal's switch.
 //   * The four switches are remembered, take their rows out of the legend and
 //     name themselves on its "Also available" line.
 //   * The SLS file is not waited for. The pins are on the map before it lands
@@ -110,6 +116,11 @@ const rank = (l) => {
 const ownerRaw = (s) => ([...entries(s)].sort((a, b) => rank(a) - rank(b))[0] || {}).owner || (s.owner && String(s.owner).trim()) || '';
 const expectSeqwater = stations.filter((s) => ownerRaw(s).split(/\s*[/,]\s*/).map((p) => p.trim()).includes('Seqwater')).length;
 const expectNoOwner = stations.filter((s) => !ownerRaw(s).trim()).length;
+// The kind of station each pin is, as its colour says: a base over a repeater
+// over a field station.
+const kindOf = (s) => ((s.roles || []).includes('base') ? 'base' : (s.roles || []).includes('repeater') ? 'repeater' : 'field');
+const kindLocated = { field: 0, repeater: 0, base: 0 };
+for (const s of located) kindLocated[kindOf(s)]++;
 const seqwaterLocated = located.filter((s) => ownerRaw(s).split(/\s*[/,]\s*/).map((p) => p.trim()).includes('Seqwater')).length;
 
 const same = (a, b) => a.size === b.size && [...a].every((x) => b.has(x));
@@ -416,8 +427,88 @@ try {
   check('Every owner\'s stations puts the whole network back',
     await page.evaluate((n) => state.mapMarkers.length === n, got.n));
 
+  // ── 6b. Show these stations: field stations, repeaters, base stations ─────
+  const boxes = () => page.evaluate(() => [...document.querySelectorAll('#map-roles-block input[data-map-role]')]
+    .map((b) => [b.dataset.mapRole, b.checked]));
+  check('Show these stations offers field stations, repeaters and base stations, all ticked',
+    JSON.stringify(await boxes()) === JSON.stringify([['field', true], ['repeater', true], ['base', true]]),
+    JSON.stringify(await boxes()));
+  const kindsOnMap = () => page.evaluate(() => {
+    const c = { field: 0, repeater: 0, base: 0 };
+    for (const m of state.mapMarkers) c[primaryRole(m.mnStation)]++;
+    const field = state.mapLines.filter((l) => l.mnLinkRole === 'core');
+    const backbone = state.mapLines.filter((l) => l.mnLinkRole === 'backbone');
+    const byId = new Map(state.data.stations.map((s) => [s.id, s]));
+    const roleOf = (id) => primaryRole(byId.get(id));
+    return { c, n: state.mapMarkers.length, field: field.length, backbone: backbone.length,
+             toBase: backbone.filter((l) => roleOf(l.mnLinkRepeaterId) === 'base' || roleOf(l.mnLinkRepeaterId2) === 'base').length,
+             note: document.getElementById('map-roles-note').textContent,
+             match: document.getElementById('map-match-note').textContent,
+             name: document.getElementById('leaflet-map').getAttribute('aria-label'),
+             legend: mapLegendHtml(), list: filteredStations().length };
+  });
+  // Links and backbone on, so there is something for the boxes to take away.
+  await page.evaluate(() => { state.mapShowLinks = true; state.mapShowBackbone = true; refreshMapLayers({ skipFit: true }); });
+  await page.waitForTimeout(200);
+  const allKinds = await kindsOnMap();
+  check('…and with all three ticked every pin is drawn', allKinds.n === got.n, `${allKinds.n} of ${got.n}`);
+  await page.uncheck('#map-roles-block input[data-map-role="field"]');
+  await page.waitForTimeout(300);
+  const noField = await kindsOnMap();
+  check('Field stations unticked: no field station pins, every repeater and base still drawn',
+    noField.c.field === 0 && noField.c.repeater === kindLocated.repeater && noField.c.base === kindLocated.base,
+    JSON.stringify({ map: noField.c, file: kindLocated }));
+  check('…a field station that also repeats stays, as the repeater its pin shows',
+    await page.evaluate(() => state.mapMarkers.some((m) => m.mnStation.roles.includes('field') && m.mnStation.roles.includes('repeater'))));
+  check('…the field stations\' links go with them, the backbone stays',
+    noField.field === 0 && noField.backbone > 0 && allKinds.field > 0, JSON.stringify({ before: allKinds.field, field: noField.field, backbone: noField.backbone }));
+  check('…says how many it is not drawing, beside the boxes, under the filters and in the map\'s name',
+    /not drawn/.test(noField.note) && /only repeaters and base stations/.test(noField.match)
+      && /not drawn/.test(noField.match) && /only repeaters and base stations/.test(noField.name),
+    `${noField.note} | ${noField.match}`);
+  check('…the legend says field stations are not drawn', /Field Station — not drawn/.test(noField.legend));
+  check('…and leaves the list alone', noField.list === stations.length, String(noField.list));
+  await page.uncheck('#map-roles-block input[data-map-role="base"]');
+  await page.waitForTimeout(300);
+  const repOnly = await kindsOnMap();
+  check('Repeaters alone: only repeater pins, and no path to a base',
+    repOnly.n === kindLocated.repeater && repOnly.c.base === 0 && repOnly.toBase === 0 && allKinds.toBase > 0,
+    JSON.stringify({ c: repOnly.c, toBase: repOnly.toBase, before: allKinds.toBase }));
+  await page.check('#map-roles-block input[data-map-role="field"]');
+  await page.check('#map-roles-block input[data-map-role="base"]');
+  await page.waitForTimeout(300);
+  const kindsBack = await kindsOnMap();
+  check('All three ticked again puts the whole network back, links and all',
+    kindsBack.n === got.n && kindsBack.field === allKinds.field && !/not drawn/.test(kindsBack.match),
+    JSON.stringify({ n: kindsBack.n, field: kindsBack.field }));
+  await page.evaluate(() => { state.mapShowLinks = false; state.mapShowBackbone = false; refreshMapLayers({ skipFit: true }); });
+
+  // Arrows along the links is in the links' card, not a card of its own.
+  check('Arrows along the links joins the card above it',
+    await page.evaluate(() => {
+      const box = document.querySelector('#map-display-block input[onchange^="MapArrows.setEnabled"]');
+      const row = box && box.closest('label');
+      return !!row && row.classList.contains('mapd-join') && !row.classList.contains('mapd-card-top');
+    }));
+
+  // The pointer to Signal bars beside the pins: ⏱️ Latency & signal, opened on
+  // its switch — focused, not ticked.
+  const barsBefore = await page.evaluate(() => MapLatency.bars());
+  await page.click('#map-display-block .mapd-goto button');
+  await page.waitForFunction(() => document.activeElement && document.activeElement.matches('#map-latency-panel input[data-lat-f="bars"]'),
+    null, { timeout: 5000 }).catch(() => {});
+  const landed = await page.evaluate(() => ({
+    focused: !!document.activeElement && document.activeElement.matches('#map-latency-panel input[data-lat-f="bars"]'),
+    bars: MapLatency.bars(),
+  }));
+  check('The Signal bars pointer in Layers lands on ⏱️ Latency & signal\'s switch, and ticks nothing',
+    landed.focused && landed.bars === barsBefore, JSON.stringify(landed));
+  await page.click('#help-panel .dock-tab[data-dock="map-display"]');
+  await page.waitForSelector('#map-owner', { state: 'attached' });
+
   // ── 7. The switches, the legend and what is remembered ────────────────────
   await page.selectOption('#map-owner', 'Seqwater');
+  await page.uncheck('#map-roles-block input[data-map-role="base"]');
   await page.waitForTimeout(200);
   const legendOn = await page.evaluate(() => mapLegendHtml());
   check('the legend keys the triangle, the grey, the black and both outlines while they are on',
@@ -451,13 +542,14 @@ try {
   await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 1000, null, { timeout: 30_000 });
   const back = await page.evaluate(() => ({
     switches: [state.mapPinShapes, state.mapPinManual, state.mapPinTm, state.mapPinSls],
-    owner: state.mapOwner, n: state.mapMarkers.length,
+    owner: state.mapOwner, kinds: state.mapRolesOff.size, n: state.mapMarkers.length,
     tri: state.mapMarkers.filter((m) => m.options.mnShape === 'triangle').length,
   }));
   check('after a reload the switches are still off', back.switches.every((v) => v === false) && back.tri === 0,
     JSON.stringify(back.switches));
-  check('…and the owner choice is gone: every owner\'s stations are drawn', back.owner === '' && back.n === got.n,
-    JSON.stringify({ owner: back.owner, n: back.n }));
+  check('…and the owner choice and Show these stations are gone: every station is drawn',
+    back.owner === '' && back.kinds === 0 && back.n === got.n,
+    JSON.stringify({ owner: back.owner, kinds: back.kinds, n: back.n }));
   await page.evaluate(() => { MapSymbols.setShapes(true); MapSymbols.setManual(true); MapSymbols.setTm(true); MapSymbols.setOutlines(true); });
   allErrors.push(...errors);
   await context.close();

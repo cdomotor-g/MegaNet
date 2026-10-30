@@ -9355,8 +9355,19 @@ body.mn-cardw-dragging {
   padding-top: .5rem;
 }
 
-/* A card with no switch to name it (Link colour) says what it is in a row of
-   the same weight. */
+/* The pointer to ⏱️ Latency & signal's Signal bars switch: a link the weight
+   of a switch's label, so it reads as a row of the panel and not a footnote. */
+.mapd-goto > .link-btn {
+  font-size: .87rem;
+  font-weight: 600;
+}
+
+.mapd-goto > .filter-note {
+  margin-top: .2rem;
+}
+
+/* A card with no switch to name it (Link colour, Show these stations) says
+   what it is in a row of the same weight. */
 .mapd-card-title {
   margin: .3rem 0;
   font-size: .87rem;
