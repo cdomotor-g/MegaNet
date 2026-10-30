@@ -3727,7 +3727,7 @@ const DB_SCHEMA = 'meganet';
 // bumped after. Neither changes a shape the app reads. 90: a station's logger
 // and the photo reader's readings (0090), applied by db-migrate.yml on 30
 // October 2026, bumped after.
-const DB_SCHEMA_VERSION = 90;
+const DB_SCHEMA_VERSION = 91;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
