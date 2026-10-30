@@ -324,6 +324,10 @@ async function tilted(page, db, pin) {
   await page.waitForFunction(() => !Map3D._map(), null, { timeout: BUILD_TIMEOUT });
   await page.waitForFunction(() => SiteFeatures._note().kind !== 'loading', null, { timeout: 10_000 }).catch(() => {});
   await page.waitForTimeout(500);
+  // The camera is handed back to the flat map a moment after the 3-D one goes;
+  // a slow runner can read it before it lands, so wait for it, then check.
+  await page.waitForFunction(() => state.map.getZoom() < 16, null, { timeout: 10_000 }).catch(() => {});
+  await page.waitForTimeout(300);
   const left = await page.evaluate(() => ({ zoom: state.map.getZoom(), n: SiteFeatures.drawn().length, note: SiteFeatures._note().kind,
                                             src: Map3D._siteFeat().source }));
   check('leaving 3-D at the flat map\'s 15 takes them off it — the floor is 16 again',

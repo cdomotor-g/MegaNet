@@ -272,7 +272,7 @@ const Palette = (() => {
     return scored.filter(x => x.score === best)
       .sort((a, b) => b.label - a.label)
       .slice(0, MAX_TABS)
-      .map(x => ({ kind: 'tab', icon: x.tab.icon, label: x.tab.label, sub: `Tab · ${x.group}`,
+      .map(x => ({ kind: 'tab', score: x.score, icon: x.tab.icon, label: x.tab.label, sub: `Tab · ${x.group}`,
                    run: () => switchTab(x.tab.id) }));
   }
 
@@ -320,7 +320,7 @@ const Palette = (() => {
     const scored = all.map(a => ({ a, score: navScore(`${a.label} ${a.find}`.toLowerCase(), terms) }))
       .filter(x => x.score > 0);
     const best = Math.max(0, ...scored.map(x => x.score));
-    return scored.filter(x => x.score === best).map(x => x.a);
+    return scored.filter(x => x.score === best).map(x => ({ ...x.a, score: x.score }));
   }
 
   // ── The list ──────────────────────────────────────────────────────────────
@@ -343,10 +343,15 @@ const Palette = (() => {
   function results(raw) {
     const q = norm(raw);
     const st = stationItems(q);
+    // A tab or an action that fits fewer of the typed words than another does
+    // gives way: "copy link" is the action, not the tab that only says "links".
+    const found = [...tabItems(q), ...actionItems(q)];
+    const top = Math.max(0, ...found.map(i => i.score || 0));
+    const answers = found.filter(i => !top || (i.score || 0) >= top || !i.score);
     return [
       ...st.list,
-      ...tabItems(q),
-      ...actionItems(q),
+      ...answers.filter(i => i.kind === 'tab'),
+      ...answers.filter(i => i.kind === 'action'),
       ...markItems(raw),
       ...placeItems(raw),
     ];
