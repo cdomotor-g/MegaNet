@@ -25,6 +25,17 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 152, date: '2026-10-30', items: [
+      '📶 <strong>SNR on the Stations map.</strong> ⏱️ Latency in the side panel is now <strong>⏱️ Latency &amp; signal</strong>. '
+        + 'Its <em>Colour by</em> row has a fourth choice, <strong>SNR</strong>: each pin coloured by how strongly the base stations '
+        + 'hear it — its signal over the receiver\'s noise, the same figure as the Message Log\'s SNR column, the median over the '
+        + 'last 24 h (or 3 or 7 days). Green is <em>strong</em> (18 dB and over), then <em>fair</em> (12–18), <em>thin</em> (10–12) '
+        + 'and red <em>marginal</em> (under 10 dB, close to the 8.5 dB where readings stop decoding). To see latency and signal '
+        + '<strong>at once</strong>, tick <strong>Signal bars beside the pins</strong>: every pin gets a small phone-style signal '
+        + 'icon at its right — four bars strong down to one marginal — while the pin itself stays coloured by Age, Delay or Checks '
+        + '(or by health, or by role). Pick a station for its SNR tile, its SNR reading by reading and each receiver\'s SNR. '
+        + 'Hover a word for what it means.',
+    ] },
     { n: 151, date: '2026-10-30', items: [
       'In ⏱️ Latency\'s <strong>Messages landing</strong> on the Stations map, a new box under <em>Animate messages on the map</em>: '
         + '<strong>Animate along hidden links</strong>. Tick it and each message\'s pulse runs along its radio links even with '

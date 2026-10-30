@@ -1,14 +1,16 @@
 // MegaNet — map-latency.js
 //
-//   MapLatency   ⏱️ Latency, a tool in the Stations map's side panel. It
-//                colours every station pin by how fresh its data is — how long
-//                since Flood-Net last heard it, how long its readings take to
-//                reach the database, or how many of its timed checks went
-//                missing — and its pane sums that up for the stations in view,
-//                following the map as it moves. Pick a station on the map and
-//                the pane is about that station instead: its checks slot by
-//                slot, its readings' delay one by one, and the receivers that
-//                carried them.
+//   MapLatency   ⏱️ Latency & signal, a tool in the Stations map's side panel.
+//                It colours every station pin by how fresh its data is — how
+//                long since Flood-Net last heard it, how long its readings
+//                take to reach the database, or how many of its timed checks
+//                went missing — or by how strongly it is heard (its SNR), and
+//                can draw that SNR as signal bars beside each pin under any
+//                colouring, so latency and signal show at once. Its pane sums
+//                it up for the stations in view, following the map as it
+//                moves. Pick a station on the map and the pane is about that
+//                station instead: its checks slot by slot, its readings' delay
+//                and SNR one by one, and the receivers that carried them.
 //
 // After core.js (state, esc, escAttr, announce), app.js (refreshMapLayers,
 // rerenderMapLegend, rerenderMapDisplayControls, focusStationOnMap,
@@ -45,13 +47,33 @@
 //            A check most of the network missed at once is the network's and
 //            is not counted against the station (`net`).
 //
+// ── And how strongly it is heard: SNR ────────────────────────────────────────
+// A fourth measure, not a latency but read beside them: the signal over the
+// receiver's own noise floor that a base station measured for the copy it
+// kept (`snr_db`, 0050) — the Message Log's SNR column, reading by reading.
+// A station's figure is the median over the window of each transmission's
+// strongest copy. Bands from 0083's numbers (backbone.js SNR_FLOOR, SNR_THIN):
+// decodes stop at about 8.5 dB, so under 10 dB is marginal and under 12 thin;
+// 18 dB and over has room for a bad day's fade. A relayed copy is heard at the
+// repeater's strength, so for a station behind a repeater it is the last hop's
+// SNR, not the station's own — Backbone's carrier-checked figure is that one.
+//
+// ── Signal bars: latency and SNR at once ─────────────────────────────────────
+// A pin has one fill, so the SNR also has a mark of its own: four rising bars
+// on a white plate at the pin's right (MapSymbols draws them, `mnBars`), as
+// many lit as its band's — four strong, one marginal — in the band's colour.
+// The count says what the colour says. They sit under any colouring: by
+// latency, by health or by role, so Age in the fill and SNR in the bars is
+// one map. A station with no SNR in the window has none.
+//
 // ── What it costs ────────────────────────────────────────────────────────────
 // Age costs nothing new: it is HealthGlance's one batch of last-heard times,
-// which the Stations tab already asks for its Last heard column. Delay and
-// Checks need the readings themselves — the window, 24 h by default (about
-// 27,000 readings when this was written, ~27 pages fetched four at a time the
-// way Station Health fetches its week) — fetched when the pane is first opened
-// or the pins are coloured by one of them, kept for WIN_TTL, and asked again
+// which the Stations tab already asks for its Last heard column. Delay,
+// Checks and SNR need the readings themselves — the window, 24 h by default
+// (about 27,000 readings when this was written, ~27 pages fetched four at a
+// time the way Station Health fetches its week) — fetched when the pane is
+// first opened, the pins are coloured by one of them or the signal bars are
+// on, kept for WIN_TTL, and asked again
 // only by ↻, a new window, or a map rebuilt after that. An analysis the Station
 // Health tab made of the same window in the last BORROW_TTL is used instead of
 // fetching it again.
@@ -79,7 +101,8 @@
 // turns the other off — MapFreq's rule for the links, applied to the pins. The
 // switch is remembered, on Colour pins by health's terms, and the first time the
 // pane is opened in a session it turns itself on: opening the tool is asking
-// for the view.
+// for the view. Turned on from all off — colours, animation and bars — it
+// brings the other two with it; each has its own box to turn it off again.
 //
 // ── Messages landing ─────────────────────────────────────────────────────────
 // The second half of the view, in a card of its own in the pane: while it is
@@ -145,11 +168,12 @@
 // map — a station heard direct by a base station, a repeater heard by one with
 // no backbone path between them — is drawn straight, pin to pin.
 //
-// Exposes: attach, detach, reset, shown, opened, follow, pinStyle, legendHtml,
-//          liveLegendHtml, altText, noteText, on, anim, hidden, setOn, setAnim,
-//          setThroughHidden, power, wantsHiddenLinks, hiddenLinks, setMode,
-//          setWin, setScope, pickBand, back, focus, refresh, yieldTo,
-//          and the rules for test/latency.mjs (classifyValue, quantile, BANDS).
+// Exposes: attach, detach, reset, shown, opened, follow, pinStyle, barsFor,
+//          legendHtml, liveLegendHtml, barsLegendHtml, altText, barsAltText,
+//          noteText, on, anim, hidden, bars, setOn, setAnim, setThroughHidden,
+//          setBars, power, wantsHiddenLinks, hiddenLinks, setMode, setWin,
+//          setScope, pickBand, back, focus, refresh, yieldTo, and the rules
+//          for test/latency.mjs (classifyValue, quantile, BANDS).
 const MapLatency = (() => {
   const SEC = 1000, MIN = 60000, HOUR = 3600000, DAY = 86400000;
 
@@ -159,10 +183,11 @@ const MapLatency = (() => {
     ['7d', '7 days', 7],
   ];
   // What HealthAnalysis reads off a reading, and no more — HealthGlance's
-  // card asks for the same columns. The signal and duplicate bookkeeping are
+  // card asks for the same columns — and the kept copy's SNR, for SNR and the
+  // signal bars. The other signal columns and the duplicate bookkeeping are
   // the Station Health tab's, not this pane's.
   const SELECT = 'addr,alert_id,a2_station,a2_sensor,station_number,channel,station_id,'
-               + 'reading_ts,received_at,value_raw,protocol,path';
+               + 'reading_ts,received_at,value_raw,protocol,path,snr_db';
   // Station Health's own analysis stands in for a fetch while it is this young.
   const BORROW_TTL = 10 * MIN;
   // …and this pane's window is fetched again after this, by a rebuild of the
@@ -280,6 +305,9 @@ const MapLatency = (() => {
     checks: { label: 'Checks', title: 'The share of each station’s timed checks that went missing over the window',
               long: 'how many of its timed checks went missing',
               head: 'How many checks went missing', worst: 'Most checks missed' },
+    snr:    { label: 'SNR',    title: 'How strongly each station is heard: its signal over the receiver’s noise, in dB — the median over the window',
+              long: 'its signal over the noise (SNR)',
+              head: 'How strongly each is heard', worst: 'Weakest signal' },
   };
   const MODE_KEYS = Object.keys(MODES);
 
@@ -312,6 +340,36 @@ const MapLatency = (() => {
       { k: 'c3', max: 0.5,      label: '25 – 50%',     fill: RAMP[4], grow: 1 },
       { k: 'c4', max: Infinity, label: 'over half',    fill: RAMP[5], grow: 2 },
     ],
+    // SNR runs the other way — more is better — so a band is the least it
+    // reaches, strongest first like every list here. `bars` is how many of the
+    // four signal bars it lights, and `word` its name, meant in WORDS.
+    snr: [
+      { k: 's0', min: 18,        label: '18 dB and over', word: 'Strong',   fill: RAMP[0], grow: 0, bars: 4 },
+      { k: 's1', min: 12,        label: '12 – 18 dB',     word: 'Fair',     fill: RAMP[2], grow: 0, bars: 3 },
+      { k: 's2', min: 10,        label: '10 – 12 dB',     word: 'Thin',     fill: RAMP[4], grow: 1, bars: 2 },
+      { k: 's3', min: -Infinity, label: 'under 10 dB',    word: 'Marginal', fill: RAMP[5], grow: 2, bars: 1 },
+    ],
+  };
+  // Where decodes stop, in dB over the noise (0083, backbone.js SNR_FLOOR).
+  const SNR_FLOOR = 8.5;
+  // The words the SNR half of the pane uses that mean something here, and
+  // what each means — on hover where it is used, and in words in the pane's
+  // fold (wordsHtml). One list, so a chip and the fold never say it two ways.
+  const WORDS = {
+    SNR: 'Signal-to-noise ratio: how far a station’s signal stood above the base station receiver’s own background '
+      + 'noise, in decibels (dB) — the SNR column of the Message Log. Every 3 dB is twice the power; decodes stop at '
+      + `about ${SNR_FLOOR} dB. A station’s figure is the median over the window, each transmission’s strongest copy. `
+      + 'For one heard through a repeater it is the repeater’s last hop, not the station’s own signal.',
+    Strong: 'Heard 18 dB or more over the noise: room for a bad day’s fade, rain on the path or a noisy neighbour.',
+    Fair: 'Heard 12 to 18 dB over the noise: decodes reliably, with a few dB to spare for a fade.',
+    Thin: `Heard 10 to 12 dB over the noise — within 3.5 dB of the ${SNR_FLOOR} dB where decodes stop. A fade or rain on `
+      + 'the path can take its readings under.',
+    Marginal: `Heard under 10 dB over the noise — within 1.5 dB of the ${SNR_FLOOR} dB where decodes stop. Expect lost `
+      + 'readings; look at its antenna, cable, connectors and path.',
+    'SNR at a receiver': 'The median signal over the noise of the copies this receiver kept, in dB. One station is heard '
+      + 'at a different SNR at each base station — it is the path — so compare a receiver with itself.',
+    'Signal bars': 'Four rising bars beside a pin, as many lit as its SNR band’s — four strong, three fair, two thin, one '
+      + 'marginal — in the band’s colour. They show under any colouring of the pins, so latency and signal read at once.',
   };
   // What is not a band. `fill: null` leaves the pin as the map would draw it
   // without this view (a gauge read by hand keeps its grey). The rings are
@@ -331,6 +389,7 @@ const MapLatency = (() => {
     age:    'not known',
     delay:  'heard, no arrival times',
     checks: 'heard, no check schedule learned',
+    snr:    'heard, no SNR recorded',
   };
   // Which of them a mode can produce: Age is known for every station heard, so
   // it has no "heard, but…" of its own.
@@ -352,14 +411,16 @@ const MapLatency = (() => {
   };
   const keep = (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* private browsing — still works this session */ } };
 
-  // The view's settings. `on`, `anim` and the mode and window are remembered;
-  // the rest is the session's. The animation is new since the colouring, so a
-  // device that has never said either way gets it with the view as it stands.
+  // The view's settings. `on`, `anim`, `bars` and the mode and window are
+  // remembered; the rest is the session's. The animation and the bars are new
+  // since the colouring, so a device that has never said either way gets them
+  // with the view as it stands.
   const onAtLoad = stored('mn-map-latency', ['on', 'off'], 'off') === 'on';
   const U = {
     on: onAtLoad,
     anim: stored('mn-latency-anim', ['on', 'off'], onAtLoad ? 'on' : 'off') === 'on',
     hidden: stored('mn-latency-hidden', ['on', 'off'], 'off') === 'on',   // run along hidden links too
+    bars: stored('mn-latency-bars', ['on', 'off'], onAtLoad ? 'on' : 'off') === 'on',
     mode: stored('mn-latency-mode', MODE_KEYS, 'age'),
     win: stored('mn-latency-win', WINDOWS.map(w => w[0]), '1d'),
     scope: 'view',           // 'view' | 'all'
@@ -377,8 +438,7 @@ const MapLatency = (() => {
 
   let map = null;
   let root = null;
-  let classes = null;          // station id → classification, for this rebuild's mode
-  let classesMode = null;
+  let classes = new Map();     // mode → (station id → classification), this rebuild's
   let classesAt = 0;
   const statMemo = new Map();  // station id → the delay and check figures off W.A
   let pinTimer = null;
@@ -449,6 +509,12 @@ const MapLatency = (() => {
     if (a < 90 * 60) return `${sign}${(a / 60).toFixed(a < 600 ? 1 : 0)} min`;
     return `${sign}${(a / 3600).toFixed(1)} h`;
   }
+  // An SNR in dB, to a tenth: "11.8 dB".
+  const fmtDb = v => (v == null || !isFinite(v) ? '—' : `${Number(v).toFixed(1)} dB`);
+  // An SNR band's word, its meaning on hover.
+  const wordHtml = b => (b && b.word ? termHtml(b.word, WORDS[b.word]) : '');
+  const snrTerm = () => termHtml('SNR', WORDS.SNR);
+
   // An age in ms, short, as the station list's Last heard column says it.
   function fmtAge(ms) {
     if (ms == null) return '—';
@@ -470,40 +536,53 @@ const MapLatency = (() => {
   // it was heard, but nothing about it was late.
   function classifyValue(mode, v) {
     const list = BANDS[mode] || BANDS.age;
+    // SNR the other way: the first band whose least it reaches.
+    if (mode === 'snr') return list.find(b => Number(v) >= b.min) || list[list.length - 1];
     const x = Math.max(0, Number(v) || 0);
     return list.find(b => x <= b.max) || list[list.length - 1];
   }
 
   // ── What is known about one station ───────────────────────────────────────
 
-  // Delay and checks, off the window's analysis, once per analysis.
+  // Delay, checks and SNR, off the window's analysis, once per analysis.
   function statsOf(S) {
     const id = S.st.id;
     let m = statMemo.get(id);
     if (m) return m;
     const series = [];             // { t, d } — each transmission's first arrival, seconds
+    const snrs = [];               // { t, v } — each transmission's strongest copy, dB
     const byPath = new Map();
     for (const tx of S.txs || []) {
-      let rt = Infinity;
+      let rt = Infinity, best = -Infinity;
       for (const c of tx.copies || []) {
+        const snr = c.snr != null && isFinite(c.snr) ? c.snr : null;
+        if (c.rt == null && snr == null) continue;
+        let p = byPath.get(c.path);
+        if (!p) byPath.set(c.path, p = { path: c.path, host: c.host, d: [], s: [], last: 0 });
+        if (snr != null) { p.s.push(snr); if (snr > best) best = snr; }
         if (c.rt == null) continue;
         if (c.rt < rt) rt = c.rt;
-        let p = byPath.get(c.path);
-        if (!p) byPath.set(c.path, p = { path: c.path, host: c.host, d: [], last: 0 });
         p.d.push((c.rt - c.t) / SEC);
         if (c.t > p.last) p.last = c.t;
       }
       if (isFinite(rt)) series.push({ t: tx.t, d: (rt - tx.t) / SEC });
+      if (isFinite(best)) snrs.push({ t: tx.t, v: best });
     }
     series.sort((a, b) => a.t - b.t);
+    snrs.sort((a, b) => a.t - b.t);
     const ds = series.map(x => x.d);
+    const vs = snrs.map(x => x.v);
     const sch = S.schedule;
     m = {
       delay: ds.length ? { p50: quantile(ds, 0.5), p95: quantile(ds, 0.95), max: Math.max(...ds), n: ds.length,
                            newest: series[series.length - 1] } : null,
       series,
+      snr: vs.length ? { p50: quantile(vs, 0.5), min: Math.min(...vs), max: Math.max(...vs),
+                         n: vs.length, newest: snrs[snrs.length - 1] } : null,
+      snrs,
       paths: [...byPath.values()]
-        .map(p => ({ path: p.path, host: p.host, n: p.d.length, p50: quantile(p.d, 0.5), p95: quantile(p.d, 0.95), last: p.last }))
+        .map(p => ({ path: p.path, host: p.host, n: Math.max(p.d.length, p.s.length), p50: quantile(p.d, 0.5), p95: quantile(p.d, 0.95),
+                     snr: quantile(p.s, 0.5), last: p.last }))
         .sort((a, b) => b.n - a.n),
       checks: sch && sch.counts ? Object.assign({}, sch.counts, { rate: sch.missRate || 0, P: sch.P }) : null,
     };
@@ -552,6 +631,10 @@ const MapLatency = (() => {
       const band = classifyValue('checks', st.checks.rate);
       return { key: band.k, band, value: st.checks.rate, last, st };
     }
+    if (mode === 'snr' && st && st.snr) {
+      const band = classifyValue('snr', st.snr.p50);
+      return { key: band.k, band, value: st.snr.p50, last, st };
+    }
     // Heard in the window — through its own readings, or by the ingest's
     // record of an address it shares with another station — and the measure
     // still not worked out.
@@ -561,17 +644,18 @@ const MapLatency = (() => {
   }
 
   // Every station's class at once, per rebuild and per answer — never per pin.
-  function classOf(s) {
-    if (!classes || classesMode !== U.mode) {
-      const now = now_();
-      classes = new Map();
-      for (const x of stations()) classes.set(x.id, classify(x, U.mode, now));
-      classesMode = U.mode;
-      classesAt = now;
+  // Per measure: the pins can wear one and the signal bars another, on one clock.
+  function classOf(s, mode = U.mode) {
+    let m = classes.get(mode);
+    if (!m) {
+      if (!classes.size) classesAt = now_();
+      m = new Map();
+      for (const x of stations()) m.set(x.id, classify(x, mode, classesAt));
+      classes.set(mode, m);
     }
-    return classes.get(s.id) || classify(s, U.mode, classesAt || now_());
+    return m.get(s.id) || classify(s, mode, classesAt || now_());
   }
-  function dirty() { classes = null; }
+  function dirty() { classes = new Map(); }
 
   // ── The pins ──────────────────────────────────────────────────────────────
 
@@ -588,13 +672,23 @@ const MapLatency = (() => {
     return { cls: c.key, fill: sp.fill, ring: sp.ring, grow: sp.grow, weight: sp.weight, dash: sp.dash };
   }
 
+  // What refreshMapLayers hands MapSymbols to draw beside a pin while the
+  // signal bars are on, under whatever colours the pin — { cls, n, fill }: its
+  // SNR band, how many of the four bars it lights and their colour. Null with
+  // the bars off, the readings not in yet, or no SNR from it in the window.
+  function barsFor(s) {
+    if (!U.bars || !s || !W.A) return null;
+    const c = classOf(s, 'snr');
+    return c.band ? { cls: c.key, n: c.band.bars, fill: c.band.fill } : null;
+  }
+
   // The pins again, once, when an answer lands or the mode changes.
   function repins() {
     if (pinTimer) return;
     pinTimer = setTimeout(() => {
       pinTimer = null;
       dirty();
-      if (U.on && state.activeTab === 'stations' && state.map && typeof refreshMapLayers === 'function') {
+      if ((U.on || U.bars) && state.activeTab === 'stations' && state.map && typeof refreshMapLayers === 'function') {
         refreshMapLayers({ skipFit: true });
       }
       if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
@@ -610,6 +704,7 @@ const MapLatency = (() => {
     // one finds them again (graphNow, pinFor), and the log is watched if it
     // should be and is not yet.
     if (U.anim) liveSync();
+    if (U.bars) ensureWindow(false);
     if (!U.on) return;
     if (HealthGlance.askNet) HealthGlance.askNet();
     if (U.mode !== 'age') ensureWindow(false);
@@ -621,12 +716,15 @@ const MapLatency = (() => {
     // Somebody's own choice, made once, is the session's from then on.
     if (!opts.auto) U.autoOn = true;
     const wasOff = !U.on && !U.anim;
+    const barsToo = !!on && wasOff && !U.bars;
     U.on = !!on;
     keep('mn-map-latency', U.on ? 'on' : 'off');
-    // The view turned on from all off brings the messages animated with it —
-    // its box in the pane is the way to have the colours without them.
+    // The view turned on from all off brings the messages animated with it,
+    // and the signal bars from everything off — their boxes in the pane are
+    // the way to have the colours without them.
     const animToo = U.on && wasOff;
     if (animToo) { U.anim = true; keep('mn-latency-anim', 'on'); liveSync(); }
+    if (barsToo) { U.bars = true; keep('mn-latency-bars', 'on'); ensureWindow(false); }
     // One colouring of the pins at a time: health gives way.
     if (U.on && state.mapHealth) {
       state.mapHealth = false;
@@ -639,7 +737,7 @@ const MapLatency = (() => {
     }
     dirty();
     if (!opts.quiet) {
-      announce(U.on ? `Pins coloured by latency — ${MODES[U.mode].long}.${animToo ? ' Messages flash on the map as they land in the log.' : ''} ${summaryText()}`
+      announce(U.on ? `Pins coloured by ${U.mode === 'snr' ? 'signal' : 'latency'} — ${MODES[U.mode].long}.${animToo ? ' Messages flash on the map as they land in the log.' : ''}${barsToo ? ' Signal bars beside the pins say each station’s SNR.' : ''} ${summaryText()}`
                     : 'Pins are back in their roles’ colours.');
     }
     if (typeof refreshMapLayers === 'function' && state.map) refreshMapLayers({ skipFit: true });
@@ -685,17 +783,41 @@ const MapLatency = (() => {
     graph = null;
   }
 
-  // ⏻ at the head of the pane: everything off at once — the pins' colours and
-  // the animation — or, from all off, the view on with both.
+  // The signal bars' own box. They colour nothing, so they sit under the
+  // latency colours, Colour pins by health or the roles alike.
+  function setBars(on, opts = {}) {
+    U.bars = !!on;
+    keep('mn-latency-bars', U.bars ? 'on' : 'off');
+    if (U.bars) ensureWindow(false);
+    dirty();
+    if (!opts.quiet) {
+      announce(U.bars ? `Signal bars beside the pins: each station’s SNR, four bars strong to one marginal. ${W.A ? snrSummaryText() : ''}`
+                      : 'Signal bars off.');
+    }
+    if (typeof refreshMapLayers === 'function' && state.map) refreshMapLayers({ skipFit: true });
+    if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
+    paint();
+  }
+
+  // ⏻ at the head of the pane: everything off at once — the pins' colours,
+  // the signal bars and the animation — or, from all off, the view on with all
+  // three.
   function power() {
     U.autoOn = true;
-    if (!U.on && !U.anim) { setOn(true); return; }
+    if (!U.on && !U.anim && !U.bars) { setOn(true); return; }
     U.anim = false;
     keep('mn-latency-anim', 'off');
     liveSync();
+    const hadBars = U.bars;
+    U.bars = false;
+    keep('mn-latency-bars', 'off');
     if (U.on) setOn(false, { quiet: true });
-    else { if (typeof rerenderMapLegend === 'function') rerenderMapLegend(); paint(); }
-    announce('Latency view off — the pins are back in their roles’ colours and no messages are animated.');
+    else {
+      if (hadBars && typeof refreshMapLayers === 'function' && state.map) refreshMapLayers({ skipFit: true });
+      if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
+      paint();
+    }
+    announce('Latency view off — the pins are back in their roles’ colours, with no signal bars, and no messages are animated.');
   }
   // Colour pins by health was turned on: this view gives way, without a word —
   // the switch that was pressed says what the pins are now.
@@ -816,7 +938,7 @@ const MapLatency = (() => {
     statMemo.clear();
     dirty();
     if (U.announce) { U.announce = false; announce(`Latency worked out from ${num(W.rows)} readings over ${winOf(U.win)[1]}. ${summaryText()}`); }
-    if (U.on && U.mode !== 'age') repins();
+    if ((U.on && U.mode !== 'age') || U.bars) repins();
     else { if (typeof rerenderMapLegend === 'function' && U.on) rerenderMapLegend(); paint(); }
   }
 
@@ -838,9 +960,16 @@ const MapLatency = (() => {
     let heard = 0, hour = 0, day = 0, week = 0, never = 0, offair = 0;
     const delays = [];
     let due = 0, got = 0, missed = 0, netMissed = 0, scheduled = 0;
+    // Each station's SNR band, whatever the pins wear: the bars' count.
+    const snrBands = new Map();
+    const snrMeds = [];
     for (const s of list) {
       const c = classOf(s);
       bands.set(c.key, (bands.get(c.key) || 0) + 1);
+      if (W.A) {
+        const cs = classOf(s, 'snr');
+        if (cs.band) { snrBands.set(cs.key, (snrBands.get(cs.key) || 0) + 1); snrMeds.push(cs.value); }
+      }
       const last = c.last != null ? c.last : lastHeardOf(s);
       if (last != null) {
         heard++;
@@ -871,6 +1000,8 @@ const MapLatency = (() => {
       medAge: quantile(ages, 0.5),
       delay: delays.length ? { p50: quantile(delays, 0.5), p95: quantile(delays, 0.95), n: delays.length } : null,
       checks: { due, got, missed, net: netMissed, scheduled },
+      snr: { p50: quantile(snrMeds, 0.5), n: snrMeds.length, bands: snrBands,
+             thin: snrBands.get('s2') || 0, edge: snrBands.get('s3') || 0 },
     };
   }
 
@@ -880,7 +1011,9 @@ const MapLatency = (() => {
     const rows = sum.list.map(s => ({ s, c: classOf(s) }));
     const keyed = band ? rows.filter(r => r.c.key === band)
       : rows.filter(r => r.c.band);
-    const score = r => (r.c.value != null ? r.c.value : r.c.last != null ? now - r.c.last : -1);
+    // The weakest signal is the worst, where the longest wait is.
+    const sign = U.mode === 'snr' ? -1 : 1;
+    const score = r => (r.c.value != null ? sign * r.c.value : r.c.last != null ? now - r.c.last : -1);
     keyed.sort((a, b) => score(b) - score(a) || String(a.s.name).localeCompare(String(b.s.name)));
     return keyed;
   }
@@ -889,6 +1022,7 @@ const MapLatency = (() => {
     if (c.band) {
       if (mode === 'age') return fmtAge(c.value);
       if (mode === 'delay') return fmtDelay(c.value);
+      if (mode === 'snr') return fmtDb(c.value);
       const k = c.st && c.st.checks;
       return k ? `${num(k.misses)} of ${num(k.due)} missed` : `${Math.round(100 * c.value)}%`;
     }
@@ -913,7 +1047,29 @@ const MapLatency = (() => {
     return `${num(t.n)} stations ${where}: ${parts.join(', ') || 'none'}.`;
   }
 
+  // The signal bars, said: how many stations in scope are in each SNR band.
+  function snrSummaryText(t) {
+    if (!W.A) return W.status === 'error' ? 'The readings could not be fetched.' : 'Fetching the readings…';
+    t = t || summary();
+    const where = U.scope === 'view' ? 'in view' : 'on the map';
+    const parts = BANDS.snr.map(b => [b, t.snr.bands.get(b.k) || 0]).filter(([, n]) => n)
+      .map(([b, n]) => `${num(n)} ${b.word.toLowerCase()} (${b.label})`);
+    return parts.length ? `SNR of ${num(t.snr.n)} stations ${where}: ${parts.join(', ')}.` : `No SNR recorded for the stations ${where}.`;
+  }
+
   // ── The pane ──────────────────────────────────────────────────────────────
+
+  // The signal bars as MapSymbols draws them beside a pin — four on a white
+  // plate, `n` lit in `fill` — for the pane's and the legend's keys.
+  function barsSvg(n, fill) {
+    let b = '';
+    for (let i = 0; i < 4; i++) {
+      const h = 3 + 2 * i;
+      b += `<rect x="${1.5 + 3 * i}" y="${10.5 - h}" width="2" height="${h}" fill="${i < n ? escAttr(fill) : 'rgba(79,100,120,.28)'}"/>`;
+    }
+    return `<svg class="lat-sig" viewBox="0 0 14 12" width="14" height="12" aria-hidden="true" focusable="false">`
+      + `<rect x=".5" y=".5" width="13" height="11" rx="2.5" fill="#fff" stroke="rgba(31,41,51,.45)"/>${b}</svg>`;
+  }
 
   const seg = (label, items, cur, fn) => `
     <span class="lat-seg" role="group" aria-label="${escAttr(label)}">${items.map(([k, text, title]) => `
@@ -927,17 +1083,16 @@ const MapLatency = (() => {
     + '<path d="M5 3.4a5.6 5.6 0 1 0 6 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>'
     + '<path d="M8 1.6v5.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
   function powerHtml() {
-    const any = U.on || U.anim;
+    const any = U.on || U.anim || U.bars;
     const what = !any ? 'Everything here is off'
-      : U.on && U.anim ? 'Pins coloured · messages animated'
-      : U.on ? 'Pins coloured · animation off'
-      : 'Messages animated · pins in their own colours';
+      : [U.on ? 'Pins coloured' : 'Pins in their own colours', U.bars ? 'signal bars' : '',
+         U.anim ? 'messages animated' : 'animation off'].filter(Boolean).join(' · ');
     return `
       <div class="lat-power-row">
         <button type="button" class="lat-power${any ? ' is-on' : ''}" aria-pressed="${any}" data-lat-f="power"
                 onclick="MapLatency.power()"
-                title="${escAttr(any ? 'Turn the whole latency view off at once — the pins’ colours and the message animation'
-                                     : 'Turn the latency view on — pins coloured by latency, and messages animated as they land')}">
+                title="${escAttr(any ? 'Turn the whole latency view off at once — the pins’ colours, the signal bars and the message animation'
+                                     : 'Turn the latency view on — pins coloured by latency, signal bars beside them, and messages animated as they land')}">
           <span class="lat-power-ico">${POWER_SVG}</span>Latency view <span class="lat-power-state">${any ? 'On' : 'Off'}</span>
         </button>
         <span class="small txt-muted">${esc(what)}</span>
@@ -949,14 +1104,21 @@ const MapLatency = (() => {
       <div class="lat-controls">
         ${powerHtml()}
         <label class="filter-check lat-switch"
-               title="Colour every station pin by latency instead of by its role. Its shape and the Bureau's outlines stay as they are.">
+               title="Colour every station pin by latency or by its signal instead of by its role. Its shape and the Bureau's outlines stay as they are.">
           <input type="checkbox" data-lat-f="on" ${U.on ? 'checked' : ''} onchange="MapLatency.setOn(this.checked)">
-          Colour pins by latency
+          Colour pins by latency or signal
         </label>
         <div class="lat-row"><span class="lat-row-h" aria-hidden="true">Colour by</span>
           ${seg('Colour by', MODE_KEYS.map(k => [k, MODES[k].label, MODES[k].title]), U.mode, 'setMode')}</div>
+        <label class="filter-check lat-switch"
+               title="${escAttr(WORDS['Signal bars'])}">
+          <input type="checkbox" data-lat-f="bars" ${U.bars ? 'checked' : ''} onchange="MapLatency.setBars(this.checked)">
+          ${barsSvg(3, BANDS.snr[1].fill)} Signal bars beside the pins
+        </label>
+        <p class="small txt-muted lat-bars-what">Each station’s ${snrTerm()}, four bars strong to one marginal, under any
+          colouring — so Age, Delay or Checks in the pins and the signal beside them read at once.</p>
         <div class="lat-row"><span class="lat-row-h" aria-hidden="true">Readings</span>
-          ${seg('Readings from the last', WINDOWS.map(([k, label]) => [k, label, `Delay and checks from the last ${label} of readings`]), U.win, 'setWin')}
+          ${seg('Readings from the last', WINDOWS.map(([k, label]) => [k, label, `Delay, checks and SNR from the last ${label} of readings`]), U.win, 'setWin')}
           <button type="button" class="link-btn lat-again" data-lat-f="again" onclick="MapLatency.refresh()"
                   title="Ask the datastore again — last-heard times and the window's readings">↻</button></div>
         <p class="small lat-status" id="lat-status" role="status">${statusHtml()}</p>
@@ -969,14 +1131,14 @@ const MapLatency = (() => {
     if (W.status === 'working') return `Working out ${num(W.fetched)} readings…`;
     if (W.status === 'error') {
       return `<span class="txt-warn">${W.denied ? 'The datastore would not let this browser read the readings'
-        : `The readings could not be fetched (${esc(W.error)})`}</span> — delay and checks are not known.
+        : `The readings could not be fetched (${esc(W.error)})`}</span> — delay, checks and SNR are not known.
         <button type="button" class="link-btn" data-lat-f="retry" onclick="MapLatency.refresh()">Try again</button>`;
     }
     if (W.status === 'ok') {
       const span = W.t1 && W.t0 ? esc(fmtSpan(W.t1 - W.t0)) : esc(w);
       return `${num(W.rows)} readings over ${span}, to ${esc(fmtWhen(W.t1))}${W.borrowed ? ' — the Station Health tab’s, worked out ' + esc(fmtAge(now_() - W.at)) : ''}${W.capped ? ' <span class="txt-warn">(stopped at the cap)</span>' : ''}.`;
     }
-    return 'Delay and checks come from the readings, fetched when they are first wanted.';
+    return 'Delay, checks and SNR come from the readings, fetched when they are first wanted.';
   }
 
   function paneHtml() {
@@ -1108,15 +1270,25 @@ const MapLatency = (() => {
           t.checks.due && t.checks.missed / t.checks.due > 0.1 ? 'adm-kpi--warn' : t.checks.due ? 'adm-kpi--ok' : '')
       : tile('Delay to the database', '…', W.status === 'error' ? 'the readings could not be fetched' : 'fetching the readings')
         + tile('Checks received', '…', '');
-    return head + `<div class="adm-kpis lat-kpis">${ageTiles}${winTiles}</div>` + barsHtml(t, mode, now)
-      + receiversHtml() + netEventsHtml() + footHtml(mode);
+    const sn = t.snr;
+    const snrTiles = W.A
+      ? tile(`Signal (${snrTerm()})`, sn.n ? esc(fmtDb(sn.p50)) : '—',
+          sn.n ? `the middle of ${num(sn.n)} ${sn.n === 1 ? 'station’s median' : 'stations’ medians'} · decodes stop near ${SNR_FLOOR} dB` : 'no SNR recorded here',
+          sn.n && sn.p50 < 12 ? 'adm-kpi--warn' : sn.n ? 'adm-kpi--ok' : '')
+        + tile('Weak signal', sn.n ? `${num(sn.thin + sn.edge)} <small>of ${num(sn.n)}</small>` : '—',
+          sn.n ? `under 12 dB · ${num(sn.thin)} ${termHtml('thin', WORDS.Thin)}, ${num(sn.edge)} ${termHtml('marginal', WORDS.Marginal)}` : '',
+          sn.edge ? 'adm-kpi--warn' : sn.n ? 'adm-kpi--ok' : '')
+      : tile(`Signal (${snrTerm()})`, '…', W.status === 'error' ? 'the readings could not be fetched' : 'fetching the readings')
+        + tile('Weak signal', '…', '');
+    return head + `<div class="adm-kpis lat-kpis">${ageTiles}${winTiles}${snrTiles}</div>` + barsHtml(t, mode, now)
+      + receiversHtml() + netEventsHtml() + footHtml(mode) + wordsHtml();
   }
 
   // The scope by band, for the mode the pins wear — the legend, counted, and
   // each row the way to the stations in it.
   function barsHtml(t, mode, now) {
     if (mode !== 'age' && !W.A) return '';
-    const bands = BANDS[mode].map(b => ({ k: b.k, label: b.label, n: t.bands.get(b.k) || 0 }));
+    const bands = BANDS[mode].map(b => ({ k: b.k, label: b.label, word: b.word, n: t.bands.get(b.k) || 0 }));
     const other = specialsFor(mode).map(k => ({ k, label: k === 'unknown' ? UNKNOWN_LABEL[mode] : SPECIAL[k].label, n: t.bands.get(k) || 0 }))
       .filter(r => r.n);
     // The bars are read against each other, so they are scaled to the bands
@@ -1131,7 +1303,7 @@ const MapLatency = (() => {
                 data-lat-f="${escAttr('band:' + r.k)}" ${r.n ? '' : 'disabled'}
                 onclick="MapLatency.pickBand('${escAttr(r.k)}')"
                 title="${escAttr(r.n ? `List the ${r.n} station${r.n === 1 ? '' : 's'} ${r.label}` : `None ${r.label}`)}">
-          ${swatch(r.k, mode)}<span class="lat-bar-label">${esc(r.label)}</span>
+          ${swatch(r.k, mode)}<span class="lat-bar-label">${r.word ? `${wordHtml(r)} · ` : ''}${esc(r.label)}</span>
           ${bar ? `<span class="lat-bar-track" aria-hidden="true"><span class="lat-bar-fill" style="width:${(100 * r.n / max).toFixed(1)}%;--dot:${escAttr(barColour(r.k, mode))}"></span></span>` : ''}
           <span class="lat-bar-n">${num(r.n)}</span></button></li>`;
     return `
@@ -1189,8 +1361,24 @@ const MapLatency = (() => {
       age: 'Age is how long since Flood-Net last heard each station — from the ingest’s record, so it reaches back further than the window.',
       delay: 'Delay is how long a reading takes from being heard to reaching the database — each transmission’s first copy to land, the median over the window.',
       checks: 'Checks are each station’s timed reports, learned from its own rhythm. A miss counts only while a receiver that hears it was listening, and one most of the network missed at once is the network’s.',
+      snr: 'SNR is how far each station’s signal stood above the receiver’s noise, as the base station measured the copy it kept — the Message Log’s SNR column. A station’s figure is the median over the window of each transmission’s strongest copy; one heard through a repeater carries the repeater’s last hop.',
     }[mode];
-    return `<p class="small txt-muted lat-foot">${esc(what)} Pick a station on the map to see its checks slot by slot.</p>`;
+    return `<p class="small txt-muted lat-foot">${esc(what)} Pick a station on the map to see its checks slot by slot${mode === 'snr' ? ' and its SNR reading by reading' : ''}.</p>`;
+  }
+
+  // The signal words with their meanings, for a finger or a keyboard, which
+  // never hover: the same list the hovers read (WORDS) — with a station's, the
+  // receivers' column too.
+  function wordsHtml(rx) {
+    const keys = ['SNR', ...BANDS.snr.map(b => b.word), 'Signal bars', ...(rx ? ['SNR at a receiver'] : [])];
+    return `
+      <details class="lat-words small">
+        <summary>What the signal words here mean</summary>
+        <dl>${keys.map(k => {
+          const b = BANDS.snr.find(x => x.word === k);
+          return `<dt>${b ? barsSvg(b.bars, b.fill) + ' ' : ''}${esc(k)}${b ? ` <span class="txt-muted">${esc(b.label)}</span>` : ''}</dt><dd>${esc(WORDS[k])}</dd>`;
+        }).join('')}</dl>
+      </details>`;
   }
 
   // ── One station ──
@@ -1248,7 +1436,15 @@ const MapLatency = (() => {
       : st && st.paths.length ? tile('Heard through', `${num(st.paths.length)} <small>receiver${st.paths.length === 1 ? '' : 's'}</small>`,
         esc(st.paths.map(p => hostLabel(p.path)).slice(0, 2).join(', ')))
       : '';
-    let body = `<div class="adm-kpis lat-kpis">${ageTile}${delayTile}${checkTile}${nextTile}</div>`;
+    // And how strongly it is heard: its SNR band's bars and word with the figure.
+    const cs = classify(s, 'snr', now);
+    const snrTile = !W.A ? tile(`Signal (${snrTerm()})`, '…', '')
+      : st && st.snr ? tile(`Signal (${snrTerm()})`, `${barsSvg(cs.band.bars, cs.band.fill)} ${esc(fmtDb(st.snr.p50))}`,
+          `${wordHtml(cs.band)} · median of ${num(st.snr.n)} · lowest ${esc(fmtDb(st.snr.min))}, newest ${esc(fmtDb(st.snr.newest.v))}`,
+          cs.band.bars <= 2 ? 'adm-kpi--warn' : 'adm-kpi--ok')
+      : tile(`Signal (${snrTerm()})`, '—', S ? 'its readings carry no SNR — no base station that measures one kept them'
+                                            : 'nothing from it in the window');
+    let body = `<div class="adm-kpis lat-kpis">${ageTile}${delayTile}${checkTile}${nextTile}${snrTile}</div>`;
     if (c.band || SPECIAL[c.key]) {
       body += `<p class="small lat-stn-band">${swatch(c.key, U.mode)} On the map now: <b>${esc(c.band ? c.band.label
         : c.key === 'unknown' ? UNKNOWN_LABEL[U.mode] : (SPECIAL[c.key].label || ''))}</b> — ${esc(MODES[U.mode].long)}.</p>`;
@@ -1260,11 +1456,13 @@ const MapLatency = (() => {
     }
     if (sch && S.slots && S.slots.length) body += stripHtml(S);
     if (st && st.series.length) body += delayChartHtml(s, st);
+    if (st && st.snrs.length) body += snrChartHtml(s, st);
     if (st && st.paths.length) body += pathsHtml(st);
     body += `<div class="button-group lat-stn-links">
         <button type="button" class="ghost" data-lat-f="health" onclick="MapLatency.openHealth('${escAttr(s.id)}')"
                 title="The Station Health tab on this station — its findings, battery and the network at any missed check">Open in Station Health</button>
       </div>`;
+    if (st && st.snr) body += wordsHtml(st.paths.length > 0);
     return head + body;
   }
 
@@ -1388,18 +1586,62 @@ const MapLatency = (() => {
       <p class="small txt-muted lat-cap">One dot a transmission: from being heard to the database, the first copy to land. The dashed line is the median, ${esc(fmtDelay(st.delay.p50))}${lateN ? `; <span class="txt-warn">${num(lateN)} took over five minutes</span>` : ''}.</p>`;
   }
 
+  // Its SNR, one dot a transmission (the strongest copy), on a scale from 5 to
+  // 30 dB with where decodes stop dotted red: a steady
+  // band is a steady path; a slide towards the floor, an antenna, a cable or a
+  // connector going; a night of dips, rain or a fade.
+  function snrChartHtml(s, st) {
+    const W_ = paneWidth(), H_ = 132, L = 38, R = 6, T = 8, B = 20;
+    const t0 = W.t0, t1 = W.t1;
+    const lo = 5, hi = 30;
+    const x = t => L + (W_ - L - R) * (t - t0) / Math.max(1, t1 - t0);
+    const y = v => T + (H_ - T - B) * (1 - (Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo));
+    let g = '';
+    [[10, '10'], [15, '15'], [20, '20'], [25, '25'], [30, '30 dB']].forEach(([v, label]) => {
+      const yy = y(v).toFixed(1);
+      g += `<line class="lat-grid" x1="${L}" x2="${W_ - R}" y1="${yy}" y2="${yy}"/><text class="hl-axis" x="${L - 4}" y="${(+yy + 3.5).toFixed(1)}" text-anchor="end">${label}</text>`;
+    });
+    const fy = y(SNR_FLOOR).toFixed(1);
+    g += `<line class="lat-floor" x1="${L}" x2="${W_ - R}" y1="${fy}" y2="${fy}"/>`;
+    const d0 = new Date(t0); d0.setHours(0, 0, 0, 0);
+    const step = t1 - t0 > 3 * DAY ? DAY : t1 - t0 > DAY ? 12 * HOUR : 6 * HOUR;
+    for (let t = d0.getTime(); t <= t1; t += step) {
+      if (t < t0) continue;
+      const xx = x(t).toFixed(1);
+      const lab = step >= DAY || new Date(t).getHours() === 0 ? fmtDay(t).replace(/,.*$/, '') : fmtHm(t);
+      g += `<line class="lat-grid" x1="${xx}" x2="${xx}" y1="${T}" y2="${H_ - B}"/><text class="hl-axis" x="${xx}" y="${H_ - 6}" text-anchor="middle">${esc(lab)}</text>`;
+    }
+    const pts = st.snrs;
+    let d = '';
+    pts.forEach(p => { d += `M${x(p.t).toFixed(1)} ${y(p.v).toFixed(1)}h0.01`; });
+    const med = y(st.snr.p50).toFixed(1);
+    const lowN = pts.filter(p => p.v < 10).length;
+    return `
+      <h4 class="lat-h" id="lat-h-snr">Its ${snrTerm()}, reading by reading</h4>
+      <svg class="lat-delay lat-snr" viewBox="0 0 ${W_} ${H_}" width="${W_}" height="${H_}" role="img"
+           aria-label="${escAttr(`${s.name}: ${pts.length} transmissions over ${fmtSpan(t1 - t0)}; the median was heard ${fmtDb(st.snr.p50)} over the noise, the lowest ${fmtDb(st.snr.min)}, the highest ${fmtDb(st.snr.max)}${lowN ? `; ${lowN} under 10 dB` : ''}. Decodes stop near ${SNR_FLOOR} dB.`)}">
+        ${g}
+        <line class="lat-med" x1="${L}" x2="${W_ - R}" y1="${med}" y2="${med}"/>
+        <path class="lat-dots" d="${d}"/>
+      </svg>
+      <p class="small txt-muted lat-cap">One dot a transmission: its strongest copy’s signal over the noise. The dashed line is the
+        median, ${esc(fmtDb(st.snr.p50))}; the red line, ${SNR_FLOOR} dB, is where decodes stop${lowN ? `; <span class="txt-warn">${num(lowN)} under 10 dB</span>` : ''}.</p>`;
+  }
+
   function pathsHtml(st) {
     return `
       <h4 class="lat-h" id="lat-h-paths">Heard through</h4>
       <div class="lat-table-wrap"><table class="lat-table" aria-labelledby="lat-h-paths">
         <thead><tr><th scope="col">Receiver</th><th scope="col" class="num">Copies</th>
           <th scope="col" class="num" title="Median time from being heard to reaching the database, through this receiver">Delay</th>
-          <th scope="col" class="num">95%</th></tr></thead>
+          <th scope="col" class="num">95%</th>
+          <th scope="col" class="num">${termHtml('SNR', WORDS['SNR at a receiver'])}</th></tr></thead>
         <tbody>${st.paths.slice(0, 8).map(p => `<tr>
           <td><span class="mono" title="${escAttr(p.path)}">${esc(hostLabel(p.path))}</span></td>
           <td class="num">${num(p.n)}</td>
           <td class="num${p.p50 > 120 ? ' txt-warn' : ''}">${esc(fmtDelay(p.p50))}</td>
-          <td class="num">${esc(fmtDelay(p.p95))}</td></tr>`).join('')}
+          <td class="num">${esc(fmtDelay(p.p95))}</td>
+          <td class="num${p.snr != null && p.snr < 10 ? ' txt-warn' : ''}">${esc(fmtDb(p.snr))}</td></tr>`).join('')}
         </tbody></table></div>`;
   }
 
@@ -2445,17 +2687,34 @@ const MapLatency = (() => {
     if (!U.on) return '';
     const mode = U.mode;
     const t = (mode === 'age' && (netKnown() || W.A)) || (mode !== 'age' && W.A) ? summary() : null;
-    const rows = BANDS[mode].map(b => ({ k: b.k, label: b.label }))
+    const by = mode === 'snr' ? 'signal' : 'latency';
+    const rows = BANDS[mode].map(b => ({ k: b.k, label: b.label, word: b.word }))
       .concat(specialsFor(mode).map(k => ({ k, label: k === 'unknown' ? UNKNOWN_LABEL[mode] : SPECIAL[k].label })));
-    return `<span class="legend-item legend-lat-h"><span class="small"><strong>⏱️ Latency — ${esc(MODES[mode].long)}</strong></span></span>`
+    return `<span class="legend-item legend-lat-h"><span class="small"><strong>⏱️ ${mode === 'snr' ? 'Signal' : 'Latency'} — ${esc(MODES[mode].long)}</strong></span></span>`
       + rows.map(r => `
       <span class="legend-item">
         ${swatch(r.k, mode)}
-        <span class="small">${esc(r.label[0].toUpperCase() + r.label.slice(1))}${t ? ` <span class="txt-muted">(${num(t.bands.get(r.k) || 0)})</span>` : ''}</span>
+        <span class="small">${r.word ? `${wordHtml(r)} · ${esc(r.label)}` : esc(r.label[0].toUpperCase() + r.label.slice(1))}${t ? ` <span class="txt-muted">(${num(t.bands.get(r.k) || 0)})</span>` : ''}</span>
       </span>`).join('') + `
       <span class="legend-item legend-off">
-        <span class="small txt-muted">Pins are coloured by latency, not by role${t && U.scope === 'view' ? ' — counted in view' : ''}. The worse bands are a step bigger.
-          Shapes and the forecast and information outlines are as always. ⏱️ Latency in the side panel says more.</span>
+        <span class="small txt-muted">Pins are coloured by ${by}, not by role${t && U.scope === 'view' ? ' — counted in view' : ''}. The worse bands are a step bigger.
+          Shapes and the forecast and information outlines are as always. ⏱️ Latency &amp; signal in the side panel says more.</span>
+      </span>`;
+  }
+
+  // The signal bars' key in the 🔑 legend, while they are on — under any
+  // colouring of the pins.
+  function barsLegendHtml() {
+    if (!U.bars) return '';
+    const t = W.A ? summary() : null;
+    return `<span class="legend-item legend-lat-h"><span class="small"><strong>${termHtml('Signal bars', WORDS['Signal bars'])} — each station’s ${snrTerm()}</strong></span></span>`
+      + BANDS.snr.map(b => `
+      <span class="legend-item">
+        ${barsSvg(b.bars, b.fill)}
+        <span class="small">${wordHtml(b)} · ${esc(b.label)}${t ? ` <span class="txt-muted">(${num(t.snr.bands.get(b.k) || 0)})</span>` : ''}</span>
+      </span>`).join('') + `
+      <span class="legend-item legend-off">
+        <span class="small txt-muted">${t ? 'No bars: no SNR from it in the window.' : 'Fetching the readings for the bars…'} Decodes stop near ${SNR_FLOOR} dB.</span>
       </span>`;
   }
 
@@ -2478,13 +2737,20 @@ const MapLatency = (() => {
   // A clause for the map's accessible name while the pins wear it.
   function altText() {
     if (!U.on) return '';
-    if (U.mode !== 'age' && !W.A) return `pins coloured by latency (${MODES[U.mode].label.toLowerCase()}) once the readings are in`;
-    return `pins coloured by latency, ${MODES[U.mode].long} — ${summaryText().replace(/\.$/, '')}`;
+    const by = U.mode === 'snr' ? 'signal' : 'latency';
+    if (U.mode !== 'age' && !W.A) return `pins coloured by ${by} (${MODES[U.mode].label}) once the readings are in`;
+    return `pins coloured by ${by}, ${MODES[U.mode].long} — ${summaryText().replace(/\.$/, '')}`;
+  }
+  // …and one for the signal bars beside them.
+  function barsAltText() {
+    if (!U.bars) return '';
+    if (!W.A) return 'signal bars beside the pins once the readings are in';
+    return `signal bars beside the pins — ${snrSummaryText().replace(/\.$/, '')}`;
   }
 
   // What Map display's health switch says while this view has the pins.
   function noteText() {
-    return U.on ? 'Off — the pins are coloured by latency (⏱️ Latency, in the side panel).' : '';
+    return U.on ? `Off — the pins are coloured by ${U.mode === 'snr' ? 'signal' : 'latency'} (⏱️ Latency & signal, in the side panel).` : '';
   }
 
   // ── The map ───────────────────────────────────────────────────────────────
@@ -2493,8 +2759,8 @@ const MapLatency = (() => {
     map = m;
     root = null;
     MapChrome.panel(m, {
-      id: 'latency', icon: '⏱️', dockIcon: Glyphs.rail('latency'), title: 'Latency',
-      btnLabel: 'Latency — colour the pins by how fresh each station’s data is, and see its checks slot by slot',
+      id: 'latency', icon: '⏱️', dockIcon: Glyphs.rail('latency'), title: 'Latency & signal',
+      btnLabel: 'Latency & signal — colour the pins by how fresh each station’s data is or by its SNR, show its SNR as signal bars beside each pin, and see its checks slot by slot',
       group: 'show', order: 40,
       html: () => `<div class="lat-pane" id="map-latency-panel">${paneHtml()}</div>`,
       onMount(el) { root = el.querySelector('#map-latency-panel'); },
@@ -2540,18 +2806,19 @@ const MapLatency = (() => {
   }
 
   return {
-    attach, detach, reset, shown, opened, follow, pinStyle,
-    legendHtml, liveLegendHtml, altText, noteText,
+    attach, detach, reset, shown, opened, follow, pinStyle, barsFor,
+    legendHtml, liveLegendHtml, barsLegendHtml, altText, barsAltText, noteText,
     on: () => U.on,
     anim: () => U.anim,
     hidden: () => U.hidden,
+    bars: () => U.bars,
     mode: () => U.mode,
     wantsHiddenLinks, hiddenLinks,
-    setOn, setAnim, setThroughHidden, power, setMode, setWin, setScope, pickBand, back, focus, refresh, openHealth, yieldTo,
+    setOn, setAnim, setThroughHidden, setBars, power, setMode, setWin, setScope, pickBand, back, focus, refresh, openHealth, yieldTo,
     // The rules, for test/latency.mjs.
     classifyValue, quantile, BANDS, SPECIAL, fmtDelay,
-    classOf: id => { const s = stationById(id); return s ? classOf(s) : null; },
-    _state: () => ({ on: U.on, anim: U.anim, mode: U.mode, win: U.win, scope: U.scope, sel: U.sel, band: U.band,
+    classOf: (id, mode) => { const s = stationById(id); return s ? classOf(s, mode) : null; },
+    _state: () => ({ on: U.on, anim: U.anim, bars: U.bars, mode: U.mode, win: U.win, scope: U.scope, sel: U.sel, band: U.band,
                      window: { key: W.key, status: W.status, rows: W.rows, borrowed: W.borrowed, error: W.error } }),
     // The log being watched, the pulses running and the way one would run,
     // for test/latency.mjs — the canvas has nothing else to ask.

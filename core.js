@@ -159,7 +159,7 @@ const TABS = [
   ] },
   { group: 'Stations & networks', tabs: [
     { id: 'stations',   label: 'Stations',               icon: '📍',
-      find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb site features ancillary pits outlets geojson relocate relocation move station new site rain gauge exposure canopy trees buildings shed latency data age stale freshness message animation pulse flash landing live' },
+      find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb site features ancillary pits outlets geojson relocate relocation move station new site rain gauge exposure canopy trees buildings shed latency data age stale freshness message animation pulse flash landing live snr signal strength noise signal bars' },
     { id: 'passranges', label: 'ALERT IDs',              icon: '🔗',
       find: 'pass ranges pass range alert id ids alertids hop chain orphans gaps alertid address window coverage base allocate allocation reserve set aside spare unused free addresses fullness full blocks address space grid new id' },
     // ⏳ Repeater Delays (delay-plan.js, repeater-delays.js) sits beside Pass
@@ -861,10 +861,13 @@ const HELP = {
       + 'to judge, and <em>never</em> for one its receivers have not heard. Hover a cell for the time. The station '
       + 'editor, beside the station\'s name, and the station\'s card on the map say the same, with the time: '
       + '<em>Last heard 14:32 today · 9 min ago</em>.',
-      '<strong>⏱️ Latency</strong>, in the side panel after 🔑, colours every pin by how fresh its data is '
+      '<strong>⏱️ Latency &amp; signal</strong>, in the side panel after 🔑, colours every pin by how fresh its data is '
       + 'instead of by its role — by <em>Age</em> (how long since Flood-Net heard it), <em>Delay</em> (how long its '
-      + 'readings take to reach the database) or <em>Checks</em> (how many of its timed checks went missing) — and '
-      + 'keeps its shape and the Bureau\'s outlines. Opening it turns the colouring on; it and <strong>Colour pins '
+      + 'readings take to reach the database) or <em>Checks</em> (how many of its timed checks went missing) — or by '
+      + '<em>SNR</em>, how strongly it is heard (its signal over the base station\'s noise, as the Message Log shows it), '
+      + 'and keeps its shape and the Bureau\'s outlines. <strong>Signal bars</strong> put the SNR beside every pin as '
+      + 'well — four bars strong, three fair, two thin, one marginal — under any colouring, so the latency and the '
+      + 'signal show at once. Opening it turns the colouring on; it and <strong>Colour pins '
       + 'by health</strong> take turns. Its pane counts the stations in view as the map moves; pick a station and it '
       + 'shows that station\'s checks slot by slot, its delay reading by reading and the receivers that carried it. '
       + 'Its <strong>Messages landing</strong> card animates the map as messages land in the log — the station '
@@ -873,8 +876,8 @@ const HELP = {
       + 'along a hop the receivers heard (an editor\'s view: a legacy burst\'s carrier names the transmitter the '
       + 'base station heard, an ALERT2 path every hop), dashed blue along one assumed from the pass ranges, and '
       + 'dotted red along a link to a repeater that was heard not passing the message on; ⏱️ in the strip '
-      + 'beats green while it is on. It comes on with the view, with a box of its own to turn it off; <strong>⏻ Latency view</strong> '
-      + 'at the top of the pane turns the colours and the animation off together.',
+      + 'beats green while it is on. It and the signal bars come on with the view, each with a box of its own to turn it '
+      + 'off; <strong>⏻ Latency view</strong> at the top of the pane turns the colours, the bars and the animation off together.',
       '<strong>The minimap</strong>, in the map\'s bottom-right corner, is the same map further out — four '
       + 'zoom levels to begin with — with the map\'s view outlined on it in red. Scroll over it to zoom the '
       + 'minimap rather than the map; that is how far out it then stays as the map moves. Drag it and the '

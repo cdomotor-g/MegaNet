@@ -297,6 +297,19 @@ on turns the other off. The pane's bars and the legend take the same literals
 through `--dot`; what carries each band without the colour is its words, beside
 every swatch and on every listed station.
 
+**A pin's signal is bars beside it, not its fill** (`map-latency.js`,
+`map-symbols.js`). SNR can colour the pins like a latency — strong to marginal on
+four steps of the same ramp, more being better — but a pin has one fill, and the
+point of the signal is to read it beside the latency. So it also has a mark of its
+own: four rising bars on a small white plate at the pin's right, as many lit as
+its band's (four strong, one marginal) in the band's colour and the rest faint,
+drawn on the pins' canvas by `MapSymbols` (`mnBars`). The count carries the band
+without the colour; the plate is the pins' white ring's reason, reading over the
+satellite and the topo alike; and the right is the side nothing else uses — the
+name hangs below a pin and its tooltip above. They sit under any colouring, a
+filter's ring and the selection's included. The pane and the legend key them with
+the same glyph as inline SVG.
+
 **A message landing is the loading logo's pulse, on the network** (`map-latency.js`,
 *Messages landing*). Its station flares as the logo's nodes do — a white-hot core
 in green inside a fading halo, rising, settling and gone inside a second — and a

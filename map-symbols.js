@@ -256,7 +256,9 @@ const MapSymbols = (function () {
 
   // ── The pin ────────────────────────────────────────────────────────────────
   // A CircleMarker that may be a triangle and may carry an outline: three
-  // options (`mnShape`, `mnOutline` and its `mnOutlineDash`) and one drawing
+  // options (`mnShape`, `mnOutline` and its `mnOutlineDash`) — and a fourth,
+  // `mnBars` { n, fill }, ⏱️ Latency & signal's signal bars at its right
+  // (map-latency.js barsFor) — and one drawing
   // routine on the canvas renderer the Stations map draws with (preferCanvas, app.js initMap). Everything else is
   // CircleMarker's own, which is the point — setStyle, setRadius, the click
   // test, setLatLng for the fan-out, the 3-D mirror reading `options` — every
@@ -286,6 +288,42 @@ const MapSymbols = (function () {
     return tri ? r + 2 * gap : r + gap;
   }
 
+  // The signal bars: four rising bars on a white plate at the pin's right, `n`
+  // of them lit in `fill` and the rest faint, so the count says what the
+  // colour says. The right is the side nothing else uses — the name label
+  // hangs below a pin and its tooltip above it. The plate is the pins' white
+  // ring's reason: it reads over the satellite imagery and the topo alike.
+  // Its top-left corner and size, for the drawing and the bounds.
+  const BARS_W = 14, BARS_H = 12;
+  function barsBox(x, y, r, weight) {
+    return { x: x + r + (weight || 0) / 2 + 1.5, y: y - 8, w: BARS_W, h: BARS_H };
+  }
+  function drawBars(ctx, p, r, o) {
+    const b = barsBox(p.x, p.y, r, o.weight);
+    ctx.save();
+    ctx.globalAlpha = o.opacity == null ? 1 : o.opacity;
+    if (ctx.setLineDash) ctx.setLineDash([]);
+    ctx.beginPath();
+    const k = 2.5, x0 = b.x + 0.5, y0 = b.y + 0.5, x1 = b.x + b.w - 0.5, y1 = b.y + b.h - 0.5;
+    ctx.moveTo(x0 + k, y0);
+    ctx.arcTo(x1, y0, x1, y1, k);
+    ctx.arcTo(x1, y1, x0, y1, k);
+    ctx.arcTo(x0, y1, x0, y0, k);
+    ctx.arcTo(x0, y0, x1, y0, k);
+    ctx.closePath();
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(31, 41, 51, .45)';
+    ctx.stroke();
+    for (let i = 0; i < 4; i++) {
+      const h = 3 + 2 * i;
+      ctx.fillStyle = i < o.mnBars.n ? o.mnBars.fill : 'rgba(79, 100, 120, .28)';
+      ctx.fillRect(b.x + 1.5 + 3 * i, b.y + 10.5 - h, 2, h);
+    }
+    ctx.restore();
+  }
+
   function pinClass() {
     if (Pin) return Pin;
     L.Canvas.include({
@@ -312,6 +350,7 @@ const MapSymbols = (function () {
         if (tri) triPath(ctx, p.x, p.y, r);
         else ctx.arc(p.x, p.y, Math.max(Math.round(r), 1), 0, Math.PI * 2, false);
         this._fillStroke(ctx, layer);
+        if (o.mnBars && o.mnBars.n) drawBars(ctx, p, r, o);
       },
     });
     Pin = L.CircleMarker.extend({
@@ -324,11 +363,20 @@ const MapSymbols = (function () {
       _updateBounds() {
         L.CircleMarker.prototype._updateBounds.call(this);
         const o = this.options;
-        if (!o.mnOutline || !this._pxBounds) return;
-        const reach = outlineR(this._radius, o.weight, o.mnShape === 'triangle') + OUTLINE_W / 2
-          + this._clickTolerance();
-        this._pxBounds.extend(this._point.subtract([reach, reach]));
-        this._pxBounds.extend(this._point.add([reach, reach]));
+        if (!this._pxBounds) return;
+        if (o.mnOutline) {
+          const reach = outlineR(this._radius, o.weight, o.mnShape === 'triangle') + OUTLINE_W / 2
+            + this._clickTolerance();
+          this._pxBounds.extend(this._point.subtract([reach, reach]));
+          this._pxBounds.extend(this._point.add([reach, reach]));
+        }
+        // The bars sit outside the circle: a redraw round the pin clears and
+        // repaints them with it.
+        if (o.mnBars && o.mnBars.n) {
+          const b = barsBox(this._point.x, this._point.y, Math.max(this._radius, 1), o.weight);
+          this._pxBounds.extend(L.point(b.x - 1, b.y - 1));
+          this._pxBounds.extend(L.point(b.x + b.w + 1, b.y + b.h + 1));
+        }
       },
     });
     return Pin;

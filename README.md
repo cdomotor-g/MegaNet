@@ -292,11 +292,12 @@ MegaNet/
 │                             look (#218): last heard, its battery and its findings on
 │                             its card, each a door into Station Health, and Colour
 │                             pins by health on the Stations map
-├── map-latency.js          ← MapLatency — ⏱️ Latency on the Stations map: every pin
-│                             coloured by its data's age, its readings' delay to the
-│                             database or its missed checks, and a pane that sums up
-│                             the stations in view and shows one's checks slot by slot,
-│                             and messages played on the map as they land in the log
+├── map-latency.js          ← MapLatency — ⏱️ Latency & signal on the Stations map:
+│                             every pin coloured by its data's age, its readings' delay
+│                             to the database, its missed checks or its SNR, the SNR as
+│                             signal bars beside each pin under any colouring, a pane
+│                             that sums up the stations in view and shows one's checks
+│                             slot by slot, and messages played on the map as they land
 ├── site-map.js             ← SiteMap   — Site Map tab (a guide to every other tab,
 │                             and the gold line from each to its button in the nav)
 ├── nav-views.js            ← NavViews  — what the left bar lists: All, Simple, Field,
@@ -1806,7 +1807,7 @@ carry how many of each. When the server works findings out itself (#215), the
 card and the pins read them there instead: the seam is `SOURCE` in
 `health-glance.js`, whose header says how.
 
-**⏱️ Latency (`map-latency.js`).** A tool in the side panel's strip, after 🔑,
+**⏱️ Latency & signal (`map-latency.js`).** A tool in the side panel's strip, after 🔑,
 for the question health's classes answer only obliquely — *how fresh is the data
 on this part of the map?* — asked three ways. **Age** is how long since Flood-Net
 last heard each station, on the plain clock rather than against its checks: under
@@ -1834,7 +1835,20 @@ moments most of the network missed its checks at once. Pick a station — on the
 map or in the pane — and the pane is about it: its last-heard time and next
 check, its delay and checks received, its checks slot by slot a row a day with
 the missed ones listed, its delay dot by dot on a log scale, and the receivers
-that carried it, with a door into Station Health. Its **Messages landing** card
+that carried it, with a door into Station Health. **SNR** is the fourth way to
+colour the pins, though not a latency: how far each station's signal stood over
+the base station receiver's noise, the kept copy's `snr_db` (0050) — the Message
+Log's SNR column — as the median over the window of each transmission's strongest
+copy: 18 dB and over *strong*, 12 *fair*, 10 *thin*, under 10 *marginal* (decodes
+stop near 8.5 dB, 0083). It rides in with the window's readings, nothing fetched
+for it alone. For a station heard through a repeater it is the last hop's SNR;
+Backbone's carrier-checked figure is the station's own. **Signal bars** draw the
+same bands beside every pin, four rising bars on a white plate at its right with
+as many lit as the band's, under any colouring — the latency colours, Colour pins
+by health or the roles — so the pins can say Age and the bars the signal at
+once. They come on with the view, have a box of their own, and ⏻ turns them off
+with the rest. A picked station's pane adds its SNR tile, its SNR dot by dot
+against the decode floor, and each receiver's SNR. Its **Messages landing** card
 plays the log on the map: every 15 s it asks `reading` for what has landed since
 the last ask (`received_at=gt.`, oldest first, a page of 1,000 at most), and a
 beat later each message's station flares green and a pulse runs along its links,

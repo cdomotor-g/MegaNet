@@ -5870,6 +5870,7 @@ function mapLegendHtml() {
         <span class="small">${v}</span>
       </span>`).join('')}
     ${MapSymbols.legendHtml({ health })}
+    ${MapLatency.barsLegendHtml()}
     ${MapLatency.liveLegendHtml()}`),
     // What the filter did to a pin, and a proposed station (0039): hollow, in
     // a dashed ring of its role's colour — planned, not built.
@@ -6798,6 +6799,9 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     // on is the one asked, and the rest of this reads either.
     const lat = MapLatency.pinStyle(s);
     const hg = lat || (MapLatency.on() ? null : HealthGlance.pinStyle(s));
+    // …and its signal bars beside it — its SNR band — under any of those
+    // colourings or the roles', so latency and signal read at once.
+    const bars = MapLatency.barsFor(s);
     // A triangle is drawn round the circle it replaces, a little larger
     // (MapSymbols.radius), and its radius is that triangle's — so the click
     // target, the leader's ring and a selection's grow all fit the mark drawn.
@@ -6822,6 +6826,7 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
       mnShape:     sym.triangle ? 'triangle' : 'circle',
       mnOutline:   sym.outline,
       mnOutlineDash: sym.outlineDash,
+      mnBars:      bars,
     }).addTo(map);
     marker.mnStationId = s.id;             // lets the table below find its pin
     marker.mnStation   = s;                // and lets labels be re-picked on pan
@@ -6835,6 +6840,8 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     marker.mnHealth    = hg && !lat ? hg.cls : null;
     // …and its latency band while ⏱️ Latency colours the pins, for the same readers.
     marker.mnLatency   = lat ? lat.cls : null;
+    // …and its SNR band while it wears the signal bars.
+    marker.mnSignal    = bars ? bars.cls : null;
     // The classification, not just its numbers — the canvas renderer draws no
     // DOM node for a className to land on, but the name label is real DOM in
     // the tooltip pane, and applyMapLabels dims it off this flag.
@@ -6929,6 +6936,9 @@ function updateMapAltName(pins, links, backbone, matched, related) {
   // …or the latency, while ⏱️ Latency colours them.
   const latency = MapLatency.altText();
   if (latency) bits.push(latency);
+  // …and the signal bars beside them, under any colouring.
+  const signal = MapLatency.barsAltText();
+  if (signal) bits.push(signal);
   // And whose stations they are, when Map display is drawing only some.
   if (MapSymbols.ownerHiding()) bits.push(MapSymbols.ownerPhrase());
   el.setAttribute('aria-label', 'Station map — ' + bits.join(', ')

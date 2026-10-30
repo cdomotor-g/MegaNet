@@ -22,6 +22,13 @@
 //      window hollow in its ring; over the whole week, the planted fading
 //      station misses more of its checks than a steady one; a rebuild of the
 //      map fetches nothing again.
+//   4b. **Signal (SNR)** — the demo week given an SNR a station: the bands'
+//      edges; coloured by SNR the strong station green and the marginal one
+//      red and a step bigger, the weakest listed first, the legend saying
+//      signal; the signal bars on since the first opening, four lit for the
+//      strong station and one for the marginal, read off the map's canvas;
+//      the bars beside the pins under the Age colouring at once; unticked,
+//      no bars and none drawn.
 //   5. **One station** — picked in the pane: on the map with its card, and in
 //      the pane its tiles, its checks slot by slot with the misses listed, its
 //      delay dot by dot and the receiver that carried it; the pane follows the
@@ -51,7 +58,8 @@
 //      a message no copy matches all blue; signed out, the
 //      card says every hop is blue and why, and the receptions are not asked.
 //   6. **One colouring at a time** — Colour pins by health turns latency off,
-//      and latency turns health off; the 🔑 legend carries whichever is on.
+//      and latency turns health off; the 🔑 legend carries whichever is on;
+//      the signal bars stay beside the pins under health's colours.
 //   7. **No data, honestly** — a datastore that cannot be reached: the pane
 //      says so and offers to try again, and nothing throws.
 //
@@ -157,8 +165,14 @@ try {
     const w = HealthAnalysis.demoWorld(undefined, { now: Date.now() });
     const idx = SensorValues.index();
     const whose = aid => { const c = idx.get(aid) || []; return c.length === 1 ? c[0].station.id : null; };
+    // And an SNR a station, a little either side of its level: strong, fair,
+    // thin and marginal, the rest fair.
+    const snrOf = { [w.roles.steady]: 19.6, [w.roles.steady2]: 13.4, [w.roles.steady3]: 11.0, [w.roles.fading]: 9.3 };
+    let k = 0;
     w.rows.forEach(r => {
-      if (whose(r.alert_id) === w.roles.steady3) r.received_at = new Date(Date.parse(r.reading_ts) + 240e3).toISOString();
+      const id = whose(r.alert_id);
+      if (id === w.roles.steady3) r.received_at = new Date(Date.parse(r.reading_ts) + 240e3).toISOString();
+      r.snr_db = id ? (snrOf[id] || 15) + [0, 0.3, -0.3][k++ % 3] : null;
     });
     const last = {}, first = {};
     w.rows.forEach(r => {
@@ -198,6 +212,8 @@ try {
       checks: [k('checks', 0), k('checks', 0.05), k('checks', 0.2), k('checks', 0.3), k('checks', 0.9)],
       q: [MapLatency.quantile([4, 1, 3, 2], 0.5), MapLatency.quantile([1, 2, 3, 4, 100], 0.95), MapLatency.quantile([], 0.5)],
       f: [MapLatency.fmtDelay(1.64), MapLatency.fmtDelay(52.2), MapLatency.fmtDelay(270), MapLatency.fmtDelay(7600)],
+      snr: [k('snr', 25), k('snr', 18), k('snr', 17.9), k('snr', 12), k('snr', 11.9), k('snr', 10), k('snr', 9.9), k('snr', 3)],
+      bars: MapLatency.BANDS.snr.map(b => b.bars),
     };
   });
   check('age: 15 min and under is the freshest band, a minute more the next; an hour, three, a day and a week are edges',
@@ -209,6 +225,9 @@ try {
   check('the median interpolates, the 95th percentile is not the maximum, nothing is null',
     rules.q[0] === 2.5 && rules.q[1] > 4 && rules.q[1] < 100 && rules.q[2] === null, J(rules.q));
   check('a delay said short: 1.6 s, 52 s, 4.5 min, 2.1 h', J(rules.f) === J(['1.6 s', '52 s', '4.5 min', '2.1 h']), J(rules.f));
+  check('SNR the other way, more is better: 18 dB and over strong, 12 fair, 10 thin, under 10 marginal',
+    J(rules.snr) === J(['s0', 's0', 's1', 's1', 's2', 's2', 's3', 's3']), J(rules.snr));
+  check('…and a band lights as many signal bars as it is strong: four, three, two, one', J(rules.bars) === J([4, 3, 2, 1]), J(rules.bars));
 
   // ── 2. Off until asked for ────────────────────────────────────────────
   log('\n2. Off until it is asked for\n');
@@ -277,13 +296,14 @@ try {
              shown: !!el.getClientRects().length, checked: el.querySelector('input[type=checkbox]').checked };
   });
   const banded = sum.bars.filter(b => !/never|hand/.test(b.label)).reduce((a, b) => a + b.n, 0);
-  check('the pane is on screen, its switch on, with the four tiles',
-    sum.shown && sum.checked && J(sum.tiles) === J(['Heard in the last hour', 'Quiet over a day', 'Delay to the database', 'Checks received']), J(sum));
+  check('the pane is on screen, its switch on, with the six tiles',
+    sum.shown && sum.checked && J(sum.tiles) === J(['Heard in the last hour', 'Quiet over a day', 'Delay to the database', 'Checks received',
+      'Signal (SNR)', 'Weak signal']), J(sum));
   check('the whole map\'s rows add up to every station drawn, and its bands to the pins that wear one',
     sum.bars.reduce((a, b) => a + b.n, 0) === sum.drawn && banded === sum.pinsBand, J({ sum, banded }));
   const fetched = count('window');
-  check('the readings were fetched for it — the window, paged, with the columns the analysis reads',
-    fetched > 0 && asked.filter(a => a.kind === 'window').every(a => /select=addr,alert_id,.*received_at/.test(a.url) && !/rssi_dbm/.test(a.url)),
+  check('the readings were fetched for it — the window, paged, with the columns the analysis reads and the kept copy\'s SNR',
+    fetched > 0 && asked.filter(a => a.kind === 'window').every(a => /select=addr,alert_id,.*received_at.*snr_db/.test(a.url) && !/rssi_dbm/.test(a.url)),
     J({ fetched }));
 
   // ── 4. Delay and checks ───────────────────────────────────────────────
@@ -312,6 +332,78 @@ try {
   await page.waitForTimeout(300);
   check('a rebuild of the map inside the window\'s lifetime fetches nothing', count('window') === w7, J({ w7, now: count('window') }));
 
+  // ── 4b. Signal (SNR) ──────────────────────────────────────────────────
+  log('\n4b. Signal: SNR in the pins, and the signal bars beside them\n');
+  await page.evaluate(() => MapLatency.setMode('snr'));
+  await waitTrue(page, id => { const m = state.mapMarkers.find(x => x.mnStationId === id); return m && /^s/.test(m.mnLatency || ''); }, R.steady);
+  const sn = { steady: await pin(page, R.steady), fading: await pin(page, R.fading), fair: await pin(page, R.steady2), thin: await pin(page, R.steady3) };
+  check('coloured by SNR: 19.6 dB strong and green, 13.4 fair, 11 thin, 9.3 marginal in red and a step bigger',
+    sn.steady.band === 's0' && /^#1a7f37$/i.test(sn.steady.fill) && sn.fair.band === 's1' && sn.thin.band === 's2'
+      && sn.fading.band === 's3' && /^#c8341f$/i.test(sn.fading.fill) && sn.fading.grow > sn.steady.grow, J(sn));
+  const snPane = await page.evaluate(() => {
+    MapLatency.setScope('all');
+    const el = document.getElementById('map-latency-panel');
+    return { worst: (el.querySelector('.lat-list li') || {}).textContent || '',
+             labels: [...el.querySelectorAll('.lat-bar-label')].slice(0, 4).map(x => x.textContent.replace(/\s+/g, ' ').trim()),
+             terms: [...el.querySelectorAll('.lat-bar-label .term')].map(t => t.title.length),
+             words: [...el.querySelectorAll('.lat-words dt')].map(x => x.textContent.replace(/\s+/g, ' ').trim()),
+             legend: document.getElementById('map-legend').textContent.replace(/\s+/g, ' ') };
+  });
+  const fadingName = await page.evaluate(id => state.data.stations.find(s => s.id === id).name, R.fading);
+  check('the pane lists the weakest first, each band by its word — its meaning on hover — and its dB',
+    snPane.worst.includes(fadingName) && /9\.\d dB/.test(snPane.worst)
+      && J(snPane.labels) === J(['Strong · 18 dB and over', 'Fair · 12 – 18 dB', 'Thin · 10 – 12 dB', 'Marginal · under 10 dB'])
+      && snPane.terms.length === 4 && snPane.terms.every(n => n > 40), J({ snPane, fadingName }));
+  check('…the words also in a fold, for a finger or a keyboard', snPane.words.length === 6 && /^SNR/.test(snPane.words[0]), J(snPane.words));
+  check('…and the 🔑 legend says the pins are signal, not latency',
+    /Signal — its signal over the noise/.test(snPane.legend) && /coloured by signal/.test(snPane.legend), snPane.legend.slice(0, 200));
+  check('a rebuild\'s worth of SNR fetched nothing new: it rode in with the window', count('window') === w7, J({ w7, now: count('window') }));
+
+  // The bars: on since the first opening, read off the map's own canvas, the
+  // station alone in view.
+  const barPx = (id) => page.evaluate(async id => {
+    const s = state.data.stations.find(x => x.id === id);
+    state.map.setView([s.lat, s.lon], 16, { animate: false });
+    await new Promise(r => setTimeout(r, 450));
+    const m = state.mapMarkers.find(x => x.mnStationId === id);
+    const rd = m._renderer, cv = rd._container, b = rd._bounds;
+    const k = cv.width / (b.max.x - b.min.x);
+    const ctx = cv.getContext('2d');
+    const bx = m._point.x + m._radius + (m.options.weight || 0) / 2 + 1.5, by = m._point.y - 8;
+    const px = (dx, dy) => Array.from(ctx.getImageData(Math.round((bx + dx - b.min.x) * k), Math.round((by + dy - b.min.y) * k), 1, 1).data);
+    return { sig: m.mnSignal, bars: m.options.mnBars, first: px(2.5, 9), fourth: px(11.5, 6), plate: px(0.8 + 13 - 1.5, 1.2) };
+  }, id);
+  const bs = await barPx(R.steady), bf = await barPx(R.fading);
+  const green = c => c[1] > c[0] + 50 && c[1] > c[2] + 30, red = c => c[0] > c[1] + 80 && c[0] > c[2] + 80;
+  check('the signal bars are on with the view: four lit for the strong station, its fourth bar green on the canvas',
+    await page.evaluate(() => MapLatency.bars()) && bs.sig === 's0' && bs.bars.n === 4 && green(bs.fourth), J(bs));
+  check('…one for the marginal station: its first bar red, its fourth faint',
+    bf.sig === 's3' && bf.bars.n === 1 && red(bf.first) && !red(bf.fourth) && !green(bf.fourth) && bf.fourth[0] > 150, J(bf));
+  await page.evaluate(() => MapLatency.setMode('age'));
+  await waitTrue(page, id => { const m = state.mapMarkers.find(x => x.mnStationId === id); return m && /^a/.test(m.mnLatency || ''); }, R.steady);
+  const both = await page.evaluate(R => {
+    const m = id => state.mapMarkers.find(x => x.mnStationId === id);
+    return { lat: m(R.steady).mnLatency, sig: m(R.steady).mnSignal, fadingSig: m(R.fading).mnSignal,
+             legend: document.getElementById('map-legend').textContent.replace(/\s+/g, ' '),
+             name: document.getElementById('leaflet-map').getAttribute('aria-label') };
+  }, R);
+  check('latency and signal at once: the pins coloured by Age, the bars beside them still saying the SNR',
+    /^a\d$/.test(both.lat) && both.sig === 's0' && both.fadingSig === 's3', J(both));
+  check('…the 🔑 legend keys both, and the map\'s name says both',
+    /Latency — how long since Flood-Net last heard it/.test(both.legend) && /Signal bars — each station’s SNR/.test(both.legend)
+      && /pins coloured by latency/.test(both.name) && /signal bars beside the pins — SNR of/.test(both.name), J(both));
+  const noBars = await page.evaluate(id => {
+    MapLatency.setBars(false);
+    const m = state.mapMarkers.find(x => x.mnStationId === id);
+    return { bars: MapLatency.bars(), signal: state.mapMarkers.filter(x => x.mnSignal).length, opt: m.options.mnBars || null,
+             lat: m.mnLatency, stored: localStorage.getItem('mn-latency-bars'),
+             legend: /Signal bars/.test(document.getElementById('map-legend').textContent) };
+  }, R.steady);
+  check('unticked, no pin carries bars and the legend drops them — the colours stay',
+    !noBars.bars && noBars.signal === 0 && !noBars.opt && /^a\d$/.test(noBars.lat) && noBars.stored === 'off' && !noBars.legend, J(noBars));
+  await page.evaluate(() => { MapLatency.setBars(true); MapLatency.setMode('checks'); MapLatency.setScope('view'); });
+  await waitTrue(page, id => { const m = state.mapMarkers.find(x => x.mnStationId === id); return m && /^c/.test(m.mnLatency || '') && m.mnSignal; }, R.steady);
+
   // ── 5. One station ────────────────────────────────────────────────────
   log('\n5. One station, picked\n');
   await page.evaluate(id => MapLatency.focus(id), R.fading);
@@ -329,13 +421,18 @@ try {
       stripName: strip ? strip.getAttribute('aria-label') : '',
       missed: (el.querySelector('.lat-missed') || {}).textContent || '',
       dots: !!el.querySelector('svg.lat-delay path.lat-dots'),
+      snrChart: !!el.querySelector('svg.lat-snr path.lat-dots') && !!el.querySelector('svg.lat-snr line.lat-floor'),
+      snrTile: ([...el.querySelectorAll('.adm-kpi')].find(x => /Signal/.test(x.querySelector('.adm-kpi-label').textContent)) || {}).textContent || '',
+      rxSnr: [...el.querySelectorAll('.lat-table tbody tr td:last-child')].map(td => td.textContent.trim()),
       rx: [...el.querySelectorAll('.lat-table tbody tr td:first-child')].map(td => td.textContent.trim()),
     };
   }, R.fading);
   check('a station pressed in the pane is on the map with its card, and the pane is about it, focus on its name',
     one.card === R.fading && one.head === one.name && one.focus === 'lat-h-stn', J(one));
-  check('…its tiles: last heard, delay, checks received and the next check',
-    J(one.tiles) === J(['Last heard', 'Delay', 'Checks received', 'Next check']), J(one.tiles));
+  check('…its tiles: last heard, delay, checks received, the next check and its signal',
+    J(one.tiles) === J(['Last heard', 'Delay', 'Checks received', 'Next check', 'Signal (SNR)']), J(one.tiles));
+  check('…its SNR reading by reading, marginal in its tile, and each receiver\'s SNR beside its delay',
+    one.snrChart && /Marginal/.test(one.snrTile) && /9\.\d dB/.test(one.snrTile) && one.rxSnr.some(v => /^9\.\d dB$/.test(v)), J(one));
   check('…its checks slot by slot, the misses drawn and named, the picture saying the counts',
     one.slots > 40 && one.misses > 0 && /missed/.test(one.stripName) && /Missed while a receiver/.test(one.missed), J(one));
   check('…its delay dot by dot, and the receiver that carried it', one.dots && one.rx.some(r => /demo-pi-sdr1/.test(r)), J(one.rx));
@@ -373,11 +470,13 @@ try {
       station_id: sid, reading_ts: new Date(at - 1500).toISOString(), received_at: at.toISOString(),
       value_raw: 7, source, path: 'serial-monitor/demo-pi-sdr1', dup_count: 0, dup_paths: null,
     });
+    // The map settled where it was put, and the plays counted, before the rows
+    // are laid in — then asked for at once, so the log's own clock has no
+    // time to find them first and play them out of sight of the count.
+    const n0 = await page.evaluate(async () => { await new Promise(r => setTimeout(r, 400)); return MapLatency._live().firedN; });
     stub.tables.reading.push(row(pick.aid, pick.id, 5), row(pick.oaid, pick.other, 3), row(64999, null, 5));
     const liveBefore = count('live');
-    const got = await page.evaluate(async id => {
-      await new Promise(r => setTimeout(r, 400));   // the map settled where it was put
-      const n0 = MapLatency._live().firedN;
+    const got = await page.evaluate(async ([id, n0]) => {
       await MapLatency._askNow();
       const t0 = performance.now();
       while (!MapLatency._live().fired.slice(-(MapLatency._live().firedN - n0) || 1e9).includes(id) && performance.now() - t0 < 4000) {
@@ -397,7 +496,7 @@ try {
                centre: px(0, 0), halo: px(sz, 0), route: MapLatency._route(id),
                pane: getComputedStyle(cv.parentNode).pointerEvents, z: cv.parentNode.style.zIndex,
                status: document.getElementById('lat-live-status').textContent.replace(/\s+/g, ' ') };
-    }, pick.id);
+    }, [pick.id, n0]);
     check('the log asked once more, for what landed after the newest it had seen',
       count('live') >= liveBefore + 1 && /received_at=gt\./.test(asked.filter(a => a.kind === 'live').pop().url), J({ before: liveBefore, now: count('live') }));
     check('the message plays: its station flares — white-hot at the core, green round it — on a canvas over the pins that takes no clicks',
@@ -523,19 +622,19 @@ try {
   check('…and ⏱️ in the strip stops glowing', off1.strip === false, J(off1.strip));
   await page.click('#map-latency-panel .lat-power');
   await page.waitForTimeout(300);
-  const pw0 = await page.evaluate(() => ({ on: MapLatency.on(), anim: MapLatency.anim(),
-    banded: state.mapMarkers.filter(m => m.mnLatency).length,
+  const pw0 = await page.evaluate(() => ({ on: MapLatency.on(), anim: MapLatency.anim(), bars: MapLatency.bars(),
+    banded: state.mapMarkers.filter(m => m.mnLatency).length, signal: state.mapMarkers.filter(m => m.mnSignal).length,
     pressed: document.querySelector('#map-latency-panel .lat-power').getAttribute('aria-pressed'),
     focus: document.activeElement && document.activeElement.dataset && document.activeElement.dataset.latF }));
-  check('⏻ turns the whole view off — no pin wears a band, nothing animated — and keeps the focus',
-    !pw0.on && !pw0.anim && pw0.banded === 0 && pw0.pressed === 'false' && pw0.focus === 'power', J(pw0));
+  check('⏻ turns the whole view off — no pin wears a band or bars, nothing animated — and keeps the focus',
+    !pw0.on && !pw0.anim && !pw0.bars && pw0.banded === 0 && pw0.signal === 0 && pw0.pressed === 'false' && pw0.focus === 'power', J(pw0));
   await page.click('#map-latency-panel .lat-power');
   await waitTrue(page, () => MapLatency._live().watching);
-  const pw1 = await page.evaluate(() => ({ on: MapLatency.on(), anim: MapLatency.anim(), watching: MapLatency._live().watching,
+  const pw1 = await page.evaluate(() => ({ on: MapLatency.on(), anim: MapLatency.anim(), bars: MapLatency.bars(), watching: MapLatency._live().watching,
     pressed: document.querySelector('#map-latency-panel .lat-power').getAttribute('aria-pressed'),
     word: document.querySelector('#map-latency-panel .lat-power-state').textContent }));
-  check('…and on again: the pins coloured and the messages animated together',
-    pw1.on && pw1.anim && pw1.watching && pw1.pressed === 'true' && pw1.word === 'On', J(pw1));
+  check('…and on again: the pins coloured, the bars beside them and the messages animated together',
+    pw1.on && pw1.anim && pw1.bars && pw1.watching && pw1.pressed === 'true' && pw1.word === 'On', J(pw1));
   const back1 = await page.evaluate(() => {
     MapLatency.setAnim(false); MapLatency.setOn(false);
     const off = !MapLatency.on() && !MapLatency.anim();
@@ -724,9 +823,11 @@ try {
   await page.waitForTimeout(400);
   const h = await page.evaluate(() => ({ lat: MapLatency.on(), health: state.mapHealth,
     latPins: state.mapMarkers.filter(m => m.mnLatency).length, stored: localStorage.getItem('mn-map-latency'),
-    note: (document.getElementById('map-health-note') || {}).textContent || '' }));
+    note: (document.getElementById('map-health-note') || {}).textContent || '',
+    both: state.mapMarkers.filter(m => m.mnHealth && m.mnSignal).length, bars: MapLatency.bars() }));
   check('Colour pins by health turns latency off — no pin wears a band, and it is remembered off',
     !h.lat && h.health && h.latPins === 0 && h.stored === 'off', J(h));
+  check('…and the signal bars stay, beside pins in health\'s colours: health and signal at once', h.bars && h.both > 0, J(h));
   await page.evaluate(() => MapLatency.setOn(true));
   await page.waitForTimeout(400);
   const l = await page.evaluate(() => ({ lat: MapLatency.on(), health: state.mapHealth,
@@ -810,6 +911,6 @@ if (failed.length) {
   for (const f of failed) log(`  ✗ ${f.label}${f.detail ? `\n      ${f.detail}` : ''}`);
   process.exit(1);
 }
-log('\nPASS — ⏱️ Latency colours every pin by age, delay or missed checks and keeps its shape and outline,\n'
-  + '       fetches the window once, sums up the stations in view, and shows a picked station\'s checks\n'
-  + '       slot by slot; one colouring of the pins at a time.');
+log('\nPASS — ⏱️ Latency & signal colours every pin by age, delay, missed checks or SNR and keeps its shape and\n'
+  + '       outline, draws the SNR as signal bars beside the pins under any colouring, fetches the window once,\n'
+  + '       sums up the stations in view, and shows a picked station\'s checks slot by slot; one colouring at a time.');

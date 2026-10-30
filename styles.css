@@ -4259,6 +4259,20 @@ hr {
 .lat-kpi .adm-kpi-label { font-size: .66rem; }
 .lat-kpi .adm-kpi-value { font-size: 1.15rem; }
 .lat-kpi .adm-kpi-sub { font-size: .7rem; }
+/* An odd tile out at the end takes the whole row rather than leaving a hole. */
+.lat-kpis > .lat-kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+/* The signal bars' key (map-latency.js barsSvg): the glyph MapSymbols draws
+   beside a pin, white plate and all — literals, as on the pins, because the
+   base maps do not go dark with the app — sat on the text's baseline. */
+.lat-sig { display: inline-block; flex: none; vertical-align: -2px; }
+.lat-kpi .adm-kpi-value .lat-sig { vertical-align: 1px; }
+.lat-bars-what { margin: -2px 0 0 1.6rem; }
+/* The signal words, for a finger or a keyboard: the hovers' meanings. */
+.lat-words > summary { cursor: pointer; color: var(--muted); }
+.lat-words dl { margin: var(--sp-1) 0 0; }
+.lat-words dt { font-weight: 600; margin-top: var(--sp-1); }
+.lat-words dd { margin: 0 0 0 1.2rem; color: var(--muted); }
 
 /* The scope by band: a row a band, each a button that lists its stations. */
 .lat-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -4314,6 +4328,8 @@ hr {
 .lat-delay { display: block; max-width: 100%; }
 .lat-grid { stroke: var(--border); stroke-width: 1; }
 .lat-med { stroke: var(--text); stroke-width: 1; stroke-dasharray: 4 3; opacity: .7; }
+/* Where decodes stop, on the SNR chart. */
+.lat-floor { stroke: var(--bad); stroke-width: 1.2; stroke-dasharray: 2 3; }
 .lat-dots { fill: none; stroke: var(--accent); stroke-width: 3.2; stroke-linecap: round; opacity: .75; }
 
 .legend-lat-h { margin-bottom: 2px; }
