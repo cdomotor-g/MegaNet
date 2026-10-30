@@ -3199,6 +3199,11 @@ h2.h-bad {
    eighth of a stacked table 643 px wide, the narrowest the stacked shape is
    drawn at before its columns go automatic. */
 .stn-heard { padding-left: .35rem; padding-right: .35rem; }
+/* The Protocol column, while ⏱️ Latency & signal colours the pins by protocol
+   (MapLatency.protoCellHtml): the pin's own key, and stacked its word beside
+   it on one line — "ALERT2 at the station" may wrap under its key. */
+.stn-proto { padding-left: .35rem; padding-right: .35rem; }
+.lat-proto-cell { display: inline-flex; align-items: center; gap: 5px; }
 
 /* The station table when it is the column beside the map rather than the page
    (#186 — the column set itself is decided in stationsTable, app.js).
@@ -8808,6 +8813,15 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 .stn-card-freqs .freq-val,
 .stn-card-freqs .freq-why { display: block; }
 .stn-card-freqs .freq-why + .freq-val { margin-top: .2rem; }
+/* …and Protocol under them: how its readings came in, the pin's key before
+   the word and a slim bar of the shares under the note — legacy orange, both
+   ways striped, ALERT2 purple (MapLatency.protoBarHtml). Literal colours, as
+   the pins' are; the words beside it say the same. */
+.lat-proto-bar {
+  display: flex; width: 100%; max-width: 11rem; height: 6px; margin-top: .25rem;
+  border-radius: 2px; overflow: hidden; background: color-mix(in srgb, var(--muted) 14%, transparent);
+}
+.lat-proto-bar > i { display: block; height: 100%; }
 .hd-card-tx + .hd-card-tx { margin-top: .35rem; padding-top: .35rem; border-top: 1px dashed var(--border); }
 .hd-card-spark { display: flex; align-items: center; gap: .5rem; margin: .2rem 0; }
 .hd-card-spark .hl-drift-spark { flex: none; }

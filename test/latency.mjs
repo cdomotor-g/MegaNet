@@ -29,6 +29,16 @@
 //      strong station and one for the marginal, read off the map's canvas;
 //      the bars beside the pins under the Age colouring at once; unticked,
 //      no bars and none drawn.
+//   4c. **Protocol** — the demo week's strong station repacked into ALERT2,
+//      its fair one heard both ways: the rule (legacy, ALERT2, both across
+//      readings or within one, ALERT2 from the station's own address, a copy
+//      of no protocol saying nothing); coloured by protocol the three orange,
+//      purple and split, none a step bigger, the split read off the canvas;
+//      the pane counting each kind by its word with its meaning on hover, most
+//      on legacy first, its words in a fold; the legend and the map's name;
+//      nothing fetched for it; the station list's Protocol column and the
+//      card's Protocol line under Heard on, with its bar; the column gone
+//      under another colouring.
 //   5. **One station** — picked in the pane: on the map with its card, and in
 //      the pane its tiles, its checks slot by slot with the misses listed, its
 //      delay dot by dot and the receiver that carried it; the pane follows the
@@ -168,11 +178,15 @@ try {
     // And an SNR a station, a little either side of its level: strong, fair,
     // thin and marginal, the rest fair.
     const snrOf = { [w.roles.steady]: 19.6, [w.roles.steady2]: 13.4, [w.roles.steady3]: 11.0, [w.roles.fading]: 9.3 };
-    let k = 0;
+    // And a protocol: the strong station repacked into ALERT2 by a
+    // concentrator, the fair one heard both ways, every other one legacy.
+    let k = 0, j = 0;
     w.rows.forEach(r => {
       const id = whose(r.alert_id);
       if (id === w.roles.steady3) r.received_at = new Date(Date.parse(r.reading_ts) + 240e3).toISOString();
       r.snr_db = id ? (snrOf[id] || 15) + [0, 0.3, -0.3][k++ % 3] : null;
+      if (id === w.roles.steady) r.protocol = 2;
+      if (id === w.roles.steady2) r.protocol = j++ % 2 ? 2 : 1;
     });
     const last = {}, first = {};
     w.rows.forEach(r => {
@@ -228,6 +242,19 @@ try {
   check('SNR the other way, more is better: 18 dB and over strong, 12 fair, 10 thin, under 10 marginal',
     J(rules.snr) === J(['s0', 's0', 's1', 's1', 's2', 's2', 's3', 's3']), J(rules.snr));
   check('…and a band lights as many signal bars as it is strong: four, three, two, one', J(rules.bars) === J([4, 3, 2, 1]), J(rules.bars));
+  const proto = await page.evaluate(() => {
+    const tx = (t, ...cs) => ({ t, copies: cs.map(c => (typeof c === 'object' && c ? c : { proto: c, r: {} })) });
+    const P = (txs, t0) => { const p = HealthAnalysis.protocolOf(txs, t0); return [p.key, p.n, p.legacy, p.alert2, p.both, p.native]; };
+    return {
+      legacy: P([tx(1, 1), tx(2, 1, 1)]), alert2: P([tx(1, 2), tx(2, 2)]), across: P([tx(1, 1), tx(2, 2)]),
+      within: P([tx(1, 1, 2)]), native: P([tx(1, { proto: 2, r: { a2_station: 1001 } })]),
+      none: P([tx(1, 0), tx(2, null)]), since: P([tx(1, 1), tx(5, 2)], 3),
+    };
+  });
+  check('protocol: legacy, ALERT2, some each way (across readings or within one), ALERT2 from the station\'s own address; '
+    + 'a copy of no protocol says nothing; older than the window left out',
+    J(proto) === J({ legacy: ['legacy', 2, 2, 0, 0, 0], alert2: ['alert2', 2, 0, 2, 0, 0], across: ['both', 2, 1, 1, 0, 0],
+      within: ['both', 1, 0, 0, 1, 0], native: ['native', 1, 0, 1, 0, 1], none: [null, 0, 0, 0, 0, 0], since: ['alert2', 1, 0, 1, 0, 0] }), J(proto));
 
   // ── 2. Off until asked for ────────────────────────────────────────────
   log('\n2. Off until it is asked for\n');
@@ -401,8 +428,99 @@ try {
   }, R.steady);
   check('unticked, no pin carries bars and the legend drops them — the colours stay',
     !noBars.bars && noBars.signal === 0 && !noBars.opt && /^a\d$/.test(noBars.lat) && noBars.stored === 'off' && !noBars.legend, J(noBars));
+
+  // ── 4c. Protocol ──────────────────────────────────────────────────────
+  log('\n4c. Protocol: legacy ALERT or ALERT2, in the pins, the station list and the card\n');
+  const wBefore = count('window');
+  await page.evaluate(() => MapLatency.setMode('protocol'));
+  await waitTrue(page, id => { const m = state.mapMarkers.find(x => x.mnStationId === id); return m && /^p/.test(m.mnLatency || ''); }, R.steady);
+  const pr = { a2: await pin(page, R.steady), both: await pin(page, R.steady2), legacy: await pin(page, R.fading) };
+  const split = await page.evaluate(R => {
+    const o = id => state.mapMarkers.find(x => x.mnStationId === id).options;
+    return { a2: o(R.steady).mnFill2 || null, both: o(R.steady2).mnFill2 || null, legacy: o(R.fading).mnFill2 || null };
+  }, R);
+  check('coloured by protocol: the station repacked into ALERT2 purple, the one heard both ways split orange and purple, '
+    + 'a legacy one orange — kinds, so none a step bigger',
+    pr.a2.band === 'p2' && /^#7c35a3$/i.test(pr.a2.fill) && !split.a2
+      && pr.both.band === 'p1' && /^#e8711c$/i.test(pr.both.fill) && /^#7c35a3$/i.test(split.both || '')
+      && pr.legacy.band === 'p0' && /^#e8711c$/i.test(pr.legacy.fill) && !split.legacy
+      && [pr.a2, pr.both, pr.legacy].every(x => x.grow === 0), J({ pr, split }));
+  // The split read off the map's own canvas: either side of the pin's middle,
+  // clear of its white ring (a triangle a little low, where it is widest).
+  const splitPx = await page.evaluate(async id => {
+    const s = state.data.stations.find(x => x.id === id);
+    state.map.setView([s.lat, s.lon], 16, { animate: false });
+    await new Promise(r => setTimeout(r, 450));
+    const m = state.mapMarkers.find(x => x.mnStationId === id);
+    const rd = m._renderer, cv = rd._container, b = rd._bounds, k = cv.width / (b.max.x - b.min.x);
+    const ctx = cv.getContext('2d'), d = m._radius * 0.35, dy = m.options.mnShape === 'triangle' ? m._radius * 0.2 : 0;
+    const px = dx => Array.from(ctx.getImageData(Math.round((m._point.x + dx - b.min.x) * k), Math.round((m._point.y + dy - b.min.y) * k), 1, 1).data);
+    return { left: px(-d), right: px(d) };
+  }, R.steady2);
+  const orange = c => c[0] > 200 && c[1] > 80 && c[1] < 160 && c[2] < 90;
+  const purple = c => c[2] > c[1] + 60 && c[0] > c[1] + 30;
+  check('…the split read off the map\'s canvas: the both-ways pin\'s left half orange, its right half purple',
+    orange(splitPx.left) && purple(splitPx.right), J(splitPx));
+  const prPane = await page.evaluate(() => {
+    const el = document.getElementById('map-latency-panel');
+    const scale = '.lat-bars:not(.lat-bars--other)';
+    return { labels: [...el.querySelectorAll(`${scale} .lat-bar-label`)].map(x => x.textContent.replace(/\s+/g, ' ').trim()),
+             terms: [...el.querySelectorAll(`${scale} .lat-bar-label .term`)].map(t => t.title.length),
+             n: [...el.querySelectorAll(`${scale} .lat-bar-n`)].map(x => Number(x.textContent.replace(/\D/g, ''))),
+             head: (el.querySelector('.lat-h5') || {}).textContent || '',
+             first: (el.querySelector('.lat-list li') || {}).textContent.replace(/\s+/g, ' ') || '',
+             folds: [...el.querySelectorAll('.lat-words summary')].map(x => x.textContent.trim()),
+             legend: document.getElementById('map-legend').textContent.replace(/\s+/g, ' '),
+             name: document.getElementById('leaflet-map').getAttribute('aria-label') };
+  });
+  check('the pane counts each kind by its word, its meaning on hover — legacy ALERT, both ways, ALERT2, ALERT2 at the station',
+    J(prPane.labels) === J(['Legacy ALERT', 'Both ways', 'ALERT2', 'ALERT2 at the station']) && prPane.terms.length === 4
+      && prPane.terms.every(n => n > 60) && prPane.n[0] >= 1 && prPane.n[1] >= 1 && prPane.n[2] >= 1 && prPane.n[3] === 0, J(prPane));
+  check('…lists the stations most on legacy ALERT first, and keeps the protocol words in a fold of their own',
+    /Most on legacy ALERT/.test(prPane.head) && /all legacy ALERT/.test(prPane.first)
+      && prPane.folds.includes('What the protocol words here mean'), J(prPane));
+  check('…and the 🔑 legend and the map\'s name say the pins are coloured by protocol',
+    /Protocol — how its readings came in/.test(prPane.legend) && /coloured by protocol/.test(prPane.legend)
+      && /split pin came both ways/.test(prPane.legend) && /pins coloured by protocol/.test(prPane.name), J(prPane));
+  check('protocol rode in with the window: nothing fetched for it', count('window') === wBefore, J({ wBefore, now: count('window') }));
+
+  // The station list grows a Protocol column, the two stations picked into
+  // the map selection so both are rows whatever the row cap.
+  const prTable = await page.evaluate(R => {
+    state.mapSelection.add(R.steady); state.mapSelection.add(R.steady2);
+    rerenderStations();
+    const wrap = document.getElementById('stations-table-wrap');
+    const cell = id => {
+      const td = wrap.querySelector(`tr[data-sid="${CSS.escape(id)}"] td.stn-proto`);
+      return td ? { key: !!td.querySelector('.lat-key'), title: (td.querySelector('[title]') || {}).title || '' } : null;
+    };
+    return { head: (wrap.querySelector('thead th.stn-proto') || {}).textContent || '', a2: cell(R.steady), both: cell(R.steady2) };
+  }, R);
+  check('the station list grows a Protocol column: each row its pin\'s key, its kind and counts on hover',
+    /^(Protocol|Via)$/.test(prTable.head.trim()) && prTable.a2 && prTable.a2.key && /^ALERT2: \d+ readings? — \d+ inside ALERT2, in the last 7 days/.test(prTable.a2.title)
+      && prTable.both && /^Both ways: /.test(prTable.both.title) && /legacy ALERT/.test(prTable.both.title), J(prTable));
+
+  // …and the card says it too, under Heard on.
+  await page.evaluate(id => MapLatency.focus(id), R.steady2);
+  await waitTrue(page, () => {
+    const row = [...document.querySelectorAll('.stn-card-freqs .acma-row')].find(x => /Protocol/.test(x.firstElementChild.textContent));
+    return row && !/asking the datastore/.test(row.textContent);
+  });
+  const prCard = await page.evaluate(() => {
+    const row = [...document.querySelectorAll('.stn-card-freqs .acma-row')].find(x => /Protocol/.test(x.firstElementChild.textContent));
+    return row ? { text: row.textContent.replace(/\s+/g, ' ').trim(), bar: row.querySelectorAll('.lat-proto-bar > i').length,
+                   term: (row.querySelector('.term') || {}).title || '', key: !!row.querySelector('.lat-key') } : null;
+  });
+  check('the station\'s card says it under Heard on: both ways, how many readings each way over the pins\' window (the week, here), a bar of the shares',
+    prCard && /Both ways/.test(prCard.text) && /legacy ALERT/.test(prCard.text) && /inside ALERT2/.test(prCard.text)
+      && /in the last 7 days/.test(prCard.text) && prCard.bar >= 2 && prCard.key && prCard.term.length > 60, J(prCard));
+  await page.evaluate(() => { closeStnCard(false); clearMapSelection(); MapLatency.back(); });
+
   await page.evaluate(() => { MapLatency.setBars(true); MapLatency.setMode('checks'); MapLatency.setScope('view'); });
   await waitTrue(page, id => { const m = state.mapMarkers.find(x => x.mnStationId === id); return m && /^c/.test(m.mnLatency || '') && m.mnSignal; }, R.steady);
+  await waitTrue(page, () => !document.querySelector('#stations-table-wrap th.stn-proto'));
+  check('coloured by anything else, the Protocol column goes', await page.evaluate(() => !document.querySelector('#stations-table-wrap th.stn-proto')
+    && !!document.querySelector('#stations-table-wrap thead')));
 
   // ── 5. One station ────────────────────────────────────────────────────
   log('\n5. One station, picked\n');
@@ -429,8 +547,8 @@ try {
   }, R.fading);
   check('a station pressed in the pane is on the map with its card, and the pane is about it, focus on its name',
     one.card === R.fading && one.head === one.name && one.focus === 'lat-h-stn', J(one));
-  check('…its tiles: last heard, delay, checks received, the next check and its signal',
-    J(one.tiles) === J(['Last heard', 'Delay', 'Checks received', 'Next check', 'Signal (SNR)']), J(one.tiles));
+  check('…its tiles: last heard, delay, checks received, the next check, its signal and its protocol',
+    J(one.tiles) === J(['Last heard', 'Delay', 'Checks received', 'Next check', 'Signal (SNR)', 'Protocol']), J(one.tiles));
   check('…its SNR reading by reading, marginal in its tile, and each receiver\'s SNR beside its delay',
     one.snrChart && /Marginal/.test(one.snrTile) && /9\.\d dB/.test(one.snrTile) && one.rxSnr.some(v => /^9\.\d dB$/.test(v)), J(one));
   check('…its checks slot by slot, the misses drawn and named, the picture saying the counts',
@@ -911,6 +1029,7 @@ if (failed.length) {
   for (const f of failed) log(`  ✗ ${f.label}${f.detail ? `\n      ${f.detail}` : ''}`);
   process.exit(1);
 }
-log('\nPASS — ⏱️ Latency & signal colours every pin by age, delay, missed checks or SNR and keeps its shape and\n'
-  + '       outline, draws the SNR as signal bars beside the pins under any colouring, fetches the window once,\n'
+log('\nPASS — ⏱️ Latency & signal colours every pin by age, delay, missed checks, SNR or protocol and keeps its shape and\n'
+  + '       outline, draws the SNR as signal bars beside the pins under any colouring, says the protocol in the\n'
+  + '       station list and on the card, fetches the window once,\n'
   + '       sums up the stations in view, and shows a picked station\'s checks slot by slot; one colouring at a time.');

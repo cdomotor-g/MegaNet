@@ -6856,6 +6856,10 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
       mnOutline:   sym.outline,
       mnOutlineDash: sym.outlineDash,
       mnBars:      bars,
+      // Coloured by protocol: a both-ways station split down the middle, one
+      // sending ALERT2 itself with a dot (map-latency.js BANDS.protocol).
+      mnFill2:     hg && hg.fill2 ? hg.fill2 : null,
+      mnDot:       hg && hg.dot ? hg.dot : null,
     }).addTo(map);
     marker.mnStationId = s.id;             // lets the table below find its pin
     marker.mnStation   = s;                // and lets labels be re-picked on pan
@@ -7623,6 +7627,8 @@ const STATIONS_ROW_CAP = 500;
 // the table has been painted once, which is what keeps a resize before the tab
 // has ever rendered from calling for a repaint of nothing.
 let stationsColsNarrow = null;
+// …and whether it holds the Protocol column (syncStationsProtocol).
+let stationsProtoCol = false;
 
 // What the table says when it is listing a map selection rather than a filter
 // result — including the way back to the filter, which is the only way back.
@@ -7682,6 +7688,13 @@ function stationsTable(allStations) {
   stationsColsNarrow = narrow;
   if (narrow) askStationsSls();
   askStationsHeard();
+  // While ⏱️ Latency & signal colours the pins by protocol, a Protocol column
+  // last: each row's legacy ALERT or ALERT2, the same answer as its pin, from
+  // the readings the pins already fetched (MapLatency.protoCellHtml). Beside
+  // the map it is the key alone, ~30 px, the word on hover; stacked, the key
+  // and the word. The other columns give it the room, the name most.
+  const proto = typeof MapLatency !== 'undefined' && MapLatency.protoColumn();
+  stationsProtoCol = proto;
   return `
     ${selBar}
     ${capped ? `
@@ -7690,12 +7703,17 @@ function stationsTable(allStations) {
           onclick="state.stationsShowAll=true;rerenderStations()">show all</button>.</p>
     ` : ''}
     <table${narrow ? ' class="stn-table--narrow"' : ''}>
-      <colgroup>${narrow ? `
+      <colgroup>${narrow ? (proto ? `
+        <col style="width:22%"><col style="width:13.5%"><col style="width:15.5%">
+        <col style="width:13%"><col style="width:16%"><col style="width:12.5%"><col style="width:7.5%">` : `
         <col style="width:24.5%"><col style="width:14.5%"><col style="width:16.5%">
-        <col style="width:14%"><col style="width:17.5%"><col style="width:13%">` : `
+        <col style="width:14%"><col style="width:17.5%"><col style="width:13%">`) : (proto ? `
+        <col style="width:15%"><col style="width:7.5%"><col style="width:10%"><col style="width:10%">
+        <col style="width:9%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:4.5%">
+        <col style="width:6.5%"><col style="width:7.5%"><col style="width:9%">` : `
         <col style="width:17%"><col style="width:8%"><col style="width:11%"><col style="width:11%">
         <col style="width:10%"><col style="width:7.5%"><col style="width:7.5%"><col style="width:8%"><col style="width:5%">
-        <col style="width:6.5%"><col style="width:8.5%">`}
+        <col style="width:6.5%"><col style="width:8.5%">`)}
       </colgroup>
       <caption class="sr-only">${narrow
         ? 'Every station the filter matched — name, number, roles, ALERT addresses, SLS catchment, and '
@@ -7703,7 +7721,7 @@ function stationsTable(allStations) {
           + 'each, and selecting a row opens a card with its radio network, elevation and ARRO link.'
         : 'Every station the filter matched — name, number, roles, radio network, ALERT addresses, '
           + 'position, whether it is enabled, a link to its ARRO admin page, and how long since '
-          + 'Flood-Net last heard it'}</caption>
+          + 'Flood-Net last heard it'}${proto ? ', and the protocol its readings came in on — legacy ALERT or ALERT2' : ''}</caption>
       <thead>
         <tr>
           <th scope="col">Name</th><th scope="col">Stn #</th><th scope="col">Roles</th>
@@ -7712,7 +7730,8 @@ function stationsTable(allStations) {
           <th scope="col">SLS catchment</th>` : `
           <th scope="col">Lat</th><th scope="col">Lon</th>
           <th scope="col">Elev (AHD)</th><th scope="col">On</th><th scope="col">ARRO</th>`}
-          <th scope="col" class="stn-heard" title="How long since Flood-Net’s receivers last heard the station — coloured against its checks: green inside two, amber from two, red from four or a day">Last heard</th>
+          <th scope="col" class="stn-heard" title="How long since Flood-Net’s receivers last heard the station — coloured against its checks: green inside two, amber from two, red from four or a day">Last heard</th>${proto ? `
+          <th scope="col" class="stn-proto">${termHtml(narrow ? 'Via' : 'Protocol', MapLatency.protoWord())}</th>` : ''}
         </tr>
       </thead>
       <tbody>
@@ -7737,7 +7756,8 @@ function stationsTable(allStations) {
               ${narrow ? '' : `<td class="small">${s.radio_network_ids.map(id => esc(netName(id))).join(', ')}</td>`}
               <td class="small">${aids.map(id => markAlertId(id, marks.nums, marks.ranges)).join(', ')}</td>
               ${narrow ? `<td class="small">${slsCatchmentCell(s)}</td>` : stationWideCellsHtml(s)}
-              <td class="small stn-heard">${HealthGlance.heardCellHtml(s)}</td>
+              <td class="small stn-heard">${HealthGlance.heardCellHtml(s)}</td>${proto ? `
+              <td class="small stn-proto">${MapLatency.protoCellHtml(s, narrow)}</td>` : ''}
             </tr>`;
         }).join('')}
       </tbody>
@@ -7863,6 +7883,23 @@ function paintStationsHeard(id) {
     const td = tr.querySelector('td.stn-heard');
     const s = byId.get(tr.dataset.sid);
     if (td && s) td.innerHTML = HealthGlance.heardCellHtml(s);
+  });
+}
+
+// The Protocol column's half of ⏱️ Latency & signal (map-latency.js): told
+// whenever the colouring or its readings change. The column put in or taken
+// out rebuilds the table; an answer landing paints its cells in place, for the
+// Last heard column's reason.
+function syncStationsProtocol() {
+  const wrap = document.getElementById('stations-table-wrap');
+  if (!wrap || !state.data) return;
+  if (MapLatency.protoColumn() !== stationsProtoCol) { rerenderStations(); return; }
+  if (!stationsProtoCol) return;
+  const byId = new Map(state.data.stations.map(s => [s.id, s]));
+  wrap.querySelectorAll('tr[data-sid]').forEach(tr => {
+    const td = tr.querySelector('td.stn-proto');
+    const s = byId.get(tr.dataset.sid);
+    if (td && s) td.innerHTML = MapLatency.protoCellHtml(s, stationsColsNarrow);
   });
 }
 

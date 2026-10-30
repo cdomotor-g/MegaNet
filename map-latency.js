@@ -4,8 +4,9 @@
 //                It colours every station pin by how fresh its data is — how
 //                long since Flood-Net last heard it, how long its readings
 //                take to reach the database, or how many of its timed checks
-//                went missing — or by how strongly it is heard (its SNR), and
-//                can draw that SNR as signal bars beside each pin under any
+//                went missing — or by how strongly it is heard (its SNR), or
+//                by the protocol its readings came in on (legacy ALERT or
+//                ALERT2), and can draw that SNR as signal bars beside each pin under any
 //                colouring, so latency and signal show at once. Its pane sums
 //                it up for the stations in view, following the map as it
 //                moves. Pick a station on the map and the pane is about that
@@ -14,7 +15,7 @@
 //
 // After core.js (state, esc, escAttr, announce), app.js (refreshMapLayers,
 // rerenderMapLegend, rerenderMapDisplayControls, focusStationOnMap,
-// stationOwner, MAP_PIN_RING), map-controls.js (MapChrome), map-symbols.js
+// stationOwner, MAP_PIN_RING, syncStationsProtocol), map-controls.js (MapChrome), map-symbols.js
 // (MapSymbols), health-analysis.js (HealthAnalysis), health.js
 // (Health.fetchReadings, and the analysis the Station Health tab last made),
 // health-glance.js (HealthGlance — when each station was last heard),
@@ -57,6 +58,22 @@
 // 18 dB and over has room for a bad day's fade. A relayed copy is heard at the
 // repeater's strength, so for a station behind a repeater it is the last hop's
 // SNR, not the station's own — Backbone's carrier-checked figure is that one.
+//
+// ── And how it came in: Protocol ─────────────────────────────────────────────
+// A fifth colouring, and not a measure: which wire protocol each station's
+// readings reached Flood-Net in over the window, as the base stations decoded
+// every copy (reading.protocol — 1 legacy ALERT, 2 ALERT2), worked out by
+// HealthAnalysis.protocolOf so the station card's Protocol line
+// (frequencies.js) says the same. Four kinds, in the order the network is
+// moving: legacy ALERT (orange); both ways, some of each (split orange and
+// purple); inside ALERT2 (purple) — which today is a legacy station a
+// concentrator repacks on the way in, under its own ALERT address; and ALERT2
+// at the station, its own radio sending ALERT2 under its ALERT2 address
+// (purple with a white dot). Kinds, so nothing grows; the split and the dot are
+// the second channel, and orange and purple differ in lightness as well as
+// hue. Its readings are the window Delay, Checks and SNR already fetch, so it
+// costs nothing new, and while it is on the station list grows a Protocol
+// column saying the same of each row (protoColumn, protoCellHtml).
 //
 // ── Signal bars: latency and SNR at once ─────────────────────────────────────
 // A pin has one fill, so the SNR also has a mark of its own: four rising bars
@@ -172,8 +189,9 @@
 //          legendHtml, liveLegendHtml, barsLegendHtml, altText, barsAltText,
 //          noteText, on, anim, hidden, bars, setOn, setAnim, setThroughHidden,
 //          setBars, power, wantsHiddenLinks, hiddenLinks, setMode, setWin,
-//          setScope, pickBand, back, focus, refresh, yieldTo, and the rules
-//          for test/latency.mjs (classifyValue, quantile, BANDS).
+//          setScope, pickBand, back, focus, refresh, yieldTo, protoColumn,
+//          protoCellHtml, and the rules for test/latency.mjs (classifyValue,
+//          quantile, BANDS).
 const MapLatency = (() => {
   const SEC = 1000, MIN = 60000, HOUR = 3600000, DAY = 86400000;
 
@@ -308,11 +326,19 @@ const MapLatency = (() => {
     snr:    { label: 'SNR',    title: 'How strongly each station is heard: its signal over the receiver’s noise, in dB — the median over the window',
               long: 'its signal over the noise (SNR)',
               head: 'How strongly each is heard', worst: 'Weakest signal' },
+    protocol: { label: 'Protocol', title: 'How each station’s readings reached Flood-Net over the window: as legacy ALERT, inside ALERT2, or some each way',
+              long: 'how its readings came in — legacy ALERT or ALERT2',
+              head: 'How each station came in', worst: 'Most on legacy ALERT' },
   };
   const MODE_KEYS = Object.keys(MODES);
 
   // Fresh to stale. See the header for why literals and why these.
   const RAMP = ['#1a7f37', '#57a83a', '#a3b92b', '#e0a21b', '#e8711c', '#c8341f', '#6b1717'];
+  // Protocol's two colours. The purple is Signal Routes' ALERT2 (styles.css
+  // --sr-alert2, series 4); legacy is an orange rather than its blue, because
+  // blue and purple run together for red-green colour-blind eyes and on
+  // satellite imagery, where orange and purple differ in lightness too.
+  const PROTO = { legacy: '#e8711c', alert2: '#7c35a3' };
   // A value at or under `max` is in the band. Age in ms, delay in seconds,
   // checks as the share missed. `grow` is pixels on the pin's radius.
   const BANDS = {
@@ -349,6 +375,18 @@ const MapLatency = (() => {
       { k: 's2', min: 10,        label: '10 – 12 dB',     word: 'Thin',     fill: RAMP[4], grow: 1, bars: 2 },
       { k: 's3', min: -Infinity, label: 'under 10 dB',    word: 'Marginal', fill: RAMP[5], grow: 2, bars: 1 },
     ],
+    // Protocol is kinds, not a scale: nothing is worse, so nothing grows. In
+    // the order the network is moving — legacy, both, ALERT2, ALERT2 from the
+    // station itself. `key` is HealthAnalysis.protocolOf's; `fill2` paints the
+    // pin's right half (MapSymbols' mnFill2) and `dot` a dot in its middle
+    // (mnDot), so a split or a dot says it as well as the colour. `word` is
+    // meant in WORDS.
+    protocol: [
+      { k: 'p0', key: 'legacy', label: 'legacy ALERT',            word: 'Legacy ALERT',          fill: PROTO.legacy, grow: 0 },
+      { k: 'p1', key: 'both',   label: 'both ways',               word: 'Both ways',             fill: PROTO.legacy, fill2: PROTO.alert2, grow: 0 },
+      { k: 'p2', key: 'alert2', label: 'inside ALERT2',           word: 'ALERT2',                fill: PROTO.alert2, grow: 0 },
+      { k: 'p3', key: 'native', label: 'ALERT2 from the station', word: 'ALERT2 at the station', fill: PROTO.alert2, dot: '#ffffff', grow: 0 },
+    ],
   };
   // Where decodes stop, in dB over the noise (0083, backbone.js SNR_FLOOR).
   const SNR_FLOOR = 8.5;
@@ -370,7 +408,21 @@ const MapLatency = (() => {
       + 'at a different SNR at each base station — it is the path — so compare a receiver with itself.',
     'Signal bars': 'Four rising bars beside a pin, as many lit as its SNR band’s — four strong, three fair, two thin, one '
       + 'marginal — in the band’s colour. They show under any colouring of the pins, so latency and signal read at once.',
+    // Protocol's words (BANDS.protocol), for the same hover and fold.
+    Protocol: 'The radio format a station’s readings reached Flood-Net in, as the base station decoded each copy: legacy '
+      + 'ALERT (Binary, Enhanced iFLOWS or ASCII) or ALERT2. Counted over the window, reading by reading.',
+    'Legacy ALERT': 'Every reading in the window arrived as a legacy ALERT burst — from the station itself, or through '
+      + 'ALERT1 repeaters that pass the burst on as it is.',
+    'Both ways': 'Some readings arrived as legacy ALERT and some inside ALERT2: a base station hears this station, or a '
+      + 'repeater carrying it, as a legacy burst, and also through a concentrator that repacks it as ALERT2.',
+    ALERT2: 'Every reading arrived inside ALERT2 frames under the station’s own ALERT address: the station sends legacy '
+      + 'ALERT, and a concentrator on the way in repacks it as ALERT2.',
+    'ALERT2 at the station': 'The station’s own radio sends ALERT2 — an ERT-A2 or similar at the site — under its ALERT2 '
+      + 'station address, rather than a concentrator repacking a legacy burst.',
+    Concentrator: 'A repeater or ELPRO 115E-2 gateway set to concentration mode: it hears legacy ALERT bursts and passes '
+      + 'them on packed inside ALERT2 frames, each still under its station’s ALERT address.',
   };
+  const PROTO_WORDS = ['Protocol', ...BANDS.protocol.map(b => b.word), 'Concentrator'];
   // What is not a band. `fill: null` leaves the pin as the map would draw it
   // without this view (a gauge read by hand keeps its grey). The rings are
   // black-ish rather than white for HealthGlance's reason: a dash has to show
@@ -390,6 +442,7 @@ const MapLatency = (() => {
     delay:  'heard, no arrival times',
     checks: 'heard, no check schedule learned',
     snr:    'heard, no SNR recorded',
+    protocol: 'heard, protocol not recorded',
   };
   // Which of them a mode can produce: Age is known for every station heard, so
   // it has no "heard, but…" of its own.
@@ -542,6 +595,9 @@ const MapLatency = (() => {
     return list.find(b => x <= b.max) || list[list.length - 1];
   }
 
+  // Protocol's band for one of HealthAnalysis.protocolOf's keys.
+  const protocolBand = key => BANDS.protocol.find(b => b.key === key) || BANDS.protocol[0];
+
   // ── What is known about one station ───────────────────────────────────────
 
   // Delay, checks and SNR, off the window's analysis, once per analysis.
@@ -585,6 +641,8 @@ const MapLatency = (() => {
                      snr: quantile(p.s, 0.5), last: p.last }))
         .sort((a, b) => b.n - a.n),
       checks: sch && sch.counts ? Object.assign({}, sch.counts, { rate: sch.missRate || 0, P: sch.P }) : null,
+      // How its transmissions came in: legacy ALERT, inside ALERT2 or both.
+      proto: HealthAnalysis.protocolOf(S.txs),
     };
     statMemo.set(id, m);
     return m;
@@ -635,6 +693,12 @@ const MapLatency = (() => {
       const band = classifyValue('snr', st.snr.p50);
       return { key: band.k, band, value: st.snr.p50, last, st };
     }
+    // Protocol is a kind, not a value: its value is the share that came as
+    // legacy ALERT alone, so a list of the stations comes most-legacy first.
+    if (mode === 'protocol' && st && st.proto.key) {
+      const band = protocolBand(st.proto.key);
+      return { key: band.k, band, value: 1 - st.proto.a2Share, last, st };
+    }
     // Heard in the window — through its own readings, or by the ingest's
     // record of an address it shares with another station — and the measure
     // still not worked out.
@@ -660,13 +724,18 @@ const MapLatency = (() => {
   // ── The pins ──────────────────────────────────────────────────────────────
 
   // What refreshMapLayers lays over a pin's own style while the view is on:
-  // { cls, fill, ring, grow, weight, dash }, or null — the view off, the
-  // answer not in yet, or a station this view leaves as it is.
+  // { cls, fill, fill2, dot, ring, grow, weight, dash }, or null — the view
+  // off, the answer not in yet, or a station this view leaves as it is.
+  // `fill2` and `dot` are Protocol's: a right half in another colour, a dot
+  // in the middle.
   function pinStyle(s) {
     if (!U.on || !s) return null;
     const c = classOf(s);
     const ring = typeof MAP_PIN_RING !== 'undefined' ? MAP_PIN_RING : '#ffffff';
-    if (c.band) return { cls: c.key, fill: c.band.fill, ring, grow: c.band.grow, weight: null, dash: null };
+    if (c.band) {
+      return { cls: c.key, fill: c.band.fill, fill2: c.band.fill2 || null, dot: c.band.dot || null,
+               ring, grow: c.band.grow, weight: null, dash: null };
+    }
     const sp = SPECIAL[c.key];
     if (!sp || !sp.fill) return null;
     return { cls: c.key, fill: sp.fill, ring: sp.ring, grow: sp.grow, weight: sp.weight, dash: sp.dash };
@@ -692,6 +761,7 @@ const MapLatency = (() => {
         refreshMapLayers({ skipFit: true });
       }
       if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
+      tableSync();
       paint();
     }, 0);
   }
@@ -737,11 +807,12 @@ const MapLatency = (() => {
     }
     dirty();
     if (!opts.quiet) {
-      announce(U.on ? `Pins coloured by ${U.mode === 'snr' ? 'signal' : 'latency'} — ${MODES[U.mode].long}.${animToo ? ' Messages flash on the map as they land in the log.' : ''}${barsToo ? ' Signal bars beside the pins say each station’s SNR.' : ''} ${summaryText()}`
+      announce(U.on ? `Pins coloured by ${colouredBy(U.mode)} — ${MODES[U.mode].long}.${animToo ? ' Messages flash on the map as they land in the log.' : ''}${barsToo ? ' Signal bars beside the pins say each station’s SNR.' : ''} ${summaryText()}`
                     : 'Pins are back in their roles’ colours.');
     }
     if (typeof refreshMapLayers === 'function' && state.map) refreshMapLayers({ skipFit: true });
     if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
+    tableSync();
     paint();
   }
 
@@ -910,6 +981,7 @@ const MapLatency = (() => {
       if (seq !== W.seq) return;
       Object.assign(W, { status: 'error', at: now_(), error: errText(err), denied: isDenied(err) });
       if (U.announce) { U.announce = false; announce('Latency: the readings could not be fetched.'); }
+      tableSync();
       paint();
       return;
     }
@@ -926,6 +998,7 @@ const MapLatency = (() => {
     } catch (err) {
       Object.assign(W, { status: 'error', at: now_(), error: 'the analysis failed: ' + errText(err), denied: false });
       if (typeof recordError === 'function') recordError({ kind: 'latency', message: W.error, where: '', stack: (err && err.stack) || '' });
+      tableSync();
       paint();
       return;
     }
@@ -1011,7 +1084,8 @@ const MapLatency = (() => {
     const rows = sum.list.map(s => ({ s, c: classOf(s) }));
     const keyed = band ? rows.filter(r => r.c.key === band)
       : rows.filter(r => r.c.band);
-    // The weakest signal is the worst, where the longest wait is.
+    // The weakest signal is the worst, where the longest wait is; for
+    // Protocol, the station most on legacy ALERT (its value, protocolOf's).
     const sign = U.mode === 'snr' ? -1 : 1;
     const score = r => (r.c.value != null ? sign * r.c.value : r.c.last != null ? now - r.c.last : -1);
     keyed.sort((a, b) => score(b) - score(a) || String(a.s.name).localeCompare(String(b.s.name)));
@@ -1023,6 +1097,7 @@ const MapLatency = (() => {
       if (mode === 'age') return fmtAge(c.value);
       if (mode === 'delay') return fmtDelay(c.value);
       if (mode === 'snr') return fmtDb(c.value);
+      if (mode === 'protocol') return protoShort(c.st.proto);
       const k = c.st && c.st.checks;
       return k ? `${num(k.misses)} of ${num(k.due)} missed` : `${Math.round(100 * c.value)}%`;
     }
@@ -1030,6 +1105,23 @@ const MapLatency = (() => {
     if (c.key === 'unknown') return UNKNOWN_LABEL[mode];
     const sp = SPECIAL[c.key];
     return sp && sp.label ? sp.label : '';
+  }
+
+  // How a station came in, short, for a list: "all legacy ALERT", "35% inside ALERT2".
+  function protoShort(p) {
+    if (!p || !p.n) return '';
+    if (p.key === 'legacy') return 'all legacy ALERT';
+    if (p.key === 'alert2') return 'all inside ALERT2';
+    if (p.key === 'native') return 'ALERT2 from the station';
+    return `${pct(p.alert2 + p.both, p.n)}% inside ALERT2`;
+  }
+  // …and in full: "38 readings — 20 legacy ALERT, 12 inside ALERT2, 6 both ways".
+  function protoLong(p) {
+    if (!p || !p.n) return '';
+    const parts = [[p.legacy, 'legacy ALERT'], [p.alert2, 'inside ALERT2'], [p.both, 'both ways']]
+      .filter(([n]) => n).map(([n, w]) => `${num(n)} ${w}`);
+    return `${num(p.n)} reading${p.n === 1 ? '' : 's'} — ${parts.join(', ')}`
+      + (p.native ? `; ${num(p.native)} sent as ALERT2 by the station itself` : '');
   }
 
   function summaryText() {
@@ -1104,9 +1196,9 @@ const MapLatency = (() => {
       <div class="lat-controls">
         ${powerHtml()}
         <label class="filter-check lat-switch"
-               title="Colour every station pin by latency or by its signal instead of by its role. Its shape and the Bureau's outlines stay as they are.">
+               title="Colour every station pin by latency, by its signal or by the protocol its readings came in on, instead of by its role. Its shape and the Bureau's outlines stay as they are.">
           <input type="checkbox" data-lat-f="on" ${U.on ? 'checked' : ''} onchange="MapLatency.setOn(this.checked)">
-          Colour pins by latency or signal
+          Colour pins by latency, signal or protocol
         </label>
         <div class="lat-row"><span class="lat-row-h" aria-hidden="true">Colour by</span>
           ${seg('Colour by', MODE_KEYS.map(k => [k, MODES[k].label, MODES[k].title]), U.mode, 'setMode')}</div>
@@ -1230,9 +1322,24 @@ const MapLatency = (() => {
       <div class="adm-kpi-value">${value}</div><div class="adm-kpi-sub">${sub}</div></div>`;
   }
 
+  // A band's name in a row: its word, meant on hover, and its edges — SNR's
+  // "Thin · 10 – 12 dB". Protocol's kinds have no edges: the word alone.
+  function bandLabelHtml(r, mode) {
+    if (!r.word) return esc(r.label);
+    return mode === 'protocol' ? wordHtml(r) : `${wordHtml(r)} · ${esc(r.label)}`;
+  }
+
+  // A band's key as the pin wears it: Protocol's both ways split down the
+  // middle, its ALERT2 at the station with a dot in it.
+  function keyFill(b) {
+    if (b.fill2) return `linear-gradient(90deg, ${b.fill} 50%, ${b.fill2} 50%)`;
+    if (b.dot) return `radial-gradient(circle, ${b.dot} 0 30%, ${b.fill} 34%)`;
+    return b.fill;
+  }
+
   function swatch(key, mode) {
     const b = (BANDS[mode] || []).find(x => x.k === key);
-    if (b) return `<span class="lat-key" style="--dot:${b.fill}" aria-hidden="true"></span>`;
+    if (b) return `<span class="lat-key" style="--dot:${keyFill(b)}" aria-hidden="true"></span>`;
     return `<span class="lat-key lat-key--${esc(key)}" aria-hidden="true"></span>`;
   }
 
@@ -1281,7 +1388,7 @@ const MapLatency = (() => {
       : tile(`Signal (${snrTerm()})`, '…', W.status === 'error' ? 'the readings could not be fetched' : 'fetching the readings')
         + tile('Weak signal', '…', '');
     return head + `<div class="adm-kpis lat-kpis">${ageTiles}${winTiles}${snrTiles}</div>` + barsHtml(t, mode, now)
-      + receiversHtml() + netEventsHtml() + footHtml(mode) + wordsHtml();
+      + receiversHtml() + netEventsHtml() + footHtml(mode) + (mode === 'protocol' ? protoWordsHtml() : '') + wordsHtml();
   }
 
   // The scope by band, for the mode the pins wear — the legend, counted, and
@@ -1303,7 +1410,7 @@ const MapLatency = (() => {
                 data-lat-f="${escAttr('band:' + r.k)}" ${r.n ? '' : 'disabled'}
                 onclick="MapLatency.pickBand('${escAttr(r.k)}')"
                 title="${escAttr(r.n ? `List the ${r.n} station${r.n === 1 ? '' : 's'} ${r.label}` : `None ${r.label}`)}">
-          ${swatch(r.k, mode)}<span class="lat-bar-label">${r.word ? `${wordHtml(r)} · ` : ''}${esc(r.label)}</span>
+          ${swatch(r.k, mode)}<span class="lat-bar-label">${bandLabelHtml(r, mode)}</span>
           ${bar ? `<span class="lat-bar-track" aria-hidden="true"><span class="lat-bar-fill" style="width:${(100 * r.n / max).toFixed(1)}%;--dot:${escAttr(barColour(r.k, mode))}"></span></span>` : ''}
           <span class="lat-bar-n">${num(r.n)}</span></button></li>`;
     return `
@@ -1321,6 +1428,8 @@ const MapLatency = (() => {
   const scopeWord = () => (U.scope === 'view' ? 'in view' : 'on the map');
   function barColour(k, mode) {
     const b = (BANDS[mode] || []).find(x => x.k === k);
+    // A bar split down the middle reads as two bars: both ways is striped.
+    if (b && b.fill2) return `repeating-linear-gradient(135deg, ${b.fill} 0 4px, ${b.fill2} 4px 8px)`;
     if (b) return b.fill;
     return k === 'quiet' ? RAMP[6] : '#7b8189';
   }
@@ -1362,6 +1471,7 @@ const MapLatency = (() => {
       delay: 'Delay is how long a reading takes from being heard to reaching the database — each transmission’s first copy to land, the median over the window.',
       checks: 'Checks are each station’s timed reports, learned from its own rhythm. A miss counts only while a receiver that hears it was listening, and one most of the network missed at once is the network’s.',
       snr: 'SNR is how far each station’s signal stood above the receiver’s noise, as the base station measured the copy it kept — the Message Log’s SNR column. A station’s figure is the median over the window of each transmission’s strongest copy; one heard through a repeater carries the repeater’s last hop.',
+      protocol: 'Protocol is the radio format each station’s readings arrived in over the window, as the base stations decoded every copy. Today ALERT2 mostly means a legacy station a concentrator repacked on the way in; a station sending ALERT2 itself has a dot in its pin.',
     }[mode];
     return `<p class="small txt-muted lat-foot">${esc(what)} Pick a station on the map to see its checks slot by slot${mode === 'snr' ? ' and its SNR reading by reading' : ''}.</p>`;
   }
@@ -1377,6 +1487,18 @@ const MapLatency = (() => {
         <dl>${keys.map(k => {
           const b = BANDS.snr.find(x => x.word === k);
           return `<dt>${b ? barsSvg(b.bars, b.fill) + ' ' : ''}${esc(k)}${b ? ` <span class="txt-muted">${esc(b.label)}</span>` : ''}</dt><dd>${esc(WORDS[k])}</dd>`;
+        }).join('')}</dl>
+      </details>`;
+  }
+
+  // Protocol's words with their meanings, the same way, each with its key.
+  function protoWordsHtml() {
+    return `
+      <details class="lat-words small">
+        <summary>What the protocol words here mean</summary>
+        <dl>${PROTO_WORDS.map(k => {
+          const b = BANDS.protocol.find(x => x.word === k);
+          return `<dt>${b ? swatch(b.k, 'protocol') + ' ' : ''}${esc(k)}</dt><dd>${esc(WORDS[k])}</dd>`;
         }).join('')}</dl>
       </details>`;
   }
@@ -1444,7 +1566,13 @@ const MapLatency = (() => {
           cs.band.bars <= 2 ? 'adm-kpi--warn' : 'adm-kpi--ok')
       : tile(`Signal (${snrTerm()})`, '—', S ? 'its readings carry no SNR — no base station that measures one kept them'
                                             : 'nothing from it in the window');
-    let body = `<div class="adm-kpis lat-kpis">${ageTile}${delayTile}${checkTile}${nextTile}${snrTile}</div>`;
+    // And how its readings came in — legacy ALERT or ALERT2 — whatever the pins wear.
+    const pr = st && st.proto;
+    const prLabel = termHtml('Protocol', WORDS.Protocol);
+    const protoTile = !W.A ? tile(prLabel, '…', '')
+      : pr && pr.key ? tile(prLabel, `${swatch(protocolBand(pr.key).k, 'protocol')} ${wordHtml(protocolBand(pr.key))}`, esc(protoLong(pr)))
+      : tile(prLabel, '—', S ? 'its readings say no radio format — typed in, or a logger’s own upload' : 'nothing from it in the window');
+    let body = `<div class="adm-kpis lat-kpis">${ageTile}${delayTile}${checkTile}${nextTile}${snrTile}${protoTile}</div>`;
     if (c.band || SPECIAL[c.key]) {
       body += `<p class="small lat-stn-band">${swatch(c.key, U.mode)} On the map now: <b>${esc(c.band ? c.band.label
         : c.key === 'unknown' ? UNKNOWN_LABEL[U.mode] : (SPECIAL[c.key].label || ''))}</b> — ${esc(MODES[U.mode].long)}.</p>`;
@@ -2707,23 +2835,71 @@ const MapLatency = (() => {
     if (el) el.innerHTML = liveStatusHtml();
   }
 
+  // ── The station list's Protocol column ────────────────────────────────────
+  // While the pins are coloured by protocol, the table under the map says the
+  // same of each row (app.js stationsTable): the column comes and goes with
+  // the colouring, so it costs nothing the pins have not already fetched, and
+  // a row cannot disagree with its pin. tableSync() is told whenever either
+  // changes — the column put in or taken out rebuilds the table, an answer
+  // landing paints its cells in place (app.js syncStationsProtocol).
+  const protoColumn = () => !!(U.on && U.mode === 'protocol');
+  function protoCellHtml(s, narrow) {
+    if (!W.A) {
+      return W.status === 'error'
+        ? '<span class="txt-muted" title="The readings could not be fetched — ⏱️ Latency &amp; signal says why">?</span>'
+        : '<span class="txt-muted" title="Fetching the readings">…</span>';
+    }
+    const c = classOf(s, 'protocol');
+    if (c.band) {
+      const tip = `${c.band.word}: ${protoLong(c.st.proto)}, in the last ${winOf(U.win)[1]}. ${WORDS[c.band.word]}`;
+      return `<span class="lat-proto-cell" title="${escAttr(tip)}">${swatch(c.key, 'protocol')}${narrow ? '' : ` ${esc(c.band.word)}`}</span>`;
+    }
+    const label = c.key === 'unknown' ? UNKNOWN_LABEL.protocol : (SPECIAL[c.key] && SPECIAL[c.key].label) || '';
+    return label ? `<span class="txt-muted" title="${escAttr(label[0].toUpperCase() + label.slice(1))}">—</span>` : '';
+  }
+  function tableSync() {
+    if (typeof syncStationsProtocol === 'function') syncStationsProtocol();
+  }
+
+  // ── The station card's Protocol line (frequencies.js) ─────────────────────
+  // Its words, keys and colours are this file's, so the card, the pane, the
+  // legend and the pins say a kind one way.
+  const protoKeyHtml = key => swatch(protocolBand(key).k, 'protocol');
+  const protoTermHtml = key => wordHtml(protocolBand(key));
+  // A station's transmissions by how they came — legacy, both (striped),
+  // ALERT2 — as one slim bar.
+  function protoBarHtml(p) {
+    if (!p || !p.n) return '';
+    const part = (n, bg) => (n ? `<i style="width:${(100 * n / p.n).toFixed(1)}%;background:${bg}"></i>` : '');
+    return `<span class="lat-proto-bar" role="img" aria-label="${escAttr(protoLong(p))}">${part(p.legacy, PROTO.legacy)}`
+      + `${part(p.both, barColour('p1', 'protocol'))}${part(p.alert2, PROTO.alert2)}</span>`;
+  }
+  // The window the pins are coloured over: [ms, words].
+  const windowSpan = () => [winOf(U.win)[2] * DAY, winOf(U.win)[1]];
+
   // ── The legend, the map's name, Map display's note ────────────────────────
+
+  // What the pins are coloured by, in a word, for a mode.
+  const colouredBy = mode => (mode === 'snr' ? 'signal' : mode === 'protocol' ? 'protocol' : 'latency');
 
   function legendHtml() {
     if (!U.on) return '';
     const mode = U.mode;
     const t = (mode === 'age' && (netKnown() || W.A)) || (mode !== 'age' && W.A) ? summary() : null;
-    const by = mode === 'snr' ? 'signal' : 'latency';
+    const by = colouredBy(mode);
     const rows = BANDS[mode].map(b => ({ k: b.k, label: b.label, word: b.word }))
       .concat(specialsFor(mode).map(k => ({ k, label: k === 'unknown' ? UNKNOWN_LABEL[mode] : SPECIAL[k].label })));
-    return `<span class="legend-item legend-lat-h"><span class="small"><strong>⏱️ ${mode === 'snr' ? 'Signal' : 'Latency'} — ${esc(MODES[mode].long)}</strong></span></span>`
+    const what = mode === 'protocol'
+      ? 'A split pin came both ways; a dot, the station sends ALERT2 itself.'
+      : 'The worse bands are a step bigger.';
+    return `<span class="legend-item legend-lat-h"><span class="small"><strong>⏱️ ${by[0].toUpperCase() + by.slice(1)} — ${esc(MODES[mode].long)}</strong></span></span>`
       + rows.map(r => `
       <span class="legend-item">
         ${swatch(r.k, mode)}
-        <span class="small">${r.word ? `${wordHtml(r)} · ${esc(r.label)}` : esc(r.label[0].toUpperCase() + r.label.slice(1))}${t ? ` <span class="txt-muted">(${num(t.bands.get(r.k) || 0)})</span>` : ''}</span>
+        <span class="small">${r.word ? bandLabelHtml(r, mode) : esc(r.label[0].toUpperCase() + r.label.slice(1))}${t ? ` <span class="txt-muted">(${num(t.bands.get(r.k) || 0)})</span>` : ''}</span>
       </span>`).join('') + `
       <span class="legend-item legend-off">
-        <span class="small txt-muted">Pins are coloured by ${by}, not by role${t && U.scope === 'view' ? ' — counted in view' : ''}. The worse bands are a step bigger.
+        <span class="small txt-muted">Pins are coloured by ${by}, not by role${t && U.scope === 'view' ? ' — counted in view' : ''}. ${what}
           Shapes and the forecast and information outlines are as always. ⏱️ Latency &amp; signal in the side panel says more.</span>
       </span>`;
   }
@@ -2763,7 +2939,7 @@ const MapLatency = (() => {
   // A clause for the map's accessible name while the pins wear it.
   function altText() {
     if (!U.on) return '';
-    const by = U.mode === 'snr' ? 'signal' : 'latency';
+    const by = colouredBy(U.mode);
     if (U.mode !== 'age' && !W.A) return `pins coloured by ${by} (${MODES[U.mode].label}) once the readings are in`;
     return `pins coloured by ${by}, ${MODES[U.mode].long} — ${summaryText().replace(/\.$/, '')}`;
   }
@@ -2776,7 +2952,7 @@ const MapLatency = (() => {
 
   // What Map display's health switch says while this view has the pins.
   function noteText() {
-    return U.on ? `Off — the pins are coloured by ${U.mode === 'snr' ? 'signal' : 'latency'} (⏱️ Latency & signal, in the side panel).` : '';
+    return U.on ? `Off — the pins are coloured by ${colouredBy(U.mode)} (⏱️ Latency & signal, in the side panel).` : '';
   }
 
   // ── The map ───────────────────────────────────────────────────────────────
@@ -2786,7 +2962,7 @@ const MapLatency = (() => {
     root = null;
     MapChrome.panel(m, {
       id: 'latency', icon: '⏱️', dockIcon: Glyphs.rail('latency'), title: 'Latency & signal',
-      btnLabel: 'Latency & signal — colour the pins by how fresh each station’s data is or by its SNR, show its SNR as signal bars beside each pin, and see its checks slot by slot',
+      btnLabel: 'Latency & signal — colour the pins by how fresh each station’s data is, by its SNR or by the protocol it came in on (legacy ALERT or ALERT2), show its SNR as signal bars beside each pin, and see its checks slot by slot',
       group: 'show', order: 40,
       html: () => `<div class="lat-pane" id="map-latency-panel">${paneHtml()}</div>`,
       onMount(el) { root = el.querySelector('#map-latency-panel'); },
@@ -2834,6 +3010,10 @@ const MapLatency = (() => {
   return {
     attach, detach, reset, shown, opened, showBars, follow, pinStyle, barsFor,
     legendHtml, liveLegendHtml, barsLegendHtml, altText, barsAltText, noteText,
+    // the station list's Protocol column, while the pins are coloured by protocol
+    protoColumn, protoCellHtml, protoWord: () => WORDS.Protocol,
+    // …and the station card's Protocol line (frequencies.js)
+    protoKeyHtml, protoTermHtml, protoBarHtml, protoText: protoLong, windowSpan,
     on: () => U.on,
     anim: () => U.anim,
     hidden: () => U.hidden,

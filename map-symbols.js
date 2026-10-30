@@ -266,7 +266,8 @@ const MapSymbols = (function () {
   // A CircleMarker that may be a triangle and may carry an outline: three
   // options (`mnShape`, `mnOutline` and its `mnOutlineDash`) — and a fourth,
   // `mnBars` { n, fill }, ⏱️ Latency & signal's signal bars at its right
-  // (map-latency.js barsFor) — and one drawing
+  // (map-latency.js barsFor), and its Protocol colouring's two, `mnFill2` a
+  // second colour on the right half and `mnDot` a dot in the middle — and one drawing
   // routine on the canvas renderer the Stations map draws with (preferCanvas, app.js initMap). Everything else is
   // CircleMarker's own, which is the point — setStyle, setRadius, the click
   // test, setLatLng for the fan-out, the 3-D mirror reading `options` — every
@@ -358,6 +359,32 @@ const MapSymbols = (function () {
         if (tri) triPath(ctx, p.x, p.y, r);
         else ctx.arc(p.x, p.y, Math.max(Math.round(r), 1), 0, Math.PI * 2, false);
         this._fillStroke(ctx, layer);
+        // Protocol's both ways (map-latency.js): the right half in a second
+        // colour, clipped to the mark, then the ring drawn over the seam again.
+        // The path survives save/restore, so the ring is the same stroke.
+        if (o.mnFill2 && o.fill) {
+          ctx.save();
+          ctx.clip();
+          ctx.globalAlpha = o.fillOpacity;
+          ctx.fillStyle = o.mnFill2;
+          ctx.fillRect(p.x, p.y - r - 1, r + 1, 2 * r + 2);
+          ctx.restore();
+          if (o.stroke && o.weight !== 0) {
+            ctx.globalAlpha = o.opacity;
+            ctx.lineWidth = o.weight;
+            ctx.strokeStyle = o.color;
+            ctx.stroke();
+          }
+        }
+        // …and its ALERT2 at the station: a dot in the middle (the centroid,
+        // for a triangle).
+        if (o.mnDot && o.fill) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, Math.max(1.5, r * 0.36), 0, Math.PI * 2, false);
+          ctx.globalAlpha = o.fillOpacity;
+          ctx.fillStyle = o.mnDot;
+          ctx.fill();
+        }
         if (o.mnBars && o.mnBars.n) drawBars(ctx, p, r, o);
       },
     });

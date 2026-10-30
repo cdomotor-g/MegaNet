@@ -843,6 +843,41 @@ const HealthAnalysis = (() => {
     }, f);
   }
 
+  // ── how a station comes in ───────────────────────────────────────────────────
+
+  // Which wire protocol a station's transmissions reached Flood-Net in, from
+  // the copies the receivers kept (meganet.protocol: 1 legacy ALERT, 2
+  // ALERT2). A legacy station a concentrator repacks into ALERT2 arrives
+  // inside ALERT2 under its own ALERT address; an ALERT2 field station arrives
+  // under its ALERT2 address (`a2_station`, 0024) — it sends ALERT2 itself. A
+  // transmission one receiver heard as a legacy burst and another inside
+  // ALERT2 came both ways; a copy of no protocol (typed in, a logger's own
+  // upload) says nothing either way. For ⏱️ Latency & signal's Protocol
+  // colouring and the station card's Protocol line alike, so the two agree.
+  //   txs  a station's transmissions (run()'s S.txs); t0 drops the older ones
+  //   →    { key: 'legacy' | 'both' | 'alert2' | 'native' | null,
+  //          n, legacy, alert2, both, native, a2Share }
+  // `legacy`, `alert2` and `both` count transmissions by how they came,
+  // `native` those whose ALERT2 copy came from the station's own ALERT2
+  // address, and `a2Share` is the share that came inside ALERT2 at all.
+  function protocolOf(txs, t0) {
+    let n = 0, legacy = 0, alert2 = 0, both = 0, native = 0;
+    for (const tx of txs || []) {
+      if (t0 != null && tx.t < t0) continue;
+      let l = false, a = false, own = false;
+      for (const c of tx.copies || []) {
+        if (c.proto === 1) l = true;
+        else if (c.proto === 2) { a = true; if (c.r && c.r.a2_station != null) own = true; }
+      }
+      if (!l && !a) continue;
+      n++;
+      if (l && a) both++; else if (l) legacy++; else alert2++;
+      if (own) native++;
+    }
+    const key = !n ? null : both || (legacy && alert2) ? 'both' : legacy ? 'legacy' : native ? 'native' : 'alert2';
+    return { key, n, legacy, alert2, both, native, a2Share: n ? (alert2 + both) / n : null };
+  }
+
   // ── the analysis ─────────────────────────────────────────────────────────────
 
   // rows    meganet.reading rows (any protocol)
@@ -2029,6 +2064,9 @@ const HealthAnalysis = (() => {
     // leaves out — for the station editor's sparklines too
     // (sensor-sparks.js), so a row's line is Station Health's.
     rainOf, spikesOf,
+    // How a station's transmissions came in — legacy ALERT, inside ALERT2 or
+    // both — for ⏱️ Latency & signal's Protocol colouring and the card's line.
+    protocolOf,
     fmtWhen, fmtSpan, fmtPeriod, ACTION, CATEGORY, CURRENT_KINDS,
     // Whether a silence went at night and came back in daylight, in the
     // site's own solar time — for the Repeaters card's shared silences too.

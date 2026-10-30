@@ -4,15 +4,17 @@
 //                 every other channel it or a base station uses (0033) — as
 //                 rows in the station editor that "+ Add frequency" adds to,
 //                 and as a line each on the station card. And on the card,
-//                 under them, what it is *assumed* to transmit on and what it
-//                 was *heard on* (see "Assumed, and heard on" below).
+//                 under them, what it is *assumed* to transmit on, what it
+//                 was *heard on* (see "Assumed, and heard on" below), and the
+//                 protocol its readings came in on — legacy ALERT or ALERT2.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, hintToggleHtml, fmtKm and
 // acmaHaversineKm, to station-editor.js for editorUnsavedRemoved/
 // editorUnsavedRefresh when a row comes and goes, to app.js for stationAlertIds
-// and findRepeaterMatches, and to health-glance.js for HealthGlance.channels and
-// onHeard. station-editor.js places editorHtml() and reads readForm()/
+// and findRepeaterMatches, to health-glance.js for HealthGlance.channels,
+// protocol and onHeard, and to map-latency.js for the Protocol line's window,
+// words and keys (MapLatency.windowSpan, protoKeyHtml…). station-editor.js places editorHtml() and reads readForm()/
 // formProblem() on save; app.js's stnCardHtml() places cardHtml(). All of it at
 // call time: the IIFE body only declares, so this file's position among the
 // modules is free (`npm run toplevel`).
@@ -55,6 +57,12 @@
 // so it costs no request of its own, and painted in place when they land.
 // Each channel says what is known to be on it: its assumed TX (heard direct),
 // a carrier's TX (relayed), or neither.
+//
+// **Protocol**, under it, is how those readings came in: legacy ALERT, inside
+// ALERT2 (a concentrator repacking the station's legacy bursts), some each
+// way, or ALERT2 sent by the station itself — over the window ⏱️ Latency &
+// signal colours the pins over, by the same rule (HealthAnalysis.protocolOf),
+// so the line and the pin say the same.
 
 const Frequencies = (function () {
 
@@ -198,8 +206,41 @@ const Frequencies = (function () {
     }).join('') + (shared ? note(shared) : ''));
   }
 
+  // How its readings came in: legacy ALERT, inside ALERT2, some each way, or
+  // ALERT2 from the station itself — counted over the window ⏱️ Latency &
+  // signal colours the pins over (24 h unless somebody picked another), so
+  // the line says what the station's pin says when the pins are coloured by
+  // protocol. From the same readings as Heard on (HealthGlance.protocol); the
+  // words, keys and colours are MapLatency's.
+  function protoHtml(s) {
+    if (s.proposed || !radio(s) || typeof HealthGlance === 'undefined' || !HealthGlance.protocol
+      || typeof MapLatency === 'undefined' || !MapLatency.windowSpan) return '';
+    const [span, label] = MapLatency.windowSpan();
+    const a = HealthGlance.protocol(s.id, Date.now() - span);
+    const title = `${MapLatency.protoWord()} Counted over the last ${label}, the window ⏱️ Latency & signal colours the pins over.`;
+    if (!a || a.status === 'asking') {
+      return row('Protocol', title, '<span class="txt-muted" aria-busy="true">asking the datastore…</span>');
+    }
+    if (a.status === 'error') {
+      return row('Protocol', title, muted('could not ask the datastore') + note('The Health section above says why, with Try again.'));
+    }
+    const kind = p => `<span class="freq-val">${MapLatency.protoKeyHtml(p.key)} ${MapLatency.protoTermHtml(p.key)}</span>`;
+    if (a.p.n) {
+      return row('Protocol', title, kind(a.p) + note(`${MapLatency.protoText(a.p)}, in the last ${label}`)
+        + MapLatency.protoBarHtml(a.p));
+    }
+    // Nothing in the window: the card's week says how it came in before.
+    if (a.week.n) {
+      return row('Protocol', title, kind(a.week)
+        + note(`nothing in the last ${label}; since ${day(a.since)}${a.capped ? ' (its newest 1,000 readings)' : ''}: ${MapLatency.protoText(a.week)}`));
+    }
+    return row('Protocol', title, muted(a.shared ? 'not told apart' : 'nothing recorded') + note(a.shared
+      ? 'Its readings came on addresses it shares with other stations, and nothing heard with them says they were this station’s.'
+      : 'None of its readings in the datastore says a radio format.'));
+  }
+
   // The block's inside: the pairs on record, one to a line the way the AlertID
-  // block lists addresses, then Assumed and Heard on. paint() redraws it.
+  // block lists addresses, then Assumed, Heard on and Protocol. paint() redraws it.
   function innerHtml(s) {
     const lines = pairs(s).map(f => {
       const what = [f.primary ? 'primary' : '', f.label || '', f.acma_licence ? `licence ${f.acma_licence}` : '']
@@ -209,7 +250,7 @@ const Frequencies = (function () {
     });
     const C = carriersOf(s);
     return `<span class="small txt-muted">Frequencies</span>${lines.length ? '<br>' + lines.join('<br>') : ''}`
-      + assumedHtml(C) + heardHtml(s, C);
+      + assumedHtml(C) + heardHtml(s, C) + protoHtml(s);
   }
 
   const cardId = id => `mn-freqs-card-${id}`;

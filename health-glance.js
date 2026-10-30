@@ -315,6 +315,9 @@ const HealthGlance = (() => {
       hasBattery: hasBattery || !!S.battery,
       findings, sev: worstSev(findings), rows: win.length, t0, newest, capped, shared: false,
       checks: checksOf(S),
+      // Its transmissions, for the Protocol line (protocol()): which window
+      // to count over is asked when the line is drawn, not here.
+      txs: S.txs,
     };
   }
 
@@ -1175,6 +1178,22 @@ const HealthGlance = (() => {
     return { status: c.status === 'error' ? 'error' : 'asking' };
   }
 
+  // How its card's readings came in — legacy ALERT or ALERT2 — for
+  // frequencies.js's Protocol line: HealthAnalysis.protocolOf over its
+  // transmissions since t0 (the window ⏱️ Latency & signal colours the pins
+  // over, so the line and the pin agree), and over the card's whole week as
+  // well, for a station that sent nothing since. Null before the card has
+  // asked, `asking` while it does with nothing in hand, `error` when it could
+  // not; else { status: 'ok', p, week, since, capped, shared }.
+  function protocol(id, t0) {
+    const c = cards.get(id);
+    if (!c) return null;
+    const g = c.glance;
+    if (!g) return { status: c.status === 'error' ? 'error' : 'asking' };
+    return { status: 'ok', p: HealthAnalysis.protocolOf(g.txs, t0), week: HealthAnalysis.protocolOf(g.txs),
+             since: g.t0, capped: g.capped, shared: g.shared };
+  }
+
   // A line on the card, pressed: the Station Health tab, on this station, at
   // the part of it the line was about. Out of full screen first, for the
   // reason fieldDataFromCard gives — the tab would be switched invisibly
@@ -1189,8 +1208,9 @@ const HealthGlance = (() => {
   return {
     // the card
     cardHtml, ask, retry, open,
-    // the channels its readings were heard on, for its frequencies (frequencies.js)
-    channels,
+    // the channels its readings were heard on, and how they came in, for its
+    // frequencies (frequencies.js)
+    channels, protocol,
     // its checks, slot by slot: the strip's press, and the editor's copy
     stripClick, checksHtml,
     // the pins

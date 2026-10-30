@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 161, date: '2026-10-30', items: [
+      '📡 <strong>Legacy ALERT or ALERT2, on the Stations map.</strong> ⏱️ Latency &amp; signal\'s <em>Colour by</em> row has a fifth '
+        + 'choice, <strong>Protocol</strong>: each pin coloured by how its readings reached Flood-Net over the last 24 h (or 3 or 7 days). '
+        + 'Orange is <em>legacy ALERT</em>; purple is <em>ALERT2</em>, which today means a legacy station that a concentrator repacks '
+        + 'into ALERT2 on the way in; a pin split orange and purple came <em>both ways</em>; and a purple pin with a white dot is a '
+        + 'station whose own radio sends ALERT2 (none yet). The pane counts each kind and lists the stations most on legacy first. '
+        + 'While the pins are coloured by protocol, the station list under the map gets a <strong>Protocol</strong> column. Every '
+        + 'station\'s card now has a <strong>Protocol</strong> line under <em>Heard on</em>, with how many readings came each way. '
+        + 'Hover a word for what it means.',
+    ] },
     { n: 160, date: '2026-10-30', items: [
       '🗺️ <strong>The minimap can be any size.</strong> Drag its top-left corner to make it bigger or smaller — or, with the '
         + 'corner focused, use the arrow keys. This device keeps the size; <em>Small</em>, <em>Medium</em> and <em>Large</em> in its '
