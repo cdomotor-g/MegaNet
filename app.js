@@ -8765,7 +8765,7 @@ function stnCardHtml(s) {
     <div class="acma-sect" id="${escAttr(slsId)}"
          data-mn-sls="${escAttr(s.station_number || '')}">${sls.html}</div>
     <!-- The logger at the site — its LPU type, serial number and versions
-         (0089, station-lpu.js): approved accounts, filled after the fetch by
+         (0090, station-lpu.js): approved accounts, filled after the fetch by
          StationLpu.cardAsk, values the photo reader read marked 📷, and not
          drawn at all when nothing is recorded. -->
     ${typeof StationLpu !== 'undefined' ? StationLpu.cardHtml(s) : ''}

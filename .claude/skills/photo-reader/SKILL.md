@@ -51,7 +51,7 @@ select count(*) from meganet.photos_to_read('agent:photo-reader', 1, 1000);
 ```
 
 If it is 0, report "No new photos to read" and stop. If the function does not
-exist, 0089 has not been applied — report that and stop.
+exist, 0090 has not been applied — report that and stop.
 
 ## 1. Fetch the photos
 

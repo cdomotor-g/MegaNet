@@ -18628,7 +18628,7 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 .stn-card-equip:empty { display: none; }
 .stn-card-equip-h { display: block; margin-bottom: .25rem; }
 
-/* A station's logger (station-lpu.js, 0089). On the card, gone when nothing is
+/* A station's logger (station-lpu.js, 0090). On the card, gone when nothing is
    recorded, as the Equipment section under it is. In the editor, a value the
    photo reader read wears a chip in the warning's tint until a person says it
    is right, then the ok's; the chip carries a word, so the colour never has to.

@@ -1,6 +1,6 @@
 // MegaNet — station-lpu.js
 //
-//   StationLpu   a station's logger (LPU, 0089): what type it is, its serial
+//   StationLpu   a station's logger (LPU, 0090): what type it is, its serial
 //                number, and the versions that matter for that kind of unit —
 //                an ELPRO ERT-A2's firmware, bootloader and radio firmware, a
 //                Campbell logger's OS and program. On the station card for an
@@ -27,7 +27,7 @@
 // the reader filled carries a 📷 chip until somebody ticks Right or types
 // another — the photo it came off a press away — and a photo that shows
 // something different from the record is said under the box, with Use it.
-// The record is never changed by a photo over a person's value: 0089 says why.
+// The record is never changed by a photo over a person's value: 0090 says why.
 //
 // ── A type that is not on the list ────────────────────────────────────────────
 // The LPU type box offers the list as you type. A type it does not know is
@@ -113,7 +113,7 @@ const StationLpu = (function () {
   }
 
   // A station's record, its readings and its history — the last two only for
-  // an editor, whose they are (0089). Kept a minute; `force` asks again.
+  // an editor, whose they are (0090). Kept a minute; `force` asks again.
   function ask(id, { force = false } = {}) {
     if (!id || !member()) return Promise.resolve(null);
     const r = recs[id];
@@ -276,7 +276,7 @@ const StationLpu = (function () {
     }
     if (typesMissing || (rec && rec.missing)) {
       return wrap(`<p class="small ef-note">The database does not keep logger details yet — they arrive with
-        db/migrations/0089_station_lpu.sql.</p>`, false);
+        db/migrations/0090_station_lpu.sql.</p>`, false);
     }
     if (rec && rec.error) {
       return wrap(`<p class="small ef-note">The logger's details could not be read: ${esc(rec.error)}.
@@ -365,7 +365,7 @@ const StationLpu = (function () {
   }
 
   // What the photo reader has done here — an editor's line, since the
-  // readings are editors' (0089).
+  // readings are editors' (0090).
   function readerHtml(rec) {
     const rs = (rec && rec.readings) || [];
     if (!editor() || !rs.length) return '';

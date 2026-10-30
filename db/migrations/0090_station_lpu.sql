@@ -1,4 +1,4 @@
--- 0089_station_lpu.sql — What a station's logger is and what it runs: its LPU
+-- 0090_station_lpu.sql — What a station's logger is and what it runs: its LPU
 -- type, picked from a list that grows only when somebody means it to, its
 -- serial number, and the versions that matter for that kind of unit — an ELPRO
 -- ERT-A2's firmware, bootloader and radio firmware, a Campbell logger's OS and
@@ -8,7 +8,7 @@
 -- Forward-only, idempotent, no begin/commit — see db/README.md:
 --
 --   psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction \
---        -f db/migrations/0089_station_lpu.sql
+--        -f db/migrations/0090_station_lpu.sql
 --
 -- Why this file exists
 -- ────────────────────
@@ -111,7 +111,7 @@ as $$
 $$;
 
 comment on function meganet.lpu_match_key(text) is
-  'An LPU type as the list compares it (0089): upper case, the make''s name (Campbell Scientific, ELPRO, ERRTS) taken out, letters and digits only. CR 300, cr-300 and Campbell Scientific CR300 are all CR300. lpu-types.js matchKey() is the same rule.';
+  'An LPU type as the list compares it (0090): upper case, the make''s name (Campbell Scientific, ELPRO, ERRTS) taken out, letters and digits only. CR 300, cr-300 and Campbell Scientific CR300 are all CR300. lpu-types.js matchKey() is the same rule.';
 
 create table if not exists meganet.lpu_type (
   key       text        primary key,
@@ -137,7 +137,7 @@ create table if not exists meganet.lpu_type (
 );
 
 comment on table meganet.lpu_type is
-  'The kinds of logger (LPU) a station can have (0089): make, model, the label shown, and the family that says which version fields it has (ert_a2: firmware, bootloader, radio firmware; campbell: OS version, program; other: firmware, program). Public. Grows only through save_station_lpu(), when an editor has confirmed a type is new; one row per match key.';
+  'The kinds of logger (LPU) a station can have (0090): make, model, the label shown, and the family that says which version fields it has (ert_a2: firmware, bootloader, radio firmware; campbell: OS version, program; other: firmware, program). Public. Grows only through save_station_lpu(), when an editor has confirmed a type is new; one row per match key.';
 comment on column meganet.lpu_type.family is
   'ert_a2 — firmware, bootloader and radio firmware, as the ERT-A2''s version screen prints them; campbell — OS version and program; other — firmware and program.';
 
@@ -198,7 +198,7 @@ create table if not exists meganet.station_lpu (
 );
 
 comment on table meganet.station_lpu is
-  'A station''s logger (LPU), one row per station (0089): its type (meganet.lpu_type), serial number, firmware, bootloader and radio firmware (an ERT-A2''s), OS version and program (a Campbell logger''s), a note, and where each value came from (provenance). Read by members; written only by save_station_lpu() (editors) and record_photo_reading() (the photo reader).';
+  'A station''s logger (LPU), one row per station (0090): its type (meganet.lpu_type), serial number, firmware, bootloader and radio firmware (an ERT-A2''s), OS version and program (a Campbell logger''s), a note, and where each value came from (provenance). Read by members; written only by save_station_lpu() (editors) and record_photo_reading() (the photo reader).';
 comment on column meganet.station_lpu.provenance is
   'Where each value came from, by column: {"from":"person",…} or {"from":"photo","photo_id":…,"by":"agent:…","taken_at":…,"confidence":…}, plus checked_by/checked_at once a person has said a photo''s value is right. A photo''s value with no checked_at has not been checked by anybody.';
 
@@ -222,7 +222,7 @@ create table if not exists meganet.station_lpu_change (
 );
 
 comment on table meganet.station_lpu_change is
-  'Every change to a station''s logger details (0089): when, who, whether a person or a photo, and the fields that moved as they were and as they became. Editors only. No foreign key on station_id: the log outlives the row.';
+  'Every change to a station''s logger details (0090): when, who, whether a person or a photo, and the fields that moved as they were and as they became. Editors only. No foreign key on station_id: the log outlives the row.';
 
 create index if not exists station_lpu_change_station_idx
   on meganet.station_lpu_change (station_id, changed_at desc, id desc);
@@ -470,7 +470,7 @@ end;
 $$;
 
 comment on function meganet.save_station_lpu(jsonb, timestamptz) is
-  'Record a station''s logger details (0089): its type — one on the list, or new_lpu_type with confirm_new once the editor has been shown the near ones — its serial number and version fields, and which photo-read values a person says are right (checked). Editors. Absent keys are left alone. Refuses a stale write (PT409) and a new type that is already on the list (23505, its key as the detail).';
+  'Record a station''s logger details (0090): its type — one on the list, or new_lpu_type with confirm_new once the editor has been shown the near ones — its serial number and version fields, and which photo-read values a person says are right (checked). Editors. Absent keys are left alone. Refuses a stale write (PT409) and a new type that is already on the list (23505, its key as the detail).';
 
 -- ── 4. What the photo reader read ────────────────────────────────────────────
 
@@ -502,7 +502,7 @@ create table if not exists meganet.photo_reading (
 );
 
 comment on table meganet.photo_reading is
-  'What the photo reader made of each field photo it read (0089): nothing to read, found something, or unreadable; a sentence saying what the photo shows; what it sent (findings) and what became of it (applied). One row per photo, reader and reader_version. Written only by record_photo_reading(); editors only.';
+  'What the photo reader made of each field photo it read (0090): nothing to read, found something, or unreadable; a sentence saying what the photo shows; what it sent (findings) and what became of it (applied). One row per photo, reader and reader_version. Written only by record_photo_reading(); editors only.';
 
 create index if not exists photo_reading_station_idx on meganet.photo_reading (station_id, read_at desc) where station_id is not null;
 create index if not exists photo_reading_when_idx    on meganet.photo_reading (read_at desc);
@@ -798,7 +798,7 @@ end;
 $$;
 
 comment on function meganet.record_photo_reading(jsonb) is
-  'Record what the photo reader read off one field photo (0089), and apply it: the LPU block to the station''s logger details — filling only what nobody recorded, never over a person''s value, a photo''s unchecked value giving way only to a later photo — and each other piece of equipment to the register''s queue through propose_equipment(). Key numbers refused. The service key or a direct connection only. Recorded again for the same photo, reader and version, it replaces the reading before.';
+  'Record what the photo reader read off one field photo (0090), and apply it: the LPU block to the station''s logger details — filling only what nobody recorded, never over a person''s value, a photo''s unchecked value giving way only to a later photo — and each other piece of equipment to the register''s queue through propose_equipment(). Key numbers refused. The service key or a direct connection only. Recorded again for the same photo, reader and version, it replaces the reading before.';
 
 -- Many readings in one call: a night's run reads tens of photos and most show
 -- nothing to read, so the reader sends them together —
@@ -877,7 +877,7 @@ end;
 $$;
 
 comment on function meganet.record_photo_readings(jsonb) is
-  'Record up to 200 of the photo reader''s readings in one call (0089), each through record_photo_reading() in its own subtransaction: a refused one is listed in failed, with why, and the rest are recorded. Answers the counts and the fields filled. The service key or a direct connection only.';
+  'Record up to 200 of the photo reader''s readings in one call (0090), each through record_photo_reading() in its own subtransaction: a refused one is listed in failed, with why, and the rest are recorded. Answers the counts and the fields filled. The service key or a direct connection only.';
 
 -- The photos the reader has still to read: live, and not read by this reader
 -- at this version or a later one. Oldest first, so a backlog is worked through
@@ -915,7 +915,7 @@ end;
 $$;
 
 comment on function meganet.photos_to_read(text, integer, integer) is
-  'The live field photos this reader has not read at this version or a later one, oldest first, at most 1,000 (0089). The service key or a direct connection only.';
+  'The live field photos this reader has not read at this version or a later one, oldest first, at most 1,000 (0090). The service key or a direct connection only.';
 
 -- ── Row level security ───────────────────────────────────────────────────────
 -- Four tables, RLS in the same file (db/README.md). None has a policy for any
@@ -982,10 +982,10 @@ end
 $$;
 
 -- ── Schema version ───────────────────────────────────────────────────────────
--- DB_SCHEMA_VERSION in core.js goes to 89 once this is applied (CLAUDE.md).
+-- DB_SCHEMA_VERSION in core.js goes to 90 once this is applied (CLAUDE.md).
 -- Guarded, so applying this late can never lower the number (db/README.md).
 
 insert into meganet.app_meta (key, value)
-values ('schema_version', '89')
+values ('schema_version', '90')
 on conflict (key) do update set value = excluded.value
   where meganet.app_meta.value::integer < excluded.value::integer;

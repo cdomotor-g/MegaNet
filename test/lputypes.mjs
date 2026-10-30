@@ -1,10 +1,10 @@
-// A station's logger (0089): the LPU type matcher (lpu-types.js) under Node,
+// A station's logger (0090): the LPU type matcher (lpu-types.js) under Node,
 // then the Logger section of the station editor and the station card
 // (station-lpu.js) in Chromium against a stand-in for the database.
 //
 //   1. **One type, however it is written** — matchKey() agrees with the
 //      database's lpu_match_key(): the pattern is lifted out of
-//      db/migrations/0089_station_lpu.sql, run as JavaScript and held to
+//      db/migrations/0090_station_lpu.sql, run as JavaScript and held to
 //      LpuTypes.matchKey() on every input here, so the editor and the database
 //      cannot disagree about which spellings are one type.
 //   2. **Did you mean** — a lookalike (CR3OO), a swap (CR030, ETR-A2), a
@@ -54,15 +54,15 @@ function ok(name, pass, detail = '') {
 }
 const J = v => JSON.stringify(v);
 
-// The list as 0089 seeds it.
-const MIGRATION = fs.readFileSync(repo('db/migrations/0089_station_lpu.sql'), 'utf8');
+// The list as 0090 seeds it.
+const MIGRATION = fs.readFileSync(repo('db/migrations/0090_station_lpu.sql'), 'utf8');
 const TYPES = [...MIGRATION.matchAll(/\('([a-z0-9_]+)', '([^']+)', '([^']*)', '([^']+)', '(ert_a2|campbell|other)', (\d+),/g)]
   .map(m => ({ key: m[1], label: m[2], make: m[3], model: m[4], family: m[5], ord: Number(m[6]) }));
 
 // ── 1. One type, however it is written ───────────────────────────────────────
 console.log('\nOne type, however it is written\n');
 {
-  ok('the seed list read out of 0089: the ERT-A2 and ten Campbell loggers', TYPES.length === 11
+  ok('the seed list read out of 0090: the ERT-A2 and ten Campbell loggers', TYPES.length === 11
     && TYPES[0].key === 'elpro_ert_a2' && TYPES.filter(t => t.family === 'campbell').length === 10, J(TYPES.map(t => t.key)));
 
   // lpu_match_key()'s pattern, as Postgres reads it: \m and \M are word

@@ -10,7 +10,7 @@
 // `state`, no network. The IIFE body only declares, so its position among the
 // modules is free (`npm run toplevel`), and test/lputypes.mjs require()s this
 // same file under Node through the `module.exports` at the foot — and holds
-// matchKey() to the database's meganet.lpu_match_key() (0089) on the inputs
+// matchKey() to the database's meganet.lpu_match_key() (0090) on the inputs
 // tools/check_station_lpu.sql gives it, so the browser and the database cannot
 // disagree about which spellings are one type.
 //
@@ -43,19 +43,19 @@
 // The score ranks them — a lookalike above a swap above a letter above a
 // contains above a digit or a suffix — and decides nothing: a person picks
 // one, or says the type is new, and the database adds a new one only then
-// (0089). Where the near ones differ by a digit or a suffix, resolve() also
+// (0090). Where the near ones differ by a digit or a suffix, resolve() also
 // says so once (`caution`), naming the models on the list that differ that
 // way, rather than repeating it under each.
 
 const LpuTypes = (function () {
 
   // The makes this network fits, as their labels and the inspection sheets
-  // write them. 0089's lpu_match_key() takes the same words out, by the same
+  // write them. 0090's lpu_match_key() takes the same words out, by the same
   // pattern: \b here is its \m and \M.
   const MAKES = /\b(CAMPBELL(?:'?S)?(?:\s*SCI(?:ENTIFIC)?)?|CSI|ELPRO(?:\s*TECHNOLOGIES)?|ERRTS)\b/g;
   const MAKES_ANY_CASE = /\b(campbell(?:'?s)?(?:\s*sci(?:entific)?)?|csi|elpro(?:\s*technologies)?|errts)\b/gi;
 
-  // Which version fields a unit of each family has (0089's lpu_type.family),
+  // Which version fields a unit of each family has (0090's lpu_type.family),
   // in the order the editor shows them.
   const FIELDS = Object.freeze({
     ert_a2:   Object.freeze(['firmware_version', 'bootloader_version', 'radio_firmware_version']),

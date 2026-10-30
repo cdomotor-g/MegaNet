@@ -38,7 +38,7 @@
 // river-details.js for RiverDetails — the Bureau's flood warning lists above
 // the ARRO block (0031, 0032) and the AEP flood levels with them (0033), which
 // editorReadForm() reads back and editorSave() asks formProblem() about first;
-// and to station-lpu.js for StationLpu — the station's logger (0089), drawn
+// and to station-lpu.js for StationLpu — the station's logger (0090), drawn
 // under the telemetry pick-list, asked about first (formProblem), saved after
 // the station (save) and put back by Undo (discard);
 // and to frequencies.js for Frequencies — the RX/TX rows in the Repeater
@@ -622,7 +622,7 @@ function editorForm(s) {
         asks rather than guesses; leave it that way unless you know the site's telemetry.
       </div>
       <!-- The logger at the site — its LPU type, serial number and versions
-           (0089, station-lpu.js) — kept in a table of its own, read by
+           (0090, station-lpu.js) — kept in a table of its own, read by
            approved accounts, and saved by editorSave() after the station. -->
       ${typeof StationLpu !== 'undefined' ? StationLpu.editorHtml(s) : ''}
       <label>RM System ID<input type="number" id="ef-rmsys" value="${s.rm_system_id || 1}"></label>
@@ -1216,7 +1216,7 @@ async function editorSave() {
     return;                      // the form, and everything typed into it, stands
   }
 
-  // The logger's details (0089, station-lpu.js) go after the station — a
+  // The logger's details (0090, station-lpu.js) go after the station — a
   // station that is new has its id only now — and before the card is drawn
   // again, while its boxes still hold what was typed. A refusal of theirs
   // leaves the station saved and their edits in the boxes the redraw makes.

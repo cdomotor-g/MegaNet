@@ -13,7 +13,7 @@
 // session can open (docs/photo-reader.md says why it is done this way).
 //
 // Which photos: SELECT=unread asks the database for the live photos this
-// reader has not read at this version (meganet.photos_to_read(), 0089), oldest
+// reader has not read at this version (meganet.photos_to_read(), 0090), oldest
 // first, at most LIMIT; SELECT=ids takes the ids given, live ones only. The
 // bytes come from the photo store (worker/photos.js), signed for the secret
 // key, or from Supabase Storage for a photo the move has not carried over yet.

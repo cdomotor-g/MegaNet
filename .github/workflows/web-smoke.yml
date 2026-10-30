@@ -1117,7 +1117,7 @@ jobs:
         if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run stationhistory
-      # A station's logger (0089): the LPU type matcher under Node — the
+      # A station's logger (0090): the LPU type matcher under Node — the
       # database's own match pattern, lifted out of the migration, agreeing
       # with lpu-types.js; a lookalike, a swap or a letter a slip, a digit or a
       # letter on the end never — then the station editor's Logger section
@@ -2194,7 +2194,7 @@ jobs:
       - name: check_station_features.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_station_features.sql
-      # A station's logger and the photo reader (0089): one type however it is
+      # A station's logger and the photo reader (0090): one type however it is
       # spelt, a new one only when confirmed and never a duplicate, editors
       # writing with the stamp they read and members reading, and the reader
       # filling only what nobody recorded — never over a person's value, a

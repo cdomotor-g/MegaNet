@@ -1,9 +1,9 @@
 -- check_station_lpu.sql — Prove a station's logger details and the photo
--- reader's door (0089), against a real database.
+-- reader's door (0090), against a real database.
 --
 --   psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_station_lpu.sql
 --
--- Every check below is one claim the head of 0089_station_lpu.sql makes, or
+-- Every check below is one claim the head of 0090_station_lpu.sql makes, or
 -- one rule its functions enforce. The whole script runs inside a transaction
 -- and rolls back, so it is safe against the live database: nothing it writes
 -- survives — the placeholder stations, the photos, the people it signs in as,
@@ -165,8 +165,8 @@ do $$
 declare
   t text;
 begin
-  perform pg_temp.check_that('schema_version is at least 89',
-    (select value::integer >= 89 from meganet.app_meta where key = 'schema_version'));
+  perform pg_temp.check_that('schema_version is at least 90',
+    (select value::integer >= 90 from meganet.app_meta where key = 'schema_version'));
 
   foreach t in array array['lpu_type', 'station_lpu', 'station_lpu_change', 'photo_reading'] loop
     perform pg_temp.check_that(format('meganet.%s exists with RLS on', t),

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """tools/photo-reader/sql.py — the photo reader's readings, checked and put into
-the statement that records them: meganet.record_photo_readings() (0089).
+the statement that records them: meganet.record_photo_readings() (0090).
 
     sql.py RESULTS.json [--model MODEL] [--reader agent:photo-reader] [--version 1] [--chunk 60]
 

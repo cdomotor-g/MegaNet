@@ -5,7 +5,7 @@ the lead, the laptop's software, the firmware pack — and which sites a
 firmware release has still to reach. Flood-Net now keeps it per station, and
 an agent reads it off the field photos every night.
 
-- **The logger's details** — db/migrations/0089_station_lpu.sql,
+- **The logger's details** — db/migrations/0090_station_lpu.sql,
   `station-lpu.js`, `lpu-types.js`.
 - **The photo reader** — `.claude/skills/photo-reader/SKILL.md`, run nightly
   by a scheduled Claude Code task; `.github/workflows/photo-reader-fetch.yml`
