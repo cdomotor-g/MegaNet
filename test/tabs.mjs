@@ -368,6 +368,13 @@ const SEED_REPDELAYS = `async () => {
   await new Promise(r => setTimeout(r, 100));
 }`;
 
+// ⚖️ Methodology is text in folds: every one opened, so the tables, the
+// glossary and every marked word are measured.
+const SEED_METHODOLOGY = `async () => {
+  document.querySelectorAll('#main-content details').forEach(d => { d.open = true; });
+  await new Promise(r => setTimeout(r, 100));
+}`;
+
 const SEED_BITFLIPPER = `async () => {
   const addr = String(state.data.stations
     .flatMap(s => (s.sensors || []).map(x => x.alert_id))
@@ -1006,6 +1013,7 @@ const CONVERTED = [
   { id: 'signalroutes', label: 'Signal Routes — the demo, a repeater picked, every fold open', issue: 'born converted', seed: SEED_SIGNALROUTES },
   { id: 'backbone',   label: 'Backbone — no datastore', issue: 'born converted' },
   { id: 'backbone',   label: 'Backbone — the demo, a repeater picked, every fold open', issue: 'born converted', seed: SEED_BACKBONE },
+  { id: 'methodology', label: 'Methodology — every section open', issue: 'born converted', seed: SEED_METHODOLOGY },
   { id: 'workbench',  label: 'Interference Workbench — intro',       issue: '#139' },
   { id: 'workbench',  label: 'Interference Workbench — worked case', issue: '#139', seed: SEED_WORKBENCH },
   { id: 'packets',    label: 'ALERT Packets',   issue: '#140', seed: SEED_PACKETS },

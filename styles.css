@@ -23773,6 +23773,16 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
 .sg-two { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); }
 .sg-cards { list-style: none; padding: 0; display: grid; gap: var(--sp-2); }
 .sg-cards li { padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); }
+/* ⚖️ Methodology (methodology.js): the Survey Guide's folds, with a table and
+   a formula of its own. */
+.mt-section > summary { cursor: pointer; }
+.mt-section > summary h3 { display: inline; margin: 0; font-size: var(--fs-lg); }
+.mt-body { line-height: var(--lh-body); }
+.mt-body ul, .mt-body ol { padding-left: 1.2rem; }
+.mt-body li + li { margin-top: var(--sp-1); }
+.mt-body h4 { margin: var(--sp-3) 0 var(--sp-1); }
+.mt-table th[scope="row"] { font-weight: 600; text-align: left; }
+.mt-eq { font-family: var(--font-mono); text-align: center; padding: var(--sp-2); background: var(--panel-sub); border-radius: var(--r-md); overflow-wrap: anywhere; }
 
 /* ── 📚 Knowledge base: the colours its section drawings share — earth cut in
    section, concrete, and rock — so a weir or a river reads the same on every

@@ -291,6 +291,7 @@ const ExportMenu = (function () {
     home:        'The front page: a way into the other tabs and a count of how the stations are — Station Health saves the findings behind the count.',
     sitemap:     'The guide to every other tab — it holds nothing of its own to save.',
     investigations: 'A list of write-ups, each a page of its own — open one, then print it or save it as a PDF from the browser.',
+    methodology: 'An explanation of how the network is judged — text to read, with nothing of its own to save; print it from the browser.',
     offline:     'This device\'s setup for working with no signal — nothing on it is a record to keep as a file.',
     views:       'What the bar on the left lists — a setting kept with your account, not a record to keep as a file.',
     lookaround:  'A view through the phone\'s camera, drawn on the screen and never recorded — there is nothing on it to keep as a file.',

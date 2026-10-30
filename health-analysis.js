@@ -2072,6 +2072,14 @@ const HealthAnalysis = (() => {
     // site's own solar time — for the Repeaters card's shared silences too.
     solarNight,
     PERIODS, COPY_WINDOW, BURST_WINDOW,
+    // The named limits, for ⚖️ Methodology (methodology.js), which explains
+    // them in words and reads its numbers from here. The thresholds written
+    // inline in run() are restated there by hand: change that page with them.
+    LIMITS: Object.freeze({
+      COPY_WINDOW, BURST_WINDOW, RAPID_MS, RAPID_STEP, REACH_KM, FIT_TOL, BIN, LISTEN_PAD, ARRIVAL_GRACE,
+      NET_BIN, NET_MIN_DUE, NET_MISS_FRAC, BATT_WARN_V, BATT_CRIT_V, BATT_OVER_V, BATT_FALL_V_PER_DAY,
+      BATT_SWING_MIN_V, RAIN_NEAR_KM, RAIN_BIG_STEP, AREA_KM, PERIODS_MIN: PERIODS.map(p => p / MIN),
+    }),
   };
 })();
 

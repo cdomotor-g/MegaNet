@@ -114,6 +114,7 @@ const Glyphs = (() => {
     search:    '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/>',
     hourglass: '<path d="M6.5 3h11M6.5 21h11"/><path d="M7.5 3c0 4.5 4.5 6 4.5 9s-4.5 4.5-4.5 9M16.5 3c0 4.5-4.5 6-4.5 9s4.5 4.5 4.5 9"/><path d="M10 18.5h4"/>',
     casefile:  '<path d="M13 21H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h8l4 4v4"/><path d="M14 3v4h4"/><circle cx="16" cy="16" r="3"/><path d="m18.2 18.2 2.3 2.3"/>',
+    scales:    '<path d="M12 3v18M8 21h8M5 7h14"/><path d="m5 7-3 7a3 3 0 0 0 6 0L5 7"/><path d="m19 7-3 7a3 3 0 0 0 6 0l-3-7"/>',
     user:      '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
     sparkle:   '<path d="M12 3c.6 4.2 2.8 6.4 7 7-4.2.6-6.4 2.8-7 7-.6-4.2-2.8-6.4-7-7 4.2-.6 6.4-2.8 7-7z"/><path d="M19 15.5v4M17 17.5h4"/>',
     more:      '<circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/>',
@@ -152,7 +153,7 @@ const Glyphs = (() => {
     levels: 'survey', twopeg: 'pegs', surveyguide: 'book',
     propagation: 'waves', biterrors: 'bolt', swr: 'meter', pinouts: 'dsub', a2firmware: 'flash', kbstaff: 'staff', kblogbook: 'logbook', kblifecycle: 'cycle', kblevel: 'solar', kbriver: 'gauge',
     admin: 'admin', basestations: 'base', backbone: 'backbone', review: 'review', a2plan: 'plan', tdma: 'slots',
-    investigations: 'casefile',
+    investigations: 'casefile', methodology: 'scales',
   };
 
   // An inspection sheet's sections (0009's section_key), for the row of signs

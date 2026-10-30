@@ -251,11 +251,11 @@ const TABS = [
   // Data held six — the readings, and what they say about the network — until
   // 🕵️ Investigations would have made it seven, past nav.mjs's ceiling. The cut
   // follows the job: the four above are the readings themselves, charted and
-  // logged; these three are judgements on them — each station's health, the
-  // repeaters ranked by what is wrong with each, and the write-ups of strange
-  // data and what was behind it. Filed straight after Data, so Station Health
-  // keeps its place in the order and a find word it shares with a later group
-  // still goes to it.
+  // logged; these are judgements on them — each station's health, the
+  // repeaters ranked by what is wrong with each, the write-ups of strange data
+  // and what was behind it, and ⚖️ how all of those are judged. Filed straight
+  // after Data, so Station Health keeps its place in the order and a find word
+  // it shares with a later group still goes to it.
   { group: 'Network health', tabs: [
     { id: 'health',     label: 'Station Health',         icon: '🚦',
       find: 'monitoring maintenance o&m faults alarms battery trend voltage solar charge missed checks check signals timed reports silent quiet offline outage schedule repeater down receiver stopped base station network health data quality corrupted copies bit flips ghosts rain gauge blocked tipped level stuck flatline register unknown address agent ai claude briefing triage network weather bulletin daily weekly summary animation news droggies presenter' },
@@ -278,6 +278,13 @@ const TABS = [
     // Health's timed reports and Admin's Network Review answer to.
     { id: 'investigations', label: 'Investigations',     icon: '🕵️',
       find: 'investigation investigations write-up write-ups writeup writeups case study studies why weird strange odd unexplained explained explanation root cause what happened what caused findings post-mortem postmortem' },
+    // ⚖️ Methodology (methodology.js) is the fourth, and the group's last: how
+    // the three before it decide — the data they read, and each rule with its
+    // numbers, bit flips most of all. Its find words are the questions put to a
+    // finding ("how do you know", "proof", "thresholds"), never "bit" or
+    // "flips", which Station Health, earlier in the group, answers to.
+    { id: 'methodology', label: 'Methodology',           icon: '⚖️',
+      find: 'methodology methodologies method methods how do we know how does it decide proof prove evidence rules criteria thresholds assumptions attribution attribute fingerprint approach caveats limitations blind spots documentation explainer' },
   ] },
   { group: 'Site visits', tabs: [
     // 📌 Nearby (nearby.js) heads the group because it is where a visit
@@ -2755,6 +2762,22 @@ const HELP = {
       { label: 'The investigations as a page of their own', href: 'investigations/' },
     ],
     related: ['health', 'backbone', 'flipsources', 'arrodata', 'bitbench'],
+  },
+
+  methodology: {
+    summary: 'How the network\'s health is judged: what the regular assessments look for, the <strong>data</strong> they read and '
+           + 'how each one <strong>decides</strong>, with its numbers. Bit flips most of all — how a <strong>corrupted copy</strong> '
+           + 'is caught, how we know it is a flip and not a reading, and how it is put down to the transmitter that made it, by '
+           + '<strong>pass range</strong> and by <strong>carrier fingerprint</strong>. Then checks and silences, batteries, sensors '
+           + 'against their neighbours, the radio itself, airtime, the Backbone\'s ranking, and what none of it can see.',
+    watch: [
+      'Each section opens on its own; the list at the top jumps to one. Words with a dotted underline explain themselves on '
+      + 'hover, and the fold at the end lists them all for a phone.',
+      'The numbers are the ones the checks use: Station Health\'s are read from its own code, so they cannot drift; the '
+      + 'database\'s are written as its jobs set them.',
+      'A method narrows where to look; it does not convict. A site visit or a field test settles it.',
+    ],
+    related: ['health', 'backbone', 'flipsources', 'investigations', 'biterrors'],
   },
 
   review: {

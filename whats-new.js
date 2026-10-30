@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 162, date: '2026-10-30', items: [
+      '⚖️ <strong>Methodology, in Network health.</strong> A new tab that explains how the network is judged: what Station Health, '
+        + 'Bit-Flip Sources and the Backbone look for, the data each reads, and the rule each decides by, with its numbers. Bit flips '
+        + 'in depth — how a corrupted copy or a ghost is caught, why we know a pair a bit or two apart is a flip and not chance, and '
+        + 'how it is put down to a repeater by pass range and by its carrier. Every special word explains itself on hover, and in a '
+        + 'list at the end.',
+    ] },
     { n: 161, date: '2026-10-30', items: [
       '📡 <strong>Legacy ALERT or ALERT2, on the Stations map.</strong> ⏱️ Latency &amp; signal\'s <em>Colour by</em> row has a fifth '
         + 'choice, <strong>Protocol</strong>: each pin coloured by how its readings reached Flood-Net over the last 24 h (or 3 or 7 days). '
