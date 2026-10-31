@@ -227,6 +227,8 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   catch up with another repository, move that `consumes` entry's pin. When where Flood-Net
   is up to changes, update `status` in `atlas.json` with today's date. The daily
   `atlas.yml` check here reports only; an issue it would open goes on #113 like any other.
+  When something blocks you, record it in `status.blocked` with what it holds up and the
+  `options` through it (who could do each, rough effort, the one you'd pick).
 
 ### How the code is laid out
 

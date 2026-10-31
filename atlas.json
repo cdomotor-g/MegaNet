@@ -52,28 +52,356 @@
     ],
     "blocked": [
       {
-        "what": "#237 switch accounts on: finish 0062, send email through Resend, Supabase sign-in settings",
-        "on": "human"
+        "id": "accounts-email",
+        "what": "#237 switch accounts on: Supabase sending through Resend, the sign-in settings and email templates, then a test drive",
+        "on": "human",
+        "kind": "access",
+        "since": "2026-10-13",
+        "issue": "#237",
+        "holds": [
+          "#158",
+          "#210 (step 1 is #237's Part 5)",
+          "sign-ups from anyone outside the Supabase team (no confirmation email reaches them)",
+          "Bureau password resets (the mail scanner uses up the links)",
+          "the agent API notify list's emails",
+          "bug reports by email"
+        ],
+        "options": [
+          {
+            "what": "Finish #237 in one sitting: Part 3 (custom SMTP: smtp.resend.com, port 465, user resend, the re_ key), Parts 4–6 (password rules, the three templates, Site URL and redirect URLs), set RESEND_API_KEY (and REPORT_EMAIL_TO) as Worker secrets as docs/bug-reports.md says, then Part 8's test drive. Parts 1, 2 and 7 look done already: the live database has admin_user_decide() and the Vault secret resend_api_key, and Resend's DNS records are on floodwarning.net",
+            "by": "human",
+            "effort": "30 min",
+            "pros": "every email path switches on at once",
+            "recommended": true
+          },
+          {
+            "what": "Do Part 5 (the three templates with the Continue link and the six-digit code) and Part 6 (Site URL and redirect URLs) alone, now",
+            "by": "human",
+            "effort": "10 min",
+            "pros": "needs no Resend; stops the Bureau's scanner using up reset links and covers #158",
+            "cons": "sign-ups from outside the team still get no email"
+          },
+          {
+            "what": "Refresh #237's body for what is left: mark Parts 1, 2 and 7 done from the live checks, add the Worker's RESEND_API_KEY step for the notify list and bug reports, and update its roadmap entry",
+            "by": "agent",
+            "effort": "Low",
+            "model": "Sonnet5/Low",
+            "pros": "the owner's sitting covers only what is left",
+            "cons": "clears nothing by itself"
+          }
+        ]
       },
       {
-        "what": "#255 move the database to Small compute; #256 choose how long receptions are kept",
-        "on": "human"
+        "id": "compute-size",
+        "what": "#255 move the database to the Small compute size (2 GB) for the Disk IO budget",
+        "on": "human",
+        "kind": "money",
+        "since": "2026-10-28",
+        "issue": "#255",
+        "holds": [
+          "headroom on Supabase's Disk IO budget (warned 2026-10-28)"
+        ],
+        "options": [
+          {
+            "what": "#255 Part 1: read the compute size and the Database report's Disk IOPS and Memory charts (last 7 days); then Part 2 if it is Nano, disk activity stayed high after 0087, or memory sits at the top: choose Small on Compute and Disk in a quiet dry-weather hour (under 2 min offline), and check the Message Log resumes",
+            "by": "human",
+            "effort": "15 min",
+            "pros": "the whole 902 MB database fits in memory",
+            "cons": "about US$5 a month more than Micro",
+            "recommended": true
+          },
+          {
+            "what": "Read the cache hit ratio and disk reads since 0087–0094 through the Supabase connector (read-only) and post them on #255, so Part 1 becomes a yes or no",
+            "by": "agent",
+            "effort": "Low",
+            "model": "Sonnet5/Low",
+            "pros": "the owner decides from numbers",
+            "cons": "the compute size itself is still a dashboard change"
+          },
+          {
+            "what": "Stay on Micro for now: answer #256 with 30 days so receptions level off near 0.7 GB, and wait for the next Disk IO warning",
+            "by": "human",
+            "effort": "5 min",
+            "pros": "costs nothing",
+            "cons": "the database is already four times the 224 MB of shared buffers"
+          },
+          {
+            "what": "If #256 keeps 90 days, go straight to Medium (4 GB, about US$60 a month) instead of Small",
+            "by": "human",
+            "effort": "10 min",
+            "pros": "one change instead of two within months",
+            "cons": "four times Small's price"
+          }
+        ]
       },
       {
-        "what": "#245 / #248 find ACMA's new register download link; the ACMA layer is stuck on 23 July 2026",
-        "on": "human"
+        "id": "reception-days",
+        "what": "#256 choose how long receptions stay in the database: 90 days or 30",
+        "on": "human",
+        "kind": "decision",
+        "since": "2026-10-28",
+        "issue": "#256",
+        "holds": [
+          "#255 (which compute size stays enough)",
+          "#240"
+        ],
+        "options": [
+          {
+            "what": "Reply (b) 30 days on #256; an agent then sets retain_reception_days by a migration, updates EPIC #240's regime line and the roadmap",
+            "by": "human",
+            "effort": "2 min",
+            "pros": "the table levels off near 0.7 GB and Small stays enough",
+            "cons": "days older than 30 come back only from the R2 archive (#243, its restore test still to run) or the rollups",
+            "recommended": true
+          },
+          {
+            "what": "Reply (a) keep 90 days: nothing changes, and plan on Medium compute within about three months",
+            "by": "human",
+            "effort": "2 min",
+            "pros": "raw receptions stay queryable for a quarter",
+            "cons": "the table nears 2 GB"
+          },
+          {
+            "what": "Reply (c) with a number between, such as 45 or 60 days",
+            "by": "human",
+            "effort": "2 min"
+          }
+        ]
       },
       {
+        "id": "acma-link",
+        "what": "#245 find ACMA's new register download link; the ACMA layer is stuck on the 23 July 2026 extract",
+        "on": "human",
+        "kind": "upstream",
+        "since": "2026-10-22",
+        "issue": "#245",
+        "holds": [
+          "the ACMA layer's licence data (stuck on 23 July 2026)",
+          "ACMA licences in the agent API",
+          "#248",
+          "each missed month of the register, which ACMA does not keep"
+        ],
+        "options": [
+          {
+            "what": "#245's steps: on acma.gov.au's register page open the Data download tab, copy spectra_rrl.zip's link, put it first in ACMA_ZIP_URLS in .github/workflows/acma-refresh.yml, run Refresh ACMA RRL data, and close PR #208 unmerged",
+            "by": "human",
+            "effort": "5 min",
+            "recommended": true
+          },
+          {
+            "what": "Paste the copied link in a comment on #245; an agent puts it in ACMA_ZIP_URLS, runs the workflow, closes PR #208, #245 and #248",
+            "by": "agent",
+            "effort": "Low",
+            "model": "Sonnet5/Low",
+            "pros": "the owner only copies a link",
+            "cons": "the link still needs a person in a browser"
+          },
+          {
+            "what": "Stopgap: download spectra_rrl.zip by hand and attach it to a release tagged acma-data-YYYY-MM-DD, then run the workflow",
+            "by": "human",
+            "effort": "10 min a week",
+            "pros": "works even if the link needs a login",
+            "cons": "the workflow uses a release only under 10 days old, so it repeats weekly"
+          }
+        ]
+      },
+      {
+        "id": "acma-refresh",
+        "what": "#248 the weekly ACMA refresh fails: no ACMA download URL works (the same fix as #245)",
+        "on": "human",
+        "kind": "upstream",
+        "since": "2026-10-27",
+        "issue": "#248",
+        "holds": [
+          "the weekly Refresh ACMA RRL data workflow (red since October)"
+        ],
+        "options": [
+          {
+            "what": "Fix it with #245: the current spectra_rrl.zip link first in ACMA_ZIP_URLS, then Actions → Refresh ACMA RRL data → Run workflow, and check it goes green",
+            "by": "human",
+            "effort": "5 min",
+            "recommended": true
+          },
+          {
+            "what": "Close #248 as a duplicate of #245 so the CI doctor reports in one place, and update the roadmap",
+            "by": "agent",
+            "effort": "Low",
+            "model": "Sonnet5/Low",
+            "cons": "the workflow stays red"
+          },
+          {
+            "what": "Stopgap: attach the zip to an acma-data-YYYY-MM-DD release each week until the link is found",
+            "by": "human",
+            "effort": "10 min a week"
+          }
+        ]
+      },
+      {
+        "id": "history-rewrite",
         "what": "#239 Part 2: rewrite git history to remove the old inspection archive (every commit ID changes)",
-        "on": "human"
+        "on": "human",
+        "kind": "access",
+        "since": "2026-10-16",
+        "issue": "#239",
+        "holds": [
+          "landholder contacts and site codes out of the public git history",
+          "#239's follow-ups: commit IDs translated in the roadmap and docs",
+          "PRs #178 and #208, closed when the old branches go"
+        ],
+        "options": [
+          {
+            "what": "#239 Part 2 on the owner's computer: pause other sessions, clone flood-net-private, DRY_RUN=1 bash history/rewrite-meganet-history.sh, then run it for real, file the GitHub Support purge, re-clone everywhere and run --update on each Pi, and hand commit-map.txt to a new session",
+            "by": "human",
+            "effort": "an hour",
+            "pros": "dry-run clean: 615 commits, main's files unchanged",
+            "recommended": true
+          },
+          {
+            "what": "Share a folder holding a flood-net-private clone through Remote Control (a Mac or Linux computer) and let a cloud session run the dry run and the rewrite there while the owner approves; the owner still sends the Support request",
+            "by": "agent",
+            "effort": "an hour, owner present",
+            "model": "Sonnet5/Med",
+            "pros": "the owner types no commands",
+            "cons": "needs Claude Code on that computer; the force-push still waits on the owner"
+          },
+          {
+            "what": "Leave it parked, as the owner chose: nothing public shows contacts or codes except old commits",
+            "by": "human",
+            "effort": "none",
+            "cons": "anyone who browses old commits can still find them"
+          }
+        ]
       },
       {
-        "what": "#157 commission the base-station logger at its first site; #207 Sign in with Microsoft",
-        "on": "human"
+        "id": "base-logger",
+        "what": "#157 commission the base-station logger (CR300) at its first site",
+        "on": "human",
+        "kind": "hardware",
+        "since": "2026-08-15",
+        "issue": "#157",
+        "holds": [
+          "the CR300 program's first compile (v3.1 never compiled)",
+          "the logger's own rain, level and battery channels (Part 9)",
+          "a base station's MQTT Last Will (Parts 6–8)"
+        ],
+        "options": [
+          {
+            "what": "Part 1 only, at a desk: compile logger/base-station-http.CR300 (v3.1) in CRBasic Editor on a Windows PC and paste the compiler output and MQTTPublish's real signature on #157; an agent fixes what it reports",
+            "by": "human",
+            "effort": "30 min",
+            "pros": "the issue's highest-value part, and no site trip",
+            "recommended": true
+          },
+          {
+            "what": "Decide whether a CR300 base is still wanted: 18 Bateson now runs an RPi ALERT Pi 4 and posts daily, and the CR300's first token was revoked; if not, an agent narrows or closes #157",
+            "by": "human",
+            "effort": "10 min",
+            "pros": "may retire the whole checklist",
+            "cons": "the logger's local sensors and Last Will go unproven"
+          },
+          {
+            "what": "The full trip, Parts 1–10: find why the CR300 went quiet in late August, load v3.1, bench-test with the self-test, set up MQTT and pull the power to prove the will",
+            "by": "human",
+            "effort": "a day"
+          }
+        ]
       },
       {
-        "what": "#204 report templates wait on the owner's example reports; #206 on a credential choice",
-        "on": "human"
+        "id": "microsoft-sign-in",
+        "what": "#207 switch on Sign in with Microsoft (an Entra app and Supabase's Azure provider)",
+        "on": "human",
+        "kind": "access",
+        "since": "2026-09-29",
+        "issue": "#207",
+        "holds": [
+          "one-click sign-in for Bureau staff"
+        ],
+        "options": [
+          {
+            "what": "#207 steps 1–9 (step 0 passed): register the app in Entra with the Supabase callback, add a 24-month secret and the email and xms_edov claims, switch on Azure in Supabase with the Tenant URL pinned to the Bureau's tenant, then test; best done in the same dashboard visit as #237",
+            "by": "human",
+            "effort": "20 min",
+            "recommended": true
+          },
+          {
+            "what": "If the Bureau's tenant refuses app registration: register it in a free Azure tenant as multitenant, keep the Tenant URL pinned to the Bureau's, and send BoM IT the admin-approval request Microsoft offers",
+            "by": "human",
+            "effort": "30 min plus BoM IT's wait",
+            "cons": "waits on BoM IT"
+          },
+          {
+            "what": "Drop it: email and the six-digit code stay the sign-in (after #237's Part 5), and #207 closes",
+            "by": "human",
+            "effort": "2 min",
+            "pros": "no client secret to renew every 24 months",
+            "cons": "staff keep waiting on an email code"
+          }
+        ]
+      },
+      {
+        "id": "report-examples",
+        "what": "#204 report templates wait on the owner's example assessment reports",
+        "on": "human",
+        "kind": "other",
+        "since": "2026-09-28",
+        "issue": "#204",
+        "holds": [
+          "assessment report templates and a drafting guide"
+        ],
+        "options": [
+          {
+            "what": "Put the example reports, with landholder contacts and site codes taken out, in the private flood-net-private repository (not the public issue) and say so on #204; an agent then does its steps 1–4",
+            "by": "human",
+            "effort": "15 min",
+            "pros": "nothing internal is published",
+            "recommended": true
+          },
+          {
+            "what": "List each report type and its section headings in a comment on #204, enough for a first template",
+            "by": "human",
+            "effort": "10 min",
+            "cons": "loses each report's wording and figure conventions"
+          },
+          {
+            "what": "Leave #204 parked: an agent can already draft from the dossier with the prompt in docs/agent-api.md, and nothing else waits on it",
+            "by": "human",
+            "effort": "none"
+          }
+        ]
+      },
+      {
+        "id": "equipment-credential",
+        "what": "#206 the equipment-proposing agent waits on a credential choice",
+        "on": "agent",
+        "kind": "decision",
+        "since": "2026-09-28",
+        "issue": "#206",
+        "holds": [
+          "equipment proposals from new field photos"
+        ],
+        "options": [
+          {
+            "what": "Close #206 as done by the nightly photo reader: it proposes equipment as agent:photo-reader through record_photo_readings() and propose_equipment() (0090) over the Supabase connector, for the Review panel; check #206's Done-when against it, comment, close, and update the roadmap",
+            "by": "agent",
+            "effort": "Low",
+            "model": "Sonnet5/Low",
+            "pros": "the work already runs every night",
+            "cons": "the owner may still want a narrower credential than the connector",
+            "recommended": true
+          },
+          {
+            "what": "Choose the project's secret key (already an Actions secret for the Dropbox and Drive syncs); an agent builds #206's scheduled job beside field-photos-dropbox.yml",
+            "by": "human",
+            "effort": "5 min",
+            "cons": "duplicates the photo reader"
+          },
+          {
+            "what": "Choose a new role with execute on propose_equipment() only; an agent adds its grants by migration and its rules to tools/check_photo_review.sql",
+            "by": "human",
+            "effort": "5 min",
+            "pros": "the narrowest credential"
+          }
+        ]
       }
     ]
   },
