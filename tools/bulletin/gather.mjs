@@ -25,6 +25,11 @@
 //     receivers measured it, because a receiver's own error looks exactly
 //     like a transmitter's
 //   * bit flips by who sent them, and the hours they keep
+//   * the hours stations keep: scheduled checks missing at night and back in
+//     daylight, night after night — and, for each group that keeps them, the
+//     repeaters they share, weighed by that repeater's own checks keeping the
+//     same hours, its own battery, whether the others it passes are heard at
+//     night, and the same one hop further up (hoursKept, below)
 //   * the rain, for context: a storm explains a lot of things
 //   * every day's numbers, for the trends
 //
@@ -291,6 +296,13 @@ export function buildFacts({ kind, A, rows, doc, server = {}, now, p0, p1, ctx0 
   const flips = flipFacts(server.flipSummary, server.flipSources, reg);
   flips.senders.forEach(x => stn(x.station_id));
 
+  // ── the hours stations keep, and the repeaters they share ──
+  // Over the last seven days for the weekly too: a fortnight would wash out
+  // hours a group began keeping this week.
+  const kept = hoursKept(A, { relays: server.relays, flips: server.flipSummary, since: p1 - 7 * DAY });
+  kept.stations.forEach(x => stn(x.station_id));
+  kept.groups.forEach(g => g.candidates.forEach(c => { stn(c.repeater_id); c.upstream.forEach(u => stn(u.repeater_id)); }));
+
   // ── rain in the period, for context ──
   const rain = [];
   for (const s of S.values()) {
@@ -341,7 +353,7 @@ export function buildFacts({ kind, A, rows, doc, server = {}, now, p0, p1, ctx0 
     silences: { regular: silences.filter(x => x.regular), occasional_count: silences.filter(x => !x.regular).length,
       occasional_sample: silences.filter(x => !x.regular).slice(0, 10).map(x => ({ station_id: x.station_id, name: x.name, days_heard: x.days_heard, transmissions: x.transmissions, last_path: x.last_path })),
       by_last_path: silentByPath },
-    areas, batteries: batteries.slice(0, 20), checks, receivers, receiver_findings: receiverFindings,
+    areas, hours: kept, batteries: batteries.slice(0, 20), checks, receivers, receiver_findings: receiverFindings,
     loggers: Object.fromEntries(loggers), channels,
     signal: fade, carrier, flips, rain: { stations_with_rain: rain.length, top: rain.slice(0, 8) },
     server_findings: { opened: opened.slice(0, 60), opened_count: opened.length, cleared: cleared.slice(0, 60), cleared_count: cleared.length,
@@ -367,6 +379,217 @@ function distKm(la1, lo1, la2, lo2) {
 }
 function repeatersOf(A, id) {
   return (A.repeaters || []).filter(R => (R.members || []).some(m => m.st && m.st.id === id)).map(R => R.id);
+}
+
+// ── the hours a station keeps ────────────────────────────────────────────────
+// A station whose scheduled checks go missing at night and come back in
+// daylight, night after night, is on a supply that cannot carry the night: its
+// own solar battery, or a repeater's on its path. Several keeping the same
+// hours behind one repeater point at that repeater — its power first (the
+// owner, 1 Nov 2026: a lead worth a look, said as one, not a verdict). Only the
+// checks a station keeps on a schedule count (its slots in health-analysis.js):
+// rain tips cluster in the afternoon storms and would make any gauge look
+// busier by day.
+//
+// Then, for each repeater a group shares, what tells it from the sites: its own
+// scheduled checks keeping the same hours; its own battery's night lows; the
+// other stations it passes, heard at night or not (one heard all night behind
+// it says it was on the air — unless that one reached a receiver another way);
+// whether its carrier was seen relaying them (relay_summary, 0092: few
+// repeaters' carriers are found, so its absence says little); and the same one
+// hop further up, for the repeaters that pass the repeater's own reports.
+export const NIGHT_HOURS = [22, 6], DAY_HOURS = [12, 18];   // Brisbane clock hours, start to end
+const inHours = (h, [a, b]) => (a < b ? h >= a && h < b : h >= a || h < b);
+export function keptHours(S, since = -Infinity) {
+  const sch = S && S.schedule;
+  if (!sch || !(sch.exp >= 8) || !Array.isArray(S.slots)) return null;
+  const judged = S.slots.filter(sl => sl.t >= since && (sl.outcome === 'hit' || sl.outcome === 'partial' || sl.outcome === 'miss'));
+  const got = sl => sl.outcome !== 'miss';
+  const rate = l => l.filter(got).length / l.length;
+  const night = judged.filter(sl => inHours(hourOf(sl.t), NIGHT_HOURS)), day = judged.filter(sl => inHours(hourOf(sl.t), DAY_HOURS));
+  if (night.length < 6 || day.length < 4) return null;
+  const nightRate = rate(night), dayRate = rate(day);
+  // Night by night: a date's night runs from its evening into the next morning.
+  const byNight = new Map();
+  night.forEach(sl => { const k = dayKey(sl.t - 12 * HOUR); if (!byNight.has(k)) byNight.set(k, []); byNight.get(k).push(sl); });
+  const nights = [...byNight.values()].filter(l => l.length >= 2);
+  const dipped = nights.filter(l => rate(l) <= Math.max(0.5 * dayRate, dayRate - 0.5));
+  // When it goes and when it is back: each night's longest run of misses
+  // that takes in the night (3 pm to 3 pm), its first miss and the check
+  // after it — not every stray miss, which would make it "back" at 4 am.
+  const runs = new Map();
+  let run = [];
+  const close = next => {
+    if (run.length && run.some(r => inHours(hourOf(r.t), NIGHT_HOURS))) {
+      const k = dayKey(run[0].t - 15 * HOUR), was = runs.get(k);
+      if (!was || run.length > was.n) runs.set(k, { n: run.length, from: run[0].t, back: next ? next.t : null });
+    }
+    run = [];
+  };
+  judged.forEach(sl => { if (!got(sl)) run.push(sl); else close(sl); });
+  close(null);
+  const main = [...runs.values()].filter(r => r.n >= 2);
+  const goes = main.map(r => { const h = hourOf(r.from); return h < 12 ? h + 24 : h; });
+  const back = main.filter(r => r.back != null).map(r => hourOf(r.back));
+  const g = median(goes), b = median(back);
+  return {
+    checks_judged: judged.length, period_min: Math.round(sch.P / MIN),
+    keeps: dayRate >= 0.6 && nightRate <= 0.6 * dayRate && dayRate - nightRate >= 0.25 && dipped.length >= 2 && dipped.length >= Math.min(3, nights.length),
+    steady: nightRate >= 0.8 * dayRate && dayRate - nightRate <= 0.15,
+    // Missing most of its checks by day and by night alike: not the hours,
+    // but worth saying of a repeater — its own path may be the same trouble.
+    poor: dayRate < 0.6 && nightRate < 0.6,
+    night_rate: round(nightRate, 2), day_rate: round(dayRate, 2), nights: nights.length, nights_dipped: dipped.length,
+    last_night_dipped: nights.length ? dipped.includes(nights[nights.length - 1]) : null,
+    goes_hour: g == null ? null : Math.round(g) % 24, back_hour: b == null ? null : Math.round(b),
+    // Gone in the evening or the night, back mid-morning to mid-afternoon:
+    // the shape of a solar battery that cannot carry the night.
+    solar_shape: g != null && b != null && g >= 16 && g <= 28 && b >= 7 && b <= 16,
+  };
+}
+export function hoursKept(A, { relays = [], flips = [], since = -Infinity } = {}) {
+  const S = A.stations;
+  const kept = new Map();
+  for (const s of S.values()) { const k = keptHours(s, since); if (k && s.st && s.st.id) kept.set(s.st.id, k); }
+  // Where a station or repeater is: a repeater that sends nothing of its own
+  // has no station in the analysis, only its register entry.
+  const repSt = new Map((A.repeaters || []).map(R => [R.id, R.rep && R.rep.st]));
+  const placed = st => (st && st.lat != null && st.lon != null && Number.isFinite(+st.lat) && Number.isFinite(+st.lon) ? st : null);
+  const at = id => placed(S.get(id) && S.get(id).st) || placed(repSt.get(id));
+  const km = (a, b) => (a && b ? distKm(+a.lat, +a.lon, +b.lat, +b.lon) : null);
+  const nameOf = id => (S.get(id) && S.get(id).st && S.get(id).st.name) || id;
+  const reps = (A.repeaters || []).map(R => ({ R, ids: new Set((R.members || []).map(m => m.st && m.st.id).filter(Boolean)) }));
+  const seenBy = new Map((relays || []).map(r => [r.station_id, new Set([...(r.relayed || []), ...(r.off_record || [])])]));
+  const flipOf = new Map((flips || []).filter(t => t.station_id).map(t => [t.station_id, t]));
+  const addrsOf = id => { const s = S.get(id); return s && s.addrs ? [...s.addrs.values()].map(a => a.aid).filter(Number.isFinite) : []; };
+  // A repeater keeping hours that passes others keeping them is not one of the
+  // group: it is what they may share, and its hours are its own record (own).
+  const night = [...kept.entries()].filter(([, k]) => k.keeps).map(([id]) => id);
+  const keepers = night.filter(id => !reps.some(x => x.R.id === id && night.some(o => o !== id && x.ids.has(o) && (km(at(o), at(id)) ?? Infinity) <= 60)));
+  // Keepers are one group when a repeater on file passes both and they are
+  // within 60 km of each other: the register's pass ranges recur across the
+  // state, and a wide backbone repeater alone should not make one group of
+  // half the network.
+  const parent = new Map(keepers.map(id => [id, id]));
+  const find = id => { while (parent.get(id) !== id) id = parent.get(id); return id; };
+  const join = (a, b) => parent.set(find(a), find(b));
+  for (let i = 0; i < keepers.length; i++) for (let j = i + 1; j < keepers.length; j++) {
+    const a = keepers[i], b = keepers[j], d = km(at(a), at(b));
+    const shared = reps.some(x => x.ids.has(a) && x.ids.has(b));
+    if (shared && d != null && d <= 60) join(a, b);
+  }
+  const comps = new Map();
+  keepers.forEach(id => { const r = find(id); if (!comps.has(r)) comps.set(r, []); comps.get(r).push(id); });
+  // What a repeater's own record says.
+  const ownOf = id => { const k = kept.get(id); return k ? { keeps_hours: k.keeps, steady: k.steady, poor: k.poor, night_rate: k.night_rate, day_rate: k.day_rate, goes_hour: k.goes_hour, back_hour: k.back_hour } : null; };
+  const batteryOf = id => {
+    const s = S.get(id), bt = s && s.battery;
+    const power = s && (s.findings || []).filter(f => f.category === 'power' && f.severity !== 'info').sort((a, b) => (a.severity === 'critical' ? 0 : 1) - (b.severity === 'critical' ? 0 : 1))[0];
+    if (!bt && !power) return null;
+    const nights = bt && bt.nights && bt.nights.length ? bt.nights : [];
+    const slope = bt && bt.slope != null ? bt.slope : nights.length >= 2 ? theilSen(nights.map(n => ({ x: n.t / DAY, y: n.v }))) : null;
+    return { last_night_v: bt ? bt.lastNight ?? null : null, latest_v: bt && bt.latest ? round(bt.latest.V, 2) : null, slope_v_per_night: round(slope, 3),
+      nights: nights.map(n => n.v).slice(-7), finding: power ? { kind: power.kind, severity: power.severity, title: power.title } : null };
+  };
+  // The others a repeater passes that say something about it: near it (60 km)
+  // and with no other repeater on file within 60 km of them that passes them
+  // too — a station several repeaters could carry is heard if any one is up,
+  // so its nights say nothing about this one.
+  const NEAR_KM = 60;
+  const nearRepsOf = id => reps.filter(x => x.ids.has(id) && (km(at(id), at(x.R.id)) ?? Infinity) <= NEAR_KM).map(x => x.R.id);
+  const othersOf = (R, ids, not) => {
+    const others = [...ids].filter(id => !not.has(id) && kept.has(id) && (km(at(id), at(R.id)) ?? Infinity) <= NEAR_KM);
+    const only = others.filter(id => { const n = nearRepsOf(id); return n.length === 1 && n[0] === R.id; });
+    const steady = only.filter(id => kept.get(id).steady), dipping = only.filter(id => kept.get(id).keeps);
+    return { near: others.length, judged: only.length, steady: steady.length, keeping_hours: dipping.length, steady_sample: steady.slice(0, 4), steady_share: only.length ? round(steady.length / only.length, 2) : null };
+  };
+  const groups = [...comps.values()].map(grp => {
+    const pts = grp.map(at).filter(Boolean);
+    const centre = pts.length ? { lat: median(pts.map(p => +p.lat)), lon: median(pts.map(p => +p.lon)) } : null;
+    const need = Math.max(1, Math.ceil(grp.length / 2));
+    // A repeater more than 100 km from the group is not what it shares: the
+    // register's ranges recur across the state.
+    const candidates = reps.filter(x => grp.filter(id => x.ids.has(id)).length >= need && !(centre && (km(centre, at(x.R.id)) ?? 0) > 100)).map(({ R, ids }) => {
+      const passes = grp.filter(id => ids.has(id)).length;
+      const others = othersOf(R, ids, new Set([...grp, R.id]));
+      const own = ownOf(R.id), battery = batteryOf(R.id);
+      const seen = seenBy.has(R.id) ? grp.some(id => addrsOf(id).some(a => seenBy.get(R.id).has(a))) : null;
+      const dist = centre ? km(centre, at(R.id)) : null;
+      const weak = weakBattery(battery);
+      const score = 2 * passes / grp.length + (own && own.keeps_hours ? 3 : 0) + (own && own.poor ? 1 : 0) - (own && own.steady ? 1.5 : 0) + (weak ? 1 : 0)
+        + (seen ? 1 : 0) - 1.5 * (others.steady_share || 0) + (dist == null ? 0 : Math.max(0, 1 - dist / 100));
+      // One hop up: the repeaters that pass this repeater's own reports.
+      const upstream = own ? reps.filter(y => y.R.id !== R.id && y.ids.has(R.id)).map(y => {
+        const o = othersOf(y.R, y.ids, new Set([R.id, ...grp, y.R.id]));
+        return { repeater_id: y.R.id, name: y.R.name, km: round(km(at(R.id), at(y.R.id)), 0), own: ownOf(y.R.id), battery: batteryOf(y.R.id),
+          others_judged: o.judged, others_steady_at_night: o.steady, others_keeping_hours: o.keeping_hours };
+      }).sort((p, q) => (p.km ?? 999) - (q.km ?? 999)).slice(0, 3) : [];
+      // Its relays' corrupted copies this week (flip_summary, 0078), against the fleet's.
+      const fl = flipOf.get(R.id);
+      const flipped = fl ? { clear: fl.clear, clear_rate: round(fl.clear_rate, 4), fleet_rate: round(fl.fleet_rate, 4) } : null;
+      return { repeater_id: R.id, name: R.name, passes, of: grp.length, km: round(dist, 0), own, battery, seen_relaying: seen, flips: flipped,
+        others_near: others.near, others_judged: others.judged, others_steady_at_night: others.steady, others_keeping_hours: others.keeping_hours, steady_sample: others.steady_sample,
+        upstream, score: round(score, 2) };
+    }).sort((p, q) => q.score - p.score).slice(0, 4);
+    const ks = grp.map(id => kept.get(id));
+    const g = {
+      stations: grp.map(id => ({ station_id: id, name: nameOf(id), ...kept.get(id) })),
+      centre: centre && { lat: round(centre.lat, 4), lon: round(centre.lon, 4) },
+      goes_hour: (() => { const m = median(ks.map(k => k.goes_hour).filter(h => h != null).map(h => (h < 12 ? h + 24 : h))); return m == null ? null : Math.round(m) % 24; })(),
+      back_hour: (() => { const m = median(ks.map(k => k.back_hour).filter(h => h != null)); return m == null ? null : Math.round(m); })(),
+      last_night: ks.filter(k => k.last_night_dipped).length,
+      candidates,
+    };
+    Object.assign(g, leadFor(g));
+    return g;
+  }).sort((a, b) => b.stations.length - a.stations.length || (b.candidates[0] ? b.candidates[0].score : 0) - (a.candidates[0] ? a.candidates[0].score : 0));
+  const stations = keepers.map(id => ({ station_id: id, name: nameOf(id), ...kept.get(id) }));
+  return { night_hours: NIGHT_HOURS, day_hours: DAY_HOURS, stations, groups };
+}
+// The lead in plain words — in full for the writer, and short (what they share
+// and the most telling of the repeater's own record) for the draft:
+// what the stations share, and what the repeater's own record adds — "worth a
+// look", never "replace".
+const weakBattery = b => !!b && (!!b.finding || b.last_night_v <= 12.2 || b.latest_v <= 11.8 || (b.slope_v_per_night <= -0.05 && b.last_night_v <= 12.8));
+const batteryWords = b => (b.finding ? `Its own battery reads ${b.finding.severity === 'critical' ? 'critical' : 'low'}: ${b.finding.title.replace(/^Battery\s*(critical|low)?\s*[—-]\s*/i, '').replace(/(\d)\s*V\b/g, '$1 volts')}`
+  : b.last_night_v != null ? `Its battery's last night low was ${b.last_night_v} volts${b.slope_v_per_night <= -0.05 ? ', and sliding' : ''}` : `Its battery reads ${b.latest_v} volts`).replace(/\.?$/, '.');
+const hourWords = h => (h == null ? null : h === 0 ? 'midnight' : h === 12 ? 'noon' : h < 12 ? `${h} in the morning` : h < 18 ? `${h - 12} in the afternoon` : `${h - 12} at night`);
+const pct = v => `${Math.round(100 * v)} percent`;
+export function leadFor(g) {
+  const n = g.stations.length, c = g.candidates[0];
+  const who = n === 1 ? g.stations[0].name : `${n} stations`;
+  const when = `${g.goes_hour != null ? `quiet from about ${hourWords(g.goes_hour)}` : 'quiet at night'}${g.back_hour != null ? `, back about ${hourWords(g.back_hour)}` : ''}`;
+  if (!c) { const t = `${who} ${n === 1 ? 'keeps' : 'keep'} the same hours — ${when} — and no repeater on file passes ${n === 1 ? 'it' : 'them all'}: the sites' own power fits best.`; return { lead: t, short: t }; }
+  const through = `${n === 1 ? 'it passes' : c.passes === n ? 'all pass' : c.passes === 1 ? 'one of them passes' : `${c.passes} of them pass`} through ${c.name}`;
+  const parts = [`${who} ${n === 1 ? 'keeps' : 'keep'} the same hours — ${when} — and ${through}.`];
+  // The short version, for the draft: about forty words, what they share and
+  // the most telling thing the repeater's own record says.
+  const key = [];
+  // Back once the sun is up is a solar supply that cannot carry the night;
+  // back before dawn is not the sun, and a link that fades at night fits too.
+  const solar = g.stations.filter(s => s.solar_shape).length * 2 > n;
+  const shape = solar
+    ? `Back once the sun is up: the shape of a solar supply that cannot carry the night, at the sites or at a repeater they share.`
+    : `Back before sunrise, so not the sun: a supply sagging in the small hours fits, and so does a link that fades at night.`;
+  parts.push(shape);
+  if (c.seen_relaying) parts.push(`${c.name}'s carrier was seen relaying them this week.`);
+  const say = (t, k) => { parts.push(t); if (k) key.push(k); };
+  if (c.own && c.own.keeps_hours) say(`${c.name}'s own checks keep those hours too (${pct(c.own.night_rate)} at night against ${pct(c.own.day_rate)} in the afternoon), so its power is worth a look first.`,
+    `Its own checks keep the same hours: its power is worth a look first.`);
+  else if (c.own && c.own.poor) say(`${c.name}'s own checks are mostly missing by day and by night alike (${pct(c.own.day_rate)} in the afternoon, ${pct(c.own.night_rate)} at night), so it is worth a look in its own right — its own path may be part of the same trouble.`,
+    `Its own checks go missing day and night: worth a look.`);
+  else if (c.own && c.own.steady) parts.push(`${c.name}'s own checks come in all night, so it was on the air.`);
+  if (c.flips && c.flips.clear >= 10 && c.flips.clear_rate >= Math.max(0.01, 2 * (c.flips.fleet_rate || 0))) parts.push(`It also relays more corrupted copies than most (${(100 * c.flips.clear_rate).toFixed(1)} percent of its bursts this week).`);
+  if (weakBattery(c.battery)) say(batteryWords(c.battery), batteryWords(c.battery));
+  if (c.others_judged >= 2 && c.others_steady_at_night / c.others_judged >= 0.6) parts.push(`Most of the stations near it that only it passes are heard all night, which points away from it.`);
+  else if (c.others_keeping_hours >= 1) parts.push(`${c.others_keeping_hours} more near it that only it passes keep the same hours.`);
+  const up = (c.upstream || []).find(u => u.own && u.own.keeps_hours);
+  if (up) parts.push(`One hop up, ${up.name}'s own checks keep the same hours too: worth a look as well.`);
+  if (!c.own) parts.push(`${c.name} sends no checks of its own on a schedule, so its own record cannot tell its power from the sites'.`);
+  else if (c.own.steady && solar) parts.push(`The sites' own solar fits better.`);
+  const head = `${who} ${n === 1 ? 'goes' : 'go'} quiet at night, night after night${g.back_hour != null ? `, back about ${hourWords(g.back_hour)}` : ''}; ${through}.`;
+  const shapeShort = solar ? 'Back once the sun is up: a solar supply that cannot carry the night fits.' : 'Back before sunrise: a sagging supply or a link that fades at night fits.';
+  return { lead: parts.join(' '), short: [head, ...(key.length ? key.slice(0, 2) : [shapeShort])].join(' ') };
 }
 function periodLabel(kind, p0, p1) {
   const end = new Date(p1).toLocaleString('en-AU', { timeZone: TZ, weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true }).replace(/:00/, '').replace(/\s?([ap])\.?m\.?/i, ' $1m');
@@ -520,15 +743,16 @@ export async function fetchServer(fetch, { url, key, p0, log = () => {} }) {
   const head = { apikey: key, 'Accept-Profile': 'meganet' };
   const since = encodeURIComponent(new Date(p0).toISOString());
   const ask = async (what, q) => { try { return await json(fetch, `${url}/rest/v1/${q}`, head); } catch (err) { log(`  (${what} not read: ${err.message})`); return null; } };
-  const [findings, transmitters, flipSummary, flipSources, refresh] = await Promise.all([
+  const [findings, transmitters, flipSummary, flipSources, refresh, relays] = await Promise.all([
     ask('findings', `health_finding?select=source,kind,severity,title,station_id,subject,first_seen,last_seen,cleared_at&or=(first_seen.gte.${since},cleared_at.gte.${since},cleared_at.is.null)&limit=3000`),
     ask('transmitters', 'transmitter_summary?select=*'),
     ask('flip summary', 'flip_summary?select=*'),
     ask('flip sources', 'flip_sources?select=period_days,data'),
     ask('health refresh', 'health_refresh?select=source,at'),
+    ask('relays', 'relay_summary?select=station_id,days,relayed,relayed_n,off_record'),
   ]);
   return { findings: findings || [], transmitters: transmitters || [], transmitterFindings: (findings || []).filter(f => f.source === 'transmitters' && !f.cleared_at),
-           flipSummary: flipSummary || [], flipSources: flipSources || [], refresh: refresh || [] };
+           flipSummary: flipSummary || [], flipSources: flipSources || [], refresh: refresh || [], relays: relays || [] };
 }
 
 export async function gather({ fetch = globalThis.fetch, kind = 'daily', now = Date.now(), cache = null, log = console.error } = {}) {
@@ -560,6 +784,7 @@ export function summary(f) {
   f.areas.slice(0, 5).forEach(a => L.push(`  group: ${a.title}`));
   f.batteries.slice(0, 5).forEach(b => L.push(`  battery: ${b.name} ${b.last_night_v} V, ${b.slope_v_per_night} V/night${b.finding ? ` — ${b.finding.title}` : ''}`));
   f.signal.repeaters.forEach(r => L.push(`  signal: ${r.fading} of ${r.measured} stations behind ${r.name} fading (${r.median_relative_db} dB)`));
+  (f.hours ? f.hours.groups : []).slice(0, 4).forEach(g => L.push(`  hours: ${g.lead}`));
   f.signal.sticks.forEach(s => L.push(`  signal at ${s.stick}: median change ${s.median_change_db} dB over ${s.stations} stations`));
   ((f.signal.by_carrier || {}).fading || []).slice(0, 6).forEach(x => L.push(`  signal by carrier: ${x.name} — ${x.week_db ?? '?'} dB in a week, ${x.three_months_db ?? '?'} dB in three months${x.finding ? ` (${x.finding.severity})` : ''}`));
   f.carrier.notable.slice(0, 6).forEach(c => L.push(`  carrier: ${c.name} — ${c.why}`));

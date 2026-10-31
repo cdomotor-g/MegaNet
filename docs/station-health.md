@@ -46,7 +46,10 @@ common (one repeater, one receiver channel, one hour), tells a receiver's own
 error from a transmitter's by the carrier, checks what changed at the base
 station, and writes the scenes — what is wrong, the evidence, and when it is
 not the obvious, the possible causes and what would tell them apart. It does
-not prescribe. Mondays at four a second task writes the week:
+not prescribe. Stations that go quiet at night and come back by day, night after
+night, it weighs against the repeater they share — that repeater's own scheduled
+checks keeping the same hours, its own battery, the stations only it passes — and
+names it as worth a look when the evidence points there. Mondays at four a second task writes the week:
 trends, chronic stations, recurring groups, the week's fingerprints and flips.
 `tools/bulletin/README.md` is both tasks' brief, and the way to run one by hand.
 

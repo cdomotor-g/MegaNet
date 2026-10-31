@@ -78,6 +78,25 @@ export function draft(F) {
       ...(near.length > 1 ? {} : {}) });
   }
 
+  // The hours stations keep (gather.mjs hoursKept): a group that goes quiet
+  // at night and comes back by day, night after night, and the repeater they
+  // share — a lead, weighed by that repeater's own record (the owner, 1 Nov
+  // 2026). One that is a single station needs its repeater's own checks to
+  // say something before it earns a scene.
+  const hg = ((F.hours && F.hours.groups) || []).find(g => g.candidates.length && ok(g.candidates[0].repeater_id)
+    && (g.stations.length >= 2 || (g.candidates[0].own && (g.candidates[0].own.keeps_hours || g.candidates[0].own.poor))));
+  const hc = hg && hg.candidates[0];
+  const repWorth = hc && hc.own && (hc.own.keeps_hours || hc.own.poor);
+  if (hg) {
+    const hmarks = hg.stations.filter(x => x.station_id !== hc.repeater_id && ok(x.station_id) && st(x.station_id) && st(x.station_id).lat != null).slice(0, 12)
+      .map(x => ({ id: x.station_id, kind: 'silent', sev: 'warn', label: clip(x.name, 60) }));
+    const repAt = st(hc.repeater_id) && st(hc.repeater_id).lat != null;
+    if (repAt) hmarks.push({ id: hc.repeater_id, kind: 'repeater', sev: repWorth ? 'warn' : 'info', label: clip(hc.name, 60) });
+    const links = repAt ? hmarks.filter(m => m.kind === 'silent').slice(0, 8).map(m => ({ from: m.id, to: hc.repeater_id, style: 'path' })) : [];
+    if (hmarks.length) scenes.push({ type: 'map', title: clip(`Quiet at night, behind ${hc.name}`, 70), sub: clip(`${plural(hg.stations.length, 'station')} quiet at night, night after night`, 90),
+      secs: 14, sev: 'warn', say: clip(hg.short, 400), stations: hmarks.map(m => m.id).slice(0, 8), marks: hmarks, ...(links.length ? { links } : {}) });
+  }
+
   // Batteries.
   const bats = (F.batteries || []).filter(b => ok(b.station_id) && b.last_night_v != null).slice(0, 4);
   if (bats.length) {
@@ -155,6 +174,7 @@ export function draft(F) {
   if (groups[0] && groups[0].stations.length >= 3) items.push({ sev: 'warn', text: clip(`${groups[0].stations.length} regular stations last heard on ${groups[0].path} went quiet.`, 160) });
   (F.findings || []).filter(f => f.severity === 'critical' && f.station_id && ok(f.station_id)).slice(0, 3)
     .forEach(f => items.push({ sev: 'critical', id: f.station_id, text: clip(`${nameOf(f.station_id)} — ${f.title}.`, 160) }));
+  if (hg) items.push({ sev: 'warn', id: hc.repeater_id, text: clip(`${hc.name}: ${plural(hg.stations.length, 'station')} it passes quiet at night, night after night — ${repWorth ? 'its power is worth a look' : 'worth a look, with the sites’ own power'}.`, 160) });
   const back = (F.server_findings || {}).back_on_air || [];
   if (back.length) items.push({ sev: 'ok', text: clip(`Heard again: ${plural(back.length, 'station')} the server had called silent — ${back.slice(0, 3).map(nameOf).join(', ')}${back.length > 3 ? ' among them' : ''}.`, 160) });
   if (items.length) scenes.push({ type: 'list', title: weekly ? 'This week, worth a look' : 'Worth a look today', secs: 11, say: 'So, worth a look: ' + clip(items.map(i => i.text.replace(/\.$/, '')).join('; '), 370) + '.', items: items.slice(0, 6), stations: items.map(i => i.id).filter(Boolean).slice(0, 6) });

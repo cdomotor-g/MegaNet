@@ -23,6 +23,12 @@
 //     fault planted per station: its facts hold the planted silent station as
 //     a regular silence and the sliding battery; its draft is valid; publishing
 //     it into a scratch copy writes the file and the index and lets the oldest go
+//   * the hours stations keep: checks missing at night and back by day, night
+//     after night, from the scheduled checks alone; such stations grouped by
+//     the repeater they share, that repeater ranked by its own checks keeping
+//     the same hours, a steady one and a far one behind it; the lead said in
+//     plain words, short enough for the draft, and drawn as a map scene with
+//     the repeater on it and a line in what is worth a look
 //   * every scene of every bulletin drawn, wide and tall, by the player itself;
 //     the title card says how the network is in plain words, with no weather
 //     on it, and the map draws its areas with no lows and highs
@@ -65,7 +71,7 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { validate, validateIndex, validateVoice, voicePathFor, PRESENTERS, SCENES, VOICE_FORMAT, STATUS_WORD, BENCHED, weatherTalk } from '../tools/bulletin/validate.mjs';
 import { scriptFor, hashFor, wordTimes, pending, tempoOf, frequencyWords, withLexicon } from '../tools/voice/speak.mjs';
-import { buildFacts, presenterFor, CREW } from '../tools/bulletin/gather.mjs';
+import { buildFacts, presenterFor, CREW, keptHours, hoursKept } from '../tools/bulletin/gather.mjs';
 import { draft } from '../tools/bulletin/draft.mjs';
 import { publish } from '../tools/bulletin/publish.mjs';
 import { loadAnalysis } from '../tools/health/report.mjs';
@@ -231,7 +237,7 @@ const HB = ctx.__HB;
 
 // ── 4. the pipeline, on the demo week ───────────────────────────────────────
 console.log('The pipeline on the demo week');
-let demoDraft = null;
+let demoDraft = null, demoFacts = null;
 {
   const NOW = Date.parse('2026-10-06T21:00:00Z');
   const api = loadAnalysis();
@@ -249,6 +255,7 @@ let demoDraft = null;
   ok('the facts carry every day of the week, and a position for every station they name',
     facts.series.length >= 7 && Object.values(facts.stations).every(s => Number.isFinite(s.lat)), `${facts.series.length} days`);
   demoDraft = draft(facts);
+  demoFacts = facts;
   const fridayDraft = draft(Object.assign({}, facts, { gathered_at: '2026-10-29T18:31:00.000Z' }));   // Friday, 4:31 am Brisbane
   ok('the draft signs off till tomorrow, and on a Friday till Monday (no daily at the weekend)',
     /Back tomorrow\./.test(demoDraft.scenes.at(-1).say) && /Back on Monday\./.test(fridayDraft.scenes.at(-1).say),
@@ -283,6 +290,51 @@ let demoDraft = null;
   const bad = publish(Object.assign(JSON.parse(JSON.stringify(demoDraft)), { headline: '<script>x</script>' }), { repo: tmp, ids, log: () => {} });
   ok('a draft with a problem is not published, and says why', !bad.ok && bad.errors.some(x => /headline: holds markup/.test(x)));
   fs.rmSync(tmp, { recursive: true, force: true });
+}
+
+// ── 4b. the hours stations keep ─────────────────────────────────────────────
+console.log('The hours stations keep');
+{
+  const HR = 3600000, t0 = Date.parse('2026-10-20T00:00:00+10:00');
+  const reg = new Map(doc.stations.map(s => [s.id, s]));
+  // A station checking in every hour for a week: missing from 10 at night to
+  // 9 in the morning (the night-quiet ones), or never (the steady ones), or on
+  // one night only.
+  const station = (id, missing) => ({
+    st: reg.get(id), schedule: { exp: 168, P: HR }, findings: [], addrs: new Map(),
+    slots: Array.from({ length: 168 }, (_, k) => { const t = t0 + k * HR, h = (k % 24); return { t, outcome: missing(h, Math.floor(k / 24)) ? 'miss' : 'hit' }; }),
+  });
+  const nightly = h => h >= 22 || h < 9, never = () => false, once = (h, d) => d === 2 && (h >= 22 || h < 9);
+  const S = new Map([
+    ['hotham_creek_al', station('hotham_creek_al', nightly)], ['stewarts_rd_al', station('stewarts_rd_al', nightly)], ['tyungun_al', station('tyungun_al', nightly)],
+    ['tallai_al', station('tallai_al', nightly)], ['molendinar_al', station('molendinar_al', never)], ['pacific_pines_al', station('pacific_pines_al', once)],
+  ]);
+  const group = ['hotham_creek_al', 'stewarts_rd_al', 'tyungun_al'].map(id => S.get(id));
+  const rep = (id, members) => ({ id, name: reg.get(id).name, rep: { st: reg.get(id) }, members });
+  const A = { stations: S, repeaters: [rep('tallai_al', [...group, S.get('pacific_pines_al')]), rep('molendinar_al', [...group, S.get('tallai_al')]), rep('amiens_knob_al', group)] };
+  const k = keptHours(S.get('hotham_creek_al')), m = keptHours(S.get('molendinar_al')), o = keptHours(S.get('pacific_pines_al'));
+  ok('a station whose checks go missing at night and are back by day, night after night, keeps hours — gone about 10 at night, back about 9',
+    k.keeps && k.night_rate === 0 && k.day_rate === 1 && k.goes_hour === 22 && k.back_hour === 9 && k.solar_shape, JSON.stringify(k));
+  ok('…one heard all night is steady, and one that missed a single night keeps no hours', m.steady && !m.keeps && !o.keeps, JSON.stringify({ m, o }));
+  const H = hoursKept(A);
+  const g = H.groups.find(x => x.stations.length === 3);
+  ok('the three that keep hours are one group, and the repeater they share whose own checks keep the same hours leads',
+    g && g.candidates[0].repeater_id === 'tallai_al' && g.candidates[0].own.keeps_hours, JSON.stringify(g && g.candidates.map(c => [c.repeater_id, c.score])));
+  ok('…the steady repeater beside it ranks below, and one 150 km away is no candidate',
+    g && g.candidates.some(c => c.repeater_id === 'molendinar_al' && c.own.steady) && !g.candidates.some(c => c.repeater_id === 'amiens_knob_al'), JSON.stringify(g && g.candidates.map(c => c.repeater_id)));
+  ok('…its case said as a lead, in plain words: back once the sun is up, its own checks keep the same hours, its power worth a look',
+    g && /all pass through Tallai AL/.test(g.lead) && /Back once the sun is up/.test(g.lead) && /its power is worth a look first/.test(g.lead) && !weatherTalk(g.lead) && !/replace|go and/i.test(g.lead), g && g.lead);
+  ok('…and short enough for the draft', g && g.short.split(/\s+/).length <= 45 && /Tallai AL/.test(g.short), g && g.short);
+  // Into a draft: a map scene with the repeater on it and the paths drawn, and a line in what is worth a look.
+  const F2 = Object.assign(JSON.parse(JSON.stringify(demoFacts)), { hours: H });
+  for (const id of ['hotham_creek_al', 'stewarts_rd_al', 'tyungun_al', 'tallai_al']) { const s = reg.get(id); F2.stations[id] = { name: s.name, lat: +s.lat, lon: +s.lon }; }
+  const d2 = draft(F2);
+  const sc = d2.scenes.find(x => x.type === 'map' && /Quiet at night, behind Tallai AL/.test(x.title));
+  ok('the draft gives it a map scene: the three, the repeater marked, a path from each', sc && sc.marks.some(mk => mk.id === 'tallai_al' && mk.kind === 'repeater')
+    && (sc.links || []).filter(l => l.to === 'tallai_al').length === 3, JSON.stringify(sc));
+  ok('…and a line in what is worth a look', d2.scenes.find(x => x.type === 'list').items.some(it => it.id === 'tallai_al' && /quiet at night/.test(it.text)));
+  const r2 = validate(d2, { stationIds: ids });
+  ok('…and the draft is still a valid bulletin', !r2.errors.length, r2.errors.join('; '));
 }
 
 // ── 5. every scene drawn, by the player itself ─────────────────────────────

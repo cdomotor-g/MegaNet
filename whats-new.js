@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 168, date: '2026-10-31', items: [
+      '📺 The <strong>Network Bulletin</strong> now looks for stations that go quiet at night and come back by day, night after '
+        + 'night, and the repeater they share. It weighs that repeater by its own record: its own scheduled checks keeping the same '
+        + 'hours, its own battery, the stations only it passes. When the evidence points there, it names the repeater as worth a look, '
+        + 'and draws the group on a map with the repeater marked.',
+    ] },
     { n: 167, date: '2026-10-31', items: [
       '📺 <strong>Network Weather</strong> is now the <strong>📺 Network Bulletin</strong>, and it speaks plainly: no more '
         + '"stormy", "fair" or "a low over Logan" for the state of the network. Flood-Net measures the real weather, so rain and '

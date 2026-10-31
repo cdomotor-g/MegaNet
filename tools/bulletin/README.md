@@ -88,7 +88,8 @@ stations judged it and how many saw the fall. Where the two disagree, trust
 `by_carrier`; **carrier fingerprints** — who is off the fleet, who moved, who
 jumped day to day, whose carrier vanished (`carrier.notable`, each with the
 days it was measured); **bit flips by who sent them** and the hours they keep
-(`flips`); the rain; the server's findings opened and cleared in the period;
+(`flips`); **the hours stations keep** (`hours`, below); the rain; the
+server's findings opened and cleared in the period;
 and the days' numbers (`series`). `stations` has every station mentioned, with
 its position.
 
@@ -131,6 +132,43 @@ scene:
    not.
 6. **What would tell the possibilities apart?** When two causes fit, say both,
    and what observation would separate them. That is not prescribing.
+7. **Does it keep hours?** A group of stations whose checks go missing at
+   night and come back by day, night after night, is one finding, and the
+   first suspect is what they share upstream: a repeater whose own supply
+   cannot carry the night drops everything it relays, and every station
+   behind it looks faulty (the owner, 1 Nov 2026). `hours` has it worked out
+   from the scheduled checks alone (rain tips crowd the afternoon storms and
+   would make any gauge look busier by day): each station's checks received
+   at night (10 pm to 6 am) against the afternoon (noon to 6 pm), the nights
+   it dipped, when it goes quiet and when it is back; the stations grouped by
+   a repeater on file that passes them and is within reach; and for each
+   group the repeaters they share (`candidates`), best first, with what
+   tells one from the sites:
+   - **its own checks** (`own`): the same hours (`keeps_hours`) is the
+     strongest lead there is; missing day and night alike (`poor`) is worth
+     saying in its own right; coming in all night (`steady`) says it was on
+     the air;
+   - **its own battery** (`battery`): a critical or sliding night low;
+   - **the stations near it that only it passes** (`others_judged`,
+     `others_steady_at_night`): heard all night says it was on the air — but
+     most stations are passed by several repeaters on file and are heard if
+     any one is up, so this is often empty;
+   - **its carrier seen relaying them** (`seen_relaying`, from
+     `relay_summary`): few repeaters' carriers are found, so its absence
+     says little;
+   - **its corrupted copies** (`flips`), and **one hop up** (`upstream`): the
+     repeaters that pass its own reports, and their own hours.
+
+   When it comes back says something too: back once the sun is up is the
+   shape of a solar supply that cannot carry the night; back before sunrise
+   is not the sun, and a link that fades at night fits as well as a supply
+   sagging in the small hours. `lead` is the case in plain words and `short`
+   a version the draft uses; check it against the queries below before you
+   lean on it. Name the repeater and say why it is worth a look — "its own
+   checks keep the same hours", "its battery reads 9 volts" — not "go and fix
+   it". A repeater the register does not show passing them (a hunch, a known
+   troublemaker) needs the carrier to put it on their path; say so if you
+   cannot.
 
 **The Supabase connector, if this session has it** (project `jjprlritvhdqpvphfrnu`,
 Flood-Net's): read-only `select`s go further than the public tables. Never write,
@@ -161,6 +199,22 @@ from meganet.base_station_command where created_at > now() - interval '36 hours'
 select app, version, status_at, status -> 'config' -> 'receivers' -> 'sdrDevices' as sticks,
        beat ->> 'load' as load, beat ->> 'temp' as temp, beat ->> 'throttled' as throttled
 from meganet.base_station;
+
+-- A repeater's own reports, or a group's, by the hour of the day across the week:
+-- does it keep the same hours as the stations behind it? (Raw counts include rain
+-- tips, which crowd the afternoon storms: compare the hours of its timed reports,
+-- or set it against a station nearby that keeps all night.)
+select alert_id, extract(hour from reading_ts at time zone 'Australia/Brisbane')::int h, count(*) n
+from meganet.reading
+where reading_ts > now() - interval '6 days' and station_id in ('<repeater id>', '<station id>')
+group by 1, 2 order by 1, 2;
+
+-- The corrupted copies a repeater's carrier put on the air, by the hour: a radio
+-- that misbehaves as its supply sags keeps the same hours as the silences.
+select extract(hour from heard_at at time zone 'Australia/Brisbane')::int h, count(*) n
+from meganet.flip_event
+where day > current_date - 7 and bad_tx = (select tx from meganet.flip_summary where station_id = '<repeater id>')
+group by 1 order by 1;
 
 -- An address arriving on two carriers at once (a repeater the register does not have,
 -- two stations sharing an address, or its own station and a relay).
@@ -307,7 +361,8 @@ Every scene has `type`, `title` (≤70), `say` (≤420), `secs`, and may have `s
 **Daily:** what changed overnight. New silences and the group they make; a
 receiver that stopped, lagged or lost its tuning; a battery crossing 12.2 or
 11.8 V; a fingerprint that jumped or a carrier that vanished; a spike in bit
-flips and whose carrier it is on; what cleared. Last night's rain, if it
+flips and whose carrier it is on; a group that went quiet again last night
+and the repeater it shares (`hours`); what cleared. Last night's rain, if it
 explains something.
 
 There is no daily on Saturday or Sunday (the owner's call, 1 November 2026:
@@ -320,8 +375,9 @@ draft's signoff already says so, and the page shows it).
 (`series`); stations that miss checks every day (chronic, not sudden); the week's
 battery slopes; fingerprints against their thirty days; whose carrier the
 week's bit flips came on and the hours they keep (interference keeps hours, a
-failing radio does not); the repeaters behind most of the trouble; each
-receiver's week; what the register needs; and what got fixed.
+failing radio does not); the repeaters behind most of the trouble, and the
+groups that went quiet night after night with the repeater they share
+(`hours`, judged over the last seven days); each receiver's week; what the register needs; and what got fixed.
 
 ## The voices
 
