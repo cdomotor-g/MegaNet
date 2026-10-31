@@ -837,6 +837,14 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 207 — 2026-10-31: 💾 Health findings written only when something is new — 0094
+
+The owner, on revision 202's two writers left alone: *"I'm leaning towards doing something about both of those"*, and to the hour-old `last_seen` that one of them costs: *"An hour is fine, do both"*. No issue; this entry is its record. **Opens and closes nothing.**
+
+- **`health_apply()`** (every station report, transmitter run and base-station run): an open finding is rewritten only when its severity, title, detail, evidence or station changes, or once its `last_seen` is 45 minutes old. Until now every open finding was rewritten every run, about 360 KB of WAL per station report. **`last_seen` is now right to within the hour**; the agent API returns it and the Backbone view breaks sorting ties with it, and nothing decides anything by it. What opened, got worse and cleared is answered exactly as before. "Quiet for 30 h" titles still change each hour, so those findings are rewritten hourly anyway.
+- **`refresh_base_station_findings()`** (every five minutes): what a run finds is collected first. `health_apply()`'s two temporary tables are made only when it found something or something is open. Their system-catalog rows were what a run wrote: **42–57 KB of WAL a run, now 0.6–2.3 KB** on live. It still runs every five minutes, so an offline base station is found as soon as before.
+- **Checks:** `check_health_findings` 42, two new: a quiet run makes no temporary tables, and a finding with nothing new keeps its `last_seen` until 45 minutes. Both fail on `0093` and pass on `0094`. Its station block now starts two hours back so reports can be an hour apart. Also every migration from zero on Postgres 16, `check_health_cards`, `check_base_stations`, `check_base_station_links`, `check_transmitter_drift`, `check_flip_fingerprints` and `check_station_snr`; the cheap five. Applied by `db-migrate.yml` in 3 s; `core.js` `DB_SCHEMA_VERSION` 94.
+
 ### Revision 206 — 2026-10-31: 📨 The agent API's changes as data, and an email when it changes — #237's Resend parts switch it on
 
 The owner: *"if we're fiddling with the API from time to time downstream users may be affected … I can submit an email address and then if we do anything to the API we shoot out a message to them … just send out an automated email."* **Opens nothing; closes nothing.** #237's entry above now says its Resend parts (2–3) also switch the list on; the issue itself is unchanged.

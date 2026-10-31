@@ -3768,8 +3768,10 @@ const DB_SCHEMA = 'meganet';
 // (0092, relay_summary, read by the Repeaters tab), applied by db-migrate.yml
 // on 30 October 2026, bumped after. 93: equipment suggestions approved in one
 // go, and a sighting with less in it never a replacement (0093), applied by
-// db-migrate.yml on 31 October 2026, bumped after.
-const DB_SCHEMA_VERSION = 93;
+// db-migrate.yml on 31 October 2026, bumped after. 94: health findings
+// rewritten only when something is new, last_seen to within the hour (0094),
+// applied by db-migrate.yml on 31 October 2026, bumped after.
+const DB_SCHEMA_VERSION = 94;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
