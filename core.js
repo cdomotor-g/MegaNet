@@ -3766,8 +3766,10 @@ const DB_SCHEMA = 'meganet';
 // October 2026, bumped after. 91: a Field Camera photo the phone saved again
 // refused (0091). 92: what each repeater is heard relaying and its turnaround
 // (0092, relay_summary, read by the Repeaters tab), applied by db-migrate.yml
-// on 30 October 2026, bumped after.
-const DB_SCHEMA_VERSION = 92;
+// on 30 October 2026, bumped after. 93: equipment suggestions approved in one
+// go, and a sighting with less in it never a replacement (0093), applied by
+// db-migrate.yml on 31 October 2026, bumped after.
+const DB_SCHEMA_VERSION = 93;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

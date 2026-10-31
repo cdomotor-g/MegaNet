@@ -155,9 +155,14 @@ size). Logger details were filled at 29 stations: 17 ERT-A2s, 4 CR300s, 4
 CR310s, and 4 whose model is not on the list yet — among them an ELPRO ERTP-02
 and ELPRO's older Field Station 2R43 canisters, which a person can add as
 types. 20 serial numbers; one ERT-A2's three versions, at Release G; two
-Campbell loggers' OS and program. 318 other pieces of equipment wait in
-**Field Photos → Review** for an administrator. Nothing disagreed with a
-person's value — nobody had entered one yet.
+Campbell loggers' OS and program. Nothing disagreed with a person's value —
+nobody had entered one yet. 318 other pieces of equipment were proposed for
+the register; after 22 were approved by hand, five of them wrongly retiring a
+unit (0093 says why, and put them right), the other 270 were settled on 31
+October with Approve all: 186 approved — 135 added, 51 the same unit seen
+again — 81 settled as duplicates of those, and 3 make-only sightings of a
+battery already on the register declined, saying so. The register then held
+153 units at 34 stations, nothing retired but four rows recorded twice.
 
 ### The nightly task
 
