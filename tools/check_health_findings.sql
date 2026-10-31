@@ -209,6 +209,9 @@ begin
   perform pg_temp.check_that('two base stations checking in now: nothing found, and the run says what it judged',
     jsonb_array_length(r -> 'opened') = 0 and (r ->> 'open')::int = 0
       and (r -> 'judged' ->> 'base_stations')::int = 2 and (r -> 'judged' ->> 'receivers')::int = 1, r::text);
+  perform pg_temp.check_that('…and, with nothing found and nothing open, made no temporary tables (0094)',
+    pg_catalog.to_regclass('pg_temp._health_now') is null and pg_catalog.to_regclass('pg_temp._health_hold') is null
+      and jsonb_array_length(r -> 'worse') = 0 and jsonb_array_length(r -> 'cleared') = 0, r::text);
   perform pg_temp.check_that('…a receiver''s count is remembered; a GPS and a receiver set aside are not judged',
     (select count(*) from meganet.health_receiver where ingest_token_id = pi) = 1
       and exists (select 1 from meganet.health_receiver where ingest_token_id = pi and rx_key = 'sdr-serial:0001' and decoded = 500));
@@ -334,7 +337,9 @@ $$;
 
 do $$
 declare
-  t   timestamptz := now() - interval '40 minutes';
+  -- Two hours back, so the reports below can be an hour apart and none of
+  -- them from the future.
+  t   timestamptz := now() - interval '2 hours';
   r   jsonb;
   f   meganet.health_finding;
   f2  meganet.health_finding;
@@ -393,10 +398,20 @@ begin
   r := pg_temp.report(jsonb_build_object('at', t + interval '30 minutes', 'complete', false, 'findings', '[]'::jsonb));
   perform pg_temp.check_that('an incomplete report clears nothing',
     (pg_temp.open_of('stations', 'silent', 'silent:' || sid)).id is not null and jsonb_array_length(r -> 'cleared') = 0, r::text);
-  r := pg_temp.report(jsonb_build_object('at', t + interval '35 minutes', 'complete', true, 'findings', '[]'::jsonb));
+  -- Nothing new about it: left alone, until its last_seen is 45 minutes old (0094).
+  r := pg_temp.report(jsonb_set(rep, '{at}', to_jsonb(t + interval '40 minutes')));
+  perform pg_temp.check_that('a finding the next report says nothing new about is not rewritten: last_seen stays',
+    (pg_temp.open_of('stations', 'silent', 'silent:' || sid)).last_seen = t + interval '15 minutes'
+      and (r ->> 'open')::int = 1 and jsonb_array_length(r -> 'opened') = 0 and jsonb_array_length(r -> 'worse') = 0, r::text);
+  r := pg_temp.report(jsonb_set(rep, '{at}', to_jsonb(t + interval '75 minutes')));
+  perform pg_temp.check_that('…until its last_seen is 45 minutes old: then it moves, and the finding is the same one',
+    (pg_temp.open_of('stations', 'silent', 'silent:' || sid)).last_seen = t + interval '75 minutes'
+      and (pg_temp.open_of('stations', 'silent', 'silent:' || sid)).id = f.id and jsonb_array_length(r -> 'opened') = 0, r::text);
+
+  r := pg_temp.report(jsonb_build_object('at', t + interval '80 minutes', 'complete', true, 'findings', '[]'::jsonb));
   perform pg_temp.check_that('a complete one that no longer names it clears it — heard again',
     (pg_temp.open_of('stations', 'silent', 'silent:' || sid)).id is null
-      and (select cleared_at from meganet.health_finding where id = f.id) = t + interval '35 minutes', r::text);
+      and (select cleared_at from meganet.health_finding where id = f.id) = t + interval '80 minutes', r::text);
 
   perform pg_temp.check_that('the station reports never touched a base station''s findings',
     v_bs > 0 and v_bs = (select count(*) from meganet.health_finding where source = 'base-stations' and cleared_at is null), v_bs::text);
