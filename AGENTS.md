@@ -217,6 +217,17 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   the file, never the issue. Whenever you open, close or edit an issue, update
   that file in the same piece of work (one edit covering several issues).
 
+- **Atlas:** the owner's map of every repository is https://cdomotor-g.github.io/atlas/
+  (source `cdomotor-g/atlas`); this repository is `flood-net` there and describes itself in
+  `atlas.json` at its root. When you change something another repository relies on (a path
+  under `provides`, or one another repository's `consumes` entry watches), tell that
+  repository in the same piece of work — the matching change if you have it, otherwise an
+  issue there titled `[Standalone] [<Model>/<Effort>] Upstream: …`. When Flood-Net needs
+  another repository to change, file an issue there and list it under `asks`. When you
+  catch up with another repository, move that `consumes` entry's pin. When where Flood-Net
+  is up to changes, update `status` in `atlas.json` with today's date. The daily
+  `atlas.yml` check here reports only; an issue it would open goes on #113 like any other.
+
 ### How the code is laid out
 
 - **No build step.** `index.html` loads `styles.css` and the app's classic

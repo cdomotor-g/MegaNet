@@ -1,0 +1,586 @@
+{
+  "$schema": "https://cdomotor-g.github.io/atlas/schema/atlas.schema.json",
+  "atlas": 1,
+  "id": "flood-net",
+  "repo": "cdomotor-g/MegaNet",
+  "name": "Flood-Net",
+  "tagline": "The engineering register and toolset for the Bureau's Queensland flood-warning radio network: stations, repeaters, health, field work.",
+  "about": "Flood-Net is the register and toolset for the Bureau of Meteorology's Queensland (and neighbouring) flood-warning telemetry network: the field stations, the repeaters that relay them, the base stations and the radio paths between. It is a browser app with no build step, backed by a Supabase Postgres database and a Cloudflare Worker at floodwarning.net, for the people who plan, inspect and keep the network running. It takes readings in from base stations, judges the network's health on a schedule, publishes a daily animated bulletin, and serves public station data to AI agents through a read-only API and MCP server. It is not a flood warning service.",
+  "kind": "web app, Cloudflare Worker and Postgres database",
+  "logo": "assets/logo.webp",
+  "site": "https://floodwarning.net",
+  "docs": {
+    "readme": "README.md",
+    "roadmap": "roadmap/roadmap-113.md",
+    "agents": "CLAUDE.md",
+    "agents-other": "AGENTS.md",
+    "agent-api": "docs/agent-api.md",
+    "database": "db/README.md",
+    "ingest": "docs/ingest-http.md",
+    "base-stations": "docs/base-stations.md",
+    "bulletin": "tools/bulletin/README.md",
+    "design-system": "docs/design-system.md",
+    "tests": "test/README.md"
+  },
+  "version": {
+    "file": "index.html",
+    "pattern": "\\?v=(\\d{8}[a-z]+)",
+    "releases": false
+  },
+  "status": {
+    "phase": "live",
+    "updated": "2026-10-31",
+    "summary": "Live and in daily use (database schema 93): this week added the agent API's changelog and email list, ACMA licences in the API, the Repeaters tab and cuts to database I/O, while account email, compute size and the ACMA download link wait on the owner.",
+    "now": [
+      "Agent API changelog and notify list shipped; emails start once #237's Resend parts are done",
+      "Photo reader: nightly reading of field photos for logger and equipment details",
+      "#243 R2 data archive: one restored-day self-test left, then close",
+      "#217 and #244 transmitter drift and bit-flip sources: gathering live days of carrier data",
+      "#258 flaky Site features 3-D hand-back check in CI"
+    ],
+    "next": [
+      "#252–#254 road routes: avoid closures, inspection runs, routes kept offline (EPIC #250)",
+      "#238 QLDTraffic flood events and road closures on the Stations map",
+      "#216 staff alerts: daily digest email and web push for critical findings",
+      "#232 measure whether one burst heard by two receivers is stored twice",
+      "#187 ACMA transmitters in the 3-D view",
+      "#220 maintenance due list; #228 accessibility follow-ups"
+    ],
+    "later": [
+      "#201 place a field photo by dragging its pin; #205 site exposure outside Queensland",
+      "#247 carrier outages on Station Health (parked until a source is chosen)"
+    ],
+    "blocked": [
+      {
+        "what": "#237 switch accounts on: finish 0062, send email through Resend, Supabase sign-in settings",
+        "on": "human"
+      },
+      {
+        "what": "#255 move the database to Small compute; #256 choose how long receptions are kept",
+        "on": "human"
+      },
+      {
+        "what": "#245 / #248 find ACMA's new register download link; the ACMA layer is stuck on 23 July 2026",
+        "on": "human"
+      },
+      {
+        "what": "#239 Part 2: rewrite git history to remove the old inspection archive (every commit ID changes)",
+        "on": "human"
+      },
+      {
+        "what": "#157 commission the base-station logger at its first site; #207 Sign in with Microsoft",
+        "on": "human"
+      },
+      {
+        "what": "#204 report templates wait on the owner's example reports; #206 on a credential choice",
+        "on": "human"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "app-shell",
+      "name": "App shell and offline",
+      "what": "The single page: about 58 tabs in 13 groups, sign-in, the station list's three sources, the service worker; index.html's script order is the contract and every app push bumps the ?v= stamp.",
+      "paths": [
+        "index.html",
+        "core.js",
+        "init.js",
+        "styles.css",
+        "sw.js",
+        "pwa.js",
+        "route.js",
+        "palette.js",
+        "nav-views.js",
+        "home.js",
+        "whats-new.js",
+        "auth.js",
+        "datastore.js",
+        "capabilities.js"
+      ],
+      "url": "https://floodwarning.net",
+      "status": "live"
+    },
+    {
+      "id": "stations-map",
+      "name": "Stations, maps and 3-D",
+      "what": "The Stations tab and its map layers, the station card and editor, the digital twin, path profiles and link budgets, printed radio path maps, Look Around and Nearby.",
+      "paths": [
+        "app.js",
+        "station-editor.js",
+        "map-*.js",
+        "digital-twin.js",
+        "twin-*.js",
+        "site-features.js",
+        "path-profile.js",
+        "link-budget.js",
+        "terrain.js",
+        "station-ar.js",
+        "nearby.js",
+        "network-maps.js",
+        "export.js"
+      ],
+      "status": "live"
+    },
+    {
+      "id": "network-rf",
+      "name": "Network, RF and interference",
+      "what": "ALERT IDs, Repeaters and Repeater Delays; the ACMA register, RF Changes and the Interference Workbench; Reception Map and Bit-Flip Sources; Signal Routes, Network Review, the ALERT2 Transition Plan and the TDMA Planner.",
+      "paths": [
+        "pass-ranges.js",
+        "address-space.js",
+        "repeaters.js",
+        "repeater-delays.js",
+        "delay-plan.js",
+        "rf-changes.js",
+        "workbench.js",
+        "reception.js",
+        "flip-sources.js",
+        "bit-bench.js",
+        "signal-routes.js",
+        "network-review.js",
+        "alert2-plan.js",
+        "tdma-planner.js",
+        "data/acma-*.json",
+        "tools/acma_fetch.py"
+      ],
+      "status": "live"
+    },
+    {
+      "id": "decoders",
+      "name": "Decoders and Serial Monitor",
+      "what": "The ALERT, ALERT2, HFEM and Quansheng codecs, the off-air SDR decoder, and the Serial Monitor whose receiver cards post what they decode, plus the sdr-pi relay for an RTL-SDR on a Pi.",
+      "paths": [
+        "packets.js",
+        "alert-dsp.js",
+        "alert2.js",
+        "quansheng.js",
+        "serial-gps.js",
+        "hfem.js",
+        "bit-flipper.js",
+        "network-view.js",
+        "serial*.js",
+        "rtlsdr.js",
+        "a2-*.js",
+        "sdr-pi.js",
+        "sdr-pi/"
+      ],
+      "status": "live"
+    },
+    {
+      "id": "network-health",
+      "name": "Readings and network health",
+      "what": "Station Health, Backbone, Investigations and Methodology, the Base Stations tab that manages RPi ALERT stations, and the Field Data, Message Log and Plots tabs over the readings; findings are worked out on the server every 15 minutes.",
+      "paths": [
+        "health.js",
+        "health-*.js",
+        "base-stations.js",
+        "backbone.js",
+        "investigations.js",
+        "methodology.js",
+        "message-log.js",
+        "arro-data.js",
+        "plot-lines.js",
+        "tools/health/",
+        ".github/workflows/station-health.yml"
+      ],
+      "status": "live"
+    },
+    {
+      "id": "bulletins",
+      "name": "Network bulletins and voices",
+      "what": "A scheduled Claude session writes a two-minute animated bulletin each weekday morning (and weekly on Mondays), drawn on Station Health and voiced by the Droggies through ElevenLabs.",
+      "paths": [
+        "health-bulletin.js",
+        "tools/bulletin/",
+        "tools/voice/",
+        "data/bulletins/",
+        "assets/presenters/",
+        ".github/workflows/bulletin-voice.yml"
+      ],
+      "status": "live"
+    },
+    {
+      "id": "field-work",
+      "name": "Site visits, surveying and training",
+      "what": "Inspection sheets, site maintenance and inspection history, the Field Camera and Field Photos, level surveys and two-peg tests, field training and the knowledge base.",
+      "paths": [
+        "inspections.js",
+        "maintenance.js",
+        "history.js",
+        "station-inspections.js",
+        "field-photos.js",
+        "field-camera.js",
+        "photo-*.js",
+        "level-*.js",
+        "levelling.js",
+        "two-peg.js",
+        "survey-guide.js",
+        "kb-*.js",
+        "knowledge-base.js",
+        "propagation*.js",
+        "swr-*.js",
+        "pinouts.js"
+      ],
+      "status": "live"
+    },
+    {
+      "id": "worker",
+      "name": "floodwarning.net Worker",
+      "what": "The Cloudflare Worker in front of the app: Access sign-in turned into a database session, the /api/db proxy for networks that block Supabase, photos and the data archive in R2, Ask Claude, bug reports, council cameras, road routes, push and scheduled notifications.",
+      "paths": [
+        "worker/index.js",
+        "worker/photos.js",
+        "worker/archive.js",
+        "worker/briefing.js",
+        "worker/report.js",
+        "worker/cameras.js",
+        "worker/drive.js",
+        "worker/push.js",
+        "worker/notify.js",
+        "wrangler.toml"
+      ],
+      "url": "https://floodwarning.net",
+      "status": "live"
+    },
+    {
+      "id": "agent-api",
+      "name": "Agent API and MCP server",
+      "what": "Read-only public station data for AI agents and scripts: REST at /api/v1 with OpenAPI, MCP at /api/mcp, rate limited, with a changelog and an email list for its changes.",
+      "paths": [
+        "worker/api.js",
+        "worker/acma.js",
+        "worker/changelog.js",
+        "docs/agent-api.md",
+        "docs/api-changelog.json",
+        "api.html",
+        "AGENTS.md",
+        "GEMINI.md",
+        "llms.txt",
+        ".github/copilot-instructions.md",
+        ".cursor/rules/"
+      ],
+      "url": "https://floodwarning.net/api/v1",
+      "status": "live"
+    },
+    {
+      "id": "database",
+      "name": "Postgres schema (Supabase)",
+      "what": "The meganet schema: stations, readings, receptions and their roll-ups, inspections, photos, health findings, ingest tokens and base stations, in 93 numbered migrations applied by the db-migrate workflow; every raw day archived to R2 before it is deleted.",
+      "paths": [
+        "db/migrations/",
+        "db/README.md",
+        "tools/check_*.sql",
+        ".github/workflows/db-migrate.yml",
+        ".github/workflows/archive-r2.yml",
+        "stations.json"
+      ],
+      "status": "live"
+    },
+    {
+      "id": "ingest-adapters",
+      "name": "MQTT bridge and base-station logger",
+      "what": "The MQTT-to-ingest bridge (Fly.io, deployed by a workflow button) and the CRBasic program for a base station's datalogger that posts over HTTPS and publishes over MQTT.",
+      "paths": [
+        "bridge/",
+        "logger/",
+        "docs/ingest-mqtt.md",
+        "docs/mqtt-provisioning.md",
+        "docs/ingest-hfem.md",
+        ".github/workflows/deploy-bridge.yml"
+      ],
+      "status": "beta"
+    },
+    {
+      "id": "automation",
+      "name": "Scheduled jobs, agent skills and data tools",
+      "what": "GitHub workflows (smoke test, ACMA refresh, photo syncs, station snapshot, roadmap sync), the CI doctor and photo reader Claude skills, the weekly security review, the ingest tools and the test suite.",
+      "paths": [
+        ".github/workflows/",
+        ".claude/skills/",
+        "tools/security-scan/",
+        "tools/ingest/",
+        "tools/snapshot_stations_json.py",
+        "test/"
+      ],
+      "status": "live"
+    }
+  ],
+  "provides": [
+    {
+      "id": "agent-api",
+      "name": "Agent API (REST and MCP)",
+      "what": "Read-only public station data: search and stations near a point, a station's record and dossier, readings and the latest reading per station, health findings and silent stations, flood levels, service levels, ACMA licences, catchments, networks, and a changelog of every visible API change.",
+      "component": "agent-api",
+      "paths": [
+        "worker/api.js",
+        "worker/acma.js",
+        "worker/changelog.js",
+        "docs/agent-api.md",
+        "docs/api-changelog.json"
+      ],
+      "url": "https://floodwarning.net/api/v1",
+      "contract": "docs/agent-api.md"
+    },
+    {
+      "id": "https-ingest",
+      "name": "HTTPS ingest for base stations",
+      "what": "PostgREST RPCs a base station calls with its own token: ingest_http (readings, deduplicated on address, time and raw value), report_ingest_point, report_receptions, and asking for a token that an administrator approves; reachable directly or through the floodwarning.net /api/db proxy.",
+      "component": "database",
+      "paths": [
+        "docs/ingest-http.md",
+        "docs/ingest-serial-monitor.md",
+        "db/migrations/0007_ingest_http.sql",
+        "db/migrations/0012_base_station_tokens.sql",
+        "db/migrations/0045_ingest_points.sql",
+        "db/migrations/0047_receptions.sql",
+        "db/migrations/0048_ingest_token_requests.sql",
+        "db/migrations/0052_ingest_seen_when_heard.sql",
+        "worker/index.js"
+      ],
+      "url": "https://floodwarning.net/api/db/rest/v1/rpc/ingest_http",
+      "contract": "docs/ingest-http.md"
+    },
+    {
+      "id": "base-station-checkin",
+      "name": "Base-station check-in",
+      "what": "A base station's minute-by-minute health report (receivers, queue, power, clock, software, spectrum) and the short fixed list of requests the Base Stations tab can leave for it: a setting, a restart, an update, its log, the team's SSH keys.",
+      "component": "network-health",
+      "paths": [
+        "docs/base-stations.md",
+        "db/migrations/0049_base_stations.sql",
+        "db/migrations/0068_base_station_spectrum.sql"
+      ],
+      "contract": "docs/base-stations.md"
+    },
+    {
+      "id": "station-list",
+      "name": "Station list",
+      "what": "Every station with its sensors, ALERT addresses, repeaters and radio details; kept in Postgres (meganet.stations_doc) and exported weekly to stations.json in the same shape.",
+      "component": "database",
+      "paths": [
+        "stations.json",
+        "db/migrations/0002_stations.sql",
+        "db/migrations/0069_stations_doc_cache.sql",
+        "tools/snapshot_stations_json.py"
+      ],
+      "url": "https://raw.githubusercontent.com/cdomotor-g/MegaNet/main/stations.json",
+      "contract": "README.md"
+    },
+    {
+      "id": "alert-dsp",
+      "name": "Off-air ALERT decoder",
+      "what": "Decodes legacy ALERT (Binary, Enhanced iFLOWS, ASCII) from SDR samples, with carrier offset; a port of agmurf/sdr-alert-decoder (MIT), with a real off-air test capture.",
+      "component": "decoders",
+      "paths": [
+        "alert-dsp.js",
+        "test/fixtures/sdr/",
+        "LICENSE"
+      ]
+    },
+    {
+      "id": "quansheng-codec",
+      "name": "Quansheng ALERT radio codec",
+      "what": "The serial codec for the Quansheng UV-K5 V3 / UV-K1 ALERT receiver firmware (schema 2): its records, its console commands and the station table it keeps.",
+      "component": "decoders",
+      "paths": [
+        "quansheng.js"
+      ]
+    },
+    {
+      "id": "alert2-parser",
+      "name": "ALERT2 / ERT-A2 parser",
+      "what": "Reads the ELPRO ERT-A2's RS-232 ASCII lines and USB binary frames by the NHWC specifications, including self-reports.",
+      "component": "decoders",
+      "paths": [
+        "alert2.js"
+      ]
+    },
+    {
+      "id": "serial-gps",
+      "name": "NMEA GPS parser",
+      "what": "NMEA 0183 GGA, RMC and GST sentences from a serial GPS.",
+      "component": "decoders",
+      "paths": [
+        "serial-gps.js"
+      ]
+    },
+    {
+      "id": "packet-formats",
+      "name": "ALERT / ERTS packet formats",
+      "what": "The ALERT / ERTS frame decoder and encoder and its FORMATS table, per the Bureau's ERTS Data Formats specification.",
+      "component": "decoders",
+      "paths": [
+        "packets.js"
+      ]
+    },
+    {
+      "id": "alert2-plan",
+      "name": "ALERT2 transition plan figures",
+      "what": "The planning figures and costs in the ALERT2 Transition Plan (equipment, site audits, licensing per network change).",
+      "component": "network-rf",
+      "paths": [
+        "alert2-plan.js"
+      ]
+    },
+    {
+      "id": "bulletin-voicing",
+      "name": "Bulletin voicing",
+      "what": "How the bulletins read the Droggies' cast (voice, model, direction, sustain, tempo) and the Bulletin voices workflow that voices each bulletin.",
+      "component": "bulletins",
+      "paths": [
+        ".github/workflows/bulletin-voice.yml",
+        "tools/voice/speak.mjs"
+      ]
+    }
+  ],
+  "consumes": [
+    {
+      "id": "droggies-voice-cast",
+      "from": "droggies",
+      "provider": "voice-cast",
+      "into": "bulletins",
+      "what": "Each presenter's voice, read from the Droggies' published site on every Bulletin voices run.",
+      "how": "live",
+      "url": "https://cdomotor-g.github.io/thedroggies/voices/cast.json",
+      "watch": [
+        "voices/cast.json",
+        "schemas/cast.schema.json"
+      ],
+      "since": {
+        "date": "2026-10-25"
+      },
+      "on_change": "A recast needs nothing: the next bulletin is voiced with it (run Actions > Bulletin voices to re-voice old ones). A new or renamed field: update tools/voice/speak.mjs and run cd test && npm run bulletin."
+    },
+    {
+      "id": "droggies-presenters",
+      "from": "droggies",
+      "provider": "character-canon",
+      "into": "bulletins",
+      "what": "The presenters' names, roles and sign-off lines copied into health-bulletin.js ROSTER and tools/bulletin/validate.mjs PRESENTERS, and their portraits cropped into assets/presenters/.",
+      "how": "generated",
+      "watch": [
+        "characters/json/",
+        "characters/art/"
+      ],
+      "since": {
+        "date": "2026-10-31"
+      },
+      "on_change": "Update ROSTER in health-bulletin.js and PRESENTERS in tools/bulletin/validate.mjs, re-crop a changed portrait into assets/presenters/, run cd test && npm run bulletin, and bump the version stamp.",
+      "drift_issue": false
+    },
+    {
+      "id": "rpi-alert-release",
+      "from": "rpi-alert",
+      "provider": "release",
+      "into": "network-health",
+      "what": "The latest RPi ALERT release, shown beside each base station's version on the Base Stations tab (amber when a station is behind).",
+      "how": "release",
+      "url": "https://api.github.com/repos/cdomotor-g/RPi_ALERT/releases/latest",
+      "on_change": "Nothing: the tab asks GitHub every five minutes while open."
+    },
+    {
+      "id": "rpi-alert-sdr-plan",
+      "from": "rpi-alert",
+      "provider": "channel-planner",
+      "into": "network-health",
+      "what": "RPi ALERT's SDR channel plan (each stick's sample-rate windows and usable band), mirrored in base-stations.js WINDOWS and the waterfall's edges, and in sdr-pi.js's channel rules.",
+      "how": "protocol",
+      "watch": [
+        "agent/web/sdr-plan.js"
+      ],
+      "since": {
+        "date": "2026-10-26"
+      },
+      "on_change": "Match WINDOWS in base-stations.js (and sdr-pi.js where the rule is shared) to the new RATES and USABLE; run cd test && npm run basestations && npm run sdrpi; bump the version stamp."
+    },
+    {
+      "id": "rpi-alert-security-review",
+      "from": "rpi-alert",
+      "into": "automation",
+      "what": "The weekly security review reads RPi ALERT's agent and Pi image beside Flood-Net, because the two trust each other through ingest tokens and Base Stations requests.",
+      "how": "reference",
+      "watch": [
+        "agent/",
+        "os/"
+      ],
+      "on_change": "Nothing by hand: the Monday review (tools/security-scan/brief.md) reads it and files findings in flood-net-private."
+    },
+    {
+      "id": "quansheng-serial-protocol",
+      "from": "quansheng-v3",
+      "provider": "serial-protocol",
+      "into": "decoders",
+      "what": "The radio's USB serial protocol (schema 2) and its station-table format, which quansheng.js implements and serial-radio.js builds from the loaded station list; sdr-pi.js follows the same line rules.",
+      "how": "protocol",
+      "watch": [
+        "docs/ALERT_SERIAL.md",
+        "tools/alert/gen_stations.py"
+      ],
+      "since": {
+        "date": "2026-10-01"
+      },
+      "on_change": "Bring quansheng.js (and serial-radio.js / sdr-pi.js where a rule is shared) into line with the changed sections; run cd test && npm run quansheng && npm run sdrpi; bump the version stamp."
+    },
+    {
+      "id": "inspection-archive",
+      "from": "flood-net-private",
+      "provider": "inspection-archive",
+      "into": "automation",
+      "what": "The historical inspection workbook and its derived files, read by the inspection ingest tools from a clone beside this one (tools/ingest/private.py) and loaded into the database.",
+      "how": "live",
+      "watch": [
+        "inspections/"
+      ],
+      "on_change": "Re-run the inspection tools in tools/ingest (survey.py, extract.py, crosswalk.py, remarks.py, load.py) against the clone; their checks run in flood-net-private's own workflow."
+    },
+    {
+      "id": "alert-packets-codec",
+      "from": "alert-packets",
+      "provider": "frame-codec",
+      "into": "decoders",
+      "what": "The ALERT / ERTS packet decoder and encoder, ported once into the ALERT Packets tab (packets.js) and developed here since.",
+      "how": "ported",
+      "watch": [
+        "index.html"
+      ]
+    },
+    {
+      "id": "alert-packets-address-file",
+      "from": "alert-packets",
+      "provider": "address-list",
+      "into": "decoders",
+      "what": "The national ALERT address file and the Bureau's ERTS Data Formats specification, kept byte-for-byte as data/All 2021 Working 2.txt and docs/BOM spec erts_data_formats_doc.pdf.",
+      "how": "vendored",
+      "watch": [
+        "All 2021 Working 2.txt",
+        "BOM spec erts_data_formats_doc.pdf"
+      ],
+      "since": {
+        "date": "2026-10-31"
+      },
+      "on_change": "Copy the changed file over data/All 2021 Working 2.txt (read by packets.js and serial-radio.js) or the PDF in docs/.",
+      "drift_issue": false
+    },
+    {
+      "id": "sort-qld-map-layers",
+      "from": "sort",
+      "provider": "qld-map-layers",
+      "into": "stations-map",
+      "what": "The QLD Globe recipes for the LiDAR contour and survey-mark layers: which ArcGIS services, sublayers resolved by name, and the server-rendered approach (map-contours.js, map-survey.js).",
+      "how": "ported",
+      "watch": [
+        "index.html",
+        "v2/js/map.js"
+      ]
+    }
+  ],
+  "asks": [
+    {
+      "to": "droggies",
+      "what": "Recast Nitto (nitwit) in voices/cast.json with a voice of his own; his current one is too like another Droggie's, so Flood-Net's bulletins bench him until then.",
+      "issue": null,
+      "since": "2026-10-31"
+    }
+  ]
+}

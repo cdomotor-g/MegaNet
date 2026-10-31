@@ -1,0 +1,26 @@
+# The Atlas check (https://cdomotor-g.github.io/atlas/): atlas.json is valid, and for
+# everything this repository takes from another, has that one moved on since we last
+# caught up? Reports only — see the Atlas section of CLAUDE.md for why.
+# The logic lives in cdomotor-g/atlas (tools/drift.mjs), shared by every repository.
+name: Atlas
+
+on:
+  push:
+    branches: [main]
+    paths: ['atlas.json', '.github/workflows/atlas.yml']
+  schedule:
+    - cron: '41 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  atlas:
+    uses: cdomotor-g/atlas/.github/workflows/drift.yml@main
+    permissions:
+      contents: read
+      issues: write
+    with:
+      issues: false
