@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 166, date: '2026-10-31', items: [
+      '📺 <strong>Network Weather</strong> is a weekday bulletin now: a new one each morning, Monday to Friday, and none on Saturday '
+        + 'or Sunday. Friday\'s stays up over the weekend without being called overdue, and signs off till Monday; the weekend is in '
+        + 'Monday\'s <em>This week</em>.',
+    ] },
     { n: 165, date: '2026-10-31', items: [
       '✅ <strong>Approve all</strong> in <em>Field Photos → Review</em>: an administrator approves the equipment suggestions '
         + 'waiting in one go — all of them, one station\'s, or only those the reader was at least 50, 70 or 90% sure of. Each goes on '

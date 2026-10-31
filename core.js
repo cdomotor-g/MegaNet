@@ -2132,7 +2132,7 @@ const HELP = {
     summary: 'What the readings landing in the datastore say about each field station and the '
            + 'network carrying them, ranked by what needs doing. It opens with <strong>📺 Network Weather</strong>: '
            + 'the last 24 hours (or the week) as a short animated bulletin, presented by one of the Droggies and '
-           + 'written each morning by Claude — what went wrong, what the findings have in common, and what the '
+           + 'written each weekday morning by Claude — what went wrong, what the findings have in common, and what the '
            + 'carrier fingerprints say about who really transmitted. <strong>Needs attention</strong> '
            + 'is the morning\'s list: stations gone silent, missed check signals rising, batteries '
            + 'sliding or not charging, rain gauges dry through their neighbours\' rain, levels that '

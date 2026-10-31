@@ -38,6 +38,8 @@
 //   * the week's readings landing redraw the tab around it and leave a playing
 //     bulletin where it is — the same stage, still playing
 //   * a station named in the scene opens on the tab below
+//   * weekdays only: Friday's daily is not stale over the weekend, and its
+//     signoff (drawn, and the draft's) says Monday, not tomorrow
 //   * Today and This week; Hide is remembered; no bulletin yet says so
 //   * the stage across the panel, 16:9; the presenter under it at the left,
 //     small, beside the words
@@ -217,6 +219,10 @@ let demoDraft = null;
   ok('the facts carry every day of the week, and a position for every station they name',
     facts.series.length >= 7 && Object.values(facts.stations).every(s => Number.isFinite(s.lat)), `${facts.series.length} days`);
   demoDraft = draft(facts);
+  const fridayDraft = draft(Object.assign({}, facts, { gathered_at: '2026-10-29T18:31:00.000Z' }));   // Friday, 4:31 am Brisbane
+  ok('the draft signs off till tomorrow, and on a Friday till Monday (no daily at the weekend)',
+    /Back tomorrow\./.test(demoDraft.scenes.at(-1).say) && /Back on Monday\./.test(fridayDraft.scenes.at(-1).say),
+    `${demoDraft.scenes.at(-1).say} / ${fridayDraft.scenes.at(-1).say}`);
   const r = validate(demoDraft, { stationIds: ids });
   ok('the draft from those facts is a valid bulletin', !r.errors.length, r.errors.join('; '));
   const speakers = demoDraft.scenes.map(s => s.presenter || demoDraft.presenter);
@@ -461,6 +467,9 @@ try {
   ok('the week landing redraws the tab around a playing bulletin and leaves it playing', kept.same && kept.playing, JSON.stringify(kept));
   await pg.evaluate(() => HealthBulletin.next());
   ok('⏭ moves to the next scene', await pg.evaluate(() => HealthBulletin._state().scene === 1 && /low over Logan/.test(document.getElementById('hb-lower').textContent)));
+  // Paused at a scene's very start is drawn finished (is-still), not frozen:
+  // let the scene ⏭ moved to start running before pausing it.
+  await until(pg, () => HealthBulletin._state().t > 0);
   await pg.click('#hb-play');
   ok('Pause freezes it', await pg.evaluate(() => !HealthBulletin._state().playing && document.getElementById('hb-stage').classList.contains('is-paused')));
   // Pointing at a segment names its scene; pressing it goes to that moment.
@@ -520,6 +529,16 @@ try {
   const opened = await pg.evaluate(() => Health.picked());
   ok('a station named in the scene opens on the tab below', opened === 'henderson_ck_al', String(opened));
 
+  // ── weekdays only: Friday's daily holds the weekend ──
+  const wk = await pg.evaluate(() => {
+    const fri = { kind: 'daily', issued_at: '2026-10-29T18:31:00Z' };   // Friday 30 October, 4:31 am Brisbane
+    const h = t => HealthBulletin._sinceIssued(fri, Date.parse(t)) / 3600e3;
+    return { sunday: h('2026-11-01T02:00:00Z'), mondayPm: h('2026-11-02T07:00:00Z'),
+             fri: HealthBulletin._nextText(fri), thu: HealthBulletin._nextText({ kind: 'daily', issued_at: '2026-10-28T18:31:00Z' }) };
+  });
+  ok('Friday\'s daily is not stale over the weekend, and is by Monday afternoon with no Monday one', wk.sunday < 36 && wk.mondayPm > 36, JSON.stringify(wk));
+  ok('…and it signs off till Monday morning; Thursday\'s till tomorrow', /Monday morning/.test(wk.fri) && /tomorrow/.test(wk.thu), JSON.stringify(wk));
+
   // ── today, this week, hide ──
   await pg.click('.hb-tools button:has-text("This week")');
   await until(pg, () => /A week of the Hillcrest repeater/.test(document.getElementById('hb-panel').textContent));
@@ -535,7 +554,7 @@ try {
   {
     const { pg, context, errors } = await page({ none: true });
     await until(pg, () => /No bulletin to show|No bulletin yet/.test((document.getElementById('hb-panel') || {}).textContent || ''));
-    ok('with no bulletin yet, the panel says so and how one comes', await pg.evaluate(() => /scheduled task writes one every morning/.test(document.getElementById('hb-panel').textContent)));
+    ok('with no bulletin yet, the panel says so and how one comes', await pg.evaluate(() => /scheduled task writes one every weekday morning/.test(document.getElementById('hb-panel').textContent)));
     ok('…and nothing breaks', !errors.length, errors.join('\n'));
     await context.close();
   }

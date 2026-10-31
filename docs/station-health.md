@@ -34,7 +34,7 @@ presents the weekly, where the Bean Counter reads the numbers — his one scene 
 the week. Each says their scenes in their own voice, the narration running
 under the stage word by word as it is said.
 
-It is written, not worked out here. Every morning at half past four a scheduled
+It is written, not worked out here. Every weekday morning at half past four a scheduled
 Claude Code task reads the network as this tab does — the same
 `health-analysis.js` over the same readings (`tools/bulletin/gather.mjs`, through
 `tools/health/report.mjs`) — with what only the server has: the findings'

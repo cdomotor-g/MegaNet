@@ -10,8 +10,8 @@
 // station links open); read at call time. Nothing runs at load.
 //
 // ── Where a bulletin comes from ─────────────────────────────────────────────
-// Not from this page. A scheduled Claude Code task runs every morning (and
-// every Monday for the week), reads the network the way this tab does — the
+// Not from this page. A scheduled Claude Code task runs every weekday morning
+// (and every Monday for the week), reads the network the way this tab does — the
 // same health-analysis.js over the readings, the server's findings, the
 // carrier fingerprints and bit-flip blame — looks further than the rules can
 // (what several findings have in common, what the fingerprints say about who
@@ -67,6 +67,32 @@ const HealthBulletin = (() => {
   const WIDE = { W: 1280, H: 720 }, TALL = { W: 720, H: 900 };
   const NARROW_PX = 620;
   const STALE = { daily: 36 * 3600e3, weekly: 9 * 86400e3 };
+  // The daily is issued on weekdays only, Monday to Friday at 4:31 am Brisbane
+  // (the owner's call, 1 Nov 2026: nobody watches it at the weekend); the
+  // weekly on Mondays, and it has the weekend. Brisbane keeps no daylight
+  // saving, so its day is UTC plus ten hours.
+  const BNE_MS = 10 * 3600e3, DAY_MS = 86400e3;
+  const bneDay = t => new Date(t + BNE_MS).getUTCDay();   // 0 Sunday … 6 Saturday
+  // How long a bulletin has been the newest one there should be: the time since
+  // it was issued, less Saturdays and Sundays for a daily — so Friday's stays
+  // current until Monday's is due, and only then can it look stale.
+  function sinceIssued(b, now) {
+    const t0 = Date.parse(b.issued_at);
+    if (b.kind === 'weekly') return now - t0;
+    let ms = 0;
+    for (let t = t0; t < now;) {
+      const next = Math.min(now, (Math.floor((t + BNE_MS) / DAY_MS) + 1) * DAY_MS - BNE_MS);
+      const wd = bneDay(t);
+      if (wd !== 0 && wd !== 6) ms += next - t;
+      t = next;
+    }
+    return ms;
+  }
+  // When the next one is, as the signoff shows it: after Friday's daily, Monday's.
+  function nextText(b) {
+    if (b.kind === 'weekly') return 'The next weekly bulletin: Monday morning.';
+    return bneDay(Date.parse(b.issued_at)) === 5 ? 'The next bulletin: Monday morning, about five.' : 'The next bulletin: tomorrow morning, about five.';
+  }
 
   // The crew, from the Droggies' canon (github.com/cdomotor-g/thedroggies,
   // characters/json/*.json): who they are and the lines they sign off with.
@@ -277,7 +303,7 @@ const HealthBulletin = (() => {
     if (B.loading && !B.index) return '<p class="small hb-note">Fetching the latest bulletin…</p>';
     if (!B.index) {
       return `<p class="small hb-note">${B.indexErr ? `No bulletin to show — ${esc(B.indexErr)}.` : 'No bulletin yet.'}
-        A scheduled task writes one every morning, and one for the week on Mondays (<a href="tools/bulletin/README.md" target="_blank" rel="noopener">how</a>).</p>`;
+        A scheduled task writes one every weekday morning, and one for the week on Mondays (<a href="tools/bulletin/README.md" target="_blank" rel="noopener">how</a>).</p>`;
     }
     const f = currentFile();
     if (!f) return `<p class="small hb-note">No ${B.kind === 'weekly' ? 'weekly' : 'daily'} bulletin has been issued yet.</p>`;
@@ -285,7 +311,7 @@ const HealthBulletin = (() => {
     if (!got || got.loading) return '<p class="small hb-note">Fetching the bulletin…</p>';
     if (got.error) return `<p class="small hb-note txt-warn">The bulletin could not be read — ${esc(got.error)}.</p>`;
     const b = got, P = who(b.presenter), sc = b.scenes || [];
-    const stale = Date.now() - Date.parse(b.issued_at) > STALE[b.kind || 'daily'];
+    const stale = sinceIssued(b, Date.now()) > STALE[b.kind || 'daily'];
     return `
       <p class="small hb-issued">${esc(issuedText(b))}${stale ? ` <span class="txt-warn">— ${b.kind === 'weekly' ? 'over a week' : 'more than a day'} old: the scheduled bulletin may have stopped.</span>` : ''}</p>
       <div class="hb-player" id="hb-player" onkeydown="HealthBulletin.key(event)">
@@ -1525,7 +1551,7 @@ const HealthBulletin = (() => {
     let out = `<g class="hb-a-fade" ${d(0.2)}>${skyMini(b, W / 2, narrow ? 190 : 170)}</g>`;
     out += `<g class="hb-a-rise" ${d(0.6)}>${text(W / 2, narrow ? 360 : 320, '', F.l, `text-anchor="middle" font-weight="700" fill="${C.text}"`, wrap(`“${line}”`, charsFor(W - pad * 2, F.l), 2))}
       ${text(W / 2, narrow ? 360 + F.l * 2.8 : 320 + F.l * 1.9, `— ${P.name}`, F.s, `text-anchor="middle" fill="${C.muted}"`)}</g>`;
-    const next = b.kind === 'weekly' ? 'The next weekly bulletin: Monday morning.' : 'The next bulletin: tomorrow morning, about five.';
+    const next = nextText(b);
     out += `<g class="hb-a-fade" ${d(1.4)}>${text(W / 2, H - L.foot - (narrow ? 90 : 60), next, F.s, `text-anchor="middle" fill="${C.accent}"`)}</g>`;
     return out;
   }
@@ -1986,7 +2012,7 @@ const HealthBulletin = (() => {
     refresh: () => { B.index = null; B.indexErr = ''; B.files.clear(); B.voices.clear(); resetPlay(); B.audioFor = null; B.audioState = 'idle'; redraw(); loadIndex(); },
     play, pause, toggle, bigPlay, go, next, prev, seekTo, setKind, pick, toggleHidden, toggleSound, setVolume, key, stageClick, open,
     seekDown, seekMove, seekUp, seekLeave, seekKey, setRate, toggleMenu, menuKey,
-    ROSTER, _draw: (s, b, narrow) => { const was = B.narrow; B.narrow = !!narrow; try { return sceneSvg(Object.assign({}, b || {}, { scenes: [s] }), 0); } finally { B.narrow = was; } },
+    ROSTER, _sinceIssued: sinceIssued, _nextText: nextText, _draw: (s, b, narrow) => { const was = B.narrow; B.narrow = !!narrow; try { return sceneSvg(Object.assign({}, b || {}, { scenes: [s] }), 0); } finally { B.narrow = was; } },
     _state: () => ({ kind: B.kind, scene: B.scene, t: B.t, playing: B.playing, ended: B.ended, file: currentFile(), hidden: B.hidden, rate: B.rate, vol: B.vol,
       sound: B.sound, voiced: !!voiceOf(current()), audio: B.audioFor === currentFile() ? B.audioState : 'idle',
       at: audioIs('ready') && mp3In() ? B.audio.currentTime : null }),

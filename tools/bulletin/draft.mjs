@@ -157,7 +157,9 @@ export function draft(F) {
   if (back.length) items.push({ sev: 'ok', text: clip(`Heard again: ${plural(back.length, 'station')} the server had called silent — ${back.slice(0, 3).map(nameOf).join(', ')}${back.length > 3 ? ' among them' : ''}.`, 160) });
   if (items.length) scenes.push({ type: 'list', title: weekly ? 'This week, worth a look' : 'Worth a look today', secs: 11, say: 'So, worth a look: ' + clip(items.map(i => i.text.replace(/\.$/, '')).join('; '), 370) + '.', items: items.slice(0, 6), stations: items.map(i => i.id).filter(Boolean).slice(0, 6) });
 
-  scenes.push({ type: 'signoff', title: 'That’s the network', secs: 7, say: weekly ? 'That’s the week on the network. Back on Monday.' : 'That’s the network this morning. Back tomorrow.' });
+  // The daily is a weekday bulletin (README, *When*): Friday's is followed by Monday's.
+  const friday = issue.toLocaleDateString('en-AU', { timeZone: TZ, weekday: 'long' }) === 'Friday';
+  scenes.push({ type: 'signoff', title: 'That’s the network', secs: 7, say: weekly ? 'That’s the week on the network. Back on Monday.' : `That’s the network this morning. Back ${friday ? 'on Monday' : 'tomorrow'}.` });
 
   // The guests (facts.guests): a scene each, the first of the kinds that suit
   // them not already somebody's. The Bean Counter takes the numbers, nothing else.

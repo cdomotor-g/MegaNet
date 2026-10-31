@@ -1,6 +1,6 @@
 # 📺 Network Weather — the bulletin task's brief
 
-Every morning a scheduled Claude Code session reads the Flood-Net network and
+Every weekday morning a scheduled Claude Code session reads the Flood-Net network and
 writes **the network's weather**: a two-minute animated bulletin about
 the last 24 hours, drawn at the top of the **Station Health** tab
 (`health-bulletin.js`). Every Monday a second one does the same for the week.
@@ -17,7 +17,7 @@ trend no one rule is looking for.
 
 | | Daily | Weekly |
 | --- | --- | --- |
-| When | every day, 4:31 am Brisbane | Mondays, 3:59 am Brisbane |
+| When | weekdays (Monday to Friday), 4:31 am Brisbane | Mondays, 3:59 am Brisbane |
 | Covers | the last 24 hours, against the week before | the last 7 days, against the week before that |
 | Length | 6–8 scenes, about 2 minutes said: 340 words of narration at most | 8–10 scenes, about 3 minutes said: 440 words at most |
 | Who | the day's Droggie presents (`facts.presenter`), Alex Chen takes the radio (`facts.cohost`), two guests a scene each (`facts.guests`) | Graham Watts presents, Alex Chen the radio, the Bean Counter the numbers, one guest |
@@ -272,6 +272,12 @@ receiver that stopped, lagged or lost its tuning; a battery crossing 12.2 or
 flips and whose carrier it is on; what cleared. Last night's rain, if it
 explains something.
 
+There is no daily on Saturday or Sunday (the owner's call, 1 November 2026:
+nobody watches it at the weekend, and each one costs a session and its voices).
+Monday's still covers the last 24 hours; the weekend is in the weekly, issued
+half an hour before it. Friday's signs off till Monday, not tomorrow (the
+draft's signoff already says so, and the page shows it).
+
 **Weekly:** the broad picture. Checks received day by day across the fortnight
 (`series`); stations that miss checks every day (chronic, not sudden); the week's
 battery slopes; fingerprints against their thirty days; whose carrier the
@@ -313,7 +319,8 @@ Two Claude Code scheduled tasks, each firing into a **standing session** of its
 own in the owner's cloud environment — a session that has this repository
 attached, so it can push to `main`:
 
-- **Flood-Net daily network bulletin** — every day at 4:31 am Brisbane, into
+- **Flood-Net daily network bulletin** — weekdays (Monday to Friday) at 4:31 am
+  Brisbane (`CRON_TZ=Australia/Brisbane 31 4 * * 1-5`), into
   the session *📺 Flood-Net daily network bulletin (scheduled)*: pull, re-read
   this file, follow it with `--kind daily`, publish and push.
 - **Flood-Net weekly network bulletin** — Mondays at 3:59 am Brisbane, so the
