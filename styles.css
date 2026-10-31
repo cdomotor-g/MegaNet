@@ -20592,6 +20592,44 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hl-dot--ok { background: var(--ok); }
 .hl-dot--irregular { background: var(--muted); width: 9px; height: 9px; }
 .hl-ring { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px dashed var(--accent); }
+/* 🌧 Rain ahead (health-rain-ahead.js): a chip for how wet, and the weather
+   model's week as seven small cells — tinted from the panel toward the accent,
+   so both themes keep their contrast; the last four dashed and paler, as the
+   least sure. The legend's disc is the map halo's own literal colours, because
+   a Leaflet path's options cannot take var() and the two must match. */
+.hl-rain-ring { display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 1px solid #0288d1; background: rgba(41, 182, 246, .35); }
+.hl-rain-chip {
+  display: inline-block; padding: .05rem .5rem; border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel)); color: var(--text);
+  font-size: var(--fs-xs); font-weight: 600; white-space: nowrap;
+}
+.hl-rain-chip--very { background: color-mix(in srgb, var(--accent) 30%, var(--panel)); border-color: var(--accent); }
+.hl-rain-chip--later { background: transparent; border-style: dashed; font-weight: 500; }
+/* Its own line under the station's name. Not display: table, which would take
+   the findings table's border-collapse and lose the pill's corners. */
+.hl-fwhere .hl-rain-chip { display: block; width: max-content; max-width: 100%; margin-top: .3rem; }
+@media (max-width: 700px) { .hl-rain-chip { white-space: normal; border-radius: var(--r-md); } }
+.hl-rain-lede { margin: .35rem 0 var(--sp-2); max-width: 90ch; }
+.hl-rain-week { display: inline-flex; gap: 2px; vertical-align: middle; }
+.hl-rain-day {
+  display: inline-flex; flex-direction: column; align-items: center; min-width: 2.1rem; padding: .1rem .15rem;
+  border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--panel);
+  font-size: var(--fs-xs); line-height: 1.2; font-variant-numeric: tabular-nums;
+}
+.hl-rain-day--some { background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
+.hl-rain-day--wet { background: color-mix(in srgb, var(--accent) 24%, var(--panel)); }
+.hl-rain-day--very { background: color-mix(in srgb, var(--accent) 45%, var(--panel)); font-weight: 700; }
+.hl-rain-day--later { opacity: .7; border-style: dashed; }
+.hl-rain-dname { color: var(--muted); }
+.hl-rain-faults { margin: 0; padding: 0; list-style: none; }
+.hl-rain-faults li + li { margin-top: .15rem; }
+.hl-rain-table td, .hl-rain-table th { white-space: normal; }
+.hl-rain-col-chip { width: 14rem; }
+.hl-rain-col-stn { width: 18%; }
+.hl-rain-col-week { width: 17.5rem; }
+.hl-rain-src { color: var(--muted); margin: var(--sp-2) 0 0; max-width: 100ch; }
+.hl-rain-more { margin-top: var(--sp-2); }
 
 /* A station. */
 .hl-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--sp-2) var(--sp-3); margin: var(--sp-2) 0; }

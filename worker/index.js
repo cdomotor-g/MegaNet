@@ -76,6 +76,12 @@
 // Flood-Net's own pages, a few a minute; the list is kept in the PHOTOS bucket
 // under _meganet/. worker/notify.js, docs/agent-api.md ("Changes").
 //
+// An eleventh: /api/rain-ahead, one weather model's rain a day for the coming week
+// at the squares Station Health's stations stand in, for its 🌧 Rain ahead card
+// — ECMWF's open data through Open-Meteo, public, read-only, kept in the edge
+// cache for hours, and never the Bureau's own forecasts (whose terms do not
+// allow publishing them here). worker/rain-ahead.js, docs/station-health.md.
+//
 // And one that is not a door at all: scheduled() below, every minute
 // (wrangler.toml's [triggers]), sends the administrators' notifications —
 // worker/push.js, db/migrations/0066_push_notifications.sql — and every
@@ -90,6 +96,7 @@ import { isReportPath, handleReport } from './report.js';
 import { isCameraPath, handleCameras } from './cameras.js';
 import { isDrivePath, handleDrive } from './drive.js';
 import { isNotifyPath, handleNotify, notifyDue, runNotify } from './notify.js';
+import { isRainAheadPath, handleRainAhead } from './rain-ahead.js';
 import { runPush } from './push.js';
 
 export { BriefingLedger } from './briefing.js';
@@ -518,6 +525,11 @@ export default {
     // The agent API's notify list (worker/notify.js): sign-ups from
     // Flood-Net's pages, a few a minute; the links in its emails.
     if (isNotifyPath(url.pathname)) return handleNotify(request, env, ctx);
+
+    // The rain one weather model has ahead at Station Health's stations
+    // (worker/rain-ahead.js): anybody, squares inside Australia only, the model
+    // asked at most once every three hours per answer whoever is looking.
+    if (isRainAheadPath(url.pathname)) return handleRainAhead(request, env, ctx);
 
     // Everything else is a static asset, and assets are served before this runs.
     // A request that gets here for any other path is a path that does not exist.

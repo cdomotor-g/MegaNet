@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 169, date: '2026-10-31', items: [
+      '🌧 <strong>Rain ahead</strong> in <em>Station Health</em>, under the map: where a weather model has rain coming in the next '
+        + 'three days, and which stations there have a fault open — a battery sliding, checks going missing, a gauge not '
+        + 'reporting — so they can be fixed before the rain arrives. <em>Get to these first</em> lists them, wettest and soonest '
+        + 'first, with the model\'s week for each; a 🌧 chip marks those faults in <em>Needs attention</em>, and a blue disc marks '
+        + 'the stations on the map. Stations with rain only later in the week are listed too, to plan a trip for. The rain is '
+        + 'ECMWF\'s model through Open-Meteo, used only to rank the faults: it is not a forecast or a warning, and not the '
+        + 'Bureau\'s — the card links to the Bureau\'s forecasts and warnings.',
+    ] },
     { n: 168, date: '2026-10-31', items: [
       '📺 The <strong>Network Bulletin</strong> now looks for stations that go quiet at night and come back by day, night after '
         + 'night, and the repeater they share. It weighs that repeater by its own record: its own scheduled checks keeping the same '

@@ -120,6 +120,11 @@ and the bulletin's footer says so.
 - **The map** — each station heard, coloured by its worst finding; bigger is
   worse. A pin opens the station. It has a row of its own, under the numbers
   and above Needs attention, so where the trouble is is the first thing seen.
+- **🌧 Rain ahead** — under the map: where one weather model has rain in the
+  next few days, and which stations there have a fault open — a battery, checks
+  not getting through, a sensor — to get to before the rain does. A chip beside
+  each such fault in Needs attention, a soft blue disc round each station on the
+  map, and the model's week on the station. [Below](#-rain-ahead).
 - **Check signals** — every scheduled station's checks over the window, slot by
   slot: received, received with frames missing, missed, missed network-wide, or
   nobody listening. Worst first; a row opens the station.
@@ -208,6 +213,92 @@ the AI's briefing back: it is drawn where Claude's would be, each
 `[[station_id]]` a link to the station, marked *pasted from another AI*, and
 kept on the device like Claude's. When Claude cannot be reached, the error on
 the card points to the pack.
+
+## 🌧 Rain ahead
+
+A fault matters most just before rain: a battery sliding towards empty, a
+station whose checks are going missing, a rain gauge that stayed dry through its
+neighbours' storm — each costs the readings that matter when the rain comes. The
+**Rain ahead** card, under the map, puts the faults this tab has found against
+the rain one weather model has coming, so the stations to get to first are the
+ones that will be rained on first.
+
+**What it shows.** A sentence — how many stations heard have rain ahead in the
+next three days, how many of those are very wet, and how many have a fault open
+— then **Get to these first**: each station with rain ahead and a fault open,
+its rain (*Very wet · 46 mm tomorrow*), its faults, and the model's seven days
+as a strip, today first, the last four paler. Stations with rain only later in
+the week follow, as *Wet later* or *Very wet later*: worth planning a trip for,
+not dropping everything. *Where the model has rain ahead, by basin* folds out
+each river basin with rain ahead, its wettest station and how many there have a
+fault open. Every word with a meaning of its own is on hover and listed under
+*What the words in this card mean*.
+
+Elsewhere on the tab: a 🌧 chip beside each such fault in **Needs attention**,
+under the station's name; a soft blue disc round each station with rain ahead on
+**the map** (deeper when very wet; in the legend as *rain ahead (model)*); the
+station's band and week as a line in **A station**; and, in the Calm look, a
+sentence after the headline — *Rain ahead at 5 stations with a fault open — get
+to them first*. The owner filter narrows the card as it narrows the rest.
+
+**The bands**, judged on today and the next two days at the station:
+
+| | |
+|---|---|
+| **Very wet** | 30 mm or more on one day, or 60 mm or more across the three |
+| **Wet** | 10 mm or more on one day, or 20 mm or more across the three |
+| *…later* | the same measure on days four to seven |
+
+Below *Wet* is not shown. **A fault open** is a warning or critical finding about
+power, check signals or a sensor — the kinds that lose readings in the rain.
+Notes, data quality and register findings do not count. Very wet comes before
+wet before later in the week, sooner before later, critical before warning.
+
+**Where the rain comes from.** ECMWF's IFS — the European Centre for
+Medium-Range Weather Forecasts' global model, run four times a day on a 9 km
+grid and published as open data (CC BY 4.0) — its rain a day for the next seven
+days, read at the middle of the quarter-degree square (about 25 km) each station
+stands in, through [Open-Meteo](https://open-meteo.com/) (CC BY 4.0). The app asks
+`/api/rain-ahead` on this site (`worker/rain-ahead.js`), fifty squares a request;
+the Worker asks Open-Meteo and keeps each answer in Cloudflare's edge cache for
+three hours, so everybody looking shares one answer, and serves the last one
+(marked stale) for up to two days while Open-Meteo will not answer. Nobody has
+checked the figure: a global model can miss a storm, or put it in the next
+valley. **Demo week** makes its rain up, and says so.
+
+**What it is not, and the rules it keeps.** Flood-Net issues no forecasts and no
+warnings ([terms](../terms.html)), and this card does not either: it uses a
+model's raw figure for one thing — which faults to fix first. So it
+
+- **uses none of the Bureau's forecast products.** The Bureau's forecasts — its
+  website, the anonymous-FTP products (the précis XML, the gridded ADFD), the
+  weather app's API — come under the default terms of its copyright notice: for
+  your own use or your own organisation's. Showing them on a page anybody can
+  open is publishing them, which needs a Registered User licence, and the
+  website does not permit scraping. Flood-Net is not a Bureau system, so it
+  links to them instead. If that changes — a licence, or Flood-Net becoming the
+  Bureau's — the Bureau's own forecast is the better source, and
+  `worker/rain-ahead.js` is the one place to change;
+- **says whose figure it is and what it is not**, under the card and on every
+  chip: *a weather model's raw figure … not a forecast or a warning from the
+  Bureau of Meteorology or from Flood-Net*, with links to the Bureau's forecasts
+  and warnings;
+- **never speaks of floods, river heights or warning levels**, and uses its own
+  plain words for how wet — *Wet*, *Very wet* — not the Bureau's warning
+  vocabulary (`npm run rainahead` holds the card to that);
+- **stays in Station Health**: not in the agent API, the notifications or the
+  Network Bulletin;
+- **credits its sources** (CC BY 4.0 asks for it): ECMWF and Open-Meteo, linked,
+  with the licence.
+
+**Open-Meteo's terms.** Its free API is for non-commercial use — it counts a
+"private or non-profit website without subscriptions or advertising" as such —
+up to 10,000 calls a day, counted per Cloudflare account for a Worker. Flood-Net
+asks about the few hundred squares its stations stand in, at most once every
+three hours in each Cloudflare location its users reach it through. Should the owner judge
+the use commercial, or need more, a paid plan's key goes in the Worker's
+`OPEN_METEO_KEY` secret and the route sends its requests to Open-Meteo's
+customer API with it; nothing else changes.
 
 ## How the readings are read
 

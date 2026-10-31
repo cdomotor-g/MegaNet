@@ -1508,6 +1508,19 @@ jobs:
         working-directory: test
         run: npm run rainmap
 
+      # 🌧 Rain ahead (health-rain-ahead.js, worker/rain-ahead.js): Station
+      # Health's card of where one weather model has rain in the next few days
+      # and which stations there have a fault open to fix first. Under Node, the
+      # route with Open-Meteo and the edge cache stood in for — squares snapped
+      # and bounded to Australia, one upstream request per answer per three
+      # hours, the last answer served stale — and the card's bands and order;
+      # in Chromium, the card, the chips beside faults, the station's week, the
+      # map's halos, the route failing and the demo week's made-up rain.
+      - name: Rain ahead — one weather model's next week, the faults to fix before the rain, and never a forecast
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run rainahead
+
       # Zip packs on the Field Photos tab (photo-zip.js). `photos` never drops a
       # zip, and everything a zip can do wrong is quiet: wrong bytes still
       # decode, a wrong code page is a wrong title, a zip that lies about its

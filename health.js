@@ -309,6 +309,10 @@ const Health = (() => {
       const landing = takeWant();
       rerender();
       if (landing) { focusPart(landing.part); syncRoute(); }
+      // 🌧 Rain ahead: the weather model's week at the squares these stations
+      // stand in (health-rain-ahead.js) — fetched now, painted in when it
+      // lands (rainChanged); nothing above waits for it.
+      if (H.A && typeof HealthRainAhead !== 'undefined') HealthRainAhead.ask(H.A, { demo: H.demo });
       if (H.A && !H.demo) announce(`Station health worked out from ${H.rows.length.toLocaleString()} readings: ${H.A.counts.attention} need attention.`);
       if (typeof HealthAgent !== 'undefined' && HealthAgent.dataChanged) HealthAgent.dataChanged();
     }, 30);
@@ -375,8 +379,9 @@ const Health = (() => {
         <div class="panel-header"><h3 id="hl-h-map">Where</h3>
           <span class="small">every station heard, by its worst finding</span></div>
         <div id="hl-map" class="hl-map" role="region" aria-label="Map of the stations heard, coloured by their worst finding"></div>
-        ${mapLegendHtml()}
+        <div id="hl-map-legend">${mapLegendHtml()}</div>
       </section>
+      ${typeof HealthRainAhead !== 'undefined' ? `<section class="panel hl-raincard" id="hl-rain" aria-labelledby="hl-h-rain">${HealthRainAhead.render()}</section>` : ''}
       <section class="panel hl-attn" aria-labelledby="hl-h-attn">
         <div class="panel-header"><h3 id="hl-h-attn">Needs attention</h3>
           <span class="small">${esc(attnCountText())}</span></div>
@@ -492,7 +497,8 @@ const Health = (() => {
     return `<p class="hl-verdict"><strong>${plural(bad.length, 'finding needs', 'findings need')} attention</strong>${
         at ? ` at ${plural(at, 'station', 'stations')}` : ''} — ${how}.${
         silent ? ` ${plural(silent, 'station is', 'stations are')} silent now.` : ''}${checks}
-      <button type="button" class="link-btn" onclick="Health.toAttention()">See them</button></p>`;
+      <button type="button" class="link-btn" onclick="Health.toAttention()">See them</button>${
+        typeof HealthRainAhead !== 'undefined' ? HealthRainAhead.verdictHtml(H.A) : ''}</p>`;
   }
 
   // "See them": down to Needs attention, focus on its heading so the list is
@@ -720,7 +726,7 @@ const Health = (() => {
     const rows = list.slice(0, 400).map((f, i) => `
       <tr class="hl-frow hl-frow--${f.severity}">
         <td>${sevHtml(f.severity)}</td>
-        <th scope="row" class="hl-fwhere">${whereHtml(f)}</th>
+        <th scope="row" class="hl-fwhere">${whereHtml(f)}${f.stationId && typeof HealthRainAhead !== 'undefined' ? HealthRainAhead.chipHtml(f.stationId, f) : ''}</th>
         <td class="hl-fwhat"><b>${esc(f.title)}</b>
           <span class="small hl-fdetail">${esc(f.detail)}</span>
           ${f.action ? `<span class="small hl-faction"><span aria-hidden="true">→</span> ${esc(f.action)}</span>` : ''}
@@ -752,6 +758,7 @@ const Health = (() => {
     return `<div class="qs-legend hl-legend">
       ${MAP_STATUS.map(([k, label]) => `<span><i class="hl-dot hl-dot--${k}" aria-hidden="true"></i>${esc(label)}</span>`).join('')}
       <span><i class="hl-ring" aria-hidden="true"></i>where a receiver hears</span>
+      ${typeof HealthRainAhead !== 'undefined' ? HealthRainAhead.legendHtml() : ''}
     </div>
     <p class="qs-hint">Bigger is worse. A station's pin opens it below; the same stations are in Needs attention and in Check signals, for a keyboard.</p>`;
   }
@@ -778,6 +785,18 @@ const Health = (() => {
       const r = { critical: 9, warn: 7, info: 5, ok: 5, irregular: 4 }[S.status] || 4;
       const sel = H.sel === S.st.id;
       const own = ownerOf(S.st);
+      // 🌧 Rain ahead (health-rain-ahead.js): a soft blue disc round a station
+      // the weather model has wet in the next three days, wider and deeper when
+      // very wet — filled, so it is not taken for a receiver's dashed ring;
+      // under its pin, and never in the way of a click on it.
+      const halo = typeof HealthRainAhead !== 'undefined' ? HealthRainAhead.haloOf(S.st.id) : null;
+      if (halo) {
+        L.circleMarker([S.st.lat, S.st.lon], {
+          radius: (sel ? r + 3 : r) + (halo.band === 'very' ? 9 : 6), className: 'hl-rain-halo',
+          color: halo.color, weight: 1, opacity: 0.7, fillColor: halo.fill, fillOpacity: halo.band === 'very' ? 0.38 : 0.22,
+          interactive: false,
+        }).addTo(layer);
+      }
       L.circleMarker([S.st.lat, S.st.lon], {
         radius: sel ? r + 3 : r, color: sel ? cssVar('--text', '#16202a') : cssVar('--panel', '#fff'), weight: sel ? 3 : 2,
         fillColor: statusColour(S.status), fillOpacity: 0.95,
@@ -842,6 +861,8 @@ const Health = (() => {
       : `no regular schedule learned from ${num(S.bursts.length)} report${S.bursts.length === 1 ? '' : 's'} — it may report on events only`]);
     facts.push(['Last heard', `${esc(fmtWhen(S.lastHeard))} (${esc(fmtAgo(S.lastHeard))})`]);
     facts.push(['Heard by', esc((S.paths || []).join(', ') || [...S.hosts].join(', '))]);
+    const rain = typeof HealthRainAhead !== 'undefined' ? HealthRainAhead.factHtml(st.id) : '';
+    if (rain) facts.push(['Rain ahead (weather model)', rain]);
     return `
       <div class="panel-header"><h3 id="hl-h-stn">${esc(st.name)}</h3>${worst}</div>
       <dl class="hl-facts">${facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join('')}
@@ -1775,6 +1796,23 @@ const Health = (() => {
     } else el.innerHTML = render();
     afterRender();
   }
+  // The weather model's rain has landed, or failed to (health-rain-ahead.js):
+  // its card, the chips beside Needs attention's faults, the Calm look's
+  // sentence, the map's halos and legend, and the station open below. Painted in
+  // place; the station panel only when one is open, so a station being typed
+  // into the finder keeps the keyboard.
+  function rainChanged() {
+    if (state.activeTab !== 'health' || !H.A || typeof HealthRainAhead === 'undefined') return;
+    const card = document.getElementById('hl-rain');
+    if (card) card.innerHTML = HealthRainAhead.render();
+    const list = document.getElementById('hl-findings');
+    if (list) list.innerHTML = findingsHtml();
+    const kpis = document.getElementById('hl-kpis');
+    if (kpis) kpis.innerHTML = kpisHtml();
+    const legend = document.getElementById('hl-map-legend');
+    if (legend) legend.innerHTML = mapLegendHtml();
+    if (H.sel) rerenderStation(); else drawMap();
+  }
   function rerenderStation() {
     const el = document.getElementById('hl-station');
     if (!el) return;
@@ -2067,7 +2105,7 @@ const Health = (() => {
     ssKind, ssAttn, ssFind, ssMore,
     openLog, openAddr, openField, openReception, showStation, picked, wantStation, exportCsv, fetchReadings,
     slotStrip,
-    setOwner, clearOwners, findOwner, owner, toAttention,
+    setOwner, clearOwners, findOwner, owner, toAttention, rainChanged,
     attnFind, stnFind, stnFindGo, checksFind, rxFind,
     // Whether the owner filter leaves a station — the Repeaters card's rows.
     owns: st => !!st && stationMatches(st),

@@ -190,6 +190,7 @@ const Methodology = (function () {
             <tr><th scope="row">Carrier offsets, drift, signal and who corrupts</th><td>The database, every hour</td><td>Each transmitter's last week against the weeks and months before</td></tr>
             <tr><th scope="row">Bit-Flip Sources</th><td>The database, every hour</td><td>The last 7 and 30 days</td></tr>
             <tr><th scope="row">Airtime and logger clocks</th><td>In your browser, from Station Health's result</td><td>Station Health's window</td></tr>
+            <tr><th scope="row">Rain ahead</th><td>In your browser, from Station Health's findings and one weather model's rain (ECMWF, through Open-Meteo, kept three hours at the edge)</td><td>Today and the next six days</td></tr>
             <tr><th scope="row">Backbone's ranking</th><td>In your browser, from the stored findings and summaries</td><td>A period you pick: 7, 14, 30, 60 or 90 days</td></tr>
             <tr><th scope="row">Network Bulletin</th><td>A scheduled Claude task, each weekday morning and each Monday</td><td>The last day, or week</td></tr>
           </tbody></table></div>`],
