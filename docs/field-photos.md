@@ -625,14 +625,26 @@ digit the OCR misread — add a note, and approve or reject:
   (`meganet.station_equipment`) and marks the suggestion, in one transaction,
   keeping what was proposed and the corrections side by side. Where the unit
   goes: the same unit already on the register (same kind, same serial, however
-  punctuated) is updated — the photo is fresher evidence of it; a unit of that
-  kind whose serial was never known is taken to be this one and gets the
-  serial; one other unit of that kind is taken to be the unit this one
-  replaced — it is retired, pointing at the new one; with two or more of the
-  kind (two solar panels) the administrator says which it replaces, or that it
-  is *another one, alongside*, because a guess there retires the wrong one.
-  Any other suggestion still waiting for the same unit is marked
+  punctuated) is updated — the photo is fresher evidence of it; the one unit
+  of that kind the suggestion does not contradict — make, model and serial
+  each blank on one side or the same, the make as a prefix (Victron is
+  Victron Energy) — is taken to be this one, and gets what it lacked: a
+  photo of only a bubbler's make is that bubbler seen again, not its
+  replacement (0093); one other unit of that kind is taken to be the unit
+  this one replaced — it is retired, pointing at the new one — except an
+  *Other*, which is never taken to replace another; with two or more of the
+  kind (two solar panels) the administrator says which it replaces, or that
+  it is *another one, alongside*, because a guess there retires the wrong
+  one. Any other suggestion still waiting for the same unit is marked
   *superseded*.
+- **Approve all** (0093), above the list: everything waiting, one station's,
+  or what the proposer was at least 50, 70 or 90% sure of, in one go —
+  `meganet.approve_equipment_suggestions()`, each through the same decision,
+  as the same unit where the register has it and alongside where not. It
+  **never retires anything**: a pile of sightings says what is there, not
+  what was swapped, so a replacement stays a decision made one at a time. One
+  that could be either of two units on the register is left waiting, saying
+  so. It asks first, with the count.
 
 The register keeps every unit ever known at a station; the live ones are on
 the **station card** (Stations map → a station → *Equipment*), for signed-in

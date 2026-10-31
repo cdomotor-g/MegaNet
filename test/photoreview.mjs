@@ -55,6 +55,7 @@ import { seedRows, attachmentsSql, inspectionsSql } from './lib/migration.mjs';
 import { photoProject, installPhotoProject, serveObjects } from './lib/photo-project.mjs';
 import { repo } from './lib/paths.mjs';
 import { tiff, gpsEntries, jpegWith } from './lib/exif.mjs';
+import { answer } from './lib/ask.mjs';
 
 const require = createRequire(import.meta.url);
 const PhotoEquipment = require(repo('photo-equipment.js'));
@@ -376,6 +377,7 @@ async function browserHalf() {
     const locked = await page.evaluate(() => [...document.querySelectorAll('.pr-actions button')].map(b => ({ disabled: b.disabled, why: b.getAttribute('aria-describedby') })));
     ok('Approve and Reject are there, and disabled, pointing at the sentence that says why',
       locked.length === 6 && locked.every(b => b.disabled && b.why === 'pr-why') && !(await page.$('.pr-sug input')), J(locked));
+    ok('no Approve all for somebody who may not approve', !(await page.$('#pr-bulk')));
     ok('…which says what an administrator is, and where to read how one is made',
       /is for an administrator — an editor the owner has marked as one \(how\)/.test(await text('#pr-why'))
         && /#administrators$/.test(await page.getAttribute('#pr-why a', 'href') || ''), await text('#pr-why'));
@@ -555,6 +557,58 @@ async function browserHalf() {
     ok('…and the line under the drop zone says so', /^Read the labels on the 1 photo just uploaded: 1 suggestion made\./.test(await page.evaluate(() => state.photos.msg.text)),
       await page.evaluate(() => state.photos.msg.text));
     await page.uncheck('#fp-read-labels');
+
+    // ── Approve all ──────────────────────────────────────────────────────────
+    section('Approve all');
+    // Three more waiting, from the photo reader: two at Gatton, one sure and
+    // one not, and one at another station.
+    // Not the first station with a place: the card's check below wants that one with an empty register.
+    const other = await page.evaluate(() => state.data.stations.filter(x => x.id !== 'gatton' && x.lat != null)[1].id);
+    const extra = (id, station, kind, make, conf) => ({ id, station_id: station, photo_id: null, equipment_key: kind, make, model: '',
+      serial_no: '', evidence: '', confidence: conf, proposed_by: 'agent:photo-reader', created_by: 'service_role',
+      created_at: new Date().toISOString(), status: 'pending', decided_by: null, decided_at: null, decision_note: null,
+      decision_patch: null, equipment_id: null });
+    db.suggestions.push(extra('00000000-0000-4000-e000-0000000000a1', 'gatton', 'solar_regulator', 'Victron Energy', 0.9),
+                        extra('00000000-0000-4000-e000-0000000000a2', 'gatton', 'other', 'Invicta', 0.4),
+                        extra('00000000-0000-4000-e000-0000000000a3', other, 'tbrg', 'HyQuest Solutions', 0.8));
+    const waiting = db.suggestions.filter(x => x.status === 'pending');
+    await page.evaluate(() => { switchTab('photos'); });
+    await page.evaluate(() => PhotoReview.reload());
+    await loaded();
+    await page.waitForSelector('#pr-bulk-go', { timeout: LOAD_TIMEOUT });
+    ok(`an administrator has Approve all, counting every one waiting — ${waiting.length}`,
+      new RegExp(`^Approve all ${waiting.length}$`).test(await text('#pr-bulk-go')) && /nothing is retired/.test(await text('#pr-bulk')),
+      await text('#pr-bulk'));
+    ok('…and the word that needs it says what it means on hover',
+      /beside what is there, with nothing retired/.test(await page.getAttribute('#pr-bulk .term', 'title') || ''));
+    await page.selectOption('#pr-bulk-station', 'gatton');
+    const atGatton = waiting.filter(x => x.station_id === 'gatton').length;
+    ok('one station chosen: the button counts only its', await text('#pr-bulk-go') === `Approve ${atGatton}`, await text('#pr-bulk-go'));
+    await page.selectOption('#pr-bulk-conf', '0.7');
+    const sure = waiting.filter(x => x.station_id === 'gatton' && (x.confidence ?? 0) >= 0.7).length;
+    ok('…and only those the reader was at least 70% sure of', await text('#pr-bulk-go') === `Approve ${sure}` && sure < atGatton, await text('#pr-bulk-go'));
+    const a0 = calls('approve_equipment_suggestions').length;
+    await page.click('#pr-bulk-go');
+    const asked = await answer(page, true);
+    ok('it asks first, saying how many, where, and that nothing is retired',
+      asked.title === `Approve ${sure} suggestion${sure === 1 ? '' : 's'} at Gatton?` && /Nothing is retired/.test(asked.text), J(asked));
+    await page.waitForFunction(() => /^Approved \d+/.test((document.querySelector('#pr-sugs .txt-ok') || {}).textContent || ''), null, { timeout: LOAD_TIMEOUT });
+    const sent = calls('approve_equipment_suggestions').slice(a0);
+    ok('one call, with the station and the confidence chosen',
+      sent.length === 1 && J(sent[0].body) === J({ p: { note: 'Approved with the others waiting, in one go', station_id: 'gatton', min_confidence: 0.7 } }), J(sent.map(c => c.body)));
+    ok('…what it did said on the panel', new RegExp(`^Approved ${sure}: ${sure} added to a register, 0 the same unit seen again\\.`).test(await text('#pr-sugs .txt-ok')),
+      await text('#pr-sugs .txt-ok'));
+    ok('…the unsure one and the other station\'s still waiting',
+      db.suggestions.find(x => x.id === '00000000-0000-4000-e000-0000000000a2').status === 'pending'
+        && db.suggestions.find(x => x.id === '00000000-0000-4000-e000-0000000000a3').status === 'pending');
+    await page.selectOption('#pr-bulk-station', '');
+    await page.selectOption('#pr-bulk-conf', '');
+    const rest = db.suggestions.filter(x => x.status === 'pending').length;
+    await page.click('#pr-bulk-go');
+    await answer(page, true);
+    await page.waitForFunction(() => !document.getElementById('pr-bulk'), null, { timeout: LOAD_TIMEOUT });
+    ok(`the rest, all ${rest}, approved — and with nothing waiting the bar is gone`,
+      db.suggestions.every(x => x.status !== 'pending') && /Nothing is waiting for a decision/.test(await text('#pr-sugs')), await text('#pr-sugs'));
 
     // ── The station card ─────────────────────────────────────────────────────
     section('The station card');

@@ -220,6 +220,28 @@ export async function installPhotoProject(page, db, store, { placed = false } = 
         return json(200, row);
       }
 
+      // Approve all (0093): every pending suggestion the filter matches, each
+      // added alongside — the stand-in does not merge; the real database does
+      // (tools/check_equipment_approve_all.sql).
+      if (fn === 'approve_equipment_suggestions') {
+        if (!db.admin) return json(403, { code: '42501', message: 'only an administrator may approve equipment suggestions' });
+        const p = body.p || {};
+        const min = p.min_confidence == null ? null : Number(p.min_confidence);
+        const todo = db.suggestions.filter(x => x.status === 'pending' && (!p.station_id || x.station_id === p.station_id)
+          && (min == null || (x.confidence ?? 0) >= min) && (!p.ids || p.ids.includes(x.id)));
+        for (const x of todo) {
+          const unit = {
+            id: nextId(db, 'f000'), station_id: x.station_id, equipment_key: x.equipment_key, make: x.make, model: x.model,
+            serial_no: x.serial_no, note: '', source: x.proposed_by === 'ocr' ? 'photo' : 'agent', photo_id: x.photo_id,
+            suggestion_id: x.id, created_at: now(), updated_at: now(), retired_at: null, replaced_by: null,
+          };
+          db.equipment.push(unit);
+          Object.assign(x, { status: 'approved', decided_by: db.user, decided_at: now(), decision_note: p.note ?? null,
+                             decision_patch: { replaces: null }, equipment_id: unit.id });
+        }
+        return json(200, { approved: todo.length, merged: 0, added: todo.length, superseded: 0, left: [], remaining: 0 });
+      }
+
       if (fn === 'decide_equipment_suggestion') {
         if (!db.admin) {
           return json(403, { code: '42501', message: 'only an administrator may approve or reject equipment suggestions',

@@ -2211,6 +2211,14 @@ jobs:
       - name: check_station_lpu.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_station_lpu.sql
+      # Approving equipment suggestions in one go (0093): two descriptions of
+      # one unit, a sighting with less in it the same unit rather than a
+      # replacement, an `other` never replacing another, approve-all never
+      # retiring and leaving the ambiguous ones waiting, administrators only,
+      # and the repair of the retirements that were one unit recorded twice.
+      - name: check_equipment_approve_all.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_equipment_approve_all.sql
       # Proposed stations (0039): what a proposal has to say, the station
       # document gaining nothing for a station that is not one, and who may
       # propose, add outright and establish — signed up through 0005's own

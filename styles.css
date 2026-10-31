@@ -18675,6 +18675,20 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 .pr-scan { display: grid; gap: var(--sp-2); max-width: 44rem; margin-bottom: var(--sp-3); }
 .pr-scan > p { margin: 0; }
 
+/* Approve all (0093): a band above the list, its two choices and the button on
+   one row that wraps on a phone. */
+.pr-bulk {
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+}
+.pr-bulk p { margin: 0 0 var(--sp-2); }
+.pr-bulk-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-2) var(--sp-3); }
+.pr-bulk-row label { display: grid; gap: .15rem; min-width: 0; }
+.pr-bulk-row select { max-width: 100%; }
 .pr-sugs { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
 .pr-sug {
   display: grid;

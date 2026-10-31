@@ -10,7 +10,8 @@
 // After field-photos.js, whose tab draws this panel and whose queue it lists,
 // and after photo-meta.js and photo-equipment.js, which read the labels —
 // index.html holds the order and the reasons. Reaches back to core.js for
-// state, esc, escAttr and announce; to datastore.js for dbSelect and dbRpc;
+// state, esc, escAttr, termHtml and announce; to modal.js for confirmDialog,
+// which Approve all asks first; to datastore.js for dbSelect and dbRpc;
 // to field-photos.js for FieldPhotos (the queue, signing, the viewer, the
 // station finder); to photo-meta.js for PhotoMeta.ocrLabels; to
 // photo-equipment.js for PhotoEquipment.parse; to app.js for docUrl. Every one
@@ -32,7 +33,11 @@
 //      first, each with its photo, the text it was read from, and what the
 //      station's register says now, beside the values proposed — editable,
 //      for an administrator to put right before approving. Decided ones
-//      below, folded.
+//      below, folded. Above them, for an administrator, **Approve all**: every
+//      suggestion waiting, one station's, or those the reader was at least so
+//      sure of, in one go (0093's approve_equipment_suggestions()) — each the
+//      same unit where the register has it and added alongside where not,
+//      never retiring anything.
 //
 // ── Who may decide ───────────────────────────────────────────────────────────
 //
@@ -60,6 +65,7 @@ const PhotoReview = (function () {
 
   const UPLOADS = 200;     // log rows in the list
   const PENDING = 100;     // suggestions waiting
+  const ALL_PENDING = 5000; // …and counted, for Approve all
   const DECIDED = 50;      // …and decided, folded under them
   const SCAN_MAX = 60;     // photos in one station's scan
   const CARD_FRESH = 60000;
@@ -88,6 +94,7 @@ const PhotoReview = (function () {
         loaded: false, loading: false, admin: null, adminError: null,
         uploads: null, uploadsError: null, filtered: null, filter: { outcome: '', origin: '' },
         pending: null, decided: null, suggestError: null, photos: {}, register: {},
+        all: null, bulk: { station: '', conf: '', busy: false, msg: null },
         drafts: {}, notes: {}, busy: {}, msgs: {},
         scan: null, scanResult: null, scanFind: '', scanStation: '', scanPhotos: null, scanError: null,
       };
@@ -98,7 +105,7 @@ const PhotoReview = (function () {
   function stationById(id) { return ((state.data && state.data.stations) || []).find(s => s.id === id) || null; }
   function stationName(id) { const st = stationById(id); return st ? st.name : (id || ''); }
   function errText(err) { return (err && err.message) || String(err); }
-  function missing(text) { return /(field_photo_upload|equipment_suggestion|station_equipment|is_admin|log_field_photo_upload|propose_equipment|decide_equipment)/.test(text || '') && /(does not exist|schema cache|not find|404)/i.test(text || ''); }
+  function missing(text) { return /(field_photo_upload|equipment_suggestion|station_equipment|is_admin|log_field_photo_upload|propose_equipment|decide_equipment|approve_equipment)/.test(text || '') && /(does not exist|schema cache|not find|404)/i.test(text || ''); }
   function doc(anchor) {
     const p = `docs/field-photos.md${anchor ? `#${anchor}` : ''}`;
     return esc(typeof docUrl === 'function' ? docUrl(p) : p);
@@ -181,10 +188,14 @@ const PhotoReview = (function () {
   async function loadSuggestions() {
     const r = R();
     try {
-      const [pending, decided] = await Promise.all([
+      const [pending, decided, all] = await Promise.all([
         dbSelect(`equipment_suggestion?select=*&status=eq.pending&order=created_at.desc&limit=${PENDING}`),
         dbSelect(`equipment_suggestion?select=*&status=neq.pending&order=decided_at.desc&limit=${DECIDED}`),
+        // Every one waiting, lightly: what Approve all counts, past the
+        // hundred drawn below it.
+        dbSelect(`equipment_suggestion?select=id,station_id,confidence&status=eq.pending&limit=${ALL_PENDING}`),
       ]);
+      r.all = all;
       const photoIds = [...new Set([...pending, ...decided].map(s => s.photo_id).filter(Boolean))];
       const stationIds = [...new Set(pending.map(s => s.station_id))];
       const [photos, register] = await Promise.all([
@@ -344,6 +355,7 @@ const PhotoReview = (function () {
         <button type="button" class="link-btn" onclick="PhotoReview.reload()">Try again</button></p>`);
     }
     if (r.lastDecision) bits.push(`<p class="small txt-ok" role="status">${esc(r.lastDecision)}</p>`);
+    if (r.admin === true && (r.all || []).length) bits.push(`<div class="pr-bulk" id="pr-bulk">${bulkHtml()}</div>`);
     const pending = r.pending || [];
     if (pending.length) {
       bits.push(`<ul class="pr-sugs" aria-labelledby="pr-eq-h">${pending.map(s => `<li class="pr-sug" id="pr-sug-${esc(s.id)}">${sugHtml(s)}</li>`).join('')}</ul>`);
@@ -491,6 +503,109 @@ const PhotoReview = (function () {
     }
     if (done) { await loadSuggestions(); repaintSugs(); }
     else repaintSug(id);
+  }
+
+  // ── Approve all ────────────────────────────────────────────────────────────
+  // The suggestions waiting, approved in one go by 0093's
+  // approve_equipment_suggestions(): every one, one station's, or those the
+  // reader was at least so sure of. Each is the same unit where the register
+  // already has it, and is added alongside where it does not — so it never
+  // retires anything: a replacement is a judgement, made one at a time above.
+  // One that could be either of two units is left waiting, and said.
+
+  const BULK_CONF = [['', 'however sure'], ['0.5', 'at least 50% sure'], ['0.7', 'at least 70% sure'], ['0.9', 'at least 90% sure']];
+  const ALONGSIDE = 'Added to the station\'s register beside what is there, with nothing retired. Approving in one go never takes one unit to have replaced another: a photo cannot tell a swap from a second unit.';
+
+  function bulkMatches() {
+    const r = R(), b = r.bulk;
+    const min = b.conf ? Number(b.conf) : null;
+    return (r.all || []).filter(x => (!b.station || x.station_id === b.station)
+      && (min == null || (x.confidence != null && Number(x.confidence) >= min)));
+  }
+
+  function bulkHtml() {
+    const r = R(), b = r.bulk;
+    const all = r.all || [];
+    const per = {};
+    for (const x of all) per[x.station_id] = (per[x.station_id] || 0) + 1;
+    const stations = Object.keys(per).sort((a, c) => stationName(a).localeCompare(stationName(c)));
+    const n = bulkMatches().length;
+    return `
+      <h4 class="pr-sug-h">Approve all</h4>
+      <p class="small">Approve what is waiting in one go. Each suggestion goes on its station's register as the same unit
+        where the register already has it, and ${termHtml('alongside', ALONGSIDE)} where it does not — nothing is retired.
+        One that could be either of two units on the register is left here for you, with why.</p>
+      <div class="pr-bulk-row">
+        <label class="small">Station
+          <select id="pr-bulk-station" onchange="PhotoReview.bulkSet('station', this.value)" ${b.busy ? 'disabled' : ''}>
+            <option value="">Every station — ${all.length}</option>
+            ${stations.map(id => `<option value="${escAttr(id)}" ${id === b.station ? 'selected' : ''}>${esc(stationName(id))} — ${per[id]}</option>`).join('')}
+          </select></label>
+        <label class="small">The reader
+          <select id="pr-bulk-conf" onchange="PhotoReview.bulkSet('conf', this.value)" ${b.busy ? 'disabled' : ''}>
+            ${BULK_CONF.map(([v, l]) => `<option value="${v}" ${v === b.conf ? 'selected' : ''}>${esc(l)}</option>`).join('')}
+          </select></label>
+        <button type="button" class="primary" id="pr-bulk-go" onclick="PhotoReview.approveAll()" ${n && !b.busy ? '' : 'disabled'}>${
+          b.busy ? 'Approving…' : `Approve ${n === all.length ? 'all ' : ''}${n}`}</button>
+      </div>
+      <p class="small" id="pr-bulk-msg" role="status">${b.msg ? `<span class="${b.msg.kind === 'error' ? 'txt-bad' : 'txt-ok'}">${esc(b.msg.text)}</span>` : ''}</p>`;
+  }
+
+  function bulkSet(key, value) {
+    const b = R().bulk;
+    b[key] = String(value || '');
+    b.msg = null;
+    part('pr-bulk', bulkHtml);
+  }
+
+  async function approveAll() {
+    const r = R(), b = r.bulk;
+    const matches = bulkMatches();
+    if (b.busy || !matches.length || r.admin !== true) return;
+    const n = matches.length;
+    const where = b.station ? `at ${stationName(b.station)}` : `at ${new Set(matches.map(x => x.station_id)).size} stations`;
+    const sure = BULK_CONF.find(([v]) => v === b.conf);
+    const yes = typeof confirmDialog === 'function' ? await confirmDialog({
+      title: `Approve ${n} suggestion${n === 1 ? '' : 's'} ${where}?`,
+      message: `Each goes on its station's register: the same unit where the register already has it, and added alongside where it does not. Nothing is retired.${b.conf ? `\nOnly those the reader was ${sure ? sure[1] : ''}.` : ''}\nOne that could be either of two units stays here for you to decide.`,
+      confirm: `Approve ${n}`,
+    }) : true;
+    if (!yes) return;
+    const p = { note: 'Approved with the others waiting, in one go' };
+    if (b.station) p.station_id = b.station;
+    if (b.conf) p.min_confidence = Number(b.conf);
+    b.busy = true;
+    b.msg = { kind: 'ok', text: `Approving ${n}…` };
+    part('pr-bulk', bulkHtml);
+    const sum = { approved: 0, merged: 0, added: 0, superseded: 0, left: [] };
+    let err = null;
+    try {
+      // Five hundred a call; ask again while it is getting somewhere.
+      for (let round = 0; round < 20; round++) {
+        const out = await dbRpc('approve_equipment_suggestions', { p });
+        for (const k of ['approved', 'merged', 'added', 'superseded']) sum[k] += Number(out && out[k]) || 0;
+        sum.left = (out && out.left) || [];
+        if (!out || !out.remaining || !out.approved) break;
+      }
+    } catch (e) {
+      err = e;
+    }
+    b.busy = false;
+    cards = {};
+    if (err) {
+      b.msg = { kind: 'error', text: missing(errText(err))
+        ? 'This database cannot approve in bulk yet — it needs db/migrations/0093_equipment_approve_all.sql applied.'
+        : `Not approved — ${errText(err)}${sum.approved ? ` (after ${sum.approved} were)` : ''}.` };
+    } else {
+      const left = sum.left.length;
+      r.lastDecision = `Approved ${sum.approved}: ${sum.added} added to a register, ${sum.merged} the same unit seen again`
+        + `${sum.superseded ? `, and ${sum.superseded} more waiting for the same unit settled with them` : ''}.`
+        + `${left ? ` ${left} left waiting — each could be either of two units on its register; decide ${left === 1 ? 'it' : 'them'} below.` : ''}`;
+      b.msg = null;
+      announce(r.lastDecision);
+    }
+    await loadSuggestions();
+    repaintSugs();
   }
 
   // ── Reading labels ─────────────────────────────────────────────────────────
@@ -781,7 +896,7 @@ const PhotoReview = (function () {
 
   return {
     html, init, repaint, reload, authChanged, queueChanged, uploadsChanged,
-    setOutcome, setOrigin, edit, note, approve, reject,
+    setOutcome, setOrigin, edit, note, approve, reject, bulkSet, approveAll,
     scan, scanFind, pickStation, scanStation, stop,
     cardHtml, cardAsk,
     // Read by the check and by nothing else.

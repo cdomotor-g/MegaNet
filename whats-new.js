@@ -25,6 +25,17 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 165, date: '2026-10-31', items: [
+      '✅ <strong>Approve all</strong> in <em>Field Photos → Review</em>: an administrator approves the equipment suggestions '
+        + 'waiting in one go — all of them, one station\'s, or only those the reader was at least 50, 70 or 90% sure of. Each goes on '
+        + 'its station\'s register as the same unit where the register already has it, and alongside where it does not: nothing is '
+        + 'retired. One that could be either of two units stays in the list for you, saying why.',
+      '🔧 <strong>A photo showing less no longer retires a unit.</strong> Approving a suggestion that shows only a unit\'s make — '
+        + '<em>Kisters</em>, where the register knows the Kisters WL3100 by its serial — now keeps the unit and adds the photo to it, '
+        + 'instead of taking it for a replacement. An <em>Other</em> never replaces another <em>Other</em>. The five units retired '
+        + 'that way on 31 October are put right: four were one unit recorded twice, now one unit with all it was known by, and the '
+        + 'fifth, a battery filed as <em>Other</em>, is back on its register.',
+    ] },
     { n: 164, date: '2026-10-30', items: [
       '⏱️ <strong>Activity only</strong>, in Latency\'s <em>Messages landing</em> on the Stations map. Tick it and the map goes '
         + 'down to its base map: every pin, line and layer is hidden, and a station shows only when a message from it has just '

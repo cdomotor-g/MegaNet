@@ -94,7 +94,10 @@ one reading per photo through `meganet.record_photo_readings()`:
 - **Everything else with a legible label** — radios, modems, regulators,
   sensors — is proposed for the station's equipment register, as
   `agent:photo-reader`, and waits in **Field Photos → Review** for an
-  administrator, exactly as the label-reading OCR's proposals do (0036).
+  administrator, exactly as the label-reading OCR's proposals do (0036) —
+  one at a time, or with **Approve all** (0093): everything waiting, one
+  station's, or what the reader was at least so sure of, each the same unit
+  where the register has it and alongside where not, nothing retired.
 - **Never recorded:** site codes — gate combinations, padlock and logger codes,
   passwords, key numbers — landholders' details, or who is in a photo. The
   database refuses a key number outright, and `tools/photo-reader/sql.py`
