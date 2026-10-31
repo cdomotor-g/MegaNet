@@ -1846,6 +1846,18 @@ jobs:
         working-directory: test
         run: npm run report
 
+      # And /api/notify (worker/notify.js): the agent API's notify list, open
+      # to anybody, emailing people. What it must not do fails in silence — a
+      # second email before Confirm is pressed, a mail scanner confirming or
+      # unsubscribing somebody, a notice sent twice or to a pending address,
+      # a run past its allowance, an address in a log, a write lost to
+      # another — because the emails still go. Offline: R2, Resend and the
+      # static assets are stand-ins.
+      - name: The API notify list — double opt-in, each change once, bounded, a way out in one click
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run apinotify
+
       # Route on map (#251): /api/drive (worker/drive.js) and the map's
       # 🛣️ (map-drive.js). What fails in silence: a route for somebody who is
       # not an editor, the router asked with the caller's session or faster

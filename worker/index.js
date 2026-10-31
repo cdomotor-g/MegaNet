@@ -70,10 +70,17 @@
 // FOSSGIS's server, for editors, a request a second at most, and the answer
 // kept in the edge cache. worker/drive.js, docs/drive.md.
 //
+// A tenth: /api/notify/*, the agent API's notify list — an email address in,
+// double opt-in, and an email to each confirmed address when
+// docs/api-changelog.json gains an entry. Anybody may sign up, from
+// Flood-Net's own pages, a few a minute; the list is kept in the PHOTOS bucket
+// under _meganet/. worker/notify.js, docs/agent-api.md ("Changes").
+//
 // And one that is not a door at all: scheduled() below, every minute
 // (wrangler.toml's [triggers]), sends the administrators' notifications —
-// worker/push.js, db/migrations/0066_push_notifications.sql. Nothing a
-// request carries reaches it.
+// worker/push.js, db/migrations/0066_push_notifications.sql — and every
+// fifteenth minute the notify list's confirmations and notices
+// (worker/notify.js). Nothing a request carries reaches it.
 
 import { isApiPath, handleApi } from './api.js';
 import { isPhotoPath, handlePhotos } from './photos.js';
@@ -82,6 +89,7 @@ import { isBriefingPath, handleBriefing } from './briefing.js';
 import { isReportPath, handleReport } from './report.js';
 import { isCameraPath, handleCameras } from './cameras.js';
 import { isDrivePath, handleDrive } from './drive.js';
+import { isNotifyPath, handleNotify, notifyDue, runNotify } from './notify.js';
 import { runPush } from './push.js';
 
 export { BriefingLedger } from './briefing.js';
@@ -507,6 +515,10 @@ export default {
     // request a second at most, whoever is asking.
     if (isDrivePath(url.pathname)) return handleDrive(request, env, ctx);
 
+    // The agent API's notify list (worker/notify.js): sign-ups from
+    // Flood-Net's pages, a few a minute; the links in its emails.
+    if (isNotifyPath(url.pathname)) return handleNotify(request, env, ctx);
+
     // Everything else is a static asset, and assets are served before this runs.
     // A request that gets here for any other path is a path that does not exist.
     if (url.pathname !== '/api/session') {
@@ -547,9 +559,19 @@ export default {
   // The notifications' sender (worker/push.js): ask the database what is due,
   // send it, report what the push services said. Said in the Worker's log only
   // when something was due or went wrong — a quiet minute says nothing.
+  //
+  // And on every fifteenth minute (notifyDue), the notify list's run
+  // (worker/notify.js): with no RESEND_API_KEY it returns before reading
+  // anything; with one, it reads the changelog and the list and sends what is
+  // due. Logged as counts only — never an address.
   async scheduled(controller, env, ctx) {
     ctx.waitUntil(runPush(env).then(out => {
       if (out.error || out.due) console.log(`[push] ${JSON.stringify(out)}`);
     }, err => console.log(`[push] ${(err && err.message) || err}`)));
+    if (notifyDue(controller && controller.scheduledTime)) {
+      ctx.waitUntil(runNotify(env).then(out => {
+        if (out.error || out.confirmations || out.notices || out.failed || out.purged) console.log(`[notify] ${JSON.stringify(out)}`);
+      }, err => console.log(`[notify] ${(err && err.message) || err}`)));
+    }
   },
 };

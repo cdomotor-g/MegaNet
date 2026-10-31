@@ -54,6 +54,7 @@ Documentation: [`docs/agent-api.md`](docs/agent-api.md).
   frequencies, power, distance, whether on the station's frequency); and
   `acma_licences_near` (`/api/v1/acma?near=lat,lon`) for a point. A weekly
   extract of the register: quote its `source_date`.
+- What changed in the API: `GET /api/v1/changelog`, newest first.
 - For a map, `format=geojson` (tool argument `format: "geojson"`) on station
   search, `stations_near` and the latest readings answers a GeoJSON
   FeatureCollection: points at `[lon, lat]`, properties the JSON row, stations

@@ -1,0 +1,27 @@
+{
+  "about": "Every change to Flood-Net's agent API (https://floodwarning.net/api/v1 and https://floodwarning.net/api/mcp) that someone using it would notice — a route, a field, a limit, a tool — newest first. Each entry is emailed once to everyone on the API notify list (sign up at https://floodwarning.net/api#notify). Served as JSON at https://floodwarning.net/api/v1/changelog and written up in docs/agent-api.md, under Changes. Add an entry in the same push as the change: it is what tells people.",
+  "entries": [
+    {
+      "id": "2026-10-31-changelog-and-notify",
+      "date": "2026-10-31",
+      "title": "This list of changes, and an email when the API changes",
+      "summary": "New: GET /api/v1/changelog lists every change to the API that someone using it would notice — routes, fields, limits, tools — newest first, and the API's index (GET /api/v1/) links to it as changelog. To be told by email, put your address in the form at https://floodwarning.net/api#notify: you are sent a link to confirm it, nothing else until you do, and every email after that has a link to stop them. Nothing about the station data has changed.",
+      "breaking": false,
+      "links": [
+        { "text": "The list of changes, as JSON", "url": "https://floodwarning.net/api/v1/changelog" },
+        { "text": "Sign up for the emails", "url": "https://floodwarning.net/api#notify" }
+      ]
+    },
+    {
+      "id": "2026-10-31-acma-licences",
+      "date": "2026-10-31",
+      "title": "The ACMA licences at a station's site, or at a point",
+      "summary": "New: GET /api/v1/stations/{id}/acma (MCP tool get_acma_licences) gives the ACMA licence numbers Flood-Net records for a station, each looked up in the ACMA's Register of Radiocommunications Licences, and the register's licences at sites within radius_m of it (500 m by default, 5 km at most) — licensee, frequencies, power, emission, authorised date, distance, the site's stated precision, and whether each is on the station's channel — with the repeaters that relay a field station. GET /api/v1/acma?near=lat,lon (MCP tool acma_licences_near) does the same for a point, for a site not built yet. The station dossier gains an acma section and its links an acma link. The register is a weekly extract; every answer gives its date. Nothing that was there before has changed.",
+      "breaking": false,
+      "links": [
+        { "text": "How to use it", "url": "https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md#get-apiv1stationsidacma" },
+        { "text": "An example answer", "url": "https://floodwarning.net/api/v1/stations/mt_glorious_al_rptr/acma" }
+      ]
+    }
+  ]
+}

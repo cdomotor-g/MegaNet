@@ -77,6 +77,22 @@
     .note p:first-child { margin-top: 0; }
     .note p:last-child { margin-bottom: 0; }
     .toc { columns: 2 14rem; padding-left: 1.2rem; margin: 0 0 1rem; }
+    .changes { list-style: none; padding: 0; }
+    .changes li { margin: .6rem 0; }
+    .changes .when { color: var(--dim); font-size: .9rem; }
+    form.notify { display: grid; gap: .8rem; max-width: 28rem; margin: 1rem 0; }
+    form.notify label { display: grid; gap: .25rem; font-weight: 600; }
+    form.notify .opt { font-weight: 400; color: var(--dim); }
+    form.notify input {
+      font: inherit; padding: .5rem .6rem; border: 1px solid var(--line); border-radius: 4px;
+      background: var(--bg); color: var(--ink); width: 100%;
+    }
+    form.notify button {
+      font: inherit; font-weight: 600; justify-self: start; padding: .55rem 1.1rem; border-radius: 6px;
+      border: 1px solid var(--brand); background: var(--brand); color: #fff; cursor: pointer;
+    }
+    form.notify button:disabled { opacity: .6; cursor: default; }
+    #notify-status:empty { display: none; }
     .toc li { margin: .15rem 0; }
     footer {
       margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
@@ -117,6 +133,7 @@
     <li><a href="#connect">Connecting an AI assistant</a></li>
     <li><a href="#http">From a script</a></li>
     <li><a href="#limits">Limits and fair use</a></li>
+    <li><a href="#notify">Changes, and an email when it changes</a></li>
     <li><a href="#not">What it does not do</a></li>
     <li><a href="#caveats">Reading the data correctly</a></li>
   </ul>
@@ -389,6 +406,11 @@
           <td><code>list_networks</code></td>
           <td>Radio networks, maintenance hubs and Radio Mobile systems — the ids <code>network=</code> and <code>hub=</code> take. <a href="/api/v1/networks">Example</a></td>
         </tr>
+        <tr>
+          <td><code>GET /api/v1/changelog</code></td>
+          <td>—</td>
+          <td>Every change to the API someone using it would notice, newest first — the list the emails below are sent from. <a href="/api/v1/changelog">Example</a></td>
+        </tr>
       </tbody>
     </table>
   </div>
@@ -480,6 +502,47 @@ curl -s -H 'X-FloodNet-Client: your-name' \
     the whole network, and name your client.
   </p>
 
+  <h2 id="notify">Changes, and an email when it changes</h2>
+  <p>
+    Every change to the API that someone using it would notice — a new route or
+    field, a limit, a tool — is listed, newest first, at
+    <a href="/api/v1/changelog"><code>GET /api/v1/changelog</code></a> and in the
+    <a href="https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md#changes">full reference</a>.
+    Leave your address here to be emailed each one.
+  </p>
+  <div class="note" id="changes">
+    <p><strong>The latest changes</strong></p>
+    <ul class="changes" id="changes-list">
+      <li><span class="when">31 October 2026</span><br>This list of changes, and an email when the API changes</li>
+      <li><span class="when">31 October 2026</span><br>The ACMA licences at a station's site, or at a point</li>
+    </ul>
+  </div>
+  <form class="notify" id="notify-form" novalidate>
+    <label>Email address
+      <input type="email" name="email" required maxlength="254" autocomplete="email" inputmode="email">
+    </label>
+    <label>Name <span class="opt">(optional)</span>
+      <input type="text" name="name" maxlength="100" autocomplete="name">
+    </label>
+    <label>Organisation <span class="opt">(optional)</span>
+      <input type="text" name="organisation" maxlength="100" autocomplete="organization">
+    </label>
+    <button type="submit">Email me when the API changes</button>
+    <p id="notify-status" role="status" aria-live="polite"></p>
+  </form>
+  <noscript><p><strong>The sign-up needs JavaScript</strong>, which is off in this browser.</p></noscript>
+  <p id="notify-mail">
+    You are sent a link to confirm the address first. Nothing else is sent
+    until you press it, and every email has a link to stop them. If
+    Flood-Net's email is not switched on yet, your sign-up is kept and the link
+    is sent as soon as it is.
+  </p>
+  <p>
+    What is kept, and how to have it removed: the
+    <a href="/privacy#api-notify">privacy policy</a>. It sends from
+    <code>noreply@floodwarning.net</code> and is used for nothing else.
+  </p>
+
   <h2 id="not">What it does not do</h2>
   <ul>
     <li>
@@ -564,5 +627,77 @@ curl -s -H 'X-FloodNet-Client: your-name' \
   </footer>
 
 </main>
+<script>
+  // The sign-up (worker/notify.js) and the latest changes (GET /api/v1/changelog).
+  // The page reads the same without this; the form needs it, since the
+  // sign-up is JSON. Text only: nothing from an answer becomes markup.
+  (function () {
+    var host = location.hostname;
+    var base = /(^|\.)floodwarning\.net$|\.workers\.dev$|\.pages\.dev$/.test(host) ? '' : 'https://floodwarning.net';
+    var form = document.getElementById('notify-form');
+    var status = document.getElementById('notify-status');
+    var note = document.getElementById('notify-mail');
+    var list = document.getElementById('changes-list');
+    var button = form.querySelector('button');
+    // form.elements, not form.name: a form's own name attribute hides an input called "name".
+    var field = function (n) { return form.elements.namedItem(n); };
+
+    fetch(base + '/api/notify', { headers: { Accept: 'application/json' }, cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (s) {
+        if (!s.accepting) {
+          button.disabled = true;
+          note.textContent = 'Sign-ups are not being taken just now. Try again later.';
+          return;
+        }
+        note.textContent = s.mail
+          ? 'You are sent a link to confirm the address first. Nothing else is sent until you press it, and every email has a link to stop them.'
+          : 'Flood-Net\'s email is not switched on yet: your sign-up is kept, and the link to confirm it is sent as soon as it is. Nothing else is sent until you press that link, and every email after has a link to stop them.';
+      })
+      .catch(function () { /* the words already on the page stand */ });
+
+    fetch(base + '/api/v1/changelog?client=api-page', { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (c) {
+        if (!c || !c.entries || !c.entries.length) return;
+        while (list.firstChild) list.removeChild(list.firstChild);
+        c.entries.slice(0, 5).forEach(function (e) {
+          var li = document.createElement('li');
+          var when = document.createElement('span');
+          when.className = 'when';
+          when.textContent = new Date(e.date + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+            + (e.breaking ? ' · breaking' : '');
+          li.appendChild(when);
+          li.appendChild(document.createElement('br'));
+          li.appendChild(document.createTextNode(e.title));
+          list.appendChild(li);
+        });
+      })
+      .catch(function () { /* the list already on the page stands */ });
+
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      if (!field('email').checkValidity() || !field('email').value.trim()) {
+        status.textContent = 'That does not look like an email address.';
+        field('email').focus();
+        return;
+      }
+      button.disabled = true;
+      status.textContent = 'Sending…';
+      fetch(base + '/api/notify/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ email: field('email').value, name: field('name').value, organisation: field('organisation').value }),
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (j) {
+          if (r.ok) { status.textContent = j.message || 'Thank you.'; form.reset(); }
+          else status.textContent = 'Not kept: ' + (j.error || ('HTTP ' + r.status)) + '.';
+        });
+      }).catch(function () {
+        status.textContent = 'Not kept: Flood-Net could not be reached. Try again in a minute.';
+      }).then(function () { button.disabled = false; });
+    });
+  })();
+</script>
 </body>
 </html>

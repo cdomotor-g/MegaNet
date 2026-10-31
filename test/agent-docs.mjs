@@ -28,6 +28,8 @@ import { repo } from './lib/paths.mjs';
 import * as api from '../worker/api.js';
 import { REPORT_RATE } from '../worker/report.js';
 import { DRIVE_RATE } from '../worker/drive.js';
+import { NOTIFY_RATE } from '../worker/notify.js';
+import { parseChangelog } from '../worker/changelog.js';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 const results = [];
@@ -139,6 +141,21 @@ check(`${PAGE} states the page and row caps the code enforces`,
   page.includes(`${api.LIMITS.listMax} rows per page`) && page.includes(`${api.LIMITS.readingsMax.toLocaleString('en-AU')} readings per call`)
   && page.includes(`${api.LIMITS.radiusMaxKm} km search radius`));
 
+// ── The list of changes is shown to people ───────────────────────────────────
+// docs/api-changelog.json is what the notify list emails; the user doc's
+// Changes section and the /api page say the same, so a reader without the
+// emails sees each change too.
+
+const changes = parseChangelog(JSON.parse(read('docs/api-changelog.json') || '{}'));
+check('docs/api-changelog.json parses with no problems', changes.problems.length === 0 && changes.entries.length > 0, changes.problems.join(' | '));
+const changesSection = (() => { const at = doc.indexOf('## Changes'); if (at < 0) return ''; const rest = doc.slice(at + 3); const end = rest.search(/^## /m); return end < 0 ? rest : rest.slice(0, end); })();
+const changesFlat = changesSection.replace(/\s+/g, ' ');
+const longDate = d => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+const unlisted = changes.entries.filter(e => !changesFlat.includes(e.title) || !(changesFlat.includes(e.date) || changesFlat.includes(longDate(e.date))));
+check(`${DOC}'s Changes section lists every entry of the changelog, dated`, changesSection && unlisted.length === 0, unlisted.map(e => e.id).join(', '));
+check(`${PAGE} has the sign-up form, posting to /api/notify/subscribe`, /id="notify"/.test(page) && page.includes('/api/notify/subscribe')
+  && /<form[^>]*id="notify-form"/.test(page));
+
 // ── wrangler.toml declares the bindings the code reads ───────────────────────
 
 const toml = read('wrangler.toml') || '';
@@ -163,8 +180,14 @@ const drive = blocks.find(x => x.name === DRIVE_RATE.binding);
 check(`wrangler.toml declares ${DRIVE_RATE.binding} as ${DRIVE_RATE.limit} / ${DRIVE_RATE.period} s`,
   drive && drive.limit === DRIVE_RATE.limit && drive.period === DRIVE_RATE.period,
   drive ? `${drive.limit} / ${drive.period}` : 'not declared');
+// …and the notify list's (worker/notify.js), the brake on its sign-ups.
+const notify = blocks.find(x => x.name === NOTIFY_RATE.binding);
+check(`wrangler.toml declares ${NOTIFY_RATE.binding} as ${NOTIFY_RATE.limit} / ${NOTIFY_RATE.period} s`,
+  notify && notify.limit === NOTIFY_RATE.limit && notify.period === NOTIFY_RATE.period,
+  notify ? `${notify.limit} / ${notify.period}` : 'not declared');
 check('wrangler.toml declares no rate limit the code does not read',
-  blocks.every(b => b.name === REPORT_RATE.binding || b.name === DRIVE_RATE.binding || api.RATE_LIMITS.some(r => r.binding === b.name)),
+  blocks.every(b => b.name === REPORT_RATE.binding || b.name === DRIVE_RATE.binding || b.name === NOTIFY_RATE.binding
+    || api.RATE_LIMITS.some(r => r.binding === b.name)),
   blocks.map(b => b.name).join(', '));
 check('each rate limit period is one Cloudflare accepts (10 or 60)', blocks.every(b => b.period === 10 || b.period === 60));
 check('each namespace_id is a distinct positive integer',

@@ -77,6 +77,10 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     relay it with their licences.
   - `acma_licences_near` — `GET /api/v1/acma?near=lat,lon&radius_m=&freq_mhz=&all=`:
     the register's licences around a point — a site not built yet, or a move.
+- **Changes:** `GET /api/v1/changelog` lists every change to the API someone
+  using it would notice, newest first (`breaking: true` when a client may need
+  to change). A person can be emailed each one: the form at
+  https://floodwarning.net/api#notify.
   - `list_catchments`, `get_catchment` — `GET /api/v1/catchments[/{id}]`
   - `list_networks` — `GET /api/v1/networks`
 - **For a map:** `format=geojson` on `/api/v1/stations` (search and `near`) and
@@ -165,6 +169,13 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   a `/api/v1` route: add the route and the tool together, and document both in
   `docs/agent-api.md` and here. Its limits are quoted in the agent files, which
   `npm run agentdocs` holds to the code.
+- **API changelog:** every change to the API's visible behaviour — a route, a
+  field, a limit, a tool — adds an entry to `docs/api-changelog.json` (and to
+  `docs/agent-api.md`'s Changes section) in the same push: that entry is what
+  emails the people on the API notify list. A refactor with no visible change
+  adds none. The notify list (`worker/notify.js`, `/api/notify/*`) keeps its
+  addresses in R2 only; never put one in the repo, docs, commits, issues, test
+  fixtures (use `example.com`) or logs.
 - **Migrations to the live database:** run `gh workflow run db-migrate.yml
   --ref main` (`-f dry_run=true` to list first; without `--ref` gh asks
   GraphQL for the default branch, which cloud sessions refuse); it applies

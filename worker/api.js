@@ -35,8 +35,11 @@
 // Besides the database it reads public files this site already serves to any
 // visitor, through the Worker's static-assets binding (env.ASSETS) and never
 // over the network: data/acma-licensing.json, the ACMA register extract the map
-// draws (worker/acma.js). A GET of a fixed path, nothing from the caller in it
-// — so this is still a door onto public data and nothing else.
+// draws (worker/acma.js), and docs/api-changelog.json, this API's own list of
+// changes (worker/changelog.js). A GET of a fixed path, nothing from the caller
+// in it — so this is still a door onto public data and nothing else. The
+// notify list that emails each change (worker/notify.js) is not part of this
+// module: it keeps addresses, and this writes nothing.
 //
 // ── Throttling ───────────────────────────────────────────────────────────────
 // Three rules, per RATE_LIMITS: a per-client minute, a per-client ten-second
@@ -73,6 +76,7 @@ import {
   nearestSite, registerRows, registerCounts, relevantRow, recordedEntry, licenceBase, extractInfo, subsetWords,
   registerSource, siteOut, summaryLines as acmaSummaryLines,
 } from './acma.js';
+import { CHANGELOG_PATH, readChangelog, resetChangelog } from './changelog.js';
 
 // ── Where things are ─────────────────────────────────────────────────────────
 
@@ -482,6 +486,7 @@ export function resetApiState() {
   MEMO.clear();
   WINDOWS.clear();
   resetAcma();
+  resetChangelog();
 }
 
 const VOCAB_MS = LIMITS.vocabularySeconds * 1000;
@@ -3130,6 +3135,36 @@ async function networksEndpoint(rc) {
   };
 }
 
+// ── The API's own changes ────────────────────────────────────────────────────
+// docs/api-changelog.json, read through ASSETS (worker/changelog.js): the list
+// worker/notify.js emails an entry of to everybody who asked, the first run
+// after the push that adds it.
+
+async function changelogEndpoint(rc) {
+  let log;
+  try {
+    log = await readChangelog(rc.env, rc.origin, rc.now);
+  } catch (err) {
+    const e = new ApiError(503, 'not available', `The API changelog could not be read: ${err.message}.`, { file: CHANGELOG_PATH });
+    e.retry = !err.unbound;
+    throw e;
+  }
+  const latest = log.entries[0] || null;
+  return {
+    count: log.entries.length,
+    latest: latest ? { id: latest.id, date: latest.date, title: latest.title, breaking: latest.breaking } : null,
+    entries: log.entries,
+    notify: {
+      sign_up: `${PUBLIC_ORIGIN}/api#notify`,
+      what: 'Leave your address on that page to be emailed each new entry: a link to confirm it comes first, and every email after that has a link to stop them.',
+    },
+    note: 'Every change to this API that someone using it would notice — a route, a field, a limit, a tool — newest first. '
+      + 'breaking: true marks one that can stop a client working as it did before. A change with nothing to notice (a fix inside, a faster answer) is not listed.',
+    source: CHANGELOG_PATH.replace(/^\//, ''),
+    generated_at: new Date().toISOString(),
+  };
+}
+
 // ── The index and the OpenAPI document ───────────────────────────────────────
 
 export const ENDPOINTS = Object.freeze([
@@ -3150,6 +3185,7 @@ export const ENDPOINTS = Object.freeze([
   { path: '/api/v1/catchments', op: 'listCatchments', summary: 'The 77 Queensland drainage basins.' },
   { path: '/api/v1/catchments/{id}', op: 'getCatchment', summary: 'One basin and its stations.' },
   { path: '/api/v1/networks', op: 'listNetworks', summary: 'Radio networks, maintenance hubs and Radio Mobile systems.' },
+  { path: '/api/v1/changelog', op: 'getApiChangelog', summary: 'Every change to this API someone using it would notice, newest first — and how to be emailed the next one.' },
 ]);
 
 function rateLimitWords() {
@@ -3166,6 +3202,9 @@ function apiIndex(rc) {
     mcp: { url: `${rc.origin}${MCP_PATH}`, transport: 'Streamable HTTP (POST, JSON responses)', protocol_versions: MCP_VERSIONS },
     openapi: `${rc.origin}${API_PREFIX}/openapi.json`,
     docs: DOCS_URL,
+    changelog: `${rc.origin}${API_PREFIX}/changelog`,
+    notify: { sign_up: `${PUBLIC_ORIGIN}/api#notify`,
+      what: 'An email to you each time this API changes in a way you would notice: leave your address on that page, confirm it from the email, stop with any email\'s link.' },
     limits: {
       rate: rateLimitWords(),
       client_name: `Name your client with the ${CLIENT_HEADER} header or ?client=<name> so your share of an address is your own.`,
@@ -3333,6 +3372,9 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
         [{ name: 'id', in: 'path', required: true, description: 'Catchment id, e.g. "herbert".', schema: { type: 'string' } },
           limitParam(LIMITS.listMax, LIMITS.listDefault), offsetParam], ok('The catchment and a page of its stations.')),
       '/api/v1/networks': op('listNetworks', 'List networks and hubs', 'Radio networks, maintenance hubs and Radio Mobile system presets — the ids ?network= and ?hub= take.', [], ok('Networks, hubs and systems.')),
+      '/api/v1/changelog': op('getApiChangelog', 'Get the API\'s changes',
+        'Every change to this API that someone using it would notice — a route, a field, a limit, a tool — newest first, each with its date, a plain-words summary, whether it is breaking, and links. Sign up at /api#notify to be emailed each one.',
+        [], ok('The changes, newest first.')),
     },
     components: {
       parameters: {
@@ -3423,6 +3465,7 @@ async function routeRest(rc, sub, params) {
     if (parts.length === 2) return catchmentEndpoint(rc, parts[1], allowParams(params, ['limit', 'offset']));
   }
   if (parts[0] === 'networks' && parts.length === 1) { none(); return networksEndpoint(rc); }
+  if (parts[0] === 'changelog' && parts.length === 1) { none(); return changelogEndpoint(rc); }
   throw new ApiError(404, 'not found', `No endpoint at ${API_PREFIX}${sub}. GET ${API_PREFIX}/ lists them.`);
 }
 

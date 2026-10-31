@@ -73,7 +73,7 @@
 
   <p class="crumb"><a href="/">Flood-Net</a> &rsaquo; Privacy policy</p>
   <h1>Privacy policy</h1>
-  <p class="stamp">Last updated 27 October 2026</p>
+  <p class="stamp">Last updated 31 October 2026</p>
   <p class="lede">
     What Flood-Net at <a href="https://floodwarning.net/">floodwarning.net</a> keeps
     about the people who use it, why, who else handles it, how long it stays, and
@@ -86,7 +86,8 @@
       account, and then we keep almost nothing: a random browser number and which
       tabs it opened, for counting visits. If you make an account we keep your
       email address, the name you give, and your account's settings, and if you
-      edit a station your address is shown on it. We do not sell anything, show
+      edit a station your address is shown on it. If you ask to be emailed when
+      the station API changes, we keep that address until you stop the emails. We do not sell anything, show
       advertising, or use tracking cookies, and we do not use your information
       for anything but running Flood-Net.
     </p>
@@ -190,7 +191,8 @@
       Confirmation codes, sign-in links, password resets, and notes that your
       account was approved. They are sent through Resend, our email provider, from
       <code>noreply@floodwarning.net</code>. We do not send newsletters or
-      marketing.
+      marketing. (The emails about changes to the station API are separate, and
+      only for those who ask — <a href="#api-notify">below</a>.)
     </dd>
   </dl>
 
@@ -225,6 +227,30 @@
     Flood-Net's use of information received from Google APIs adheres to the
     <a href="https://developers.google.com/terms/api-services-user-data-policy">Google
     API Services User Data Policy</a>, including the Limited Use requirements.
+  </p>
+
+  <h2 id="api-notify">Emails when the station API changes</h2>
+  <p>
+    If you leave your address on <a href="/api#notify">the station API page</a>
+    to be told when the API changes, we keep:
+  </p>
+  <ul>
+    <li>the email address, and the name and organisation if you give them;</li>
+    <li>when you signed up and when you confirmed, the two random links your
+      emails carry (to confirm, and to stop), and which change we last sent
+      you, or why the last email could not be sent.</li>
+  </ul>
+  <p>
+    The first email is a link to confirm the address; nothing else is sent
+    until it is pressed, so an address somebody else typed in gets that one
+    email and no other. The emails are sent through Resend from
+    <code>noreply@floodwarning.net</code>, say only what changed in the API,
+    and are used for nothing else. The list is kept in Flood-Net's private
+    storage at Cloudflare (R2) — never in the public source code, and never in
+    a log. Every email has a link that stops them and deletes the address at
+    once; a sign-up whose link is not pressed within 14 days is deleted. Write
+    to <a href="mailto:privacy@floodwarning.net">privacy@floodwarning.net</a>
+    to have it removed by hand.
   </p>
 
   <h2 id="photos">Field photos, surveys and your location</h2>
@@ -342,7 +368,7 @@
     <dt>Google</dt>
     <dd>Sign-in, if you choose <em>Continue with Google</em>.</dd>
     <dt>Resend</dt>
-    <dd>Sends the account emails.</dd>
+    <dd>Sends the account emails, and the emails about changes to the station API.</dd>
     <dt>Apple, Google, Mozilla and Microsoft</dt>
     <dd>Deliver an administrator's notifications, if they turn them on — whichever
       runs the push service of the browser they use. The messages are encrypted

@@ -980,6 +980,35 @@ if (ACMA_REP && BY_BASE && ACMA_FIELD && PERSON_SITE) {
   api.resetApiState();
 }
 
+// ── The API's own changes ────────────────────────────────────────────────────
+section('API changelog');
+
+{
+  api.resetApiState();
+  assetReads.length = 0;
+  const file = JSON.parse(fs.readFileSync(repo('docs/api-changelog.json'), 'utf8'));
+  const r = await get('/api/v1/changelog');
+  const c = r.json || {};
+  check('GET /api/v1/changelog answers the committed list, newest first', r.status === 200
+    && JSON.stringify(c.entries.map(e => e.id)) === JSON.stringify(file.entries.map(e => e.id)) && c.count === file.entries.length
+    && c.latest && c.latest.id === file.entries[0].id, `${r.status} ${c.detail || ''}`);
+  check('…each entry with its date, title, plain summary, breaking and links', c.entries.every(e => /^\d{4}-\d{2}-\d{2}$/.test(e.date)
+    && e.title && e.summary && typeof e.breaking === 'boolean' && Array.isArray(e.links)));
+  check('…and where to sign up for the emails', c.notify && /\/api#notify$/.test(c.notify.sign_up));
+  check('…read by one GET of /docs/api-changelog.json through the assets binding', assetReads.length === 1
+    && assetReads[0].path === '/docs/api-changelog.json' && assetReads[0].method === 'GET', JSON.stringify(assetReads));
+  const idx = (await get('/api/v1/')).json;
+  check('the index links the changelog and the sign-up', idx.changelog === 'https://floodwarning.net/api/v1/changelog'
+    && /\/api#notify$/.test(idx.notify.sign_up));
+  const extra = await get('/api/v1/changelog?since=2026-01-01');
+  check('the changelog takes no parameters, and says so', extra.status === 400 && /takes none/.test(extra.json.detail));
+  api.resetApiState();
+  const unbound = await get('/api/v1/changelog', { env: {} });
+  check('without the assets binding: 503, and no Retry-After', unbound.status === 503 && unbound.json.error === 'not available'
+    && !unbound.headers.get('retry-after'));
+  api.resetApiState();
+}
+
 section('Flood levels, SLS, readings');
 
 {
@@ -1746,13 +1775,14 @@ section('Read-only');
 // A broad sweep over every route and every tool, cold each time, and then
 // everything it sent upstream is held to the read-only rules.
 stub.requests = [];
+assetReads.length = 0;
 for (const p of ['/api/v1/', '/api/v1/stations?q=river&type=river', `/api/v1/stations?near=${RICH.lat},${RICH.lon}&manual=true`,
   `/api/v1/stations/${RICH.id}`, `/api/v1/stations/${RICH.id}/dossier`, `/api/v1/stations/${RICH.id}/readings?resolution=raw`,
   `/api/v1/stations/${RICH.id}/flood-levels`, `/api/v1/stations/${MANUAL.id}/service-level`, '/api/v1/catchments',
   `/api/v1/catchments/${RICH.catchment_ids[0]}`, '/api/v1/networks', `/api/v1/stations/${RICH.station_number}/readings`,
   '/api/v1/readings/latest', `/api/v1/readings/latest?type=river&network=${NETWORKED.radio_network_ids[0]}&basin=river&format=geojson`,
   `/api/v1/readings/latest?bbox=${RICH.lon - 1},${RICH.lat - 1},${RICH.lon + 1},${RICH.lat + 1}`, '/api/v1/stations?q=tide&format=geojson',
-  `/api/v1/stations/${RICH.id}/acma?all=true`, `/api/v1/acma?near=${RICH.lat},${RICH.lon}&radius_m=5000`]) {
+  `/api/v1/stations/${RICH.id}/acma?all=true`, `/api/v1/acma?near=${RICH.lat},${RICH.lon}&radius_m=5000`, '/api/v1/changelog']) {
   api.resetApiState();
   await get(p);
 }
@@ -1778,6 +1808,9 @@ function toolArgs(name) {
 
 const everything = stub.requests.slice();
 {
+  const fixed = new Set(['/data/acma-licensing.json', '/docs/api-changelog.json']);
+  check('every file the sweep read through the assets binding is a GET of one of two fixed public paths',
+    assetReads.length > 0 && assetReads.every(x => x.method === 'GET' && fixed.has(x.path)), JSON.stringify([...new Set(assetReads.map(x => x.path))]));
   const base = `${api.SUPABASE_REST_URL}/`;
   const bad = everything.filter(q => q.method !== 'GET');
   check('every upstream request of the sweep is a GET', everything.length > 40 && bad.length === 0, `${everything.length} reads, ${bad.length} not GET`);

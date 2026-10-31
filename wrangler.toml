@@ -28,10 +28,11 @@ directory = "."
 # The Worker reads a few of those files itself, through this binding, the first
 # time an isolate needs each — so a route that never touches one loads nothing
 # more than it did: /api/cameras/* (worker/cameras.js) looks a camera up in
-# data/council-cameras.json, the same file the map draws, and the agent API's
+# data/council-cameras.json, the same file the map draws; the agent API's
 # /api/v1/…/acma (worker/acma.js) reads data/acma-licensing.json, the ACMA
-# register extract. Assets are still served before the Worker runs; the binding
-# changes nothing about that.
+# register extract; and /api/v1/changelog and the notify list
+# (worker/changelog.js) read docs/api-changelog.json. Assets are still served
+# before the Worker runs; the binding changes nothing about that.
 binding = "ASSETS"
 
 # The field photos' bytes (worker/photos.js, /api/photos/*): Cloudflare R2, 10 GB
@@ -121,6 +122,20 @@ namespace_id = "1104"
   limit = 3
   period = 60
 
+# The agent API's notify list (worker/notify.js, /api/notify/*): a few
+# sign-ups a minute from one address, keyed on a hash of it — each new address
+# is sent an email, so this is a brake on using the form to send them. Not part
+# of the agent API; NOTIFY_RATE in worker/notify.js holds the same numbers, and
+# test/agent-docs.mjs checks the two agree.
+
+[[ratelimits]]
+name = "NOTIFY_RATE_LIMIT"
+namespace_id = "1106"
+
+  [ratelimits.simple]
+  limit = 3
+  period = 60
+
 # Route on map (worker/drive.js, /api/drive, #251): the routes asked of
 # FOSSGIS's Valhalla, on one key for everybody — FOSSGIS allows this
 # application a request a second, and this keeps it to half that a minute per
@@ -142,5 +157,9 @@ namespace_id = "1105"
 # service. Its VAPID key is made on the first run and kept in the PHOTOS
 # bucket, so there is nothing to set; without SUPABASE_SECRET_KEY a run
 # returns before it asks anything. docs/accounts.md, "Notifications on a phone".
+# On every fifteenth of those minutes the same handler runs the agent API's
+# notify list (worker/notify.js): without RESEND_API_KEY it returns before
+# reading anything; with it, it emails the confirmations waiting and each new
+# entry of docs/api-changelog.json, a few at a time.
 [triggers]
 crons = ["* * * * *"]

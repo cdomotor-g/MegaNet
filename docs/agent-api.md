@@ -50,8 +50,11 @@ you send is forwarded: not your `Authorization` header, not a cookie, not a
 Cloudflare Access identity. There is no write verb anywhere in it, and no
 database function is called. Besides the database it reads public files this
 site already serves to anybody — the ACMA register extract the map draws
-(`data/acma-licensing.json`) — through the Worker's static-assets binding, by a
+(`data/acma-licensing.json`) and this API's own list of changes
+(`docs/api-changelog.json`) — through the Worker's static-assets binding, by a
 GET of a fixed path: still read-only, and still nothing that is not public.
+The [notify list](#changes) that emails each change is a separate route
+(`/api/notify`), outside the API, and keeps its addresses privately.
 
 **Public data only.** It can read exactly what an anonymous visitor can
 ([`docs/access.md`](access.md), "The decision: the data stays public"). It
@@ -270,7 +273,8 @@ trimmed; readings and health are illustrative.
 ### `GET /api/v1/`
 
 The index: version, endpoints, limits, and links to this page, the OpenAPI
-document and the MCP server.
+document, the MCP server, the [list of changes](#get-apiv1changelog) and the
+sign-up for an email when the API changes.
 
 ```sh
 curl -s https://floodwarning.net/api/v1/
@@ -285,6 +289,8 @@ curl -s https://floodwarning.net/api/v1/
   "mcp": { "url": "https://floodwarning.net/api/mcp", "transport": "Streamable HTTP (POST, JSON responses)",
            "protocol_versions": ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"] },
   "openapi": "https://floodwarning.net/api/v1/openapi.json",
+  "changelog": "https://floodwarning.net/api/v1/changelog",
+  "notify": { "sign_up": "https://floodwarning.net/api#notify", "what": "An email to you each time this API changes …" },
   "limits": { "rate": ["60 requests / 60 s per client", "20 requests / 10 s per client (burst)", "240 requests / 60 s per address"], "list_max": 100 },
   "disclaimer": "Flood-Net is not a flood warning service, …"
 }
@@ -1133,6 +1139,34 @@ presets — the ids that `network=` and `hub=` take.
   "rm_systems": [{ "id": 1, "name": "Field Station 1W", "tx_power_w": 1, "antenna_gain_dbi": 5.15, "…": "…" }] }
 ```
 
+### `GET /api/v1/changelog`
+
+Every change to this API that someone using it would notice — a route, a
+field, a limit, a tool — newest first: the [Changes](#changes) below, as data.
+Each entry has an `id`, a `date`, a `title`, a plain-words `summary`,
+`breaking` (`true` when a client that relied on what was there before may need
+to change) and `links`. `latest` is the newest; `notify.sign_up` is where to
+leave an address to be emailed the next one. It takes no parameters.
+
+```sh
+curl -s https://floodwarning.net/api/v1/changelog | jq '.entries[] | {date, title, breaking}'
+```
+
+```json
+{
+  "count": 2,
+  "latest": { "id": "2026-10-31-changelog-and-notify", "date": "2026-10-31", "title": "This list of changes, and an email when the API changes", "breaking": false },
+  "entries": [
+    { "id": "2026-10-31-changelog-and-notify", "date": "2026-10-31", "title": "This list of changes, and an email when the API changes",
+      "summary": "New: GET /api/v1/changelog lists every change to the API …", "breaking": false,
+      "links": [{ "text": "The list of changes, as JSON", "url": "https://floodwarning.net/api/v1/changelog" }, "…"] },
+    { "id": "2026-10-31-acma-licences", "date": "2026-10-31", "title": "The ACMA licences at a station's site, or at a point", "…": "…" }
+  ],
+  "notify": { "sign_up": "https://floodwarning.net/api#notify", "what": "Leave your address on that page …" },
+  "source": "docs/api-changelog.json"
+}
+```
+
 ---
 
 ## Limits and fair use
@@ -1260,6 +1294,54 @@ dossier will be extended with anything the templates need that it lacks.
 
 ---
 
+## Changes
+
+Every change to the API that someone using it would notice is listed here and
+at [`GET /api/v1/changelog`](#get-apiv1changelog), newest first — both from
+[`docs/api-changelog.json`](api-changelog.json), which a change adds an entry to
+in the same push. A change with nothing to notice (a fix inside, a faster
+answer) is not listed.
+
+- **31 October 2026 — This list of changes, and an email when the API
+  changes.** `GET /api/v1/changelog` lists every change, newest first, and the
+  index links to it as `changelog`. The [notify list](#an-email-when-the-api-changes)
+  emails each one to whoever asks. Nothing about the station data changed.
+- **31 October 2026 — The ACMA licences at a station's site, or at a point.**
+  [`GET /api/v1/stations/{id}/acma`](#get-apiv1stationsidacma) (MCP
+  `get_acma_licences`) and [`GET /api/v1/acma`](#get-apiv1acma)
+  (`acma_licences_near`) are new; the dossier gains an `acma` section and its
+  `links` an `acma` link. Nothing that was there before changed.
+
+### An email when the API changes
+
+Leave an email address in the form on [the API page](https://floodwarning.net/api#notify)
+— with a name and an organisation if you like — and each new entry above is
+emailed to you once, in plain text, from `noreply@floodwarning.net`.
+
+- **Confirm first.** The first email is a link; the page it opens has a
+  **Confirm** button, and nothing more is sent until it is pressed. An address
+  somebody else typed in gets that one email and no other, and a mail system
+  that opens links to scan them confirms nothing.
+- **Stop any time.** Every email has a link to stop them — a page with one
+  button that deletes the address from the list — and carries the
+  `List-Unsubscribe` headers a mail program's own *Unsubscribe* uses, which
+  takes one click.
+- **Several at once.** Changes pushed together come as one email. A breaking
+  one says so in its subject.
+- **Not switched on yet?** The emails go through Resend once Flood-Net's mail is
+  set up (issue #237). Until then a sign-up is kept, and its confirmation is
+  sent as soon as mail is on; the form says which.
+- **What is kept, and where.** The address, the name and organisation if
+  given, when it signed up and confirmed, and which change it was last sent —
+  in Flood-Net's private storage (Cloudflare R2), never in this repository, and
+  never in a log. Unsubscribing deletes it. The [privacy policy](https://floodwarning.net/privacy#api-notify) has the rest.
+
+A program can sign up too — `POST https://floodwarning.net/api/notify/subscribe`
+with `{"email": "…"}` — but only from Flood-Net's own pages (the request needs
+their `Origin`), a few a minute: it is a form for people, not an API.
+
+---
+
 ## For the owner
 
 ### Let agents past Cloudflare Access
@@ -1372,6 +1454,37 @@ without failing. Nothing else depends on it.
 `tools/check_health_cards.sql` proves the migration, in a transaction that
 rolls back, so it is safe against the live database. `DB_SCHEMA_VERSION` in
 `core.js` follows it to 85 once it is live.
+
+### The notify list
+
+`worker/notify.js` answers `/api/notify/*` and, from the Worker's
+`scheduled()` on every fifteenth minute (:04, :19, :34, :49 UTC), sends what is
+due: the confirmations waiting, then each new `docs/api-changelog.json` entry to
+every confirmed address — 10 emails a run at most, 60 a UTC day, paced under
+Resend's two a second, so a big list takes a few runs. Pushing an entry is all
+it takes: Workers Builds deploys it, and the next run emails it.
+
+- **Mail.** It sends through Resend with the bug reporter's `RESEND_API_KEY` and
+  sender, so #237's Parts 2–3 switch it on. Until then sign-ups are kept as
+  pending and a run reads nothing; the first run after the key is set sends
+  every waiting confirmation.
+- **Adding somebody.** Put their address in the form on
+  [the API page](https://floodwarning.net/api#notify). They get the
+  confirmation email (once mail is on) and are on the list when they press
+  Confirm — nobody can be put on it without their own click.
+- **The list.** One JSON object, `_meganet/api-notify/subscribers.json`, in the
+  `meganet-photos` R2 bucket (Cloudflare dashboard → **R2** → **meganet-photos**
+  → `_meganet/api-notify/`). No photo path reaches `_meganet/`. To remove
+  somebody by hand, download it, delete their entry from `subscribers`, and
+  upload it back under the same name — or use the link in any email they were
+  sent.
+- **Brakes.** Flood-Net's own pages only, JSON only, 3 sign-ups a minute from
+  one address (`NOTIFY_RATE_LIMIT` in `wrangler.toml`), 30 new addresses a UTC
+  day and 1,000 in all. A pending sign-up whose link went unanswered for 14
+  days is deleted, as is one never sent a link for a year.
+- **Checking it.** `GET https://floodwarning.net/api/notify` answers
+  `{"accepting": true, "mail": false|true, "latest": …}`. The Worker's log has a
+  `[notify]` line of counts when a run sent something — never an address.
 
 ### Check which limiter is running
 

@@ -54,8 +54,9 @@ const REPO = 'cdomotor-g/MegaNet';
 const GITHUB_ISSUES_URL = `https://api.github.com/repos/${REPO}/issues`;
 const RESEND_URL = 'https://api.resend.com/emails';
 // The sender 0062's account mail uses: the one address on floodwarning.net
-// that Resend is set up to send from.
-const MAIL_FROM = 'Flood-Net <noreply@floodwarning.net>';
+// that Resend is set up to send from. The API notify list (worker/notify.js)
+// sends from it too.
+export const MAIL_FROM = 'Flood-Net <noreply@floodwarning.net>';
 
 export const REPORT_RATE = Object.freeze({ binding: 'REPORT_RATE_LIMIT', limit: 3, period: 60 });
 export const DAY_MAX = 25;
