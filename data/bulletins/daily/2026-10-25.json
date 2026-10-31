@@ -10,9 +10,9 @@
  },
  "presenter": "bean-counter",
  "cohost": "tech-wizard",
- "outlook": {
-  "sky": "unsettled",
-  "label": "Unsettled over Logan"
+ "status": {
+  "level": "several",
+  "label": "Several need attention"
  },
  "headline": "Twenty-one stations behind the Hillcrest repeater went quiet — one shared path, not 21 faults — and four only because we stopped listening.",
  "stats": [

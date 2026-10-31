@@ -10,9 +10,9 @@
  },
  "presenter": "seasoned-hydrographer",
  "cohost": "tech-wizard",
- "outlook": {
-  "sky": "unsettled",
-  "label": "Wet, unsettled at the end"
+ "status": {
+  "level": "several",
+  "label": "Several need attention"
  },
  "headline": "A wet week in which our base station began hearing four times the stations — and the Hillcrest repeater, half its relays corrupted all week, faded at the end of it.",
  "stats": [

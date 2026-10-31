@@ -10,9 +10,9 @@
  },
  "presenter": "tech-wizard",
  "cohost": "seasoned-hydrographer",
- "outlook": {
-  "sky": "stormy",
-  "label": "Stormy"
+ "status": {
+  "level": "widespread",
+  "label": "Widespread trouble"
  },
  "headline": "Hillcrest repeater quiet since 2:15 Monday afternoon, on top of the Lockyer, still mostly dark behind Toowoomba for a third day.",
  "stats": [

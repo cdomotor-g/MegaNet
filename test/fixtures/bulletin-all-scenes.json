@@ -10,9 +10,9 @@
  },
  "presenter": "seasoned-hydrographer",
  "cohost": "tech-wizard",
- "outlook": {
-  "sky": "patchy",
-  "label": "Patchy, clearing later"
+ "status": {
+  "level": "few",
+  "label": "A few need attention"
  },
  "headline": "Ten stations around Henderson Creek went quiet together overnight — one cause, not ten faults — and one receiver briefly lost its tuning.",
  "stats": [
@@ -52,15 +52,15 @@
   {
    "type": "title",
    "title": "Good morning",
-   "say": "Good morning. Here's the network for the last 24 hours: patchy, clearing later. Ten stations around Henderson Creek went quiet together, and one receiver lost its tuning for half an hour.",
+   "say": "Good morning. Here's the network for the last 24 hours: a few need attention. Ten stations around Henderson Creek went quiet together, and one receiver lost its tuning for half an hour.",
    "secs": 12
   },
   {
    "type": "map",
-   "title": "A low over Logan",
+   "title": "Ten quiet around Logan",
    "sub": "10 stations quiet together — one cause",
    "sev": "warn",
-   "say": "The big system this morning sits over Logan. Ten stations around Henderson Creek stopped within one check of each other. When that many go together, look for what they share: here, the Hillcrest repeater.",
+   "say": "The main trouble this morning is around Logan. Ten stations around Henderson Creek stopped within one check of each other. When that many go together, look for what they share: here, the Hillcrest repeater.",
    "secs": 14,
    "stations": [
     "henderson_ck_al",

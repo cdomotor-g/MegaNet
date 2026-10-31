@@ -324,7 +324,7 @@ const Health = (() => {
 
   // ── rendering: the page ────────────────────────────────────────────────────
 
-  // The page: 📺 Network Weather first (health-bulletin.js), then the tab's
+  // The page: 📺 Network Bulletin first (health-bulletin.js), then the tab's
   // own. The bulletin sits in a slot of its own because this page redraws
   // itself when the week's readings land, a few seconds after it opens —
   // rerender() redraws what follows the slot and leaves a bulletin that is

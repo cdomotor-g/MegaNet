@@ -22,13 +22,15 @@ them** goes straight to Needs attention, under the map. The paragraph explaining
 the tab is two lines deep until *More about this tab*. The Classic look shows
 the numbers without the sentence.
 
-## 📺 Network Weather
+## 📺 Network Bulletin
 
 At the very top of the tab, above everything worked out here, is the
 network's **bulletin**: its last 24 hours — or, on the *This week* switch, its
 last seven days — told in about two minutes of animated scenes (three for the
-week), a weather report about the network rather than the sky. One of the
-Droggies presents it, a different one each day of the week, with Alex Chen on
+week), like the morning news. It speaks of the network in plain words, never in
+weather words: Flood-Net measures the real weather, so rain, storms and rising
+rivers come into it only as themselves, when they bear on the stations or their
+sensors. One of the Droggies presents it, a different one each weekday, with Alex Chen on
 the radio and two more of the crew dropping in for a scene each; Graham Watts
 presents the weekly, where the Bean Counter reads the numbers — his one scene of
 the week. Each says their scenes in their own voice, the narration running
@@ -48,10 +50,13 @@ not prescribe. Mondays at four a second task writes the week:
 trends, chronic stations, recurring groups, the week's fingerprints and flips.
 `tools/bulletin/README.md` is both tasks' brief, and the way to run one by hand.
 
-**The scenes.** The forecast (clear, fair, patchy, unsettled, stormy) with the
-headline and four numbers; the **synoptic chart** — the stations on file in
-view over Queensland's river basins, the scene's stations marked, a *low*
-circled where trouble gathers and a *high* where everything checked in; the
+**The scenes.** How the network is, on a dial and in a word — *All well*,
+*Minor issues*, *A few need attention*, *Several need attention* or *Widespread
+trouble*, by the number of critical findings and of stations that report on a
+schedule gone quiet (each level's meaning is on hover, and listed under *Read
+it instead*) — with the headline and four numbers; the **map** — the stations
+on file in view over Queensland's river basins, the scene's stations marked, an
+area shaded where trouble gathers and in green where everything checked in; the
 **batteries** that need a look, filled to last night's low and dropping from
 the first night shown; **check signals** slot by slot; the fleet's **carrier
 fingerprints** lined up as a barcode, with the ones that moved sliding from

@@ -10,9 +10,9 @@
  },
  "presenter": "nitwit",
  "cohost": "tech-wizard",
- "outlook": {
-  "sky": "unsettled",
-  "label": "Unsettled"
+ "status": {
+  "level": "several",
+  "label": "Several need attention"
  },
  "headline": "The Lockyer is back: Toowoomba returned Thursday morning and its stations with it. Eight new quiet ones, on the Gold Coast and in the Northern Rivers.",
  "stats": [

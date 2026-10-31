@@ -54,7 +54,7 @@
 //
 //   Nothing else. The datastore's other reads, the Worker's /api routes,
 //   sign-in, map tiles: the network's, as if this worker were not here. So
-//   are the Network Weather bulletins' voices (data/bulletins/voice/*.mp3,
+//   are the Network Bulletins' voices (data/bulletins/voice/*.mp3,
 //   health-bulletin.js): a megabyte or so a bulletin, fetched only when Play
 //   is pressed with the sound on — a fortnight of them is not worth keeping
 //   on every device, and with no signal the bulletin plays without them. The

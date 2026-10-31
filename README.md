@@ -285,7 +285,7 @@ MegaNet/
 │                             checker, every step written out
 ├── owner-logos.js          ← OwnerLogos — each station owner's logo beside its name
 │                             on the station card and in the editor (the marks in assets/owners/)
-├── health-bulletin.js      ← HealthBulletin — 📺 Network Weather at the top of Station
+├── health-bulletin.js      ← HealthBulletin — 📺 Network Bulletin at the top of Station
 │                             Health: the network's day or week as a short animated
 │                             bulletin, drawn from data/bulletins/ (tools/bulletin/)
 ├── health-glance.js        ← HealthGlance — a station's health where people already
@@ -448,7 +448,7 @@ MegaNet/
 │   ├── a2plan.mjs           (the ALERT2 Transition Plan tab: its list only, who sees it, the inventory and the plan add up, the card moves it)
 │   ├── tdma.mjs             (the TDMA Planner: air-time formula, two worked frames, the card)
 │   ├── healthreport.mjs     (Station Health run unattended: the browser's analysis over the demo week, reported as the database takes it)
-│   ├── bulletin.mjs         (📺 Network Weather: the published bulletins, the pipeline on the demo week, the player in Chromium)
+│   ├── bulletin.mjs         (📺 Network Bulletin: the published bulletins, the pipeline on the demo week, the player in Chromium)
 │   ├── fixtures/photos/     (the two Solocator photos the feature was built from, overlays kept)
 │   ├── concat-verify.mjs    (byte-exact concat-and-diff, for the app.js split)
 │   ├── syntax-check.mjs     (node --check over every script index.html loads)
@@ -467,7 +467,7 @@ MegaNet/
 │   ├── check_base_stations.sql (psql: prove base stations checking in, being asked, the team keys (0049) and the waterfall (0068) — 60 checks, rolls back)
 │   ├── check_health_findings.sql (psql: prove the health findings kept between visits — base stations, receivers, station reports (0059) — 39 checks, rolls back)
 │   ├── health/report.mjs    (Station Health's own health-analysis.js, run every fifteen minutes by station-health.yml, its findings reported to the database)
-│   ├── bulletin/            (📺 Network Weather: the scheduled task's brief, and gather → draft → validate → publish into data/bulletins/)
+│   ├── bulletin/            (📺 Network Bulletin: the scheduled task's brief, and gather → draft → validate → publish into data/bulletins/)
 │   ├── field-photos/        (the Dropbox and Google Drive → Flood-Net photo sync, run by field-photos-dropbox.yml and field-photos-gdrive.yml)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)
 │   ├── acma_prefilter.py    (reduce the 68 MB ACMA RRL extract to data/acma-raw/)
@@ -950,10 +950,10 @@ or an area gone quiet, a battery low — while it works out for itself which
 base stations have stopped checking in and which receivers run but have decoded
 nothing for hours (#215); the tab shows the server's last look while its own
 week loads.
-At the top of the tab, **📺 Network Weather** tells the network's last day — and,
+At the top of the tab, **📺 Network Bulletin** tells the network's last day — and,
 on Mondays, its week — as a short animated bulletin presented by one of the
-Droggies: a weather report about the network rather than the sky, written each
-morning by a scheduled Claude Code task that reads the same findings, the carrier
+Droggies, in plain words (no weather words for the network's state), written each
+weekday morning by a scheduled Claude Code task that reads the same findings, the carrier
 fingerprints and the bit flips, and looks for what they have in common
 ([`tools/bulletin/README.md`](tools/bulletin/README.md)).
 [`docs/station-health.md`](docs/station-health.md) lists every finding, what

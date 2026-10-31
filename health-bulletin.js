@@ -1,9 +1,12 @@
 // MegaNet — health-bulletin.js
 //
-//   HealthBulletin   📺 Network Weather, at the top of the Station Health tab:
+//   HealthBulletin   📺 Network Bulletin, at the top of the Station Health tab:
 //                    the network's last day — or week — told as a short
-//                    animated bulletin, a weather report about the network
-//                    rather than the sky, presented by one of the Droggies.
+//                    animated bulletin, like the morning news, presented by
+//                    one of the Droggies. In plain words: no weather words for
+//                    the network's state (the owner, 1 Nov 2026) — Flood-Net
+//                    measures the real weather, and the rain and the rivers
+//                    are news here only as themselves.
 //
 // After core.js (esc, escAttr, announce, state), app.js and health.js (Health,
 // whose page draws this one's panel first and whose stations the bulletin's
@@ -44,8 +47,9 @@
 // stations are links. A rendered video would be none of those.
 //
 // ── What a person sees ──────────────────────────────────────────────────────
-// A video player. The title card — the network's "forecast" (clear to
-// stormy), the headline, four numbers — with a big ▶ in the middle of it.
+// A video player. The title card — how the network is, in plain words on a
+// dial (all well to widespread trouble), the headline, four numbers — with a
+// big ▶ in the middle of it.
 // Playing, each scene runs its few seconds with its narration under the
 // player. Under the picture, the player's own bar: a seek slider across the
 // whole bulletin, a segment a scene (the gaps are the chapter marks, and a
@@ -126,7 +130,7 @@ const HealthBulletin = (() => {
   const portrait = id => `assets/presenters/${ROSTER[id] ? id : 'seasoned-hydrographer'}.webp`;
   const who = id => ROSTER[id] || ROSTER['seasoned-hydrographer'];
 
-  // The studio's own colours: a weather map is the same map in a light page
+  // The studio's own colours: a map is the same map in a light page
   // and a dark one, so the stage does not follow the theme — the panel round
   // it does. Every pair here is 4.5:1 or better on the stage's ground.
   const C = {
@@ -138,7 +142,24 @@ const HealthBulletin = (() => {
   const SEV_ICON = { critical: '⛔', warn: '⚠', info: 'ℹ', ok: '✓' };
   const SEV_WORD = { critical: 'Critical', warn: 'Warning', info: 'Note', ok: 'Good news' };
   const TONE = { ok: C.ok, warn: C.warn, bad: C.critical, neutral: C.neutral };
-  const SKY_WORD = { clear: 'Clear', fair: 'Fair', patchy: 'Patchy', unsettled: 'Unsettled', stormy: 'Stormy' };
+  // How the network is, by what needs attention (tools/bulletin/validate.mjs
+  // STATUSES and STATUS_WORD; test/bulletin.mjs holds the two together), and
+  // what each level means, for hover and for the list under Read it instead.
+  // A bulletin from before 1 Nov 2026 kept as it was by this device's copy
+  // still says it in weather words (outlook.sky): read as the same levels.
+  const STATUS_LEVELS = ['well', 'minor', 'few', 'several', 'widespread'];
+  const STATUS_WORD = { well: 'All well', minor: 'Minor issues', few: 'A few need attention', several: 'Several need attention', widespread: 'Widespread trouble' };
+  const STATUS_MEANING = {
+    well: 'Nothing on the network needs attention.',
+    minor: 'Some findings to note, but none critical and no station that reports on a schedule gone quiet.',
+    few: 'One or two critical findings, or up to five stations that report on a schedule gone quiet.',
+    several: 'Three to seven critical findings, or six to fourteen stations that report on a schedule gone quiet.',
+    widespread: 'Eight or more critical findings, or fifteen or more stations that report on a schedule gone quiet.',
+  };
+  const STATUS_TONE = { well: C.ok, minor: C.ok, few: C.warn, several: C.warn, widespread: C.critical };
+  const FROM_OUTLOOK = { clear: 'well', fair: 'minor', patchy: 'few', unsettled: 'several', stormy: 'widespread' };
+  const levelOf = b => (b && b.status && STATUS_WORD[b.status.level] ? b.status.level : FROM_OUTLOOK[b && b.outlook && b.outlook.sky] || 'minor');
+  const entryLevel = e => (STATUS_WORD[e.status] ? e.status : FROM_OUTLOOK[e.sky] || 'minor');
   // The player's speeds, and how far ← → move on the seek slider.
   const RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
   const NUDGE_MS = 5000;
@@ -283,20 +304,23 @@ const HealthBulletin = (() => {
     const picker = list.length > 1 ? `<label class="hb-pick"><span class="sr-only">Earlier bulletins</span>
       <select onchange="HealthBulletin.pick(this.value)">${list.map(e => `<option value="${escAttr(e.file)}"${e.file === currentFile() ? ' selected' : ''}>${esc(fmtIssue(e))}</option>`).join('')}</select></label>` : '';
     const head = `<div class="panel-header hb-head">
-        <h2 id="hb-h"><span aria-hidden="true">📺</span> Network Weather</h2>
+        <h2 id="hb-h"><span aria-hidden="true">📺</span> Network Bulletin</h2>
         <div class="button-group hb-tools">
           <span class="hl-seg" role="group" aria-label="Which bulletin">${kinds}</span>${picker}
           <button class="ghost" onclick="HealthBulletin.toggleHidden()" aria-expanded="${!B.hidden}" aria-controls="hb-body">${B.hidden ? 'Show' : 'Hide'}</button>
         </div>
       </div>`;
-    if (B.hidden) return head + `<p class="small hb-folded">${b ? `${esc(skyLabel(b))} — ${esc(b.headline)}` : 'The network’s bulletin, hidden on this device.'}</p>`;
+    if (B.hidden) return head + `<p class="small hb-folded">${b ? `${statusTerm(b)} — ${esc(b.headline)}` : 'The network’s bulletin, hidden on this device.'}</p>`;
     return head + `<div id="hb-body">${bodyHtml()}</div>`;
   }
-  function skyLabel(b) { return (b.outlook && b.outlook.label) || SKY_WORD[b.outlook && b.outlook.sky] || ''; }
+  // A bulletin's own wording of its level, unless it is from before the plain
+  // words (then the level's own label: its outlook was the weather's).
+  function statusLabel(b) { return (b.status && b.status.label) || STATUS_WORD[levelOf(b)]; }
+  function statusTerm(b) { const lv = levelOf(b); return termHtml(statusLabel(b), `${STATUS_WORD[lv]}: ${STATUS_MEANING[lv]}`); }
   function fmtIssue(e) {
     const d = new Date(e.issued_at);
     const day = isNaN(d) ? e.id : d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-    return `${day} — ${SKY_WORD[e.sky] || ''}`;
+    return `${day} — ${STATUS_WORD[entryLevel(e)]}`;
   }
 
   function bodyHtml() {
@@ -313,7 +337,7 @@ const HealthBulletin = (() => {
     const b = got, P = who(b.presenter), sc = b.scenes || [];
     const stale = sinceIssued(b, Date.now()) > STALE[b.kind || 'daily'];
     return `
-      <p class="small hb-issued">${esc(issuedText(b))}${stale ? ` <span class="txt-warn">— ${b.kind === 'weekly' ? 'over a week' : 'more than a day'} old: the scheduled bulletin may have stopped.</span>` : ''}</p>
+      <p class="small hb-issued">${statusTerm(b)} · ${esc(issuedText(b))}${stale ? ` <span class="txt-warn">— ${b.kind === 'weekly' ? 'over a week' : 'more than a day'} old: the scheduled bulletin may have stopped.</span>` : ''}</p>
       <div class="hb-player" id="hb-player" onkeydown="HealthBulletin.key(event)">
         <div class="hb-stage${stageState()}" id="hb-stage" tabindex="0" role="group"
              aria-roledescription="bulletin" aria-label="${escAttr(`${b.kind === 'weekly' ? 'Weekly' : 'Daily'} network bulletin, ${sc.length} scenes. Space plays or pauses; arrow keys move between scenes; M turns the sound off and on; the less-than and greater-than keys change the speed.`)}"
@@ -347,13 +371,15 @@ const HealthBulletin = (() => {
         <ol>${sc.map((s, i) => `<li><b>${esc(s.title)}.</b> ${esc(s.say)}${(s.stations || []).length ? ` <span class="small">(${stationLinks(s.stations)})</span>` : ''}
           <button class="link-btn small" onclick="HealthBulletin.go(${i})">show</button></li>`).join('')}</ol>
         ${(b.caveats || []).length ? `<p class="small"><b>What it could not tell:</b> ${b.caveats.map(esc).join(' ')}</p>` : ''}
+        <p class="small"><b>How the network is, in a word</b> — the level on the title card, by what needs attention:</p>
+        <dl class="hb-key small">${STATUS_LEVELS.map(lv => `<dt>${esc(STATUS_WORD[lv])}</dt><dd>${esc(STATUS_MEANING[lv])}</dd>`).join('')}</dl>
       </details>
       <p class="small hb-foot">${esc(footText(b, P))}</p>`;
   }
 
   // The big ▶ in the middle of the picture, on the title card before it has
   // played and at the end — a disc and nothing more, as on any video, so it
-  // hides as little of the forecast as it can. Its name says how long it
+  // hides as little of the title card as it can. Its name says how long it
   // runs: as said with the sound on, as written with it off.
   const bigPlayShown = () => !B.playing && (B.ended || (B.scene === 0 && B.t === 0));
   const bigPlayName = b => B.ended ? 'Watch again' : `Play the bulletin · ${fmtDur(totalSecs(b))}`;
@@ -727,24 +753,24 @@ const HealthBulletin = (() => {
       + text(L.W / 2, L.H / 2 + 24, 'Its narration is below, and in Read it instead.', L.F.s, `text-anchor="middle" fill="${C.faint}"`);
   }
 
-  // ── title: the forecast, the headline and the numbers ──
+  // ── title: how the network is, the headline and the numbers ──
   function drawTitle(s, b, L) {
     const { W, H, F, pad, narrow } = L;
-    const sky = (b.outlook && b.outlook.sky) || 'fair';
+    const level = levelOf(b);
     const when = new Date(b.issued_at);
     const day = isNaN(when) ? '' : when.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
-    const kicker = b.kind === 'weekly' ? 'THE WEEK ON THE NETWORK' : 'THE NETWORK WEATHER';
+    const kicker = b.kind === 'weekly' ? 'THE WEEK ON THE NETWORK' : 'THE DAY ON THE NETWORK';
     let out = '';
     out += `<g class="hb-a-fade" ${d(0.1)}>${text(pad, pad + F.s, kicker, F.s, `fill="${C.accent}" font-weight="700" letter-spacing="3"`)}`
       + text(pad, pad + F.s * 2.3, day, F.xs, `fill="${C.muted}" letter-spacing="2"`) + '</g>';
-    // The forecast under the date line — a sun's rays reach about 130 above
-    // its centre — and beside it on a phone.
-    const gs = narrow ? 0.8 : 1.1;
-    const gx = narrow ? W - pad - 170 : pad + 150, gy = narrow ? pad + 150 : Math.max(250, Math.round(pad + F.s * 2.3 + 16 + 130 * gs));
-    out += `<g transform="translate(${gx} ${gy}) scale(${gs})"><g class="hb-a-pop" ${d(0.3)}>${skyGlyph(sky)}</g></g>`;
+    // The dial under the date line — it reaches DIAL_TOP above its centre —
+    // and beside it on a phone.
+    const gs = narrow ? 0.62 : 1.1;
+    const gx = narrow ? W - pad - 110 : pad + 150, gy = Math.round(pad + F.s * 2.3 + (narrow ? 24 : 36) + DIAL_TOP * gs);
+    out += `<g transform="translate(${gx} ${gy}) scale(${gs})"><g class="hb-a-pop" ${d(0.3)}>${statusGlyph(level)}</g></g>`;
     const tx = narrow ? pad : 360, tw = W - tx - pad;
-    const ty = narrow ? Math.max(280, Math.round(glyphBottom(gy, gs) + F.l * 0.85)) : 170;
-    out += `<g class="hb-a-rise" ${d(0.6)}>${text(tx, ty, skyLabel(b), F.l, `fill="${sevSky(sky)}" font-weight="700"`)}</g>`;
+    const ty = narrow ? Math.max(260, Math.round(glyphBottom(gy, gs) + F.l * 1.1)) : 170;
+    out += `<g class="hb-a-rise" ${d(0.6)}><title>${esc(`${STATUS_WORD[level]}: ${STATUS_MEANING[level]}`)}</title>${text(tx, ty, statusLabel(b), F.l, `fill="${STATUS_TONE[level]}" font-weight="700"`)}</g>`;
     // The headline whole — up to four lines, five on a phone — and the
     // numbers under however many it took.
     // A long headline on a phone goes a size smaller rather than to five lines.
@@ -784,32 +810,31 @@ const HealthBulletin = (() => {
     }
     return out;
   }
-  // How far below its centre the forecast drawing reaches (rain under a cloud).
-  const glyphBottom = (gy, gs) => gy + 110 * gs;
+  // How far the dial reaches above its centre, and below it (its hub).
+  const DIAL_TOP = 128, DIAL_BOTTOM = 20;
+  const glyphBottom = (gy, gs) => gy + DIAL_BOTTOM * gs;
   const fmtStat = v => (typeof v === 'number' ? (Number.isInteger(v) ? v.toLocaleString() : v.toLocaleString(undefined, { maximumFractionDigits: 1 })) : String(v));
-  const sevSky = sky => ({ clear: C.ok, fair: C.ok, patchy: C.warn, unsettled: C.warn, stormy: C.critical }[sky] || C.text);
 
-  // The forecast, drawn: a sun, a cloud, rain, a storm. Centred on 0,0, about
-  // 260 across.
-  function skyGlyph(sky) {
-    const sun = (x, y, r) => `<g class="hb-sun" transform="translate(${x} ${y})"><g class="hb-spin">${Array.from({ length: 12 }, (_, k) =>
-        `<line x1="0" y1="${-(r + 14)}" x2="0" y2="${-(r + 36)}" stroke="#ffd166" stroke-width="9" stroke-linecap="round" transform="rotate(${k * 30})"/>`).join('')}</g>
-        <circle r="${r}" fill="#ffd166"/></g>`;
-    const cloud = (x, y, k, fill) => `<g transform="translate(${x} ${y}) scale(${k})"><g class="hb-drift" fill="${fill}">
-        <circle cx="-48" cy="10" r="38"/><circle cx="0" cy="-18" r="52"/><circle cx="52" cy="6" r="40"/><rect x="-86" y="10" width="176" height="44" rx="22"/></g></g>`;
-    const rain = (n, col) => Array.from({ length: n }, (_, k) =>
-      `<line class="hb-rain" ${dd(k * 0.17, '')} x1="${-60 + k * 30}" y1="70" x2="${-70 + k * 30}" y2="98" stroke="${col}" stroke-width="7" stroke-linecap="round"/>`).join('');
-    switch (sky) {
-      case 'clear': return sun(0, 0, 62);
-      case 'fair': return sun(-30, -30, 50) + cloud(40, 40, 0.7, '#e9f1f7');
-      case 'patchy': return sun(-46, -46, 44) + cloud(10, 18, 0.95, '#d8e4ee');
-      case 'unsettled': return cloud(0, 0, 1, '#b9c9d6') + rain(5, '#74c7ff');
-      default: return cloud(0, -6, 1.05, '#7d8ea0') + rain(5, '#74c7ff')
-        + '<path class="hb-bolt" d="M6 34 L-22 92 L4 92 L-12 140 L38 72 L12 72 L28 34 Z" fill="#ffd166" stroke="#0b2234" stroke-width="3"/>';
-    }
+  // How the network is, drawn: a dial of five bands from green to red, lit up
+  // to the level, its needle on it. Centred on its hub at 0,0; about 260
+  // across, DIAL_TOP above the hub and DIAL_BOTTOM below.
+  function statusGlyph(level) {
+    const k = Math.max(0, STATUS_LEVELS.indexOf(level));
+    const BAND = ['#43dc9e', '#a8df6b', '#ffd166', '#ff9a52', '#ff6b6b'];
+    const R = 110, w = 30, gap = 0.035, cy = 0;
+    const at = (a, r) => `${(r * Math.cos(a)).toFixed(1)} ${(cy + r * Math.sin(a)).toFixed(1)}`;
+    let out = '';
+    BAND.forEach((col, i) => {
+      const a0 = Math.PI + (i * Math.PI) / 5 + gap, a1 = Math.PI + ((i + 1) * Math.PI) / 5 - gap;
+      out += `<path d="M${at(a0, R)} A${R} ${R} 0 0 1 ${at(a1, R)}" fill="none" stroke="${col}" stroke-width="${w}" stroke-opacity="${i <= k ? 1 : 0.18}"/>`;
+    });
+    const a = Math.PI + ((k + 0.5) * Math.PI) / 5;
+    out += `<line x1="0" y1="${cy}" x2="${(78 * Math.cos(a)).toFixed(1)}" y2="${(cy + 78 * Math.sin(a)).toFixed(1)}" stroke="${C.text}" stroke-width="9" stroke-linecap="round"/>
+      <circle cx="0" cy="${cy}" r="16" fill="${C.text}"/><circle cx="0" cy="${cy}" r="6" fill="${BAND[k]}"/>`;
+    return out;
   }
 
-  // ── map: the synoptic chart — the network, its lows and its links ──
+  // ── map: the network, its trouble spots and its links ──
   function drawMap(s, b, L) {
     const { W, H, F, pad, narrow } = L;
     const marks = (s.marks || []).map(m => {
@@ -880,28 +905,18 @@ const HealthBulletin = (() => {
       && !placed.some(p => !(rect.x1 < p.x0 || rect.x0 > p.x1 || rect.y1 < p.y0 || rect.y0 > p.y1));
     // Names and count badges are drawn last, over every mark and ring.
     let labels = '', badges = '';
-    // The isobars, so a name can be put where no ring runs through it.
+    // The areas' edges, so a name can be put where no edge runs through it.
     const rings = areas.map(a => ({ x: P.x(a.lon), y: P.y(a.lat), r: Math.max(28, a.km / P.kmPerUnit) }));
-    const crosses = rect => rings.some(g => [1, 0.72, 0.45].some(f => {
-      const R = g.r * f, nx = Math.max(rect.x0, Math.min(g.x, rect.x1)), ny = Math.max(rect.y0, Math.min(g.y, rect.y1));
+    const crosses = rect => rings.some(g => {
+      const R = g.r, nx = Math.max(rect.x0, Math.min(g.x, rect.x1)), ny = Math.max(rect.y0, Math.min(g.y, rect.y1));
       const far = Math.max(...[[rect.x0, rect.y0], [rect.x1, rect.y0], [rect.x0, rect.y1], [rect.x1, rect.y1]].map(([px, py]) => Math.hypot(px - g.x, py - g.y)));
       return Math.hypot(nx - g.x, ny - g.y) < R && far > R;
-    }));
-    // Lows and highs: an area in trouble is a low, isobars round it; one all
-    // checked in is a high.
+    });
+    // The areas: a group in trouble shaded in its severity's colour, one all
+    // checked in in green — a plain patch of the map, not a weather chart's
+    // lows and highs (the owner, 1 Nov 2026).
     areas.forEach((a, k) => {
       const x = P.x(a.lon), y = P.y(a.lat), r = Math.max(28, a.km / P.kmPerUnit), col = sevC(a.sev);
-      const low = a.sev !== 'ok';
-      // The L (or H) at the centre, unless a station's mark is there — the
-      // centre of a group is usually one of its stations — then inside the
-      // ring wherever nothing is.
-      const gl = F.l * 0.45;
-      let gx = x, gy = y;
-      for (const [fx, fy] of [[0, 0], [-0.6, 0], [0.6, 0], [0, -0.6], [0, 0.6], [-0.45, -0.45], [0.45, -0.45], [-0.45, 0.45], [0.45, 0.45], [-0.85, 0], [0.85, 0]]) {
-        const cx = x + fx * r, cy = y + fy * r;
-        if (fits({ x0: cx - gl, y0: cy - gl * 1.15, x1: cx + gl, y1: cy + gl * 1.15 })) { gx = cx; gy = cy; break; }
-      }
-      placed.push({ x0: gx - gl, y0: gy - gl * 1.15, x1: gx + gl, y1: gy + gl * 1.15 });
       // Its name above it, else below, else beside: wherever nothing else is.
       let lab = '';
       if (a.label) {
@@ -915,10 +930,9 @@ const HealthBulletin = (() => {
           lab = text(spot.lx, spot.ly, a.label, fs, `text-anchor="${spot.anchor}" font-weight="700" fill="${col}" ${halo}`);
         }
       }
-      out += `<g class="hb-a-fade" ${d(0.5 + k * 0.4)}>${[1, 0.72, 0.45].map((f, j) =>
-          `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r * f).toFixed(1)}" fill="${j === 0 ? col : 'none'}" fill-opacity="${j === 0 ? 0.08 : 0}" stroke="${col}" stroke-opacity="${0.85 - j * 0.2}" stroke-width="${j === 0 ? 2.5 : 2}" stroke-dasharray="${j === 0 ? '' : '10 8'}"/>`).join('')}
-        <circle class="hb-a-pulse" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r * 0.45).toFixed(1)}" fill="none" stroke="${col}" stroke-width="3" ${d(0.9 + k * 0.4)}/>
-        ${text(gx, gy + F.l * 0.36, low ? 'L' : 'H', F.l, `text-anchor="middle" font-weight="800" fill="${col}" ${halo}`)}</g>`;
+      out += `<g class="hb-a-fade" ${d(0.5 + k * 0.4)}>
+        <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${col}" fill-opacity=".12" stroke="${col}" stroke-opacity=".85" stroke-width="2.5"/>
+        ${a.sev !== 'ok' ? `<circle class="hb-a-pulse" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r * 0.45).toFixed(1)}" fill="none" stroke="${col}" stroke-width="3" ${d(0.9 + k * 0.4)}/>` : ''}</g>`;
       if (lab) labels += `<g class="hb-a-fade" ${d(0.5 + k * 0.4)}>${lab}</g>`;
     });
     // The links: who relays whom, and where the blame points.
@@ -956,7 +970,7 @@ const HealthBulletin = (() => {
           const lx = x + ox, x0 = anchor === 'start' ? lx : anchor === 'end' ? lx - w : lx - w / 2, y0 = y + oy - fs;
           return { lx, ly: y + oy, anchor, far, rect: { x0, y0, x1: x0 + w, y1: y0 + h } };
         };
-        // Beside its mark where nothing is and no isobar runs through it;
+        // Beside its mark where nothing is and no area's edge runs through it;
         // else beside it anyway; else a step further out, on a leader line;
         // and as a last resort where it first tried — a name is never lost.
         const nearby = near.map(t => spot(t, false));
@@ -1548,14 +1562,14 @@ const HealthBulletin = (() => {
     const { W, H, F, pad, narrow } = L;
     const P = who(b.presenter);
     const line = s.line || P.lines[(new Date(b.issued_at).getDate() || 0) % P.lines.length];
-    let out = `<g class="hb-a-fade" ${d(0.2)}>${skyMini(b, W / 2, narrow ? 190 : 170)}</g>`;
+    let out = `<g class="hb-a-fade" ${d(0.2)}>${statusMini(b, W / 2, narrow ? 200 : 180)}</g>`;
     out += `<g class="hb-a-rise" ${d(0.6)}>${text(W / 2, narrow ? 360 : 320, '', F.l, `text-anchor="middle" font-weight="700" fill="${C.text}"`, wrap(`“${line}”`, charsFor(W - pad * 2, F.l), 2))}
       ${text(W / 2, narrow ? 360 + F.l * 2.8 : 320 + F.l * 1.9, `— ${P.name}`, F.s, `text-anchor="middle" fill="${C.muted}"`)}</g>`;
     const next = nextText(b);
     out += `<g class="hb-a-fade" ${d(1.4)}>${text(W / 2, H - L.foot - (narrow ? 90 : 60), next, F.s, `text-anchor="middle" fill="${C.accent}"`)}</g>`;
     return out;
   }
-  function skyMini(b, x, y) { return `<g transform="translate(${x} ${y}) scale(.62)">${skyGlyph((b.outlook && b.outlook.sky) || 'fair')}</g>`; }
+  function statusMini(b, x, y) { return `<g transform="translate(${x} ${y}) scale(.62)">${statusGlyph(levelOf(b))}</g>`; }
 
   const DRAW = { title: drawTitle, map: drawMap, battery: drawBattery, checks: drawChecks, carrier: drawCarrier,
                  triangulate: drawTriangulate, receivers: drawReceivers, trend: drawTrend, list: drawList, signoff: drawSignoff };
@@ -2012,7 +2026,7 @@ const HealthBulletin = (() => {
     refresh: () => { B.index = null; B.indexErr = ''; B.files.clear(); B.voices.clear(); resetPlay(); B.audioFor = null; B.audioState = 'idle'; redraw(); loadIndex(); },
     play, pause, toggle, bigPlay, go, next, prev, seekTo, setKind, pick, toggleHidden, toggleSound, setVolume, key, stageClick, open,
     seekDown, seekMove, seekUp, seekLeave, seekKey, setRate, toggleMenu, menuKey,
-    ROSTER, _sinceIssued: sinceIssued, _nextText: nextText, _draw: (s, b, narrow) => { const was = B.narrow; B.narrow = !!narrow; try { return sceneSvg(Object.assign({}, b || {}, { scenes: [s] }), 0); } finally { B.narrow = was; } },
+    ROSTER, STATUS_WORD, _sinceIssued: sinceIssued, _nextText: nextText, _draw: (s, b, narrow) => { const was = B.narrow; B.narrow = !!narrow; try { return sceneSvg(Object.assign({}, b || {}, { scenes: [s] }), 0); } finally { B.narrow = was; } },
     _state: () => ({ kind: B.kind, scene: B.scene, t: B.t, playing: B.playing, ended: B.ended, file: currentFile(), hidden: B.hidden, rate: B.rate, vol: B.vol,
       sound: B.sound, voiced: !!voiceOf(current()), audio: B.audioFor === currentFile() ? B.audioState : 'idle',
       at: audioIs('ready') && mp3In() ? B.audio.currentTime : null }),

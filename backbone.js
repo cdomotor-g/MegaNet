@@ -341,7 +341,7 @@ const Backbone = (() => {
   // When a silence began: the last thing heard, else when it was found.
   const quietFrom = f => { const e = ev(f); return Number(e.lastHeard) || ms(e.since) || ms(f.first_seen); };
   // A silence counts when the station kept a schedule, or was heard often
-  // enough to be missed — the Network Weather bulletin's "regular". One heard a
+  // enough to be missed — the Network Bulletin's "regular". One heard a
   // few times a week, with no schedule to it, is a repeater our receivers
   // catch by luck from far away: its silence is not news (a note, below).
   const SELDOM_REPORTS = 30;

@@ -20,7 +20,12 @@
 export const FORMAT = 'floodnet-bulletin/1';
 export const INDEX_FORMAT = 'floodnet-bulletin-index/1';
 export const KINDS = ['daily', 'weekly'];
-export const SKIES = ['clear', 'fair', 'patchy', 'unsettled', 'stormy'];
+// How the network is, in plain words, by what needs attention: no weather
+// words for it (the owner, 1 Nov 2026) — Flood-Net measures the real weather,
+// so "stormy" or "a low over Logan" would read as rain. STATUS_WORD is each
+// level's own label; a bulletin may word its label otherwise (≤40 characters).
+export const STATUSES = ['well', 'minor', 'few', 'several', 'widespread'];
+export const STATUS_WORD = { well: 'All well', minor: 'Minor issues', few: 'A few need attention', several: 'Several need attention', widespread: 'Widespread trouble' };
 export const SEVS = ['critical', 'warn', 'info', 'ok'];
 export const TONES = ['ok', 'warn', 'bad', 'neutral'];
 export const MARKS = ['silent', 'battery', 'flip', 'carrier', 'receiver', 'repeater', 'sensor', 'signal', 'ok', 'note'];
@@ -55,6 +60,29 @@ const LIMITS = {
 // bulletins published before that, and voiced as they were, keep their cast.
 export const MINOR = 'bean-counter';
 const BEFORE_THE_CAST_RULES = new Set(['daily-2026-10-25', 'weekly-2026-10-25']);
+// Out of the cast for now (the owner, 1 Nov 2026): Nitto's voice was too like
+// another's. He stays in PRESENTERS so the bulletins he was in still play.
+export const BENCHED = ['nitwit'];
+// Weather words said of the network rather than of the weather (the owner,
+// 1 Nov 2026). Rain, a storm, a river rising are news when they bear on the
+// network or its sensors — say them plainly; these are the figures of speech.
+export const WEATHER_TALK = [
+  /\b(stormy|unsettled|patchy|sunny|cloudy|overcast|drizzly|forecasts?|forecast(?:ing|er)|synoptic|isobars?|skies|sky|outlook|weatherman|barometer)\b/i,
+  /\b(?:network(?:['’]s)?|the network)\s+weather\b|\bweather\s+(?:on|of|over|for)\s+the\s+network\b/i,
+  /\b(?:a|the|new|small|deep|lingering)\s+(?:low|high)\s+(?:over|on|in|across|around)\b/i,
+  /\bclearing\s+(?:over|in\s+the|across|around)\b/i,
+  /\b(?:fair|clear|bright|calm)\s+(?:on|across|over)\s+the\s+(?:network|chart|map)\b/i,
+  /\ba\s+(?:fair|clear|calm|bright)\s+(?:day|morning|night|week|weekend|start|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i,
+  /(?:^|[.!?:;—–]\s*)(?:fair|clear|calm|bright)(?:\s+again)?\s*[:;—–,.]/i,
+];
+// The bulletins published before these rules, and voiced as they were: their
+// cast and their words stand (re-voicing them would spend ElevenLabs credits).
+const BEFORE_THE_PLAIN_RULES = new Set(['daily-2026-10-25', 'daily-2026-10-26', 'daily-2026-10-27', 'daily-2026-10-29',
+  'daily-2026-10-30', 'daily-2026-10-31', 'daily-2026-11-01', 'weekly-2026-10-25', 'weekly-2026-10-26']);
+export function weatherTalk(text) {
+  for (const re of WEATHER_TALK) { const m = re.exec(String(text || '')); if (m) return m[0]; }
+  return null;
+}
 
 export function validate(b, { stationIds = null } = {}) {
   const errors = [], warnings = [];
@@ -115,8 +143,9 @@ export function validate(b, { stationIds = null } = {}) {
   }
   oneOf('presenter', b.presenter, PRESENTERS);
   oneOf('cohost', b.cohost, PRESENTERS, { req: false });
-  if (!isObj(b.outlook)) err('outlook', 'missing');
-  else { oneOf('outlook.sky', b.outlook.sky, SKIES); str('outlook.label', b.outlook.label, 40); }
+  if (b.outlook != null) err('outlook', 'the weather outlook is gone — status: { level, label } instead');
+  if (!isObj(b.status)) err('status', 'missing');
+  else { oneOf('status.level', b.status.level, STATUSES); str('status.label', b.status.label, 40); }
   str('headline', b.headline, LIMITS.headline);
   list('stats', b.stats == null ? [] : b.stats, 0, 4).forEach((s, i) => {
     const w = `stats[${i}]`;
@@ -155,6 +184,18 @@ export function validate(b, { stationIds = null } = {}) {
     for (const f of spec.fields) if (s[f] == null) err(W + '.' + f, 'missing');
     scene(W, s);
   });
+  if (!BEFORE_THE_PLAIN_RULES.has(b.id)) {
+    const cast = [b.presenter, b.cohost, ...scenes.map(s => isObj(s) && s.presenter)];
+    for (const id of BENCHED) if (cast.includes(id)) err('presenter', `${id} is out of the cast for now — another Droggie takes the scene`);
+    const said = [['headline', b.headline], ['status.label', isObj(b.status) && b.status.label],
+      ...scenes.flatMap((s, i) => isObj(s) ? ['title', 'sub', 'say', 'line'].map(k => [`scenes[${i}].${k}`, s[k]])
+        .concat((s.areas || []).map((a, k) => [`scenes[${i}].areas[${k}].label`, isObj(a) && a.label]))
+        .concat((s.marks || []).map((m, k) => [`scenes[${i}].marks[${k}].label`, isObj(m) && m.label])) : [])];
+    for (const [w, t] of said) {
+      const hit = typeof t === 'string' && weatherTalk(t);
+      if (hit) err(w, `"${hit}" — a weather word for the network; say what happened plainly (rain and rivers only as themselves)`);
+    }
+  }
   if (scenes.length && !BEFORE_THE_CAST_RULES.has(b.id)) {
     if (b.presenter === MINOR) err('presenter', 'the Bean Counter presents no bulletin — one scene, in the weekly, at most');
     const his = scenes.filter(s => isObj(s) && (s.presenter || b.presenter) === MINOR).length;
@@ -324,7 +365,7 @@ export function validateIndex(ix) {
       else if (t > last) errors.push(`${w}: newer than the one before it — newest first`);
       else last = t;
       if (typeof e.headline !== 'string') errors.push(`${w}.headline: missing`);
-      if (!SKIES.includes(e.sky)) errors.push(`${w}.sky: "${e.sky}"`);
+      if (!STATUSES.includes(e.status)) errors.push(`${w}.status: "${e.status}"`);
     });
   }
   return { errors, warnings };

@@ -10,9 +10,9 @@
  },
  "presenter": "know-it-all",
  "cohost": "tech-wizard",
- "outlook": {
-  "sky": "fair",
-  "label": "Fair"
+ "status": {
+  "level": "minor",
+  "label": "Minor issues"
  },
  "headline": "Fair: eighty percent of checks in and only four quiet stations. One to watch below Clarrie Hall Dam, where the dam gauge beside it is talking fine.",
  "stats": [

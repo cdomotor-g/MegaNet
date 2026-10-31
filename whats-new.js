@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 167, date: '2026-10-31', items: [
+      '📺 <strong>Network Weather</strong> is now the <strong>📺 Network Bulletin</strong>, and it speaks plainly: no more '
+        + '"stormy", "fair" or "a low over Logan" for the state of the network. Flood-Net measures the real weather, so rain and '
+        + 'rising rivers come into the bulletin only as themselves, when they bear on the stations or their sensors. The title card '
+        + 'shows how the network is on a dial and in a word, from <em>All well</em> to <em>Widespread trouble</em>: point at the word '
+        + 'for what it means, or see every level under <em>Read it instead</em>. The map shades the areas in trouble instead of '
+        + 'drawing lows and highs. Bulletins issued before today keep the words they were said in.',
+      'Nitto sits the bulletins out for now, until he has a voice of his own; the Know-It-All presents on Fridays.',
+    ] },
     { n: 166, date: '2026-10-31', items: [
       '📺 <strong>Network Weather</strong> is a weekday bulletin now: a new one each morning, Monday to Friday, and none on Saturday '
         + 'or Sunday. Friday\'s stays up over the weekend without being called overdue, and signs off till Monday; the weekend is in '

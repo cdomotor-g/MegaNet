@@ -119,7 +119,7 @@ findings on the real station file).
 - A repeater with no sensors of its own (Mt Glorious AL RPTR) can only be seen
   off air through the stations behind it.
 - The base stations' own receivers — a channel no longer listened to, a stick
-  that lost its tuning — are on the Base Stations tab and in Network Weather,
+  that lost its tuning — are on the Base Stations tab and in the Network Bulletin,
   not here; when several repeaters stop together, rule our end out first.
 
 `npm run backbone` holds it to a planted month on the real station file.

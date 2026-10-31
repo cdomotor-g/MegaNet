@@ -1,4 +1,4 @@
-// 📺 Network Weather — the bulletin at the top of Station Health
+// 📺 Network Bulletin — the bulletin at the top of Station Health
 // (health-bulletin.js) and the tools the scheduled task writes it with
 // (tools/bulletin/: gather.mjs, draft.mjs, validate.mjs, publish.mjs).
 //
@@ -9,18 +9,23 @@
 //     newest first, and every file in the index there (and none that is not)
 //   * the validator says what is wrong where: markup in a narration, a station
 //     not on file, a scene that cannot be said in its seconds, a weekly that
-//     covers a day
+//     covers a day; and, in plain words, a weather word said of the network
+//     ("stormy", "a low over Logan") or the old weather outlook — while rain
+//     and rivers said as themselves pass
 //   * the crew: the player's ROSTER and the validator's PRESENTERS are the same
 //     Droggies, and each has a portrait in assets/presenters/; the rota gives
 //     every daily a presenter, Alex (or Graham) for the radio and two guests,
 //     and the weekly the Bean Counter for its numbers — who presents nothing,
 //     says one scene at most, and is in no daily; a bulletin's narration is
-//     held to about two minutes (three for the weekly)
+//     held to about two minutes (three for the weekly); Nitto is out of the
+//     cast — in no bulletin the rota makes, and refused in a new one
 //   * the pipeline on the demo week — the Station Health tab's own week with a
 //     fault planted per station: its facts hold the planted silent station as
 //     a regular silence and the sliding battery; its draft is valid; publishing
 //     it into a scratch copy writes the file and the index and lets the oldest go
-//   * every scene of every bulletin drawn, wide and tall, by the player itself
+//   * every scene of every bulletin drawn, wide and tall, by the player itself;
+//     the title card says how the network is in plain words, with no weather
+//     on it, and the map draws its areas with no lows and highs
 //   * the voices: every voice file published is its bulletin's, scene for
 //     scene and word for word, with its MP3 beside it and none left without a
 //     bulletin; the validator refuses one that is not; the voicing tool
@@ -31,7 +36,7 @@
 //
 // Then Chromium:
 //
-//   * the tab opens with the bulletin first: its forecast, headline and Play;
+//   * the tab opens with the bulletin first: its status, headline and Play;
 //     no page errors; every scene's drawing parses as SVG
 //   * Play runs it: the scene moves on, the caption is revealed, the bar fills;
 //     pause freezes it; a scene picked from the bar is drawn finished
@@ -58,7 +63,7 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
-import { validate, validateIndex, validateVoice, voicePathFor, PRESENTERS, SCENES, VOICE_FORMAT } from '../tools/bulletin/validate.mjs';
+import { validate, validateIndex, validateVoice, voicePathFor, PRESENTERS, SCENES, VOICE_FORMAT, STATUS_WORD, BENCHED, weatherTalk } from '../tools/bulletin/validate.mjs';
 import { scriptFor, hashFor, wordTimes, pending, tempoOf, frequencyWords, withLexicon } from '../tools/voice/speak.mjs';
 import { buildFacts, presenterFor, CREW } from '../tools/bulletin/gather.mjs';
 import { draft } from '../tools/bulletin/draft.mjs';
@@ -166,6 +171,25 @@ console.log('The validator');
   for (const k of [1, 2, 3]) Object.assign(long.scenes[k], { say: Array.from({ length: 80 }, () => 'word').join(' '), secs: 25 });
   ok('…and narration past about two minutes', has(/words of narration, more than a daily's 340/, validate(long, { stationIds: ids }).errors));
   ok('…while the two bulletins published before the rules keep their cast', !validate(Object.assign({}, bean, { id: 'daily-2026-10-25' }), { stationIds: ids }).errors.length);
+  // Plain words (the owner, 1 Nov 2026): no weather words for the network.
+  const plain = Object.assign(JSON.parse(JSON.stringify(FIXTURE)), { id: 'daily-2026-11-03' });
+  ok('a bulletin in plain words is valid', !validate(plain, { stationIds: ids }).errors.length, validate(plain, { stationIds: ids }).errors.join('; '));
+  const wet = JSON.parse(JSON.stringify(plain));
+  wet.headline = 'Stormy on the network: ten stations quiet.';
+  wet.scenes[1].title = 'A low over Logan';
+  wet.scenes[0].say = 'Good morning. Fair again: most checks came in.';
+  wet.scenes.at(-1).say = 'That’s the network: fair, with a couple of showers. Back tomorrow.';
+  const we = validate(wet, { stationIds: ids }).errors;
+  ok('…and one that speaks of the network in weather words is refused, saying where', ['headline', 'scenes\\[1\\]\\.title', 'scenes\\[0\\]\\.say', `scenes\\[${wet.scenes.length - 1}\\]\\.say`].every(w => we.some(x => new RegExp(`^${w}: ".+" — a weather word`).test(x))), we.join('; '));
+  ok('…as is one with the old weather outlook in place of its status', validate(Object.assign({}, plain, { status: undefined, outlook: { sky: 'fair', label: 'Fair' } }), { stationIds: ids }).errors.some(x => /^outlook:/.test(x)) );
+  const real = ['Rain overnight: 41 millimetres at Tyungun, and the river rose a metre past the gauge.', 'A storm through Logan at ten past nine took out three stations; lightning, possibly.',
+    'Kunghur’s low was 9.5 volts.', 'Two transmitters sit 2.5 kilohertz high, day after day.', 'The battery stayed low over the weekend.', 'It is fair to say the repeater is the cause.',
+    'A gauge dry through its neighbours’ storm is worth a look.', 'Clear of the trouble: Pine Rivers, all in.'];
+  ok('…while rain, storms and rivers said as themselves, and plain words, pass', real.every(t => !weatherTalk(t)), real.filter(t => weatherTalk(t)).map(t => `${weatherTalk(t)} ← ${t}`).join('; '));
+  const nitto = Object.assign(JSON.parse(JSON.stringify(plain)), { presenter: 'nitwit' });
+  const guest = JSON.parse(JSON.stringify(plain)); guest.scenes[2].presenter = 'nitwit';
+  ok('Nitto, out of the cast for now, is refused in a new bulletin — presenting or as a guest', [nitto, guest].every(x => validate(x, { stationIds: ids }).errors.some(e => /nitwit is out of the cast/.test(e))));
+  ok('…while the bulletins he was in before still stand', !validate(Object.assign({}, nitto, { id: 'daily-2026-10-30' }), { stationIds: ids }).errors.some(e => /out of the cast/.test(e)));
 }
 
 // ── 3. the crew ─────────────────────────────────────────────────────────────
@@ -182,6 +206,7 @@ const HB = ctx.__HB;
 {
   const roster = Object.keys(HB.ROSTER).sort(), list = PRESENTERS.slice().sort();
   ok('the player and the validator know the same presenters', JSON.stringify(roster) === JSON.stringify(list), `${roster} vs ${list}`);
+  ok('…and the same status levels, in the same words', JSON.stringify(HB.STATUS_WORD) === JSON.stringify(STATUS_WORD), `${JSON.stringify(HB.STATUS_WORD)} vs ${JSON.stringify(STATUS_WORD)}`);
   // The rota, over a fortnight of dailies and a few weeklies.
   const days = Array.from({ length: 14 }, (_, k) => presenterFor('daily', Date.parse('2026-10-25T20:00:00Z') + k * 86400000));
   const bad = days.filter(d => d.presenter === 'bean-counter' || d.guests.length !== 2 || d.guests.includes('bean-counter')
@@ -189,7 +214,12 @@ const HB = ctx.__HB;
   ok('every daily has a presenter, a radio voice and two other guests — never the Bean Counter', !bad.length, JSON.stringify(bad));
   const heard = new Set(days.flatMap(d => [d.presenter, d.cohost, ...d.guests]));
   ok('…and over a fortnight the whole crew is heard', CREW.every(id => heard.has(id)), [...heard].join(', '));
+  const weekdays = days.filter((d, k) => ![0, 6].includes(new Date(Date.parse('2026-10-25T20:00:00Z') + k * 86400000 + 10 * 3600000).getUTCDay()));
+  const hosts = new Set(weekdays.map(d => d.presenter));
+  ok('…every one of them presenting on a weekday, the Bean Counter aside', CREW.every(id => hosts.has(id)), [...hosts].join(', '));
   const weeks = [0, 7, 14, 21].map(k => presenterFor('weekly', Date.parse('2026-10-25T18:00:00Z') + k * 86400000));
+  const benched = [...days, ...weeks].filter(d => [d.presenter, d.cohost, ...d.guests].some(id => BENCHED.includes(id)));
+  ok('no bulletin the rota makes has anyone out of the cast in it (Nitto, for now)', BENCHED.includes('nitwit') && !CREW.includes('nitwit') && !benched.length, JSON.stringify(benched));
   ok('the weekly: Graham, Alex for the radio, the Bean Counter for its numbers and a guest',
     weeks.every(w => w.presenter === 'seasoned-hydrographer' && w.cohost === 'tech-wizard' && w.guests[0] === 'bean-counter' && w.guests[1] && !['seasoned-hydrographer', 'tech-wizard', 'bean-counter'].includes(w.guests[1])),
     JSON.stringify(weeks));
@@ -275,6 +305,15 @@ console.log('Every scene drawn');
   const map = HB._draw(pile, FIXTURE, false);
   const drawn = (map.match(/class="hb-mark/g) || []).length;
   ok('stations drawn on top of each other become one mark with a count', drawn === 2 && />7<\/tspan>/.test(map) && /The repeater/.test(map), `${drawn} marks`);
+  // Plain words: the map's areas are patches, not a weather chart's lows and
+  // highs; the title card says how the network is with no weather on it.
+  const areaMap = HB._draw(FIXTURE.scenes.find(s => s.type === 'map' && (s.areas || []).length), FIXTURE, false);
+  ok('the map draws its areas plainly — no L or H, no rings of isobars', !/>[LH]<\/tspan>/.test(areaMap) && !/stroke-dasharray="10 8"/.test(areaMap) && /Henderson Ck/.test(areaMap));
+  const card0 = HB._draw(FIXTURE.scenes[0], FIXTURE, false);
+  ok('the title card says how the network is in plain words, with its meaning on hover, and no weather',
+    />A few need attention<\/tspan>/.test(card0) && /<title>A few need attention: One or two critical findings/.test(card0) && !/WEATHER|hb-sun|hb-bolt|hb-rain/.test(card0), card0.slice(0, 400));
+  const oldCard = HB._draw(published.find(b => b.id === 'daily-2026-10-26').scenes[0], Object.assign({}, published.find(b => b.id === 'daily-2026-10-26'), { status: undefined, outlook: { sky: 'stormy', label: 'Stormy' } }), false);
+  ok('…as does a copy kept from before, with the weather outlook: read as its level, not its weather word', />Widespread trouble<\/tspan>/.test(oldCard) && !/Stormy/.test(oldCard));
   // A title tile's label is shown whole, on two lines when it needs them.
   const title = Object.assign({}, FIXTURE.scenes.find(s => s.type === 'title'));
   const tiles = Object.assign({}, FIXTURE, { stats: [{ label: 'quiet stations that keep a schedule', value: 26 }, ...FIXTURE.stats.slice(1)] });
@@ -370,8 +409,8 @@ const weekFile = 'data/bulletins/weekly/2026-10-25.json';
 const week = Object.assign(JSON.parse(JSON.stringify(FIXTURE)), { kind: 'weekly', id: 'weekly-2026-10-25', presenter: 'seasoned-hydrographer',
   headline: 'A week of the Hillcrest repeater.', period: { from: '2026-10-17T19:00:00Z', to: '2026-10-24T19:00:00Z', label: 'The seven days 18 to 25 Oct' } });
 const fixIndex = { format: 'floodnet-bulletin-index/1', updated_at: FIXTURE.issued_at,
-  daily: [{ id: FIXTURE.id, file: fixFile, issued_at: FIXTURE.issued_at, headline: FIXTURE.headline, sky: FIXTURE.outlook.sky }],
-  weekly: [{ id: week.id, file: weekFile, issued_at: week.issued_at, headline: week.headline, sky: week.outlook.sky }] };
+  daily: [{ id: FIXTURE.id, file: fixFile, issued_at: FIXTURE.issued_at, headline: FIXTURE.headline, status: FIXTURE.status.level }],
+  weekly: [{ id: week.id, file: weekFile, issued_at: week.issued_at, headline: week.headline, status: week.status.level }] };
 // A quiet hum as long as the voice file says, standing in for its MP3.
 function wav(secs, rate = 8000) {
   const n = Math.round(secs * rate), w = Buffer.alloc(44 + n);
@@ -417,7 +456,11 @@ try {
              play: !!document.querySelector('.hb-bigplay'), still: document.getElementById('hb-stage').classList.contains('is-still') };
   });
   ok('the tab opens with the bulletin, above everything else', first.firstChild === 'hb-slot');
-  ok('…its forecast, headline and Play showing, drawn finished', /Patchy, clearing later/.test(first.text) && /Ten stations around Henderson Creek/.test(first.text) && first.play && first.still, first.text.slice(0, 300));
+  ok('…its status, headline and Play showing, drawn finished', /A few need attention/.test(first.text) && /Ten stations around Henderson Creek/.test(first.text) && first.play && first.still, first.text.slice(0, 300));
+  const words = await pg.evaluate(() => ({ heading: document.getElementById('hb-h').textContent, term: (document.querySelector('.hb-issued .term') || {}).title || '',
+    key: [...document.querySelectorAll('.hb-transcript .hb-key dt')].map(d => d.textContent) }));
+  ok('…headed Network Bulletin, its status a word with its meaning on hover, and every level\'s meaning under Read it instead',
+    /Network Bulletin/.test(words.heading) && !/Weather/.test(words.heading) && /^A few need attention: One or two critical/.test(words.term) && words.key.length === 5 && words.key[0] === 'All well', JSON.stringify(words));
   const parse = await pg.evaluate(fx => fx.scenes.map((s, i) => {
     const svg = HealthBulletin._draw(s, fx, false);
     const d = new DOMParser().parseFromString(svg, 'image/svg+xml');
@@ -466,7 +509,7 @@ try {
   const kept = await pg.evaluate(el => ({ same: document.getElementById('hb-stage') === el, playing: HealthBulletin._state().playing }), stage);
   ok('the week landing redraws the tab around a playing bulletin and leaves it playing', kept.same && kept.playing, JSON.stringify(kept));
   await pg.evaluate(() => HealthBulletin.next());
-  ok('⏭ moves to the next scene', await pg.evaluate(() => HealthBulletin._state().scene === 1 && /low over Logan/.test(document.getElementById('hb-lower').textContent)));
+  ok('⏭ moves to the next scene', await pg.evaluate(() => HealthBulletin._state().scene === 1 && /Ten quiet around Logan/.test(document.getElementById('hb-lower').textContent)));
   // Paused at a scene's very start is drawn finished (is-still), not frozen:
   // let the scene ⏭ moved to start running before pausing it.
   await until(pg, () => HealthBulletin._state().t > 0);
@@ -662,4 +705,4 @@ try {
 }
 
 if (failures) { console.log(`\n${failures} check${failures === 1 ? '' : 's'} failed.`); process.exit(1); }
-console.log('\nNetwork Weather: all checks passed.');
+console.log('\nNetwork Bulletin: all checks passed.');

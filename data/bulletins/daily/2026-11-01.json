@@ -10,9 +10,9 @@
  },
  "presenter": "new-recruit",
  "cohost": "tech-wizard",
- "outlook": {
-  "sky": "fair",
-  "label": "Fair"
+ "status": {
+  "level": "minor",
+  "label": "Minor issues"
  },
  "headline": "Fair again: eighty-two percent of checks in. Two Tweed stations still quiet, and a Gold Coast group that goes quiet at night.",
  "stats": [

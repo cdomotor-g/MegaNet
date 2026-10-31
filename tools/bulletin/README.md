@@ -1,7 +1,7 @@
-# 📺 Network Weather — the bulletin task's brief
+# 📺 Network Bulletin — the bulletin task's brief
 
 Every weekday morning a scheduled Claude Code session reads the Flood-Net network and
-writes **the network's weather**: a two-minute animated bulletin about
+writes **the network's bulletin**: a two-minute animated bulletin about
 the last 24 hours, drawn at the top of the **Station Health** tab
 (`health-bulletin.js`). Every Monday a second one does the same for the week.
 This file is what those sessions follow. It is also how a person can run one
@@ -9,11 +9,16 @@ by hand.
 
 The idea, in the owner's words: somebody wakes up, makes a coffee, puts on the
 news and gets a download of what happened in the world overnight — this is
-that, for a network technician. Technician meets weatherman: the weather of the
-*network*, not the sky. It draws attention to what needs attention, and goes
+that, for a network technician. It draws attention to what needs attention, and goes
 past what a person scanning the tab would see: what several findings have in
 common, what the carrier fingerprints say about who really transmitted, the
 trend no one rule is looking for.
+
+It began as "the network's weather" — technician meets weatherman. The owner
+dropped that on 1 November 2026: Flood-Net measures the real weather, so a
+weather word for the network's state ("stormy", "a low over Logan") reads as
+rain, and nobody can tell which is meant. The bulletin speaks plainly (below,
+*Plain words*); the rain and the rivers are in it only as themselves.
 
 | | Daily | Weekly |
 | --- | --- | --- |
@@ -48,7 +53,7 @@ node tools/bulletin/publish.mjs $SP/draft.json --facts $SP/facts.json
 
 # 5. Check it draws, then push straight to main (no pull request).
 (cd test && npm install --no-audit --no-fund >/dev/null 2>&1; npm run bulletin)
-git add data/bulletins && git commit -m "Network Weather: daily bulletin for <date> — <the headline, short>"
+git add data/bulletins && git commit -m "Network Bulletin: daily bulletin for <date> — <the headline, short>"
 git pull --rebase origin main && git push origin main
 ```
 
@@ -194,6 +199,32 @@ measured on one day is not yet a drifting crystal. Rank by consequence for
 flood warning and by confidence: a river level station gone quiet before a
 storm outranks a slow battery. Say confidence where it is not high.
 
+**Plain words — no weather for the network.** Never describe the network's
+state in weather words: not "stormy", "fair", "unsettled", "patchy", "clearing
+over Logan", "a low over the Lockyer", "showers on the Gold Coast" for stations
+that drop out at night, "on the chart", "the forecast". Flood-Net measures the
+real weather — rain gauges, river levels — so in a bulletin a weather word
+reads as rain, and the technician cannot tell which you mean (the owner, 1 Nov
+2026). Say what happened: "ten stations went quiet around Henderson Creek",
+"most checks came in", "a few need attention". The real weather *is* news when
+it bears on the network or its sensors, and is worth saying as itself, with
+its numbers: a storm through Logan at ten past nine that took three stations
+off air, forty-one millimetres at Tyungun overnight and the river up a metre at
+a station that went quiet, a gauge dry through its neighbours' rain, water in a
+cabinet. Publishing refuses the usual figures of speech (`WEATHER_TALK` in
+`validate.mjs`) and says which word and where: rephrase, don't work round it.
+
+**How the network is, in a word** — the bulletin's `status`: `level` one of
+`well` (*All well*: nothing needs attention), `minor` (*Minor issues*: findings
+to note, none critical, no regular station quiet), `few` (*A few need
+attention*: one or two critical findings, or up to five regular stations
+quiet), `several` (*Several need attention*: three to seven, or six to
+fourteen) or `widespread` (*Widespread trouble*: eight or more, or fifteen or
+more); and `label`, up to 40 characters, that level's words or your own plain
+ones ("Quiet around Logan, the rest in"). The draft sets it by those numbers;
+weigh it by consequence for flood warning. The title card draws it on a dial,
+and the page gives each level's meaning on hover.
+
 **Numbers from the facts or your queries only.** Never invent a station,
 reading, time or cause. Times in Brisbane, as people say them ("ten past ten
 on Saturday"). Stations by name as they are on file; their ids in `stations`,
@@ -208,6 +239,13 @@ presents (the day's Droggie, from [the Droggies' canon](https://github.com/cdomo
 batteries or the check signals suits most of them — marked `"presenter": "<id>"`
 on the scene; the draft has already placed them. Give each guest a line of their
 own character as they arrive, and get on with it.
+
+**Nitto is out of the cast for now** (the owner, 1 Nov 2026: his voice was too
+like another Droggie's). The rota leaves him out — the Know-It-All has his
+Friday — and publishing refuses a new bulletin with him in it (`BENCHED` in
+`validate.mjs`); the bulletins he was in still play. He comes back when the
+Droggies' cast gives him a voice of his own: take him off `BENCHED`, and put
+him back in `ROTA` and `CREW` in `gather.mjs`.
 
 **The Bean Counter is one of the show's lesser figures** (the owner's call). He
 presents no bulletin and is in no daily. In the weekly he reads the numbers —
@@ -250,8 +288,8 @@ Every scene has `type`, `title` (≤70), `say` (≤420), `secs`, and may have `s
 
 | Type | Draws | Fields |
 | --- | --- | --- |
-| `title` | the forecast (clear → stormy), the headline, four numbers | uses the bulletin's `outlook`, `headline`, `stats` |
-| `map` | the synoptic chart: the stations on file, the scene's marks, lows (trouble) and highs (all well) | `marks[]` {`id` or `lat`/`lon`, `kind`, `sev`, `label`?}; `areas[]` {`lat`,`lon`,`km`,`sev`,`label`?}; `links[]` {`from`,`to`, `style`: relay·blame·path·clean}; `focus`? {`lat`,`lon`,`km`} |
+| `title` | how the network is, on a dial and in a word (all well → widespread trouble), the headline, four numbers | uses the bulletin's `status`, `headline`, `stats` |
+| `map` | the map: the stations on file, the scene's marks, and areas shaded where trouble gathers (by `sev`) or green where everything checked in | `marks[]` {`id` or `lat`/`lon`, `kind`, `sev`, `label`?}; `areas[]` {`lat`,`lon`,`km`,`sev`,`label`?}; `links[]` {`from`,`to`, `style`: relay·blame·path·clean}; `focus`? {`lat`,`lon`,`km`} |
 | `battery` | up to 5 batteries, filled to their night low, dropping from the first night | `items[]` {`id`,`name`,`v`,`trend`?,`days_to`?,`nights`?,`note`?} |
 | `checks` | up to 6 stations' checks, slot by slot | `items[]` {`id`,`name`,`strip` of H P M N U .,`rate`?,`note`?} |
 | `carrier` | every transmitter's fingerprint as a barcode, and up to 3 that moved | `fleet[]` ppm; `band`; `items[]` {`name`,`kind`,`now`,`was`?,`series`?,`note`?} |

@@ -10,9 +10,9 @@
  },
  "presenter": "seasoned-hydrographer",
  "cohost": "tech-wizard",
- "outlook": {
-  "sky": "stormy",
-  "label": "Stormy at our end"
+ "status": {
+  "level": "widespread",
+  "label": "Widespread trouble"
  },
  "headline": "Half the week’s trouble was at our end: 152.400 is no longer listened to, and 151.5375 was dark for two days. Five stations around Caboolture barely reach us.",
  "stats": [

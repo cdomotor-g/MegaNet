@@ -14,6 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { STATUS_WORD } from './validate.mjs';
 
 const TZ = 'Australia/Brisbane';
 const clip = (s, n) => { s = String(s || ''); return s.length <= n ? s : s.slice(0, n - 1).replace(/\s+\S*$/, '') + '…'; };
@@ -31,11 +32,12 @@ export function draft(F) {
   const dateKey = issue.toLocaleDateString('en-CA', { timeZone: TZ });
   const weekly = F.kind === 'weekly';
 
-  // How the network looks, in one word: by what needs a visit, not by count.
+  // How the network is, in plain words (no weather words for it: README,
+  // *Plain words*): by what needs a visit, not by count.
   const crit = (F.findings || []).filter(f => f.severity === 'critical').length;
   const regular = (F.silences && F.silences.regular) || [];
-  const sky = crit >= 8 || regular.length >= 15 ? 'stormy' : crit >= 3 || regular.length >= 6 ? 'unsettled' : crit || regular.length ? 'patchy' : (F.findings || []).length ? 'fair' : 'clear';
-  const skyLabel = { stormy: 'Stormy', unsettled: 'Unsettled', patchy: 'Patchy', fair: 'Fair', clear: 'Clear' }[sky];
+  const level = crit >= 8 || regular.length >= 15 ? 'widespread' : crit >= 3 || regular.length >= 6 ? 'several' : crit || regular.length ? 'few' : (F.findings || []).length ? 'minor' : 'well';
+  const levelLabel = STATUS_WORD[level];
 
   const groups = (F.silences && F.silences.by_last_path) || [];
   const headline = clip(regular.length
@@ -55,7 +57,7 @@ export function draft(F) {
   ];
 
   scenes.push({ type: 'title', title: weekly ? 'The week on the network' : 'Good morning', secs: 10,
-    say: clip(`${weekly ? 'Here is the week on the network' : 'Good morning — here is the network for the last 24 hours'}: ${skyLabel.toLowerCase()}. ${headline}`, 400) });
+    say: clip(`${weekly ? 'Here is the week on the network' : 'Good morning — here is the network for the last 24 hours'}: ${levelLabel.toLowerCase()}. ${headline}`, 400) });
 
   // The map: who went quiet, the groups, the worst batteries and flips.
   const marks = [];
@@ -176,7 +178,7 @@ export function draft(F) {
     format: 'floodnet-bulletin/1', kind: F.kind, id: `${F.kind}-${dateKey}`, issued_at: F.gathered_at,
     period: { from: F.period.from, to: F.period.to, label: clip(F.period.label, 90) },
     presenter: F.presenter, cohost: F.cohost,
-    outlook: { sky, label: skyLabel }, headline, stats,
+    status: { level, label: levelLabel }, headline, stats,
     scenes,
     sources: { readings: n.readings_in_period, stations_heard: n.stations_heard_in_period, gathered_at: F.gathered_at },
     caveats: [],

@@ -10,9 +10,9 @@
  },
  "presenter": "turbo",
  "cohost": "tech-wizard",
- "outlook": {
-  "sky": "stormy",
-  "label": "Stormy"
+ "status": {
+  "level": "widespread",
+  "label": "Widespread trouble"
  },
  "headline": "Hillcrest and its neighbours are reporting again, but the Lockyer behind Toowoomba is still mostly dark, five days on.",
  "stats": [

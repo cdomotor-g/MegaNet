@@ -20790,7 +20790,7 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hl-followup { margin-top: var(--sp-3); display: grid; gap: .3rem; }
 .hl-followup input { flex: 1 1 18rem; min-width: 0; }
 
-/* ── 📺 Network Weather (health-bulletin.js) ──────────────────────────────────
+/* ── 📺 Network Bulletin (health-bulletin.js) ──────────────────────────────────
    The bulletin at the top of Station Health: a video player across the panel
    — the stage, a big ▶ in the middle of it until it plays, and under it the
    player's bar (the seek slider, a segment a scene, then the buttons) — then
@@ -20929,6 +20929,12 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hb-w.is-said { opacity: 1; }
 .hb-transcript { margin-top: var(--sp-2); }
 .hb-transcript ol { padding-left: 1.3rem; display: grid; gap: .35rem; max-width: 80ch; line-height: 1.45; }
+/* The status levels and what each means: the same list the title card's
+   label and the line above the player give on hover. */
+.hb-key { display: grid; grid-template-columns: max-content 1fr; gap: .2rem .9rem; max-width: 80ch; margin: .2rem 0 0; }
+.hb-key dt { font-weight: 600; }
+.hb-key dd { margin: 0; }
+@media (max-width: 520px) { .hb-key { grid-template-columns: 1fr; } .hb-key dd { margin-bottom: .3rem; } }
 .hb-foot { color: var(--muted); margin: var(--sp-2) 0 0; }
 @media (max-width: 700px) {
   .hb-anchor { gap: var(--sp-2); }
@@ -20954,10 +20960,6 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hb-a-fill { transform-box: fill-box; transform-origin: center bottom; animation: hb-fill 1.8s ease-in-out var(--d, 0s) both; }
 .hb-sweep { animation: hb-sweep 1.6s ease-out var(--d, 0s) both; }
 .hb-flow { animation: hb-flow 1.1s linear infinite; }
-.hb-spin { transform-box: fill-box; transform-origin: center; animation: hb-spin 40s linear infinite; }
-.hb-drift { animation: hb-drift 7s ease-in-out infinite alternate; }
-.hb-rain { animation: hb-rain 1.1s linear var(--d, 0s) infinite; }
-.hb-bolt { animation: hb-bolt 3.2s steps(1) infinite; }
 @keyframes hb-fade { from { opacity: 0; } }
 @keyframes hb-rise { from { opacity: 0; transform: translateY(26px); } }
 @keyframes hb-pop { from { opacity: 0; transform: scale(.2); } }
@@ -20968,10 +20970,6 @@ button.adm-danger:hover { border-color: var(--bad); }
 @keyframes hb-fill { from { transform: scaleY(var(--from, 1)); } }
 @keyframes hb-sweep { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 @keyframes hb-flow { to { stroke-dashoffset: -22; } }
-@keyframes hb-spin { to { transform: rotate(360deg); } }
-@keyframes hb-drift { from { transform: translateX(-7px); } to { transform: translateX(7px); } }
-@keyframes hb-rain { from { opacity: 1; transform: translateY(-6px); } to { opacity: 0; transform: translateY(34px); } }
-@keyframes hb-bolt { 0%, 62%, 70%, 100% { opacity: 1; } 64%, 72% { opacity: .15; } }
 @keyframes hb-talk { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.022) translateY(-2px); } }
 .hb-stage.is-paused .hb-svgbox * { animation-play-state: paused !important; }
 .hb-stage.is-still .hb-svgbox * { animation: none !important; }

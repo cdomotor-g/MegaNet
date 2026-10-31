@@ -7,7 +7,7 @@
    "file": "data/bulletins/daily/2026-11-01.json",
    "issued_at": "2026-10-31T18:31:46.249Z",
    "headline": "Fair again: eighty-two percent of checks in. Two Tweed stations still quiet, and a Gold Coast group that goes quiet at night.",
-   "sky": "fair",
+   "status": "minor",
    "presenter": "new-recruit"
   },
   {
@@ -15,7 +15,7 @@
    "file": "data/bulletins/daily/2026-10-31.json",
    "issued_at": "2026-10-30T18:32:26.593Z",
    "headline": "Fair: eighty percent of checks in and only four quiet stations. One to watch below Clarrie Hall Dam, where the dam gauge beside it is talking fine.",
-   "sky": "fair",
+   "status": "minor",
    "presenter": "know-it-all"
   },
   {
@@ -23,7 +23,7 @@
    "file": "data/bulletins/daily/2026-10-30.json",
    "issued_at": "2026-10-29T18:32:26.853Z",
    "headline": "The Lockyer is back: Toowoomba returned Thursday morning and its stations with it. Eight new quiet ones, on the Gold Coast and in the Northern Rivers.",
-   "sky": "unsettled",
+   "status": "several",
    "presenter": "nitwit"
   },
   {
@@ -31,7 +31,7 @@
    "file": "data/bulletins/daily/2026-10-29.json",
    "issued_at": "2026-10-28T18:31:55.707Z",
    "headline": "Hillcrest and its neighbours are reporting again, but the Lockyer behind Toowoomba is still mostly dark, five days on.",
-   "sky": "stormy",
+   "status": "widespread",
    "presenter": "turbo"
   },
   {
@@ -39,7 +39,7 @@
    "file": "data/bulletins/daily/2026-10-27.json",
    "issued_at": "2026-10-26T18:32:12.346Z",
    "headline": "Hillcrest repeater quiet since 2:15 Monday afternoon, on top of the Lockyer, still mostly dark behind Toowoomba for a third day.",
-   "sky": "stormy",
+   "status": "widespread",
    "presenter": "tech-wizard"
   },
   {
@@ -47,7 +47,7 @@
    "file": "data/bulletins/daily/2026-10-26.json",
    "issued_at": "2026-10-25T18:32:15.217Z",
    "headline": "The Toowoomba repeater has been silent since 4:23 on Sunday morning, and the Lockyer stations behind it went with it: one path, not twenty faults.",
-   "sky": "stormy",
+   "status": "widespread",
    "presenter": "seasoned-hydrographer"
   },
   {
@@ -55,7 +55,7 @@
    "file": "data/bulletins/daily/2026-10-25.json",
    "issued_at": "2026-10-24T21:55:04.156Z",
    "headline": "Twenty-one stations behind the Hillcrest repeater went quiet — one shared path, not 21 faults — and four only because we stopped listening.",
-   "sky": "unsettled",
+   "status": "several",
    "presenter": "bean-counter"
   }
  ],
@@ -65,7 +65,7 @@
    "file": "data/bulletins/weekly/2026-10-26.json",
    "issued_at": "2026-10-25T18:00:39.526Z",
    "headline": "Half the week’s trouble was at our end: 152.400 is no longer listened to, and 151.5375 was dark for two days. Five stations around Caboolture barely reach us.",
-   "sky": "stormy",
+   "status": "widespread",
    "presenter": "seasoned-hydrographer"
   },
   {
@@ -73,7 +73,7 @@
    "file": "data/bulletins/weekly/2026-10-25.json",
    "issued_at": "2026-10-24T21:56:59.573Z",
    "headline": "A wet week in which our base station began hearing four times the stations — and the Hillcrest repeater, half its relays corrupted all week, faded at the end of it.",
-   "sky": "unsettled",
+   "status": "several",
    "presenter": "seasoned-hydrographer"
   }
  ]

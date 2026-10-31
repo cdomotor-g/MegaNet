@@ -39,7 +39,7 @@ export function publish(b, { repo = REPO, ids, dry = false, log = console.log } 
   const ixPath = path.join(repo, ixRel);
   let ix = { format: INDEX_FORMAT, updated_at: null, daily: [], weekly: [] };
   if (fs.existsSync(ixPath)) ix = JSON.parse(fs.readFileSync(ixPath, 'utf8'));
-  const entry = { id: b.id, file: rel, issued_at: b.issued_at, headline: b.headline, sky: b.outlook.sky, presenter: b.presenter };
+  const entry = { id: b.id, file: rel, issued_at: b.issued_at, headline: b.headline, status: b.status.level, presenter: b.presenter };
   const list = (ix[b.kind] || []).filter(e => e.id !== b.id);
   list.push(entry);
   list.sort((x, y) => Date.parse(y.issued_at) - Date.parse(x.issued_at));

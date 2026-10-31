@@ -46,14 +46,17 @@ const DAY = 86400000, HOUR = 3600000, MIN = 60000;
 const TZ = 'Australia/Brisbane';
 
 // Who is in each bulletin. The day's Droggie presents (Brisbane's day, Sunday
-// first: the New Recruit draws the weekend shift as well as Wednesday); Alex
-// Chen takes the radio scenes (Graham on Alex's own day); and two more of the
-// crew take a scene each as guests, in turn, so the whole crew is heard. The
-// weekly is Graham's, with Alex for the radio, the Bean Counter for its numbers
-// and one guest. The Bean Counter is one of the show's lesser figures (the
-// owner, 25 Oct 2026): he never presents and is in no daily — one scene a week.
-export const ROTA = ['new-recruit', 'seasoned-hydrographer', 'tech-wizard', 'new-recruit', 'turbo', 'nitwit', 'know-it-all'];
-export const CREW = ['seasoned-hydrographer', 'tech-wizard', 'new-recruit', 'turbo', 'nitwit', 'know-it-all'];
+// first; the daily is a weekday bulletin, so the weekend's two only matter to
+// a run by hand); Alex Chen takes the radio scenes (Graham on Alex's own day);
+// and two more of the crew take a scene each as guests, in turn, so the whole
+// crew is heard. The weekly is Graham's, with Alex for the radio, the Bean
+// Counter for its numbers and one guest. The Bean Counter is one of the show's
+// lesser figures (the owner, 25 Oct 2026): he never presents and is in no
+// daily — one scene a week. Nitto (nitwit) is out of the cast until he has a
+// voice of his own (the owner, 1 Nov 2026; validate.mjs BENCHED): the
+// Know-It-All has his Friday.
+export const ROTA = ['new-recruit', 'seasoned-hydrographer', 'tech-wizard', 'new-recruit', 'turbo', 'know-it-all', 'know-it-all'];
+export const CREW = ['seasoned-hydrographer', 'tech-wizard', 'new-recruit', 'turbo', 'know-it-all'];
 export function presenterFor(kind, now) {
   const local = new Date(new Date(now).toLocaleString('en-US', { timeZone: TZ }));
   const day = Math.floor(Date.UTC(local.getFullYear(), local.getMonth(), local.getDate()) / DAY);

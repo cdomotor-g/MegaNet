@@ -191,7 +191,7 @@ const Methodology = (function () {
             <tr><th scope="row">Bit-Flip Sources</th><td>The database, every hour</td><td>The last 7 and 30 days</td></tr>
             <tr><th scope="row">Airtime and logger clocks</th><td>In your browser, from Station Health's result</td><td>Station Health's window</td></tr>
             <tr><th scope="row">Backbone's ranking</th><td>In your browser, from the stored findings and summaries</td><td>A period you pick: 7, 14, 30, 60 or 90 days</td></tr>
-            <tr><th scope="row">Network Weather bulletin</th><td>A scheduled Claude task, each weekday morning and each Monday</td><td>The last day, or week</td></tr>
+            <tr><th scope="row">Network Bulletin</th><td>A scheduled Claude task, each weekday morning and each Monday</td><td>The last day, or week</td></tr>
           </tbody></table></div>`],
 
       ['frame', 'What one ALERT frame can and cannot tell us', `
@@ -557,7 +557,7 @@ const Methodology = (function () {
             readings — a station's detail, its readings with the corrupted copies beside them, the network at one moment, up to 30 days
             of history, the stations nearby. It writes which stations to visit first and why, and what it could not tell. It cannot
             change anything.</li>
-          <li><strong>📺 Network Weather</strong> is written by a scheduled Claude task each weekday morning and each Monday, from the same
+          <li><strong>📺 Network Bulletin</strong> is written by a scheduled Claude task each weekday morning and each Monday, from the same
             analysis, the server's findings and the carrier fingerprints, looking for what several findings have in common.</li>
           <li><strong>${go('investigations', '🕵️ Investigations')}</strong> are write-ups of strange data, each dated, saying what is
             established, what is likely and what is still open, with the exports and the script behind every figure kept in the

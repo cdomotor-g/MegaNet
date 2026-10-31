@@ -10,9 +10,9 @@
  },
  "presenter": "seasoned-hydrographer",
  "cohost": "tech-wizard",
- "outlook": {
-  "sky": "stormy",
-  "label": "Stormy"
+ "status": {
+  "level": "widespread",
+  "label": "Widespread trouble"
  },
  "headline": "The Toowoomba repeater has been silent since 4:23 on Sunday morning, and the Lockyer stations behind it went with it: one path, not twenty faults.",
  "stats": [
