@@ -837,6 +837,15 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 205 — 2026-10-31: 📡 Agent API — the ACMA licences at a station's site, or at a point
+
+The owner, for the SoRT scope builder's new "ACMA licence" row — record the licence number when a site already has one that can be reused, flag a council's licence to transfer to the Bureau, or a new licence and a network assessment. **Opens nothing; closes nothing.**
+
+- **`GET /api/v1/stations/{id}/acma`** (MCP `get_acma_licences`) and **`GET /api/v1/acma?near=lat,lon`** (`acma_licences_near`), and an `acma` section in the dossier: the licences Flood-Net records for the station (repeater and frequencies), each looked up in the ACMA register — by base number too, since the register says `1441013/1` where Flood-Net often records `1441013`; the register's licences within `radius_m` (500 m by default, 5 km at most), one row per licence and site, with licensee, frequencies, power, emission, distance, the site's stated precision and whether it is on the station's channel (within 6.25 kHz); by default the station's own, its frequencies', the Bureau's and the VHF high band's, `all=true` for every one; and, for a field station, the repeaters that relay it with their licences. A private individual is never named.
+- **Read through `ASSETS`**, as the cameras read their catalog: `data/acma-licensing.json`, a column form of `acma-devices.json` and `acma-sites.json` that `tools/acma_fetch.py` now writes with them (0.9 MB; the 4.6 MB devices file would be ~50 ms of `JSON.parse`, five times a Workers Free request's CPU). CLAUDE.md's and AGENTS.md's read-only rule now name it.
+- **The extract is from 23 July 2026** (#248: the weekly download has found no working URL since ACMA moved it), and every answer says its `source_date`, its age, and to check the ACMA's register.
+- **Checks:** `agentapi` 407 (the file held to the other two row for row; the rows around a station worked out independently; three mutations each caught), `agentdocs`, the cheap five, `gate`, `dbproxy`, `councilcams`; `wrangler deploy --dry-run`.
+
 ### Revision 204 — 2026-10-30: 🔁 Repeaters — what was heard kept by the server (0092), the delay measured, the map full screen
 
 The owner, on the new tab: the heard column to load as it opens (*"if there's a smarter way… less I/O or less database calls… I'll rely on your sage advice"*), a delay that is *"some sort of actual, whether it's measured or recorded"* beside the plan, the map to zoom with the wheel, half as tall again, and full screen. **Opens nothing; closes nothing.**

@@ -25,11 +25,13 @@ main = "worker/index.js"
 
 [assets]
 directory = "."
-# The Worker reads one of those files itself: /api/cameras/* (worker/cameras.js)
-# looks a camera up in data/council-cameras.json, the same file the map draws,
-# through this binding — the first time an isolate needs it, so the routes that
-# never touch a camera load nothing more than they did. Assets are still served
-# before the Worker runs; the binding changes nothing about that.
+# The Worker reads a few of those files itself, through this binding, the first
+# time an isolate needs each — so a route that never touches one loads nothing
+# more than it did: /api/cameras/* (worker/cameras.js) looks a camera up in
+# data/council-cameras.json, the same file the map draws, and the agent API's
+# /api/v1/…/acma (worker/acma.js) reads data/acma-licensing.json, the ACMA
+# register extract. Assets are still served before the Worker runs; the binding
+# changes nothing about that.
 binding = "ASSETS"
 
 # The field photos' bytes (worker/photos.js, /api/photos/*): Cloudflare R2, 10 GB

@@ -27,7 +27,9 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   `claude mcp add --transport http floodnet https://floodwarning.net/api/mcp`.
 - **Read-only, public data only.** It reads with the database's publishable key,
   so it sees what an anonymous visitor sees: no inspection remarks, raw ingest
-  payloads, photos or user data. Nothing you send is forwarded upstream.
+  payloads, photos or user data. Besides the database it reads only public files
+  the site already serves (the ACMA register extract). Nothing you send is
+  forwarded upstream.
 - **Rate limits:** 60 requests / 60 s per client, 20 requests / 10 s per client
   (burst), 240 requests / 60 s per address. A 429 carries `Retry-After` (over
   MCP, JSON-RPC error `-32000` with `data.retry_after`): wait, then continue.
@@ -65,6 +67,16 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     0085 has not been applied yet.
   - `get_flood_levels` — `GET /api/v1/stations/{id}/flood-levels`
   - `get_service_level` — `GET /api/v1/stations/{id}/service-level`
+  - `get_acma_licences` — `GET /api/v1/stations/{id}/acma?radius_m=&freq_mhz=&all=`:
+    the radio licences at a station's site — the ACMA licence numbers Flood-Net
+    records for it, each looked up in the ACMA register (status, licensee,
+    expiry, where its transmitters are); the register's licences within
+    `radius_m` (500 m by default, 5 km at most) with licensee, frequencies,
+    power, emission, distance, the site's stated precision and whether each is
+    on the station's frequency; and, for a field station, the repeaters that
+    relay it with their licences.
+  - `acma_licences_near` — `GET /api/v1/acma?near=lat,lon&radius_m=&freq_mhz=&all=`:
+    the register's licences around a point — a site not built yet, or a move.
   - `list_catchments`, `get_catchment` — `GET /api/v1/catchments[/{id}]`
   - `list_networks` — `GET /api/v1/networks`
 - **For a map:** `format=geojson` on `/api/v1/stations` (search and `near`) and
@@ -91,6 +103,9 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     Flood-Net's own ingest — most stations report through the Bureau's
     systems, so "not recorded" there, or a station missing from the latest
     readings, says nothing about whether a station works;
+  - the ACMA licences are a weekly extract of the ACMA's register, cut to the
+    network's area (`register_extract.source_date` says when): say that date,
+    and check a licence on the ACMA's own register before relying on it;
   - "not recorded" is never zero.
 - **Fair use:** cache what you fetch, and ask about the stations you need rather
   than walking the whole network — the API answers a station, or a page of
@@ -142,6 +157,14 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   summary and one more than the last marker after that — so the owner can find
   it by scrolling; then **What changed**, **Checks run**, **What you need to
   do**, **Open questions** (skip empty ones).
+- **Agent API (`worker/api.js`):** read-only by construction — upstream it
+  makes only GETs to PostgREST with the publishable key, for relations in
+  `READABLE_RELATIONS`, and reads public files the site already serves (the
+  ACMA register extract) through the Worker's `ASSETS` binding; nothing from
+  the caller's request is forwarded. No RPCs. Every MCP tool is an adapter over
+  a `/api/v1` route: add the route and the tool together, and document both in
+  `docs/agent-api.md` and here. Its limits are quoted in the agent files, which
+  `npm run agentdocs` holds to the code.
 - **Migrations to the live database:** run `gh workflow run db-migrate.yml
   --ref main` (`-f dry_run=true` to list first; without `--ref` gh asks
   GraphQL for the default branch, which cloud sessions refuse); it applies

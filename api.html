@@ -94,7 +94,8 @@
     an AI assistant or a script at it and it can look up any station in the
     Bureau of Meteorology's Queensland flood-warning telemetry network — where
     it is, how it reports, its flood levels and Service Level Specification
-    entry, its health and recent readings — with no sign-in and no key.
+    entry, its health and recent readings, the radio licences at its site —
+    with no sign-in and no key.
   </p>
 
   <div class="scroll">
@@ -174,6 +175,17 @@
       run every fifteen minutes.
     </dd>
 
+    <dt>Radio licences</dt>
+    <dd>
+      What the ACMA's Register of Radiocommunications Licences has at a
+      station's site, or at a point where one might go: the licences Flood-Net
+      records for the station, each looked up; the licences within a radius,
+      with their licensee, frequencies, power and distance, and whether each
+      is on the station's frequency; and the repeaters that relay a field
+      station, with theirs. From a weekly extract of the register for the
+      network's area.
+    </dd>
+
     <dt>Catchments and networks</dt>
     <dd>
       The 77 Queensland drainage basins and their stations; the radio networks,
@@ -210,6 +222,11 @@
     <li>
       <strong>Plan a trip</strong> — the stations near a point or on a hub,
       nearest first, with distance and bearing.
+    </li>
+    <li>
+      <strong>Scope a site's licensing</strong> — whether a station already has
+      an ACMA licence that can be reused, whose it is, or what is licensed on
+      the hill where a new one would go.
     </li>
     <li>
       <strong>Make a map</strong> — any station list as GeoJSON for QGIS, a web
@@ -333,6 +350,29 @@
           <td><code>GET /api/v1/stations/{id}/service-level</code></td>
           <td><code>get_service_level</code></td>
           <td>The station's Service Level Specification entries. <a href="/api/v1/stations/abergowrie_br_al/service-level">Example</a></td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/stations/{id}/acma</code></td>
+          <td><code>get_acma_licences</code></td>
+          <td>
+            The radio licences at a station's site: the ACMA licences Flood-Net
+            records for it, looked up in the ACMA's register, and the
+            register's licences within <code>radius_m</code> (500 m by default,
+            up to 5 km) — licensee, frequencies, power, distance, and whether
+            each is on the station's frequency (<code>freq_mhz</code> adds
+            one; <code>all</code> lists every licence); for a field station,
+            the repeaters that relay it.
+            <a href="/api/v1/stations/mt_glorious_al_rptr/acma">Example</a>
+          </td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/acma</code></td>
+          <td><code>acma_licences_near</code></td>
+          <td>
+            The same register around a point, <code>near=lat,lon</code> — a
+            site not built yet, or a move.
+            <a href="/api/v1/acma?near=-27.3151,152.7477">Example</a>
+          </td>
         </tr>
         <tr>
           <td><code>GET /api/v1/catchments</code></td>
@@ -489,6 +529,12 @@ curl -s -H 'X-FloodNet-Client: your-name' \
       <strong>Readings are Flood-Net's own ingest.</strong> Most stations report
       through the Bureau's systems instead, so a station missing from the
       readings or the silent list says nothing about whether it works.
+    </li>
+    <li>
+      <strong>The ACMA licences are an extract.</strong> They come from a
+      weekly copy of the ACMA's register, cut to the network's area; the
+      answer says the copy's date. Check a licence on the ACMA's own register
+      before relying on it.
     </li>
     <li>
       <strong>“Not recorded” is not zero</strong>, and “unavailable” means a

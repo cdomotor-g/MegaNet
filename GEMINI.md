@@ -48,6 +48,12 @@ Documentation: [`docs/agent-api.md`](docs/agent-api.md).
   its check schedule day by day, its battery's night lows; and for a page of
   stations, by owner or station ids, `get_health_findings`
   (`/api/v1/health/findings`).
+- Radio licences: `get_acma_licences` (`/api/v1/stations/{id}/acma`) — the
+  ACMA licences Flood-Net records for a station, looked up in the ACMA
+  register, and the register's licences within `radius_m` of it (licensee,
+  frequencies, power, distance, whether on the station's frequency); and
+  `acma_licences_near` (`/api/v1/acma?near=lat,lon`) for a point. A weekly
+  extract of the register: quote its `source_date`.
 - For a map, `format=geojson` (tool argument `format: "geojson"`) on station
   search, `stations_near` and the latest readings answers a GeoJSON
   FeatureCollection: points at `[lon, lat]`, properties the JSON row, stations

@@ -20,6 +20,13 @@
 // 2026-07-28 stateless revision), the Origin rule, batching, errors, the edge
 // cache, and that /api/db and /api/session behave exactly as before.
 //
+// The ACMA licences (/stations/{id}/acma, /acma, the dossier's acma section)
+// read data/acma-licensing.json through the static-assets binding, stood in
+// for here by the repository's own files: that the committed file says what
+// acma-devices.json and acma-sites.json say, that the answers are the
+// register's own rows around the station, that it is read once per isolate
+// and only by GET of that path, and that no private individual is named.
+//
 // Run:  npm run agentapi        (node agent-api.mjs; -v lists what passed)
 
 import fs from 'node:fs';
@@ -27,6 +34,7 @@ import { repo } from './lib/paths.mjs';
 import { PostgrestStub } from './lib/postgrest-stub.mjs';
 import worker, { dbProxyTarget } from '../worker/index.js';
 import * as api from '../worker/api.js';
+import { metresBetween, licensee as acmaLicensee } from '../worker/acma.js';
 import { CARD_WINDOWS } from '../tools/health/cards.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
@@ -327,11 +335,27 @@ T.reading_latest = latestOf(T.reading);
 const stub = new PostgrestStub({ base: api.SUPABASE_REST_URL, columns: COLUMNS, tables: T });
 globalThis.fetch = (input, init) => stub.fetch(input, init);
 
+// The static-assets binding, serving the repository's files as the deploy
+// does, and recording every read.
+const assetReads = [];
+const ASSETS = {
+  async fetch(req) {
+    const u = new URL(typeof req === 'string' ? req : req.url);
+    assetReads.push({ method: typeof req === 'string' ? 'GET' : req.method, path: u.pathname });
+    try {
+      return new Response(fs.readFileSync(repo(decodeURIComponent(u.pathname).replace(/^\/+/, ''))), { headers: { 'Content-Type': 'application/json' } });
+    } catch (_) {
+      return new Response('Not found', { status: 404 });
+    }
+  },
+};
+const ENV = { ASSETS };
+
 let ipCounter = 0;
 const freshIp = () => `198.51.100.${(ipCounter++ % 250) + 1}`;
 const ctx = { waitUntil: () => {} };
 
-async function send(path, { method = 'GET', headers = {}, body, env = {}, ip } = {}) {
+async function send(path, { method = 'GET', headers = {}, body, env = ENV, ip } = {}) {
   const h = new Headers(headers);
   if (!h.has('CF-Connecting-IP')) h.set('CF-Connecting-IP', ip || freshIp());
   const init = { method, headers: h };
@@ -566,7 +590,7 @@ let dossier;
   check('the dossier answers 200', r.status === 200, `status ${r.status} ${r.json && r.json.detail}`);
   check(`it stays inside the fan-out cap (${api.LIMITS.upstreamPerRequest} reads)`, calls <= api.LIMITS.upstreamPerRequest, `${calls} reads`);
   const sections = ['identity', 'location', 'networks_and_radio', 'telemetry', 'service_level', 'bureau_listings', 'flood_levels',
-    'inspections', 'nearby_stations'];
+    'inspections', 'nearby_stations', 'acma'];
   check('every section is there, each with a status', sections.every(k => dossier[k] && typeof dossier[k].status === 'string'),
     sections.filter(k => !dossier[k]).join(', '));
   check('it has sources, a generated_at, links and the disclaimer', dossier.sources.length >= 5 && dossier.generated_at
@@ -704,6 +728,258 @@ let dossier;
 }
 
 // ── Flood levels, service level, readings ────────────────────────────────────
+// ── ACMA licences ────────────────────────────────────────────────────────────
+section('ACMA licences');
+
+// The register three ways: the two files the app reads, and the agent API's
+// copy of them — which has to say exactly what they say.
+const DEVICES = JSON.parse(fs.readFileSync(repo('data/acma-devices.json'), 'utf8'));
+const SITES = JSON.parse(fs.readFileSync(repo('data/acma-sites.json'), 'utf8'));
+const LICENSING = JSON.parse(fs.readFileSync(repo('data/acma-licensing.json'), 'utf8'));
+{
+  const m = LICENSING.meta || {};
+  check('acma-licensing.json is from the same extract as acma-devices.json', m.source_date === DEVICES.meta.source_date
+    && m.generated === DEVICES.meta.generated && m.attribution === DEVICES.meta.attribution, `${m.source_date} ${m.generated}`);
+  const siteKey = x => JSON.stringify([String(x.id), x.name ?? null, x.lat, x.lon, x.state ?? null, x.precision ?? null]);
+  const wantSites = new Set(SITES.sites.map(siteKey));
+  const gotSites = new Set(LICENSING.sites.map(([id, name, lat, lon, state, precision]) => siteKey({ id, name, lat, lon, state, precision })));
+  check('…with every site acma-sites.json has, as it has it, and no other', wantSites.size === gotSites.size && [...wantSites].every(k => gotSites.has(k)),
+    `${wantSites.size} vs ${gotSites.size}`);
+  const txKey = (site, lic, d) => JSON.stringify([String(site), lic, d.f_mhz ?? null, d.bw_khz ?? null, d.emission ?? null, d.tx_w ?? null, d.eirp_w ?? null, d.authorised ?? null]);
+  const wantTx = new Map(), gotTx = new Map();
+  for (const d of DEVICES.devices) { const k = txKey(d.site_id, d.lic, d); wantTx.set(k, (wantTx.get(k) || 0) + 1); }
+  for (const [si, li, f_mhz, bw_khz, emission, tx_w, eirp_w, authorised, count] of LICENSING.transmitters) {
+    const k = txKey(LICENSING.sites[si][0], LICENSING.licences[li][0], { f_mhz, bw_khz, emission, tx_w, eirp_w, authorised });
+    gotTx.set(k, (gotTx.get(k) || 0) + count);
+  }
+  check('…every transmitter acma-devices.json has, as many times, and no other', wantTx.size === gotTx.size && [...wantTx].every(([k, n]) => gotTx.get(k) === n),
+    `${wantTx.size} vs ${gotTx.size} distinct`);
+  const licOk = LICENSING.licences.every(([no, status, kind, issued, expiry, ci]) => {
+    const l = DEVICES.licences[no], k = LICENSING.kinds[kind] || [];
+    return l && l.status === status && l.type === k[0] && l.category === k[1] && l.service === k[2] && l.subservice === k[3]
+      && (l.issued ?? null) === (issued ?? null) && l.expiry === expiry && LICENSING.clients[ci] && l.client_no === LICENSING.clients[ci][0];
+  });
+  check('…every licence as the register gives it — status, kind, dates, licensee', licOk
+    && LICENSING.licences.length === new Set(DEVICES.devices.map(d => d.lic)).size);
+  const persons = LICENSING.clients.filter(c => c[3] === 'Person');
+  const clientsOk = LICENSING.clients.every(([no, name, trading, type]) => {
+    const c = DEVICES.clients[no];
+    return c && c.type === type && (type === 'Person' ? name === null && trading === null : name === c.name && (trading ?? null) === (c.trading ?? null));
+  });
+  check('…every licensee by name, except a private individual, who has none there', clientsOk && persons.length > 0, `${persons.length} individuals`);
+}
+
+// Fixtures, found in the data rather than named, and the answers they should
+// get worked out here from acma-devices.json and acma-sites.json, not by the
+// code under test.
+const kHzApart = (a, b) => Math.abs(a - b) * 1000;
+const baseOf = n => String(n || '').split('/')[0].trim();
+const devicesAt = new Map();
+for (const d of DEVICES.devices) { if (!devicesAt.has(String(d.site_id))) devicesAt.set(String(d.site_id), []); devicesAt.get(String(d.site_id)).push(d); }
+const registerBases = new Set(Object.keys(DEVICES.licences).map(baseOf));
+const recordedNumbers = st => [...(st.repeater ? [st.repeater.acma_licence] : []), ...(st.frequencies || []).map(f => f && f.acma_licence)]
+  .flatMap(x => String(x || '').match(/\d{3,10}(?:\/\d{1,3})?/g) || []).filter((x, i, a) => a.indexOf(x) === i);
+const recordedFreqs = st => [...(st.repeater ? [st.repeater.rx_mhz, st.repeater.tx_mhz] : []),
+  ...(st.frequencies || []).flatMap(f => [f.rx_mhz, f.tx_mhz])].filter(f => f != null).map(Number);
+function registerAround(lat, lon, radiusM) {
+  const pairs = new Map();
+  for (const site of SITES.sites) {
+    const m = metresBetween(lat, lon, site.lat, site.lon);
+    if (m > radiusM) continue;
+    for (const d of devicesAt.get(String(site.id)) || []) {
+      const k = `${d.lic}@${site.id}`;
+      if (!pairs.has(k)) pairs.set(k, { lic: d.lic, site: String(site.id), m, f: [] });
+      pairs.get(k).f.push(d.f_mhz);
+    }
+  }
+  return pairs;
+}
+const addrsOf = st => [...new Set([...Object.values(st.alert_ids || {}).flatMap(v => [].concat(v)), ...(st.sensors || []).map(x => x.alert_id)]
+  .filter(x => x != null && Number.isInteger(Number(x))).map(Number))].slice(0, 12);
+const byIdLive = new Map(live.map(x => [x.id, x]));
+function relayersOf(st) {
+  const addrs = addrsOf(st);
+  return live.filter(r => r.repeater && r.id !== st.id && addrs.some(a => passes(r.id, a)))
+    .map(r => ({ r, km: r.lat != null ? Math.round(metresBetween(st.lat, st.lon, r.lat, r.lon) / 10) / 100 : null }))
+    .filter(x => x.km == null || x.km <= api.LIMITS.relayKmMax)
+    .sort((a, b) => (a.km ?? 1e9) - (b.km ?? 1e9) || (a.r.id < b.r.id ? -1 : 1)).slice(0, api.LIMITS.relayListMax).map(x => x.r);
+}
+// A repeater whose own licence is at a site within 500 m, on its own frequency
+// — of those, the one with the most licences around it, so the order and the
+// default listing have something to sort and leave out.
+const ACMA_REP = live.filter(st => st.repeater && st.lat != null && recordedNumbers(st).length && (() => {
+  const bases = new Set(recordedNumbers(st).map(baseOf)), fs_ = recordedFreqs(st);
+  return [...registerAround(st.lat, st.lon, 500).values()].some(x => bases.has(baseOf(x.lic)) && x.f.some(f => fs_.some(g => kHzApart(f, g) <= 6.25)));
+})()).map(st => ({ st, n: registerAround(st.lat, st.lon, 500).size })).sort((a, b) => b.n - a.n || (a.st.id < b.st.id ? -1 : 1))
+  .map(x => x.st)[0];
+// One whose licence is recorded without the register's "/n".
+const BY_BASE = live.find(st => st.repeater && /^\d+$/.test(String(st.repeater.acma_licence || '').trim())
+  && registerBases.has(String(st.repeater.acma_licence).trim()) && !DEVICES.licences[String(st.repeater.acma_licence).trim()]);
+// A field station relayed by a repeater with a licence recorded.
+const ACMA_FIELD = live.find(st => !st.repeater && st.lat != null && !(st.roles || []).includes('repeater') && !(st.frequencies || []).length
+  && relayersOf(st).some(r => recordedNumbers(r).length));
+// A licence held by a private individual, and where it is.
+const PERSON_DEV = DEVICES.devices.find(d => (DEVICES.clients[(DEVICES.licences[d.lic] || {}).client_no] || {}).type === 'Person');
+const PERSON_SITE = PERSON_DEV && SITES.sites.find(x => String(x.id) === String(PERSON_DEV.site_id));
+const PERSON_NAME = PERSON_DEV && DEVICES.clients[DEVICES.licences[PERSON_DEV.lic].client_no].name;
+check('the ACMA fixtures exist in the data', ACMA_REP && BY_BASE && ACMA_FIELD && PERSON_SITE && PERSON_NAME && PERSON_NAME.length > 3
+  && registerAround(ACMA_REP.lat, ACMA_REP.lon, 500).size >= 10,
+  `repeater ${ACMA_REP && ACMA_REP.id}, by base ${BY_BASE && BY_BASE.id}, field ${ACMA_FIELD && ACMA_FIELD.id}`);
+const noGenerated = o => JSON.parse(JSON.stringify(o, (k, v) => (k === 'generated_at' ? undefined : v)));
+const rankOf = x => (x.recorded_by_floodnet ? 0 : x.matches_station_frequency ? 1 : x.licensee.is_bureau ? 2 : x.vhf_high_band ? 3 : 4);
+const ROW_FIELDS = ['licence', 'status', 'service', 'subservice', 'expiry', 'expiry_passed', 'licensee', 'site', 'frequencies_mhz', 'emissions',
+  'tx_power_w', 'eirp_w', 'authorised', 'transmitters', 'vhf_high_band', 'recorded_by_floodnet', 'matches_station_frequency', 'matched_frequencies_mhz'];
+
+if (ACMA_REP && BY_BASE && ACMA_FIELD && PERSON_SITE) {
+  api.resetApiState();
+  assetReads.length = 0;
+  stub.requests = [];
+  const r = await get(`/api/v1/stations/${ACMA_REP.id}/acma`);
+  const a = r.json || {};
+  check('GET /api/v1/stations/{id}/acma answers 200', r.status === 200, `${r.status} ${a.detail || ''}`);
+  check('…from a few database reads', stub.requests.length > 0 && stub.requests.length <= 6, `${stub.requests.length} reads`);
+  check('…and the register by one GET of /data/acma-licensing.json through the assets binding, and nothing else',
+    assetReads.length === 1 && assetReads[0].path === '/data/acma-licensing.json' && assetReads[0].method === 'GET', JSON.stringify(assetReads));
+  const nums = recordedNumbers(ACMA_REP);
+  check('recorded: every licence number the station record carries, in its order', a.recorded.status === 'ok'
+    && JSON.stringify(a.recorded.licences.map(x => x.licence)) === JSON.stringify(nums), JSON.stringify(a.recorded.licences && a.recorded.licences.map(x => x.licence)));
+  check('…each looked up: the register\'s number for it, status, expiry, licensee and where its transmitters are, nearest first',
+    a.recorded.licences.some(x => x.in_register) && a.recorded.licences.filter(x => x.in_register).every(x => x.register_licence && x.status && 'expiry' in x
+      && x.licensee && 'is_bureau' in x.licensee && x.sites.length && x.sites.every((y, i, s2) => i === 0 || y.distance_m >= s2[i - 1].distance_m)));
+
+  const all = (await get(`/api/v1/stations/${ACMA_REP.id}/acma?all=true`)).json;
+  const want = registerAround(ACMA_REP.lat, ACMA_REP.lon, 500);
+  const gotKeys = all.register.licences.map(x => `${x.licence}@${x.site.id}`);
+  check('all=true lists exactly the register\'s licences at the sites within 500 m, one row per licence and site',
+    gotKeys.length === want.size && gotKeys.every(k => want.has(k)) && all.register.licences_total === want.size && all.register.listing === 'all',
+    `${gotKeys.length} rows vs ${want.size}`);
+  check('…each with every field a scope sheet reads, the distance within the radius and the site\'s stated precision',
+    all.register.licences.every(x => ROW_FIELDS.every(f => f in x) && x.site.distance_m <= 500 && x.site.precision && x.frequencies_mhz.length
+      && x.transmitters >= 1), ROW_FIELDS.filter(f => !(f in (all.register.licences[0] || {}))).join(', '));
+  const fs_ = recordedFreqs(ACMA_REP);
+  check('matches_station_frequency is true exactly where a transmitter is within 6.25 kHz of a frequency the station records',
+    all.register.licences.every(x => x.matches_station_frequency === want.get(`${x.licence}@${x.site.id}`).f.some(f => fs_.some(g => kHzApart(f, g) <= 6.25))));
+  const own = all.register.licences.filter(x => x.recorded_by_floodnet);
+  check('the station\'s own licences are flagged recorded_by_floodnet, by base number', own.length > 0
+    && all.register.licences.every(x => x.recorded_by_floodnet === new Set(nums.map(baseOf)).has(baseOf(x.licence))));
+  check('rows come its own first, then on its frequencies, the Bureau\'s, the VHF high band, the rest — nearest first within each',
+    all.register.licences.every((x, i, rows) => i === 0 || rankOf(rows[i - 1]) < rankOf(x)
+      || (rankOf(rows[i - 1]) === rankOf(x) && rows[i - 1].site.distance_m <= x.site.distance_m)));
+  const relevant = all.register.licences.filter(x => x.recorded_by_floodnet || x.matches_station_frequency === true || x.licensee.is_bureau || x.vhf_high_band);
+  check('by default only those rows are listed, in that order; the counts and sites still cover them all',
+    JSON.stringify(a.register.licences) === JSON.stringify(relevant) && relevant.length < all.register.licences.length && a.register.listing === 'relevant'
+      && a.register.licences_total === all.register.licences_total && a.register.site_count === all.register.site_count
+      && JSON.stringify(a.register.counts) === JSON.stringify(all.register.counts), `${a.register.licences.length} of ${all.register.licences_total}`);
+  check('sites: each site within the radius once, nearest first, with how many licences it has and how many are listed',
+    a.register.sites.length === a.register.site_count && a.register.sites.every((x, i, s2) => (i === 0 || x.distance_m >= s2[i - 1].distance_m)
+      && x.precision && x.licences === all.register.licences.filter(y => y.site.id === x.id).length
+      && x.listed === a.register.licences.filter(y => y.site.id === x.id).length));
+  const now = Date.now();
+  check('expiry_passed is true exactly where the expiry date has gone by', all.register.licences.every(x =>
+    x.expiry_passed === (x.expiry ? Date.parse(`${x.expiry}T23:59:59Z`) < now : false)));
+  const src = a.sources[0];
+  check('sources name the ACMA register, its extract\'s date, the attribution and when Flood-Net refreshed it',
+    /Register of Radiocommunications Licences/.test(src.name) && src.source_date === DEVICES.meta.source_date && src.licence === 'CC BY 4.0'
+      && /CC BY 4\.0/.test(src.attribution) && src.refreshed_at === DEVICES.meta.generated && src.file === '/data/acma-licensing.json', JSON.stringify(src));
+  check('register_extract says how old the extract is, and says it is stale past two weeks', a.register_extract.source_date === DEVICES.meta.source_date
+    && Number.isInteger(a.register_extract.age_days) && a.register_extract.stale === (a.register_extract.age_days > 14) && (!a.register_extract.stale || /ACMA/.test(a.register_extract.note)));
+  check('the summary is plain sentences naming the station and its licence', Array.isArray(a.summary) && a.summary[0].includes(ACMA_REP.name)
+    && a.summary.some(l => l.includes(nums[0])) && a.summary.some(l => /Within 500 m/.test(l)), a.summary && a.summary.join(' | '));
+  check('the notes state the subset and the matching rule', a.notes.some(n => /subset/.test(n) && /60 km/.test(n)) && a.notes.some(n => /6\.25 kHz/.test(n)));
+  await get(`/api/v1/stations/${ACMA_REP.id}/acma?radius_m=1000`);
+  await get(`/api/v1/acma?near=${ACMA_REP.lat},${ACMA_REP.lon}`);
+  check('the register is read once per isolate, then answered from its index', assetReads.length === 1, `${assetReads.length} reads`);
+
+  const b = (await get(`/api/v1/stations/${BY_BASE.id}/acma`)).json;
+  const e = b.recorded.licences.find(x => x.recorded_on === 'repeater');
+  check('a licence recorded without its "/n" is found by its base number, and the register\'s number given', e && e.in_register === true
+    && e.matched_by === 'base number' && baseOf(e.register_licence) === e.licence && /\//.test(e.register_licence), JSON.stringify(e && { l: e.licence, r: e.register_licence }));
+
+  const f = (await get(`/api/v1/stations/${ACMA_FIELD.id}/acma`)).json;
+  const relayers = relayersOf(ACMA_FIELD);
+  check('relayed_by: the nearest repeaters within 150 km whose pass ranges cover a field station\'s addresses',
+    f.relayed_by.status === 'ok' && JSON.stringify(f.relayed_by.repeaters.map(x => x.id)) === JSON.stringify(relayers.map(x => x.id)),
+    `${JSON.stringify(f.relayed_by.repeaters && f.relayed_by.repeaters.map(x => x.id))} vs ${JSON.stringify(relayers.map(x => x.id))}`);
+  check('…each with the licences recorded for it, looked up in the register, and the frequency it receives on',
+    f.relayed_by.repeaters.every(x => JSON.stringify(x.licences.map(y => y.licence)) === JSON.stringify(recordedNumbers(byIdLive.get(x.id)))
+      && x.rx_mhz === (byIdLive.get(x.id).repeater.rx_mhz ?? null)) && f.relayed_by.repeaters.some(x => x.licences.some(y => y.in_register)));
+  check('with no frequency recorded, every match is null — not false — and the count is null', f.frequencies.status === 'not recorded'
+    && f.register.counts.matching_frequency === null && f.register.licences.every(x => x.matches_station_frequency === null));
+  check('…and the summary says it is relayed', f.summary.some(l => /relayed by/.test(l)), f.summary.join(' | '));
+  const rx = relayers.map(x => x.repeater.rx_mhz).find(x => x != null);
+  const fq = await get(`/api/v1/stations/${ACMA_FIELD.id}/acma?freq_mhz=${rx}&radius_m=5000`);
+  check('freq_mhz matches the register against a frequency it names', fq.status === 200 && fq.json.frequencies.asked[0] === rx
+    && fq.json.query.freq_mhz[0] === rx && fq.json.query.radius_m === 5000 && fq.json.register.counts.matching_frequency !== null);
+
+  const p = await get(`/api/v1/acma?near=${ACMA_REP.lat},${ACMA_REP.lon}&all=true&freq_mhz=${fs_.join(',')}`);
+  check('GET /api/v1/acma?near= answers the register around a point — the same rows as around the station there',
+    p.status === 200 && JSON.stringify(p.json.register.licences.map(x => `${x.licence}@${x.site.id}:${x.matches_station_frequency}`).sort())
+      === JSON.stringify(all.register.licences.map(x => `${x.licence}@${x.site.id}:${x.matches_station_frequency}`).sort()), `${p.status}`);
+  const empty = await get('/api/v1/acma?near=-20,160');
+  check('…and with nothing near, says so and names the nearest registered site', empty.status === 200 && empty.json.register.status === 'not recorded'
+    && empty.json.register.nearest_site && empty.json.register.nearest_site.distance_m > 5000 && /no transmitter/.test(empty.json.summary.join(' ')));
+  for (const [q, what] of [['', 'no point'], ['?near=north', 'a point that is not lat,lon'], [`?near=${ACMA_REP.lat},${ACMA_REP.lon}&radius_m=5001`, 'a radius over 5 km'],
+    [`?near=${ACMA_REP.lat},${ACMA_REP.lon}&freq_mhz=abc`, 'a frequency that is not a number'], [`?near=${ACMA_REP.lat},${ACMA_REP.lon}&freq_mhz=1,2,3,4,5,6,7,8,9`, 'nine frequencies'],
+    [`?near=${ACMA_REP.lat},${ACMA_REP.lon}&all=maybe`, 'all that is not true or false'], [`?near=${ACMA_REP.lat},${ACMA_REP.lon}&radius_km=1`, 'an unknown parameter']]) {
+    const x = await get(`/api/v1/acma${q}`);
+    check(`GET /api/v1/acma refuses ${what} with a 400 saying what to change`, x.status === 400 && x.json.detail, `${x.status} ${x.json && x.json.detail}`);
+  }
+
+  // The same channel and not the next: a transmitter 6 kHz off a frequency
+  // asked about matches it, one 12.5 kHz off — the next channel — does not.
+  const ch = all.register.licences.find(x => x.vhf_high_band && x.frequencies_mhz.length === 1);
+  const chSite = ch && SITES.sites.find(x => String(x.id) === ch.site.id);
+  const at = f => get(`/api/v1/acma?near=${chSite.lat},${chSite.lon}&radius_m=5&all=true&freq_mhz=${f}`)
+    .then(x => x.json.register.licences.find(y => y.licence === ch.licence && y.site.id === ch.site.id));
+  const sameCh = chSite && await at((ch.frequencies_mhz[0] + 0.006).toFixed(4));
+  const nextCh = chSite && await at((ch.frequencies_mhz[0] + 0.0125).toFixed(4));
+  check('a frequency matches on the same channel (6 kHz off) and not on the next one (12.5 kHz off)', sameCh && nextCh
+    && sameCh.matches_station_frequency === true && nextCh.matches_station_frequency === false, ch && `${ch.licence} ${ch.frequencies_mhz[0]}`);
+
+  // The Bureau's licences are listed by default whatever their band.
+  const bureauDev = DEVICES.devices.find(x => x.f_mhz != null && (x.f_mhz < 148 || x.f_mhz > 174)
+    && /bureau of meteorology/i.test((DEVICES.clients[(DEVICES.licences[x.lic] || {}).client_no] || {}).name || ''));
+  const bureauSite = bureauDev && SITES.sites.find(x => String(x.id) === String(bureauDev.site_id));
+  const bureau = bureauSite && (await get(`/api/v1/acma?near=${bureauSite.lat},${bureauSite.lon}&radius_m=5`)).json;
+  const brow = bureau && bureau.register.licences.find(x => x.licence === bureauDev.lic);
+  check('the Bureau of Meteorology\'s licences are listed by default, whatever their band', brow && brow.licensee.is_bureau === true
+    && brow.vhf_high_band === false, bureauDev && `${bureauDev.lic} ${bureauDev.f_mhz} MHz`);
+
+  check('licensee() never names a private individual, even one the file named', (() => {
+    const o = acmaLicensee({ client_no: '1', name: 'A Person', trading_name: 'A Person', type: 'Person' });
+    return o.name === null && o.trading_name === null && o.type === 'Person' && !JSON.stringify(o).includes('A Person');
+  })());
+
+  const person = await get(`/api/v1/acma?near=${PERSON_SITE.lat},${PERSON_SITE.lon}&radius_m=25&all=true`);
+  const prow = person.json.register.licences.find(x => x.licence === PERSON_DEV.lic);
+  check('a licensee registered as a private individual is never named', prow && prow.licensee.type === 'Person' && prow.licensee.name === null
+    && prow.licensee.trading_name === null && !person.text.includes(PERSON_NAME), prow && JSON.stringify(prow.licensee));
+
+  const d = (await get(`/api/v1/stations/${ACMA_REP.id}/dossier`)).json;
+  check('the dossier\'s acma section is what /acma answers by default', d.acma.status === 'ok'
+    && JSON.stringify(noGenerated({ ...d.acma, status: undefined, link: undefined, source: undefined }))
+      === JSON.stringify(noGenerated({ summary: a.summary, recorded: a.recorded, frequencies: a.frequencies, register: a.register, relayed_by: a.relayed_by, register_extract: a.register_extract }))
+    && d.acma.link.endsWith(`/api/v1/stations/${ACMA_REP.id}/acma`));
+  check('…its summary carries the recorded licences, and its sources the register', d.summary.some(l => /ACMA licence/.test(l))
+    && d.sources.some(x => x.file === '/data/acma-licensing.json'), d.summary.join(' | '));
+
+  const tool = await rpc('tools/call', { name: 'get_acma_licences', arguments: { id: ACMA_REP.id } });
+  check('get_acma_licences answers what the REST route does', tool.json.result && tool.json.result.isError === false
+    && JSON.stringify(noGenerated(tool.json.result.structuredContent)) === JSON.stringify(noGenerated(a)));
+  const toolNear = await rpc('tools/call', { name: 'acma_licences_near', arguments: { lat: ACMA_REP.lat, lon: ACMA_REP.lon, radius_m: 300, freq_mhz: fs_[0], all: true } });
+  check('acma_licences_near takes a point, a radius, a frequency and all', toolNear.json.result && toolNear.json.result.isError === false
+    && toolNear.json.result.structuredContent.query.radius_m === 300 && toolNear.json.result.structuredContent.query.freq_mhz[0] === fs_[0]
+    && toolNear.json.result.structuredContent.register.listing === 'all');
+
+  api.resetApiState();
+  const unbound = await get(`/api/v1/stations/${ACMA_REP.id}/acma`, { env: {} });
+  check('without the assets binding the route says so: 503, and no Retry-After', unbound.status === 503 && unbound.json.error === 'not available'
+    && /ASSETS/.test(unbound.json.detail) && !unbound.headers.get('retry-after'), `${unbound.status} ${unbound.json && unbound.json.detail}`);
+  const unboundDossier = await get(`/api/v1/stations/${ACMA_REP.id}/dossier`, { env: {} });
+  check('…and a dossier still answers, its acma section unavailable', unboundDossier.status === 200 && unboundDossier.json.acma.status === 'unavailable');
+  api.resetApiState();
+}
+
 section('Flood levels, SLS, readings');
 
 {
@@ -1475,7 +1751,8 @@ for (const p of ['/api/v1/', '/api/v1/stations?q=river&type=river', `/api/v1/sta
   `/api/v1/stations/${RICH.id}/flood-levels`, `/api/v1/stations/${MANUAL.id}/service-level`, '/api/v1/catchments',
   `/api/v1/catchments/${RICH.catchment_ids[0]}`, '/api/v1/networks', `/api/v1/stations/${RICH.station_number}/readings`,
   '/api/v1/readings/latest', `/api/v1/readings/latest?type=river&network=${NETWORKED.radio_network_ids[0]}&basin=river&format=geojson`,
-  `/api/v1/readings/latest?bbox=${RICH.lon - 1},${RICH.lat - 1},${RICH.lon + 1},${RICH.lat + 1}`, '/api/v1/stations?q=tide&format=geojson']) {
+  `/api/v1/readings/latest?bbox=${RICH.lon - 1},${RICH.lat - 1},${RICH.lon + 1},${RICH.lat + 1}`, '/api/v1/stations?q=tide&format=geojson',
+  `/api/v1/stations/${RICH.id}/acma?all=true`, `/api/v1/acma?near=${RICH.lat},${RICH.lon}&radius_m=5000`]) {
   api.resetApiState();
   await get(p);
 }
@@ -1494,6 +1771,7 @@ function toolArgs(name) {
     case 'get_health_findings': return { min_severity: 'warn', limit: 3 };
     case 'list_catchments': case 'list_networks': return {};
     case 'get_catchment': return { id: RICH.catchment_ids[0], limit: 3 };
+    case 'acma_licences_near': return { lat: RICH.lat, lon: RICH.lon, radius_m: 2000 };
     default: return { id: RICH.id };
   }
 }
@@ -1650,7 +1928,8 @@ section('MCP');
   const list = await rpc('tools/list', {}, { headers: { 'MCP-Protocol-Version': '2025-06-18' } });
   const tools = list.json.result.tools;
   const expected = ['search_stations', 'get_station', 'get_station_dossier', 'stations_near', 'get_readings', 'get_latest_readings', 'get_silent_stations',
-    'get_station_health', 'get_health_findings', 'list_catchments', 'get_catchment', 'get_flood_levels', 'get_service_level', 'list_networks'];
+    'get_station_health', 'get_health_findings', 'list_catchments', 'get_catchment', 'get_flood_levels', 'get_service_level',
+    'get_acma_licences', 'acma_licences_near', 'list_networks'];
   check('tools/list has every tool', expected.every(n => tools.some(t => t.name === n)) && tools.length === expected.length, tools.map(t => t.name).join(', '));
   check('every tool is annotated read-only and has an object input schema', tools.every(t => t.annotations.readOnlyHint === true
     && t.annotations.destructiveHint === false && t.inputSchema.type === 'object' && t.description.length > 40));

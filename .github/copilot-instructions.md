@@ -31,6 +31,10 @@ See [`docs/agent-api.md`](../docs/agent-api.md).
   Station Health says about one station — findings, check schedule day by day,
   battery night lows; `get_health_findings` (`/api/v1/health/findings`) the
   same for a page of stations, by owner or station ids.
+- `get_acma_licences` (`/api/v1/stations/{id}/acma`) gives the ACMA licences
+  Flood-Net records for a station and the ACMA register's licences around it;
+  `acma_licences_near` (`/api/v1/acma?near=lat,lon`) the same for a point. The
+  register is a weekly extract — quote its `source_date`.
 - Flood classes are metres on the gauge, AEP levels modelled m AHD (indicative);
   quote each figure's source and datum.
 

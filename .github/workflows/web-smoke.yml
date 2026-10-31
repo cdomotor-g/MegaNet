@@ -117,6 +117,14 @@ on:
       # start no workflow.
       - 'data/council-cameras.json'
       - 'tools/council_cameras.py'
+      # The ACMA register the agent API's /acma reads, the two files it is
+      # built from and the tool that builds them: `npm run agentapi` holds
+      # acma-licensing.json to the other two, so a refresh pushed by hand is
+      # checked; the weekly job's own pushes start no workflow.
+      - 'data/acma-licensing.json'
+      - 'data/acma-devices.json'
+      - 'data/acma-sites.json'
+      - 'tools/acma_fetch.py'
       - '.github/workflows/web-smoke.yml'
   pull_request:
     paths:
@@ -215,6 +223,14 @@ on:
       # start no workflow.
       - 'data/council-cameras.json'
       - 'tools/council_cameras.py'
+      # The ACMA register the agent API's /acma reads, the two files it is
+      # built from and the tool that builds them: `npm run agentapi` holds
+      # acma-licensing.json to the other two, so a refresh pushed by hand is
+      # checked; the weekly job's own pushes start no workflow.
+      - 'data/acma-licensing.json'
+      - 'data/acma-devices.json'
+      - 'data/acma-sites.json'
+      - 'tools/acma_fetch.py'
       - '.github/workflows/web-smoke.yml'
   workflow_dispatch:
 

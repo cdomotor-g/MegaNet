@@ -32,6 +32,12 @@
 // read-only RPC anon has, stations_doc(), returns 7.5 MB and is exactly what an
 // API per station exists to avoid.
 //
+// Besides the database it reads public files this site already serves to any
+// visitor, through the Worker's static-assets binding (env.ASSETS) and never
+// over the network: data/acma-licensing.json, the ACMA register extract the map
+// draws (worker/acma.js). A GET of a fixed path, nothing from the caller in it
+// — so this is still a door onto public data and nothing else.
+//
 // ── Throttling ───────────────────────────────────────────────────────────────
 // Three rules, per RATE_LIMITS: a per-client minute, a per-client ten-second
 // burst, and a per-address ceiling. A client is the caller's address plus the
@@ -61,6 +67,12 @@
 // it. So a route can be live before the relation it reads is, and for that
 // while it answers 503 "not available yet", naming the relation and the
 // migration (ARRIVES_WITH), rather than a 502 that calls it a bug.
+
+import {
+  LICENSING_PATH, MATCH_KHZ, VHF_HIGH_MHZ, REGISTER_URL, acmaRegister, resetAcma, licenceNumbersIn, sitesWithin,
+  nearestSite, registerRows, registerCounts, relevantRow, recordedEntry, licenceBase, extractInfo, subsetWords,
+  registerSource, siteOut, summaryLines as acmaSummaryLines,
+} from './acma.js';
 
 // ── Where things are ─────────────────────────────────────────────────────────
 
@@ -128,6 +140,21 @@ export const LIMITS = Object.freeze({
   vocabularySeconds: 3600,
   mcpBodyMaxBytes: 65536,
   mcpBatchMax: 10,
+  // The ACMA register around a station or a point (worker/acma.js). 500 m by
+  // default: tools/acma_fetch.py's own radius for matching a repeater to its
+  // licence, which holds every licence already recorded against one (the
+  // farthest 457 m, at a site whose precision is Unknown) and is five times
+  // the coarsest precision a site states (Within 100 metres). Up to 5 km for a
+  // look round a hill — 149 licences at most, anywhere in the network.
+  acmaRadiusDefaultM: 500,
+  acmaRadiusMaxM: 5000,
+  acmaFreqsMax: 8,
+  acmaRowsMax: 300,
+  // The repeaters that relay a station, listed with their licences: the
+  // nearest few within this — beyond it a pass range covering the address is
+  // usually another region using the same one.
+  relayKmMax: 150,
+  relayListMax: 5,
 });
 
 // What may be read. Every relation here is granted to `anon` by a migration and
@@ -454,6 +481,7 @@ async function memo(key, ttlMs, load) {
 export function resetApiState() {
   MEMO.clear();
   WINDOWS.clear();
+  resetAcma();
 }
 
 const VOCAB_MS = LIMITS.vocabularySeconds * 1000;
@@ -1108,6 +1136,7 @@ function stationLinks(rc, id) {
     readings: `${base}/readings`,
     flood_levels: `${base}/flood-levels`,
     service_level: `${base}/service-level`,
+    acma: `${base}/acma`,
     app: `${rc.origin}/?station=${encodeURIComponent(id)}`,
   };
 }
@@ -1408,6 +1437,311 @@ async function serviceLevelEndpoint(rc, rawId) {
   };
 }
 
+// ── ACMA licences: what Flood-Net records, and what the register has here ────
+// For the SoRT scope builder's "ACMA licence" row, and anybody else asking
+// whether a site is licensed: the licences the station record carries, each
+// looked up in the ACMA register extract, and every licence the extract has at
+// a site within radius_m — worker/acma.js has the data and the rules.
+
+export const ACMA_PARAMS = ['radius_m', 'freq_mhz', 'all'];
+export const ACMA_NEAR_PARAMS = ['near', 'radius_m', 'freq_mhz', 'all'];
+const ACMA_FILE_WORDS = `the ACMA register extract (${LICENSING_PATH})`;
+
+function parsePoint(v, name) {
+  const m = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/.exec(String(v));
+  if (!m) throw bad(`"${name}" must be "lat,lon" in decimal degrees, e.g. ${name}=-27.3151,152.7477.`);
+  return { lat: parseFloatParam(m[1], `${name} latitude`, -90, 90), lon: parseFloatParam(m[2], `${name} longitude`, -180, 180) };
+}
+
+function parseAcmaParams(params) {
+  const radiusM = params.radius_m === undefined ? LIMITS.acmaRadiusDefaultM
+    : Math.round(parseFloatParam(params.radius_m, 'radius_m', 1, LIMITS.acmaRadiusMaxM));
+  let freqs = [];
+  if (params.freq_mhz !== undefined) {
+    const parts = String(params.freq_mhz).split(',').map(s => s.trim()).filter(Boolean);
+    if (!parts.length) throw bad('"freq_mhz" is empty: give one or more frequencies in MHz, comma-separated, e.g. freq_mhz=151.525.');
+    if (parts.length > LIMITS.acmaFreqsMax) throw bad(`"freq_mhz" takes at most ${LIMITS.acmaFreqsMax} frequencies.`);
+    freqs = uniq(parts.map(p => parseFloatParam(p, 'freq_mhz', 0.001, 300000)));
+  }
+  return { radiusM, freqs, all: parseBool(params.all, 'all') === true };
+}
+
+// The register, or a 503 that says why not. retry false when the binding is
+// missing: waiting will not bind it.
+async function acmaRegisterFor(rc) {
+  try {
+    return await acmaRegister(rc.env, rc.origin);
+  } catch (err) {
+    const e = new ApiError(503, 'not available', `The ACMA register extract could not be read: ${err.message}.`
+      + `${err.unbound ? '' : ' Try again in a minute.'}`, { file: LICENSING_PATH });
+    e.retry = !err.unbound;
+    throw e;
+  }
+}
+
+// The licences the station record carries, and the frequencies it records.
+function recordedLicences(doc) {
+  const out = [];
+  const rep = doc.repeater;
+  if (rep) {
+    for (const n of licenceNumbersIn(rep.acma_licence)) {
+      out.push({ licence: n, recorded_on: 'repeater', label: null, rx_mhz: num(rep.rx_mhz), tx_mhz: num(rep.tx_mhz) });
+    }
+  }
+  for (const f of Array.isArray(doc.frequencies) ? doc.frequencies : []) {
+    for (const n of licenceNumbersIn(f && f.acma_licence)) {
+      out.push({ licence: n, recorded_on: 'frequency', label: f.label || null, rx_mhz: num(f.rx_mhz), tx_mhz: num(f.tx_mhz) });
+    }
+  }
+  return out;
+}
+
+function recordedFrequencies(doc) {
+  const items = [];
+  const rep = doc.repeater;
+  if (rep && (num(rep.rx_mhz) != null || num(rep.tx_mhz) != null)) {
+    items.push({ rx_mhz: num(rep.rx_mhz), tx_mhz: num(rep.tx_mhz), label: 'repeater pair', recorded_on: 'repeater' });
+  }
+  for (const f of Array.isArray(doc.frequencies) ? doc.frequencies : []) {
+    if (f && (num(f.rx_mhz) != null || num(f.tx_mhz) != null)) {
+      items.push({ rx_mhz: num(f.rx_mhz), tx_mhz: num(f.tx_mhz), label: f.label || null, recorded_on: 'frequency' });
+    }
+  }
+  return items;
+}
+
+function frequenciesSection(items, asked) {
+  const mhz = uniq([...items.flatMap(i => [i.rx_mhz, i.tx_mhz]), ...asked].filter(f => f != null)).sort((a, b) => a - b);
+  return stripNulls({
+    status: mhz.length ? 'ok' : 'not recorded',
+    mhz,
+    recorded: items,
+    asked,
+    detail: mhz.length ? null : 'No frequency to match: Flood-Net records none for this station and none was asked about, so '
+      + 'matches_station_frequency is null on every licence. Pass freq_mhz to match against one — a field station transmits on '
+      + 'the receive frequency of the repeater that relays it (relayed_by).',
+    note: `A transmitter matches a frequency when it is on the same channel: within ${MATCH_KHZ} kHz of it, tools/acma_fetch.py's co-channel rule.`,
+    source: 'meganet.station_json (repeater.rx_mhz / tx_mhz and frequencies[]); freq_mhz as asked',
+  });
+}
+
+// The register within radiusM of a point. Unless `all`, only the licences a
+// telemetry site's licensing is about are listed (relevantRow); the counts and
+// the sites are always of everything.
+function registerSection(reg, lat, lon, { radiusM, freqs, recordedBases = new Set(), now, all = false }) {
+  const source = `${ACMA_FILE_WORDS}, as of its source_date`;
+  if (lat == null || lon == null) {
+    return { status: 'not recorded', radius_m: radiusM, detail: 'The station has no recorded position, so nothing can be measured from it.', source };
+  }
+  const hits = sitesWithin(reg, lat, lon, radiusM);
+  const rows = registerRows(hits, { freqs, recordedBases, now });
+  const counts = registerCounts(rows, freqs.length > 0);
+  if (!rows.length) {
+    return { status: 'not recorded', radius_m: radiusM, centre: { lat, lon }, site_count: 0, licences_total: 0, counts,
+      sites: [], licences: [], nearest_site: nearestSite(reg, lat, lon),
+      detail: `No transmitter in the register extract is within ${radiusM} m. That is not proof the ACMA's own register has none here: see notes.`,
+      source };
+  }
+  const shown = (all ? rows : rows.filter(relevantRow)).slice(0, LIMITS.acmaRowsMax);
+  const listedAt = new Map(), allAt = new Map();
+  for (const r of rows) allAt.set(r.site.id, (allAt.get(r.site.id) || 0) + 1);
+  for (const r of shown) listedAt.set(r.site.id, (listedAt.get(r.site.id) || 0) + 1);
+  return {
+    status: 'ok',
+    radius_m: radiusM,
+    centre: { lat, lon },
+    site_count: hits.length,
+    licences_total: rows.length,
+    licences_listed: shown.length,
+    listing: all ? 'all' : 'relevant',
+    counts,
+    sites: hits.map(h => ({ ...siteOut(h.site, h.m, h.bearing), licences: allAt.get(h.site.id) || 0, listed: listedAt.get(h.site.id) || 0 })),
+    licences: shown,
+    note: (all ? 'Every licence at those sites' : 'The licences a telemetry site\'s licensing is about — the ones Flood-Net records for the '
+      + `station, those on a frequency it records (or freq_mhz names), the Bureau of Meteorology's, and the rest of the VHF high band (${VHF_HIGH_MHZ[0]}–${VHF_HIGH_MHZ[1]} MHz, `
+      + 'where ALERT telemetry is); all=true lists every one, counts and sites always count them all')
+      + '. One row per licence and site, in that order, nearest first within each. site.distance_m runs from the recorded position to '
+      + 'the site\'s registered one, whose precision the register states (Within 10 metres, Within 100 metres or Unknown). status, '
+      + 'expiry and licensee are as at the extract\'s source_date; expiry_passed is true where that expiry date has gone by since. '
+      + 'tx_power_w and eirp_w are the highest of the licence\'s transmitters at the site; authorised the earliest.',
+    source,
+  };
+}
+
+// The repeaters that relay the station — the nearest few within
+// LIMITS.relayKmMax — with the licences Flood-Net records for each, looked up.
+async function relayedBySection(rc, reg, doc, relayP) {
+  const src = 'meganet.pass_range; meganet.station, meganet.repeater and meganet.station_frequency for the repeaters';
+  const ctx = await relayP;
+  if (!ctx.addrs.length) return { status: 'not recorded', detail: 'The station has no ALERT addresses for a repeater to relay.', source: src };
+  if (!ctx.passRead.ok) return unavailable(ctx.passRead.error, 'meganet.pass_range');
+  const ids = [...ctx.listening.keys()].slice(0, LIMITS.idsPerRead);
+  if (!ids.length) {
+    return { status: 'not recorded', detail: 'No recorded repeater pass range covers this station\'s ALERT addresses.', addresses: ctx.addrs, source: src };
+  }
+  const [st, rp] = await Promise.all([
+    rc.up.select('station', [['select', 'id,name,station_number,lat,lon,station_frequency(rx_mhz,tx_mhz,label,acma_licence)'],
+      ['id', `in.${pgList(ids)}`], ['deleted_at', 'is.null']]),
+    rc.up.select('repeater', [['select', 'station_id,acma_licence,rx_mhz,tx_mhz'], ['station_id', `in.${pgList(ids)}`]]),
+  ]);
+  const repBy = byKey(rp.rows, 'station_id');
+  const lat = num(doc.lat), lon = num(doc.lon);
+  const all = st.rows.map(s => {
+    const d = lat != null && num(s.lat) != null ? round(haversineKm(lat, lon, num(s.lat), num(s.lon)), 2) : null;
+    return { s, d };
+  });
+  const near = all.filter(x => x.d == null || x.d <= LIMITS.relayKmMax)
+    .sort((a, b) => (a.d ?? 1e9) - (b.d ?? 1e9) || (a.s.id < b.s.id ? -1 : 1));
+  const far = all.length - near.length;
+  if (!near.length) {
+    return { status: 'not recorded', addresses: ctx.addrs, source: src,
+      detail: `The ${plainCount(all.length, 'repeater')} whose pass ranges cover its addresses ${all.length === 1 ? 'is' : 'are'} all more than `
+        + `${LIMITS.relayKmMax} km away — another region using the same address, most likely, not a relay.` };
+  }
+  const repeaters = near.slice(0, LIMITS.relayListMax).map(({ s, d }) => {
+    const rep = repBy.get(s.id) || {};
+    const entries = [];
+    for (const n of licenceNumbersIn(rep.acma_licence)) {
+      entries.push({ licence: n, recorded_on: 'repeater', label: null, rx_mhz: num(rep.rx_mhz), tx_mhz: num(rep.tx_mhz) });
+    }
+    for (const f of Array.isArray(s.station_frequency) ? s.station_frequency : []) {
+      for (const n of licenceNumbersIn(f.acma_licence)) {
+        entries.push({ licence: n, recorded_on: 'frequency', label: f.label || null, rx_mhz: num(f.rx_mhz), tx_mhz: num(f.tx_mhz) });
+      }
+    }
+    return {
+      id: s.id, name: s.name, station_number: s.station_number || null, distance_km: d,
+      passes_addresses: ctx.listening.get(s.id) || [],
+      rx_mhz: num(rep.rx_mhz), tx_mhz: num(rep.tx_mhz),
+      licences: entries.map(e => recordedEntry(reg, e, num(s.lat), num(s.lon), rc.now, true)),
+    };
+  });
+  return {
+    status: 'ok',
+    addresses: ctx.addrs,
+    repeaters,
+    ...(near.length > repeaters.length ? { repeaters_not_listed: near.length - repeaters.length } : {}),
+    note: 'The repeaters whose recorded pass ranges cover this station\'s ALERT addresses (exclusions honoured), nearest first, '
+      + `within ${LIMITS.relayKmMax} km${far ? ` (${far} farther away left out — at that distance a range covering the address is usually another region using it)` : ''}, `
+      + 'with the licences Flood-Net records for each, looked up in the register (nearest_site is measured from the repeater). A field '
+      + 'station transmits on its repeater\'s receive frequency (rx_mhz) and may hold no licence registered at its own site.',
+    source: src,
+  };
+}
+
+const plainCount = (n, one) => `${n} ${n === 1 ? one : `${one}s`}`;
+
+// Everything but the station's identity: summary, recorded, frequencies,
+// register, relayed_by, register_extract.
+async function acmaForStation(rc, reg, st, { radiusM, freqs, all = false }, relayP) {
+  const doc = st.doc;
+  const lat = num(doc.lat), lon = num(doc.lon);
+  const list = recordedLicences(doc).map(e => recordedEntry(reg, e, lat, lon, rc.now));
+  const recorded = list.length
+    ? { status: 'ok', licences: list,
+      note: 'The licence numbers Flood-Net\'s register records against this station, each looked up in the register extract — '
+        + 'by its number, else by the number before the "/" (Flood-Net often records 1441013 where the register says 1441013/1). '
+        + 'sites lists where the register puts the licence\'s transmitters, nearest first.',
+      source: 'meganet.station_json (repeater.acma_licence and frequencies[].acma_licence)' }
+    : { status: 'not recorded', licences: [],
+      detail: 'Flood-Net records no ACMA licence number for this station (repeater.acma_licence or a frequency\'s acma_licence).',
+      source: 'meganet.station_json (repeater.acma_licence and frequencies[].acma_licence)' };
+  const items = recordedFrequencies(doc);
+  const frequencies = frequenciesSection(items, freqs);
+  const register = registerSection(reg, lat, lon, { radiusM, freqs: frequencies.mhz,
+    recordedBases: new Set(list.map(e => licenceBase(e.register_licence || e.licence))), now: rc.now, all });
+  let relayed;
+  try { relayed = await relayedBySection(rc, reg, doc, relayP); } catch (err) { relayed = unavailable(err, 'meganet.pass_range / station / repeater'); }
+  const extract = extractInfo(reg, rc.now);
+  return {
+    summary: acmaSummaryLines({ who: doc.name || st.id, proposed: doc.proposed === true, recorded, register, relayed, extract, radiusM }),
+    recorded,
+    frequencies,
+    register,
+    relayed_by: relayed,
+    register_extract: extract,
+  };
+}
+
+function acmaNotes(reg, extract) {
+  return [
+    subsetWords(reg),
+    `A licence is matched to a station's frequency when one of its transmitters is on the same channel — within ${MATCH_KHZ} kHz, `
+      + 'tools/acma_fetch.py\'s co-channel rule — as a frequency the station records (its repeater pair and listed frequencies) or freq_mhz names.',
+    'A licensee registered as a private individual is not named.',
+    ...(extract.note ? [extract.note] : []),
+  ];
+}
+
+async function acmaEndpoint(rc, rawId, params) {
+  const q = parseAcmaParams(params);
+  const st = await loadStationDoc(rc, rawId);
+  const relayP = relayContext(rc, st.doc, st.id);
+  const reg = await acmaRegisterFor(rc);
+  const body = await acmaForStation(rc, reg, st, q, relayP);
+  return {
+    id: st.id,
+    ...(st.resolved_from ? { resolved_from: st.resolved_from } : {}),
+    name: st.doc.name,
+    lat: num(st.doc.lat),
+    lon: num(st.doc.lon),
+    roles: st.doc.roles || [],
+    proposed: st.doc.proposed === true,
+    query: { radius_m: q.radiusM, ...(q.freqs.length ? { freq_mhz: q.freqs } : {}), ...(q.all ? { all: true } : {}) },
+    ...body,
+    notes: acmaNotes(reg, body.register_extract),
+    sources: [
+      registerSource(reg),
+      { relation: 'meganet.station_json', what: 'the station\'s position, and the licences and frequencies Flood-Net records for it', updated_at: st.updated_at },
+      { relation: 'meganet.pass_range / meganet.repeater / meganet.station_frequency', what: 'the repeaters that relay it, and the licences recorded for them' },
+    ],
+    links: { ...stationLinks(rc, st.id), register: REGISTER_URL },
+    generated_at: new Date().toISOString(),
+  };
+}
+
+async function acmaNearEndpoint(rc, params) {
+  if (params.near === undefined) {
+    throw bad(`"near" is needed: GET ${API_PREFIX}/acma?near=lat,lon in decimal degrees, with radius_m up to ${LIMITS.acmaRadiusMaxM}. `
+      + `For a station, GET ${API_PREFIX}/stations/{id}/acma.`);
+  }
+  const near = parsePoint(params.near, 'near');
+  const q = parseAcmaParams(params);
+  const reg = await acmaRegisterFor(rc);
+  const extract = extractInfo(reg, rc.now);
+  const frequencies = q.freqs.length
+    ? { status: 'ok', mhz: q.freqs, asked: q.freqs, note: `A transmitter matches a frequency when it is on the same channel: within ${MATCH_KHZ} kHz of it.`, source: 'freq_mhz as asked' }
+    : { status: 'not recorded', mhz: [], asked: [], detail: 'No frequency asked about (freq_mhz), so matches_station_frequency is null on every licence.', source: 'freq_mhz as asked' };
+  const register = registerSection(reg, near.lat, near.lon, { radiusM: q.radiusM, freqs: q.freqs, now: rc.now, all: q.all });
+  return {
+    near,
+    query: { near: `${near.lat},${near.lon}`, radius_m: q.radiusM, ...(q.freqs.length ? { freq_mhz: q.freqs } : {}), ...(q.all ? { all: true } : {}) },
+    summary: acmaSummaryLines({ who: null, recorded: null, register, relayed: null, extract, radiusM: q.radiusM }),
+    frequencies,
+    register,
+    register_extract: extract,
+    notes: acmaNotes(reg, extract),
+    sources: [registerSource(reg)],
+    links: {
+      stations_near: `${rc.origin}${API_PREFIX}/stations?near=${near.lat},${near.lon}&radius_km=10`,
+      register: REGISTER_URL,
+    },
+    generated_at: new Date().toISOString(),
+  };
+}
+
+// The dossier's section: what GET /stations/{id}/acma answers by default.
+async function acmaSection(rc, st, relayP) {
+  const reg = await acmaRegisterFor(rc);
+  const body = await acmaForStation(rc, reg, st, { radiusM: LIMITS.acmaRadiusDefaultM, freqs: [] }, relayP);
+  return {
+    status: 'ok',
+    ...body,
+    link: `${rc.origin}${API_PREFIX}/stations/${encodeURIComponent(st.id)}/acma`,
+    source: `${ACMA_FILE_WORDS}; meganet.station_json; meganet.pass_range / repeater / station_frequency`,
+  };
+}
+
 // ── The dossier ──────────────────────────────────────────────────────────────
 // One call, everything a report drafter needs about one station, each section
 // labelled with where it came from and saying so when there is nothing —
@@ -1646,18 +1980,15 @@ async function nearbySection(rc, doc, id) {
     : { status: 'not recorded', detail: 'No other live station within about 330 km.', source: 'meganet.station' };
 }
 
-async function radioSection(rc, doc, id, networks, rmSystems) {
+// The station's ALERT addresses and the repeaters whose recorded pass ranges
+// cover them (exclusions honoured): { addrs, passRead, listening: Map(repeater
+// → addresses) }. One read, shared by the dossier's radio and ACMA sections;
+// it never throws — a failed read is passRead.ok false.
+async function relayContext(rc, doc, id) {
   const addrs = uniq([...flattenAlertIds(doc.alert_ids),
     ...(doc.sensors || []).map(s => num(s.alert_id)).filter(x => Number.isInteger(x))]).slice(0, 12);
-
-  const [passRead, linkRead] = await Promise.all([
-    addrs.length ? settle(rc.up.select('pass_range', [['select', 'repeater_id,kind,lo,hi'],
-      ['or', `(${addrs.map(a => `and(lo.lte.${a},hi.gte.${a})`).join(',')})`], ['limit', 1000]])) : null,
-    settle(rc.up.select('link_fade_margin', [['select',
-      'station_a_id,station_b_id,kind,margin_db,margin_ab_db,margin_ba_db,distance_km,freq_mhz,verdict,band,model,computed_at'],
-      ['or', `(station_a_id.eq.${pgQuote(id)},station_b_id.eq.${pgQuote(id)})`], ['order', 'margin_db.asc'], ['limit', 50]])),
-  ]);
-
+  const passRead = addrs.length ? await settle(rc.up.select('pass_range', [['select', 'repeater_id,kind,lo,hi'],
+    ['or', `(${addrs.map(a => `and(lo.lte.${a},hi.gte.${a})`).join(',')})`], ['limit', 1000]])) : null;
   const listening = new Map();
   if (passRead && passRead.ok) {
     const byRep = new Map();
@@ -1673,6 +2004,16 @@ async function radioSection(rc, doc, id, networks, rmSystems) {
       if (passes.length) listening.set(rep, passes);
     }
   }
+  return { addrs, passRead, listening };
+}
+
+async function radioSection(rc, doc, id, networks, rmSystems, relayP = relayContext(rc, doc, id)) {
+  const [{ addrs, passRead, listening }, linkRead] = await Promise.all([
+    relayP,
+    settle(rc.up.select('link_fade_margin', [['select',
+      'station_a_id,station_b_id,kind,margin_db,margin_ab_db,margin_ba_db,distance_km,freq_mhz,verdict,band,model,computed_at'],
+      ['or', `(station_a_id.eq.${pgQuote(id)},station_b_id.eq.${pgQuote(id)})`], ['order', 'margin_db.asc'], ['limit', 50]])),
+  ]);
   const links = linkRead.ok ? linkRead.value.rows : [];
   const otherIds = uniq([...listening.keys(), ...links.map(l => (l.station_a_id === id ? l.station_b_id : l.station_a_id))]).slice(0, 60);
   let names = new Map();
@@ -1776,6 +2117,11 @@ function summaryLines(doc, d) {
   }
   const aep = d.flood_levels.aep_levels;
   if (aep.status === 'ok' && aep.selected.aep_1_m != null) lines.push(`Modelled 1% AEP level ${aep.selected.aep_1_m} m AHD (indicative, confidence ${aep.selected.confidence ?? 'n/a'} of 9).`);
+  // The ACMA licences recorded for it, and what the register says of them —
+  // the section's own first lines, when there is a licence to speak of.
+  if (d.acma && d.acma.status === 'ok' && d.acma.recorded.status === 'ok') {
+    lines.push(...d.acma.summary.filter(l => /^Flood-Net records|^(It is|All \d+ are|\d+ of them (is|are)) in the register/.test(l)).slice(0, 2));
+  }
   const insp = d.inspections;
   if (insp.status === 'ok' && insp.last_visit) lines.push(`${insp.visits_recorded} site visit(s) recorded; the last on ${insp.last_visit.date}.`);
   if (d.telemetry.health.status === 'ok') lines.push(`Flood-Net last heard from it at ${d.telemetry.health.last_seen_at}.`);
@@ -1789,6 +2135,9 @@ async function dossierEndpoint(rc, rawId) {
   const days = 30;                       // UTC dates, today included
   const toDate = new Date(rc.now).toISOString().slice(0, 10);
   const fromDate = new Date(rc.now - (days - 1) * 86400000).toISOString().slice(0, 10);
+  // The pass ranges over its addresses: read once, for the radio section's
+  // repeaters listening and the ACMA section's relayed_by.
+  const relayP = relayContext(rc, doc, id);
 
   const [sls, health, daily, cats, hubs, nets, rms, slsDocs, fv, indexes] = await Promise.all([
     settle(slsRowsFor(rc, id)),
@@ -1805,10 +2154,11 @@ async function dossierEndpoint(rc, rawId) {
     settle(bureauIndexOf(rc)),
   ]);
   const indexBy = indexes.ok ? byKey(indexes.value, 'code') : new Map();
-  const [inspections, nearby, radio] = await Promise.all([
+  const [inspections, nearby, radio, acma] = await Promise.all([
     settle(inspectionsSection(rc, id)),
     settle(nearbySection(rc, doc, id)),
-    settle(radioSection(rc, doc, id, nets.ok ? byKey(nets.value) : null, rms.ok ? byKey(rms.value) : null)),
+    settle(radioSection(rc, doc, id, nets.ok ? byKey(nets.value) : null, rms.ok ? byKey(rms.value) : null, relayP)),
+    settle(acmaSection(rc, st, relayP)),
   ]);
 
   const slsRows = sls.ok ? sls.value : [];
@@ -1838,6 +2188,7 @@ async function dossierEndpoint(rc, rawId) {
     flood_levels: buildFloodLevels(doc, slsRows, fv),
     inspections: inspections.ok ? inspections.value : unavailable(inspections.error, 'meganet.inspection_chart_*'),
     nearby_stations: nearby.ok ? nearby.value : unavailable(nearby.error, 'meganet.station'),
+    acma: acma.ok ? acma.value : unavailable(acma.error, ACMA_FILE_WORDS),
   };
   if (!sls.ok) d.flood_levels.sls_flood_classes = unavailable(sls.error, 'meganet.sls_location');
 
@@ -1862,6 +2213,8 @@ async function dossierEndpoint(rc, rawId) {
       { relation: 'meganet.inspection_chart_*', what: 'numbers recorded at site visits (no remarks)' },
       { relation: 'meganet.pass_range / meganet.link_fade_margin', what: 'repeater pass ranges and saved modelled link margins' },
       { relation: 'meganet.station / catchment / hub / radio_network / rm_system', what: 'nearby stations and reference names' },
+      { file: LICENSING_PATH, what: 'the ACMA Register of Radiocommunications Licences, as the weekly extract Flood-Net keeps (CC BY 4.0)',
+        source_date: acma.ok ? acma.value.register_extract.source_date : null },
     ],
     links: stationLinks(rc, id),
     disclaimer: DISCLAIMER,
@@ -2789,6 +3142,8 @@ export const ENDPOINTS = Object.freeze([
   { path: '/api/v1/stations/{id}/readings', op: 'getStationReadings', summary: 'Telemetry ingested into Flood-Net: raw, hourly or daily, bounded windows.' },
   { path: '/api/v1/stations/{id}/flood-levels', op: 'getStationFloodLevels', summary: 'Flood classes, SLS classes, crossings, gauge zero, flood effects, AEP levels and one AHD ladder.' },
   { path: '/api/v1/stations/{id}/service-level', op: 'getStationServiceLevel', summary: 'The station\'s entries in the Service Level Specifications (Queensland; New South Wales and the ACT).' },
+  { path: '/api/v1/stations/{id}/acma', op: 'getStationAcmaLicences', summary: 'The ACMA licences Flood-Net records for a station, and the ACMA register\'s licences at sites within radius_m of it.' },
+  { path: '/api/v1/acma', op: 'getAcmaLicencesNear', summary: 'The ACMA register\'s licences at sites within radius_m of a point — for a site not built yet, or a move.' },
   { path: '/api/v1/readings/latest', op: 'getLatestReadings', summary: 'Every station\'s newest reading on each channel, in one call: by network, basin, kind or bounding box.' },
   { path: '/api/v1/health/silent', op: 'getSilentStations', summary: 'The stations gone quiet now, and the groups that went quiet together, from the server\'s own health run.' },
   { path: '/api/v1/health/findings', op: 'getHealthFindings', summary: 'Station Health for a page of stations, worst first — by owner, by station ids, or by network, basin, kind or bounding box.' },
@@ -2822,7 +3177,7 @@ function apiIndex(rc) {
       cache_seconds: LIMITS.cacheSeconds,
     },
     station_ids: 'Lowercase slugs such as "abergowrie_br_al"; an all-digit id is also tried as a Bureau station number.',
-    data_policy: 'Only what the public (anon) key can read: no inspection remarks, raw ingest payloads, photos or user data. See docs/access.md.',
+    data_policy: 'Only what the public (anon) key can read, and public files the site already serves (the ACMA register extract): no inspection remarks, raw ingest payloads, photos or user data. See docs/access.md.',
     disclaimer: DISCLAIMER,
     generated_at: new Date().toISOString(),
   };
@@ -2859,6 +3214,9 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
   const formatParam = { name: 'format', in: 'query', required: false,
     description: 'json (default), or geojson: a GeoJSON FeatureCollection (RFC 7946) of Point features at [lon, lat], each feature\'s properties the row the JSON answer gives. A station with no recorded position is left out and named in omitted_without_position.',
     schema: { type: 'string', enum: FORMATS, default: 'json' } };
+  const acmaAllParam = { name: 'all', in: 'query', required: false,
+    description: 'true lists every licence within radius_m. By default only those a telemetry site\'s licensing is about: the station\'s recorded ones, those on its frequencies (or freq_mhz), the Bureau\'s and the rest of 148–174 MHz.',
+    schema: { type: 'boolean', default: false } };
   const op = (operationId, summary, description, parameters, responses) =>
     ({ get: { operationId, summary, description, parameters, responses } });
   const q = (name, description, schema) => ({ name, in: 'query', required: false, description, schema });
@@ -2920,6 +3278,22 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
       '/api/v1/stations/{id}/service-level': op('getStationServiceLevel', 'Get the SLS entries',
         'The station\'s entries in the Service Level Specifications (QLD; NSW and the ACT), one per document that lists it: gauge type, data type, priority, owner, schedules, flood classes and prediction — and the NSW gauge datum and AWRC number — with each edition.',
         [idParam], ok('The SLS entries.')),
+      '/api/v1/stations/{id}/acma': op('getStationAcmaLicences', 'Get a station\'s ACMA licences',
+        'The ACMA licences Flood-Net records for the station, each looked up in the register; the register\'s licences at sites within radius_m, with licensee, frequencies, power, distance and whether it matches a station frequency; and the repeaters that relay it.',
+        [
+          idParam,
+          q('radius_m', `Metres around the station to list the register's licences, 1–${LIMITS.acmaRadiusMaxM} (default ${LIMITS.acmaRadiusDefaultM}).`, { type: 'number', minimum: 1, maximum: LIMITS.acmaRadiusMaxM, default: LIMITS.acmaRadiusDefaultM }),
+          q('freq_mhz', `Frequencies in MHz, comma-separated (up to ${LIMITS.acmaFreqsMax}), to match the register against besides those Flood-Net records — e.g. 151.525. A match is within ${MATCH_KHZ} kHz.`, { type: 'string', maxLength: 100 }),
+          acmaAllParam,
+        ], ok('The recorded licences, the register around the station, and the repeaters that relay it.')),
+      '/api/v1/acma': op('getAcmaLicencesNear', 'Get the ACMA licences near a point',
+        'The ACMA register\'s licences at sites within radius_m of a point — for a site not built yet, or a station being moved: licensee, frequencies, power, emission, distance, the site\'s stated precision.',
+        [
+          { ...q('near', 'The point, "lat,lon" in decimal degrees.', { type: 'string', pattern: '^-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?$' }), required: true },
+          q('radius_m', `Metres around the point, 1–${LIMITS.acmaRadiusMaxM} (default ${LIMITS.acmaRadiusDefaultM}).`, { type: 'number', minimum: 1, maximum: LIMITS.acmaRadiusMaxM, default: LIMITS.acmaRadiusDefaultM }),
+          q('freq_mhz', `Frequencies in MHz, comma-separated (up to ${LIMITS.acmaFreqsMax}), to flag the licences on — e.g. 151.525. A match is within ${MATCH_KHZ} kHz.`, { type: 'string', maxLength: 100 }),
+          acmaAllParam,
+        ], ok('The register\'s licences around the point.')),
       '/api/v1/readings/latest': op('getLatestReadings', 'Get the latest readings',
         'Every station Flood-Net holds telemetry for, each channel\'s newest reading and its age, in one call — filtered by radio network, basin, kind or bounding box. Most stations report through the Bureau\'s own systems and are absent.',
         [
@@ -3029,10 +3403,12 @@ async function routeRest(rc, sub, params) {
           allowParams(params, ['from', 'to', 'resolution', 'channel', 'limit', 'offset']));
         case 'flood-levels': none(); return floodLevelsEndpoint(rc, parts[1]);
         case 'service-level': none(); return serviceLevelEndpoint(rc, parts[1]);
+        case 'acma': return acmaEndpoint(rc, parts[1], allowParams(params, ACMA_PARAMS));
         default: break;
       }
     }
   }
+  if (parts[0] === 'acma' && parts.length === 1) return acmaNearEndpoint(rc, allowParams(params, ACMA_NEAR_PARAMS));
   if (parts[0] === 'readings' && parts.length === 2 && parts[1] === 'latest') {
     return latestReadingsEndpoint(rc, allowParams(params, LATEST_PARAMS));
   }
@@ -3340,6 +3716,7 @@ export const MCP_INSTRUCTIONS = [
   'Station ids are lowercase slugs such as "abergowrie_br_al" (a Bureau number also works). Find stations with search_stations or stations_near, then call get_station_dossier for everything about one station in a single call — identity, location, radio, telemetry and health, the Service Level Specification entry, the Bureau\'s flood classes, crossings and gauge zero, AEP levels, inspection numbers and nearby stations, each labelled with its source. Use get_flood_levels or get_service_level when only that is needed.',
   'For what Station Health says about a station — its findings with what to do, its check schedule day by day, its battery\'s night lows — call get_station_health; for a maintenance run\'s worth of stations, get_health_findings by owner or by station ids.',
   'For what every gauge is saying now, call get_latest_readings once — by radio network, basin, kind or bounding box if you like — rather than get_readings station by station; it covers only telemetry ingested into Flood-Net, which most stations do not send. For what has gone quiet, call get_silent_stations. For a map, search_stations, stations_near, get_latest_readings and get_silent_stations answer GeoJSON with format "geojson".',
+  'For radio licensing, get_acma_licences gives the ACMA licences Flood-Net records for a station and every licence the ACMA register has near it (licensee, frequencies, power, distance, whether it is on the station\'s frequency); acma_licences_near does the same for a point where a site might go. The register is a weekly extract kept for the network\'s area — say its source_date, and check a licence on the ACMA\'s register before relying on it.',
   'Heights: flood classes, crossings and flood effects are metres on the gauge, not AHD; AEP levels are modelled metres AHD and indicative only. Say which source a figure came from. Sections report status "ok", "not recorded" or "unavailable" — never read "not recorded" as zero.',
   `Be gentle: ${rateLimitWords().join('; ')}. Cache what you fetch and do not walk the whole network station by station.`,
   'Flood-Net is not a flood warning service. For current warnings and observations, send people to the Bureau of Meteorology (bom.gov.au).',
@@ -3361,6 +3738,8 @@ const listFilters = {
 };
 const formatArg = { type: 'string', enum: FORMATS,
   description: 'json (default), or geojson for a map: a GeoJSON FeatureCollection of Point features at [lon, lat], properties the same rows; a station with no position is left out and named.' };
+
+const acmaAllArg = { type: 'boolean', description: 'true: every licence within radius_m. By default only those a telemetry site\'s licensing is about — the station\'s recorded ones, those on its frequencies, the Bureau\'s and the rest of 148–174 MHz; the counts and sites always count them all.' };
 
 const pick = (a, keys) => Object.fromEntries(keys.filter(k => a[k] !== undefined).map(k => [k, String(a[k])]));
 const enc = encodeURIComponent;
@@ -3494,6 +3873,31 @@ export const MCP_TOOLS = Object.freeze([
     description: 'A station\'s entries in the Service Level Specifications — Queensland\'s, and the one for New South Wales and the ACT; a station on the border has one from each: gauge type (Manual/Automatic), data type, priority, owner, schedules, flood classes and prediction (and, from the NSW document, the gauge datum and AWRC number), each with its edition.',
     inputSchema: { type: 'object', properties: { id: idArg }, required: ['id'], additionalProperties: false },
     route: a => [`/stations/${enc(a.id)}/service-level`, {}],
+  },
+  {
+    name: 'get_acma_licences',
+    title: 'Get a station\'s ACMA licences',
+    description: `The radio licences at a station's site: the ACMA licence numbers Flood-Net records for it (its repeater pair and listed frequencies), each looked up in the ACMA register — status, licensee, expiry, where its transmitters are; the register's licences at sites within radius_m (default ${LIMITS.acmaRadiusDefaultM} m, max ${LIMITS.acmaRadiusMaxM}) — its own, those on its frequencies (or freq_mhz), the Bureau's and the rest of the VHF high band, or every one with all — each with licensee, frequencies, power, emission, distance, the site's stated precision and whether it matches a station frequency; and the repeaters that relay it, with their licences. From a weekly extract of the register for the network's area — its source_date says how old.`,
+    inputSchema: { type: 'object', properties: {
+      id: idArg,
+      radius_m: { type: 'number', minimum: 1, maximum: LIMITS.acmaRadiusMaxM, description: `Metres around the station (default ${LIMITS.acmaRadiusDefaultM}, max ${LIMITS.acmaRadiusMaxM}).` },
+      freq_mhz: { type: 'string', maxLength: 100, description: `Frequencies in MHz to match against as well, comma-separated (up to ${LIMITS.acmaFreqsMax}), e.g. "151.525".` },
+      all: acmaAllArg,
+    }, required: ['id'], additionalProperties: false },
+    route: a => [`/stations/${enc(a.id)}/acma`, pick(a, ['radius_m', 'freq_mhz', 'all'])],
+  },
+  {
+    name: 'acma_licences_near',
+    title: 'ACMA licences near a point',
+    description: `The ACMA register's licences at sites within radius_m (default ${LIMITS.acmaRadiusDefaultM} m, max ${LIMITS.acmaRadiusMaxM}) of a latitude/longitude — for a site not built yet, or a station being moved: licence number, licensee, frequencies, power, emission, distance and the site's stated precision. Those on freq_mhz first, then the Bureau's and the VHF high band (where ALERT telemetry is); all for every licence. When nothing is that close, the nearest registered site.`,
+    inputSchema: { type: 'object', properties: {
+      lat: { type: 'number', minimum: -90, maximum: 90, description: 'Latitude, decimal degrees (negative south).' },
+      lon: { type: 'number', minimum: -180, maximum: 180, description: 'Longitude, decimal degrees.' },
+      radius_m: { type: 'number', minimum: 1, maximum: LIMITS.acmaRadiusMaxM, description: `Metres around the point (default ${LIMITS.acmaRadiusDefaultM}, max ${LIMITS.acmaRadiusMaxM}).` },
+      freq_mhz: { type: 'string', maxLength: 100, description: `Frequencies in MHz to flag, comma-separated (up to ${LIMITS.acmaFreqsMax}), e.g. "151.525".` },
+      all: acmaAllArg,
+    }, required: ['lat', 'lon'], additionalProperties: false },
+    route: a => ['/acma', { near: `${a.lat},${a.lon}`, ...pick(a, ['radius_m', 'freq_mhz', 'all']) }],
   },
   {
     name: 'list_networks',

@@ -6,7 +6,8 @@ against MegaNet repeater RX channels, and emit the static JSON the map reads.
 PIPELINE POSITION
     spectra_rrl.zip (ACMA daily extract, ~68 MB — never committed)
         └─ tools/acma_prefilter.py       → data/acma-raw/   (committed subset)
-              └─ tools/acma_fetch.py     → data/acma-*.json (committed, read by app.js)
+              └─ tools/acma_fetch.py     → data/acma-*.json (committed, read by app.js;
+                                            acma-licensing.json by the agent API's Worker)
 
     Despite the name (kept from the original design), this script performs no
     network fetch: the sandboxed environment has no egress to acma.gov.au. Input
@@ -883,12 +884,115 @@ def build_outputs(args, tables, anchors, per_anchor, counts, median_w, source_da
     dicts_out = {'meta': meta_common}
     dicts_out.update(tables['dicts'])
 
+    subset = {
+        'radius_km': args.radius_km, 'cosite_m': args.cosite_m,
+        'band_mhz': [float(x) for x in args.band.split(':')],
+    }
+
     return {
         'acma-threats.json': threats_out,
         'acma-sites.json': sites_out,
         'acma-devices.json': devices_out,
         'acma-dictionaries.json': dicts_out,
         'acma-timeline.json': build_timeline(tables, per_anchor, meta_common),
+        'acma-licensing.json': build_licensing(sites_out['sites'], devs_out, lics_out,
+                                               clients_out, meta_common, subset),
+    }
+
+
+# ── The agent API's copy: data/acma-licensing.json ───────────────────────────
+#
+# GET /api/v1/stations/{id}/acma and GET /api/v1/acma (worker/acma.js) answer
+# "which licences are at this site" from the same register as the map. The
+# Worker reads the file through its static-assets binding, once per isolate —
+# and acma-devices.json is 4.6 MB of objects, about 50 ms of JSON.parse, five
+# times a Workers Free request's whole 10 ms of CPU. This is the part of it the
+# API needs, in columns, with the repeated words said once: about 0.9 MB that
+# parses in a few milliseconds.
+#
+# Built from the outputs above rather than from the tables, so it says exactly
+# what acma-devices.json and acma-sites.json say; test/agent-api.mjs re-derives
+# it from those two files and fails if the committed copy differs. A licensee
+# registered as a private individual (client type "Person") has no name here:
+# the API serves organisations' names, never a person's.
+
+LICENSING_COLUMNS = {
+    'kinds': ['type', 'category', 'service', 'subservice'],
+    'sites': ['id', 'name', 'lat', 'lon', 'state', 'precision'],
+    'clients': ['client_no', 'name', 'trading_name', 'type'],
+    'licences': ['number', 'status', 'kind', 'issued', 'expiry', 'client'],
+    'transmitters': ['site', 'licence', 'f_mhz', 'bw_khz', 'emission', 'tx_w', 'eirp_w',
+                     'authorised', 'count'],
+}
+
+
+def _num_key(s):
+    """Sort key for ACMA identifiers: numbers by value, anything else after."""
+    head = (s or '').split('/')[0]
+    return (0, int(head), s) if head.isdigit() else (1, 0, s or '')
+
+
+def build_licensing(sites, devices, licences, clients, meta, subset):
+    """sites, devices, licences and clients as acma-sites.json and
+    acma-devices.json hold them; meta the extract's (generated, source_date,
+    source, attribution). Returns the acma-licensing.json document."""
+    site_rows = sorted(sites, key=lambda s: _num_key(s['id']))
+    site_idx = {s['id']: i for i, s in enumerate(site_rows)}
+    used = [d for d in devices if d.get('site_id') in site_idx and d.get('lic') in licences]
+    lic_nos = sorted({d['lic'] for d in used}, key=_num_key)
+    lic_idx = {no: i for i, no in enumerate(lic_nos)}
+    client_nos = sorted({licences[no].get('client_no') for no in lic_nos
+                         if licences[no].get('client_no') in clients}, key=_num_key)
+    client_idx = {no: i for i, no in enumerate(client_nos)}
+
+    kinds, kind_idx = [], {}
+    lic_rows = []
+    for no in lic_nos:
+        l = licences[no]
+        k = (l.get('type'), l.get('category'), l.get('service'), l.get('subservice'))
+        if k not in kind_idx:
+            kind_idx[k] = len(kinds)
+            kinds.append(list(k))
+        lic_rows.append([no, l.get('status'), kind_idx[k], l.get('issued'), l.get('expiry'),
+                         client_idx.get(l.get('client_no'))])
+
+    client_rows = []
+    for no in client_nos:
+        c = clients[no]
+        person = c.get('type') == 'Person'
+        client_rows.append([no, None if person else c.get('name'),
+                            None if person else c.get('trading'), c.get('type')])
+
+    counted = {}
+    for d in used:
+        row = (site_idx[d['site_id']], lic_idx[d['lic']], d.get('f_mhz'), d.get('bw_khz'),
+               d.get('emission'), d.get('tx_w'), d.get('eirp_w'), d.get('authorised'))
+        counted[row] = counted.get(row, 0) + 1
+    tx_rows = [list(r) + [n] for r, n in sorted(
+        counted.items(), key=lambda kv: (kv[0][0], kv[0][1], kv[0][2] if kv[0][2] is not None else -1,
+                                         json.dumps(kv[0][3:], sort_keys=True)))]
+
+    return {
+        'meta': dict(
+            {k: meta[k] for k in ('generated', 'source_date', 'source', 'attribution') if k in meta},
+            note='Read by the agent API (worker/acma.js, GET /api/v1/stations/{id}/acma and '
+                 'GET /api/v1/acma): the register\'s transmitters in this subset by site, licence '
+                 'and licensee, in columns (see columns). Built by tools/acma_fetch.py from what '
+                 'acma-devices.json and acma-sites.json hold. A licensee registered as a private '
+                 'individual is not named. Licensee details must not be used for unsolicited '
+                 'messaging (Spam Act 2003 / Do Not Call Register Act 2006).',
+            derived_from=['data/acma-devices.json', 'data/acma-sites.json'],
+            subset=subset,
+            columns=LICENSING_COLUMNS,
+            counts={'sites': len(site_rows), 'licences': len(lic_rows), 'clients': len(client_rows),
+                    'transmitters': len(used), 'rows': len(tx_rows)},
+        ),
+        'kinds': kinds,
+        'sites': [[s['id'], s.get('name'), s.get('lat'), s.get('lon'), s.get('state'), s.get('precision')]
+                  for s in site_rows],
+        'clients': client_rows,
+        'licences': lic_rows,
+        'transmitters': tx_rows,
     }
 
 

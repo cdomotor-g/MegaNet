@@ -11,8 +11,10 @@ ask what every gauge reporting into Flood-Net is saying now, in one call
 station — its findings and what to do about them, its check schedule day by
 day, its battery's night lows ([station health](#get-apiv1stationsidhealth)) —
 or about a field team's whole run of stations at once
-([health findings](#get-apiv1healthfindings)), and have any list of stations as
-[GeoJSON for a map](#geojson-for-a-map).
+([health findings](#get-apiv1healthfindings)), have any list of stations as
+[GeoJSON for a map](#geojson-for-a-map), and ask which radio licences the ACMA's
+register has at a station's site — or at a point where one might go
+([ACMA licences](#get-apiv1stationsidacma)).
 
 It was built for drafting **assessment reports**, and the one-call
 [station dossier](#get-apiv1stationsiddossier) is shaped for that. It is not
@@ -46,7 +48,10 @@ of public relations, carrying the *publishable* key — the same key, and so the
 same row-level security, as a visitor to the app who has not signed in. Nothing
 you send is forwarded: not your `Authorization` header, not a cookie, not a
 Cloudflare Access identity. There is no write verb anywhere in it, and no
-database function is called.
+database function is called. Besides the database it reads public files this
+site already serves to anybody — the ACMA register extract the map draws
+(`data/acma-licensing.json`) — through the Worker's static-assets binding, by a
+GET of a fixed path: still read-only, and still nothing that is not public.
 
 **Public data only.** It can read exactly what an anonymous visitor can
 ([`docs/access.md`](access.md), "The decision: the data stays public"). It
@@ -229,6 +234,8 @@ says what to change; an unknown tool or malformed request is a JSON-RPC error.
 | `get_health_findings` | The same for a page of stations, worst first: by owner, station ids, network, basin, kind or bounding box | `GET /api/v1/health/findings` |
 | `get_flood_levels` | Flood classes, SLS classes, crossings, gauge zero, flood effects, AEP levels, one AHD ladder | `GET /api/v1/stations/{id}/flood-levels` |
 | `get_service_level` | The station's Service Level Specification entry | `GET /api/v1/stations/{id}/service-level` |
+| `get_acma_licences` | The ACMA licences Flood-Net records for a station, each looked up in the register; the register's licences around it (licensee, frequencies, power, distance, whether on the station's frequency); the repeaters that relay it | `GET /api/v1/stations/{id}/acma` |
+| `acma_licences_near` | The register's licences around a point — for a site not built yet, or a move | `GET /api/v1/acma?near=` |
 | `list_catchments` | The 77 Queensland drainage basins | `GET /api/v1/catchments` |
 | `get_catchment` | One basin and a page of its stations | `GET /api/v1/catchments/{id}` |
 | `list_networks` | Radio networks, maintenance hubs, Radio Mobile systems | `GET /api/v1/networks` |
@@ -447,6 +454,7 @@ never silently missing, and "not recorded" never means zero.
 | `flood_levels` | as [`/flood-levels`](#get-apiv1stationsidflood-levels) |
 | `inspections` | how many visits, first and last, and the numbers the last three recorded (battery and solar volts, SWR, RSSI, fade margins, gas) |
 | `nearby_stations` | the five nearest live stations: distance, bearing, kinds, and `proposed` where one is only proposed |
+| `acma` | the ACMA licences: what [`/acma`](#get-apiv1stationsidacma) answers by default — the licences recorded for it, the register's within 500 m, the repeaters that relay it |
 | `sources`, `links`, `disclaimer`, `generated_at` | provenance and where to go next |
 
 ```sh
@@ -671,6 +679,190 @@ class has not been defined yet (`flood_classes_not_yet_defined`, printed
 `n/a`: "not yet defined by the NSW SES"), that a location is a small catchment
 with a faster response (`fast_response`, its `^`), or that a service is
 interim with no determined lead time (`prediction.interim_service`, its `*`).
+
+### `GET /api/v1/stations/{id}/acma`
+
+The radio licences at a station's site, from the ACMA's **Register of
+Radiocommunications Licences** — for a scope sheet's "ACMA licence" line: the
+licence number to record when the site already has one that can be reused, a
+council's licence that would have to be transferred to the Bureau, or nothing,
+and a new licence and a network assessment to plan. Flood-Net gives the facts;
+the call is yours. Three parts:
+
+- **`recorded`** — the licence numbers Flood-Net records for the station (its
+  repeater pair's and each listed frequency's `acma_licence`), each looked up in
+  the register: the register's own number for it (`register_licence` —
+  Flood-Net often records `1441013` where the register says `1441013/1`, so a
+  number not found whole is matched by the part before the `/`, and
+  `matched_by` says which), `status`, `service`, `subservice`, `issued`,
+  `expiry`, `expiry_passed`, the `licensee`, and the `sites` where the register
+  puts its transmitters, nearest first. `in_register: false`, with a `detail`,
+  when the extract does not have it.
+- **`register`** — the register's licences at sites within `radius_m`, one row
+  per licence and site. By default the ones a telemetry site's licensing is
+  about, in this order, nearest first within each: the station's own
+  (`recorded_by_floodnet`), those on a frequency it records
+  (`matches_station_frequency`), the Bureau of Meteorology's
+  (`licensee.is_bureau`), and the rest of the VHF high band, 148–174 MHz, where
+  ALERT telemetry is (`vhf_high_band`). `all=true` lists every licence.
+  `counts`, `licences_total` and `sites` always cover them all: `sites` gives
+  each site once, with its position, its `precision`, `distance_m`, bearing,
+  and how many licences it holds and how many are `listed`. With nothing that
+  close, `status` is `not recorded` and `nearest_site` says where the nearest
+  registered site is.
+- **`relayed_by`** — for a field station, the repeaters whose pass ranges cover
+  its ALERT addresses (the nearest five within 150 km — farther away, a range
+  covering the address is usually another region reusing it), each with the
+  frequency it receives on (`rx_mhz`, the one the field station transmits on)
+  and the licences Flood-Net records for it, looked up. A field station often
+  has no transmitter registered at its own site.
+
+Also: `frequencies` (what the register is matched against — what Flood-Net
+records for the station, and `freq_mhz`), `summary` (plain sentences),
+`register_extract` (`source_date`, `refreshed_at`, `age_days`, and `stale`
+past 14 days, with a `note`), `notes`, `sources` and `links`.
+
+| Parameter | Meaning |
+|---|---|
+| `radius_m` | metres around the station, 1–5000; default 500 — the radius `tools/acma_fetch.py` matches a repeater to its licence within, which holds every licence already recorded against one (the farthest 457 m away, at a site whose stated precision is *Unknown*) and is five times the coarsest precision a site states (*Within 100 metres*) |
+| `freq_mhz` | frequencies in MHz to match against besides those Flood-Net records, comma-separated, up to 8 — for a field station, its repeater's `rx_mhz` |
+| `all` | `true` lists every licence within the radius; by default only the ones described above |
+
+A row of `register.licences`:
+
+| Field | Meaning |
+|---|---|
+| `licence` | the register's licence number, such as `10774614/1` |
+| `status`, `expiry`, `expiry_passed` | as at the extract's `source_date`; `expiry_passed` is `true` when the expiry date has gone by since — renewed or lapsed, the extract cannot say |
+| `service`, `subservice` | such as Fixed / Point to Multipoint (an ALERT network's licence), Land Mobile, Spectrum (the mobile carriers) |
+| `licensee` | `name`, `trading_name`, the ACMA's client `type` (Local Government, State Government, Company…) and `is_bureau`. A licensee registered as a private individual is never named |
+| `site` | `id`, `name`, `distance_m` from the station, and the `precision` the register states for the site's position (*Within 10 metres*, *Within 100 metres*, *Unknown*) |
+| `frequencies_mhz`, `emissions` | its transmitters' at that site |
+| `tx_power_w`, `eirp_w` | the highest of them, in watts |
+| `authorised` | the earliest of their authorisation dates |
+| `transmitters` | how many there are |
+| `vhf_high_band` | one of them is in 148–174 MHz |
+| `recorded_by_floodnet` | Flood-Net records this licence for the station |
+| `matches_station_frequency`, `matched_frequencies_mhz` | one of them is on the same channel — within 6.25 kHz, `tools/acma_fetch.py`'s co-channel rule — as a frequency the station records or `freq_mhz` names; `null`, not `false`, when there was no frequency to match |
+
+```sh
+curl -s -H 'X-FloodNet-Client: your-name' \
+  'https://floodwarning.net/api/v1/stations/mt_glorious_al_rptr/acma'
+```
+
+A real answer, from the extract of 23 July 2026, trimmed (`…`) — Mt Glorious
+AL RPTR, Seqwater's repeater:
+
+```json
+{
+  "id": "mt_glorious_al_rptr", "name": "Mt Glorious AL RPTR", "lat": -27.3151, "lon": 152.7477,
+  "roles": ["field", "repeater"], "proposed": false, "query": { "radius_m": 500 },
+  "summary": [
+    "Flood-Net records 5 ACMA licences for Mt Glorious AL RPTR: 10774614/1 (its repeater pair, 151.525 MHz), 10774616/1 (Seqwater ALERT, 152.4625 MHz), …",
+    "All 5 are in the register extract of 23 July 2026, granted, held by Seqwater, with transmitters as near as 37 m.",
+    "Within 500 m, the register extract of 23 July 2026 has 83 licences at 4 sites; 7 are on a frequency Flood-Net records for the station; 15 are in the VHF high band (148–174 MHz); 11 are the Bureau of Meteorology's.",
+    "…"
+  ],
+  "recorded": { "status": "ok", "licences": [{
+    "licence": "10774614/1", "recorded_on": "repeater", "label": null, "rx_mhz": 151.525, "tx_mhz": 151.525,
+    "in_register": true, "register_licence": "10774614/1", "matched_by": "number",
+    "status": "Granted", "service": "Fixed", "subservice": "Point to Multipoint", "issued": "2026-03-19",
+    "expiry": "2027-03-17", "expiry_passed": false,
+    "licensee": { "name": "Queensland Bulk Water Supply Authority", "trading_name": "Seqwater",
+                  "type": "State Government", "client_no": "1144435", "is_bureau": false },
+    "sites": [{ "id": "15843", "name": "Powerlink Tower The Summit MOUNT GLORIOUS", "state": "QLD",
+                "precision": "Within 10 metres", "frequencies_mhz": [151.525], "distance_m": 37 }], "sites_total": 1
+  }, "…"] },
+  "frequencies": { "status": "ok", "mhz": [151.425, 151.525, 151.5375, 152.25, 152.4625], "…": "…" },
+  "register": {
+    "status": "ok", "radius_m": 500, "site_count": 4, "licences_total": 83, "licences_listed": 26, "listing": "relevant",
+    "counts": { "matching_frequency": 7, "vhf_high_band": 15, "recorded_by_floodnet": 5, "bureau": 11 },
+    "sites": [{ "id": "15843", "name": "Powerlink Tower The Summit MOUNT GLORIOUS", "lat": -27.31529, "lon": 152.74801,
+                "state": "QLD", "precision": "Within 10 metres", "distance_m": 37, "bearing_deg": 125, "direction": "SE",
+                "licences": 31, "listed": 14 }, "…"],
+    "licences": [
+      { "licence": "10774614/1", "status": "Granted", "service": "Fixed", "subservice": "Point to Multipoint",
+        "expiry": "2027-03-17", "expiry_passed": false,
+        "licensee": { "name": "Queensland Bulk Water Supply Authority", "trading_name": "Seqwater", "type": "State Government", "is_bureau": false },
+        "site": { "id": "15843", "name": "Powerlink Tower The Summit MOUNT GLORIOUS", "distance_m": 37, "precision": "Within 10 metres" },
+        "frequencies_mhz": [151.525], "emissions": ["12K5F2D"], "tx_power_w": 5, "eirp_w": 14.1, "authorised": "2026-03-19",
+        "transmitters": 1, "vhf_high_band": true, "recorded_by_floodnet": true,
+        "matches_station_frequency": true, "matched_frequencies_mhz": [151.525] },
+      { "licence": "433573/1", "status": "Granted", "service": "Fixed", "subservice": "Point to Point",
+        "expiry": "2026-09-23", "expiry_passed": true,
+        "licensee": { "name": "BUREAU OF METEOROLOGY", "trading_name": "Bureau of Meteorology", "type": "Other Commonwealth Agency", "is_bureau": true },
+        "site": { "id": "15842", "name": "Airservices Tower The Summit MOUNT GLORIOUS", "distance_m": 41, "precision": "Within 10 metres" },
+        "frequencies_mhz": [450.925], "emissions": ["16K0F2D"], "tx_power_w": 4, "eirp_w": 0, "authorised": "1991-01-11",
+        "transmitters": 1, "vhf_high_band": false, "recorded_by_floodnet": false,
+        "matches_station_frequency": false, "matched_frequencies_mhz": [] },
+      "…"
+    ]
+  },
+  "relayed_by": { "status": "not recorded", "detail": "The station has no ALERT addresses for a repeater to relay." },
+  "register_extract": { "source_date": "2026-07-23", "refreshed_at": "2026-07-23T11:14:04Z", "age_days": 100, "stale": true, "note": "…" },
+  "sources": [{ "name": "ACMA Register of Radiocommunications Licences", "licence": "CC BY 4.0", "source_date": "2026-07-23", "…": "…" }, "…"]
+}
+```
+
+A field station usually has nothing registered at its own site, and then
+`relayed_by` is the part to read. Fifteen Mile AL, the same day, trimmed:
+
+```json
+{
+  "id": "fifteen_mile_al", "name": "Fifteen Mile AL",
+  "summary": [
+    "Flood-Net records no ACMA licence for Fifteen Mile AL.",
+    "In the register extract of 23 July 2026 there is no transmitter within 500 m; the nearest registered site is Lookout State Forest R909 PECHEY, 7.7 km NNW.",
+    "It is relayed by Toowoomba AL (17 km, receiving on 151.525 MHz, no licence recorded), Mt Glorious AL RPTR (67.27 km, receiving on 151.525 MHz, licence 10774614/1, …).",
+    "…"
+  ],
+  "recorded": { "status": "not recorded", "licences": [], "detail": "…" },
+  "frequencies": { "status": "not recorded", "mhz": [], "detail": "No frequency to match: … Pass freq_mhz to match against one …" },
+  "register": { "status": "not recorded", "radius_m": 500, "site_count": 0, "licences": [],
+                "counts": { "matching_frequency": null, "vhf_high_band": 0, "recorded_by_floodnet": 0, "bureau": 0 },
+                "nearest_site": { "id": "14592", "name": "Lookout State Forest R909 PECHEY", "precision": "Within 100 metres",
+                                  "distance_m": 7745, "direction": "NNW", "…": "…" } },
+  "relayed_by": { "status": "ok", "addresses": [4043, 4044], "repeaters": [
+    { "id": "toowoomba_al", "name": "Toowoomba AL", "distance_km": 17, "passes_addresses": [4043, 4044],
+      "rx_mhz": 151.525, "tx_mhz": 151.525, "licences": [] },
+    { "id": "mt_glorious_al_rptr", "name": "Mt Glorious AL RPTR", "distance_km": 67.27, "rx_mhz": 151.525, "licences": [
+      { "licence": "10774614/1", "recorded_on": "repeater", "in_register": true, "status": "Granted",
+        "subservice": "Point to Multipoint", "expiry": "2027-03-17", "expiry_passed": false,
+        "licensee": { "name": "Queensland Bulk Water Supply Authority", "trading_name": "Seqwater", "type": "State Government", "is_bureau": false },
+        "nearest_site": { "id": "15843", "name": "Powerlink Tower The Summit MOUNT GLORIOUS", "distance_m": 37 } }, "…"] }
+  ] }
+}
+```
+
+`?freq_mhz=151.525` would match the register around it against that channel.
+A row's `site.distance_m` is from the station's recorded position to the
+site's registered one; measure it against the site's stated `precision`
+before reading two places as one.
+
+### `GET /api/v1/acma`
+
+The `register` part of the answer above, for a **point** — a site not built
+yet, or where a station might move to. No station, so no `recorded` or
+`relayed_by`; `frequencies` holds only what `freq_mhz` names.
+
+| Parameter | Meaning |
+|---|---|
+| `near` | the point, `lat,lon` in decimal degrees — required |
+| `radius_m` | metres around it, 1–5000; default 500 |
+| `freq_mhz` | frequencies in MHz to flag the licences on, comma-separated, up to 8 |
+| `all` | `true` lists every licence within the radius; by default those on `freq_mhz`, the Bureau's and the VHF high band |
+
+```sh
+curl -s 'https://floodwarning.net/api/v1/acma?near=-27.3166,152.749&radius_m=300&freq_mhz=151.525' | jq '.summary'
+```
+
+```json
+[
+  "Within 300 m, the register extract of 23 July 2026 has 83 licences at 4 sites; 1 is on a frequency asked about; 15 are in the VHF high band (148–174 MHz); 11 are the Bureau of Meteorology's.",
+  "The 26 licences listed are held by Seqwater (State Government), Bureau of Meteorology (Other Commonwealth Agency), Philcomm Pty Ltd (Company), …",
+  "The register extract is 100 days old; anything licensed or changed since 23 July 2026 is not in it."
+]
+```
 
 ### `GET /api/v1/health/silent`
 
@@ -966,6 +1158,7 @@ The limiter is Cloudflare's rate limiting binding: counted per Cloudflare
 location and eventually consistent — a brake, not an exact quota.
 
 Other caps: 100 rows per page; a 250 km search radius; 5,000 readings per call;
+a 5 km radius for the ACMA licences (500 m by default) and 300 licences per answer;
 reading windows of 7 / 31 / 731 days (raw / hourly / daily); 1,000 stations per
 call of the latest readings (100 by default); 100 station ids per call of the
 health findings; at most 5,000 stations considered
@@ -1029,6 +1222,17 @@ quote it:
 - **Kinds are derived.** `rain`/`river` come from the record's ALERT addresses,
   location types and the Bureau's river height list; see
   [`/api/v1/stations`](#get-apiv1stations).
+- **The ACMA register is an extract, and a subset.** The licences come from the
+  ACMA's Register of Radiocommunications Licences as Flood-Net last took it
+  (`register_extract.source_date`; refreshed weekly when the download works),
+  cut to the transmitters at sites within 60 km of a Flood-Net repeater — every
+  one in 148–174 MHz, those whose harmonics could land on a repeater's receive
+  channel, and any frequency within 250 m of a repeater. A licence that is not
+  in it may still be on the ACMA's register, and a status or expiry may have
+  changed since: check the ACMA's own register before relying on one, and say
+  the extract's date when you quote it. Contains data from the Australian
+  Communications and Media Authority, Register of Radiocommunications Licences
+  (CC BY 4.0); licensee details must not be used for unsolicited messaging.
 
 ---
 
