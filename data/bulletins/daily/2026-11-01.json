@@ -1,0 +1,408 @@
+{
+ "format": "floodnet-bulletin/1",
+ "kind": "daily",
+ "id": "daily-2026-11-01",
+ "issued_at": "2026-10-31T18:31:46.249Z",
+ "period": {
+  "from": "2026-10-30T18:31:46.249Z",
+  "to": "2026-10-31T18:31:46.249Z",
+  "label": "24 hours to 4:31 am Sunday"
+ },
+ "presenter": "new-recruit",
+ "cohost": "tech-wizard",
+ "outlook": {
+  "sky": "fair",
+  "label": "Fair"
+ },
+ "headline": "Fair again: eighty-two percent of checks in. Two Tweed stations still quiet, and a Gold Coast group that goes quiet at night.",
+ "stats": [
+  {
+   "label": "stations heard",
+   "value": 910,
+   "tone": "neutral"
+  },
+  {
+   "label": "checks received",
+   "value": 82,
+   "unit": "%",
+   "was": 74,
+   "tone": "warn"
+  },
+  {
+   "label": "quiet, keep a schedule",
+   "value": 7,
+   "tone": "warn"
+  },
+  {
+   "label": "critical findings",
+   "value": 9,
+   "tone": "bad"
+  }
+ ],
+ "scenes": [
+  {
+   "type": "title",
+   "title": "Good morning",
+   "secs": 14,
+   "say": "Good morning! The New Recruit here. Should I be writing this down? A fair Sunday: eighty-two percent of checks came in, up from seventy-four, and only seven stations that keep a schedule went quiet."
+  },
+  {
+   "type": "map",
+   "title": "Lingering low over the Tweed",
+   "sub": "two stations, two different stories",
+   "sev": "warn",
+   "secs": 25,
+   "say": "In the Tweed, the gauge below Clarrie Hall Dam has missed forty-five checks in a row. One report got through in the last day. The dam gauge beside it sent ninety-seven, so the path works and the station is the suspect. Dunbible Creek missed all its checks too, but its battery's last low was 9.8 volts, so that one looks like power.",
+   "stations": [
+    "clarrie_hall_dam_d_s",
+    "clarrie_hall_dam",
+    "dunbible_creek_at_dunbible_creek_rail_trail_bridge"
+   ],
+   "marks": [
+    {
+     "id": "clarrie_hall_dam_d_s",
+     "kind": "silent",
+     "sev": "critical",
+     "label": "Clarie Hall Dam D/S"
+    },
+    {
+     "id": "clarrie_hall_dam",
+     "kind": "ok",
+     "sev": "ok",
+     "label": "Clarrie Hall Dam"
+    },
+    {
+     "id": "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+     "kind": "battery",
+     "sev": "critical",
+     "label": "Dunbible Creek"
+    }
+   ],
+   "focus": {
+    "lat": -28.42,
+    "lon": 153.35,
+    "km": 30
+   }
+  },
+  {
+   "type": "map",
+   "title": "Night showers on the Gold Coast",
+   "sub": "quiet overnight, back in the afternoon",
+   "sev": "warn",
+   "secs": 25,
+   "say": "On the Gold Coast, Hotham Creek, Stewarts Road, Pacific Pines and Tyungun went quiet overnight again. Over five days, these stations come through about three times as often in the late afternoon as before dawn, while Molendinar, Tallai and Tallebudgera Creek Road keep talking all night. A hop that fades overnight fits; so does something at the sites. If they come back together mid-morning, it's the hop.",
+   "stations": [
+    "hotham_creek_al",
+    "stewarts_rd_al",
+    "pacific_pines_al",
+    "tyungun_al",
+    "molendinar_al",
+    "tallai_al",
+    "tallebudgera_ck_rd_al"
+   ],
+   "marks": [
+    {
+     "id": "hotham_creek_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "stewarts_rd_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "pacific_pines_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "tyungun_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "molendinar_al",
+     "kind": "repeater",
+     "sev": "ok"
+    },
+    {
+     "id": "tallai_al",
+     "kind": "repeater",
+     "sev": "ok"
+    },
+    {
+     "id": "tallebudgera_ck_rd_al",
+     "kind": "repeater",
+     "sev": "ok"
+    }
+   ],
+   "areas": [
+    {
+     "lat": -27.92,
+     "lon": 153.3,
+     "km": 25,
+     "sev": "warn",
+     "label": "northern Gold Coast"
+    }
+   ],
+   "focus": {
+    "lat": -27.95,
+    "lon": 153.3,
+    "km": 40
+   }
+  },
+  {
+   "type": "receivers",
+   "title": "Our end of the line",
+   "presenter": "tech-wizard",
+   "sev": "info",
+   "secs": 13,
+   "say": "Alex Chen on the radio. Both receivers ran all day and nobody changed a setting. 152.400 still isn't being listened to, and the second base station still has no receiver set up.",
+   "items": [
+    {
+     "name": "rpi-83071968 stick 1",
+     "up": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "note": "up all day; settings unchanged"
+    },
+    {
+     "name": "rpi-83071968 stick 2",
+     "up": [
+      0.17,
+      1,
+      0.67,
+      0,
+      0.33,
+      1,
+      0.83,
+      0.17,
+      1,
+      1,
+      0.17,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "note": "up all day; settings unchanged"
+    }
+   ]
+  },
+  {
+   "type": "battery",
+   "title": "Batteries",
+   "presenter": "nitwit",
+   "sev": "warn",
+   "secs": 13,
+   "say": "Nitto on batteries, righto! Loamside's sliding: 12.7 down to 12.0 over four nights. Eungella keeps climbing, now 10.9. Lake Orr Weir and Slacks Creek sit flat at 12.7 with no daily charge.",
+   "items": [
+    {
+     "id": "loamside_al",
+     "name": "Loamside AL",
+     "v": 12,
+     "nights": [
+      12.7,
+      12.6,
+      12.4,
+      12
+     ],
+     "note": "Battery low — 12.0 V"
+    },
+    {
+     "id": "eungella_oxley_rive",
+     "name": "Eungella (Oxley River)",
+     "v": 10.9,
+     "nights": [
+      10.2,
+      10.3,
+      10.6,
+      10.6,
+      10.6,
+      10.8,
+      10.9
+     ],
+     "note": "Battery critical — 10.9 V"
+    },
+    {
+     "id": "lake_orr_weir_tw_al",
+     "name": "Lake Orr Weir TW AL",
+     "v": 12.7,
+     "nights": [
+      12.8,
+      12.8,
+      12.8,
+      12.8,
+      12.7,
+      12.7,
+      12.7,
+      12.7
+     ],
+     "note": "No daily charge — battery flat-lining at 12.8 V"
+    },
+    {
+     "id": "slacks_ck_reserve_pk",
+     "name": "Slacks Ck (Reserve Park) AL",
+     "v": 12.7,
+     "nights": [
+      12.8,
+      12.8,
+      12.8,
+      12.7,
+      12.7
+     ],
+     "note": "No daily charge — battery flat-lining at 12.8 V"
+    }
+   ],
+   "stations": [
+    "loamside_al",
+    "eungella_oxley_rive",
+    "lake_orr_weir_tw_al",
+    "slacks_ck_reserve_pk"
+   ]
+  },
+  {
+   "type": "checks",
+   "title": "Check signals",
+   "secs": 10,
+   "sev": "warn",
+   "say": "The Know-It-All, obviously. Priestdale, Bromelton Dam, The Summit and Round Mountain missed every check. Boobegan Creek Lock has missed twenty-four straight. I'd have spotted that.",
+   "stations": [
+    "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+    "priestdale_al",
+    "clarrie_hall_dam_d_s",
+    "boobegan_ck_lock_al",
+    "wynnum_byrneside_tce_al"
+   ],
+   "items": [
+    {
+     "id": "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+     "name": "Dunbible Creek at Dunbible Creek Rail Trail Bridge",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Missed checks rising — 100% in the last 24 h"
+    },
+    {
+     "id": "priestdale_al",
+     "name": "Priestdale AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 46 checks"
+    },
+    {
+     "id": "clarrie_hall_dam_d_s",
+     "name": "Clarie Hall Dam D/S",
+     "strip": "MMMMMMMMMMMMMMMMMMMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 45 checks"
+    },
+    {
+     "id": "boobegan_ck_lock_al",
+     "name": "Boobegan Ck Lock AL",
+     "strip": "MMMMMMMMMMMMMMMMMMMMMMMM",
+     "rate": 0,
+     "note": "Missed checks rising — 100% in the last 24 h"
+    },
+    {
+     "id": "wynnum_byrneside_tce_al",
+     "name": "Wynnum (Byrneside Tce) AL",
+     "strip": "MM",
+     "rate": 0,
+     "note": "Misses 25% of its checks"
+    }
+   ],
+   "presenter": "know-it-all"
+  },
+  {
+   "type": "list",
+   "title": "Worth a look today",
+   "secs": 16,
+   "say": "So, worth a look: the gauge below Clarrie Hall Dam, Dunbible Creek's power, and the Gold Coast group's night gaps. And good news: a hundred stations the server had called silent were heard again, Boat Mountain among them.",
+   "stations": [
+    "clarrie_hall_dam_d_s",
+    "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+    "hotham_creek_al",
+    "loamside_al",
+    "boat_mountain_al"
+   ],
+   "items": [
+    {
+     "sev": "critical",
+     "id": "clarrie_hall_dam_d_s",
+     "text": "Clarie Hall Dam D/S: 45 checks missed; the dam gauge beside it is fine."
+    },
+    {
+     "sev": "critical",
+     "id": "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+     "text": "Dunbible Creek: 9.8 V low and missing checks."
+    },
+    {
+     "sev": "warn",
+     "id": "hotham_creek_al",
+     "text": "Northern Gold Coast group: quiet overnight, back in the afternoon."
+    },
+    {
+     "sev": "warn",
+     "id": "loamside_al",
+     "text": "Loamside AL: battery 12.7 to 12.0 V in four nights."
+    },
+    {
+     "sev": "ok",
+     "id": "boat_mountain_al",
+     "text": "Heard again: 100 stations the server had called silent."
+    }
+   ]
+  },
+  {
+   "type": "signoff",
+   "title": "That’s the network",
+   "secs": 8,
+   "say": "That's the network: fair, with a couple of showers. Is it supposed to be this quiet? Back tomorrow.",
+   "line": "Is it supposed to do that?"
+  }
+ ],
+ "sources": {
+  "readings": 22098,
+  "stations_heard": 910,
+  "gathered_at": "2026-10-31T18:31:46.249Z"
+ },
+ "caveats": [
+  "The Gold Coast day-night pattern is from five days of readings; it may be the stations reporting less at night rather than the path fading.",
+  "The per-stick figures show about sixty stations a few decibels weaker; earlier checks found the channel's own signal steady, so it is left out.",
+  "Clarie Hall Dam D/S's cause cannot be told from here: power, radio and aerial all fit."
+ ],
+ "author": "Claude Code, from the bulletin draft and read-only queries"
+}

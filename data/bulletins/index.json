@@ -1,7 +1,15 @@
 {
  "format": "floodnet-bulletin-index/1",
- "updated_at": "2026-10-30T18:34:46.493Z",
+ "updated_at": "2026-10-31T18:33:44.435Z",
  "daily": [
+  {
+   "id": "daily-2026-11-01",
+   "file": "data/bulletins/daily/2026-11-01.json",
+   "issued_at": "2026-10-31T18:31:46.249Z",
+   "headline": "Fair again: eighty-two percent of checks in. Two Tweed stations still quiet, and a Gold Coast group that goes quiet at night.",
+   "sky": "fair",
+   "presenter": "new-recruit"
+  },
   {
    "id": "daily-2026-10-31",
    "file": "data/bulletins/daily/2026-10-31.json",
