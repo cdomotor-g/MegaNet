@@ -2956,6 +2956,17 @@ Every repeater on file, beside ALERT IDs (October 2026; `repeaters.js`):
   reach. A repeater linked to nothing is drawn amber. Press one to pick out its
   links and open its row. The wheel zooms it; **⛶ Full screen** opens it over
   the whole window.
+- **A link's ground and budget** (November 2026): press a link on the map — or
+  *profile & budget* beside a linked repeater or base in an opened row — and
+  the card under the map draws the ground between the two ends (line of sight,
+  60% Fresnel zone, the land cover, the earth's curve) with its verdict, and the
+  link budget term by term with the fade margin each way it carries traffic:
+  both ways between two repeaters, one way from a repeater to its base. It is
+  the Stations map's figure, not a second one — the same ground
+  (`pathGround`), the same Longley–Rice model and field allowance
+  (`pathAnalyse`), the same radio at each end, with anything typed over it on
+  the Stations map's cards — and **Open on the Stations map** takes the same
+  path to the full profile card and link budget there.
 - **A table, sortable by any heading**: repeater, station number, network,
   channel, addresses and field stations its pass ranges carry, links (and
   whether a base is in reach), **pass ranges set** (on record, exclusions

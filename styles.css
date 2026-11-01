@@ -3018,6 +3018,25 @@ a.rptr-stn:hover { text-decoration-thickness: 2px; }
 .rptr-chip { display: inline-block; padding: 0 .4em; border-radius: var(--r-sm); background: color-mix(in srgb, var(--role-base) 18%, transparent); font-size: var(--fs-xs); }
 .rptr-off { font-weight: 600; }
 .rptr-foot { display: flex; justify-content: center; margin: var(--sp-2) 0 0; }
+/* A link's ground and budget, under the map (Repeaters' pathHtml): the tiles,
+   the chart at the card's width, then the budget beside the facts — one under
+   the other on a phone. The chart, its key and the budget table are the
+   Stations map's profile card's own classes (.path-chart, .path-key-*,
+   .lb-table), so the two read alike. */
+.rptr-path h3 { overflow-wrap: anywhere; }
+.rptr-path-chart { margin-top: var(--sp-3); }
+.rptr-path-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: var(--sp-2) var(--sp-5); align-items: start; margin-top: var(--sp-3); }
+/* A column may be narrower than the table in it: the table scrolls in its own
+   .table-wrap rather than widening the page. */
+.rptr-path-grid > * { min-width: 0; }
+/* The direction headings are two station names each: they wrap, where the
+   figures under them (.lb-num) never do. */
+.rptr-lb thead th { font-weight: 600; vertical-align: bottom; white-space: normal; overflow-wrap: anywhere; }
+.rptr-lb tfoot .small { font-weight: 400; }
+.rptr-path-facts { margin: 0 0 var(--sp-2); padding-left: 1.1rem; }
+.rptr-path-facts li { margin: 0 0 var(--sp-1); }
+.rptr-path-note { margin: 0 0 var(--sp-1); }
+.rptr-path-btn { margin-left: .3rem; }
 
 .bf-td-match { text-align: center; }
 

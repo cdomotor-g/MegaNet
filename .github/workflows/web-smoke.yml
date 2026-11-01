@@ -581,6 +581,18 @@ jobs:
         working-directory: test
         run: npm run passranges
 
+      # 🔁 Repeaters: a link pressed on its map (or "profile & budget" in an
+      # opened row) opens the ground between its ends and the link budget each
+      # way, under the map. Real pairs from the register on terrainkit's hilly
+      # ground; the oracle is the Stations map — the same link opened there
+      # through the card's hand-off must give the same fade margin. Plus the
+      # columns adding up, one way to a base, a failed ground, full screen,
+      # Escape and a phone.
+      - name: Repeaters — a link's ground profile and link budget
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run rptrpath
+
       # 🗼 Backbone, "State of the backbone" (backbone.js): the findings, the
       # carriers and the corrupted copies read for the period from a planted
       # month on the real repeaters — the off-air corrupting one first, issues

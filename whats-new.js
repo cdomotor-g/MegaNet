@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 171, date: '2026-11-01', items: [
+      '🔁 <strong>Repeaters</strong>: press a link on the map — or <strong>profile &amp; budget</strong> beside a linked repeater or '
+        + 'base in an opened row — for the ground between its two ends and its <strong>link budget</strong>, under the map: the '
+        + 'elevation profile with the line of sight and the Fresnel zone over it, whether the path is clear, and the fade margin '
+        + 'each way it carries traffic — both ways between two repeaters, one way from a repeater to its base. The figures are the '
+        + 'Stations map\'s own, so the margin here and there is one number; <strong>Open on the Stations map</strong> takes the same '
+        + 'path to the full card, to change a figure or read the ground from LiDAR.',
+    ] },
     { n: 170, date: '2026-11-01', items: [
       '🚘 <strong>Driving mode</strong>, on the panel of a 🛣️ <em>Route on map</em> once the route is worked out: <strong>🚘 Drive</strong> '
         + 'on a phone or a tablet follows the route as you drive it. The map fills the screen in 3-D, tilted and turning with the car, '
