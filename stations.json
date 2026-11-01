@@ -17894,8 +17894,8 @@
       "name": "Carbrook (Riedel Rd) AL",
       "station_number": "540236",
       "station_type": "auto_water_level",
-      "lat": -27.7,
-      "lon": 153.2833,
+      "lat": -27.694406,
+      "lon": 153.279496,
       "elevation_ahd": 8.9,
       "roles": [
         "field"
@@ -17904,7 +17904,11 @@
       "catchment_ids": [
         "logan_albert"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 6240,
+        "battery": 6241,
+        "water_level": 6243
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -75232,9 +75236,8 @@
       "id": "ravensbourne_al",
       "name": "Ravensbourne AL",
       "station_number": "540299",
-      "station_type": "auto_rain_gauge",
-      "lat": -27.3627,
-      "lon": 152.1589,
+      "lat": -27.362847,
+      "lon": 152.158788,
       "elevation_ahd": 624.1,
       "roles": [
         "field"
@@ -75244,7 +75247,8 @@
         "brisbane"
       ],
       "alert_ids": {
-        "rainfall": 6782
+        "rainfall": 6782,
+        "battery": 6783
       },
       "satcom": {
         "enabled": false,
