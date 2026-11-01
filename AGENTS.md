@@ -77,6 +77,13 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     relay it with their licences.
   - `acma_licences_near` — `GET /api/v1/acma?near=lat,lon&radius_m=&freq_mhz=&all=`:
     the register's licences around a point — a site not built yet, or a move.
+  - `get_radio_path` — `GET /api/v1/stations/{id}/radio-path`: how a station's
+    readings reach a base station — the repeaters that pass its ALERT addresses,
+    the routes on along the backbone (the Stations map's rules), and every hop's
+    fade margin as Flood-Net saved it, both ways, with its band, frequency,
+    model and date and whether it is stale (why, in words); the best path and
+    its weakest hop; the path margins measured at site visits. A repeater's
+    routes start at itself; a hop nobody saved says it is not modelled yet.
 - **Changes:** `GET /api/v1/changelog` lists every change to the API someone
   using it would notice, newest first (`breaking: true` when a client may need
   to change). A person can be emailed each one: the form at
@@ -110,6 +117,10 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   - the ACMA licences are a weekly extract of the ACMA's register, cut to the
     network's area (`register_extract.source_date` says when): say that date,
     and check a licence on the ACMA's own register before relying on it;
+  - a radio path's fade margins are modelled, saved from the Stations map, and
+    say whether they are `stale`; every one is today (worked out with the
+    land-cover model, which reads much too low) — say so when you quote one,
+    and quote the measured attenuator tests beside it;
   - "not recorded" is never zero.
 - **Fair use:** cache what you fetch, and ask about the stations you need rather
   than walking the whole network — the API answers a station, or a page of

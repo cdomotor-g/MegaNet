@@ -392,6 +392,18 @@
           </td>
         </tr>
         <tr>
+          <td><code>GET /api/v1/stations/{id}/radio-path</code></td>
+          <td><code>get_radio_path</code></td>
+          <td>
+            How a station's readings reach a base station: the repeaters that
+            pass its ALERT addresses, the routes on along the backbone, and
+            every hop's fade margin as Flood-Net saved it — both ways, with
+            whether it is stale and why — the best path and its weakest hop,
+            and the margins measured at site visits.
+            <a href="/api/v1/stations/fifteen_mile_al/radio-path">Example</a>
+          </td>
+        </tr>
+        <tr>
           <td><code>GET /api/v1/catchments</code></td>
           <td><code>list_catchments</code></td>
           <td>The 77 Queensland drainage basins. <a href="/api/v1/catchments">Example</a></td>

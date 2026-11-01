@@ -12,9 +12,11 @@ station — its findings and what to do about them, its check schedule day by
 day, its battery's night lows ([station health](#get-apiv1stationsidhealth)) —
 or about a field team's whole run of stations at once
 ([health findings](#get-apiv1healthfindings)), have any list of stations as
-[GeoJSON for a map](#geojson-for-a-map), and ask which radio licences the ACMA's
+[GeoJSON for a map](#geojson-for-a-map), ask which radio licences the ACMA's
 register has at a station's site — or at a point where one might go
-([ACMA licences](#get-apiv1stationsidacma)).
+([ACMA licences](#get-apiv1stationsidacma)) — and follow a station's readings
+to a base station, hop by hop, with the fade margin Flood-Net saved for each
+hop and whether it still holds ([radio path](#get-apiv1stationsidradio-path)).
 
 It was built for drafting **assessment reports**, and the one-call
 [station dossier](#get-apiv1stationsiddossier) is shaped for that. It is not
@@ -239,6 +241,7 @@ says what to change; an unknown tool or malformed request is a JSON-RPC error.
 | `get_service_level` | The station's Service Level Specification entry | `GET /api/v1/stations/{id}/service-level` |
 | `get_acma_licences` | The ACMA licences Flood-Net records for a station, each looked up in the register; the register's licences around it (licensee, frequencies, power, distance, whether on the station's frequency); the repeaters that relay it | `GET /api/v1/stations/{id}/acma` |
 | `acma_licences_near` | The register's licences around a point — for a site not built yet, or a move | `GET /api/v1/acma?near=` |
+| `get_radio_path` | How a station's readings reach a base station: the repeaters that pass its addresses, the routes on along the backbone, each hop's saved fade margin and whether it is stale, the best path and its weakest hop, and the path margins measured at site visits | `GET /api/v1/stations/{id}/radio-path` |
 | `list_catchments` | The 77 Queensland drainage basins | `GET /api/v1/catchments` |
 | `get_catchment` | One basin and a page of its stations | `GET /api/v1/catchments/{id}` |
 | `list_networks` | Radio networks, maintenance hubs, Radio Mobile systems | `GET /api/v1/networks` |
@@ -461,6 +464,7 @@ never silently missing, and "not recorded" never means zero.
 | `inspections` | how many visits, first and last, and the numbers the last three recorded (battery and solar volts, SWR, RSSI, fade margins, gas) |
 | `nearby_stations` | the five nearest live stations: distance, bearing, kinds, and `proposed` where one is only proposed |
 | `acma` | the ACMA licences: what [`/acma`](#get-apiv1stationsidacma) answers by default — the licences recorded for it, the register's within 500 m, the repeaters that relay it |
+| `radio_path` | the way its readings reach a base station: what [`/radio-path`](#get-apiv1stationsidradio-path) answers, shorter — one route per repeater, each hop in full only on the best path and the first hops, the measured margins from `inspections` |
 | `sources`, `links`, `disclaimer`, `generated_at` | provenance and where to go next |
 
 ```sh
@@ -870,6 +874,227 @@ curl -s 'https://floodwarning.net/api/v1/acma?near=-27.3166,152.749&radius_m=300
 ]
 ```
 
+### `GET /api/v1/stations/{id}/radio-path`
+
+How a station's readings reach a base station, hop by hop, with the fade
+margin Flood-Net saved for every hop — for a scope sheet's "Fade margin" line,
+a station that has to move, or a planner looking for the weak hop. Nothing is
+modelled here: every figure is one the Stations map worked out (Longley–Rice
+over sampled terrain) and an editor saved, and the answer says when one no
+longer holds, and why. It takes no parameters.
+
+**The routes follow the Stations map's own rules.**
+
+- A field station's **first hop** is a repeater whose recorded pass ranges carry
+  one of its ALERT addresses (exclusions honoured) — the nearest 5 within
+  150 km, the same repeaters [`/acma`](#get-apiv1stationsidacma) lists under
+  `relayed_by`.
+- **On from there:** a repeater within 100 km — the map's *Max TX distance*,
+  where it draws backbone paths — that passes one of the same addresses, or any
+  base station within 100 km, which ends the route. Every repeater on a route
+  must pass some of what the one before it passed on.
+- A **repeater** starts from itself, and goes on to repeaters whose pass-range
+  windows take some of what it relays. A **base station** has no path on from it.
+- At most 4 repeaters a route (the Repeater Delays plan's own reach), never the
+  same station twice, and from each first repeater the routes through the fewest
+  repeaters that reach a base and through one more. On the network of November
+  2026, 975 stations reach a base through one repeater, 44 through two, 11
+  through three and 3 through four. Frequencies are not matched, as the map
+  does not match them; each hop says the one its figure was worked out at.
+
+What it answers:
+
+- **`summary`** — plain sentences: the repeaters, the best path and its weakest
+  hop, what is stale and why, what is not modelled, and the measured margins.
+- **`best_path`** — the best route to a base station: every hop modelled first,
+  then the fewest hops not modelled, then the strongest weakest hop, then the
+  fewest hops, then the shortest. `route` in words, `stations`, `base`,
+  `hop_count`, `distance_km`, `complete` (every hop modelled),
+  `unmodelled_hops`, `stale_hops`, `weakest_hop`, and each hop in brief.
+- **`repeaters`** — for a field station, its first repeaters, nearest first:
+  `distance_km`, `passes_addresses`, `rx_mhz` and `tx_mhz`, `first_hop` (in
+  brief) and `to_base` — `routes_found`, `bases_reachable` (each base with
+  `fewest_hops` and its distance from the repeater) and the best three
+  `routes`, each from the station itself. For a repeater, one item: itself,
+  with `first_hop: null`.
+- **`hops`** — every hop on the routes listed, once, in full (below).
+- **`measured`** — the station's last five attenuator tests from site visits,
+  newest first: `this_visit_db` (after the visit's work), `original_db`
+  (before it) and `this_visit_range_db`. The test adds loss at the station a
+  step at a time until its reports stop reaching base, so it measures the whole
+  path, station to base; a reading is a step — 24 on a 3 dB attenuator is
+  24–27 dB, 19 off that grid is 19–20, and 30 is "at least 30".
+- **`model`** — the model Flood-Net uses now (`current`, in words) and the ones
+  the figures were saved with; `rules` (the numbers above), `notes`, `sources`
+  and `links`.
+
+A hop in `hops`:
+
+| Field | Meaning |
+|---|---|
+| `from`, `to` | the two ends; `to.role` is `repeater` or `base` |
+| `kind` | `field` (a field station to the repeater that carries it) or `backbone` (a repeater on to a repeater or a base) |
+| `distance_km` | between the two, as the register places them now |
+| `status` | `ok`, or `not modelled` — no figure is saved for the pair, and `detail` says how one is made |
+| `margin_db`, `margin_back_db` | the saved fade margin the way the traffic runs (from → to), and the other way, in dB |
+| `band`, `thresholds_db` | `margin_db` against the thresholds saved with it: `good` at `thresholds_db.good` (15 dB) or more, `ok` at `thresholds_db.ok` (6 dB), else `bad` |
+| `freq_mhz`, `verdict` | the frequency it was worked out at; the line of sight on the same profile — `clear`, `marginal` or `obstructed` |
+| `model`, `computed_at` | the model it was worked out with, and when |
+| `stale`, `ends_changed`, `stale_reasons` | whether the map would not show it today; whether either end has changed since; and why, in words — `model`, `settings` (the field allowance, LiDAR ground), `moved`, `height`, `antenna`, `radio`, `frequency`, or `unreadable` |
+
+**Stale.** A saved figure carries a signature of everything it was worked out
+from — both ends' positions, ground heights, antenna heights and radio
+systems, the frequency, the model and its settings — and the map shows a figure
+only while the register still matches it. This builds the same signature, at
+the app's default settings, and gives every figure all the same, with
+`stale: true` and the reasons where it no longer matches: a stale figure is
+still evidence. **Today every saved figure is stale.** They were worked out on
+3–4 September 2026 with the land-cover model (`itm-p2p/2`), which Flood-Net's
+calibration against attenuator tests found reads about 41 dB below the margins
+measured on site, on average ([`network-review.md`](network-review.md)); the
+map now uses the field model (`itm-p2p/3`). Until the fade-margin layer is
+worked out and saved again, quote them as stale — they are much too low — and
+set `measured` beside them. For a "Fade margin over 20 dB" line, read
+`best_path.weakest_hop.margin_db` and its `stale`, and the newest of
+`measured.tests`.
+
+```sh
+curl -s -H 'X-FloodNet-Client: your-name' \
+  'https://floodwarning.net/api/v1/stations/fifteen_mile_al/radio-path'
+```
+
+A real answer, from the live database on 1 November 2026, trimmed (`…`) —
+Fifteen Mile AL, a field station:
+
+```json
+{
+  "id": "fifteen_mile_al", "name": "Fifteen Mile AL", "station_number": "540601", "roles": ["field"],
+  "lat": -27.3986, "lon": 152.0731, "proposed": false, "starts_as": "field station",
+  "summary": [
+    "Fifteen Mile AL's ALERT addresses 4043 and 4044 are passed by 2 repeaters within 150 km: Toowoomba AL (17 km) and Mt Glorious AL RPTR (67.27 km).",
+    "Best path to a base station, every hop modelled: Fifteen Mile AL → Toowoomba AL (-22.8 dB) → GATTON LVRC ENVIROMON BASESTATION (+5.2 dB). Its weakest hop is Fifteen Mile AL → Toowoomba AL, -22.8 dB, bad (under 6 dB).",
+    "Every saved figure on these routes is stale: worked out on 3 September 2026 with the land-cover model (itm-p2p/2), and Flood-Net now works fade margins out with the field model (itm-p2p/3), calibrated against path margins measured on site. The land-cover model read about 41 dB below those measurements on average, so read these figures as much too low, not as the margin, until the Stations map's fade-margin layer is worked out and saved again.",
+    "On 3 hops an end has also changed since — moved, or its ground height, antenna, radio or frequency — and stale_reasons says which.",
+    "13 of the 16 hops on these routes have no saved figure: not modelled yet — Flood-Net computes these on the Stations map and an editor saves them.",
+    "Measured on site: the last attenuator test, on 9 December 2016, found Fifteen Mile AL's reports still reaching base through 19 dB of added loss (read as 19–20 dB); before it, 19 dB on 15 December 2015 and 21 dB on 27 November 2014. That is the whole path, station to base; the figures above are each hop's."
+  ],
+  "best_path": {
+    "status": "ok", "route": "Fifteen Mile AL → Toowoomba AL → GATTON LVRC ENVIROMON BASESTATION",
+    "stations": ["fifteen_mile_al", "toowoomba_al", "gatton_lvrc_enviromon_basestation"],
+    "base": { "id": "gatton_lvrc_enviromon_basestation", "name": "GATTON LVRC ENVIROMON BASESTATION" },
+    "hop_count": 2, "distance_km": 49.26, "complete": true, "unmodelled_hops": 0, "stale_hops": 2,
+    "weakest_hop": { "from": "fifteen_mile_al", "to": "toowoomba_al", "margin_db": -22.8, "band": "bad", "stale": true },
+    "hops": [
+      { "from": "fifteen_mile_al", "to": "toowoomba_al", "status": "ok", "margin_db": -22.8, "band": "bad", "stale": true },
+      { "from": "toowoomba_al", "to": "gatton_lvrc_enviromon_basestation", "status": "ok", "margin_db": 5.2, "band": "bad", "stale": true }
+    ]
+  },
+  "repeaters": {
+    "status": "ok", "addresses": [4043, 4044],
+    "items": [
+      { "id": "toowoomba_al", "name": "Toowoomba AL", "station_number": "540162", "distance_km": 17, "passes_addresses": [4043, 4044],
+        "rx_mhz": 151.525, "tx_mhz": 151.525,
+        "first_hop": { "from": "fifteen_mile_al", "to": "toowoomba_al", "status": "ok", "margin_db": -22.8, "band": "bad", "stale": true },
+        "to_base": { "status": "ok", "routes_found": 12,
+          "bases_reachable": [{ "id": "gatton_lvrc_enviromon_basestation", "name": "GATTON LVRC ENVIROMON BASESTATION", "fewest_hops": 2, "distance_km": 32.26 }, "…"],
+          "routes": [
+            { "route": "Fifteen Mile AL → Toowoomba AL → GATTON LVRC ENVIROMON BASESTATION", "complete": true, "…": "…" },
+            { "route": "Fifteen Mile AL → Toowoomba AL → Marburg Radar", "complete": true,
+              "weakest_hop": { "from": "toowoomba_al", "to": "marburg_radar", "margin_db": -26.9, "band": "bad", "stale": true }, "…": "…" },
+            { "route": "Fifteen Mile AL → Toowoomba AL → Dalby Base Station", "complete": false, "unmodelled_hops": 1, "…": "…" }
+          ] } },
+      { "id": "mt_glorious_al_rptr", "name": "Mt Glorious AL RPTR", "distance_km": 67.27, "passes_addresses": [4043, 4044],
+        "first_hop": { "from": "fifteen_mile_al", "to": "mt_glorious_al_rptr", "status": "not modelled" }, "to_base": { "…": "…" } }
+    ]
+  },
+  "hops": [
+    { "from": { "id": "fifteen_mile_al", "name": "Fifteen Mile AL" }, "to": { "id": "toowoomba_al", "name": "Toowoomba AL", "role": "repeater" },
+      "kind": "field", "distance_km": 17, "status": "ok", "margin_db": -22.8, "margin_back_db": -22.8, "band": "bad",
+      "thresholds_db": { "good": 15, "ok": 6 }, "freq_mhz": 151.5, "verdict": "obstructed",
+      "model": "itm-p2p/2", "computed_at": "2026-09-03T06:29:42.439504+00:00", "stale": true, "ends_changed": true,
+      "stale_reasons": [
+        { "reason": "model", "detail": "Worked out with the land-cover model (itm-p2p/2); Flood-Net now works margins out with the field model (itm-p2p/3)." },
+        { "reason": "moved", "detail": "Toowoomba AL has moved 13 m since: its recorded position is not the one this was worked out at." },
+        { "reason": "height", "detail": "Toowoomba AL had no recorded ground height then; it has 708.87 m AHD now." },
+        { "reason": "frequency", "detail": "Worked out at 151.5 MHz; the line's frequency is 151.525 MHz now." }
+      ] },
+    { "from": { "id": "fifteen_mile_al", "…": "…" }, "to": { "id": "mt_glorious_al_rptr", "…": "…" }, "kind": "field", "distance_km": 67.27,
+      "status": "not modelled",
+      "detail": "Not modelled yet — Flood-Net computes fade margins on the Stations map (Layers → Link colour: By fade margin) and an editor saves them; none has been saved for this hop." },
+    "…"
+  ],
+  "measured": { "status": "ok", "tests": [
+    { "date": "2016-12-09", "date_precision": "day", "this_visit_db": 19, "this_visit_range_db": [19, 20] },
+    { "date": "2015-12-15", "date_precision": "day", "this_visit_db": 19, "this_visit_range_db": [19, 20] },
+    { "date": "2014-11-27", "date_precision": "day", "this_visit_db": 21, "this_visit_range_db": [21, 24] }
+  ], "note": "…" },
+  "model": { "current": "itm-p2p/3",
+    "current_words": "the field model: Longley–Rice over the bare terrain at 256 points, less a 12 dB allowance measured on site, with repeaters and bases on at least a 10 m mast",
+    "saved_models": { "itm-p2p/2": 3 }, "note": "…" },
+  "rules": { "first_hops": 5, "first_hop_km": 150, "backbone_km": 100, "repeaters_per_route": 4, "beyond_fewest": 1, "routes_listed": 3 }
+}
+```
+
+Its own attenuator tests carried 19–21 dB of added loss to base; the land-cover
+model put its first hop alone at −22.8 dB. That gap is the calibration's
+finding, at one station.
+
+A repeater starts from itself. Toowoomba AL, the same day, trimmed:
+
+```json
+{
+  "id": "toowoomba_al", "name": "Toowoomba AL", "station_number": "540162", "roles": ["field", "repeater"], "starts_as": "repeater",
+  "summary": [
+    "Toowoomba AL is a repeater, so its routes to a base station start at itself: 28 routes reach 8 base stations, the nearest GATTON LVRC ENVIROMON BASESTATION (32.26 km).",
+    "Best path to a base station, every hop modelled: Toowoomba AL → GATTON LVRC ENVIROMON BASESTATION (+5.2 dB). Its weakest hop is Toowoomba AL → GATTON LVRC ENVIROMON BASESTATION, +5.2 dB, bad (under 6 dB).",
+    "Every saved figure on these routes is stale: …",
+    "On 8 hops an end has also changed since — …",
+    "20 of the 32 hops on these routes have no saved figure: not modelled yet — …",
+    "No attenuator test of Toowoomba AL's path margin is recorded at a site visit."
+  ],
+  "repeaters": { "status": "ok", "items": [{
+    "id": "toowoomba_al", "name": "Toowoomba AL", "distance_km": 0, "rx_mhz": 151.525, "tx_mhz": 151.525, "first_hop": null,
+    "to_base": { "status": "ok", "routes_found": 28, "bases_reachable": ["…"], "routes": [
+      { "route": "Toowoomba AL → GATTON LVRC ENVIROMON BASESTATION", "complete": true,
+        "weakest_hop": { "from": "toowoomba_al", "to": "gatton_lvrc_enviromon_basestation", "margin_db": 5.2, "band": "bad", "stale": true }, "…": "…" },
+      { "route": "Toowoomba AL → Schultz Lookout AL → Constitution Hill", "complete": true, "hops": [
+          { "from": "toowoomba_al", "to": "schultz_lookout_aler", "status": "ok", "margin_db": 4.6, "band": "bad", "stale": true },
+          { "from": "schultz_lookout_aler", "to": "constitution_hill", "status": "ok", "margin_db": -3.7, "band": "bad", "stale": true }], "…": "…" },
+      { "route": "Toowoomba AL → Mt Petersen AL → Marburg Radar", "complete": true, "hops": [
+          { "from": "toowoomba_al", "to": "mt_petersen_al", "status": "ok", "margin_db": 35.8, "band": "good", "stale": true },
+          { "from": "mt_petersen_al", "to": "marburg_radar", "status": "ok", "margin_db": -9.3, "band": "bad", "stale": true }], "…": "…" }
+    ] } }],
+    "note": "Toowoomba AL is a repeater itself, so its routes start here: first_hop is null." },
+  "hops": [
+    "…",
+    { "from": { "id": "schultz_lookout_aler", "name": "Schultz Lookout AL" }, "to": { "id": "constitution_hill", "name": "Constitution Hill", "role": "base" },
+      "kind": "backbone", "distance_km": 63.42, "status": "ok", "margin_db": -3.7, "margin_back_db": -3.7, "band": "bad",
+      "freq_mhz": 151.525, "verdict": "obstructed", "model": "itm-p2p/2", "stale": true, "ends_changed": false,
+      "stale_reasons": [{ "reason": "model", "detail": "Worked out with the land-cover model (itm-p2p/2); Flood-Net now works margins out with the field model (itm-p2p/3)." }], "…": "…" }
+  ],
+  "measured": { "status": "not recorded", "visits_read": 2, "detail": "None of the 2 dated site visits read recorded an attenuator test of its path margin." }
+}
+```
+
+A base station answers `starts_as: "base station"` and no path; a station with
+no ALERT address, or none a repeater passes, says so in `repeaters.detail`.
+
+**In the app.** For a person, `links.app` opens the station on the Stations map
+— `https://floodwarning.net/?tab=stations&station=<id>` — with its radio paths
+drawn; clicking one opens its card, elevation profile and link budget. Add
+`&map=<lat>,<lon>,<zoom>` to centre the map somewhere else at the same time —
+a site the station might move to, say: the side panel's 🚚 **Relocate station**
+then takes *Use the station on the card* and models the ground around it, and
+the link budget prices a path from any point on the map. No address opens those
+tools by itself; these two open the map where they work.
+
+A dossier's `radio_path` is the same answer, shorter: one route per repeater,
+each hop in full only on the best path and the first hops, no
+`bases_reachable`, and `measured` from the dossier's own `inspections` (its
+last three visits). It reads the repeaters and base stations once, held five
+minutes, and the saved figures between the stations its routes touch in one
+more read.
+
 ### `GET /api/v1/health/silent`
 
 What has gone quiet. The stations Station Health finds **silent now** — they
@@ -1195,7 +1420,9 @@ Other caps: 100 rows per page; a 250 km search radius; 5,000 readings per call;
 a 5 km radius for the ACMA licences (500 m by default) and 300 licences per answer;
 reading windows of 7 / 31 / 731 days (raw / hourly / daily); 1,000 stations per
 call of the latest readings (100 by default); 100 station ids per call of the
-health findings; at most 5,000 stations considered
+health findings; for a radio path, the nearest 5 first repeaters within 150 km,
+100 km a backbone hop, 4 repeaters a route and 1,000 routes weighed, 3 listed per
+repeater; at most 5,000 stations considered
 by one filtered search before paging; 32 database reads per request, six at a
 time, each with a 10-second timeout; MCP bodies up to 64 KB and batches of up to
 10.
@@ -1256,6 +1483,14 @@ quote it:
 - **Kinds are derived.** `rain`/`river` come from the record's ALERT addresses,
   location types and the Bureau's river height list; see
   [`/api/v1/stations`](#get-apiv1stations).
+- **Saved fade margins are modelled, and today all stale.** A radio path's
+  figures are the Stations map's Longley–Rice margins as an editor saved them,
+  each with the model it was worked out with and whether the register still
+  matches it (`stale`, `stale_reasons`). Every one now was worked out on 3–4
+  September 2026 with the land-cover model, which reads far below measured
+  margins; say so when you quote one, and quote the attenuator tests
+  (`measured`) beside it. A hop with no saved figure is `not modelled`, never
+  zero.
 - **The ACMA register is an extract, and a subset.** The licences come from the
   ACMA's Register of Radiocommunications Licences as Flood-Net last took it
   (`register_extract.source_date`; refreshed weekly when the download works),
@@ -1302,6 +1537,16 @@ at [`GET /api/v1/changelog`](#get-apiv1changelog), newest first — both from
 in the same push. A change with nothing to notice (a fix inside, a faster
 answer) is not listed.
 
+- **1 November 2026 — A station's radio path to base, with the fade margins
+  Flood-Net saved.** [`GET /api/v1/stations/{id}/radio-path`](#get-apiv1stationsidradio-path)
+  (MCP `get_radio_path`) is new: the repeaters that pass a station's ALERT
+  addresses, the routes on along the backbone to a base station, and every
+  hop's saved fade margin — both ways, band, frequency, distance, line of
+  sight, model and date — with whether it is stale and why, the best path and
+  its weakest hop, and the path margins measured at site visits. Every saved
+  figure is stale today (worked out with the land-cover model, which reads much
+  too low), and each answer says so. The dossier gains a `radio_path` section
+  and its `links` a `radio_path` link. Nothing that was there before changed.
 - **31 October 2026 — This list of changes, and an email when the API
   changes.** `GET /api/v1/changelog` lists every change, newest first, and the
   index links to it as `changelog`. The [notify list](#an-email-when-the-api-changes)

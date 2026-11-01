@@ -54,6 +54,12 @@ Documentation: [`docs/agent-api.md`](docs/agent-api.md).
   frequencies, power, distance, whether on the station's frequency); and
   `acma_licences_near` (`/api/v1/acma?near=lat,lon`) for a point. A weekly
   extract of the register: quote its `source_date`.
+- How a station's readings reach a base station: `get_radio_path`
+  (`/api/v1/stations/{id}/radio-path`) — the repeaters that pass its
+  addresses, the routes on along the backbone, every hop's saved fade margin
+  and whether it is stale (and why), the best path and its weakest hop, and the
+  margins measured at site visits. The saved figures are all stale today: say
+  so when you quote one.
 - What changed in the API: `GET /api/v1/changelog`, newest first.
 - For a map, `format=geojson` (tool argument `format: "geojson"`) on station
   search, `stations_near` and the latest readings answers a GeoJSON

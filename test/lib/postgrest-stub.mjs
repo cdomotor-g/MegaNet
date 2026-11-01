@@ -10,7 +10,7 @@
 // query that only works against a forgiving fake is the failure it exists for.
 //
 // What it implements is what the API uses, and nothing it does not:
-//   select=a,b,rel(c,d) (one-to-many embeds off meganet.station)   order=a.asc,b.desc.nullslast
+//   select=a,b,rel(c,d) (the embeds below, nested)   order=a.asc,b.desc.nullslast
 //   eq neq gt gte lt lte like ilike in is cs cd ov, each with not.       limit offset
 //   or=(…) and=(…) nested, quoted values, {arrays}, (lists), a->b / a->>b paths
 //   Prefer: count=exact → Content-Range, and 416 past the end
@@ -27,9 +27,20 @@ const PRIVATE = new Set(['reading_raw', 'app_user', 'editor_allow', 'ingest_toke
   'inspection_power', 'inspection_radio', 'inspection_data', 'field_photo', 'maintenance_activity',
   'attachment', 'field_photo_sync', 'bridge_health_secret']);
 
-// The embeds PostgREST can infer from a foreign key onto meganet.station.
+// The embeds PostgREST can infer from a foreign key: parent → child → the
+// child's column that points at the parent, the parent's column it points at,
+// and whether the child is one-to-one with the parent. meganet.repeater's key
+// is its station_id, so PostgREST answers it as an object (or null), not a list
+// — as the live database does — and meganet.pass_range hangs off the repeater.
 const STATION_CHILDREN = new Set(['sensor', 'station_flood_class', 'station_aep_level', 'station_crossing',
   'station_gauge_survey', 'station_flood_effect', 'station_bureau_listing', 'station_frequency']);
+const EMBEDS = {
+  station: {
+    ...Object.fromEntries([...STATION_CHILDREN].map(c => [c, { fk: 'station_id', pk: 'id', one: false }])),
+    repeater: { fk: 'station_id', pk: 'id', one: true },
+  },
+  repeater: { pass_range: { fk: 'repeater_id', pk: 'station_id', one: false } },
+};
 
 export class PostgrestStub {
   constructor({ base, columns, tables }) {
@@ -39,19 +50,20 @@ export class PostgrestStub {
     this.requests = [];
     this.fault = null;             // (relation, url) → Response | Error | null
     this.maxRows = MAX_ROWS;
-    this.index = new Map();        // relation → Map(station_id → rows)
+    this.index = new Map();        // `relation.fk` → Map(fk value → rows)
   }
 
-  childrenOf(relation, stationId) {
-    if (!this.index.has(relation)) {
+  childrenOf(relation, value, fk = 'station_id') {
+    const key = `${relation}.${fk}`;
+    if (!this.index.has(key)) {
       const m = new Map();
       for (const r of this.tables[relation] || []) {
-        if (!m.has(r.station_id)) m.set(r.station_id, []);
-        m.get(r.station_id).push(r);
+        if (!m.has(r[fk])) m.set(r[fk], []);
+        m.get(r[fk]).push(r);
       }
-      this.index.set(relation, m);
+      this.index.set(key, m);
     }
-    return this.index.get(relation).get(stationId) || [];
+    return this.index.get(key).get(value) || [];
   }
 
   reset() { this.requests = []; this.fault = null; }
@@ -155,10 +167,11 @@ function parseSelect(v, relation, columns) {
     const m = /^([a-z_][a-z0-9_]*)(!inner)?\((.*)\)$/i.exec(item);
     if (m) {
       const child = m[1];
-      if (relation !== 'station' || !STATION_CHILDREN.has(child)) {
+      const how = EMBEDS[relation] && EMBEDS[relation][child];
+      if (!how) {
         throw fail(`Could not find a relationship between '${relation}' and '${child}' in the schema cache`, 'PGRST200');
       }
-      items.push({ embed: child, select: parseSelect(m[3], child, columns) });
+      items.push({ embed: child, how, select: parseSelect(m[3], child, columns) });
       continue;
     }
     if (item === '*') { items.push({ star: true }); continue; }
@@ -345,7 +358,8 @@ function project(row, select, stub, relation) {
     if (item.star) Object.assign(out, row);
     else if (item.col) out[item.col] = row[item.col] === undefined ? null : row[item.col];
     else if (item.embed) {
-      out[item.embed] = stub.childrenOf(item.embed, row.id).map(c => project(c, item.select, stub, item.embed));
+      const kids = stub.childrenOf(item.embed, row[item.how.pk], item.how.fk).map(c => project(c, item.select, stub, item.embed));
+      out[item.embed] = item.how.one ? (kids[0] || null) : kids;
     }
   }
   return out;

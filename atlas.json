@@ -30,9 +30,10 @@
   "status": {
     "phase": "live",
     "updated": "2026-11-01",
-    "summary": "Live and in daily use (database schema 94): this week added a driving mode that follows a station's route in 3-D, the agent API's changelog and email list, ACMA licences in the API, the Repeaters tab and cuts to database I/O, while account email, compute size and the ACMA download link wait on the owner.",
+    "summary": "Live and in daily use (database schema 94): this week added a driving mode that follows a station's route in 3-D, the agent API's changelog and email list, ACMA licences and radio paths in the API, the Repeaters tab and cuts to database I/O, while account email, compute size and the ACMA download link wait on the owner.",
     "now": [
       "Agent API changelog and notify list shipped; emails start once #237's Resend parts are done",
+      "Agent API radio paths to base, for SoRT's Fade Margin question: live, and every saved fade margin stale until the map's layer is swept and saved again",
       "Photo reader: nightly reading of field photos for logger and equipment details",
       "#243 R2 data archive: one restored-day self-test left, then close",
       "#217 and #244 transmitter drift and bit-flip sources: gathering live days of carrier data",
@@ -336,6 +337,33 @@
             "effort": "none"
           }
         ]
+      },
+      {
+        "id": "fade-resweep",
+        "what": "Sweep the Stations map's fade-margin layer and save it again: every saved fade margin predates the field model (itm-p2p/3)",
+        "on": "human",
+        "kind": "access",
+        "since": "2026-10-08",
+        "holds": [
+          "every figure in the agent API's radio paths (/api/v1/stations/{id}/radio-path), all stale until then",
+          "the fade-margin colours on the Stations map",
+          "sort"
+        ],
+        "options": [
+          {
+            "what": "Signed in as an editor: Stations map → Layers → Link colour: By fade margin; leave it to sweep every link, then press Save to the datastore",
+            "by": "human",
+            "effort": "an hour, mostly waiting",
+            "pros": "the map paints again and the API's radio paths turn current, with no change to anything else",
+            "recommended": true
+          },
+          {
+            "what": "Leave it: each radio-path answer already says every figure is stale and why, and gives the station's attenuator tests beside them",
+            "by": "human",
+            "effort": "none",
+            "cons": "SoRT's Fade Margin question has only stale modelled figures and old measurements to go on"
+          }
+        ]
       }
     ]
   },
@@ -513,6 +541,7 @@
         "worker/api.js",
         "worker/acma.js",
         "worker/changelog.js",
+        "worker/radio-path.js",
         "docs/agent-api.md",
         "docs/api-changelog.json",
         "api.html",
@@ -572,12 +601,13 @@
     {
       "id": "agent-api",
       "name": "Agent API (REST and MCP)",
-      "what": "Read-only public station data: search and stations near a point, a station's record and dossier, readings and the latest reading per station, health findings and silent stations, flood levels, service levels, ACMA licences, catchments, networks, and a changelog of every visible API change.",
+      "what": "Read-only public station data: search and stations near a point, a station's record and dossier, readings and the latest reading per station, health findings and silent stations, flood levels, service levels, ACMA licences, a station's radio path to the base stations with the fade margin saved for each hop, catchments, networks, and a changelog of every visible API change.",
       "component": "agent-api",
       "paths": [
         "worker/api.js",
         "worker/acma.js",
         "worker/changelog.js",
+        "worker/radio-path.js",
         "docs/agent-api.md",
         "docs/api-changelog.json"
       ],

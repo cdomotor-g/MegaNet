@@ -2,6 +2,17 @@
   "about": "Every change to Flood-Net's agent API (https://floodwarning.net/api/v1 and https://floodwarning.net/api/mcp) that someone using it would notice — a route, a field, a limit, a tool — newest first. Each entry is emailed once to everyone on the API notify list (sign up at https://floodwarning.net/api#notify). Served as JSON at https://floodwarning.net/api/v1/changelog and written up in docs/agent-api.md, under Changes. Add an entry in the same push as the change: it is what tells people.",
   "entries": [
     {
+      "id": "2026-11-01-radio-path",
+      "date": "2026-11-01",
+      "title": "A station's radio path to base, with the fade margins Flood-Net saved",
+      "summary": "New: GET /api/v1/stations/{id}/radio-path (MCP tool get_radio_path) follows a station's readings to a base station. It lists the repeaters whose pass ranges carry the station's ALERT addresses (the nearest 5 within 150 km), each one's routes on along the backbone to a base station (100 km a hop, at most 4 repeaters — the Stations map's own rules), and every hop's fade margin as Flood-Net saved it: both ways, its band against the saved thresholds, frequency, distance, line of sight, model and date, and whether it is stale, with the reasons in words. It names the best path and its weakest hop, says plainly where a hop has not been modelled, and gives the station's attenuator tests from site visits. Please note: every saved figure is stale today — worked out in September 2026 with an older model that reads much too low — and each answer says so. The station dossier gains a radio_path section and its links a radio_path link. Nothing that was there before has changed.",
+      "breaking": false,
+      "links": [
+        { "text": "How to use it", "url": "https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md#get-apiv1stationsidradio-path" },
+        { "text": "An example answer", "url": "https://floodwarning.net/api/v1/stations/fifteen_mile_al/radio-path" }
+      ]
+    },
+    {
       "id": "2026-10-31-changelog-and-notify",
       "date": "2026-10-31",
       "title": "This list of changes, and an email when the API changes",

@@ -41,6 +41,12 @@
 // notify list that emails each change (worker/notify.js) is not part of this
 // module: it keeps addresses, and this writes nothing.
 //
+// A station's radio path to the base stations (/stations/{id}/radio-path) is
+// worked out here from public rows — the repeaters, base stations and pass
+// ranges, and the fade margins the Stations map saved — by the map's own rules,
+// in worker/radio-path.js. Nothing is modelled: a hop nobody has saved a
+// figure for says so.
+//
 // ── Throttling ───────────────────────────────────────────────────────────────
 // Three rules, per RATE_LIMITS: a per-client minute, a per-client ten-second
 // burst, and a per-address ceiling. A client is the caller's address plus the
@@ -77,6 +83,11 @@ import {
   registerSource, siteOut, summaryLines as acmaSummaryLines,
 } from './acma.js';
 import { CHANGELOG_PATH, readChangelog, resetChangelog } from './changelog.js';
+import {
+  BACKBONE_KM, MAX_REPEATERS, FADE_MODEL, FADE_SAMPLES, FADE_SETTINGS, buildTopology, stationNode, carriersOf, walkRoutes,
+  hopDetail, hopBrief, routeStats, compareRoutes, routeOut, summaryLines as radioSummaryLines, modelWords,
+  pairKey as radioPairKey, attenuatorRange, NOT_MODELLED,
+} from './radio-path.js';
 
 // ── Where things are ─────────────────────────────────────────────────────────
 
@@ -159,6 +170,29 @@ export const LIMITS = Object.freeze({
   // usually another region using the same one.
   relayKmMax: 150,
   relayListMax: 5,
+  // A station's radio path to the base stations (worker/radio-path.js). Its
+  // first hops are relayed_by's — the nearest relayListMax within relayKmMax —
+  // and on from each the Stations map's backbone: a hop within its Max TX
+  // distance, at most radioRepeatersMax repeaters a route (delay-plan.js's
+  // maxHops), and radioBeyondShortest past the fewest that reach a base from
+  // that first repeater. On the network of November 2026, 975 stations reach
+  // a base through one repeater, 44 need two, 11 three and 3 four — while a
+  // cluster round the Tweed makes over 2,000 routes within four repeaters, the
+  // same dozen stations in every order, and a Worker's CPU is counted in
+  // milliseconds. Shortest first, radioRoutesMax at most, over at most
+  // radioNodesMax stations (the margins for those are one read);
+  // radioRoutesListed listed per first repeater (one in the dossier).
+  radioBackboneKm: BACKBONE_KM,
+  radioRepeatersMax: MAX_REPEATERS,
+  radioBeyondShortest: 1,
+  radioRoutesMax: 1000,
+  radioNodesMax: 100,
+  radioRoutesListed: 3,
+  // The repeaters, bases and pass ranges change when an editor changes them:
+  // held this long in an isolate, so a busy minute reads them once.
+  radioTopologySeconds: 300,
+  // Attenuator tests listed from the station's site visits.
+  radioMeasuredVisits: 5,
 });
 
 // What may be read. Every relation here is granted to `anon` by a migration and
@@ -1142,6 +1176,7 @@ function stationLinks(rc, id) {
     flood_levels: `${base}/flood-levels`,
     service_level: `${base}/service-level`,
     acma: `${base}/acma`,
+    radio_path: `${base}/radio-path`,
     app: `${rc.origin}/?station=${encodeURIComponent(id)}`,
   };
 }
@@ -1747,6 +1782,340 @@ async function acmaSection(rc, st, relayP) {
   };
 }
 
+// ── A station's radio path to the base stations ──────────────────────────────
+// For the SoRT scope builder's "Fade Margin >20 dB" row, and anybody asking
+// how a station's readings get home: the repeaters that pass its addresses,
+// the ways on from each along the backbone to a base station, and the fade
+// margin the Stations map saved for every hop, with whether it still holds.
+// worker/radio-path.js has the rules; this does the reads — the network's
+// repeaters and bases (one read, held a few minutes), the saved margins among
+// the stations the routes touch (one read), the radio systems (a vocabulary)
+// and the station's attenuator tests (two reads).
+
+const RADIO_TOPOLOGY_SELECT = 'id,name,station_number,lat,lon,elevation_ahd,roles,rm_system_id,'
+  + 'repeater(rx_mhz,tx_mhz,pass_range(kind,lo,hi))';
+const LINK_FADE_SELECT = 'station_a_id,station_b_id,kind,margin_db,margin_ab_db,margin_ba_db,distance_km,freq_mhz,verdict,'
+  + 'signature,model,good_db,ok_db,band,computed_at';
+
+// Every live repeater and base station with its receive frequency and pass
+// ranges — the repeater embedded one-to-one, its pass ranges inside it.
+const radioTopologyOf = rc => memo('radio:topology', LIMITS.radioTopologySeconds * 1000, async () => {
+  const { rows } = await rc.up.selectAll('station', [['select', RADIO_TOPOLOGY_SELECT],
+    ['roles', `ov.${pgArray(['repeater', 'base'])}`], ['deleted_at', 'is.null'], ['order', 'id.asc']], LIMITS.candidateMax,
+  { ttl: LIMITS.radioTopologySeconds });
+  return buildTopology(rows);
+});
+
+// The saved margins between any two of `ids`: pair key → row.
+async function savedMarginsAmong(rc, ids) {
+  if (ids.length < 2) return new Map();
+  const list = pgList(ids);
+  const { rows } = await rc.up.selectAll('link_fade_margin', [['select', LINK_FADE_SELECT],
+    ['station_a_id', `in.${list}`], ['station_b_id', `in.${list}`], ['order', 'station_a_id.asc,station_b_id.asc']], LIMITS.candidateMax);
+  return new Map(rows.map(r => [radioPairKey(r.station_a_id, r.station_b_id), r]));
+}
+
+const MEASURED_SOURCE = 'meganet.inspection_chart_visit and meganet.inspection_chart_fade_margin (numbers only)';
+const MEASURED_NOTE = 'The PATH MARGIN test on a site inspection sheet: loss added at the station, a step at a time, until its '
+  + 'reports stop reaching base. A test\'s figure is the largest load still received there — this_visit after the visit\'s '
+  + 'work, original before it. A reading is a step: on a 3 dB attenuator 24 means 24–27 dB, off that grid a 1 dB one (19 means '
+  + '19–20 dB), and 30 means at least 30, where most attenuators stop (this_visit_range_db). It measures the whole path, '
+  + 'station to base, on the day; the modelled figures are each hop\'s.';
+
+// One visit's test, or null when it recorded none: the largest load in each
+// phase, a nought (not tested) and anything past 60 dB (a typing slip) set
+// aside — the Network Review's reading (network-review.js loadMeasured).
+function attenuatorTest(date, precision, thisVisit, original) {
+  const ok = v => (v != null && v > 0 && v <= 60 ? v : null);
+  const t = ok(num(thisVisit)), o = ok(num(original));
+  if (t == null && o == null) return null;
+  return stripNulls({ date, date_precision: precision || null, this_visit_db: t,
+    this_visit_range_db: t != null ? attenuatorRange(t) : null, original_db: o });
+}
+
+// The station's last few attenuator tests, newest first.
+async function measuredFadeSection(rc, id) {
+  const { rows: visits } = await rc.up.select('inspection_chart_visit', [['select', 'id,inspected_on,date_precision'],
+    ['station_id', `eq.${id}`], ['inspected_on', 'not.is.null'], ['order', 'inspected_on.desc'], ['limit', 40]]);
+  if (!visits.length) return { status: 'not recorded', detail: 'No dated site inspection is recorded for this station.', source: MEASURED_SOURCE };
+  const { rows } = await rc.up.select('inspection_chart_fade_margin', [['select', 'inspection_id,phase,load_db'],
+    ['inspection_id', `in.${pgList(visits.map(v => v.id))}`], ['limit', 1000]]);
+  const most = new Map();
+  for (const r of rows) {
+    const v = num(r.load_db);
+    if (v == null || !['this_visit', 'original'].includes(r.phase)) continue;
+    const e = most.get(r.inspection_id) || {};
+    e[r.phase] = Math.max(e[r.phase] ?? -Infinity, v);
+    most.set(r.inspection_id, e);
+  }
+  const tests = visits.map(v => attenuatorTest(v.inspected_on, v.date_precision, most.get(v.id)?.this_visit, most.get(v.id)?.original))
+    .filter(Boolean).slice(0, LIMITS.radioMeasuredVisits);
+  if (!tests.length) {
+    return { status: 'not recorded', visits_read: visits.length, source: MEASURED_SOURCE,
+      detail: `None of the ${plainCount(visits.length, 'dated site visit')} read recorded an attenuator test of its path margin.` };
+  }
+  return { status: 'ok', tests, note: MEASURED_NOTE, source: MEASURED_SOURCE };
+}
+
+// The same from the dossier's own inspections section — its last three visits
+// — so the dossier spends no read on it.
+function measuredFromInspections(insp) {
+  const source = 'the dossier\'s inspections section (its last three visits)';
+  const tests = insp && insp.status === 'ok' ? (insp.recent_visits || []).map(v => attenuatorTest(v.date, v.date_precision,
+    v.fade_margin_db_by_phase && v.fade_margin_db_by_phase.this_visit, v.fade_margin_db_by_phase && v.fade_margin_db_by_phase.original))
+    .filter(Boolean) : [];
+  return tests.length ? { status: 'ok', tests, note: MEASURED_NOTE, source }
+    : { status: 'not recorded', detail: 'None of the site visits the dossier reads recorded an attenuator test of its path margin.', source };
+}
+
+const RADIO_RULES_NOTE = 'Routes follow the Stations map\'s own rules. A field station\'s first hop is a repeater whose pass ranges carry '
+  + `one of its ALERT addresses (exclusions honoured) — the nearest ${LIMITS.relayListMax} within ${LIMITS.relayKmMax} km, as relayed_by lists them. `
+  + `On from there: a repeater within ${BACKBONE_KM} km (the map's Max TX distance) that passes one of the same addresses — a backbone `
+  + `path — or any base station within ${BACKBONE_KM} km, where the route ends. A repeater's own routes start at itself and go on to `
+  + 'repeaters whose pass-range windows take some of what it relays; every repeater after the first must take some of what the one '
+  + `before passed on. From each first repeater, routes through the fewest repeaters that reach a base and through ${LIMITS.radioBeyondShortest} `
+  + `more, at most ${MAX_REPEATERS} repeaters a route and never the same station twice; frequencies are not matched, as the map does not match them.`;
+const RADIO_FIGURE_NOTE = 'A hop\'s figure is the fade margin the Stations map worked out for that pair of stations (Longley–Rice over '
+  + 'sampled terrain) and an editor saved: margin_db the way the traffic runs (from → to), margin_back_db the other way, band '
+  + 'margin_db against the thresholds saved with it (good at thresholds_db.good or more, ok at thresholds_db.ok or more, else bad), '
+  + 'verdict the line of sight on the same profile (clear, marginal or obstructed). stale: the map would not show it today — '
+  + 'stale_reasons says why in words: the model or its settings changed, or an end moved or its ground height, antenna or radio '
+  + 'changed, or the frequency did (ends_changed). A stale figure is given all the same, as evidence; the map shows none.';
+
+// The answer's body, for the route and the dossier. `measuredP` is the
+// measured section, settle()d where it was started so a failed read waits for
+// this rather than surfacing as nobody's error (the route reads it; the
+// dossier takes its own inspections section's).
+async function radioPathFor(rc, st, { routesListed = LIMITS.radioRoutesListed, measuredP }) {
+  const doc = st.doc;
+  const self = stationNode({ ...doc, id: st.id }, doc.repeater);
+  const [topoRead, rms] = await Promise.all([radioTopologyOf(rc), settle(rmSystemsOf(rc))]);
+  const sysById = rms.ok ? byKey(rms.value) : new Map();
+  // A repeater the network's held copy does not have yet (added in the last
+  // few minutes) is walked from its own record.
+  const topo = topoRead.nodes.has(self.id) || !self.isRepeater ? topoRead
+    : { ...topoRead, nodes: new Map(topoRead.nodes).set(self.id, self), near: new Map() };
+  const start = self.isBase ? 'base' : self.isRepeater ? 'repeater' : 'field';
+  const addrs = uniq([...flattenAlertIds(doc.alert_ids),
+    ...(doc.sensors || []).map(s => num(s.alert_id)).filter(x => Number.isInteger(x))]).slice(0, 12);
+
+  let starts = [], listed = [], notListed = 0, far = 0, noPathWhy = null;
+  const name = doc.name || st.id;
+  if (start === 'repeater') {
+    starts = [{ node: topo.nodes.get(self.id), carried: null }];
+  } else if (start === 'field') {
+    if (self.lat == null || self.lon == null) {
+      noPathWhy = `${name} has no recorded position, so the repeaters that carry it cannot be put in order of distance.`;
+    } else if (!addrs.length) {
+      noPathWhy = `${name} has no ALERT addresses for a repeater to relay, so Flood-Net cannot say which way its readings travel.`;
+    } else {
+      const carriers = carriersOf(topo, self, addrs);
+      const near = carriers.filter(c => c.km != null && c.km <= LIMITS.relayKmMax);
+      far = carriers.length - near.length;
+      listed = near.slice(0, LIMITS.relayListMax);
+      notListed = near.length - listed.length;
+      starts = listed.map(c => ({ node: c.node, carried: c.passes.map(a => [a, a]) }));
+      if (!carriers.length) noPathWhy = `No recorded repeater pass range covers ${name}'s ALERT addresses (${addrs.join(', ')}).`;
+      else if (!near.length) {
+        noPathWhy = `The ${plainCount(carriers.length, 'repeater')} whose pass ranges cover ${name}'s addresses ${carriers.length === 1 ? 'is' : 'are'} `
+          + `more than ${LIMITS.relayKmMax} km away — another region using the same address, most likely, not a relay.`;
+      }
+    }
+  }
+
+  const walk = walkRoutes(topo, starts, { linkKm: BACKBONE_KM, maxRepeaters: LIMITS.radioRepeatersMax,
+    beyond: LIMITS.radioBeyondShortest, cap: LIMITS.radioRoutesMax, nodeCap: LIMITS.radioNodesMax });
+  const margins = await savedMarginsAmong(rc, uniq([self.id, ...walk.nodes]));
+  const ends = id => (id === self.id ? self : topo.nodes.get(id) || null);
+  const nameOf = id => (ends(id) ? ends(id).name : id);
+  const hopCache = new Map();
+  const hopOf = (fromId, toId, kind) => {
+    const key = `${fromId}>${toId}`;
+    if (!hopCache.has(key)) {
+      hopCache.set(key, hopDetail(ends(fromId), ends(toId), margins.get(radioPairKey(fromId, toId)) || null, { kind, sysById, ends }));
+    }
+    return hopCache.get(key);
+  };
+
+  // Every route, weighed, grouped by the repeater it leaves through.
+  const byStart = new Map();
+  for (const w of walk.routes) {
+    const stations = start === 'field' ? [self.id, ...w.path] : w.path;
+    const hops = [];
+    for (let i = 0; i < stations.length - 1; i++) hops.push(hopOf(stations[i], stations[i + 1], start === 'field' && i === 0 ? 'field' : 'backbone'));
+    if (!byStart.has(w.start)) byStart.set(w.start, []);
+    byStart.get(w.start).push(routeStats(stations, hops));
+  }
+  for (const list of byStart.values()) list.sort(compareRoutes);
+  const best = [...byStart.values()].map(l => l[0]).sort(compareRoutes)[0] || null;
+
+  // The hops on what is listed, each once, in order of first appearance.
+  const shown = [];
+  const seen = new Set();
+  const keep = h => { const k = `${h.from.id}>${h.to.id}`; if (!seen.has(k)) { seen.add(k); shown.push(h); } };
+  if (best) best.hops.forEach(keep);
+
+  const toBase = (startId, firstRepeater) => {
+    const list = byStart.get(startId) || [];
+    const bases = new Map();
+    for (const r of list) {
+      const b = r.stations[r.stations.length - 1];
+      if (!bases.has(b) || bases.get(b) > r.hops.length) bases.set(b, r.hops.length);
+    }
+    const reach = [...bases.entries()].map(([id, hops]) => {
+      const km = firstRepeater && ends(id) && firstRepeater.lat != null && ends(id).lat != null
+        ? round(haversineKm(firstRepeater.lat, firstRepeater.lon, ends(id).lat, ends(id).lon), 2) : null;
+      return { id, name: nameOf(id), fewest_hops: hops, distance_km: km };
+    }).sort((a, b) => a.fewest_hops - b.fewest_hops || (a.distance_km ?? 1e9) - (b.distance_km ?? 1e9) || (a.id < b.id ? -1 : 1));
+    const top = list.slice(0, routesListed);
+    top.forEach(r => r.hops.forEach(keep));
+    return list.length ? {
+      status: 'ok', routes_found: list.length, bases_reachable: reach, routes: top.map(r => routeOut(r, nameOf)),
+    } : {
+      status: 'not recorded',
+      detail: `No base station is within reach along the backbone: ${BACKBONE_KM} km a hop, at most ${LIMITS.radioRepeatersMax} repeaters a route.`,
+    };
+  };
+
+  let repeaters;
+  if (start === 'base') {
+    repeaters = { status: 'not recorded', detail: `${name} is a base station: there is no path on from it.` };
+  } else if (start === 'repeater') {
+    const tb = toBase(self.id, self);
+    repeaters = { status: 'ok', items: [{ id: self.id, name, station_number: self.station_number, distance_km: 0,
+      rx_mhz: self.rx_mhz, tx_mhz: self.tx_mhz, first_hop: null, to_base: tb }],
+    note: `${name} is a repeater itself, so its routes start here: first_hop is null.` };
+  } else if (listed.length) {
+    repeaters = {
+      status: 'ok',
+      addresses: addrs,
+      items: listed.map(c => {
+        const first = hopOf(self.id, c.node.id, 'field');
+        keep(first);
+        return { id: c.node.id, name: c.node.name, station_number: c.node.station_number, distance_km: round(c.km, 2),
+          passes_addresses: c.passes, rx_mhz: c.node.rx_mhz, tx_mhz: c.node.tx_mhz,
+          ...(c.node.isBase ? { is_base: true } : {}), first_hop: hopBrief(first), to_base: toBase(c.node.id, c.node) };
+      }),
+      ...(notListed ? { repeaters_not_listed: notListed } : {}),
+      ...(far ? { farther_away: far } : {}),
+      note: 'The repeaters whose recorded pass ranges carry this station\'s ALERT addresses (exclusions honoured), nearest first, '
+        + `within ${LIMITS.relayKmMax} km${far ? ` (${far} farther away left out — at that distance a range covering the address is usually another region using it)` : ''}; `
+        + 'each with the hop to it and its best routes on to a base station.',
+    };
+  } else {
+    repeaters = { status: 'not recorded', ...(addrs.length ? { addresses: addrs } : {}), detail: noPathWhy || 'No repeater carries this station.' };
+  }
+
+  const measured = await measuredP;
+  const measuredOut = measured.ok ? measured.value : unavailable(measured.error, MEASURED_SOURCE);
+  // What the figures are on every route weighed, listed or not — so the
+  // dossier, which lists fewer, says the same as the route — for the summary
+  // and `model`.
+  const weighed = [...hopCache.values()];
+  const modelled = weighed.filter(h => h.status === 'ok');
+  const times = modelled.map(h => h.computed_at).filter(Boolean).sort();
+  const staleOnes = modelled.filter(h => h.stale);
+  const byModel = staleOnes.filter(h => h.stale_reasons.some(r => r.reason === 'model'));
+  const savedModels = {};
+  for (const h of modelled) savedModels[h.model || 'unknown'] = (savedModels[h.model || 'unknown'] || 0) + 1;
+  const summary = radioSummaryLines({
+    name, proposed: doc.proposed === true, start, addresses: addrs,
+    repeaters: listed.map(c => ({ name: c.node.name, distance_km: round(c.km, 2) })), notListed,
+    firstHopKm: LIMITS.relayKmMax, linkKm: BACKBONE_KM, maxRepeaters: LIMITS.radioRepeatersMax,
+    routesFound: start === 'repeater' ? (byStart.get(self.id) || []).length : walk.routes.length,
+    bases: start === 'repeater' && repeaters.items[0].to_base.status === 'ok'
+      ? [...repeaters.items[0].to_base.bases_reachable].sort((a, b) => (a.distance_km ?? 1e9) - (b.distance_km ?? 1e9)) : [],
+    noPathWhy, best,
+    stale: { modelled: modelled.length, stale: staleOnes.length, byModel: byModel.length,
+      oldModels: uniq(byModel.map(h => h.model)), endsChanged: modelled.filter(h => h.ends_changed).length,
+      from: times[0] || null, to: times[times.length - 1] || null },
+    unmodelled: weighed.length - modelled.length, hopCount: weighed.length,
+    measured: measuredOut,
+  });
+
+  return {
+    starts_as: start === 'field' ? 'field station' : start === 'repeater' ? 'repeater' : 'base station',
+    summary,
+    best_path: best ? { status: 'ok', ...routeOut(best, nameOf) }
+      : { status: 'not recorded', detail: start === 'base' ? `${name} is a base station: there is no path on from it.`
+        : noPathWhy || 'No route from this station reaches a base station along the backbone.' },
+    repeaters,
+    ...(walk.truncated ? { routes_truncated: `Only the first ${LIMITS.radioRoutesMax} routes, shortest first, over at most `
+      + `${LIMITS.radioNodesMax} stations, were weighed; longer ones were not.` } : {}),
+    hops: shown,
+    measured: measuredOut,
+    model: {
+      current: FADE_MODEL,
+      current_words: `${modelWords(FADE_MODEL)}: Longley–Rice over the bare terrain at ${FADE_SAMPLES} points, less a `
+        + `${FADE_SETTINGS.allowance} dB allowance measured on site, with repeaters and bases on at least a ${FADE_SETTINGS.mastAgl} m mast`,
+      saved_models: savedModels,
+      ...(Object.keys(savedModels).includes('itm-p2p/2') ? { note: 'itm-p2p/2 is the land-cover model, the default until the '
+        + 'field calibration of October 2026: held against path margins measured on site it read about 41 dB low on average '
+        + '(docs/network-review.md), so its figures are much too low. Turning the Stations map\'s fade-margin layer on and '
+        + 'saving it again replaces them.' } : {}),
+    },
+    rules: { first_hops: LIMITS.relayListMax, first_hop_km: LIMITS.relayKmMax, backbone_km: BACKBONE_KM,
+      repeaters_per_route: LIMITS.radioRepeatersMax, beyond_fewest: LIMITS.radioBeyondShortest, routes_listed: routesListed },
+  };
+}
+
+async function radioPathEndpoint(rc, rawId) {
+  const st = await loadStationDoc(rc, rawId);
+  const body = await radioPathFor(rc, st, { measuredP: settle(measuredFadeSection(rc, st.id)) });
+  return {
+    id: st.id,
+    ...(st.resolved_from ? { resolved_from: st.resolved_from } : {}),
+    name: st.doc.name,
+    station_number: st.doc.station_number || null,
+    roles: st.doc.roles || [],
+    lat: num(st.doc.lat),
+    lon: num(st.doc.lon),
+    proposed: st.doc.proposed === true,
+    ...body,
+    notes: [RADIO_RULES_NOTE, RADIO_FIGURE_NOTE, NOT_MODELLED,
+      `The repeaters, base stations and pass ranges are read once and held for ${LIMITS.radioTopologySeconds / 60} minutes; `
+        + 'the saved figures and the station\'s own record are read fresh.'],
+    sources: [
+      { relation: 'meganet.link_fade_margin', what: 'the fade margins the Stations map worked out and an editor saved, one row per pair of stations' },
+      { relation: 'meganet.station / meganet.repeater / meganet.pass_range', what: 'the repeaters and base stations, their receive frequencies and pass ranges' },
+      { relation: 'meganet.rm_system', what: 'the radio systems a saved figure is checked against (power, gain, line loss, threshold, antenna height)' },
+      { relation: 'meganet.station_json', what: 'the station\'s own record', updated_at: st.updated_at },
+      { relation: 'meganet.inspection_chart_visit / meganet.inspection_chart_fade_margin', what: 'attenuator tests at site visits (numbers only)' },
+    ],
+    links: stationLinks(rc, st.id),
+    generated_at: new Date().toISOString(),
+  };
+}
+
+// The dossier's section: the same, shorter — one route per repeater, every
+// hop's full detail only for the best path and the first hops, the measured
+// margins from the dossier's own inspections section, and the notes left to
+// the route, which a dossier links to.
+async function radioPathSection(rc, st, measuredP) {
+  const body = await radioPathFor(rc, st, { routesListed: 1, measuredP });
+  const ok = body.best_path.status === 'ok' || body.repeaters.status === 'ok';
+  const full = new Set([...(body.best_path.hops || []), ...(body.repeaters.items || []).map(i => i.first_hop).filter(Boolean)]
+    .map(h => `${h.from}>${h.to}`));
+  const { note: _mNote, ...measured } = body.measured;
+  const { note: _modelNote, ...model } = body.model;
+  return {
+    status: ok ? 'ok' : 'not recorded',
+    ...(ok ? {} : { detail: body.summary[0] || body.repeaters.detail }),
+    ...body,
+    repeaters: body.repeaters.items ? { ...body.repeaters, items: body.repeaters.items.map(i => {
+      const { bases_reachable: _b, ...toBase } = i.to_base;
+      return { ...i, to_base: toBase };
+    }) } : body.repeaters,
+    hops: body.hops.filter(h => full.has(`${h.from.id}>${h.to.id}`)),
+    measured,
+    model,
+    note: `One route per repeater, and each hop in full only on the best path and the first hops: ${API_PREFIX}/stations/{id}/radio-path `
+      + `lists ${LIMITS.radioRoutesListed} routes per repeater, every hop in full, the base stations each reaches, and what every field means.`,
+    link: `${rc.origin}${API_PREFIX}/stations/${encodeURIComponent(st.id)}/radio-path`,
+    source: 'meganet.link_fade_margin; meganet.station / repeater / pass_range; meganet.rm_system; the inspections section',
+  };
+}
+
 // ── The dossier ──────────────────────────────────────────────────────────────
 // One call, everything a report drafter needs about one station, each section
 // labelled with where it came from and saying so when there is nothing —
@@ -2159,11 +2528,15 @@ async function dossierEndpoint(rc, rawId) {
     settle(bureauIndexOf(rc)),
   ]);
   const indexBy = indexes.ok ? byKey(indexes.value, 'code') : new Map();
-  const [inspections, nearby, radio, acma] = await Promise.all([
-    settle(inspectionsSection(rc, id)),
+  // The radio path takes its measured margins from the inspections section,
+  // so it costs the dossier no read of its own for them.
+  const inspP = inspectionsSection(rc, id);
+  const [inspections, nearby, radio, acma, radioPath] = await Promise.all([
+    settle(inspP),
     settle(nearbySection(rc, doc, id)),
     settle(radioSection(rc, doc, id, nets.ok ? byKey(nets.value) : null, rms.ok ? byKey(rms.value) : null, relayP)),
     settle(acmaSection(rc, st, relayP)),
+    settle(radioPathSection(rc, st, settle(inspP.then(measuredFromInspections)))),
   ]);
 
   const slsRows = sls.ok ? sls.value : [];
@@ -2194,6 +2567,8 @@ async function dossierEndpoint(rc, rawId) {
     inspections: inspections.ok ? inspections.value : unavailable(inspections.error, 'meganet.inspection_chart_*'),
     nearby_stations: nearby.ok ? nearby.value : unavailable(nearby.error, 'meganet.station'),
     acma: acma.ok ? acma.value : unavailable(acma.error, ACMA_FILE_WORDS),
+    radio_path: radioPath.ok ? radioPath.value
+      : unavailable(radioPath.error, 'meganet.link_fade_margin; meganet.station / repeater / pass_range'),
   };
   if (!sls.ok) d.flood_levels.sls_flood_classes = unavailable(sls.error, 'meganet.sls_location');
 
@@ -2216,7 +2591,7 @@ async function dossierEndpoint(rc, rawId) {
       { relation: 'meganet.station_health', what: 'what Flood-Net\'s own ingest last heard' },
       { relation: 'meganet.reading_daily', what: `daily rollups of telemetry ingested into Flood-Net, last ${days} UTC days` },
       { relation: 'meganet.inspection_chart_*', what: 'numbers recorded at site visits (no remarks)' },
-      { relation: 'meganet.pass_range / meganet.link_fade_margin', what: 'repeater pass ranges and saved modelled link margins' },
+      { relation: 'meganet.pass_range / meganet.link_fade_margin', what: 'repeater pass ranges, saved modelled link margins and the radio path to a base station' },
       { relation: 'meganet.station / catchment / hub / radio_network / rm_system', what: 'nearby stations and reference names' },
       { file: LICENSING_PATH, what: 'the ACMA Register of Radiocommunications Licences, as the weekly extract Flood-Net keeps (CC BY 4.0)',
         source_date: acma.ok ? acma.value.register_extract.source_date : null },
@@ -3179,6 +3554,7 @@ export const ENDPOINTS = Object.freeze([
   { path: '/api/v1/stations/{id}/service-level', op: 'getStationServiceLevel', summary: 'The station\'s entries in the Service Level Specifications (Queensland; New South Wales and the ACT).' },
   { path: '/api/v1/stations/{id}/acma', op: 'getStationAcmaLicences', summary: 'The ACMA licences Flood-Net records for a station, and the ACMA register\'s licences at sites within radius_m of it.' },
   { path: '/api/v1/acma', op: 'getAcmaLicencesNear', summary: 'The ACMA register\'s licences at sites within radius_m of a point — for a site not built yet, or a move.' },
+  { path: '/api/v1/stations/{id}/radio-path', op: 'getStationRadioPath', summary: 'How a station\'s readings reach a base station: its repeaters, the backbone on, and the fade margin Flood-Net saved for each hop, stale or not.' },
   { path: '/api/v1/readings/latest', op: 'getLatestReadings', summary: 'Every station\'s newest reading on each channel, in one call: by network, basin, kind or bounding box.' },
   { path: '/api/v1/health/silent', op: 'getSilentStations', summary: 'The stations gone quiet now, and the groups that went quiet together, from the server\'s own health run.' },
   { path: '/api/v1/health/findings', op: 'getHealthFindings', summary: 'Station Health for a page of stations, worst first — by owner, by station ids, or by network, basin, kind or bounding box.' },
@@ -3197,7 +3573,7 @@ function apiIndex(rc) {
     name: 'Flood-Net station API',
     version: API_VERSION,
     read_only: true,
-    description: 'Read-only, public station-level data from Flood-Net — the register of the Bureau of Meteorology\'s Queensland (and neighbouring) flood-warning telemetry network: field stations, repeaters, base stations, their Bureau flood-warning details, SLS entries, AEP levels, health, ingested readings and inspection numbers. Useful for drafting assessment reports, and for anything else.',
+    description: 'Read-only, public station-level data from Flood-Net — the register of the Bureau of Meteorology\'s Queensland (and neighbouring) flood-warning telemetry network: field stations, repeaters, base stations, the radio paths between them with their saved fade margins, their Bureau flood-warning details, SLS entries, AEP levels, health, ingested readings and inspection numbers. Useful for drafting assessment reports, and for anything else.',
     endpoints: ENDPOINTS.map(e => ({ method: 'GET', path: e.path, summary: e.summary })),
     mcp: { url: `${rc.origin}${MCP_PATH}`, transport: 'Streamable HTTP (POST, JSON responses)', protocol_versions: MCP_VERSIONS },
     openapi: `${rc.origin}${API_PREFIX}/openapi.json`,
@@ -3333,6 +3709,9 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
           q('freq_mhz', `Frequencies in MHz, comma-separated (up to ${LIMITS.acmaFreqsMax}), to flag the licences on — e.g. 151.525. A match is within ${MATCH_KHZ} kHz.`, { type: 'string', maxLength: 100 }),
           acmaAllParam,
         ], ok('The register\'s licences around the point.')),
+      '/api/v1/stations/{id}/radio-path': op('getStationRadioPath', 'Get a station\'s radio path to base',
+        'How a station\'s readings reach a base station: the repeaters that pass its ALERT addresses, the routes on along the backbone, each hop\'s saved fade margin and whether it is stale, the best path and its weakest hop, and its measured path margins.',
+        [idParam], ok('The routes to a base station, hop by hop, with the saved figures.')),
       '/api/v1/readings/latest': op('getLatestReadings', 'Get the latest readings',
         'Every station Flood-Net holds telemetry for, each channel\'s newest reading and its age, in one call — filtered by radio network, basin, kind or bounding box. Most stations report through the Bureau\'s own systems and are absent.',
         [
@@ -3446,6 +3825,7 @@ async function routeRest(rc, sub, params) {
         case 'flood-levels': none(); return floodLevelsEndpoint(rc, parts[1]);
         case 'service-level': none(); return serviceLevelEndpoint(rc, parts[1]);
         case 'acma': return acmaEndpoint(rc, parts[1], allowParams(params, ACMA_PARAMS));
+        case 'radio-path': none(); return radioPathEndpoint(rc, parts[1]);
         default: break;
       }
     }
@@ -3759,6 +4139,7 @@ export const MCP_INSTRUCTIONS = [
   'Station ids are lowercase slugs such as "abergowrie_br_al" (a Bureau number also works). Find stations with search_stations or stations_near, then call get_station_dossier for everything about one station in a single call — identity, location, radio, telemetry and health, the Service Level Specification entry, the Bureau\'s flood classes, crossings and gauge zero, AEP levels, inspection numbers and nearby stations, each labelled with its source. Use get_flood_levels or get_service_level when only that is needed.',
   'For what Station Health says about a station — its findings with what to do, its check schedule day by day, its battery\'s night lows — call get_station_health; for a maintenance run\'s worth of stations, get_health_findings by owner or by station ids.',
   'For what every gauge is saying now, call get_latest_readings once — by radio network, basin, kind or bounding box if you like — rather than get_readings station by station; it covers only telemetry ingested into Flood-Net, which most stations do not send. For what has gone quiet, call get_silent_stations. For a map, search_stations, stations_near, get_latest_readings and get_silent_stations answer GeoJSON with format "geojson".',
+  'For how a station\'s readings reach a base station, call get_radio_path: the repeaters that pass its ALERT addresses, the routes on along the backbone, and the fade margin Flood-Net saved for every hop — with whether each is stale (worked out with an older model, or an end has changed since), the best path and its weakest hop, and the path margins measured at site visits. Say which figures are stale when you quote them.',
   'For radio licensing, get_acma_licences gives the ACMA licences Flood-Net records for a station and every licence the ACMA register has near it (licensee, frequencies, power, distance, whether it is on the station\'s frequency); acma_licences_near does the same for a point where a site might go. The register is a weekly extract kept for the network\'s area — say its source_date, and check a licence on the ACMA\'s register before relying on it.',
   'Heights: flood classes, crossings and flood effects are metres on the gauge, not AHD; AEP levels are modelled metres AHD and indicative only. Say which source a figure came from. Sections report status "ok", "not recorded" or "unavailable" — never read "not recorded" as zero.',
   `Be gentle: ${rateLimitWords().join('; ')}. Cache what you fetch and do not walk the whole network station by station.`,
@@ -3941,6 +4322,13 @@ export const MCP_TOOLS = Object.freeze([
       all: acmaAllArg,
     }, required: ['lat', 'lon'], additionalProperties: false },
     route: a => ['/acma', { near: `${a.lat},${a.lon}`, ...pick(a, ['radius_m', 'freq_mhz', 'all']) }],
+  },
+  {
+    name: 'get_radio_path',
+    title: 'Get a station\'s radio path to base',
+    description: `How a station's readings reach a base station: the repeaters whose pass ranges carry its ALERT addresses (the nearest ${LIMITS.relayListMax} within ${LIMITS.relayKmMax} km), each one's routes on along the backbone to a base station (${BACKBONE_KM} km a hop, at most ${MAX_REPEATERS} repeaters a route — the Stations map's rules), and every hop's fade margin as Flood-Net saved it: both ways, its band, frequency, distance, line of sight, model and date, and whether it is stale, with why in words. Also the best path and its weakest hop, and the path margins measured at site visits. For a repeater the routes start at itself. A hop nobody has modelled says so.`,
+    inputSchema: { type: 'object', properties: { id: idArg }, required: ['id'], additionalProperties: false },
+    route: a => [`/stations/${enc(a.id)}/radio-path`, {}],
   },
   {
     name: 'list_networks',

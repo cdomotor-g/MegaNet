@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-01** (revision 209 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-01** (revision 210 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -837,6 +837,19 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 210 — 2026-11-01: 📶 Agent API — a station's radio path to base, with the fade margins Flood-Net saved
+
+The owner, for the SoRT scope builder's *Fade Margin >20 dB* question: Flood-Net's fade-margin figures from a station to its repeaters and on to the base stations. No issue; this entry is its record. **Opens nothing; closes nothing.**
+
+- **`GET /api/v1/stations/{id}/radio-path`** (MCP `get_radio_path`), and a shorter `radio_path` section in the dossier: the repeaters that pass the station's ALERT addresses (`relayed_by`'s nearest 5 within 150 km); each one's routes on to a base station by the Stations map's own rules — a backbone hop within the 100 km Max TX distance to a repeater that passes what the route carries, or to any base, at most 4 repeaters (`delay-plan.js`'s `maxHops`) and one past the fewest that reach a base; and every hop's saved `link_fade_margin` row — both ways, band against its saved thresholds, frequency, distance, line of sight, model, date and **stale**, with the reasons in words. Then the best path and its weakest hop, and the station's last attenuator tests from site visits, read as steps (the Network Review's rule). A repeater starts at itself; a base has no path on; a hop nobody saved says *not modelled yet*.
+- **Stale is the app's own test.** `worker/radio-path.js` builds `map-fade.js`'s `sigFor` signature at the app's defaults and names what no longer matches: the model, its settings, an end that moved, a ground height, an antenna, a radio, the frequency. `test/agent-api.mjs` runs the app's own `sigFor` (lifted from `map-fade.js` and `path-profile.js` into a `vm`) against it, and holds the mirrored constants to `core.js`, `path-profile.js`, `map-fade.js` and `delay-plan.js`.
+- **What the live data says.** All 3,176 saved rows (3,134 field, 42 backbone) are `itm-p2p/2`, the land-cover model, from 3–4 September 2026 — so every figure the route gives is stale today, and each answer says so. 2,205 rows also have an end whose ground height changed since (the Elvis heights), 577 an end that moved, 89 a new frequency. Fifteen Mile AL's first hop reads −22.8 dB where its attenuator tests carried 19–21 dB to base. Across the network, 975 stations reach a base through one repeater, 44 need two, 11 three and 3 four; 390 reach none — no base station in the register within reach of their repeaters.
+- **Reads and time.** The repeaters and bases in one read (`station` with `repeater(rx_mhz,tx_mhz,pass_range(kind,lo,hi))` embedded, held five minutes), the saved margins between the stations the routes touch in one more, the radio systems (a vocabulary) and two for the attenuator tests: six for the route; the dossier goes from 24 reads to 26 of its 32. The walk is a few milliseconds of CPU at the densest spot — round the Tweed, a dozen stations made 2,134 routes within four repeaters, the same few in every order, and 150 under the one-past-the-fewest rule.
+- **A link for people** (no new feature): `https://floodwarning.net/?tab=stations&station=<id>` opens the station on the Stations map, and `&map=<lat>,<lon>,<zoom>` centres the map elsewhere — a site it might move to — where 🚚 Relocate station (*Use the station on the card*) and the link budget model it. No address opens those tools by itself.
+- **Checks:** `agentapi` 461 (the new section: the app's `sigFor` against the Worker's, the constants, every listed route held to the rules independently, fresh, old-model and unsaved hops, the repeater, base and no-address cases, the measured tests, the dossier section, the tool; four deliberate breaks each caught), `agentdocs` 126, `apinotify` 80, the cheap five; `wrangler deploy --dry-run`. The PostgREST stub now embeds `repeater` one-to-one and `pass_range` inside it, as the live database does. Changelog entry `2026-11-01-radio-path`; `atlas.json`'s agent-api entries name the route, and the re-sweep below is on its blocked list.
+
+**What a person could do (offered, not filed):** revision 141's sweep-and-save, now with a second reason. Signed in as an editor: Stations map → Layers → Link colour: *By fade margin*, let it sweep, then **Save to the datastore**. Every saved row predates `itm-p2p/3`, so until then every radio-path figure the API gives is stale.
 
 ### Revision 209 — 2026-11-01: 🚘 Driving mode — the route followed in 3-D as it is driven
 

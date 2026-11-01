@@ -35,6 +35,10 @@ See [`docs/agent-api.md`](../docs/agent-api.md).
   Flood-Net records for a station and the ACMA register's licences around it;
   `acma_licences_near` (`/api/v1/acma?near=lat,lon`) the same for a point. The
   register is a weekly extract — quote its `source_date`.
+- `get_radio_path` (`/api/v1/stations/{id}/radio-path`) follows a station's
+  readings to a base station: its repeaters, the backbone on, each hop's saved
+  fade margin and whether it is stale, the best path and its weakest hop, and
+  the measured margins from site visits.
 - Flood classes are metres on the gauge, AEP levels modelled m AHD (indicative);
   quote each figure's source and datum.
 

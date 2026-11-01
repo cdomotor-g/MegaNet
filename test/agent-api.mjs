@@ -35,6 +35,8 @@ import { PostgrestStub } from './lib/postgrest-stub.mjs';
 import worker, { dbProxyTarget } from '../worker/index.js';
 import * as api from '../worker/api.js';
 import { metresBetween, licensee as acmaLicensee } from '../worker/acma.js';
+import * as rp from '../worker/radio-path.js';
+import vm from 'node:vm';
 import { CARD_WINDOWS } from '../tools/health/cards.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
@@ -978,6 +980,303 @@ if (ACMA_REP && BY_BASE && ACMA_FIELD && PERSON_SITE) {
   const unboundDossier = await get(`/api/v1/stations/${ACMA_REP.id}/dossier`, { env: {} });
   check('…and a dossier still answers, its acma section unavailable', unboundDossier.status === 200 && unboundDossier.json.acma.status === 'unavailable');
   api.resetApiState();
+}
+
+// ── A station's radio path to the base stations ──────────────────────────────
+section('Radio path');
+
+// The app's own signature for a line — map-fade.js sigFor, with endSys and
+// freqFor, over path-profile.js's radio helpers and core.js's defaults — run
+// here as the app runs it, so the Worker's copy is held to the real thing and
+// not to a restatement of it. A function that moves or is renamed fails here,
+// which is the moment worker/radio-path.js needs looking at again.
+const appSource = f => fs.readFileSync(repo(f), 'utf8');
+function sourceOf(src, name, file) {
+  const at = src.indexOf(`function ${name}(`);
+  if (at < 0) throw new Error(`${file} has no function ${name}`);
+  let depth = 0, i = src.indexOf('{', at);
+  for (; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}' && --depth === 0) break;
+  }
+  return src.slice(at, i + 1);
+}
+function objectOf(src, name, file) {
+  const at = src.search(new RegExp(`const ${name}\\s*=\\s*\\{`));
+  if (at < 0) throw new Error(`${file} has no const ${name} = {…}`);
+  let depth = 0, i = src.indexOf('{', at);
+  const from = i;
+  for (; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}' && --depth === 0) break;
+  }
+  return src.slice(from, i + 1);
+}
+const scalarOf = (src, name, file) => {
+  const m = new RegExp(`const ${name}\\s*=\\s*('[^']*'|-?[\\d.]+)`).exec(src);
+  if (!m) throw new Error(`${file} has no const ${name}`);
+  return m[1];
+};
+let APP = null;
+try {
+  const core = appSource('core.js'), pp = appSource('path-profile.js'), mf = appSource('map-fade.js');
+  const script = [
+    `const RM_NET_DEFAULTS = ${objectOf(core, 'RM_NET_DEFAULTS', 'core.js')};`,
+    `const FN_MODEL_DEFAULTS = ${objectOf(core, 'FN_MODEL_DEFAULTS', 'core.js')};`,
+    `const PATH_DEFAULT_MHZ = ${scalarOf(pp, 'PATH_DEFAULT_MHZ', 'path-profile.js')};`,
+    `const PATH_DEFAULT_AGL = ${scalarOf(pp, 'PATH_DEFAULT_AGL', 'path-profile.js')};`,
+    `const MODEL = ${scalarOf(mf, 'MODEL', 'map-fade.js')};`,
+    `const SAMPLES = ${scalarOf(mf, 'SAMPLES', 'map-fade.js')};`,
+    ...['rmSystemOf', 'stationIsMast', 'stationAntenna', 'pathPropOf'].map(n => sourceOf(pp, n, 'path-profile.js')),
+    ...['endSys', 'freqFor', 'sigFor'].map(n => sourceOf(mf, n, 'map-fade.js')),
+    'this.consts = { RM_NET_DEFAULTS, FN_MODEL_DEFAULTS, PATH_DEFAULT_MHZ, PATH_DEFAULT_AGL, MODEL, SAMPLES };',
+  ].join('\n');
+  APP = vm.createContext({ state: { data: { rm_systems: DOC.rm_systems }, link: {} } });
+  vm.runInContext(script, APP);
+} catch (err) {
+  APP = { error: err.message };
+}
+check('the app\'s sigFor (map-fade.js) and its helpers run here as they run in the app', APP && typeof APP.sigFor === 'function',
+  APP && APP.error);
+const C = (APP && APP.consts) || {};
+const coreSrc = appSource('core.js'), delaySrc = appSource('delay-plan.js');
+check('the Worker models with the app\'s model, samples and defaults', rp.FADE_MODEL === C.MODEL && rp.FADE_SAMPLES === C.SAMPLES
+  && rp.FADE_DEFAULT_MHZ === C.PATH_DEFAULT_MHZ && rp.FADE_DEFAULT_AGL_M === C.PATH_DEFAULT_AGL
+  && JSON.stringify(rp.FADE_SETTINGS) === JSON.stringify(C.FN_MODEL_DEFAULTS),
+  `${rp.FADE_MODEL}/${C.MODEL}, ${JSON.stringify(rp.FADE_SETTINGS)} / ${JSON.stringify(C.FN_MODEL_DEFAULTS)}`);
+const D = C.RM_NET_DEFAULTS || {};
+check('…and core.js\'s propagation defaults, as pathPropOf reads them', JSON.stringify(rp.FADE_PROPAGATION) === JSON.stringify({
+  climate: D.Climate, N0: D.Refractivity, epsilon: D.Permittivity, sigma: D.Conductivity, pol: D.Polarization,
+  mdvar: D['Stat. mode'], time: D['%Time'], location: D['%Location'], situation: D['%Situation'] }), JSON.stringify(rp.FADE_PROPAGATION));
+check('the backbone is the Stations map\'s Max TX distance, and a route the delay plan\'s hops',
+  rp.BACKBONE_KM === Number((/mapMaxLinkKm:\s*(\d+)/.exec(coreSrc) || [])[1])
+  && rp.MAX_REPEATERS === Number((/maxHops:\s*(\d+)/.exec(delaySrc) || [])[1]),
+  `${rp.BACKBONE_KM} km, ${rp.MAX_REPEATERS} repeaters`);
+
+const SYS = new Map(DOC.rm_systems.map(r => [r.id, r]));
+const nodeOfDoc = st => rp.stationNode(st, st.repeater);
+const isBaseSt = s => (s.roles || []).includes('base');
+const placed = s => s && s.lat != null && s.lon != null;
+const kmApart = (a, b) => metresBetween(a.lat, a.lon, b.lat, b.lon) / 1000;
+const BASES = live.filter(s => isBaseSt(s) && placed(s));
+const basesNear = r => BASES.filter(b => b.id !== r.id && kmApart(r, b) <= rp.BACKBONE_KM).sort((a, b) => kmApart(r, a) - kmApart(r, b));
+// A field station whose nearest carrying repeater has base stations within
+// the backbone's reach — Fifteen Mile AL where the data still has it.
+const RP_FIELD = [byIdLive.get('fifteen_mile_al'), ...live].find(st => st && placed(st) && !(st.roles || []).includes('repeater')
+  && !isBaseSt(st) && addrsOf(st).length && relayersOf(st).some(r => !isBaseSt(r) && basesNear(r).length >= 2));
+const RP_FIRST = RP_FIELD && relayersOf(RP_FIELD).find(r => !isBaseSt(r) && basesNear(r).length >= 2);
+const RP_BASE_NEAR = RP_FIRST && basesNear(RP_FIRST)[0];
+// A repeater with a base station in reach — Toowoomba AL, else the first.
+const RP_REPEATER = [byIdLive.get('toowoomba_al'), ...live].find(st => st && st.repeater && (st.roles || []).includes('repeater')
+  && !isBaseSt(st) && placed(st) && basesNear(st).length);
+const RP_BASE = [byIdLive.get('18_bateson'), ...BASES].find(Boolean);
+check('the radio path fixtures exist in stations.json', RP_FIELD && RP_FIRST && RP_BASE_NEAR && RP_REPEATER && RP_BASE,
+  `field ${RP_FIELD && RP_FIELD.id} via ${RP_FIRST && RP_FIRST.id} to ${RP_BASE_NEAR && RP_BASE_NEAR.id}; repeater ${RP_REPEATER && RP_REPEATER.id}`);
+
+{
+  // The signature, the app's and the Worker's, for every kind of line: a
+  // field station to its repeater, a repeater to a base, both ways round.
+  const pairs = [[RP_FIELD, RP_FIRST], [RP_FIRST, RP_BASE_NEAR], [RP_BASE_NEAR, RP_FIRST], [RP_REPEATER, basesNear(RP_REPEATER)[0]]];
+  const differ = pairs.filter(([a, b]) => APP.sigFor && APP.sigFor(a, b) !== rp.fadeSignature(nodeOfDoc(a), nodeOfDoc(b), SYS));
+  check('the Worker builds the signature the app saves, for every kind of line, either way round', APP.sigFor && differ.length === 0,
+    differ.map(([a, b]) => `${a.id}>${b.id}: app ${APP.sigFor(a, b)} | worker ${rp.fadeSignature(nodeOfDoc(a), nodeOfDoc(b), SYS)}`).join(' ; '));
+
+  // Three saved rows: the first hop fresh from the app's own sigFor, worked
+  // out with a different figure each way; the hop on to a base saved with the
+  // land-cover model (itm-p2p/2) and its antennas at their system's height.
+  // Nothing else on these routes is saved.
+  const [fa, fb] = [RP_FIELD.id, RP_FIRST.id].sort();
+  T.link_fade_margin.push({ station_a_id: fa, station_b_id: fb, kind: 'field', margin_db: fa === RP_FIELD.id ? 21.5 : 18,
+    margin_ab_db: 21.5, margin_ba_db: 18, distance_km: Math.round(kmApart(RP_FIELD, RP_FIRST) * 10) / 10,
+    freq_mhz: APP.freqFor ? APP.freqFor(RP_FIELD, RP_FIRST) : null, verdict: 'clear',
+    signature: APP.sigFor ? APP.sigFor(RP_FIELD, RP_FIRST) : 'x', model: rp.FADE_MODEL, good_db: 15, ok_db: 6, band: 'good',
+    computed_at: '2026-10-30T01:00:00+00:00', computed_by: null });
+  const fresh = APP.sigFor ? APP.sigFor(RP_FIRST, RP_BASE_NEAR).split('|') : [];
+  const sysAgl = s => { const x = SYS.get(s.rm_system_id); return x && x.antenna_height_m != null ? x.antenna_height_m : 4; };
+  const [ba, bb] = [RP_FIRST, RP_BASE_NEAR].sort((x, y) => (x.id < y.id ? -1 : 1));
+  const older = fresh.length ? ['itm-p2p/2', ...[1, 2].map(i => { const e = fresh[i].split(','); e[3] = String(sysAgl(i === 1 ? ba : bb)); return e.join(','); }),
+    fresh[3], fresh[4], 'cover', ...fresh.slice(6)].join('|') : 'x';
+  T.link_fade_margin.push({ station_a_id: ba.id, station_b_id: bb.id, kind: 'backbone', margin_db: 7, margin_ab_db: 7, margin_ba_db: 7,
+    distance_km: Math.round(kmApart(RP_FIRST, RP_BASE_NEAR) * 10) / 10, freq_mhz: fresh[3] ? Number(fresh[3]) : null,
+    verdict: 'obstructed', signature: older, model: 'itm-p2p/2', good_db: 15, ok_db: 6, band: 'ok',
+    computed_at: '2026-09-03T06:29:42+00:00', computed_by: null });
+
+  api.resetApiState();
+  stub.requests = [];
+  const r = await get(`/api/v1/stations/${RP_FIELD.id}/radio-path`);
+  const reads = stub.requests.length;
+  const p = r.json || {};
+  check('GET /stations/{id}/radio-path answers 200 for a field station', r.status === 200 && p.id === RP_FIELD.id
+    && p.starts_as === 'field station', `${r.status} ${p.detail || ''}`);
+  check(`…from a few database reads (${reads})`, reads > 0 && reads <= 8, stub.requests.map(q => new URL(q.url).pathname.split('/').pop()).join(' '));
+  check('…every read a GET of a public relation, the topology in one read with its repeaters and pass ranges embedded',
+    stub.requests.every(q => q.method === 'GET') && stub.requests.filter(q => /\/station\?/.test(q.url)
+      && decodeURIComponent(q.url).includes('repeater(rx_mhz,tx_mhz,pass_range(kind,lo,hi))')).length === 1);
+  const want = relayersOf(RP_FIELD).map(x => x.id);
+  const items = (p.repeaters && p.repeaters.items) || [];
+  check('its first repeaters are relayed_by\'s: the nearest that pass its addresses, within the limit',
+    p.repeaters.status === 'ok' && JSON.stringify(items.map(i => i.id)) === JSON.stringify(want),
+    `${items.map(i => i.id)} vs ${want}`);
+  check('…each with the addresses it passes, and the hop to it', items.every(i => i.passes_addresses.length
+    && i.passes_addresses.every(a => addrsOf(RP_FIELD).includes(a) && passes(i.id, a))
+    && i.first_hop && i.first_hop.from === RP_FIELD.id && i.first_hop.to === i.id));
+
+  // Every route listed, held to the rules independently of the code.
+  const routes = items.flatMap(i => (i.to_base.routes || []).map(rt => ({ via: i.id, rt })));
+  const byId = new Map([...live, RP_FIELD].map(s => [s.id, s]));
+  const broken = routes.filter(({ via, rt }) => {
+    const ids = rt.stations;
+    const reps = ids.slice(1, -1);
+    if (ids[0] !== RP_FIELD.id || ids[1] !== via || new Set(ids).size !== ids.length) return true;
+    if (!isBaseSt(byId.get(ids[ids.length - 1])) || reps.some(x => isBaseSt(byId.get(x)))) return true;
+    if (reps.length > rp.MAX_REPEATERS || rt.hop_count !== ids.length - 1 || rt.hops.length !== ids.length - 1) return true;
+    let carried = addrsOf(RP_FIELD).filter(a => passes(via, a));
+    for (let k = 2; k < ids.length; k++) {
+      if (kmApart(byId.get(ids[k - 1]), byId.get(ids[k])) > rp.BACKBONE_KM + 1e-9) return true;
+      if (k < ids.length - 1) {
+        carried = carried.filter(a => passes(ids[k], a));
+        if (!carried.length) return true;
+      }
+    }
+    return rt.hops.some((h, k) => h.from !== ids[k] || h.to !== ids[k + 1]);
+  });
+  check('every route listed starts at the station and its repeater, ends at a base, repeats no station, keeps within the backbone\'s '
+    + `${rp.BACKBONE_KM} km a hop and ${rp.MAX_REPEATERS} repeaters, and every repeater on it passes the station's address`,
+    routes.length > 0 && broken.length === 0, broken.map(x => x.rt.route).join(' | '));
+  check('…each repeater lists at most three, best first', items.every(i => !i.to_base.routes || (i.to_base.routes.length <= 3
+    && i.to_base.routes_found >= i.to_base.routes.length)));
+
+  const hops = new Map((p.hops || []).map(h => [`${h.from.id}>${h.to.id}`, h]));
+  check('every hop a route names is in hops, once', routes.every(({ rt }) => rt.hops.every(h => hops.has(`${h.from}>${h.to}`)))
+    && hops.size === (p.hops || []).length);
+  const first = hops.get(`${RP_FIELD.id}>${RP_FIRST.id}`);
+  const there = RP_FIELD.id < RP_FIRST.id ? 21.5 : 18, back = RP_FIELD.id < RP_FIRST.id ? 18 : 21.5;
+  check('a saved hop gives its figure the way the traffic runs, and the other way', first && first.status === 'ok'
+    && first.margin_db === there && first.margin_back_db === back && first.band === (there >= 15 ? 'good' : 'ok')
+    && first.thresholds_db.good === 15 && first.kind === 'field', JSON.stringify(first));
+  check('…and one saved from the app\'s own signature is not stale', first && first.stale === false && first.ends_changed === false
+    && first.stale_reasons.length === 0 && first.model === rp.FADE_MODEL, JSON.stringify(first && first.stale_reasons));
+  const onward = hops.get(`${RP_FIRST.id}>${RP_BASE_NEAR.id}`);
+  check('one worked out with the land-cover model is stale for that alone, and says so in words', onward && onward.status === 'ok'
+    && onward.stale === true && onward.ends_changed === false && onward.stale_reasons.length === 1
+    && onward.stale_reasons[0].reason === 'model' && /land-cover model \(itm-p2p\/2\)/.test(onward.stale_reasons[0].detail)
+    && onward.band === 'ok' && onward.kind === 'backbone' && onward.to.role === 'base', JSON.stringify(onward && onward.stale_reasons));
+  const bare = [...hops.values()].filter(h => h.status !== 'ok');
+  check('a hop nobody saved says it is not modelled yet, and how one is', bare.length > 0 && bare.every(h => h.status === 'not modelled'
+    && /Not modelled yet/.test(h.detail) && h.margin_db === undefined));
+  const best = p.best_path;
+  check('the best path is the one route with every hop modelled, and its weakest hop the weaker of the two',
+    best.status === 'ok' && best.complete === true && JSON.stringify(best.stations) === JSON.stringify([RP_FIELD.id, RP_FIRST.id, RP_BASE_NEAR.id])
+    && best.weakest_hop.from === RP_FIRST.id && best.weakest_hop.margin_db === 7 && best.stale_hops === 1, JSON.stringify(best));
+  check('the summary says the best path, its weakest hop, what is stale and what is not modelled, in sentences',
+    p.summary.some(l => l.startsWith('Best path to a base station, every hop modelled:') && l.includes(`${RP_FIRST.name} → ${RP_BASE_NEAR.name}, +7.0 dB, ok`))
+    && p.summary.some(l => /^1 of the 2 saved figures on these routes is stale/.test(l)) && p.summary.some(l => /not modelled yet/.test(l)),
+    p.summary.join(' | '));
+  check('…with the rules, the model, notes, sources and links', p.rules.backbone_km === rp.BACKBONE_KM && p.model.current === rp.FADE_MODEL
+    && p.model.saved_models['itm-p2p/2'] === 1 && /land-cover model/.test(p.model.note) && p.notes.length >= 3
+    && p.sources.some(x => x.relation === 'meganet.link_fade_margin') && p.links.radio_path.endsWith(`/stations/${RP_FIELD.id}/radio-path`)
+    && p.links.app === `https://floodwarning.net/?station=${RP_FIELD.id}`);
+  check('the answer stays well inside an MCP client\'s output budget', r.text.length < 40000, `${r.text.length} bytes`);
+
+  const tool = await rpc('tools/call', { name: 'get_radio_path', arguments: { id: RP_FIELD.id } });
+  check('get_radio_path answers what the REST route does', tool.json.result && tool.json.result.isError === false
+    && JSON.stringify(noGenerated(tool.json.result.structuredContent)) === JSON.stringify(noGenerated(p)));
+  const extra = await get(`/api/v1/stations/${RP_FIELD.id}/radio-path?hops=9`);
+  check('the route takes no parameters, and says so', extra.status === 400 && /takes none/.test(extra.json.detail));
+}
+
+{
+  // A repeater starts at itself.
+  const r = await get(`/api/v1/stations/${RP_REPEATER.id}/radio-path`);
+  const p = r.json || {};
+  const it = p.repeaters && p.repeaters.items && p.repeaters.items[0];
+  check('a repeater\'s routes start at itself: no first hop', r.status === 200 && p.starts_as === 'repeater' && p.repeaters.items.length === 1
+    && it.id === RP_REPEATER.id && it.first_hop === null && it.to_base.status === 'ok'
+    && it.to_base.routes.every(rt => rt.stations[0] === RP_REPEATER.id && isBaseSt(byIdLive.get(rt.stations[rt.stations.length - 1]))),
+    JSON.stringify(it && it.to_base.routes.map(x => x.route)));
+  check('…and its summary says so, with the base stations it reaches', /is a repeater, so its routes to a base station start at itself/.test(p.summary[0])
+    && it.to_base.bases_reachable.length >= 1, p.summary[0]);
+  check('…the nearest base in reach among them', it.to_base.bases_reachable.some(b => b.id === basesNear(RP_REPEATER)[0].id));
+
+  const b = await get(`/api/v1/stations/${RP_BASE.id}/radio-path`);
+  check('a base station has no path on from it, and says so', b.status === 200 && b.json.starts_as === 'base station'
+    && b.json.best_path.status === 'not recorded' && b.json.repeaters.status === 'not recorded' && /is a base station/.test(b.json.summary[0]));
+  const none = await get(`/api/v1/stations/${PROPOSED.id}/radio-path`);
+  check('a station with no ALERT address: not recorded, and why', none.status === 200 && none.json.repeaters.status === 'not recorded'
+    && /no ALERT addresses/.test(none.json.repeaters.detail) && /is proposed, not yet built/.test(none.json.summary[0]));
+  const missing = await get('/api/v1/stations/no_such_station_here/radio-path');
+  check('an unknown station is 404', missing.status === 404);
+
+  // The attenuator tests: newest first, each phase's largest load, a nought
+  // or a visit with none left out, and read as the step it is.
+  const m = (await get(`/api/v1/stations/${RICH.id}/radio-path`)).json.measured;
+  check('measured margins are the site visits\' attenuator tests, newest first, read as steps', m.status === 'ok'
+    && JSON.stringify(m.tests) === JSON.stringify([{ date: '2026-03-15', date_precision: 'day', this_visit_db: 22, this_visit_range_db: [22, 23] },
+      { date: '2025-06-10', date_precision: 'day', original_db: 16 }]), JSON.stringify(m.tests));
+}
+
+{
+  // The dossier carries the same, shorter.
+  const d = (await get(`/api/v1/stations/${RP_FIELD.id}/dossier`)).json;
+  const route = (await get(`/api/v1/stations/${RP_FIELD.id}/radio-path`)).json;
+  const s = d.radio_path;
+  check('the dossier has a radio_path section: the route\'s summary and best path', s && s.status === 'ok'
+    && JSON.stringify(s.summary) === JSON.stringify(route.summary) && JSON.stringify(s.best_path) === JSON.stringify(route.best_path)
+    && s.link.endsWith(`/stations/${RP_FIELD.id}/radio-path`), JSON.stringify({ d: s && s.summary, r: route.summary }));
+  const onBest = new Set(s.best_path.hops.map(h => `${h.from}>${h.to}`));
+  check('…one route per repeater, and full hops only for the best path and the first hops', s.repeaters.items.every(i => i.to_base.routes.length <= 1
+    && !i.to_base.bases_reachable) && s.hops.every(h => onBest.has(`${h.from.id}>${h.to.id}`) || h.from.id === RP_FIELD.id)
+    && s.hops.length < route.hops.length, `${s.hops.length} of ${route.hops.length}`);
+  check('…its measured margins from the dossier\'s own inspections section', s.measured && /inspections section/.test(s.measured.source));
+}
+
+{
+  // The pure parts, on their own.
+  check('open windows: pass ranges less exclusions, an inverted range dropped', JSON.stringify(rp.openWindows([
+    { kind: 'pass', lo: 100, hi: 199 }, { kind: 'exclusion', lo: 150, hi: 160 }, { kind: 'pass', lo: 50, hi: 40 }]))
+    === JSON.stringify([[100, 149], [161, 199]]));
+  const n = (id, extra = {}) => ({ id, name: id, lat: -27.5, lon: 152.5, elevation_ahd: 100, roles: ['field'], rm_system_id: 1,
+    rx_mhz: null, isRepeater: false, isBase: false, windows: [], ...extra });
+  const A = n('aa'), B = n('bb', { roles: ['repeater'], rx_mhz: 151.525, lat: -27.4, isRepeater: true });
+  const sig = rp.fadeSignature(A, B, SYS);
+  const row = { station_a_id: 'aa', station_b_id: 'bb', signature: sig };
+  check('a figure whose signature is today\'s holds', rp.staleReasons(row, A, B, SYS).length === 0, JSON.stringify(rp.staleReasons(row, A, B, SYS)));
+  const why = (a, b, s = sig) => rp.staleReasons({ ...row, signature: s }, a, b, SYS).map(x => x.reason).join(',');
+  check('…an end moved, its ground height, its radio, or the frequency changed: each named',
+    why({ ...A, lat: -27.501 }, B) === 'moved' && why({ ...A, elevation_ahd: 101 }, B) === 'height'
+    && why({ ...A, rm_system_id: 2 }, B) === 'antenna,radio' && why(A, { ...B, rx_mhz: 152.4 }) === 'frequency',
+    [why({ ...A, lat: -27.501 }, B), why({ ...A, elevation_ahd: 101 }, B), why({ ...A, rm_system_id: 2 }, B), why(A, { ...B, rx_mhz: 152.4 })].join(' / '));
+  check('…the field allowance, or a signature it cannot read', why(A, B, sig.replace(`field-${rp.FADE_SETTINGS.allowance}`, 'field-16')) === 'settings'
+    && why(A, B, 'sig') === 'unreadable');
+  check('…how far an end moved, in words', /has moved 111 m since/.test(rp.staleReasons(row, { ...A, lat: -27.501 }, B, SYS)[0].detail));
+  check('a repeater is modelled on its mast under the field model, on its system\'s antenna before it',
+    rp.antennaAgl(B, SYS.get(1), 'itm-p2p/3') === rp.FADE_SETTINGS.mastAgl && rp.antennaAgl(B, SYS.get(1), 'itm-p2p/2') === 4
+    && rp.antennaAgl(A, SYS.get(1), 'itm-p2p/3') === 4);
+  check('an attenuator reading is the step it is', JSON.stringify([24, 19, 30, 33].map(rp.attenuatorRange)) === '[[24,27],[19,20],[30,null],[33,null]]');
+  check('dates in words', rp.dateSpanWords('2026-09-03T06:29:42Z', '2026-09-04T01:00:00Z') === 'between 3 and 4 September 2026'
+    && rp.dateSpanWords('2026-09-03', '2026-09-03') === 'on 3 September 2026');
+
+  // The walk on a made-up network: a station's repeater S, a base 50 km from
+  // it, repeaters beside it — one whose windows overlap S's but not the
+  // station's address — and one out of reach; a route takes only what the one
+  // before it passed on, and goes one repeater past the fewest.
+  const at = (id, lon, extra) => ({ id, name: id, lat: -27, lon, elevation_ahd: null, roles: ['repeater'], rm_system_id: 1,
+    rx_mhz: null, isRepeater: true, isBase: false, windows: [[1000, 1999]], ...extra });
+  const net = rp.buildTopology([]);
+  for (const x of [at('s', 150), at('r1', 150.5), at('r2', 151), at('r3', 151.5, { windows: [[5000, 5999]] }),
+    at('r4', 150.25, { windows: [[1000, 1400]] }),
+    at('base1', 150.5, { roles: ['base'], isRepeater: false, isBase: true, windows: [] })]) net.nodes.set(x.id, x);
+  net.repeaters = [...net.nodes.values()].filter(x => x.isRepeater && !x.isBase);
+  net.bases = [...net.nodes.values()].filter(x => x.isBase);
+  const w = rp.walkRoutes(net, [{ node: net.nodes.get('s'), carried: [[1500, 1500]] }], { beyond: 1 });
+  const paths = w.routes.map(x => x.path.join('>')).sort();
+  check('the walk: straight to the base, and through one repeater more, never through one that does not pass the address',
+    JSON.stringify(paths) === JSON.stringify(['s>base1', 's>r1>base1', 's>r2>base1']), JSON.stringify(paths));
+  const own = rp.walkRoutes(net, [{ node: net.nodes.get('s'), carried: null }], { beyond: 1 }).routes.map(x => x.path.join('>')).sort();
+  check('…while a repeater\'s own walk takes any repeater whose windows overlap what it relays',
+    JSON.stringify(own) === JSON.stringify(['s>base1', 's>r1>base1', 's>r2>base1', 's>r4>base1']), JSON.stringify(own));
+  check('…and stops at its cap, saying so', rp.walkRoutes(net, [{ node: net.nodes.get('s'), carried: null }], { cap: 1 }).truncated === true);
+  T.link_fade_margin.length = 1;   // leave RICH's row only, as the rest of the checks expect
 }
 
 // ── The API's own changes ────────────────────────────────────────────────────
@@ -1962,7 +2261,7 @@ section('MCP');
   const tools = list.json.result.tools;
   const expected = ['search_stations', 'get_station', 'get_station_dossier', 'stations_near', 'get_readings', 'get_latest_readings', 'get_silent_stations',
     'get_station_health', 'get_health_findings', 'list_catchments', 'get_catchment', 'get_flood_levels', 'get_service_level',
-    'get_acma_licences', 'acma_licences_near', 'list_networks'];
+    'get_acma_licences', 'acma_licences_near', 'get_radio_path', 'list_networks'];
   check('tools/list has every tool', expected.every(n => tools.some(t => t.name === n)) && tools.length === expected.length, tools.map(t => t.name).join(', '));
   check('every tool is annotated read-only and has an object input schema', tools.every(t => t.annotations.readOnlyHint === true
     && t.annotations.destructiveHint === false && t.inputSchema.type === 'object' && t.description.length > 40));
