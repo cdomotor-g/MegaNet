@@ -63,6 +63,7 @@ env:
   # https://www.acma.gov.au/register-radiocommunication-licences-rrl and put it
   # first here.
   ACMA_ZIP_URLS: >-
+    https://cdn.acma.gov.au/rrl/spectra_rrl.zip
     https://cdn.acma.gov.au/rrl-updates/spectra_rrl.zip
     https://cdn.acma.gov.au/offline-rrl/spectra_rrl.zip
     https://web.acma.gov.au/rrl-updates/spectra_rrl.zip
