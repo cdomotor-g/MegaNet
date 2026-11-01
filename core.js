@@ -253,9 +253,10 @@ const TABS = [
   // follows the job: the four above are the readings themselves, charted and
   // logged; these are judgements on them — each station's health, the
   // repeaters ranked by what is wrong with each, the write-ups of strange data
-  // and what was behind it, and ⚖️ how all of those are judged. Filed straight
-  // after Data, so Station Health keeps its place in the order and a find word
-  // it shares with a later group still goes to it.
+  // and what was behind it, and ⚖️ how all of those are judged — and then ✅
+  // what is being done about them. Filed straight after Data, so Station
+  // Health keeps its place in the order and a find word it shares with a
+  // later group still goes to it.
   { group: 'Network health', tabs: [
     { id: 'health',     label: 'Station Health',         icon: '🚦',
       find: 'monitoring maintenance o&m faults alarms battery trend voltage solar charge missed checks check signals timed reports silent quiet offline outage schedule repeater down receiver stopped base station network health data quality corrupted copies bit flips ghosts rain gauge blocked tipped level stuck flatline register unknown address agent ai claude briefing triage network bulletin daily weekly summary animation news droggies presenter' },
@@ -285,6 +286,16 @@ const TABS = [
     // "flips", which Station Health, earlier in the group, answers to.
     { id: 'methodology', label: 'Methodology',           icon: '⚖️',
       find: 'methodology methodologies method methods how do we know how does it decide proof prove evidence rules criteria thresholds assumptions attribution attribute fingerprint approach caveats limitations blind spots documentation explainer' },
+    // ✅ Tasks (tasks.js, 0095) is the fifth: the jobs handed to a team, each
+    // at a station, and the teams themselves — what a finding, an inspection
+    // or the SoRT forum leaves to be done. Listed only to administrators and
+    // the people on a team (`who: 'tasks'`). Its find words are the jobs and
+    // the people ("job", "assign", "roster", "sort forum") — never "council",
+    // which nav.mjs holds for Site Maintenance (whose own form is called
+    // Council Maintenance Tasks, and keeps "tasks" among its words: the label
+    // wins the tie for this tab), nor "the", "network" or "signal".
+    { id: 'tasks',      label: 'Tasks',                  icon: '✅',     who: 'tasks',
+      find: 'task todo to-do job jobs work order orders assign assigned assignment hand out handout handed over follow up follow-up actions action items outstanding backlog due overdue team teams roster crew owner owners members sort forum scope builder' },
   ] },
   { group: 'Site visits', tabs: [
     // 📌 Nearby (nearby.js) heads the group because it is where a visit
@@ -449,17 +460,20 @@ function tabCannot(t) {
 // box, Ctrl+K, a view or the Site Map — where Base Stations and Network Review
 // are listed to everyone and say who they are for once opened. `who: 'a2plan'`
 // is the same for the people on the ALERT2 Transition Plan's list (0076),
-// whom the owner nominates — administrators are not on it by being one. Either
-// is still a tab (TAB_LIST holds it, and ?tab= opens it), so the module's own
-// render is what refuses anybody else; this decides only whether it is
-// offered. The database is not asked anything new: Auth.isAdmin() and
-// Auth.a2plan() are whoami()'s answers, and auth.js re-renders the nav
-// whenever they change.
+// whom the owner nominates — administrators are not on it by being one.
+// `who: 'tasks'` is ✅ Tasks (0095): an administrator, and anybody whoami()
+// says has tasks — on a team, or the maker of one. Each is still a tab
+// (TAB_LIST holds it, and ?tab= opens it), so the module's own render is what
+// refuses anybody else; this decides only whether it is offered. The database
+// is not asked anything new: Auth.isAdmin(), Auth.a2plan() and Auth.tasks()
+// are whoami()'s answers, and auth.js re-renders the nav whenever they change.
 function tabShown(t) {
   if (!t || !t.who) return true;
   if (typeof Auth === 'undefined' || !Auth.isSignedIn()) return false;
   if (t.who === 'a2plan') return !!(Auth.a2plan && Auth.a2plan());
-  return !!((Auth.isAdmin && Auth.isAdmin()) || Auth.role() === 'admin');
+  const admin = !!((Auth.isAdmin && Auth.isAdmin()) || Auth.role() === 'admin');
+  if (t.who === 'tasks') return admin || !!(Auth.tasks && Auth.tasks());
+  return admin;
 }
 
 // What the help panel says, keyed by the same tab ids TABS uses. Kept beside
@@ -2639,7 +2653,7 @@ const HELP = {
             { label: 'Ingest tokens, and base stations that ask for one', href: 'docs/ingest-http.md' },
             { label: 'The database schema, migrations and who may write', href: 'db/README.md' },
             { label: 'Why the station list lives in Postgres', href: 'docs/datastore-decision.md' }],
-    related: ['export', 'photos', 'basestations'],
+    related: ['export', 'photos', 'basestations', 'tasks'],
   },
   basestations: {
     summary: 'Every base station and ingest point on one list: whether it is checking in, its '
@@ -2796,6 +2810,37 @@ const HELP = {
       'A method narrows where to look; it does not convict. A site visit or a field test settles it.',
     ],
     related: ['health', 'backbone', 'flipsources', 'investigations', 'biterrors'],
+  },
+
+  tasks: {
+    summary: 'The jobs handed to a <strong>team</strong>, each at a station: what needs doing, which team has it, how far it has '
+           + 'got — <strong>open</strong>, <strong>in progress</strong>, <strong>waiting</strong>, <strong>done</strong> or '
+           + '<strong>cancelled</strong> — when it is due, and a <strong>thread</strong> of every change and note. Filter by whose, '
+           + 'status, team and station; open one to move it on, or — if you hand out tasks — make one. <strong>My teams</strong>, '
+           + 'under the list, shows who is on your teams, and lets a team\'s owners add and take off its members. A station\'s '
+           + 'card lists the tasks still going there. And the <strong>SoRT</strong> scope builder hands the jobs a forum agreed '
+           + 'straight over: they arrive here to be checked before anything is made.',
+    watch: [
+      '<strong>Seen by the people they are for.</strong> A task is seen by the team it is handed to, whoever made it and the '
+      + 'people who hand out tasks — not by every approved account, since some are councils, contractors and other outside '
+      + 'users. A team\'s roster is seen by its own people and administrators only.',
+      '<strong>Who hands out tasks:</strong> administrators and the members of a team marked as handing them out (the SoRT '
+      + 'Forum) — to any team — and a team\'s owners, to their own team. Administrators make the teams and name their owners '
+      + 'on the Admin tab, under Teams; owners add members by the address of their Flood-Net account.',
+      '<strong>The team moves it on</strong> — open, in progress, waiting, done — and writes notes. Whoever handed it out, an '
+      + 'owner of its team and the people who hand out tasks also hand it to another team, change its words or date, and '
+      + 'cancel it or bring it back. Every change is kept in its thread, with who and when.',
+      '<strong>From SoRT, nothing is made until you press Create.</strong> Each task is shown with its team picked for it — '
+      + 'the team looking after the hub SoRT named, or the team by name — to change before it is made. A task already '
+      + 'made from the same hand-off says so, with a link to it, rather than being made twice.',
+      '<strong>Nobody is told yet.</strong> A task waits on this tab and on its station\'s card: an email when one is handed '
+      + 'to your team comes later.',
+      'A word with a dotted underline says what it means when the pointer rests on it; <em>What the words on this page '
+      + 'mean</em>, at the foot, lists them all.',
+    ],
+    links: [{ label: 'Accounts, the groups, and who may do what', href: 'docs/accounts.md' },
+            { label: 'The database: teams, tasks and who reads them', href: 'db/README.md' }],
+    related: ['health', 'maintenance', 'inspections', 'admin'],
   },
 
   review: {

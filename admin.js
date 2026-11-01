@@ -16,8 +16,10 @@
 // exportMayDownload; to auth.js for Auth; to mem-meter.js for MemMeter; to
 // push.js for Push, whose Notifications panel it draws among the cards; to
 // admin-links.js for AdminLinks, whose Base station connections it draws under
-// the dashboard; and to station-history.js for StationHistory, whose Deleted
-// stations panel it draws under the cards and loads from init().
+// the dashboard; to admin-teams.js for AdminTeams, whose Teams panel (0095) it
+// draws under the ingest tokens and loads from init(); and to
+// station-history.js for StationHistory, whose Deleted stations panel it draws
+// under the cards and loads from init().
 // Nothing here runs at load. auth.js calls Admin.authChanged() on every sign-in
 // and sign-out.
 //
@@ -62,6 +64,15 @@ const Admin = (function () {
     { who: 'Member', how: 'Approved — automatically for an address on the allowlist (any @bom.gov.au), or by an administrator here',
       may: 'Everything an account may, and see the field photos.',
       not: 'Edit anything, unless the allowlist also lets it in (Approve as editor does both).' },
+    { who: 'On a team', how: 'A member put on a team by an administrator, or by one of the team\'s owners, by their address (0095)',
+      may: 'See the tasks handed to the team and who else is on it; move those tasks on and write notes on them.',
+      not: 'Hand out or cancel a task, or see another team\'s tasks or roster.' },
+    { who: 'Team owner', how: 'Named by an administrator, under Teams on this tab',
+      may: 'Everything somebody on the team may, plus: add and take off its members, hand tasks to the team, and hand over, change or cancel its tasks.',
+      not: 'Name another owner, or hand a task to another team.' },
+    { who: 'Hands out tasks', how: 'On a team marked so (the SoRT Forum), or an administrator',
+      may: 'Give a task to any team, or to none yet, and see every task.',
+      not: 'Change who is on a team they do not own.' },
     { who: 'Viewer', how: 'app_user.role = viewer',
       may: 'Everything an editor may, today — the role is recorded but not enforced yet.',
       not: 'To stop somebody writing, remove their allowlist entry rather than making them a viewer.',
@@ -514,6 +525,7 @@ const Admin = (function () {
         <div id="adm-links" class="stack">${typeof AdminLinks !== 'undefined' ? AdminLinks.render() : ''}</div>
         <div id="adm-people" class="stack">${peopleHtml()}</div>
         <div id="adm-tokens">${typeof AdminTokens !== 'undefined' ? AdminTokens.render() : ''}</div>
+        <div id="adm-teams">${typeof AdminTeams !== 'undefined' ? AdminTeams.render() : ''}</div>
         <div class="adm-cards">
           ${dataHtml()}
           <div class="panel">
@@ -539,6 +551,8 @@ const Admin = (function () {
     // How each base station's connection has been (admin-links.js, 0080).
     if (typeof AdminLinks !== 'undefined') AdminLinks.start();
     if (typeof AdminTokens !== 'undefined' && isAdmin()) AdminTokens.load();
+    // The teams and every roster (admin-teams.js, 0095).
+    if (typeof AdminTeams !== 'undefined' && isAdmin()) AdminTeams.load();
     // This device's notifications (push.js, 0066), and the icon's count.
     if (typeof Push !== 'undefined' && isAdmin()) Push.refresh();
   }

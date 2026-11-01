@@ -1733,6 +1733,16 @@ jobs:
         working-directory: test
         run: npm run a2plan
 
+      # Chromium. ✅ Tasks (tasks.js), the Admin tab's Teams (admin-teams.js)
+      # and SoRT's #tasks= hand-off (0095), over stood-in doors that keep the
+      # database's rules: who each is for, the list and its filters, a task
+      # moved on, handed over and changed, a new one, My teams, a station's
+      # card, the hand-off read as untrusted and made only on Create.
+      - name: Tasks — teams, the list, a task, SoRT's hand-off, Admin › Teams
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run tasks
+
       # Node, then Chromium. The TDMA Planner tab (tdma-planner.js): the AirLink
       # air-time formula and the two worked frames against the sources' figures, then the tab, its card and its CSVs.
       - name: TDMA Planner — the air-time formula, the two worked examples, the card
@@ -2348,6 +2358,16 @@ jobs:
       - name: check_alert2_plan.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_alert2_plan.sql
+      # Teams and tasks (0095): an administrator makes the teams and names the
+      # owners, an owner changes the rest of their roster, a roster seen by its
+      # team and administrators alone; a task handed out only by the people
+      # who may, seen by them, its team and its maker — through the policy and
+      # the doors alike — moved on by its team, handed over and cancelled by
+      # whoever manages it, and the same SoRT job made once; nothing for
+      # anybody signed out or declined.
+      - name: check_teams_and_tasks.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_teams_and_tasks.sql
       # ALERT addresses set aside before a station holds them (0084): editors
       # set aside and release, approved accounts read; an address held by a
       # station in the hub, set aside already, out of 1–8191 or outside the

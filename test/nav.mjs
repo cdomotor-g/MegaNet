@@ -35,10 +35,12 @@
 //                  people it is for and to nobody else — not in the bar, the
 //                  find box, Ctrl+K or the Site Map: `who: 'admin'` to an
 //                  administrator, `who: 'a2plan'` to the ALERT2 Transition
-//                  Plan's list (0076), administrators or not. So the coverage
-//                  above runs as an administrator on that list, where every tab
-//                  is listed, and the end of the file checks the other half —
-//                  an administrator off the list among them.
+//                  Plan's list (0076), administrators or not, and `who:
+//                  'tasks'` to administrators and the people on a team (0095).
+//                  So the coverage above runs as an administrator on that list,
+//                  where every tab is listed, and the end of the file checks
+//                  the other half — an administrator off the list among them,
+//                  and somebody on a team who is nothing else.
 //
 // Run:  npm run nav
 //       npm run nav -- -v    also print what passed
@@ -80,6 +82,8 @@ const PROBES = [
   { q: 'install',               want: 'offline',     why: 'the job, not the label' },
   { q: 'no signal',             want: 'offline',     why: 'the situation, typed as said' },
   { q: 'home screen',           want: 'offline',     why: 'where it ends up' },
+  { q: 'sort forum',            want: 'tasks',       why: 'where the forum\'s jobs go (0095)' },
+  { q: 'todo',                  want: 'tasks',       why: 'the job list, typed as one word' },
 ];
 
 const server  = await startServer();
@@ -106,8 +110,8 @@ try {
   // listed to one, so "every tab is in the nav" is a claim about this session.
   // The other kinds of session are checked at the end.
   await page.evaluate(() => {
-    window.__auth = { isSignedIn: Auth.isSignedIn, isAdmin: Auth.isAdmin, role: Auth.role, a2plan: Auth.a2plan };
-    Auth.isSignedIn = () => true; Auth.isAdmin = () => true; Auth.role = () => 'admin'; Auth.a2plan = () => true;
+    window.__auth = { isSignedIn: Auth.isSignedIn, isAdmin: Auth.isAdmin, role: Auth.role, a2plan: Auth.a2plan, tasks: Auth.tasks };
+    Auth.isSignedIn = () => true; Auth.isAdmin = () => true; Auth.role = () => 'admin'; Auth.a2plan = () => true; Auth.tasks = () => true;
     renderTabs();
   });
 
@@ -379,7 +383,7 @@ try {
       gone: lines.filter(l => l.tab && !ids.includes(l.tab)).map(l => `${l.name} → ${l.tab}`),
       nowhere: lines.filter(l => [l.tab, l.act, l.href].filter(Boolean).length !== 1 || !l.acts).map(l => l.name),
       panelOff: lines.filter(l => l.panel && l.tab !== 'stations').map(l => l.name),
-      badWho: lines.filter(l => !['', 'signin', 'member', 'editor', 'admin', 'list'].includes(l.who)).map(l => l.name),
+      badWho: lines.filter(l => !['', 'signin', 'member', 'editor', 'admin', 'list', 'team'].includes(l.who)).map(l => l.name),
       twice: names.filter((x, i) => names.indexOf(x) !== i),
       rendered: document.querySelectorAll('#cap-list .cap-item[id]').length,
       links: [...document.querySelectorAll('#cap-list .cap-item[id] a.cap-name')].filter(a => /[?&]tab=[a-z0-9]+/.test(a.getAttribute('href'))).length,
@@ -542,13 +546,14 @@ try {
   console.log('\nWho sees what — a tab for some people is listed to nobody else\n');
   await page.setViewportSize({ width: 1440, height: 900 });
   // Who this session is: signed in or not, an administrator or not, on the
-  // ALERT2 Transition Plan's list or not.
-  const as = (signedIn, admin, onList) => page.evaluate(([signedIn, admin, onList]) => {
+  // ALERT2 Transition Plan's list or not, on a team or not.
+  const as = (signedIn, admin, onList, onTeam = false) => page.evaluate(([signedIn, admin, onList, onTeam]) => {
     navFind('');
     Auth.isSignedIn = () => signedIn; Auth.isAdmin = () => admin;
     Auth.role = () => (admin ? 'admin' : signedIn ? 'editor' : null); Auth.a2plan = () => onList;
+    Auth.tasks = () => onTeam;
     renderTabs();
-  }, [signedIn, admin, onList]);
+  }, [signedIn, admin, onList, onTeam]);
   const restricted = await page.evaluate(() => TAB_LIST.filter(t => t.who).map(t => ({ id: t.id, label: t.label, who: t.who })));
   check('at least one tab is listed only to some people', restricted.length > 0, restricted.map(t => `${t.id} (${t.who})`).join(', '));
   const seen = () => page.evaluate((ids) => {
@@ -576,15 +581,22 @@ try {
   await as(true, true, false);
   w = await seen();
   const plan = restricted.findIndex(t => t.who === 'a2plan');
-  check('an administrator who is not on the plan\'s list does not have the plan, and has every tab for administrators',
+  const tasksAt = restricted.findIndex(t => t.who === 'tasks');
+  check('an administrator who is not on the plan\'s list does not have the plan, and has every tab for administrators — Tasks among them',
     plan >= 0 && w.bar[plan] === 0 && !w.found[plan] && !w.cards[plan]
-    && restricted.every((t, i) => t.who !== 'admin' || (w.bar[i] === 1 && w.found[i] && w.cards[i])), JSON.stringify(w));
+    && restricted.every((t, i) => (t.who !== 'admin' && t.who !== 'tasks') || (w.bar[i] === 1 && w.found[i] && w.cards[i])), JSON.stringify(w));
+  await as(true, false, false, true);
+  w = await seen();
+  check('somebody on a team who is nothing else has Tasks, and no tab for administrators or the plan',
+    tasksAt >= 0 && w.bar[tasksAt] === 1 && w.found[tasksAt] && w.cards[tasksAt]
+    && restricted.every((t, i) => t.who === 'tasks' || (w.bar[i] === 0 && !w.found[i] && !w.cards[i])), JSON.stringify(w));
   await as(true, false, true);
   w = await seen();
   check('…and somebody on the list who is not an administrator has the plan',
     w.bar[plan] === 1 && w.found[plan] && w.cards[plan], JSON.stringify(w));
   const inPalette = (on) => page.evaluate(([ids, on]) => {
     Auth.isSignedIn = () => on; Auth.isAdmin = () => on; Auth.role = () => (on ? 'admin' : null); Auth.a2plan = () => on;
+    Auth.tasks = () => on;
     return ids.map(t => Palette.results(t.label).some(x => x.kind === 'tab' && x.label === t.label));
   }, [restricted, on]);
   const palOut = await inPalette(false), palIn = await inPalette(true);
@@ -593,7 +605,7 @@ try {
   await as(true, false, false);
   const opened = await page.evaluate((ids) => { navFind(''); return ids.map(t => { switchTab(t.id); return document.getElementById('main-content').textContent; }); }, restricted);
   check('opened by its address, each says who it is for and shows nothing more',
-    opened.every(t => /administrators only|only for the people nominated/i.test(t) && t.length < 600), opened.map(t => t.slice(0, 100)).join(' | '));
+    opened.every(t => /administrators only|only for the people nominated|for administrators and the people on a team/i.test(t) && t.length < 600), opened.map(t => t.slice(0, 100)).join(' | '));
   await page.evaluate(() => { navFind(''); switchTab('stations'); });
 
   if (errors.length) check('no uncaught page errors', false, errors.join(' | '));

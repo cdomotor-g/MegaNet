@@ -413,6 +413,15 @@ const SiteMap = (function () {
         'Check the thresholds and the limits of what the methods can see',
       ],
     },
+    tasks: {
+      what: 'The jobs handed to a team, each at a station: who has it, how far it has got and when it is due, with a thread of every change and note — and the teams themselves.',
+      use: [
+        'See what your team has to do, and move a job on as it goes',
+        'Hand a job to a team, or check what SoRT\'s forum handed over before it is made',
+        'See who is on your teams; owners add and take off members',
+      ],
+      note: 'Administrators and the people on a team.',
+    },
     review: {
       what: 'A network reviewed the way a planner does it: every station\'s fade margin to every repeater, base or proposed site, beside what the attenuator found on site.',
       use: [
@@ -518,7 +527,7 @@ const SiteMap = (function () {
     'Data': { step: 'What the sensors said',
       blurb: 'The readings themselves: opened in ARRO, charted from its exports and from our own receivers, and logged as they arrive.' },
     'Network health': { step: 'How it is holding up',
-      blurb: 'What the readings say about the network: each station\'s health, the repeaters ranked by what is wrong with each, write-ups of strange data and what was behind it, and how all of it is judged.' },
+      blurb: 'What the readings say about the network: each station\'s health, the repeaters ranked by what is wrong with each, write-ups of strange data and what was behind it, how all of it is judged — and the tasks handed to the teams that fix it.' },
     'Site visits': { step: 'What we did on site',
       blurb: 'The paperwork of a visit, digitised — inspections, council maintenance, the record of both, and the photos.' },
     'Surveying': { step: 'How high it all is',
@@ -551,6 +560,7 @@ const SiteMap = (function () {
     { text: 'Rank the repeaters by what is wrong with them', tab: 'backbone' },
     { text: 'Read why a chart looked wrong, and what was behind it', tab: 'investigations' },
     { text: 'Learn how a bit flip is caught and who it is put down to', tab: 'methodology' },
+    { text: 'See what your team has to do, or hand a job to a team', tab: 'tasks' },
     { text: 'Work out what could have corrupted a station\'s readings', tab: 'bitbench' },
     { text: 'Work out what is interfering with a repeater', tab: 'workbench' },
     { text: 'Listen to ALERT off the air',                 tab: 'serial' },
@@ -858,7 +868,9 @@ const SiteMap = (function () {
   function tasksHtml() {
     const items = TASKS.map(task => {
       const t = tabOf(task.tab);
-      if (!t) return '';
+      // A job on a tab kept for some people is listed to them alone, as its
+      // card and its button are (tabShown, core.js).
+      if (!t || !tabShown(t)) return '';
       return `
           <li><button type="button" class="sm-task" data-sm-point="tab:${t.id}" onclick="switchTab('${t.id}')">
             <span class="sm-task-ico" aria-hidden="true">${task.icon || t.icon}</span>

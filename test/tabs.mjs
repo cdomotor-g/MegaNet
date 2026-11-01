@@ -915,6 +915,75 @@ const BS_STATUS = {
 const BS_ROW = (o) => Object.assign({ host_station_id: null, host_station: null, revoked_at: null, managed: true, app: 'base station agent',
   version: '0.6.0', mode: 'manage', idle_s: 60, last_seen_at: BS_AGO(20), status_at: BS_AGO(300), last_used_at: BS_AGO(30),
   watch_until: null, keys_hash: 'h1', waiting: 0, receivers: [] }, o);
+// ✅ Tasks (0095), born converted: signed out, then as somebody on a team who
+// hands out tasks — the list, My teams, a SoRT hand-off under review and the
+// words' fold — and then one task open, every fold open. The doors are
+// answered from TK_FIXTURE (the route below); Auth is stood in for while the
+// tab is open, as the plan's seed does it.
+const TK_HANDOFF = Buffer.from(JSON.stringify({ v: 1, source: 'sort', session: 'tabs-check', forum: '2026-10-07',
+  station: { id: 'fifteen_mile_al', number: '540601', name: 'Fifteen Mile AL', hub: 'brisbane' },
+  tasks: [{ ref: 'alertIds', title: 'Check the ALERT IDs against the pass ranges', detail: 'Two addresses look wrong.', team: { hub: 'brisbane' } },
+          { ref: 'custom-1', title: 'Fence the hut', detail: '', team: { name: 'Nobody here' }, due: '2026-12-01' }] }), 'utf8')
+  .toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const TK_TEAMS = [
+  { id: 't-bris', name: 'Brisbane Hub', hub_id: 'brisbane', hub: 'Brisbane Hub', hands_out: false, role: 'owner', tasks: null,
+    roster: [{ id: 'u1', who: 'Olive Owner with a rather long name', email: 'olive.owner.with.a.long.address@example.test', owner: true, you: true, added_at: '2026-10-01T00:00:00Z', added_by: 'Ada Admin' },
+             { id: 'u2', who: 'Max Member', email: 'max@example.test', owner: false, you: false, added_at: '2026-10-02T00:00:00Z', added_by: 'Olive Owner' }] },
+  { id: 't-sort', name: 'SoRT Forum', hub_id: null, hub: null, hands_out: true, role: 'member', tasks: null,
+    roster: [{ id: 'u1', who: 'Olive Owner with a rather long name', email: null, owner: false, you: true, added_at: '2026-10-01T00:00:00Z', added_by: 'Ada Admin' }] },
+  { id: 't-radio', name: 'Radio licensing', hub_id: null, hub: null, hands_out: false, role: null, tasks: null, roster: null },
+];
+const TK_TASK = (id, over) => ({ id, station_id: 'loudoun_br_al', title: 'Clear the orifice line', team_id: 't-bris', team: 'Brisbane Hub',
+  status: 'open', due_on: '2026-10-20', source: 'floodnet', source_date: null, source_ref: null, created_at: '2026-10-10T00:00:00Z',
+  created_by: 'Olive Owner', updated_at: '2026-10-10T00:00:00Z', closed_at: null, my_team: true, by_me: true, notes: 1,
+  last_at: '2026-10-11T00:00:00Z', ...over });
+const TK_FIXTURE = {
+  teams_read: () => ({ me: { admin: false, hands_out: true, on: ['t-bris', 't-sort'], owns: ['t-bris'] }, teams: TK_TEAMS, hubs: null }),
+  task_list: () => [TK_TASK('k1'),
+    TK_TASK('k2', { title: 'Replace the battery, and check the charge regulator while there', station_id: 'fifteen_mile_al', status: 'in_progress', due_on: '2026-12-15' }),
+    TK_TASK('k3', { title: 'Licence transfer', station_id: 'abbieglassie_al', team_id: 't-radio', team: 'Radio licensing', status: 'waiting', due_on: null, my_team: false }),
+    TK_TASK('k5', { title: 'Order spare radios', station_id: null, team_id: null, team: null, by_me: false, my_team: false, due_on: null }),
+    TK_TASK('k6', { title: 'Check the ALERT IDs', station_id: 'fifteen_mile_al', source: 'sort', source_date: '2026-10-07', source_ref: 'sort:tabs-check:alertIds' })],
+  task_refs: () => [{ ref: 'sort:tabs-check:alertIds', created_at: '2026-10-07T03:00:00Z', visible: true, id: 'k6' }],
+  task_get: () => ({ ...TK_TASK('k1'), details: 'Silt at the outlet.\nTake the auger.',
+    may: { work: true, manage: true, any_team: true, owns: ['t-bris'] },
+    thread: [{ id: 1, kind: 'created', body: '', from: null, to: 'Brisbane Hub', who: 'Olive Owner', you: true, at: '2026-10-10T00:00:00Z' },
+             { id: 2, kind: 'note', body: 'Gate key is at the depot.', from: null, to: null, who: 'Max Member', you: false, at: '2026-10-11T00:00:00Z' },
+             { id: 3, kind: 'status', body: 'Booked for Tuesday.', from: 'open', to: 'waiting', who: 'Max Member', you: false, at: '2026-10-12T00:00:00Z' }] }),
+};
+const SEED_TK_OUT = `() => {
+  if (window.__tkAuth) { Object.assign(Auth, window.__tkAuth); delete window.__tkAuth; }
+  Tasks.authChanged();
+}`;
+const SEED_TK_AUTH = `() => {
+  if (!window.__tkAuth) {
+    const real = { isSignedIn: Auth.isSignedIn, tasks: Auth.tasks, handsOut: Auth.handsOut, teamOwner: Auth.teamOwner };
+    window.__tkAuth = real;
+    const here = () => state.activeTab === 'tasks';
+    Auth.isSignedIn = () => here() || real.isSignedIn();
+    Auth.tasks = () => here() || (real.tasks ? real.tasks() : false);
+    Auth.handsOut = () => here() || (real.handsOut ? real.handsOut() : false);
+    Auth.teamOwner = () => here() || (real.teamOwner ? real.teamOwner() : false);
+  }
+}`;
+const SEED_TK = `async () => {
+  (${SEED_TK_AUTH})();
+  history.replaceState(history.state, '', location.pathname + location.search + '#tasks=${TK_HANDOFF}');
+  Tasks.restoreFromUrl();
+  Tasks.authChanged();
+  const until = async (fn, ms) => { const t0 = Date.now(); while (!fn() && Date.now() - t0 < ms) await new Promise(r => setTimeout(r, 50)); };
+  await until(() => document.querySelector('#tk-table table') && document.getElementById('tk-ho-go') && /Already made/.test(document.getElementById('tk-handoff').textContent), 5000);
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+}`;
+const SEED_TK_TASK = `async () => {
+  (${SEED_TK_AUTH})();
+  Tasks.open('k1');
+  const until = async (fn, ms) => { const t0 = Date.now(); while (!fn() && Date.now() - t0 < ms) await new Promise(r => setTimeout(r, 50)); };
+  await until(() => document.querySelector('.tk-thread') && document.getElementById('tk-manage'), 5000);
+  for (const d of document.querySelectorAll('#main-content details')) d.open = true;
+  Tasks.dismissHandoff();
+}`;
+
 const BS_FIXTURE = {
   admin_base_stations: () => ({ now: new Date().toISOString(), keys_hash: 'h2', stations: [
     BS_ROW({ id: 11, label: 'Mt Stuart base', host_station: 'Mt Stuart', status: BS_STATUS, keys_hash: 'h1',
@@ -1045,6 +1114,9 @@ const CONVERTED = [
   { id: 'review',     label: 'Network Review — a matrix of two repeaters and a proposed site', issue: 'born converted', seed: SEED_NR },
   { id: 'a2plan',     label: 'ALERT2 Transition Plan — signed out', issue: 'born converted', seed: SEED_A2_OUT },
   { id: 'a2plan',     label: 'ALERT2 Transition Plan — the plan, every table open', issue: 'born converted', seed: SEED_A2 },
+  { id: 'tasks',      label: 'Tasks — signed out', issue: 'born converted', seed: SEED_TK_OUT },
+  { id: 'tasks',      label: 'Tasks — the list, My teams and a SoRT hand-off under review, every fold open', issue: 'born converted', seed: SEED_TK },
+  { id: 'tasks',      label: 'Tasks — one task open, its thread and every fold', issue: 'born converted', seed: SEED_TK_TASK },
   { id: 'tdma',       label: 'TDMA Planner — sketch, every fold open', issue: 'born converted', seed: SEED_TDMA },
   { id: 'tdma',       label: 'TDMA Planner — from the register', issue: 'born converted', seed: SEED_TDMA_REG },
   { id: 'propagation', label: 'Radio Propagation — the lesson, the echo story and every drawing', issue: 'born converted', seed: SEED_RP },
@@ -1131,6 +1203,13 @@ try {
     const rows = PHOTO_FIXTURE[table];
     if (route.request().method() !== 'GET' || !rows) return route.fallback();
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) });
+  });
+  // ✅ Tasks' doors, answered from TK_FIXTURE (see SEED_TK).
+  await page.route('**://*.supabase.co/rest/v1/rpc/*', route => {
+    const fn = new URL(route.request().url()).pathname.split('/').pop();
+    const answer = TK_FIXTURE[fn];
+    if (!answer) return route.fallback();
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(answer()) });
   });
   // The Base Stations tab's calls, answered from BS_FIXTURE (see SEED_BS).
   await page.route('**://*.supabase.co/rest/v1/rpc/*base_station*', route => {

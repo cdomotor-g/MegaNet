@@ -477,6 +477,19 @@
       "status": "live"
     },
     {
+      "id": "teams-tasks",
+      "name": "Teams and tasks",
+      "what": "Teams (each hub's staff, Property Services, Radio licensing, the SoRT Forum and the rest) and the tasks handed to them, each at a station with a status, a due date and a thread of notes; a roster seen only by its own people and administrators, a task only by its team, its maker and the people who hand out tasks; and the SoRT scope builder's #tasks= hand-off, reviewed before anything is made.",
+      "paths": [
+        "tasks.js",
+        "admin-teams.js",
+        "db/migrations/0095_teams_and_tasks.sql",
+        "tools/check_teams_and_tasks.sql",
+        "test/tasks.mjs"
+      ],
+      "status": "live"
+    },
+    {
       "id": "bulletins",
       "name": "Network bulletins and voices",
       "what": "A scheduled Claude session writes a two-minute animated bulletin each weekday morning (and weekly on Mondays), drawn on Station Health and voiced by the Droggies through ElevenLabs.",
@@ -865,6 +878,21 @@
         "index.html",
         "v2/js/map.js"
       ]
+    },
+    {
+      "id": "sort-tasks-handoff",
+      "from": "sort",
+      "provider": "tasks-handoff",
+      "into": "teams-tasks",
+      "what": "The SoRT scope builder's hand-off of a forum's agreed jobs for a station: it opens floodwarning.net/#tasks=<base64url of UTF-8 JSON, v 1>, and the Tasks tab reviews them — each task's team picked by the hub or the team name SoRT gives, de-duplicated by sort:<session>:<ref> — making nothing until somebody who hands out tasks presses Create (tasks.js, parseHandoff).",
+      "how": "protocol",
+      "watch": [
+        "v2/js/tasks.js"
+      ],
+      "since": {
+        "date": "2026-11-01"
+      },
+      "on_change": "Read SoRT's payload as v2/js/tasks.js now writes it and bring tasks.js's parseHandoff() and test/tasks.mjs up to it. A payload with a new v needs a reader of its own beside v 1's, which links already sent still carry."
     }
   ],
   "asks": [

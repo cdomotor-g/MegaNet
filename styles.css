@@ -21991,6 +21991,7 @@ button.adm-danger:hover { border-color: var(--bad); }
 .cap-tag-member { border-color: var(--ok);     color: var(--ok); }
 .cap-tag-signin,
 .cap-tag-list   { border-color: var(--warn);   color: var(--warn); }
+.cap-tag-team   { border-color: var(--accent); color: var(--accent); }
 /* A source can name three organisations; on a phone it wraps inside its ring
    rather than pushing the page sideways. */
 .cap-src { border-style: dashed; color: var(--muted); font-weight: 400; white-space: normal; max-width: 100%; }
@@ -26392,3 +26393,64 @@ select.kl-in { width: auto; font-family: inherit; }
   :root[data-look="signs"] .field-btn .gl { stroke-width: 2.4; }
   :root[data-look="signs"] .hm-big .gl-tile { width: 4rem; height: 4rem; }
 }
+
+
+/* ✅ Tasks (tasks.js, 0095) and the Admin tab's Teams (admin-teams.js).
+   A status is a chip in its colour with the word in the page's own ink — the
+   Repeater Delays bands' shape — so no colour has to carry a word: open and in
+   progress blue (the second filled more), waiting amber, done green,
+   cancelled grey. */
+.tk-page .panel-header .button-group { margin: 0; }
+.tk-filters select, .tk-filters input { max-width: 100%; }
+.tk-table, .tk-roster { font-size: var(--fs-sm); }
+.table-wrap table.tk-table { min-width: 44rem; }
+.table-wrap table.tk-roster { min-width: 26rem; }
+.tk-st { --c: var(--muted); display: inline-block; white-space: nowrap; padding: 0 .5em; border: 1px solid var(--c);
+         border-radius: var(--r-pill); background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--text);
+         font-size: var(--fs-xs); line-height: 1.6; }
+.tk-st-open        { --c: var(--accent); }
+.tk-st-in_progress { --c: var(--accent); background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.tk-st-waiting     { --c: var(--warn); }
+.tk-st-done        { --c: var(--ok); }
+.tk-st-cancelled   { --c: var(--border); }
+.tk-src, .tk-chip, .tk-role { display: inline-block; padding: 0 .45em; border: 1px solid var(--border); border-radius: var(--r-pill);
+                              font-size: var(--fs-xs); font-weight: 400; line-height: 1.6; color: var(--muted); white-space: nowrap; }
+.tk-late { color: var(--bad); }
+.tk-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--sp-1) var(--sp-3); margin: var(--sp-3) 0; }
+.tk-facts dt { color: var(--muted); font-size: var(--fs-sm); }
+.tk-facts dd { margin: 0; overflow-wrap: anywhere; }
+.tk-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+.tk-details { padding: var(--sp-2) var(--sp-3); border-left: 3px solid var(--border); margin: var(--sp-3) 0; }
+.tk-form { margin-top: var(--sp-3); }
+.tk-form h3 { margin: 0 0 var(--sp-2); }
+.tk-wide { display: grid; gap: var(--sp-1); font-size: var(--fs-sm); color: var(--muted); margin: var(--sp-2) 0; max-width: 48rem; }
+.tk-wide input, .tk-wide textarea { color: var(--text); width: 100%; }
+.tk-thread { list-style: none; padding: 0; margin: var(--sp-2) 0 0; display: grid; gap: var(--sp-2); }
+.tk-entry { border-left: 3px solid var(--border); padding: var(--sp-1) var(--sp-3); }
+.tk-entry-note { border-left-color: var(--accent); }
+.tk-entry .tk-body { margin-top: var(--sp-1); }
+.tk-picks { list-style: none; padding: 0; margin: var(--sp-1) 0; display: grid; gap: var(--sp-1); }
+.tk-picked { margin: var(--sp-2) 0; font-weight: 600; overflow-wrap: anywhere; }
+.tk-team { margin-top: var(--sp-4); }
+.tk-team h3 { margin: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+.tk-add { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); align-items: flex-end; margin-top: var(--sp-2); }
+.tk-add label { display: grid; gap: var(--sp-1); font-size: var(--fs-sm); color: var(--muted); flex: 1 1 18rem; min-width: 0; }
+.tk-add p { flex-basis: 100%; margin: 0; }
+.tk-mail, .adm-team-mail { overflow-wrap: anywhere; }
+.tk-handoff { border-left: 4px solid var(--accent); }
+.tk-ho-rows { padding-left: 1.4rem; margin: var(--sp-3) 0; display: grid; gap: var(--sp-3); }
+.tk-ho-row { overflow-wrap: anywhere; }
+.tk-ho-row.is-out .tk-wide, .tk-ho-row.is-out .control-row { color: var(--muted); }
+.tk-ho-title { font-weight: 600; }
+.tk-ref { font-weight: 400; }
+.tk-fold summary { cursor: pointer; }
+.tk-words-list dt { font-weight: 600; margin-top: var(--sp-2); }
+.tk-words-list dd { margin: 0; }
+.stn-card-tasks .acma-row > span:last-child { text-align: left; }
+.adm-team-open { margin-top: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); }
+.adm-team-open h3 { margin: 0 0 var(--sp-2); }
+.table-wrap table.adm-teams-table { min-width: 40rem; }
+.adm-teams-table tr.is-open th { font-weight: 700; }
+.adm-team-words summary { cursor: pointer; }
+.adm-team-words dt { font-weight: 600; margin-top: var(--sp-1); }
+.adm-team-words dd { margin: 0; }

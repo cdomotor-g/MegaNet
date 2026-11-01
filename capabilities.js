@@ -37,7 +37,7 @@
 // Who: '' is anybody, signed in or not; 'signin' needs an account of any kind;
 // 'member' an account an administrator has approved; 'editor' an editor or an
 // administrator; 'admin' an administrator; 'list' the people on that tool's
-// own list. That is who may *use* it — most admin tabs are listed to everyone and say who they
+// own list; 'team' administrators and the people on a team (0095). That is who may *use* it — most admin tabs are listed to everyone and say who they
 // are for once opened. A line on a tab kept to a list of people (`who:` on its
 // TABS entry, tabShown()) is left off for anyone not on it, as the Site Map
 // and the bar leave the tab itself.
@@ -66,6 +66,8 @@ const Capabilities = (function () {
       meaning: 'For administrators only — accounts given the admin role on the Admin tab. Others are told who it is for once they open it.' },
     list:   { label: 'On the list',
       meaning: 'Only for the people the owner has put on this tool\'s own list; anyone else is not shown it at all.' },
+    team:   { label: 'Teams',
+      meaning: 'For administrators and the people on a team — an administrator names a team\'s owners, and they add its members. Anyone else is not shown it at all.' },
   };
   const SOURCE_MEANING = 'Comes from the organisation named, not from Flood-Net\'s own records — fetched as you look, or copied in from what they publish. It is only as current as they keep it.';
   const WORDS = [
@@ -74,6 +76,7 @@ const Capabilities = (function () {
     ['Approved account', WHO.member.meaning],
     ['Sign-in', WHO.signin.meaning],
     ['On the list', WHO.list.meaning],
+    ['Teams', WHO.team.meaning],
     ['A name in a dashed outline', SOURCE_MEANING],
   ];
 
@@ -482,6 +485,17 @@ const Capabilities = (function () {
         { name: 'How the network is judged', tab: 'methodology',
           what: 'Every Network health assessment explained: the data it reads, the rule it decides by and its numbers, bit flips in depth.',
           find: 'methodology' },
+        { name: 'Tasks', tab: 'tasks', who: 'team',
+          what: 'The jobs handed to a team, each at a station, moved on from open to done with a thread of notes.',
+          find: 'jobs todo assign' },
+        { name: 'Hand a job to a team', tab: 'tasks', who: 'team',
+          what: 'Administrators and the SoRT Forum give tasks to any team; a team\'s owners to their own.',
+          find: 'assign new task' },
+        { name: 'Tasks from the SoRT forum', tab: 'tasks', who: 'team',
+          what: 'The jobs a forum agreed, handed over by SoRT\'s scope builder and checked here before they are made.',
+          src: 'SoRT', find: 'scope builder forum' },
+        { name: 'My teams', tab: 'tasks', where: 'My teams', who: 'team',
+          what: 'Who is on your teams; a team\'s owners add and take off its members by address.', find: 'roster members' },
         { name: 'Alerts on your device', tab: 'admin', where: '🔔 Notifications', who: 'admin',
           what: 'A notification and a count on the app\'s icon when an account is waiting or a base station asks to join.',
           find: 'push notification' },
@@ -603,6 +617,8 @@ const Capabilities = (function () {
           what: 'What your account may do, and what each kind of account may do.', find: 'roles permissions' },
         { name: 'Users and approvals', tab: 'admin', who: 'admin',
           what: 'Approve new accounts, give roles, and choose who may sign in.', find: 'allowlist' },
+        { name: 'Teams', tab: 'admin', where: 'Teams', who: 'admin',
+          what: 'Make the teams tasks are handed to, link each to its hub, and name its owners.', find: 'roster owners groups' },
         { name: 'Admin dashboard', tab: 'admin', who: 'admin',
           what: 'The database\'s health and size, who is online, when people were last seen, and visits a day.',
           find: 'statistics analytics' },
@@ -719,6 +735,8 @@ const Capabilities = (function () {
         what: 'ARRO\'s own pages, opened from Flood-Net, and its CSV exports, which you load into Plots yourself.' },
       { key: 'google', name: 'Google and Apple', how: 'link', match: ['Google', 'Apple'],
         what: 'Street View, Google Earth, Apple Maps and directions: links that open their apps.' },
+      { key: 'sort', name: 'SoRT', how: 'link', match: ['SoRT'],
+        what: 'The scope builder for the SoRT forum: the jobs a forum agreed for a station, handed to the Tasks tab in a link you open, and made only once somebody who hands out tasks has checked them.' },
       { key: 'drive', name: 'Dropbox and Google Drive', how: 'sched', match: ['Dropbox', 'Google Drive'],
         what: 'Field photos dropped in linked folders, brought in every 15 minutes.' },
       { key: 'mallee', name: 'Mallee HydroTech', url: 'https://malleehydrotech.com.au', how: 'kept', match: ['Mallee HydroTech'],
@@ -767,6 +785,8 @@ const Capabilities = (function () {
         what: 'Features mapped by editors, equipment read from photos and approved, and every change made to a station.' },
       { name: 'Accounts, roles and views', tab: 'admin', kept: 'db',
         what: 'Who may sign in and what each may do, and each account\'s own views of the bar.' },
+      { name: 'Teams and tasks', tab: 'tasks', kept: 'db',
+        what: 'The teams and who is on them, and the tasks handed to them with every change — seen only by the people each is for.' },
       { name: 'Reference files', tab: 'maps', kept: 'repo',
         what: 'The radio-path map sheets, the 2021 national ALERT address list, the investigations, demo data and the lessons\' material.' },
       { name: 'Files you load', tab: 'arrodata', kept: 'device',
@@ -820,7 +840,7 @@ const Capabilities = (function () {
   function whoOk(it) {
     switch (S.who) {
       case 'open':    return !it.who;
-      case 'account': return !!it.who;   // signin, member, editor, admin, list
+      case 'account': return !!it.who;   // signin, member, editor, admin, list, team
       case 'editor':  return it.who === 'editor' || it.who === 'admin';
       case 'admin':   return it.who === 'admin';
       default:        return true;

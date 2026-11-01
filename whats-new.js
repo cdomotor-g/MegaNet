@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 172, date: '2026-11-01', items: [
+      '✅ <strong>Tasks</strong>, under <em>Network health</em>, for administrators and the people on a team: the jobs handed to a '
+        + 'team, each at a station — who has it, how far it has got (open, in progress, waiting, done or cancelled), when it is due, '
+        + 'and a thread of every change and note. The team moves its tasks on; administrators and the SoRT Forum hand tasks to any '
+        + 'team, and a team\'s owners to their own. <strong>My teams</strong>, under the list, shows who is on your teams, and lets '
+        + 'an owner add or take off members by the address of their Flood-Net account. A station\'s card lists its tasks still going. '
+        + 'Administrators make the teams and name their owners on the Admin tab, under <em>Teams</em>. And the SoRT scope builder '
+        + 'can hand a forum\'s jobs straight over: they open here to be checked, and nothing is made until somebody who hands out '
+        + 'tasks presses Create. Nobody is emailed about a task yet.',
+    ] },
     { n: 171, date: '2026-11-01', items: [
       '🔁 <strong>Repeaters</strong>: press a link on the map — or <strong>profile &amp; budget</strong> beside a linked repeater or '
         + 'base in an opened row — for the ground between its two ends and its <strong>link budget</strong>, under the map: the '

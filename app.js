@@ -3856,6 +3856,7 @@ function renderMain() {
     case 'backbone':   el.innerHTML = Backbone.render();       Backbone.init();   break;
     case 'investigations': el.innerHTML = Investigations.render(); Investigations.init(); break;
     case 'methodology': el.innerHTML = Methodology.render(); Methodology.init(); break;
+    case 'tasks':      el.innerHTML = Tasks.render();          Tasks.init();      break;
     case 'review':     el.innerHTML = NetworkReview.render(); NetworkReview.init(); break;
     case 'a2plan':     el.innerHTML = Alert2Plan.render();    Alert2Plan.init();    break;
     case 'tdma':       el.innerHTML = TdmaPlanner.render();   TdmaPlanner.init();   break;
@@ -8375,6 +8376,8 @@ function repaintStnCard() {
   RiverCatchments.ask(`mn-catch-card-${s.id}`, s);
   // The logger's details, for an approved account, on the same terms.
   if (typeof StationLpu !== 'undefined') StationLpu.cardAsk(s);
+  // The tasks still going here, for the people tasks are for (tasks.js, 0095).
+  if (typeof Tasks !== 'undefined') Tasks.cardAsk(s);
   // The equipment register, for a signed-in editor, on the same terms.
   if (typeof PhotoReview !== 'undefined') PhotoReview.cardAsk(s);
   // …and its site features (site-features.js), kept per station for two
@@ -8685,6 +8688,12 @@ function stnCardHtml(s) {
          Nothing for a proposed station, which has nothing to have heard. The
          owner stays the card's first row, as it always is. -->
     ${HealthGlance.cardHtml(s)}
+    <!-- The tasks still going here (0095, tasks.js), after its health — what
+         is wrong with it, then what is being done about it: for the people
+         tasks are for, and nothing at all for anybody else. Filled after the
+         fetch by Tasks.cardAsk, kept per station for a minute; for somebody
+         who may hand out tasks, a way to make one here. -->
+    ${typeof Tasks !== 'undefined' ? Tasks.cardHtml(s) : ''}
     <!-- Data (stnCardDataHtml): Field data → and its ARRO admin page, then its neighbours
          plotted with it (group-plots.js) — a river height gauge's river,
          every gauge along it, and a rain gauge's surroundings, within the

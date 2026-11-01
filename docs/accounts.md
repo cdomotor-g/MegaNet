@@ -10,10 +10,25 @@ is still decided by the database, in four steps:
 | **An account** | Sign up, and confirm the address from the email | Its own left-bar views, kept in the database and on every device it signs in on |
 | **A member** | Approved — automatically for an address on the allowlist (any `@bom.gov.au`), or by an administrator on the Admin tab | The field photos |
 | **An editor** | On the allowlist (by address or domain) — *Approve as editor* puts an address there | Editing stations, inspections, surveys, photos — exactly as before |
-| **An administrator** | An editor whose role is `admin` | Approving accounts, managing users, and a notification on their phone when somebody is waiting (`0066`) |
+| **An administrator** | An editor whose role is `admin` | Approving accounts, managing users, making the teams and naming their owners, and a notification on their phone when somebody is waiting (`0066`) |
 
-The enforcement is in Postgres — `meganet.is_member()`, `meganet.is_editor()` and
-`meganet.is_admin()` — and in the Worker's photo route (`worker/photos.js`), which asks
+Beside those, a member may be on **teams** (`0095`) — the groups tasks are handed to:
+
+| Who | How they get there | What it adds |
+|---|---|---|
+| **On a team** | A member put on it by an administrator, or by one of its owners, by the address of their account | The ✅ Tasks tab: the tasks handed to the team — to move on and write notes on — and who else is on it |
+| **A team's owner** | Named by an administrator (Admin tab → **Teams**) | Adds and takes off the team's members (Tasks → **My teams**), hands tasks to the team, and hands over, changes or cancels its tasks |
+| **Hands out tasks** | On a team flagged so — the **SoRT Forum** — or an administrator | Gives a task to any team, or to none yet, and sees every task |
+
+A team's **name** is seen by every member, so a task can say which team has it; its
+**roster** only by administrators and that team's own people — names to all of them,
+addresses to its owners and administrators. A **task** is seen by the people who hand out
+tasks, its team and whoever made it, never by every member: some are councils, contractors
+and other outside users. Nobody browses the account list but administrators, as before.
+
+The enforcement is in Postgres — `meganet.is_member()`, `meganet.is_editor()`,
+`meganet.is_admin()` and, for teams and tasks, `meganet.hands_out_tasks()` and
+`meganet.my_teams()` — and in the Worker's photo route (`worker/photos.js`), which asks
 the database the same questions. The app only asks; see [`access.md`](access.md) for the
 layers.
 
@@ -327,6 +342,12 @@ so a stranger can cause a notification; at most one a minute reaches each device
 * **Removing somebody.** The users table's **Delete**, as before (`access.md`).
 * **Notifications.** Admin tab → **🔔 Notifications**: *Send a test*, *Turn off on this
   device*, or **Remove** a device from the list — a phone that was lost or replaced.
+* **Teams.** Admin tab → **Teams**: make a team (a name, the hub it looks after, whether it
+  hands out tasks), open it, and add its **owners** by the address of their account with
+  *As an owner* ticked. The owners add everybody else on the Tasks tab, under **My teams**.
+  Somebody has to be approved before they can be put on a team. Telling a team when a task
+  arrives waits for #237's email (and #216's alerts); until then it waits on the Tasks tab
+  and on the station's card.
 * **Unconfirmed sign-ups** are folded away under the waiting list. They count for nothing —
   a typo or a robot — and need no action.
 

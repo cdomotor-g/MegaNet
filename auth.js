@@ -25,8 +25,10 @@
 // aside, approved accounts read them and editors make them); to
 // nav-views.js for NavViews.authChanged (0062: an account's own views); to
 // push.js for Push.authChanged (0066: an administrator's notifications and the
-// icon's count); to toast.js for the once-a-page notes; and to datastore.js
-// for dbSetAccessToken.
+// icon's count); to tasks.js for Tasks.authChanged and admin-teams.js for
+// AdminTeams.authChanged (0095: a team's tasks and roster are its own
+// people's, the teams an administrator's to make); to toast.js for the
+// once-a-page notes; and to datastore.js for dbSetAccessToken.
 // datastore.js and station-editor.js call back into Auth, so this is a cycle —
 // which is fine in one shared global scope and would not be under ESM, one of
 // the four reasons #129 gives for classic scripts. Nothing here runs at load,
@@ -955,6 +957,8 @@ const Auth = (function () {
                        typeof AdminDash   !== 'undefined' ? AdminDash   : null,
                        typeof AdminTokens !== 'undefined' ? AdminTokens : null,
                        typeof AdminLinks  !== 'undefined' ? AdminLinks  : null,
+                       typeof AdminTeams  !== 'undefined' ? AdminTeams  : null,
+                       typeof Tasks       !== 'undefined' ? Tasks       : null,
                        typeof BaseStations !== 'undefined' ? BaseStations : null,
                        typeof NetworkReview !== 'undefined' ? NetworkReview : null,
                        typeof Alert2Plan !== 'undefined' ? Alert2Plan : null,
@@ -1619,6 +1623,16 @@ const Auth = (function () {
     // whoami()'s is_member (0062): may see the field photos. False until the
     // database has answered — an answer is what decides, not a guess.
     isMember:   () => !!session && !!(who && who.is_member),
+    // whoami()'s teams and tasks (0095): `tasks` lists the Tasks tab (on a
+    // team, or the maker of a task — an administrator always has it, and a
+    // database before 0095 says nothing, so administrators alone then);
+    // `hands_out` may give a task to any team; `team_owner` owns one; `teams`
+    // is how many they are on. What the tab asks before it offers anything —
+    // the functions behind it refuse anybody else regardless.
+    tasks:      () => !!session && !!who && (who.tasks !== undefined ? !!who.tasks : !!who.is_admin),
+    handsOut:   () => !!session && !!(who && who.hands_out),
+    teamOwner:  () => !!session && !!(who && who.team_owner),
+    teams:      () => (session && who && Number(who.teams)) || 0,
     // Whether whoami() has answered for this session yet.
     known:      () => !!session && !!who,
     // unconfirmed | pending | approved | automatic | declined, or null (0062).

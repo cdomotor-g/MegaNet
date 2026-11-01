@@ -183,3 +183,9 @@ if (typeof window !== 'undefined') Workbench.restoreFromUrl();
 // for Workbench's reason, and after it: the two never share a URL.
 if (typeof window !== 'undefined') AdminTokens.restoreFromUrl();
 
+// SoRT's scope builder (0095): #tasks=… opens the Tasks tab on a review of the
+// jobs a forum agreed, nothing made until somebody who may hand out tasks
+// presses Create (tasks.js). After the first render for Workbench's reason;
+// it also puts back one kept from earlier in this browser tab.
+if (typeof window !== 'undefined') Tasks.restoreFromUrl();
+
