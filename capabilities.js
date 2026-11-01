@@ -744,7 +744,7 @@ const Capabilities = (function () {
       { key: 'makers', name: 'Equipment makers', how: 'kept', match: ['Makers\' manuals', 'ELPRO'],
         what: 'ELPRO, Campbell Scientific and the rest: pinouts and the ERT-A2\'s firmware steps from their manuals.' },
       { key: 'anthropic', name: 'Anthropic (Claude)', url: 'https://www.anthropic.com', how: 'runs', match: ['Anthropic'],
-        what: 'The AI briefing on Station Health, and the Network Bulletins written each weekday morning.' },
+        what: 'The AI briefing on Station Health, and the Network Bulletins written each morning Tuesday to Friday and each Monday for the week.' },
       { key: 'elevenlabs', name: 'ElevenLabs', url: 'https://elevenlabs.io', how: 'runs', match: ['ElevenLabs'],
         what: 'The bulletins\' voices.' },
       { key: 'supabase', name: 'Supabase', url: 'https://supabase.com', how: 'runs',

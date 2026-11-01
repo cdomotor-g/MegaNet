@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 173, date: '2026-11-01', items: [
+      '📺 The <strong>Network Bulletin</strong> on Mondays is the week\'s: there is no daily that day, so the panel opens on the '
+        + 'weekly. The daily runs Tuesday to Friday. The panel now opens on whichever bulletin is newest; pick <em>Daily</em> or '
+        + '<em>Weekly</em> (the switches were <em>Today</em> and <em>This week</em>) and this device keeps your pick until a newer '
+        + 'bulletin comes out.',
+    ] },
     { n: 172, date: '2026-11-01', items: [
       '✅ <strong>Tasks</strong>, under <em>Network health</em>, for administrators and the people on a team: the jobs handed to a '
         + 'team, each at a station — who has it, how far it has got (open, in progress, waiting, done or cancelled), when it is due, '

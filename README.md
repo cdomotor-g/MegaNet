@@ -954,7 +954,7 @@ week loads.
 At the top of the tab, **📺 Network Bulletin** tells the network's last day — and,
 on Mondays, its week — as a short animated bulletin presented by one of the
 Droggies, in plain words (no weather words for the network's state), written each
-weekday morning by a scheduled Claude Code task that reads the same findings, the carrier
+morning Tuesday to Friday, and the week's on Mondays, by a scheduled Claude Code task that reads the same findings, the carrier
 fingerprints and the bit flips, and looks for what they have in common
 ([`tools/bulletin/README.md`](tools/bulletin/README.md)).
 [`docs/station-health.md`](docs/station-health.md) lists every finding, what

@@ -1,9 +1,9 @@
 # 📺 Network Bulletin — the bulletin task's brief
 
-Every weekday morning a scheduled Claude Code session reads the Flood-Net network and
+Every morning Tuesday to Friday a scheduled Claude Code session reads the Flood-Net network and
 writes **the network's bulletin**: a two-minute animated bulletin about
 the last 24 hours, drawn at the top of the **Station Health** tab
-(`health-bulletin.js`). Every Monday a second one does the same for the week.
+(`health-bulletin.js`). Every Monday a second one does the same for the week, in the daily's place.
 This file is what those sessions follow. It is also how a person can run one
 by hand.
 
@@ -22,7 +22,7 @@ rain, and nobody can tell which is meant. The bulletin speaks plainly (below,
 
 | | Daily | Weekly |
 | --- | --- | --- |
-| When | weekdays (Monday to Friday), 4:31 am Brisbane | Mondays, 3:59 am Brisbane |
+| When | Tuesday to Friday, 4:31 am Brisbane | Mondays, 3:59 am Brisbane — Monday's only bulletin |
 | Covers | the last 24 hours, against the week before | the last 7 days, against the week before that |
 | Length | 6–8 scenes, about 2 minutes said: 340 words of narration at most | 8–10 scenes, about 3 minutes said: 440 words at most |
 | Who | the day's Droggie presents (`facts.presenter`), Alex Chen takes the radio (`facts.cohost`), two guests a scene each (`facts.guests`) | Graham Watts presents, Alex Chen the radio, the Bean Counter the numbers, one guest |
@@ -365,13 +365,18 @@ flips and whose carrier it is on; a group that went quiet again last night
 and the repeater it shares (`hours`); what cleared. Last night's rain, if it
 explains something.
 
-There is no daily on Saturday or Sunday (the owner's call, 1 November 2026:
-nobody watches it at the weekend, and each one costs a session and its voices).
-Monday's still covers the last 24 hours; the weekend is in the weekly, issued
-half an hour before it. Friday's signs off till Monday, not tomorrow (the
-draft's signoff already says so, and the page shows it).
+There is no daily on Saturday, Sunday or Monday (the owner's calls, 1 and 2
+November 2026: nobody watches it at the weekend, a Monday daily would say again
+what the weekly says, and each one costs a session and its voices). The weekly
+is Monday's bulletin, and the page opens on it that day — it opens on whichever
+bulletin is newest. Tuesday's daily covers the last 24 hours as any other;
+Friday's signs off till Monday and the week, the weekly till Tuesday (the
+draft's signoffs say so, and the page shows it).
 
-**Weekly:** the broad picture. Checks received day by day across the fortnight
+**Weekly:** Monday's only bulletin, so it opens with this morning's news — one
+scene of what is wrong now that was not on Friday (new silences and the group
+they make, a receiver down, a battery crossing 11.8 volts) — then the broad
+picture. Checks received day by day across the fortnight
 (`series`); stations that miss checks every day (chronic, not sudden); the week's
 battery slopes; fingerprints against their thirty days; whose carrier the
 week's bit flips came on and the hours they keep (interference keeps hours, a
@@ -413,12 +418,11 @@ Two Claude Code scheduled tasks, each firing into a **standing session** of its
 own in the owner's cloud environment — a session that has this repository
 attached, so it can push to `main`:
 
-- **Flood-Net daily network bulletin** — weekdays (Monday to Friday) at 4:31 am
-  Brisbane (`CRON_TZ=Australia/Brisbane 31 4 * * 1-5`), into
+- **Flood-Net daily network bulletin** — Tuesday to Friday at 4:31 am
+  Brisbane (`CRON_TZ=Australia/Brisbane 31 4 * * 2-5`), into
   the session *📺 Flood-Net daily network bulletin (scheduled)*: pull, re-read
   this file, follow it with `--kind daily`, publish and push.
-- **Flood-Net weekly network bulletin** — Mondays at 3:59 am Brisbane, so the
-  two do not push at once, into *📺 Flood-Net weekly network bulletin
+- **Flood-Net weekly network bulletin** — Mondays at 3:59 am Brisbane, into *📺 Flood-Net weekly network bulletin
   (scheduled)*: the same with `--kind weekly`.
 
 Why standing sessions, and not a fresh one each morning: a fresh scheduled

@@ -51,8 +51,8 @@ const DAY = 86400000, HOUR = 3600000, MIN = 60000;
 const TZ = 'Australia/Brisbane';
 
 // Who is in each bulletin. The day's Droggie presents (Brisbane's day, Sunday
-// first; the daily is a weekday bulletin, so the weekend's two only matter to
-// a run by hand); Alex Chen takes the radio scenes (Graham on Alex's own day);
+// first; the daily runs Tuesday to Friday, so the other three only matter to
+// a run by hand — Graham presents Monday's bulletin, the weekly); Alex Chen takes the radio scenes (Graham on Alex's own day);
 // and two more of the crew take a scene each as guests, in turn, so the whole
 // crew is heard. The weekly is Graham's, with Alex for the radio, the Bean
 // Counter for its numbers and one guest. The Bean Counter is one of the show's

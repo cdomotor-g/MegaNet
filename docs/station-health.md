@@ -25,7 +25,7 @@ the numbers without the sentence.
 ## 📺 Network Bulletin
 
 At the very top of the tab, above everything worked out here, is the
-network's **bulletin**: its last 24 hours — or, on the *This week* switch, its
+network's **bulletin**: its last 24 hours — or, on the *Weekly* switch, its
 last seven days — told in about two minutes of animated scenes (three for the
 week), like the morning news. It speaks of the network in plain words, never in
 weather words: Flood-Net measures the real weather, so rain, storms and rising
@@ -36,7 +36,7 @@ presents the weekly, where the Bean Counter reads the numbers — his one scene 
 the week. Each says their scenes in their own voice, the narration running
 under the stage word by word as it is said.
 
-It is written, not worked out here. Every weekday morning at half past four a scheduled
+It is written, not worked out here. Every morning Tuesday to Friday at half past four a scheduled
 Claude Code task reads the network as this tab does — the same
 `health-analysis.js` over the same readings (`tools/bulletin/gather.mjs`, through
 `tools/health/report.mjs`) — with what only the server has: the findings'
@@ -49,8 +49,11 @@ not the obvious, the possible causes and what would tell them apart. It does
 not prescribe. Stations that go quiet at night and come back by day, night after
 night, it weighs against the repeater they share — that repeater's own scheduled
 checks keeping the same hours, its own battery, the stations only it passes — and
-names it as worth a look when the evidence points there. Mondays at four a second task writes the week:
-trends, chronic stations, recurring groups, the week's fingerprints and flips.
+names it as worth a look when the evidence points there. Mondays at four a second task writes the week
+in the daily's place — this morning's news first, then trends, chronic stations, recurring groups, the
+week's fingerprints and flips. The panel opens on whichever bulletin is newest: the week's on a Monday,
+the day's the rest of the week; a pick of *Daily* or *Weekly* holds on this device until a newer one is
+issued.
 `tools/bulletin/README.md` is both tasks' brief, and the way to run one by hand.
 
 **The scenes.** How the network is, on a dial and in a word — *All well*,
@@ -84,8 +87,8 @@ station's name on the stage or beside it opens it below on this tab; *Read it
 instead* is the whole script with its stations; *Hide* folds it to its headline.
 The sound, its volume, the speed and *Hide* are remembered on this device (in
 the browser's own storage — nothing on the server, and clearing the site's data
-forgets them). Earlier bulletins are in the list beside *Today* and
-*This week* (fourteen days and eight weeks are kept). The stage takes the
+forgets them). Earlier bulletins are in the list beside *Daily* and
+*Weekly* (fourteen days and eight weeks are kept). The stage takes the
 panel's full width; under it, the presenter's portrait sits at the left beside
 what they are saying, smaller on a phone, where the scene is drawn tall. A map's
 stations drawn on top of each other become one mark with a count. With reduced

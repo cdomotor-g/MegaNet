@@ -49,9 +49,12 @@
 //   * the week's readings landing redraw the tab around it and leave a playing
 //     bulletin where it is — the same stage, still playing
 //   * a station named in the scene opens on the tab below
-//   * weekdays only: Friday's daily is not stale over the weekend, and its
-//     signoff (drawn, and the draft's) says Monday, not tomorrow
-//   * Today and This week; Hide is remembered; no bulletin yet says so
+//   * dailies Tuesday to Friday, the weekly on Mondays in their place:
+//     Friday's daily is not stale until Tuesday afternoon; its signoff (drawn,
+//     and the draft's) says Monday and the week, the weekly's Tuesday
+//   * the panel opens on the newest bulletin — the weekly on a Monday — and a
+//     device's pick holds until a newer one is issued
+//   * Daily and Weekly; Hide is remembered; no bulletin yet says so
 //   * the stage across the panel, 16:9; the presenter under it at the left,
 //     small, beside the words
 //   * a phone: drawn tall, the presenter beside the words, no sideways scroll;
@@ -220,9 +223,11 @@ const HB = ctx.__HB;
   ok('every daily has a presenter, a radio voice and two other guests — never the Bean Counter', !bad.length, JSON.stringify(bad));
   const heard = new Set(days.flatMap(d => [d.presenter, d.cohost, ...d.guests]));
   ok('…and over a fortnight the whole crew is heard', CREW.every(id => heard.has(id)), [...heard].join(', '));
-  const weekdays = days.filter((d, k) => ![0, 6].includes(new Date(Date.parse('2026-10-25T20:00:00Z') + k * 86400000 + 10 * 3600000).getUTCDay()));
-  const hosts = new Set(weekdays.map(d => d.presenter));
-  ok('…every one of them presenting on a weekday, the Bean Counter aside', CREW.every(id => hosts.has(id)), [...hosts].join(', '));
+  // Dailies run Tuesday to Friday; Graham presents Monday's bulletin, the weekly.
+  const dailyDays = days.filter((d, k) => [2, 3, 4, 5].includes(new Date(Date.parse('2026-10-25T20:00:00Z') + k * 86400000 + 10 * 3600000).getUTCDay()));
+  const hosts = new Set(dailyDays.map(d => d.presenter));
+  ok('…every one of them presenting a daily, Graham aside (he has the weekly), the Bean Counter aside',
+    CREW.filter(id => id !== 'seasoned-hydrographer').every(id => hosts.has(id)) && !hosts.has('seasoned-hydrographer'), [...hosts].join(', '));
   const weeks = [0, 7, 14, 21].map(k => presenterFor('weekly', Date.parse('2026-10-25T18:00:00Z') + k * 86400000));
   const benched = [...days, ...weeks].filter(d => [d.presenter, d.cohost, ...d.guests].some(id => BENCHED.includes(id)));
   ok('no bulletin the rota makes has anyone out of the cast in it (Nitto, for now)', BENCHED.includes('nitwit') && !CREW.includes('nitwit') && !benched.length, JSON.stringify(benched));
@@ -257,9 +262,10 @@ let demoDraft = null, demoFacts = null;
   demoDraft = draft(facts);
   demoFacts = facts;
   const fridayDraft = draft(Object.assign({}, facts, { gathered_at: '2026-10-29T18:31:00.000Z' }));   // Friday, 4:31 am Brisbane
-  ok('the draft signs off till tomorrow, and on a Friday till Monday (no daily at the weekend)',
-    /Back tomorrow\./.test(demoDraft.scenes.at(-1).say) && /Back on Monday\./.test(fridayDraft.scenes.at(-1).say),
-    `${demoDraft.scenes.at(-1).say} / ${fridayDraft.scenes.at(-1).say}`);
+  const weeklyDraft = draft(Object.assign({}, facts, { kind: 'weekly' }));
+  ok('the draft signs off till tomorrow, on a Friday till Monday and the week, and the weekly till Tuesday\'s daily',
+    /Back tomorrow\./.test(demoDraft.scenes.at(-1).say) && /Back on Monday, with the week\./.test(fridayDraft.scenes.at(-1).say) && /daily is back on Tuesday/.test(weeklyDraft.scenes.at(-1).say),
+    `${demoDraft.scenes.at(-1).say} / ${fridayDraft.scenes.at(-1).say} / ${weeklyDraft.scenes.at(-1).say}`);
   const r = validate(demoDraft, { stationIds: ids });
   ok('the draft from those facts is a valid bulletin', !r.errors.length, r.errors.join('; '));
   const speakers = demoDraft.scenes.map(s => s.presenter || demoDraft.presenter);
@@ -479,8 +485,9 @@ async function page(opts = {}) {
   const errors = [];
   pg.on('pageerror', e => errors.push(e.message));
   await applyNetworkPolicy(pg, server.origin);
+  if (opts.store) await context.addInitScript(kv => { for (const [k, v] of Object.entries(kv)) localStorage.setItem(k, v); }, opts.store);
   await pg.route('**/data/bulletins/index.json', r => (opts.none ? r.fulfill({ status: 404, body: 'not found' })
-    : r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixIndex) })));
+    : r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(opts.index || fixIndex) })));
   await pg.route('**/' + fixFile, r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FIXTURE) }));
   await pg.route('**/' + weekFile, r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(week) }));
   // Voiced only when asked for (opts.voice: the voice file to serve for the
@@ -624,20 +631,23 @@ try {
   const opened = await pg.evaluate(() => Health.picked());
   ok('a station named in the scene opens on the tab below', opened === 'henderson_ck_al', String(opened));
 
-  // ── weekdays only: Friday's daily holds the weekend ──
+  // ── dailies Tuesday to Friday: Friday's daily holds until Tuesday's ──
   const wk = await pg.evaluate(() => {
     const fri = { kind: 'daily', issued_at: '2026-10-29T18:31:00Z' };   // Friday 30 October, 4:31 am Brisbane
     const h = t => HealthBulletin._sinceIssued(fri, Date.parse(t)) / 3600e3;
-    return { sunday: h('2026-11-01T02:00:00Z'), mondayPm: h('2026-11-02T07:00:00Z'),
-             fri: HealthBulletin._nextText(fri), thu: HealthBulletin._nextText({ kind: 'daily', issued_at: '2026-10-28T18:31:00Z' }) };
+    return { sunday: h('2026-11-01T02:00:00Z'), mondayPm: h('2026-11-02T07:00:00Z'), tuesdayPm: h('2026-11-03T07:00:00Z'),
+             fri: HealthBulletin._nextText(fri), thu: HealthBulletin._nextText({ kind: 'daily', issued_at: '2026-10-28T18:31:00Z' }),
+             week: HealthBulletin._nextText({ kind: 'weekly', issued_at: '2026-11-01T17:59:00Z' }) };
   });
-  ok('Friday\'s daily is not stale over the weekend, and is by Monday afternoon with no Monday one', wk.sunday < 36 && wk.mondayPm > 36, JSON.stringify(wk));
-  ok('…and it signs off till Monday morning; Thursday\'s till tomorrow', /Monday morning/.test(wk.fri) && /tomorrow/.test(wk.thu), JSON.stringify(wk));
+  ok('Friday\'s daily is not stale over the weekend or on Monday (the weekly\'s day), and is by Tuesday afternoon with no Tuesday one',
+    wk.sunday < 36 && wk.mondayPm < 36 && wk.tuesdayPm > 36, JSON.stringify(wk));
+  ok('…and it signs off till the week\'s on Monday morning; Thursday\'s till tomorrow; the weekly till Tuesday\'s daily',
+    /week’s, Monday morning/.test(wk.fri) && /tomorrow/.test(wk.thu) && /daily, Tuesday morning/.test(wk.week), JSON.stringify(wk));
 
-  // ── today, this week, hide ──
-  await pg.click('.hb-tools button:has-text("This week")');
+  // ── daily, weekly, hide ──
+  await pg.click('.hb-tools button:has-text("Weekly")');
   await until(pg, () => /A week of the Hillcrest repeater/.test(document.getElementById('hb-panel').textContent));
-  ok('This week shows the weekly, presented by Graham', await pg.evaluate(() => HealthBulletin._state().kind === 'weekly' && /Graham Watts/.test(document.querySelector('#hb-caption .hb-speaker').textContent)));
+  ok('Weekly shows the weekly, presented by Graham', await pg.evaluate(() => HealthBulletin._state().kind === 'weekly' && /Graham Watts/.test(document.querySelector('#hb-caption .hb-speaker').textContent)));
   await pg.click('.hb-tools button:has-text("Hide")');
   const hidden = await pg.evaluate(() => ({ body: !!document.getElementById('hb-body'), kept: localStorage.getItem('mn-hb-hidden'), folded: (document.querySelector('.hb-folded') || {}).textContent || '' }));
   ok('Hide folds it to its headline, and the device remembers', !hidden.body && hidden.kept === '1' && /A week of the Hillcrest repeater/.test(hidden.folded), JSON.stringify(hidden));
@@ -645,11 +655,30 @@ try {
   ok(`no page errors`, !errors.length, errors.join('\n'));
   await context.close();
 
+  // ── the newest bulletin first: the weekly on a Monday ──
+  {
+    // The weekly issued after the newest daily, as on a Monday with no daily.
+    const monday = Object.assign(JSON.parse(JSON.stringify(fixIndex)), { weekly: [Object.assign({}, fixIndex.weekly[0], { issued_at: '2026-10-25T17:59:00Z' })] });
+    const opening = async (store) => {
+      const { pg, context, errors } = await page({ index: monday, store });
+      await until(pg, () => !!document.querySelector('#hb-stage svg'));
+      const r = await pg.evaluate(() => ({ kind: HealthBulletin._state().kind, on: (document.querySelector('.hb-tools .hl-chip--on') || {}).textContent || '' }));
+      await context.close();
+      return Object.assign(r, { errors });
+    };
+    const fresh = await opening(null);
+    ok('the panel opens on the newest bulletin: the weekly, on a Monday', fresh.kind === 'weekly' && /Weekly/.test(fresh.on) && !fresh.errors.length, JSON.stringify(fresh));
+    const kept = await opening({ 'mn-hb-kind': 'daily|weekly-2026-10-25' });
+    ok('…a device that picked Daily since that weekly was issued keeps Daily', kept.kind === 'daily', JSON.stringify(kept));
+    const older = await opening({ 'mn-hb-kind': 'daily|daily-2026-10-25' });
+    ok('…and one that picked it before a newer bulletin came opens on the newer one', older.kind === 'weekly', JSON.stringify(older));
+  }
+
   // ── no bulletin yet ──
   {
     const { pg, context, errors } = await page({ none: true });
     await until(pg, () => /No bulletin to show|No bulletin yet/.test((document.getElementById('hb-panel') || {}).textContent || ''));
-    ok('with no bulletin yet, the panel says so and how one comes', await pg.evaluate(() => /scheduled task writes one every weekday morning/.test(document.getElementById('hb-panel').textContent)));
+    ok('with no bulletin yet, the panel says so and how one comes', await pg.evaluate(() => /scheduled task writes one each morning Tuesday to Friday/.test(document.getElementById('hb-panel').textContent)));
     ok('…and nothing breaks', !errors.length, errors.join('\n'));
     await context.close();
   }

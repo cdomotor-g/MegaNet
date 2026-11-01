@@ -13,8 +13,8 @@
 // station links open); read at call time. Nothing runs at load.
 //
 // ── Where a bulletin comes from ─────────────────────────────────────────────
-// Not from this page. A scheduled Claude Code task runs every weekday morning
-// (and every Monday for the week), reads the network the way this tab does — the
+// Not from this page. A scheduled Claude Code task runs every morning Tuesday
+// to Friday (and every Monday for the week, in the daily's place), reads the network the way this tab does — the
 // same health-analysis.js over the readings, the server's findings, the
 // carrier fingerprints and bit-flip blame — looks further than the rules can
 // (what several findings have in common, what the fingerprints say about who
@@ -71,31 +71,33 @@ const HealthBulletin = (() => {
   const WIDE = { W: 1280, H: 720 }, TALL = { W: 720, H: 900 };
   const NARROW_PX = 620;
   const STALE = { daily: 36 * 3600e3, weekly: 9 * 86400e3 };
-  // The daily is issued on weekdays only, Monday to Friday at 4:31 am Brisbane
-  // (the owner's call, 1 Nov 2026: nobody watches it at the weekend); the
-  // weekly on Mondays, and it has the weekend. Brisbane keeps no daylight
-  // saving, so its day is UTC plus ten hours.
+  // The daily is issued Tuesday to Friday at 4:31 am Brisbane, and the weekly
+  // on Mondays at 3:59 in its place (the owner's calls, 1 and 2 Nov 2026: no
+  // daily at the weekend, when nobody watches, nor on the weekly's day, which
+  // would say the same twice). Brisbane keeps no daylight saving, so its day
+  // is UTC plus ten hours.
   const BNE_MS = 10 * 3600e3, DAY_MS = 86400e3;
+  const DAILY_DAYS = new Set([2, 3, 4, 5]);
   const bneDay = t => new Date(t + BNE_MS).getUTCDay();   // 0 Sunday … 6 Saturday
   // How long a bulletin has been the newest one there should be: the time since
-  // it was issued, less Saturdays and Sundays for a daily — so Friday's stays
-  // current until Monday's is due, and only then can it look stale.
+  // it was issued, counting only a daily's own days — so Friday's stays
+  // current until Tuesday's is due, and only then can it look stale.
   function sinceIssued(b, now) {
     const t0 = Date.parse(b.issued_at);
     if (b.kind === 'weekly') return now - t0;
     let ms = 0;
     for (let t = t0; t < now;) {
       const next = Math.min(now, (Math.floor((t + BNE_MS) / DAY_MS) + 1) * DAY_MS - BNE_MS);
-      const wd = bneDay(t);
-      if (wd !== 0 && wd !== 6) ms += next - t;
+      if (DAILY_DAYS.has(bneDay(t))) ms += next - t;
       t = next;
     }
     return ms;
   }
-  // When the next one is, as the signoff shows it: after Friday's daily, Monday's.
+  // When the next one is, as the signoff shows it: after Friday's daily, the
+  // week's on Monday; after the week's, the daily on Tuesday.
   function nextText(b) {
-    if (b.kind === 'weekly') return 'The next weekly bulletin: Monday morning.';
-    return bneDay(Date.parse(b.issued_at)) === 5 ? 'The next bulletin: Monday morning, about five.' : 'The next bulletin: tomorrow morning, about five.';
+    if (b.kind === 'weekly') return 'The next bulletin: the daily, Tuesday morning, about five.';
+    return bneDay(Date.parse(b.issued_at)) === 5 ? 'The next bulletin: the week’s, Monday morning, about four.' : 'The next bulletin: tomorrow morning, about five.';
   }
 
   // The crew, from the Droggies' canon (github.com/cdomotor-g/thedroggies,
@@ -179,7 +181,11 @@ const HealthBulletin = (() => {
 
   const B = {
     index: null, indexErr: '', loading: false,
-    kind: stored('mn-hb-kind', v => v === 'daily' || v === 'weekly') || 'daily',
+    // Which bulletin shows: the newest issued, daily or weekly — so the weekly
+    // on Mondays, when there is no daily, and the day's daily the rest of the
+    // week. A device's own pick holds until a newer bulletin is issued: it is
+    // kept as "kind|newest id" (mn-hb-kind), and a newer one outranks it.
+    kind: 'daily',
     pick: { daily: null, weekly: null },     // the file chosen, or the newest
     files: new Map(),                        // file → bulletin | { error }
     voices: new Map(),                       // file → its voice file, or null: not voiced (yet)
@@ -227,11 +233,19 @@ const HealthBulletin = (() => {
     try { B.index = await getJson(INDEX); }
     catch (err) { B.index = null; B.indexErr = (err && err.message) || String(err); }
     B.loading = false;
-    // The kind remembered on this device, unless there is none of it yet and
-    // there is of the other.
-    const other = B.kind === 'daily' ? 'weekly' : 'daily';
-    if (!entries(B.kind).length && entries(other).length) B.kind = other;
+    B.kind = openingKind();
     await loadCurrent();
+  }
+  // The newest bulletin issued, of either kind.
+  function newest() {
+    return ['daily', 'weekly'].map(k => entries(k)[0] && { k, e: entries(k)[0] }).filter(Boolean)
+      .sort((x, y) => (Date.parse(y.e.issued_at) || 0) - (Date.parse(x.e.issued_at) || 0))[0] || null;
+  }
+  function openingKind() {
+    const n = newest();
+    if (!n) return B.kind;
+    const m = /^(daily|weekly)\|(.+)$/.exec(stored('mn-hb-kind', v => /^(daily|weekly)\|/.test(v)) || '');
+    return m && m[2] === n.e.id && entries(m[1]).length ? m[1] : n.k;
   }
   function entries(kind) { return (B.index && Array.isArray(B.index[kind]) ? B.index[kind] : []); }
   function currentFile(kind) {
@@ -294,7 +308,7 @@ const HealthBulletin = (() => {
   }
   function panelInner() {
     const b = current();
-    const kinds = [['daily', 'Today'], ['weekly', 'This week']].map(([k, label]) => {
+    const kinds = [['daily', 'Daily'], ['weekly', 'Weekly']].map(([k, label]) => {
       const e = entries(k)[0];
       const fresh = e && !seen().has(e.id) ? '<span class="hb-new" aria-label="not yet played on this device">new</span>' : '';
       return `<button class="hl-chip${B.kind === k ? ' hl-chip--on' : ''}" aria-pressed="${B.kind === k}" onclick="HealthBulletin.setKind('${k}')"
@@ -327,7 +341,7 @@ const HealthBulletin = (() => {
     if (B.loading && !B.index) return '<p class="small hb-note">Fetching the latest bulletin…</p>';
     if (!B.index) {
       return `<p class="small hb-note">${B.indexErr ? `No bulletin to show — ${esc(B.indexErr)}.` : 'No bulletin yet.'}
-        A scheduled task writes one every weekday morning, and one for the week on Mondays (<a href="tools/bulletin/README.md" target="_blank" rel="noopener">how</a>).</p>`;
+        A scheduled task writes one each morning Tuesday to Friday, and one for the week on Mondays (<a href="tools/bulletin/README.md" target="_blank" rel="noopener">how</a>).</p>`;
     }
     const f = currentFile();
     if (!f) return `<p class="small hb-note">No ${B.kind === 'weekly' ? 'weekly' : 'daily'} bulletin has been issued yet.</p>`;
@@ -1948,7 +1962,9 @@ const HealthBulletin = (() => {
   }
   function setKind(k) {
     if (k !== 'daily' && k !== 'weekly' || k === B.kind) return;
-    B.kind = k; keep('mn-hb-kind', k);
+    B.kind = k;
+    const n = newest();
+    keep('mn-hb-kind', n ? `${k}|${n.e.id}` : null);
     resetPlay();
     redraw();
     loadCurrent();
@@ -2026,7 +2042,7 @@ const HealthBulletin = (() => {
     refresh: () => { B.index = null; B.indexErr = ''; B.files.clear(); B.voices.clear(); resetPlay(); B.audioFor = null; B.audioState = 'idle'; redraw(); loadIndex(); },
     play, pause, toggle, bigPlay, go, next, prev, seekTo, setKind, pick, toggleHidden, toggleSound, setVolume, key, stageClick, open,
     seekDown, seekMove, seekUp, seekLeave, seekKey, setRate, toggleMenu, menuKey,
-    ROSTER, STATUS_WORD, _sinceIssued: sinceIssued, _nextText: nextText, _draw: (s, b, narrow) => { const was = B.narrow; B.narrow = !!narrow; try { return sceneSvg(Object.assign({}, b || {}, { scenes: [s] }), 0); } finally { B.narrow = was; } },
+    ROSTER, STATUS_WORD, _sinceIssued: sinceIssued, _nextText: nextText, _openingKind: () => openingKind(), _draw: (s, b, narrow) => { const was = B.narrow; B.narrow = !!narrow; try { return sceneSvg(Object.assign({}, b || {}, { scenes: [s] }), 0); } finally { B.narrow = was; } },
     _state: () => ({ kind: B.kind, scene: B.scene, t: B.t, playing: B.playing, ended: B.ended, file: currentFile(), hidden: B.hidden, rate: B.rate, vol: B.vol,
       sound: B.sound, voiced: !!voiceOf(current()), audio: B.audioFor === currentFile() ? B.audioState : 'idle',
       at: audioIs('ready') && mp3In() ? B.audio.currentTime : null }),
