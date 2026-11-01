@@ -3824,8 +3824,11 @@ const DB_SCHEMA = 'meganet';
 // go, and a sighting with less in it never a replacement (0093), applied by
 // db-migrate.yml on 31 October 2026, bumped after. 94: health findings
 // rewritten only when something is new, last_seen to within the hour (0094),
-// applied by db-migrate.yml on 31 October 2026, bumped after.
-const DB_SCHEMA_VERSION = 94;
+// applied by db-migrate.yml on 31 October 2026, bumped after. 95: teams and
+// the tasks handed to them, whoami()'s tasks, hands_out, team_owner and teams
+// (0095, tasks.js and admin-teams.js), applied by db-migrate.yml on 1 November
+// 2026, bumped after.
+const DB_SCHEMA_VERSION = 95;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
