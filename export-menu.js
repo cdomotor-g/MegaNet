@@ -298,6 +298,7 @@ const ExportMenu = (function () {
     nearby:      'A list measured from where you stand, kept only while the tab is open — the Stations tab saves the same stations, positions and all.',
     propagation: 'A lesson in how radio travels — made-up demonstrations, not records; nothing on it is data to keep as a file.',
     biterrors:   'A lesson in why readings arrive wrong — still drawings of the physics, not records; the Bit Bench saves its batches.',
+    tasks:       'The jobs handed to each team — a live list kept in the database and changed by the people it is handed to, so a file would be out of date as soon as it was saved.',
     maps:        'The printed sheets are the files: each one opens as its own PDF.',
     bitflipper:  'A calculator: the variants of one address, on screen to read or copy.',
     packets:     'It decodes what is pasted into it: the paste was the file, and the decode is on screen to copy.',

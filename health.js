@@ -1811,7 +1811,19 @@ const Health = (() => {
     if (kpis) kpis.innerHTML = kpisHtml();
     const legend = document.getElementById('hl-map-legend');
     if (legend) legend.innerHTML = mapLegendHtml();
-    if (H.sel) rerenderStation(); else drawMap();
+    if (H.sel) {
+      // Redrawing the station panel would drop the focus a press from another
+      // tab just put on one of its headings (focusPart): put it back.
+      const a = document.activeElement;
+      const keep = a && a.id && a.closest && a.closest('#hl-station') ? a.id : null;
+      rerenderStation();
+      const again = keep && document.getElementById(keep);
+      if (again && document.activeElement !== again) {
+        again.setAttribute('tabindex', '-1');
+        if (/^H\d$/.test(again.tagName) && again.scrollIntoView) again.scrollIntoView({ block: 'start' });
+        again.focus({ preventScroll: true });
+      }
+    } else drawMap();
   }
   function rerenderStation() {
     const el = document.getElementById('hl-station');

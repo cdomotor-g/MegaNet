@@ -6768,7 +6768,7 @@ body .map-panel.is-driving {
 
 /* A phone held upright: the words under the turn, and the foot's figures
    under its buttons' row so neither is squeezed. */
-@media (max-width: 420px) {
+@media (max-width: 380px) {
   .mn-dm-dist { font-size: 1.6rem; }
   .mn-dm-text { font-size: .98rem; }
   .mn-dm-arrow svg { width: 2.8rem; height: 2.8rem; }
@@ -21255,7 +21255,7 @@ button.adm-danger:hover { border-color: var(--bad); }
 .hb-key { display: grid; grid-template-columns: max-content 1fr; gap: .2rem .9rem; max-width: 80ch; margin: .2rem 0 0; }
 .hb-key dt { font-weight: 600; }
 .hb-key dd { margin: 0; }
-@media (max-width: 520px) { .hb-key { grid-template-columns: 1fr; } .hb-key dd { margin-bottom: .3rem; } }
+@media (max-width: 560px) { .hb-key { grid-template-columns: 1fr; } .hb-key dd { margin-bottom: .3rem; } }
 .hb-foot { color: var(--muted); margin: var(--sp-2) 0 0; }
 @media (max-width: 700px) {
   .hb-anchor { gap: var(--sp-2); }

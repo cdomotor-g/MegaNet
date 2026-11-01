@@ -382,7 +382,14 @@ try {
     && Math.abs(free.moved[0] - 120) < 25 && Math.abs(free.moved[1] - 60) < 25, J(free));
   await page.evaluate(() => DriveMode.act('pause'));
   await page.click('.mn-dm-tools [data-act="centre"]', { timeout: 3000 }).catch(() => page.evaluate(() => DriveMode.act('centre')));
-  await page.waitForTimeout(1500);
+  // The ease takes 900 ms of frames, which a software-rendered runner draws
+  // slowly: wait for the camera to arrive (up to 8 s) rather than a fixed time.
+  await page.waitForFunction(() => {
+    const d = Map3D._drive();
+    if (!d.camera || !d.puck) return false;
+    const m = 111320, dy = (d.camera.lat - d.puck.lat) * m, dx = (d.camera.lon - d.puck.lon) * m * Math.cos(d.puck.lat * Math.PI / 180);
+    return Math.hypot(dx, dy) < 0.5;
+  }, null, { timeout: 8000 }).catch(() => {});
   const back = await view(page);
   check('◎ puts the camera back over the car', (await st(page)).follow === true
     && km([back.camera.lat, back.camera.lon], [back.puck.lat, back.puck.lon]) * 1000 < 1 && Math.abs(back.camera.pitch - PITCH) < 0.5, J(back.camera));
