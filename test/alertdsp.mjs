@@ -23,6 +23,9 @@
 //     scope and a capture
 //   * the Worker source builds — it is this module rebuilt from its own text
 //
+// and two ALERT Binary bursts off the air, since the rig's is Enhanced iFLOWS
+// and the live networks send Binary (see "Two real ALERT Binary bursts" below).
+//
 // Node only, no browser. Run:  npm run alertdsp   (-v to list what passed)
 
 import fs from 'node:fs';
@@ -66,6 +69,24 @@ check('the vector is 3 s of 240 ksps u8 IQ', iq.length === 240000 * 2 * 3, `${iq
   const asBinary = D.decodeU8(iq, { format: D.BINARY });
   check('one format at a time: the rig\'s Enhanced burst read as Binary is nothing',
     asBinary.readings.length === 0, show(asBinary.readings));
+}
+
+// ── Two real ALERT Binary bursts, 18 Bateson, 151.500 MHz ───────────────────
+// Recorded by RPi ALERT's Recordings at the 18 Bateson base station (an
+// RTL-SDR at 240 ksps, centred on the channel: the burst and 0.4 s either
+// side, as its decoder read it) and fetched over the base-station request
+// queue: 1957 = 29 on 2026-10-19, about 16 dB over the noise, and 5304 = 41
+// on 2026-11-01, about 9 dB — the weak one is the test of a filter change that
+// costs sensitivity. Each decoded to exactly this on the station.
+
+for (const [file, id, value] of [['binary_151.500_1957.iq8', 1957, 29], ['binary_151.500_5304_weak.iq8', 5304, 41]]) {
+  const v = new Uint8Array(fs.readFileSync(path.join(REPO_ROOT, 'test/fixtures/sdr', file)));
+  check(`${file} is 1.25 s of 240 ksps u8 IQ`, v.length === 240000 * 2 * 1.25, `${v.length} bytes`);
+  const r = D.decodeU8(v, { format: D.BINARY });
+  check(`ALERT Binary off the air: ${id} = ${value}, and nothing else`,
+    r.readings.length === 1 && r.readings[0].sensorId === id && r.readings[0].value === value, show(r.readings));
+  const asEif = D.decodeU8(v, { format: D.ENHANCED_IFLOWS });
+  check(`one format at a time: ${file} read as Enhanced iFLOWS is nothing`, asEif.readings.length === 0, show(asEif.readings));
 }
 
 // ── The CRC and the encoder, against the rig's own frames ────────────────────

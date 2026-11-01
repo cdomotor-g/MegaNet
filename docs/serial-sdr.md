@@ -167,8 +167,10 @@ a real capture. What needs real hardware, in order:
 6. **Bias tee** (V3/V4) with a meter on the SMA, never with an antenna that shorts DC.
 7. **ALERT.** Tune 151.500 MHz with an antenna, *ALERT Binary*, gain ~30 dB. Bursts should
    show on the timeline; readings should match what the network's own feed (or a
-   Quansheng radio on the same channel, in the next card) reports. Save a capture of a
-   good burst — it can become a second regression vector beside the 4078 rig's.
+   Quansheng radio on the same channel, in the next card) reports. Two Binary bursts
+   recorded at 18 Bateson are already regression vectors beside the 4078 rig's
+   (`test/fixtures/sdr/binary_151.500_*.iq8`, `npm run alertdsp`); a capture from another
+   stick or site is still worth adding.
 8. **ppm.** Measure the stick's error on a known carrier and set it; the decoder searches
    ±10 kHz, so this matters more for the display than for decoding.
 

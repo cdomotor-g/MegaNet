@@ -29,7 +29,7 @@
   },
   "status": {
     "phase": "live",
-    "updated": "2026-10-31",
+    "updated": "2026-11-01",
     "summary": "Live and in daily use (database schema 93): this week added the agent API's changelog and email list, ACMA licences in the API, the Repeaters tab and cuts to database I/O, while account email, compute size and the ACMA download link wait on the owner.",
     "now": [
       "Agent API changelog and notify list shipped; emails start once #237's Resend parts are done",
@@ -178,7 +178,6 @@
         "holds": [
           "the ACMA layer's licence data (stuck on 23 July 2026)",
           "ACMA licences in the agent API",
-          "#248",
           "each missed month of the register, which ACMA does not keep"
         ],
         "options": [
@@ -189,7 +188,7 @@
             "recommended": true
           },
           {
-            "what": "Paste the copied link in a comment on #245; an agent puts it in ACMA_ZIP_URLS, runs the workflow, closes PR #208, #245 and #248",
+            "what": "Paste the copied link in a comment on #245; an agent puts it in ACMA_ZIP_URLS, runs the workflow, and closes PR #208 and #245",
             "by": "agent",
             "effort": "Low",
             "model": "Sonnet5/Low",
@@ -202,37 +201,6 @@
             "effort": "10 min a week",
             "pros": "works even if the link needs a login",
             "cons": "the workflow uses a release only under 10 days old, so it repeats weekly"
-          }
-        ]
-      },
-      {
-        "id": "acma-refresh",
-        "what": "#248 the weekly ACMA refresh fails: no ACMA download URL works (the same fix as #245)",
-        "on": "human",
-        "kind": "upstream",
-        "since": "2026-10-27",
-        "issue": "#248",
-        "holds": [
-          "the weekly Refresh ACMA RRL data workflow (red since October)"
-        ],
-        "options": [
-          {
-            "what": "Fix it with #245: the current spectra_rrl.zip link first in ACMA_ZIP_URLS, then Actions → Refresh ACMA RRL data → Run workflow, and check it goes green",
-            "by": "human",
-            "effort": "5 min",
-            "recommended": true
-          },
-          {
-            "what": "Close #248 as a duplicate of #245 so the CI doctor reports in one place, and update the roadmap",
-            "by": "agent",
-            "effort": "Low",
-            "model": "Sonnet5/Low",
-            "cons": "the workflow stays red"
-          },
-          {
-            "what": "Stopgap: attach the zip to an acma-data-YYYY-MM-DD release each week until the link is found",
-            "by": "human",
-            "effort": "10 min a week"
           }
         ]
       },
@@ -366,40 +334,6 @@
             "what": "Leave #204 parked: an agent can already draft from the dossier with the prompt in docs/agent-api.md, and nothing else waits on it",
             "by": "human",
             "effort": "none"
-          }
-        ]
-      },
-      {
-        "id": "equipment-credential",
-        "what": "#206 the equipment-proposing agent waits on a credential choice",
-        "on": "agent",
-        "kind": "decision",
-        "since": "2026-09-28",
-        "issue": "#206",
-        "holds": [
-          "equipment proposals from new field photos"
-        ],
-        "options": [
-          {
-            "what": "Close #206 as done by the nightly photo reader: it proposes equipment as agent:photo-reader through record_photo_readings() and propose_equipment() (0090) over the Supabase connector, for the Review panel; check #206's Done-when against it, comment, close, and update the roadmap",
-            "by": "agent",
-            "effort": "Low",
-            "model": "Sonnet5/Low",
-            "pros": "the work already runs every night",
-            "cons": "the owner may still want a narrower credential than the connector",
-            "recommended": true
-          },
-          {
-            "what": "Choose the project's secret key (already an Actions secret for the Dropbox and Drive syncs); an agent builds #206's scheduled job beside field-photos-dropbox.yml",
-            "by": "human",
-            "effort": "5 min",
-            "cons": "duplicates the photo reader"
-          },
-          {
-            "what": "Choose a new role with execute on propose_equipment() only; an agent adds its grants by migration and its rules to tools/check_photo_review.sql",
-            "by": "human",
-            "effort": "5 min",
-            "pros": "the narrowest credential"
           }
         ]
       }
