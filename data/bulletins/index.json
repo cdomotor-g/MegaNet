@@ -1,6 +1,6 @@
 {
  "format": "floodnet-bulletin-index/1",
- "updated_at": "2026-10-31T18:33:44.435Z",
+ "updated_at": "2026-11-01T18:06:19.487Z",
  "daily": [
   {
    "id": "daily-2026-11-01",
@@ -60,6 +60,14 @@
   }
  ],
  "weekly": [
+  {
+   "id": "weekly-2026-11-02",
+   "file": "data/bulletins/weekly/2026-11-02.json",
+   "issued_at": "2026-11-01T18:00:13.511Z",
+   "headline": "Twenty-one stations missed every check all week; thirteen were last measured on 152.400, which no one listens to now. The rest of the network held at seven in ten.",
+   "status": "several",
+   "presenter": "seasoned-hydrographer"
+  },
   {
    "id": "weekly-2026-10-26",
    "file": "data/bulletins/weekly/2026-10-26.json",
