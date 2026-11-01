@@ -2178,6 +2178,13 @@ jobs:
       - name: check_reading_signal.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_reading_signal.sql
+      # One ALERT burst heard several ways is one reading (0096, #232): copies
+      # of an ALERT address's reading within 8 s either side counted on it,
+      # two real readings left two, the window a setting, the lock taken only
+      # by a batch with an ALERT address.
+      - name: check_alert_copies.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_alert_copies.sql
       # The newest reading of every address (0057), which the agent API's
       # /api/v1/readings/latest reads: one row per address, by the device's
       # own time and the later received of a tie, agreeing with DISTINCT ON —

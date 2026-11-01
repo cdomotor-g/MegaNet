@@ -700,6 +700,21 @@ cannot disagree with the columns it is built from, and the primary key
 `insert … on conflict do nothing`, and the copy that lost bumps `dup_count` and
 appends its path to `dup_paths`.
 
+**An ALERT address's copies are a window, not an instant (`0096`, #232).** A
+legacy ALERT frame carries no time: whoever hears it — a Pi, the browser, an
+ALERT2 concentrator — stamps it on arrival, and the copies of one burst come by
+different routes seconds apart, so the exact key never matched them (5.9 % of
+three days' ALERT readings were stored twice). For a reading with an
+`alert_id`, whichever protocol carried it, `ingest()` first looks for one with
+the same `addr` and `value_raw` within `app_meta`'s `alert_copy_window_s` (8)
+either side of its time; if there is one, this copy is counted on it as above.
+8 s is wider than any relay measured (none 8–10 s apart across channels) and
+narrower than any station's repeat (none under 10 s on one channel in a week);
+`0` turns it off. A call carrying an ALERT address takes one transaction lock
+before its first row, so two receivers posting one burst at once take turns
+rather than both storing it. ALERT2 self-reports and station-number readings
+carry the station's own time and keep the exact key.
+
 A station that transmits both ways has two addresses, and they do not deduplicate
 against each other. That is correct — they are two transmissions — and it is the
 thing `path` and `dup_count` exist to make visible.

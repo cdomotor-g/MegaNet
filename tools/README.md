@@ -51,6 +51,18 @@ through `ingest_http()` with a token; and the table refusing out-of-range values
 written round `ingest()`. Red on a missing round-before-cast, a dropped envelope
 frequency and a strict RSSI parse.
 
+`check_alert_copies.sql` holds `0096` (#232), one ALERT burst heard several ways as
+one reading: 26 checks — two receivers' copies 0.8 s apart one reading, the second
+path in `dup_paths`, the first copy's time, path and frequency kept, the call and its
+`reading_raw` row saying duplicates 1; a copy stamped earlier but posted later, and
+an ALERT2 concentration record's copy of a legacy one, counted on it; three copies in
+one batch one reading; 7.9 s one, 8.5 s two; a copy between two readings counted on
+the nearer; while the same value a minute apart, another value a second apart, an
+ALERT2 self-report and a station-number reading 1 s apart all stay two; the setting
+at 0 (the exact key alone), 30, a word, 600 and missing; and the transaction lock
+taken only by a batch with an ALERT address. 13 of the 26 are red against `0050`'s
+`ingest()`.
+
 `check_ingest_seen.sql` holds `0052`, a station last seen when it was heard: 15 checks
 through `ingest_http()` with a token — a live reading seen at its own time; one posted
 three days late seen three days ago, not now, and never dragging back a station heard

@@ -523,7 +523,9 @@ curl -s 'https://floodwarning.net/api/v1/stations/abergowrie_br_al/readings?reso
 A **raw** row is one reading as it was received: `t` (the device's own time),
 `addr`, `value_raw` as transmitted, `value` and `unit` where Flood-Net had a
 conversion, `quality`, `received_at`, the `path` it came by (which receiver),
-`dup_count` (copies heard again) — and the frequency and signal the receiver
+`dup_count` (copies heard again — for an ALERT address, any copy stamped
+within 8 s, since a legacy ALERT frame carries no time and each receiver
+stamps it when it heard it) — and the frequency and signal the receiver
 gave: `freq_mhz`, `rssi_dbm`, `level_dbfs` and `snr_db`, each only where that
 receiver measures it (an SDR gives level and SNR, a radio its RSSI) and absent,
 never zero, where it does not. A real row, from 27 October 2026:
@@ -1537,6 +1539,15 @@ at [`GET /api/v1/changelog`](#get-apiv1changelog), newest first — both from
 in the same push. A change with nothing to notice (a fix inside, a faster
 answer) is not listed.
 
+- **1 November 2026 — One ALERT burst heard several ways is one reading.**
+  A legacy ALERT frame carries no time, so each receiver stamps it when it
+  heard it, and copies of one burst that came through a repeater or an ALERT2
+  concentrator were stored as separate readings a second or so apart — about
+  6 % of ALERT readings. From today the same address and value within 8
+  seconds is one reading, its other copies counted in `dup_count`. Raw
+  readings for a legacy ALERT station have fewer near-identical rows and more
+  `dup_count`; nothing else changed. Readings stored before today keep their
+  twins.
 - **1 November 2026 — A station's radio path to base, with the fade margins
   Flood-Net saved.** [`GET /api/v1/stations/{id}/radio-path`](#get-apiv1stationsidradio-path)
   (MCP `get_radio_path`) is new: the repeaters that pass a station's ALERT

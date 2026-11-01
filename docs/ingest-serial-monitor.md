@@ -57,7 +57,10 @@ Two things identify where a reading came from:
   is an `rtl-sdr`) and keeps it in this browser. Every reading it posts carries the
   path **`serial-monitor/<receiver id>`**, and the source `serial`. When two
   receivers hear the same reading, `ingest()` stores it once and records the second
-  receiver's path in `dup_paths` — so it is on record that both heard it.
+  receiver's path in `dup_paths` — so it is on record that both heard it. Each
+  receiver stamps a legacy ALERT burst when it heard it, so two copies of one burst
+  are a fraction of a second to a few seconds apart; the same address and value
+  within 8 s either side are one reading (`0096`).
 
 The receiver describes itself through `meganet.report_ingest_point()` (migration
 `0045`) when it starts sending, whenever its name or location changes, and every 15

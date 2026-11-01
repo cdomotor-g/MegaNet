@@ -26,7 +26,7 @@ flowchart LR
     BR -- "subscribe" --> BG[bridge<br/>bridge/README.md]
     BG -- "the same HTTPS POST,<br/>with the bridge's token" --> IH
     IH --> ING["meganet.ingest()<br/>0006 — the shared contract"]
-    ING --> DB[(readings<br/>dedup on station + timestamp + raw value<br/>then roll-up and retention)]
+    ING --> DB[(readings<br/>dedup on station + timestamp + raw value<br/>an ALERT address: within 8 s<br/>then roll-up and retention)]
 ```
 
 What the two paths share is everything that matters: the payload shape, the
@@ -36,6 +36,14 @@ token model — the bridge is just another ingest point holding another token.
 reading arriving twice — same address, same `reading_ts`, same `value_raw` —
 is stored once, whichever door it came through, which is why retrying is safe
 on both paths and why the two can even run side by side during a migration.
+A reading on an **ALERT address** is the one case where "same `reading_ts`" is
+loosened (`0096`, #232): a legacy ALERT frame carries no time, so each receiver
+stamps it when it heard it, and the copies of one burst — direct, through a
+repeater, through an ALERT2 concentrator, at another base station — arrive
+seconds apart. The same address and `value_raw` within **8 seconds** either side
+of a stored reading is that reading again: counted in its `dup_count`, its path
+added to `dup_paths`. A station's own clock (ALERT2 self-reports, loggers by
+station number) keeps the exact key.
 What the MQTT path adds is presence: a broker knows when a station stops
 talking, and the HTTP path has no way to say so.
 
