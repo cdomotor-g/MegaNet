@@ -461,7 +461,7 @@ Refer to every station as [[station_id]] (its id, not its name) so the app can l
         return { station: S.st.name, count: list.length, readings: list.map(tx => {
           const k = kindOf(tx.addr), c = SensorValues.convert(k, tx.v, S.st);
           return { t: iso(tx.t), address: tx.aid, kind: k, raw: tx.v, value: c && c.value != null ? c.text : null,
-                   copies: tx.copies.length, corrupted_copies: tx.bad.map(b => ({ raw: b.x.v, bits: b.bits })) };
+                   copies: HealthAnalysis.copiesHeard(tx.copies), corrupted_copies: tx.bad.map(b => ({ raw: b.x.v, bits: b.bits })) };
         }) };
       }
       case 'station_history': {

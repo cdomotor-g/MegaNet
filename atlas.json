@@ -37,6 +37,7 @@
       "Agent API radio paths to base, for SoRT's Fade Margin question: live, and every saved fade margin stale until the map's layer is swept and saved again",
       "Photo reader: nightly reading of field photos for logger and equipment details",
       "#243 R2 data archive: one restored-day self-test left, then close",
+      "One ALERT burst heard several ways is one reading (0096, #232 closed): copies within 8 s counted on it",
       "#217 and #244 transmitter drift and bit-flip sources: gathering live days of carrier data",
       "#258 flaky Site features 3-D hand-back check in CI"
     ],
@@ -44,7 +45,6 @@
       "#252–#254 road routes: avoid closures, inspection runs, routes kept offline (EPIC #250)",
       "#238 QLDTraffic flood events and road closures on the Stations map",
       "#216 staff alerts: daily digest email and web push for critical findings",
-      "#232 measure whether one burst heard by two receivers is stored twice",
       "#187 ACMA transmitters in the 3-D view",
       "#220 maintenance due list; #228 accessibility follow-ups"
     ],

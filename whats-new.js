@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 174, date: '2026-11-01', items: [
+      '📡 One ALERT burst heard several ways — direct, through a repeater, through the ALERT2 network or at two base stations — '
+        + 'is now <strong>one reading</strong>. Each copy used to arrive a second or so after the last and be kept as a reading of '
+        + 'its own, so about one ALERT reading in seventeen was a copy. The <strong>Message Log</strong> shows such a reading as '
+        + '<em>heard 2 times</em> or more, with every path it came by, and <strong>Station Health</strong> counts every receiver '
+        + 'that heard it. Readings from before today keep their copies.',
+    ] },
     { n: 173, date: '2026-11-01', items: [
       '📺 The <strong>Network Bulletin</strong> on Mondays is the week\'s: there is no daily that day, so the panel opens on the '
         + 'weekly. The daily runs Tuesday to Friday. The panel now opens on whichever bulletin is newest; pick <em>Daily</em> or '

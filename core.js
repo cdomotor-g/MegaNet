@@ -3827,8 +3827,12 @@ const DB_SCHEMA = 'meganet';
 // applied by db-migrate.yml on 31 October 2026, bumped after. 95: teams and
 // the tasks handed to them, whoami()'s tasks, hands_out, team_owner and teams
 // (0095, tasks.js and admin-teams.js), applied by db-migrate.yml on 1 November
-// 2026, bumped after.
-const DB_SCHEMA_VERSION = 95;
+// 2026, bumped after. 96: one ALERT burst heard several ways is one reading —
+// copies on an ALERT address within app_meta's alert_copy_window_s (8 s)
+// counted on it (0096, #232), applied by db-migrate.yml on 1 November 2026,
+// bumped after; no shape the app reads changes, and health-analysis.js counts
+// the copies in dup_count and dup_paths.
+const DB_SCHEMA_VERSION = 96;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

@@ -181,17 +181,23 @@ const SensorValues = (() => {
     const seenAnchor = new Set();
     for (const r of list) {
       if (r.alert_id == null) continue;
-      const h = hostOf(r.path);
-      if (!heardOn.has(h)) heardOn.set(h, new Set());
-      const set = heardOn.get(h);
-      if (set.has(r.alert_id)) continue;
-      set.add(r.alert_id);
+      // Every receiver that heard it: the kept copy's, and the ones whose
+      // copies were counted on it (dup_paths) — since 0096 all of one ALERT
+      // burst's copies within 8 s, so a receiver whose copies land second
+      // still says where it listens (#232).
+      const hostsHeard = new Set([hostOf(r.path), ...(Array.isArray(r.dup_paths) ? r.dup_paths.map(hostOf) : [])]);
       const c = idx.get(r.alert_id);
-      if (c && c.length === 1 && placed(c[0].station)) {
-        if (!anchorsOn.has(h)) anchorsOn.set(h, []);
-        anchorsOn.get(h).push(c[0].station);
-        const k = c[0].station.id + '|' + r.alert_id;
-        if (!seenAnchor.has(k)) { seenAnchor.add(k); anchorsAll.push(c[0].station); }
+      for (const h of hostsHeard) {
+        if (!heardOn.has(h)) heardOn.set(h, new Set());
+        const set = heardOn.get(h);
+        if (set.has(r.alert_id)) continue;
+        set.add(r.alert_id);
+        if (c && c.length === 1 && placed(c[0].station)) {
+          if (!anchorsOn.has(h)) anchorsOn.set(h, []);
+          anchorsOn.get(h).push(c[0].station);
+          const k = c[0].station.id + '|' + r.alert_id;
+          if (!seenAnchor.has(k)) { seenAnchor.add(k); anchorsAll.push(c[0].station); }
+        }
       }
     }
     const centreOf = sts => sts.length >= MIN_ANCHORS

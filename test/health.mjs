@@ -291,6 +291,30 @@ try {
   ok('a rain gauge tipping every 7 s through a storm is reporting, not corrupted', rules.stormBad === 0 && rules.stormTx === 12, JSON.stringify(rules));
   ok('a battery copy with a bit flipped 2 s after the clean one is a corrupted copy of it', rules.flipBad === 1 && rules.flipTruth === 133, JSON.stringify(rules));
 
+  // Since 0096 one ALERT burst's copies within 8 s are one reading, the other
+  // copies counted on it (dup_count) and their paths in dup_paths (#232).
+  const merged = await page.evaluate(() => {
+    const H = 3600e3, t0 = Date.UTC(2026, 8, 1);
+    const rec = (aid, t, v, path, dups, via) => ({ addr: 'a:' + aid, alert_id: aid, reading_ts: new Date(t).toISOString(), received_at: new Date(t + 2000).toISOString(),
+      value_raw: v, protocol: 1, path, dup_count: dups, dup_paths: via });
+    // A flipped copy heard first, then the clean value heard twice and stored once.
+    const vote = HealthAnalysis._transmissions(HealthAnalysis._normalise([
+      rec(7003, t0, 133 ^ 8, 'serial-monitor/test-pi-sdr1', 0, []),
+      rec(7003, t0 + 1500, 133, 'serial-monitor/test-pi-sdr0', 1, ['serial-monitor/test-pi-sdr2'])]));
+    // Every 10 minutes for 12 hours, Pi A's copy stored and Pi B's, a second
+    // later, counted on it: B heard every one of them.
+    const rows = [];
+    for (let k = 0; k < 72; k++) rows.push(rec(7004, t0 + k * 600e3, 50 + (k % 3), 'serial-monitor/test-pi-a-sdr0', 1, ['serial-monitor/test-pi-b-sdr1']));
+    const rx = HealthAnalysis._receivers(HealthAnalysis._normalise(rows), t0, t0 + 12 * H, t0 + 12 * H);
+    const host = id => rx.find(h => h.host === SensorValues.hostOf('serial-monitor/' + id + '-sdr0'));
+    const a = host('test-pi-a'), b = host('test-pi-b');
+    return { truth: vote[0] && vote[0].v, bad: vote.reduce((n, tx) => n + tx.bad.length, 0), hosts: vote[0] && vote[0].hosts.size,
+      a: a && a.n, b: b && b.n, bPath: b && b.paths.map(p => p.path + ':' + p.n).join(','), bSilentMin: b && Math.round(b.silentFor / 60e3) };
+  });
+  ok('a value heard twice and stored once outvotes a flipped copy heard first', merged.truth === 133 && merged.bad === 1 && merged.hosts === 1, JSON.stringify(merged));
+  ok('a receiver whose copies are all counted on another\'s readings is credited with every one, on its own path',
+    merged.a === 72 && merged.b === 72 && merged.bPath === 'serial-monitor/test-pi-b-sdr1:72' && merged.bSilentMin === 10, JSON.stringify(merged));
+
   // A ghost on a station's own address, and two stations that only look alike.
   const gh = await page.evaluate(() => {
     const H = 3600e3, pop = x => { let n = 0; while (x) { n += x & 1; x >>>= 1; } return n; };

@@ -244,6 +244,7 @@ const HealthAnalysis = (() => {
       const v = Number(r.value_raw);
       if (!isFinite(t) || !isFinite(v)) continue;
       const rt = Date.parse(r.received_at);
+      const via = viaOf(r);
       out.push({
         r, t, rt: isFinite(rt) ? rt : null, v,
         aid: r.alert_id != null ? Number(r.alert_id) : null,
@@ -253,30 +254,70 @@ const HealthAnalysis = (() => {
         lvl: r.rssi_dbm != null ? Number(r.rssi_dbm) : r.level_dbfs != null ? Number(r.level_dbfs) : null,
         lvlUnit: r.rssi_dbm != null ? 'dBm' : r.level_dbfs != null ? 'dBFS' : null,
         snr: r.snr_db != null ? Number(r.snr_db) : null,
+        // Copies of this reading heard again and counted on it (dup_count),
+        // and the other paths they came by (dup_paths). Since 0096 that is
+        // every copy of one ALERT burst within 8 s — direct, through a
+        // repeater or a concentrator, at another base station — so a copy
+        // counts here, not as a row of its own (#232).
+        dups: Math.max(0, Number(r.dup_count) || 0),
+        via,
+        viaHosts: via.map(hostOfPath),
       });
     }
     out.sort((a, b) => a.t - b.t);
     return out;
   }
+  function hostOfPath(p) { return SensorValues.hostOf(p || '') || '(no path)'; }
+  function viaOf(r) {
+    return Array.isArray(r.dup_paths) ? [...new Set(r.dup_paths.filter(p => p && p !== (r.path || '')))] : [];
+  }
+  // Every host a transmission's copies came through, the copies counted on a
+  // reading included.
+  function hostsOf(copies) { return new Set(copies.flatMap(c => [c.host, ...(c.viaHosts || [])])); }
+  // How many copies of a transmission were heard: each stored row and the
+  // copies counted on it.
+  function copiesHeard(copies) { return copies.reduce((n, c) => n + 1 + (c.dups || 0), 0); }
 
   // ── 2. receivers ─────────────────────────────────────────────────────────────
 
   function receivers(recs, t0, t1, now) {
     const hosts = new Map();
+    const hostFor = id => {
+      let h = hosts.get(id);
+      if (!h) hosts.set(id, h = { host: id, paths: new Map(), times: [], lags: [], bins: new Set(), addrs: new Set(), corrupted: 0, sig: [], snr: [] });
+      return h;
+    };
+    const pathFor = (h, path, t) => {
+      let p = h.paths.get(path);
+      if (!p) h.paths.set(path, p = { path, n: 0, first: t, last: t, freq: null, bins: new Set() });
+      p.n++; p.last = t;
+      p.bins.add(Math.floor(t / BIN));
+      return p;
+    };
     for (const x of recs) {
-      let h = hosts.get(x.host);
-      if (!h) hosts.set(x.host, h = { host: x.host, paths: new Map(), times: [], lags: [], bins: new Set(), addrs: new Set(), corrupted: 0, sig: [], snr: [] });
+      const h = hostFor(x.host);
       h.times.push(x.t);
       if (x.rt != null) h.lags.push((x.rt - x.t) / 1000);
       h.bins.add(Math.floor(x.t / BIN));
       if (x.aid != null) h.addrs.add(x.aid);
       if (x.lvl != null) { h.sig.push(x.lvl); h.sigUnit = x.lvlUnit; }
       if (x.snr != null) h.snr.push(x.snr);
-      let p = h.paths.get(x.path);
-      if (!p) h.paths.set(x.path, p = { path: x.path, n: 0, first: x.t, last: x.t, freq: null, bins: new Set() });
-      p.n++; p.last = x.t;
-      p.bins.add(Math.floor(x.t / BIN));
+      const p = pathFor(h, x.path, x.t);
       if (x.r.freq_mhz != null && p.freq == null) p.freq = Number(x.r.freq_mhz);
+      // The other paths that heard it (dup_paths) heard it too, at its time —
+      // a receiver whose copies land second is not one gone quiet (#232).
+      // A host is counted once a reading however many of its channels heard it.
+      const counted = new Set([x.host]);
+      x.via.forEach((vp, i) => {
+        const vh = x.viaHosts[i], h2 = hostFor(vh);
+        if (!counted.has(vh)) {
+          counted.add(vh);
+          h2.times.push(x.t);
+          h2.bins.add(Math.floor(x.t / BIN));
+          if (x.aid != null) h2.addrs.add(x.aid);
+        }
+        pathFor(h2, vp, x.t);
+      });
     }
     const list = [];
     hosts.forEach(h => {
@@ -366,7 +407,7 @@ const HealthAnalysis = (() => {
       const flush = () => {
         if (!cur) return;
         const votes = new Map();
-        cur.copies.forEach(c => votes.set(c.v, (votes.get(c.v) || 0) + 1));
+        cur.copies.forEach(c => votes.set(c.v, (votes.get(c.v) || 0) + 1 + (c.dups || 0)));
         let best = null, bestN = -1, tie = false;
         votes.forEach((n, v) => { if (n > bestN) { best = v; bestN = n; tie = false; } else if (n === bestN) tie = true; });
         if (tie) {
@@ -391,11 +432,11 @@ const HealthAnalysis = (() => {
           const vals = [...new Set(cur.copies.map(c => c.v))].filter(v => v !== best);
           vals.forEach(v => {
             const copies = cur.copies.filter(c => c.v === v);
-            mine.push({ addr, aid: cur.aid, t: copies[0].t, v, copies, bad: [], hosts: new Set(copies.map(c => c.host)) });
+            mine.push({ addr, aid: cur.aid, t: copies[0].t, v, copies, bad: [], hosts: hostsOf(copies) });
           });
           cur.copies = cur.copies.filter(c => c.v === best);
         }
-        cur.hosts = new Set(cur.copies.map(c => c.host));
+        cur.hosts = hostsOf(cur.copies);
         mine.push(cur);
         prevV = best;
         cur = null;
@@ -432,11 +473,11 @@ const HealthAnalysis = (() => {
       if (!moved.size) return;
       moved.forEach(v => {
         const copies = tx.copies.filter(c => c.v === v);
-        extra.push({ addr: tx.addr, aid: tx.aid, t: copies[0].t, v, copies, bad: [], hosts: new Set(copies.map(c => c.host)), rapid: true });
+        extra.push({ addr: tx.addr, aid: tx.aid, t: copies[0].t, v, copies, bad: [], hosts: hostsOf(copies), rapid: true });
       });
       tx.copies = tx.copies.filter(c => !moved.has(c.v));
       tx.bad = tx.bad.filter(b => !moved.has(b.x.v));
-      tx.hosts = new Set(tx.copies.map(c => c.host));
+      tx.hosts = hostsOf(tx.copies);
     });
     return extra;
   }
@@ -936,7 +977,7 @@ const HealthAnalysis = (() => {
       A.bad += tx.bad.length;
       S.txs.push(tx);
       tx.hosts.forEach(h => S.hosts.add(h));
-      new Set(tx.copies.map(c => c.path)).forEach(p => S.pathN.set(p, (S.pathN.get(p) || 0) + 1));
+      new Set(tx.copies.flatMap(c => [c.path, ...c.via])).forEach(p => S.pathN.set(p, (S.pathN.get(p) || 0) + 1));
     }
     rx.forEach(h => { h.corrupted = hostCorrupt.get(h.host) || 0; });
 
@@ -1895,7 +1936,7 @@ const HealthAnalysis = (() => {
     }
     return {
       t, from, to, slot: outcome ? { t: slot.t, outcome } : null,
-      mine: mine.map(tx => ({ t: tx.t, addr: tx.addr, aid: tx.aid, v: tx.v, copies: tx.copies.length, bad: tx.bad.map(b => ({ v: b.x.v, bits: b.bits, host: b.x.host })), ghosts: tx.ghosts || 0 })),
+      mine: mine.map(tx => ({ t: tx.t, addr: tx.addr, aid: tx.aid, v: tx.v, copies: copiesHeard(tx.copies), bad: tx.bad.map(b => ({ v: b.x.v, bits: b.bits, host: b.x.host })), ghosts: tx.ghosts || 0 })),
       receivers: rxNear, othersDelivering, peers: peerRows, netEvent: ev || null, verdict,
     };
   }
@@ -1912,7 +1953,8 @@ const HealthAnalysis = (() => {
     const conv = v => SensorValues.convert(sen.kind, v, S.st);
     const onSlot = S.slots ? S.slots.some(sl => sl.burst && sl.burst.txs.includes(tx)) : false;
     return {
-      kind: sen.kind, tx: { t: tx.t, v: tx.v, conv: conv(tx.v), copies: tx.copies.map(c => ({ host: c.host, path: c.path, v: c.v, t: c.t, lvl: c.lvl, lvlUnit: c.lvlUnit })),
+      kind: sen.kind, tx: { t: tx.t, v: tx.v, conv: conv(tx.v), copies: tx.copies.map(c => ({ host: c.host, path: c.path, v: c.v, t: c.t, lvl: c.lvl, lvlUnit: c.lvlUnit, again: c.dups, via: c.via })),
+                           heard: copiesHeard(tx.copies), paths: [...new Set(tx.copies.flatMap(c => [c.path, ...c.via]))],
                            bad: tx.bad.map(b => ({ v: b.x.v, bits: b.bits, dtS: round(b.dt / 1000, 1), host: b.x.host })) },
       prev: prev ? { t: prev.t, v: prev.v, conv: conv(prev.v), dt: tx.t - prev.t } : null,
       next: next ? { t: next.t, v: next.v, conv: conv(next.v), dt: next.t - tx.t } : null,
@@ -2056,9 +2098,12 @@ const HealthAnalysis = (() => {
 
   return {
     run, contextAt, readingContext, demoWorld,
+    // How many copies of a transmission were heard: its rows and the copies
+    // counted on them (dup_count, 0096).
+    copiesHeard,
     // The arithmetic, for test/health.mjs.
     _detectSchedule: detectSchedule, _theilSen: theilSen, _batteryOf: batteryOf, _rainOf: rainOf,
-    _transmissions: transmissions, _normalise: normalise, _pop: pop,
+    _transmissions: transmissions, _normalise: normalise, _pop: pop, _receivers: receivers,
     // A rain gauge's tips with the counter's wraps, resets and corrupted
     // frames taken out, and the one-reading spikes a battery or a level
     // leaves out — for the station editor's sparklines too

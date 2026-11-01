@@ -1024,7 +1024,7 @@ const Health = (() => {
       <div class="hl-lens-reading">
         <b>${esc(SensorValues.kindLabel(C.kind) || 'Reading')} ${esc(String(C.tx.v))}${C.tx.conv && C.tx.conv.value != null ? ` = ${esc(C.tx.conv.text)}` : ''}</b>
         <span class="small">${C.onSlot ? 'part of a scheduled check' : 'off its schedule — an event report'} ·
-          heard ${C.tx.copies.length} time${C.tx.copies.length === 1 ? '' : 's'} (${esc([...new Set(C.tx.copies.map(c => c.path))].join(', '))})</span>
+          heard ${C.tx.heard} time${C.tx.heard === 1 ? '' : 's'} (${esc(C.tx.paths.join(', '))})</span>
         ${C.tx.bad.length ? `<span class="small txt-warn">${C.tx.bad.length} corrupted cop${C.tx.bad.length === 1 ? 'y' : 'ies'} stored beside it: ${C.tx.bad.map(b => `${b.v} (${b.bits} bit${b.bits === 1 ? '' : 's'}, ${b.dtS} s later)`).join(', ')}</span>` : ''}
         <span class="small">Before it: ${C.prev ? `${esc(String(C.prev.v))}${C.prev.conv && C.prev.conv.value != null ? ' = ' + esc(C.prev.conv.text) : ''}, ${esc(HealthAnalysis.fmtSpan(C.prev.dt))} earlier` : 'nothing in the window'}.
           After it: ${C.next ? `${esc(String(C.next.v))}${C.next.conv && C.next.conv.value != null ? ' = ' + esc(C.next.conv.text) : ''}, ${esc(HealthAnalysis.fmtSpan(C.next.dt))} later` : 'nothing yet'}.</span>
@@ -1219,7 +1219,7 @@ const Health = (() => {
                     aria-pressed="${sel}" title="This reading in context">${esc(fmtTs(tx.t))}</button></td>
               <td>${esc(SensorValues.kindLabel(k) || tx.addr)}</td>
               <td>${esc(String(tx.v))}${conv && conv.value != null ? ` <span class="small">= ${esc(conv.text)}</span>` : ''}</td>
-              <td>${tx.copies.length}</td>
+              <td>${HealthAnalysis.copiesHeard(tx.copies)}</td>
               <td>${tx.bad.length ? `<span class="txt-warn">${tx.bad.map(b => b.x.v).join(', ')}</span>` : ''}</td></tr>`;
           }).join('')}</tbody>
         </table>
