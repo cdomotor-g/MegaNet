@@ -1692,6 +1692,14 @@ const MessageLog = (() => {
   // Every fetched row and every column, whatever the views are hiding — the
   // narrow view is a reading aid, not a statement about the record.
 
+  // A text cell that a spreadsheet would read as a formula (a leading = + - @,
+  // tab or return) gets a leading apostrophe, so strings a device reported open
+  // as text. Text columns only: the numeric ones keep their minus signs.
+  function csvText(s) {
+    s = String(s ?? '');
+    return csvEscape(/^[=+\-@\t\r]/.test(s) ? "'" + s : s);
+  }
+
   function exportCsv() {
     const rows = ml.rows || [];
     if (!rows.length) return;
@@ -1710,13 +1718,13 @@ const MessageLog = (() => {
       const v = rowValueOf(r, res);
       lines.push([
         csvEscape(r.reading_ts), csvEscape(r.received_at), csvEscape(r.addr),
-        r.alert_id ?? '', csvEscape(r.station_number || ''), csvEscape(r.channel || ''),
-        csvEscape(res.st ? res.st.name : ''), csvEscape(r.station_id || res.st?.id || ''),
-        r.value_raw ?? '', r.value ?? '', csvEscape(r.unit || ''), csvEscape(r.conversion || ''),
+        r.alert_id ?? '', csvText(r.station_number || ''), csvText(r.channel || ''),
+        csvText(res.st ? res.st.name : ''), csvEscape(r.station_id || res.st?.id || ''),
+        r.value_raw ?? '', r.value ?? '', csvText(r.unit || ''), csvText(r.conversion || ''),
         csvEscape(vocabKey('quality', r.quality)), csvEscape(vocabKey('protocol', r.protocol)),
-        csvEscape(vocabKey('source', r.source)), csvEscape(r.path || ''),
+        csvEscape(vocabKey('source', r.source)), csvText(r.path || ''),
         r.freq_mhz ?? '', r.rssi_dbm ?? '', r.level_dbfs ?? '', r.snr_db ?? '',
-        r.dup_count ?? 0, csvEscape((r.dup_paths || []).join(' | ')), r.raw_id ?? '',
+        r.dup_count ?? 0, csvText((r.dup_paths || []).join(' | ')), r.raw_id ?? '',
         csvEscape(sensorLabel(res)),
         v && v.value != null ? v.value : '', csvEscape(v && v.value != null ? v.unit || '' : ''),
         v ? (v.inferred ? 'true' : 'false') : '', csvEscape(v ? v.rule + (v.note ? ' — ' + v.note : '') : ''),
