@@ -106,6 +106,15 @@
 // nothing; what SiteFeatures does differently while this view is up — a lower
 // zoom floor, for a camera that sees kilometres — is that file's ("Tilted").
 //
+// The route to a station (map-drive.js) is the seventh, and the photos'
+// arrangement once more: `MapDrive.plan()` is what 🛣️ Route on map drew — the
+// stretches in the order they are driven, each with 2-D's own colours — read
+// into a source of its own (`mn-drive`) and draped, so the road climbs the
+// range it climbs. And it is the one thing here that can take the camera:
+// while the route is driven (map-drive-mode.js), the camera is put where the
+// car is, heading up and tilted, every frame, and what would otherwise move
+// with it holds still (see "Driving", below).
+//
 // The Queensland cadastre — Map display's property boundaries (map-lots.js)
 // and road parcels (map-roads.js), the layers Queensland Globe draws — is
 // draped like the elevation ramp rather than mirrored like the pins: each of
@@ -287,6 +296,10 @@ const Map3D = (function () {
   let lfMoving = false;  // the 2-D map was moved, and the camera has not followed yet
   let lfQuiet  = false;  // this file is moving one map to match the other
   let lfZoom   = null;   // the 2-D map's zoom as this file last left it
+  let drive    = null;   // { gesture } while a drive has the camera (see "Driving")
+  let puck     = null;   // the car, an arrow lying on the ground (ml.Marker), while driving
+  let tags     = new Map(); // station id → the ml.Marker naming it, while driving
+  let driveEase = false; // the drive's first frame eases in from wherever the camera was
 
   // ── base maps ────────────────────────────────────────────────────────────
   // The five the 2-D map already offers, as MapLibre raster sources. They are
@@ -1010,6 +1023,255 @@ const Map3D = (function () {
     return { head: p.title, sub: `${p.name} · ${p.sub} · click for more` };
   }
 
+  // ── The route to a station, draped (map-drive.js) ───────────────────────
+  // MapDrive.plan() is what 2-D drew: the stretches in the order they are
+  // driven, each with its look, and where the drive starts. While the route
+  // is being driven, the stretches are the drive's own copy of it
+  // (DriveMode.plan) — the route it is following, which stays on screen while
+  // a new one is asked for from where the car has gone — and the start's dot
+  // goes: the car is past it. Rebuilt whenever either says it changed; a
+  // route is a few thousand points at most and changes when it is asked for,
+  // not as the car moves.
+  //
+  // The widths are 2-D's at the zooms the network is looked at from, and
+  // grow past them: a draped line is drawn into the ground at the tile's own
+  // scale and seen at a slant, and the road ahead of a car at zoom 16 would be
+  // a hairline at 2-D's 4.5 px.
+  const ROUTE_GAP_PX = 10;    // 2-D's '2,8' dots: one every ten pixels
+  function routeWidth(extra) {
+    const w = ['+', ['get', 'w'], extra];
+    return ['interpolate', ['linear'], ['zoom'], 11, w, 14, ['*', w, 1.4], 17, ['*', w, 2.2]];
+  }
+
+  function routePlan() {
+    const d = typeof DriveMode !== 'undefined' && DriveMode.plan ? DriveMode.plan() : null;
+    if (d) return d;
+    return typeof MapDrive !== 'undefined' && MapDrive.plan ? MapDrive.plan() : null;
+  }
+
+  function routeFeatures() {
+    const p = routePlan();
+    const out = [];
+    for (const l of (p && p.legs) || []) {
+      if (!l.pts || l.pts.length < 2) continue;
+      out.push({ type: 'Feature',
+        properties: { kind: l.kind, colour: l.look.color, casing: l.look.casing, w: l.look.weight },
+        geometry: { type: 'LineString', coordinates: l.pts.map(q => [q[1], q[0]]) } });
+    }
+    if (p && p.start && !drive) {
+      out.push({ type: 'Feature',
+        properties: { kind: 'start', colour: p.startLook.color, casing: p.startLook.casing, w: 0 },
+        geometry: { type: 'Point', coordinates: [p.start[1], p.start[0]] } });
+    }
+    return { type: 'FeatureCollection', features: out };
+  }
+
+  // The route's layers are shown only while there is a route: MapLibre counts
+  // a source as in use, and puts its credit in the ⓘ, whenever a shown layer
+  // draws from it — and a route's credit with no route on the map is a credit
+  // for nothing.
+  const ROUTE_LAYERS = ['mn-drive-casing', 'mn-drive-gap-casing', 'mn-drive-line', 'mn-drive-gap',
+                        'mn-drive-start', 'mn-drive-start-dot'];
+  function syncRoute() {
+    if (!map || !ready) return;
+    const src = map.getSource('mn-drive');
+    if (!src) return;
+    const data = routeFeatures();
+    src.setData(data);
+    const vis = data.features.length ? 'visible' : 'none';
+    for (const id of ROUTE_LAYERS) {
+      if (map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== vis) map.setLayoutProperty(id, 'visibility', vis);
+    }
+  }
+
+  // ── Driving (map-drive-mode.js) ─────────────────────────────────────────
+  // While a drive is followed the camera is the drive's: DriveMode puts it
+  // where the car is, heading up, tilted and close, every frame (driveFrame),
+  // with the car an arrow lying on the road a little below the middle of the
+  // view, so most of the screen is the road ahead. What would otherwise move
+  // with the camera holds still for it — the 2-D map under the canvas (put
+  // where the drive ended when it ends: onCameraEnd), the minimap, the
+  // rising water and the sheets, the needle and the quad — and what is not
+  // about the road goes: the radio paths, which draped at this zoom read as
+  // roads; the hover label and the hint; and the click on a pin, whose card
+  // would cover the road. The pins stay, and the stations nearest ahead are
+  // named over theirs (driveTags).
+  //
+  // A drag, a pinch or a turn by hand is the driver looking round: the drive
+  // is told (`gesture`), stops putting the camera back, and offers to. It is
+  // heard from the press itself (onDrivePress), not from MapLibre's own
+  // events: putting the camera somewhere stops MapLibre's gestures (jumpTo
+  // calls stop()), so a camera put over the car every frame stopped every
+  // drag before it had moved far enough to begin. So while a button or a
+  // finger is down on the view the camera is held still under it; a press
+  // that moves past DRIVE_PRESS_PX, a wheel or a camera key is a look
+  // round; and one let go where it went down is a tap, and the drive goes on
+  // following.
+  const DRIVE_LINKS = ['mn-links-casing', 'mn-links'];
+  const DRIVE_PRESS_PX = 4;
+
+  function lookedRound() {
+    if (!drive) return;
+    drive.press = null;
+    if (drive.gesture) drive.gesture();
+  }
+
+  function onDrivePress(e) {
+    if (!drive || !map || !map.getCanvasContainer().contains(e.target)) return;
+    drive.press = { x: e.clientX, y: e.clientY };
+  }
+
+  function onDriveMove(e) {
+    if (drive && drive.press && Math.hypot(e.clientX - drive.press.x, e.clientY - drive.press.y) > DRIVE_PRESS_PX) lookedRound();
+  }
+
+  function onDriveUp() { if (drive) drive.press = null; }
+
+  function onDriveWheel(e) {
+    if (drive && map && map.getCanvasContainer().contains(e.target)) lookedRound();
+  }
+
+  function onDriveKey(e) {
+    if (drive && map && e.target === map.getCanvas() && /^(Arrow\w+|\+|-|=|_)$/.test(e.key)) lookedRound();
+  }
+
+  function listenForDrive(on) {
+    if (!host) return;
+    const how = on ? 'addEventListener' : 'removeEventListener';
+    host[how]('pointerdown', onDrivePress, true);
+    host[how]('wheel', onDriveWheel, { capture: true, passive: true });
+    host[how]('keydown', onDriveKey, true);
+    document[how]('pointermove', onDriveMove, true);
+    document[how]('pointerup', onDriveUp, true);
+    document[how]('pointercancel', onDriveUp, true);
+  }
+
+  function puckEl() {
+    const el = document.createElement('div');
+    el.className = 'mn-drive-puck';
+    el.setAttribute('aria-hidden', 'true');
+    el.innerHTML = '<svg viewBox="0 0 48 48" width="48" height="48"><circle cx="24" cy="24" r="21" class="mn-drive-puck-halo"/>'
+      + '<path d="M24 7 L37 38 L24 31 L11 38 Z" class="mn-drive-puck-arrow"/></svg>';
+    return el;
+  }
+
+  // Applied when the drive takes the camera, and again on a style that loads
+  // while it has it.
+  function holdForDrive() {
+    if (!map || !ready || !drive) return;
+    for (const id of DRIVE_LINKS) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
+    dropWater();
+    hideTip();
+    if (typeof MapMini !== 'undefined' && MapMini.camera) MapMini.camera(null);
+    syncRoute();
+    foldCredit();
+  }
+
+  // The credits, folded to their ⓘ while driving. MapLibre opens them the
+  // first time they have anything to say — as the sources load, after the
+  // drive has started — and folds them at the first drag, and a drive never
+  // drags: on a phone they were six lines over the car. So they are folded
+  // again after every update of them (build(): MapLibre's own listener was
+  // added first), unless the driver has opened them with the ⓘ.
+  function foldCredit() {
+    if (!drive || drive.creditOpen || !host) return;
+    const credit = host.querySelector('.maplibregl-ctrl-attrib.maplibregl-compact-show');
+    if (credit) credit.classList.remove('maplibregl-compact-show');
+  }
+
+  // …and given back. The camera keeps where the car was and its heading, and
+  // is lifted out of the street: back to this view's own tilt, at a zoom that
+  // shows the country round it. Its moveend puts the 2-D map there. A jump,
+  // not an ease: the map's panel is going back into the page as this runs,
+  // and MapLibre 6's resize() stops an ease part-way (it asks the map, not
+  // its camera, whether it is moving) — which left the drive's padding on a
+  // camera nobody was driving.
+  function releaseDrive() {
+    listenForDrive(false);
+    if (puck) { try { puck.remove(); } catch (_) {} }
+    puck = null;
+    for (const m of tags.values()) { try { m.remove(); } catch (_) {} }
+    tags.clear();
+    if (host) host.classList.remove('is-driving');
+    if (!map || !ready) return;
+    for (const id of DRIVE_LINKS) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
+    syncWater();
+    syncRoute();
+    if (typeof MapMini !== 'undefined' && MapMini.camera) MapMini.camera(map);
+    map.jumpTo({ padding: { top: 0, bottom: 0, left: 0, right: 0 }, pitch: PITCH_HOME,
+                 zoom: Math.min(map.getZoom(), 14) });
+    syncCamera();
+  }
+
+  // The stations to name: the drive's list, nearest first, cut to the ones
+  // this camera can see — in front of it and inside the canvas, standing on
+  // the ground where MapLibre draws them — and to `max` of them besides the
+  // station driven to. A name for a pin off the edge of the view is a name
+  // over nothing. What was named is handed back.
+  // Where a name goes: over its pin, or under it when the banner leaves no
+  // room over it, slid sideways to stay whole — or null when it cannot. Its
+  // box comes from its words, wide enough to judge an overlap by without
+  // laying the name out first.
+  const TAG_H = 22, TAG_LIFT = 10;
+  function tagPlace(t, p, w, hi, lo) {
+    const width = 6.6 * (String(t.name).length + String(t.dist).length + (t.dest ? 3 : 1)) + 18;
+    if (width > w - 4 || p.y < hi || p.y > lo) return null;
+    const dx = Math.max(2 - (p.x - width / 2), Math.min(0, (w - 2) - (p.x + width / 2)));
+    const above = p.y - TAG_LIFT - TAG_H >= hi;
+    if (!above && p.y + TAG_LIFT + TAG_H > lo) return null;
+    const top = above ? p.y - TAG_LIFT - TAG_H : p.y + TAG_LIFT;
+    return { l: p.x + dx - width / 2, r: p.x + dx + width / 2, t: top, b: top + TAG_H,
+             offset: [Math.round(dx), Math.round((above ? -1 : 1) * (TAG_LIFT + TAG_H / 2))] };
+  }
+
+  function driveTagsNow(list, { max = Infinity, top = 0, bottom = Infinity } = {}) {
+    if (!map || !ready || !drive) return [];
+    const keep = new Set();
+    const shown = [];
+    const boxes = [];
+    const w = map.getContainer().clientWidth;
+    const lo = Math.min(isFinite(bottom) ? bottom : Infinity, map.getContainer().clientHeight);
+    const hi = isFinite(top) ? top : 0;
+    let others = 0;
+    for (const t of list || []) {
+      if (!t || t.id == null || !isFinite(t.lat) || !isFinite(t.lon)) continue;
+      if (!t.dest && others >= max) continue;
+      const ll = new ml.LngLat(t.lon, t.lat);
+      if (pinScale(ll) == null) continue;
+      const p = map.project(ll);
+      if (!p || !isFinite(p.x) || !isFinite(p.y)) continue;
+      // Whole, between the banner and the foot, and clear of every name
+      // already given — the station driven to first, then the nearest.
+      const box = tagPlace(t, p, w, hi, lo);
+      if (!box) continue;
+      if (boxes.some(o => box.l < o.r + 4 && box.r > o.l - 4 && box.t < o.b + 2 && box.b > o.t - 2)) continue;
+      boxes.push(box);
+      if (!t.dest) others++;
+      shown.push(t);
+      keep.add(t.id);
+      let m = tags.get(t.id);
+      if (!m) {
+        const el = document.createElement('div');
+        el.className = 'mn-drive-tag';
+        el.setAttribute('aria-hidden', 'true');
+        m = new ml.Marker({ element: el, anchor: 'center', offset: box.offset }).setLngLat([t.lon, t.lat]).addTo(map);
+        tags.set(t.id, m);
+      } else {
+        m.setLngLat([t.lon, t.lat]);
+        m.setOffset(box.offset);
+      }
+      const el = m.getElement();
+      const key = `${t.name}|${t.dist}|${t.dest ? 1 : 0}`;
+      if (el.dataset.key !== key) {
+        el.dataset.key = key;
+        el.classList.toggle('is-dest', !!t.dest);
+        el.innerHTML = `<span class="mn-drive-tag-n">${t.dest ? '🏁 ' : ''}${esc(t.name)}</span> <span class="mn-drive-tag-d">${esc(t.dist)}</span>`;
+      }
+    }
+    for (const [id, m] of tags) if (!keep.has(id)) { try { m.remove(); } catch (_) {} tags.delete(id); }
+    return shown;
+  }
+
   // ── The pin being moved (map-move-pin.js) ───────────────────────────────
   // MapMovePin's marker is a Leaflet L.Marker, and this canvas covers every
   // Leaflet pane: armed in 3-D, the mode came up with its panel in the corner
@@ -1207,6 +1469,8 @@ const Map3D = (function () {
   function hoverNow() {
     tipFrame = 0;
     if (!map || !tipAt) return;
+    // A drive has the camera, and nothing on the map is a target ("Driving").
+    if (drive) { hideTip(); return; }
     const canvas = map.getCanvas();
     // An armed tool's crosshair is syncDrawTool's, and every click is a vertex.
     if (drawArmed()) { hideTip(); return; }
@@ -1853,7 +2117,7 @@ const Map3D = (function () {
       this.prog = this.vbo = this.uploaded = this.map = null;
     },
     render(gl, args) {
-      if (!buf || !this.prog) return;
+      if (!buf || !this.prog || drive) return;
       // MapLibre 5 hands `render` a RenderArgs object whose
       // defaultProjectionData.mainMatrix is the one to use (it is the globe-safe
       // path as well as the mercator one). Earlier majors passed the matrix
@@ -1946,9 +2210,40 @@ const Map3D = (function () {
         'mn-draw-live': { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
         // The stations' site features (syncSiteFeat), filled the same way.
         'mn-sitefeat':  { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+        // The route to a station (syncRoute), filled the same way, with the
+        // router's credit — the route panel's own line, which is out of sight
+        // while the route is driven.
+        'mn-drive':     { type: 'geojson', data: { type: 'FeatureCollection', features: [] },
+                          attribution: 'Route © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors, by Valhalla' },
       },
       layers: [
         { id: 'mn-base', type: 'raster', source: 'mn-base' },
+        // ── The route to a station (map-drive.js, syncRoute) ─────────────
+        // Under the links and over the ground's rasters, where its pane is in
+        // 2-D (395, under the links at 400) — GROUND lists the four, so a
+        // cadastre switched on later goes under them. 2-D's casing, then the
+        // road's blue or the track's green, and what is not mapped dotted
+        // white on a dark casing, each dot of the casing under a dot of the
+        // line: MapLibre measures a dash in the line's own width, so the two
+        // patterns are 2-D's ten pixels apart divided by each one's width.
+        { id: 'mn-drive-casing', type: 'line', source: 'mn-drive',
+          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!=', ['get', 'kind'], 'gap']],
+          layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' },
+          paint: { 'line-color': ['get', 'casing'], 'line-opacity': 0.85, 'line-width': routeWidth(3.5) } },
+        { id: 'mn-drive-gap-casing', type: 'line', source: 'mn-drive',
+          filter: ['==', ['get', 'kind'], 'gap'],
+          layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' },
+          paint: { 'line-color': ['get', 'casing'], 'line-opacity': 0.85, 'line-width': routeWidth(3.5),
+                   'line-dasharray': ['literal', [0, ROUTE_GAP_PX / 6]] } },
+        { id: 'mn-drive-line', type: 'line', source: 'mn-drive',
+          filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!=', ['get', 'kind'], 'gap']],
+          layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' },
+          paint: { 'line-color': ['get', 'colour'], 'line-width': routeWidth(0) } },
+        { id: 'mn-drive-gap', type: 'line', source: 'mn-drive',
+          filter: ['==', ['get', 'kind'], 'gap'],
+          layout: { 'line-cap': 'round', 'line-join': 'round', visibility: 'none' },
+          paint: { 'line-color': ['get', 'colour'], 'line-width': routeWidth(0),
+                   'line-dasharray': ['literal', [0, ROUTE_GAP_PX / 2.5]] } },
         // The elevation drape goes between the base and the links, and is added
         // by syncElevation() rather than declared here: it is off by default,
         // its tile template carries the relief switch, and a source whose URL
@@ -2091,6 +2386,15 @@ const Map3D = (function () {
           layout: { 'icon-image': ['get', 'icon'],
                     'icon-allow-overlap': true, 'icon-ignore-placement': true },
           paint: { 'icon-opacity-transition': { duration: 0, delay: 0 } } },
+        // Where the route starts: 2-D's ringed dot, standing on the ground
+        // under the pins as its pane is under theirs.
+        { id: 'mn-drive-start', type: 'circle', source: 'mn-drive',
+          filter: ['==', ['get', 'kind'], 'start'], layout: { visibility: 'none' },
+          paint: { 'circle-radius': 5.5, 'circle-color': '#ffffff',
+                   'circle-stroke-color': ['get', 'casing'], 'circle-stroke-width': 3 } },
+        { id: 'mn-drive-start-dot', type: 'circle', source: 'mn-drive',
+          filter: ['==', ['get', 'kind'], 'start'], layout: { visibility: 'none' },
+          paint: { 'circle-radius': 3, 'circle-color': ['get', 'colour'] } },
         // The Bureau's forecast and information locations' outlines
         // (map-symbols.js): 2-D's pink, as a ring round the pin's own —
         // solid for a forecast location, dashed for an information one.
@@ -2234,7 +2538,9 @@ const Map3D = (function () {
   // The ground's raster stack, bottom up: a layer added later goes under the
   // first of the ones above it that exists, so the order never depends on
   // which was added first.
-  const GROUND = ['mn-base', 'mn-elev', 'mn-water', 'mn-polar', 'mn-lots', 'mn-roads', 'mn-links-casing', 'mn-links'];
+  const GROUND = ['mn-base', 'mn-elev', 'mn-water', 'mn-polar', 'mn-lots', 'mn-roads',
+                  'mn-drive-casing', 'mn-drive-gap-casing', 'mn-drive-line', 'mn-drive-gap',
+                  'mn-links-casing', 'mn-links'];
 
   function under(id) {
     const above = GROUND.slice(GROUND.indexOf(id) + 1);
@@ -2356,7 +2662,9 @@ const Map3D = (function () {
                 lastDraw: 0, lastLine: 0, raf: 0, rangeTimer: 0, colours: null, scale: null };
   let waterClock = null;   // the check's seam: a shorter cycle (Map3D._waterClock)
 
-  function waterShown() { return !!state.map3dWater && !!map && ready; }
+  // Not while a drive has the camera: an animation over the road ahead is
+  // the last thing a driver needs, and the switch is left as it was.
+  function waterShown() { return !!state.map3dWater && !!map && ready && !drive; }
 
   function reducedMotion() {
     try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return false; }
@@ -2509,7 +2817,7 @@ const Map3D = (function () {
   // and the range needs terrain drawn, which comes a few frames later.
   function syncWater() {
     if (!map || !ready) return;
-    if (!state.map3dWater) { dropWater(); return; }
+    if (!state.map3dWater || drive) { dropWater(); return; }
     if (!map.getSource(WATER_DEM)) {
       map.addSource(WATER_DEM, { type: 'raster-dem', tiles: [DEM_URL], tileSize: DEM_TILE_PX,
                                  maxzoom: DEM_MAXZOOM, encoding: 'terrarium' });
@@ -2871,7 +3179,7 @@ const Map3D = (function () {
   // answer for ground that is not under them any more (a pin drawn at one
   // place is reported seven pixels from it) until somebody drags the map.
   function follow() {
-    if (!map || !leafletLive()) return;
+    if (!map || !leafletLive() || drive) return;
     const c = leaflet.getCenter(), z = leaflet.getZoom();
     const zoom = z === lfZoom ? map.getZoom() : Math.max(0, z - 1);
     lfZoom = z;
@@ -2892,7 +3200,8 @@ const Map3D = (function () {
   // every `moveend` listener on the 2-D map (labels, rivers, contours…)
   // running again for no move.
   function onCameraEnd(e) {
-    if (lfQuiet || !map || !leafletLive()) return;
+    // A drive moves the camera every frame; the 2-D map is put where it ended.
+    if (lfQuiet || !map || !leafletLive() || drive) return;
     if (lfMoving && !(e && e.originalEvent)) return;
     lfMoving = false;
     const c = map.getCenter(), z = map.getZoom() + 1;
@@ -2946,8 +3255,10 @@ const Map3D = (function () {
     // and each costs two `innerHTML` writes on a 15 px SVG; `moveend` was the
     // alternative and it is the wrong one, because the whole value of a needle
     // is that it moves *with* the map you are turning.
-    map.on('rotate', syncCamera);
-    map.on('pitch', syncCamera);
+    // Not while a drive turns the camera every frame: the two are behind its
+    // screen, and are drawn again when it ends (releaseDrive).
+    map.on('rotate', () => { if (!drive) syncCamera(); });
+    map.on('pitch', () => { if (!drive) syncCamera(); });
 
     // The station card's leader (map-leader.js) is drawn over this canvas while
     // it is up, to where MapLibre puts the pin (pinAt) — so it is redrawn in
@@ -2991,6 +3302,9 @@ const Map3D = (function () {
       // again at the floor it keeps for this view.
       syncSiteFeat();
       if (typeof SiteFeatures !== 'undefined' && SiteFeatures.refresh) SiteFeatures.refresh();
+      // And the route to a station, and a drive that already has the camera.
+      syncRoute();
+      holdForDrive();
       // And the rising water, unless it has been turned off.
       syncWater();
       applyDim();
@@ -3012,7 +3326,7 @@ const Map3D = (function () {
       // boundaries on it, which reads as one big lot. Counted and said.
       if (src in cadKeys) { cadFails[src] = (cadFails[src] || 0) + 1; setNote(); }
     });
-    map.on('moveend', () => { if (state.map3dSheets) queueSheets(); });
+    map.on('moveend', () => { if (state.map3dSheets && !drive) queueSheets(); });
     // The 2-D map under the canvas goes where the camera stopped (see "One
     // view" above).
     map.on('moveend', onCameraEnd);
@@ -3046,6 +3360,8 @@ const Map3D = (function () {
     // layer-scoped listener and a plain one both fire, in registration order —
     // so the order is written out here instead of relied upon.
     map.on('click', e => {
+      // A drive has the camera: a tap is not a pin's card over the road.
+      if (drive) { stopBubbling(e); return; }
       // Draw & measure, armed: the click is a vertex wherever it lands — on a
       // pin, on a path or on bare ground — ahead of everything below, because
       // in 2-D arming a tool takes every pin and line out of the pointer's way
@@ -3229,6 +3545,18 @@ const Map3D = (function () {
     });
     map.on('mouseout', () => { tipAt = null; hideTip(); });
     map.on('movestart', hideTip);
+    // The credits kept folded while driving (foldCredit), and the ⓘ heard.
+    map.on('sourcedata', foldCredit);
+    map.on('styledata', foldCredit);
+    host.addEventListener('click', e => {
+      const b = drive && e.target && e.target.closest && e.target.closest('.maplibregl-ctrl-attrib-button');
+      const c = b && b.closest('.maplibregl-ctrl-attrib');
+      if (c) drive.creditOpen = c.classList.contains('maplibregl-compact-show');
+    });
+    // A drag, a pinch, a wheel or a key on the canvas while a drive has the
+    // camera: the driver looking round ("Driving"). This file's own moves
+    // carry no originalEvent.
+    map.on('movestart', e => { if (drive && drive.gesture && e && e.originalEvent) drive.gesture(); });
   }
 
   function syncLeader() {
@@ -3847,6 +4175,109 @@ const Map3D = (function () {
     // switch, signing in or out, a feature saved or shown from the card. Two
     // early returns while 3-D is shut.
     siteFeaturesChanged() { syncSiteFeat(); },
+    // 🛣️ Route on map drew again or took its route down (map-drive.js), or a
+    // drive took the route over or let it go (map-drive-mode.js). Two early
+    // returns while 3-D is shut.
+    routeChanged() { syncRoute(); },
+
+    // ── For the drive (map-drive-mode.js; "Driving" above) ──
+    // The camera handed to a drive, or taken back. `gesture` is called when
+    // somebody moves the camera by hand while the drive has it. Handed over
+    // before the style has loaded, it is applied when it does.
+    drive(on, opts = {}) {
+      if (on) {
+        drive = { gesture: typeof opts.gesture === 'function' ? opts.gesture : null, press: null };
+        driveEase = true;
+        if (host) host.classList.add('is-driving');
+        listenForDrive(true);
+        holdForDrive();
+        return true;
+      }
+      if (!drive) return false;
+      drive = null;
+      driveEase = false;
+      releaseDrive();
+      return true;
+    },
+    driving() { return !!drive; },
+
+    // One frame of the drive: the car at { lat, lon } pointing `heading` and,
+    // while the drive is following it (`follow`), the camera over the car at
+    // `bearing`, `pitch` and `zoom`, padded `pad` ({ top, bottom }, pixels)
+    // so the car stands where the drive wants it between its banner and its
+    // foot. The first frame eases in from wherever the camera was; the rest
+    // jump, because the drive moves the car smoothly itself, frame by frame.
+    // False with no ground to draw on yet.
+    driveFrame(f) {
+      if (!drive || !map || !ready || !f || !isFinite(f.lat) || !isFinite(f.lon)) return false;
+      const ll = [f.lon, f.lat];
+      if (!puck) puck = new ml.Marker({ element: puckEl(), rotationAlignment: 'map', pitchAlignment: 'map' }).setLngLat(ll).addTo(map);
+      else puck.setLngLat(ll);
+      puck.setRotation(isFinite(f.heading) ? f.heading : 0);
+      // Not under a press, which may be the start of a drag ("Driving").
+      if (!f.follow || drive.press) return true;
+      const h = map.getContainer().clientHeight || 0;
+      const pad = f.pad && isFinite(f.pad.top) && isFinite(f.pad.bottom) && f.pad.top + f.pad.bottom < h
+        ? { top: Math.max(0, f.pad.top), bottom: Math.max(0, f.pad.bottom) }
+        : { top: Math.round(h * 0.44), bottom: 0 };
+      const cam = { center: ll, padding: { ...pad, left: 0, right: 0 } };
+      if (isFinite(f.bearing)) cam.bearing = f.bearing;
+      if (isFinite(f.pitch)) cam.pitch = f.pitch;
+      if (isFinite(f.zoom)) cam.zoom = f.zoom;
+      // Back to the car after somebody looked round: eased, as the first frame is.
+      if (f.ease) driveEase = true;
+      if (driveEase) {
+        driveEase = false;
+        if (!reducedMotion()) { map.easeTo({ ...cam, duration: 900 }); return true; }
+      }
+      // An ease under way — the first frame's, or a re-centre's — is let finish.
+      // MapLibre 6's map answers isMoving() for its camera, not isEasing().
+      if (map.isMoving()) return true;
+      map.jumpTo(cam);
+      return true;
+    },
+
+    // The stations named while driving: from [{ id, lat, lon, name, dist,
+    // dest }], nearest first, those in view between `top` and `bottom` (the
+    // drive's banner and foot, pixels down the view) and clear of each other,
+    // at most `max` besides the one driven to, each over its pin
+    // (driveTagsNow). The rest go. Returns those named.
+    driveTags(list, opts = {}) { return driveTagsNow(list, opts); },
+
+    // The drive's 🗺️: straight down, north up, the points given in view.
+    // The drive has stopped following when it asks.
+    driveOverview(pts) {
+      if (!drive || !map || !ready || !pts || pts.length < 2) return false;
+      const b = new ml.LngLatBounds();
+      for (const p of pts) b.extend([p[1], p[0]]);
+      map.jumpTo({ pitch: 0, bearing: 0, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
+      const el = map.getContainer();
+      const padY = Math.min(140, Math.round(el.clientHeight * 0.2));
+      const padX = Math.min(48, Math.round(el.clientWidth * 0.1));
+      map.fitBounds(b, { padding: { top: padY, bottom: padY, left: padX, right: padX }, maxZoom: 16,
+                         duration: reducedMotion() ? 0 : 700 });
+      return true;
+    },
+
+    // For the check: the drive here — the car, the names, the camera, and
+    // what the route's source and the links' layers hold.
+    _drive() {
+      const c = map && map.getCenter();
+      const src = map && map.getSource('mn-drive');
+      const at = puck ? puck.getLngLat() : null;
+      return {
+        on: !!drive,
+        host: !!(host && host.classList.contains('is-driving')),
+        puck: at ? { lat: at.lat, lon: at.lng, rotation: puck.getRotation() } : null,
+        tags: [...tags].map(([id, m]) => ({ id, text: m.getElement().textContent,
+                                            dest: m.getElement().classList.contains('is-dest') })),
+        camera: map ? { lat: c.lat, lon: c.lng, zoom: map.getZoom(), pitch: map.getPitch(),
+                        bearing: map.getBearing(), padding: map.getPadding() } : null,
+        links: map && ready && map.getLayer('mn-links') ? (map.getLayoutProperty('mn-links', 'visibility') || 'visible') : null,
+        water: !!(map && ready && map.getLayer('mn-water')),
+        route: src ? src.serialize().data : null,
+      };
+    },
 
     // Put the camera back overhead without leaving 3-D — the gesture that gets
     // somebody un-lost after a rotate, and the one thing a tilted map makes
@@ -4119,6 +4550,15 @@ const Map3D = (function () {
     // And Draw & measure's markers; its shapes are in state and come back
     // with the next map.
     dropDraw();
+    // And the drive's car and names, which go with the map. The drive itself
+    // goes on, and hands the next map its camera (DriveMode.attach).
+    if (puck) { try { puck.remove(); } catch (_) {} }
+    puck = null;
+    for (const m of tags.values()) { try { m.remove(); } catch (_) {} }
+    tags.clear();
+    listenForDrive(false);
+    drive = null;
+    driveEase = false;
     // The site features' source, its glyphs and its popup go with the map,
     // and a glyph still loading for this one is dropped when it lands.
     sfKey = null;

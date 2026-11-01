@@ -6192,6 +6192,7 @@ function stopStationsMap() {
   MapMovePin.detach();
   SiteFeatures.detach();
   MapDrive.detach();
+  DriveMode.detach();
   MapArrows.detach();
   MapElevation.detach();
   MapHere.detach();
@@ -6342,6 +6343,11 @@ function initMap() {
   // check exists to catch.
   Map3D.attach(state.map);
   registerTabTeardown('Stations 3-D', () => Map3D.stop());
+  // A drive being followed (map-drive-mode.js) outlives a render of the tab —
+  // after Map3D, whose view it opens again and whose camera it takes back —
+  // and ends with the tab: there is no map to follow it on anywhere else.
+  DriveMode.attach(state.map);
+  registerTabTeardown('Stations drive', () => DriveMode.end());
   // The site-scale view, one step up from ⛰️: from zoom 17 the map hands its
   // rectangle to the station's digital twin (map-twin.js). After Map3D, so
   // its overlay is the later child of the container and paints above the

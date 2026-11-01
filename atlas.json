@@ -30,7 +30,7 @@
   "status": {
     "phase": "live",
     "updated": "2026-11-01",
-    "summary": "Live and in daily use (database schema 93): this week added the agent API's changelog and email list, ACMA licences in the API, the Repeaters tab and cuts to database I/O, while account email, compute size and the ACMA download link wait on the owner.",
+    "summary": "Live and in daily use (database schema 94): this week added a driving mode that follows a station's route in 3-D, the agent API's changelog and email list, ACMA licences in the API, the Repeaters tab and cuts to database I/O, while account email, compute size and the ACMA download link wait on the owner.",
     "now": [
       "Agent API changelog and notify list shipped; emails start once #237's Resend parts are done",
       "Photo reader: nightly reading of field photos for logger and equipment details",

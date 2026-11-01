@@ -493,7 +493,10 @@ try {
   check('Turn by turn: the router\'s three, no arrival of its own', fold.steps.length === 3 && /Turn right onto Sandgate Road/.test(fold.steps[1]), J(fold.steps));
   check('every word the panel uses in its own sense has a meaning on hover — a sentence, not the word again',
     fold.terms.length >= 2 && fold.terms.every(t => t.title.length > 60 && t.title !== t.text), J(fold.terms));
-  check('… and listed in the fold for a finger or a keyboard', J(fold.words) === J(['From', 'By road', 'Access track', 'Not mapped']), J(fold.words));
+  // The route's words, then the drive's (map-drive-mode.js), whose screen has
+  // no room for a fold of its own.
+  check('… and listed in the fold for a finger or a keyboard', J(fold.words) === J(['From', 'By road', 'Access track', 'Not mapped',
+    'To go', 'Arrive', 'Off the route', 'Preview']), J(fold.words));
   check('🚗 Directions on the panel too, to the station\'s own coordinate', !!fold.dir && fold.dir.includes(encodeURIComponent(`${pin[0]},${pin[1]}`)), fold.dir);
   check('OpenStreetMap\'s credit and its report-a-map-error link (FOSSGIS\'s terms)',
     fold.links.includes('https://www.openstreetmap.org/copyright') && fold.links.includes('https://www.openstreetmap.org/fixthemap'), J(fold.links));

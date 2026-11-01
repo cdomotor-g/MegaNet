@@ -80,6 +80,18 @@
 // The route outlives the map being rebuilt under it (a render of the tab, a
 // visit to another one): detach() takes the drawing off, attach() puts it back.
 // Signing out takes it away — it was asked for an editor.
+//
+// ── In 3-D, and driven ───────────────────────────────────────────────────────
+// What is drawn is also handed over as data — plan(), the stretches in the
+// order they are driven, each with 2-D's own look — and every draw tells the
+// ⛰️ view (Map3D.routeChanged), which drapes it on the ground. The route is
+// still worked out on the flat map: open() and a start picked on the map leave
+// 3-D, whose camera's ground is not the flat map's under a click
+// (site-features.js's reason). From the panel, 🚘 Drive and ▶ Preview hand the
+// route to the driving mode (map-drive-mode.js), which follows it in 3-D and
+// asks for it again from where the car is when the car leaves it (reroute).
+// While a drive is on, a route worked out again is neither fitted on the flat
+// map nor announced here: the drive's camera and the drive's words say it.
 const MapDrive = (function () {
   const ROUTE = '/api/drive';
   const PANE = 'mnDrive';
@@ -337,17 +349,25 @@ const MapDrive = (function () {
       job.status = 'ok';
       repaint();
       draw();
-      fit();
+      // A drive under way has the camera, and says the new route itself.
+      if (!driving()) {
+        fit();
+        announce(`Route to ${job.name}: ${summaryText()}.`);
+      }
       repaintCards();
-      announce(`Route to ${job.name}: ${summaryText()}.`);
     } catch (err) {
       if (!job || seq !== my) return;
       job.status = 'error';
       job.error = (err && err.message) || String(err);
       repaint();
       draw();
-      announce(`No route to ${job.name}: ${job.error}`);
+      if (!driving()) announce(`No route to ${job.name}: ${job.error}`);
     }
+  }
+
+  // A drive is following this route (map-drive-mode.js).
+  function driving() {
+    return typeof DriveMode !== 'undefined' && !!DriveMode.active && DriveMode.active();
   }
 
   function clear() {
@@ -358,6 +378,7 @@ const MapDrive = (function () {
     clearLayer();
     removePanel();
     repaintCards();
+    tell();
   }
 
   // ── Choosing the start ─────────────────────────────────────────────────────
@@ -410,6 +431,10 @@ const MapDrive = (function () {
   function pick() {
     if (!job || !map) return;
     seq++;
+    // A click on the tilted view is not the flat map's coordinate for that
+    // pixel, so the start is picked on the flat map (site-features.js's
+    // reason) — the route is drawn in 3-D, and Change can be pressed there.
+    if (typeof Map3D !== 'undefined' && Map3D.active && Map3D.active() && Map3D.stop) Map3D.stop();
     takeMap();
     picking = true;
     job.status = 'choose';
@@ -590,9 +615,12 @@ const MapDrive = (function () {
     return `<details class="mn-drive-fold"><summary>Turn by turn (${rows.length})</summary><ol class="mn-drive-steps">${rows.join('')}</ol></details>`;
   }
 
+  // The panel's words, and the drive's after them: the drive's screen has no
+  // room for a fold, and this is where its two buttons are.
   function wordsHtml() {
+    const all = WORDS.concat(typeof DriveMode !== 'undefined' && DriveMode.WORDS ? DriveMode.WORDS : []);
     return `<details class="mn-drive-fold"><summary>What the words here mean</summary>
-      <dl class="mn-drive-words">${WORDS.map(([, label, meaning]) => `<dt>${esc(label)}</dt><dd>${esc(meaning)}</dd>`).join('')}</dl>
+      <dl class="mn-drive-words">${all.map(([, label, meaning]) => `<dt>${esc(label)}</dt><dd>${esc(meaning)}</dd>`).join('')}</dl>
     </details>`;
   }
 
@@ -648,6 +676,7 @@ const MapDrive = (function () {
       body = `<dl class="mn-drive-read">${rows}</dl>
         ${stepsHtml()}
         <div class="pill-row">
+          ${typeof DriveMode !== 'undefined' && DriveMode.pillsHtml ? DriveMode.pillsHtml() : ''}
           ${s ? directionsPillHtml(job.live ? { lat: job.dest[0], lon: job.dest[1] } : s) : ''}
           <button type="button" class="pill" onclick="MapDrive.fit()" title="Fit the whole route on the map">${pillText('🔍', 'Whole route')}</button>
         </div>
@@ -727,10 +756,39 @@ const MapDrive = (function () {
     return (k && k.colour) || '#76ff03';
   }
 
+  // How each kind of stretch is drawn, in Leaflet's pixels — here, and in the
+  // 3-D view, which reads it off plan() rather than keeping a palette of its own.
+  function look(kind) {
+    if (kind === 'road') return { color: ROAD, casing: ROAD_CASING, weight: 4.5, dash: '' };
+    if (kind === 'track') return { color: trackColour(), casing: TRACK_CASING, weight: 4, dash: '' };
+    return { color: GAP, casing: GAP_CASING, weight: 2.5, dash: '2,8' };
+  }
+
+  // The drive in the order it is driven, latitude first: the stretch to the
+  // road when the start is off it, the road, the stretch from the road's end,
+  // the access track, the stretch from the track to the station. What draw()
+  // draws, and what the 3-D view drapes and the drive follows (plan()).
+  function legs() {
+    const out = [];
+    const r = job && job.route;
+    if (!r) return out;
+    const g = gaps();
+    const from = job.start ? [job.start.lat, job.start.lon] : null;
+    const add = (kind, pts) => { if (pts && pts.length >= 2) out.push({ kind, pts }); };
+    if (g.start && from) add('gap', [from, r.shape[0]]);
+    add('road', r.shape);
+    if (g.mid) add('gap', [r.shape[r.shape.length - 1], job.to]);
+    if (job.track) {
+      add('track', job.track.pts);
+      if (g.end) add('gap', [job.track.pts[job.track.pts.length - 1], job.dest]);
+    }
+    return out;
+  }
+
   function draw() {
     clearLayer();
     drawn = [];
-    if (!map || !job) return;
+    if (!map || !job) { tell(); return; }
     if (!map.getPane(PANE)) {
       const p = map.createPane(PANE);
       p.style.zIndex = PANE_Z;
@@ -738,30 +796,43 @@ const MapDrive = (function () {
     }
     if (!renderer) renderer = L.canvas({ pane: PANE });
     layer = L.layerGroup().addTo(map);
-    const line = (kind, pts, look) => {
-      if (!pts || pts.length < 2) return;
+    for (const { kind, pts } of legs()) {
+      const k = look(kind);
       drawn.push({ kind, pts: pts.map(p => p.slice()) });
-      if (look.casing) L.polyline(pts, { renderer, pane: PANE, interactive: false, color: look.casing, weight: look.weight + 3.5, opacity: .85, dashArray: look.dash || null, lineCap: 'round', lineJoin: 'round' }).addTo(layer);
-      L.polyline(pts, { renderer, pane: PANE, interactive: false, color: look.color, weight: look.weight, opacity: 1, dashArray: look.dash || null, lineCap: 'round', lineJoin: 'round' }).addTo(layer);
-    };
-    const gapLook = { color: GAP, casing: GAP_CASING, weight: 2.5, dash: '2,8' };
-    const r = job.route;
-    const from = job.start ? [job.start.lat, job.start.lon] : null;
-    if (r) {
-      const g = gaps();
-      if (g.start && from) line('gap', [from, r.shape[0]], gapLook);
-      line('road', r.shape, { color: ROAD, casing: ROAD_CASING, weight: 4.5 });
-      const roadEnd = r.shape[r.shape.length - 1];
-      if (g.mid) line('gap', [roadEnd, job.to], gapLook);
-      if (job.track) {
-        line('track', job.track.pts, { color: trackColour(), casing: TRACK_CASING, weight: 4 });
-        if (g.end) line('gap', [job.track.pts[job.track.pts.length - 1], job.dest], gapLook);
-      }
+      L.polyline(pts, { renderer, pane: PANE, interactive: false, color: k.casing, weight: k.weight + 3.5, opacity: .85, dashArray: k.dash || null, lineCap: 'round', lineJoin: 'round' }).addTo(layer);
+      L.polyline(pts, { renderer, pane: PANE, interactive: false, color: k.color, weight: k.weight, opacity: 1, dashArray: k.dash || null, lineCap: 'round', lineJoin: 'round' }).addTo(layer);
     }
+    const from = job.start ? [job.start.lat, job.start.lon] : null;
     if (from) {
       L.circleMarker(from, { renderer, pane: PANE, interactive: false, radius: 7, weight: 3, color: ROAD_CASING, fillColor: '#ffffff', fillOpacity: 1 }).addTo(layer);
       L.circleMarker(from, { renderer, pane: PANE, interactive: false, radius: 3, weight: 0, fillColor: ROAD, fillOpacity: 1 }).addTo(layer);
     }
+    tell();
+  }
+
+  // The 3-D view and the drive, told the route changed. Both read plan().
+  function tell() {
+    if (typeof Map3D !== 'undefined' && Map3D.routeChanged) Map3D.routeChanged();
+    if (typeof DriveMode !== 'undefined' && DriveMode.routeChanged) DriveMode.routeChanged();
+  }
+
+  // The route as data, for the 3-D view and the drive: null with none asked
+  // for. `legs` are copies — a caller may keep them — and `look` is 2-D's.
+  function plan() {
+    if (!job) return null;
+    const r = job.route;
+    return {
+      stationId: job.stationId, name: job.name, status: job.status, error: job.error,
+      dest: job.dest.slice(),
+      start: job.start ? [job.start.lat, job.start.lon] : null,
+      startLook: { color: ROAD, casing: ROAD_CASING },
+      legs: legs().map(l => ({ kind: l.kind, pts: l.pts.map(p => p.slice()), look: look(l.kind) })),
+      steps: r ? r.steps.map(st => ({ ...st })) : [],
+      km: r ? r.km : 0,
+      s: r ? r.s : 0,
+      ferry: !!(r && r.ferry),
+      trackM: job.track ? job.track.lengthM : 0,
+    };
   }
 
   // How much of the map the panel stands over, as fitBounds padding:
@@ -863,6 +934,14 @@ const MapDrive = (function () {
     active: () => !!job,
     picking: () => picking,
     DEPOT,
+    plan,
+
+    // From the drive, which has left the road: the route again, from where the
+    // car is. The start is the fix, as the owner's rule's first case is.
+    reroute(fix) {
+      if (!job || !fix || !isFinite(fix.lat) || !isFinite(fix.lon)) return;
+      route({ lat: fix.lat, lon: fix.lon, label: 'Where you are', how: 'gps', acc: fix.acc });
+    },
 
     // Read by the check and by nothing else.
     _job: () => (job ? JSON.parse(JSON.stringify(job)) : null),

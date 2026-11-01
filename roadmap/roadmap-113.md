@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-01** (revision 208 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-01** (revision 209 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -231,6 +231,7 @@ Six per-tab issues are about to restyle nineteen tabs in parallel. The decisions
 ### 🛣️ EPIC #250 — road routes to a station, drawn on Flood-Net's own map — **OPEN, opened revision 199**
 `[Epic]` `[Opus5/High]` — the rating is for the children; each touches the Worker, the station card and the Stations map together. The owner, 2026-10-28: *"It would be nice to be able to bring in directions, as in road directions … into FloodNet and put it on the map."* Google is out (its Routes API results may only be shown on a Google Map); the road comes from OpenStreetMap through **Valhalla on FOSSGIS's server**, via the Worker's `/api/drive`, and the last stretch from the station's own access track (`0067`, 743 stations). 🚗 Directions (#225) stays. **Editors only, for now**; the drive starts where the phone is, else Pritchard Road, Virginia for a Brisbane-hub station, else the panel asks. `docs/drive.md`.
 - ~~**#251**~~ `[Sub-issue of #250]` `[Opus5/High]` — **CLOSED at revision 199, opened at 199** — 🛣️ Route on map (`map-drive.js`, `worker/drive.js`): the start by the owner's rule (and Change: where I am, the depot, a click on the map, a town, a station or a coordinate typed), the road to the access track's road end, the track to the gauge, the unmapped stretches dotted and measured, the turns, OpenStreetMap's credit and fix-the-map link. `npm run drive` (90).
+- 🚘 **Driving mode** (revision 209, no issue — the owner's request) — the route #251 draws, followed in ⛰️ 3-D as it is driven (`map-drive-mode.js`): heading up, the next turn shown and said, the stations ahead named, re-routed from where the car is when it leaves the road; ▶ Preview plays it at a desk. `npm run drivemode` (49). #254's route kept on the phone would let it start with no signal.
 - **#252** `[Sub-issue of #250]` `[Opus5/High]` — **OPEN, opened revision 199** — routes that go round QLDTraffic's flooded and closed roads (Valhalla's `exclude_polygons`), saying which closures were avoided. Best after #238, which reads the same events feed for the map.
 - **#253** `[Sub-issue of #250]` `[Opus5/Med]` — **OPEN, opened revision 199** — an inspection run: several stations in the best order from the chosen start, each leg's drive and the day's total; and road distances on 📌 Nearby.
 - **#254** `[Sub-issue of #250]` `[Sonnet5/Med]` — **OPEN, opened revision 199** — a route kept on the phone for when there is no signal, drawn again with the day it was asked.
@@ -836,6 +837,16 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 209 — 2026-11-01: 🚘 Driving mode — the route followed in 3-D as it is driven
+
+The owner: *"Can you please make a driving mode? The user might like to follow navigation in the app and have the usual sort of 3-D perspective of the road ahead and the stations that are in view around the place."* No issue; this entry is its record. **Opens nothing; closes nothing.** It sits under EPIC #250, after #251.
+
+- **🚘 Drive** (a phone or a tablet) and **▶ Preview the drive** (anywhere) on the route panel (`map-drive-mode.js`). The Stations map fills the window and turns to ⛰️ 3-D: heading up, tilted 58°, closer in at a crawl and further out at highway speed, the car an arrow on the road 78% of the way down the road left between the banner and the foot. The banner: the next turn's arrow, how far and the router's words — then Flood-Net's for where the mapped road ends, the access track, what is not mapped, and arriving. Said aloud about 15 s out and at the turn (`speechSynthesis`, en-AU; 🔊 remembered), and always in the live region. The foot: ✕ End/Escape, to go, arrive, 🔊, 🗺️ overview or ◎ re-centre.
+- **Following the phone**: `watchPosition`, each fix put on the route within 40 m plus its ±, the car carried along the line between fixes; rougher than 100 m is not followed. **Off the route** for 6 s on the road: `MapDrive.reroute()` asks `/api/drive` again from the fix, at most every 20 s, the old route followed meanwhile; past the road, the banner gives the station's direction and distance. Wake Lock while it lasts.
+- **The stations named**: from the pins the map draws, nearest ahead, cut by the 3-D view to those on screen — whole, between banner and foot, never overlapping — at most six, plus the station driven to with 🏁 from 30 km out.
+- **`map-3d.js`**: the route draped (`mn-drive`, under the links, `GROUND` extended, its OpenStreetMap/Valhalla credit in the ⓘ only while a route is up), so ⛰️ shows a route whenever one is up; a *Driving* section that takes the camera — paths, water, minimap, hover, pin clicks and the 2-D follow held, the credits folded to their ⓘ, a press holding the camera so a drag can begin (MapLibre's `jumpTo` stops gestures), the camera given back by a jump (`resize()` stops an ease part-way in MapLibre 6). **`map-drive.js`**: `plan()`, `reroute()`, every draw told to the 3-D view and the drive; a start picked on the map leaves 3-D first.
+- **Checks:** `drivemode` (49, new, in CI) — red on four deliberate breaks (camera tilt, turn words, the press hold, re-routing without waiting). `drive` 90 (its fold lists the drive's words too), `map3d` 261, `help`, the cheap five. `docs/drive.md` has the section; What's new 170.
 
 ### Revision 208 — 2026-11-01: 🧹 Clearing what was already done — #206 closed, #248 into #245, #237 and #232 brought up to date
 

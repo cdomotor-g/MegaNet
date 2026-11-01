@@ -25,6 +25,17 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 170, date: '2026-11-01', items: [
+      '🚘 <strong>Driving mode</strong>, on the panel of a 🛣️ <em>Route on map</em> once the route is worked out: <strong>🚘 Drive</strong> '
+        + 'on a phone or a tablet follows the route as you drive it. The map fills the screen in 3-D, tilted and turning with the car, '
+        + 'with the next turn and how far to it across the top — said out loud as it comes up — and the time to go and when you would '
+        + 'arrive across the foot. The stations ahead are named over their pins with how far each is, and the one you are driving to is '
+        + 'flagged 🏁. Leave the route while still on the road and it is worked out again from where you are; past the road, it says '
+        + 'which way the station is. Drag the map to look round and ◎ goes back to the car; 🗺️ shows the rest of the route from overhead. '
+        + '<strong>▶ Preview the drive</strong>, on any device, plays the same drive along the route sped up, without using where you are. '
+        + 'With a route up, ⛰️ 3-D now drapes it on the ground too. Keep Flood-Net on screen while driving — a phone stops giving a page '
+        + 'its position in the background — and remember the route knows nothing of floods: if it\'s flooded, forget it.',
+    ] },
     { n: 169, date: '2026-10-31', items: [
       '🌧 <strong>Rain ahead</strong> in <em>Station Health</em>, under the map: where a weather model has rain coming in the next '
         + 'three days, and which stations there have a fault open — a battery sliding, checks going missing, a gauge not '

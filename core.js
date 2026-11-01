@@ -1234,6 +1234,15 @@ const HELP = {
       + 'town, a station or a coordinate typed in. <em>Change</em> picks another start. The roads are '
       + 'OpenStreetMap\'s, through the Valhalla router, so traffic, closures and floods are not taken into '
       + 'account. Signed-in editors only, as the access tracks are.',
+      'Once the route is worked out, <strong>🚘 Drive</strong> (on a phone or a tablet) follows it as you drive: '
+      + 'the map fills the screen in 3-D, tilted and turning with the car, with the next turn and how far to it '
+      + 'across the top, said out loud as it comes up, and the time and distance to go across the foot. The '
+      + 'stations ahead are named over their pins with how far each is, the one you are driving to flagged 🏁. '
+      + 'Leave the route on the road and it is worked out again from where you are; drag the map to look round, '
+      + 'and ◎ goes back to the car. <strong>▶ Preview the drive</strong> plays the same drive along the route, '
+      + 'sped up, without using where you are. 🔊 turns the voice off, ✕ End or Escape ends it. Keep Flood-Net '
+      + 'on screen while driving: a phone stops giving a page its position in the background. The route knows '
+      + 'nothing of floods — if it\'s flooded, forget it.',
       'The two <strong>document searches</strong> do not send the station\'s name as written. A '
       + 'library search box requires <em>every</em> term to match, so a site filed as "Upper Sandy '
       + 'Ck" would be unreachable from a search that said "Creek" — the wrong half of the pair '
