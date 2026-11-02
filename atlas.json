@@ -40,7 +40,7 @@
       "One ALERT burst heard several ways is one reading (0096, #232 closed): copies within 8 s counted on it",
       "#217 and #244 transmitter drift and bit-flip sources: gathering live days of carrier data",
       "#258 flaky Site features 3-D hand-back check in CI",
-      "Legacy ALERT over MQTT trial (ELPRO gateway, Alert1 path): the bridge now decodes it and drops the gateway's re-sent table; live once the bridge is redeployed"
+      "Legacy ALERT over MQTT trial (ELPRO gateway, Alert1 path): the bridge decodes it and drops the gateway's re-sent table, live since 2 Nov with the trial's first hour replayed"
     ],
     "next": [
       "#252–#254 road routes: avoid closures, inspection runs, routes kept offline (EPIC #250)",
