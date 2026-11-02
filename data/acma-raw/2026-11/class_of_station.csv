@@ -1,0 +1,14 @@
+CODE,DESCRIPTION
+BC,"BC - Broadcast Station, Sound"
+BT,"BT - Broadcast Station, Television"
+FB,FB - Base station
+FC,FC - Coast station
+FL,FL - Land station
+FP,FP - Port station
+FS,FS - Land station established solely for safety of life
+FW,FW - Mobile station (service area 0 km; eff.anthgt. Annex 5 2.5)
+FX,FX - Fixed station
+ML,ML - Land mobile station
+MO,MO - Mobile station
+MR,MR - Radiolocation mobile station
+MS,MS - Ship station

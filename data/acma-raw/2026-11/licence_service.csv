@@ -1,0 +1,29 @@
+SV_ID,SV_NAME
+1,Broadcasting
+2,Fixed
+3,Land Mobile
+5,Maritime Coast
+6,Amateur
+8,Aeronautical
+9,Earth
+10,PTS
+12,Approval
+18,Radiodetermination
+25,Trade/Transfer
+50,Datacasting
+65,Defence
+66,Aircraft
+67,Maritime Ship
+68,Outpost
+69,Scientific
+75,Space
+85,Spectrum
+90,Broadcast Service Licence
+93,Datacasting Service Licence
+95,Broadcasting Class Licence
+102,Fixed Receive
+105,Major Coast Receive
+109,Earth Receive
+110,PTS 900 MHz
+165,Defence Receive
+175,Space Receive
