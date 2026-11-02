@@ -55,8 +55,11 @@ Where the port departs from the Kotlin, the code says so at the spot:
   on the 12 kHz baseband, where they cost almost nothing. `npm run alertdsp` holds
   it to the full decoder: the rig, both real Binary bursts, 24 synthesised bursts
   from 3 to 25 dB and the demo band through the live pipeline all read the same,
-  in under half the time. RPi ALERT can run it beside the full decoder to compare
-  the two in the field before it is made the default.
+  in under half the time. `Pipeline.configure({ compare: true })` also decodes
+  each burst the other way and reports whether the two read the same, with each
+  one's time, in the decode's `compare`. The readings posted stay the pipeline's
+  own, and it skips the comparison while bursts are waiting. RPi ALERT uses it to
+  prove lean in the field before it is made the default.
 
 ## Getting the stick to the browser
 

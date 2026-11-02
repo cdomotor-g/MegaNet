@@ -855,7 +855,7 @@ const AlertDsp = (function alertDspModule() {
       this.post = post;
       this.cfg = {
         deviceRate: FS_IN, channelOffsetHz: 0, format: BINARY, minVotes: 4, minVotesCrc: 4,
-        gate: true, squelchDb: 8, fftSize: 2048, specHz: 20, scopeHz: 15, audio: false, lean: false,
+        gate: true, squelchDb: 8, fftSize: 2048, specHz: 20, scopeHz: 15, audio: false, lean: false, compare: false,
       };
       this.reset();
     }
@@ -1111,7 +1111,21 @@ const AlertDsp = (function alertDspModule() {
       if (len < FS_IN / 2) return;
       const wr = new Float32Array(len), wi = new Float32Array(len);
       for (let k = 0; k < len; k++) { const p = (from + k) % CAP; wr[k] = this.ringR[p]; wi[k] = this.ringI[p]; }
-      const r = decodeWindow(wr, wi, { format: c.format, minVotes: c.minVotes, minVotesCrc: c.minVotesCrc, lean: !!c.lean });
+      const opts = { format: c.format, minVotes: c.minVotes, minVotesCrc: c.minVotesCrc, lean: !!c.lean };
+      const r = decodeWindow(wr, wi, opts);
+      // compare: decode the same window the other way too, and say whether the
+      // two read the same — how the lean decoder is proven in the field before
+      // it is the default (#259). The readings posted are still this
+      // pipeline's own (cfg.lean's), so ingest is unchanged. Skipped while
+      // bursts are waiting, so it never makes the decoder fall behind.
+      let compare = null;
+      if (c.compare && !this.pending.length) {
+        const o = decodeWindow(wr, wi, Object.assign({}, opts, { lean: !c.lean }));
+        const keys = x => x.readings.map(y => y.sensorId + '=' + y.value).sort();
+        const full = c.lean ? o : r, lean = c.lean ? r : o;
+        const fk = keys(full), lk = keys(lean);
+        compare = { same: fk.join(' ') === lk.join(' '), full: fk, lean: lk, msFull: Math.round(full.ms), msLean: Math.round(lean.ms) };
+      }
       // Which readings this burst carried. A window reaches 0.4 s or more
       // either side of its burst, so a neighbouring burst — a repeater's copy a
       // moment later, another station keying up — can be read in it too. A
@@ -1148,7 +1162,7 @@ const AlertDsp = (function alertDspModule() {
       this.post({
         type: 'decode', readings: fresh, copies, all: r.readings.length, shadows: r.shadows || [], candidates: r.candidates,
         ms: Math.round(r.ms), combos: r.combos, seconds: len / FS_IN, format: c.format,
-        burst: burst ? { ms: burst.ms, peakDb: burst.peak, nfDb: burst.nf, t: burst.t } : null, trace,
+        burst: burst ? { ms: burst.ms, peakDb: burst.peak, nfDb: burst.nf, t: burst.t } : null, trace, compare,
       }, transfer);
     }
 

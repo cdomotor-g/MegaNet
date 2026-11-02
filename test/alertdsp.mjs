@@ -288,6 +288,18 @@ for (const c of [
   const full = run(false), lean = run(true);
   check('the live pipeline with lean on reads the demo band as with it off', full === lean && full.length > 0, `${full} | lean ${lean}`);
   check('lean is off unless asked for', new D.Pipeline(() => {}).cfg.lean === false);
+
+  // compare: the posted readings are the pipeline's own, and every decode
+  // says whether the other way read the same.
+  const cmp = [], got = [];
+  const pc = new D.Pipeline(m => { if (m.type === 'decode') { got.push(...m.readings.map(x => `${x.sensorId}=${x.value}`)); if (m.compare) cmp.push(m.compare); } });
+  pc.configure({ deviceRate: 240000, channelOffsetHz: 0, format: D.BINARY, gate: true, squelchDb: 8, compare: true });
+  const band = D.demoBand();
+  for (let o = 0; o < band.length; o += 32768) pc.feed(band.subarray(o, Math.min(band.length, o + 32768)));
+  check('compare posts the full decoder\'s readings unchanged', got.sort().join(' ') === full, got.join(' '));
+  check('…and says, for every burst, that lean read the same', cmp.length >= 3 && cmp.every(x => x.same && x.msLean > 0 && x.msFull > 0),
+    JSON.stringify(cmp.map(x => [x.same, x.msFull, x.msLean])));
+  check('compare is off unless asked for', new D.Pipeline(() => {}).cfg.compare === false);
 }
 
 // ── The Worker's source ──────────────────────────────────────────────────────
