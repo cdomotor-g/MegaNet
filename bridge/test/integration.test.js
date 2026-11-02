@@ -668,6 +668,44 @@ test('the ALERT2 path: a report the gateway republishes is stored once, and ever
   await waitFor(() => broker.bridgeAcks().length === frames.length, { what: 'both messages to be acked' });
 });
 
+test('an ELPRO message handed over as retained teaches the filter and stores nothing', async (t) => {
+  // The gateway publishes with retain set, so every time the bridge subscribes
+  // the broker hands over each topic's last publish again. On 2 November one
+  // restart stored seven old republishes that way. Retained: learned, not
+  // posted — and a republish of it afterwards is recognised.
+  const broker = await startBroker();
+  const api = await startApi();
+  t.after(async () => {
+    await closeStations();
+    await api.close();
+    await broker.close();
+  });
+
+  const station = await connectStation(broker.port, 'elpro_test');
+  const topic = 'meganet/v1/elpro_test/logger/reading/elpro/Station 1001';
+  const old = '[{"timestamp":1793586988464,"Sensor":8,"Value":142,"AlertTimestamp":33118}]';
+  await station.publishAsync(topic, old, { qos: 1, retain: true });
+
+  const bridge = startBridge(broker.port, api.url);
+  t.after(() => bridge.stop());
+  await waitFor(() => api.of('ingest_http').length === 1, { what: 'the retained message to reach the raw table' });
+  assert.equal(api.of('ingest_http')[0].body.payload.frame, old, 'the bytes are kept');
+  assert.deepEqual(api.of('ingest_http')[0].body.payload.readings, [], 'nothing is claimed');
+
+  // The gateway republishing that report a quarter-hour on: already known.
+  await station.publishAsync(topic,
+    '[{"timestamp":1793587888464,"Sensor":8,"Value":142,"AlertTimestamp":33118}]', { qos: 1 });
+  // A new transmission: stored.
+  await station.publishAsync(topic,
+    '[{"timestamp":1793590588464,"Sensor":8,"Value":143,"AlertTimestamp":36718}]', { qos: 1 });
+  await waitFor(() => api.of('ingest_http').length === 3, { what: 'the live messages to land' });
+  const live = api.of('ingest_http').slice(1).map((c) => c.body.payload.readings);
+  assert.deepEqual(live, [
+    [],
+    [{ a2_station: 1001, a2_sensor: 8, reading_ts: 1793590588464, value_raw: 143 }],
+  ]);
+});
+
 test('a bridge that was down loses nothing: the broker held the hour and hands it back (#163)', async (t) => {
   const broker = await startBroker();
   const api = await startApi();

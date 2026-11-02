@@ -222,6 +222,21 @@ function createBridge(config, deps = {}) {
       copies = kept.copies;
     }
 
+    // A retained message is the broker handing over a topic's last publish as
+    // the bridge subscribes — on every restart and reconnect. On the ELPRO relay
+    // paths that is usually a republish the filter above took out (or 0097
+    // removed), and a filter that has only just started cannot know that: on 2
+    // November one restart stored seven such readings. So it teaches the filter
+    // (above) and posts nothing. Anything the bridge has not seen arrives as an
+    // ordinary message anyway — the persistent session queues it — so the only
+    // reading this can cost is one published while the bridge was down and its
+    // session had lapsed, which the broker had already lost. The raw row still
+    // keeps the bytes.
+    if (packet.retain && (route.legacyAlert || route.sourceStation !== undefined)) {
+      resent += parsed.readings.length;
+      parsed.readings = [];
+    }
+
     log.debug('message_queued', {
       topic,
       station: route.station,
@@ -230,6 +245,7 @@ function createBridge(config, deps = {}) {
       source: route.source,
       sourceStation: route.sourceStation,
       legacyAlert: route.legacyAlert,
+      retained: packet.retain || false,
       readings: parsed.readings.length,
       resent,
       copies,

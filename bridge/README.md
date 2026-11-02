@@ -108,6 +108,14 @@ hours the pair counts as new again, because the stamp wraps every 12 and a
 station that transmits at the same second each hour repeats it. Sets without
 an `AlertTimestamp` pass through. `message_queued` logs `resent` and `copies`.
 
+**On both ELPRO paths a retained message teaches the filter and stores
+nothing.** The gateway publishes with retain set, so each time the bridge
+subscribes the broker hands over every topic's last publish again — usually a
+republish the filter dropped, which a filter that has just started cannot
+recognise (one restart on 2 November stored seven). Anything the bridge has not
+seen still arrives as an ordinary message through the persistent session. The
+raw row keeps the bytes; `message_queued` logs `retained`.
+
 ---
 
 ## Running it
