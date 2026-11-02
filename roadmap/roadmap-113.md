@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-01** (revision 212 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-02** (revision 213 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -242,8 +242,9 @@ Six per-tab issues are about to restyle nineteen tabs in parallel. The decisions
 - ~~**#242**~~ `[Sub-issue of #240]` `[Opus5/High]` — **CLOSED at revision 172** (`0072`, applied live by the owner) — a reception's `detail` as seventeen typed columns, moved only when a value comes back exactly, and read back whole through `reception_detail(r)`. Backfilled: 309,633 rows rewritten, every one's detail identical before and after (md5). 560 → 263 bytes a row; `reception_alert_idx` became a survey-only partial index; `reading_ingest_token_idx` kept.
 - **#243** `[Sub-issue of #240]` `[Opus5/High]` — **OPEN, all but its last check — revision 173** — the data archive is live: `meganet-archive` in R2, `/api/archive` (`worker/archive.js`), the nightly archiver (`archive-r2.yml`, 14:37 UTC) that reads every day back before recording it, `0073` (manifest; `retain()` deleting only days archived and rolled up at their count, pg_cron 15:17 UTC) and `0074` (btree time indexes, counting from the rollups). First runs: 139 days, 420,957 rows, 13.5 MB, every day's count matching the database. **Left**: the first nightly `retain()` (2026-10-22, 15,492 submissions), then a run whose self-test restores a released day — then close. The nightly run timed out listing submission days on 2026-10-25, -28 and -29; `0088` counts only the days that can change anything (revision 201).
 - **#256** `[Sub-issue of #240]` `[Human]` — **OPEN, opened revision 200** — decide how long receptions stay in the database: 90 days (the regime as set; the table levels off near 2 GB, which means Medium compute within months), 30 (near 0.7 GB) or between. Nothing is lost either way — every day is archived to R2 (#243) and rolled up forever (#241) before `retain()` deletes it; the app reads raw receptions at most 7 days back (Reception Map) and 48 hours (waterfall). The owner replies a, b or c; an agent sets `retain_reception_days` by a migration and updates this epic's regime line.
+- **#260** `[Sub-issue of #240]` `[Opus5/High]` — **OPEN, opened revision 213** — fold the ALERT twins stored before `0096` (#232) into one reading each: 5.9% of ALERT readings over the days measured, kept 730 days otherwise. Measure a day at a time first; fold each cluster as `ingest()` now would (the copy stored first kept, the rest into its `dup_count` and `dup_paths`, then deleted); only days already in `archive_day`, deciding how a folded day's count sits with the manifest so `retain()` and the archiver stay clean; rollups rebuilt for what it touched; a day a run, off-peak; `db-checks`; a changelog entry. **After #243 and #257, better after #255/#256.**
 
-> **Sequencing.** ~~#241~~ (done, revision 171) → ~~#242~~ (done, revision 172) → #243. The rollup comes first so no reception is ever deleted without one; #242 before #243 so the archive is written in the final shape; `retain()` is scheduled only inside #243. **Already done at revision 170 (`0070`)**: `roll_up()` hourly on pg_cron and `retain_reading_days` 730 — nothing is deleted until #243.
+> **Sequencing.** ~~#241~~ (done, revision 171) → ~~#242~~ (done, revision 172) → #243 → #260 (it deletes rows, so only once the archive is proven and #257's `archive_due()` timeout is fixed). The rollup comes first so no reception is ever deleted without one; #242 before #243 so the archive is written in the final shape; `retain()` is scheduled only inside #243. **Already done at revision 170 (`0070`)**: `roll_up()` hourly on pg_cron and `retain_reading_days` 730 — nothing is deleted until #243.
 
 ### 📣 EPIC #214 — network health that reaches people: findings on the server, alerts to staff, transmitter drift — **OPEN, opened revision 117**
 `[Epic]` `[Opus5/High]` — the rating is for the children. Out of the UX review of 2026-10-07 (Flood-Net item 5, and the review's three cross-repo items). The network's health is something a person has to go and look at today: Station Health works its findings out in the browser when its tab is open, Base Stations shows online / quiet / offline when that tab is open, and nothing tells anyone. **The scope is the network's equipment, for the people who keep it running** — Flood-Net is not a flood warning service (`docs/agent-api.md`), and nothing under this epic alerts anyone about river levels. #156's "watch-and-notify during field tests" is a different thing and stays there.
@@ -704,7 +705,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### AI agent — Opus5
 | Effort | Issues |
 |---|---|
-| High | **#250** (epic — road routes on the map; rating is for its children) · **#252** (routes round QLDTraffic's flooded and closed roads — *best after #238*) · **#244** (who corrupts — bit flips by carrier fingerprint, *live; a week of data to look at*) · **#186** (epic — rating is for its children; #187 is its last open child) · **#204** (assessment report drafts from the dossier — *blocked on the example reports*) · **#214** (epic — rating is for its children) · **#216** (alerts to staff — *a person sets two secrets*) · **#240** (epic — rating is for its children) · **#243** (archive to R2, then `retain()` scheduled — *last*) |
+| High | **#250** (epic — road routes on the map; rating is for its children) · **#252** (routes round QLDTraffic's flooded and closed roads — *best after #238*) · **#244** (who corrupts — bit flips by carrier fingerprint, *live; a week of data to look at*) · **#186** (epic — rating is for its children; #187 is its last open child) · **#204** (assessment report drafts from the dossier — *blocked on the example reports*) · **#214** (epic — rating is for its children) · **#216** (alerts to staff — *a person sets two secrets*) · **#240** (epic — rating is for its children) · **#260** (fold the ALERT twins stored before `0096` — *after #243 and #257*) · **#243** (archive to R2, then `retain()` scheduled — *last*) |
 | Med | **#253** (an inspection run — stations in the best order, road distances on Nearby) · ~~#206~~ (*closed at revision 208: the photo reader does it*) · **#247** (carrier outages on Station Health — *a maybe, parked; blocked on the owner choosing a source*) |
 
 ### AI agent — Sonnet5
@@ -837,6 +838,14 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 213 — 2026-11-02: 🧮 #260 opened — the ALERT twins stored before 0096
+
+The owner, on revision 212's open question about the readings `0096` came too late for: *"open an issue for later on the twins. latency fine for now."* **Opens #260; closes nothing.**
+
+- **#260** `[Sub-issue of #240]` `[Opus5/High]`: fold the twins stored before `0096` into one reading each, the way `ingest()` stores them now. It deletes rows, so it waits on #243 (the archive proven) and #257 (`archive_due()` timing out), and is better after #255/#256 settle the Disk IO headroom. Added to EPIC #240's list and sequencing, and to the Opus5 High row.
+- **The Latency tab's per-path delay** for a copy counted on another receiver's reading stays as it is (no sample of its own): the owner is content. Noted in #260's scope.
+- `atlas.json`: #260 under *Later*.
 
 ### Revision 212 — 2026-11-01: 📡 One ALERT burst heard several ways is one reading — 0096, #232 closed
 
