@@ -3831,8 +3831,12 @@ const DB_SCHEMA = 'meganet';
 // copies on an ALERT address within app_meta's alert_copy_window_s (8 s)
 // counted on it (0096, #232), applied by db-migrate.yml on 1 November 2026,
 // bumped after; no shape the app reads changes, and health-analysis.js counts
-// the copies in dup_count and dup_paths.
-const DB_SCHEMA_VERSION = 96;
+// the copies in dup_count and dup_paths. 97: an ALERT2 report the ELPRO gateway
+// republished is one reading — 8,960 timer repeats removed and 2,146 copies
+// counted on their first sighting, rollups rebuilt (0097), applied by
+// db-migrate.yml on 2 November 2026, bumped after; no shape the app reads
+// changes.
+const DB_SCHEMA_VERSION = 97;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
