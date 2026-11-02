@@ -1,0 +1,476 @@
+{
+ "format": "floodnet-bulletin/1",
+ "kind": "daily",
+ "id": "daily-2026-11-03",
+ "issued_at": "2026-11-02T18:32:14.941Z",
+ "period": {
+  "from": "2026-11-01T18:32:14.941Z",
+  "to": "2026-11-02T18:32:14.941Z",
+  "label": "24 hours to 4:32 am Tuesday"
+ },
+ "presenter": "tech-wizard",
+ "cohost": "seasoned-hydrographer",
+ "status": {
+  "level": "several",
+  "label": "A Gold Coast group quiet overnight"
+ },
+ "headline": "Eight Gold Coast hinterland stations went quiet overnight, all passed by Tallai, whose own reports keep the same hours. Most checks came in.",
+ "stats": [
+  {
+   "label": "stations heard",
+   "value": 1072,
+   "tone": "neutral"
+  },
+  {
+   "label": "checks received",
+   "value": 82,
+   "unit": "%",
+   "was": 78,
+   "tone": "warn"
+  },
+  {
+   "label": "quiet, keep a schedule",
+   "value": 12,
+   "tone": "warn"
+  },
+  {
+   "label": "critical findings",
+   "value": 12,
+   "tone": "bad"
+  }
+ ],
+ "scenes": [
+  {
+   "type": "title",
+   "title": "Good morning",
+   "secs": 14,
+   "say": "Good morning, Alex Chen presenting. Eighty-two percent of checks came in, up from seventy-eight. Twelve stations that keep a schedule went quiet, and seven of them sit together in the Gold Coast hinterland."
+  },
+  {
+   "type": "map",
+   "title": "Quiet at night, behind Tallai",
+   "sub": "eight stations, one repeater they share",
+   "sev": "warn",
+   "secs": 25,
+   "say": "Natural Bridge, Hotham Creek and Stewarts Road have gone quiet at night most of this week, back around dawn. Last night Binna Burra, Beechmont, Clagiraba Road, Willow Vale and Springbrook joined them, all between ten to two and twenty past. Every one is passed by the Tallai repeater. Over six days Tallai's own reports drop by about half overnight, while Molendinar, ten kilometres away, holds steady.",
+   "stations": [
+    "tallai_al",
+    "natural_bridge_al",
+    "hotham_creek_al",
+    "stewarts_rd_al",
+    "clagiraba_road_al",
+    "binna_burra_al",
+    "beechmont_al",
+    "willow_vale_al"
+   ],
+   "marks": [
+    {
+     "id": "tallai_al",
+     "kind": "repeater",
+     "sev": "warn",
+     "label": "Tallai AL"
+    },
+    {
+     "id": "molendinar_al",
+     "kind": "repeater",
+     "sev": "ok",
+     "label": "Molendinar AL"
+    },
+    {
+     "id": "natural_bridge_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "hotham_creek_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "stewarts_rd_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "clagiraba_road_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "binna_burra_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "beechmont_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "willow_vale_al",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "springbrook_national_park_al",
+     "kind": "silent",
+     "sev": "warn"
+    }
+   ],
+   "links": [
+    {
+     "from": "natural_bridge_al",
+     "to": "tallai_al",
+     "style": "blame"
+    },
+    {
+     "from": "hotham_creek_al",
+     "to": "tallai_al",
+     "style": "blame"
+    },
+    {
+     "from": "stewarts_rd_al",
+     "to": "tallai_al",
+     "style": "blame"
+    },
+    {
+     "from": "clagiraba_road_al",
+     "to": "tallai_al",
+     "style": "blame"
+    },
+    {
+     "from": "binna_burra_al",
+     "to": "tallai_al",
+     "style": "blame"
+    },
+    {
+     "from": "beechmont_al",
+     "to": "tallai_al",
+     "style": "blame"
+    },
+    {
+     "from": "willow_vale_al",
+     "to": "tallai_al",
+     "style": "blame"
+    },
+    {
+     "from": "springbrook_national_park_al",
+     "to": "tallai_al",
+     "style": "blame"
+    }
+   ],
+   "areas": [
+    {
+     "lat": -28,
+     "lon": 153.25,
+     "km": 25,
+     "sev": "warn",
+     "label": "quiet overnight"
+    }
+   ],
+   "focus": {
+    "lat": -28,
+    "lon": 153.27,
+    "km": 40
+   }
+  },
+  {
+   "type": "list",
+   "title": "Tallai: what would tell",
+   "sev": "info",
+   "secs": 18,
+   "say": "They come back before sunrise, so it isn't the sun on a panel. A supply sagging in the small hours fits, and so does a link that fades at night. Tallai's battery holds 13.4 volts overnight, which leans towards the link or its radio.",
+   "stations": [
+    "tallai_al",
+    "molendinar_al"
+   ],
+   "items": [
+    {
+     "sev": "warn",
+     "id": "tallai_al",
+     "text": "Tallai AL: own reports about half overnight; battery steady 13.4 V."
+    },
+    {
+     "sev": "ok",
+     "id": "molendinar_al",
+     "text": "Molendinar AL, 10 km away: steady day and night."
+    },
+    {
+     "sev": "info",
+     "text": "Back before sunrise: not the sun; supply, link or radio."
+    }
+   ]
+  },
+  {
+   "type": "map",
+   "title": "Quiet in the Tweed and Richmond",
+   "sub": "two repeaters quiet",
+   "sev": "warn",
+   "secs": 25,
+   "say": "Further south, the Murwillumbah Hartigans Hill repeater got one report through in the last day, at eight past twelve on Monday. Kunghur and Dunbible Creek nearby are quiet too, but both have weak batteries of their own, so that's not yet one cause. Goonellabah, Terania Creek and Upper Burringbar went quiet together just before ten last night. Tyalgum Creek had twenty millimetres of rain.",
+   "stations": [
+    "murwillumbah_hartigans_hill",
+    "kunghur_the_junction",
+    "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+    "goonellabah_wyreem",
+    "terania_ck",
+    "upper_burringbar_rd"
+   ],
+   "marks": [
+    {
+     "id": "murwillumbah_hartigans_hill",
+     "kind": "silent",
+     "sev": "critical",
+     "label": "Hartigans Hill"
+    },
+    {
+     "id": "goonellabah_wyreem",
+     "kind": "silent",
+     "sev": "warn",
+     "label": "Goonellabah"
+    },
+    {
+     "id": "kunghur_the_junction",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "terania_ck",
+     "kind": "silent",
+     "sev": "warn"
+    },
+    {
+     "id": "upper_burringbar_rd",
+     "kind": "silent",
+     "sev": "warn"
+    }
+   ],
+   "focus": {
+    "lat": -28.5,
+    "lon": 153.35,
+    "km": 50
+   }
+  },
+  {
+   "type": "receivers",
+   "title": "Our end of the line",
+   "presenter": "seasoned-hydrographer",
+   "sev": "info",
+   "secs": 16,
+   "say": "Graham Watts, on the radio. Both receivers ran all day, no settings changed, and 152.400 still isn't listened to. One slow one: Bundamba Barclay Street's signal, measured on its own carrier, is down about three decibels in a week.",
+   "stations": [
+    "bundamba_barclay_st"
+   ],
+   "items": [
+    {
+     "name": "rpi-83071968 stick 1",
+     "up": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "note": "up all day; settings unchanged"
+    },
+    {
+     "name": "rpi-83071968 stick 2",
+     "up": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "note": "up all day; settings unchanged"
+    }
+   ]
+  },
+  {
+   "type": "battery",
+   "title": "Batteries",
+   "presenter": "new-recruit",
+   "sev": "critical",
+   "secs": 17,
+   "say": "The New Recruit. Is it supposed to do that? Hinze Dam read 9.1 volts last night after a week near 12.7, and Eungella fell from 10.9 to 9.5. One night each, so tonight will tell. Dunbible Creek is still 9.8.",
+   "items": [
+    {
+     "id": "hinze_dam_hw_al",
+     "name": "Hinze Dam HW AL",
+     "v": 9.1,
+     "nights": [
+      12.7,
+      12.6,
+      12.9,
+      12.7,
+      12.6,
+      12.6,
+      9.1
+     ],
+     "note": "Battery critical — 9.1 V"
+    },
+    {
+     "id": "eungella_oxley_rive",
+     "name": "Eungella (Oxley River)",
+     "v": 9.5,
+     "nights": [
+      10.6,
+      10.6,
+      10.6,
+      10.8,
+      10.9,
+      10.9,
+      9.5
+     ],
+     "note": "Battery critical — 9.5 V"
+    },
+    {
+     "id": "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+     "name": "Dunbible Creek at Dunbible Creek Rail Trail Bridge",
+     "v": 9.8,
+     "nights": [
+      9.9,
+      9.8,
+      9.8
+     ],
+     "note": "Battery critical — 9.8 V"
+    },
+    {
+     "id": "nicolls_bridge_al",
+     "name": "Nicolls Bridge AL",
+     "v": 13.2,
+     "nights": [
+      13.6,
+      13.6,
+      13.6,
+      13.6,
+      13.6,
+      13.4,
+      13.2,
+      13.2
+     ],
+     "note": "Battery falling 0.06 V a day"
+    }
+   ],
+   "stations": [
+    "hinze_dam_hw_al",
+    "eungella_oxley_rive",
+    "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+    "nicolls_bridge_al"
+   ]
+  },
+  {
+   "type": "checks",
+   "title": "Check signals",
+   "secs": 10,
+   "sev": "warn",
+   "say": "Turbo, quick lap! Boat Mountain, Rock Valley, Bromelton Dam and Blackstone Bridge missed every check. The gauge below Clarrie Hall Dam is still at zero.",
+   "stations": [
+    "boat_mountain_al",
+    "clarrie_hall_dam_d_s",
+    "rock_valley_leycest",
+    "kunghur_the_junction",
+    "dunbible_creek_at_dunbible_creek_rail_trail_bridge"
+   ],
+   "items": [
+    {
+     "id": "boat_mountain_al",
+     "name": "Boat Mountain AL",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Missed checks rising — 100% in the last 24 h"
+    },
+    {
+     "id": "clarrie_hall_dam_d_s",
+     "name": "Clarie Hall Dam D/S",
+     "strip": "MMMMMMMMMMMMMMMMMMMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 93 checks"
+    },
+    {
+     "id": "rock_valley_leycest",
+     "name": "Rock Valley (Leycester Creek)",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Missed checks rising — 100% in the last 24 h"
+    },
+    {
+     "id": "kunghur_the_junction",
+     "name": "Kunghur (The Junction)",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 20 checks"
+    },
+    {
+     "id": "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+     "name": "Dunbible Creek at Dunbible Creek Rail Trail Bridge",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Silent — missed its last 30 checks"
+    }
+   ],
+   "presenter": "turbo"
+  },
+  {
+   "type": "signoff",
+   "title": "That’s the network",
+   "secs": 9,
+   "say": "That's the network: Tallai worth a look, two quiet repeaters further south, and a hundred and twenty-three stations heard again. Back tomorrow.",
+   "line": "That’s not a fault, that’s a symptom."
+  }
+ ],
+ "sources": {
+  "readings": 22758,
+  "stations_heard": 1072,
+  "gathered_at": "2026-11-02T18:32:14.941Z"
+ },
+ "caveats": [
+  "Tallai sends no strict schedule of its own reports, so its night dip is from raw counts over six days.",
+  "Kunghur and Dunbible Creek have weak batteries of their own, so Hartigans Hill cannot yet be called their cause.",
+  "Hinze Dam's and Eungella's lows are single nights; one reading cannot separate a failing battery from a bad value."
+ ],
+ "author": "Claude Code, from the bulletin draft and read-only queries"
+}
