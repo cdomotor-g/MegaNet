@@ -83,16 +83,18 @@ nothing.
 
 **That path re-sends its table, so the bridge remembers what it sent**
 (`src/resends.js`). The gateway keeps every address it has heard with its last
-value; a report from a known address goes out alone, but one from a new address
-goes out at the front of the *whole table*, every entry restamped with that
-publish's time. Stored as they come, the re-sent entries would say every
-address reported again each time any new one did — a quiet station would keep
-looking heard. So per topic the bridge keeps each address's last value and
-stores only each message's first entry, the new addresses straight after it,
-and any later entry whose value has changed. Just after a restart it knows no
-table, so the first whole-table message keeps only its first entry. The raw row
-keeps every byte either way; `message_queued` (debug) logs how many were
-`resent`.
+value. Reports from addresses already in the table go out on their own (or
+together, when a station's sensors arrive in the same instant); a report from a
+new address goes out at the front of the *whole table*, every entry restamped
+with that publish's time. Stored as they come, the re-sent entries would say
+every address reported again each time any new one did — a quiet station would
+keep looking heard. The re-sent part always has the same shape: the previous
+table, in order, at the end of the message. So per topic the bridge remembers
+the last table and keeps what is in front of it, plus any re-sent entry whose
+value has changed; a short message that ends with no table is a batch of
+reports, all kept. When it cannot tell — just after a restart, or a message the
+table does not explain — it keeps the first entry only. The raw row keeps every
+byte either way; `message_queued` (debug) logs how many were `resent`.
 
 **The ALERT2 path republishes too, and its `AlertTimestamp` says so.** The
 gateway publishes a station's last report again every 15 minutes and on the

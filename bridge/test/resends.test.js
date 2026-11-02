@@ -104,6 +104,65 @@ test('the live hour: every fresh report kept, every re-sent entry taken out', ()
   });
 });
 
+test('reports that arrive together from addresses already in the table are all kept', () => {
+  // 02:25:17 UTC: [614, 616, 615] — one station's three sensors, two hours after
+  // they first appeared, all already in the table. Not a table: the 44-entry
+  // table is not behind them, and the next new address (725, at 02:48:07) still
+  // carries it whole. The first version of this filter kept 614 and dropped the
+  // other two, because their values had not changed.
+  const filter = createResendFilter();
+  const table = '713:142 761:135 760:1053 759:133 758:1739 614:1498 616:136 615:14 768:136 765:89 712:61';
+  filter.fresh(TOPIC, frame('712:61'));
+  filter.fresh(TOPIC, frame(table));
+  assert.equal(label(filter.fresh(TOPIC, frame('614:1498 616:136 615:14')).readings), '614:1498 616:136 615:14');
+  // The next table is the old one with the new address on the front — not the
+  // batch — and only the new address is fresh.
+  assert.equal(label(filter.fresh(TOPIC, frame(`725:136 ${table}`)).readings), '725:136');
+  assert.equal(label(filter.fresh(TOPIC, frame(`714:139 725:136 ${table}`)).readings), '714:139');
+});
+
+test('a table delivered again whole keeps only its first entry', () => {
+  // 00:55:19 UTC: the gateway's retained message, handed to the bridge again as
+  // it reconnected — the previous table, same entries, same times. It ends with
+  // no shorter table, so it is read as one this process cannot split.
+  const filter = createResendFilter();
+  const before = '763:140 762:120 707:136 706:9 638:142 637:179 636:1153 712:46 747:131 746:451';
+  filter.fresh(TOPIC, frame('762:120 707:136 706:9 638:142 637:179 636:1153 712:46 747:131 746:451'));
+  filter.fresh(TOPIC, frame(before));
+  assert.equal(label(filter.fresh(TOPIC, frame(`704:1340 ${before}`)).readings), '704:1340');
+  assert.equal(label(filter.fresh(TOPIC, frame(`704:1340 ${before}`)).readings), '704:1340');
+});
+
+test('more new addresses in front of the table than any moment brings is read as lost track', () => {
+  // Nine "new" addresses in front of a two-entry table is not nine reports in
+  // one instant — the largest batch seen was three — but messages this process
+  // never saw. First entry only, and the message becomes the table.
+  const filter = createResendFilter();
+  filter.fresh(TOPIC, frame('746:451'));
+  filter.fresh(TOPIC, frame('747:131 746:451'));
+  const big = '704:1340 763:140 762:120 707:136 706:9 638:142 637:179 636:1153 712:46 747:131 746:451';
+  assert.equal(label(filter.fresh(TOPIC, frame(big)).readings), '704:1340');
+  assert.equal(label(filter.fresh(TOPIC, frame(`705:136 ${big}`)).readings), '705:136');
+});
+
+test('a table emptied and growing again is followed from its first report', () => {
+  // 23:53-23:57 UTC: the table emptied twice; each time the first report went
+  // out alone and each new address then went on the front of a growing table.
+  const filter = createResendFilter();
+  filter.fresh(TOPIC, frame('707:136 706:9 638:143 637:179 636:1153 724:905 747:136 746:451 713:143 712:29'));
+  for (const [line, want] of [
+    ['712:31', '712:31'],
+    ['762:120 712:31', '762:120'],
+    ['763:141 762:120 712:31', '763:141'],
+    ['741:130', '741:130'],
+    ['748:886 741:130', '748:886'],
+    ['749:132 748:886 741:130', '749:132'],
+    ['712:32 749:132 748:886 741:130', '712:32'],
+  ]) {
+    assert.equal(label(filter.fresh(TOPIC, frame(line)).readings), want, line);
+  }
+});
+
 test('resent counts what was taken out', () => {
   const filter = createResendFilter();
   filter.fresh(TOPIC, frame('759:133 712:27'));
