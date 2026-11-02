@@ -2108,6 +2108,13 @@ jobs:
       - name: check_mqtt.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_mqtt.sql
+      # 0097 taking the ELPRO gateway's republished ALERT2 reports back out of
+      # what the bridge stored: a relay sequence through ingest(), 0097 run from
+      # its file twice, and only first sightings, copies counted and the rollups
+      # matching left. Needs no stations.
+      - name: check_alert2_republished.sql
+        if: ${{ !cancelled() }}
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_alert2_republished.sql
       # The receivers behind an ingest token (0045): token-checked, refusing a
       # bad report by name, a change a new row and a repeat not, editors only —
       # and nothing but a GPS fix ever stored as an exact location.

@@ -715,6 +715,19 @@ before its first row, so two receivers posting one burst at once take turns
 rather than both storing it. ALERT2 self-reports and station-number readings
 carry the station's own time and keep the exact key.
 
+**An ALERT2 report the ELPRO gateway republished is one reading (`0097`).** The
+gateway relaying ALERT2 over MQTT publishes a station's last report again every
+15 minutes and on the hour, under a fresh publish time, until the station sends
+something new; the bridge filed each one as a reading until 2 November 2026,
+when `bridge/src/resends.js` started telling them apart by the relayed station's
+own `AlertTimestamp`. `0097` takes the same rule back over the messages still in
+`reading_raw`: per topic and sensor slot, the same stamp and value within 10 s of
+its first sighting is a copy (removed, and counted on that reading's
+`dup_count`), within 11 hours a repeat (removed), and otherwise a report (kept).
+It rebuilds `reading_hourly` and `reading_daily` for the buckets it changed, and
+leaves `reading_raw` and the readings from before the raw window alone.
+`tools/check_alert2_republished.sql` proves it.
+
 A station that transmits both ways has two addresses, and they do not deduplicate
 against each other. That is correct — they are two transmissions — and it is the
 thing `path` and `dup_count` exist to make visible.
