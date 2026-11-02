@@ -244,6 +244,52 @@ for (const c of [
     JSON.stringify(d4.map(m => ({ r: m.readings.map(x => `${x.sensorId}:${x.own}:${x.at}`), c: (m.copies || []).map(x => x.sensorId) }))));
 }
 
+// ── The lean decoder (#259) ──────────────────────────────────────────────────
+//
+// decodeWindow({ lean: true }) filters once per carrier guess and nudges after.
+// It must read what the full decoder reads — the real bursts, the demo band
+// through the live pipeline, and synthesised bursts across SNRs and carrier
+// offsets — and do it in clearly less time. Off unless asked for.
+
+{
+  const keys = r => r.readings.map(x => `${x.sensorId}=${x.value}`).sort().join(' ');
+  const real = [
+    ['the rig (Enhanced iFLOWS)', 'testrig_burst_240k.iq8', D.ENHANCED_IFLOWS],
+    ['Binary 151.500 #1957', 'binary_151.500_1957.iq8', D.BINARY],
+    ['Binary 151.500 #5304, weak', 'binary_151.500_5304_weak.iq8', D.BINARY],
+  ];
+  for (const [name, file, format] of real) {
+    const v = new Uint8Array(fs.readFileSync(path.join(REPO_ROOT, 'test/fixtures/sdr', file)));
+    const a = D.decodeU8(v, { format }), b = D.decodeU8(v, { format, lean: true });
+    check(`lean reads ${name} as the full decoder does`, keys(a) === keys(b) && a.combos === b.combos, `${keys(a)} | lean ${keys(b)}`);
+  }
+
+  let same = 0, n = 0, tFull = 0, tLean = 0;
+  const diffs = [];
+  for (let t = 0; t < 24; t++) {
+    const snr = 3 + (t * 7) % 23, cfo = ((t * 389) % 2400) - 1200, id = 1 + (t * 331) % 8000, val = (t * 97) % 2047;
+    const v = D.synthIq({ frames: [D.encodeFrame(D.BINARY, id, val)], seconds: 3, startSec: 1.0, cfoHz: cfo, snrDb: snr, seed: 100 + t });
+    const f = D.u8ToFloat(v);
+    const a = D.decodeWindow(f.ir, f.ii), b = D.decodeWindow(f.ir, f.ii, { lean: true });
+    tFull += a.ms; tLean += b.ms; n++;
+    if (keys(a) === keys(b)) same++; else diffs.push(`${snr} dB ${cfo} Hz: ${keys(a)} | lean ${keys(b)}`);
+  }
+  check('lean reads 24 synthesised Binary bursts (3–25 dB, ±1.2 kHz) exactly as the full decoder does', same === n, diffs.join('; '));
+  check('…in under 80% of the time', tLean < 0.8 * tFull, `${Math.round(tFull / n)} ms → ${Math.round(tLean / n)} ms a burst`);
+
+  const run = lean => {
+    const out = [];
+    const p = new D.Pipeline(m => { if (m.type === 'decode') out.push(...m.readings.map(x => `${x.sensorId}=${x.value}`)); });
+    p.configure({ deviceRate: 240000, channelOffsetHz: 0, format: D.BINARY, gate: true, squelchDb: 8, lean });
+    const band = D.demoBand();
+    for (let o = 0; o < band.length; o += 32768) p.feed(band.subarray(o, Math.min(band.length, o + 32768)));
+    return out.sort().join(' ');
+  };
+  const full = run(false), lean = run(true);
+  check('the live pipeline with lean on reads the demo band as with it off', full === lean && full.length > 0, `${full} | lean ${lean}`);
+  check('lean is off unless asked for', new D.Pipeline(() => {}).cfg.lean === false);
+}
+
 // ── The Worker's source ──────────────────────────────────────────────────────
 
 {

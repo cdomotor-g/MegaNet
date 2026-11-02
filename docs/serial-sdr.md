@@ -47,6 +47,16 @@ Where the port departs from the Kotlin, the code says so at the spot:
 - **A burst gate.** The live pipeline decodes a window around each burst (the
   channel's power over its own ~30 s floor), rather than every 3 s window. Untick
   *decode bursts only* to go back to the desktop's every-1.5 s cadence.
+- **Lean decoding, when asked for** (`decodeWindow(…, { lean: true })`, or
+  `Pipeline.configure({ lean: true })`; off by default, #259). A burst is decoded
+  with 45 guesses: 3 carrier candidates × 3 tone hypotheses × 5 nudges of ±75 and
+  ±150 Hz. Each guess used to filter the whole window again, which was two thirds
+  of the decode. Lean filters once per hypothesis and makes the nudges afterwards
+  on the 12 kHz baseband, where they cost almost nothing. `npm run alertdsp` holds
+  it to the full decoder: the rig, both real Binary bursts, 24 synthesised bursts
+  from 3 to 25 dB and the demo band through the live pipeline all read the same,
+  in under half the time. RPi ALERT can run it beside the full decoder to compare
+  the two in the field before it is made the default.
 
 ## Getting the stick to the browser
 

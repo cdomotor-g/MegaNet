@@ -374,6 +374,25 @@ const AlertDsp = (function alertDspModule() {
     return { br, bi };
   }
 
+  // Shift a 12 kHz baseband by −dc Hz: what mixDecimate(…, hyp + dc) would have
+  // given, up to the low-pass's edge. dc 0 hands the same arrays back.
+  function nudge(bb, dc) {
+    if (!dc) return bb;
+    const n = bb.br.length, br = new Float32Array(n), bi = new Float32Array(n);
+    const w = -2 * Math.PI * dc / FS_BB, dr = Math.cos(w), di = Math.sin(w);
+    let pr = 1, pi = 0;
+    for (let k = 0; k < n; k++) {
+      const xr = bb.br[k], xi = bb.bi[k];
+      br[k] = xr * pr - xi * pi;
+      bi[k] = xr * pi + xi * pr;
+      const nr = pr * dr - pi * di;
+      pi = pr * di + pi * dr;
+      pr = nr;
+      if ((k & 0x3ff) === 0x3ff) { const m = Math.sqrt(pr * pr + pi * pi); pr /= m; pi /= m; }
+    }
+    return { br, bi };
+  }
+
   // The four-sideband soft decision, normalised to zero mean, unit deviation:
   //   d = (|MF(+f1)| + |MF(−f1)|) − (|MF(+f2)| + |MF(−f2)|)
   // Positive is mark (1), negative is space (0).
@@ -486,6 +505,9 @@ const AlertDsp = (function alertDspModule() {
   //                 a 1-in-64 filter and thousands of bit positions are tried
   //                 per burst, so it lowers the bar; it never replaces consensus.
   //   trim          false decodes the whole window, as the Kotlin did
+  //   lean          true filters the window once per carrier guess instead of
+  //                 once per nudge (below): the same readings in under half the
+  //                 time. Off unless asked for, so ingest decodes as it always has.
   function decodeWindow(ir, ii, opts) {
     opts = opts || {};
     const format = opts.format || BINARY;
@@ -525,8 +547,15 @@ const AlertDsp = (function alertDspModule() {
         // …and a little either side of each. Too few combinations and real
         // frames sit under the bar — that is what made the rig's battery
         // frame drop out on the phone.
+        //
+        // DEPARTS FROM THE KOTLIN with opts.lean. The window is filtered once
+        // for the hypothesis and each nudge is made afterwards, by rotating the
+        // 12 kHz baseband — tens of hertz inside a 5 kHz low-pass, so only the
+        // filter's very edge differs. Two thirds of a burst's decode was this
+        // filtering, repeated 45 times; lean does it 9 times (#259).
+        const base = opts.lean ? mixDecimate(wr, wi, hyp) : null;
         for (const dc of [-150, -75, 0, 75, 150]) {
-          const bb = mixDecimate(wr, wi, hyp + dc);
+          const bb = base ? nudge(base, dc) : mixDecimate(wr, wi, hyp + dc);
           const d = afskSoft(bb.br, bb.bi);
           if (d.length < SPB * 20) continue;
           result.combos++;
@@ -826,7 +855,7 @@ const AlertDsp = (function alertDspModule() {
       this.post = post;
       this.cfg = {
         deviceRate: FS_IN, channelOffsetHz: 0, format: BINARY, minVotes: 4, minVotesCrc: 4,
-        gate: true, squelchDb: 8, fftSize: 2048, specHz: 20, scopeHz: 15, audio: false,
+        gate: true, squelchDb: 8, fftSize: 2048, specHz: 20, scopeHz: 15, audio: false, lean: false,
       };
       this.reset();
     }
@@ -1082,7 +1111,7 @@ const AlertDsp = (function alertDspModule() {
       if (len < FS_IN / 2) return;
       const wr = new Float32Array(len), wi = new Float32Array(len);
       for (let k = 0; k < len; k++) { const p = (from + k) % CAP; wr[k] = this.ringR[p]; wi[k] = this.ringI[p]; }
-      const r = decodeWindow(wr, wi, { format: c.format, minVotes: c.minVotes, minVotesCrc: c.minVotesCrc });
+      const r = decodeWindow(wr, wi, { format: c.format, minVotes: c.minVotes, minVotesCrc: c.minVotesCrc, lean: !!c.lean });
       // Which readings this burst carried. A window reaches 0.4 s or more
       // either side of its burst, so a neighbouring burst — a repeater's copy a
       // moment later, another station keying up — can be read in it too. A
@@ -1191,7 +1220,7 @@ const AlertDsp = (function alertDspModule() {
     FS_IN, FS_BB, DECIM, BAUD, SPB, AFSK_F1, AFSK_F2, FORMATS, DEVICE_RATES,
     BINARY, ASCII, ENHANCED_IFLOWS,
     firwin, fft, crc6Enhanced, parseBytes, parseFrame, encodeFrame, frameBytes,
-    carrierSearch, mixDecimate, afskSoft, gardner, decodeWindow, decodeU8, u8ToFloat,
+    carrierSearch, mixDecimate, nudge, afskSoft, gardner, decodeWindow, decodeU8, u8ToFloat,
     synthIq, demoBand, Decimator, Pipeline, workerSource,
   };
 })();
