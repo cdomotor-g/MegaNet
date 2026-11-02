@@ -47,19 +47,26 @@ Where the port departs from the Kotlin, the code says so at the spot:
 - **A burst gate.** The live pipeline decodes a window around each burst (the
   channel's power over its own ~30 s floor), rather than every 3 s window. Untick
   *decode bursts only* to go back to the desktop's every-1.5 s cadence.
-- **Lean decoding, when asked for** (`decodeWindow(…, { lean: true })`, or
-  `Pipeline.configure({ lean: true })`; off by default, #259). A burst is decoded
-  with 45 guesses: 3 carrier candidates × 3 tone hypotheses × 5 nudges of ±75 and
-  ±150 Hz. Each guess used to filter the whole window again, which was two thirds
-  of the decode. Lean filters once per hypothesis and makes the nudges afterwards
-  on the 12 kHz baseband, where they cost almost nothing. `npm run alertdsp` holds
-  it to the full decoder: the rig, both real Binary bursts, 24 synthesised bursts
-  from 3 to 25 dB and the demo band through the live pipeline all read the same,
-  in under half the time. `Pipeline.configure({ compare: true })` also decodes
-  each burst the other way and reports whether the two read the same, with each
-  one's time, in the decode's `compare`. The readings posted stay the pipeline's
-  own, and it skips the comparison while bursts are waiting. RPi ALERT uses it to
-  prove lean in the field before it is made the default.
+- **Lean decoding** (#259). A burst is decoded with 45 guesses: 3 carrier
+  candidates × 3 tone hypotheses × 5 nudges of ±75 and ±150 Hz. Each guess used to
+  filter the whole window again, which was two thirds of the decode. Lean filters
+  once per hypothesis and makes the nudges afterwards on the 12 kHz baseband, where
+  they cost almost nothing. **The live pipeline decodes lean by default** since
+  2026-11-03. The first base station to run both read 11,628 live bursts with
+  them, and 14 (0.12%) read differently; lean took a third of the time.
+  `Pipeline.configure({ lean: false })` goes back to the full decoder, and
+  `decodeWindow` is full unless given `lean: true`. `npm run alertdsp` holds lean
+  to the full decoder: the rig, both real Binary bursts, 24 synthesised bursts from
+  3 to 25 dB and the demo band all read the same. `compare: true` decodes each
+  burst the other way too and reports whether the two agree, in the decode's
+  `compare`; the readings posted stay the pipeline's own, and the comparison is
+  skipped while bursts are waiting.
+- **Between bursts, block copies.** The samples go into the decode, capture and
+  spectrum rings a block at a time rather than a sample at a time, with the same
+  contents, message for message. That's about a quarter of a 240 ksps channel's
+  work between bursts. `specHz: 0` turns the spectrum off for a pipeline that
+  doesn't need one: RPi ALERT's second and later channels on a stick, whose slice
+  the first channel draws. That's another sixth.
 
 ## Getting the stick to the browser
 

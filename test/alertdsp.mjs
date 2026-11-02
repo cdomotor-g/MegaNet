@@ -287,19 +287,33 @@ for (const c of [
   };
   const full = run(false), lean = run(true);
   check('the live pipeline with lean on reads the demo band as with it off', full === lean && full.length > 0, `${full} | lean ${lean}`);
-  check('lean is off unless asked for', new D.Pipeline(() => {}).cfg.lean === false);
+  check('the live pipeline decodes lean unless told lean: false', new D.Pipeline(() => {}).cfg.lean === true);
 
   // compare: the posted readings are the pipeline's own, and every decode
   // says whether the other way read the same.
   const cmp = [], got = [];
   const pc = new D.Pipeline(m => { if (m.type === 'decode') { got.push(...m.readings.map(x => `${x.sensorId}=${x.value}`)); if (m.compare) cmp.push(m.compare); } });
-  pc.configure({ deviceRate: 240000, channelOffsetHz: 0, format: D.BINARY, gate: true, squelchDb: 8, compare: true });
+  pc.configure({ deviceRate: 240000, channelOffsetHz: 0, format: D.BINARY, gate: true, squelchDb: 8, compare: true, lean: false });
   const band = D.demoBand();
   for (let o = 0; o < band.length; o += 32768) pc.feed(band.subarray(o, Math.min(band.length, o + 32768)));
   check('compare posts the full decoder\'s readings unchanged', got.sort().join(' ') === full, got.join(' '));
   check('…and says, for every burst, that lean read the same', cmp.length >= 3 && cmp.every(x => x.same && x.msLean > 0 && x.msFull > 0),
     JSON.stringify(cmp.map(x => [x.same, x.msFull, x.msLean])));
   check('compare is off unless asked for', new D.Pipeline(() => {}).cfg.compare === false);
+
+  // specHz 0: no spectrum at all, and nothing else changes — the Pi's other
+  // channels on a stick, whose slice its first channel already draws.
+  const msgsOf = spec => {
+    const out = [];
+    const q = new D.Pipeline(m => out.push(m));
+    q.configure({ deviceRate: 240000, channelOffsetHz: 0, format: D.BINARY, gate: true, squelchDb: 8, specHz: spec });
+    for (let o = 0; o < band.length; o += 32768) q.feed(band.subarray(o, Math.min(band.length, o + 32768)));
+    return out;
+  };
+  const on = msgsOf(1), off = msgsOf(0);
+  const dk = ms => ms.filter(m => m.type === 'decode').flatMap(m => m.readings.map(x => `${x.sensorId}=${x.value}`)).sort().join(' ');
+  check('specHz 0 posts no spectrum', on.some(m => m.type === 'spectrum') && !off.some(m => m.type === 'spectrum'));
+  check('…and decodes the same', dk(on) === dk(off) && dk(on) === full, dk(off));
 }
 
 // ── The Worker's source ──────────────────────────────────────────────────────

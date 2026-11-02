@@ -29,7 +29,7 @@
   },
   "status": {
     "phase": "live",
-    "updated": "2026-11-02",
+    "updated": "2026-11-03",
     "summary": "Live and in daily use (database schema 95): this week added teams and the tasks handed to them, with the SoRT scope builder's hand-off, a driving mode that follows a station's route in 3-D, the agent API's changelog and email list, ACMA licences and radio paths in the API, the Repeaters tab and cuts to database I/O, while account email, compute size and the ACMA download link wait on the owner.",
     "now": [
       "Teams and tasks (0095) live: thirteen starter teams with nobody on them yet — an administrator names each team's owners on the Admin tab; SoRT's #tasks= hand-off lands on the Tasks tab for review",
@@ -41,7 +41,7 @@
       "#217 and #244 transmitter drift and bit-flip sources: gathering live days of carrier data",
       "#258 flaky Site features 3-D hand-back check in CI",
       "Legacy ALERT over MQTT trial (ELPRO gateway, Alert1 path): the bridge decodes it and drops the gateway's re-sent table, live since 2 Nov with the trial's first hour replayed; the ALERT2 path's timer republishes are now stored once too (0097 cleared a month of them)",
-      "#259 a lighter off-air decoder: part 1 (filter once per carrier guess, the same readings in under half the time) shipped opt-in as `lean`; RPi ALERT compares it with the full decoder in the field before it becomes the default"
+      "#259 a lighter off-air decoder: lean decoding is the live pipeline's default (0.12% of 11,628 live bursts read differently, a third of the time), and the work between bursts is a quarter less; part 2, filtering channels only around bursts, left"
     ],
     "next": [
       "#252–#254 road routes: avoid closures, inspection runs, routes kept offline (EPIC #250)",

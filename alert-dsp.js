@@ -506,8 +506,10 @@ const AlertDsp = (function alertDspModule() {
   //                 per burst, so it lowers the bar; it never replaces consensus.
   //   trim          false decodes the whole window, as the Kotlin did
   //   lean          true filters the window once per carrier guess instead of
-  //                 once per nudge (below): the same readings in under half the
-  //                 time. Off unless asked for, so ingest decodes as it always has.
+  //                 once per nudge (below): the same readings in a third of the
+  //                 time. The live Pipeline decodes lean unless told lean: false
+  //                 (since 2026-11-03: 14 of 11,628 live bursts read differently
+  //                 at the first base station to compare the two, 0.12%).
   function decodeWindow(ir, ii, opts) {
     opts = opts || {};
     const format = opts.format || BINARY;
@@ -827,6 +829,17 @@ const AlertDsp = (function alertDspModule() {
     }
   }
 
+  // Write `src` into the ring `ring` as if sample by sample from position `at`
+  // (any non-negative count; it wraps): at most two block copies.
+  function ringPut(ring, at, src) {
+    const cap = ring.length, n = src.length;
+    if (!n) return;
+    if (n > cap) { ringPut(ring, at + n - cap, src.subarray(n - cap)); return; }
+    const p = at % cap, first = Math.min(n, cap - p);
+    ring.set(first === n ? src : src.subarray(0, first), p);
+    if (first < n) ring.set(src.subarray(first), 0);
+  }
+
   // Goertzel power of one tone over the last `len` samples of a ring.
   function goertzel(buf, start, len, freq, fs) {
     const w = 2 * Math.PI * freq / fs, c = 2 * Math.cos(w);
@@ -855,7 +868,7 @@ const AlertDsp = (function alertDspModule() {
       this.post = post;
       this.cfg = {
         deviceRate: FS_IN, channelOffsetHz: 0, format: BINARY, minVotes: 4, minVotesCrc: 4,
-        gate: true, squelchDb: 8, fftSize: 2048, specHz: 20, scopeHz: 15, audio: false, lean: false, compare: false,
+        gate: true, squelchDb: 8, fftSize: 2048, specHz: 20, scopeHz: 15, audio: false, lean: true, compare: false,
       };
       this.reset();
     }
@@ -934,17 +947,20 @@ const AlertDsp = (function alertDspModule() {
       // device rate → 240k channel
       const ch = this.dec1.process(ir, ii);
       const m = ch.r.length;
-      const CAP = this.ringR.length;
       const passthrough = this.dec1.factor === 1 && !this.dec1.offset;
-      for (let k = 0; k < m; k++) {
-        const pos = (this.total + k) % CAP;
-        this.ringR[pos] = ch.r[k]; this.ringI[pos] = ch.i[k];
-        const cp = ((this.total + k) % (this.capU8.length >> 1)) * 2;
-        if (passthrough) { this.capU8[cp] = u8[2 * k]; this.capU8[cp + 1] = u8[2 * k + 1]; }
-        else {
-          this.capU8[cp] = Math.max(0, Math.min(255, Math.round(ch.r[k] + 127.5)));
-          this.capU8[cp + 1] = Math.max(0, Math.min(255, Math.round(ch.i[k] + 127.5)));
+      // Into the rings a block at a time (at most two pieces, either side of
+      // the wrap), not a sample at a time with a division each: the same
+      // contents, a fraction of the work between bursts (#259).
+      ringPut(this.ringR, this.total, ch.r);
+      ringPut(this.ringI, this.total, ch.i);
+      if (passthrough) ringPut(this.capU8, this.total * 2, u8.subarray(0, 2 * m));
+      else {
+        const q = new Uint8Array(2 * m);
+        for (let k = 0; k < m; k++) {
+          q[2 * k] = Math.max(0, Math.min(255, Math.round(ch.r[k] + 127.5)));
+          q[2 * k + 1] = Math.max(0, Math.min(255, Math.round(ch.i[k] + 127.5)));
         }
+        ringPut(this.capU8, this.total * 2, q);
       }
       this.total += m;
 
@@ -984,10 +1000,15 @@ const AlertDsp = (function alertDspModule() {
 
     feedSpectrum(ir, ii, n) {
       const c = this.cfg, N = c.fftSize;
-      for (let i = 0; i < n; i++) {
-        this.specR[this.specPos] = ir[i]; this.specI[this.specPos] = ii[i];
-        this.specPos = (this.specPos + 1) % N;
-      }
+      // specHz 0: no spectrum from this pipeline — the Pi's other channels on
+      // a stick, whose spectrum is the same slice its first channel draws.
+      if (!c.specHz) return;
+      // Only the last N samples can matter; they go where the sample-by-sample
+      // loop would have put them.
+      const from = Math.max(0, n - N);
+      ringPut(this.specR, this.specPos + from, ir.subarray(from, n));
+      ringPut(this.specI, this.specPos + from, ii.subarray(from, n));
+      this.specPos = (this.specPos + n) % N;
       this.specFill = Math.min(N, this.specFill + n);
       this.sinceFft += n; this.sincePost += n;
       if (this.specFill >= N && this.sinceFft >= c.deviceRate / (c.specHz * 4)) {

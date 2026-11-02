@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-02** (revision 214 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-03** (revision 215 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -421,7 +421,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 > ~~**⚠️** These were originally listed as "independent — no sequencing dependency." They are logically independent but **mechanically serialised**~~ — **resolved the easy way: one agent did both in sequence**, #121 read #120's pane comment instead of picking a z-index blind, and the `MemMeter` third of the table had already been obsoleted by #144 (layers are counted generically off `liveMaps()`).
 
 ## Standalone issues
-- **#259** `[Standalone]` `[Opus5/High]` — **OPEN, opened revision 214** — a lighter off-air decoder, so cheaper industrial computers (a Toradex Verdin AM62, open-ALERT's trial) and a busy Pi 4 keep up. **Part 1 shipped at revision 214, opt-in:** `decodeWindow`/`Pipeline` `lean` filters once per carrier guess. It reads the same as the full decoder on every real and synthesised burst in `npm run alertdsp`, in under half the time. It is off by default, so the Serial Monitor and ingest decode exactly as before. RPi ALERT runs it beside the full decoder to compare (RPi_ALERT#3). **Left:** make `lean` the default once RPi ALERT's field comparison agrees, then part 2: filter a channel only around bursts (a stick-level front end watching 50 FFTs a second, about a fortieth of the between-bursts work in a prototype).
+- **#259** `[Standalone]` `[Opus5/High]` — **OPEN, opened revision 214** — a lighter off-air decoder, so cheaper industrial computers (a Toradex Verdin AM62, open-ALERT's trial) and a busy Pi 4 keep up. **Part 1 done at revision 215:** lean decoding (filter once per carrier guess) is the live pipeline's default, after RPi ALERT's compare at the first base station: 14 of 11,628 live bursts read differently (0.12%), lean in a third of the time. Between bursts, the rings are filled a block at a time (exactly the same messages, a quarter less work), and `specHz: 0` lets a pipeline skip the spectrum (another sixth). **Left:** part 2, filtering a channel only around bursts (a stick-level front end watching 50 FFTs a second).
 - **#255** `[Standalone]` `[Human]` — **OPEN, opened revision 200** — move the Supabase database to the **Small** compute size (2 GB, about US$15 a month, about US$5 more than Micro once the Pro plan's compute credit is counted). Supabase warned on 2026-10-28 that the project is using up its Disk IO Budget; `0087` removed the biggest causes, and what is left is a 902 MB database with 224 MB of shared buffers. Part 1 reads the current size and the Database report's Disk IOPS and Memory charts; Part 2 changes the size (under 2 minutes offline, in a quiet dry-weather hour) and checks readings resume; Part 3 hands back to an agent to read the new settings. Depends on nothing; #256 decides whether Small stays enough.
 - ~~**#249**~~ `[Standalone]` `[Human]` — **CLOSED at revision 196, opened at 193** — the db-migrate workflow's `SUPABASE_DB_URL` secret replaced with a session-pooler URI; the owner's run and an agent session's dry run both reach the database (schema_version 86, nothing pending). Agents apply migrations with `gh workflow run db-migrate.yml --ref main` again.
 - ~~**#248**~~ `[Standalone]` `[Human]` — **CLOSED at revision 208 as a duplicate of #245**, which needs the same fix and now carries `CI doctor: Refresh ACMA RRL data` in its title so the CI doctor reports there — CI doctor: Refresh ACMA RRL data finds no working download URL (cdn.acma.gov.au 404); someone copies ACMA's current extract link into `ACMA_ZIP_URLS`; depends on nothing, blocks nothing.
@@ -704,7 +704,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### AI agent — Opus5
 | Effort | Issues |
 |---|---|
-| High | **#259** (a lighter off-air decoder — *part 1 shipped opt-in; default after RPi ALERT's field comparison, then part 2*) · **#250** (epic — road routes on the map; rating is for its children) · **#252** (routes round QLDTraffic's flooded and closed roads — *best after #238*) · **#244** (who corrupts — bit flips by carrier fingerprint, *live; a week of data to look at*) · **#186** (epic — rating is for its children; #187 is its last open child) · **#204** (assessment report drafts from the dossier — *blocked on the example reports*) · **#214** (epic — rating is for its children) · **#216** (alerts to staff — *a person sets two secrets*) · **#240** (epic — rating is for its children) · **#260** (fold the ALERT twins stored before `0096` — *after #243 and #257*) · **#243** (archive to R2, then `retain()` scheduled — *last*) |
+| High | **#259** (a lighter off-air decoder — *part 1 done and the default; part 2 left: filter channels only around bursts*) · **#250** (epic — road routes on the map; rating is for its children) · **#252** (routes round QLDTraffic's flooded and closed roads — *best after #238*) · **#244** (who corrupts — bit flips by carrier fingerprint, *live; a week of data to look at*) · **#186** (epic — rating is for its children; #187 is its last open child) · **#204** (assessment report drafts from the dossier — *blocked on the example reports*) · **#214** (epic — rating is for its children) · **#216** (alerts to staff — *a person sets two secrets*) · **#240** (epic — rating is for its children) · **#260** (fold the ALERT twins stored before `0096` — *after #243 and #257*) · **#243** (archive to R2, then `retain()` scheduled — *last*) |
 | Med | **#253** (an inspection run — stations in the best order, road distances on Nearby) · ~~#206~~ (*closed at revision 208: the photo reader does it*) · **#247** (carrier outages on Station Health — *a maybe, parked; blocked on the owner choosing a source*) |
 
 ### AI agent — Sonnet5
@@ -837,6 +837,15 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 215 — 2026-11-03: 🪶 #259 — lean decoding is the default, and the work between bursts a quarter less
+
+RPi ALERT 0.16's *Compare* ran overnight at the first base station: 14 of 11,628 live bursts read differently (0.12%; 13 of them on one stick with a differently placed aerial), lean in 33–34% of the full decoder's time. The owner: *"0.7% seems like a rate we can live with for the savings … progress with leaning up."* **Closes nothing; #259 stays open for part 2.**
+
+- `alert-dsp.js`: `Pipeline` `lean` defaults to true, so the Serial Monitor, the Pi relay (`sdr-pi`) and RPi ALERT all decode lean; `lean: false` gives the full decoder, and `decodeWindow` is full unless asked.
+- `alert-dsp.js`, between bursts: `ringPut()` fills the decode, capture and spectrum rings a block at a time. Checked against the old code on the demo band at 240 ksps, a 960 ksps stream 50 kHz off, and lean with compare, at three chunk sizes: every message the same. A 240 ksps channel went from 22.6 to 17.2 ms a second of signal. `specHz: 0` skips the spectrum entirely: 13.3 ms.
+- `npm run alertdsp` (71): lean is the pipeline's default, and `specHz: 0` posts no spectrum and decodes the same. `docs/serial-sdr.md`: *Lean decoding* and *Between bursts, block copies*.
+- RPi ALERT 0.17 takes it: its default decoder is lean, and only a stick's first channel computes the stick's spectrum.
 
 ### Revision 214 — 2026-11-02: 🪶 #259 — a lighter decoder, alongside the full one
 
