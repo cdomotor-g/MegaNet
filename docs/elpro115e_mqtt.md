@@ -197,8 +197,20 @@ from a known address is published alone, but one from a **new** address is publi
 the front of the **whole table**, every entry restamped with that moment — which looks
 like the unit re-transmitting history. It is not a delivery fault: each publish is
 received and acknowledged once. The bridge stores only the fresh entries (see
-`bridge/README.md`); if the unit has a setting that publishes only the report that
-arrived, it would save the airtime, and **record it here if you find one**.
+`bridge/README.md`).
+
+On the bench it **settles down once every address is in the table**: the last whole-table
+publish was at 01:47 UTC (44 entries, about 2 h 10 min into the trial), and every message
+after it was one report from an address already there. The table also **empties now and
+then** — three times in the first 70 minutes — and each time it fills again from scratch,
+a whole-table burst per address. So expect the bursts back after anything that empties it
+(the bench saw no cause; a configuration save or restart is the first suspect) and whenever
+an address the table lacks reports — a station on a daily timer, or one that reports only on
+an event. **No setting turns it off**, as far as the technician could find (2 November
+2026); **Historian** and **Queue Size** are not it — the bursts went on with Historian off and
+a queue of 1, and each one is a single publish with one time, not a backlog. Leave Historian
+on: it is the store-and-forward that keeps an outage's reports, and the bridge drops what it
+replays twice.
 
 **5 · The ALERT2 path republishes as well — on a timer.** Every ALERT2 set carries an
 `AlertTimestamp` (the relayed station's own stamp, seconds since its most recent 00:00 or
