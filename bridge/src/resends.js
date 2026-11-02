@@ -49,24 +49,66 @@
 //
 // The memory is a Map per topic and lives only as long as the process; it is
 // small (one number per ALERT address) and bounded in topics.
+//
+// ── The ALERT2 relay path does it too (`…/elpro/Station NNNN`) ──────────────
+//
+// Measured over every ALERT2 message the bench gateway sent from 2 October to
+// 2 November 2026: 22,261 sensor values, about 2,100 of them a report seen for
+// the first time. The rest are the gateway publishing a report it has already
+// published, with a fresh `timestamp` each time:
+//
+//   - again within seconds (median 2.6 s) — the same burst heard twice, or the
+//     same publish delivered twice;
+//   - again every 15 minutes, and again on the hour, for as long as the
+//     station sends nothing new — out to days. A station that has gone quiet
+//     keeps being "heard".
+//
+// Here the frame says which is which: every set carries the relayed station's
+// own `AlertTimestamp` (messages.js keeps it beside the reading), and a new
+// transmission always carries a new one — across that month an old stamp never
+// came back after a newer one. The stamp cannot be placed in time (the bench
+// clocks keep no zone this can name), but it does not need to be: per topic,
+// each sensor slot's last report is remembered as stamp and value, and a set
+// with both the same is the same report.
+//
+//   - Within A2_COPY_MS of its first sighting it is a copy, and is posted under
+//     the first sighting's time so the database counts it on that reading
+//     (dup_count), as it counts any copy.
+//   - After that it is the gateway repeating itself, and is taken out.
+//   - Past A2_REPEAT_MS it is treated as new again, because the stamp counts a
+//     half-day and wraps: a station that transmits at the same second every
+//     hour sends the same stamp twelve hours later, and a value that has not
+//     changed (a battery, a fixed RSSI) makes it the same pair. Eleven hours
+//     keeps that genuine report. The cost is a station that has gone quiet
+//     being stored once more every eleven hours, against four or more an hour
+//     before this.
+//
+// A set with no AlertTimestamp (Station 1003's frames carry none) is passed
+// through untouched: there is nothing to tell it by.
+
+const { alertStampOf } = require('./messages');
 
 const DEFAULT_MAX_TABLES = 256;
+const A2_COPY_MS = 10 * 1000;
+const A2_REPEAT_MS = 11 * 60 * 60 * 1000;
 
 function createResendFilter({ maxTables = DEFAULT_MAX_TABLES } = {}) {
-  // topic → { values: Map<alert_id, value_raw>, warm: boolean }
+  // Legacy: topic → { values: Map<alert_id, value_raw>, warm: boolean }
+  // ALERT2: topic → { values: Map<a2_sensor, {stamp, value, ts, at}> }
   const tables = new Map();
+  const a2Tables = new Map();
 
-  function tableFor(key) {
-    let table = tables.get(key);
+  function tableFor(key, map = tables) {
+    let table = map.get(key);
     if (table) {
       // Most recently used last, so the first key is the one to evict.
-      tables.delete(key);
-      tables.set(key, table);
+      map.delete(key);
+      map.set(key, table);
       return table;
     }
     table = { values: new Map(), warm: false };
-    tables.set(key, table);
-    while (tables.size > maxTables) tables.delete(tables.keys().next().value);
+    map.set(key, table);
+    while (map.size > maxTables) map.delete(map.keys().next().value);
     return table;
   }
 
@@ -114,7 +156,52 @@ function createResendFilter({ maxTables = DEFAULT_MAX_TABLES } = {}) {
     };
   }
 
-  return { fresh, size: () => tables.size };
+  /**
+   * The readings in one ALERT2 relay message that are not the gateway
+   * repeating a report it has already published (see the header).
+   *
+   * `readings` are what parseElpro() made of the message, each with its
+   * AlertTimestamp beside it. Returns `{readings, resent, copies}`: the
+   * readings to post, how many were taken out as repeats, and how many were
+   * posted as copies under their first sighting's time.
+   */
+  function freshA2(key, readings) {
+    const known = tableFor(key, a2Tables).values;
+    const out = [];
+    let resent = 0;
+    let copies = 0;
+    for (const r of readings) {
+      const stamp = alertStampOf(r);
+      if (stamp === null || !Number.isInteger(r.a2_sensor)) {
+        out.push(r);
+        continue;
+      }
+      // When, by the gateway's clock — its publish time, which is what the
+      // reading carries; the receipt time stands in if it carried none.
+      const at = msOf(r.reading_ts);
+      const last = known.get(r.a2_sensor);
+      if (last && last.stamp === stamp && last.value === r.value_raw && at - last.at < A2_REPEAT_MS) {
+        if (at - last.at <= A2_COPY_MS) {
+          out.push({ ...r, reading_ts: last.ts });
+          copies += 1;
+        } else {
+          resent += 1;
+        }
+        continue;
+      }
+      known.set(r.a2_sensor, { stamp, value: r.value_raw, ts: r.reading_ts, at });
+      out.push(r);
+    }
+    return { readings: out, resent, copies };
+  }
+
+  return { fresh, freshA2, size: () => tables.size + a2Tables.size };
 }
 
-module.exports = { createResendFilter, DEFAULT_MAX_TABLES };
+function msOf(ts) {
+  if (typeof ts === 'number' && Number.isFinite(ts)) return ts;
+  const ms = Date.parse(ts);
+  return Number.isFinite(ms) ? ms : Date.now();
+}
+
+module.exports = { createResendFilter, DEFAULT_MAX_TABLES, A2_COPY_MS, A2_REPEAT_MS };

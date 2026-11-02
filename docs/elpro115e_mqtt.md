@@ -200,6 +200,17 @@ received and acknowledged once. The bridge stores only the fresh entries (see
 `bridge/README.md`); if the unit has a setting that publishes only the report that
 arrived, it would save the airtime, and **record it here if you find one**.
 
+**5 · The ALERT2 path republishes as well — on a timer.** Every ALERT2 set carries an
+`AlertTimestamp` (the relayed station's own stamp, seconds since its most recent 00:00 or
+12:00), and on the bench the same stamp and values come back about every 15 minutes and
+on the hour, each time with a fresh `timestamp`, for as long as the station sends nothing
+new — in the month to 2 November 2026, 22,261 values for about 2,100 reports. The bridge
+now stores each report once (see `bridge/README.md`). The bench stations' clocks keep
+none of UTC, AEST or AEDT, so the stamp says *which* report this is but not *when* it was
+sent; the reading is filed at the gateway's time for its first publish. If the unit's
+**Update Time** on these inputs is what drives the republishing, setting it to 0 and
+relying on **Sensitivity** would stop it — **record what you find**.
+
 **Optional: capture the whole ELPRO tree.** Setting the Topic Prefix one level deeper —
 `meganet/v1/<station>/logger/reading/elpro/` — puts *everything* the gateway emits under
 the subscribed filter, including the DBIRTH copies and the diagnostic devices. It is not

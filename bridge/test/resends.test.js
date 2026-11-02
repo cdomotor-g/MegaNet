@@ -165,3 +165,90 @@ test('the memory is bounded in topics', () => {
   for (let i = 0; i < 10; i += 1) filter.fresh(`t${i}`, frame('712:1'));
   assert.equal(filter.size(), 3);
 });
+
+// ── The ALERT2 relay path (`…/elpro/Station NNNN`) ───────────────────────────
+
+const { parseElpro, alertStampOf } = require('../src/messages');
+
+// One ALERT2 relay message as the gateway publishes it: every set stamped with
+// the publish time, and carrying the relayed station's own AlertTimestamp.
+function a2(station, at, sets) {
+  const ts = Date.parse(at);
+  const frame = sets.split(' ').map((s) => {
+    const [pair, stamp] = s.split('@');
+    const [sensor, value] = pair.split(':').map(Number);
+    const set = { timestamp: ts, Sensor: sensor, Value: value };
+    if (stamp !== undefined) set.AlertTimestamp = Number(stamp);
+    return set;
+  });
+  return parseElpro(Buffer.from(JSON.stringify(frame)), undefined, station).readings;
+}
+const a2label = (rs) => rs.map((r) => `${r.a2_sensor}:${r.value_raw}`).join(' ');
+const A2_TOPIC = 'meganet/v1/elpro_test/logger/reading/elpro/Station 1000';
+
+test('ALERT2: a report republished on the gateway timer is stored once (Station 1000, live)', () => {
+  // Station 1000 on 1-2 November 2026, as reading_raw holds it: slots 9 and 10
+  // every quarter hour and 0, 7, 8 at :26, all under one AlertTimestamp per
+  // hour — the gateway publishing the station's last report again until the
+  // next one arrives. Every one of these was stored as a new reading.
+  const filter = createResendFilter();
+  const run = (at, sets) => a2label(filter.freshA2(A2_TOPIC, a2(1000, at, sets)).readings);
+
+  assert.equal(run('2026-11-01T23:01:54Z', '9:248@13604 10:-100@13604'), '9:248 10:-100');
+  assert.equal(run('2026-11-01T23:16:54Z', '9:248@13604 10:-100@13604'), '');
+  assert.equal(run('2026-11-01T23:26:17Z', '0:35@13604 7:-1250@13604 8:137@13604 9:248@13604 10:-100@13604'),
+    '0:35 7:-1250 8:137', 'slots seen for the first time are kept; the rest of the message is not');
+  assert.equal(run('2026-11-01T23:31:54Z', '9:248@13604 10:-100@13604'), '');
+  assert.equal(run('2026-11-01T23:46:54Z', '9:248@13604 10:-100@13604'), '');
+  // A new transmission is a new stamp, whatever the values.
+  assert.equal(run('2026-11-02T00:16:54Z', '9:248@39711 10:-100@39711'), '9:248 10:-100');
+  assert.equal(run('2026-11-02T00:26:17Z', '0:35@39711 7:-1250@39711 8:137@39711 9:248@39711 10:-100@39711'),
+    '0:35 7:-1250 8:137');
+  assert.equal(run('2026-11-02T00:31:54Z', '9:248@39711 10:-100@39711'), '');
+  assert.equal(run('2026-11-02T01:16:55Z', '9:248@111 10:-100@111'), '9:248 10:-100');
+});
+
+test('ALERT2: the same report again within seconds is posted as a copy of the first', () => {
+  // Station 1001, 23:36 UTC on 1 November: the same AlertTimestamp in two
+  // messages a second apart. Posted under the first one's time, so the
+  // database counts it on that reading instead of storing a second.
+  const filter = createResendFilter();
+  const topic = 'meganet/v1/elpro_test/logger/reading/elpro/Station 1001';
+  const first = filter.freshA2(topic, a2(1001, '2026-11-01T23:36:27.200Z', '0:2627@4310 8:143@4310 10:-89@4310'));
+  const again = filter.freshA2(topic, a2(1001, '2026-11-01T23:36:28.400Z', '0:2627@4310 8:143@4310 10:-89@4310'));
+  assert.equal(first.copies, 0);
+  assert.equal(again.copies, 3);
+  assert.equal(again.resent, 0);
+  assert.deepEqual(again.readings.map((r) => r.reading_ts), first.readings.map((r) => r.reading_ts));
+});
+
+test('ALERT2: the same stamp and value twelve hours on is a new report', () => {
+  // The stamp counts a half-day, so a station transmitting at the same second
+  // every hour repeats it twelve hours later — with a fixed value, exactly.
+  const filter = createResendFilter();
+  assert.equal(a2label(filter.freshA2(A2_TOPIC, a2(1000, '2026-11-02T01:01:54Z', '9:248@111')).readings), '9:248');
+  assert.equal(a2label(filter.freshA2(A2_TOPIC, a2(1000, '2026-11-02T13:01:54Z', '9:248@111')).readings), '9:248');
+});
+
+test('ALERT2: a changed value, another station, or no stamp at all is never taken out', () => {
+  const filter = createResendFilter();
+  filter.freshA2(A2_TOPIC, a2(1000, '2026-11-02T00:16:54Z', '9:248@39711'));
+  // Same stamp, different value: not the same report.
+  assert.equal(a2label(filter.freshA2(A2_TOPIC, a2(1000, '2026-11-02T00:31:54Z', '9:249@39711')).readings), '9:249');
+  // Another relayed station keeps its own memory.
+  const other = 'meganet/v1/elpro_test/logger/reading/elpro/Station 1001';
+  assert.equal(a2label(filter.freshA2(other, a2(1001, '2026-11-02T00:31:54Z', '9:248@39711')).readings), '9:248');
+  // Station 1003's frames carry no AlertTimestamp — nothing to tell them by.
+  const t1003 = 'meganet/v1/elpro_test/logger/reading/elpro/Station 1003';
+  for (const at of ['2026-11-02T00:01:39Z', '2026-11-02T00:16:39Z']) {
+    assert.equal(a2label(filter.freshA2(t1003, a2(1003, at, '13:93.3 11:137')).readings), '13:93.3 11:137');
+  }
+});
+
+test('ALERT2: the AlertTimestamp rides beside the reading, never in what is posted', () => {
+  const [r] = a2(1000, '2026-11-02T00:16:54Z', '9:248@39711');
+  assert.equal(alertStampOf(r), 39711);
+  assert.deepEqual(r, { a2_station: 1000, a2_sensor: 9, reading_ts: Date.parse('2026-11-02T00:16:54Z'), value_raw: 248 });
+  assert.ok(!JSON.stringify(r).includes('39711'));
+  assert.equal(alertStampOf(a2(1003, '2026-11-02T00:01:39Z', '13:93.3')[0]), null);
+});

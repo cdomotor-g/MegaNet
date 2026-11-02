@@ -202,14 +202,24 @@ function createBridge(config, deps = {}) {
     // reconstruct the topic from a log line that has since aged out.
     if (route.source) parsed.envelope.path = topic;
 
-    // The legacy ALERT gateway re-sends its whole table whenever a new address
-    // reports; only the fresh reports become readings. The frame in the
-    // envelope is untouched, so the raw row still holds every entry.
+    // Both ELPRO relay paths re-send what they have already published — the
+    // legacy one its whole table whenever a new address reports, the ALERT2
+    // one a station's last report on a timer. Only fresh reports become
+    // readings (resends.js). The frame in the envelope is untouched, so the
+    // raw row still holds every entry.
     let resent = 0;
+    let copies = 0;
     if (route.legacyAlert) {
       const kept = resends.fresh(topic, parsed.readings);
       parsed.readings = kept.readings;
       resent = kept.resent;
+    } else if (route.sourceStation !== undefined) {
+      // The ALERT2 relay path republishes a station's last report on a timer
+      // for as long as nothing new arrives; its AlertTimestamp says so.
+      const kept = resends.freshA2(topic, parsed.readings);
+      parsed.readings = kept.readings;
+      resent = kept.resent;
+      copies = kept.copies;
     }
 
     log.debug('message_queued', {
@@ -222,6 +232,7 @@ function createBridge(config, deps = {}) {
       legacyAlert: route.legacyAlert,
       readings: parsed.readings.length,
       resent,
+      copies,
       dup: packet.dup || false,
     });
 

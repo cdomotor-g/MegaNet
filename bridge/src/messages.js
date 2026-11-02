@@ -38,6 +38,21 @@ const MAX_READINGS = 1000;
 // unacked message.
 const MAX_BYTES = 256 * 1024;
 
+// The relayed ALERT2 station's own time stamp for a reading — the frame's
+// `AlertTimestamp`, seconds since the station's most recent 00:00 or 12:00 —
+// kept beside the reading rather than in it. It is not a time Flood-Net can
+// place (the bench stations' clocks keep none of UTC, AEST or AEDT), so it is
+// not posted; but it is the report's identity, and resends.js needs it to tell
+// a fresh report from the gateway publishing an old one again. A WeakMap so it
+// is invisible to JSON.stringify and to anything comparing readings.
+const A2_STAMPS = new WeakMap();
+
+/** The AlertTimestamp a reading's set carried, or null. */
+function alertStampOf(reading) {
+  const stamp = reading && typeof reading === 'object' ? A2_STAMPS.get(reading) : undefined;
+  return stamp === undefined ? null : stamp;
+}
+
 class PoisonMessage extends Error {
   constructor(why) {
     super(why);
@@ -363,7 +378,10 @@ function elproReadings(set, stamp, a2Station, legacyAlert) {
       return isAlertId(address) ? [{ alert_id: address, reading_ts: stamp, value_raw: value }] : [];
     }
     if (a2Station === null || !isA2Sensor(address)) return [];
-    return [{ a2_station: a2Station, a2_sensor: address, reading_ts: stamp, value_raw: value }];
+    const reading = { a2_station: a2Station, a2_sensor: address, reading_ts: stamp, value_raw: value };
+    const a2Stamp = elproNumber(set, 'alerttimestamp');
+    if (a2Stamp !== null && Number.isInteger(a2Stamp)) A2_STAMPS.set(reading, a2Stamp);
+    return [reading];
   }
 
   // Shape 2: the key IS the address, which is what the provisioning card asks
@@ -422,4 +440,6 @@ function isA2Sensor(n) {
   return Number.isInteger(n) && n >= 0 && n <= 254;
 }
 
-module.exports = { MAX_READINGS, MAX_BYTES, PoisonMessage, parseReadings, parseHfem, parseElpro, parseStatus };
+module.exports = {
+  MAX_READINGS, MAX_BYTES, PoisonMessage, parseReadings, parseHfem, parseElpro, parseStatus, alertStampOf,
+};

@@ -629,6 +629,45 @@ test('the legacy ALERT path: Sensor is the address, and the re-sent table is not
   await waitFor(() => broker.bridgeAcks().length === frames.length, { what: 'every message to be acked' });
 });
 
+test('the ALERT2 path: a report the gateway republishes is stored once, and every message still lands raw', async (t) => {
+  // Station 1000's slots 9 and 10, republished a quarter-hour later under the
+  // same AlertTimestamp (resends.js). The second message is kept as evidence
+  // and claims nothing.
+  const broker = await startBroker();
+  const api = await startApi();
+  const bridge = startBridge(broker.port, api.url);
+  t.after(async () => {
+    await closeStations();
+    await bridge.stop();
+    await api.close();
+    await broker.close();
+  });
+
+  await waitFor(() => broker.subscribed.has('test-bridge'), { what: 'the bridge to subscribe' });
+  const station = await connectStation(broker.port, 'elpro_test');
+
+  const topic = 'meganet/v1/elpro_test/logger/reading/elpro/Station 1000';
+  const frames = [
+    '[{"timestamp":1793577714000,"Sensor":9,"Value":248,"AlertTimestamp":39711},'
+      + '{"timestamp":1793577714000,"Sensor":10,"Value":-100,"AlertTimestamp":39711}]',
+    '[{"timestamp":1793578614812,"Sensor":9,"Value":248,"AlertTimestamp":39711},'
+      + '{"timestamp":1793578614812,"Sensor":10,"Value":-100,"AlertTimestamp":39711}]',
+  ];
+  for (const payload of frames) await station.publishAsync(topic, payload, { qos: 1 });
+
+  await waitFor(() => api.of('ingest_http').length === frames.length,
+    { what: 'both messages to reach the raw table' });
+  const bodies = api.of('ingest_http').map((c) => c.body.payload);
+  assert.deepEqual(bodies.map((b) => b.frame), frames);
+  assert.deepEqual(bodies[0].readings, [
+    { a2_station: 1000, a2_sensor: 9, reading_ts: 1793577714000, value_raw: 248 },
+    { a2_station: 1000, a2_sensor: 10, reading_ts: 1793577714000, value_raw: -100 },
+  ], 'the stamp is not posted');
+  assert.deepEqual(bodies[1].readings, [], 'the republished report claims nothing');
+
+  await waitFor(() => broker.bridgeAcks().length === frames.length, { what: 'both messages to be acked' });
+});
+
 test('a bridge that was down loses nothing: the broker held the hour and hands it back (#163)', async (t) => {
   const broker = await startBroker();
   const api = await startApi();

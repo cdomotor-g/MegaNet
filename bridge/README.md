@@ -94,6 +94,18 @@ table, so the first whole-table message keeps only its first entry. The raw row
 keeps every byte either way; `message_queued` (debug) logs how many were
 `resent`.
 
+**The ALERT2 path republishes too, and its `AlertTimestamp` says so.** The
+gateway publishes a station's last report again every 15 minutes and on the
+hour, freshly stamped, for as long as nothing new arrives — in the month to 2
+November 2026, about 2,100 reports arrived as 22,261 sensor values. Each set
+carries the relayed station's own `AlertTimestamp`, which a new transmission
+always changes, so per topic the bridge remembers each slot's last stamp and
+value: the same pair within 10 s is a copy (posted under the first sighting's
+time, so the database counts it), and after that a repeat, taken out. Past 11
+hours the pair counts as new again, because the stamp wraps every 12 and a
+station that transmits at the same second each hour repeats it. Sets without
+an `AlertTimestamp` pass through. `message_queued` logs `resent` and `copies`.
+
 ---
 
 ## Running it
