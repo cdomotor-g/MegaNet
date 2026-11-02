@@ -187,6 +187,19 @@ no QoS or retain column. Harmless — the bridge asks for QoS 1 anyway, and a re
 reading only means a new subscriber sees the last one — but it means the guide's field
 list is not exhaustive for the 115E-2, so trust the unit over the document.
 
+**4 · Legacy ALERT comes under `Alert1`, and re-sends its table (2 November 2026).** With
+**ALERT Protocol Mode** = "ALERT In", the bench unit publishes every legacy report to
+`…/reading/elpro/Alert1` in the same array shape — `[{"timestamp":…, "Sensor":712,
+"Value":34}]` — where `Sensor` is the **ALERT address**, not a slot in a relayed station.
+The bridge reads it that way off the `Alert1` tail; until it did, these were raw rows
+claiming nothing. The unit also keeps a table of every address it has heard: a report
+from a known address is published alone, but one from a **new** address is published at
+the front of the **whole table**, every entry restamped with that moment — which looks
+like the unit re-transmitting history. It is not a delivery fault: each publish is
+received and acknowledged once. The bridge stores only the fresh entries (see
+`bridge/README.md`); if the unit has a setting that publishes only the report that
+arrived, it would save the airtime, and **record it here if you find one**.
+
 **Optional: capture the whole ELPRO tree.** Setting the Topic Prefix one level deeper —
 `meganet/v1/<station>/logger/reading/elpro/` — puts *everything* the gateway emits under
 the subscribed filter, including the DBIRTH copies and the diagnostic devices. It is not

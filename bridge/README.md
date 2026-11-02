@@ -73,6 +73,27 @@ The other ELPRO payload shape is unchanged. Where the JSON *key* is the address,
 that key is the Payload Prefix a technician typed and is a real ALERT address, so
 it still becomes `alert_id`.
 
+**Legacy ALERT arrives under an `Alert1` tail, and there `Sensor` is the ALERT
+address.** A gateway in "ALERT In" mode publishes every legacy report to
+`…/reading/elpro/Alert1` in the same `Sensor`/`Value` array — but a legacy burst
+has no station to be a slot of, so `parseTopic()` sets `route.legacyAlert` and
+`parseElpro()` emits `{alert_id}` (stored as `a:712`). Before this was known
+(first seen 2 November 2026) every such message became a raw row claiming
+nothing.
+
+**That path re-sends its table, so the bridge remembers what it sent**
+(`src/resends.js`). The gateway keeps every address it has heard with its last
+value; a report from a known address goes out alone, but one from a new address
+goes out at the front of the *whole table*, every entry restamped with that
+publish's time. Stored as they come, the re-sent entries would say every
+address reported again each time any new one did — a quiet station would keep
+looking heard. So per topic the bridge keeps each address's last value and
+stores only each message's first entry, the new addresses straight after it,
+and any later entry whose value has changed. Just after a restart it knows no
+table, so the first whole-table message keeps only its first entry. The raw row
+keeps every byte either way; `message_queued` (debug) logs how many were
+`resent`.
+
 ---
 
 ## Running it

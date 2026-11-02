@@ -588,6 +588,47 @@ test('a tail that names no relayed station mints no reading, and keeps every byt
   await waitFor(() => broker.bridgeAcks().length === 1, { what: 'the message to be acked' });
 });
 
+test('the legacy ALERT path: Sensor is the address, and the re-sent table is not stored again', async (t) => {
+  // The bench gateway relaying legacy ALERT (2 November 2026). Every message
+  // lands in the raw row whole; only the fresh report in each becomes a reading
+  // — the rest is the gateway's table of last values, re-sent and restamped
+  // whenever a new address reports (resends.js).
+  const broker = await startBroker();
+  const api = await startApi();
+  const bridge = startBridge(broker.port, api.url);
+  t.after(async () => {
+    await closeStations();
+    await bridge.stop();
+    await api.close();
+    await broker.close();
+  });
+
+  await waitFor(() => broker.subscribed.has('test-bridge'), { what: 'the bridge to subscribe' });
+  const station = await connectStation(broker.port, 'elpro_test');
+
+  const topic = 'meganet/v1/elpro_test/logger/reading/elpro/Alert1';
+  const frames = [
+    ' [{"timestamp":1793576289589,\n"Sensor":712,\n"Value":27\n}]',
+    '[{"timestamp":1793576512859,"Sensor":759,"Value":133},{"timestamp":1793576512859,"Sensor":712,"Value":27}]',
+    '[{"timestamp":1793576581223,"Sensor":710,"Value":89},{"timestamp":1793576581224,"Sensor":759,"Value":133},'
+      + '{"timestamp":1793576581224,"Sensor":712,"Value":27}]',
+  ];
+  for (const payload of frames) await station.publishAsync(topic, payload, { qos: 1 });
+
+  await waitFor(() => api.of('ingest_http').length === frames.length,
+    { what: 'every message to reach the raw table' });
+  const bodies = api.of('ingest_http').map((c) => c.body.payload);
+  assert.deepEqual(bodies.map((b) => b.frame), frames, 'every byte of every message is kept');
+  assert.ok(bodies.every((b) => b.path === topic && b.protocol === 'elpro'));
+  assert.deepEqual(bodies.map((b) => b.readings), [
+    [{ alert_id: 712, reading_ts: 1793576289589, value_raw: 27 }],
+    [{ alert_id: 759, reading_ts: 1793576512859, value_raw: 133 }],
+    [{ alert_id: 710, reading_ts: 1793576581223, value_raw: 89 }],
+  ]);
+
+  await waitFor(() => broker.bridgeAcks().length === frames.length, { what: 'every message to be acked' });
+});
+
 test('a bridge that was down loses nothing: the broker held the hour and hands it back (#163)', async (t) => {
   const broker = await startBroker();
   const api = await startApi();

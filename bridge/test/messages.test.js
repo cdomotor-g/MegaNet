@@ -318,6 +318,41 @@ test('elpro: the gateway diagnostic devices file as raw, claiming nothing', () =
   assert.match(envelope.frame, /IP Address/);
 });
 
+// ── The legacy ALERT relay path (the `Alert1` tail) ──────────────────────────
+// Same array of Sensor/Value objects, but `Sensor` is the ALERT address itself.
+
+test('elpro: on the legacy ALERT path, Sensor is the ALERT address', () => {
+  // The frame exactly as the bench unit published it, whitespace and all.
+  const raw = ' [{"timestamp":1793578989432,\n"Sensor":712,\n"Value":34\n}]';
+  const { readings, envelope } = parseElpro(Buffer.from(raw), undefined, null, { legacyAlert: true });
+  assert.deepEqual(readings, [{ alert_id: 712, reading_ts: 1793578989432, value_raw: 34 }]);
+  assert.equal(envelope.protocol, 'elpro');
+  assert.equal(envelope.frame, raw, 'the bytes survive whatever the parser made of them');
+});
+
+test('elpro: without the legacy flag the same frame still claims nothing', () => {
+  // What the bridge did before the Alert1 tail was known: no relayed station,
+  // so no ALERT2 pair, and 712 is far outside an ALERT2 slot anyway. The raw
+  // row kept every one of these, which is how the path was diagnosed.
+  const raw = '[{"timestamp":1793578989432,"Sensor":712,"Value":34}]';
+  assert.deepEqual(parseElpro(Buffer.from(raw)).readings, []);
+  assert.deepEqual(parseElpro(Buffer.from(raw), undefined, 1003).readings, []);
+});
+
+test('elpro: the legacy path keeps every entry in order, and only real addresses', () => {
+  const { readings } = parseElpro(buf([
+    { timestamp: 5, Sensor: 760, Value: 1053 },
+    { timestamp: 5, Sensor: 710, Value: 89 },
+    { timestamp: 5, Sensor: 0, Value: 1 },       // zero is not an ALERT address
+    { timestamp: 5, Sensor: 70000, Value: 1 },   // nor is anything over 16 bits
+    { timestamp: 5, Sensor: 712 },               // half a pair names nothing
+  ]), undefined, null, { legacyAlert: true });
+  assert.deepEqual(readings, [
+    { alert_id: 760, reading_ts: 5, value_raw: 1053 },
+    { alert_id: 710, reading_ts: 5, value_raw: 89 },
+  ]);
+});
+
 test('elpro: still throws for the two cases where accepting causes the harm', () => {
   assert.throws(() => parseElpro(Buffer.alloc(0)), PoisonMessage);
   assert.throws(() => parseElpro(Buffer.alloc(300 * 1024, 0x20)), PoisonMessage);

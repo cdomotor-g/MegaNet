@@ -131,6 +131,29 @@ function a2StationOf(tail) {
   return Number.isInteger(n) && n >= 1 && n <= 65535 ? n : null;
 }
 
+// The gateway's legacy ALERT relay path ("ALERT In" mode), first seen live on
+// 2 November 2026 when the bench unit started relaying legacy ALERT alongside
+// ALERT2. It publishes every legacy report under one sub-device, `Alert1`:
+//
+//   meganet/v1/elpro_test/logger/reading/elpro/Alert1
+//   [{"timestamp":1793578989432, "Sensor":712, "Value":34}]
+//
+// There is no relayed station to read out of that tail, and none is needed:
+// on this path `Sensor` is the ALERT address itself (the burst's own 13-bit
+// address — 712 above), not a slot inside a station as on the ALERT2 path.
+// So the tail decides how messages.js reads `Sensor`, and it has to: the two
+// paths send the same payload shape, and reading one as the other is the #169
+// defect the other way round.
+//
+// Only `Alert1` (any case, with or without a space before the 1). `Alert2`,
+// `Alert` and the like are not guessed at: a tail nobody has seen mints no
+// reading and keeps its bytes in the raw row, which is how this one was found.
+const ALERT1_TAIL = /^alert\s*1$/i;
+
+function isLegacyAlertTail(tail) {
+  return typeof tail === 'string' && ALERT1_TAIL.test(tail.trim());
+}
+
 /**
  * The topic a device publishes readings to. `format` defaults to 'json' — the
  * bare `…/reading` topic; 'hfem' appends the segment that routes the payload
@@ -215,6 +238,9 @@ const SUBSCRIPTIONS = [
  * own tree below the format segment, joined back into one string. It is absent
  * rather than empty when there is no tail, so `if (route.source)` is the whole
  * test a caller needs and the two formats that never have one are unchanged.
+ * Two fields are read out of that tail when it says something: `sourceStation`
+ * (`Station 1003` — the relayed ALERT2 station) and `legacyAlert: true`
+ * (`Alert1` — the legacy ALERT relay path). Each is absent when it does not.
  */
 function parseTopic(topic) {
   if (typeof topic !== 'string' || topic === '') {
@@ -275,6 +301,9 @@ function parseTopic(topic) {
     const route = { kind: 'reading', station: parts[2], device: parts[3], format, source };
     const a2 = a2StationOf(source);
     if (a2 !== null) route.sourceStation = a2;
+    // The legacy ALERT path — `Sensor` is then an ALERT address (see
+    // ALERT1_TAIL). Absent rather than false otherwise, like sourceStation.
+    else if (isLegacyAlertTail(source)) route.legacyAlert = true;
     return route;
   }
 

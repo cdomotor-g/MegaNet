@@ -219,6 +219,30 @@ test('the relayed ALERT2 station address is read out of the tail, or not at all'
   );
 });
 
+test('an Alert1 tail is the legacy ALERT relay path, and nothing else is', () => {
+  // The topic the bench unit published when it started relaying legacy ALERT
+  // (2 November 2026). There is no station in it to read — on this path the
+  // payload's `Sensor` is the ALERT address itself — so the tail sets a flag
+  // that tells messages.js to read it that way.
+  assert.deepEqual(parseTopic('meganet/v1/elpro_test/logger/reading/elpro/Alert1'), {
+    kind: 'reading', station: 'elpro_test', device: 'logger', format: 'elpro',
+    source: 'Alert1',
+    legacyAlert: true,
+  });
+
+  const legacy = (tail) => parseTopic(`meganet/v1/elpro_test/logger/reading/elpro/${tail}`).legacyAlert;
+  for (const tail of ['Alert1', 'alert1', 'ALERT1', 'Alert 1', '  Alert1  ']) {
+    assert.equal(legacy(tail), true, tail);
+  }
+  // Not guessed at: a tail nobody has seen keeps its bytes and claims nothing.
+  for (const tail of ['Alert2', 'Alert', 'Alert10', 'Alert1x', 'DBIRTH/elpro/Alert1',
+                      'Station 1003', '1003', 'Broker Diagnostics']) {
+    assert.equal(legacy(tail), undefined, tail);
+  }
+  // And the two readings of a tail never both apply.
+  assert.ok(!('sourceStation' in parseTopic('meganet/v1/s/logger/reading/elpro/Alert1')));
+});
+
 test('source is absent, not empty, when there is no tail', () => {
   // So `if (route.source)` is the whole test bridge.js needs, and the two
   // formats that never carry one parse to exactly what they always did.

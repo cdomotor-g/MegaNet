@@ -9,6 +9,7 @@ const mqtt = require('mqtt');
 const { SUBSCRIPTIONS, parseTopic } = require('./topics');
 const { parseReadings, parseHfem, parseElpro, parseStatus, PoisonMessage } = require('./messages');
 const { createBatcher } = require('./batcher');
+const { createResendFilter } = require('./resends');
 const { createHealth } = require('./health');
 const { createSink } = require('./sink');
 const { createLogger } = require('./log');
@@ -26,6 +27,9 @@ function createBridge(config, deps = {}) {
     timeoutMs: config.api.timeoutMs,
   });
   const connect = deps.connect || mqtt.connect;
+  // What each legacy ALERT gateway has already published, so its re-sent
+  // table is not stored again as fresh readings (resends.js).
+  const resends = deps.resends || createResendFilter();
 
   let client = null;
   let heartbeatTimer = null;
@@ -177,7 +181,8 @@ function createBridge(config, deps = {}) {
           // The relayed ALERT2 station address, off the topic tail. Undefined
           // becomes null inside, and a message whose tail names no station
           // mints no ALERT2 reading — the raw row still keeps every byte.
-          ? parseElpro(packet.payload, undefined, route.sourceStation ?? null)
+          ? parseElpro(packet.payload, undefined, route.sourceStation ?? null,
+            { legacyAlert: route.legacyAlert === true })
           : parseReadings(packet.payload);
     } catch (err) {
       if (err instanceof PoisonMessage) {
@@ -197,6 +202,16 @@ function createBridge(config, deps = {}) {
     // reconstruct the topic from a log line that has since aged out.
     if (route.source) parsed.envelope.path = topic;
 
+    // The legacy ALERT gateway re-sends its whole table whenever a new address
+    // reports; only the fresh reports become readings. The frame in the
+    // envelope is untouched, so the raw row still holds every entry.
+    let resent = 0;
+    if (route.legacyAlert) {
+      const kept = resends.fresh(topic, parsed.readings);
+      parsed.readings = kept.readings;
+      resent = kept.resent;
+    }
+
     log.debug('message_queued', {
       topic,
       station: route.station,
@@ -204,7 +219,9 @@ function createBridge(config, deps = {}) {
       format: route.format,
       source: route.source,
       sourceStation: route.sourceStation,
+      legacyAlert: route.legacyAlert,
       readings: parsed.readings.length,
+      resent,
       dup: packet.dup || false,
     });
 

@@ -252,6 +252,14 @@ function truncate(text, n) {
  * `timestamp` is Linux epoch MILLISECONDS, which meganet.as_ts() already takes
  * as a number (it divides anything >= 1e11 by 1000).
  *
+ * The gateway's legacy ALERT relay path sends the same `Sensor`/`Value` array
+ * under an `Alert1` topic tail, where `Sensor` is the ALERT address itself;
+ * `legacyAlert` (topics.js reads it off the tail) says to read it that way.
+ * That path also re-sends its whole table of last values, freshly stamped,
+ * every time a sensor it has not heard yet reports — resends.js takes those
+ * back out, after this parser, because telling them apart needs memory of the
+ * messages before and this function has none.
+ *
  * **This parser never throws for a payload it cannot read**, which is the one
  * place it deliberately differs from parseReadings() and parseHfem(). Those two
  * decode formats this project defined; this one decodes a format a vendor
@@ -274,7 +282,12 @@ function truncate(text, n) {
  * The size and count limits still throw, because those are the two cases where
  * accepting the message is what causes harm rather than what preserves evidence.
  */
-function parseElpro(payload, receivedAt = () => new Date().toISOString(), a2Station = null) {
+function parseElpro(
+  payload,
+  receivedAt = () => new Date().toISOString(),
+  a2Station = null,
+  { legacyAlert = false } = {},
+) {
   if (payload == null || payload.length === 0) {
     throw new PoisonMessage('empty payload');
   }
@@ -307,7 +320,7 @@ function parseElpro(payload, receivedAt = () => new Date().toISOString(), a2Stat
     const stamp = typeof set.timestamp === 'number' && Number.isFinite(set.timestamp)
       ? set.timestamp
       : arrivedAt;
-    readings.push(...elproReadings(set, stamp, a2Station));
+    readings.push(...elproReadings(set, stamp, a2Station, legacyAlert));
   }
 
   if (readings.length > MAX_READINGS) {
@@ -326,22 +339,29 @@ function parseElpro(payload, receivedAt = () => new Date().toISOString(), a2Stat
  * instead of against our card, and the raw row says so without inventing an
  * address to cover it.
  */
-function elproReadings(set, stamp, a2Station) {
+function elproReadings(set, stamp, a2Station, legacyAlert) {
   // Shape 1: an explicit `Sensor` field. Checked first and taken exclusively,
   // because an object that names its own sensor is not *also* describing
   // addresses in its other key names — scanning on would turn a stray numeric
   // key into a second reading nobody sent.
   //
-  // This is the ALERT2 relay path, and `Sensor` is a **slot within the relayed
+  // On the ALERT2 relay path `Sensor` is a **slot within the relayed
   // station**, not an ALERT address. #169 read it as one, so `Sensor 10` off
   // Station 1000 and `Sensor 10` off Station 1001 both became `a:10` — two
   // instruments under one identity, and liable to attach themselves to whatever
   // real station owns ALERT address 10 the day somebody adds it. The station
   // half comes from the topic tail (topics.js), which is the only place it
   // exists, so without it there is no address here to file anything under.
+  //
+  // On the legacy ALERT relay path (the `Alert1` tail) the same field *is* the
+  // ALERT address — a legacy burst carries nothing else to be a slot of — so
+  // it is stored as one, and the tail is the only thing that says which.
   const address = elproNumber(set, 'sensor');
   const value = elproNumber(set, 'value');
   if (address !== null && value !== null) {
+    if (legacyAlert) {
+      return isAlertId(address) ? [{ alert_id: address, reading_ts: stamp, value_raw: value }] : [];
+    }
     if (a2Station === null || !isA2Sensor(address)) return [];
     return [{ a2_station: a2Station, a2_sensor: address, reading_ts: stamp, value_raw: value }];
   }
