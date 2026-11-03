@@ -516,6 +516,17 @@ jobs:
         working-directory: test
         run: npm run bulletin
 
+      # 🎬 Videos (explainers.js, tools/explainers/, EPIC #262): every video
+      # published in data/explainers/ valid and playable, the validator, the
+      # voicing that spends credits once (a scene's key; drafts never voiced;
+      # one scene changed, one scene said), then the tab in Chromium — opened
+      # by ?watch=, every scene drawn, play, a clicker, full screen and out,
+      # voiced and not, no videos yet, and a phone.
+      - name: Videos — the welcome and how-tos, on the bulletin's player
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run explainers
+
       # Node-only and fast. The Airtime panel's reasoning on networks built
       # for it: the circle two checks share (the gcd of their periods), how a
       # logger keeps time (steady, drifting, jumped, randomised), damage

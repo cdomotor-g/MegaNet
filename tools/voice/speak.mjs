@@ -1,4 +1,5 @@
-// tools/voice/speak.mjs — the Droggies' own voices for a network bulletin.
+// tools/voice/speak.mjs — the Droggies' own voices for a network bulletin,
+// and for the 🎬 Videos (explainers.js, EPIC #262).
 //
 // Turns a published bulletin (data/bulletins/<kind>/<date>.json) into one MP3
 // and a voice file beside it in data/bulletins/voice/<kind>/: every scene said
@@ -14,8 +15,9 @@
 // a bulletin; nothing here runs in the browser.
 //
 //   node tools/voice/speak.mjs --pending          voice every bulletin whose voice is missing or out of
-//                                                 date, and let go of voices whose bulletin has gone
-//   node tools/voice/speak.mjs FILE.json          voice one bulletin (--force: even if up to date)
+//                                                 date, and let go of voices whose bulletin has gone;
+//                                                 then the same for every video marked final
+//   node tools/voice/speak.mjs FILE.json          voice one bulletin or video (--force: even if up to date)
 //   node tools/voice/speak.mjs --sample LINES.json --out DIR
 //                                                 say casting test lines: [{ name, voice_id, model, text, settings }]
 //   --cast PATH|URL   the cast file (default: the published thedroggies one)
@@ -25,6 +27,16 @@
 // Each run says how many ElevenLabs credits it used and how many are left this
 // month (the account the key belongs to). Exits 1 if any bulletin could not be
 // voiced; the others are still written.
+//
+// A video is voiced differently from a bulletin, because it is said once and
+// played for months (EPIC #262): only once its words are approved ("voice":
+// "final" — a draft is never voiced), and a scene at a time. Each scene's
+// voice is kept under a key made of who says it and what they say
+// (sceneKey) — data/explainers/voice/clips/<key>.mp3, with the time each word
+// starts beside it — so a video with one scene's words changed has that scene
+// said again and the rest joined from what was kept: the credits of one
+// scene, not of the video. A recast is not in the key, as a recast is not in a
+// bulletin's hash: it reaches a video only when the workflow is run with force.
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -33,6 +45,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { VOICE_FORMAT, voicePathFor } from '../bulletin/validate.mjs';
+import { VOICE_FORMAT as XP_FORMAT, voicePathFor as xpVoicePath, clipPathFor, validate as validateExplainer, listFiles as xpFiles, writeIndex as xpWriteIndex } from '../explainers/validate.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..', '..');
@@ -42,6 +55,7 @@ const API = 'https://api.elevenlabs.io/v1';
 const RATE = 44100;                 // samples a second, mono, throughout
 const GAP = 0.45;                   // seconds of quiet between scenes
 const BITRATE = '48k';              // speech, mono: about 0.36 MB a minute
+const CLIP_BITRATE = '96k';         // a video's scene as kept: joined and encoded again, so kept finer
 // Every scene as loud as every other, whoever says it — the voices come out of
 // ElevenLabs up to 3 LU apart — at the podcast standard, peaks under -1.5 dBTP.
 const LOUD = { I: -16, TP: -1.5, LRA: 11 };
@@ -177,7 +191,7 @@ function ffmpeg(args, input) {
   return r.stdout;
 }
 const toPcm = mp3 => ffmpeg(['-i', 'pipe:0', '-f', 's16le', '-ac', '1', '-ar', String(RATE), 'pipe:1'], mp3);
-const toMp3 = pcm => ffmpeg(['-f', 's16le', '-ac', '1', '-ar', String(RATE), '-i', 'pipe:0', '-codec:a', 'libmp3lame', '-b:a', BITRATE, '-f', 'mp3', 'pipe:1'], pcm);
+const toMp3 = (pcm, rate = BITRATE) => ffmpeg(['-f', 's16le', '-ac', '1', '-ar', String(RATE), '-i', 'pipe:0', '-codec:a', 'libmp3lame', '-b:a', rate, '-f', 'mp3', 'pipe:1'], pcm);
 // A voice the cast plays faster or slower ("tempo": 1.1 is a tenth faster),
 // stretched after it is said with its pitch kept — the model's own speed
 // setting changes the voice as well as the pace.
@@ -285,6 +299,121 @@ export function pending(cast, { repo = REPO, force = [] } = {}) {
   return { todo, orphans };
 }
 
+// ── one video ───────────────────────────────────────────────────────────────
+
+// A scene's key: who says it and what they say, as the voice is sent it (the
+// lexicon's respellings in, so a pronunciation put right says the scene
+// again) — not the voice itself, nor its direction: a recast is not a change
+// of words. Explainers.voiceFileOf and the voice file name the same clips.
+export function sceneKey(speaker, say, cast) {
+  const said = scriptFor(say, { model: '' }, cast).text;
+  return crypto.createHash('sha256').update(JSON.stringify([XP_FORMAT, speaker, said])).digest('hex').slice(0, 24);
+}
+export const explainerKeys = (x, cast) => (x.scenes || []).map(s => sceneKey(speakerOf(x, s), s.say, cast));
+export const explainerHash = keys => crypto.createHash('sha256').update(keys.join(',')).digest('hex').slice(0, 32);
+
+// What voicing a video would take: each scene's speaker, voice, key and clip,
+// and whether its clip is already kept (said before, in these words) — unless
+// forced, when every scene is said again.
+export function planExplainer(x, cast, { repo = REPO, force = false } = {}) {
+  return (x.scenes || []).map((s, i) => {
+    const speaker = speakerOf(x, s), v = cast.voices[speaker], key = sceneKey(speaker, s.say, cast), clip = clipPathFor(key);
+    const reuse = !force && fs.existsSync(path.join(repo, clip.audio)) && fs.existsSync(path.join(repo, clip.json));
+    return { i, speaker, v, key, clip, reuse, script: v ? scriptFor(s.say, v, cast) : null };
+  });
+}
+
+export async function voiceExplainer(file, cast, { key, castSrc, repo = REPO, dry = false, force = false, log = console.log, say: tell = tts } = {}) {
+  const x = JSON.parse(fs.readFileSync(path.join(repo, file), 'utf8'));
+  const { errors } = validateExplainer(x, { file });
+  if (errors.length) throw new Error(`${file}: ${errors[0]}${errors.length > 1 ? ` (and ${errors.length - 1} more)` : ''}`);
+  if (x.voice !== 'final') throw new Error(`${file} is a draft: it is voiced once its words are approved and it is marked "voice": "final"`);
+  const plan = planExplainer(x, cast, { repo, force });
+  const missing = [...new Set(plan.filter(p => !p.v).map(p => p.speaker))];
+  if (missing.length) throw new Error(`${file}: no voice cast for ${missing.join(', ')}`);
+  const toSay = plan.filter(p => !p.reuse);
+  const by = {};
+  toSay.forEach(p => { by[p.v.model] = (by[p.v.model] || 0) + p.script.text.length; });
+  const est = Object.entries(by).reduce((n, [m, c]) => n + c * RATE_OF(m), 0);
+  log(`  ${file}: ${plan.length} scenes — ${toSay.length} to say${toSay.length ? ` (${Object.entries(by).map(([m, c]) => `${c} characters on ${m}`).join(', ')})` : ''}, ${plan.length - toSay.length} kept as said — about ${Math.round(est)} credits`);
+  if (dry) return { file, dry: true, credits: est, said: toSay.length, kept: plan.length - toSay.length };
+  const scenes = x.scenes, pcm = [], out = [];
+  let at = 0, cost = 0;
+  for (const p of plan) {
+    const s = scenes[p.i];
+    let meta;
+    if (!p.reuse) {
+      const prev = scenes[p.i - 1] && speakerOf(x, scenes[p.i - 1]) === p.speaker ? scenes[p.i - 1].say : null;
+      const next = scenes[p.i + 1] && speakerOf(x, scenes[p.i + 1]) === p.speaker ? scenes[p.i + 1].say : null;
+      const r = await tell(p.v, p.script.text, cast, { key, prevText: prev, nextText: next });
+      const tempo = tempoOf(p.v);
+      const said = level(stretch(toPcm(r.audio), tempo));
+      const secs = said.length / 2 / RATE;
+      meta = { key: p.key, speaker: p.speaker, voice: p.v.voice_name || p.v.voice_id, model: p.v.model, secs: round(secs),
+        words: wordTimes(p.script, r.alignment, 0, tempo).map(t => Math.min(t, round(secs))), generated_at: new Date().toISOString() };
+      fs.mkdirSync(path.join(repo, path.dirname(p.clip.audio)), { recursive: true });
+      fs.writeFileSync(path.join(repo, p.clip.audio), toMp3(said, CLIP_BITRATE));
+      fs.writeFileSync(path.join(repo, p.clip.json), JSON.stringify(meta, null, 1) + '\n');
+      cost += r.cost || p.script.text.length;
+    } else meta = JSON.parse(fs.readFileSync(path.join(repo, p.clip.json), 'utf8'));
+    // Every scene from its kept clip — said now or before — so a video joined
+    // from both sounds the same throughout.
+    const clip = toPcm(fs.readFileSync(path.join(repo, p.clip.audio)));
+    const secs = clip.length / 2 / RATE;
+    const n = String(s.say || '').split(/\s+/).filter(Boolean).length;
+    if (!Array.isArray(meta.words) || meta.words.length !== n) throw new Error(`${file}: scene ${p.i + 1}'s kept voice has ${meta.words ? meta.words.length : 'no'} word times for ${n} words — run with --force`);
+    out.push({ key: p.key, clip: p.clip.audio, speaker: p.speaker, voice: meta.voice, model: meta.model,
+      start: round(at), end: round(at + secs), words: meta.words.map(t => Math.min(round(at + t), round(at + secs))) });
+    pcm.push(clip);
+    at += secs;
+    if (p.i < plan.length - 1) { pcm.push(Buffer.alloc(Math.round(GAP * RATE) * 2)); at += GAP; }
+    log(`    scene ${p.i + 1}/${plan.length}: ${p.reuse ? 'kept as said' : 'said'} by ${meta.voice}, ${secs.toFixed(1)} s`);
+  }
+  const mp3 = toMp3(Buffer.concat(pcm));
+  const { json: vRel, audio: aRel } = xpVoicePath(file);
+  fs.mkdirSync(path.join(repo, path.dirname(vRel)), { recursive: true });
+  fs.writeFileSync(path.join(repo, aRel), mp3);
+  const doc = { format: XP_FORMAT, explainer: x.id, file, audio: aRel, bytes: mp3.length, duration: round(at),
+    hash: explainerHash(plan.map(p => p.key)), generated_at: new Date().toISOString(),
+    cast: { source: castSrc || CAST_URL, updated: cast.updated || null }, scenes: out };
+  fs.writeFileSync(path.join(repo, vRel), JSON.stringify(doc, null, 1) + '\n');
+  log(`  ${file} → ${aRel}: ${doc.duration} s, ${(mp3.length / 1e6).toFixed(2)} MB; ${toSay.length} said, about ${Math.round(cost)} characters`);
+  return { file, voice: vRel, audio: aRel, cost, said: toSay.length, kept: plan.length - toSay.length };
+}
+
+// Which videos need voicing — marked final, and their voice missing or not of
+// these words — and what has lost its video: a voice whose video has gone, a
+// kept scene no video's voice uses any more. A draft is never voiced, and the
+// clips its last voice used are kept, for when it is final again.
+export function pendingExplainers(cast, { repo = REPO, force = [] } = {}) {
+  const todo = [], orphans = [], used = new Set();
+  const files = xpFiles(repo);
+  for (const rel of files) {
+    let x;
+    try { x = JSON.parse(fs.readFileSync(path.join(repo, rel), 'utf8')); } catch (_) { continue; }
+    const vp = xpVoicePath(rel);
+    let now = null;
+    try { now = fs.existsSync(path.join(repo, vp.json)) ? JSON.parse(fs.readFileSync(path.join(repo, vp.json), 'utf8')) : null; } catch (_) { now = null; }
+    if (now) (now.scenes || []).forEach(sc => { if (sc && sc.key) used.add(sc.key); });
+    if (x.voice !== 'final') continue;
+    const keys = explainerKeys(x, cast);
+    keys.forEach(k => used.add(k));
+    const forced = force.includes('all') || force.includes(rel);
+    if (forced || !now || now.hash !== explainerHash(keys) || !fs.existsSync(path.join(repo, vp.audio))) todo.push({ file: rel, force: forced });
+  }
+  const vdir = path.join(repo, 'data', 'explainers', 'voice');
+  for (const f of fs.existsSync(vdir) ? fs.readdirSync(vdir) : []) {
+    const m = /^([a-z0-9][a-z0-9-]*)\.(json|mp3)$/.exec(f);
+    if (m && !files.includes(`data/explainers/${m[1]}.json`)) orphans.push(`data/explainers/voice/${f}`);
+  }
+  const cdir = path.join(vdir, 'clips');
+  for (const f of fs.existsSync(cdir) ? fs.readdirSync(cdir) : []) {
+    const m = /^([0-9a-f]{24})\.(json|mp3)$/.exec(f);
+    if (m && !used.has(m[1])) orphans.push(`data/explainers/voice/clips/${f}`);
+  }
+  return { todo, orphans };
+}
+
 // ── casting test lines ──────────────────────────────────────────────────────
 
 async function sample(linesFile, outDir, { key, log = console.log }) {
@@ -323,24 +452,35 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const castSrc = arg('--cast') || CAST_URL;
     const cast = withLexicon(await readCast(castSrc), arg('--lexicon') || LEXICON);
     console.log(`Cast: ${castSrc} (updated ${cast.updated || 'unknown'}), ${Object.keys(cast.voices).length} voices.`);
-    let files;
+    let files, videos = [];
+    const isVideo = f => /^data\/explainers\/[a-z0-9][a-z0-9-]*\.json$/.test(f) && !/\/index\.json$/.test(f);
     if (argv.includes('--pending')) {
       const force = (arg('--force') || '').split(',').map(s => s.trim()).filter(Boolean);
       const { todo, orphans } = pending(cast, { force });
-      for (const o of orphans) { if (!dry) fs.unlinkSync(path.join(REPO, o)); console.log(`  ${dry ? 'would let go of' : 'let go of'} ${o}`); }
+      const xp = pendingExplainers(cast, { force });
+      for (const o of [...orphans, ...xp.orphans]) { if (!dry) fs.unlinkSync(path.join(REPO, o)); console.log(`  ${dry ? 'would let go of' : 'let go of'} ${o}`); }
       files = todo;
+      videos = xp.todo;
       if (!files.length) console.log('Every bulletin is voiced and up to date.');
+      if (!videos.length) console.log('Every video marked final is voiced and up to date.');
     } else {
-      files = argv.filter(a => a.endsWith('.json') && a !== arg('--cast') && a !== arg('--lexicon'));
-      if (!files.length) { console.error('node tools/voice/speak.mjs (--pending | FILE.json) [--cast PATH|URL] [--dry-run] [--force]'); process.exit(2); }
+      const named = argv.filter(a => a.endsWith('.json') && a !== arg('--cast') && a !== arg('--lexicon')).map(f => path.relative(REPO, path.resolve(f)));
+      if (!named.length) { console.error('node tools/voice/speak.mjs (--pending | FILE.json) [--cast PATH|URL] [--dry-run] [--force]'); process.exit(2); }
+      files = named.filter(f => !isVideo(f));
+      videos = named.filter(isVideo).map(file => ({ file, force: argv.includes('--force') }));
     }
     let failed = 0;
     for (const f of files) {
-      const rel = argv.includes('--pending') ? f : path.relative(REPO, path.resolve(f));
-      try { await voiceBulletin(rel, cast, { key, castSrc, dry }); }
+      try { await voiceBulletin(f, cast, { key, castSrc, dry }); }
       catch (err) { failed++; console.error(`  ${f}: not voiced — ${err.message}`); }
     }
-    if (files.length) await tally();
+    for (const v of videos) {
+      try { await voiceExplainer(v.file, cast, { key, castSrc, dry, force: v.force }); }
+      catch (err) { failed++; console.error(`  ${v.file}: not voiced — ${err.message}`); }
+    }
+    // The list of videos says how long each runs as said.
+    if (videos.length && !dry) { const { changed } = xpWriteIndex(REPO); if (changed) console.log('  data/explainers/index.json: the lengths as said.'); }
+    if (files.length || videos.length) await tally();
     process.exit(failed ? 1 : 0);
   } catch (err) { console.error(err.message); process.exit(1); }
 }

@@ -10,6 +10,12 @@
 # a Droggie there changes the next bulletin here (and, run by hand with force
 # "all", re-voices the ones still listed).
 #
+# It does the same for the 🎬 Videos (data/explainers/<id>.json, EPIC #262) —
+# but only a video marked "voice": "final", its words approved; a draft is
+# never voiced. A video is voiced a scene at a time and each scene kept
+# (data/explainers/voice/clips/), so a video with one scene's words changed
+# spends that scene's credits and no more (tools/explainers/README.md).
+#
 # The ElevenLabs key is the ELEVENLABS_API_KEY repository secret; it reaches
 # speak.mjs as an environment variable and nothing else, and GitHub masks it in
 # the log. The commit is made with this workflow's own token, so it starts no
@@ -28,10 +34,11 @@ on:
     paths:
       - 'data/bulletins/daily/*.json'
       - 'data/bulletins/weekly/*.json'
+      - 'data/explainers/*.json'
   workflow_dispatch:
     inputs:
       force:
-        description: 'Re-voice even if up to date: "all", or bulletin files, comma-separated'
+        description: 'Re-voice even if up to date: "all", or bulletin or video files, comma-separated (a video forced is said again whole)'
         required: false
         default: ''
       sample:
@@ -88,12 +95,12 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git add -A data/bulletins/voice
+          git add -A data/bulletins/voice data/explainers/voice data/explainers/index.json
           if git diff --cached --quiet; then
             echo "No voice changed — nothing to commit."
             exit 0
           fi
-          git commit -m "Bulletin voices: $(git diff --cached --name-only -- 'data/bulletins/voice/*.json' | sed -E 's#data/bulletins/voice/##; s#\.json$##' | paste -sd, - | sed 's/,/, /g')" \
+          git commit -m "Bulletin voices: $(git diff --cached --name-only -- 'data/bulletins/voice/*.json' 'data/explainers/voice/*.json' | grep -v '/clips/' | sed -E 's#data/bulletins/voice/##; s#data/explainers/voice/#video #; s#\.json$##' | paste -sd, - | sed 's/,/, /g')" \
                      -m "Said by the Droggies' cast (thedroggies voices/cast.json) through ElevenLabs; tools/voice/speak.mjs."
           for attempt in 1 2 3; do
             git pull --rebase origin main && git push origin HEAD:main && exit 0

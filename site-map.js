@@ -73,6 +73,14 @@ const SiteMap = (function () {
         'See which tools are for admins or editors only',
       ],
     },
+    videos: {
+      what: 'Short drawn videos about Flood-Net, said by the Droggies — a welcome to the whole of it, and how-tos that each show one job.',
+      use: [
+        'Watch the welcome before you start, or show it at the start of a meeting',
+        'Play a video full screen in a meeting room, a clicker moving it on',
+        'Send somebody the link that opens a video ready to play',
+      ],
+    },
     offline: {
       what: 'Flood-Net with no signal: what this device has saved, a button that saves the rest, and how to put it on your home screen.',
       use: [
@@ -566,6 +574,7 @@ const SiteMap = (function () {
     { text: 'Listen to ALERT off the air',                 tab: 'serial' },
     { text: 'Fill in a site inspection',                   tab: 'inspections' },
     { text: 'Get a phone ready for a site with no signal', tab: 'offline' },
+    { text: 'Show Flood-Net to a meeting room',             tab: 'videos' },
     { text: 'Take site photos stamped with where and which way', tab: 'camera' },
     { text: 'Find the station nearest you, and start its inspection', tab: 'nearby' },
     { text: 'See which way a station is from where you stand', tab: 'lookaround' },

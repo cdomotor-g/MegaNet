@@ -3780,8 +3780,9 @@ function renderMain() {
   // The 🧪 Bit Bench and ⚡ Bit Errors are about bits, and work on made-up
   // frames; with a list they only name the station an address belongs to.
   // 📟 The SWR Meter works on made-up stations and readings typed in, and
-  // 💾 A2 Firmware on a made-up unit and versions pasted in.
-  const noDataTabs = ['sitemap', 'capabilities', 'offline', 'views', 'bitbench', 'biterrors', 'swr', 'pinouts', 'a2firmware', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'camera', 'levels', 'twopeg', 'surveyguide', 'kbstaff', 'kblogbook', 'kblifecycle', 'kblevel', 'kbriver', 'admin', 'basestations', 'tdma'];
+  // 💾 A2 Firmware on a made-up unit and versions pasted in. 🎬 Videos are
+  // about the app; with no list a video's counts fall back to its own.
+  const noDataTabs = ['sitemap', 'capabilities', 'videos', 'offline', 'views', 'bitbench', 'biterrors', 'swr', 'pinouts', 'a2firmware', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'camera', 'levels', 'twopeg', 'surveyguide', 'kbstaff', 'kblogbook', 'kblifecycle', 'kblevel', 'kbriver', 'admin', 'basestations', 'tdma'];
   // The Stations cards may be in the side panel rather than in here, and the
   // innerHTML below does not reach them there. Out first, whatever is about to
   // be drawn: a render of the Stations tab emits a fresh copy of every card,
@@ -3808,6 +3809,7 @@ function renderMain() {
                        initStationFilters(); initMap(); break;
     case 'sitemap':    el.innerHTML = SiteMap.render();       SiteMap.init();      break;
     case 'capabilities': el.innerHTML = Capabilities.render(); Capabilities.init(); break;
+    case 'videos':     el.innerHTML = Explainers.render();    Explainers.init();   break;
     case 'offline':    el.innerHTML = OfflineTab.render();    OfflineTab.init();   break;
     case 'views':      el.innerHTML = NavViews.render();      NavViews.init();     break;
     case 'lookaround': el.innerHTML = StationAR.render();     StationAR.init();    break;

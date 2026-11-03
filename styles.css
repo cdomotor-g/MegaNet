@@ -13364,7 +13364,8 @@ code {
 .adm-rcv-btn { white-space: nowrap; }
 .adm-rcv-caret { display: inline-block; transition: transform .15s ease; }
 .adm-rcv-btn[aria-expanded="true"] .adm-rcv-caret { transform: rotate(90deg); }
-@media (prefers-reduced-motion: reduce) { .adm-rcv-caret { transition: none; } }
+/* Its turn is stilled with reduced motion by the one policy (the blanket rule
+   under "prefers-reduced-motion" below): one block for the whole sheet (shell.mjs). */
 .adm-rcv-row > td { padding: .2rem .6rem .7rem 1.6rem; background: var(--panel-sub); }
 .adm-rcv-table { width: 100%; font-size: .85rem; }
 .adm-rcv-table tfoot th, .adm-rcv-table tfoot td { font-weight: 600; border-top: 1px solid var(--border); }
@@ -21370,6 +21371,49 @@ button.adm-danger:hover { border-color: var(--bad); }
 @keyframes hb-talk { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.022) translateY(-2px); } }
 .hb-stage.is-paused .hb-svgbox * { animation-play-state: paused !important; }
 .hb-stage.is-still .hb-svgbox * { animation: none !important; }
+
+/* ── 🎬 Videos (explainers.js) ────────────────────────────────────────────────
+   The bulletin's own player (.hb-* above) with a row of cards over it to pick
+   a video, and meeting mode: the show — the stage, its bar, the presenter and
+   the words — filling the screen. The browser's own full screen where it has
+   one; fixed over the page where it has not (an iPhone's Safari), the same
+   layout either way. Black round it in either theme, as a cinema is, and the
+   words large enough to read from the back of the room. The stage is as wide
+   as a 16:9 picture can be with the words still under it. */
+.xp-lede { margin: 0 0 var(--sp-3); color: var(--muted); max-width: 72ch; }
+.xp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.xp-card { display: grid; grid-template-columns: 52px 1fr; column-gap: var(--sp-2); row-gap: .1rem; align-items: start; text-align: left;
+  min-height: 44px; padding: .55rem .7rem; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-sub);
+  color: inherit; font: inherit; cursor: pointer; }
+.xp-card img { grid-row: 1 / span 3; width: 52px; height: 65px; object-fit: cover; border-radius: 8px; background: var(--hb-ground); }
+.xp-card-t { font-weight: 700; }
+.xp-card-s { font-size: var(--fs-sm); color: var(--muted); }
+.xp-card-m { font-size: var(--fs-xs); color: var(--muted); }
+.xp-card.is-on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.xp-card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.xp-tools { margin-top: var(--sp-2); align-items: center; flex-wrap: wrap; }
+.xp-kept { color: var(--muted); }
+.xp-armed { margin: 0 0 var(--sp-2); }
+.xp-empty { margin-bottom: var(--sp-3); }
+.xp-fold { margin-top: var(--sp-3); }
+.xp-show.is-meeting { position: fixed; inset: 0; z-index: 2147483000; display: flex; flex-direction: column; justify-content: center;
+  gap: 1.2vh; box-sizing: border-box; padding: 2vh 3vw; background: #000; color: #f2f7fb; overflow: hidden; }
+.xp-show.is-meeting .hb-player,
+.xp-show.is-meeting .hb-anchor { width: min(94vw, calc((100vh - 28vh) * 16 / 9)); margin: 0 auto; }
+.xp-show.is-meeting .hb-player { box-shadow: none; }
+.xp-show.is-meeting .hb-anchor { align-items: center; }
+.xp-show.is-meeting .hb-presenter { width: min(9vw, 12vh); }
+.xp-show.is-meeting .hb-words,
+.xp-show.is-meeting .hb-words::before { background: #0b1a26; border-color: #20384b; }
+.xp-show.is-meeting .hb-words { min-height: 0; color: #f2f7fb; }
+.xp-show.is-meeting .hb-say { max-width: none; font-size: clamp(1.1rem, 2.2vw, 2.4rem); line-height: 1.35; }
+.xp-show.is-meeting .hb-who span,
+.xp-show.is-meeting .hb-chips { display: none; }
+.xp-show.is-meeting .hb-speaker { color: #74c7ff; }
+.xp-show.is-meeting .hb-ctl { transition: opacity .35s ease-out; }
+.xp-show.is-meeting.is-idle { cursor: none; }
+.xp-show.is-meeting.is-idle .hb-ctl { opacity: 0; }
+html.xp-meeting-on, html.xp-meeting-on body { overflow: hidden; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Site Map (site-map.js) — a guide to every other tab, and the gold line from

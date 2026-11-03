@@ -189,3 +189,8 @@ if (typeof window !== 'undefined') AdminTokens.restoreFromUrl();
 // it also puts back one kept from earlier in this browser tab.
 if (typeof window !== 'undefined') Tasks.restoreFromUrl();
 
+// A video's link (explainers.js): ?watch=<id> opens 🎬 Videos on that video,
+// ready to play full screen on its first ▶ — for a meeting room's laptop.
+// After the first render for Workbench's reason.
+if (typeof window !== 'undefined') Explainers.restoreFromUrl();
+

@@ -63,9 +63,22 @@
 // bulletins it has played — in this browser's storage, nothing on the server.
 // Reduced motion: nothing plays by itself and the scenes are drawn finished.
 
-const HealthBulletin = (() => {
+// ── One player, more than one show ──────────────────────────────────────────
+// The player is made by makeShowPlayer(cfg), not written once for the
+// bulletin: 🎬 Videos (explainers.js, EPIC #262) plays its explainers on the
+// same stage, bar, voices and keys. cfg is everything that differs — the
+// prefix of the page's ids (cfg.id, and of this device's settings, mn-<id>-…),
+// the name its buttons call (cfg.global), the index and the kinds in it, where
+// a file's voice is and what one looks like, what the panel round the player
+// says (cfg.panel), scenes of its own (cfg.draw), the word for one ("bulletin"),
+// where a station opens, and keys of its own. With no cfg it is the bulletin,
+// exactly as it was: HealthBulletin below.
 
-  const INDEX = 'data/bulletins/index.json';
+function makeShowPlayer(cfg = {}) {
+  const ID = cfg.id || 'hb', G = cfg.global || 'HealthBulletin';
+  const NOUN = cfg.noun || 'bulletin';
+  const KINDS = cfg.kinds || ['daily', 'weekly'];
+  const INDEX = cfg.index || 'data/bulletins/index.json';
   // The stage spans the panel, 16:9 like the screen it imitates; on a phone
   // (a stage under NARROW_PX) it is drawn tall instead.
   const WIDE = { W: 1280, H: 720 }, TALL = { W: 720, H: 900 };
@@ -185,30 +198,30 @@ const HealthBulletin = (() => {
     // on Mondays, when there is no daily, and the day's daily the rest of the
     // week. A device's own pick holds until a newer bulletin is issued: it is
     // kept as "kind|newest id" (mn-hb-kind), and a newer one outranks it.
-    kind: 'daily',
-    pick: { daily: null, weekly: null },     // the file chosen, or the newest
+    kind: KINDS[0],
+    pick: Object.fromEntries(KINDS.map(k => [k, null])),   // the file chosen, or the newest
     files: new Map(),                        // file → bulletin | { error }
     voices: new Map(),                       // file → its voice file, or null: not voiced (yet)
     scene: 0, t: 0, playing: false, ended: false, last: 0, timer: null,
     // The sound, on unless this device turned it off; the one <audio> it
     // plays through, which bulletin's MP3 that holds, and how that is going.
-    sound: stored('mn-hb-sound', v => v === '0') !== '0',
+    sound: stored(`mn-${ID}-sound`, v => v === '0') !== '0',
     audio: null, audioUrl: null, audioFor: null, audioState: 'idle',   // idle | loading | ready | failed
     // The speed and the volume, as this device last left them.
-    rate: +(stored('mn-hb-rate', v => RATES.includes(+v)) || 1),
-    vol: +(stored('mn-hb-vol', v => v !== '' && +v >= 0 && +v <= 1) || 1),
+    rate: +(stored(`mn-${ID}-rate`, v => RATES.includes(+v)) || 1),
+    vol: +(stored(`mn-${ID}-vol`, v => v !== '' && +v >= 0 && +v <= 1) || 1),
     drag: false, menu: false, countTok: 0,
-    hidden: stored('mn-hb-hidden', v => v === '1') === '1',
+    hidden: stored(`mn-${ID}-hidden`, v => v === '1') === '1',
     narrow: null, drawnNarrow: null, stageW: null, drawnK: 1, ro: null,
     basins: null,                            // null | 'loading' | [{ bbox, rings }] | 'failed'
   };
 
   function stored(k, ok) { try { const v = localStorage.getItem(k); return v != null && ok(v) ? v : null; } catch (_) { return null; } }
   function keep(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (_) {} }
-  function seen() { try { return new Set(JSON.parse(localStorage.getItem('mn-hb-seen') || '[]')); } catch (_) { return new Set(); } }
+  function seen() { try { return new Set(JSON.parse(localStorage.getItem(`mn-${ID}-seen`) || '[]')); } catch (_) { return new Set(); } }
   function markSeen(id) {
     const s = seen(); if (s.has(id)) return;
-    s.add(id); keep('mn-hb-seen', JSON.stringify([...s].slice(-60)));
+    s.add(id); keep(`mn-${ID}-seen`, JSON.stringify([...s].slice(-60)));
   }
   const reduced = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const stationName = id => {
@@ -238,13 +251,13 @@ const HealthBulletin = (() => {
   }
   // The newest bulletin issued, of either kind.
   function newest() {
-    return ['daily', 'weekly'].map(k => entries(k)[0] && { k, e: entries(k)[0] }).filter(Boolean)
+    return KINDS.map(k => entries(k)[0] && { k, e: entries(k)[0] }).filter(Boolean)
       .sort((x, y) => (Date.parse(y.e.issued_at) || 0) - (Date.parse(x.e.issued_at) || 0))[0] || null;
   }
   function openingKind() {
     const n = newest();
     if (!n) return B.kind;
-    const m = /^(daily|weekly)\|(.+)$/.exec(stored('mn-hb-kind', v => /^(daily|weekly)\|/.test(v)) || '');
+    const m = /^(daily|weekly)\|(.+)$/.exec(stored(`mn-${ID}-kind`, v => /^(daily|weekly)\|/.test(v)) || '');
     return m && m[2] === n.e.id && entries(m[1]).length ? m[1] : n.k;
   }
   function entries(kind) { return (B.index && Array.isArray(B.index[kind]) ? B.index[kind] : []); }
@@ -283,16 +296,18 @@ const HealthBulletin = (() => {
   // data/bulletins/daily/2026-10-25.json → data/bulletins/voice/daily/2026-10-25.json
   // (tools/bulletin/validate.mjs voicePathFor says the same).
   function voiceFileOf(f) {
+    if (cfg.voiceFileOf) return cfg.voiceFileOf(f);
     const m = /^data\/bulletins\/(daily|weekly)\/(\d{4}-\d{2}-\d{2})\.json$/.exec(f || '');
     return m ? `data/bulletins/voice/${m[1]}/${m[2]}.json` : null;
   }
   // A voice file is played only if it is this bulletin's, scene for scene and
   // word for word: one left from a bulletin rewritten the same day, before
   // its new voice has landed, would say other words over these scenes.
+  const VOICE = cfg.voice || { format: 'floodnet-bulletin-voice/1', key: 'bulletin', audio: /^data\/bulletins\/voice\/(daily|weekly)\/\d{4}-\d{2}-\d{2}\.mp3$/ };
   function fits(v, b) {
     const sc = (b && b.scenes) || [];
-    return !!v && v.format === 'floodnet-bulletin-voice/1' && v.bulletin === b.id
-      && /^data\/bulletins\/voice\/(daily|weekly)\/\d{4}-\d{2}-\d{2}\.mp3$/.test(v.audio || '')
+    return !!v && v.format === VOICE.format && v[VOICE.key] === b.id
+      && VOICE.audio.test(v.audio || '')
       && Array.isArray(v.scenes) && v.scenes.length === sc.length && sc.length > 0
       && v.scenes.every((x, i) => x && Number.isFinite(x.start) && Number.isFinite(x.end) && x.end >= x.start
         && (i === 0 || x.start >= v.scenes[i - 1].end)
@@ -304,28 +319,31 @@ const HealthBulletin = (() => {
   function render() {
     // data-no-lede: not the tab's introduction, which the Calm look folds
     // (calm-shell.js) — that is Station Health's own, under this.
-    return `<section class="panel hb${B.hidden ? ' hb--hidden' : ''}" id="hb-panel" aria-labelledby="hb-h" data-no-lede>${panelInner()}</section>`;
+    return `<section class="${panelClass()}" id="${ID}-panel" aria-labelledby="${ID}-h" data-no-lede>${inner()}</section>`;
   }
+  const panelClass = () => `panel hb${cfg.panelClass ? ' ' + cfg.panelClass : ''}${B.hidden ? ' hb--hidden' : ''}`;
+  // What is round the player: the show's own (cfg.panel), or the bulletin's.
+  function inner() { return cfg.panel ? cfg.panel(API) : panelInner(); }
   function panelInner() {
     const b = current();
     const kinds = [['daily', 'Daily'], ['weekly', 'Weekly']].map(([k, label]) => {
       const e = entries(k)[0];
       const fresh = e && !seen().has(e.id) ? '<span class="hb-new" aria-label="not yet played on this device">new</span>' : '';
-      return `<button class="hl-chip${B.kind === k ? ' hl-chip--on' : ''}" aria-pressed="${B.kind === k}" onclick="HealthBulletin.setKind('${k}')"
+      return `<button class="hl-chip${B.kind === k ? ' hl-chip--on' : ''}" aria-pressed="${B.kind === k}" onclick="${G}.setKind('${k}')"
         ${e ? '' : 'disabled title="None issued yet"'}>${esc(label)}${fresh}</button>`;
     }).join('');
     const list = entries(B.kind);
     const picker = list.length > 1 ? `<label class="hb-pick"><span class="sr-only">Earlier bulletins</span>
-      <select onchange="HealthBulletin.pick(this.value)">${list.map(e => `<option value="${escAttr(e.file)}"${e.file === currentFile() ? ' selected' : ''}>${esc(fmtIssue(e))}</option>`).join('')}</select></label>` : '';
+      <select onchange="${G}.pick(this.value)">${list.map(e => `<option value="${escAttr(e.file)}"${e.file === currentFile() ? ' selected' : ''}>${esc(fmtIssue(e))}</option>`).join('')}</select></label>` : '';
     const head = `<div class="panel-header hb-head">
-        <h2 id="hb-h"><span aria-hidden="true">📺</span> Network Bulletin</h2>
+        <h2 id="${ID}-h"><span aria-hidden="true">📺</span> Network Bulletin</h2>
         <div class="button-group hb-tools">
           <span class="hl-seg" role="group" aria-label="Which bulletin">${kinds}</span>${picker}
-          <button class="ghost" onclick="HealthBulletin.toggleHidden()" aria-expanded="${!B.hidden}" aria-controls="hb-body">${B.hidden ? 'Show' : 'Hide'}</button>
+          <button class="ghost" onclick="${G}.toggleHidden()" aria-expanded="${!B.hidden}" aria-controls="${ID}-body">${B.hidden ? 'Show' : 'Hide'}</button>
         </div>
       </div>`;
     if (B.hidden) return head + `<p class="small hb-folded">${b ? `${statusTerm(b)} — ${esc(b.headline)}` : 'The network’s bulletin, hidden on this device.'}</p>`;
-    return head + `<div id="hb-body">${bodyHtml()}</div>`;
+    return head + `<div id="${ID}-body">${bodyHtml()}</div>`;
   }
   // A bulletin's own wording of its level, unless it is from before the plain
   // words (then the level's own label: its outlook was the weather's).
@@ -348,47 +366,63 @@ const HealthBulletin = (() => {
     const got = B.files.get(f);
     if (!got || got.loading) return '<p class="small hb-note">Fetching the bulletin…</p>';
     if (got.error) return `<p class="small hb-note txt-warn">The bulletin could not be read — ${esc(got.error)}.</p>`;
-    const b = got, P = who(b.presenter), sc = b.scenes || [];
+    const b = got, P = who(b.presenter);
     const stale = sinceIssued(b, Date.now()) > STALE[b.kind || 'daily'];
     return `
       <p class="small hb-issued">${statusTerm(b)} · ${esc(issuedText(b))}${stale ? ` <span class="txt-warn">— ${b.kind === 'weekly' ? 'over a week' : 'more than a day'} old: the scheduled bulletin may have stopped.</span>` : ''}</p>
-      <div class="hb-player" id="hb-player" onkeydown="HealthBulletin.key(event)">
-        <div class="hb-stage${stageState()}" id="hb-stage" tabindex="0" role="group"
-             aria-roledescription="bulletin" aria-label="${escAttr(`${b.kind === 'weekly' ? 'Weekly' : 'Daily'} network bulletin, ${sc.length} scenes. Space plays or pauses; arrow keys move between scenes; M turns the sound off and on; the less-than and greater-than keys change the speed.`)}"
-             onclick="HealthBulletin.stageClick(event)">
-          <div class="hb-svgbox" id="hb-svgbox">${sceneSvg(b, B.scene)}</div>
-          <div class="hb-lower" id="hb-lower">${lowerHtml(b, B.scene)}</div>
-          <div class="hb-flash-slot" id="hb-flash" aria-hidden="true"></div>
-          ${bigPlayShown() ? bigPlayButton(b) : ''}
-        </div>
-        <div class="hb-ctl" id="hb-ctl">
-          ${seekHtml(b)}
-          <div class="hb-ctl-row">
-            <button class="hb-cbtn" onclick="HealthBulletin.prev()" aria-label="Previous scene" title="Previous scene (←)">${icon('prev')}</button>
-            <button class="hb-cbtn hb-cbtn--main" id="hb-play" onclick="HealthBulletin.toggle()" aria-label="${B.playing ? 'Pause' : 'Play'}" title="${B.playing ? 'Pause' : 'Play'} (space)">${icon(B.playing ? 'pause' : 'play')}</button>
-            <button class="hb-cbtn" onclick="HealthBulletin.next()" aria-label="Next scene" title="Next scene (→)">${icon('next')}</button>
-            <span class="hb-volgrp" id="hb-sound-slot">${soundButton(b)}</span>
-            <span class="hb-clock" id="hb-clock">${esc(clockText(b))}</span>
-            <span class="hb-chapter" id="hb-chapter">${esc(chapterText(b))}</span>
-            <span class="hb-speed" id="hb-speed-slot">${speedHtml()}</span>
-          </div>
-        </div>
-      </div>
-      <div class="hb-anchor">
-        <figure class="hb-presenter" id="hb-presenter">${presenterHtml(b, B.scene)}</figure>
-        <div class="hb-words">
-          <div class="hb-caption" id="hb-caption">${captionHtml(b, B.scene)}</div>
-          <div class="hb-chips" id="hb-chips">${chipsHtml(b, B.scene)}</div>
-        </div>
-      </div>
+      ${playerHtml(b)}
+      ${anchorHtml(b)}
       <details class="hb-transcript"><summary>Read it instead</summary>
-        <ol>${sc.map((s, i) => `<li><b>${esc(s.title)}.</b> ${esc(s.say)}${(s.stations || []).length ? ` <span class="small">(${stationLinks(s.stations)})</span>` : ''}
-          <button class="link-btn small" onclick="HealthBulletin.go(${i})">show</button></li>`).join('')}</ol>
+        ${transcriptHtml(b)}
         ${(b.caveats || []).length ? `<p class="small"><b>What it could not tell:</b> ${b.caveats.map(esc).join(' ')}</p>` : ''}
         <p class="small"><b>How the network is, in a word</b> — the level on the title card, by what needs attention:</p>
         <dl class="hb-key small">${STATUS_LEVELS.map(lv => `<dt>${esc(STATUS_WORD[lv])}</dt><dd>${esc(STATUS_MEANING[lv])}</dd>`).join('')}</dl>
       </details>
       <p class="small hb-foot">${esc(footText(b, P))}</p>`;
+  }
+  // The player — the stage and its bar — the presenter and the words under
+  // it, and the script as a list: the parts a show's own panel (cfg.panel)
+  // puts together round what it says itself.
+  function stageLabel(b) {
+    if (cfg.stageLabel) return cfg.stageLabel(b);
+    return `${b.kind === 'weekly' ? 'Weekly' : 'Daily'} network bulletin, ${(b.scenes || []).length} scenes. Space plays or pauses; arrow keys move between scenes; M turns the sound off and on; the less-than and greater-than keys change the speed.`;
+  }
+  function playerHtml(b) {
+    return `<div class="hb-player" id="${ID}-player" onkeydown="${G}.key(event)">
+        <div class="hb-stage${stageState()}" id="${ID}-stage" tabindex="0" role="group"
+             aria-roledescription="${NOUN}" aria-label="${escAttr(stageLabel(b))}"
+             onclick="${G}.stageClick(event)">
+          <div class="hb-svgbox" id="${ID}-svgbox">${sceneSvg(b, B.scene)}</div>
+          <div class="hb-lower" id="${ID}-lower">${lowerHtml(b, B.scene)}</div>
+          <div class="hb-flash-slot" id="${ID}-flash" aria-hidden="true"></div>
+          ${bigPlayShown() ? bigPlayButton(b) : ''}
+        </div>
+        <div class="hb-ctl" id="${ID}-ctl">
+          ${seekHtml(b)}
+          <div class="hb-ctl-row">
+            <button class="hb-cbtn" onclick="${G}.prev()" aria-label="Previous scene" title="Previous scene (←)">${icon('prev')}</button>
+            <button class="hb-cbtn hb-cbtn--main" id="${ID}-play" onclick="${G}.toggle()" aria-label="${B.playing ? 'Pause' : 'Play'}" title="${B.playing ? 'Pause' : 'Play'} (space)">${icon(B.playing ? 'pause' : 'play')}</button>
+            <button class="hb-cbtn" onclick="${G}.next()" aria-label="Next scene" title="Next scene (→)">${icon('next')}</button>
+            <span class="hb-volgrp" id="${ID}-sound-slot">${soundButton(b)}</span>
+            <span class="hb-clock" id="${ID}-clock">${esc(clockText(b))}</span>
+            <span class="hb-chapter" id="${ID}-chapter">${esc(chapterText(b))}</span>
+            <span class="hb-speed" id="${ID}-speed-slot">${speedHtml()}</span>${cfg.controls ? cfg.controls(API, b) : ''}
+          </div>
+        </div>
+      </div>`;
+  }
+  function anchorHtml(b) {
+    return `<div class="hb-anchor">
+        <figure class="hb-presenter" id="${ID}-presenter">${presenterHtml(b, B.scene)}</figure>
+        <div class="hb-words">
+          <div class="hb-caption" id="${ID}-caption">${captionHtml(b, B.scene)}</div>
+          <div class="hb-chips" id="${ID}-chips">${chipsHtml(b, B.scene)}</div>
+        </div>
+      </div>`;
+  }
+  function transcriptHtml(b) {
+    return `<ol>${(b.scenes || []).map((s, i) => `<li><b>${esc(s.title)}.</b> ${esc(s.say)}${(s.stations || []).length ? ` <span class="small">(${stationLinks(s.stations)})</span>` : ''}
+          <button class="link-btn small" onclick="${G}.go(${i})">show</button></li>`).join('')}</ol>`;
   }
 
   // The big ▶ in the middle of the picture, on the title card before it has
@@ -396,15 +430,15 @@ const HealthBulletin = (() => {
   // hides as little of the title card as it can. Its name says how long it
   // runs: as said with the sound on, as written with it off.
   const bigPlayShown = () => !B.playing && (B.ended || (B.scene === 0 && B.t === 0));
-  const bigPlayName = b => B.ended ? 'Watch again' : `Play the bulletin · ${fmtDur(totalSecs(b))}`;
+  const bigPlayName = b => B.ended ? 'Watch again' : `Play the ${NOUN} · ${fmtDur(totalSecs(b))}`;
   function bigPlayButton(b) {
-    return `<button class="hb-bigplay" title="${escAttr(bigPlayName(b))}" onclick="event.stopPropagation(); HealthBulletin.bigPlay()">${bigPlayHtml(b)}</button>`;
+    return `<button class="hb-bigplay" title="${escAttr(bigPlayName(b))}" onclick="event.stopPropagation(); ${G}.bigPlay()">${bigPlayHtml(b)}</button>`;
   }
   function bigPlayHtml(b) {
     return `<span class="hb-bigplay-disc">${icon(B.ended ? 'replay' : 'play')}</span><span class="sr-only">${esc(bigPlayName(b))}</span>`;
   }
   function drawBigPlay() {
-    const stage = document.getElementById('hb-stage'), big = stage && stage.querySelector('.hb-bigplay'), b = current();
+    const stage = document.getElementById(`${ID}-stage`), big = stage && stage.querySelector('.hb-bigplay'), b = current();
     if (!stage || !b) return;
     if (!bigPlayShown()) { if (big) big.remove(); return; }
     if (big) { big.innerHTML = bigPlayHtml(b); big.title = bigPlayName(b); }
@@ -420,7 +454,7 @@ const HealthBulletin = (() => {
   const isPaused = () => !isStill() && !B.playing;
   function stageState() { return isStill() ? ' is-still' : isPaused() ? ' is-paused' : ''; }
   function stagePose() {
-    const stage = document.getElementById('hb-stage');
+    const stage = document.getElementById(`${ID}-stage`);
     if (!stage) return;
     stage.classList.toggle('is-still', isStill());
     stage.classList.toggle('is-paused', isPaused());
@@ -443,7 +477,7 @@ const HealthBulletin = (() => {
       + 'It points at what needs a look and why it might be; it does not diagnose — check the station on this tab before driving out.';
   }
   function stationLinks(ids) {
-    return ids.map(id => `<button class="link-btn" onclick="HealthBulletin.open('${escAttr(id)}')">${esc(stationName(id) || id)}</button>`).join(', ');
+    return ids.map(id => `<button class="link-btn" onclick="${G}.open('${escAttr(id)}')">${esc(stationName(id) || id)}</button>`).join(', ');
   }
 
   // A scene's seconds: as said, with the sound on and the bulletin voiced —
@@ -475,14 +509,14 @@ const HealthBulletin = (() => {
   // dragged anywhere to go there, the scene under the pointer named above it.
   function seekHtml(b) {
     const total = totalSecs(b) || 1;
-    return `<div class="hb-seek" id="hb-seek" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0" aria-valuemax="${Math.round(total)}"
-        ${seekAria(b)} style="${seekVars(b)}" onkeydown="HealthBulletin.seekKey(event)"
-        onpointerdown="HealthBulletin.seekDown(event)" onpointermove="HealthBulletin.seekMove(event)" onpointerup="HealthBulletin.seekUp(event)"
-        onpointercancel="HealthBulletin.seekUp(event)" onpointerleave="HealthBulletin.seekLeave()">
+    return `<div class="hb-seek" id="${ID}-seek" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0" aria-valuemax="${Math.round(total)}"
+        ${seekAria(b)} style="${seekVars(b)}" onkeydown="${G}.seekKey(event)"
+        onpointerdown="${G}.seekDown(event)" onpointermove="${G}.seekMove(event)" onpointerup="${G}.seekUp(event)"
+        onpointercancel="${G}.seekUp(event)" onpointerleave="${G}.seekLeave()">
         <div class="hb-segs">${(b.scenes || []).map((s, i) => `<span class="hb-seg${i === B.scene ? ' is-on' : ''}${i < B.scene ? ' is-done' : ''}" style="--f:${(secsOf(b, i) / total).toFixed(4)}">
           <span class="hb-seg-fill" style="--p:${fillPct(b, i).toFixed(1)}%"></span></span>`).join('')}</div>
         <span class="hb-thumb"></span>
-        <span class="hb-tip" id="hb-tip" hidden></span>
+        <span class="hb-tip" id="${ID}-tip" hidden></span>
       </div>`;
   }
   const seekText = b => `${mmss(atSecs(b))} of ${mmss(totalSecs(b))}, ${chapterText(b)}`;
@@ -502,7 +536,7 @@ const HealthBulletin = (() => {
   // The scene under a pointer and how far into it, a gap counting as the
   // start of the scene after it.
   function pointAt(x) {
-    const seek = document.getElementById('hb-seek'), b = current();
+    const seek = document.getElementById(`${ID}-seek`), b = current();
     if (!seek || !b) return null;
     const segs = seek.querySelectorAll('.hb-seg');
     for (let i = 0; i < segs.length; i++) {
@@ -535,7 +569,7 @@ const HealthBulletin = (() => {
   function seekUp(e) {
     if (!B.drag) return;
     B.drag = false;
-    const el = document.getElementById('hb-seek');
+    const el = document.getElementById(`${ID}-seek`);
     if (el) { el.classList.remove('is-drag'); try { el.releasePointerCapture(e.pointerId); } catch (_) {} }
     // A finger lifted leaves nothing hovering.
     if (e.pointerType && e.pointerType !== 'mouse') hideTip();
@@ -565,7 +599,7 @@ const HealthBulletin = (() => {
     seekTo(i, ms - before * 1000);
   }
   function showTip(x, p) {
-    const seek = document.getElementById('hb-seek'), tip = document.getElementById('hb-tip'), b = current(), s = b && sceneOf(b, p.i);
+    const seek = document.getElementById(`${ID}-seek`), tip = document.getElementById(`${ID}-tip`), b = current(), s = b && sceneOf(b, p.i);
     if (!seek || !tip || !s) return;
     tip.innerHTML = `<b>${esc(s.title)}</b><span>Scene ${p.i + 1} · ${mmss(startOf(b, p.i) + p.ms / 1000)}</span>`;
     tip.hidden = false;
@@ -574,36 +608,36 @@ const HealthBulletin = (() => {
     seek.querySelectorAll('.hb-seg').forEach((seg, i) => seg.classList.toggle('is-hover', i === p.i));
   }
   function hideTip() {
-    const tip = document.getElementById('hb-tip');
+    const tip = document.getElementById(`${ID}-tip`);
     if (tip) tip.hidden = true;
-    document.querySelectorAll('#hb-seek .hb-seg.is-hover').forEach(seg => seg.classList.remove('is-hover'));
+    document.querySelectorAll(`#${ID}-seek .hb-seg.is-hover`).forEach(seg => seg.classList.remove('is-hover'));
   }
 
   // ── the speed ──────────────────────────────────────────────────────────────
   // ½× to 2×: the scenes, their motion and the voices together (the voices
   // keep their pitch). Remembered on this device.
   function speedHtml() {
-    return `<button class="hb-cbtn hb-speed-btn" id="hb-speed" onclick="HealthBulletin.toggleMenu()" aria-haspopup="menu" aria-expanded="${B.menu}"
-        aria-controls="hb-speed-menu" aria-label="Playback speed, ${escAttr(rateLabel(B.rate))}" title="Playback speed (&lt; &gt;)">${esc(rateLabel(B.rate))}</button>
-      <span class="hb-speed-menu" id="hb-speed-menu" role="menu" aria-label="Playback speed" onkeydown="HealthBulletin.menuKey(event)"${B.menu ? '' : ' hidden'}>
+    return `<button class="hb-cbtn hb-speed-btn" id="${ID}-speed" onclick="${G}.toggleMenu()" aria-haspopup="menu" aria-expanded="${B.menu}"
+        aria-controls="${ID}-speed-menu" aria-label="Playback speed, ${escAttr(rateLabel(B.rate))}" title="Playback speed (&lt; &gt;)">${esc(rateLabel(B.rate))}</button>
+      <span class="hb-speed-menu" id="${ID}-speed-menu" role="menu" aria-label="Playback speed" onkeydown="${G}.menuKey(event)"${B.menu ? '' : ' hidden'}>
         <span class="hb-speed-h" aria-hidden="true">Speed</span>
-        ${RATES.slice().reverse().map(r => `<button role="menuitemradio" aria-checked="${r === B.rate}" tabindex="-1" onclick="HealthBulletin.setRate(${r})">${r === 1 ? 'Normal' : esc(rateLabel(r))}</button>`).join('')}
+        ${RATES.slice().reverse().map(r => `<button role="menuitemradio" aria-checked="${r === B.rate}" tabindex="-1" onclick="${G}.setRate(${r})">${r === 1 ? 'Normal' : esc(rateLabel(r))}</button>`).join('')}
       </span>`;
   }
   function drawSpeed() {
-    const slot = document.getElementById('hb-speed-slot');
+    const slot = document.getElementById(`${ID}-speed-slot`);
     if (slot) slot.innerHTML = speedHtml();
   }
   function setRate(r) {
     if (!RATES.includes(+r)) return;
     B.rate = +r;
-    keep('mn-hb-rate', B.rate === 1 ? null : String(B.rate));
+    keep(`mn-${ID}-rate`, B.rate === 1 ? null : String(B.rate));
     if (B.audio) { B.audio.defaultPlaybackRate = B.rate; B.audio.playbackRate = B.rate; }
     syncAnims(true);
     const was = B.menu;
     B.menu = false; watchMenu();
     drawSpeed();
-    if (was) { const btn = document.getElementById('hb-speed'); if (btn) btn.focus(); }
+    if (was) { const btn = document.getElementById(`${ID}-speed`); if (btn) btn.focus(); }
     if (typeof announce === 'function') announce(`Speed ${B.rate === 1 ? 'normal' : rateLabel(B.rate)}.`);
   }
   function stepRate(d) { const k = RATES.indexOf(B.rate) + d; if (k >= 0 && k < RATES.length) setRate(RATES[k]); }
@@ -611,7 +645,7 @@ const HealthBulletin = (() => {
     B.menu = open == null ? !B.menu : !!open;
     watchMenu();
     drawSpeed();
-    if (B.menu) { const on = document.querySelector('#hb-speed-menu [aria-checked="true"]'); if (on) on.focus(); }
+    if (B.menu) { const on = document.querySelector(`#${ID}-speed-menu [aria-checked="true"]`); if (on) on.focus(); }
   }
   // Open, the menu closes on a press anywhere else.
   function watchMenu() {
@@ -619,16 +653,16 @@ const HealthBulletin = (() => {
     if (B.menu) document.addEventListener('pointerdown', menuAway, true);
   }
   function menuAway(e) {
-    if (e.target && e.target.closest && e.target.closest('#hb-speed-slot')) return;
+    if (e.target && e.target.closest && e.target.closest(`#${ID}-speed-slot`)) return;
     B.menu = false; watchMenu(); drawSpeed();
   }
   function menuKey(e) {
-    const items = [...document.querySelectorAll('#hb-speed-menu [role="menuitemradio"]')];
+    const items = [...document.querySelectorAll(`#${ID}-speed-menu [role="menuitemradio"]`)];
     const k = items.indexOf(document.activeElement);
     if (e.key === 'Escape' || e.key === 'Tab') {
       if (e.key === 'Escape') e.preventDefault();
       toggleMenu(false);
-      const btn = document.getElementById('hb-speed'); if (btn) btn.focus();
+      const btn = document.getElementById(`${ID}-speed`); if (btn) btn.focus();
     } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       const to = items[(k + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length];
@@ -651,8 +685,9 @@ const HealthBulletin = (() => {
   function chipsHtml(b, i) {
     const s = sceneOf(b, i), ids = (s && s.stations) || [];
     if (!ids.length) return '';
-    return `<span class="small hb-chips-k">On this tab:</span> ${ids.map(id => `<button class="hl-chip hl-chip--sm" onclick="HealthBulletin.open('${escAttr(id)}')"
-      title="Pause and open this station below">${esc(stationName(id) || id)}</button>`).join(' ')}`;
+    const CH = cfg.chips || { label: 'On this tab:', title: 'Pause and open this station below' };
+    return `<span class="small hb-chips-k">${esc(CH.label)}</span> ${ids.map(id => `<button class="hl-chip hl-chip--sm" onclick="${G}.open('${escAttr(id)}')"
+      title="${escAttr(CH.title)}">${esc(stationName(id) || id)}</button>`).join(' ')}`;
   }
   function lowerHtml(b, i) {
     const s = sceneOf(b, i);
@@ -690,8 +725,8 @@ const HealthBulletin = (() => {
     catch (err) { inner = drawUnknown(s, b, L, err); }
     return `<svg class="hb-svg hb-t-${escAttr(s.type)}" viewBox="0 0 ${L.W} ${L.H}" role="img" aria-label="${escAttr(s.title)}"
       preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-      <defs><linearGradient id="hb-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${C.ground2}"/><stop offset="1" stop-color="${C.ground}"/></linearGradient></defs>
-      <rect width="${L.W}" height="${L.H}" fill="url(#hb-g)"/>${inner}</svg>`;
+      <defs><linearGradient id="${ID}-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${C.ground2}"/><stop offset="1" stop-color="${C.ground}"/></linearGradient></defs>
+      <rect width="${L.W}" height="${L.H}" fill="url(#${ID}-g)"/>${inner}</svg>`;
   }
   function layout() {
     const narrow = B.narrow != null ? B.narrow : (typeof innerWidth === 'number' && innerWidth < 700);
@@ -875,7 +910,7 @@ const HealthBulletin = (() => {
     const box = { x: pad * 0.5, y: pad * 0.5, w: W - pad, h: H - L.foot - pad * 0.5 };
     const P = projector(bb, box);
     let out = `<g class="hb-grid" stroke="${C.grid}" stroke-width="1">${gridLines(P, box)}</g>`;
-    out += `<g id="hb-basins">${basinsSvg(P, box)}</g>`;
+    out += `<g id="${ID}-basins">${basinsSvg(P, box)}</g>`;
     // The network itself, every station on file in view, faint: the stars the
     // scene's own marks stand out from.
     const all = ((typeof state !== 'undefined' && state.data && state.data.stations) || []);
@@ -1086,12 +1121,12 @@ const HealthBulletin = (() => {
       });
     } catch (_) { B.basins = 'failed'; return; }
     // Into the map on the stage now, if one is up — without starting it over.
-    const b = current(), s = b && sceneOf(b, B.scene), g = document.getElementById('hb-basins');
+    const b = current(), s = b && sceneOf(b, B.scene), g = document.getElementById(`${ID}-basins`);
     if (s && s.type === 'map' && g) {
-      const svg = document.getElementById('hb-svgbox');
+      const svg = document.getElementById(`${ID}-svgbox`);
       const tmp = document.createElement('div');
       tmp.innerHTML = sceneSvg(b, B.scene);
-      const fresh = tmp.querySelector('#hb-basins');
+      const fresh = tmp.querySelector(`#${ID}-basins`);
       if (fresh && svg) { g.innerHTML = fresh.innerHTML; g.querySelectorAll('.hb-a-fade').forEach(n => n.classList.remove('hb-a-fade')); }
     }
   }
@@ -1253,8 +1288,8 @@ const HealthBulletin = (() => {
       // has barely moved: a squashed arrowhead says nothing.
       const moved = xw != null && Math.abs(xn - xw) >= 24;
       out += `<g>${xw != null ? `<line x1="${xw.toFixed(1)}" y1="${ay - 64}" x2="${xw.toFixed(1)}" y2="${ay + 36}" stroke="${col}" stroke-width="3" stroke-dasharray="5 5" stroke-opacity=".7" class="hb-a-fade" ${d(t0)}/>` : ''}
-        ${moved ? `<path d="M${xw.toFixed(1)} ${ay - 8} L${(xn + (xn > xw ? -10 : 10)).toFixed(1)} ${ay - 8}" stroke="${col}" stroke-width="3" marker-end="url(#hb-arr${k})" class="hb-a-draw" style="--d:${(t0 + 0.4).toFixed(2)}s;--len:${Math.ceil(Math.abs(xn - xw) + 10)}"/>
-          <defs><marker id="hb-arr${k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="${col}"/></marker></defs>` : ''}
+        ${moved ? `<path d="M${xw.toFixed(1)} ${ay - 8} L${(xn + (xn > xw ? -10 : 10)).toFixed(1)} ${ay - 8}" stroke="${col}" stroke-width="3" marker-end="url(#${ID}-arr${k})" class="hb-a-draw" style="--d:${(t0 + 0.4).toFixed(2)}s;--len:${Math.ceil(Math.abs(xn - xw) + 10)}"/>
+          <defs><marker id="${ID}-arr${k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="${col}"/></marker></defs>` : ''}
         <g class="${xw != null ? 'hb-a-slide' : 'hb-a-pop'}" ${dd(t0 + 0.4, `--dx:${xw != null ? (xw - xn).toFixed(1) : 0}px`)}>
           <line x1="${xn.toFixed(1)}" y1="${ay - 64}" x2="${xn.toFixed(1)}" y2="${ay + 40}" stroke="${col}" stroke-width="6" stroke-linecap="round"/>
           <circle cx="${xn.toFixed(1)}" cy="${ay - 64}" r="8" fill="${col}"/>
@@ -1585,8 +1620,11 @@ const HealthBulletin = (() => {
   }
   function statusMini(b, x, y) { return `<g transform="translate(${x} ${y}) scale(.62)">${statusGlyph(levelOf(b))}</g>`; }
 
-  const DRAW = { title: drawTitle, map: drawMap, battery: drawBattery, checks: drawChecks, carrier: drawCarrier,
-                 triangulate: drawTriangulate, receivers: drawReceivers, trend: drawTrend, list: drawList, signoff: drawSignoff };
+  // A show's own scenes (cfg.draw), drawn with the stage's own hand: its
+  // colours, its type sizes, its way of wrapping words.
+  const DRAW = Object.assign({ title: drawTitle, map: drawMap, battery: drawBattery, checks: drawChecks, carrier: drawCarrier,
+                 triangulate: drawTriangulate, receivers: drawReceivers, trend: drawTrend, list: drawList, signoff: drawSignoff },
+    cfg.draw ? cfg.draw({ C, text, wrap, charsFor, d, dd, vtop, halo, sevC, fmtStat, who, portrait, SEV_ICON, drawMap, drawList, stationAt }) : {});
 
   // ── playing ────────────────────────────────────────────────────────────────
 
@@ -1604,7 +1642,7 @@ const HealthBulletin = (() => {
     drawBigPlay();
     setTalking(true);
     flash('play');
-    const box = document.getElementById('hb-svgbox'); if (box) countUp(box);
+    const box = document.getElementById(`${ID}-svgbox`); if (box) countUp(box);
   }
   function pause() {
     const was = B.playing;
@@ -1621,7 +1659,7 @@ const HealthBulletin = (() => {
   function bigPlay() {
     const had = document.activeElement && document.activeElement.closest && document.activeElement.closest('.hb-bigplay');
     play();
-    const stage = document.getElementById('hb-stage');
+    const stage = document.getElementById(`${ID}-stage`);
     if (had && stage) stage.focus({ preventScroll: true });
   }
   function go(i) {
@@ -1656,14 +1694,14 @@ const HealthBulletin = (() => {
   function startScene() {
     const b = current();
     if (!b) return;
-    const box = document.getElementById('hb-svgbox');
+    const box = document.getElementById(`${ID}-svgbox`);
     if (!box) return;
     box.innerHTML = sceneSvg(b, B.scene);
     stagePose();
     syncAnims();
-    const lower = document.getElementById('hb-lower'); if (lower) lower.innerHTML = lowerHtml(b, B.scene);
-    const pres = document.getElementById('hb-presenter'); if (pres) pres.innerHTML = presenterHtml(b, B.scene);
-    const chips = document.getElementById('hb-chips'); if (chips) chips.innerHTML = chipsHtml(b, B.scene);
+    const lower = document.getElementById(`${ID}-lower`); if (lower) lower.innerHTML = lowerHtml(b, B.scene);
+    const pres = document.getElementById(`${ID}-presenter`); if (pres) pres.innerHTML = presenterHtml(b, B.scene);
+    const chips = document.getElementById(`${ID}-chips`); if (chips) chips.innerHTML = chipsHtml(b, B.scene);
     drawBigPlay();
     countUp(box);
     drawCaption();
@@ -1676,7 +1714,7 @@ const HealthBulletin = (() => {
   // Web Animations API, its SVG ones by the drawing's own clock. Only the
   // speed, when the moment has not moved.
   function syncAnims(rateOnly) {
-    const box = document.getElementById('hb-svgbox'), svg = box && box.querySelector('svg');
+    const box = document.getElementById(`${ID}-svgbox`), svg = box && box.querySelector('svg');
     if (!svg) return;
     if (!rateOnly) {
       try {
@@ -1693,7 +1731,7 @@ const HealthBulletin = (() => {
   }
   // ▶ or ⏸ blooming in the middle of the picture as it is pressed.
   function flash(kind) {
-    const slot = document.getElementById('hb-flash');
+    const slot = document.getElementById(`${ID}-flash`);
     if (!slot || reduced()) return;
     slot.innerHTML = `<span class="hb-flash">${icon(kind)}</span>`;
   }
@@ -1739,7 +1777,7 @@ const HealthBulletin = (() => {
   function stopClock() { if (B.timer) clearInterval(B.timer); B.timer = null; }
   function tick() {
     const b = current();
-    if (!b || !document.getElementById('hb-stage')) { stopClock(); return; }
+    if (!b || !document.getElementById(`${ID}-stage`)) { stopClock(); return; }
     const now = performance.now(), dt = now - B.last;
     B.last = now;
     // With the voices on, the sound keeps the time: the stage waits while the
@@ -1765,11 +1803,14 @@ const HealthBulletin = (() => {
   function finish() {
     B.playing = false; B.ended = true; B.t = 0;
     stopClock(); stopAudio(); setTalking(false);
-    redraw();
-    if (typeof announce === 'function') announce('End of the bulletin.');
+    // A show that may be playing full screen (cfg.softFinish) keeps its stage:
+    // the panel drawn again would take the full screen away with it.
+    if (cfg.softFinish) { stagePose(); syncAnims(); drawBigPlay(); drawControls(); drawCaption(true); }
+    else redraw();
+    if (typeof announce === 'function') announce(`End of the ${NOUN}.`);
   }
   function drawCaption(all) {
-    const b = current(), s = b && sceneOf(b, B.scene), el = document.getElementById('hb-caption');
+    const b = current(), s = b && sceneOf(b, B.scene), el = document.getElementById(`${ID}-caption`);
     if (!s || !el) return;
     if (!el.querySelector('.hb-w') || el.getAttribute('data-scene') !== String(B.scene)) {
       el.innerHTML = captionHtml(b, B.scene);
@@ -1780,7 +1821,7 @@ const HealthBulletin = (() => {
     words.forEach((w, k) => w.classList.toggle('is-said', k < n));
   }
   function drawProgress() {
-    const b = current(), seek = document.getElementById('hb-seek');
+    const b = current(), seek = document.getElementById(`${ID}-seek`);
     if (!b || !seek) return;
     const segs = seek.querySelectorAll('.hb-seg');
     if (segs.length !== (b.scenes || []).length) { seek.outerHTML = seekHtml(b); return; }
@@ -1800,11 +1841,11 @@ const HealthBulletin = (() => {
       seek.setAttribute('aria-valuenow', String(Math.floor(atSecs(b))));
       seek.setAttribute('aria-valuetext', text);
     }
-    const clock = document.getElementById('hb-clock'); if (clock) clock.textContent = clockText(b);
-    const ch = document.getElementById('hb-chapter'); if (ch) ch.textContent = chapterText(b);
+    const clock = document.getElementById(`${ID}-clock`); if (clock) clock.textContent = clockText(b);
+    const ch = document.getElementById(`${ID}-chapter`); if (ch) ch.textContent = chapterText(b);
   }
   function drawControls() {
-    const btn = document.getElementById('hb-play');
+    const btn = document.getElementById(`${ID}-play`);
     if (btn) {
       btn.innerHTML = icon(B.playing ? 'pause' : 'play');
       btn.setAttribute('aria-label', B.playing ? 'Pause' : 'Play');
@@ -1813,7 +1854,7 @@ const HealthBulletin = (() => {
     drawProgress();
   }
   function setTalking(on) {
-    const img = document.querySelector('#hb-presenter img');
+    const img = document.querySelector(`#${ID}-presenter img`);
     if (img) img.classList.toggle('is-talking', !!on);
   }
 
@@ -1858,7 +1899,7 @@ const HealthBulletin = (() => {
     B.audioFor = f; B.audioState = 'loading';
     drawProgress();
     try {
-      const res = await fetch(v.audio, { credentials: 'same-origin' });
+      const res = await fetch(cfg.audioUrl ? cfg.audioUrl(v) : v.audio, { credentials: 'same-origin' });
       if (!res.ok) throw new Error(`${v.audio} answered ${res.status}`);
       const blob = await res.blob();
       if (B.audioFor !== f) return;                      // another bulletin since
@@ -1914,7 +1955,7 @@ const HealthBulletin = (() => {
   function toggleSound() {
     if (audioIs('failed')) { B.audioState = 'idle'; B.sound = true; }
     else B.sound = !B.sound;
-    keep('mn-hb-sound', B.sound ? null : '0');
+    keep(`mn-${ID}-sound`, B.sound ? null : '0');
     const b = current();
     if (b && B.playing) { if (voiced(b)) startAudio(b); else stopAudio(); }
     drawSound(); drawProgress();
@@ -1927,51 +1968,52 @@ const HealthBulletin = (() => {
       : B.sound ? ['Sound on', 'The presenters say it in their own voices. Press to turn the sound off.']
       : ['Sound off', 'Press to hear the presenters say it.'];
     // A failure says so in words; otherwise the icon is the label.
-    return `<button class="hb-cbtn${failed ? ' hb-cbtn--wide' : ''}" id="hb-sound" onclick="HealthBulletin.toggleSound()" aria-pressed="${on}"
+    return `<button class="hb-cbtn${failed ? ' hb-cbtn--wide' : ''}" id="${ID}-sound" onclick="${G}.toggleSound()" aria-pressed="${on}"
         title="${escAttr(title)} (M)">${icon(on && B.vol > 0 ? 'sound' : 'mute')}<span class="${failed ? 'hb-cbtn-text' : 'sr-only'}">${esc(label)}</span></button>
-      <input type="range" class="hb-vol" id="hb-vol" min="0" max="1" step="0.05" value="${B.vol}" aria-label="Volume"
-        aria-valuetext="${Math.round(B.vol * 100)}%" oninput="HealthBulletin.setVolume(this.value)"${on ? '' : ' disabled'}>`;
+      <input type="range" class="hb-vol" id="${ID}-vol" min="0" max="1" step="0.05" value="${B.vol}" aria-label="Volume"
+        aria-valuetext="${Math.round(B.vol * 100)}%" oninput="${G}.setVolume(this.value)"${on ? '' : ' disabled'}>`;
   }
   function setVolume(v) {
     v = Math.max(0, Math.min(1, +v));
     if (!Number.isFinite(v)) return;
     B.vol = v;
-    keep('mn-hb-vol', v === 1 ? null : String(v));
+    keep(`mn-${ID}-vol`, v === 1 ? null : String(v));
     if (B.audio) B.audio.volume = v;
-    const el = document.getElementById('hb-vol');
+    const el = document.getElementById(`${ID}-vol`);
     if (el) {
       if (+el.value !== v) el.value = String(v);
       el.setAttribute('aria-valuetext', `${Math.round(v * 100)}%`);
     }
-    const btn = document.getElementById('hb-sound');
+    const btn = document.getElementById(`${ID}-sound`);
     if (btn) { const svg = btn.querySelector('svg'); if (svg) svg.outerHTML = icon(v > 0 && B.sound && !audioIs('failed') ? 'sound' : 'mute'); }
   }
   function drawSound() {
-    const slot = document.getElementById('hb-sound-slot');
+    const slot = document.getElementById(`${ID}-sound-slot`);
     if (slot) slot.innerHTML = soundButton(current());
   }
 
   // ── events ─────────────────────────────────────────────────────────────────
 
   function redraw() {
-    const el = document.getElementById('hb-panel');
+    const el = document.getElementById(`${ID}-panel`);
     if (!el) return;
-    el.className = `panel hb${B.hidden ? ' hb--hidden' : ''}`;
-    el.innerHTML = panelInner();
+    el.className = panelClass();
+    el.innerHTML = inner();
     watchSize();
+    if (cfg.redrawn) cfg.redrawn(API);
   }
   function setKind(k) {
     if (k !== 'daily' && k !== 'weekly' || k === B.kind) return;
     B.kind = k;
     const n = newest();
-    keep('mn-hb-kind', n ? `${k}|${n.e.id}` : null);
+    keep(`mn-${ID}-kind`, n ? `${k}|${n.e.id}` : null);
     resetPlay();
     redraw();
     loadCurrent();
   }
   function pick(file) { B.pick[B.kind] = file; resetPlay(); redraw(); loadCurrent(); }
   function toggleHidden() {
-    B.hidden = !B.hidden; keep('mn-hb-hidden', B.hidden ? '1' : null);
+    B.hidden = !B.hidden; keep(`mn-${ID}-hidden`, B.hidden ? '1' : null);
     if (B.hidden) pause();
     redraw();
   }
@@ -1982,6 +2024,7 @@ const HealthBulletin = (() => {
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
     if (t && t.closest('a, select, input, [role="slider"], [role="menu"]')) return;
     if ((k === ' ' || k === 'Enter') && t && t.closest('button')) return;
+    if (cfg.key && cfg.key(e, API)) { e.preventDefault(); return; }
     if (k === ' ' || k === 'k' || k === 'K') { e.preventDefault(); toggle(); }
     else if (k === 'ArrowRight') { e.preventDefault(); next(); }
     else if (k === 'ArrowLeft') { e.preventDefault(); prev(); }
@@ -1998,6 +2041,7 @@ const HealthBulletin = (() => {
   function open(id) {
     if (!id) return;
     pause();
+    if (cfg.open) { cfg.open(id); return; }
     if (typeof Health === 'undefined') return;
     const st = Health.state && Health.state();
     if (st && st.A && st.A.stations && st.A.stations.has(id) && Health.select) Health.select(id);
@@ -2007,7 +2051,7 @@ const HealthBulletin = (() => {
   // The stage is drawn wide on a wide screen and tall on a phone; crossing
   // over redraws the scene where it is.
   function watchSize() {
-    const stage = document.getElementById('hb-stage');
+    const stage = document.getElementById(`${ID}-stage`);
     if (B.ro) { B.ro.disconnect(); B.ro = null; }
     if (!stage || typeof ResizeObserver === 'undefined') return;
     B.ro = new ResizeObserver(entries => {
@@ -2017,7 +2061,7 @@ const HealthBulletin = (() => {
       B.stageW = w;
       const k = !B.narrow ? Math.min(1.25, Math.max(1, Math.round(20 * 1000 / w) / 20)) : 1;
       if (B.narrow === B.drawnNarrow && k === B.drawnK) return;
-      const b = current(), box = document.getElementById('hb-svgbox');
+      const b = current(), box = document.getElementById(`${ID}-svgbox`);
       if (!b || !box) return;
       box.innerHTML = sceneSvg(b, B.scene);
       // Redrawn where it was, not played over from its start.
@@ -2037,6 +2081,14 @@ const HealthBulletin = (() => {
     if (B.ro) { B.ro.disconnect(); B.ro = null; }
   }
 
+  // What a show's own panel and hooks may use (cfg.panel, cfg.controls,
+  // cfg.key, cfg.redrawn).
+  const API = {
+    B, ID, G, current, currentFile, entries, pick, redraw, resetPlay, playerHtml, anchorHtml, transcriptHtml, stageLabel,
+    totalSecs: b => totalSecs(b), fmtDur, voiceOf: b => voiceOf(b), who, portrait, go, play, pause, toggle, next, prev, startScene, syncAnims,
+    reload: () => { B.index = null; B.indexErr = ''; loadIndex(); },
+  };
+
   return {
     render, init, stop, adopt,
     refresh: () => { B.index = null; B.indexErr = ''; B.files.clear(); B.voices.clear(); resetPlay(); B.audioFor = null; B.audioState = 'idle'; redraw(); loadIndex(); },
@@ -2046,7 +2098,10 @@ const HealthBulletin = (() => {
     _state: () => ({ kind: B.kind, scene: B.scene, t: B.t, playing: B.playing, ended: B.ended, file: currentFile(), hidden: B.hidden, rate: B.rate, vol: B.vol,
       sound: B.sound, voiced: !!voiceOf(current()), audio: B.audioFor === currentFile() ? B.audioState : 'idle',
       at: audioIs('ready') && mp3In() ? B.audio.currentTime : null }),
+    _api: API,
   };
-})();
+}
 
-if (typeof window !== 'undefined') window.HealthBulletin = HealthBulletin;
+const HealthBulletin = makeShowPlayer();
+
+if (typeof window !== 'undefined') { window.HealthBulletin = HealthBulletin; window.makeShowPlayer = makeShowPlayer; }

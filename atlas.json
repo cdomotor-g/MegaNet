@@ -45,7 +45,7 @@
       "#259 a lighter off-air decoder: lean decoding is the live pipeline's default (0.12% of 11,628 live bursts read differently, a third of the time); part 2, BurstWatch, filters a channel only around its bursts (the same readings in every test, a sixth to a twentieth of the work between them) and is in RPi ALERT 0.18 behind a setting, waiting on its check at the first base station"
     ],
     "next": [
-      "EPIC #262 explainers: the player and meeting mode (#263), then a welcome to Flood-Net presented by Graham (#264) and the station-card how-to (#265), each voiced once the owner OKs its script",
+      "EPIC #262 explainers: 🎬 Videos and its player shipped (#263) — next the welcome presented by Graham (#264) and the station-card how-to with its walkthrough scene (#265), each voiced once the owner OKs its script",
       "#252–#254 road routes: avoid closures, inspection runs, routes kept offline (EPIC #250)",
       "#238 QLDTraffic flood events and road closures on the Stations map",
       "#216 staff alerts: daily digest email and web push for critical findings",

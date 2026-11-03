@@ -152,6 +152,15 @@ const TABS = [
     // nor any nav.mjs's probes hold for other tabs ("maps", "view", "network").
     { id: 'capabilities', label: 'Capabilities',         icon: '📇',
       find: 'capability capabilities features feature list functions functionality abilities possible catalogue catalog inventory layers overlays outside external sources datasets feeds admin only' },
+    // 🎬 Videos (explainers.js, EPIC #262): short drawn videos about
+    // Flood-Net itself, said by the Droggies — a welcome for a first look or a
+    // meeting room, and how-tos that each show one job. Beside Capabilities,
+    // the other page about the app rather than the stations. Its find words
+    // are what somebody wanting to be shown types; none that the Site Map
+    // answers to ("guide", "tour", "introduction", "help"), and no "how" or
+    // "to", which would tie it with every tab a question starts with.
+    { id: 'videos',     label: 'Videos',                 icon: '🎬',
+      find: 'video videos watch welcome tutorial tutorials explainer explainers walkthrough demo demonstration presentation meeting room projector clicker full screen animation animated' },
     { id: 'offline',    label: 'Offline & Install',      icon: '📲',
       find: 'offline no signal no reception flight mode airplane mode install app add to home screen homescreen icon pwa progressive web app phone tablet saved cache ready set up device update new version' },
     { id: 'views',      label: 'Views',                  icon: '🎛️',
@@ -599,6 +608,28 @@ const HELP = {
     related: ['sitemap', 'home', 'stations'],
     links: [
       { label: 'Capabilities — how the list works (README)', href: 'README.md#39-capabilities-everything-flood-net-can-do-a-line-each' },
+    ],
+  },
+  videos: {
+    summary: 'Short drawn videos about Flood-Net itself, said by the Droggies in their own voices: a '
+           + '<strong>welcome</strong> for a first look — or the start of a meeting — and how-tos that each '
+           + 'show one job. Pick one from the cards and press ▶; the words are shown as they are said, and '
+           + '<em>Read it instead</em> has the whole script. <strong>⛶ Full screen</strong> (or F) fills the '
+           + 'screen for a meeting room: a presentation clicker moves a scene at a time, and Esc leaves. '
+           + '<strong>🔗 Copy link</strong> gives an address that opens the video ready to play full screen.',
+    watch: [
+      'A video marked <em>Draft</em> plays without voices: its words are still being checked, and it is '
+      + 'voiced once they are approved. The voices are made once, so a video never spends anything to watch.',
+      'Before a meeting somewhere the Wi-Fi may not work, press <strong>📥 Keep for no signal</strong> with a '
+      + 'signal: the video, its words and its voices are kept on the device.',
+      'The numbers in a video (how many stations, and so on) are counted when it plays, from what this '
+      + 'device has loaded — so they are always today\'s, and the voices never say them.',
+      'The keys on the player: space plays and pauses, ← → or Page Up / Page Down move a scene, F is full '
+      + 'screen, M turns the sound off and on, &lt; &gt; change the speed.',
+    ],
+    related: ['capabilities', 'sitemap', 'home'],
+    links: [
+      { label: 'How a video is made (tools/explainers/README.md)', href: 'tools/explainers/README.md' },
     ],
   },
   offline: {

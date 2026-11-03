@@ -6166,6 +6166,35 @@ nowhere, and a line whose outside source is missing from *Where the data
 comes from* — so a new tab or a new source is added here when it is added to
 the app.
 
+### 40. Videos (Short Drawn Videos About Flood-Net, for a First Look or a Meeting Room)
+
+🎬 **Videos**, under *Start here* between Capabilities and Offline & Install,
+plays short drawn videos about Flood-Net itself, said by the Droggies in their
+own voices: a **welcome** — presented by Graham Watts, the Seasoned
+Hydrographer — for a first look or the start of a meeting, and **how-tos**, the
+New Recruit being shown one job at a time (EPIC #262). They play on the 📺
+Network Bulletin's own player (`makeShowPlayer`, `health-bulletin.js`): each
+scene drawn from a small file, the words revealed as they are said, *Read it
+instead* the whole script, and the stations a scene names a press away on the
+map. A drawing of a tab is a sketch, never a screenshot, its name read from the
+nav as it is now; a number in a video is counted when it plays — so the
+voices, said once, never go stale.
+
+**⛶ Full screen** (or F) is for a meeting room: the picture fills the screen,
+the words large under it, the bar hidden while it plays; a presentation
+clicker's Page Down and Page Up move a scene, and Esc leaves. **🔗 Copy link**
+gives `https://floodwarning.net/?watch=<id>`, which opens the video ready to
+play, its first ▶ full screen. **📥 Keep for no signal** fetches the video, its
+words and its voices ahead, for a venue whose Wi-Fi cannot be trusted.
+
+A video is `data/explainers/<id>.json`, written to `tools/explainers/README.md`
+and checked by `tools/explainers/validate.mjs`. It plays silent as a **draft**
+until its words are approved, and is voiced only once it is marked final —
+a scene at a time, each scene kept, so changing one scene's words spends that
+scene's ElevenLabs credits and no more (`tools/voice/speak.mjs`,
+`bulletin-voice.yml`). `npm run explainers` holds the tab, the validator and
+the voicing to all of it.
+
 ## Deployment Plan
 
 The plan the consolidation was built to, kept as the record of it. **Every

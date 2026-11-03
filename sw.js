@@ -58,7 +58,12 @@
 //   health-bulletin.js): a megabyte or so a bulletin, fetched only when Play
 //   is pressed with the sound on — a fortnight of them is not worth keeping
 //   on every device, and with no signal the bulletin plays without them. The
-//   small voice files beside them are kept like any other file.
+//   small voice files beside them are kept like any other file. The 🎬
+//   Videos' voices (data/explainers/voice/*.mp3, explainers.js) are kept, as
+//   any other file is: there are a handful, each voiced once and played for
+//   months, and one is wanted in a meeting room whose Wi-Fi cannot be trusted
+//   (📥 Keep for no signal fetches it ahead). Each is asked for with its
+//   voice's hash (?h=), so a video voiced again is a new copy, not the old.
 //
 // And one thing that is not keeping at all: an administrator's notifications
 // (0066) arrive here, from the push service, whether or not a page is open —
