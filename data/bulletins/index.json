@@ -1,7 +1,15 @@
 {
  "format": "floodnet-bulletin-index/1",
- "updated_at": "2026-11-03T05:52:15.225Z",
+ "updated_at": "2026-11-03T18:35:49.120Z",
  "daily": [
+  {
+   "id": "daily-2026-11-04",
+   "file": "data/bulletins/daily/2026-11-04.json",
+   "issued_at": "2026-11-03T18:32:11.971Z",
+   "headline": "Our second receiver stick has heard about a fifth of its usual traffic since midday Tuesday. And a correction: yesterday's Tallai lead was our route, not Tallai.",
+   "status": "few",
+   "presenter": "new-recruit"
+  },
   {
    "id": "daily-2026-11-03",
    "file": "data/bulletins/daily/2026-11-03.json",

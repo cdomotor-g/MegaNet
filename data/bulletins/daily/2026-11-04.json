@@ -1,0 +1,344 @@
+{
+ "format": "floodnet-bulletin/1",
+ "kind": "daily",
+ "id": "daily-2026-11-04",
+ "issued_at": "2026-11-03T18:32:11.971Z",
+ "period": {
+  "from": "2026-11-02T18:32:11.971Z",
+  "to": "2026-11-03T18:32:11.971Z",
+  "label": "24 hours to 4:32 am Wednesday"
+ },
+ "presenter": "new-recruit",
+ "cohost": "tech-wizard",
+ "status": {
+  "level": "few",
+  "label": "A few need attention"
+ },
+ "headline": "Our second receiver stick has heard about a fifth of its usual traffic since midday Tuesday. And a correction: yesterday's Tallai lead was our route, not Tallai.",
+ "stats": [
+  {
+   "label": "stations heard",
+   "value": 1291,
+   "tone": "neutral"
+  },
+  {
+   "label": "checks received",
+   "value": 81,
+   "unit": "%",
+   "was": 81,
+   "tone": "warn"
+  },
+  {
+   "label": "unheard, keep a schedule",
+   "value": 4,
+   "tone": "warn"
+  },
+  {
+   "label": "critical findings",
+   "value": 12,
+   "tone": "bad"
+  }
+ ],
+ "scenes": [
+  {
+   "type": "title",
+   "title": "Good morning",
+   "secs": 20,
+   "say": "Good morning, the New Recruit here. Should I be writing this down? Eighty-one percent of checks came in, about the same as before, and Flood-Net stopped hearing four stations that keep a schedule. One thing at our own end needs a look, and there's a correction to yesterday."
+  },
+  {
+   "type": "receivers",
+   "title": "Our second stick, thinned out",
+   "presenter": "tech-wizard",
+   "sev": "warn",
+   "secs": 25,
+   "say": "Alex Chen on the radio. Our second receiver stick has thinned right out since about noon on Tuesday. From the addresses it hears most, it caught three hundred and sixty-six copies in the ten hours from one o'clock, against eighteen hundred and eighty-seven in the ten hours before eleven. What it still hears arrives at the same strength and on the same carriers, so it isn't detuned.",
+   "stations": [
+    "misty_morn_al"
+   ],
+   "items": [
+    {
+     "name": "rpi-83071968 stick 1",
+     "up": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "note": "steady"
+    },
+    {
+     "name": "rpi-83071968 stick 2",
+     "up": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0.67,
+      0.67,
+      0.83,
+      1,
+      0.83,
+      0.67,
+      0.5,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0.33
+     ],
+     "note": "about a fifth of its usual traffic since noon Tuesday"
+    }
+   ]
+  },
+  {
+   "type": "list",
+   "title": "What would tell",
+   "presenter": "tech-wizard",
+   "sev": "info",
+   "secs": 25,
+   "say": "The base station installed an update at 12:59 on Tuesday and rebooted at eight past one, but the drop started an hour before that. All those senders falling together means one cause: the stick, its aerial or cable, or one repeater they share. The stick's own record on the Pi would tell. Misty Morn, heard only on that stick, has been unheard since four that morning, before the drop.",
+   "stations": [
+    "misty_morn_al"
+   ],
+   "items": [
+    {
+     "sev": "warn",
+     "text": "Stick 2: down to about a fifth from about noon Tuesday; signal and carriers unchanged."
+    },
+    {
+     "sev": "info",
+     "text": "Update at 12:59 pm, reboot 1:08 pm Tuesday: after the drop began."
+    },
+    {
+     "sev": "warn",
+     "id": "misty_morn_al",
+     "text": "Misty Morn AL, heard only on stick 2: unheard since 4 am Tuesday, before the drop."
+    }
+   ]
+  },
+  {
+   "type": "map",
+   "title": "A correction: the hinterland was our route",
+   "sub": "ARRO had the data",
+   "sev": "info",
+   "secs": 25,
+   "say": "Now the correction. Yesterday we said eight Gold Coast hinterland stations went quiet overnight behind Tallai. Technicians found their data complete in the Bureau's own record. Every copy we had came to us re-sent by one relay station on one stick, so the gap was on our route, not at the sites. Last night that relay's feed held all night.",
+   "stations": [
+    "tallai_al",
+    "beechmont_al",
+    "natural_bridge_al",
+    "hotham_creek_al",
+    "binna_burra_al",
+    "molendinar_al"
+   ],
+   "marks": [
+    {
+     "id": "tallai_al",
+     "kind": "repeater",
+     "sev": "ok",
+     "label": "Tallai AL"
+    },
+    {
+     "id": "beechmont_al",
+     "kind": "ok",
+     "sev": "ok"
+    },
+    {
+     "id": "natural_bridge_al",
+     "kind": "ok",
+     "sev": "ok"
+    },
+    {
+     "id": "hotham_creek_al",
+     "kind": "ok",
+     "sev": "ok"
+    },
+    {
+     "id": "binna_burra_al",
+     "kind": "ok",
+     "sev": "ok"
+    },
+    {
+     "id": "molendinar_al",
+     "kind": "ok",
+     "sev": "ok"
+    }
+   ],
+   "focus": {
+    "lat": -28,
+    "lon": 153.27,
+    "km": 40
+   }
+  },
+  {
+   "type": "battery",
+   "title": "Batteries",
+   "presenter": "turbo",
+   "sev": "critical",
+   "secs": 18,
+   "say": "Turbo, race ya! Marburg read 9.4 volts last night after a week at 13.2. Eungella shows why one night isn't enough: it dropped to 9.5, then came straight back to 10.9. Dunbible Creek holds at 9.8, and Burringbar is sliding, 12.5 down to 12.1.",
+   "items": [
+    {
+     "id": "marburg_al",
+     "name": "Marburg AL",
+     "v": 9.4,
+     "nights": [
+      13.3,
+      13.2,
+      13.2,
+      13.3,
+      13.3,
+      13.2,
+      13.2,
+      9.4
+     ],
+     "note": "Battery critical — 9.4 V"
+    },
+    {
+     "id": "eungella_oxley_rive",
+     "name": "Eungella (Oxley River)",
+     "v": 10.9,
+     "nights": [
+      10.6,
+      10.6,
+      10.8,
+      10.9,
+      10.9,
+      9.5,
+      10.9
+     ],
+     "note": "Battery critical — 10.9 V"
+    },
+    {
+     "id": "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+     "name": "Dunbible Creek at Dunbible Creek Rail Trail Bridge",
+     "v": 9.8,
+     "nights": [
+      9.9,
+      9.8,
+      9.8
+     ],
+     "note": "Battery critical — 9.8 V"
+    },
+    {
+     "id": "burringbar_burringbar_creek",
+     "name": "Burringbar (Burringbar Creek)",
+     "v": 12.1,
+     "nights": [
+      12.5,
+      12.5,
+      12.3,
+      12.2,
+      12.1
+     ],
+     "note": "Battery low — 12.1 V"
+    }
+   ],
+   "stations": [
+    "marburg_al",
+    "eungella_oxley_rive",
+    "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+    "burringbar_burringbar_creek"
+   ]
+  },
+  {
+   "type": "checks",
+   "title": "Check signals",
+   "secs": 11,
+   "sev": "warn",
+   "say": "The Know-It-All. We heard none of the checks from Dunbible Creek, the gauge below Clarrie Hall Dam or Hartigans Hill. ARRO will say whether they reported. Obviously.",
+   "stations": [
+    "moggill_aitchenson",
+    "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+    "clarrie_hall_dam_d_s",
+    "tallai_al",
+    "ashgrove_royal_pde_al"
+   ],
+   "items": [
+    {
+     "id": "moggill_aitchenson",
+     "name": "Moggill (Aitchenson St East) AL-B",
+     "strip": "MM",
+     "rate": 0,
+     "note": "Misses 29% of its checks"
+    },
+    {
+     "id": "dunbible_creek_at_dunbible_creek_rail_trail_bridge",
+     "name": "Dunbible Creek at Dunbible Creek Rail Trail Bridge",
+     "strip": "MMMMMMMM",
+     "rate": 0,
+     "note": "Not heard — missed its last 38 checks"
+    },
+    {
+     "id": "clarrie_hall_dam_d_s",
+     "name": "Clarie Hall Dam D/S",
+     "strip": "MMMMMMMMMMMMMMMMMMMMMMMM",
+     "rate": 0,
+     "note": "Not heard — missed its last 117 checks"
+    },
+    {
+     "id": "tallai_al",
+     "name": "Tallai AL",
+     "strip": "MMMMMMMMMMMMMMMMMMMMMMMM",
+     "rate": 0,
+     "note": "Missed checks rising — 100% in the last 24 h"
+    },
+    {
+     "id": "ashgrove_royal_pde_al",
+     "name": "Ashgrove (Royal Pde) AL",
+     "strip": "MM",
+     "rate": 0,
+     "note": "Misses 36% of its checks"
+    }
+   ],
+   "presenter": "know-it-all"
+  },
+  {
+   "type": "signoff",
+   "title": "That’s the network",
+   "secs": 10,
+   "say": "That's the network: our second stick first, Beechmont unheard since ten last night, and Marburg's battery. A hundred and sixteen stations heard again. Back tomorrow.",
+   "line": "Is it supposed to do that?"
+  }
+ ],
+ "sources": {
+  "readings": 25805,
+  "stations_heard": 1291,
+  "gathered_at": "2026-11-03T18:32:11.971Z"
+ },
+ "caveats": [
+  "Every silence here is what Flood-Net's receivers heard; ARRO, the Bureau's record, may have the stations' data.",
+  "Most of the addresses stick 2 lost are not on the register, so their senders cannot be named.",
+  "Beechmont reaches us only through one relay station; whether it reported is ARRO's to say."
+ ],
+ "author": "Claude Code, from the bulletin draft and read-only queries"
+}
