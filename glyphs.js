@@ -104,6 +104,8 @@ const Glyphs = (() => {
     routes:    '<circle cx="4" cy="5" r="1.8"/><circle cx="4" cy="12" r="1.8"/><circle cx="4" cy="19" r="1.8"/><path d="M5.8 5c4 0 4 7 6.2 7M5.8 19c4 0 4-7 6.2-7M5.8 12H12"/><circle cx="13.5" cy="12" r="1.5"/><path d="M15 12h4"/><rect x="19" y="9" width="3" height="6" rx=".8"/>',
     // Capabilities: a list, each line ticked.
     checklist: '<path d="M10 6h10M10 12h10M10 18h10"/><path d="m3.5 6 1.5 1.5L8 4.5M3.5 12l1.5 1.5L8 10.5M3.5 18l1.5 1.5L8 16.5"/>',
+    // 🎬 Videos: a screen on its stand, a ▶ on it.
+    screen:    '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="m10 8 5 2.5-5 2.5z"/><path d="M12 17v3M8 20.5h8"/>',
     // Tasks: two jobs in their boxes, the first done — boxes, where
     // Capabilities' list is bare ticks.
     task:      '<rect x="3" y="3.5" width="7.5" height="7.5" rx="1.5"/><path d="m4.9 7.3 1.6 1.6 2.6-2.9"/><path d="M13.5 6h7.5M13.5 9h4.5"/><rect x="3" y="13" width="7.5" height="7.5" rx="1.5"/><path d="M13.5 15.5h7.5M13.5 18.5h4.5"/>',
@@ -147,7 +149,7 @@ const Glyphs = (() => {
   // its group's (tab(), below), so a missing line is a plainer button, never
   // a blank one — and `npm run looks` lists any that are missing.
   const TAB = {
-    home: 'home', sitemap: 'signpost', capabilities: 'checklist', offline: 'offline', views: 'sliders',
+    home: 'home', sitemap: 'signpost', capabilities: 'checklist', videos: 'screen', offline: 'offline', views: 'sliders',
     stations: 'map', maps: 'route', passranges: 'chain', repeaters: 'repeater', repdelays: 'hourglass', export: 'download', mapgen: 'print', lookaround: 'look',
     rf: 'spectrum', rfchanges: 'trend', workbench: 'interfere', reception: 'drive', flipsources: 'search', bitbench: 'bits',
     bitflipper: 'flip', network: 'graph', packets: 'decode', alert2: 'packet', hfem: 'message', serial: 'plug',
