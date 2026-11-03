@@ -314,6 +314,7 @@ const ExportMenu = (function () {
     kblifecycle: 'A lesson with scenarios to work through — nothing on it is a record to keep as a file.',
     kblevel:     'A walkthrough of a day\'s levelling, practised on made-up figures — nothing on it is a record to keep as a file.',
     kbriver:     'A walkthrough of a routine site visit, practised on made-up figures — nothing on it is a record to keep as a file.',
+    videos:      'Short films to watch — each plays on its own page, with nothing of its own to keep as a file.',
     basestations: 'The fleet\'s live state, for administering it — nothing here is a record to keep as a file.',
   };
 

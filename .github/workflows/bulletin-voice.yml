@@ -95,7 +95,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git add -A data/bulletins/voice data/explainers/voice data/explainers/index.json
+          for p in data/bulletins/voice data/explainers/voice data/explainers/index.json; do [ -e "$p" ] && git add -A -- "$p"; done
           if git diff --cached --quiet; then
             echo "No voice changed — nothing to commit."
             exit 0
