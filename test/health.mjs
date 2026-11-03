@@ -315,6 +315,42 @@ try {
   ok('a receiver whose copies are all counted on another\'s readings is credited with every one, on its own path',
     merged.a === 72 && merged.b === 72 && merged.bPath === 'serial-monitor/test-pi-b-sdr1:72' && merged.bSilentMin === 10, JSON.stringify(merged));
 
+  // Heard, not checked (the owner, 3 Nov 2026: "we checked the rain … and there
+  // was rain data there all the way through"). Beechmont checks in hourly; for
+  // seven hours its checks go missing while its rain gauge tips every twenty
+  // minutes, Binna Burra checking in throughout on the same receiver. Then the
+  // same seven hours with nothing heard from it at all.
+  const near = await page.evaluate(() => {
+    const H = 3600e3, M = 60e3, t0 = Date.UTC(2026, 9, 1, 0, 0, 0);
+    const rec = (aid, t, v) => ({ addr: 'a:' + aid, alert_id: aid, reading_ts: new Date(t).toISOString(), received_at: new Date(t + 2000).toISOString(),
+      value_raw: v, protocol: 1, path: 'serial-monitor/test-pi-sdr0', dup_count: 0, dup_paths: [] });
+    const world = tips => {
+      const rows = [];
+      let rain = 1000;
+      for (let k = 0; k < 48; k++) {
+        const t = t0 + k * H;
+        rows.push(rec(2210, t + 5 * M, 96), rec(2211, t + 5 * M + 4000, 135));        // Binna Burra, every hour
+        const gap = k >= 20 && k < 27;
+        if (!gap) rows.push(rec(2215, t, rain), rec(2216, t + 4000, 135));            // Beechmont's check
+        if (gap && tips) for (const m of [10, 30, 50]) rows.push(rec(2215, t + m * M, ++rain));
+      }
+      const A = HealthAnalysis.run(rows, { t0: t0 - H, t1: t0 + 48 * H, now: t0 + 48 * H });
+      const S = A.stations.get('beechmont_al');
+      const gapSlots = S && S.slots ? S.slots.filter(sl => sl.t >= t0 + 20 * H && sl.t < t0 + 27 * H) : [];
+      const lens = S ? HealthAnalysis.contextAt(A, 'beechmont_al', t0 + 23 * H) : null;
+      return { period: S && S.schedule && Math.round(S.schedule.P / M), misses: gapSlots.filter(sl => sl.outcome === 'miss').length,
+        heardNear: gapSlots.filter(sl => sl.heardNear).length, spell: !!(S && S.findings.some(f => f.kind === 'silent-spell')),
+        verdict: lens && lens.verdict };
+    };
+    return { wet: world(true), dry: world(false) };
+  });
+  ok('a missed check with the station\'s rain heard around it is marked heard another way, and seven hours of them is no "not heard" spell',
+    near && near.wet.period === 60 && near.wet.misses === 7 && near.wet.heardNear === 7 && !near.wet.spell, JSON.stringify(near && near.wet));
+  ok('…the lens says the station was on the air and the check itself was lost',
+    near && near.wet.verdict && near.wet.verdict.kind === 'info' && /other report/.test(near.wet.verdict.text) && /check itself was lost/.test(near.wet.verdict.text), JSON.stringify(near && near.wet.verdict));
+  ok('…while the same seven hours with nothing heard is a spell, and its lens points to ARRO',
+    near && near.dry.misses === 7 && near.dry.heardNear === 0 && near.dry.spell && near.dry.verdict && /ARRO/.test(near.dry.verdict.text), JSON.stringify(near && near.dry));
+
   // A ghost on a station's own address, and two stations that only look alike.
   const gh = await page.evaluate(() => {
     const H = 3600e3, pop = x => { let n = 0; while (x) { n += x & 1; x >>>= 1; } return n; };

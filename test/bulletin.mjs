@@ -322,6 +322,13 @@ console.log('The hours stations keep');
   ok('a station whose checks go missing at night and are back by day, night after night, keeps hours — gone about 10 at night, back about 9',
     k.keeps && k.night_rate === 0 && k.day_rate === 1 && k.goes_hour === 22 && k.back_hour === 9 && k.solar_shape, JSON.stringify(k));
   ok('…one heard all night is steady, and one that missed a single night keeps no hours', m.steady && !m.keeps && !o.keeps, JSON.stringify({ m, o }));
+  // Heard, not checked: the same night-quiet checks, but its rain tips heard
+  // within half an hour of every missed one — the station on the air all night,
+  // so it keeps no hours (the owner, 3 Nov 2026: the rain was there all through).
+  const wet = station('hotham_creek_al', nightly);
+  wet.slots.forEach(sl => { if (sl.outcome === 'miss') sl.heardNear = 2; });
+  const kw = keptHours(wet);
+  ok('…and one whose checks go missing at night while its other reports are heard keeps no hours', kw && !kw.keeps && kw.night_rate === 1, JSON.stringify(kw));
   const H = hoursKept(A);
   const g = H.groups.find(x => x.stations.length === 3);
   ok('the three that keep hours are one group, and the repeater they share whose own checks keep the same hours leads',

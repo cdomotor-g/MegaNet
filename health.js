@@ -998,7 +998,8 @@ const Health = (() => {
         const oc = outcomes[sl.outcome] || OUTCOME.unknown;
         const sel = o.sel ? o.sel(sl) : false;
         svg += `<rect class="hl-slot ${oc.cls}${sel ? ' hl-slot--sel' : ''}" x="${x}" y="${y}" width="${cell}" height="${cellH}" rx="2"
-                  data-t="${sl.t}"><title>${esc(fmtWhen(sl.t))} — ${esc(oc.label)}${sl.missing && sl.missing.length ? ' (no ' + esc(sl.missing.join(', ')) + ')' : ''}</title></rect>`;
+                  data-t="${sl.t}"><title>${esc(fmtWhen(sl.t))} — ${esc(oc.label)}${sl.missing && sl.missing.length ? ' (no ' + esc(sl.missing.join(', ')) + ')' : ''}${
+                  sl.heardNear && sl.outcome === 'miss' ? esc(` — but ${sl.heardNear === 1 ? 'another report' : `${sl.heardNear} other reports`} from it heard within half an hour: on the air, the check lost`) : ''}</title></rect>`;
         if (oc.x) svg += `<path class="hl-slot-x" d="M${x + i0} ${y + i0}L${x + cell - i0} ${y + cellH - i0}M${x + cell - i0} ${y + i0}L${x + i0} ${y + cellH - i0}"/>`;
       });
     });

@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 182, date: '2026-11-03', items: [
+      '🌧 <strong>A missed check is not a station unheard.</strong> When a station\'s rain tip or level change came in within '
+        + 'half an hour of a check 🚦 <em>Station Health</em> missed, the station was on the air and only the check was lost. '
+        + 'Pointing at that square on its check strip now says so, the context lens says <em>the check itself was lost</em>, '
+        + 'a gauge tipping all night is no longer called <em>not heard</em> for those hours, and the 📺 bulletin counts it as heard.',
+    ] },
     { n: 181, date: '2026-11-03', items: [
       '📡 <strong>Not heard, not silent.</strong> 🚦 <em>Station Health</em> now says a station is <em>not heard</em> '
         + '(<em>Not heard — missed its last 4 checks</em>, <em>… went unheard together</em>) instead of silent or gone quiet, '

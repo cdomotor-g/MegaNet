@@ -1547,6 +1547,15 @@ at [`GET /api/v1/changelog`](#get-apiv1changelog), newest first — both from
 in the same push. A change with nothing to notice (a fix inside, a faster
 answer) is not listed.
 
+- **3 November 2026 — A missed check with the station's rain heard around it
+  is a check lost, not a station unheard.** When a station's rain tip or level
+  change arrived within half an hour of a check Flood-Net missed, the station
+  was on the air and only the check was lost. Such a miss still counts as
+  missed, but it now ends a spell — no *Not heard for 7 h, then heard again*
+  for a gauge tipping all night — and the details of *Missed checks rising*
+  and *Misses N% of its checks* (`get_station_health`) say how many misses had
+  other reports around them. *Not heard* always meant nothing of any kind and
+  is unchanged; no route, field or kind has changed.
 - **3 November 2026 — Silent stations are said as not heard by Flood-Net, and
   point to ARRO.** A station Flood-Net calls silent is one its own receivers
   have not heard, not one that has stopped reporting: on 3 November eight Gold

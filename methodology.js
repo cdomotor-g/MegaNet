@@ -79,7 +79,7 @@ const Methodology = (function () {
       slot: 'A moment the station\'s learned schedule says a check is due. Each slot is judged: received, received with a sensor missing, missed, or unknown.',
       listening: `A receiver that has heard this station delivered other traffic within ${min(L.LISTEN_PAD * L.BIN)} before the moment and within ${min(L.LISTEN_PAD * L.BIN)} after it — proof it was working then.`,
       unknown: 'A slot when no receiver that hears the station was shown to be listening. It is never counted against the station.',
-      spell: 'Four or more checks missed in a row while the receivers were listening: the station, or its path, gone for a while.',
+      spell: 'Four or more checks missed in a row while the receivers were listening, with nothing else heard from the station around any of them: the station, or its path to Flood-Net, gone for a while.',
       solar: 'Clock time shifted by the station\'s longitude, so that noon is when the sun is highest there. A battery\'s day and night are judged in it.',
       swing: 'How far a solar station\'s battery rises from its night-time low to its daytime high. No swing means no charge is arriving.',
       theilSen: 'A trend taken as the median of the slopes between every pair of points, so that one bad night cannot bend it the way it bends an ordinary straight-line fit.',
@@ -136,6 +136,11 @@ const Methodology = (function () {
             A value that is odd on its own is often plain once you see what was heard in the same seconds.</li>
           <li><strong>Absence is only evidence when someone was listening.</strong> A check is counted as missed only if a receiver
             that hears that station was shown to be working at the time. Otherwise it is <em>unknown</em>, and never counted.</li>
+          <li><strong>A missed check is not a station unheard.</strong> When its other reports — a rain tip, a level change — were heard
+            within half an hour of a missed check (half its interval, for a station checking in more often), the station was on the air
+            and the route to us was up: the check itself was lost, on the air or at the logger. Such a miss still counts as a missed
+            check, but it ends a ${term('spell', 'spell')}, the context lens says so, and the bulletin's night-time hours count it as heard.
+            When a station is called not heard at all, nothing of any kind has been heard from it.</li>
           <li><strong>Corrupted data is set aside first.</strong> Corrupted copies and ghosts are found before anything else is worked
             out, so a flipped bit is never counted as a check, a battery reading or rain.</li>
           <li><strong>Like is compared with like.</strong> A battery is trended on its lowest reading each night, in the station's own

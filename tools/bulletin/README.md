@@ -175,8 +175,11 @@ The questions that earn a scene:
    first suspect is what they share upstream: a repeater whose own supply
    cannot carry the night drops everything it relays, and every station
    behind it looks faulty (the owner, 1 Nov 2026). `hours` has it worked out
-   from the scheduled checks alone (rain tips crowd the afternoon storms and
-   would make any gauge look busier by day): each station's checks received
+   from the scheduled checks (rain tips crowd the afternoon storms and
+   would make any gauge look busier by day) — but a missed check with the
+   station's other reports heard within half an hour (a rain tip, a level
+   change) counts as heard, because the station was on the air and our route
+   up: each station's checks received
    at night (10 pm to 6 am) against the afternoon (noon to 6 pm), the nights
    it dipped, when it goes quiet and when it is back; the stations grouped by
    a repeater on file that passes them and is within reach; and for each

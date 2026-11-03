@@ -367,6 +367,17 @@ quarter-hour in which 60% or more of the network's due checks (at least five)
 went missing although the receivers were up is a **network-wide miss**, counted
 apart from every station's.
 
+**A missed check is not a station unheard.** A missed check with the station's
+other reports — a rain tip, a level change — heard within half an hour of it
+(half its interval, if that is shorter) was a check lost, on the air or at the
+logger, while the station was on the air and the route to us was up. It still
+counts as a missed check, but it ends a spell (four or more in a row with
+nothing heard), the strip says so on hover, the context lens says *the check
+itself was lost*, the missed-checks findings count such misses, and the
+bulletin's night-time hours count it as heard. *Not heard* always means nothing
+of any kind: its last-heard time is the station's last transmission, whatever
+it carried.
+
 **The battery is trended on its night lows.** A solar station swings half a volt
 or more every day, so its trend is the lowest reading between 18:00 and 09:00 in
 the station's own solar time, night after night (Theil–Sen, robust to the odd bad

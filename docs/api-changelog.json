@@ -2,6 +2,16 @@
   "about": "Every change to Flood-Net's agent API (https://floodwarning.net/api/v1 and https://floodwarning.net/api/mcp) that someone using it would notice — a route, a field, a limit, a tool — newest first. Each entry is emailed once to everyone on the API notify list (sign up at https://floodwarning.net/api#notify). Served as JSON at https://floodwarning.net/api/v1/changelog and written up in docs/agent-api.md, under Changes. Add an entry in the same push as the change: it is what tells people.",
   "entries": [
     {
+      "id": "2026-11-03-heard-near",
+      "date": "2026-11-03",
+      "title": "A missed check with the station's rain heard around it is a check lost, not a station unheard",
+      "summary": "A missed check is no longer read as the station unheard when its other reports were heard around it. When a station's rain tip or level change arrived within half an hour of a check Flood-Net missed (half its interval, if that is shorter), the station was on the air and the route to Flood-Net was up, and only the check was lost — on the air, or at the logger. Such a miss still counts as a missed check, but it now ends a spell, so a station tipping rain all night while its checks went missing no longer gets \"Not heard for 7 h, then heard again\"; and the details of \"Missed checks rising\" and \"Misses N% of its checks\" (GET /api/v1/stations/{id}/health, get_station_health) say how many of the misses had other reports heard around them. \"Not heard\" (GET /api/v1/health/silent) always meant nothing of any kind and is unchanged. No route, field or kind has changed.",
+      "breaking": false,
+      "links": [
+        { "text": "How a check is scored", "url": "https://github.com/cdomotor-g/MegaNet/blob/main/docs/station-health.md#how-the-readings-are-read" }
+      ]
+    },
+    {
       "id": "2026-11-03-not-heard",
       "date": "2026-11-03",
       "title": "Silent stations are said as not heard by Flood-Net, and point to ARRO",

@@ -389,7 +389,9 @@ function repeatersOf(A, id) {
 // owner, 1 Nov 2026: a lead worth a look, said as one, not a verdict). Only the
 // checks a station keeps on a schedule count (its slots in health-analysis.js):
 // rain tips cluster in the afternoon storms and would make any gauge look
-// busier by day.
+// busier by day. But a missed check with its other reports heard within half
+// an hour (slot.heardNear) counts as heard: the station was on the air, and
+// the hours are about whether it, or its route to us, was.
 //
 // Then, for each repeater a group shares, what tells it from the sites: its own
 // scheduled checks keeping the same hours; its own battery's night lows; the
@@ -404,7 +406,10 @@ export function keptHours(S, since = -Infinity) {
   const sch = S && S.schedule;
   if (!sch || !(sch.exp >= 8) || !Array.isArray(S.slots)) return null;
   const judged = S.slots.filter(sl => sl.t >= since && (sl.outcome === 'hit' || sl.outcome === 'partial' || sl.outcome === 'miss'));
-  const got = sl => sl.outcome !== 'miss';
+  // Heard, not checked: a missed check with the station's other reports (a
+  // rain tip, a level change) heard within half an hour counts as heard — the
+  // station was on the air and our route up, which is all the hours are about.
+  const got = sl => sl.outcome !== 'miss' || !!sl.heardNear;
   const rate = l => l.filter(got).length / l.length;
   const night = judged.filter(sl => inHours(hourOf(sl.t), NIGHT_HOURS)), day = judged.filter(sl => inHours(hourOf(sl.t), DAY_HOURS));
   if (night.length < 6 || day.length < 4) return null;

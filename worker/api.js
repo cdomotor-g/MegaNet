@@ -3242,7 +3242,7 @@ function healthRow(rc, st, { card, owner, days, heardAt }) {
 }
 
 const HEALTH_NOTES = {
-  rules: 'Station Health\'s own rules (health-analysis.js — the Station Health tab\'s), run by the server every fifteen minutes over the window\'s telemetry ingested into Flood-Net. A check counts as missed only when a receiver that hears the station was listening; checks missed network-wide, or when nobody was listening, are counted apart.',
+  rules: 'Station Health\'s own rules (health-analysis.js — the Station Health tab\'s), run by the server every fifteen minutes over the window\'s telemetry ingested into Flood-Net. A check counts as missed only when a receiver that hears the station was listening; checks missed network-wide, or when nobody was listening, are counted apart. A missed check with the station\'s other reports (a rain tip, a level change) heard within half an hour is a check lost while the station was on the air: it ends a spell, and the missed-checks findings say how many there were.',
   scope: 'Only stations whose telemetry reaches Flood-Net can be judged: most report through the Bureau\'s own systems, and a station with nothing here may simply not send to Flood-Net.',
   status: 'status is the station\'s worst own finding (critical, warn, info), ok when nothing was found, irregular when no check schedule could be learned (it may report on events only), or not heard when the window holds nothing from it.',
 };

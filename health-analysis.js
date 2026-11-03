@@ -86,6 +86,12 @@ const HealthAnalysis = (() => {
   // A station's check: every sensor's frame, a few seconds apart (rain, level,
   // battery at 5.4 s spacing at Strathpine), inside a minute and a half.
   const BURST_WINDOW = 90000;
+  // A missed check is not the station unheard when its other reports — a rain
+  // tip, a level change — were heard within this of the slot: the station was
+  // on the air and the route to us was working, and only the check was lost
+  // (on the air, or at the logger). Half its period at most, so a three-hourly
+  // station's tip an hour and a half off does not vouch for the slot.
+  const HEARD_NEAR = 30 * MIN;
   // A station reporting faster than its copies land — a rain gauge tipping
   // every six to eleven seconds through a storm, as a:5356 did in the first
   // week of stored readings — puts two real values inside one copy window,
@@ -1066,6 +1072,12 @@ const HealthAnalysis = (() => {
           sl.outcome = sl.missing.length ? 'partial' : 'hit';
         } else {
           sl.outcome = sl.covered ? 'miss' : 'unknown';
+          // The station heard another way around the missed check (#269's
+          // question: the rain was there all the way through).
+          const w = Math.min(sch.P / 2, HEARD_NEAR);
+          let n = 0;
+          for (let j = lowerBound(times, s0 - w); j < times.length && times[j] <= s0 + w; j++) n++;
+          if (n) sl.heardNear = n;
         }
         slots.push(sl);
       }
@@ -1082,9 +1094,11 @@ const HealthAnalysis = (() => {
       let run = [];
       const spells = [];
       const close = () => { if (run.length >= 4) spells.push({ from: run[0].t, to: run[run.length - 1].t, n: run.length, slots: run }); run = []; };
+      // A miss with the station's other reports heard around it ends a run:
+      // a spell is the station unheard for hours, and it was heard.
       judged.forEach((sl, i) => {
         if (sl.outcome === 'miss') {
-          run.push(sl);
+          if (sl.heardNear) close(); else run.push(sl);
           const prev = judged[i - 1], next = judged[i + 1];
           sl.isolated = (!prev || prev.outcome !== 'miss') && (!next || next.outcome !== 'miss');
         } else close();
@@ -1186,6 +1200,15 @@ const HealthAnalysis = (() => {
         sch.trend = dailyRates.length >= 4 ? theilSen(dailyRates.map(d => d.x), dailyRates.map(d => d.y)) : null;
 
         const every = `every ${fmtPeriod(sch.P)}`;
+        // Of some missed checks, those with the station's other reports heard
+        // around them, said: it was on the air and our route was up, so the
+        // check was lost on the air or at the logger, not on the path.
+        const heardWords = xs => {
+          const n = xs.filter(x => x.outcome === 'miss' && x.heardNear).length;
+          return n ? ` ${n === xs.filter(x => x.outcome === 'miss').length ? (n === 1 ? 'That miss had' : 'Every one had') : `${n} of them had`}`
+            + ` other reports from it (rain, a level change) heard within half an hour — the station was on the air and Flood-Net's route to it was up,`
+            + ` so ${n === 1 ? 'that check was' : 'those checks were'} lost on the air (a clash with another transmission) or at the logger, not on the path.` : '';
+        };
         const silentMs = S.lastHeard != null ? now - S.lastHeard : Infinity;
         if (trailing >= 2 && silentMs >= Math.max(90 * MIN, 2 * sch.P)) {
           const since = S.lastHeard;
@@ -1201,21 +1224,21 @@ const HealthAnalysis = (() => {
           F.push(finding('missed-rising', last24.filter(x => x.outcome === 'miss').length >= 3 ? 'warn' : 'info', {
             stationId: st.id,
             title: `Missed checks rising — ${Math.round(100 * sch.rate24)}% in the last 24 h`,
-            detail: `${last24.filter(x => x.outcome === 'miss').length} of ${sch.n24} checks missed in the last day, against ${Math.round(100 * sch.ratePrior)}% before (${every}).`,
+            detail: `${last24.filter(x => x.outcome === 'miss').length} of ${sch.n24} checks missed in the last day, against ${Math.round(100 * sch.ratePrior)}% before (${every}).${heardWords(last24)}`,
             evidence: { rate24: round(sch.rate24, 2), ratePrior: round(sch.ratePrior, 2), n24: sch.n24, nPrior: sch.nPrior },
           }));
         } else if (sch.trend != null && sch.trend >= 0.08 && dailyRates[dailyRates.length - 1].y >= 0.2) {
           F.push(finding('missed-rising', 'warn', {
             stationId: st.id,
             title: `Missed checks rising — up ${Math.round(100 * sch.trend)} points a day`,
-            detail: `Its daily share of missed checks has climbed to ${Math.round(100 * dailyRates[dailyRates.length - 1].y)}% (${every}).`,
+            detail: `Its daily share of missed checks has climbed to ${Math.round(100 * dailyRates[dailyRates.length - 1].y)}% (${every}).${heardWords(counted.filter(x => x.t > now - 3 * DAY))}`,
             evidence: { trendPerDay: round(sch.trend, 3), daily: sch.daily.map(d => [d.day, d.miss, d.hit + d.partial + d.miss]) },
           }));
         } else if (own - spellMisses >= 8 && sch.scatteredRate >= 0.1) {
           F.push(finding('missed-checks', sch.scatteredRate >= 0.25 ? 'warn' : 'info', {
             stationId: st.id,
             title: `Misses ${Math.round(100 * sch.scatteredRate)}% of its checks`,
-            detail: `${sch.scatteredMisses} of ${own - spellMisses} checks missed here and there (${every}) while the receivers were listening — a marginal path rather than a dead station.`,
+            detail: `${sch.scatteredMisses} of ${own - spellMisses} checks missed here and there (${every}) while the receivers were listening — a marginal path rather than a dead station.${heardWords(sl.filter(x => !x.spell))}`,
             evidence: { misses: sch.scatteredMisses, due: own - spellMisses, rate: round(sch.scatteredRate, 2) },
           }));
         }
@@ -1882,6 +1905,9 @@ const HealthAnalysis = (() => {
     const listeningHere = rxNear.some(r => r.binsWithTraffic > 0);
     const slot = S.slots ? S.slots.reduce((best, sl) => (Math.abs(sl.t - t) < (best ? Math.abs(best.t - t) : Infinity) ? sl : best), null) : null;
     const mine = S.txs.filter(tx => tx.t >= from && tx.t <= to);
+    // Its own reports around the moment, as bursts (a check's frames are one):
+    // a missed check with these heard was a check lost, not a station unheard.
+    const mineBursts = (S.bursts || []).filter(b => b.t >= from && b.t <= to).length;
 
     // Peers: the nearest stations sharing a repeater with it, then the
     // nearest few of any kind. A big repeater carries a hundred stations
@@ -1923,13 +1949,15 @@ const HealthAnalysis = (() => {
       verdict = { kind: 'network', text: 'None of the receivers that hear this station delivered anything around then — it is the receiver that was not there, not the station.' };
     } else if (ev) {
       verdict = { kind: 'network', text: `Part of a network-wide gap: ${ev.missed} of ${ev.due} checks due between ${fmtClock(ev.from)} and ${fmtClock(ev.to)} were missed.` };
+    } else if (outcome === 'miss' && mineBursts) {
+      verdict = { kind: 'info', text: `Its check was missed, but ${plural(mineBursts, 'other report')} from it (rain, a level change) ${mineBursts === 1 ? 'was' : 'were'} heard within ${fmtSpan(span)} — the station was on the air and Flood-Net's route to it was working, so the check itself was lost: on the air (a clash with another transmission) or at the logger.` };
     } else if (outcome === 'miss' && due.length >= 2 && frac >= 0.5) {
       verdict = { kind: 'shared', text: `${missed.length} of ${due.length} of its neighbours missed their checks around then too${downTxt} — the shared path or the area, not this station.` };
     } else if (outcome === 'miss' && due.length >= 2 && frac >= 0.25) {
       verdict = { kind: 'shared', text: `${missed.length} of ${due.length} of its neighbours missed theirs around then too${downTxt} — partly the path or the area; watch whether this station misses more than they do.` };
     } else if (outcome === 'miss') {
       verdict = { kind: 'own', text: due.length
-        ? `The receivers were delivering and ${due.length - missed.length} of ${due.length} of its neighbours checked in on time${downTxt} — this miss is the station's own.`
+        ? `The receivers were delivering and ${due.length - missed.length} of ${due.length} of its neighbours checked in on time${downTxt} — this miss is the station's own, or its own route's to Flood-Net: ARRO says whether the check was sent.`
         : `The receivers were delivering; no neighbour was due at the same time to compare with${downTxt}.` };
     } else if (outcome === 'partial') {
       verdict = { kind: 'own', text: 'The check arrived, but without every sensor\'s frame — frames lost on the way, one at a time.' };
