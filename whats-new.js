@@ -25,6 +25,17 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 179, date: '2026-11-03', items: [
+      '⚡ <strong>Quicker on a busy laptop.</strong> With a Teams call running, the <strong>Stations</strong> tab took ten '
+        + 'seconds or more to open on some laptops; it now takes a few. The <strong>Repeaters</strong> and <strong>Repeater '
+        + 'Delays</strong> tabs and a repeater\'s card no longer stop the page while the delay plan is worked out, and '
+        + '<strong>ALERT IDs</strong> opens faster.',
+      '📶 <strong>On a weak signal</strong>, a device that has opened Flood-Net before shows its saved station list after '
+        + 'eight seconds instead of waiting for the whole download — the header says it is a <em>saved copy</em>, how old, '
+        + 'and that the current list is on its way. If the current list turns out different, <strong>Use the newer '
+        + 'list</strong> appears beside the station count. A datastore read that gets no answer for 30 seconds now says '
+        + 'so, and can be tried again, instead of loading for ever.',
+    ] },
     { n: 178, date: '2026-11-03', items: [
       '📊 <strong>Open in ARRO</strong> on 🚦 <em>Station Health</em>: a station opened there has a link to its page in ARRO, '
         + 'the Bureau\'s own record of what it sent. Station Health shows what Flood-Net\'s receivers heard, so a station '

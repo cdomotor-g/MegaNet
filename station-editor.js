@@ -455,6 +455,44 @@ function editorChecksPaint(id) {
   if (s) el.innerHTML = HealthGlance.checksHtml(s);
 }
 
+// The delay ⏳ Repeater Delays' plan suggests for this repeater. The suggestion
+// is not explanation: it is this repeater's own figure, so it stays on screen
+// when the paragraph above it is folded.
+function efDelaySuggestionHtml(s) {
+  const sug = typeof RepeaterDelays !== 'undefined' ? RepeaterDelays.suggestion(s) : null;
+  if (!sug) return '';
+  return sug.status === 'free' || !sug.cluster ? `<div class="full small ef-hint">
+          Suggested: <strong>any</strong> — no other repeater relays its readings to a receiver that hears both
+          (<button type="button" class="link-btn" onclick="switchTab('repdelays')">⏳ Repeater Delays</button>).
+        </div>` : `<div class="full small ef-hint">
+          Suggested: <strong>${sug.delay} ms</strong> — group ${sug.cluster} of the
+          <button type="button" class="link-btn" onclick="switchTab('repdelays')">⏳ Repeater Delays</button> plan, set so
+          the repeaters relaying the same readings never send their copies on top of each other.
+        </div>`;
+}
+
+// …or, while the plan is still to be worked out for this file, a place for it
+// that is filled a beat after the card is on screen. The plan is half a second
+// the first time (two seconds on a laptop busy with a Teams call), and it held
+// the whole card back: the first press on a repeater was a frozen page.
+function efDelaySuggestionSlot(s) {
+  const ready = typeof RepeaterDelays === 'undefined' || !RepeaterDelays.planReady || RepeaterDelays.planReady();
+  if (ready) return efDelaySuggestionHtml(s);
+  const id = String(s.id);
+  const fill = () => {
+    const slot = document.getElementById('ef-delay-sug');
+    if (!slot || slot.dataset.station !== id || !state.data) return;
+    const st = state.data.stations.find(x => String(x.id) === id);
+    let html = '';
+    try { html = st ? efDelaySuggestionHtml(st) : ''; } catch (_) { /* no suggestion, as before */ }
+    slot.outerHTML = html || '';
+  };
+  // Off the page's thread where the browser can (RepeaterDelays.planSoon).
+  if (RepeaterDelays.planSoon) RepeaterDelays.planSoon().then(fill, fill);
+  else setTimeout(fill, 60);
+  return `<div class="full small ef-hint txt-muted" id="ef-delay-sug" data-station="${escAttr(id)}">Suggested: working it out…</div>`;
+}
+
 function editorForm(s) {
   const hasRep  = s.roles.includes('repeater');
   const hasBase = s.roles.includes('base');
@@ -688,20 +726,7 @@ function editorForm(s) {
           How long this repeater waits before re-transmitting a message its pass ranges accept.
           Blank means not set, not zero.
         </div>
-        ${(() => {
-          // The suggestion is not explanation: it is this repeater's own figure,
-          // so it stays on screen when the paragraph above it is folded.
-          const sug = typeof RepeaterDelays !== 'undefined' ? RepeaterDelays.suggestion(s) : null;
-          if (!sug) return '';
-          return sug.status === 'free' || !sug.cluster ? `<div class="full small ef-hint">
-          Suggested: <strong>any</strong> — no other repeater relays its readings to a receiver that hears both
-          (<button type="button" class="link-btn" onclick="switchTab('repdelays')">⏳ Repeater Delays</button>).
-        </div>` : `<div class="full small ef-hint">
-          Suggested: <strong>${sug.delay} ms</strong> — group ${sug.cluster} of the
-          <button type="button" class="link-btn" onclick="switchTab('repdelays')">⏳ Repeater Delays</button> plan, set so
-          the repeaters relaying the same readings never send their copies on top of each other.
-        </div>`;
-        })()}
+        ${efDelaySuggestionSlot(s)}
         <!-- The repeater's own RX/TX pair first (ef-rx, ef-tx — what every path
              tool reads), then a row per other channel, with + Add (0033). -->
         ${Frequencies.editorHtml(s, { primary: true })}

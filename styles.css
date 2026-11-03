@@ -1055,6 +1055,19 @@ header p {
   opacity: .6;
 }
 
+/* Use the newer list: the datastore's answer, arrived after the saved copy on
+   screen was drawn (app.js, updateHeaderStats). In the line's own type, and
+   underlined so it reads as something to press. */
+.hdr-newer {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* The shared .panel-header rule spaces its two ends apart, which is wrong here:
    these are one cluster pinned to the right of the title, and the title is what
    gives when the row runs short. */

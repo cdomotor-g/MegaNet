@@ -466,8 +466,10 @@ const OfflineTab = (function () {
           <li><strong>The first visit needs a signal</strong>, and so does signing in. After that, with no
             signal, the saved copy opens on the device itself — the sign-in cannot be reached, and is not asked
             for until there is a signal again.</li>
-          <li><strong>A weak signal can be slower than none.</strong> On one bar, Flood-Net may wait a while for
-            the network before it falls back to the saved copy. Flight mode makes it use the copy straight away.</li>
+          <li><strong>A weak signal can be slower than none.</strong> On one bar, the station list waits eight
+            seconds for the network, then shows the saved copy — the header says so — while the current one carries on
+            coming; if that turns out different, <strong>Use the newer list</strong> appears beside the station count.
+            Other parts may wait a while longer before they fall back. Flight mode makes it use the copy straight away.</li>
           <li><strong>On an iPhone or iPad</strong>, the home-screen icon keeps a copy and a sign-in of its own,
             separate from the browser's. Set it up from the icon.</li>
           <li><strong>Each browser keeps its own.</strong> Chrome and Firefox on one computer each need setting

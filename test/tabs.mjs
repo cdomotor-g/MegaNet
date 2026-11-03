@@ -362,6 +362,10 @@ const SEED_REPEATERS = `async () => {
 // comparison of limits is worked out a limit at a time when asked, so it is
 // asked for and waited on, and every fold opened.
 const SEED_REPDELAYS = `async () => {
+  // The plan at its defaults is worked out off the page's thread
+  // (RepeaterDelays.planSoon) and the tab drawn again when it lands.
+  for (let i = 0; i < 200 && !RepeaterDelays.planReady(); i++) await new Promise(r => setTimeout(r, 50));
+  await new Promise(r => setTimeout(r, 50));
   RepeaterDelays.compare();
   for (let i = 0; i < 200 && !RepeaterDelays.state().compare; i++) await new Promise(r => setTimeout(r, 50));
   document.querySelectorAll('#main-content details').forEach(d => { d.open = true; });

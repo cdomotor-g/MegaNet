@@ -240,9 +240,32 @@ function stationDocRequest(kind) {
   return [kind === 'github' ? GITHUB_RAW_URL : 'stations.json', {}];
 }
 
+// How long the opening load waits for the datastore's whole answer before it
+// draws the copy this device kept of it last time (sw.js keeps one on every
+// answer). The list is most of a megabyte and the datastore takes two or three
+// seconds to put it together, so on a good line it is in well inside this; on
+// a laptop sharing its line with a Teams call, or a phone on one bar, it can
+// be half a minute, and that was half a minute of nothing on any tab that
+// needs the stations. The copy is said to be one, and how old (the header),
+// the download carries on, and what it brings is used as below.
+const LIST_SLOW_MS = 8000;
+
 async function loadFromApi({ announce = true } = {}) {
   loadStep('api');
   const t0 = _dbClock();
+  // Only in the opening chain, and only where a copy can have been kept.
+  const early = { drawn: null, settled: false, timer: null };
+  if (state.load && state.load.busy && typeof Pwa !== 'undefined' && Pwa.keptList) {
+    early.timer = setTimeout(async () => {
+      const k = await Pwa.keptList('api');
+      if (!k || early.settled || state.data) return;
+      try {
+        applyStationDoc(k.text, { kind: 'api', kept: k.kept, slow: true });
+      } catch (_) { return; }            // a copy that does not parse is no copy
+      early.drawn = k;
+      renderAfterLoad();
+    }, LIST_SLOW_MS);
+  }
   try {
     const res = await fetch(...stationDocRequest('api'));
     if (!res.ok) {
@@ -254,18 +277,56 @@ async function loadFromApi({ announce = true } = {}) {
       throw new Error(detail);
     }
     const text = await readLoadText(res, 'api');
-    applyStationDoc(text, { kind: 'api', ms: Math.round(_dbClock() - t0), kept: res.headers.get('X-FloodNet-Offline') });
+    early.settled = true;
+    clearTimeout(early.timer);
+    const source = { kind: 'api', ms: Math.round(_dbClock() - t0), kept: res.headers.get('X-FloodNet-Offline') };
+    // The kept copy is on screen: the answer replaces only its label when it
+    // is the same list, and is offered — never swapped in under somebody's
+    // pointer, filters and open card — when it is not.
+    if (early.drawn && state.dataSource && state.dataSource.slow) {
+      if (text === early.drawn.text) {
+        state.dataSource = stationDocSource(state.data, source);
+        state.loadError = null;
+        updateHeaderStats();
+      } else {
+        state.newerList = { text, source };
+        updateHeaderStats();
+        Toast.note('A newer station list has arrived — Use the newer list, beside the station count, puts it on screen.');
+      }
+      return true;
+    }
+    applyStationDoc(text, source);
   } catch (err) {
+    early.settled = true;
+    clearTimeout(early.timer);
     // Same rejection for DNS failure, CORS refusal, no network, and a project
     // that is down — the browser deliberately does not distinguish
     // them. Record what is known and let the caller fall back.
     state.loadError = `the datastore: ${err && err.message || err}`;
+    // …unless the kept copy is already on screen, which is what the worker
+    // would have answered with anyway: it stays, now said to be there because
+    // the datastore did not answer rather than because it was slow.
+    if (early.drawn && state.dataSource && state.dataSource.slow) {
+      state.dataSource.slow = false;
+      updateHeaderStats();
+      return true;
+    }
     if (announce) Toast.failed(`Could not load from the datastore: ${err && err.message || err}`);
     loadFailed('api', err);
     return false;
   }
   renderAfterLoad();
   return true;
+}
+
+// Use the newer list, beside the station count: the datastore's answer that
+// arrived after the kept copy was drawn, put on screen when somebody asks.
+function useNewerList() {
+  const n = state.newerList;
+  if (!n) return;
+  state.newerList = null;
+  loadJson(n.text, n.source);
+  announce(`Station list updated — ${state.data.stations.length} stations`);
 }
 
 // The datastore first, then the file — in that order, and saying which one won.
@@ -517,11 +578,9 @@ function loadTriedHtml(tried) {
 // its fallback chain: replacing the database's data with an older file, blaming
 // the datastore for a fault in the browser, and then throwing again on the way
 // back out. The data being in hand is the success condition.
-function applyStationDoc(text, source) {
-  const data = JSON.parse(text);
-  if (!Array.isArray(data.stations)) throw new Error('Missing "stations" array');
-  state.data       = data;
-  state.dataSource = {
+// Where the loaded list came from, as the header says it.
+function stationDocSource(data, source) {
+  return {
     kind:  (source && source.kind) || 'file',
     detail: source && source.detail,
     ms:    source && source.ms,
@@ -529,12 +588,24 @@ function applyStationDoc(text, source) {
     // The document's own date, which is the one that answers "how old is this
     // data?" — as opposed to `at`, which only says when it was fetched. A file
     // from GitHub is fresh and its contents may be a month old.
-    dated: (data.meta && data.meta.updated) || null,
+    dated: (data && data.meta && data.meta.updated) || null,
     // With no signal, sw.js answers with the copy it kept and says when it
     // kept it (#213): never passed off as current — the header says it is a
     // saved copy, and how old.
     kept: keptDate(source && source.kept),
+    // …and the opening load draws that copy itself when the datastore is slow
+    // to answer (loadFromApi), saying so, while the answer is still coming.
+    slow: !!(source && source.slow),
   };
+}
+
+function applyStationDoc(text, source) {
+  const data = JSON.parse(text);
+  if (!Array.isArray(data.stations)) throw new Error('Missing "stations" array');
+  state.data       = data;
+  state.dataSource = stationDocSource(data, source);
+  // A newer list waiting to be used is about the list this one replaces.
+  state.newerList  = null;
   // Cleared on success: whatever failed on the way to here has been superseded
   // by something that worked, and a stale error under a good load reads as a
   // current problem.
@@ -591,11 +662,24 @@ function updateHeaderStats() {
   // the database or from a file committed a month ago, and telling those apart
   // should not require opening a tab and pressing a button.
   const from = !src ? ''
-    : src.kept ? ` · saved copy${src.kept instanceof Date ? `, ${keptAge(src.kept)} old` : ''} — ${keptWhy(src.kind)}`
+    : src.kept ? ` · saved copy${src.kept instanceof Date ? `, ${keptAge(src.kept)} old` : ''} — ${keptWhy(src.kind, src.slow)}`
     : ` · from ${SOURCE_LABELS[src.kind] || src.kind}`;
   el.textContent =
     `${s.length} stations · ${s.filter(x => x.roles.includes('repeater')).length} repeaters${from}`;
   el.title = src ? dataSourceSummary() : '';
+  // The datastore's answer, arrived after the kept copy was drawn and not the
+  // same list (loadFromApi): first on the line, where a narrow header that
+  // cuts the line short does not cut it off.
+  if (state.newerList) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'hdr-newer';
+    b.textContent = 'Use the newer list';
+    b.title = 'The datastore\'s current station list arrived after the saved copy on screen was drawn, and it is not the same. '
+      + 'Press to put it on screen: the tab is drawn again from it.';
+    b.addEventListener('click', useNewerList);
+    el.prepend(b, ' · ');
+  }
 }
 
 // One line of plain English about the loaded document: where it came from, when
@@ -614,8 +698,10 @@ function keptDate(v) {
 // exactly as no network does, and sw.js cannot tell the two apart; the page
 // can say which, so "no signal" is never said with a signal.
 const KEPT_SOURCE = { api: 'the datastore', bundled: 'this site', github: 'GitHub' };
-function keptWhy(kind) {
+function keptWhy(kind, slow) {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'no signal';
+  // Drawn by the page itself while the answer is still coming (loadFromApi).
+  if (slow) return `${KEPT_SOURCE[kind] || 'its source'} is slow to answer; the current list is on its way`;
   return `no answer from ${KEPT_SOURCE[kind] || 'its source'}`;
 }
 
@@ -633,7 +719,8 @@ function dataSourceSummary() {
   const src = state.dataSource;
   if (!src) return 'Nothing loaded yet.';
   const bits = src.kept
-    ? [`A copy kept on this device${src.kept instanceof Date ? `, saved ${src.kept.toLocaleString()}` : ''}: ${SOURCE_LABELS[src.kind] || src.kind} could not be reached`]
+    ? [`A copy kept on this device${src.kept instanceof Date ? `, saved ${src.kept.toLocaleString()}` : ''}: ${SOURCE_LABELS[src.kind] || src.kind} ${
+        src.slow ? 'is slow to answer, and the current list is still on its way' : 'could not be reached'}`]
     : [`Loaded from ${SOURCE_LABELS[src.kind] || src.kind}`];
   if (src.detail) bits.push(src.detail);
   if (src.ms != null) bits.push(`${src.ms} ms`);
@@ -3507,8 +3594,15 @@ function dockAdopt(el, info) {
     if (e.pane.parentNode !== panes) panes.appendChild(e.pane);
     if (el.parentNode !== e.pane) e.pane.appendChild(el);
   }
-  renderDock({ instant: true });
   const f = info.focused;
+  // While the Stations map is being built its controls arrive a dozen at a
+  // time, and dockSettle() paints the panel once when they have all come —
+  // painted for each of them as well, the panel was measured and laid out
+  // sixteen times in one press of the tab, which on a laptop busy with a
+  // Teams call was a second of the tab not answering. A control arriving
+  // with focus in it is painted at once: its strip button is where focus goes.
+  if (dockBuilding && !f) dockBuildPending = true;
+  else renderDock({ instant: true });
   if (!f || e.kind !== 'panel') return null;
   // The side panel hides a panel's corner icon and its 📌 (it has a button of
   // its own for the panel, and a pin there would change nothing anyone could
@@ -3593,7 +3687,25 @@ let dockStripScroll = 0;
 // element with the same id inside the same panel, or — for an element with no
 // id of its own — that panel's strip button, which is the nearest thing to it
 // that is still there. Only when nothing else has taken focus in the meantime.
+// The Stations map's build, from its first control to dockSettle(): the side
+// panel is painted once at the end of it rather than once per control
+// (dockAdopt). Set by initMap; cleared by dockSettle, or — a build that threw
+// part-way — by the next turn of the event loop, which paints what arrived.
+let dockBuilding = false;
+let dockBuildPending = false;
+function dockBuildStart() {
+  dockBuilding = true;
+  dockBuildPending = false;
+  setTimeout(() => {
+    if (!dockBuilding) return;
+    dockBuilding = false;
+    if (dockBuildPending) { dockBuildPending = false; renderDock({ instant: true }); }
+  }, 0);
+}
+
 function dockSettle(built) {
+  dockBuilding = false;
+  dockBuildPending = false;
   // Only a build that handed its controls to the side panel says which panes
   // exist. A build that kept them in the corner hands none over, and counting
   // it would make a remembered pane look gone the next time they are handed
@@ -4253,8 +4365,15 @@ function syncStationsSplitHeight() {
   // calls this a second time, sixteen pixels after the map was built, and
   // `npm run linkbudget` caught the result as "a click dead on a pin sets an
   // end" failing on a pin the pointer was dead on.
+  //
+  // The Stations map is measured at once as well as with the others a turn
+  // later: on the tab's first build this runs before a single pin is on it,
+  // and a map left on its old box until then was fitted and drawn there, then
+  // drawn again at the new one — every pin twice, a third of a second of a
+  // slow laptop's Stations tab. The later pass then finds nothing to change.
   if (h !== lastSplitHeight) {
     lastSplitHeight = h;
+    if (state.map) { try { state.map.invalidateSize(); } catch (_) {} }
     invalidateMapSizes(0);
   }
 }
@@ -6331,6 +6450,7 @@ function initMap() {
   const el = document.getElementById('leaflet-map');
   // No map to build: the side panel lets go of the panes the last one had.
   if (!el) { dockSettle(false); return; }
+  dockBuildStart();
   // preferCanvas: with ~3,174 station pins and ~3,141 pass-range link lines,
   // the default SVG renderer means ~6,300 SVG nodes rebuilt on every refresh.
   // A single canvas element instead. The renderer is created explicitly for

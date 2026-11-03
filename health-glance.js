@@ -544,15 +544,26 @@ const HealthGlance = (() => {
     return classes.get(id) || 'nodata';
   }
 
-  // How many of the stations the map can show are in each class.
+  // How many of the stations the map can show are in each class — counted
+  // once per rebuild of the classes and kept, not once per call: ⏱️ Latency
+  // asks for the counts while it classes every pin, and a count of all ~5,000
+  // stations for each of ~5,000 pins was eight seconds of a slow laptop's
+  // Stations tab on a Teams call. Kept against the classes it counted (a
+  // rebuild makes a new map) and the list it counted them in.
+  let tallyMemo = null;
   function tally() {
+    if (dirty) rebuild();
+    const list = (state.data && state.data.stations) || [];
+    const m = tallyMemo;
+    if (m && m.classes === classes && m.list === list && m.n === list.length) return Object.assign({}, m.t);
     const t = { ok: 0, watch: 0, fault: 0, nodata: 0, total: 0 };
-    ((state.data && state.data.stations) || []).forEach(s => {
+    list.forEach(s => {
       if (s.lat == null || s.lon == null) return;
       t[classOf(s.id)]++;
       t.total++;
     });
-    return t;
+    tallyMemo = { classes, list, n: list.length, t };
+    return Object.assign({}, t);
   }
   const num = n => Number(n).toLocaleString();
 
@@ -1217,6 +1228,9 @@ const HealthGlance = (() => {
     pinStyle, reset, setPins, askAgain, noteHtml, legendHtml, altText,
     // the counts, for Home and the Instrument look's banner
     onNet, askNet, counts,
+    // …and only whether the batch has answered yet, which costs nothing
+    // (counts() counts): ⏱️ Latency asks it once per pin.
+    answeredAt: () => net.okAt,
     // the station list's Last heard column, and the editor's header
     heardCellHtml, heardHeadHtml, onHeard,
     // when one station was last heard, as everything known says — for

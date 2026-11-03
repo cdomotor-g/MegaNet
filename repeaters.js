@@ -1870,6 +1870,20 @@ const Repeaters = (() => {
   // without it and it is worked out a beat later.
   function wantPlan() {
     if (S.planReady || S.planTimer || typeof RepeaterDelays === 'undefined') return;
+    // Off the page's thread where the browser can (RepeaterDelays.planSoon):
+    // the half second — two on a laptop busy with a Teams call — was the tab
+    // not answering just after it was drawn.
+    if (RepeaterDelays.planSoon) {
+      const asked = S.planTimer = {};
+      RepeaterDelays.planSoon().catch(() => null).then(() => {
+        if (S.planTimer !== asked) return;      // the tab was left meanwhile
+        S.planTimer = null;
+        if (!active()) return;
+        S.planReady = true;
+        refresh();
+      });
+      return;
+    }
     S.planTimer = setTimeout(() => {
       S.planTimer = null;
       if (!active()) return;

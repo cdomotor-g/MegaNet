@@ -4769,6 +4769,10 @@ const state = {
   // Why the datastore was not used, when it was not. Kept after a fallback so
   // the Export tab can say what went wrong rather than only that something did.
   loadError:      null,
+  // The datastore's answer that arrived after the opening load had drawn the
+  // copy this device kept, when it is not the same list: { text, source },
+  // put on screen by Use the newer list in the header (app.js, loadFromApi).
+  newerList:      null,
   // The automatic load while it is under way, and what it tried (app.js,
   // autoLoad; #212): { busy, kind, got, total, about, retry,
   // tried: [{ kind, error }] } — `total` the exact size when it can be known,

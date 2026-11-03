@@ -184,6 +184,80 @@ const RepeaterDelays = (function () {
   // everybody, whatever this device's tab is set to — or null for a station
   // that is not a repeater on the plan.
   const planAtDefaults = () => planFor(DelayPlan.settings({})) || { repeaters: [] };
+  // Whether that plan is already worked out for this file. Working it out is
+  // half a second the first time — two on a laptop busy with a Teams call —
+  // so the station editor asks this first and fills its suggestion in a beat
+  // after the card is on screen, rather than holding the card back for it.
+  const planReady = () => typeof state !== 'undefined' && !!state.data
+    && !!state.delayPlans && state.delayPlans.has(key(DelayPlan.settings({})));
+
+  // ── The plan at defaults, worked out off the page's thread ────────────────
+  // What planReady() is for: a promise of the plan at defaults that does not
+  // stop the page while it is worked out. Where the browser can, the same
+  // DelayPlan.plan runs in a worker — delay-plan.js loaded into it as the page
+  // loaded it, handed the fields of the stations the plan reads — and its
+  // answer is kept where planFor() keeps it, so every caller that asks after
+  // has it at once and the same. Where a worker cannot be made (file://, a
+  // browser without them, one that fails or throws), it is worked out here, a
+  // turn later, as before. An answer for a file that has been replaced or
+  // edited since it was asked for is thrown away (state.delayPlans is a new
+  // map by then, or none).
+  let soon = null;          // { data, plans, k, promise } while one is on its way
+  let workerUrl = null;
+  // Only what DelayPlan.plan reads of a station: a sensor's ALERT address is
+  // all it reads of the sensors, which are most of a station's bytes.
+  const slim = st => ({
+    id: st.id, name: st.name, roles: st.roles, enabled: st.enabled, proposed: st.proposed,
+    lat: st.lat, lon: st.lon, repeater: st.repeater, alert_ids: st.alert_ids, frequencies: st.frequencies,
+    basin: st.basin, lga: st.lga, hub_id: st.hub_id,
+    sensors: Array.isArray(st.sensors) ? st.sensors.map(se => (se ? { alert_id: se.alert_id } : se)) : st.sensors,
+  });
+  function inWorker(stations, o) {
+    if (typeof Worker === 'undefined' || typeof Blob === 'undefined' || typeof URL === 'undefined'
+        || !URL.createObjectURL || typeof document === 'undefined' || location.protocol === 'file:') return Promise.resolve(null);
+    const tag = document.querySelector('script[src*="delay-plan.js"]');
+    if (!tag || !tag.src) return Promise.resolve(null);
+    return new Promise(resolve => {
+      let w = null;
+      const done = v => { if (w) { try { w.terminate(); } catch (_) {} w = null; } resolve(v); };
+      try {
+        if (!workerUrl) {
+          workerUrl = URL.createObjectURL(new Blob([`importScripts(${JSON.stringify(tag.src)});
+self.onmessage = e => {
+  let out;
+  try { out = { plan: DelayPlan.plan(e.data.stations, e.data.opts) }; } catch (err) { out = { error: String((err && err.message) || err) }; }
+  self.postMessage(out);
+};`], { type: 'text/javascript' }));
+        }
+        w = new Worker(workerUrl);
+        w.onmessage = e => done(e.data && e.data.plan ? e.data.plan : null);
+        w.onerror = ev => { if (ev && ev.preventDefault) ev.preventDefault(); done(null); };
+        w.postMessage({ stations: stations.map(slim), opts: o });
+      } catch (_) { done(null); }
+    });
+  }
+  function planSoon() {
+    if (typeof state === 'undefined' || !state.data) return Promise.resolve(null);
+    const o = DelayPlan.settings({});
+    const k = key(o);
+    if (state.delayPlans && state.delayPlans.has(k)) return Promise.resolve(state.delayPlans.get(k));
+    const data = state.data;
+    if (!state.delayPlans) state.delayPlans = new Map();
+    const plans = state.delayPlans;
+    if (soon && soon.data === data && soon.plans === plans && soon.k === k) return soon.promise;
+    const current = () => state.data === data && state.delayPlans === plans;
+    const here = () => new Promise(res => setTimeout(() => res(current() ? planFor(o) : null), 0));
+    const promise = inWorker(data.stations, o)
+      .then(p => {
+        if (!p) return here();
+        if (!current()) return null;
+        if (!plans.has(k)) plans.set(k, p);
+        return plans.get(k);
+      }, here)
+      .then(p => { if (soon && soon.promise === promise) soon = null; return p; });
+    soon = { data, plans, k, promise };
+    return promise;
+  }
   function suggestion(station) {
     if (!station || !station.id) return null;
     const r = planAtDefaults().repeaters.find(x => x.id === station.id);
@@ -448,6 +522,20 @@ const RepeaterDelays = (function () {
   function render() {
     const o = opts();
     W = words(o);
+    // At the defaults, a plan not yet worked out for this file is worked out
+    // off the page's thread (planSoon) and the tab drawn again when it is in,
+    // rather than the tab holding the page still for it. Other settings are
+    // worked out here, as they always were: they are somebody's own question.
+    if (typeof state !== 'undefined' && state.data && !planReady() && key(o) === key(DelayPlan.settings({}))) {
+      planSoon().then(() => { if (state.activeTab === 'repdelays' && planReady()) renderMain(); });
+      return `
+    <div class="page rd-page" style="--page-max:1200px">
+      <div class="panel">
+        <div class="panel-header"><h2>Repeater delays</h2></div>
+        <p class="small" role="status">Working out the plan for every repeater on file…</p>
+      </div>
+    </div>`;
+    }
     const p = current();
     const body = !p
       ? '<p class="small" role="status">The station register is not loaded yet.</p>'
@@ -563,6 +651,6 @@ const RepeaterDelays = (function () {
     dlText(`floodnet-repeater-delay-pairs-${p.settings.maxMs}ms.csv`, lines.join('\n') + '\n');
   }
 
-  return { render, init, set: setOpt, reset, compare, openStation, exportCsv, exportPairsCsv, current, suggestion, planAtDefaults,
+  return { render, init, set: setOpt, reset, compare, openStation, exportCsv, exportPairsCsv, current, suggestion, planAtDefaults, planReady, planSoon,
            state: () => S };
 })();

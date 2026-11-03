@@ -357,16 +357,44 @@ async function dbRpc(fn, args) {
 // Anonymous is the normal case. Readings, the rollups and the vocabularies are
 // granted to `anon` in 0006 — a river height is not a secret — so this works
 // signed out, and signing in adds nothing to a read.
+//
+// A read that has not started to answer in DB_READ_WAIT_MS is given up, with
+// an error that says so. The datastore's own statement limits end any query
+// in seconds, so a wait that long is the line, not the query: a phone on one
+// bar, a laptop sharing its uplink with a Teams call. Left to the browser such
+// a request can hang for minutes, and the panels that wait on one say
+// "loading" for all of them — and will not ask again while it is loading.
+// Only the start of the answer is timed: a long answer arriving slowly is
+// still arriving, and is read to its end. Writes are never timed out — a
+// write given up might still have landed (dbRpc).
+const DB_READ_WAIT_MS = 30000;
+
 async function dbSelect(path) {
-  const res = await fetch(`${DB_URL}/${path}`, {
-    headers: {
-      apikey: DB_ANON_KEY,
-      ...(_dbToken ? { Authorization: `Bearer ${_dbToken}` } : {}),
-      'Accept-Profile': DB_SCHEMA,
-      Accept: 'application/json',
-    },
-    cache: 'no-store',
-  });
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), DB_READ_WAIT_MS) : null;
+  let res;
+  try {
+    res = await fetch(`${DB_URL}/${path}`, {
+      headers: {
+        apikey: DB_ANON_KEY,
+        ...(_dbToken ? { Authorization: `Bearer ${_dbToken}` } : {}),
+        'Accept-Profile': DB_SCHEMA,
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+      ...(ctl ? { signal: ctl.signal } : {}),
+    });
+  } catch (err) {
+    if (ctl && ctl.signal.aborted) {
+      const e = new Error(`No answer from the datastore in ${DB_READ_WAIT_MS / 1000} s — the connection may be too weak just now. Try again.`);
+      e.status = 0;
+      e.timeout = true;
+      throw e;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
   const text = await res.text();
   let body = null;
   try { body = text ? JSON.parse(text) : null; } catch (_) { /* not JSON */ }

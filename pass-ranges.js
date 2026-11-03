@@ -138,14 +138,22 @@ function renderPassRangesHtml() {
 }
 
 // Field stations carrying an AlertID that no repeater's pass ranges cover.
+// Read off the pass-range relation the app already keeps (passRelationIndex,
+// app.js) rather than worked out again — every station against every repeater
+// against every address, on every render and every keystroke of the filter,
+// was most of a second of this tab on a slow laptop. The relation leaves a
+// station out of its own carriers; here a repeater that is also a field
+// station and passes its own address still covers it, as it always did.
 function passRangeOrphans() {
-  const all       = state.data.stations;
-  const repeaters = all.filter(s => s.roles.includes('repeater') && s.repeater);
+  const all = state.data.stations;
+  const { byStation } = passRelationIndex();
   return all.filter(s => {
     if (!s.roles.includes('field')) return false;
+    if (byStation.has(s.id)) return false;
     const ids = stationAlertIds(s);
     if (!ids.length) return false;
-    return !repeaters.some(r => ids.some(id => passRangeCoversId(r.repeater, id)));
+    const self = s.roles.includes('repeater') && s.repeater;
+    return !(self && ids.some(id => passRangeCoversId(s.repeater, id)));
   });
 }
 

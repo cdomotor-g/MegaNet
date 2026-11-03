@@ -726,8 +726,10 @@ const MapLatency = (() => {
     return m;
   }
 
-  // Whether the last-heard batch has answered, or a card has.
+  // Whether the last-heard batch has answered, or a card has. Asked once per
+  // pin, so it asks for the time alone: counts() counts every station.
   function netKnown() {
+    if (HealthGlance.answeredAt) return !!HealthGlance.answeredAt();
     const c = HealthGlance.counts ? HealthGlance.counts() : null;
     return !!(c && c.okAt);
   }

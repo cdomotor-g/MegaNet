@@ -42,7 +42,7 @@
 // until somebody asks again (the tab's Check for a newer version).
 //
 // Exposes: start, check, offer, wanted, possible, status, prepare, keepData,
-//          remove, canPrompt, promptInstall, installed, onChange.
+//          remove, canPrompt, promptInstall, installed, onChange, keptList.
 // Requires: core.js (APP_VERSION, state, DB_URL); at call time, app.js
 //           (stationDocRequest), datastore.js (dbSelect), and inspections.js
 //           and maintenance.js (refPaths).
@@ -300,6 +300,20 @@ const Pwa = (function () {
     } catch (_) { return 0; }
   }
 
+  // The station list as the worker last kept it from `kind`'s source —
+  // { text, kept: when it was kept } — or null with none kept, or no Cache API
+  // to read it from. What the opening load draws while the datastore is slow
+  // to answer (app.js, loadFromApi); the worker itself answers with it only
+  // when the network fails.
+  async function keptList(kind) {
+    try {
+      if (typeof caches === 'undefined' || typeof stationDocRequest !== 'function') return null;
+      const hit = await caches.match(abs(stationDocRequest(kind)[0]), { cacheName: DATA });
+      if (!hit) return null;
+      return { text: await hit.text(), kept: hit.headers.get(KEPT) || 'unknown' };
+    } catch (_) { return null; }
+  }
+
   // Has the worker written a copy of url since t0? It writes beside the
   // answer, not before it, so this gives it a moment.
   async function keptSince(url, t0, ms = 10000) {
@@ -418,7 +432,7 @@ const Pwa = (function () {
 
   return {
     start, check, offer, wanted, possible, status, prepare, keepData, remove,
-    canPrompt, promptInstall, installed, onChange,
+    canPrompt, promptInstall, installed, onChange, keptList,
   };
 })();
 if (typeof window !== 'undefined') window.Pwa = Pwa;

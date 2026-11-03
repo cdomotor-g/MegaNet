@@ -1063,6 +1063,16 @@ jobs:
         working-directory: test
         run: npm run offlinetab
 
+      # The station list on a slow line (app.js loadFromApi): a device that has
+      # opened Flood-Net before draws its kept copy after 8 s without the whole
+      # answer, says it is a saved copy and why, and the answer relabels it
+      # (the same list), is offered as Use the newer list (a different one) or
+      # leaves it standing (none); a quick answer is drawn as itself.
+      - name: Slow line — the kept station list first, said to be one
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run slowlist
+
       # The left bar's views (nav-views.js, 0062): All, Simple and Field, a
       # tab the view leaves out never lost from the bar or the find box, the
       # Views tab signed out and signed in — an account's own view made,
