@@ -6621,8 +6621,8 @@ function initMap() {
   // network instead.
   refreshMapLayers({ animate: false });
   refreshAcmaLayer();
-  // ACMA transmitters are on by default, so the first visit to the map pulls the
-  // core data in. Panels that gain content once it lands are refreshed in place
+  // ACMA transmitters are off until somebody turns them on (and remembered once
+  // they have), so a map visit with the layer on pulls the core data in. Panels that gain content once it lands are refreshed in place
   // rather than by re-rendering the tab, which would throw away the map view.
   if (state.filters.acma.show && !state.acma.loaded && !state.acma.loading) {
     acmaEnsureCore()
@@ -10311,7 +10311,7 @@ function acmaVisibleThreats(ignoreAnchorSel) {
 // ── filters panel block ──
 
 // The master toggle sits outside the collapsible block: ACMA transmitters are
-// drawn by default, so the way to turn them off has to be visible without
+// off until it is ticked, so the way to turn them on has to be visible without
 // hunting through a closed twisty.
 function acmaFilterBlockHtml() {
   return `<div id="acma-filter-block">${acmaFilterHeadHtml()}</div>`;
@@ -10430,6 +10430,9 @@ function rerenderAcmaFilterBlock() {
 
 function toggleAcmaShow(checked) {
   state.filters.acma.show = checked;
+  // Remembered on this device, like the other overlays: off is the default
+  // (core.js), so only somebody who ticked it sees the squares next visit.
+  try { localStorage.setItem('mn-acma', checked ? 'on' : 'off'); } catch (_) {}
   if (!checked) {
     closeAcmaCard();
     refreshAcmaLayer();

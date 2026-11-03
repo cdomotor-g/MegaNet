@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 184, date: '2026-11-03', items: [
+      '📡 <strong>ACMA licence pins are hidden until you turn them on.</strong> The squares for the ACMA\'s licensed '
+        + 'transmitters no longer cover the <strong>Stations</strong> map on every visit. To see them, open 🗺️ '
+        + '<em>Layers</em> and tick <em>Show ACMA licensed transmitters</em> at the bottom; this device remembers your '
+        + 'choice next time.',
+    ] },
     { n: 183, date: '2026-11-03', items: [
       '🫧 <strong>Nearby pins are grouped into bubbles</strong> on the <strong>Stations</strong> map until you zoom in — each '
         + 'says how many stations are in it; press one to zoom in on them, and from zoom 12 every station has its own pin again. '

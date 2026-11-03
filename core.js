@@ -4207,9 +4207,13 @@ const state = {
     readBy:       '',
     slsRole:      '',
     acma: {
-      show:        true,                        // on by default; the ~1.4 MB core
-                                                // data is fetched the first time
-                                                // the map tab opens, not at page load
+      // Off by default for everybody, visitors included, and remembered once
+      // somebody ticks it in Layers (toggleAcmaShow, app.js). Several hundred
+      // squares over the network was a lot to meet on a first visit. The
+      // ~1.4 MB core data is fetched only when the layer is on and the map
+      // tab opens, never at page load.
+      show:        (() => { try { return localStorage.getItem('mn-acma') === 'on'; }
+                            catch (_) { return false; } })(),
       mechanisms:  new Set(['co_channel', 'adjacent', 'imd3', 'harmonic', 'cosite_desense']),
       minScore:    20,   // scores carry a ×0.7 unknown-LOS discount, so they cluster low
       losOnly:     false,

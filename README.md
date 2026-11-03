@@ -6362,9 +6362,11 @@ interference investigation starts from evidence instead of guesswork.
 
 ### Using it
 
-- **Stations tab → Map display → "Show ACMA licensed transmitters"**: master toggle, **on
-  by default** — the ~1.4 MB core data (threats + sites) is fetched the first
-  time the Stations tab opens, not at page load, and untick to drop the layer.
+- **Stations tab → Map display → "Show ACMA licensed transmitters"**: master toggle, **off
+  by default** for everybody, visitors included, and remembered on the device
+  once ticked (`mn-acma`) — the ~1.4 MB core data (threats + sites) is fetched
+  only once the layer is on and the Stations tab is open, never at page load,
+  and untick to drop the layer.
   Under it, *ACMA / RF Environment options* holds the mechanism checkboxes,
   minimum-score slider, current-licences-only, search
   radius, antenna beam wedges and threat links. Transmitters render as
