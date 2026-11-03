@@ -1,5 +1,6 @@
-// The two boundary layers on the Stations map (#179): the 77 Queensland
-// drainage basins and the Bureau's eight maintenance hubs.
+// The boundary layers on the Stations map: the 77 Queensland drainage basins
+// and the Bureau's eight maintenance hubs (#179), and the council areas — the
+// ABS's local government areas, lines first and shaded on request.
 //
 // Both draw from a file in this repo rather than from a service, so unlike the
 // rivers there is nothing to seed and nothing to stub — the harness's own
@@ -259,6 +260,93 @@ try {
   check('a station carries both facts, and its catchment ids are basin ids',
     !!doc.sample && !!doc.sample.hub_id && Array.isArray(doc.sample.catchment_ids),
     JSON.stringify(doc.sample));
+
+  // ── Council areas (map-councils.js): off, then on, lines, names, shading ───
+  const cOff = await page.evaluate(() => ({
+    on: state.mapCouncils,
+    paths: document.querySelectorAll('.leaflet-mnCouncils-pane path').length,
+    note: document.getElementById('map-council-note').textContent,
+    shadeRow: !!document.querySelector('[aria-label="Council area shading opacity"]'),
+  }));
+  check('council areas are off on a first visit and have drawn nothing',
+    cOff.on === false && cOff.paths === 0 && /hidden/i.test(cOff.note) && !cOff.shadeRow, JSON.stringify(cOff));
+
+  await page.evaluate(() => {
+    state.map.setView([-27.55, 152.75], 9, { animate: false });
+    MapCouncils.setEnabled(true);
+  });
+  await page.waitForFunction(() => MapCouncils.active()
+    && document.querySelectorAll('.leaflet-mnCouncils-pane path').length > 0, null, { timeout: 20_000 });
+  await page.waitForTimeout(300);
+  const cOn = await page.evaluate(() => {
+    const paths = [...document.querySelectorAll('.leaflet-mnCouncils-pane path')];
+    return {
+      total: paths.length,
+      interactive: paths.filter((p) => p.classList.contains('leaflet-interactive')).length,
+      panePointer: getComputedStyle(document.querySelector('.leaflet-mnCouncils-pane')).pointerEvents,
+      filled: paths.filter((p) => Number(p.getAttribute('fill-opacity') || 0) > 0).length,
+      labels: [...document.querySelectorAll('.mn-council-label')].map((e) => e.textContent.trim()),
+      shadeBox: !!document.querySelector('input[onchange^="MapCouncils.setShade"]'),
+      legend: (document.getElementById('map-legend') || {}).textContent || '',
+      stored: localStorage.getItem('mn-councils'),
+    };
+  });
+  check('every council area in the file draws, all states', cOn.total >= 540, `${cOn.total} paths`);
+  check('no council area claims the pointer — the pane is inert',
+    cOn.interactive === 0 && cOn.panePointer === 'none',
+    `${cOn.interactive} interactive, pane pointer-events: ${cOn.panePointer}`);
+  check('lines only until shading is asked for', cOn.filled === 0, `${cOn.filled} filled`);
+  check('the councils in view are named at zoom 9 — Brisbane, Ipswich, Logan',
+    ['Brisbane', 'Ipswich', 'Logan'].every((n) => cOn.labels.includes(n)), JSON.stringify(cOn.labels.slice(0, 15)));
+  check('the shading switch appears under the layer once it is on, and the choice is remembered',
+    cOn.shadeBox && cOn.stored === 'on', JSON.stringify({ box: cOn.shadeBox, stored: cOn.stored }));
+  check('the legend keys the boundary line', /Council area \(LGA\) boundary/.test(cOn.legend), cOn.legend.slice(0, 80));
+
+  await page.evaluate(() => MapCouncils.setShade(true));
+  await page.waitForTimeout(200);
+  const shaded = await page.evaluate(() => {
+    const paths = [...document.querySelectorAll('.leaflet-mnCouncils-pane path')];
+    const ops = new Set(paths.map((p) => p.getAttribute('fill-opacity')));
+    return {
+      filled: paths.filter((p) => Number(p.getAttribute('fill-opacity') || 0) > 0).length,
+      total: paths.length, ops: [...ops],
+      slider: !!document.querySelector('[aria-label="Council area shading opacity"]'),
+      tints: (document.getElementById('map-legend') || {}).textContent.includes('never a neighbour'),
+    };
+  });
+  check('shading fills every council area, with the opacity slider and the tints in the key',
+    shaded.filled === shaded.total && shaded.slider && shaded.tints, JSON.stringify(shaded));
+  await page.evaluate(() => MapCouncils.setOpacity(0.5));
+  const op = await page.evaluate(() => document.querySelector('.leaflet-mnCouncils-pane path').getAttribute('fill-opacity'));
+  check('the slider restyles in place', op === '0.5', String(op));
+
+  // No two neighbours share a tint: the build tool's promise, checked on the
+  // file the page draws — councils sharing a vertex are neighbours.
+  const tints = await page.evaluate(async () => {
+    const fc = await MapCouncils.ready();
+    const owner = new Map();
+    let clash = [];
+    fc.features.forEach((f, i) => {
+      const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+      for (const p of polys) for (const r of p) for (const [x, y] of r) {
+        const k = x + ',' + y, o = owner.get(k);
+        if (o == null) { owner.set(k, i); continue; }
+        if (o !== i && fc.features[o].properties.c === f.properties.c) clash.push(f.properties.name + '/' + fc.features[o].properties.name);
+      }
+    });
+    clash = [...new Set(clash)];
+    return { n: fc.features.length, clash: clash.slice(0, 5), noLabel: fc.features.filter((f) => !f.properties.lp).length };
+  });
+  check('no two neighbouring councils share a tint, and every one has a label point',
+    tints.clash.length === 0 && tints.noLabel === 0, JSON.stringify(tints));
+
+  await page.evaluate(() => { MapCouncils.setShade(false); MapCouncils.setEnabled(false); });
+  await page.waitForTimeout(200);
+  const cGone = await page.evaluate(() => ({
+    paths: document.querySelectorAll('.leaflet-mnCouncils-pane path').length,
+    labels: document.querySelectorAll('.mn-council-label').length,
+  }));
+  check('the off switch takes the council lines and names together', cGone.paths === 0 && cGone.labels === 0, JSON.stringify(cGone));
 
   // ── Off again ─────────────────────────────────────────────────────────────
   await page.evaluate(() => { MapCatchments.setEnabled(false); MapHubs.setEnabled(false); });

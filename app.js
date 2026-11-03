@@ -5505,6 +5505,34 @@ function mapDisplayControlsHtml() {
       Maintenance hubs (BoM)
     </label>
     <p class="filter-note" id="map-hub-note">${MapHubs.noteHtml()}</p>
+    <!-- Council areas (map-councils.js): the third boundary layer, and the
+         finest — whose local government area a site is in. Lines by default,
+         each council named once it fits; shaded on request, every council its
+         own soft tint (no two neighbours alike) at the strength the slider
+         sets. The same layer is on the 🔁 Repeaters map. -->
+    <label class="filter-check"
+           title="Council areas: each local government area (LGA) — the area one council governs — outlined, and named once you are close enough for the name to fit. Every state and territory, from the Australian Bureau of Statistics (ASGS Edition 4, 2026), whose boundaries are an approximation of the legal ones.">
+      <input type="checkbox" ${state.mapCouncils ? 'checked' : ''}
+             onchange="MapCouncils.setEnabled(this.checked)">
+      Council areas (LGA boundaries)
+    </label>
+    ${state.mapCouncils ? `
+    <label class="filter-check filter-sub"
+           title="Fill each council area with a soft tint of its own, so the areas read at a glance. The tints only tell neighbours apart — no two councils that share a border have the same one — and mean nothing else.">
+      <input type="checkbox" ${state.mapCouncilShade ? 'checked' : ''}
+             onchange="MapCouncils.setShade(this.checked)">
+      Shade each council area
+    </label>
+    ${state.mapCouncilShade ? `
+    <label class="filter-range">
+      <span>Shading opacity <strong id="council-opacity-val" aria-hidden="true">${
+        Math.round(state.mapCouncilOpacity * 100)}%</strong></span>
+      <input type="range" min="0.05" max="0.8" step="0.05" value="${state.mapCouncilOpacity}"
+             aria-label="Council area shading opacity"
+             aria-valuetext="${Math.round(state.mapCouncilOpacity * 100)} per cent"
+             oninput="document.getElementById('council-opacity-val').textContent=Math.round(this.value*100)+'%';this.setAttribute('aria-valuetext',Math.round(this.value*100)+' per cent');MapCouncils.setOpacity(+this.value)">
+    </label>` : ''}` : ''}
+    <p class="filter-note" id="map-council-note">${MapCouncils.noteHtml()}</p>
     <label class="filter-check">
       <input type="checkbox" ${state.mapLos ? 'checked' : ''}
              onchange="MapLos.setEnabled(this.checked);rerenderMapLegend()">
@@ -5762,6 +5790,7 @@ function mapLegendOffLayersHtml() {
     !state.mapWind            && 'Wind regions',
     !state.mapCatchments      && 'River catchments',
     !state.mapHubs            && 'Maintenance hubs',
+    !state.mapCouncils        && 'Council areas',
     !state.mapLos             && 'Line-of-sight checks',
     !state.filters.acma.show  && 'ACMA licences',
   ].filter(Boolean);
@@ -5834,6 +5863,25 @@ function mapHubLegendHtml() {
         <span class="legend-sq" style="--dot:${h.color}"></span>
         <span class="small">${esc(h.name)}</span>
       </span>`).join('');
+}
+
+// The council key: the one boundary line, and — when the areas are shaded —
+// what the tints are for, which is nothing but telling neighbours apart. The
+// line's colour is MapCouncils.LINE, so the key is the map by construction.
+function mapCouncilLegendHtml() {
+  const tints = state.mapCouncilShade ? `
+      <span class="legend-item">
+        <span class="legend-tints" aria-hidden="true">${MapCouncils.tints().map(c => `<i style="--dot:${c}"></i>`).join('')}</span>
+        <span class="small">Shaded: each council its own tint, never a neighbour's — the tint means nothing else</span>
+      </span>` : '';
+  return `
+      <span class="legend-item">
+        <span class="legend-line legend-line-council" style="--line:${MapCouncils.LINE}"></span>
+        <span class="small">Council area (LGA) boundary — named as you zoom in</span>
+      </span>${tints}
+      <span class="legend-item legend-off">
+        <span class="small txt-muted">${esc(MapCouncils.PROVENANCE)}</span>
+      </span>`;
 }
 
 function mapWindLegendHtml() {
@@ -6036,6 +6084,7 @@ function mapLegendHtml() {
     MapRoadOwners.active() ? MapRoadOwners.legendHtml() : '',
     MapCatchments.active() ? mapCatchmentLegendHtml() : '',
     MapHubs.active() ? mapHubLegendHtml() : '',
+    MapCouncils.active() ? mapCouncilLegendHtml() : '',
     state.mapWind ? mapWindLegendHtml() : '',
   ].map(mapLegendCard);
   const acma = state.filters.acma.show ? [mapLegendCard(Object.entries(ACMA_MECH).map(([k, m]) => `
@@ -6204,6 +6253,7 @@ function stopStationsMap() {
   MapRivers.detach();
   MapCatchments.detach();
   MapHubs.detach();
+  MapCouncils.detach();
   MapSurvey.detach();
   MapContours.detach();
   ElvisCoverage.detach();
@@ -6383,6 +6433,7 @@ function initMap() {
   MapRivers.attach(state.map);
   MapCatchments.attach(state.map);
   MapHubs.attach(state.map);
+  MapCouncils.attach(state.map);
   MapSurvey.attach(state.map);
   MapContours.attach(state.map);
   ElvisCoverage.attach(state.map);

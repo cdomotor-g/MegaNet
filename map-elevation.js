@@ -653,6 +653,19 @@ const MapElevation = (function () {
 
     layer(opts) { return new (layerClass())(opts); },
 
+    // The ~30 m colouring on another map — the 🔁 Repeaters tab's — in its own
+    // copy of this pane, at the opacity given, with the relief switch the
+    // Stations map has (paint reads it). The ~30 m tiles only: the Elvis
+    // source, its queue and its note belong to the Stations map's panel.
+    drawOn(m, opacity) {
+      if (!m.getPane(PANE)) m.createPane(PANE).style.zIndex = PANE_Z;
+      const lay = new (layerClass())({ pane: PANE, opacity: Math.max(0.1, Math.min(1, Number(opacity) || 0.6)) }).addTo(m);
+      return {
+        setOpacity(v) { lay.setOpacity(Math.max(0.1, Math.min(1, Number(v) || 0.6))); },
+        remove() { try { lay.remove(); } catch (_) { /* map gone */ } },
+      };
+    },
+
     // zoomend keeps the note honest about the Elvis source's zoom floor, which
     // no tile event would otherwise report — tiles below it are just 30 m.
     attach(m) { map = m; m.on('zoomend', refreshNoteSoon); sync(); },

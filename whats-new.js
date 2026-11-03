@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 175, date: '2026-11-03', items: [
+      '🏛️ <strong>Council areas</strong> on the <strong>Stations</strong> map: tick <em>Council areas (LGA boundaries)</em> in '
+        + '🗺️ Layers, under <em>Overlay layers</em>, for every council\'s boundary across Australia, each named as you zoom in. '
+        + '<em>Shade each council area</em> fills them with soft tints — no two neighbours alike — at the strength the slider sets.',
+      '🔁 The <strong>Repeaters</strong> map\'s 🗺️ Layers now has overlays too: council areas (shaded or not), maintenance hubs, '
+        + 'river catchments and ground height as colour, on the map and full screen. They are kept apart from the Stations map\'s.',
+    ] },
     { n: 174, date: '2026-11-01', items: [
       '📡 One ALERT burst heard several ways — direct, through a repeater, through the ALERT2 network or at two base stations — '
         + 'is now <strong>one reading</strong>. Each copy used to arrive a second or so after the last and be kept as a reading of '

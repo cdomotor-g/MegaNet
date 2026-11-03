@@ -1189,3 +1189,13 @@ The sub-catchment pages are about 50 MB each, 27 of them, forty-five minutes
 or so from the service; the fine catchments some 21,000 tiles, twenty-five
 minutes at 12 requests in flight. With `--cache` a rebuild asks for nothing
 and takes a few minutes. `npm run rivercatchments` holds the files to their shape.
+
+`build_lga_layer.mjs` (Node, not Python) rebuilds `data/lga-boundaries.geojson`,
+the council areas the Stations and Repeaters maps draw (`map-councils.js`): the
+Australian Bureau of Statistics' ASGS Edition 4 (2026) local government areas,
+generalised copy, fetched from the ABS's ArcGIS service, simplified with a
+pinned mapshaper (run through npx) so neighbouring councils keep one shared
+border, with more detail in Queensland and New South Wales, islands under 2 km²
+dropped, and each council given a tint index none of its neighbours has and a
+label point inside it. `node tools/build_lga_layer.mjs` fetches and builds;
+`--in <file>` builds from a saved download. Its header lists every choice.

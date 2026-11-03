@@ -2994,6 +2994,12 @@ td {
 .rptr-k-rb { border-top: 3px dashed var(--map-backbone); }
 .rptr-k-dot { width: .75rem; height: .75rem; border-radius: 50%; background: var(--role-repeater); }
 .rptr-k-iso { background: var(--warn); }
+/* The overlays' rows in the key, when they are on: each boundary in its own
+   layer's ink — the council violet (MapCouncils.LINE), a hub's blue, a
+   basin's North East Coast blue at the basins' lighter weight. */
+.rptr-k-council { border-top: 2px solid #6a3d9a; }
+.rptr-k-hub { border-top: 2px solid #3a86c8; }
+.rptr-k-basin { border-top: 1px solid #2f8fd0; }
 .rptr-k-base { color: var(--text); }
 .rptr-air { margin: var(--sp-2) 0; }
 .table-wrap table.rptr-table { min-width: 74rem; }
@@ -4093,6 +4099,16 @@ hr {
 .legend-line-contour { border-top-color: rgb(214, 104, 26); }
 /* The lot line is white over a dark casing, as MapLots draws it. */
 .legend-line-lot { border-top-color: #fff; box-shadow: 0 0 0 1px rgba(20, 20, 20, .6); }
+/* A council boundary (map-councils.js): MapCouncils.LINE through --line, two
+   pixels as on the map; the tints beside it, when shaded, as a row of chips. */
+.legend-line-council { border-top: 2px solid var(--line, var(--map-line)); }
+.legend-tints { display: inline-flex; gap: 2px; flex: none; }
+.legend-tints i {
+  width: 8px;
+  height: 10px;
+  background: var(--dot, var(--muted));
+  border: 1px solid rgba(0, 0, 0, .3);
+}
 /* A road keyed by who manages it (map-road-owners.js): the class's colour
    through --road, set inline from the same table the server-rendered image is
    drawn from. A private road is dashed, as on the map; the State-controlled
@@ -4631,6 +4647,31 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
    disagree with the toggle). */
 [data-theme="dark"] .mn-catchment-label > span { color: #123044; }
 [data-theme="dark"] .mn-hub-label > span { color: #2a3742; }
+
+/* A council's name (map-councils.js): the hubs' and basins' label, smaller and
+   in the boundary's own violet, so it reads as belonging to the line round it
+   rather than to a river or a hub. Fixed dark ink and a white halo in either
+   theme, for the basins' reason: it sits over map tiles, not over the page. */
+.mn-council-label {
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+}
+.mn-council-label > span {
+  display: inline-block;
+  transform: translate(-50%, -50%);
+  font-size: .68rem;
+  color: #4a2a72;
+  text-shadow:
+     1px  1px 0 rgba(255, 255, 255, .92),
+    -1px  1px 0 rgba(255, 255, 255, .92),
+     1px -1px 0 rgba(255, 255, 255, .92),
+    -1px -1px 0 rgba(255, 255, 255, .92),
+     0    0   4px rgba(255, 255, 255, .75);
+}
 
 /* The road parcel's name on hover (#176). Sticky to the cursor like the river
    label above, and dressed the way the fixed river name is — its own near-white

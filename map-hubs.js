@@ -152,25 +152,18 @@ const MapHubs = (function () {
     layer = labels = null;
   }
 
-  function render() {
-    if (!map || !state.mapHubs || !data) return;
-    clearLayer();
+  // Heavier on the line than the catchments and lighter on the fill: a hub
+  // boundary is read as a *line* — which side of it a station is on — where a
+  // basin is read as an area.
+  function hubStyle(f) {
+    const c = colorFor(f);
+    return { color: c, weight: 2, opacity: 0.7, fillColor: c, fillOpacity: 0.05 };
+  }
 
-    layer = L.geoJSON(data, {
-      pane: PANE,
-      renderer,
-      interactive: false,
-      attribution: ATTRIBUTION,
-      style: f => {
-        const c = colorFor(f);
-        // Heavier on the line than the catchments and lighter on the fill: a
-        // hub boundary is read as a *line* — which side of it a station is on —
-        // where a basin is read as an area.
-        return { color: c, weight: 2, opacity: 0.7, fillColor: c, fillOpacity: 0.05 };
-      },
-    }).addTo(map);
-
-    labels = L.layerGroup([], { pane: PANE }).addTo(map);
+  // The boundaries and their names on map `m`, in its own copy of this pane.
+  function drawInto(m, r) {
+    const lay = L.geoJSON(data, { pane: PANE, renderer: r, interactive: false, attribution: ATTRIBUTION, style: hubStyle }).addTo(m);
+    const lab = L.layerGroup([], { pane: PANE }).addTo(m);
     for (const f of features()) {
       const at = labelPoint(f);
       if (!at) continue;
@@ -182,9 +175,23 @@ const MapHubs = (function () {
           html: `<span>${esc(f.properties.name)}</span>`,
           iconSize: null,
         }),
-      }).addTo(labels);
+      }).addTo(lab);
     }
+    return [lay, lab];
+  }
 
+  function makePane(m) {
+    if (!m.getPane(PANE)) {
+      const pane = m.createPane(PANE);
+      pane.style.zIndex = PANE_Z;
+      pane.style.pointerEvents = 'none';
+    }
+  }
+
+  function render() {
+    if (!map || !state.mapHubs || !data) return;
+    clearLayer();
+    [layer, labels] = drawInto(map, renderer);
     setNote('on');
   }
 
@@ -242,13 +249,26 @@ const MapHubs = (function () {
 
     attach(m) {
       map = m;
-      if (!m.getPane(PANE)) {
-        const pane = m.createPane(PANE);
-        pane.style.zIndex = PANE_Z;
-        pane.style.pointerEvents = 'none';
-      }
+      makePane(m);
       renderer = L.svg({ pane: PANE });
       if (state.mapHubs) run();
+    },
+
+    // The same hubs on another map — the 🔁 Repeaters tab's — drawn as the
+    // Stations map draws them, whatever this map's switch says. The handle
+    // takes them down; a handle removed before the file arrives draws nothing.
+    drawOn(m) {
+      makePane(m);
+      const r = L.svg({ pane: PANE });
+      let drawn = [], gone = false;
+      ensureData().then(() => { if (!gone) drawn = drawInto(m, r); }, () => { /* the caller says so */ });
+      return {
+        remove() {
+          gone = true;
+          for (const l of drawn) { try { m.removeLayer(l); } catch (_) { /* map gone */ } }
+          drawn = [];
+        },
+      };
     },
 
     detach() {

@@ -59,8 +59,16 @@
 // opinion, a copy for a report — is a press away on the Stations map
 // (MapBackbone.openOnStations), the hand-off the Network View popup makes.
 //
+// ── The map's overlays ───────────────────────────────────────────────────────
+// The map's 🗺️ Layers carries the base maps and four of the Stations map's
+// overlays — ground height, council areas (with their shading), maintenance
+// hubs and drainage basins — drawn by those layers' own modules on this map,
+// remembered on the device apart from the Stations map's. "The map's
+// overlays", below, says which were left out and why.
+//
 // After core.js, datastore.js (dbSelect), app.js, pass-ranges.js,
-// map-backbone.js, map-controls.js (addBaseLayers), signal-routes.js,
+// map-backbone.js, map-controls.js (addBaseLayers, MapChrome), map-elevation.js,
+// map-councils.js, map-hubs.js, map-catchments.js, signal-routes.js,
 // terrain.js, land-cover.js, path-profile.js and link-budget.js (LB_MARGIN,
 // lbMarginClass), all read at call time; before init.js. Nothing runs at load: app.js's
 // renderMain() calls render() and init(); auth.js calls authChanged().
@@ -74,7 +82,7 @@ const Repeaters = (() => {
   const WARN_PPM = 2.5;            // the server's off-channel line (tx_offset_warn_ppm)
   const RUNS_SHOWN = 8;            // heard runs in a cell; the rest when the row opens
   const LIST_SHOWN = 24;           // addresses listed in a detail line before "and N more"
-  const LS_SORT = 'mn-rpt-sort', LS_FULL = 'mn-rpt-full', LS_KM = 'mn-rpt-km';
+  const LS_SORT = 'mn-rpt-sort', LS_FULL = 'mn-rpt-full', LS_KM = 'mn-rpt-km', LS_LAYERS = 'mn-rpt-layers';
   // The frame and the transmitter's coming up, the Repeater Delays plan's own
   // figures (delay-plan.js), taken off a measured turnaround to leave the delay.
   const FRAME_MS = 133, LEAD_MS = 300;
@@ -114,6 +122,12 @@ const Repeaters = (() => {
       measured: 'Repeaters whose carrier the base stations measured in the last week, against the fleet — the server judges it hourly.',
       found: 'Repeaters whose carrier was picked out at a base station over the last week, so what they relay is known.',
       timed: 'Repeaters whose turnaround was measured over the last week: a station\'s own burst and the repeater\'s copy of it, both heard at one base station.',
+      // The map's overlay layers (🗺️ Layers on the map).
+      layElev: 'The ground itself as colour, in the Radio Mobile colour file\'s height bands (the key is under the switch), from ~30 m terrain tiles, above the EGM96 geoid — the Stations map\'s elevation shading. A picture of the ground: a link\'s own ground is read when it is pressed.',
+      layCouncils: 'Council areas: each local government area (LGA) — the area one council governs — outlined, and named once the map is close enough for the name to fit. The Australian Bureau of Statistics\' set (2026), an approximation of the legal boundaries.',
+      layShade: 'Each council area filled with a soft tint of its own, so the areas read at a glance. The tints only tell neighbours apart — no two councils that share a border have the same one — and mean nothing else.',
+      layHubs: 'The Bureau\'s eight field maintenance hubs, as at May 2018, each in its own colour: whose hub a repeater is in, and so who drives out to it.',
+      layBasins: 'The 77 Queensland drainage basins, coloured by which way the water goes and named from zoom 7: which basin a repeater\'s stations are in.',
       // A link pressed on the map: its ground and its budget.
       pathCard: 'The ground between the two sites, cut along the straight line joining them with the curve of the earth added, and what the signal gains and loses on its way from one antenna to the other. A model of the path, not a measurement of it.',
       verdict: 'Read off the picture. Clear: nothing on the ground reaches the 60% Fresnel zone the whole way. Marginal: ground or trees reach into it but stay under the line of sight. Obstructed: they rise above the line of sight.',
@@ -141,6 +155,8 @@ const Repeaters = (() => {
     ['actual', 'Delay (actual)'], ['recorded', 'Recorded'], ['turnaround', 'Turnaround'], ['measuredDelay', 'Measured'],
     ['plan', 'Delay (planned)'], ['linkKm', 'Link distance'], ['rrLink', 'Repeater to repeater'],
     ['baseLink', 'Repeater to base station'], ['isolated', 'Linked to nothing'],
+    ['layElev', 'Ground height as colour'], ['layCouncils', 'Council areas (LGA boundaries)'], ['layShade', 'Shade each council area'],
+    ['layHubs', 'Maintenance hubs'], ['layBasins', 'River catchments'],
     ['pathCard', 'Ground profile and link budget'], ['verdict', 'Clear, Marginal, Obstructed'], ['fresnel', '60% Fresnel zone'],
     ['fade', 'Fade margin'], ['eirp', 'EIRP'], ['fspl', 'Free-space loss'], ['terrain', 'Terrain'], ['stats', 'Statistics'],
     ['floor', 'Obstruction floor'], ['allowance', 'Field allowance'], ['clutter', 'Ground cover'], ['pathLoss', 'Path loss'],
@@ -188,6 +204,11 @@ const Repeaters = (() => {
     planReady: false, planTimer: null,
     map: null, layer: null, fitted: false,
     fmap: null, flayer: null,   // the map full screen, while it is open
+    // The overlays both maps draw (🗺️ Layers on the map), remembered on this
+    // device apart from the Stations map's own; what each map has drawn of
+    // them (a handle per layer, per map); and which files could not be read.
+    lay: { elev: false, elevOp: 0.6, councils: false, shade: false, shadeOp: 0.22, hubs: false, basins: false },
+    lh: new Map(), layFail: {},
     M: null, key: null,
     // The link whose ground and budget are open under the map: { a, b } the
     // two station ids, A first, and what was worked out for them (computePath).
@@ -219,6 +240,14 @@ const Repeaters = (() => {
     S.full = readLS(LS_FULL) === '1';
     const km = Number(readLS(LS_KM));
     if (Number.isFinite(km) && km >= 10 && km <= KM_MAX) S.km = km;
+    try {
+      const l = JSON.parse(readLS(LS_LAYERS) || 'null');
+      if (l && typeof l === 'object') {
+        for (const k of ['elev', 'councils', 'shade', 'hubs', 'basins']) if (typeof l[k] === 'boolean') S.lay[k] = l[k];
+        if (Number.isFinite(l.elevOp)) S.lay.elevOp = clampOp('elevOp', l.elevOp);
+        if (Number.isFinite(l.shadeOp)) S.lay.shadeOp = clampOp('shadeOp', l.shadeOp);
+      }
+    } catch (_) { /* a hand-edited store */ }
   }
 
   // ── What is known ─────────────────────────────────────────────────────────
@@ -703,6 +732,9 @@ const Repeaters = (() => {
       <li><span class="rptr-k rptr-k-dot" aria-hidden="true"></span>Repeater</li>
       <li><span class="rptr-k rptr-k-dot rptr-k-iso" aria-hidden="true"></span>${term('isolated', 'Linked to nothing')}</li>
       <li><span class="rptr-k-base" aria-hidden="true">◆&#xFE0E;</span>Base station</li>
+      ${S.lay.councils ? `<li><span class="rptr-k rptr-k-council" aria-hidden="true"></span>${term('layCouncils', 'Council area boundary')}</li>` : ''}
+      ${S.lay.hubs ? `<li><span class="rptr-k rptr-k-hub" aria-hidden="true"></span>${term('layHubs', 'Maintenance hub boundary')}</li>` : ''}
+      ${S.lay.basins ? `<li><span class="rptr-k rptr-k-basin" aria-hidden="true"></span>${term('layBasins', 'Drainage basin')}</li>` : ''}
     </ul>`;
   }
 
@@ -762,7 +794,8 @@ const Repeaters = (() => {
         <div class="panel-header"><h2>Repeaters</h2></div>
         <p class="small txt-muted">Every repeater on file: the links between them and to the base stations, and for each its pass ranges
           on record beside what the base stations hear it relaying, its carrier, its delay and the stations it passes on. Press a column's
-          heading to sort by it; open a row to list its stations.</p>
+          heading to sort by it; open a row to list its stations. The map's 🗺️ Layers adds ground height, council areas, maintenance
+          hubs and catchments under the links.</p>
         <div id="rptr-tiles">${tilesHtml(M)}</div>
         <label class="pr-filter">
           Filter by station number, AlertID, AlertID range or station name
@@ -781,7 +814,7 @@ const Repeaters = (() => {
         </div>
         <div id="rptr-map" class="rptr-map" role="region" aria-label="Map of the repeaters, the links between them and the base stations in reach"></div>
         <div id="rptr-pick-line">${pickHtml(M)}</div>
-        ${keyHtml()}
+        <div data-rptr-key>${keyHtml()}</div>
       </div>
 
       <div id="rptr-path-slot">${S.pathShown = pathHtml()}</div>
@@ -860,19 +893,175 @@ const Repeaters = (() => {
   // a map that only zoomed with its buttons was the complaint.
   function stopMap() {
     closeFull();
-    if (S.map) { try { removeMap(S.map); } catch (_) { /* gone */ } }
+    if (S.map) { dropLayers(S.map); try { removeMap(S.map); } catch (_) { /* gone */ } }
     S.map = null; S.layer = null;
   }
-  function newMap(id) {
+  // `which` is 'p' for the page's map, 'f' for the one full screen: the two
+  // flyouts' controls are told apart by it.
+  function newMap(id, which) {
     const map = L.map(id, { scrollWheelZoom: true, wheelPxPerZoomLevel: 90 }).setView([-25.5, 151.5], 6);
-    if (typeof addBaseLayers === 'function') addBaseLayers(map);
-    return { map, layer: L.layerGroup().addTo(map) };
+    if (typeof addBaseLayers === 'function') {
+      // The base maps' section at the top of a 🗺️ Layers flyout of this tab's
+      // own, the overlays under it — the Stations map's arrangement (app.js,
+      // stationsMapPanels), with the overlays this map has.
+      addBaseLayers(map, { panel: false });
+      if (typeof MapChrome !== 'undefined') {
+        MapChrome.panel(map, {
+          id: 'display', icon: '🗺️', title: 'Layers',
+          btnLabel: 'Layers — base maps, ground height, council areas, maintenance hubs and catchments',
+          group: 'show', order: 10,
+          html: () => (map.mnBases ? map.mnBases.html() : '') + layersHtml(which),
+          onMount: body => { if (map.mnBases) map.mnBases.bind(body); },
+        });
+      }
+    }
+    const layer = L.layerGroup().addTo(map);
+    syncLayers(map);
+    return { map, layer };
+  }
+
+  // ── The map's overlays ────────────────────────────────────────────────────
+  // Four of the Stations map's layers, the ones that say something about a
+  // radio path or the site at its end: the ground (where the hills are), the
+  // council areas (whose area a site is in), the maintenance hubs (who drives
+  // to it) and the drainage basins (which catchment it serves). Each is the
+  // Stations map's own module drawing on this map — MapElevation.drawOn,
+  // MapCouncils.view, MapHubs.drawOn, MapCatchments.drawOn — so the colours
+  // and the files are one set. Left on the Stations map, as being about
+  // stations rather than links or costing a request a view: the rivers and
+  // rain, survey marks, contours, roads and lots, photos and cameras, the
+  // carriers' coverage, wind regions and the ACMA register.
+  const OP_RANGE = { elevOp: [0.1, 1], shadeOp: [0.05, 0.8] };
+  function clampOp(k, v) {
+    const [lo, hi] = OP_RANGE[k];
+    return Math.max(lo, Math.min(hi, Number(v) || lo));
+  }
+  const pc = v => Math.round(v * 100);
+
+  function layersHtml(sfx) {
+    const L_ = S.lay;
+    const box = (k, on, w, label, sub) => `
+      <label class="filter-check${sub ? ' filter-sub' : ''}">
+        <input type="checkbox" id="rptr-lay-${k}-${sfx}" data-rptr-lay="${k}" ${on ? 'checked' : ''}
+               onchange="Repeaters.setLayer('${k}', this.checked)">
+        ${term(w, label)}
+      </label>`;
+    const range = (k, label) => `
+      <label class="filter-range">
+        <span>${label} <strong data-rptr-val="${k}" aria-hidden="true">${pc(L_[k])}%</strong></span>
+        <input type="range" min="${OP_RANGE[k][0]}" max="${OP_RANGE[k][1]}" step="0.05" value="${L_[k]}" data-rptr-range="${k}"
+               aria-label="${escAttr(label)}" aria-valuetext="${pc(L_[k])} per cent"
+               oninput="Repeaters.layOpacity('${k}', this.value)" onchange="Repeaters.layOpacity('${k}', this.value, true)">
+      </label>`;
+    return `
+      <div class="map-display-h">Overlay layers</div>
+      ${box('councils', L_.councils, 'layCouncils', 'Council areas (LGA boundaries)')}
+      <div data-rptr-sub="councils" ${L_.councils ? '' : 'hidden'}>
+        ${box('shade', L_.shade, 'layShade', 'Shade each council area', true)}
+        <div data-rptr-sub="shade" ${L_.shade ? '' : 'hidden'}>${range('shadeOp', 'Council shading opacity')}</div>
+      </div>
+      ${box('hubs', L_.hubs, 'layHubs', 'Maintenance hubs (BoM)')}
+      ${box('basins', L_.basins, 'layBasins', 'River catchments (drainage basins)')}
+      ${box('elev', L_.elev, 'layElev', 'Ground height as colour')}
+      <!-- Last, because its key is a dozen bands long and would push the
+           switches under it out of the flyout. -->
+      <div data-rptr-sub="elev" ${L_.elev ? '' : 'hidden'}>
+        ${range('elevOp', 'Ground height opacity')}
+        ${typeof MapElevation !== 'undefined' ? MapElevation.rampHtml() : ''}
+      </div>
+      <p class="filter-note" data-rptr-lay-note>${layNote()}</p>`;
+  }
+
+  const LAY_FILE = { councils: 'Council boundaries', hubs: 'Hub boundaries', basins: 'Drainage basins' };
+  function layNote() {
+    const failed = Object.keys(LAY_FILE).filter(k => S.lay[k] && S.layFail[k]);
+    if (failed.length) {
+      return `${failed.map(k => LAY_FILE[k]).join(', ')} could not be read — untick and tick again to try again.`;
+    }
+    const bits = [];
+    if (S.lay.elev) bits.push('Ground height from ~30 m terrain tiles; the relief and the 5 m LiDAR source are on the Stations map\'s Layers.');
+    if (S.lay.councils && typeof MapCouncils !== 'undefined') bits.push(`Council areas: ${MapCouncils.PROVENANCE}`);
+    return esc(bits.join(' ') || 'Drawn under the links, on this map and full screen; the Stations map keeps its own.');
+  }
+
+  function saveLayers() { writeLS(LS_LAYERS, JSON.stringify(S.lay)); }
+
+  // What each map has drawn made to match S.lay: a handle made for a layer
+  // turned on, taken down for one turned off, restyled for the rest.
+  function syncLayers(map) {
+    if (!map) return;
+    let h = S.lh.get(map);
+    if (!h) S.lh.set(map, h = {});
+    const want = S.lay;
+    const watch = (k, p) => { if (p && p.catch) p.catch(() => { S.layFail[k] = true; paintLayers(); }); };
+    const toggle = (k, on, make) => {
+      if (on && !h[k]) h[k] = make();
+      else if (!on && h[k]) { h[k].remove(); h[k] = null; }
+    };
+    if (typeof MapElevation !== 'undefined' && MapElevation.drawOn) {
+      toggle('elev', want.elev, () => MapElevation.drawOn(map, want.elevOp));
+      if (h.elev) h.elev.setOpacity(want.elevOp);
+    }
+    if (typeof MapCouncils !== 'undefined') {
+      toggle('councils', want.councils, () => {
+        watch('councils', MapCouncils.ready());
+        return MapCouncils.view(map, { shade: want.shade, opacity: want.shadeOp });
+      });
+      if (h.councils) { h.councils.setShade(want.shade); h.councils.setOpacity(want.shadeOp); }
+    }
+    if (typeof MapHubs !== 'undefined' && MapHubs.drawOn) {
+      toggle('hubs', want.hubs, () => { watch('hubs', MapHubs.ready()); return MapHubs.drawOn(map); });
+    }
+    if (typeof MapCatchments !== 'undefined' && MapCatchments.drawOn) {
+      toggle('basins', want.basins, () => { watch('basins', MapCatchments.ready()); return MapCatchments.drawOn(map); });
+    }
+  }
+  function dropLayers(map) {
+    const h = map && S.lh.get(map);
+    if (h) for (const x of Object.values(h)) if (x) { try { x.remove(); } catch (_) { /* map gone */ } }
+    if (map) S.lh.delete(map);
+  }
+
+  // Both flyouts and both keys brought into line with S.lay, in place — no
+  // flyout is rebuilt, so a switch keeps its focus.
+  function paintLayers() {
+    for (const el of document.querySelectorAll('[data-rptr-lay]')) el.checked = !!S.lay[el.dataset.rptrLay];
+    for (const el of document.querySelectorAll('[data-rptr-sub]')) el.hidden = !S.lay[el.dataset.rptrSub];
+    for (const el of document.querySelectorAll('[data-rptr-lay-note]')) el.innerHTML = layNote();
+    for (const el of document.querySelectorAll('[data-rptr-key]')) el.innerHTML = keyHtml();
+  }
+
+  function setLayer(k, on) {
+    if (!(k in S.lay) || k.endsWith('Op')) return;
+    S.lay[k] = !!on;
+    if (on) S.layFail[k] = false;
+    saveLayers();
+    syncLayers(S.map);
+    syncLayers(S.fmap);
+    paintLayers();
+  }
+
+  // A slider moving: the figure and the other map's slider follow it, and the
+  // drawn layers take the new strength in place; stored once it is let go.
+  function layOpacity(k, v, commit) {
+    if (!OP_RANGE[k]) return;
+    S.lay[k] = clampOp(k, v);
+    for (const el of document.querySelectorAll(`[data-rptr-val="${k}"]`)) el.textContent = `${pc(S.lay[k])}%`;
+    for (const el of document.querySelectorAll(`[data-rptr-range="${k}"]`)) {
+      if (Number(el.value) !== S.lay[k]) el.value = S.lay[k];
+      el.setAttribute('aria-valuetext', `${pc(S.lay[k])} per cent`);
+    }
+    for (const h of S.lh.values()) {
+      if (k === 'elevOp' && h.elev) h.elev.setOpacity(S.lay.elevOp);
+      if (k === 'shadeOp' && h.councils) h.councils.setOpacity(S.lay.shadeOp);
+    }
+    if (commit) saveLayers();
   }
   function initMap() {
     stopMap();
     const el = document.getElementById('rptr-map');
     if (!el || typeof L === 'undefined' || !S.M) return;
-    ({ map: S.map, layer: S.layer } = newMap('rptr-map'));
+    ({ map: S.map, layer: S.layer } = newMap('rptr-map', 'p'));
     if (typeof registerLiveMap === 'function') registerLiveMap('Repeaters', () => S.map);
     S.fitted = false;
     drawMap();
@@ -888,17 +1077,17 @@ const Repeaters = (() => {
       title: 'Links between repeaters',
       wide: true,
       onClose: () => {
-        if (S.fmap) { try { removeMap(S.fmap); } catch (_) { /* gone */ } }
+        if (S.fmap) { dropLayers(S.fmap); try { removeMap(S.fmap); } catch (_) { /* gone */ } }
         S.fmap = null; S.flayer = null;
       },
       html: `<div class="rptr-full">
         <div class="rptr-full-bar">${kmHtml('rptr-km-full')}</div>
         <div id="rptr-mapfull" class="rptr-mapfull" role="region" aria-label="Map of the repeaters, full screen"></div>
         <div id="rptr-full-pick">${pickHtml(S.M)}</div>
-        ${keyHtml()}
+        <div data-rptr-key>${keyHtml()}</div>
       </div>`,
     });
-    ({ map: S.fmap, layer: S.flayer } = newMap('rptr-mapfull'));
+    ({ map: S.fmap, layer: S.flayer } = newMap('rptr-mapfull', 'f'));
     drawMap();
     // At the page map's view once the card has its size.
     requestAnimationFrame(() => {
@@ -1759,5 +1948,5 @@ const Repeaters = (() => {
 
   return { render, init, refresh, authChanged, toggle, sort, filter, setFull, kmShow, setKm, pick: pickRep, goTo, showOnMap, openFull, closeFull,
            openStation, readAir, exportCsv, model, state: () => S,
-           openPath, closePath, pathKey, pathOnStations, pathRetry, pathReport };
+           openPath, closePath, pathKey, pathOnStations, pathRetry, pathReport, setLayer, layOpacity };
 })();

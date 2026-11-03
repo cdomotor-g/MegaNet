@@ -245,6 +245,14 @@ const MapCatchments = (function () {
   }
 
   // ── Drawing ───────────────────────────────────────────────────────────────
+  function makePane(m) {
+    if (!m.getPane(PANE)) {
+      const pane = m.createPane(PANE);
+      pane.style.zIndex = PANE_Z;
+      pane.style.pointerEvents = 'none';
+    }
+  }
+
   function clearLayer() {
     for (const l of [layer, hot, labels]) if (l && map) map.removeLayer(l);
     layer = hot = labels = null;
@@ -393,13 +401,51 @@ const MapCatchments = (function () {
 
     attach(m) {
       map = m;
-      if (!m.getPane(PANE)) {
-        const pane = m.createPane(PANE);
-        pane.style.zIndex = PANE_Z;
-        pane.style.pointerEvents = 'none';
-      }
+      makePane(m);
       renderer = L.svg({ pane: PANE });
       if (state.mapCatchments) run();
+    },
+
+    // The basins on another map — the 🔁 Repeaters tab's — as the Stations
+    // map's faint pass draws them, with no filter box to light any up, so each
+    // is named instead once the view is close enough (zoom 7) for the names
+    // to sit inside their basins. The handle takes them down.
+    drawOn(m) {
+      makePane(m);
+      const r = L.svg({ pane: PANE });
+      let lay = null, lab = null, gone = false;
+      const names = () => {
+        if (!lab) return;
+        lab.clearLayers();
+        if (m.getZoom() < 7) return;
+        const box = m.getBounds().pad(0.05);
+        for (const f of basins()) {
+          const at = labelPoint(f);
+          if (!at || !box.contains(at)) continue;
+          L.marker(at, {
+            pane: PANE, interactive: false, keyboard: false,
+            icon: L.divIcon({ className: 'mn-catchment-label', html: `<span>${esc(f.properties.name)}</span>`, iconSize: null }),
+          }).addTo(lab);
+        }
+      };
+      ensureData().then(() => {
+        if (gone) return;
+        lay = L.geoJSON(data, {
+          pane: PANE, renderer: r, interactive: false, attribution: ATTRIBUTION,
+          style: f => { const c = colorFor(f); return { color: c, weight: 1, opacity: 0.45, fillColor: c, fillOpacity: 0.06 }; },
+        }).addTo(m);
+        lab = L.layerGroup([], { pane: PANE }).addTo(m);
+        names();
+        m.on('moveend', names);
+      }, () => { /* the caller says so */ });
+      return {
+        remove() {
+          gone = true;
+          m.off('moveend', names);
+          for (const l of [lay, lab]) if (l) { try { m.removeLayer(l); } catch (_) { /* map gone */ } }
+          lay = lab = null;
+        },
+      };
     },
 
     detach() {

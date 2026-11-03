@@ -4355,6 +4355,15 @@ const state = {
   // The Bureau's eight maintenance hub boundaries (see MapHubs). Off by
   // default and remembered, for the same reasons.
   mapHubs:        localStorage.getItem('mn-hubs') === 'on',
+  // Council areas — local government areas, the ABS's set (see MapCouncils).
+  // Off by default and remembered, for the same reasons; shading (each council
+  // its own tint) is off until asked for, and its strength remembered with it.
+  mapCouncils:       localStorage.getItem('mn-councils') === 'on',
+  mapCouncilShade:   localStorage.getItem('mn-council-shade') === 'on',
+  mapCouncilOpacity: (() => {
+    const v = Number(localStorage.getItem('mn-council-opacity'));
+    return Number.isFinite(v) && v >= 0.05 && v <= 0.8 ? v : 0.22;
+  })(),
   // Line-of-sight check on drawn links (see MapLos). Off by default and not
   // persisted, for MapSurvey's reasons — it fetches terrain tiles on enable.
   mapLos:         false,

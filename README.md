@@ -2955,7 +2955,11 @@ Every repeater on file, beside ALERT IDs (October 2026; `repeaters.js`):
   Stations map's own *Max TX distance*) — dashed on to every base station in
   reach. A repeater linked to nothing is drawn amber. Press one to pick out its
   links and open its row. The wheel zooms it; **⛶ Full screen** opens it over
-  the whole window.
+  the whole window. Its **🗺️ Layers** has the base maps and four of the
+  Stations map's overlays (November 2026): **council areas** (shaded on
+  request), **maintenance hubs**, **river catchments** and **ground height as
+  colour**, drawn by those layers' own modules, on this map and full screen,
+  and remembered apart from the Stations map's switches.
 - **A link's ground and budget** (November 2026): press a link on the map — or
   *profile & budget* beside a linked repeater or base in an opened row — and
   the card under the map draws the ground between the two ends (line of sight,
@@ -3306,6 +3310,15 @@ by region, and — new — suggests the relevant map(s) for any station.
 > already lights up rivers. `catchments[]` now carries 77 basins with each one's
 > drainage division. See `db/README.md` → **Where a station is** for what changed
 > and how it was checked.
+>
+> **Council areas** (November 2026) are a third boundary layer on the Stations map
+> and the 🔁 Repeaters map (**Council areas (LGA boundaries)**, off by default,
+> shaded on request): the Australian Bureau of Statistics' 547 local government
+> areas, ASGS Edition 4 (2026), every state, cut to about 1 MB by
+> `tools/build_lga_layer.mjs` into `data/lga-boundaries.geojson` and drawn by
+> `map-councils.js`. The ABS calls its LGAs an approximation of the gazetted
+> boundaries, so near a boundary the card's cadastre answer below is the one to
+> trust.
 >
 > The roadmap's other two items were not done and are not tracked: (a) an `lga`
 > field populated from an authoritative QLD LGA boundary set, and (c)

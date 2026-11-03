@@ -23,7 +23,10 @@
 //   · every marked word on the card has a meaning, and the page's word list
 //     carries them;
 //   · a failed ground says so, draws no flat profile, and Try again recovers;
-//   · Escape and ✕ close it and hand focus back; a phone gets the whole card.
+//   · Escape and ✕ close it and hand focus back; a phone gets the whole card;
+//   · the map's 🗺️ Layers: council areas (shaded on request), hubs, basins and
+//     ground height, on both maps, out of the pointer's way, remembered apart
+//     from the Stations map's switches.
 //
 //   node --run rptrpath      (or: npm run rptrpath)
 //       npm run rptrpath -- -v    also print what passed
@@ -228,6 +231,68 @@ await until(() => !Repeaters.state().fmap && !!Repeaters.pathReport());
 await ready(pick.rr.a, pick.rr.b);
 const fs = await page.evaluate(() => ({ modal: !!document.querySelector('#rptr-mapfull'), card: !!document.getElementById('rptr-path'), r: Repeaters.pathReport() }));
 ok('pressed full screen, the dialog closes and the card opens under the page map', !fs.modal && fs.card && fs.r.status === 'ready', J({ modal: fs.modal, card: fs.card }));
+
+// ── 7b. the map's overlays (🗺️ Layers on the map) ──────────────────────────
+// Four of the Stations map's layers, drawn by their own modules on this map:
+// council areas (shaded on request), maintenance hubs, drainage basins and
+// ground height. Off to begin with; on in the page map and the full-screen
+// one alike; remembered apart from the Stations map's switches; off again
+// takes them down; nothing takes the pointer a link or a repeater wants. The
+// link card from step 7 stays open under the map for step 8.
+const lay0 = await page.evaluate(() => {
+  const el = Repeaters.state().map.getContainer();
+  return {
+    boxes: [...el.querySelectorAll('[data-rptr-lay]')].map(b => `${b.dataset.rptrLay}:${b.checked}`),
+    base: !!el.querySelector('.mn-mapctl[data-panel="display"] [data-base-map]'),
+    drawn: el.querySelectorAll('.leaflet-mnCouncils-pane path, .leaflet-mnHubs-pane path, .leaflet-mnCatchments-pane path').length,
+  };
+});
+ok('the map\'s 🗺️ Layers carries the base maps and the overlays, all off to begin with',
+  lay0.base && lay0.boxes.length === 5 && lay0.boxes.every(b => b.endsWith(':false')) && lay0.drawn === 0, J(lay0));
+await page.evaluate(() => { for (const k of ['councils', 'shade', 'hubs', 'basins', 'elev']) Repeaters.setLayer(k, true); });
+await until(() => {
+  const el = Repeaters.state().map.getContainer();
+  return el.querySelectorAll('.leaflet-mnCouncils-pane path').length > 500 && el.querySelectorAll('.leaflet-mnHubs-pane path').length === 8
+    && el.querySelectorAll('.leaflet-mnCatchments-pane path').length >= 77 && el.querySelectorAll('.leaflet-mnElevation-pane canvas').length > 0;
+});
+const lay1 = await page.evaluate(() => {
+  const el = Repeaters.state().map.getContainer();
+  const paths = [...el.querySelectorAll('.leaflet-mnCouncils-pane path, .leaflet-mnHubs-pane path, .leaflet-mnCatchments-pane path')];
+  const councils = [...el.querySelectorAll('.leaflet-mnCouncils-pane path')];
+  return {
+    interactive: paths.filter(p => p.classList.contains('leaflet-interactive')).length,
+    panes: ['mnCouncils', 'mnHubs', 'mnCatchments'].map(n => getComputedStyle(Repeaters.state().map.getPane(n)).pointerEvents),
+    shaded: councils.filter(p => Number(p.getAttribute('fill-opacity')) > 0).length === councils.length,
+    key: document.querySelector('[data-rptr-key]').textContent,
+    boxes: [...el.querySelectorAll('[data-rptr-lay]')].every(b => b.checked),
+    stored: JSON.parse(localStorage.getItem('mn-rpt-layers') || '{}'),
+    stations: state.mapCouncils || state.mapHubs || state.mapCatchments || state.mapElev,
+  };
+});
+ok('on, each overlay draws on the page map, none taking the pointer', lay1.interactive === 0 && lay1.panes.every(p => p === 'none'), J(lay1.panes));
+ok('council shading fills every council area', lay1.shaded);
+ok('the key names the boundaries that are on, and the switches agree', /Council area boundary/.test(lay1.key)
+  && /Maintenance hub boundary/.test(lay1.key) && /Drainage basin/.test(lay1.key) && lay1.boxes, lay1.key.replace(/\s+/g, ' '));
+ok('the choice is remembered on this device, apart from the Stations map\'s', lay1.stored.councils === true && lay1.stored.elev === true
+  && !lay1.stations, J({ stored: lay1.stored, stations: lay1.stations }));
+await page.evaluate(() => Repeaters.layOpacity('shadeOp', 0.5, true));
+ok('the shading slider restyles in place', await page.evaluate(() =>
+  Repeaters.state().map.getContainer().querySelector('.leaflet-mnCouncils-pane path').getAttribute('fill-opacity') === '0.5'));
+await page.evaluate(() => Repeaters.openFull());
+await until(() => !!Repeaters.state().fmap && Repeaters.state().fmap.getContainer().querySelectorAll('.leaflet-mnCouncils-pane path').length > 500);
+const layF = await page.evaluate(() => {
+  const el = Repeaters.state().fmap.getContainer();
+  return { hubs: el.querySelectorAll('.leaflet-mnHubs-pane path').length, boxes: el.querySelectorAll('[data-rptr-lay]:checked').length };
+});
+ok('full screen draws the same overlays, its switches ticked', layF.hubs === 8 && layF.boxes === 5, J(layF));
+await page.evaluate(() => { Repeaters.setLayer('councils', false); Repeaters.setLayer('hubs', false); });
+const layOff = await page.evaluate(() => [Repeaters.state().map, Repeaters.state().fmap].map(m =>
+  m.getContainer().querySelectorAll('.leaflet-mnCouncils-pane path, .mn-council-label, .leaflet-mnHubs-pane path, .mn-hub-label').length));
+ok('off takes the councils and hubs down from both maps', layOff.every(n => n === 0), J(layOff));
+await page.evaluate(() => Repeaters.closeFull());
+await until(() => !Repeaters.state().fmap);
+ok('closing full screen lets its map\'s overlays go', await page.evaluate(() => Repeaters.state().lh.size === 1));
+await page.evaluate(() => { for (const k of ['shade', 'basins', 'elev']) Repeaters.setLayer(k, false); });
 
 // ── 8. a phone ──────────────────────────────────────────────────────────────
 await page.setViewportSize({ width: 390, height: 844 });
