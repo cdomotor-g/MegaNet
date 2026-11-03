@@ -2383,6 +2383,16 @@ jobs:
       - name: check_teams_and_tasks.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_teams_and_tasks.sql
+      # One person, one account (0100): an administrator folds a second
+      # account into the first — teams, owning, tasks, notes, the plan's list,
+      # devices, views, role, approval and editing move over — and its address
+      # stays as the kept account's second one: where mail goes if they say
+      # so, found by a team's owner, on the roster, refused an account of its
+      # own until freed. Nobody else may; nor an unconfirmed, declined or
+      # self merge, nor one a table it does not know still points at.
+      - name: check_account_merge.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_account_merge.sql
       # ALERT addresses set aside before a station holds them (0084): editors
       # set aside and release, approved accounts read; an address held by a
       # station in the hub, set aside already, out of 1–8191 or outside the

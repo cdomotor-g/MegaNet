@@ -13628,7 +13628,11 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   font-size: var(--fs-sm);
 }
 .au-or::before, .au-or::after { content: ''; flex: 1 1 auto; border-top: 1px solid var(--border); }
-.au-msg, .au-check, .au-standing { margin: 0; }
+.au-msg, .au-check, .au-standing, .au-addresses { margin: 0; }
+/* Where an account's emails go, among its addresses (0100). */
+.au-mail-to { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .25rem; min-width: 0; }
+.au-mail-to legend { padding: 0; margin-bottom: .15rem; color: var(--muted); }
+.au-mail-to label { overflow-wrap: anywhere; }
 .au-alt, .au-new { margin: .2rem 0 0; color: var(--muted); }
 .au-benefits { margin: .4rem 0 0; padding-left: 0; list-style: none; display: grid; gap: .35rem; font-size: var(--fs-sm); }
 .au-benefits li { display: grid; grid-template-columns: 1.5rem 1fr; gap: .3rem; }
@@ -19669,6 +19673,13 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 .adm-table select { min-width: 0; }
 .adm-row-acts { white-space: nowrap; }
 .adm-row-acts button + button { margin-left: .3rem; }
+/* The users table's actions: three of them since Same person… (0100), so they
+   wrap in the column rather than widen it and squeeze the addresses. */
+.adm-acts-wrap { display: flex; flex-wrap: wrap; gap: .3rem; white-space: normal; }
+.adm-acts-wrap button + button { margin-left: 0; }
+/* An account's second address under the one it signs in with (0100). */
+.adm-also { margin-top: .2rem; overflow-wrap: anywhere; }
+.adm-also .link-btn { margin-left: .3rem; }
 
 .adm-form {
   display: grid;

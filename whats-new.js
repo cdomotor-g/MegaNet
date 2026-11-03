@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 176, date: '2026-11-03', items: [
+      '👤 <strong>One person, one account.</strong> Somebody with two accounts — a personal address and a Bureau one, say — '
+        + 'can be made one: an administrator presses <strong>Same person…</strong> on the Admin tab\'s users table, and '
+        + 'everything the second account had (its teams, tasks, notes and devices) moves to the first. Its address stays on '
+        + 'the account as a <em>second address</em>: it does not sign in, but adding the person to a team by it finds them, '
+        + 'and under <strong>Your account</strong> they choose which address Flood-Net\'s emails go to.',
+    ] },
     { n: 175, date: '2026-11-03', items: [
       '🏛️ <strong>Council areas</strong> on the <strong>Stations</strong> map: tick <em>Council areas (LGA boundaries)</em> in '
         + '🗺️ Layers, under <em>Overlay layers</em>, for every council\'s boundary across Australia, each named as you zoom in. '

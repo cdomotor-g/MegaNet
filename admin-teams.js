@@ -54,12 +54,22 @@ const AdminTeams = (function () {
   // The words, from the Tasks tab's one list.
   const FALLBACK = {
     handsout: 'Members of a team marked this way may give a task to any team, and see every task. Administrators may too.',
-    owner: 'Looks after a team\'s roster: adds and takes off its members by the address of their Flood-Net account. An administrator names a team\'s owners.',
+    owner: 'Looks after a team\'s roster: adds and takes off its members by the address of their Flood-Net account — the one they sign in with, or a second address. An administrator names a team\'s owners.',
     hub: 'The maintenance hub the team looks after. A task SoRT hands over for a hub goes to its team. One team a hub.',
+    second: 'Another address of the same person — an account of its own until an administrator made the two one. It does not sign in, but adding them to a team by it finds them.',
   };
   function word(k) {
     const w = typeof Tasks !== 'undefined' && Tasks.WORDS ? Tasks.WORDS[k] : null;
     return w || FALLBACK[k] || '';
+  }
+
+  // The address a person signs in with, and their second addresses (0100), to
+  // the people who see addresses on a roster.
+  function mailsHtml(p, cls) {
+    const also = Array.isArray(p.also) ? p.also.filter(Boolean) : [];
+    const own = p.email && p.email !== p.who ? `<div class="small txt-muted ${cls}">${esc(p.email)}</div>` : '';
+    return own + also.map(a => `<div class="small txt-muted ${cls}">${esc(a)} · ${
+      termHtml('second address', word('second'))}</div>`).join('');
   }
 
   function errText(err, what) {
@@ -109,7 +119,7 @@ const AdminTeams = (function () {
           <th scope="col" class="col-optional">Added</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
         <tbody>${r.map(p => `<tr>
           <th scope="row">${esc(p.who || p.email || '—')}${p.you ? ' <span class="badge">you</span>' : ''}${
-            p.email && p.email !== p.who ? `<div class="small txt-muted adm-team-mail">${esc(p.email)}</div>` : ''}</th>
+            mailsHtml(p, 'adm-team-mail')}</th>
           <td><label class="check-label"><input type="checkbox" data-k="own:${escAttr(t.id)}:${escAttr(p.id)}"${p.owner ? ' checked' : ''}${busy ? ' disabled' : ''}
                 onchange="AdminTeams.setOwner('${escAttr(t.id)}', '${escAttr(p.id)}', this.checked)"><span class="sr-only">${esc(p.who || p.email || '')} owns ${esc(t.name)}</span></label></td>
           <td class="small col-optional">${esc(dmy(p.added_at))}${p.added_by ? ` by ${esc(p.added_by)}` : ''}</td>
@@ -155,6 +165,7 @@ const AdminTeams = (function () {
           <dt>Hands out tasks</dt><dd>${esc(word('handsout'))}</dd>
           <dt>Owner</dt><dd>${esc(word('owner'))}</dd>
           <dt>Hub</dt><dd>${esc(word('hub'))}</dd>
+          <dt>Second address</dt><dd>${esc(word('second'))}</dd>
         </dl></details>`;
   }
 

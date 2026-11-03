@@ -29,7 +29,10 @@
 //   6. **An administrator** — the count on Admin in the bar, a note, and on
 //      the tab the accounts waiting with Approve, Approve as editor and
 //      Decline (asked first), each sent to admin_user_decide; and the switch
-//      for who may sign up, sent to admin_set_signup.
+//      for who may sign up, sent to admin_set_signup. A second address under
+//      its account (0100), *Same person…* sending account_merge for the row
+//      folded in and the account named, and *Your account* choosing where the
+//      emails go (my_mail_to).
 //   7. **A refresh with no answer** — a stored session found expired on a
 //      page that opens with no network (a phone's home-screen app brought
 //      back, a laptop woken) is kept, not signed out, and refreshed once, not
@@ -75,7 +78,9 @@ const WHO = {
                may_write: true, is_admin: false, is_member: true, status: 'automatic', signup: 'open', schema_version: '65' },
   'tok-admin': { signed_in: true, email: 'boss@bom.gov.au', display_name: 'Boss', role: 'admin',
                may_write: true, is_admin: true, is_member: true, status: 'automatic', signup: 'open',
-               approvals_waiting: 2, schema_version: '65' },
+               approvals_waiting: 2, schema_version: '65',
+               // 0100: a second address, where the emails go.
+               addresses: [{ email: 'boss@home.example', mail_here: true }], mail_to: 'boss@home.example' },
 };
 const session = (tok, email) => ({ access_token: tok, refresh_token: `r-${tok}`, expires_in: 3600, token_type: 'bearer',
   user: { id: `id-${tok}`, email } });
@@ -160,7 +165,8 @@ async function main() {
       if (name === 'admin_users') {
         return reply([
           { id: 'u-boss', email: 'boss@bom.gov.au', display_name: 'Boss', role: 'admin', status: 'automatic', is_you: true,
-            created_at: '2026-09-01T00:00:00Z', confirmed_at: '2026-09-01T00:00:00Z', may_edit: true },
+            created_at: '2026-09-01T00:00:00Z', confirmed_at: '2026-09-01T00:00:00Z', may_edit: true,
+            addresses: [{ email: 'boss@home.example', mail_here: true }] },
           { id: 'u-pat', email: 'pat@council.example', display_name: 'Pat Example', role: 'editor', status: 'pending',
             created_at: '2026-10-12T22:00:00Z', confirmed_at: '2026-10-12T22:05:00Z', may_edit: false },
           { id: 'u-lee', email: 'lee@contractor.example', display_name: null, role: 'editor', status: 'pending',
@@ -172,6 +178,9 @@ async function main() {
       if (name === 'admin_allowlist') return reply([]);
       if (name === 'admin_user_decide') return reply({ id: body.p_id, status: body.p_decision === 'approve' ? 'approved' : 'declined' });
       if (name === 'admin_set_signup') return reply(body.p_open ? 'open' : 'allowlist');
+      if (name === 'account_merge') return reply({ kept: 'boss@bom.gov.au', folded_in: 'pat@council.example', teams: 1 });
+      if (name === 'admin_address_remove') return reply([]);
+      if (name === 'my_mail_to') return reply({ ...WHO[bearer], mail_to: (body && body.p_email) || WHO[bearer].email });
       return route.fulfill({ status: 404, contentType: 'application/json', body: J({ message: 'not stood in for' }) });
     };
     await page.route('**/rest/v1/rpc/**', rpc);
@@ -510,6 +519,46 @@ async function main() {
     await p6.waitForTimeout(400);
     const sw = sentTo('rpc/admin_set_signup', b6).pop();
     check('the switch for who may sign up goes to admin_set_signup', sw && sw.body.p_open === false, J(sw));
+
+    // One person, two accounts (0100).
+    const sec = await p6.evaluate(() => {
+      const rows = [...document.querySelectorAll('.table-wrap[aria-labelledby="adm-users-h"] tbody tr')];
+      const boss = rows.find(tr => tr.dataset.user === 'u-boss');
+      return { also: (boss?.querySelector('.adm-also')?.textContent || '').replace(/\s+/g, ' ').trim(),
+               term: boss?.querySelector('.adm-also .term')?.getAttribute('title') || '',
+               same: rows.map(tr => [tr.dataset.user, !!tr.querySelector('button[onclick^="Admin.samePerson"]')]) };
+    });
+    check('the users table shows a second address under its account, its meaning on hover; Same person… on the rows it can fold in',
+      /boss@home\.example/.test(sec.also) && /their emails go here/.test(sec.also) && /does not sign in/.test(sec.term)
+        && J(sec.same) === J([['u-boss', false], ['u-pat', true], ['u-lee', true], ['u-bot', false]]), J(sec));
+    const b6m = sent.length;
+    await p6.click('tr[data-user="u-pat"] button:has-text("Same person")');
+    await p6.waitForSelector('#app-ask-input');
+    await p6.fill('#app-ask-input', 'Boss@BoM.gov.au ');
+    await p6.click('[data-ask="yes"]');
+    await p6.waitForSelector('#app-ask-check');
+    const ask2 = await p6.evaluate(() => document.querySelector('.modal-card--ask')?.textContent.replace(/\s+/g, ' ') || '');
+    await p6.click('[data-ask="yes"]');
+    await p6.waitForTimeout(400);
+    const merged = sentTo('rpc/account_merge', b6m).map(r => r.body);
+    check('Same person… asks for the account kept, says what happens, and sends account_merge with the emails going to the folded-in address',
+      J(merged) === J([{ p_keep: 'u-boss', p_retire: 'u-pat', p_mail_here: true }])
+        && /part of boss@bom\.gov\.au/.test(ask2) && /no undo/.test(ask2), J({ merged, ask: ask2.slice(0, 160) }));
+
+    await p6.evaluate(() => Auth.open());
+    await p6.waitForSelector('#auth-modal .au-mail-to input[type="radio"]', { timeout: 10_000 });
+    const acct = await p6.evaluate(() => ({
+      text: (document.querySelector('#auth-modal .au-addresses')?.textContent || '').replace(/\s+/g, ' '),
+      radios: [...document.querySelectorAll('#auth-modal .au-mail-to input')].map(i => [i.value, i.checked]),
+    }));
+    check('Your account names the second address and where the emails go, as whoami() says',
+      /boss@home\.example/.test(acct.text) && J(acct.radios) === J([['', false], ['boss@home.example', true]]), J(acct));
+    const b6a = sent.length;
+    await p6.click('#auth-modal .au-mail-to input[value=""]');
+    await p6.waitForFunction(() => /emails to you go to boss@bom\.gov\.au/.test(document.querySelector('#auth-modal .au-msg')?.textContent || ''),
+      null, { timeout: 10_000 });
+    const mt = sentTo('rpc/my_mail_to', b6a).pop();
+    check('…and choosing the address they sign in with sends my_mail_to(null), and says so', mt && mt.body.p_email === null, J(mt));
     await c6.close();
 
     // ═══════════════════════════════════════════════════════════════════════

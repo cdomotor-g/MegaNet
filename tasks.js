@@ -85,16 +85,17 @@ const Tasks = (function () {
     due: 'The date it should be done by, if one was set. Once it has passed and the task is not done, it says overdue.',
     unassigned: 'No team has it yet. It waits, seen only by the people who hand out tasks and whoever made it, until one of them picks a team.',
     handsout: 'Members of a team marked this way — the SoRT Forum — may give a task to any team, and see every task. Administrators may too.',
-    owner: 'Looks after a team\'s roster: adds and takes off its members by the address of their Flood-Net account. An administrator names a team\'s owners. An owner may hand tasks to their own team.',
+    owner: 'Looks after a team\'s roster: adds and takes off its members by the address of their Flood-Net account — the one they sign in with, or a second address. An administrator names a team\'s owners. An owner may hand tasks to their own team.',
     member: 'On the team: sees its tasks, moves them on and writes notes on them.',
     sort: 'Made from the list the SoRT forum agreed for a station, handed over from SoRT\'s scope builder — the date is the forum\'s.',
     thread: 'Everything that has happened to the task, oldest first: who made it, every change of status or team, every edit and every note, with who and when.',
     mine: 'The tasks handed to a team you are on.',
+    second: 'Another address of the same person — an account of its own until an administrator made the two one. It does not sign in, but adding them to a team by it finds them.',
   };
   const GLOSSARY = [['task', 'Task'], ['team', 'Team'], ['status', 'Status'],
     ...STATUS.map(s => [`st:${s.key}`, s.label]),
     ['due', 'Due'], ['unassigned', 'Unassigned'], ['handsout', 'Hands out tasks'], ['owner', 'Owner'],
-    ['member', 'Member'], ['sort', 'From SoRT'], ['thread', 'Thread']];
+    ['member', 'Member'], ['second', 'Second address'], ['sort', 'From SoRT'], ['thread', 'Thread']];
   const word = k => (k.startsWith('st:') ? (STATUS_OF[k.slice(3)] || {}).meaning : WORDS[k]) || '';
 
   const MAX_HANDOFF = 30;              // tasks a hand-off may carry
@@ -644,6 +645,15 @@ const Tasks = (function () {
 
   // ── My teams ───────────────────────────────────────────────────────────────
 
+  // The address a person signs in with, and their second addresses (0100), to
+  // the people who see addresses on a roster.
+  function mailsHtml(p, cls) {
+    const also = Array.isArray(p.also) ? p.also.filter(Boolean) : [];
+    const own = p.email && p.email !== p.who ? `<div class="small txt-muted ${cls}">${esc(p.email)}</div>` : '';
+    return own + also.map(a => `<div class="small txt-muted ${cls}">${esc(a)} · ${
+      termHtml('second address', word('second'))}</div>`).join('');
+  }
+
   function rosterHtml(t, ownerView) {
     const r = Array.isArray(t.roster) ? t.roster : [];
     if (!r.length) return '<p class="small txt-muted">Nobody yet.</p>';
@@ -653,7 +663,7 @@ const Tasks = (function () {
           ${ownerView ? '<th scope="col"><span class="sr-only">Actions</span></th>' : ''}</tr></thead>
         <tbody>${r.map(p => `<tr>
           <th scope="row">${esc(p.who || p.email || '—')}${p.you ? ' <span class="badge">you</span>' : ''}${
-            p.email && p.email !== p.who ? `<div class="small txt-muted tk-mail">${esc(p.email)}</div>` : ''}</th>
+            mailsHtml(p, 'tk-mail')}</th>
           <td>${p.owner ? `<span class="term-chip tk-role" title="${esc(word('owner'))}">Owner</span>`
                         : `<span class="term-chip tk-role" title="${esc(word('member'))}">Member</span>`}</td>
           <td class="small col-optional">${esc(dmy(String(p.added_at || '').slice(0, 10)))}${p.added_by ? ` by ${esc(p.added_by)}` : ''}</td>

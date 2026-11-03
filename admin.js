@@ -9,8 +9,9 @@
 //           housekeeping tools that had no other home.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for state, esc, escAttr, announce, APP_VERSION and
-// DB_SCHEMA_VERSION; across to app.js for loadFromGitHub, dataSourceSummary,
+// Reaches back to core.js for state, esc, escAttr, termHtml, announce,
+// APP_VERSION and DB_SCHEMA_VERSION; to modal.js for confirmDialog and
+// promptDialog; across to app.js for loadFromGitHub, dataSourceSummary,
 // docUrl and switchTab; to datastore.js for dbRpc, dbCheck, renderDbStatusHtml,
 // reloadFromDatastore and snapshotStationsJson; to export.js for
 // exportMayDownload; to auth.js for Auth; to mem-meter.js for MemMeter; to
@@ -249,6 +250,16 @@ const Admin = (function () {
         </fieldset>`;
   }
 
+  // An account's second addresses (0100), under the address it signs in with.
+  function secondHtml(u) {
+    const list = Array.isArray(u.addresses) ? u.addresses.filter(a => a && a.email) : [];
+    return list.map(a => `
+                    <div class="small txt-muted adm-also">+ ${esc(a.email)} · ${termHtml('second address', WORDS.second)}${
+                      a.mail_here ? ' · their emails go here' : ''}
+                      <button type="button" class="link-btn" onclick="Admin.freeAddress('${escAttr(a.email)}')"
+                        aria-label="Free ${escAttr(a.email)} from ${escAttr(u.email)}">Free…</button></div>`).join('');
+  }
+
   // The word for an account's standing, in the users table.
   const STANDING = {
     automatic:   ['approved', 'txt-ok', 'Approved by the allowlist — its address or its domain is on it'],
@@ -271,11 +282,12 @@ const Admin = (function () {
     entry:     'An address (name@example.org) matches that one person; a domain (@example.org) matches everybody whose address ends in it, now and later.',
     initialRole: 'The role an account starts with, the first time somebody this entry matches signs up. Used once: after that, change the role in Users. An address\'s own entry wins over its domain\'s; none set means editor.',
     matches:   'How many accounts this entry lets in now. An address with none has not signed up yet: the entry is waiting for them.',
+    second:    'An address that was an account of its own until an administrator made it part of this one (Same person…). It does not sign in; somebody adding the person to a team finds this account by it, and the person can have Flood-Net\'s emails sent to it.',
   };
   const WORD_LABELS = [
     ['users', 'Users'], ['allowlist', 'Allowlist'], ['role', 'Role'], ['standing', 'Standing'],
     ['mayEdit', 'May edit'], ['lastSeen', 'Last seen'], ['entry', 'Entry'], ['initialRole', 'Initial role'],
-    ['matches', 'Matches'],
+    ['matches', 'Matches'], ['second', 'Second address'],
   ];
   const th = (k, label, cls) => `<th scope="col"${cls ? ` class="${cls}"` : ''}>${termHtml(label, WORDS[k])}</th>`;
 
@@ -324,7 +336,10 @@ const Admin = (function () {
         </div>
         <p class="small">${termHtml('People', WORDS.users)}: one row for each account, most recently seen first. Here you
           set somebody's name and role and see their standing. Whether they may edit is <em>not</em> set here — the
-          allowlist below decides it, and <strong>May edit</strong> names the entry that lets them in.</p>
+          allowlist below decides it, and <strong>May edit</strong> names the entry that lets them in. Somebody with two
+          accounts — a personal address and a work one, say — is made one person with <strong>Same person…</strong> on
+          the account they will stop signing in with: everything it has moves to the other, and its address stays there
+          as a ${termHtml('second address', WORDS.second)}.</p>
         ${status}
         ${list.length ? `
         <div class="table-wrap" role="region" tabindex="0" aria-labelledby="adm-users-h">
@@ -340,7 +355,7 @@ const Admin = (function () {
             <tbody>
               ${list.map(u => `
                 <tr data-user="${escAttr(u.id)}">
-                  <td>${esc(u.email)}${u.is_you ? ' <span class="badge">you</span>' : ''}</td>
+                  <td>${esc(u.email)}${u.is_you ? ' <span class="badge">you</span>' : ''}${secondHtml(u)}</td>
                   <td><input type="text" data-f="name" value="${escAttr(u.display_name || '')}"
                              aria-label="Display name for ${escAttr(u.email)}"></td>
                   <td><select data-f="role" aria-label="Role for ${escAttr(u.email)}">
@@ -352,13 +367,16 @@ const Admin = (function () {
                     ? '<span class="adm-online">● online</span>'
                     : esc(typeof AdminDash !== 'undefined' ? AdminDash.ago(u.last_seen_at || u.last_sign_in_at) : '')}
                     ${u.visits_30d ? `<br><span class="txt-muted">${Math.min(30, u.visits_30d)} day${u.visits_30d === 1 ? '' : 's'} in 30</span>` : ''}</td>
-                  <td class="adm-row-acts">
+                  <td class="adm-row-acts"><div class="adm-acts-wrap">
                     <button class="exp-btn-sm" onclick="Admin.saveUser('${escAttr(u.id)}')">Save</button>
                     ${u.status === 'declined' ? `<button class="exp-btn-sm" onclick="Admin.decide('${escAttr(u.id)}','reset')"
                         title="Undo the decline: unlocked, and waiting again">Undo decline</button>` : ''}
+                    ${u.is_you || u.status === 'declined' || !u.confirmed_at ? '' : `<button class="exp-btn-sm"
+                        onclick="Admin.samePerson('${escAttr(u.id)}')"
+                        title="This is the same person as another account: make the two one, kept under the other">Same person…</button>`}
                     ${u.is_you ? '' : `<button class="exp-btn-sm adm-danger"
                         onclick="Admin.deleteUser('${escAttr(u.id)}')">Delete</button>`}
-                  </td>
+                  </div></td>
                 </tr>`).join('')}
             </tbody>
           </table>
@@ -776,6 +794,50 @@ const Admin = (function () {
       `Deleted ${u.email}.${out && out.still_allowed ? ' The allowlist still lets them sign in again.' : ''}`);
   }
 
+  // One person with two accounts (0100: account_merge). Asked on the account
+  // they will stop signing in with; the one they keep is named by its address.
+  // Everything moves over, the kept account gets whatever the other could do,
+  // the other's sign-in goes and its address stays as the kept one's second.
+  async function samePerson(id) {
+    const u = (users || []).find(x => x.id === id);
+    if (!u) return;
+    const typed = await promptDialog({ title: `${u.email} is the same person as…`,
+      label: 'The address of the account they will keep signing in with',
+      message: `Everything ${u.email} has moves to the account you name: its teams (owning them where it did), the tasks `
+        + 'it made and its notes, the ALERT2 plan\'s list, its devices and views, and whatever it was allowed to do. '
+        + `Then ${u.email} stops signing in by itself and stays on that account as its second address — somebody adding `
+        + 'them to a team finds them by it, and their emails can go to it.',
+      placeholder: 'their.other@example.com', confirm: 'Next' });
+    if (typed == null) return;
+    const want = typed.trim().toLowerCase();
+    const keep = (users || []).find(x => String(x.email || '').toLowerCase() === want);
+    if (!keep) return Toast.failed(`No account signs in as ${typed.trim()}. Type the address of the account they keep.`);
+    if (keep.id === u.id) return Toast.failed('That is the same account. Type the address of their other one.');
+    const answer = await confirmDialog({ title: `Make ${u.email} part of ${keep.email}?`,
+      message: `${u.email} will no longer sign in; ${keep.email} keeps everything it had. There is no undo: freeing the `
+        + 'address afterwards lets it make a new account, an empty one.',
+      checkbox: { label: `Send Flood-Net's emails to ${u.email} from now on (they can change it under Your account).`,
+                  checked: true },
+      confirm: 'Make them one account', danger: true });
+    if (!answer) return;
+    await act('account_merge', { p_keep: keep.id, p_retire: u.id, p_mail_here: !!answer.checked }, out =>
+      `${u.email} is part of ${keep.email} now${out && out.teams
+        ? `, on ${out.teams} team${out.teams === 1 ? '' : 's'}` : ''}.`);
+    // Kept under the account signed in here: its addresses, teams and role
+    // just changed, so ask the database again.
+    if (keep.is_you && typeof Auth !== 'undefined' && Auth.recheck) await Auth.recheck();
+  }
+
+  // A second address let go (0100: admin_address_remove): it no longer finds
+  // the account, no email goes to it, and it may sign up afresh.
+  async function freeAddress(email) {
+    if (!(await confirmDialog({ title: `Free ${email}?`,
+      message: 'It stops being part of its account: nobody finds the account by it and no email goes to it. It may '
+        + 'then sign up as an account of its own — a new one, with none of what the account has.',
+      confirm: 'Free the address', danger: true }))) return;
+    act('admin_address_remove', { p_email: email }, () => `${email} is free.`);
+  }
+
   function formField(k, v) { form[k] = v; }
 
   function saveEntry() {
@@ -831,7 +893,7 @@ const Admin = (function () {
     if (state.activeTab === 'admin' && isAdmin()) load();
   }
 
-  return { render, init, load, authChanged, saveUser, deleteUser, formField,
+  return { render, init, load, authChanged, saveUser, deleteUser, samePerson, freeAddress, formField,
            saveEntry, editEntry, removeEntry, forgetKey, clearLocal, decide, setSignup,
            // What admin_users() last said (null before it answers), for the
            // Teams panel's suggestions.

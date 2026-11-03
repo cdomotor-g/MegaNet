@@ -7,7 +7,8 @@
 //          account would give them.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for AUTH_URL, DB_URL, DB_ANON_KEY, DB_SCHEMA and esc;
+// Reaches back to core.js for AUTH_URL, DB_URL, DB_ANON_KEY, DB_SCHEMA, esc,
+// escAttr and termHtml;
 // across to app.js for setHeaderLabel, rerenderStationEditorCard, renderTabs
 // and switchTab; to field-photos.js for FieldPhotos.authChanged, because every
 // photo it holds was fetched for one session (0035, 0062: members only); to
@@ -742,13 +743,27 @@ const Auth = (function () {
   // GoTrue's refusals, in the words the person needs. It does not pass a
   // trigger's message through, so a sign-up the database refused arrives as a
   // generic "Database error saving new user" — which, since 0062, means sign-up
-  // has been closed to listed addresses.
+  // has been closed to listed addresses, and since 0100 also that the address
+  // is a second address on another account. With sign-up open it can only be
+  // the second.
+  // Whether anybody may make an account, as far as this page knows: the
+  // Create form's check, else whoami(). Unknown is not open.
+  function signupIsOpen() {
+    if (ui.check && typeof ui.check.open === 'boolean') return ui.check.open;
+    return !!who && who.signup === 'open';
+  }
+
   function errorText(err, email) {
     const m = String(err && err.message || '');
     const code = (err && err.code) || '';
     if (/database error|unexpected_failure/i.test(m)) {
+      const second = `${email || 'This address'} is a second address on a Flood-Net account — an administrator made it `
+           + 'and another address one account — so it does not sign in by itself. Sign in the way that account does: '
+           + 'with Google, say, or the address it was made with.';
+      if (signupIsOpen()) return second;
       return `New accounts are open only to listed addresses at the moment, and ${email || 'this address'} is not `
-           + 'one. Any @bom.gov.au address can still sign up; anyone else has to be added by an administrator.';
+           + 'one. Any @bom.gov.au address can still sign up; anyone else has to be added by an administrator. '
+           + `(Or ${email || 'it'} is a second address on an existing account: sign in the way that account does.)`;
     }
     if (code === 'invalid_credentials' || code === 'invalid_grant' || /invalid login credentials/i.test(m)) {
       return 'That email and password do not match an account. Check both, or use Forgot your password.';
@@ -1114,6 +1129,59 @@ const Auth = (function () {
           ${who.is_member && !who.may_write ? '<p class="small">Editing is for Bureau staff and the people an administrator adds — ask one if you should be able to.</p>' : ''}`;
   }
 
+  // An account's second addresses (0100): each was an account of its own until
+  // an administrator folded it into this one (Admin → Same person…). It signs
+  // nothing in, but a colleague adding the person to a team finds them by it,
+  // and Flood-Net's emails go to whichever address the person picks here.
+  const SECOND_ADDRESS = 'An address of yours that was an account of its own until an administrator made the two '
+    + 'one account. It cannot sign in by itself; a colleague can add you to a team by it, and Flood-Net\'s emails '
+    + 'can go to it.';
+  function addressesHtml(own, busy) {
+    const list = (who && Array.isArray(who.addresses)) ? who.addresses.filter(a => a && a.email) : [];
+    if (!list.length) return '';
+    const to = String((who && who.mail_to) || own || '').toLowerCase();
+    const opt = (value, label) => `
+              <label class="check-inline"><input type="radio" name="au-mail-to" value="${escAttr(value)}"
+                ${to === String(value || own || '').toLowerCase() ? 'checked' : ''} ${busy ? 'disabled' : ''}
+                onchange="Auth.mailTo(this.value)"> ${esc(label)}</label>`;
+    return `
+          <p class="small au-addresses">Your ${termHtml(list.length === 1 ? 'second address' : 'second addresses', SECOND_ADDRESS)}:
+            ${list.map(a => `<strong>${esc(a.email)}</strong>`).join(', ')} — an account of its own until an administrator
+            made the two one. It does not sign in by itself, but a colleague can add you to a team by it.</p>
+          <fieldset class="au-mail-to">
+            <legend class="small">Flood-Net's emails to you go to</legend>${opt('', own || 'the address you sign in with')}${
+              list.map(a => opt(a.email, a.email)).join('')}
+          </fieldset>`;
+  }
+
+  async function mailTo(email) {
+    if (!session) return;
+    setBusy(true, 'Saving…');
+    let out = null;
+    try {
+      const res = await fetch(`${DB_URL}/rpc/my_mail_to`, {
+        method: 'POST',
+        headers: {
+          apikey: DB_ANON_KEY,
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Profile': DB_SCHEMA,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ p_email: email || null }),
+        cache: 'no-store',
+      });
+      out = await res.json().catch(() => null);
+      if (!res.ok) throw new Error((out && out.message) || `the database answered ${res.status}`);
+    } catch (err) {
+      setBusy(false);
+      return setMsg('error', `That did not save: ${err.message}.`);
+    }
+    if (out && typeof out === 'object') who = out;
+    setBusy(false);
+    setMsg('ok', `Flood-Net's emails to you go to ${(who && who.mail_to) || email || 'the address you sign in with'} from now on.`);
+  }
+
   // Every form that waits on an email has a way out of it: the email may never
   // come, and the person may have a password, Google or Microsoft after all.
   function backHtml() {
@@ -1157,6 +1225,7 @@ const Auth = (function () {
         <div class="modal-form">
           <p>Signed in as ${name ? `<strong>${esc(name)}</strong> · ` : ''}<strong>${esc(email || 'this account')}</strong>.</p>
           ${standingHtml()}
+          ${addressesHtml(email, busy)}
           ${msg}
           <p class="small">${
             session && session.via === 'gate'
@@ -1599,7 +1668,7 @@ const Auth = (function () {
     start, open, close, back, go, render,
     signIn, signUp, confirmCode, resend, forgot, recoverCode, setPassword, followLink,
     requestCode, verifyCode, signInWith, signInMicrosoft, signOut,
-    togglePassword, checkAddress, snooze, recheck,
+    togglePassword, checkAddress, snooze, recheck, mailTo,
     // Read by the editor and the Data source panel. Both ask the database in the
     // end; these only decide what to say before that round trip.
     isSignedIn: () => !!session,

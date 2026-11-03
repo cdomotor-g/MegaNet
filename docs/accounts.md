@@ -32,6 +32,10 @@ The enforcement is in Postgres — `meganet.is_member()`, `meganet.is_editor()`,
 the database the same questions. The app only asks; see [`access.md`](access.md) for the
 layers.
 
+A person has **one account**, however many addresses they have. An account may keep a
+**second address** (`0100`) beside the one it signs in with — see
+[One person, two addresses](#one-person-two-addresses) below.
+
 **An address counts only once it is confirmed.** `is_member()` and `is_editor()` read the
 address from `auth.users`, and only once `email_confirmed_at` is set (0054). That is what
 stops somebody typing a Bureau address they do not hold and being approved for it, and it
@@ -348,8 +352,64 @@ so a stranger can cause a notification; at most one a minute reaches each device
   Somebody has to be approved before they can be put on a team. Telling a team when a task
   arrives waits for #237's email (and #216's alerts); until then it waits on the Tasks tab
   and on the station's card.
+* **Somebody with two accounts** — a personal address and a Bureau one, say. Admin tab →
+  users table → **Same person…** on the account they will stop signing in with → type the
+  address of the account they keep → **Next** → leave *Send Flood-Net's emails to …* ticked
+  if their mail should go to the address being folded in → **Make them one account**. See
+  [One person, two addresses](#one-person-two-addresses).
 * **Unconfirmed sign-ups** are folded away under the waiting list. They count for nothing —
   a typo or a robot — and need no action.
+
+## One person, two addresses
+
+Since `0100` (November 2026). Teams and tasks (`0095`) made two accounts of one person into
+two people: a task handed to one was not on the other's Tasks tab, a team's owner was only
+one of them, and a colleague adding them by their Bureau address found the account they never
+signed in with. The owner had exactly that — a personal address signed in with Google, and a
+Bureau one — and asked to sign in with Google and keep the Bureau address "for notifications
+at least, or unforeseen situations".
+
+**What *Same person…* does** (`meganet.account_merge()`; administrators, or the owner from the
+SQL editor):
+
+* Everything the folded-in account has moves to the kept one: its teams, owning them where it
+  did (on a team as both, the person is on it once); the tasks it made and the notes it wrote;
+  its place on the ALERT2 plan's list, its scenarios and fade margins; its notification
+  devices and visits; and its left-bar views, if the kept account has none of its own.
+* The kept account can do whatever the other could: the higher role, approval, and — where the
+  folded-in address was on the allowlist (a Bureau address is, by domain) and the kept one is
+  not — the kept address goes on the allowlist, which is what editing asks.
+* The folded-in sign-in is deleted. Its address stays, as the kept account's **second
+  address**, with the date it was confirmed.
+* Names written as text on what the person edited (a station's *updated by*, an inspection's)
+  are history and stay as they were.
+* A table it does not know about that still points at the folded-in account stops it, and
+  nothing changes — a new table with a foreign key to `auth.users` has to be taught to it.
+
+**What a second address does.** It signs nothing in. Somebody adding the person to a team, or
+to the ALERT2 plan's list, finds them by it. A team's owners and administrators see it on the
+roster beside the address the person signs in with. The person chooses, under **Your
+account → Flood-Net's emails to you go to**, which address the emails go to (the merge's tick
+box sets the first choice). That covers the account emails today and #216's alerts when they
+come (`meganet.mail_address()`).
+
+**Signing in with it afterwards.** A password, a code or a sign-up for a second address is
+refused (`auth_user_gate()`), and the panel says why: it is part of another account, which the
+person signs in to the way they usually do. So nobody becomes two people again by mistake.
+**Free…** under the address (Admin tab, users table) takes it off the account: it then finds
+nothing, no mail goes to it, and it may sign up afresh — as a new, empty account. That is the
+way out for an unforeseen case (Google sign-in unavailable, a Bureau system that needs a Bureau
+sign-in): free the address, sign up with it, and fold it back in later.
+
+**Adding a second address** is only ever by folding in an account: sign up with the address,
+confirm it, and have an administrator press *Same person…*. Confirming an address needs an
+email sent and a code typed, and an account's sign-up already does exactly that.
+
+**Microsoft sign-in (#207).** When the Bureau's Microsoft sign-in is switched on, signing in
+with it as a second address is refused like any other way in. Signing in to the same account
+with Microsoft needs Supabase's *manual linking* (Authentication → Sign In / Providers →
+**Allow manual linking**) and a *Link Microsoft* button on *Your account* — a piece of work for
+then, not now.
 
 ## If something is wrong
 
@@ -371,3 +431,5 @@ so a stranger can cause a notification; at most one a minute reaches each device
 | An emailed link signed Safari in, but the iPhone's home-screen app is still signed out | iOS opens a link from Mail in Safari, never in the home-screen app, and the two keep separate sign-ins. In the app, type the six-digit code from the same email; the panel says so there. |
 | Signed out of an app or tab that was asleep (a laptop's lid, an iPhone's home-screen app in the background) | Before 23 October 2026 a refresh that got no answer on waking signed the session out (auth log: a `/logout` 403 *token is expired* with no `/token` refresh before it). It now keeps the session and tries again. A refresh GoTrue itself refuses (`/token` 400) still signs out. |
 | The icon's number is out of date | It catches up when the app is opened (step G, the count). |
+| Signing in with an address says it *is a second address on a Flood-Net account* | It was folded into another account (*Same person…*): sign in with that one. To let the address have an account of its own again, an administrator presses **Free…** under it. |
+| *Same person…* says a table *still refers to* the account | A table added after `0100` points at accounts and the merge does not know how to move it. Nothing was changed. Teach `account_merge()` that table in a migration. |
