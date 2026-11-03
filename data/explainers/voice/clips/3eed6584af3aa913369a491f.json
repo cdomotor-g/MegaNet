@@ -1,0 +1,22 @@
+{
+ "key": "3eed6584af3aa913369a491f",
+ "speaker": "seasoned-hydrographer",
+ "voice": "Tanksinker",
+ "model": "eleven_v4",
+ "secs": 5.04,
+ "words": [
+  0.36,
+  0.48,
+  0.72,
+  1.04,
+  1.76,
+  2,
+  2.16,
+  2.84,
+  3.04,
+  3.36,
+  3.76,
+  4.12
+ ],
+ "generated_at": "2026-11-03T23:57:36.134Z"
+}
