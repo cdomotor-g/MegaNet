@@ -3841,7 +3841,7 @@ const DB_SCHEMA = 'meganet';
 // removed, the legacy reports two bridge restarts cut short restored, rollups
 // rebuilt (0098), applied by db-migrate.yml on 3 November 2026, bumped after;
 // no shape the app reads changes.
-const DB_SCHEMA_VERSION = 98;
+const DB_SCHEMA_VERSION = 99;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
