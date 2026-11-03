@@ -29,14 +29,14 @@
   },
   "status": {
     "phase": "live",
-    "updated": "2026-11-03",
+    "updated": "2026-11-04",
     "summary": "Live and in daily use (database schema 95): this week added teams and the tasks handed to them, with the SoRT scope builder's hand-off, a driving mode that follows a station's route in 3-D, the agent API's changelog and email list, ACMA licences and radio paths in the API, the Repeaters tab and cuts to database I/O, while account email, compute size and the ACMA download link wait on the owner.",
     "now": [
       "Responsiveness pass for a laptop on a Teams call and a phone on one bar: the Stations tab opens in a third of the time on a slow CPU, the repeater delay plan is worked out in a worker, a saved station list is shown after 8 s of a slow download and downloaded only when it has changed (ETag), and the Stations map groups nearby pins into bubbles (worst, average or mix under health and Latency) until zoomed in",
       "Teams and tasks (0095) live: one team has its owner so far — an administrator names each team's owners on the Admin tab; SoRT's #tasks= hand-off lands on the Tasks tab for review",
       "One person, one account (0100): an account keeps a second address — found by a team's owner, where its emails can go, refused a sign-in of its own; the Admin tab's Same person… folds a second account in",
       "Agent API changelog and notify list shipped; emails start once #237's Resend parts are done",
-      "Agent API radio paths to base, for SoRT's Fade Margin question: live, and every saved fade margin stale until the map's layer is swept and saved again",
+      "Agent API radio paths to base, for SoRT's Fade Margin question: live, with fresh fade margins since the fade-resweep blocker cleared on 4 Nov 2026 (#235: the Stations map's layer swept under the 12 dB field model and saved to the datastore); 15 links are still stale (Save is greyed out for them) and 2 failed to compute, the map still wants a visual check, and #235 stays open to sweep again after #234 and #233",
       "Photo reader: nightly reading of field photos for logger and equipment details",
       "#243 R2 data archive: one restored-day self-test left, then close",
       "One ALERT burst heard several ways is one reading (0096, #232 closed): copies within 8 s counted on it",
@@ -372,34 +372,6 @@
             "effort": "none"
           }
         ]
-      },
-      {
-        "id": "fade-resweep",
-        "what": "Sweep the Stations map's fade-margin layer and save it again: every saved fade margin predates the field model (itm-p2p/3)",
-        "on": "human",
-        "kind": "access",
-        "since": "2026-10-08",
-        "holds": [
-          "every figure in the agent API's radio paths (/api/v1/stations/{id}/radio-path), all stale until then",
-          "the fade-margin colours on the Stations map",
-          "sort"
-        ],
-        "options": [
-          {
-            "what": "Signed in as an editor: Stations map → Layers → Link colour: By fade margin; leave it to sweep every link, then press Save to the datastore",
-            "by": "human",
-            "effort": "an hour, mostly waiting",
-            "pros": "the map paints again and the API's radio paths turn current, with no change to anything else",
-            "recommended": true
-          },
-          {
-            "what": "Leave it: each radio-path answer already says every figure is stale and why, and gives the station's attenuator tests beside them",
-            "by": "human",
-            "effort": "none",
-            "cons": "SoRT's Fade Margin question has only stale modelled figures and old measurements to go on"
-          }
-        ],
-        "issue": "#235"
       },
       {
         "id": "team-owners",
