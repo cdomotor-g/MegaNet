@@ -367,6 +367,28 @@
             "effort": "none",
             "cons": "SoRT's Fade Margin question has only stale modelled figures and old measurements to go on"
           }
+        ],
+        "issue": "#235"
+      },
+      {
+        "id": "team-owners",
+        "what": "Name an owner for each of the 13 starter teams (all empty since 0095), SoRT Forum first",
+        "on": "human",
+        "kind": "access",
+        "since": "2026-11-01",
+        "issue": "#261",
+        "holds": [
+          "SoRT forum tasks created by anyone but administrators",
+          "each team seeing its own tasks on the Tasks tab",
+          "sort"
+        ],
+        "options": [
+          {
+            "what": "Admin tab → Teams → open the team → Add somebody, by the address of their Flood-Net account → tick As an owner → Add to …; owners then add their members under Tasks → My teams",
+            "by": "human",
+            "effort": "15 min",
+            "recommended": true
+          }
         ]
       }
     ]
