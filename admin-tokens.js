@@ -68,12 +68,107 @@ const AdminTokens = (function () {
     return future ? 'in ' + span : (m < 1 ? 'just now' : span + ' ago');
   }
 
+  // ── the receivers behind a token ──────────────────────────────────────────
+  //
+  // A base station reports one receiver per channel it listens on, so a Pi with
+  // two RTL-SDR sticks on a dozen channels each is two dozen receivers, and
+  // listed in the row they made it a screen tall. The row says how many, of
+  // which kinds and when last heard; the count opens a row under it with the
+  // receivers by device, each device's channels enumerated.
+
+  // The tokens whose receivers are open, by id, so a repaint keeps them open.
+  const openRcv = new Set();
+
+  // What the words in the panel mean (CLAUDE.md "Plain words"): the headings'
+  // hovers, and the fold under the table.
+  const WORDS = {
+    receivers: 'Each channel a base station listens on reports itself as a receiver, so one radio stick tuned to nine channels is nine. Click the count to see them by device.',
+    device:    'The radio the receivers belong to: each receiver\'s name before its channel, as the base station names it.',
+    channels:  'The frequencies the device\'s receivers listen on, in MHz, one receiver each — lowest first.',
+    kind:      'What decodes the readings: rtl-sdr (a software radio stick), quansheng or ert-a2 (a radio on a serial cable), or serial (another serial receiver).',
+    location:  'Where the receivers say they are, and how they know: from GPS (the only exact one), the browser, typed in, the station they sit at, or worked out from the stations they hear.',
+  };
+  const LOCATION = { gps: 'GPS', browser: 'the browser', manual: 'typed in', station: 'its station', heard: 'the stations it hears' };
+
+  // "18 Bateson — RTL-SDR · 151.5375" is the device and the channel; a name
+  // with no " · " is a device of its own.
+  function splitName(p) {
+    const n = String(p.name || p.point_id || '');
+    const i = n.lastIndexOf(' · ');
+    return i > 0 ? { device: n.slice(0, i), channel: n.slice(i + 3) } : { device: n, channel: '' };
+  }
+
+  function lastHeard(rs) { return rs.reduce((m, p) => Math.max(m, new Date(p.last_seen_at).getTime() || 0), 0); }
+
+  function locationText(p) {
+    const s = p.location_source || 'none';
+    if (s === 'none') return 'no location';
+    return 'from ' + (LOCATION[s] || s) + (p.location_approx ? ', approximate' : '');
+  }
+
+  // The cell: two short lines however many receivers there are.
   function receiversHtml(t) {
     const r = t.receivers || [];
     if (!r.length) return '<span class="small qs-dim">none reported</span>';
-    return r.map(p => '<div class="small">' + esc(p.name || p.point_id) + ' <span class="qs-dim">(' + esc(p.receiver)
-      + (p.location_source && p.location_source !== 'none' ? ', location ' + esc(p.location_source) + (p.location_approx ? ', approximate' : '') : ', no location')
-      + ')</span></div>').join('');
+    const id = Number(t.id), open = openRcv.has(id);
+    const kinds = new Map();
+    r.forEach(p => kinds.set(p.receiver || 'unknown', (kinds.get(p.receiver || 'unknown') || 0) + 1));
+    const devices = new Set(r.map(p => splitName(p).device)).size;
+    const last = lastHeard(r);
+    return '<button type="button" class="exp-btn-sm adm-rcv-btn" aria-expanded="' + open + '" aria-controls="adm-rcv-' + id + '"'
+      + ' onclick="AdminTokens.toggleReceivers(' + id + ')"><span class="adm-rcv-caret" aria-hidden="true">▸</span> '
+      + r.length + ' receiver' + (r.length === 1 ? '' : 's')
+      + (devices > 1 ? ' on ' + devices + ' devices' : '') + '</button>'
+      + '<div class="small qs-dim">' + esc([...kinds].sort((a, b) => b[1] - a[1]).map(([k, n]) => n + ' ' + k).join(' · '))
+      + (last ? ' · heard ' + esc(rel(last)) : '') + '</div>';
+  }
+
+  // The row under it: one line a device — how many receivers, on which
+  // channels, of what kind, where, last heard — and the total.
+  function receiversRowHtml(t) {
+    const r = t.receivers || [];
+    if (!r.length) return '';
+    const id = Number(t.id);
+    const groups = new Map();
+    r.forEach(p => {
+      const s = splitName(p);
+      if (!groups.has(s.device)) groups.set(s.device, []);
+      groups.get(s.device).push({ p, channel: s.channel });
+    });
+    const th = (k, label) => '<th scope="col">' + termHtml(label, WORDS[k]) + '</th>';
+    const rows = [...groups].sort((a, b) => a[0].localeCompare(b[0])).map(([device, xs]) => {
+      const chans = xs.filter(x => x.channel)
+        .sort((a, b) => (parseFloat(a.channel) - parseFloat(b.channel)) || a.channel.localeCompare(b.channel));
+      const last = lastHeard(xs.map(x => x.p));
+      return '<tr><th scope="row">' + esc(device) + '</th><td>' + xs.length + '</td>'
+        + '<td class="small adm-rcv-chans">' + (chans.length ? chans.map(x => '<span class="adm-rcv-ch" title="'
+            + escAttr((x.p.point_id || '') + (x.p.last_seen_at ? ' · heard ' + rel(x.p.last_seen_at) : '')) + '">'
+            + esc(x.channel) + '</span>').join(' ') : '—') + '</td>'
+        + '<td class="small">' + esc([...new Set(xs.map(x => x.p.receiver || 'unknown'))].join(', ')) + '</td>'
+        + '<td class="small">' + esc([...new Set(xs.map(x => locationText(x.p)))].join('; ')) + '</td>'
+        + '<td class="small">' + (last ? esc(rel(last)) : '—') + '</td></tr>';
+    });
+    return '<tr class="adm-rcv-row" id="adm-rcv-' + id + '"' + (openRcv.has(id) ? '' : ' hidden') + '><td colspan="5">'
+      + '<table class="adm-table adm-rcv-table"><caption class="sr-only">The receivers behind ' + esc(t.label) + ', by device</caption>'
+      + '<colgroup><col style="width:22%"><col style="width:6rem"><col style="width:36%"><col style="width:6.5rem">'
+      + '<col style="width:16%"><col style="width:7rem"></colgroup>'
+      + '<thead><tr>' + th('device', 'Device') + th('receivers', 'Receivers') + th('channels', 'Channels (MHz)')
+      + th('kind', 'Kind') + th('location', 'Location') + '<th scope="col">Last heard</th></tr></thead>'
+      + '<tbody>' + rows.join('') + '</tbody>'
+      + (groups.size > 1 ? '<tfoot><tr><th scope="row">All ' + groups.size + ' devices</th><td>' + r.length + '</td><td colspan="4"></td></tr></tfoot>' : '')
+      + '</table></td></tr>';
+  }
+
+  // Opened and closed in place: a repaint would take the label being typed
+  // in the form above.
+  function toggleReceivers(id) {
+    id = Number(id);
+    const open = !openRcv.has(id);
+    if (open) openRcv.add(id); else openRcv.delete(id);
+    const row = document.getElementById('adm-rcv-' + id);
+    if (row) row.hidden = !open;
+    const btn = document.querySelector('#adm-tokens .adm-rcv-btn[aria-controls="adm-rcv-' + id + '"]');
+    if (btn) btn.setAttribute('aria-expanded', String(open));
   }
 
   // ── the requests ──────────────────────────────────────────────────────────
@@ -226,17 +321,25 @@ const AdminTokens = (function () {
     if (list) {
       body += '<div class="table-wrap medium" role="region" tabindex="0" aria-labelledby="adm-tok-h"><table class="adm-table">'
         + '<caption class="sr-only">Ingest tokens, live first, most recently used first</caption>'
-        + '<thead><tr><th scope="col">Label</th><th scope="col">Receivers</th><th scope="col">Last used</th>'
+        + '<thead><tr><th scope="col">Label</th><th scope="col">' + termHtml('Receivers', WORDS.receivers) + '</th><th scope="col">Last used</th>'
         + '<th scope="col">Made</th><th scope="col">Status</th></tr></thead><tbody>'
-        + (list.length ? list.map(t => '<tr><th scope="row">' + esc(t.label)
+        + (list.length ? list.map(t => '<tr class="adm-tok-row"><th scope="row">' + esc(t.label)
             + (t.host_station ? '<div class="small qs-dim">at ' + esc(t.host_station) + '</div>' : '') + '</th>'
             + '<td>' + receiversHtml(t) + '</td>'
             + '<td class="small">' + when(t.last_used_at) + '</td>'
             + '<td class="small">' + when(t.created_at) + (t.created_by ? '<div class="qs-dim">' + esc(t.created_by) + '</div>' : '') + '</td>'
             + '<td>' + (t.revoked_at ? '<span class="badge">revoked ' + when(t.revoked_at) + '</span>'
-              : '<button class="ghost" onclick="AdminTokens.revoke(' + Number(t.id) + ')" aria-label="Revoke ' + esc(t.label) + '">Revoke…</button>') + '</td></tr>').join('')
+              : '<button class="ghost" onclick="AdminTokens.revoke(' + Number(t.id) + ')" aria-label="Revoke ' + esc(t.label) + '">Revoke…</button>') + '</td></tr>'
+            + receiversRowHtml(t)).join('')
           : '<tr><td colspan="5" class="small">No tokens yet.</td></tr>')
         + '</tbody></table></div>';
+      // The same meanings as the hovers, for a finger or a keyboard.
+      if (list.some(t => (t.receivers || []).length)) {
+        body += '<details class="adm-why"><summary>What the words about receivers mean</summary><dl class="adm-words">'
+          + [['receivers', 'Receivers'], ['device', 'Device'], ['channels', 'Channels'], ['kind', 'Kind'], ['location', 'Location']]
+            .map(([k, label]) => '<dt>' + esc(label) + '</dt><dd>' + esc(WORDS[k]) + '</dd>').join('')
+          + '</dl></details>';
+      }
     }
     return '<div class="panel">' + head + body + '</div>';
   }
@@ -467,7 +570,7 @@ const AdminTokens = (function () {
   }
 
   return { render, load, create, revoke, copy, useHere, dismiss, authChanged, restoreFromUrl,
-           openApprove, approveField, cancelApprove, approve, deny };
+           openApprove, approveField, cancelApprove, approve, deny, toggleReceivers };
 })();
 
 if (typeof window !== 'undefined') window.AdminTokens = AdminTokens;

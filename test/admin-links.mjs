@@ -6,7 +6,9 @@
 //      users, allowlist and tokens were a column beside the data cards, and an
 //      address broke across three lines); the cards with no table share two
 //      columns; on a phone the tables scroll sideways rather than folding
-//      words into letters.
+//      words into letters. Each account's May edit names the allowlist entry
+//      that lets it in, and a token's receivers are a count that opens, in
+//      place, into a row a device with its channels enumerated.
 //   2. **The card** — 18 Bateson's month, as 0080 records it from the live
 //      readings of 17, 21 and 24 Oct 2026 (three nine-minute dropouts at about
 //      3 am, the 72 minutes without readings on the 19th) and a restart, a new
@@ -70,7 +72,18 @@ const USERS = [
   { id: 'u2', email: 'field.tech@contractor.example', display_name: 'Field Tech', role: 'editor', status: 'approved', created_at: '2026-10-02T00:00:00Z', confirmed_at: '2026-10-02T00:00:00Z', may_edit: true },
 ];
 const ALLOW = [{ id: 1, entry: '@bom.gov.au', role: 'editor', note: 'Any Bureau address', created_at: '2026-08-01T00:00:00Z' }];
-const TOKENS = [{ id: 11, label: '18 Bateson', host_station: '18_bateson', created_at: '2026-10-06T00:00:00Z', created_by: 'boss@bom.gov.au', last_used_at: NOW, revoked_at: null }];
+// 18 Bateson's Pi as it reports itself: two RTL-SDR sticks, a receiver a
+// channel each, and a Quansheng on a cable — the list that made its row a
+// screen tall before the receivers folded into a drilldown.
+const rx = (dev, mhz, over = {}) => ({ point_id: `rpi-83071968-${dev}-${mhz}`, name: `18 Bateson — ${dev} · ${mhz}`, receiver: 'rtl-sdr',
+  location_source: 'station', location_approx: true, last_seen_at: NOW, ...over });
+const RECEIVERS = [
+  ...['151.5375', '151.425', '151.337', '151.500', '151.525', '152.400'].map(f => rx('RTL-SDR', f)),
+  ...['151.575', '151.550', '152.400', '152.250'].map(f => rx('RTL-SDR 2', f)),
+  { point_id: 'q-1', name: '18 Bateson — Quansheng', receiver: 'quansheng', location_source: 'gps', location_approx: false, last_seen_at: NOW },
+];
+const TOKENS = [{ id: 11, label: '18 Bateson', host_station: '18_bateson', created_at: '2026-10-06T00:00:00Z', created_by: 'boss@bom.gov.au', last_used_at: NOW, revoked_at: null,
+  receivers: RECEIVERS }];
 
 async function main() {
   const server = await startServer();
@@ -145,6 +158,45 @@ async function main() {
         full(box.users) && full(box.tokens) && full(box.roles) && full(box.log), J(box));
       check('…and the cards with no table share two columns', box.columns === 2, J(box));
       check('…and a long address sits on one line, not three', box.email === 1, J(box));
+
+      // Users and the allowlist read as one answer: each person's May edit
+      // names the entry that lets them in.
+      const by = await page.evaluate(() => [...document.querySelectorAll('.table-wrap[aria-labelledby="adm-users-h"] tbody tr')]
+        .map(tr => tr.querySelectorAll('td')[4]?.innerText.replace(/\s+/g, ' ').trim()));
+      // The second stand-in may edit by no entry the list holds, so none is named.
+      check('each account\'s May edit names the allowlist entry that lets it in',
+        J(by) === J(['yes by @bom.gov.au', 'yes']), J(by));
+
+      // A token's receivers: a count and a line, opened by a click into a row
+      // of their own, by device, each device's channels enumerated.
+      const shut = await page.evaluate(() => {
+        const tr = document.querySelector('#adm-tokens tr.adm-tok-row');
+        const btn = tr?.querySelector('.adm-rcv-btn');
+        return { h: Math.round(tr?.getBoundingClientRect().height || 0), btn: btn?.textContent.replace(/\s+/g, ' ').trim(),
+                 expanded: btn?.getAttribute('aria-expanded'), line: btn?.nextElementSibling?.textContent.trim(),
+                 hidden: document.getElementById('adm-rcv-11')?.hidden };
+      });
+      check('a token with eleven receivers is one short row: a count and a line of kinds, the list folded away',
+        shut.h > 0 && shut.h < 90 && /11 receivers on 3 devices/.test(shut.btn || '') && shut.expanded === 'false'
+          && /^10 rtl-sdr · 1 quansheng/.test(shut.line || '') && shut.hidden === true, J(shut));
+      await page.fill('#adm-tok-label', 'Typed, not yet made');
+      await page.click('#adm-tokens .adm-rcv-btn');
+      const opened = await page.evaluate(() => {
+        const row = document.getElementById('adm-rcv-11');
+        return { hidden: row?.hidden, expanded: document.querySelector('#adm-tokens .adm-rcv-btn')?.getAttribute('aria-expanded'),
+                 devices: [...(row?.querySelectorAll(':scope table > tbody > tr') || [])].map(tr => [...tr.children].slice(0, 3).map(c => c.textContent.replace(/\s+/g, ' ').trim())),
+                 total: row?.querySelector('tfoot td')?.textContent.trim(), typed: document.getElementById('adm-tok-label')?.value };
+      });
+      check('…which a click opens: a line a device, how many receivers, its channels lowest first, and the total',
+        opened.hidden === false && opened.expanded === 'true' && J(opened.devices) === J([
+          ['18 Bateson — Quansheng', '1', '—'],
+          ['18 Bateson — RTL-SDR', '6', '151.337 151.425 151.500 151.525 151.5375 152.400'],
+          ['18 Bateson — RTL-SDR 2', '4', '151.550 151.575 152.250 152.400'],
+        ]) && opened.total === '11', J(opened));
+      check('…opened in place, so the label being typed above is kept', opened.typed === 'Typed, not yet made', J(opened));
+      await page.click('#adm-tokens .adm-rcv-btn');
+      check('…and closed again by the same click',
+        await page.evaluate(() => document.getElementById('adm-rcv-11')?.hidden === true));
       await context.close();
     }
     {

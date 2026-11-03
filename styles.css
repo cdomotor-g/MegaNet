@@ -13360,6 +13360,17 @@ code {
 .adm-tok-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: .6rem; align-items: end; margin: .6rem 0; }
 .adm-tok-form label { display: grid; gap: .3rem; font-size: .85rem; color: var(--muted); }
 .adm-tok-minted p { margin: .3rem 0; }
+/* A token's receivers: a count that opens a row under it, by device. */
+.adm-rcv-btn { white-space: nowrap; }
+.adm-rcv-caret { display: inline-block; transition: transform .15s ease; }
+.adm-rcv-btn[aria-expanded="true"] .adm-rcv-caret { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .adm-rcv-caret { transition: none; } }
+.adm-rcv-row > td { padding: .2rem .6rem .7rem 1.6rem; background: var(--panel-sub); }
+.adm-rcv-table { width: 100%; font-size: .85rem; }
+.adm-rcv-table tfoot th, .adm-rcv-table tfoot td { font-weight: 600; border-top: 1px solid var(--border); }
+.adm-rcv-chans { line-height: 1.6; }
+.adm-rcv-ch { display: inline-block; padding: 0 .3em; border: 1px solid var(--border); border-radius: 4px;
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rx-sources, .rx-filters { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .5rem 0; }
 #rx-rd-note:empty { display: none; }
 .rx-notes { margin: 0 0 .75rem; padding-left: 1.25rem; }
@@ -19673,6 +19684,19 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
 }
 
 button.adm-danger { color: var(--bad); }
+/* Users and the allowlist: which entry lets each person in, and the fold that
+   says why they are two lists. */
+.adm-by code { font-size: .75rem; white-space: nowrap; }
+.adm-why { margin-top: .75rem; }
+.adm-why > summary { cursor: pointer; font-size: var(--fs-sm); font-weight: 600; }
+.adm-why p { margin: .5rem 0; max-width: 72ch; }
+.adm-words { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .3rem .9rem; margin: .5rem 0 0; font-size: var(--fs-sm); }
+.adm-words dt { font-weight: 600; }
+.adm-words dd { margin: 0; color: var(--muted); max-width: 72ch; }
+@media (max-width: 560px) {
+  .adm-words { grid-template-columns: minmax(0, 1fr); }
+  .adm-words dd { margin-bottom: .4rem; }
+}
 button.adm-danger:hover { border-color: var(--bad); }
 
 /* ── Admin dashboard (admin-dashboard.js) ────────────────────────────────────

@@ -115,6 +115,8 @@ select pg_temp.visit((select claims from _who where k = 'anon'), '00000000-0000-
 select pg_temp.visit((select claims from _who where k = 'anon'), '00000000-0000-4000-8000-0000000da5a1', 'Bad Tab; drop');
 select pg_temp.visit((select claims from _who where k = 'anon'), '00000000-0000-4000-8000-0000000da5a1', 'admin', 'toaster');
 select pg_temp.visit((select claims from _who where k = 'editor'), '00000000-0000-4000-8000-0000000da5a2', 'photos', 'desktop');
+-- The same person on a second browser the same day: a day, not two (0099).
+select pg_temp.visit((select claims from _who where k = 'editor'), '00000000-0000-4000-8000-0000000da5a3', 'stations', 'phone');
 
 do $$
 declare r meganet.app_visit;
@@ -138,7 +140,7 @@ begin
   v := pg_temp.as_role('authenticated', (select claims from _who where k = 'admin'),
          $q$select (select e ->> 'visits_30d' from jsonb_array_elements(meganet.admin_users()) e
                      where e ->> 'email' = 'dash-editor@example.test')$q$);
-  perform pg_temp.check_that('admin_users counts a person''s visits', v = '1', v);
+  perform pg_temp.check_that('admin_users counts the days a person visited, not their browsers (0099)', v = '1', v);
 
   v := pg_temp.as_role('authenticated', (select claims from _who where k = 'admin'),
          $q$select (select e ->> 'last_seen_at' from jsonb_array_elements(meganet.admin_users()) e

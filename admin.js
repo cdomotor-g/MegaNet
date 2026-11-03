@@ -75,9 +75,9 @@ const Admin = (function () {
       may: 'Give a task to any team, or to none yet, and see every task.',
       not: 'Change who is on a team they do not own.' },
     { who: 'Viewer', how: 'app_user.role = viewer',
-      may: 'Everything an editor may, today — the role is recorded but not enforced yet.',
-      not: 'To stop somebody writing, remove their allowlist entry rather than making them a viewer.',
-      note: 'not enforced' },
+      may: 'Everything an editor may, today — the role does not stop editing yet.',
+      not: 'Write an AI briefing on Flood-Net\'s own key. To stop somebody editing, remove the allowlist entry that lets them in rather than making them a viewer.',
+      note: 'does not stop edits' },
     { who: 'Editor', how: 'On the allowlist (by address or domain), signed in',
       may: 'Edit, delete and restore stations, and see and put back what a station said before; record inspections and maintenance, upload and place field photos, propose equipment, snapshot stations.json, generate exports.',
       not: 'Approve equipment suggestions, prune the upload log, manage users.' },
@@ -258,6 +258,43 @@ const Admin = (function () {
     unconfirmed: ['unconfirmed', 'txt-muted', 'Has not confirmed its address'],
   };
 
+  // What the words in the two lists mean (CLAUDE.md "Plain words"). The
+  // headings' hovers and the fold under the allowlist are this one list, so a
+  // heading and the fold never explain a word two ways.
+  const WORDS = {
+    users:     'People: one row for each person who has made an account. Their name, role and standing are kept here.',
+    allowlist: 'Rules about addresses, not people: each entry is one address or a whole domain, so it can match many accounts, or somebody who has not signed up yet.',
+    role:      'Admin is the one that matters: an admin manages this tab (users, the allowlist, tokens, teams) — while the allowlist also lets them edit. Editor and viewer edit alike, because whether somebody may edit is the allowlist\'s (May edit); a viewer only may not write an AI briefing on Flood-Net\'s own key.',
+    standing:  'Whether the account is let in as a member, who sees the field photos and inspection records: approved (by an allowlist entry, or by an administrator), waiting for an administrator, declined (locked out), or unconfirmed (its address was never confirmed).',
+    mayEdit:   'Whether this person may edit stations, record inspections and upload photos. Not set here: yes when their confirmed address matches an allowlist entry — their own address\'s, or their domain\'s, which is named under it.',
+    lastSeen:  'When the account last used Flood-Net, or online while it has a session open now. "Days in 30" is on how many of the last 30 days it was used, on any device.',
+    entry:     'An address (name@example.org) matches that one person; a domain (@example.org) matches everybody whose address ends in it, now and later.',
+    initialRole: 'The role an account starts with, the first time somebody this entry matches signs up. Used once: after that, change the role in Users. An address\'s own entry wins over its domain\'s; none set means editor.',
+    matches:   'How many accounts this entry lets in now. An address with none has not signed up yet: the entry is waiting for them.',
+  };
+  const WORD_LABELS = [
+    ['users', 'Users'], ['allowlist', 'Allowlist'], ['role', 'Role'], ['standing', 'Standing'],
+    ['mayEdit', 'May edit'], ['lastSeen', 'Last seen'], ['entry', 'Entry'], ['initialRole', 'Initial role'],
+    ['matches', 'Matches'],
+  ];
+  const th = (k, label, cls) => `<th scope="col"${cls ? ` class="${cls}"` : ''}>${termHtml(label, WORDS[k])}</th>`;
+
+  // Which allowlist entries match an address — the database's email_allowed()
+  // (0004) said again, for showing which rule is which person's. The database
+  // still decides; this only names the entry.
+  const isDomain = a => String(a.entry || '')[0] === '@';
+  function entryMatches(a, email) {
+    const x = String(a.entry || '').toLowerCase(), e = String(email || '').toLowerCase();
+    return x === e || (x[0] === '@' && e.endsWith(x));
+  }
+  // The one entry to name: the address's own, else the longest domain.
+  function allowedBy(email) {
+    const hits = (allow || []).filter(a => entryMatches(a, email));
+    return hits.find(a => !isDomain(a))
+      || hits.sort((a, b) => String(b.entry).length - String(a.entry).length)[0] || null;
+  }
+  function matchedUsers(a) { return (users || []).filter(u => entryMatches(a, u.email)); }
+
   // ── Users and the allowlist ──
 
   function peopleHtml() {
@@ -282,23 +319,22 @@ const Admin = (function () {
     return `
       <div class="panel">
         <div class="panel-header">
-          <h2 id="adm-users-h">Users <span class="badge">${list.length}</span></h2>
+          <h2 id="adm-users-h">Users — who has an account <span class="badge">${list.length}</span></h2>
           <button class="exp-btn-sm" onclick="Admin.load()">Refresh</button>
         </div>
-        <p class="small">Every account, most recently seen first. Anybody may sign up; to let somebody edit, put their
-          address on the allowlist below with the role they should arrive with (or approve them as an editor above).
-          <strong>Viewer</strong> is recorded but not enforced yet — to stop somebody editing, remove their allowlist
-          entry.</p>
+        <p class="small">${termHtml('People', WORDS.users)}: one row for each account, most recently seen first. Here you
+          set somebody's name and role and see their standing. Whether they may edit is <em>not</em> set here — the
+          allowlist below decides it, and <strong>May edit</strong> names the entry that lets them in.</p>
         ${status}
         ${list.length ? `
         <div class="table-wrap" role="region" tabindex="0" aria-labelledby="adm-users-h">
           <table class="adm-table">
-            <caption class="sr-only">Signed-in users, their roles, and whether the allowlist lets them edit</caption>
-            <colgroup><col style="width:34%"><col style="width:15%"><col style="width:7.5rem">
-              <col style="width:6.5rem"><col style="width:4.5rem"><col style="width:13%"><col style="width:9.5rem"></colgroup>
+            <caption class="sr-only">Every account, its role and standing, and which allowlist entry lets it edit</caption>
+            <colgroup><col style="width:32%"><col style="width:14%"><col style="width:7.5rem">
+              <col style="width:6.5rem"><col style="width:7rem"><col style="width:11%"><col style="width:9.5rem"></colgroup>
             <thead><tr>
-              <th scope="col">Email</th><th scope="col">Display name</th><th scope="col">Role</th>
-              <th scope="col">Standing</th><th scope="col">May edit</th><th scope="col" class="col-optional">Last seen</th>
+              <th scope="col">Email</th><th scope="col">Display name</th>${th('role', 'Role')}
+              ${th('standing', 'Standing')}${th('mayEdit', 'May edit')}${th('lastSeen', 'Last seen', 'col-optional')}
               <th scope="col"><span class="sr-only">Actions</span></th>
             </tr></thead>
             <tbody>
@@ -309,13 +345,13 @@ const Admin = (function () {
                              aria-label="Display name for ${escAttr(u.email)}"></td>
                   <td><select data-f="role" aria-label="Role for ${escAttr(u.email)}">
                     ${ROLES.map(r => `<option value="${r}"${u.role === r ? ' selected' : ''}>${r}</option>`).join('')}
-                  </select></td>
+                  </select>${roleHint(u)}</td>
                   <td>${standingCell(u)}</td>
-                  <td>${u.may_edit ? '<span class="txt-ok">yes</span>' : '<span class="txt-bad">no</span>'}</td>
+                  <td>${mayEditCell(u)}</td>
                   <td class="small col-optional" title="${escAttr(lastSeenTitle(u))}">${u.active_sessions
                     ? '<span class="adm-online">● online</span>'
                     : esc(typeof AdminDash !== 'undefined' ? AdminDash.ago(u.last_seen_at || u.last_sign_in_at) : '')}
-                    ${u.visits_30d ? `<br><span class="txt-muted">${u.visits_30d} day${u.visits_30d === 1 ? '' : 's'} in 30</span>` : ''}</td>
+                    ${u.visits_30d ? `<br><span class="txt-muted">${Math.min(30, u.visits_30d)} day${u.visits_30d === 1 ? '' : 's'} in 30</span>` : ''}</td>
                   <td class="adm-row-acts">
                     <button class="exp-btn-sm" onclick="Admin.saveUser('${escAttr(u.id)}')">Save</button>
                     ${u.status === 'declined' ? `<button class="exp-btn-sm" onclick="Admin.decide('${escAttr(u.id)}','reset')"
@@ -335,6 +371,37 @@ const Admin = (function () {
     if (!st) return '—';
     const by = u.status === 'approved' && u.decided_by ? ` by ${u.decided_by}` : '';
     return `<span class="${st[1]}" title="${escAttr(st[2] + by)}">${esc(st[0])}</span>`;
+  }
+
+  // Does the allowlist let this account edit right now? admin_users' may_edit
+  // is the address matching an entry; a decline or an unconfirmed address
+  // still stops it (is_editor() asks editor_email(), 0054, 0062).
+  function edits(u) { return !!u.may_edit && u.status !== 'declined' && u.status !== 'unconfirmed'; }
+
+  // "yes, by @bom.gov.au": the column that ties a person to the rule that
+  // lets them in, so the two lists read as one answer.
+  function mayEditCell(u) {
+    if (!u.may_edit) return '<span class="txt-bad">no</span><div class="small txt-muted">no entry matches</div>';
+    if (!edits(u)) {
+      return `<span class="txt-bad">no</span><div class="small txt-muted">${u.status === 'declined'
+        ? 'declined' : 'not until confirmed'}</div>`;
+    }
+    const a = allowedBy(u.email);
+    if (!a) return '<span class="txt-ok">yes</span>';
+    return `<span class="txt-ok">yes</span><div class="small txt-muted adm-by">${isDomain(a)
+      ? `by <code>${esc(a.entry)}</code>` : 'by its own entry'}</div>`;
+  }
+
+  // Said where the role and the allowlist disagree — the two cases where the
+  // Role column on its own says the wrong thing.
+  function roleHint(u) {
+    if (u.role === 'admin' && !edits(u)) {
+      return '<div class="small txt-warn">not in force: cannot edit</div>';
+    }
+    if (u.role === 'viewer' && edits(u)) {
+      return '<div class="small txt-warn">still edits: viewer does not stop editing</div>';
+    }
+    return '';
   }
 
   // The hover on "Last seen": the absolute times, and what browser the latest
@@ -358,15 +425,20 @@ const Admin = (function () {
 
   function allowHtml() {
     const list = allow || [];
+    const open = typeof Auth === 'undefined' || !Auth.signupOpen || Auth.signupOpen();
     return `
       <div class="panel">
         <div class="panel-header">
-          <h2 id="adm-allow-h">Allowlist — who may sign in and edit <span class="badge">${list.length}</span></h2>
+          <h2 id="adm-allow-h">Allowlist — who may edit <span class="badge">${list.length}</span></h2>
         </div>
-        <p class="small">An address (<code>name@example.org</code>) lets one person in; a domain
-          (<code>@example.org</code>) lets in everybody at it. The initial role is what a person
-          gets the first time they sign in — an address's wins over its domain's, and it is never
-          applied again after that.</p>
+        <p class="small">${termHtml('Rules, not people', WORDS.allowlist)}. An address (<code>name@example.org</code>)
+          matches one person; a domain (<code>@example.org</code>) matches everybody at it — including people who have
+          not signed up yet. A confirmed address that an entry matches <strong>may edit</strong>, and is approved
+          without waiting for you. ${open
+            ? 'Anybody else may still make an account; they wait under Waiting for approval.'
+            : 'While sign-up is limited to the allowlist, an entry is also the only way to make an account.'}
+          The <strong>initial role</strong> is the role a new account starts with, used once; after that, change it
+          in Users.</p>
         <form class="adm-form" onsubmit="Admin.saveEntry();return false">
           <label>Address or @domain
             <input type="text" id="adm-entry" inputmode="email" autocomplete="off" required
@@ -385,21 +457,21 @@ const Admin = (function () {
         ${list.length ? `
         <div class="table-wrap" role="region" tabindex="0" aria-labelledby="adm-allow-h">
           <table class="adm-table">
-            <caption class="sr-only">Allowlist entries, the role each gives a first sign-in, and how many users each matches</caption>
-            <colgroup><col style="width:32%"><col style="width:6rem"><col style="width:28%">
-              <col style="width:4rem"><col style="width:14%"><col style="width:9.5rem"></colgroup>
+            <caption class="sr-only">Allowlist entries, the role each gives a new account, and which accounts each lets in</caption>
+            <colgroup><col style="width:30%"><col style="width:7.5rem"><col style="width:26%">
+              <col style="width:7rem"><col style="width:14%"><col style="width:9.5rem"></colgroup>
             <thead><tr>
-              <th scope="col">Entry</th><th scope="col">Initial role</th><th scope="col">Note</th>
-              <th scope="col">Users</th><th scope="col" class="col-optional">Added</th>
+              ${th('entry', 'Entry')}${th('initialRole', 'Initial role')}<th scope="col">Note</th>
+              ${th('matches', 'Matches')}<th scope="col" class="col-optional">Added</th>
               <th scope="col"><span class="sr-only">Actions</span></th>
             </tr></thead>
             <tbody>
               ${list.map((a, i) => `
                 <tr>
                   <td><code>${esc(a.entry)}</code>${a.kind === 'domain' ? ' <span class="badge">domain</span>' : ''}</td>
-                  <td>${esc(a.initial_role || 'editor')}</td>
+                  <td>${initialRoleCell(a)}</td>
                   <td class="small">${esc(a.note || '')}</td>
-                  <td>${esc(a.users)}</td>
+                  <td>${matchesCell(a)}</td>
                   <td class="small col-optional">${when(a.added_at)}${a.added_by ? ` · ${esc(a.added_by)}` : ''}</td>
                   <td class="adm-row-acts">
                     <button class="exp-btn-sm" onclick="Admin.editEntry(${i})">Edit</button>
@@ -409,7 +481,45 @@ const Admin = (function () {
             </tbody>
           </table>
         </div>` : ''}
+        ${whyTwoHtml()}
       </div>`;
+  }
+
+  // An address's initial role does nothing once its account exists: it was
+  // given (or, for an entry added later, never given) at sign-up.
+  function initialRoleCell(a) {
+    const role = esc(a.initial_role || 'editor');
+    if (isDomain(a) || !users || !matchedUsers(a).length) return role;
+    return `<span class="txt-muted">${role}</span><div class="small txt-muted">not used now: has an account</div>`;
+  }
+
+  // How many accounts the entry lets in, and — on hover, and for one — who.
+  function matchesCell(a) {
+    const n = Number(a.users) || 0;
+    if (!n) return isDomain(a) ? '0' : '0<div class="small txt-muted">no account yet</div>';
+    const who = users ? matchedUsers(a).map(u => u.email) : [];
+    if (!who.length) return esc(n);
+    return n === 1 && !isDomain(a) ? '1'
+      : `<span title="${escAttr(who.join(', '))}">${esc(n)}</span>`;
+  }
+
+  // Why the people and the rules are two lists, and what each word means — the
+  // same meanings as the headings' hovers, for a finger or a keyboard.
+  function whyTwoHtml() {
+    return `
+        <details class="adm-why">
+          <summary>Why two lists, and what the words in them mean</summary>
+          <p class="small"><strong>Users</strong> are people; the <strong>allowlist</strong> is rules. They cannot be one
+            table, because neither fits the other's rows: one domain entry (<code>@bom.gov.au</code>) lets in every
+            Bureau address, including people who have not signed up yet, and an address can be put on the list before
+            its owner ever arrives; while somebody approved by hand — a council officer who should see the photos — is
+            an account with no entry at all. So each account's <strong>May edit</strong> names the entry that applies
+            to it, and each entry's <strong>Matches</strong> counts the accounts it lets in.</p>
+          <p class="small"><strong>To stop somebody editing</strong>, remove the entry that lets them in (their May edit
+            says which). Somebody let in only by a domain has no entry of their own, and short of removing the
+            whole domain there is no way to stop them today: <strong>viewer</strong> does not stop editing yet.</p>
+          <dl class="adm-words">${WORD_LABELS.map(([k, label]) => `<dt>${esc(label)}</dt><dd>${esc(WORDS[k])}</dd>`).join('')}</dl>
+        </details>`;
   }
 
   // ── Roles and privileges ──
