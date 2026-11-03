@@ -425,12 +425,21 @@ const BaseStations = (function () {
   // and time zone. Sent as the smallest patch that says what changed, through
   // the same checks the station's own page uses.
 
+  // The station's decoder (receivers.sdr.decoder, RPi ALERT 0.16+).
+  const DECODERS = [['lean', 'Lean — about a third of the work (default from 0.17)'], ['full', 'Full — the original decoder'],
+    ['compare', 'Compare — both on every burst, to check Lean']];
+  const DECODER_MEANING = 'How the station reads a burst. Lean filters each carrier guess once, about a third of the Full decoder\'s work, '
+    + 'and read the same in 99.9% of 11,628 bursts at 18 Bateson. Compare runs both on every burst and counts where they differ — '
+    + 'the readings sent are still the chosen one\'s — so it costs more than either.';
+
   function formFrom(cfg, rx) {
     const sd = (cfg.receivers || {}).sdr || {};
     const f = {
       name: cfg.name || '', enabled: (cfg.meganet || {}).enabled !== false, receptions: (cfg.meganet || {}).receptions !== false,
       sdrOn: sd.enabled !== false, freq: sd.freqHz ? (sd.freqHz / 1e6).toFixed(4) : '', format: sd.format || 'BINARY',
       gain: sd.gainDb == null ? 'auto' : String(sd.gainDb), ppm: String(sd.ppm || 0), squelch: String(sd.squelchDb ?? 8), rate: String(sd.sampleRate || 0),
+      // RPi ALERT 0.16 and later (MegaNet #259); absent on older stations, and then not offered.
+      decoder: sd.decoder || '',
       audio: (cfg.audio || {}).enabled === false ? 'off' : ((cfg.audio || {}).mode || 'auto'), volume: String((cfg.audio || {}).volume ?? 80),
       kiosk: (cfg.kiosk || {}).mode || 'auto', tz: (cfg.system || {}).timezone || '',
     };
@@ -478,6 +487,7 @@ const BaseStations = (function () {
       const sq = num(f.squelch, 'the squelch is 2–40 dB', 2, 40);
       if (sq !== (sd.squelchDb ?? 8)) put('receivers.sdr.squelchDb', sq);
       if (Number(f.rate) !== (sd.sampleRate || 0)) put('receivers.sdr.sampleRate', Number(f.rate));
+      if (sd.decoder !== undefined && f.decoder && f.decoder !== sd.decoder) put('receivers.sdr.decoder', f.decoder);
       // Each stick's own, as the station's page builds them: entries for
       // sticks not shown are kept; a blank field is the shared setting.
       const sticks = rx.filter(x => x.kind === 'sdr');
@@ -551,7 +561,9 @@ const BaseStations = (function () {
         ${inp('ppm', 'Correction, ppm', ' inputmode="numeric"')}
         ${inp('squelch', 'Squelch, dB', ' inputmode="numeric"')}
         ${sel('rate', 'Window', [['0', 'Automatic — the narrowest that holds the channels']].concat(WINDOWS))}
+        ${f.decoder ? sel('decoder', termHtml('Decoder', DECODER_MEANING), DECODERS) : ''}
       </div>
+      ${f.decoder ? `<p class="small qs-dim"><strong>Decoder:</strong> ${esc(DECODER_MEANING)}</p>` : ''}
       ${sticks.length ? `<h4>Each stick <span class="small qs-dim">(blank: as above)</span></h4>${sticks.map(r => {
         const v = f['s:' + r.key] || {};
         const k = escAttr(r.key);

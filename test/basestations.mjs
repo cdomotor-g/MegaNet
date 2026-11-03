@@ -393,7 +393,15 @@ try {
     const g4 = JSON.parse(JSON.stringify(f4));
     g4['s:' + stick1] = Object.assign({}, g4['s:' + stick1], { name: 'North stick' });
     const serialSame = B._patchFrom(old, f4, rx4), serialRenamed = B._patchFrom(old, g4, rx4);
+    // The decoder (RPi ALERT 0.16+): sent when changed, never to a station that has none.
+    const d17 = JSON.parse(JSON.stringify(cfg));
+    d17.receivers.sdr.decoder = 'compare';
+    const fd = B._formFrom(d17, rx);
+    const decoder = { shown: fd.decoder, none: B._formFrom(cfg, rx).decoder,
+      same: B._patchFrom(d17, fd, rx), lean: B._patchFrom(d17, Object.assign({}, fd, { decoder: 'lean' }), rx),
+      old: B._patchFrom(cfg, Object.assign({}, f, { decoder: 'lean' }), rx) };
     return {
+      decoder,
       serialShown: f4['s:' + stick1].gain, serialSame, serialRenamed,
       liveness: [
         B._liveness({ managed: true, mode: 'manage', idle_s: 60, last_seen_at: t(20) }).k,
@@ -431,6 +439,10 @@ try {
     pure.deaf.length === 1 && pure.deaf[0][0] === 'txt-bad' && pure.deaf[0][1] === 'Stick A has decoded nothing for 26 h', JSON.stringify(pure.deaf));
   ok('what needs a look: a refused token, power, heat, the clock, the queue, a receiver down — and not the GPS',
     pure.flags.join('|') === 'token refused|under-voltage now|77 °C|clock not set|600 readings waiting|1 receiver not receiving', pure.flags.join('|'));
+  ok('the decoder is offered where the station has one, and sent only when changed',
+    pure.decoder.shown === 'compare' && pure.decoder.none === '' && Object.keys(pure.decoder.same.patch).length === 0
+      && JSON.stringify(pure.decoder.lean.patch) === '{"receivers":{"sdr":{"decoder":"lean"}}}' && Object.keys(pure.decoder.old.patch).length === 0,
+    JSON.stringify(pure.decoder));
   ok('the settings form untouched is no change at all', pure.same.patch && Object.keys(pure.same.patch).length === 0, JSON.stringify(pure.same));
   const p = (pure.changed || {}).patch || {};
   ok('a changed form is the smallest patch that says so',
