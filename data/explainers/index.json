@@ -1,6 +1,6 @@
 {
  "format": "floodnet-explainer-index/1",
- "updated_at": "2026-11-03T12:32:32Z",
+ "updated_at": "2026-11-03T23:56:36Z",
  "explainers": [
   {
    "id": "welcome",
@@ -9,8 +9,8 @@
    "summary": "A first look, with Graham and Turbo: the stations, the repeaters and the radio paths between them, in one place — and where to start.",
    "kind": "welcome",
    "presenter": "seasoned-hydrographer",
-   "voice": "draft",
-   "secs": 140,
+   "voice": "final",
+   "secs": 149,
    "updated": "2026-11-03"
   }
  ]

@@ -5,104 +5,319 @@
  "title": "Welcome to Flood-Net",
  "summary": "A first look, with Graham and Turbo: the stations, the repeaters and the radio paths between them, in one place — and where to start.",
  "presenter": "seasoned-hydrographer",
- "voice": "draft",
+ "voice": "final",
  "updated": "2026-11-03",
  "order": 1,
  "scenes": [
-  { "type": "cover", "title": "Welcome to Flood-Net", "sub": "A first look, with Graham",
-    "line": "The stations, the repeaters and the radio paths between them — in one place.",
-    "say": "G'day. Graham Watts. I've looked after these gauges longer than most of them have been on the air. Let me show you round.",
-    "secs": 10 },
-  { "type": "figure", "title": "The network", "sub": "Counted as it plays",
-    "say": "These are the stations that measure the rain and the rivers, and the repeaters that relay their readings home by radio.",
-    "secs": 10,
-    "figures": [
-     { "of": "stations", "value": 4900, "label": "stations on file" },
-     { "of": "rain", "value": 2400, "label": "with a rain gauge" },
-     { "of": "repeaters", "value": 140, "label": "repeaters" }
-    ],
-    "note": "Counted from the station list this device has loaded." },
-  { "type": "map", "title": "On the map", "sub": "Every station on file",
-    "say": "Here they all are, from the coast to well past the range.",
-    "secs": 6 },
-  { "type": "shot", "title": "The front page", "sub": "How the network is, and the tools used most",
-    "say": "The front page tells you how the network is right now, and puts the tools you'll reach for most a press away.",
-    "secs": 10, "shot": "home",
-    "callouts": [
-     { "target": "status", "text": "How the network is, right now", "cue": "right now" },
-     { "target": "most", "text": "The tools used most, a press away", "cue": "tools" }
-    ] },
-  { "type": "shot", "title": "A station's card", "sub": "Everything about one site",
-    "say": "Press a station and its card has the lot: its health, who owns it, and its rain and river neighbours, their plots a press away.",
-    "secs": 12, "shot": "station-card", "focus": "card",
-    "callouts": [
-     { "target": "health", "text": "When it was last heard, and anything wrong", "cue": "health" },
-     { "target": "owner", "text": "Who owns it", "cue": "owns" },
-     { "target": "data", "text": "Its river and rain neighbours, plotted", "cue": "rain" }
-    ] },
-  { "type": "shot", "title": "How the network is", "sub": "Checked every weekday morning",
-    "say": "Every weekday morning the network checks itself, and the crew put what needs a look into a short bulletin, with one for the whole week on Mondays.",
-    "secs": 13, "shot": "health",
-    "callouts": [
-     { "target": "bulletin", "text": "The morning's bulletin, said by the crew", "cue": "bulletin" },
-     { "target": "kinds", "text": "The day's, or the week's", "cue": "week" }
-    ] },
-  { "type": "shot", "title": "The radio side", "sub": "What else is on the air",
-    "say": "On the radio side, it lists every licensed transmitter that could trouble a repeater, scored, worst first, with path profiles and coverage on the map.",
-    "secs": 13, "shot": "rf",
-    "callouts": [
-     { "target": "byRepeater", "text": "Each repeater, and what could trouble it", "cue": "repeater" },
-     { "target": "candidates", "text": "Every licensed transmitter, scored, worst first", "cue": "scored" }
-    ] },
-  { "type": "shot", "title": "Out in the field", "sub": "Made for a phone",
-    "say": "Out in the field it's made for your phone: the stations nearest where you're standing, the inspection sheet, and photos that know where they were taken. There's plenty more. Turbo, you're quicker than me.",
-    "secs": 17, "shot": "nearby",
-    "callouts": [
-     { "target": "list", "text": "The stations nearest you, by distance", "cue": "nearest" },
-     { "target": "first", "text": "Press one for its sheet, photos or the way in", "cue": "inspection" }
-    ] },
-  { "type": "tally", "title": "And plenty more", "sub": "A line each on the Capabilities page", "presenter": "turbo",
-    "say": "Flat out, then! Path profiles, link budgets, radio coverage, repeater sites, ALERT decoders, bit-flip hunting, interference cases, level surveys, two-peg tests, field photos, printable path maps, and exports for Radio Mobile and Google Earth!",
-    "secs": 13,
-    "items": [
-     { "icon": "〽️", "text": "Path profiles", "cue": "path profiles" },
-     { "icon": "📶", "text": "Link budgets and fade margins", "cue": "link budgets" },
-     { "icon": "📡", "text": "Radio coverage", "cue": "radio coverage" },
-     { "icon": "🗼", "text": "The best spots for a repeater", "cue": "repeater sites" },
-     { "icon": "🔣", "text": "ALERT, ALERT2 and HFEM decoders", "cue": "decoders" },
-     { "icon": "🔎", "text": "Bit-flip sources, hunted down", "cue": "bit-flip" },
-     { "icon": "🔬", "text": "Interference cases", "cue": "interference" },
-     { "icon": "📏", "text": "Level surveys", "cue": "level surveys" },
-     { "icon": "🎯", "text": "Two-peg tests", "cue": "two-peg" },
-     { "icon": "📷", "text": "Field photos, stamped", "cue": "field photos" },
-     { "icon": "🖨️", "text": "Printable radio path maps", "cue": "printable" },
-     { "icon": "📤", "text": "Radio Mobile, KML and CSV exports", "cue": "exports" }
-    ] },
-  { "type": "tally", "title": "Where the data comes from", "sub": "Every source credited on the Capabilities page", "presenter": "turbo",
-    "say": "And the data comes in from the Bureau, ACMA, the Queensland Government, Transport and Main Roads, the councils' cameras, Geoscience Australia, New South Wales Spatial Services, the ACCC, OpenStreetMap, Esri and the ECMWF. Personal best!",
-    "secs": 14,
-    "items": [
-     { "icon": "🌧️", "text": "Bureau of Meteorology", "cue": "Bureau" },
-     { "icon": "📻", "text": "ACMA's radio licences", "cue": "ACMA" },
-     { "icon": "🏛️", "text": "Queensland Government", "cue": "Queensland" },
-     { "icon": "🛣️", "text": "Transport and Main Roads", "cue": "Transport" },
-     { "icon": "🎥", "text": "Councils' flood cameras", "cue": "councils'" },
-     { "icon": "⛰️", "text": "Geoscience Australia's LiDAR", "cue": "Geoscience" },
-     { "icon": "🗾", "text": "NSW Spatial Services", "cue": "New South Wales" },
-     { "icon": "📱", "text": "ACCC mobile coverage", "cue": "ACCC" },
-     { "icon": "🗺️", "text": "OpenStreetMap", "cue": "OpenStreetMap" },
-     { "icon": "🛰️", "text": "Esri imagery", "cue": "Esri" },
-     { "icon": "☔", "text": "ECMWF's rain outlook", "cue": "ECMWF" }
-    ] },
-  { "type": "shot", "title": "The rest, a line each", "sub": "And where each one comes from",
-    "say": "That's the start of it. The lot is listed on one page, a line each, with where each one comes from, and there are short videos for the jobs you'll do most.",
-    "secs": 14, "shot": "capabilities",
-    "callouts": [
-     { "target": "search", "text": "Search everything it can do", "cue": "listed" },
-     { "target": "facts", "text": "Every outside source, credited", "cue": "comes from" }
-    ] },
-  { "type": "signoff", "title": "Have a look round", "sub": "Start anywhere",
-    "say": "Have a look round. It's going to be a long day, so we might as well do it properly.",
-    "secs": 8, "line": "Might as well do it properly.", "tab": "home" }
+  {
+   "type": "cover",
+   "title": "Welcome to Flood-Net",
+   "sub": "A first look, with Graham",
+   "line": "The stations, the repeaters and the radio paths between them — in one place.",
+   "say": "G'day. Graham Watts. I've looked after these gauges longer than most of them have been on the air. Let me show you round.",
+   "secs": 10
+  },
+  {
+   "type": "figure",
+   "title": "The network",
+   "sub": "Counted as it plays",
+   "say": "These are the stations that measure the rain and the rivers, and the repeaters that relay their readings home by radio.",
+   "secs": 10,
+   "figures": [
+    {
+     "of": "stations",
+     "value": 4900,
+     "label": "stations on file"
+    },
+    {
+     "of": "rain",
+     "value": 2400,
+     "label": "with a rain gauge"
+    },
+    {
+     "of": "repeaters",
+     "value": 140,
+     "label": "repeaters"
+    }
+   ],
+   "note": "Counted from the station list this device has loaded."
+  },
+  {
+   "type": "map",
+   "title": "On the map",
+   "sub": "Every station on file",
+   "say": "Here they all are, from the coast to well past the range.",
+   "secs": 6
+  },
+  {
+   "type": "shot",
+   "title": "The front page",
+   "sub": "How the network is, and the tools used most",
+   "say": "The front page tells you how the network is right now, and puts the tools you'll reach for most a press away.",
+   "secs": 10,
+   "shot": "home",
+   "callouts": [
+    {
+     "target": "status",
+     "text": "How the network is, right now",
+     "cue": "right now"
+    },
+    {
+     "target": "most",
+     "text": "The tools used most, a press away",
+     "cue": "tools"
+    }
+   ]
+  },
+  {
+   "type": "shot",
+   "title": "A station's card",
+   "sub": "Everything about one site",
+   "say": "Press a station and its card has the lot: its health, who owns it, and its rain and river neighbours, their plots a press away.",
+   "secs": 12,
+   "shot": "station-card",
+   "focus": "card",
+   "callouts": [
+    {
+     "target": "health",
+     "text": "When it was last heard, and anything wrong",
+     "cue": "health"
+    },
+    {
+     "target": "owner",
+     "text": "Who owns it",
+     "cue": "owns"
+    },
+    {
+     "target": "data",
+     "text": "Its river and rain neighbours, plotted",
+     "cue": "rain"
+    }
+   ]
+  },
+  {
+   "type": "shot",
+   "title": "How the network is",
+   "sub": "Checked every weekday morning",
+   "say": "Every weekday morning the network checks itself, and the crew put what needs a look into a short bulletin, with one for the whole week on Mondays.",
+   "secs": 13,
+   "shot": "health",
+   "callouts": [
+    {
+     "target": "bulletin",
+     "text": "The morning's bulletin, said by the crew",
+     "cue": "bulletin"
+    },
+    {
+     "target": "kinds",
+     "text": "The day's, or the week's",
+     "cue": "week"
+    }
+   ]
+  },
+  {
+   "type": "shot",
+   "title": "The radio side",
+   "sub": "What else is on the air",
+   "say": "On the radio side, it lists every licensed transmitter that could trouble a repeater, scored, worst first, with path profiles and coverage on the map.",
+   "secs": 13,
+   "shot": "rf",
+   "callouts": [
+    {
+     "target": "byRepeater",
+     "text": "Each repeater, and what could trouble it",
+     "cue": "repeater"
+    },
+    {
+     "target": "candidates",
+     "text": "Every licensed transmitter, scored, worst first",
+     "cue": "scored"
+    }
+   ]
+  },
+  {
+   "type": "shot",
+   "title": "Out in the field",
+   "sub": "Made for a phone",
+   "say": "Out in the field it's made for your phone: the stations nearest where you're standing, the inspection sheet, and photos that know where they were taken. There's plenty more. Turbo, you're quicker than me.",
+   "secs": 17,
+   "shot": "nearby",
+   "callouts": [
+    {
+     "target": "list",
+     "text": "The stations nearest you, by distance",
+     "cue": "nearest"
+    },
+    {
+     "target": "first",
+     "text": "Press one for its sheet, photos or the way in",
+     "cue": "inspection"
+    }
+   ]
+  },
+  {
+   "type": "tally",
+   "title": "And plenty more",
+   "sub": "A line each on the Capabilities page",
+   "presenter": "turbo",
+   "say": "Flat out, then! Path profiles, link budgets, radio coverage, repeater sites, ALERT decoders, bit-flip hunting, interference cases, level surveys, two-peg tests, field photos, printable path maps, and exports for Radio Mobile and Google Earth!",
+   "secs": 13,
+   "items": [
+    {
+     "icon": "〽️",
+     "text": "Path profiles",
+     "cue": "path profiles"
+    },
+    {
+     "icon": "📶",
+     "text": "Link budgets and fade margins",
+     "cue": "link budgets"
+    },
+    {
+     "icon": "📡",
+     "text": "Radio coverage",
+     "cue": "radio coverage"
+    },
+    {
+     "icon": "🗼",
+     "text": "The best spots for a repeater",
+     "cue": "repeater sites"
+    },
+    {
+     "icon": "🔣",
+     "text": "ALERT, ALERT2 and HFEM decoders",
+     "cue": "decoders"
+    },
+    {
+     "icon": "🔎",
+     "text": "Bit-flip sources, hunted down",
+     "cue": "bit-flip"
+    },
+    {
+     "icon": "🔬",
+     "text": "Interference cases",
+     "cue": "interference"
+    },
+    {
+     "icon": "📏",
+     "text": "Level surveys",
+     "cue": "level surveys"
+    },
+    {
+     "icon": "🎯",
+     "text": "Two-peg tests",
+     "cue": "two-peg"
+    },
+    {
+     "icon": "📷",
+     "text": "Field photos, stamped",
+     "cue": "field photos"
+    },
+    {
+     "icon": "🖨️",
+     "text": "Printable radio path maps",
+     "cue": "printable"
+    },
+    {
+     "icon": "📤",
+     "text": "Radio Mobile, KML and CSV exports",
+     "cue": "exports"
+    }
+   ]
+  },
+  {
+   "type": "tally",
+   "title": "Where the data comes from",
+   "sub": "Every source credited on the Capabilities page",
+   "presenter": "turbo",
+   "say": "And the data comes in from the Bureau, ACMA, the Queensland Government, Transport and Main Roads, the councils' cameras, Geoscience Australia, New South Wales Spatial Services, the ACCC, OpenStreetMap, Esri and the ECMWF. Personal best!",
+   "secs": 14,
+   "items": [
+    {
+     "icon": "🌧️",
+     "text": "Bureau of Meteorology",
+     "cue": "Bureau"
+    },
+    {
+     "icon": "📻",
+     "text": "ACMA's radio licences",
+     "cue": "ACMA"
+    },
+    {
+     "icon": "🏛️",
+     "text": "Queensland Government",
+     "cue": "Queensland"
+    },
+    {
+     "icon": "🛣️",
+     "text": "Transport and Main Roads",
+     "cue": "Transport"
+    },
+    {
+     "icon": "🎥",
+     "text": "Councils' flood cameras",
+     "cue": "councils'"
+    },
+    {
+     "icon": "⛰️",
+     "text": "Geoscience Australia's LiDAR",
+     "cue": "Geoscience"
+    },
+    {
+     "icon": "🗾",
+     "text": "NSW Spatial Services",
+     "cue": "New South Wales"
+    },
+    {
+     "icon": "📱",
+     "text": "ACCC mobile coverage",
+     "cue": "ACCC"
+    },
+    {
+     "icon": "🗺️",
+     "text": "OpenStreetMap",
+     "cue": "OpenStreetMap"
+    },
+    {
+     "icon": "🛰️",
+     "text": "Esri imagery",
+     "cue": "Esri"
+    },
+    {
+     "icon": "☔",
+     "text": "ECMWF's rain outlook",
+     "cue": "ECMWF"
+    }
+   ]
+  },
+  {
+   "type": "shot",
+   "title": "The rest, a line each",
+   "sub": "And where each one comes from",
+   "say": "That's the start of it. The lot is listed on one page, a line each, with where each one comes from, and there are short videos for the jobs you'll do most.",
+   "secs": 14,
+   "shot": "capabilities",
+   "callouts": [
+    {
+     "target": "search",
+     "text": "Search everything it can do",
+     "cue": "listed"
+    },
+    {
+     "target": "facts",
+     "text": "Every outside source, credited",
+     "cue": "comes from"
+    }
+   ]
+  },
+  {
+   "type": "signoff",
+   "title": "Watch this space",
+   "sub": "Still growing, a new thing at a time",
+   "say": "And it's still growing: new things land all the time, and What's new, up in the banner, lists each one. So watch this space. It's going to be a long day, so we might as well do it properly.",
+   "secs": 17,
+   "line": "Might as well do it properly.",
+   "next": "✨ What's new — up in the banner"
+  }
  ]
 }
