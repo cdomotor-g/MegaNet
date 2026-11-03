@@ -292,6 +292,18 @@ Two things keep it a route rather than a hole, both asserted in
   `X-Forwarded-For`, so one person's retries do not spend the project's whole
   auth rate limit.
 
+One thing it does besides carry: **the station list, when it has not changed.**
+A `GET /api/db/rest/v1/rpc/stations_doc` first reads when the datastore last
+built the list (`stations_doc_cache.built_at`, migration 0069 — a few bytes,
+readable by anyone) and uses that as the list's `ETag`. A request whose
+`If-None-Match` names it — `sw.js` sends one from the copy it kept — is answered
+`304 Not Modified` with no list; any other gets the list with the `ETag` on it.
+The note is read before the list, never after, so an `ETag` is never newer than
+the list it goes out with. It is compared rather than hashed because hashing
+5 MB takes more than the Free plan's 10 ms of Worker CPU. On a phone on one bar
+that is about 900 KB not downloaded on most visits. `test/db-proxy.mjs` holds the
+304, the 200 and the unreadable note; `test/offline.mjs` the worker's half.
+
 Origins without that Worker in front of them — `github.io`, `file://`, a
 checkout on a spare port — are not on the list and keep dialling Supabase
 directly, exactly as every origin did before. The Data source panel says which

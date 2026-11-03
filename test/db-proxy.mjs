@@ -14,7 +14,8 @@
 //
 // Run:  npm run dbproxy
 
-import { dbProxyTarget, dbProxyRequestHeaders, dbProxyIsUpgrade } from '../worker/index.js';
+import worker, { dbProxyTarget, dbProxyRequestHeaders, dbProxyIsUpgrade,
+                 stationsDocTag, etagMatches, STATIONS_DOC_TAG_URL } from '../worker/index.js';
 
 const UPSTREAM = 'https://jjprlritvhdqpvphfrnu.supabase.co';
 const results = [];
@@ -129,6 +130,61 @@ const plain = dbProxyRequestHeaders(wsHeaders);
 header('on a plain request the handshake headers are stripped',
        plain.get('upgrade') === null && plain.get('connection') === null && plain.get('sec-websocket-key') === null,
        String(plain.get('upgrade')));
+
+// ── The station list, when it has not changed ────────────────────────────────
+// Its ETag is the ready-built list's built_at (0069), read before the list; a
+// browser that names it is told 304 with no list, one that does not is sent the
+// list with it, and when the note cannot be read the list goes as it always
+// did. Supabase stood in for on fetch.
+const AT = '2026-10-30T01:28:55.290353+00:00';
+const TAG = `"sd-${AT}"`;
+header('a built_at row is the list\'s ETag', stationsDocTag([{ built_at: AT }]) === TAG, String(stationsDocTag([{ built_at: AT }])));
+header('no row, or a row that is not a time, is no ETag',
+       stationsDocTag([]) === null && stationsDocTag(null) === null && stationsDocTag([{ built_at: 'x"y' }]) === null, 'null');
+header('If-None-Match names it, as sent and as Cloudflare weakens it, in a list',
+       etagMatches(TAG, TAG) && etagMatches(`W/${TAG}`, TAG) && etagMatches(`"other", ${TAG}`, TAG), 'matches');
+header('a different or missing If-None-Match does not', !etagMatches('"sd-2026-01-01"', TAG) && !etagMatches(null, TAG), 'no match');
+
+const realFetch = globalThis.fetch;
+async function ask(ifNoneMatch, { tagOk = true } = {}) {
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push({ url: String(url), headers: init.headers });
+    if (String(url) === STATIONS_DOC_TAG_URL) {
+      return tagOk ? new Response(JSON.stringify([{ built_at: AT }]), { status: 200, headers: { 'Content-Type': 'application/json' } })
+        : new Response('{"message":"nope"}', { status: 500 });
+    }
+    return new Response('{"stations":[]}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  try {
+    const headers = { apikey: 'k', 'Accept-Profile': 'meganet', Accept: 'application/json' };
+    if (ifNoneMatch) headers['If-None-Match'] = ifNoneMatch;
+    const res = await worker.fetch(new Request('https://floodwarning.net/api/db/rest/v1/rpc/stations_doc', { headers }), {}, {});
+    return { status: res.status, etag: res.headers.get('etag'), body: await res.text(), cache: res.headers.get('cache-control'), calls };
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+{
+  const same = await ask(`W/${TAG}`);
+  header('the list unchanged: 304, its ETag, no body, and the list never asked for',
+         same.status === 304 && same.etag === TAG && same.body === '' && same.cache === 'no-store'
+           && same.calls.length === 1 && same.calls[0].url === STATIONS_DOC_TAG_URL,
+         `${same.status} ${same.etag} ${same.calls.map(c => c.url.replace(UPSTREAM, '')).join(' then ')}`);
+  header('the If-None-Match itself is not forwarded to Supabase',
+         same.calls.every(c => !c.headers || c.headers.get('if-none-match') === null), 'not forwarded');
+  const changed = await ask('"sd-2026-01-01T00:00:00+00:00"');
+  header('the list changed: 200, the list, and its ETag — the note read first',
+         changed.status === 200 && changed.etag === TAG && changed.body === '{"stations":[]}'
+           && changed.calls.length === 2 && changed.calls[0].url === STATIONS_DOC_TAG_URL,
+         `${changed.status} ${changed.etag} ${changed.calls.map(c => c.url.replace(UPSTREAM, '')).join(' then ')}`);
+  const first = await ask(null);
+  header('a first visit: the list with its ETag', first.status === 200 && first.etag === TAG && first.body === '{"stations":[]}',
+         `${first.status} ${first.etag}`);
+  const noNote = await ask(`W/${TAG}`, { tagOk: false });
+  header('the note unreadable: the list as it always went, with no ETag',
+         noNote.status === 200 && noNote.etag === null && noNote.body === '{"stations":[]}', `${noNote.status} ${noNote.etag}`);
+}
 
 console.log('');
 for (const r of results) console.log(`  ${r.ok ? '✓' : '✗'} ${r.what} — ${r.detail}`);

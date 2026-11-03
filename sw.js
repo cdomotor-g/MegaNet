@@ -284,14 +284,37 @@ async function file(event) {
 // The station document and the sheets' tables: the network's, with a copy
 // kept beside it and when it was kept; with no network, the copy, marked as
 // one — the loaders put its age in the header.
+//
+// A copy kept with an ETag, from this origin, is asked for again with it
+// (If-None-Match): the station list through /api/db names its build
+// (worker/index.js), stations.json its file. A 304 says the copy is the list
+// as it stands now, so the copy is the answer — as a plain 200, no different
+// to the page from the network's — and is kept again, with the time it was
+// found current. Never off this origin: the header would have to be allowed
+// by somebody else's CORS, and Supabase's does not.
 async function kept(event) {
   const req = event.request;
+  let hit = null;
+  try { hit = await caches.match(req.url, { cacheName: DATA }); } catch (_) { /* no copy */ }
+  const tag = hit && new URL(req.url).origin === SCOPE.origin ? hit.headers.get('ETag') : null;
+  let ask = req;
+  if (tag) {
+    const headers = new Headers(req.headers);
+    headers.set('If-None-Match', tag);
+    ask = new Request(req, { headers });
+  }
   try {
-    const res = await fetch(req);
+    const res = await fetch(ask);
+    if (tag && res.status === 304) {
+      const body = await hit.arrayBuffer();
+      const headers = new Headers(hit.headers);
+      headers.delete('X-FloodNet-Kept');
+      event.waitUntil(keepDated(req.url, new Response(body.slice(0), { status: 200, headers: hit.headers })).catch(() => {}));
+      return new Response(body, { status: 200, headers });
+    }
     if (whole(res)) event.waitUntil(keepDated(req.url, res.clone()).catch(() => {}));
     return res;
   } catch (err) {
-    const hit = await caches.match(req.url, { cacheName: DATA });
     if (!hit) throw err;
     const headers = new Headers(hit.headers);
     headers.set(OFFLINE_HEADER, hit.headers.get('X-FloodNet-Kept') || 'unknown');

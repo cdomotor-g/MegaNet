@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 180, date: '2026-11-03', items: [
+      '📶 <strong>The station list is downloaded only when it has changed.</strong> A device that already has it now asks '
+        + 'whether it is still current, and is told so in a moment instead of fetching the whole list again — about 900 KB '
+        + 'saved on most visits, which is most of the wait on one bar of signal or a busy call.',
+    ] },
     { n: 179, date: '2026-11-03', items: [
       '⚡ <strong>Quicker on a busy laptop.</strong> With a Teams call running, the <strong>Stations</strong> tab took ten '
         + 'seconds or more to open on some laptops; it now takes a few. The <strong>Repeaters</strong> and <strong>Repeater '

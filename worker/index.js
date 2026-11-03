@@ -418,6 +418,59 @@ export function dbProxyIsUpgrade(headers) {
   return (headers.get('upgrade') || '').toLowerCase() === 'websocket';
 }
 
+// ── The station list, when it has not changed (304) ──────────────────────────
+//
+// Every visit asks for the whole station list — about 900 KB over the wire, and
+// two seconds of the datastore writing it out — and it changes a few times a
+// day. The datastore keeps the list ready-built and notes when it built it
+// (stations_doc_cache.built_at, 0069), which anybody may read and which is a
+// few bytes. So that note is the list's ETag: read first, before the list, and
+// a browser that already holds the list it names (If-None-Match — sent by
+// sw.js from the copy it kept) is told 304 Not Modified at once, with no list.
+// On a phone on one bar, or a laptop sharing its line with a Teams call, that
+// is the difference between half a minute and a moment.
+//
+// Read before the list and never after it, so an ETag is never newer than the
+// list it goes out with: a list built in between goes out under the older tag,
+// and the next visit fetches it again — once too often, never once too few.
+// Compared here rather than hashed here because the Worker's CPU allowance on
+// the Free plan (10 ms) is less than hashing 5 MB takes. When the note cannot be
+// read the list goes as it always did, with no ETag.
+const STATIONS_DOC_TARGET = `${SUPABASE_URL}/rest/v1/rpc/stations_doc`;
+export const STATIONS_DOC_TAG_URL = `${SUPABASE_URL}/rest/v1/stations_doc_cache?select=built_at`;
+
+// The ETag for a built_at row, or null for none.
+export function stationsDocTag(rows) {
+  const at = Array.isArray(rows) && rows[0] && rows[0].built_at;
+  return typeof at === 'string' && /^[0-9T:.+\- ]{10,40}$/.test(at) ? `"sd-${at.replace(/ /g, 'T')}"` : null;
+}
+
+// Whether an If-None-Match names this ETag. Weakly: Cloudflare marks an ETag
+// weak (W/) when it compresses the body, and a browser sends it back so.
+export function etagMatches(ifNoneMatch, etag) {
+  if (!ifNoneMatch || !etag) return false;
+  const bare = t => t.trim().replace(/^W\//, '');
+  return ifNoneMatch.split(',').some(t => bare(t) === bare(etag));
+}
+
+async function stationsDocTagFor(request) {
+  try {
+    const res = await fetch(STATIONS_DOC_TAG_URL, { headers: dbProxyRequestHeaders(request.headers), redirect: 'manual' });
+    if (!res.ok) return null;
+    return stationsDocTag(await res.json());
+  } catch (_) {
+    return null;
+  }
+}
+
+// What every answer from the proxy carries (dbProxy says why).
+function dbProxyGuardHeaders(headers) {
+  headers.set('Cache-Control', 'no-store');
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
+  return headers;
+}
+
 async function dbProxy(request, target) {
   // A socket: fetch() completes the upgrade upstream, and the response it
   // hands back — status 101, the socket on it — is returned as it stands,
@@ -442,6 +495,15 @@ async function dbProxy(request, target) {
   // land in the Worker's memory on its way past.
   if (request.method !== 'GET' && request.method !== 'HEAD') init.body = request.body;
 
+  // The station list: its ETag first, and nothing more when the browser has it.
+  let tag = null;
+  if (request.method === 'GET' && target === STATIONS_DOC_TARGET) {
+    tag = await stationsDocTagFor(request);
+    if (tag && etagMatches(request.headers.get('if-none-match'), tag)) {
+      return new Response(null, { status: 304, headers: dbProxyGuardHeaders(new Headers({ ETag: tag })) });
+    }
+  }
+
   let res;
   try {
     res = await fetch(target, init);
@@ -461,15 +523,15 @@ async function dbProxy(request, target) {
   // Authorization — a session, a one-time code, one person's RLS-filtered rows —
   // and a cache between here and the browser keyed on the URL alone would hand
   // one caller's answer to the next.
-  headers.set('Cache-Control', 'no-store');
+  //
   // Nothing proxied here is ever meant to render as a document on this origin.
   // Storage objects in particular are user-uploaded bytes served from the app's
   // own origin, so an uploaded SVG/HTML must not execute as a page: nosniff stops
   // content-type guessing, and the sandbox CSP strips script/navigation if one is
   // opened directly. These are ignored by fetch(), so the JSON API is unaffected
   // and inline <img> subresource loads still render. Same headers as /api/photos.
-  headers.set('X-Content-Type-Options', 'nosniff');
-  headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
+  dbProxyGuardHeaders(headers);
+  if (tag && res.ok) headers.set('ETag', tag);
 
   return new Response(res.body, {
     status: res.status,

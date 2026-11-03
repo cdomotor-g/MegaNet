@@ -205,6 +205,44 @@ async function main() {
     check('controlled, it keeps the station document the page loaded', C.data.some(u => /\/stations\.json$/.test(u)), J(C.data.slice(0, 4)));
     check('…and the inspection sheet\'s tables', C.data.some(u => /\/rest\/v1\/inspection_form\?/.test(u))
       && C.data.some(u => /\/rest\/v1\/yes_no\?/.test(u)), J(C.data.filter(u => /rest/.test(u)).length));
+    // A copy kept with an ETag is asked for again with it, and a 304 is
+    // answered from the copy (sw.js kept; the station list's ETag on
+    // floodwarning.net is the datastore's build, worker/index.js). Here the
+    // same-origin stations.json carries one, as Cloudflare's static assets do.
+    {
+      const LIST = fs.readFileSync(repo('stations.json'));
+      const seen = [];
+      const etagged = route => {
+        const inm = route.request().headers()['if-none-match'] || null;
+        seen.push(inm);
+        if (inm === '"list-1"') return route.fulfill({ status: 304, headers: { ETag: '"list-1"' } });
+        return route.fulfill({ status: 200, body: LIST, headers: { 'Content-Type': 'application/json', ETag: '"list-1"' } });
+      };
+      await context.route('**/stations.json', etagged);
+      const keptAt = () => page.evaluate(async () => {
+        const hit = await caches.match(new URL('stations.json', location.href).href, { cacheName: 'floodnet-data' });
+        return hit ? { etag: hit.headers.get('ETag'), at: hit.headers.get('X-FloodNet-Kept') } : null;
+      });
+      await page.reload({ waitUntil: 'load', timeout: LOAD_TIMEOUT });
+      await page.waitForFunction(() => !!state.data, null, { timeout: LOAD_TIMEOUT });
+      await page.waitForTimeout(300);
+      const k1 = await keptAt();
+      check('a list that comes with an ETag is kept with it', k1 && k1.etag === '"list-1"', J(k1));
+      seen.length = 0;
+      await page.waitForTimeout(50);
+      await page.reload({ waitUntil: 'load', timeout: LOAD_TIMEOUT });
+      await page.waitForFunction(() => !!state.data, null, { timeout: LOAD_TIMEOUT });
+      await page.waitForTimeout(300);
+      const k2 = await keptAt();
+      const H304 = await header(page);
+      check('asked again, the worker names it (If-None-Match), and a 304 is answered from the copy, as the list',
+        seen.includes('"list-1"') && H304.stations > 100 && /from stations\.json/.test(H304.stats) && !/saved copy/.test(H304.stats),
+        J({ seen, H304 }));
+      check('…and the copy is kept again, as found current now', k2 && k1 && k2.etag === '"list-1"' && Date.parse(k2.at) > Date.parse(k1.at),
+        J({ k1, k2 }));
+      await context.unroute('**/stations.json', etagged);
+    }
+
     let H = await header(page);
     check('online, the header says where the list came from, as ever', /from stations\.json/.test(H.stats) && !/saved copy/.test(H.stats), J(H));
     // A kept copy on screen while there is a signal (a datastore that is down
