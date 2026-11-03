@@ -1344,7 +1344,9 @@ const BaseStations = (function () {
   }
 
   function sigSpark(days, warn, today) {
-    const W = 140, H = 30, t0 = today - (SIG_DAYS - 1) * 86400000;
+    // 40 tall: the content height of the shortest row (a name on two lines),
+    // so the line fills the row without making any row taller.
+    const W = 140, H = 40, t0 = today - (SIG_DAYS - 1) * 86400000;
     const shown = days.filter(d => d.t >= t0);
     const lim = Math.max(warn * 2, ...shown.map(d => Math.abs(d.shift)));
     const x = t => ((t - t0) / Math.max(1, today - t0)) * (W - 4) + 2, y = v => H / 2 - (v / lim) * (H / 2 - 2);
