@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-03** (revision 217 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-03** (revision 218 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -421,7 +421,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 > ~~**⚠️** These were originally listed as "independent — no sequencing dependency." They are logically independent but **mechanically serialised**~~ — **resolved the easy way: one agent did both in sequence**, #121 read #120's pane comment instead of picking a z-index blind, and the `MemMeter` third of the table had already been obsoleted by #144 (layers are counted generically off `liveMaps()`).
 
 ## Standalone issues
-- **#259** `[Standalone]` `[Opus5/High]` — **OPEN, opened revision 214** — a lighter off-air decoder, so cheaper industrial computers (a Toradex Verdin AM62, open-ALERT's trial) and a busy Pi 4 keep up. **Part 1 done at revision 215:** lean decoding (filter once per carrier guess) is the live pipeline's default, after RPi ALERT's compare at the first base station: 14 of 11,628 live bursts read differently (0.12%), lean in a third of the time. Between bursts, the rings are filled a block at a time (exactly the same messages, a quarter less work), and `specHz: 0` lets a pipeline skip the spectrum (another sixth). **Left:** part 2, filtering a channel only around bursts (a stick-level front end watching 50 FFTs a second).
+- **#259** `[Standalone]` `[Opus5/High]` — **OPEN, opened revision 214** — a lighter off-air decoder, so cheaper industrial computers (a Toradex Verdin AM62, open-ALERT's trial) and a busy Pi 4 keep up. **Part 1 done at revision 215:** lean decoding (filter once per carrier guess) is the live pipeline's default, after RPi ALERT's compare at the first base station: 14 of 11,628 live bursts read differently (0.12%), lean in a third of the time. Between bursts, the rings are filled a block at a time (exactly the same messages, a quarter less work), and `specHz: 0` lets a pipeline skip the spectrum (another sixth). **Part 2 built at revision 218:** `BurstWatch` filters a channel only around its bursts (25 looks a second between them), reading the same as the pipeline alone in every case `npm run alertdsp` tries; RPi ALERT 0.18 carries it behind *Between bursts* (default *Always*, as before) with a *Check both* mode. **Left:** the check at the first base station, then making it the Pi's default, then this closes.
 - **#255** `[Standalone]` `[Human]` — **OPEN, opened revision 200** — move the Supabase database to the **Small** compute size (2 GB, about US$15 a month, about US$5 more than Micro once the Pro plan's compute credit is counted). Supabase warned on 2026-10-28 that the project is using up its Disk IO Budget; `0087` removed the biggest causes, and what is left is a 902 MB database with 224 MB of shared buffers. Part 1 reads the current size and the Database report's Disk IOPS and Memory charts; Part 2 changes the size (under 2 minutes offline, in a quiet dry-weather hour) and checks readings resume; Part 3 hands back to an agent to read the new settings. Depends on nothing; #256 decides whether Small stays enough.
 - ~~**#249**~~ `[Standalone]` `[Human]` — **CLOSED at revision 196, opened at 193** — the db-migrate workflow's `SUPABASE_DB_URL` secret replaced with a session-pooler URI; the owner's run and an agent session's dry run both reach the database (schema_version 86, nothing pending). Agents apply migrations with `gh workflow run db-migrate.yml --ref main` again.
 - ~~**#248**~~ `[Standalone]` `[Human]` — **CLOSED at revision 208 as a duplicate of #245**, which needs the same fix and now carries `CI doctor: Refresh ACMA RRL data` in its title so the CI doctor reports there — CI doctor: Refresh ACMA RRL data finds no working download URL (cdn.acma.gov.au 404); someone copies ACMA's current extract link into `ACMA_ZIP_URLS`; depends on nothing, blocks nothing.
@@ -705,7 +705,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### AI agent — Opus5
 | Effort | Issues |
 |---|---|
-| High | **#259** (a lighter off-air decoder — *part 1 done and the default; part 2 left: filter channels only around bursts*) · **#250** (epic — road routes on the map; rating is for its children) · **#252** (routes round QLDTraffic's flooded and closed roads — *best after #238*) · **#244** (who corrupts — bit flips by carrier fingerprint, *live; a week of data to look at*) · **#186** (epic — rating is for its children; #187 is its last open child) · **#204** (assessment report drafts from the dossier — *blocked on the example reports*) · **#214** (epic — rating is for its children) · **#216** (alerts to staff — *a person sets two secrets*) · **#240** (epic — rating is for its children) · **#260** (fold the ALERT twins stored before `0096` — *after #243 and #257*) · **#243** (archive to R2, then `retain()` scheduled — *last*) |
+| High | **#259** (a lighter off-air decoder — *part 1 the default; part 2 built and on the Pi behind a setting — waits on its field check*) · **#250** (epic — road routes on the map; rating is for its children) · **#252** (routes round QLDTraffic's flooded and closed roads — *best after #238*) · **#244** (who corrupts — bit flips by carrier fingerprint, *live; a week of data to look at*) · **#186** (epic — rating is for its children; #187 is its last open child) · **#204** (assessment report drafts from the dossier — *blocked on the example reports*) · **#214** (epic — rating is for its children) · **#216** (alerts to staff — *a person sets two secrets*) · **#240** (epic — rating is for its children) · **#260** (fold the ALERT twins stored before `0096` — *after #243 and #257*) · **#243** (archive to R2, then `retain()` scheduled — *last*) |
 | Med | **#253** (an inspection run — stations in the best order, road distances on Nearby) · ~~#206~~ (*closed at revision 208: the photo reader does it*) · **#247** (carrier outages on Station Health — *a maybe, parked; blocked on the owner choosing a source*) |
 
 ### AI agent — Sonnet5
@@ -839,6 +839,14 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 218 — 2026-11-03: 🪶 #259 part 2 — filtering a channel only around its bursts
+
+The owner, after part 1: *"yes please go on that."* **Closes nothing; #259 stays open for part 2's field check.**
+
+- `alert-dsp.js`: `BurstWatch`, in front of a `Pipeline`: the last 1.6 s of the window kept as bytes, 25 looks a second at the channel's power; the pipeline asleep between bursts, woken 3 dB before the squelch would open, moved on (`Pipeline.skip()`) and replayed from a second before. `Pipeline.postLevel()` split out; `feedSpectrum()` takes a chunk's end alone. Between bursts, per second of signal: 2.6 ms against 6–8 at 240 ksps, 3.0 against 39 at 960 ksps, 4.4 against 94 at 2.4 Msps.
+- `npm run alertdsp` (83): the same readings and the same bursts, watched or not — 240k, 960k off centre with a clipping neighbour, the rig and a real Binary burst in their own quiet; a quiet channel never woken and still reporting its level; ungated, never asleep. `docs/serial-sdr.md`: *Filtering only around bursts*.
+- RPi ALERT 0.18 takes it, behind *Between bursts*; Base Stations offers that setting where a station has it.
 
 ### Revision 217 — 2026-11-03: 👤 One person, one account — a second address, and *Same person…*
 

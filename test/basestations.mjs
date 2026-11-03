@@ -400,8 +400,13 @@ try {
     const decoder = { shown: fd.decoder, none: B._formFrom(cfg, rx).decoder,
       same: B._patchFrom(d17, fd, rx), lean: B._patchFrom(d17, Object.assign({}, fd, { decoder: 'lean' }), rx),
       old: B._patchFrom(cfg, Object.assign({}, f, { decoder: 'lean' }), rx) };
+    d17.receivers.sdr.watch = 'always';
+    const fw = B._formFrom(d17, rx);
+    const watch = { shown: fw.watch, none: B._formFrom(cfg, rx).watch, check: B._patchFrom(d17, Object.assign({}, fw, { watch: 'check' }), rx),
+      old: B._patchFrom(cfg, Object.assign({}, f, { watch: 'bursts' }), rx),
+      checks: B._checksHtml({ lean_check: { compared: 11628, differ: 14, time_pct: 34 }, watch_check: { both: 120, only_always: 1, only_watch: 0, awake_pct: 9, time_pct: 31 } }) };
     return {
-      decoder,
+      decoder, watch,
       serialShown: f4['s:' + stick1].gain, serialSame, serialRenamed,
       liveness: [
         B._liveness({ managed: true, mode: 'manage', idle_s: 60, last_seen_at: t(20) }).k,
@@ -443,6 +448,12 @@ try {
     pure.decoder.shown === 'compare' && pure.decoder.none === '' && Object.keys(pure.decoder.same.patch).length === 0
       && JSON.stringify(pure.decoder.lean.patch) === '{"receivers":{"sdr":{"decoder":"lean"}}}' && Object.keys(pure.decoder.old.patch).length === 0,
     JSON.stringify(pure.decoder));
+  ok('between bursts is offered where the station has it, and sent only when changed',
+    pure.watch.shown === 'always' && pure.watch.none === '' && JSON.stringify(pure.watch.check.patch) === '{"receivers":{"sdr":{"watch":"check"}}}'
+      && Object.keys(pure.watch.old.patch).length === 0, JSON.stringify(pure.watch));
+  ok('a stick\'s checks say how its lean decoder and its watch have done',
+    /14 of 11,628 bursts differ \(0\.12%\) · lean 34% of the time/.test(pure.watch.checks) && /120 read both ways, 1 only filtering always, 0 only around bursts · awake 9% · 31% of the work/.test(pure.watch.checks),
+    pure.watch.checks);
   ok('the settings form untouched is no change at all', pure.same.patch && Object.keys(pure.same.patch).length === 0, JSON.stringify(pure.same));
   const p = (pure.changed || {}).patch || {};
   ok('a changed form is the smallest patch that says so',

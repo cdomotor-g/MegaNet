@@ -922,6 +922,31 @@ const AlertDsp = (function alertDspModule() {
       this.audioOut = []; this.audioOutN = 0;
       this.recent = new Map();
       this.bursts = 0; this.decodes = 0;
+      this.floor = 0;      // the first 240k sample filtered since the watch last skipped (BurstWatch)
+      this.settle = 0;     // gate blocks to pass over after a skip, while the filters fill
+    }
+
+    // BurstWatch let `nDev` device samples go by unfiltered (a whole number of
+    // 10 ms gate blocks): carry on as if they had been. The clocks move on —
+    // the 240k count, the gate's block phase, the mixer's phase — the filters'
+    // history goes, and nothing before the skip is read into a decode window,
+    // so what follows is filtered, gated and decoded as it would have been
+    // (#259).
+    skip(nDev) {
+      const d1 = this.dec1, m = Math.round(nDev / d1.factor);
+      if (m <= 0) return;
+      d1.hr.fill(0); d1.hi.fill(0);
+      if (d1.offset) {
+        const w = -2 * Math.PI * ((d1.offset * nDev) % d1.inRate) / d1.inRate;
+        const cr = Math.cos(w), ci = Math.sin(w), pr = d1.pr, pi = d1.pi;
+        d1.pr = pr * cr - pi * ci; d1.pi = pr * ci + pi * cr;
+      }
+      this.dec2.hr.fill(0); this.dec2.hi.fill(0);
+      this.total += m;
+      this.floor = this.total;
+      this.lastR = 0; this.lastI = 0;
+      this.openRun = 0;
+      this.settle = 2;
     }
 
     feed(u8) {
@@ -970,18 +995,7 @@ const AlertDsp = (function alertDspModule() {
 
       // level report, ~10 a second
       this.sinceLevel += n;
-      if (this.sinceLevel >= c.deviceRate / 10) {
-        const msg = {
-          type: 'level',
-          dbfs: db(this.pwr / Math.max(1, this.bytes / 2) / (2 * 127.5 * 127.5)),
-          clipPct: 100 * this.clip / Math.max(1, this.bytes),
-          hist: Array.from(this.hist),
-          chDb: this.chDb, nfDb: this.nf, open: this.open, squelchDb: c.squelchDb,
-          bursts: this.bursts, decodes: this.decodes,
-        };
-        this.post(msg);
-        this.hist.fill(0); this.clip = 0; this.bytes = 0; this.pwr = 0; this.sinceLevel = 0;
-      }
+      if (this.sinceLevel >= c.deviceRate / 10) this.postLevel();
 
       // ungated: decode the last 3 s every 1.5 s, as the desktop does
       if (!c.gate) {
@@ -998,6 +1012,22 @@ const AlertDsp = (function alertDspModule() {
       }
     }
 
+    postLevel() {
+      const c = this.cfg;
+      this.post({
+        type: 'level',
+        dbfs: db(this.pwr / Math.max(1, this.bytes / 2) / (2 * 127.5 * 127.5)),
+        clipPct: 100 * this.clip / Math.max(1, this.bytes),
+        hist: Array.from(this.hist),
+        chDb: this.chDb, nfDb: this.nf, open: this.open, squelchDb: c.squelchDb,
+        bursts: this.bursts, decodes: this.decodes,
+      });
+      this.hist.fill(0); this.clip = 0; this.bytes = 0; this.pwr = 0; this.sinceLevel = 0;
+    }
+
+    // ir/ii: the chunk's samples, or only its last ones (BurstWatch hands on
+    // only the end of a chunk: nothing before the last fftSize can count); n:
+    // how many the chunk had.
     feedSpectrum(ir, ii, n) {
       const c = this.cfg, N = c.fftSize;
       // specHz 0: no spectrum from this pipeline — the Pi's other channels on
@@ -1005,9 +1035,9 @@ const AlertDsp = (function alertDspModule() {
       if (!c.specHz) return;
       // Only the last N samples can matter; they go where the sample-by-sample
       // loop would have put them.
-      const from = Math.max(0, n - N);
-      ringPut(this.specR, this.specPos + from, ir.subarray(from, n));
-      ringPut(this.specI, this.specPos + from, ii.subarray(from, n));
+      const t = ir.length, from = Math.max(0, t - N);
+      ringPut(this.specR, this.specPos + n - (t - from), ir.subarray(from, t));
+      ringPut(this.specI, this.specPos + n - (t - from), ii.subarray(from, t));
       this.specPos = (this.specPos + n) % N;
       this.specFill = Math.min(N, this.specFill + n);
       this.sinceFft += n; this.sincePost += n;
@@ -1083,6 +1113,7 @@ const AlertDsp = (function alertDspModule() {
       const p = db(this.blkP / this.blkN / (2 * 127.5 * 127.5));
       this.blkP = 0; this.blkN = 0;
       this.chDb = p;
+      if (this.settle) { this.settle--; return; }
       if (this.nf == null) {
         this.nfInit.push(p);
         if (this.nfInit.length >= 30) { this.nf = Math.min.apply(null, this.nfInit); this.nfInit = []; }
@@ -1117,7 +1148,7 @@ const AlertDsp = (function alertDspModule() {
         let from = b.from - pad, to = b.to + pad;
         const minLen = FS_IN * 1.2;
         if (to - from < minLen) { const grow = (minLen - (to - from)) / 2; from -= grow; to += grow; }
-        b.from = Math.max(Math.max(0, this.total - this.ringR.length + FS_IN / 10), Math.round(from));
+        b.from = Math.max(Math.max(0, this.floor, this.total - this.ringR.length + FS_IN / 10), Math.round(from));
         b.to = Math.round(to);
         b.decodeAt = b.to;
         this.post({ type: 'burst', ms: b.ms, peakDb: b.peak, nfDb: b.nf, t: b.t });
@@ -1127,7 +1158,7 @@ const AlertDsp = (function alertDspModule() {
 
     decodeRange(from, to, burst) {
       const c = this.cfg, CAP = this.ringR.length;
-      from = Math.max(from, this.total - CAP + 1, 0);
+      from = Math.max(from, this.total - CAP + 1, 0, this.floor);
       const len = to - from;
       if (len < FS_IN / 2) return;
       const wr = new Float32Array(len), wi = new Float32Array(len);
@@ -1223,6 +1254,196 @@ const AlertDsp = (function alertDspModule() {
     }
   }
 
+  // ── between bursts: watch the channel, filter only around its bursts ──────
+  //
+  // A Pipeline filters every sample of the stick's window into its channel,
+  // burst or not, and between bursts — nearly all of the time — that is nearly
+  // all of a base station's decoding work (#259). A BurstWatch stands in front
+  // of one. It keeps the last WATCH_KEEP_S of the window as it came, bytes, and
+  // 25 times a second takes a short look at the channel: 2,048 samples at
+  // 240k (8.5 ms), mixed to the channel and summed down to 240k from whatever
+  // the window is, through an FFT, the power within WATCH_BW_HZ of it. While
+  // that stays near the channel's floor the pipeline sleeps: nothing is
+  // filtered. When it comes within WATCH_LEAD_DB of the squelch — before the
+  // squelch would open, so a burst it would open on wakes the pipeline first
+  // — the pipeline is moved on to WATCH_PREROLL_S before and the kept bytes
+  // are put through it. From there it is the pipeline as always, the same
+  // code on the same samples: it filters, gates and decodes, and the decode
+  // window, reaching 0.6 s at most before the squelch opened, is inside what
+  // it filtered. Once the channel has been quiet for WATCH_HANG_S, the
+  // squelch shut and every burst decoded, it sleeps again.
+  //
+  // Asleep, the watch keeps the rest of the pipeline going: the floor the
+  // squelch works from follows the watch's own (the difference between the
+  // two learned each time both ran), so the squelch wakes where it would have
+  // been; the level reports carry the watch's looks; the spectrum (cfg.specHz)
+  // takes the end of each chunk, as the pipeline itself does.
+  //
+  // Ungated (cfg.gate false) it never sleeps. A carrier that stays on keeps
+  // it awake: then it costs what the pipeline alone does, and no more.
+  //
+  //   const w = new BurstWatch(pipe, { afterFeed: n => … });
+  //   w.feed(u8)    in place of pipe.feed(u8); w.reset() with pipe.reset()
+  //   opts.afterFeed(n): after each time the pipeline is fed n device samples.
+  const WATCH_N = 2048, WATCH_HZ = 25, WATCH_BW_HZ = 6000, WATCH_LEAD_DB = 3;
+  const WATCH_PREROLL_S = 1.0, WATCH_HANG_S = 1.0, WATCH_KEEP_S = 1.6;
+  const WATCH_DOWN = 1 - Math.pow(0.95, 100 / WATCH_HZ), WATCH_UP = (100 / WATCH_HZ) / 3000;
+
+  class BurstWatch {
+    constructor(pipe, opts) {
+      this.pipe = pipe;
+      this.opts = opts || {};
+      this.stats = { looks: 0, wakes: 0, samples: 0, awake: 0 };
+      this.reset();
+    }
+
+    reset() {
+      const c = this.pipe.cfg, N = WATCH_N;
+      this.rate = c.deviceRate; this.offset = c.channelOffsetHz || 0;
+      this.D = Math.max(1, Math.round(this.rate / FS_IN));    // device samples to one of 240k
+      this.look = N * this.D;                                    // device samples a look takes
+      this.hop = Math.max(this.look, Math.round(this.rate / WATCH_HZ));
+      this.block = Math.round(this.rate / 100);                  // a gate block: what a skip moves by
+      this.ring = new Uint8Array(2 * Math.ceil(this.rate * WATCH_KEEP_S));
+      this.at = 0;            // device samples ever seen
+      this.fed = 0;           // …of them the pipeline has been given, or moved past
+      this.nextLook = 0;
+      this.awake = true; this.wokeAt = 0; this.loudAt = -Infinity; this.wantWake = false;
+      this.nf = null; this.nfInit = []; this.p = null; this.cal = null;
+      this.nfAt = [];         // [device sample, the watch's floor then], the last WATCH_KEEP_S of looks
+      this.re = new Float32Array(N); this.im = new Float32Array(N);
+      this.win = new Float32Array(N);
+      let w2 = 0;
+      for (let i = 0; i < N; i++) {
+        const x = 2 * Math.PI * i / (N - 1);
+        this.win[i] = 0.35875 - 0.48829 * Math.cos(x) + 0.14128 * Math.cos(2 * x) - 0.01168 * Math.cos(3 * x);
+        w2 += this.win[i] * this.win[i];
+      }
+      this.norm = 1 / (N * w2 * 2 * 127.5 * 127.5);
+      this.bins = [];
+      for (let k = 0; k < N; k++) if (Math.abs((k < N / 2 ? k : k - N) * FS_IN / N) <= WATCH_BW_HZ) this.bins.push(k);
+      const w = -2 * Math.PI * this.offset / this.rate;
+      this.dr = Math.cos(w); this.di = Math.sin(w);
+    }
+
+    feed(u8) {
+      const p = this.pipe, c = p.cfg;
+      if (c.deviceRate !== this.rate || (c.channelOffsetHz || 0) !== this.offset) this.reset();
+      const n = u8.length >> 1;
+      if (!n) return;
+      const cap = this.ring.length >> 1;
+      ringPut(this.ring, 2 * this.at, u8.subarray(0, 2 * n));
+      this.at += n;
+      this.stats.samples += n;
+      if (this.nextLook < this.at - cap) this.nextLook = this.at - this.look;   // a chunk longer than what is kept
+      while (this.nextLook + this.look <= this.at) { this.lookAt(this.nextLook); this.nextLook += this.hop; }
+      if (!this.awake && (this.wantWake || c.gate === false)) this.wake();
+      this.wantWake = false;
+      if (this.awake) {
+        this.stats.awake += n;
+        if (this.fed === this.at - n) this.give(u8, n);
+        else this.replay();
+        this.sleepIfQuiet();
+      } else {
+        if (c.specHz) {
+          const t = Math.min(n, c.fftSize), tr = new Float32Array(t), ti = new Float32Array(t);
+          for (let k = 0, j = 2 * (n - t); k < t; k++, j += 2) { tr[k] = u8[j] - 127.5; ti[k] = u8[j + 1] - 127.5; }
+          p.feedSpectrum(tr, ti, n);
+        }
+        p.sinceLevel += n;
+        if (p.sinceLevel >= c.deviceRate / 10) p.postLevel();
+      }
+    }
+
+    give(u8, n) {
+      this.pipe.feed(u8);
+      this.fed += n;
+      if (this.opts.afterFeed) this.opts.afterFeed(n);
+    }
+
+    // What has come since the pipeline was last fed, from the bytes kept, in
+    // chunks of 50 ms (as rtl_sdr's own come, near enough).
+    replay() {
+      const cap = this.ring.length >> 1, step = 5 * this.block;
+      while (this.fed < this.at) {
+        const len = Math.min(step, this.at - this.fed), out = new Uint8Array(2 * len);
+        const from = (this.fed % cap) * 2, first = Math.min(2 * len, this.ring.length - from);
+        out.set(this.ring.subarray(from, from + first), 0);
+        if (first < 2 * len) out.set(this.ring.subarray(0, 2 * len - first), first);
+        this.give(out, len);
+      }
+    }
+
+    wake() {
+      const cap = this.ring.length >> 1;
+      const want = Math.max(this.at - Math.round(WATCH_PREROLL_S * this.rate), this.at - cap + this.block);
+      if (want > this.fed) {
+        const skip = Math.floor((want - this.fed) / this.block) * this.block;
+        if (skip > 0) { this.pipe.skip(skip); this.fed += skip; }
+      }
+      // The squelch's floor as the watch had it where the replay starts, not
+      // now: the replay moves the pipeline's own floor over what comes after,
+      // and must not move it twice.
+      if (this.cal != null && this.nfAt.length) {
+        let then = this.nfAt[0][1];
+        for (const [at, nf] of this.nfAt) { if (at > this.fed) break; then = nf; }
+        this.pipe.nf = then + this.cal;
+      }
+      this.awake = true; this.wokeAt = this.at; this.stats.wakes++;
+    }
+
+    sleepIfQuiet() {
+      const p = this.pipe, c = p.cfg;
+      if (c.gate === false || p.nf == null || this.nf == null || p.open || p.burst || p.pending.length) return;
+      if (this.at - this.loudAt < WATCH_HANG_S * this.rate) return;
+      if (this.at - this.wokeAt < (WATCH_PREROLL_S + WATCH_HANG_S) * this.rate) return;
+      this.awake = false;
+      this.cal = p.nf - this.nf;
+    }
+
+    // A look at the channel from device sample s0: its power, in the
+    // pipeline's dB, and the watch's floor and loudness from it.
+    lookAt(s0) {
+      const N = WATCH_N, D = this.D, ring = this.ring, cap2 = ring.length, re = this.re, im = this.im, win = this.win;
+      const dr = this.dr, di = this.di, asleep = !this.awake, p = this.pipe, hist = p.hist;
+      let pos = (2 * s0) % cap2, pr = 1, pi = 0, clip = 0, pw = 0;
+      for (let k = 0; k < N; k++) {
+        let sr = 0, si = 0;
+        for (let j = 0; j < D; j++) {
+          const a = ring[pos], b = ring[pos + 1];
+          pos += 2; if (pos >= cap2) pos = 0;
+          const x = a - 127.5, y = b - 127.5;
+          if (asleep) {
+            hist[a >> 3]++; hist[b >> 3]++;
+            if (a <= 1 || a >= 254) clip++;
+            if (b <= 1 || b >= 254) clip++;
+            pw += x * x + y * y;
+          }
+          sr += x * pr - y * pi; si += x * pi + y * pr;
+          const nr = pr * dr - pi * di; pi = pr * di + pi * dr; pr = nr;
+        }
+        re[k] = sr / D * win[k]; im[k] = si / D * win[k];
+      }
+      if (asleep) { p.clip += clip; p.bytes += 2 * N * D; p.pwr += pw; }
+      fft(re, im);
+      let e = 0;
+      for (const k of this.bins) e += re[k] * re[k] + im[k] * im[k];
+      const db1 = db(e * this.norm);
+      this.p = db1; this.stats.looks++;
+      if (this.nf == null) {
+        this.nfInit.push(db1);
+        if (this.nfInit.length >= 15) { this.nf = Math.min.apply(null, this.nfInit); this.nfInit = []; }
+        return;
+      }
+      if (db1 >= this.nf + p.cfg.squelchDb - WATCH_LEAD_DB) { this.loudAt = s0 + this.look; this.wantWake = true; }
+      else this.nf += (db1 - this.nf) * (db1 < this.nf ? WATCH_DOWN : WATCH_UP);   // the squelch's own rates, per look
+      this.nfAt.push([s0 + this.look, this.nf]);
+      if (this.nfAt.length > WATCH_KEEP_S * WATCH_HZ + 2) this.nfAt.shift();
+      // Asleep, the squelch's floor follows this one, and so does its level.
+      if (asleep && this.cal != null) { p.nf = this.nf + this.cal; p.chDb = db1 + this.cal; }
+    }
+  }
+
   // The worker's whole program. Runs inside the Worker, where AlertDsp is the
   // copy of this module workerSource() put in front of it.
   function workerMain() {
@@ -1256,7 +1477,7 @@ const AlertDsp = (function alertDspModule() {
     BINARY, ASCII, ENHANCED_IFLOWS,
     firwin, fft, crc6Enhanced, parseBytes, parseFrame, encodeFrame, frameBytes,
     carrierSearch, mixDecimate, nudge, afskSoft, gardner, decodeWindow, decodeU8, u8ToFloat,
-    synthIq, demoBand, Decimator, Pipeline, workerSource,
+    synthIq, demoBand, Decimator, Pipeline, BurstWatch, workerSource,
   };
 })();
 

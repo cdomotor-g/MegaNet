@@ -316,6 +316,74 @@ for (const c of [
   check('…and decodes the same', dk(on) === dk(off) && dk(on) === full, dk(off));
 }
 
+// ── BurstWatch: filtered only around bursts, read the same (#259 part 2) ──────
+//
+// The same stream through today's pipeline, which filters every sample, and
+// through one a BurstWatch wakes only around bursts: the same readings and the
+// same bursts (each one's length, so the squelch opened and shut on the same
+// samples), with the watched one asleep between them.
+
+{
+  const B = (id, v) => D.encodeFrame(D.BINARY, id, v);
+  const keyOf = x => x.slice().sort().join(' ');
+  const run = (u8, cfg, watched) => {
+    const out = { readings: [], bursts: [], levels: 0 };
+    const pipe = new D.Pipeline(m => {
+      if (m.type === 'decode') for (const r of m.readings) out.readings.push(r.sensorId + '=' + r.value);
+      if (m.type === 'burst') out.bursts.push(m.ms);
+      if (m.type === 'level') out.levels++;
+    });
+    pipe.configure(Object.assign({ specHz: 0, scopeHz: 1, lean: true }, cfg));
+    const w = watched ? new D.BurstWatch(pipe) : null;
+    const step = 2 * Math.round(cfg.deviceRate / 20);
+    for (let i = 0; i < u8.length; i += step) { const c = u8.subarray(i, i + step); w ? w.feed(c) : pipe.feed(c); }
+    out.stats = w && w.stats;
+    return out;
+  };
+  // A stick's noise is ~10 counts either side of 127.5; bursts 6 dB under it to 30 over.
+  const amp0 = rate => 10 * Math.sqrt(2 * Math.pow(10, 0.6) * 12000 / rate);
+  const streamOf = (rate, off, extra) => {
+    const bursts = [];
+    let t = 1.5, id = 1000;
+    for (const rel of [-6, -2, 1, 3, 5, 8, 12, 20, 30]) {
+      bursts.push({ startSec: t, frames: [B(id, id % 4000), B(id + 1, 7)], cfoHz: off + (id % 7 - 3) * 1500, amp: amp0(rate) * Math.pow(10, rel / 20) });
+      id += 2; t += 2.6;
+    }
+    return D.synthIq({ fs: rate, seconds: t + 1, snrDb: 6, amp: amp0(rate), bursts: bursts.concat(extra || []), seed: 7 });
+  };
+  const same = (name, u8, cfg) => {
+    const a = run(u8, cfg, false), b = run(u8, cfg, true);
+    check(`watched, ${name}: the same readings`, keyOf(a.readings) === keyOf(b.readings) && a.readings.length > 0, `${keyOf(a.readings)} | watched ${keyOf(b.readings)}`);
+    check(`…the same bursts`, a.bursts.join() === b.bursts.join(), `${a.bursts.join()} | watched ${b.bursts.join()}`);
+    return b;
+  };
+  same('240k', streamOf(240000, 0), { deviceRate: 240000, channelOffsetHz: 0 });
+  // 960k, the channel off centre, a neighbour 12.5 kHz away loud enough to clip
+  // the stick's bytes (the floor drops under it, once, in both), and another
+  // channel's burst at the far side of the window.
+  const nb = [{ startSec: 4.2, frames: [B(3000, 1)], cfoHz: -200000 + 12500, amp: 400 }, { startSec: 15.4, frames: [B(3001, 2)], cfoHz: 100000, amp: 60 }];
+  const w960 = same('960k off centre, a clipping neighbour', streamOf(960000, -200000, nb), { deviceRate: 960000, channelOffsetHz: -200000 });
+  check('…and slept between them', w960.stats.wakes >= 5 && w960.stats.awake < 0.85 * w960.stats.samples, JSON.stringify(w960.stats));
+  // The real captures, each in 5 s of its own quietest stretch either side.
+  for (const [file, format] of [['testrig_burst_240k.iq8', D.ENHANCED_IFLOWS], ['binary_151.500_1957.iq8', D.BINARY]]) {
+    const rec = new Uint8Array(fs.readFileSync(path.join(REPO_ROOT, 'test/fixtures/sdr', file))), n = rec.length >> 1;
+    let at = 0, least = Infinity;
+    for (let s0 = 0; s0 + 24000 <= n; s0 += 6000) { let e = 0; for (let i = 2 * s0; i < 2 * (s0 + 24000); i++) e += (rec[i] - 127.5) ** 2; if (e < least) { least = e; at = s0; } }
+    const piece = rec.subarray(2 * at, 2 * (at + 24000)), k = 50, u8 = new Uint8Array(2 * k * piece.length + rec.length);
+    for (let i = 0; i < k; i++) { u8.set(piece, i * piece.length); u8.set(piece, k * piece.length + rec.length + i * piece.length); }
+    u8.set(rec, k * piece.length);
+    same(file, u8, { deviceRate: 240000, channelOffsetHz: 0, format });
+  }
+  // A quiet channel: asleep after its first 2 s, still reporting its level, and woken by nothing.
+  const quiet = D.synthIq({ fs: 960000, seconds: 12, snrDb: 6, amp: amp0(960000), bursts: [], seed: 3 });
+  const q = run(quiet, { deviceRate: 960000, channelOffsetHz: 150000 }, true);
+  check('a quiet channel: no wakes, asleep after the first 2 s', q.stats.wakes === 0 && q.stats.awake <= 2.1 * 960000, JSON.stringify(q.stats));
+  check('…and its level reported all the while, ~10 a second', q.levels >= 110, String(q.levels));
+  // Ungated, there is nothing to wake on: it never sleeps.
+  const u = run(quiet, { deviceRate: 960000, channelOffsetHz: 150000, gate: false }, true);
+  check('ungated, it never sleeps', u.stats.awake === u.stats.samples, JSON.stringify(u.stats));
+}
+
 // ── The Worker's source ──────────────────────────────────────────────────────
 
 {

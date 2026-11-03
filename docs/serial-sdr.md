@@ -47,6 +47,31 @@ Where the port departs from the Kotlin, the code says so at the spot:
 - **A burst gate.** The live pipeline decodes a window around each burst (the
   channel's power over its own ~30 s floor), rather than every 3 s window. Untick
   *decode bursts only* to go back to the desktop's every-1.5 s cadence.
+- **Filtering only around bursts** (#259 part 2, `BurstWatch`). Between bursts a
+  `Pipeline` still filters every sample of the stick's window down to its channel:
+  nearly all of a base station's work, and more the wider the window. A
+  `BurstWatch` stands in front of one: `new BurstWatch(pipe)`, then `w.feed(u8)`
+  in place of `pipe.feed(u8)`. It keeps the last 1.6 s of the window as bytes and
+  25 times a second takes a look at the channel (2,048 samples at 240k, mixed to
+  the channel and summed down from the window's rate, an FFT, the power within
+  6 kHz). While that stays near the channel's floor the pipeline sleeps. When it
+  comes within 3 dB of the squelch, the pipeline is moved on to a second before
+  (`Pipeline.skip()`: its clocks and the gate's block phase carried on, its filter
+  history let go, nothing before the skip read into a decode window) and the kept
+  bytes are put through it; from there it is the pipeline as always. It sleeps
+  again once the channel has been quiet a second, the squelch shut and every burst
+  decoded. Asleep, the squelch's floor follows the watch's own (the difference
+  learned each time both ran, applied as of where a replay starts so a replay
+  never moves it twice), the level reports carry the watch's looks, and the
+  spectrum takes the end of each chunk. Ungated, or with a carrier that stays up,
+  it stays awake and costs what the pipeline does. Measured on a quiet channel,
+  per second of signal: 2.6 ms against the pipeline's 6–8 ms at 240 ksps, 3.0
+  against 39 at 960 ksps, 4.4 against 94 at 2.4 Msps. `npm run alertdsp` runs the
+  same stream through both: bursts from 6 dB under the noise to 30 over at 240k,
+  960k off centre with a neighbour loud enough to clip the stick's bytes, and the
+  rig's and a Binary station's real bursts in their own quiet: the same readings
+  and the same bursts, each the same length. Nothing on the website uses it yet;
+  RPi ALERT 0.18 does, behind its *Between bursts* setting.
 - **Lean decoding** (#259). A burst is decoded with 45 guesses: 3 carrier
   candidates × 3 tone hypotheses × 5 nudges of ±75 and ±150 Hz. Each guess used to
   filter the whole window again, which was two thirds of the decode. Lean filters

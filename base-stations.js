@@ -347,7 +347,7 @@ const BaseStations = (function () {
           <th scope="row">${esc(r.name)} <span class="small qs-dim">${esc(r.kind)}</span></th>
           <td class="small"><span class="${r.state === 'running' ? 'txt-ok' : r.state === 'unplugged' || r.state === 'error' ? 'txt-bad' : 'txt-warn'}">${esc(r.state === 'running' ? 'receiving' : r.state)}</span>${r.error ? `<div class="txt-warn">${esc(r.error)}</div>` : ''}</td>
           <td class="small">${esc(rxDetail(r)) || '—'}</td>
-          <td class="small">${r.decoded != null ? esc(r.decoded) + ' decoded' : ''}${r.dataAgoS != null ? `<div class="qs-dim">data ${esc(span(r.dataAgoS).replace(/^0 min$/, 'just now'))}</div>` : ''}${deafFor(s, r.key) ? `<div class="${deafFor(s, r.key).severity === 'critical' ? 'txt-bad' : 'txt-warn'}">nothing new for ${esc(span((now() - Date.parse((deafFor(s, r.key).evidence || {}).changed_at)) / 1000))}</div>` : ''}</td>
+          <td class="small">${r.decoded != null ? esc(r.decoded) + ' decoded' : ''}${r.kind === 'sdr' ? checksHtml(r) : ''}${r.dataAgoS != null ? `<div class="qs-dim">data ${esc(span(r.dataAgoS).replace(/^0 min$/, 'just now'))}</div>` : ''}${deafFor(s, r.key) ? `<div class="${deafFor(s, r.key).severity === 'critical' ? 'txt-bad' : 'txt-warn'}">nothing new for ${esc(span((now() - Date.parse((deafFor(s, r.key).evidence || {}).changed_at)) / 1000))}</div>` : ''}</td>
           <td class="adm-row-acts">${!ask ? '' : r.state === 'unplugged'
             ? askBtn('device.forget', { key: r.key }, 'Remove ' + r.name + '? The station forgets it — its name, its own settings and its Flood-Net receiver id.', 'Remove…', 'exp-btn-sm adm-danger', 'Remove ' + r.name)
             : askBtn('device.restart', { key: r.key }, null, 'Restart', 'exp-btn-sm', 'Restart ' + r.name)}</td>
@@ -432,6 +432,26 @@ const BaseStations = (function () {
     + 'and read the same in 99.9% of 11,628 bursts at 18 Bateson. Compare runs both on every burst and counts where they differ — '
     + 'the readings sent are still the chosen one\'s — so it costs more than either.';
 
+  // What the station's decoders do between bursts (receivers.sdr.watch, RPi ALERT 0.18+).
+  const WATCHES = [['always', 'Filter every sample (as before)'], ['bursts', 'Filter only around bursts'], ['check', 'Check — both, and count where they differ']];
+  const WATCH_MEANING = 'Each channel\'s decoder used to filter the stick\'s whole window all the time, burst or not. Around bursts, it watches the '
+    + 'channel 25 times a second and filters only from a second before something shows: from 2½ times less work at 240 kHz to 20 times less at 2.4 MHz. '
+    + 'Check runs both and counts readings only one of them got; the readings sent are the first\'s.';
+
+  // A stick's checks, as its status reports them: lean against full (receivers.sdr.decoder
+  // 'compare'), and around bursts against always (receivers.sdr.watch 'check').
+  function checksHtml(r) {
+    const out = [], n = v => Number(v || 0).toLocaleString();
+    const l = r.lean_check;
+    if (l && l.compared) out.push(`${termHtml('Lean check', 'The station decodes every burst both ways (Decoder: Compare) and counts bursts the two read differently.')}: `
+      + `${n(l.differ)} of ${n(l.compared)} bursts differ (${(100 * l.differ / l.compared).toFixed(2)}%)${l.time_pct != null ? ' · lean ' + l.time_pct + '% of the time' : ''}`);
+    const w = r.watch_check;
+    if (w && (w.both || w.only_always || w.only_watch)) out.push(`${termHtml('Around-bursts check', 'Between bursts: Check. Readings both ways, and readings only one of the two decoders got.')}: `
+      + `${n(w.both)} read both ways, ${n(w.only_always)} only filtering always, ${n(w.only_watch)} only around bursts`
+      + (w.awake_pct != null ? ` · awake ${w.awake_pct}%` : '') + (w.time_pct != null ? ` · ${w.time_pct}% of the work` : ''));
+    return out.map(x => `<div class="qs-dim">${x}</div>`).join('');
+  }
+
   function formFrom(cfg, rx) {
     const sd = (cfg.receivers || {}).sdr || {};
     const f = {
@@ -440,6 +460,8 @@ const BaseStations = (function () {
       gain: sd.gainDb == null ? 'auto' : String(sd.gainDb), ppm: String(sd.ppm || 0), squelch: String(sd.squelchDb ?? 8), rate: String(sd.sampleRate || 0),
       // RPi ALERT 0.16 and later (MegaNet #259); absent on older stations, and then not offered.
       decoder: sd.decoder || '',
+      // RPi ALERT 0.18 and later (MegaNet #259 part 2).
+      watch: sd.watch || '',
       audio: (cfg.audio || {}).enabled === false ? 'off' : ((cfg.audio || {}).mode || 'auto'), volume: String((cfg.audio || {}).volume ?? 80),
       kiosk: (cfg.kiosk || {}).mode || 'auto', tz: (cfg.system || {}).timezone || '',
     };
@@ -488,6 +510,7 @@ const BaseStations = (function () {
       if (sq !== (sd.squelchDb ?? 8)) put('receivers.sdr.squelchDb', sq);
       if (Number(f.rate) !== (sd.sampleRate || 0)) put('receivers.sdr.sampleRate', Number(f.rate));
       if (sd.decoder !== undefined && f.decoder && f.decoder !== sd.decoder) put('receivers.sdr.decoder', f.decoder);
+      if (sd.watch !== undefined && f.watch && f.watch !== sd.watch) put('receivers.sdr.watch', f.watch);
       // Each stick's own, as the station's page builds them: entries for
       // sticks not shown are kept; a blank field is the shared setting.
       const sticks = rx.filter(x => x.kind === 'sdr');
@@ -562,8 +585,10 @@ const BaseStations = (function () {
         ${inp('squelch', 'Squelch, dB', ' inputmode="numeric"')}
         ${sel('rate', 'Window', [['0', 'Automatic — the narrowest that holds the channels']].concat(WINDOWS))}
         ${f.decoder ? sel('decoder', termHtml('Decoder', DECODER_MEANING), DECODERS) : ''}
+        ${f.watch ? sel('watch', termHtml('Between bursts', WATCH_MEANING), WATCHES) : ''}
       </div>
       ${f.decoder ? `<p class="small qs-dim"><strong>Decoder:</strong> ${esc(DECODER_MEANING)}</p>` : ''}
+      ${f.watch ? `<p class="small qs-dim"><strong>Between bursts:</strong> ${esc(WATCH_MEANING)}</p>` : ''}
       ${sticks.length ? `<h4>Each stick <span class="small qs-dim">(blank: as above)</span></h4>${sticks.map(r => {
         const v = f['s:' + r.key] || {};
         const k = escAttr(r.key);
@@ -1838,7 +1863,7 @@ const BaseStations = (function () {
   return { render, init, load, open, close, ask, askFrom, cancel, field, stick, resetForm, saveSettings,
            keyField, addKey, removeKey, authChanged, wfWindow, chWindow,
            // Pure, for test/basestations.mjs.
-           _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf,
+           _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _checksHtml: checksHtml, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf,
            _chRows: chRows, _chVerdict: chVerdict };
 })();
 
