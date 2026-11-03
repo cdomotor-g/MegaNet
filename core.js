@@ -3840,8 +3840,12 @@ const DB_SCHEMA = 'meganet';
 // back with their 2,544 copies counted, 6 copy rows from retained hand-overs
 // removed, the legacy reports two bridge restarts cut short restored, rollups
 // rebuilt (0098), applied by db-migrate.yml on 3 November 2026, bumped after;
-// no shape the app reads changes.
-const DB_SCHEMA_VERSION = 99;
+// no shape the app reads changes. 99: the Users table's "days in 30" counts
+// days, not browsers (0099). 100: one person, one account — an account's
+// second addresses, Same person… and where the emails go (0100), applied by
+// db-migrate.yml on 3 November 2026, bumped after; whoami() and admin_users()
+// gain addresses, and the app reads them only where they are there.
+const DB_SCHEMA_VERSION = 100;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
