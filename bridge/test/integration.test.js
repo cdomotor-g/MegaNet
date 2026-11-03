@@ -629,10 +629,11 @@ test('the legacy ALERT path: Sensor is the address, and the re-sent table is not
   await waitFor(() => broker.bridgeAcks().length === frames.length, { what: 'every message to be acked' });
 });
 
-test('the ALERT2 path: a report the gateway republishes is stored once, and every message still lands raw', async (t) => {
-  // Station 1000's slots 9 and 10, republished a quarter-hour later under the
-  // same AlertTimestamp (resends.js). The second message is kept as evidence
-  // and claims nothing.
+test('the ALERT2 path: a burst published twice within seconds is one reading, and the next transmission another', async (t) => {
+  // Station 1001 sends about half its bursts twice, a second or two apart, same
+  // stamp and values: the second is counted on the first (resends.js). Fifteen
+  // minutes on under the same stamp is the station transmitting again — the
+  // bench clocks do not always move the stamp — and is a reading.
   const broker = await startBroker();
   const api = await startApi();
   const bridge = startBridge(broker.port, api.url);
@@ -646,33 +647,31 @@ test('the ALERT2 path: a report the gateway republishes is stored once, and ever
   await waitFor(() => broker.subscribed.has('test-bridge'), { what: 'the bridge to subscribe' });
   const station = await connectStation(broker.port, 'elpro_test');
 
-  const topic = 'meganet/v1/elpro_test/logger/reading/elpro/Station 1000';
+  const topic = 'meganet/v1/elpro_test/logger/reading/elpro/Station 1001';
   const frames = [
-    '[{"timestamp":1793577714000,"Sensor":9,"Value":248,"AlertTimestamp":39711},'
-      + '{"timestamp":1793577714000,"Sensor":10,"Value":-100,"AlertTimestamp":39711}]',
-    '[{"timestamp":1793578614812,"Sensor":9,"Value":248,"AlertTimestamp":39711},'
-      + '{"timestamp":1793578614812,"Sensor":10,"Value":-100,"AlertTimestamp":39711}]',
+    '[{"timestamp":1793586988346,"Sensor":8,"Value":142,"AlertTimestamp":33118}]',
+    '[{"timestamp":1793586988464,"Sensor":8,"Value":142,"AlertTimestamp":33118}]',
+    '[{"timestamp":1793587888346,"Sensor":8,"Value":142,"AlertTimestamp":33118}]',
   ];
   for (const payload of frames) await station.publishAsync(topic, payload, { qos: 1 });
 
   await waitFor(() => api.of('ingest_http').length === frames.length,
-    { what: 'both messages to reach the raw table' });
+    { what: 'every message to reach the raw table' });
   const bodies = api.of('ingest_http').map((c) => c.body.payload);
   assert.deepEqual(bodies.map((b) => b.frame), frames);
-  assert.deepEqual(bodies[0].readings, [
-    { a2_station: 1000, a2_sensor: 9, reading_ts: 1793577714000, value_raw: 248 },
-    { a2_station: 1000, a2_sensor: 10, reading_ts: 1793577714000, value_raw: -100 },
-  ], 'the stamp is not posted');
-  assert.deepEqual(bodies[1].readings, [], 'the republished report claims nothing');
+  const reading = (ts) => [{ a2_station: 1001, a2_sensor: 8, reading_ts: ts, value_raw: 142 }];
+  assert.deepEqual(bodies[0].readings, reading(1793586988346), 'the stamp is not posted');
+  assert.deepEqual(bodies[1].readings, reading(1793586988346), 'the copy is posted under the first one\'s time');
+  assert.deepEqual(bodies[2].readings, reading(1793587888346), 'the next transmission is a reading');
 
-  await waitFor(() => broker.bridgeAcks().length === frames.length, { what: 'both messages to be acked' });
+  await waitFor(() => broker.bridgeAcks().length === frames.length, { what: 'every message to be acked' });
 });
 
 test('an ELPRO message handed over as retained teaches the filter and stores nothing', async (t) => {
   // The gateway publishes with retain set, so every time the bridge subscribes
   // the broker hands over each topic's last publish again. On 2 November one
-  // restart stored seven old republishes that way. Retained: learned, not
-  // posted — and a republish of it afterwards is recognised.
+  // restart stored seven old messages that way. Retained: learned, not posted
+  // — and a copy of it a moment later is counted on it, not stored apart.
   const broker = await startBroker();
   const api = await startApi();
   t.after(async () => {
@@ -692,16 +691,17 @@ test('an ELPRO message handed over as retained teaches the filter and stores not
   assert.equal(api.of('ingest_http')[0].body.payload.frame, old, 'the bytes are kept');
   assert.deepEqual(api.of('ingest_http')[0].body.payload.readings, [], 'nothing is claimed');
 
-  // The gateway republishing that report a quarter-hour on: already known.
+  // The same burst published again 118 ms on: a copy, under the retained one's
+  // time, so the database counts it on the reading it already holds.
   await station.publishAsync(topic,
-    '[{"timestamp":1793587888464,"Sensor":8,"Value":142,"AlertTimestamp":33118}]', { qos: 1 });
+    '[{"timestamp":1793586988582,"Sensor":8,"Value":142,"AlertTimestamp":33118}]', { qos: 1 });
   // A new transmission: stored.
   await station.publishAsync(topic,
     '[{"timestamp":1793590588464,"Sensor":8,"Value":143,"AlertTimestamp":36718}]', { qos: 1 });
   await waitFor(() => api.of('ingest_http').length === 3, { what: 'the live messages to land' });
   const live = api.of('ingest_http').slice(1).map((c) => c.body.payload.readings);
   assert.deepEqual(live, [
-    [],
+    [{ a2_station: 1001, a2_sensor: 8, reading_ts: 1793586988464, value_raw: 142 }],
     [{ a2_station: 1001, a2_sensor: 8, reading_ts: 1793590588464, value_raw: 143 }],
   ]);
 });

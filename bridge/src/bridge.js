@@ -202,11 +202,11 @@ function createBridge(config, deps = {}) {
     // reconstruct the topic from a log line that has since aged out.
     if (route.source) parsed.envelope.path = topic;
 
-    // Both ELPRO relay paths re-send what they have already published — the
-    // legacy one its whole table whenever a new address reports, the ALERT2
-    // one a station's last report on a timer. Only fresh reports become
-    // readings (resends.js). The frame in the envelope is untouched, so the
-    // raw row still holds every entry.
+    // The legacy ELPRO path re-sends its whole table whenever a new address
+    // reports, and the ALERT2 one publishes some bursts twice within seconds;
+    // only fresh reports become readings, and copies are counted on the first
+    // (resends.js). The frame in the envelope is untouched, so the raw row still
+    // holds every entry.
     let resent = 0;
     let copies = 0;
     if (route.legacyAlert) {
@@ -214,8 +214,8 @@ function createBridge(config, deps = {}) {
       parsed.readings = kept.readings;
       resent = kept.resent;
     } else if (route.sourceStation !== undefined) {
-      // The ALERT2 relay path republishes a station's last report on a timer
-      // for as long as nothing new arrives; its AlertTimestamp says so.
+      // The ALERT2 relay path publishes some bursts twice within seconds; the
+      // second is a copy of the first, counted on it (resends.js).
       const kept = resends.freshA2(topic, parsed.readings);
       parsed.readings = kept.readings;
       resent = kept.resent;
@@ -224,8 +224,8 @@ function createBridge(config, deps = {}) {
 
     // A retained message is the broker handing over a topic's last publish as
     // the bridge subscribes — on every restart and reconnect. On the ELPRO relay
-    // paths that is usually a republish the filter above took out (or 0097
-    // removed), and a filter that has only just started cannot know that: on 2
+    // paths that publish was handled when it arrived (or was a copy, or a
+    // re-sent table), and a filter that has only just started cannot tell: on 2
     // November one restart stored seven such readings. So it teaches the filter
     // (above) and posts nothing. Anything the bridge has not seen arrives as an
     // ordinary message anyway — the persistent session queues it — so the only

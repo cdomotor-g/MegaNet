@@ -65,41 +65,29 @@
 // The memory is a Map per topic and lives only as long as the process; it is
 // small (one number per ALERT address) and bounded in topics.
 //
-// ── The ALERT2 relay path does it too (`…/elpro/Station NNNN`) ──────────────
+// ── The ALERT2 relay path (`…/elpro/Station NNNN`): copies only ─────────────
 //
-// Measured over every ALERT2 message the bench gateway sent from 2 October to
-// 2 November 2026: 22,261 sensor values, about 2,100 of them a report seen for
-// the first time. The rest are the gateway publishing a report it has already
-// published, with a fresh `timestamp` each time:
+// The gateway does NOT republish ALERT2. Every set carries the relayed
+// station's own `AlertTimestamp` (messages.js keeps it beside the reading), and
+// on 2 November 2026 this file took a set with the same stamp and value as the
+// slot's last one, minutes or hours later, as the gateway repeating itself.
+// That was wrong, and was taken back the next day (0098): each bench station
+// has its own rhythm — Station 1000 every 15 minutes, 1001-1003 about hourly —
+// and their values change between messages while the bench units' stamps stay
+// put for hours. So a repeated stamp there is a clock that has not moved, not a
+// publish nobody asked for. (Real ALERT2 stations do move it every time: all
+// 201,754 bursts the network heard in the three days before carried one, and a
+// station's stamp only ever came back within two minutes, relayed.)
 //
-//   - again within seconds (median 2.6 s) — the same burst heard twice, or the
-//     same publish delivered twice;
-//   - again every 15 minutes, and again on the hour, for as long as the
-//     station sends nothing new — out to days. A station that has gone quiet
-//     keeps being "heard".
-//
-// Here the frame says which is which: every set carries the relayed station's
-// own `AlertTimestamp` (messages.js keeps it beside the reading), and a new
-// transmission always carries a new one — across that month an old stamp never
-// came back after a newer one. The stamp cannot be placed in time (the bench
-// clocks keep no zone this can name), but it does not need to be: per topic,
-// each sensor slot's last report is remembered as stamp and value, and a set
-// with both the same is the same report.
-//
-//   - Within A2_COPY_MS of its first sighting it is a copy, and is posted under
-//     the first sighting's time so the database counts it on that reading
-//     (dup_count), as it counts any copy.
-//   - After that it is the gateway repeating itself, and is taken out.
-//   - Past A2_REPEAT_MS it is treated as new again, because the stamp counts a
-//     half-day and wraps: a station that transmits at the same second every
-//     hour sends the same stamp twelve hours later, and a value that has not
-//     changed (a battery, a fixed RSSI) makes it the same pair. Eleven hours
-//     keeps that genuine report. The cost is a station that has gone quiet
-//     being stored once more every eleven hours, against four or more an hour
-//     before this.
-//
-// A set with no AlertTimestamp (Station 1003's frames carry none) is passed
-// through untouched: there is nothing to tell it by.
+// What does repeat is the same burst published twice in quick succession —
+// about half of 1001-1003's messages have a twin within 10 s, the same stamp
+// and values. So per topic each sensor slot's last set is remembered as stamp,
+// value and time, and a set with the same stamp and value within A2_COPY_MS of
+// that first sighting is a copy: posted under the first sighting's time, so the
+// database counts it on that reading (dup_count), as it counts any copy.
+// Everything else is a reading. A set with no AlertTimestamp (Station 1003's
+// frames carry none) is passed through untouched: there is nothing to tell a
+// copy by.
 
 const { alertStampOf } = require('./messages');
 
@@ -108,7 +96,6 @@ const DEFAULT_MAX_TABLES = 256;
 // arrived together rather than a table this process has lost track of (rule 4).
 const BATCH_MAX = 8;
 const A2_COPY_MS = 10 * 1000;
-const A2_REPEAT_MS = 11 * 60 * 60 * 1000;
 
 function createResendFilter({ maxTables = DEFAULT_MAX_TABLES } = {}) {
   // Legacy: topic → { values: Map<alert_id, value_raw>, order: alert_id[] | null,
@@ -185,18 +172,18 @@ function createResendFilter({ maxTables = DEFAULT_MAX_TABLES } = {}) {
   }
 
   /**
-   * The readings in one ALERT2 relay message that are not the gateway
-   * repeating a report it has already published (see the header).
+   * One ALERT2 relay message's readings, with any copy of a set just seen
+   * moved onto that set's time (see the header).
    *
    * `readings` are what parseElpro() made of the message, each with its
    * AlertTimestamp beside it. Returns `{readings, resent, copies}`: the
-   * readings to post, how many were taken out as repeats, and how many were
-   * posted as copies under their first sighting's time.
+   * readings to post (all of them), none taken out (`resent` is always 0 here,
+   * kept so the caller treats both paths alike), and how many were posted as
+   * copies under their first sighting's time.
    */
   function freshA2(key, readings) {
     const known = tableFor(key, a2Tables).values;
     const out = [];
-    let resent = 0;
     let copies = 0;
     for (const r of readings) {
       const stamp = alertStampOf(r);
@@ -208,19 +195,16 @@ function createResendFilter({ maxTables = DEFAULT_MAX_TABLES } = {}) {
       // reading carries; the receipt time stands in if it carried none.
       const at = msOf(r.reading_ts);
       const last = known.get(r.a2_sensor);
-      if (last && last.stamp === stamp && last.value === r.value_raw && at - last.at < A2_REPEAT_MS) {
-        if (at - last.at <= A2_COPY_MS) {
-          out.push({ ...r, reading_ts: last.ts });
-          copies += 1;
-        } else {
-          resent += 1;
-        }
+      if (last && last.stamp === stamp && last.value === r.value_raw
+          && at >= last.at && at - last.at <= A2_COPY_MS) {
+        out.push({ ...r, reading_ts: last.ts });
+        copies += 1;
         continue;
       }
       known.set(r.a2_sensor, { stamp, value: r.value_raw, ts: r.reading_ts, at });
       out.push(r);
     }
-    return { readings: out, resent, copies };
+    return { readings: out, resent: 0, copies };
   }
 
   return { fresh, freshA2, size: () => tables.size + a2Tables.size };
@@ -239,4 +223,4 @@ function msOf(ts) {
   return Number.isFinite(ms) ? ms : Date.now();
 }
 
-module.exports = { createResendFilter, DEFAULT_MAX_TABLES, BATCH_MAX, A2_COPY_MS, A2_REPEAT_MS };
+module.exports = { createResendFilter, DEFAULT_MAX_TABLES, BATCH_MAX, A2_COPY_MS };

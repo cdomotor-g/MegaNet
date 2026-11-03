@@ -96,22 +96,21 @@ reports, all kept. When it cannot tell — just after a restart, or a message th
 table does not explain — it keeps the first entry only. The raw row keeps every
 byte either way; `message_queued` (debug) logs how many were `resent`.
 
-**The ALERT2 path republishes too, and its `AlertTimestamp` says so.** The
-gateway publishes a station's last report again every 15 minutes and on the
-hour, freshly stamped, for as long as nothing new arrives — in the month to 2
-November 2026, about 2,100 reports arrived as 22,261 sensor values. Each set
-carries the relayed station's own `AlertTimestamp`, which a new transmission
-always changes, so per topic the bridge remembers each slot's last stamp and
-value: the same pair within 10 s is a copy (posted under the first sighting's
-time, so the database counts it), and after that a repeat, taken out. Past 11
-hours the pair counts as new again, because the stamp wraps every 12 and a
-station that transmits at the same second each hour repeats it. Sets without
-an `AlertTimestamp` pass through. `message_queued` logs `resent` and `copies`.
+**The ALERT2 path does not republish; it publishes some bursts twice.** Each
+set carries the relayed station's own `AlertTimestamp`. About half of the bench
+stations' messages have a twin within seconds, same stamp and values, so per
+topic the bridge remembers each slot's last stamp, value and time, and a set
+with the same stamp and value within 10 s is a copy — posted under the first
+sighting's time, so the database counts it on that reading. Everything else is
+a reading, including the same stamp minutes or hours later: the bench units'
+clocks do not always move it, and on 2 November 2026 the bridge briefly took
+those for republishes and dropped real transmissions (put back by `0098`). Sets
+without an `AlertTimestamp` pass through. `message_queued` logs `copies`.
 
 **On both ELPRO paths a retained message teaches the filter and stores
 nothing.** The gateway publishes with retain set, so each time the bridge
-subscribes the broker hands over every topic's last publish again — usually a
-republish the filter dropped, which a filter that has just started cannot
+subscribes the broker hands over every topic's last publish again — a message
+the bridge handled when it arrived, which a filter that has just started cannot
 recognise (one restart on 2 November stored seven). Anything the bridge has not
 seen still arrives as an ordinary message through the persistent session. The
 raw row keeps the bytes; `message_queued` logs `retained`.
