@@ -226,7 +226,7 @@ ok('…the same findings as the analysis worked out directly, and the commit it 
   !!rep && rep.findings.length === findings.length && rep.findings.some(f => f.subject === 'silent:' + silentId) && rep.detail.commit === '0123456789ab');
 ok('…read with the publishable key, reported with the secret one',
   s1.seen.reportKey === 'sb_secret_test' && [...s1.seen.keys].filter(k => k !== 'sb_secret_test').every(k => /^sb_publishable_/.test(k)));
-ok('…and says what it reported and what changed', out && out.opened && lines.some(l => /^Reported: \d+ open/.test(l)) && lines.some(l => /opened {3}Silent/.test(l)),
+ok('…and says what it reported and what changed', out && out.opened && lines.some(l => /^Reported: \d+ open/.test(l)) && lines.some(l => /opened {3}Not heard/.test(l)),
   lines.slice(-4).join(' | '));
 
 ok('…from the register the database gave', !!rep && rep.detail.register === 'database' && s1.seen.registerAsked === 1);

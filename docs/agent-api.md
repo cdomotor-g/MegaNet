@@ -234,7 +234,7 @@ says what to change; an unknown tool or malformed request is a JSON-RPC error.
 | `get_station_dossier` | Everything a report needs about one station, in one call | `GET /api/v1/stations/{id}/dossier` |
 | `get_readings` | Telemetry ingested into Flood-Net: raw, hourly or daily | `GET /api/v1/stations/{id}/readings` |
 | `get_latest_readings` | What every gauge is saying now: each station's newest reading on every channel, in one call, by network, basin, kind or bounding box; `format: "geojson"` for a map | `GET /api/v1/readings/latest` |
-| `get_silent_stations` | What has gone quiet: the stations silent now, worst first, with when each was last heard, and the groups that went quiet together; by network, basin, kind, bounding box or severity; `format: "geojson"` for a map | `GET /api/v1/health/silent` |
+| `get_silent_stations` | What Flood-Net has stopped hearing: the stations silent (not heard) now, worst first, with when each was last heard, and the groups that went unheard together; by network, basin, kind, bounding box or severity; `format: "geojson"` for a map | `GET /api/v1/health/silent` |
 | `get_station_health` | What Station Health says about one station over 3, 7 or 14 days: its findings with what to do, its check schedule day by day, its battery's night lows and trend | `GET /api/v1/stations/{id}/health` |
 | `get_health_findings` | The same for a page of stations, worst first: by owner, station ids, network, basin, kind or bounding box | `GET /api/v1/health/findings` |
 | `get_flood_levels` | Flood classes, SLS classes, crossings, gauge zero, flood effects, AEP levels, one AHD ladder | `GET /api/v1/stations/{id}/flood-levels` |
@@ -1099,16 +1099,24 @@ more read.
 
 ### `GET /api/v1/health/silent`
 
-What has gone quiet. The stations Station Health finds **silent now** — they
-have missed their expected checks while the receivers that hear them kept
-delivering other traffic — worst first (critical, then the longest silent),
-and the **groups** that went quiet together, around one place
+What Flood-Net has stopped hearing. The stations Station Health finds **silent
+(not heard) now** — Flood-Net's receivers have missed their expected checks
+while they kept delivering other traffic — worst first (critical, then the
+longest silent), and the **groups** that went unheard together, around one place
 (`area-silence`) or behind one repeater (`repeater-down`), which usually share
 one cause. It is the server's own run of Station Health's rules, every fifteen
 minutes with nobody's browser open; `checked_at` and `minutes_since_checked`
 say when it last looked, and a note says so if that is more than 45 minutes
 ago. Like the latest readings, it can only judge stations whose telemetry is
 ingested into Flood-Net — a station absent here is not thereby well.
+
+Silent here is what Flood-Net's receivers heard, not what the station sent.
+The stations report to the Bureau through its own base stations, and Flood-Net
+often hears a station one way where the Bureau has several: a station silent
+here may be reporting all the while. ARRO, the Bureau's record, says whether it
+is — `arro_site` on `get_station` names the station's ARRO site. On 3 Nov 2026
+eight Gold Coast stations behind Tallai were silent here overnight and
+complete in ARRO. Each finding's `action` says to look there first.
 
 | Parameter | Meaning |
 |---|---|
@@ -1138,9 +1146,9 @@ curl -s 'https://floodwarning.net/api/v1/health/silent?severity=critical'
   "checked_at": "2026-10-21T07:31:46.096+00:00", "minutes_since_checked": 4,
   "stations": [{
     "id": "mt_tamborine_al", "name": "Mt Tamborine AL", "lat": -27.94, "lon": 153.19, "kinds": ["rain"],
-    "radio_network_ids": [], "severity": "critical", "title": "Silent — missed its last 4 checks",
-    "detail": "Checks every 3 h; nothing heard since 08:17 today (9.2 h), while the receivers that hear it kept delivering other traffic.",
-    "action": "Check power and radio at the station; if its repeater went quiet too, start there.",
+    "radio_network_ids": [], "severity": "critical", "title": "Not heard — missed its last 4 checks",
+    "detail": "Checks every 3 h; Flood-Net has heard nothing from it since 08:17 today (9.2 h), while the receivers that hear it kept delivering other traffic. ARRO says whether it kept reporting.",
+    "action": "Look in ARRO first: if its reports are there, the gap is on Flood-Net's route to it, not at the station. If ARRO has the gap too, check power and radio at the station — and its repeater, if that went unheard as well.",
     "last_heard_at": "2026-10-20T22:17:47.000Z", "minutes_since_heard": 558,
     "checks_every_minutes": 180, "checks_missed": 4, "noticed_at": "2026-10-21T06:38:02.347+00:00"
   }],
@@ -1199,7 +1207,7 @@ battery went critical while its checks stopped arriving whole:
       "action": "Check the antenna, cable and connectors, and the path to its repeater — compare with its last fade margin.",
       "since": null, "cause": null, "evidence": { "n24": 8, "nPrior": 48, "rate24": 1, "ratePrior": 0.56 } },
     { "id": "shared-spell:spell:couran_point_al@498021", "kind": "shared-spell", "category": "network", "severity": "warn",
-      "about": "group", "title": "113 stations across 217 km, Pottsville West Reservoir to Linville AL, went silent together, and came back",
+      "about": "group", "title": "113 stations across 217 km, Pottsville West Reservoir to Linville AL, went unheard together, and were heard again",
       "since": "2026-10-24T20:38:21.206Z", "evidence": { "from": "2026-10-24T20:38:21.206Z", "to": "2026-10-25T19:19:43.044Z",
       "stations": ["coplicks_br_al", "…"], "stationsTotal": 113 }, "…": "…" },
     "…"
@@ -1319,12 +1327,12 @@ attention — so a client can see which owners it may ask for:
   "owners": [{ "owner": "Bureau of Meteorology", "stations": 92 }, { "owner": "none", "stations": 79 },
              { "owner": "Seqwater", "stations": 24 }],
   "stations": [
-    { "id": "nindooinbah_dam_al", "worst": "critical", "findings": ["Silent — missed its last 23 checks", "Battery low — 12.1 V",
+    { "id": "nindooinbah_dam_al", "worst": "critical", "findings": ["Not heard — missed its last 23 checks", "Battery low — 12.1 V",
       "31% of its checks arrive incomplete", "Rain counter went backwards 2 times", "2 corrupted rain-gauge counts set aside"] },
-    { "id": "ewen_maddock_dam_al", "worst": "critical", "findings": ["Silent — missed its last 27 checks",
-      "Went silent for 15 h, then came back", "Rain counter went backwards 1 time", "4 corrupted rain-gauge counts set aside"] },
-    { "id": "bill_gunn_dam_al", "worst": "warn", "findings": ["Silent — missed its last 20 checks",
-      "9 stations around Bill Gunn Dam AL went quiet together", "Rain counter went backwards 1 time", "4 corrupted rain-gauge counts set aside"] },
+    { "id": "ewen_maddock_dam_al", "worst": "critical", "findings": ["Not heard — missed its last 27 checks",
+      "Not heard for 15 h, then heard again", "Rain counter went backwards 1 time", "4 corrupted rain-gauge counts set aside"] },
+    { "id": "bill_gunn_dam_al", "worst": "warn", "findings": ["Not heard — missed its last 20 checks",
+      "9 stations around Bill Gunn Dam AL went unheard together", "Rain counter went backwards 1 time", "4 corrupted rain-gauge counts set aside"] },
     "…"
   ]
 }
@@ -1539,6 +1547,19 @@ at [`GET /api/v1/changelog`](#get-apiv1changelog), newest first — both from
 in the same push. A change with nothing to notice (a fix inside, a faster
 answer) is not listed.
 
+- **3 November 2026 — Silent stations are said as not heard by Flood-Net, and
+  point to ARRO.** A station Flood-Net calls silent is one its own receivers
+  have not heard, not one that has stopped reporting: on 3 November eight Gold
+  Coast stations behind Tallai were silent here overnight and complete in the
+  Bureau's ARRO. The findings' titles now read *Not heard — missed its last N
+  checks*, *Not heard for 15 h*, *Not heard for 15 h, then heard again* and *N
+  stations behind X went unheard together*; details say Flood-Net heard
+  nothing; and each silence's `action` starts by looking in ARRO, where the
+  station's `arro_site` names its site. `GET /api/v1/health/silent` and
+  `get_silent_stations` say the same in their notes and descriptions. The
+  route, the tool, the kinds and every field are as they were — match on
+  `kind`, not on a title's words. Open findings take the new words at the
+  server's next run, within fifteen minutes.
 - **1 November 2026 — One ALERT burst heard several ways is one reading.**
   A legacy ALERT frame carries no time, so each receiver stamps it when it
   heard it, and copies of one burst that came through a repeater or an ALERT2

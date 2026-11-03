@@ -25,8 +25,9 @@ See [`docs/agent-api.md`](../docs/agent-api.md).
 - `get_latest_readings` (`/api/v1/readings/latest`) is what every gauge
   reporting into Flood-Net is saying now, in one call; `format=geojson` on it
   and on station search answers GeoJSON for a map (`[lon, lat]`).
-- `get_silent_stations` (`/api/v1/health/silent`) lists what has gone quiet —
-  stations silent now and groups that went quiet together.
+- `get_silent_stations` (`/api/v1/health/silent`) lists what Flood-Net has stopped
+  hearing — stations silent (not heard) now and groups that went unheard together.
+  A station may still be reporting to the Bureau: ARRO (`arro_site`) says whether.
 - `get_station_health` (`/api/v1/stations/{id}/health?days=3|7|14`) is what
   Station Health says about one station — findings, check schedule day by day,
   battery night lows; `get_health_findings` (`/api/v1/health/findings`) the

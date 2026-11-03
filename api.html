@@ -12,9 +12,9 @@
        reference this page summarises; test/agent-docs.mjs holds both to the
        code's URLs, limits, endpoints and tools. -->
   <link rel="canonical" href="https://floodwarning.net/api">
-  <link rel="icon" type="image/svg+xml" href="assets/icon-small.svg?v=20261103s">
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=20261103s">
-  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=20261103s">
+  <link rel="icon" type="image/svg+xml" href="assets/icon-small.svg?v=20261103t">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=20261103t">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=20261103t">
   <meta name="theme-color" content="#0b5cab">
 
   <!-- Self-contained for the same reason as about.html: no stylesheet, font or
@@ -103,7 +103,7 @@
 <body>
 <main>
 
-  <img class="logo" src="assets/logo.webp?v=20261103s" alt="" width="900" height="879">
+  <img class="logo" src="assets/logo.webp?v=20261103t" alt="" width="900" height="879">
   <h1>Flood-Net station API</h1>
   <p class="lede">
     Flood-Net's station register, readable by programs as well as people. Point
@@ -186,10 +186,11 @@
 
     <dt>Station health</dt>
     <dd>
-      The stations that have gone silent now, worst first, with when each was
-      last heard and what to check, and the groups that went quiet together
+      The stations Flood-Net is not hearing now, worst first, with when each was
+      last heard and what to check, and the groups that went unheard together
       (around one place, or behind one repeater) — from the server's own health
-      run every fifteen minutes.
+      run every fifteen minutes. It is what Flood-Net's receivers heard, not what
+      the stations sent: ARRO, the Bureau's record, says whether one kept reporting.
     </dd>
 
     <dt>Radio licences</dt>
@@ -332,7 +333,7 @@
           <td><code>GET /api/v1/health/silent</code></td>
           <td><code>get_silent_stations</code></td>
           <td>
-            The stations silent now and the groups that went quiet together;
+            The stations not heard now and the groups that went unheard together;
             filter as above, or by <code>severity</code>.
             <a href="/api/v1/health/silent">Example</a>
           </td>

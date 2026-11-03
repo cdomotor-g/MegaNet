@@ -360,9 +360,11 @@ const Health = (() => {
         </div>
         <p class="sub hl-sub">What the readings say about each field station and the network carrying them — learned check schedules
           and the checks that went missing, batteries across their solar day, rain gauges and levels against their neighbours,
-          receivers and repeaters that went quiet, stored readings that are corrupted copies rather than data, and which stations' checks
+          receivers that stopped and repeaters that went unheard, stored readings that are corrupted copies rather than data, and which stations' checks
           land on top of each other — with the check time or repeater delay to change.
-          A missed check only counts against a station when a receiver that hears it was listening at the time.</p>
+          A missed check only counts against a station when a receiver that hears it was listening at the time.
+          All of it is what Flood-Net's own receivers heard: a station not heard here may still be reporting to the Bureau,
+          and ARRO, the Bureau's record, says whether it is.</p>
         <div id="hl-status" class="small hl-status" role="status">${statusHtml()}</div>
         <div id="hl-ownnote" class="small hl-ownnote">${ownNoteHtml()}</div>
         <div id="hl-kpis">${kpisHtml()}</div>
@@ -442,6 +444,9 @@ const Health = (() => {
     if (el && state.activeTab === 'health') el.innerHTML = statusHtml(msg);
   }
 
+  // "Not heard now", on hover — and in words in the tab's intro, for a finger.
+  const NOT_HEARD_MEANS = 'Stations whose last two or more checks Flood-Net\'s receivers have not heard while they kept hearing others. '
+    + 'The station may still be reporting to the Bureau — ARRO says whether it is.';
   function kpisHtml() {
     const A = H.A;
     if (!A) return '';
@@ -459,7 +464,7 @@ const Health = (() => {
         attention: F.filter(f => f.severity !== 'info').length,
       });
     }
-    const chip = (k, v, sub, cls) => `<div class="qs-chip${cls ? ' ' + cls : ''}"><span class="qs-chip-k">${esc(k)}</span>`
+    const chip = (k, v, sub, cls, meaning) => `<div class="qs-chip${cls ? ' ' + cls : ''}"><span class="qs-chip-k">${termHtml(k, meaning)}</span>`
       + `<span class="qs-chip-v">${v}</span>${sub ? `<span class="qs-chip-k">${sub}</span>` : ''}</div>`;
     const pct = c.checksDue ? Math.round(100 * c.checksReceived / c.checksDue) : null;
     const silent = F.filter(f => f.kind === 'silent').length;
@@ -469,7 +474,7 @@ const Health = (() => {
       ${chip('Stations heard', num(c.stationsHeard), `${num(c.scheduled)} on a learned schedule`)}
       ${chip('Checks received', pct == null ? '—' : pct + '%', `${num(c.checksReceived)} of ${num(c.checksDue)} due`, pct != null && pct < 80 ? 'warn' : '')}
       ${chip('Need attention', num(c.attention), 'critical and warnings', c.attention ? 'warn' : '')}
-      ${chip('Silent now', num(silent), 'stations', silent ? 'bad' : '')}
+      ${chip('Not heard now', num(silent), 'stations', silent ? 'bad' : '', NOT_HEARD_MEANS)}
       ${chip('Power', num(power), 'battery findings', power ? 'warn' : '')}
       ${chip('Corrupted copies', num(c.corrupted + c.ghosts), own ? 'whole network' : `${num(c.ghosts)} under the wrong address`, '')}
       ${chip('Receivers', num(c.receivers), (rxDown ? `${rxDown} stopped` : 'delivering') + (own ? ' · whole network' : ''), rxDown ? 'bad' : '')}
@@ -496,7 +501,7 @@ const Health = (() => {
     const how = [crit && `${num(crit)} critical`, warn && plural(warn, 'warning', 'warnings')].filter(Boolean).join(', ');
     return `<p class="hl-verdict"><strong>${plural(bad.length, 'finding needs', 'findings need')} attention</strong>${
         at ? ` at ${plural(at, 'station', 'stations')}` : ''} — ${how}.${
-        silent ? ` ${plural(silent, 'station is', 'stations are')} silent now.` : ''}${checks}
+        silent ? ` Flood-Net is not hearing ${plural(silent, 'station', 'stations')} now.` : ''}${checks}
       <button type="button" class="link-btn" onclick="Health.toAttention()">See them</button>${
         typeof HealthRainAhead !== 'undefined' ? HealthRainAhead.verdictHtml(H.A) : ''}</p>`;
   }

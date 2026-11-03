@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-03** (revision 222 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-03** (revision 223 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -433,6 +433,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 > ~~**⚠️** These were originally listed as "independent — no sequencing dependency." They are logically independent but **mechanically serialised**~~ — **resolved the easy way: one agent did both in sequence**, #121 read #120's pane comment instead of picking a z-index blind, and the `MemMeter` third of the table had already been obsoleted by #144 (layers are counted generically off `liveMaps()`).
 
 ## Standalone issues
+- **#269** `[Standalone]` `[Human]` — **OPEN, opened revision 223** — identify ALERT2 concentrator **11762**, the one route Flood-Net hears about 1,650 legacy addresses by (the Tallai group of 3 Nov among them), and the ALERT2 repeaters on its way to our stick (10019, 11056, 10115, 11099, 10057, 10310; and 33300, the stick's other concentrator). None is on the register. A person who knows the Bureau's ALERT2 network replies on the issue with each site; *not* by setting a station's ALERT2 station address, which attributes readings. **Unblocks:** an agent putting them on the register so Signal Routes, Station Health and the bulletin can name the route a gap is on. Depends on nothing.
 - **#259** `[Standalone]` `[Opus5/High]` — **OPEN, opened revision 214** — a lighter off-air decoder, so cheaper industrial computers (a Toradex Verdin AM62, open-ALERT's trial) and a busy Pi 4 keep up. **Part 1 done at revision 215:** lean decoding (filter once per carrier guess) is the live pipeline's default, after RPi ALERT's compare at the first base station: 14 of 11,628 live bursts read differently (0.12%), lean in a third of the time. Between bursts, the rings are filled a block at a time (exactly the same messages, a quarter less work), and `specHz: 0` lets a pipeline skip the spectrum (another sixth). **Part 2 built at revision 218:** `BurstWatch` filters a channel only around its bursts (25 looks a second between them), reading the same as the pipeline alone in every case `npm run alertdsp` tries; RPi ALERT 0.18 carries it behind *Between bursts* (default *Always*, as before) with a *Check both* mode. **Revision 221:** light decoding (`lean: 2`, the burst filtered to 48 kHz once: half of lean's time, as many true readings in every test) for RPi ALERT 0.19 with a lean-against-light compare; the watch's pre-roll and hang-over shortened (a third less awake, the same readings); the Pi's pipeline keeps 5 s and no capture bytes. **Left:** the checks at the first base station, then the Pi's defaults, then this closes.
 - **#255** `[Standalone]` `[Human]` — **OPEN, opened revision 200** — move the Supabase database to the **Small** compute size (2 GB, about US$15 a month, about US$5 more than Micro once the Pro plan's compute credit is counted). Supabase warned on 2026-10-28 that the project is using up its Disk IO Budget; `0087` removed the biggest causes, and what is left is a 902 MB database with 224 MB of shared buffers. Part 1 reads the current size and the Database report's Disk IOPS and Memory charts; Part 2 changes the size (under 2 minutes offline, in a quiet dry-weather hour) and checks readings resume; Part 3 hands back to an agent to read the new settings. Depends on nothing; #256 decides whether Small stays enough.
 - ~~**#249**~~ `[Standalone]` `[Human]` — **CLOSED at revision 196, opened at 193** — the db-migrate workflow's `SUPABASE_DB_URL` secret replaced with a session-pooler URI; the owner's run and an agent session's dry run both reach the database (schema_version 86, nothing pending). Agents apply migrations with `gh workflow run db-migrate.yml --ref main` again.
@@ -576,7 +577,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## Resource allocation summary
 
-> ## ⬛ Six AI rows, and sixteen `[Human]` issues.
+> ## ⬛ Six AI rows, and eighteen `[Human]` issues.
 >
 > **Revision 163 opens and closes nothing** — at the owner's request, **three more looks, in pictures**: 🔲 **Tiles**, 🎚️ **Instrument** and 🪧 **Signs**, each Calm's shell drawn with a new set of pictograms (`glyphs.js`), and 🏠 **Home** (`home.js`), a new tab heading Start here — the network's counts, the six tools used most as big tiles, every other tool under them. Calm stays the default; Classic is untouched. See revision 163 below.
 >
@@ -760,7 +761,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### Human
 | Issues |
 |---|
-| #66, #156, #157, #158, #166, #185, #207, #210, #233, #234, #235, #236, #237, #239, #255, #256, #261 |
+| #66, #156, #157, #158, #166, #185, #207, #210, #233, #234, #235, #236, #237, #239, #255, #256, #261, #269 |
 
 > **The Human column shrank for a reason worth recording.** #145 was `[Human]` because applying a migration and creating a Storage bucket "needs the dashboard and the database password". That is no longer true: #149 applied `0010` and created the bucket from an agent session over the Supabase MCP connection, and verified both with read-only queries afterwards. **Before allocating anything else to a human on the grounds that it touches the live database, check whether that connection is available.** #146 and #148 were both allocated partly on that assumption, were re-noted at revision 15, and at revision 16 were done that way: `0011` applied over the same connection and verified with read-only queries. **Two migrations applied by an agent now, so this is a settled fact rather than one project's luck.** The Human column is #66, #156 and #157 — and each is `[Human]` for the right reason rather than the dashboard one: #156 is a product decision (which suggested features to want), and **#157 is the first one on this board that is `[Human]` because of the *toolchain*, not the credentials.** CRBasic Editor is Windows-only and Campbell's, and every `campbellsci.com` host is unreachable from the agent environment's egress policy, so a datalogger program cannot be compiled — or its instruction reference read — by any session, however it is allocated. That is a new category, and it is worth naming: the test above ("check whether that connection is available") does not dispose of it, because no connection would help.
 >
@@ -853,6 +854,14 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 223 — 2026-11-03: 📡 #269 opened — unheard is not quiet: Station Health, the agent API and the bulletin say what Flood-Net heard
+
+The owner, after this morning's daily called eight Gold Coast stations behind Tallai quiet and technicians found them all in ARRO: *"reword those ones … and open the human."*
+
+- **#269 opened** — `[Standalone]` `[Human]`: identify ALERT2 concentrator 11762 and the repeaters on its route to us. Added to the standalone list and the Human column.
+- Shipped with it, no issue of its own: Station Health's silence findings say *Not heard — missed its last N checks*, *Not heard for …*, *… went unheard together*, and each silence's action starts by looking in ARRO (`health-analysis.js`, `health-glance.js`, `methodology.js`); the KPI chip is *Not heard now* with its meaning on hover and in the tab's intro. The agent API's `get_silent_stations` notes and descriptions say the same and point to `arro_site` (`worker/api.js`, the five agent files, `api.html`, `docs/agent-api.md`), with a non-breaking changelog entry. Kinds, routes and fields unchanged.
+- Earlier the same day (no revision): Station Health's station panel gained *Open in ARRO*, the 3 Nov daily was corrected, and the bulletin brief, draft and hours lead say *Flood-Net stopped hearing*.
 
 ### Revision 222 — 2026-11-03: 🎬 #268 opened (an MP4 of each video); the welcome's draft on the site (#264)
 

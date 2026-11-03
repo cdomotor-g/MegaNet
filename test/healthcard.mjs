@@ -307,7 +307,7 @@ try {
     rules.long === 'fault' && rules.learned === 'fault' && rules.onceNow === 'ok', J([rules.long, rules.learned, rules.onceNow]));
   check('…and a finding still counts for a station heard too seldom to judge its silence', rules.onceWarn === 'watch', rules.onceWarn);
   check('the silence as a finding: critical at four checks, and saying it cannot see the receivers',
-    rules.quiet && rules.quiet.severity === 'critical' && /Quiet for 13 h/.test(rules.quiet.title)
+    rules.quiet && rules.quiet.severity === 'critical' && /Not heard for 13 h/.test(rules.quiet.title)
       && /receivers/.test(rules.quiet.detail) && rules.notQuiet === null, J(rules.quiet));
   check('no readings is nothing heard, not an error', rules.empty.lastHeard === null && rules.empty.findings.length === 0, J(rules.empty));
 
@@ -397,7 +397,7 @@ try {
 
   const silent = await card(page, R.silent);
   check('a station gone silent: a fault, its silence the worst finding, saying the receivers are Station Health’s to weigh',
-    /Fault/.test(silent.badge || '') && /Quiet for/.test(silent.findings || '') && silent.cls === 'fault'
+    /Fault/.test(silent.badge || '') && /Not heard for/.test(silent.findings || '') && silent.cls === 'fault'
       && /Station Health/.test(silent.text) && /receivers/.test(silent.text), J({ badge: silent.badge, findings: silent.findings }));
   const steady = await card(page, R.steady);
   check('a station left alone: OK, nothing found', /OK/.test(steady.badge || '') && /nothing found/.test(steady.findings || '') && steady.cls === 'ok',
@@ -408,7 +408,7 @@ try {
   const once = await card(page, W.once);
   check('heard once, two days ago: when, no data rather than a fault, and why',
     /No data/.test(once.badge || '') && /ago/.test(once.heard || '') && /Heard once/.test(once.text) && /too seldom/.test(once.text)
-      && once.cls === 'nodata' && !/Quiet for/.test(once.text), J({ badge: once.badge, heard: once.heard, text: once.text.slice(-200) }));
+      && once.cls === 'nodata' && !/Not heard for/.test(once.text), J({ badge: once.badge, heard: once.heard, text: once.text.slice(-200) }));
   const shared = await card(page, W.shared.id);
   check('heard only on an address it shares, where nothing tells the owners apart: not called its own — no data, and why',
     /No data/.test(shared.badge || '') && /not told apart/.test(shared.heard || '') && /addresses it shares/.test(shared.text)
@@ -990,7 +990,7 @@ try {
 
     const silent2 = await card(p, R.silent);
     check('a fresh server is the one home for silence: the card shows its finding, not one of its own, and says whose look it is',
-      /Fault/.test(silent2.badge || '') && /Silent — missed its last 12 checks/.test(silent2.findings || '') && !/Quiet for/.test(silent2.text)
+      /Fault/.test(silent2.badge || '') && /Silent — missed its last 12 checks/.test(silent2.findings || '') && !/Not heard for/.test(silent2.text)
         && silent2.cls === 'fault' && /as the server last worked it out over every receiver’s week — 5 min ago/.test(silent2.text),
       J({ badge: silent2.badge, findings: silent2.findings, text: silent2.text.slice(-220) }));
     const steady2 = await card(p, R.steady);
@@ -1047,7 +1047,7 @@ try {
     await toStations(p2);
     const stale = await card(p2, R.silent);
     check('a stale server: the card\'s own rules again — its quiet line, and the receivers Station Health\'s to weigh — and its findings not asked for',
-      /Quiet for/.test(stale.findings || '') && /Station Health’s to weigh/.test(stale.text) && stale.cls === 'fault' && serverAsked.length === 0,
+      /Not heard for/.test(stale.findings || '') && /Station Health’s to weigh/.test(stale.text) && stale.cls === 'fault' && serverAsked.length === 0,
       J({ findings: stale.findings, asked: serverAsked }));
     await ctx2.close();
   }

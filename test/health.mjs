@@ -757,7 +757,7 @@ try {
     JSON.stringify(ss.rows.slice(0, 2)));
   ok('…those of concern first, worst first', ss.rows.every((y, i) => i === 0 || SEV_AT(ss.rows[i - 1].cls) <= SEV_AT(y.cls)), ss.rows.map(y => SEV_AT(y.cls)).join(''));
   ok('…the silent station\'s every sensor highlighted critical, saying so',
-    ssOf(WORLD.roles.silent).length >= 2 && ssOf(WORLD.roles.silent).every(y => /hl-frow--critical/.test(y.cls) && /Silent/.test(y.worst)), JSON.stringify(ssOf(WORLD.roles.silent)));
+    ssOf(WORLD.roles.silent).length >= 2 && ssOf(WORLD.roles.silent).every(y => /hl-frow--critical/.test(y.cls) && /Not heard/.test(y.worst)), JSON.stringify(ssOf(WORLD.roles.silent)));
   const fall = ssRow(ss.falling);
   ok('…the sliding battery highlighted, its fall named, and its trend line sloping down',
     /hl-frow--(warn|critical)/.test(fall.cls) && /Battery falling/.test(fall.worst) && fall.trend && fall.trend[3] > fall.trend[1] + 2
@@ -919,7 +919,7 @@ try {
     Health.lensAt(id, miss.t, 'slot');
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     const box = document.getElementById('hl-lens');
-    return { open: !!document.getElementById('hl-station') && /Silent|silent/.test(document.getElementById('hl-station').textContent),
+    return { open: !!document.getElementById('hl-station') && /Not heard/.test(document.getElementById('hl-station').textContent),
       strip: !!document.querySelector('#hl-station svg rect[data-t]'), batt: !!document.querySelector('#hl-station svg path, #hl-station svg polyline'),
       lens: box ? box.textContent.replace(/\s+/g, ' ').slice(0, 400) : '' };
   }, WORLD.roles.silent);

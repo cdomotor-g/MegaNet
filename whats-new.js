@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 181, date: '2026-11-03', items: [
+      '📡 <strong>Not heard, not silent.</strong> 🚦 <em>Station Health</em> now says a station is <em>not heard</em> '
+        + '(<em>Not heard — missed its last 4 checks</em>, <em>… went unheard together</em>) instead of silent or gone quiet, '
+        + 'because all it knows is what Flood-Net\'s receivers picked up: the station may still be reporting to the Bureau. '
+        + 'What to do starts with <strong>Open in ARRO</strong> — if its reports are there, nobody needs to drive out. '
+        + 'The station cards, the ⚖️ <em>Methodology</em> tab and the agent API say the same.',
+    ] },
     { n: 180, date: '2026-11-03', items: [
       '📶 <strong>The station list is downloaded only when it has changed.</strong> A device that already has it now asks '
         + 'whether it is still current, and is told so in a moment instead of fetching the whole list again — about 900 KB '

@@ -40,9 +40,10 @@ Documentation: [`docs/agent-api.md`](docs/agent-api.md).
   channel, in one call, by network, basin, kind or `bbox=west,south,east,north`.
   It covers only telemetry ingested into Flood-Net; a 503 "not available yet"
   means database migration 0057 has not been applied yet.
-- What has gone quiet: `get_silent_stations` (`/api/v1/health/silent`) — the
-  stations silent now and the groups that went quiet together, from the
-  server's health run every 15 minutes (`checked_at` says when it last looked).
+- What Flood-Net has stopped hearing: `get_silent_stations` (`/api/v1/health/silent`) — the
+  stations silent (not heard) now and the groups that went unheard together, from the
+  server's health run every 15 minutes (`checked_at` says when it last looked). What
+  Flood-Net heard, not what the stations sent: ARRO (`arro_site`) says whether one kept reporting.
 - What Station Health says about a station: `get_station_health`
   (`/api/v1/stations/{id}/health?days=3|7|14`) — its findings with what to do,
   its check schedule day by day, its battery's night lows; and for a page of

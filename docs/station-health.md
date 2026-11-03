@@ -16,7 +16,7 @@ week of real stations, one of every fault planted in it.
 
 In the Calm look (the default) the tab opens with its answer in a sentence —
 how many findings need attention and at how many stations, how bad, how many
-stations are silent now and what share of the checks due came in — above the
+stations Flood-Net is not hearing now and what share of the checks due came in — above the
 numbers it comes from, then the map across the page's full width, and **See
 them** goes straight to Needs attention, under the map. The paragraph explaining
 the tab is two lines deep until *More about this tab*. The Classic look shows
@@ -379,10 +379,19 @@ that never goes backwards), so a flipped bit or a reset cannot read as a downpou
 a step of 50 tips or more between two transmissions is not rain.
 
 **Silences that happen together are one finding.** Stations behind one repeater
-that went quiet inside one check period of each other, stations within 30 km that
-went quiet together with no repeater to blame, and stations that went silent
-together *and came back* together, are each reported once — the repeater, the
+that went unheard inside one check period of each other, stations within 30 km that
+went unheard together with no repeater to blame, and stations that went unheard
+together *and were heard again* together, are each reported once — the repeater, the
 area or the spell — and the stations' own findings point there.
+
+**A silence is what Flood-Net heard, not what the station sent.** The stations
+report to the Bureau through its own base stations; Flood-Net listens alongside,
+often by one route where the Bureau has several. So every silence is worded as
+*not heard*, and its action starts in ARRO — the station's **Open in ARRO**: if
+the reports are there, the gap is on Flood-Net's route, and nobody needs to
+drive to the site. On 3 Nov 2026 eight Gold Coast stations behind Tallai were
+unheard here overnight and complete in ARRO; everything we had from them came
+through one ALERT2 concentrator (#269).
 
 **Repeaters only within reach.** A repeater relays a station only if its pass
 ranges let the address through *and* it is within 400 km of the station: the same
@@ -392,8 +401,8 @@ address numbers recur across the country.
 
 | Finding | Severity | Triggered when | What to do |
 | --- | --- | --- | --- |
-| **Silent** | critical after 4 missed checks or a day, else warning | its last 2+ checks missed, quiet for at least 2 periods, while the receivers that hear it kept delivering | Check power and radio at the station; if its repeater went quiet too, start there. |
-| **Went silent, then came back** | note | 4+ checks in a row missed and then reporting again, the spell 6 h or longer; *it went at night and came back in daylight* is the shape of a solar site that cannot carry itself through the night | Look for what comes and goes: battery voltage overnight, connectors, the antenna mount, the repeater. |
+| **Not heard** (kind `silent`) | critical after 4 missed checks or a day, else warning | its last 2+ checks missed, unheard for at least 2 periods, while the receivers that hear it kept delivering | Look in ARRO first: if its reports are there, the gap is on Flood-Net's route to it. If ARRO has the gap too, check power and radio at the station — and its repeater, if that went unheard as well. |
+| **Not heard, then heard again** | note | 4+ checks in a row missed and then heard again, the spell 6 h or longer; *unheard at night and heard again in daylight* is the shape of a solar site that cannot carry itself through the night, if ARRO has the gap too | If ARRO has the same gap, look for what comes and goes: battery voltage overnight, connectors, the antenna mount, the repeater. If not, it was Flood-Net's route. |
 | **Missed checks rising** | warning (note for 2 in a day) | the last 24 h's miss rate 20 points above the days before, with 2+ misses; or the daily miss rate climbing 8+ points a day to 20% | Check the antenna, cable and connectors, and the path to its repeater — compare with its last fade margin. |
 | **Misses n% of its checks** | warning from 25%, note from 10% | misses scattered through the window (not one spell), 8+ checks due | A marginal path: antenna alignment, cable and connectors, the repeater; a fade-margin test settles it. |
 | **Checks arrive incomplete** | note | a quarter or more of its checks arrived without every sensor's frame | Frames are being lost on the way: check the antenna and cable, and the radio's transmit power. |
@@ -411,9 +420,9 @@ address numbers recur across the country.
 | **Rain recorded alone** | warning | 10 mm or more in six hours when no gauge within 30 km recorded more than 1 mm | Was the gauge tipped — a visit, wildlife, vandalism? |
 | **Level unchanged through rain** | warning | every level reading identical while gauges within 30 km recorded a median 15 mm or more | Check the level sensor — float, encoder or transducer. |
 | **Level reads zero throughout** | note | every level reading 0 | A dry pool, or a disconnected sensor. |
-| **Stations behind a repeater went quiet together** | critical | 3+ stations behind one repeater, 60% or more of those still heard before, last heard inside one check period of each other | Check the repeater — power, antenna, radio. |
-| **Stations around a place went quiet together** | warning | 3+ unexplained silent stations within 30 km of one of them, last heard within two hours or a check period of it | Something they share: a repeater not on file, a link, local interference. |
-| **Went silent together, and came back** | warning | spells at stations sharing a repeater or within 30 km that overlap by half the shorter | Check the shared repeater's logs and power for that time. |
+| **Stations behind a repeater went unheard together** | critical | 3+ stations behind one repeater, 60% or more of those still heard before, last heard inside one check period of each other | Look in ARRO for them first; if their reports are not there, check the repeater — power, antenna, radio. |
+| **Stations around a place went unheard together** | warning | 3+ unexplained unheard stations within 30 km of one of them, last heard within two hours or a check period of it | Look in ARRO for them first; if not there, something they share: a repeater not on file, a link, local interference. |
+| **Went unheard together, and were heard again** | warning | spells at stations sharing a repeater or within 30 km that overlap by half the shorter | Look in ARRO for that time first; if not there, check the shared repeater's logs and power for that time. |
 | **Repeater relays with bit errors** | warning | the common factor in 5+ corrupted copies, at 3× the network's median rate (3% at least), over 20+ transmissions it could carry | Check the repeater's receiver and transmitter. |
 | **Receiver stopped** | critical (warning after a day; a note for a short session days ago) | a receiver that delivered 50+ readings has delivered nothing for an hour | Check the base station on the Base Stations tab — power, network, the receiver software. |
 | **Receiver outage** | warning | a gap in its delivery of 45 minutes, or four times its 90th-percentile gap if longer (once it has 30+ bursts to judge by) | Power, network, or the receiver restarting. Checks due then are not counted against the stations. |
@@ -892,7 +901,7 @@ hover and in *What the words in this card mean* under the table:
 
 | State | When |
 | --- | --- |
-| Off air | The base stations' carrier measurements stop at it two days or more before the rest of the fleet's (critical with its own station or two stations behind it silent too); Station Health's *stations behind it went quiet together*; its own station and two or more behind it going quiet within a check period of each other (critical at three); or every one of two or more stations only it carries silent |
+| Off air | The base stations' carrier measurements stop at it two days or more before the rest of the fleet's (critical with its own station or two stations behind it silent too); Station Health's *stations behind it went unheard together*; its own station and two or more behind it going quiet within a check period of each other (critical at three); or every one of two or more stations only it carries silent |
 | Dropping out | Stations behind it silent together and back again (*shared-spell*) |
 | Corrupting | The common factor in corrupted copies (*repeater-bitflips*), or the server's *transmitter-corrupting* on its carrier |
 | Fading | The server's *transmitter-snr-falling* |
@@ -965,8 +974,8 @@ Tuesday.
   So the battery, the schedule and the copy rules are this tab's exactly. What
   one station's readings cannot carry is everything that needs the rest of the
   network: whether its receivers were listening, its neighbours' rain, a repeater
-  in common. Its silence is said as *Quiet for …*, not *Silent*, and says the
-  receivers are this tab's to weigh. A station with no readings left costs a
+  in common. Its silence is said as *Not heard for …*, not *Not heard — missed its
+  last N checks*, and says the receivers are this tab's to weigh. A station with no readings left costs a
   second, one-row look at `meganet.station_health`, so *never heard* is only said
   when it is true.
 - **Colour pins by health**, in the Stations map's Layers (off by
@@ -999,7 +1008,7 @@ card and the pins take what it keeps: the card asks for the station's open
 findings beside its readings, and the pins' one request a load brings the worst
 per station. For a station heard within the week the server reads, its silence
 is the server's verdict alone — worked out over every receiver, with whether they
-were listening — and *Quiet for …* and the assumed three hours stand down. The
+were listening — and *Not heard for …* and the assumed three hours stand down. The
 kinds the server keeps (silent, a battery low, critical or not charging, and the
 network's) come from it; the rest (a battery falling, a blocked gauge …) are still
 worked out on the card. A station last heard before that week, or a server that
@@ -1030,7 +1039,7 @@ egress — more than the free plan's 5 GB for everything together, and a needles
 share of the Pro plan's 250 GB.
 
 **What is kept.** The findings about a present condition — *silent*, a repeater
-or an area whose stations went quiet together, a receiver that stopped
+or an area whose stations went unheard together, a receiver that stopped
 delivering, a battery low, critical or not charging — at the severity the
 analysis gave, in `meganet.health_finding`: one row each, with when it was first
 seen, when last, and when it cleared. They are public, like the readings they

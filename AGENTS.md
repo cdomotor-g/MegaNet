@@ -52,10 +52,13 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     Use it rather than `get_readings` station by station. A 503 "not
     available yet" means database migration 0057 has not been applied yet.
   - `get_silent_stations` — `GET /api/v1/health/silent?network=&basin=&type=&bbox=&severity=`:
-    what has gone quiet — the stations silent now, worst first, with when each
-    was last heard, and the groups that went quiet together (around a place,
-    or behind a repeater). From the server's health run every 15 minutes;
-    `checked_at` says when it last looked.
+    what Flood-Net has stopped hearing — the stations silent (not heard) now,
+    worst first, with when each was last heard, and the groups that went
+    unheard together (around a place, or behind a repeater). From the server's
+    health run every 15 minutes; `checked_at` says when it last looked. It is
+    what Flood-Net's receivers heard, not what the stations sent: one may
+    still be reporting to the Bureau, and ARRO (`arro_site` on `get_station`)
+    says whether it is.
   - `get_station_health` — `GET /api/v1/stations/{id}/health?days=3|7|14`:
     what Station Health says about one station — its findings (severity, what,
     what to do, since when, evidence), its learned check schedule with checks

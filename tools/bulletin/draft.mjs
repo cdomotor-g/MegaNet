@@ -71,7 +71,7 @@ export function draft(F) {
   regular.slice(0, 18).forEach((x, k) => addMark(x.station_id, 'silent', sevOf(x.severity), k < 4 ? x.name : null));
   (F.batteries || []).filter(b => b.finding && b.finding.severity === 'critical').slice(0, 4).forEach(b => addMark(b.station_id, 'battery', 'critical', b.name));
   (F.flips && F.flips.senders || []).slice(0, 2).forEach(s => addMark(s.station_id, 'flip', 'warn', s.name));
-  const areas = (F.areas || []).filter(a => a.centre).slice(0, 4).map(a => ({ lat: a.centre.lat, lon: a.centre.lon, km: Math.max(5, Math.min(120, a.centre.km || 20)), sev: sevOf(a.severity), label: clip(a.title.replace(/ went quiet together.*$/, ''), 58) }));
+  const areas = (F.areas || []).filter(a => a.centre).slice(0, 4).map(a => ({ lat: a.centre.lat, lon: a.centre.lon, km: Math.max(5, Math.min(120, a.centre.km || 20)), sev: sevOf(a.severity), label: clip(a.title.replace(/ went (quiet|unheard) together.*$/, ''), 58) }));
   if (marks.length) {
     const near = marks.filter(m => st(m.id)).map(m => st(m.id));
     scenes.push({ type: 'map', title: 'Where', sub: clip(`${plural(marks.length, 'station')} to look at`, 90), secs: 12, sev: crit ? 'critical' : 'warn',

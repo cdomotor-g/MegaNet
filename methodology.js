@@ -386,13 +386,14 @@ const Methodology = (function () {
           interference — and are counted apart, not against each station.</p>
         <h4>The verdicts</h4>
         <ul>
-          <li><strong>Silent</strong> — its last two or more checks missed and nothing heard for at least 90 minutes and two intervals.
-            Critical at four checks or a day.</li>
+          <li><strong>Not heard</strong> — its last two or more checks missed and nothing heard for at least 90 minutes and two intervals.
+            Critical at four checks or a day. Heard, that is, by Flood-Net's receivers: ARRO, the Bureau's record, says whether it kept
+            reporting, and that is the first thing to look at.</li>
           <li><strong>Missed checks rising</strong> — at least 20 points more of its checks missed in the last day than before, two or
             more of them; or a daily share of misses climbing 8 points a day.</li>
           <li><strong>Misses its checks</strong> — 10% or more missed here and there, of at least eight due outside its spells: a marginal
             path rather than a dead station.</li>
-          <li><strong>Went silent, then came back</strong> — a ${term('spell', 'spell')} of six hours or more. When it went between 4 pm
+          <li><strong>Not heard, then heard again</strong> — a ${term('spell', 'spell')} of six hours or more. When it went between 4 pm
             and 4 am ${term('solar', 'solar time')} and came back between 8 am and 4 pm, within 30 hours, it is said to look like a solar
             site whose battery cannot carry it through the night.</li>
           <li><strong>Incomplete checks</strong> — a quarter or more arriving without every sensor's frame, naming the sensor most often
@@ -401,15 +402,16 @@ const Methodology = (function () {
         </ul>`],
 
       ['shared', 'Failures that are shared: repeaters, areas and receivers', `
-        <p>When several stations fall silent, the question is what they have in common.</p>
+        <p>When Flood-Net stops hearing several stations, the question is what they have in common — and the route they reach us by is
+          one of the things they can share.</p>
         <ul>
           <li><strong>A repeater down.</strong> A repeater that fails at one moment silences each station behind it at that station's
             next check, so their last checks fall within one check interval of each other, not at one instant. When at least three
             stations whose addresses a repeater passes went silent inside one interval (at least three hours, or 1.25 times the longest
             interval among them), and they are at least 60% of its stations that were being heard, the repeater is named. Two repeaters
             carrying the same stations are named together, the likelier first.</li>
-          <li><strong>An area gone quiet.</strong> Silent stations no repeater explains, within ${L.AREA_KM} km of each other: something
-            they share — a link, a hill, local interference.</li>
+          <li><strong>An area gone unheard.</strong> Unheard stations no repeater explains, within ${L.AREA_KM} km of each other: something
+            they share — a link, a hill, local interference, or Flood-Net's one route to them.</li>
           <li><strong>A receiver.</strong> One of our base stations that has stopped delivering for an hour or more; an outage longer
             than 45 minutes and four times its usual longest gap; uploads queuing for more than two minutes; or a clock running ahead of
             the database. Separately, the database calls a receiver <em>deaf</em> when it is still checking in but has decoded nothing
@@ -569,6 +571,10 @@ const Methodology = (function () {
         <ul>
           <li><strong>Only what reaches a receiver.</strong> A station no receiver hears is unknown, not silent — and so is every check
             due while its receivers were down.</li>
+          <li><strong>Only Flood-Net's receivers.</strong> The stations report to the Bureau through its own base stations; Flood-Net
+            listens alongside, often by one route where the Bureau has several. A station unheard here may be reporting all the while,
+            as eight Gold Coast stations behind Tallai were on 3 Nov 2026 — every report in ARRO, gone from ours on one concentrator's
+            route. ARRO tells the two apart.</li>
           <li><strong>Legacy frames do not name their sender.</strong> Without a measured carrier, attribution is by pass range, and
             circumstantial. Carriers were measured only from decoder version 0.14 on, and only by Flood-Net's own receivers.</li>
           <li><strong>Some flips look like readings.</strong> A low-bit flip on a slowly changing value, a corrupted copy whose clean

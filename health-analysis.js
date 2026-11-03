@@ -642,7 +642,7 @@ const HealthAnalysis = (() => {
     const a = mod(solarHours(from, lon), 24), b = mod(solarHours(to, lon), 24);
     return (a >= 16 || a < 4) && b >= 8 && b <= 16 && to - from <= 30 * HOUR;
   }
-  const SOLAR_HINT = 'It went at night and came back in daylight — the pattern of a solar site whose battery cannot carry it through the night.';
+  const SOLAR_HINT = 'Unheard at night and heard again in daylight — the pattern of a solar site whose battery cannot carry it through the night, if ARRO has the gap too.';
 
   function batteryOf(series, st, now) {
     // series: [{t, V}] with corrupted copies and implausible values already out.
@@ -826,8 +826,12 @@ const HealthAnalysis = (() => {
     'battery-no-charge': 'Check the panel, its cable, the regulator and the fuse — no daily charge is reaching the battery.',
     'battery-float':     'Nothing to do if the station is mains-charged; a solar one reading dead flat has a stuck sensor.',
     'battery-overcharge':'Check the regulator — it is holding the battery above 15 V.',
-    'silent':            'Check power and radio at the station; if its repeater went quiet too, start there.',
-    'silent-spell':      'Look for what comes and goes: battery voltage overnight, connectors, the antenna mount, the repeater.',
+    // The silences are what Flood-Net's receivers did not hear, and ARRO — the
+    // Bureau's own record — may hold every report (the Tallai group, 3 Nov
+    // 2026: unheard here overnight, complete in ARRO). So each says to look
+    // there before anybody drives to a site.
+    'silent':            'Look in ARRO first: if its reports are there, the gap is on Flood-Net\'s route to it, not at the station. If ARRO has the gap too, check power and radio at the station — and its repeater, if that went unheard as well.',
+    'silent-spell':      'If ARRO has the same gap, look for what comes and goes: battery voltage overnight, connectors, the antenna mount, the repeater. If not, it was Flood-Net\'s route to it.',
     'missed-rising':     'Check the antenna, cable and connectors, and the path to its repeater — compare with its last fade margin.',
     'missed-checks':     'A marginal path: antenna alignment, cable and connectors, the repeater; a fade-margin test settles it.',
     'partial-checks':    'Frames are being lost on the way: check the antenna and cable, and the radio\'s transmit power.',
@@ -843,9 +847,9 @@ const HealthAnalysis = (() => {
     'receiver-outage':   'The base station stopped delivering for a while: power, network, or the receiver restarting.',
     'receiver-latency':  'Uploads are queuing — check the base station\'s network link.',
     'receiver-clock':    'Set the base station\'s clock (NTP) — its timestamps run ahead of the database.',
-    'repeater-down':     'Check the repeater — power, antenna, radio: every station behind it went quiet together.',
-    'shared-spell':      'Check the shared repeater\'s logs and power for that time — a solar repeater that browns out, a link that drops.',
-    'area-silence':      'Something these stations share went quiet: a repeater, a link, or local interference.',
+    'repeater-down':     'Look in ARRO for them first: if their reports are there, the repeater is passing them and the gap is on Flood-Net\'s route. If not, check the repeater — power, antenna, radio: every station behind it went unheard together.',
+    'shared-spell':      'Look in ARRO for that time first: if their reports are there, it was Flood-Net\'s route. If not, check the shared repeater\'s logs and power for that time — a solar repeater that browns out, a link that drops.',
+    'area-silence':      'Look in ARRO for them first: if their reports are there, it is Flood-Net\'s route to them. If not, something they share: a repeater, a link, or local interference.',
     'repeater-bitflips': 'Check the repeater\'s receiver and transmitter — it is relaying frames with flipped bits.',
     'network-miss':      'A network-wide gap: check the receiver, and for interference on the channel at that time.',
     'ghosts':            'Nothing at the stations — these are corrupted copies stored under the wrong address.',
@@ -853,7 +857,7 @@ const HealthAnalysis = (() => {
     'registry-unknown':  'Fix the register: a station is reporting on an address no station on file carries.',
     'registry-kind':     'Fix the register: the address\'s values do not fit the sensor type on file.',
     'registry-ambiguous':'Fix the register: two nearby stations share this address, so its readings cannot be attributed.',
-    'not-heard':         'Confirm whether these are decommissioned, or check them — their repeaters were relaying others.',
+    'not-heard':         'Confirm whether these are decommissioned — ARRO says whether they still report — or check them: their repeaters were relaying others.',
   };
 
   // The findings about a present condition — what is wrong *now* — as against
@@ -1187,8 +1191,8 @@ const HealthAnalysis = (() => {
           const since = S.lastHeard;
           F.push(finding('silent', trailing >= 4 || silentMs >= DAY ? 'critical' : 'warn', {
             stationId: st.id, since,
-            title: `Silent — missed its last ${plural(trailing, 'check')}`,
-            detail: `Checks ${every}; nothing heard since ${fmtWhen(since, now)} (${fmtSpan(silentMs)}), while the receivers that hear it kept delivering other traffic.`,
+            title: `Not heard — missed its last ${plural(trailing, 'check')}`,
+            detail: `Checks ${every}; Flood-Net has heard nothing from it since ${fmtWhen(since, now)} (${fmtSpan(silentMs)}), while the receivers that hear it kept delivering other traffic. ARRO says whether it kept reporting.`,
             evidence: { trailingMisses: trailing, lastHeard: since, periodMin: sch.P / MIN },
           }));
         } else if (sch.n24 >= 4 && sch.nPrior >= 8 && sch.rate24 >= sch.ratePrior + 0.2
@@ -1220,9 +1224,9 @@ const HealthAnalysis = (() => {
         if (closed && closed.to - closed.from >= 6 * HOUR) {
           F.push(finding('silent-spell', 'info', {
             stationId: st.id, since: closed.from, key: st.id + '@' + closed.from,
-            title: `Went silent for ${fmtSpan(closed.to - closed.from + sch.P)}, then came back`,
-            detail: `${plural(closed.n, 'check')} in a row missed from ${fmtWhen(closed.from, now)} to ${fmtWhen(closed.to, now)} while the receivers that hear it were listening, then reporting again. `
-                  + (solarNight(closed.from, closed.to + sch.P, st.lon) ? SOLAR_HINT : 'Intermittent power, a loose connection, or a path that comes and goes.'),
+            title: `Not heard for ${fmtSpan(closed.to - closed.from + sch.P)}, then heard again`,
+            detail: `${plural(closed.n, 'check')} in a row missed from ${fmtWhen(closed.from, now)} to ${fmtWhen(closed.to, now)} while the receivers that hear it were listening, then heard again. `
+                  + (solarNight(closed.from, closed.to + sch.P, st.lon) ? SOLAR_HINT : 'Intermittent power, a loose connection, or a path that comes and goes — at the site, or on Flood-Net\'s route to it.'),
             evidence: { from: closed.from, to: closed.to, checks: closed.n, spells: sch.spells.length },
           }));
         }
@@ -1257,8 +1261,8 @@ const HealthAnalysis = (() => {
         if (quiet >= Math.max(12 * HOUR, 4 * typical) && listening(S.paths, now - HOUR)) {
           F.push(finding('silent', 'warn', {
             stationId: st.id, since: S.lastHeard,
-            title: `Quiet for ${fmtSpan(quiet)}`,
-            detail: `No regular check schedule could be learned from ${plural(S.bursts.length, 'report')}; last heard ${fmtWhen(S.lastHeard, now)}, and its receivers are still delivering.`,
+            title: `Not heard for ${fmtSpan(quiet)}`,
+            detail: `No regular check schedule could be learned from ${plural(S.bursts.length, 'report')}; Flood-Net last heard it ${fmtWhen(S.lastHeard, now)}, and its receivers are still delivering. ARRO says whether it kept reporting.`,
             evidence: { reports: S.bursts.length, lastHeard: S.lastHeard },
           }));
         }
@@ -1566,10 +1570,10 @@ const HealthAnalysis = (() => {
       const own = m.reps.find(x => x.ownSilent);
       netFindings.push(finding('repeater-down', 'critical', {
         repeaterId: c.R.id, since: c.from, key: 'rep:' + c.R.id,
-        title: `${c.G.length} stations behind ${who} went quiet together`,
+        title: `${c.G.length} stations behind ${who} went unheard together`,
         detail: `Their last checks landed between ${fmtWhen(c.from, now)} and ${fmtWhen(c.to, now)} — inside one check period of each other, which is how a shared failure looks — while the receivers kept listening`
               + (c.still ? `; ${plural(c.still, 'station')} behind it ${c.still === 1 ? 'is' : 'are'} still heard, perhaps direct.` : '.')
-              + (own ? ` The repeater site's own station, ${own.ownSilent.st.name}, went quiet too.` : '')
+              + (own ? ` The repeater site's own station, ${own.ownSilent.st.name}, went unheard too.` : '')
               + (names.length > 1 ? ` Every one of them passes through ${names.length} repeaters on file; ${c.R.name} explains them best.` : ''),
         evidence: { stations: c.G.map(S => S.st.id), repeaters: m.reps.map(x => x.R.id), from: c.from, to: c.to, stillHeard: c.still, ratio: round(c.ratio, 2) },
       }));
@@ -1577,7 +1581,7 @@ const HealthAnalysis = (() => {
         if (f.kind !== 'silent' || f.cause) return;
         f.cause = { repeaterId: c.R.id, name: c.R.name };
         f.severity = 'warn';
-        f.detail += ` One of ${c.G.length} behind ${who} that went quiet together — see that finding first.`;
+        f.detail += ` One of ${c.G.length} behind ${who} that went unheard together — see that finding first.`;
       }));
     });
     // An area going quiet together with no repeater to blame: silent stations
@@ -1601,8 +1605,8 @@ const HealthAnalysis = (() => {
       const onsets = group.map(o => o.lastHeard).sort((a, b) => a - b);
       netFindings.push(finding('area-silence', 'warn', {
         key: 'area:' + S.st.id, since: onsets[0],
-        title: `${group.length} stations around ${S.st.name} went quiet together`,
-        detail: `Within ${AREA_KM} km of ${S.st.name}, last heard between ${fmtWhen(onsets[0], now)} and ${fmtClock(onsets[onsets.length - 1])}. Something they share — a repeater not on file, a link, local interference.`,
+        title: `${group.length} stations around ${S.st.name} went unheard together`,
+        detail: `Within ${AREA_KM} km of ${S.st.name}, last heard between ${fmtWhen(onsets[0], now)} and ${fmtClock(onsets[onsets.length - 1])}. Something they share — a repeater not on file, a link, local interference, or Flood-Net's one route to them.`,
         evidence: { stations: group.map(o => o.st.id), from: onsets[0], to: onsets[onsets.length - 1] },
       }));
       group.forEach(o => o.findings.forEach(f => {
@@ -1660,15 +1664,15 @@ const HealthAnalysis = (() => {
       const lon = median(pl.map(S => S.st.lon)) || 150;
       netFindings.push(finding('shared-spell', 'warn', {
         key: 'spell:' + anchor.st.id + '@' + Math.round(from / HOUR), since: from,
-        title: `${sts.length} stations ${where} went silent together, and came back`,
-        detail: `Silent from about ${fmtWhen(from, now)} to ${fmtWhen(to, now)} while the receivers listened, then reporting again — together, so not ${sts.length} faults but one: ${via ? 'the repeater they share, or its link' : 'something they share — a repeater, a link, a channel'} went away for a while.`
+        title: `${sts.length} stations ${where} went unheard together, and were heard again`,
+        detail: `Unheard from about ${fmtWhen(from, now)} to ${fmtWhen(to, now)} while the receivers listened, then heard again — together, so not ${sts.length} faults but one: ${via ? 'the repeater they share, or its link' : 'something they share — a repeater, a link, a channel'} went away for a while, or Flood-Net's route to them did.`
               + (solarNight(from, to, lon) ? ' ' + SOLAR_HINT : ''),
         evidence: { stations: sts.map(S => S.st.id), from, to, repeaters: top.map(R => R.id), spreadKm: Math.round(spread) },
       }));
       sts.forEach(S => S.findings.forEach(f => {
         if (f.kind !== 'silent-spell' || f.cause) return;
         f.cause = via ? { name: via } : { area: anchor.st.name };
-        f.detail += ` One of ${sts.length} ${via ? `behind ${via}` : 'nearby'} that went silent together — see that finding first.`;
+        f.detail += ` One of ${sts.length} ${via ? `behind ${via}` : 'nearby'} that went unheard together — see that finding first.`;
       }));
     });
 

@@ -269,9 +269,9 @@ const HealthGlance = (() => {
     return {
       kind: 'silent', category: 'comms', severity: ms >= b.fault ? 'critical' : 'warn',
       stationId: id, since: lastHeard,
-      title: `Quiet for ${HealthAnalysis.fmtSpan(ms)}`,
-      detail: `Nothing heard since ${HealthAnalysis.fmtWhen(lastHeard, now)}. ${every}${missed >= 2 ? ` — ${missed} checks gone by` : ''}. `
-            + 'Whether the receivers that hear it were listening all that time is what the Station Health tab weighs.',
+      title: `Not heard for ${HealthAnalysis.fmtSpan(ms)}`,
+      detail: `Flood-Net has heard nothing from it since ${HealthAnalysis.fmtWhen(lastHeard, now)}. ${every}${missed >= 2 ? ` — ${missed} checks gone by` : ''}. `
+            + 'Whether the receivers that hear it were listening all that time is what the Station Health tab weighs, and ARRO says whether it kept reporting.',
       action: (HealthAnalysis.ACTION && HealthAnalysis.ACTION.silent) || '',
     };
   }
@@ -736,14 +736,14 @@ const HealthGlance = (() => {
     if (h.judged) {
       return `${when}. ` + (h.P ? `It checks every ${HealthAnalysis.fmtPeriod(h.P)}. ` : '')
         + 'Whether it is overdue is the server’s call, over every receiver’s week and whether the ones that hear it '
-        + (h.cls === 'ok' ? 'were listening: it has not called it silent.' : 'were listening: it calls it silent.');
+        + (h.cls === 'ok' ? 'were listening: it has not called it unheard.' : 'were listening: it calls it unheard — ARRO says whether it kept reporting.');
     }
     // The bars themselves, in hours: "four of its checks or a day" is not what
     // an assumed check does — its fault waits the whole day.
     const b = bars(h.P), span = HealthAnalysis.fmtSpan;
     return `${when}. `
       + (h.P ? `It checks every ${HealthAnalysis.fmtPeriod(h.P)}:` : 'Until its card has been opened and its own checks learned,')
-      + ` amber once quiet ${span(b.watch)}, red from ${span(b.fault)}. `
+      + ` amber once unheard ${span(b.watch)}, red from ${span(b.fault)}. `
       + 'Whether its receivers were listening is Station Health’s to weigh.';
   }
 
@@ -900,8 +900,8 @@ const HealthGlance = (() => {
     if (!state.mapHealth) return '';
     const what = {
       ok:     'OK — heard within two of its checks',
-      watch:  'Watch — quiet two checks or more, or a warning: a dashed ring, a step bigger',
-      fault:  'Fault — quiet four checks or a day, or a critical finding: a heavy ring, bigger again',
+      watch:  'Watch — not heard for two checks or more, or a warning: a dashed ring, a step bigger',
+      fault:  'Fault — not heard for four checks or a day, or a critical finding: a heavy ring, bigger again',
       nodata: 'No data — never heard, heard too seldom to judge, or the datastore could not be asked: hollow, in a dotted ring',
     };
     const t = net.at ? tally() : null;
@@ -1118,7 +1118,7 @@ const HealthGlance = (() => {
       : `From ${num(g.rows)} reading${g.rows === 1 ? '' : 's'} since ${esc(fmtDay(g.t0))}${g.capped ? ' (the newest 1,000)' : ''}`
         + `${c.status === 'loading' ? ', asking again…' : c.status === 'error' ? ' — asking again just now failed' : ''}`
         + (k.judged
-          ? `; whether it is silent, and the rest the server keeps, as the server last worked it out over every receiver’s week — ${esc(ago(g.serverAt || net.serverAt, now))}.`
+          ? `; whether it is unheard, and the rest the server keeps, as the server last worked it out over every receiver’s week — ${esc(ago(g.serverAt || net.serverAt, now))}.`
           : '; whether its receivers were listening is Station Health’s to weigh.'));
     return wrap(head(cls) + lines.join('') + list + strip + `<p class="small txt-muted stn-card-exp-foot">${foot}</p>`);
   }

@@ -2,6 +2,17 @@
   "about": "Every change to Flood-Net's agent API (https://floodwarning.net/api/v1 and https://floodwarning.net/api/mcp) that someone using it would notice — a route, a field, a limit, a tool — newest first. Each entry is emailed once to everyone on the API notify list (sign up at https://floodwarning.net/api#notify). Served as JSON at https://floodwarning.net/api/v1/changelog and written up in docs/agent-api.md, under Changes. Add an entry in the same push as the change: it is what tells people.",
   "entries": [
     {
+      "id": "2026-11-03-not-heard",
+      "date": "2026-11-03",
+      "title": "Silent stations are said as not heard by Flood-Net, and point to ARRO",
+      "summary": "A station Flood-Net calls silent is one its own receivers have not heard — not one that has stopped reporting. The stations report to the Bureau through its own base stations, and Flood-Net often hears a station one way where the Bureau has several: on 3 November eight Gold Coast stations behind Tallai were silent here overnight and complete in the Bureau's ARRO. So the words now say what is known. The findings' titles read \"Not heard — missed its last N checks\", \"Not heard for 15 h\", \"Not heard for 15 h, then heard again\" and \"N stations behind X went unheard together\" (they read \"Silent —\", \"Quiet for\", \"Went silent … then came back\" and \"went quiet together\"); details say Flood-Net heard nothing; and each silence's action starts by looking in ARRO, where the station's arro_site (GET /api/v1/stations/{id}) names its site. GET /api/v1/health/silent and get_silent_stations say the same in their notes and descriptions. The route, the tool, the kinds (silent, silent-spell, repeater-down, area-silence, shared-spell) and every field are as they were — match on kind, not on a title's words. Findings already open take the new words at the server's next run, within fifteen minutes.",
+      "breaking": false,
+      "links": [
+        { "text": "The silent-stations route", "url": "https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md#get-apiv1healthsilent" },
+        { "text": "What ARRO is for, on Station Health", "url": "https://github.com/cdomotor-g/MegaNet/blob/main/docs/station-health.md#a-station" }
+      ]
+    },
+    {
       "id": "2026-11-01-alert-copies",
       "date": "2026-11-01",
       "title": "One ALERT burst heard several ways is one reading",

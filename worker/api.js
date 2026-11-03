@@ -2958,8 +2958,9 @@ async function latestReadingsEndpoint(rc, params) {
 }
 
 // ── GET /api/v1/health/silent ────────────────────────────────────────────────
-// "What's gone quiet?" — the stations Station Health finds silent now, and the
-// groups that went quiet together (an area, or a repeater), as the server's
+// "What has Flood-Net stopped hearing?" — the stations Station Health finds
+// silent (not heard) now, and the groups that went unheard together (an area,
+// or a repeater), as the server's
 // own run left them (0059, #215: tools/health/report.mjs every fifteen
 // minutes, Station Health's health-analysis.js run with nobody's browser open).
 //
@@ -3070,8 +3071,9 @@ async function silentStationsEndpoint(rc, params) {
   const checkedAt = refresh.rows[0] ? refresh.rows[0].at : null;
   const checkedAgo = checkedAt ? minutesSince(checkedAt, rc.now) : null;
 
-  notes.push('A station is silent when it has missed its expected checks while the receivers that hear it kept delivering other traffic — Station Health\'s own rule, run by the server every fifteen minutes. Only stations whose telemetry is ingested into Flood-Net can be judged; one absent here may simply not send to Flood-Net.');
-  notes.push('groups are stations that went quiet together — around one place (area-silence) or behind one repeater (repeater-down): usually one cause, worth one visit.');
+  notes.push('A station is silent (not heard) when Flood-Net\'s receivers have missed its expected checks while they kept delivering other traffic — Station Health\'s own rule, run by the server every fifteen minutes. Only stations whose telemetry is ingested into Flood-Net can be judged; one absent here may simply not send to Flood-Net.');
+  notes.push('Silent here is what Flood-Net heard, not what the station sent: it may still be reporting to the Bureau through the Bureau\'s own base stations. ARRO, the Bureau\'s record, says whether it is — the station\'s arro_site (get_station) names its ARRO site.');
+  notes.push('groups are stations that went unheard together — around one place (area-silence) or behind one repeater (repeater-down): usually one cause, which may be the route they reach Flood-Net by rather than anything at the sites.');
   if (!checkedAt) {
     notes.push('The server has not recorded a health run yet, so nothing here is current.');
   } else if (checkedAgo > SILENT_STALE_MINUTES) {
@@ -3556,7 +3558,7 @@ export const ENDPOINTS = Object.freeze([
   { path: '/api/v1/acma', op: 'getAcmaLicencesNear', summary: 'The ACMA register\'s licences at sites within radius_m of a point — for a site not built yet, or a move.' },
   { path: '/api/v1/stations/{id}/radio-path', op: 'getStationRadioPath', summary: 'How a station\'s readings reach a base station: its repeaters, the backbone on, and the fade margin Flood-Net saved for each hop, stale or not.' },
   { path: '/api/v1/readings/latest', op: 'getLatestReadings', summary: 'Every station\'s newest reading on each channel, in one call: by network, basin, kind or bounding box.' },
-  { path: '/api/v1/health/silent', op: 'getSilentStations', summary: 'The stations gone quiet now, and the groups that went quiet together, from the server\'s own health run.' },
+  { path: '/api/v1/health/silent', op: 'getSilentStations', summary: 'The stations Flood-Net is not hearing now, and the groups it stopped hearing together, from the server\'s own health run.' },
   { path: '/api/v1/health/findings', op: 'getHealthFindings', summary: 'Station Health for a page of stations, worst first — by owner, by station ids, or by network, basin, kind or bounding box.' },
   { path: '/api/v1/catchments', op: 'listCatchments', summary: 'The 77 Queensland drainage basins.' },
   { path: '/api/v1/catchments/{id}', op: 'getCatchment', summary: 'One basin and its stations.' },
@@ -3723,7 +3725,7 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
           limitParam(LIMITS.latestMax, LIMITS.latestDefault), offsetParam,
         ], okOrGeo('A page of stations, each with its channels\' newest readings; or a GeoJSON FeatureCollection of them.')),
       '/api/v1/health/silent': op('getSilentStations', 'Get the silent stations',
-        'Stations silent now — missed checks while their receivers kept hearing others — worst first, with when each was last heard, and the groups that went quiet together. From the server\'s run every 15 minutes; checked_at says when it last looked.',
+        'Stations not heard now — checks Flood-Net\'s receivers missed while hearing others — worst first, with when each was last heard, and groups gone unheard together. Not what the stations sent: ARRO says if one kept reporting. From the server\'s run every 15 minutes; checked_at says when.',
         [
           q('network', 'A radio network id. See /api/v1/networks.', { type: 'string' }),
           q('basin', 'Words in the Bureau\'s basin name for the station, e.g. "Burdekin".', { type: 'string' }),
@@ -4233,7 +4235,7 @@ export const MCP_TOOLS = Object.freeze([
   {
     name: 'get_silent_stations',
     title: 'Get the silent stations',
-    description: `What has gone quiet: the stations Station Health finds silent now — missed their expected checks while the receivers that hear them kept delivering other traffic — worst first, each with when it was last heard, how many checks it missed and what to check; and the groups that went quiet together (around one place, or behind one repeater), which usually share one cause. Filter by radio network, basin, kind, bounding box or severity; format "geojson" for a map. From the server's own run every fifteen minutes — checked_at says when it last looked. Only stations whose telemetry reaches Flood-Net can be judged.`,
+    description: `What Flood-Net has stopped hearing: the stations Station Health finds silent (not heard) now — expected checks Flood-Net's receivers missed while they kept delivering other traffic — worst first, each with when it was last heard, how many checks it missed and what to check; and the groups that went unheard together (around one place, or behind one repeater), which usually share one cause. It is what Flood-Net heard, not what the stations sent: a station may still be reporting to the Bureau, and ARRO (the station's arro_site, from get_station) says whether it is. Filter by radio network, basin, kind, bounding box or severity; format "geojson" for a map. From the server's own run every fifteen minutes — checked_at says when it last looked. Only stations whose telemetry reaches Flood-Net can be judged.`,
     inputSchema: { type: 'object', properties: {
       network: listFilters.network, basin: listFilters.basin, type: listFilters.type,
       bbox: { type: 'string', maxLength: 100, description: 'A bounding box, "west,south,east,north" in decimal degrees — longitude first — e.g. "152.5,-28.2,153.6,-27.0".' },
