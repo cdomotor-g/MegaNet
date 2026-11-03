@@ -42,7 +42,7 @@
       "#217 and #244 transmitter drift and bit-flip sources: gathering live days of carrier data",
       "#258 flaky Site features 3-D hand-back check in CI",
       "Legacy ALERT over MQTT trial (ELPRO gateway, Alert1 path): the bridge decodes it and drops the gateway's re-sent table, live since 2 Nov with the trial's first hour replayed; ALERT2 relay readings are one per transmission with near-simultaneous copies counted (0098 put back what 0097 had wrongly removed)",
-      "#259 a lighter off-air decoder: lean decoding is the live pipeline's default (0.12% of 11,628 live bursts read differently, a third of the time), and the work between bursts is a quarter less; part 2, filtering channels only around bursts, left"
+      "#259 a lighter off-air decoder: lean decoding is the live pipeline's default (0.12% of 11,628 live bursts read differently, a third of the time); part 2, BurstWatch, filters a channel only around its bursts (the same readings in every test, a sixth to a twentieth of the work between them) and is in RPi ALERT 0.18 behind a setting, waiting on its check at the first base station"
     ],
     "next": [
       "#252–#254 road routes: avoid closures, inspection runs, routes kept offline (EPIC #250)",
