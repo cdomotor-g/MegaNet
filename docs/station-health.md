@@ -46,7 +46,10 @@ common (one repeater, one receiver channel, one hour), tells a receiver's own
 error from a transmitter's by the carrier, checks what changed at the base
 station, and writes the scenes — what is wrong, the evidence, and when it is
 not the obvious, the possible causes and what would tell them apart. It does
-not prescribe. Stations that go quiet at night and come back by day, night after
+not prescribe. It says *Flood-Net stopped hearing*, not *went quiet*: what it reads
+is what our receivers got, and the Bureau may have had every report (the Gold
+Coast group behind Tallai on 3 Nov 2026, unheard here overnight and complete in
+ARRO). Stations unheard at night and back by day, night after
 night, it weighs against the repeater they share — that repeater's own scheduled
 checks keeping the same hours, its own battery, the stations only it passes — and
 names it as worth a look when the evidence points there. Mondays at four a second task writes the week
@@ -152,7 +155,12 @@ Opening a station shows its check schedule (the period, the phase, what share
 arrived), its checks as a strip — one mark per slot — its battery across its
 solar day with the night-time lows trended, its rain and level, its sensors, its
 findings, and the last site visit with the battery measured then (from the
-inspection history).
+inspection history). Its buttons go to the station on the Stations tab, its
+readings in the Message Log, its sensors on Field Data, and — for a station with
+an ARRO site id — **Open in ARRO**, the Bureau's own record of what it sent.
+Everything on this tab is what Flood-Net's receivers heard, often by one route
+where the Bureau has several, so a station quiet here may still be reporting:
+ARRO says whether it did. A station not heard in the window has the link too.
 
 **The context lens.** Pick a missed check (a mark on the strip, or the buttons
 under it) or a reading, and the lens shows the network at that moment: which

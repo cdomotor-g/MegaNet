@@ -12,9 +12,9 @@
  "cohost": "seasoned-hydrographer",
  "status": {
   "level": "several",
-  "label": "A Gold Coast group quiet overnight"
+  "label": "A Gold Coast group unheard overnight"
  },
- "headline": "Eight Gold Coast hinterland stations went quiet overnight, all passed by Tallai, whose own reports keep the same hours. Most checks came in.",
+ "headline": "Flood-Net heard eight Gold Coast hinterland stations less overnight, but ARRO has their data: the gap was on our one route to them. Most checks came in.",
  "stats": [
   {
    "label": "stations heard",
@@ -29,7 +29,7 @@
    "tone": "warn"
   },
   {
-   "label": "quiet, keep a schedule",
+   "label": "unheard, keep a schedule",
    "value": 12,
    "tone": "warn"
   },
@@ -44,15 +44,15 @@
    "type": "title",
    "title": "Good morning",
    "secs": 14,
-   "say": "Good morning, Alex Chen presenting. Eighty-two percent of checks came in, up from seventy-eight. Twelve stations that keep a schedule went quiet, and seven of them sit together in the Gold Coast hinterland."
+   "say": "Good morning, Alex Chen presenting. Eighty-two percent of checks came in, up from seventy-eight. We stopped hearing twelve stations that keep a schedule; seven sit together in the Gold Coast hinterland, and they were reporting all along."
   },
   {
    "type": "map",
-   "title": "Quiet at night, behind Tallai",
-   "sub": "eight stations, one repeater they share",
+   "title": "Unheard at night, Gold Coast hinterland",
+   "sub": "eight stations, one way to us",
    "sev": "warn",
    "secs": 25,
-   "say": "Natural Bridge, Hotham Creek and Stewarts Road have gone quiet at night most of this week, back around dawn. Last night Binna Burra, Beechmont, Clagiraba Road, Willow Vale and Springbrook joined them, all between ten to two and twenty past. Every one is passed by the Tallai repeater. Over six days Tallai's own reports drop by about half overnight, while Molendinar, ten kilometres away, holds steady.",
+   "say": "Natural Bridge, Hotham Creek and Stewarts Road have been heard less at night most of this week. Last night we lost Binna Burra, Beechmont, Clagiraba Road, Willow Vale and Springbrook too, from half past two until five. Technicians found their data in ARRO: they were on the air. The gap is on our one route to them.",
    "stations": [
     "tallai_al",
     "natural_bridge_al",
@@ -67,7 +67,7 @@
     {
      "id": "tallai_al",
      "kind": "repeater",
-     "sev": "warn",
+     "sev": "info",
      "label": "Tallai AL"
     },
     {
@@ -121,42 +121,42 @@
     {
      "from": "natural_bridge_al",
      "to": "tallai_al",
-     "style": "blame"
+     "style": "path"
     },
     {
      "from": "hotham_creek_al",
      "to": "tallai_al",
-     "style": "blame"
+     "style": "path"
     },
     {
      "from": "stewarts_rd_al",
      "to": "tallai_al",
-     "style": "blame"
+     "style": "path"
     },
     {
      "from": "clagiraba_road_al",
      "to": "tallai_al",
-     "style": "blame"
+     "style": "path"
     },
     {
      "from": "binna_burra_al",
      "to": "tallai_al",
-     "style": "blame"
+     "style": "path"
     },
     {
      "from": "beechmont_al",
      "to": "tallai_al",
-     "style": "blame"
+     "style": "path"
     },
     {
      "from": "willow_vale_al",
      "to": "tallai_al",
-     "style": "blame"
+     "style": "path"
     },
     {
      "from": "springbrook_national_park_al",
      "to": "tallai_al",
-     "style": "blame"
+     "style": "path"
     }
    ],
    "areas": [
@@ -165,7 +165,7 @@
      "lon": 153.25,
      "km": 25,
      "sev": "warn",
-     "label": "quiet overnight"
+     "label": "unheard here overnight"
     }
    ],
    "focus": {
@@ -176,38 +176,38 @@
   },
   {
    "type": "list",
-   "title": "Tallai: what would tell",
+   "title": "How Flood-Net hears them",
    "sev": "info",
-   "secs": 18,
-   "say": "They come back before sunrise, so it isn't the sun on a panel. A supply sagging in the small hours fits, and so does a link that fades at night. Tallai's battery holds 13.4 volts overnight, which leans towards the link or its radio.",
+   "secs": 20,
+   "say": "It all reaches us one way: re-sent in ALERT2 by one concentrator, a station that gathers older-style reports and passes them on. Tallai's own reports thin out on that route too, so they can't tell Tallai from the route. Molendinar, same route, holds all night. No site visit needed.",
    "stations": [
     "tallai_al",
     "molendinar_al"
    ],
    "items": [
     {
-     "sev": "warn",
+     "sev": "info",
      "id": "tallai_al",
-     "text": "Tallai AL: own reports about half overnight; battery steady 13.4 V."
+     "text": "Tallai AL: reaches us by the same route and thins out at night too; battery steady 13.4 V."
     },
     {
      "sev": "ok",
      "id": "molendinar_al",
-     "text": "Molendinar AL, 10 km away: steady day and night."
+     "text": "Molendinar AL, the same route to us: steady day and night."
     },
     {
-     "sev": "info",
-     "text": "Back before sunrise: not the sun; supply, link or radio."
+     "sev": "ok",
+     "text": "ARRO has data from every station checked: they were on the air. The gap is between them and us."
     }
    ]
   },
   {
    "type": "map",
    "title": "Quiet in the Tweed and Richmond",
-   "sub": "two repeaters quiet",
+   "sub": "two repeaters we barely heard",
    "sev": "warn",
    "secs": 25,
-   "say": "Further south, the Murwillumbah Hartigans Hill repeater got one report through in the last day, at eight past twelve on Monday. Kunghur and Dunbible Creek nearby are quiet too, but both have weak batteries of their own, so that's not yet one cause. Goonellabah, Terania Creek and Upper Burringbar went quiet together just before ten last night. Tyalgum Creek had twenty millimetres of rain.",
+   "say": "Further south, we heard the Murwillumbah Hartigans Hill repeater once in the last day, just after noon Monday. Kunghur and Dunbible Creek are unheard too, but both have weak batteries, so not yet one cause. We lost Goonellabah, Terania Creek and Upper Burringbar together just before ten; ARRO will say if they reported. Tyalgum Creek had twenty millimetres of rain.",
    "stations": [
     "murwillumbah_hartigans_hill",
     "kunghur_the_junction",
@@ -407,7 +407,7 @@
    "title": "Check signals",
    "secs": 10,
    "sev": "warn",
-   "say": "Turbo, quick lap! Boat Mountain, Rock Valley, Bromelton Dam and Blackstone Bridge missed every check. The gauge below Clarrie Hall Dam is still at zero.",
+   "say": "Turbo, quick lap! No checks heard from Boat Mountain, Rock Valley, Bromelton Dam or Blackstone Bridge. The gauge below Clarrie Hall Dam is still at zero.",
    "stations": [
     "boat_mountain_al",
     "clarrie_hall_dam_d_s",
@@ -457,8 +457,8 @@
   {
    "type": "signoff",
    "title": "That’s the network",
-   "secs": 9,
-   "say": "That's the network: Tallai worth a look, two quiet repeaters further south, and a hundred and twenty-three stations heard again. Back tomorrow.",
+   "secs": 11,
+   "say": "That's the network: a Gold Coast group we heard less of, though ARRO has it all, two repeaters south we barely heard, and a hundred and twenty-three heard again. Back tomorrow.",
    "line": "That’s not a fault, that’s a symptom."
   }
  ],
@@ -468,9 +468,10 @@
   "gathered_at": "2026-11-02T18:32:14.941Z"
  },
  "caveats": [
-  "Tallai sends no strict schedule of its own reports, so its night dip is from raw counts over six days.",
+  "Corrected 3 Nov: technicians found the Gold Coast stations' data in ARRO, so they were reporting; the first version said they went quiet and pointed at Tallai.",
+  "Flood-Net hears that group only through one ALERT2 concentrator (11762) and one receiver; ARRO hears them by the Bureau's own routes.",
   "Kunghur and Dunbible Creek have weak batteries of their own, so Hartigans Hill cannot yet be called their cause.",
   "Hinze Dam's and Eungella's lows are single nights; one reading cannot separate a failing battery from a bad value."
  ],
- "author": "Claude Code, from the bulletin draft and read-only queries"
+ "author": "Claude Code, from the draft and read-only queries; corrected 3 Nov"
 }

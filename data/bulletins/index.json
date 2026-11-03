@@ -1,12 +1,12 @@
 {
  "format": "floodnet-bulletin-index/1",
- "updated_at": "2026-11-02T18:35:04.378Z",
+ "updated_at": "2026-11-03T05:52:15.225Z",
  "daily": [
   {
    "id": "daily-2026-11-03",
    "file": "data/bulletins/daily/2026-11-03.json",
    "issued_at": "2026-11-02T18:32:14.941Z",
-   "headline": "Eight Gold Coast hinterland stations went quiet overnight, all passed by Tallai, whose own reports keep the same hours. Most checks came in.",
+   "headline": "Flood-Net heard eight Gold Coast hinterland stations less overnight, but ARRO has their data: the gap was on our one route to them. Most checks came in.",
    "status": "several",
    "presenter": "tech-wizard"
   },

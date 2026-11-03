@@ -41,7 +41,7 @@ export function draft(F) {
 
   const groups = (F.silences && F.silences.by_last_path) || [];
   const headline = clip(regular.length
-    ? `${plural(regular.length, 'station')} that keep a schedule went quiet${groups[0] && groups[0].stations.length >= 3 ? `, ${groups[0].stations.length} of them last heard on one channel` : ''}; ${plural(crit, 'critical finding')} in all.`
+    ? `Flood-Net stopped hearing ${plural(regular.length, 'station')} that keep a schedule${groups[0] && groups[0].stations.length >= 3 ? `, ${groups[0].stations.length} of them last heard on one channel` : ''}; ${plural(crit, 'critical finding')} in all.`
     : `${plural((F.findings || []).length, 'finding')} need attention, ${plural(crit, 'critical')}.`, 170);
 
   const opened = (F.server_findings || {}).opened || [], cleared = (F.server_findings || {}).cleared || [];
@@ -52,14 +52,16 @@ export function draft(F) {
       tone: n.received_pct_in_period >= 90 ? 'ok' : n.received_pct_in_period >= 75 ? 'warn' : 'bad' },
     // Not the server's opened and cleared: its findings open and close every
     // fifteen minutes as stations come and go, and the count says nothing.
-    { label: 'quiet, keep a schedule', value: regular.length, tone: regular.length ? 'warn' : 'ok' },
+    { label: 'unheard, keep a schedule', value: regular.length, tone: regular.length ? 'warn' : 'ok' },
     { label: 'critical findings', value: crit, tone: crit ? 'bad' : 'ok' },
   ];
 
   scenes.push({ type: 'title', title: weekly ? 'The week on the network' : 'Good morning', secs: 10,
     say: clip(`${weekly ? 'Here is the week on the network' : 'Good morning — here is the network for the last 24 hours'}: ${levelLabel.toLowerCase()}. ${headline}`, 400) });
 
-  // The map: who went quiet, the groups, the worst batteries and flips.
+  // The map: who Flood-Net stopped hearing, the groups, the worst batteries
+  // and flips. Unheard, never "went quiet": all the facts know is what our
+  // receivers got, and ARRO may have every report (README, *Investigate*).
   const marks = [];
   const addMark = (id, kind, sev, label) => {
     if (!ok(id) || marks.some(m => m.id === id) || marks.length >= 30) return;
@@ -73,7 +75,7 @@ export function draft(F) {
   if (marks.length) {
     const near = marks.filter(m => st(m.id)).map(m => st(m.id));
     scenes.push({ type: 'map', title: 'Where', sub: clip(`${plural(marks.length, 'station')} to look at`, 90), secs: 12, sev: crit ? 'critical' : 'warn',
-      say: clip(regular.length ? `The stations that went quiet are on the map${areas.length ? ', and the places where several went together are circled' : ''}. When several go together, look for what they share before blaming each one.` : 'These are the stations with something to look at.', 400),
+      say: clip(regular.length ? `The stations Flood-Net stopped hearing are on the map${areas.length ? ', and the places where several went together are circled' : ''}. When several go together, look for what they share, our route to them included, before blaming each one.` : 'These are the stations with something to look at.', 400),
       stations: marks.slice(0, 6).map(m => m.id), marks, ...(areas.length ? { areas } : {}),
       ...(near.length > 1 ? {} : {}) });
   }
@@ -93,7 +95,7 @@ export function draft(F) {
     const repAt = st(hc.repeater_id) && st(hc.repeater_id).lat != null;
     if (repAt) hmarks.push({ id: hc.repeater_id, kind: 'repeater', sev: repWorth ? 'warn' : 'info', label: clip(hc.name, 60) });
     const links = repAt ? hmarks.filter(m => m.kind === 'silent').slice(0, 8).map(m => ({ from: m.id, to: hc.repeater_id, style: 'path' })) : [];
-    if (hmarks.length) scenes.push({ type: 'map', title: clip(`Quiet at night, behind ${hc.name}`, 70), sub: clip(`${plural(hg.stations.length, 'station')} quiet at night, night after night`, 90),
+    if (hmarks.length) scenes.push({ type: 'map', title: clip(`Unheard at night, behind ${hc.name}`, 70), sub: clip(`${plural(hg.stations.length, 'station')} unheard at night, night after night`, 90),
       secs: 14, sev: 'warn', say: clip(hg.short, 400), stations: hmarks.map(m => m.id).slice(0, 8), marks: hmarks, ...(links.length ? { links } : {}) });
   }
 
@@ -171,10 +173,10 @@ export function draft(F) {
 
   // Worth a look.
   const items = [];
-  if (groups[0] && groups[0].stations.length >= 3) items.push({ sev: 'warn', text: clip(`${groups[0].stations.length} regular stations last heard on ${groups[0].path} went quiet.`, 160) });
+  if (groups[0] && groups[0].stations.length >= 3) items.push({ sev: 'warn', text: clip(`Flood-Net stopped hearing ${groups[0].stations.length} regular stations last heard on ${groups[0].path}.`, 160) });
   (F.findings || []).filter(f => f.severity === 'critical' && f.station_id && ok(f.station_id)).slice(0, 3)
     .forEach(f => items.push({ sev: 'critical', id: f.station_id, text: clip(`${nameOf(f.station_id)} — ${f.title}.`, 160) }));
-  if (hg) items.push({ sev: 'warn', id: hc.repeater_id, text: clip(`${hc.name}: ${plural(hg.stations.length, 'station')} it passes quiet at night, night after night — ${repWorth ? 'its power is worth a look' : 'worth a look, with the sites’ own power'}.`, 160) });
+  if (hg) items.push({ sev: 'warn', id: hc.repeater_id, text: clip(`${hc.name}: ${plural(hg.stations.length, 'station')} it passes unheard at night, night after night — ${repWorth ? 'its power is worth a look if ARRO has the gaps too' : 'worth a look, with the sites’ power, if ARRO has the gaps too'}.`, 160) });
   const back = (F.server_findings || {}).back_on_air || [];
   if (back.length) items.push({ sev: 'ok', text: clip(`Heard again: ${plural(back.length, 'station')} the server had called silent — ${back.slice(0, 3).map(nameOf).join(', ')}${back.length > 3 ? ' among them' : ''}.`, 160) });
   if (items.length) scenes.push({ type: 'list', title: weekly ? 'This week, worth a look' : 'Worth a look today', secs: 11, say: 'So, worth a look: ' + clip(items.map(i => i.text.replace(/\.$/, '')).join('; '), 370) + '.', items: items.slice(0, 6), stations: items.map(i => i.id).filter(Boolean).slice(0, 6) });

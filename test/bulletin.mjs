@@ -331,14 +331,20 @@ console.log('The hours stations keep');
   ok('…its case said as a lead, in plain words: back once the sun is up, its own checks keep the same hours, its power worth a look',
     g && /all pass through Tallai AL/.test(g.lead) && /Back once the sun is up/.test(g.lead) && /its power is worth a look first/.test(g.lead) && !weatherTalk(g.lead) && !/replace|go and/i.test(g.lead), g && g.lead);
   ok('…and short enough for the draft', g && g.short.split(/\s+/).length <= 45 && /Tallai AL/.test(g.short), g && g.short);
+  // What the facts know is what Flood-Net heard: the Tallai group of 3 Nov 2026
+  // was "quiet" here and complete in ARRO. Said as unheard, and the repeater's
+  // own hours lean on it only if the Bureau's record has the gaps too.
+  ok('…said as what Flood-Net heard, never as the stations going quiet, and the repeater weighed against ARRO',
+    g && /^Flood-Net stops hearing/.test(g.short) && /unheard here/.test(g.lead) && !/\bgo(es)? quiet\b|went quiet/.test(g.lead + ' ' + g.short)
+      && /if ARRO has the same gaps/.test(g.lead) && /ARRO/.test(g.short), g && `${g.lead} | ${g.short}`);
   // Into a draft: a map scene with the repeater on it and the paths drawn, and a line in what is worth a look.
   const F2 = Object.assign(JSON.parse(JSON.stringify(demoFacts)), { hours: H });
   for (const id of ['hotham_creek_al', 'stewarts_rd_al', 'tyungun_al', 'tallai_al']) { const s = reg.get(id); F2.stations[id] = { name: s.name, lat: +s.lat, lon: +s.lon }; }
   const d2 = draft(F2);
-  const sc = d2.scenes.find(x => x.type === 'map' && /Quiet at night, behind Tallai AL/.test(x.title));
+  const sc = d2.scenes.find(x => x.type === 'map' && /Unheard at night, behind Tallai AL/.test(x.title));
   ok('the draft gives it a map scene: the three, the repeater marked, a path from each', sc && sc.marks.some(mk => mk.id === 'tallai_al' && mk.kind === 'repeater')
     && (sc.links || []).filter(l => l.to === 'tallai_al').length === 3, JSON.stringify(sc));
-  ok('…and a line in what is worth a look', d2.scenes.find(x => x.type === 'list').items.some(it => it.id === 'tallai_al' && /quiet at night/.test(it.text)));
+  ok('…and a line in what is worth a look', d2.scenes.find(x => x.type === 'list').items.some(it => it.id === 'tallai_al' && /unheard at night/.test(it.text) && /ARRO/.test(it.text)));
   const r2 = validate(d2, { stationIds: ids });
   ok('…and the draft is still a valid bulletin', !r2.errors.length, r2.errors.join('; '));
 }

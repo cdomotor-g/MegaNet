@@ -848,6 +848,15 @@ try {
     await frame();
     const fact = [...document.querySelectorAll('#hl-station .hl-facts div')].find(d => /Owner/.test(d.querySelector('dt').textContent));
     after.fact = fact ? fact.querySelector('dd').textContent.replace(/\s+/g, ' ') : null;
+    // The station in ARRO: the Bureau's record, beside the buttons, for a
+    // station with an ARRO site id — and nothing for one without.
+    const arroA = document.querySelector('#hl-station .hl-stn-links a.hl-arro');
+    const arroSt = A.stations.get(sid).st;
+    after.arro = { want: arroSiteUrl(arroSiteId(arroSt)), href: arroA ? arroA.getAttribute('href') : null,
+      target: arroA ? arroA.getAttribute('target') : null, rel: arroA ? arroA.getAttribute('rel') : null,
+      text: arroA ? arroA.textContent.replace(/\s+/g, ' ').trim() : null, title: arroA ? arroA.title : null };
+    const noArro = [...A.stations.values()].find(S => arroSiteId(S.st) == null);
+    if (noArro) { Health.select(noArro.st.id); await frame(); after.arro.none = !document.querySelector('#hl-station a.hl-arro'); }
     Health.close();
     Health.clearOwners();
     await frame();
@@ -895,6 +904,11 @@ try {
     own.after.ssOwned && own.after.ssRows.length < ss.rows.length && own.after.cleared.ssRows === ss.rows.length,
     JSON.stringify({ owned: own.after.ssOwned, rows: own.after.ssRows.length, cleared: own.after.cleared.ssRows, all: ss.rows.length }));
   ok('…the station opened says who owns it and where that came from', own.after.fact && own.after.fact.includes(own.after.pick) && /SLS|Service Level|recorded/.test(own.after.fact), own.after.fact);
+  const ar = own.after.arro;
+  ok('…and links to its page in ARRO, in a new tab, saying on hover that ARRO is the Bureau\'s record and this tab what Flood-Net heard',
+    ar && ar.want && ar.href === ar.want && ar.target === '_blank' && /noopener/.test(ar.rel || '') && /^Open in ARRO/.test(ar.text || '')
+      && /Bureau's own record/.test(ar.title || '') && /Flood-Net's receivers heard/.test(ar.title || ''), JSON.stringify(ar));
+  ok('…and a station with no ARRO site id has no ARRO link', ar && ar.none !== false, JSON.stringify(ar));
   ok('…and All owners puts the whole network back', !own.after.cleared.note && own.after.cleared.stored === '[]' && own.after.cleared.heardKpi === own.total.toLocaleString(),
     JSON.stringify(own.after.cleared));
 

@@ -825,6 +825,20 @@ const Health = (() => {
 
   // ── one station ────────────────────────────────────────────────────────────
 
+  // The station in ARRO, the Bureau's own record of what it sent. Everything
+  // on this tab is what Flood-Net's receivers heard, which for many stations is
+  // one route of several: a station this tab calls quiet may be reporting
+  // through the Bureau's base stations all the while — the Tallai group on
+  // 3 Nov 2026, quiet here and complete in ARRO. ARRO is the way to tell the
+  // two apart, so it is a press away. Nothing for a station with no ARRO site
+  // id (arroSiteId, core.js), rather than a dead link.
+  function arroLinkHtml(st) {
+    const id = typeof arroSiteId === 'function' ? arroSiteId(st) : null;
+    const url = id != null && typeof arroSiteUrl === 'function' ? arroSiteUrl(id) : null;
+    return url ? `<a class="btn-link hl-arro" href="${esc(url)}" target="_blank" rel="noopener"
+        title="${esc(`ARRO site ${id}: the Bureau's own record of what this station sent. This tab shows only what Flood-Net's receivers heard, so a station quiet here may still be reporting — ARRO says whether it did`)}">Open in ARRO <span aria-hidden="true">↗</span></a>` : '';
+  }
+
   function stationHtml() {
     const S = H.sel && H.A && H.A.stations.get(H.sel);
     // Asked for from another tab, and not in this window: said, with the way
@@ -841,6 +855,7 @@ const Health = (() => {
         <div class="button-group hl-stn-links">
           ${!H.demo ? longer.map(([k, label]) => `<button class="ghost" onclick="Health.setWin('${k}')">Look back ${esc(label)}</button>`).join('') : ''}
           <button class="ghost" onclick="goToStation('${escAttr(gone.id)}')">Show on the Stations tab</button>
+          ${arroLinkHtml(gone)}
           <button class="ghost" onclick="Health.close()">Close</button>
         </div>
         ${stnFindHtml()}`;
@@ -871,6 +886,7 @@ const Health = (() => {
         <button class="ghost" onclick="goToStation('${escAttr(st.id)}')">Show on the Stations tab</button>
         <button class="ghost" onclick="Health.openLog('${escAttr(st.id)}')" title="This station's readings in the window, in the Message Log">Its readings in the Message Log</button>
         <button class="ghost" onclick="Health.openField('${escAttr(st.id)}')" title="Chart its sensors on the Field Data tab">Chart on Field Data</button>
+        ${arroLinkHtml(st)}
         <button class="ghost" onclick="Health.close()">Close</button>
       </div>
       ${stnFindHtml()}

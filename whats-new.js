@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 178, date: '2026-11-03', items: [
+      '📊 <strong>Open in ARRO</strong> on 🚦 <em>Station Health</em>: a station opened there has a link to its page in ARRO, '
+        + 'the Bureau\'s own record of what it sent. Station Health shows what Flood-Net\'s receivers heard, so a station '
+        + 'quiet here may still be reporting — ARRO says whether it did. The 📺 <strong>Network Bulletin</strong> now says '
+        + '<em>Flood-Net stopped hearing</em> rather than <em>went quiet</em>, and this morning\'s has been corrected: the '
+        + 'Gold Coast stations behind Tallai were reporting all night.',
+    ] },
     { n: 177, date: '2026-11-03', items: [
       '🏠 <strong>Street addresses</strong> in 📍 <em>Find a place</em>: type <em>12 Mary Street, Gympie</em> and the map goes '
         + 'to the house, with a blue pin on the property — or just a street, <em>Old Gympie Rd</em>. Queensland addresses '

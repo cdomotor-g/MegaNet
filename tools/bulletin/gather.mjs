@@ -558,8 +558,11 @@ const pct = v => `${Math.round(100 * v)} percent`;
 export function leadFor(g) {
   const n = g.stations.length, c = g.candidates[0];
   const who = n === 1 ? g.stations[0].name : `${n} stations`;
-  const when = `${g.goes_hour != null ? `quiet from about ${hourWords(g.goes_hour)}` : 'quiet at night'}${g.back_hour != null ? `, back about ${hourWords(g.back_hour)}` : ''}`;
-  if (!c) { const t = `${who} ${n === 1 ? 'keeps' : 'keep'} the same hours — ${when} — and no repeater on file passes ${n === 1 ? 'it' : 'them all'}: the sites' own power fits best.`; return { lead: t, short: t }; }
+  // Unheard, not quiet: all this knows is what Flood-Net's receivers got, and a
+  // station Flood-Net hears one way may be reporting to the Bureau by others
+  // all night (the Tallai group, 3 Nov 2026 — every check in ARRO).
+  const when = `${g.goes_hour != null ? `unheard here from about ${hourWords(g.goes_hour)}` : 'unheard here at night'}${g.back_hour != null ? `, back about ${hourWords(g.back_hour)}` : ''}`;
+  if (!c) { const t = `${who} ${n === 1 ? 'keeps' : 'keep'} the same hours — ${when} — and no repeater on file passes ${n === 1 ? 'it' : 'them all'}: the sites' own power fits best, if ARRO has the gaps too.`; return { lead: t, short: t }; }
   const through = `${n === 1 ? 'it passes' : c.passes === n ? 'all pass' : c.passes === 1 ? 'one of them passes' : `${c.passes} of them pass`} through ${c.name}`;
   const parts = [`${who} ${n === 1 ? 'keeps' : 'keep'} the same hours — ${when} — and ${through}.`];
   // The short version, for the draft: about forty words, what they share and
@@ -574,8 +577,11 @@ export function leadFor(g) {
   parts.push(shape);
   if (c.seen_relaying) parts.push(`${c.name}'s carrier was seen relaying them this week.`);
   const say = (t, k) => { parts.push(t); if (k) key.push(k); };
-  if (c.own && c.own.keeps_hours) say(`${c.name}'s own checks keep those hours too (${pct(c.own.night_rate)} at night against ${pct(c.own.day_rate)} in the afternoon), so its power is worth a look first.`,
-    `Its own checks keep the same hours: its power is worth a look first.`);
+  // A repeater's own checks reach Flood-Net by the same receivers as the
+  // stations behind it, often by the same route, so keeping their hours points
+  // at it only if the Bureau's record (ARRO) has the gaps too.
+  if (c.own && c.own.keeps_hours) say(`${c.name}'s own checks keep those hours too (${pct(c.own.night_rate)} at night against ${pct(c.own.day_rate)} in the afternoon), so its power is worth a look first — if ARRO has the same gaps; if not, the gap is in how Flood-Net hears them.`,
+    `Its own checks keep the same hours: its power is worth a look first, if ARRO has the gaps too.`);
   else if (c.own && c.own.poor) say(`${c.name}'s own checks are mostly missing by day and by night alike (${pct(c.own.day_rate)} in the afternoon, ${pct(c.own.night_rate)} at night), so it is worth a look in its own right — its own path may be part of the same trouble.`,
     `Its own checks go missing day and night: worth a look.`);
   else if (c.own && c.own.steady) parts.push(`${c.name}'s own checks come in all night, so it was on the air.`);
@@ -587,7 +593,7 @@ export function leadFor(g) {
   if (up) parts.push(`One hop up, ${up.name}'s own checks keep the same hours too: worth a look as well.`);
   if (!c.own) parts.push(`${c.name} sends no checks of its own on a schedule, so its own record cannot tell its power from the sites'.`);
   else if (c.own.steady && solar) parts.push(`The sites' own solar fits better.`);
-  const head = `${who} ${n === 1 ? 'goes' : 'go'} quiet at night, night after night${g.back_hour != null ? `, back about ${hourWords(g.back_hour)}` : ''}; ${through}.`;
+  const head = `Flood-Net stops hearing ${who} at night, night after night${g.back_hour != null ? `, back about ${hourWords(g.back_hour)}` : ''}; ${through}.`;
   const shapeShort = solar ? 'Back once the sun is up: a solar supply that cannot carry the night fits.' : 'Back before sunrise: a sagging supply or a link that fades at night fits.';
   return { lead: parts.join(' '), short: [head, ...(key.length ? key.slice(0, 2) : [shapeShort])].join(' ') };
 }

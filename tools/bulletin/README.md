@@ -93,8 +93,34 @@ server's findings opened and cleared in the period;
 and the days' numbers (`series`). `stations` has every station mentioned, with
 its position.
 
-Work through it as an analyst, not a summariser. The questions that earn a
-scene:
+Work through it as an analyst, not a summariser. First, what the facts are
+about: **what Flood-Net's receivers heard, not what the stations sent.** The
+stations report to the Bureau through its own base stations, and ARRO
+(Contrail) is the record of that. Flood-Net is one more listener, and for
+many stations it has one route where the Bureau has several. A station
+missing here may be reporting there all the while. So:
+
+- **Say "Flood-Net stopped hearing", "we didn't hear", "unheard here" —
+  never "went quiet", "went offline", "stopped reporting" or "missed every
+  check"** of a station or a group, unless you know the Bureau's record has
+  the gap too. On 3 Nov 2026 the daily said eight Gold Coast hinterland
+  stations "went quiet overnight" behind Tallai; technicians found every one
+  they checked complete in ARRO. The gap was all ours (below).
+- **Find out how Flood-Net hears the group before you blame what they share.**
+  Much of what a receiver stick hears comes as legacy ALERT reports re-sent
+  in ALERT2 by a concentrator (`reception.a2_source`, the ALERT2 station that
+  gathered them) through ALERT2 repeaters (`a2_path`) — on the 151.5375 MHz
+  stick in Nov 2026, nearly all of it — the query under the connector, below. If the whole group, and the repeater you suspect, reach
+  us through one concentrator and one stick, then that route is a common
+  factor too, and the repeater's own reports thinning out at the same hours
+  say nothing against it: they come the same way. Compare a station on the
+  same route that holds all night (Molendinar, 3 Nov), and the rest of that
+  concentrator's feed at the same hours.
+- **Say where to check.** A silence or a repeater lead that rests on our
+  ears alone ends with what would settle it: "ARRO will say whether they
+  reported." A repeater worth a look is one whose gaps ARRO has too.
+
+The questions that earn a scene:
 
 1. **What do they share?** Before calling anything a station fault, look for
    the common factor: one repeater, one receiver stick, one channel, one area,
@@ -122,6 +148,18 @@ scene:
    −19 ppm correction at 10:06 Brisbane on 24 Oct; it had never had one — its
    carriers measured about +2.9 kHz from 19 Oct — and the patch of 10:33
    Brisbane (00:33 UTC) corrected it for the first time, from 10:34.
+   The same goes for a route. On 3 Nov 2026 eight Gold Coast hinterland
+   stations behind Tallai were unheard overnight, Tallai's own reports thinned
+   out at the same hours, and the daily called it Tallai. Every report Flood-Net
+   had from all nine, and from Molendinar beside them, came re-sent by one
+   ALERT2 concentrator (11762) to one stick (`rpi-83071968` sdr1, 151.5375).
+   On three of the week's nights (29 and 31 Oct, 2 Nov) the group's copies per
+   hour fell 38 to 48 percent at night against the afternoon, while the rest of
+   11762's feed fell 10 to 34 and Molendinar's held; from 4 to 5 am on 3 Nov the
+   whole feed all but stopped (113 rows against about 1,300 an hour) while the
+   other concentrator on the stick (33300) came in as usual. ARRO had the
+   stations' data. The gap was on our route — most likely the hop from Tallai
+   into 11762 — and nothing at the sites needed a visit.
 4. **Is it new, chronic or getting better?** Compare with `series` and the
    server's history. Say what cleared: good news is news — but a finding the
    server cleared may only have rolled out of its week, so the good news is
@@ -200,6 +238,29 @@ select app, version, status_at, status -> 'config' -> 'receivers' -> 'sdrDevices
        beat ->> 'load' as load, beat ->> 'temp' as temp, beat ->> 'throttled' as throttled
 from meganet.base_station;
 
+-- How Flood-Net hears a group: which ALERT2 concentrator re-sent their reports
+-- (a2_source; null is heard direct, as legacy ALERT), by which ALERT2 path, on
+-- which stick, at night (10 pm to 6 am) against the afternoon (noon to 6 pm).
+-- One source and one stick for the whole group is one route, and a gap on it is
+-- ours, not theirs. The legacy addresses are the stations' alert ids.
+select point_id, a2_source, a2_path::text path, count(*) n,
+       count(*) filter (where extract(hour from heard_at at time zone 'Australia/Brisbane') >= 22
+                           or extract(hour from heard_at at time zone 'Australia/Brisbane') < 6) night,
+       count(*) filter (where extract(hour from heard_at at time zone 'Australia/Brisbane') between 12 and 17) afternoon
+from meganet.reception where heard_at > now() - interval '3 days' and ok and alert_id in (<addresses>)
+group by 1, 2, 3 order by n desc limit 20;
+
+-- …and that concentrator's whole feed hour by hour, the group's share of it, and a
+-- second concentrator on the same stick: the group thinning out while the rest of
+-- the feed holds is the hop into the concentrator; the whole feed going is the
+-- concentrator or its path to us; both concentrators going is the stick.
+select date_trunc('hour', heard_at) t,
+       count(*) filter (where a2_source = <concentrator>) feed,
+       count(*) filter (where a2_source = <concentrator> and alert_id in (<addresses>)) grp,
+       count(*) filter (where a2_source = <another concentrator>) other
+from meganet.reception where heard_at > now() - interval '36 hours' and ok and point_id = '<point>'
+group by 1 order by 1;
+
 -- A repeater's own reports, or a group's, by the hour of the day across the week:
 -- does it keep the same hours as the stations behind it? (Raw counts include rain
 -- tips, which crowd the afternoon storms: compare the hours of its timed reports,
@@ -259,12 +320,12 @@ over Logan", "a low over the Lockyer", "showers on the Gold Coast" for stations
 that drop out at night, "on the chart", "the forecast". Flood-Net measures the
 real weather — rain gauges, river levels — so in a bulletin a weather word
 reads as rain, and the technician cannot tell which you mean (the owner, 1 Nov
-2026). Say what happened: "ten stations went quiet around Henderson Creek",
+2026). Say what happened: "we stopped hearing ten stations around Henderson Creek",
 "most checks came in", "a few need attention". The real weather *is* news when
 it bears on the network or its sensors, and is worth saying as itself, with
 its numbers: a storm through Logan at ten past nine that took three stations
 off air, forty-one millimetres at Tyungun overnight and the river up a metre at
-a station that went quiet, a gauge dry through its neighbours' rain, water in a
+a station we stopped hearing, a gauge dry through its neighbours' rain, water in a
 cabinet. Publishing refuses the usual figures of speech (`WEATHER_TALK` in
 `validate.mjs`) and says which word and where: rephrase, don't work round it.
 
