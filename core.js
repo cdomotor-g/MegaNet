@@ -3835,8 +3835,13 @@ const DB_SCHEMA = 'meganet';
 // republished is one reading — 8,960 timer repeats removed and 2,146 copies
 // counted on their first sighting, rollups rebuilt (0097), applied by
 // db-migrate.yml on 2 November 2026, bumped after; no shape the app reads
-// changes.
-const DB_SCHEMA_VERSION = 97;
+// changes. 98: 0097 was wrong — the bench stations transmit on their own
+// rhythm and their stamps do not move — so 6,439 ELPRO ALERT2 readings were put
+// back with their 2,544 copies counted, 6 copy rows from retained hand-overs
+// removed, the legacy reports two bridge restarts cut short restored, rollups
+// rebuilt (0098), applied by db-migrate.yml on 3 November 2026, bumped after;
+// no shape the app reads changes.
+const DB_SCHEMA_VERSION = 98;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

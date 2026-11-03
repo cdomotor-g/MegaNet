@@ -40,7 +40,7 @@
       "One ALERT burst heard several ways is one reading (0096, #232 closed): copies within 8 s counted on it",
       "#217 and #244 transmitter drift and bit-flip sources: gathering live days of carrier data",
       "#258 flaky Site features 3-D hand-back check in CI",
-      "Legacy ALERT over MQTT trial (ELPRO gateway, Alert1 path): the bridge decodes it and drops the gateway's re-sent table, live since 2 Nov with the trial's first hour replayed; the ALERT2 path's timer republishes are now stored once too (0097 cleared a month of them)",
+      "Legacy ALERT over MQTT trial (ELPRO gateway, Alert1 path): the bridge decodes it and drops the gateway's re-sent table, live since 2 Nov with the trial's first hour replayed; ALERT2 relay readings are one per transmission with near-simultaneous copies counted (0098 put back what 0097 had wrongly removed)",
       "#259 a lighter off-air decoder: lean decoding is the live pipeline's default (0.12% of 11,628 live bursts read differently, a third of the time), and the work between bursts is a quarter less; part 2, filtering channels only around bursts, left"
     ],
     "next": [
