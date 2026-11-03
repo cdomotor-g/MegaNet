@@ -90,6 +90,28 @@ const AlertDsp = (function alertDspModule() {
   // Anti-alias lowpass for the ÷20 (5 kHz of 120 kHz Nyquist) — the Kotlin's.
   const LPF = firwin(121, 5000 / (FS_IN / 2));
 
+  // The light decoder's two (#259): the window to 48 kHz once — everything any
+  // carrier guess can reach, ±10 kHz of search, a tone either side and the
+  // signal's own ±5 kHz, flat to 16.5 kHz and stopped by 31.5, where 48 kHz
+  // would fold it back — then each guess from there, ÷4 to 12 kHz with the same
+  // 5 kHz low-pass, its transition as wide (6.3 kHz against LPF's 6.5).
+  const FS_LIGHT = 48000, LIGHT_DECIM = FS_IN / FS_LIGHT, LIGHT_SEG = 2048;
+  const LPF_PRE = firwin(55, 24000 / (FS_IN / 2));
+  const LPF_48 = firwin(25, 5000 / (FS_LIGHT / 2));
+
+  // ir/ii at 240k → { ir, ii } at 48k: filtered, only the kept samples computed.
+  function toLight(ir, ii) {
+    const taps = LPF_PRE.length, D = LIGHT_DECIM, n = ir.length;
+    const outN = Math.max(0, Math.floor((n - taps) / D) + 1);
+    const or = new Float32Array(outN), oi = new Float32Array(outN);
+    for (let o = 0, k = taps - 1; o < outN; o++, k += D) {
+      let ar = 0, ai = 0;
+      for (let t = 0; t < taps; t++) { const h = LPF_PRE[t]; ar += ir[k - t] * h; ai += ii[k - t] * h; }
+      or[o] = ar; oi[o] = ai;
+    }
+    return { ir: or, ii: oi };
+  }
+
   // ── FFT ─────────────────────────────────────────────────────────────────────
 
   const fftTables = {};
@@ -285,12 +307,13 @@ const AlertDsp = (function alertDspModule() {
   // and picks candidates from the average of the hot segments by the Kotlin's
   // own rule: ≥ 6× the median, 600 Hz apart, at most three. No hot segment, no
   // candidates — and so no decode of a window that is only noise.
-  function carrierSearch(ir, ii, maxCands) {
+  function carrierSearch(ir, ii, maxCands, fs, seg) {
     maxCands = maxCands || 3;
-    const n = SEG;
+    fs = fs || FS_IN;
+    const n = seg || SEG;
     const nseg = Math.floor(ir.length / n);
     if (nseg < 1) return { cands: [], hot: null };
-    const binHz = FS_IN / n;
+    const binHz = fs / n;
     const bins = [], freqs = [];
     for (let i = 0; i < n; i++) {
       const f = i <= n / 2 ? i * binHz : (i - n) * binHz;
@@ -341,10 +364,11 @@ const AlertDsp = (function alertDspModule() {
   // Tune to centerHz and decimate ÷20 to 12 kHz with the polyphase lowpass —
   // only the kept samples are computed. The Kotlin's, with its scratch reused.
   let mixR = new Float32Array(0), mixI = new Float32Array(0);
-  function mixDecimate(ir, ii, centerHz) {
-    const n = ir.length, taps = LPF.length;
+  function mixDecimate(ir, ii, centerHz, fs, lpf, decim) {
+    fs = fs || FS_IN; lpf = lpf || LPF; decim = decim || DECIM;
+    const n = ir.length, taps = lpf.length;
     if (mixR.length < n) { mixR = new Float32Array(n); mixI = new Float32Array(n); }
-    const w = -2 * Math.PI * centerHz / FS_IN;
+    const w = -2 * Math.PI * centerHz / fs;
     const dr = Math.cos(w), di = Math.sin(w);
     let pr = 1, pi = 0;
     for (let i = 0; i < n; i++) {
@@ -359,13 +383,13 @@ const AlertDsp = (function alertDspModule() {
         if (m > 1e-9) { pr /= m; pi /= m; }
       }
     }
-    const outN = Math.floor((n - taps) / DECIM);
+    const outN = Math.floor((n - taps) / decim);
     if (outN <= 0) return { br: new Float32Array(0), bi: new Float32Array(0) };
     const br = new Float32Array(outN), bi = new Float32Array(outN);
-    for (let o = 0, k = taps - 1; o < outN; o++, k += DECIM) {
+    for (let o = 0, k = taps - 1; o < outN; o++, k += decim) {
       let ar = 0, ai = 0;
       for (let t = 0; t < taps; t++) {
-        const h = LPF[t], idx = k - t;
+        const h = lpf[t], idx = k - t;
         ar += mixR[idx] * h;
         ai += mixI[idx] * h;
       }
@@ -521,7 +545,12 @@ const AlertDsp = (function alertDspModule() {
 
     // opts.candidates skips the search — the tests use it to hold the vote bar
     // against noise, which the search would otherwise never let through.
-    const search = opts.candidates ? { cands: opts.candidates, hot: null } : carrierSearch(ir, ii);
+    // opts.lean 2, light: the window to 48 kHz once, and the search and every
+    // guess from there (#259) — a fifth of the samples to filter, nine times.
+    const light = opts.lean === 2;
+    const fsW = light ? FS_LIGHT : FS_IN;
+    if (light) { const l = toLight(ir, ii); ir = l.ir; ii = l.ii; }
+    const search = opts.candidates ? { cands: opts.candidates, hot: null } : light ? carrierSearch(ir, ii, 3, FS_LIGHT, LIGHT_SEG) : carrierSearch(ir, ii);
     result.candidates = search.cands;
     if (!search.cands.length) { result.ms = nowMs() - t0; return result; }
 
@@ -530,14 +559,15 @@ const AlertDsp = (function alertDspModule() {
     // offers the framer more chances to find a frame that is not there.
     let wr = ir, wi = ii, a0 = 0;
     if (opts.trim !== false && search.hot) {
-      const a = Math.max(0, search.hot[0] - Math.round(0.25 * FS_IN));
-      const z = Math.min(ir.length, search.hot[1] + Math.round(0.35 * FS_IN));
+      const a = Math.max(0, search.hot[0] - Math.round(0.25 * fsW));
+      const z = Math.min(ir.length, search.hot[1] + Math.round(0.35 * fsW));
       wr = ir.subarray(a, z); wi = ii.subarray(a, z); a0 = a;
     }
     // Where in the window a frame starts, in seconds: its first symbol. Good
     // to a symbol or two — enough to tell which burst of several in a window
     // carried it (#217).
-    const secOf = pos => Math.round((a0 + pos * SPB * DECIM) / FS_IN * 50) / 50;
+    const secOf = light ? pos => Math.round((a0 / FS_LIGHT + pos * SPB / FS_BB) * 50) / 50
+      : pos => Math.round((a0 + pos * SPB * DECIM) / FS_IN * 50) / 50;
     const at = new Map();
 
     const votes = new Map();
@@ -555,7 +585,7 @@ const AlertDsp = (function alertDspModule() {
         // 12 kHz baseband — tens of hertz inside a 5 kHz low-pass, so only the
         // filter's very edge differs. Two thirds of a burst's decode was this
         // filtering, repeated 45 times; lean does it 9 times (#259).
-        const base = opts.lean ? mixDecimate(wr, wi, hyp) : null;
+        const base = light ? mixDecimate(wr, wi, hyp, FS_LIGHT, LPF_48, FS_LIGHT / FS_BB) : opts.lean ? mixDecimate(wr, wi, hyp) : null;
         for (const dc of [-150, -75, 0, 75, 150]) {
           const bb = base ? nudge(base, dc) : mixDecimate(wr, wi, hyp + dc);
           const d = afskSoft(bb.br, bb.bi);
@@ -869,6 +899,10 @@ const AlertDsp = (function alertDspModule() {
       this.cfg = {
         deviceRate: FS_IN, channelOffsetHz: 0, format: BINARY, minVotes: 4, minVotesCrc: 4,
         gate: true, squelchDb: 8, fftSize: 2048, specHz: 20, scopeHz: 15, audio: false, lean: true, compare: false,
+        // ringS: seconds of the channel kept for decode windows (a 3 s burst and
+        // its margins need 3.8); capture: false keeps no bytes for "capture IQ"
+        // — RPi ALERT never asks, and saves the memory and the work (#259).
+        ringS: 8, capture: true,
       };
       this.reset();
     }
@@ -876,7 +910,8 @@ const AlertDsp = (function alertDspModule() {
     configure(c) {
       const before = this.cfg;
       this.cfg = Object.assign({}, this.cfg, c || {});
-      if (before.deviceRate !== this.cfg.deviceRate || before.fftSize !== this.cfg.fftSize) this.reset();
+      if (before.deviceRate !== this.cfg.deviceRate || before.fftSize !== this.cfg.fftSize || before.ringS !== this.cfg.ringS
+        || before.capture !== this.cfg.capture) this.reset();
       else if (before.channelOffsetHz !== this.cfg.channelOffsetHz) this.dec1.setOffset(this.cfg.channelOffsetHz);
     }
 
@@ -890,10 +925,10 @@ const AlertDsp = (function alertDspModule() {
       // 240k → 12k channel, the decoder's own lowpass, for the gate, the audio
       // and the scope.
       this.dec2 = new Decimator(FS_IN, DECIM, 5000, 121);
-      const CAP = FS_IN * 8;                       // 8 s of 240k IQ for decode windows
+      const CAP = Math.round(FS_IN * Math.max(4, c.ringS || 8));   // 240k IQ for decode windows
       this.ringR = new Float32Array(CAP);
       this.ringI = new Float32Array(CAP);
-      this.capU8 = new Uint8Array(FS_IN * 2 * 10); // 10 s for "capture IQ"
+      this.capU8 = c.capture === false ? null : new Uint8Array(FS_IN * 2 * 10); // 10 s for "capture IQ"
       this.total = 0;                              // 240k samples ever written
       // spectrum
       const N = c.fftSize;
@@ -978,7 +1013,8 @@ const AlertDsp = (function alertDspModule() {
       // contents, a fraction of the work between bursts (#259).
       ringPut(this.ringR, this.total, ch.r);
       ringPut(this.ringI, this.total, ch.i);
-      if (passthrough) ringPut(this.capU8, this.total * 2, u8.subarray(0, 2 * m));
+      if (!this.capU8) { /* capture: false */ }
+      else if (passthrough) ringPut(this.capU8, this.total * 2, u8.subarray(0, 2 * m));
       else {
         const q = new Uint8Array(2 * m);
         for (let k = 0; k < m; k++) {
@@ -1163,20 +1199,29 @@ const AlertDsp = (function alertDspModule() {
       if (len < FS_IN / 2) return;
       const wr = new Float32Array(len), wi = new Float32Array(len);
       for (let k = 0; k < len; k++) { const p = (from + k) % CAP; wr[k] = this.ringR[p]; wi[k] = this.ringI[p]; }
-      const opts = { format: c.format, minVotes: c.minVotes, minVotesCrc: c.minVotesCrc, lean: !!c.lean };
+      const opts = { format: c.format, minVotes: c.minVotes, minVotesCrc: c.minVotesCrc, lean: c.lean === 2 ? 2 : !!c.lean };
       const r = decodeWindow(wr, wi, opts);
-      // compare: decode the same window the other way too, and say whether the
-      // two read the same — how the lean decoder is proven in the field before
-      // it is the default (#259). The readings posted are still this
-      // pipeline's own (cfg.lean's), so ingest is unchanged. Skipped while
-      // bursts are waiting, so it never makes the decoder fall behind.
+      // compare: decode the same window another way too, and say whether the
+      // two read the same — how a lighter decoder is proven in the field
+      // before it is the default (#259). cfg.compareLean is the other way's
+      // lean (false full, true lean, 2 light); left out, the opposite of this
+      // pipeline's. `full` is the heavier of the two, `lean` the lighter. The
+      // readings posted are still this pipeline's own, so ingest is unchanged.
+      // Skipped while bursts are waiting, so it never makes the decoder fall
+      // behind.
       let compare = null;
       if (c.compare && !this.pending.length) {
-        const o = decodeWindow(wr, wi, Object.assign({}, opts, { lean: !c.lean }));
-        const keys = x => x.readings.map(y => y.sensorId + '=' + y.value).sort();
-        const full = c.lean ? o : r, lean = c.lean ? r : o;
-        const fk = keys(full), lk = keys(lean);
-        compare = { same: fk.join(' ') === lk.join(' '), full: fk, lean: lk, msFull: Math.round(full.ms), msLean: Math.round(lean.ms) };
+        const mine = c.lean === 2 ? 2 : !!c.lean;
+        const other = c.compareLean !== undefined ? (c.compareLean === 2 ? 2 : !!c.compareLean) : !mine;
+        const rank = v => (v === 2 ? 2 : v ? 1 : 0);
+        if (rank(other) !== rank(mine)) {
+          const o = decodeWindow(wr, wi, Object.assign({}, opts, { lean: other }));
+          const keys = x => x.readings.map(y => y.sensorId + '=' + y.value).sort();
+          const heavyMine = rank(mine) < rank(other), full = heavyMine ? r : o, lean = heavyMine ? o : r;
+          const fk = keys(full), lk = keys(lean);
+          compare = { same: fk.join(' ') === lk.join(' '), full: fk, lean: lk, msFull: Math.round(full.ms), msLean: Math.round(lean.ms),
+            pair: [rank(heavyMine ? mine : other), rank(heavyMine ? other : mine)] };
+        }
       }
       // Which readings this burst carried. A window reaches 0.4 s or more
       // either side of its burst, so a neighbouring burst — a repeater's copy a
@@ -1242,6 +1287,7 @@ const AlertDsp = (function alertDspModule() {
     }
 
     capture(seconds) {
+      if (!this.capU8) { this.post({ type: 'error', message: 'this pipeline keeps no capture (capture: false)' }); return; }
       const per = this.capU8.length >> 1;
       const len = Math.min(per, this.total, Math.round((seconds || 3) * FS_IN));
       const out = new Uint8Array(len * 2);
@@ -1286,7 +1332,7 @@ const AlertDsp = (function alertDspModule() {
   //   w.feed(u8)    in place of pipe.feed(u8); w.reset() with pipe.reset()
   //   opts.afterFeed(n): after each time the pipeline is fed n device samples.
   const WATCH_N = 2048, WATCH_HZ = 25, WATCH_BW_HZ = 6000, WATCH_LEAD_DB = 3;
-  const WATCH_PREROLL_S = 1.0, WATCH_HANG_S = 1.0, WATCH_KEEP_S = 1.6;
+  const WATCH_PREROLL_S = 0.8, WATCH_HANG_S = 0.5, WATCH_KEEP_S = 1.4;
   const WATCH_DOWN = 1 - Math.pow(0.95, 100 / WATCH_HZ), WATCH_UP = (100 / WATCH_HZ) / 3000;
 
   class BurstWatch {

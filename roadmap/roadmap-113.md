@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-03** (revision 220 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-03** (revision 221 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -432,7 +432,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 > ~~**⚠️** These were originally listed as "independent — no sequencing dependency." They are logically independent but **mechanically serialised**~~ — **resolved the easy way: one agent did both in sequence**, #121 read #120's pane comment instead of picking a z-index blind, and the `MemMeter` third of the table had already been obsoleted by #144 (layers are counted generically off `liveMaps()`).
 
 ## Standalone issues
-- **#259** `[Standalone]` `[Opus5/High]` — **OPEN, opened revision 214** — a lighter off-air decoder, so cheaper industrial computers (a Toradex Verdin AM62, open-ALERT's trial) and a busy Pi 4 keep up. **Part 1 done at revision 215:** lean decoding (filter once per carrier guess) is the live pipeline's default, after RPi ALERT's compare at the first base station: 14 of 11,628 live bursts read differently (0.12%), lean in a third of the time. Between bursts, the rings are filled a block at a time (exactly the same messages, a quarter less work), and `specHz: 0` lets a pipeline skip the spectrum (another sixth). **Part 2 built at revision 218:** `BurstWatch` filters a channel only around its bursts (25 looks a second between them), reading the same as the pipeline alone in every case `npm run alertdsp` tries; RPi ALERT 0.18 carries it behind *Between bursts* (default *Always*, as before) with a *Check both* mode. **Left:** the check at the first base station, then making it the Pi's default, then this closes.
+- **#259** `[Standalone]` `[Opus5/High]` — **OPEN, opened revision 214** — a lighter off-air decoder, so cheaper industrial computers (a Toradex Verdin AM62, open-ALERT's trial) and a busy Pi 4 keep up. **Part 1 done at revision 215:** lean decoding (filter once per carrier guess) is the live pipeline's default, after RPi ALERT's compare at the first base station: 14 of 11,628 live bursts read differently (0.12%), lean in a third of the time. Between bursts, the rings are filled a block at a time (exactly the same messages, a quarter less work), and `specHz: 0` lets a pipeline skip the spectrum (another sixth). **Part 2 built at revision 218:** `BurstWatch` filters a channel only around its bursts (25 looks a second between them), reading the same as the pipeline alone in every case `npm run alertdsp` tries; RPi ALERT 0.18 carries it behind *Between bursts* (default *Always*, as before) with a *Check both* mode. **Revision 221:** light decoding (`lean: 2`, the burst filtered to 48 kHz once: half of lean's time, as many true readings in every test) for RPi ALERT 0.19 with a lean-against-light compare; the watch's pre-roll and hang-over shortened (a third less awake, the same readings); the Pi's pipeline keeps 5 s and no capture bytes. **Left:** the checks at the first base station, then the Pi's defaults, then this closes.
 - **#255** `[Standalone]` `[Human]` — **OPEN, opened revision 200** — move the Supabase database to the **Small** compute size (2 GB, about US$15 a month, about US$5 more than Micro once the Pro plan's compute credit is counted). Supabase warned on 2026-10-28 that the project is using up its Disk IO Budget; `0087` removed the biggest causes, and what is left is a 902 MB database with 224 MB of shared buffers. Part 1 reads the current size and the Database report's Disk IOPS and Memory charts; Part 2 changes the size (under 2 minutes offline, in a quiet dry-weather hour) and checks readings resume; Part 3 hands back to an agent to read the new settings. Depends on nothing; #256 decides whether Small stays enough.
 - ~~**#249**~~ `[Standalone]` `[Human]` — **CLOSED at revision 196, opened at 193** — the db-migrate workflow's `SUPABASE_DB_URL` secret replaced with a session-pooler URI; the owner's run and an agent session's dry run both reach the database (schema_version 86, nothing pending). Agents apply migrations with `gh workflow run db-migrate.yml --ref main` again.
 - ~~**#248**~~ `[Standalone]` `[Human]` — **CLOSED at revision 208 as a duplicate of #245**, which needs the same fix and now carries `CI doctor: Refresh ACMA RRL data` in its title so the CI doctor reports there — CI doctor: Refresh ACMA RRL data finds no working download URL (cdn.acma.gov.au 404); someone copies ACMA's current extract link into `ACMA_ZIP_URLS`; depends on nothing, blocks nothing.
@@ -852,6 +852,16 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 221 — 2026-11-03: 🪶 #259 — light decoding, and a lighter watch, so smaller computers can run a base station
+
+The owner: *"do another pass over our code and look for any other efficiencies … could we get it down to a Solo or an RPI v3?"* **Closes nothing; #259 stays open for its field checks.**
+
+- `alert-dsp.js`: `decodeWindow(…, { lean: 2 })` — light: the window to 48 kHz once (55 taps), the carrier search there (2,048-point FFTs), each of the nine guesses from 48 kHz (÷4, 25 taps). 65 ms a burst against lean's 122; over 600 synthesised windows 642 true readings each, votes 24.0 against 24.2, ghosts 573 against 568. `Pipeline` `compareLean` checks one decoder against another; `compare.pair` names them.
+- `BurstWatch`: 0.8 s of pre-roll (a decode window reaches 0.6 s back), half a second of hang-over, 1.4 s kept — the same readings and bursts in every test, a third less time awake.
+- `Pipeline` `ringS` and `capture: false`: RPi ALERT keeps 5 s and no capture bytes — 10 MB less a channel, the same messages.
+- Base Stations: Light and Compare light offered from RPi ALERT 0.19; a stick's check says which two it compares.
+- `npm run alertdsp` (93). `docs/serial-sdr.md`: *Light decoding*, *RPi ALERT's pipeline*.
 
 ### Revision 220 — 2026-11-03: 🎬 #263 closed — the explainer player, and the Videos tab
 

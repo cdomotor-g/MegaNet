@@ -404,6 +404,8 @@ try {
     const fw = B._formFrom(d17, rx);
     const watch = { shown: fw.watch, none: B._formFrom(cfg, rx).watch, check: B._patchFrom(d17, Object.assign({}, fw, { watch: 'check' }), rx),
       old: B._patchFrom(cfg, Object.assign({}, f, { watch: 'bursts' }), rx),
+      light: B._checksHtml({ lean_check: { compared: 900, differ: 3, time_pct: 52, pair: 'lean-light' } }),
+      offered: [B._decodersFor({ version: '0.18.0' }).length, B._decodersFor({ version: '0.19.0' }).length],
       checks: B._checksHtml({ lean_check: { compared: 11628, differ: 14, time_pct: 34 }, watch_check: { both: 120, only_always: 1, only_watch: 0, awake_pct: 9, time_pct: 31 } }) };
     return {
       decoder, watch,
@@ -452,8 +454,10 @@ try {
     pure.watch.shown === 'always' && pure.watch.none === '' && JSON.stringify(pure.watch.check.patch) === '{"receivers":{"sdr":{"watch":"check"}}}'
       && Object.keys(pure.watch.old.patch).length === 0, JSON.stringify(pure.watch));
   ok('a stick\'s checks say how its lean decoder and its watch have done',
-    /14 of 11,628 bursts differ \(0\.12%\) · lean 34% of the time/.test(pure.watch.checks) && /120 read both ways, 1 only filtering always, 0 only around bursts · awake 9% · 31% of the work/.test(pure.watch.checks),
+    /14 of 11,628 bursts differ \(0\.12%\) · lean 34% of full's time/.test(pure.watch.checks) && /120 read both ways, 1 only filtering always, 0 only around bursts · awake 9% · 31% of the work/.test(pure.watch.checks),
     pure.watch.checks);
+  ok('Light is offered from RPi ALERT 0.19, and its check says so',
+    pure.watch.offered.join() === '3,5' && /Light check.*3 of 900 bursts differ \(0\.33%\) · light 52% of lean's time/.test(pure.watch.light), JSON.stringify([pure.watch.offered, pure.watch.light]));
   ok('the settings form untouched is no change at all', pure.same.patch && Object.keys(pure.same.patch).length === 0, JSON.stringify(pure.same));
   const p = (pure.changed || {}).patch || {};
   ok('a changed form is the smallest patch that says so',

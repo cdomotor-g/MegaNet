@@ -384,6 +384,63 @@ for (const c of [
   check('ungated, it never sleeps', u.stats.awake === u.stats.samples, JSON.stringify(u.stats));
 }
 
+// ── Light: the window to 48 kHz once, then every guess (#259) ───────────────────
+//
+// Not bit for bit the lean decoder (another filter), so held to what matters:
+// the real bursts and the demo band read the same, as many true readings found
+// over synthesised bursts from 4 to 30 dB, in less time.
+
+{
+  const keyOf = r => r.readings.map(x => `${x.sensorId}=${x.value}`).sort().join(' ');
+  let lt = 0, gt = 0;
+  for (const [name, file, format] of [['the rig (Enhanced iFLOWS)', 'testrig_burst_240k.iq8', D.ENHANCED_IFLOWS], ['a Binary station', 'binary_151.500_1957.iq8', D.BINARY], ['a weak Binary station', 'binary_151.500_5304_weak.iq8', D.BINARY]]) {
+    const v = new Uint8Array(fs.readFileSync(path.join(REPO_ROOT, 'test/fixtures/sdr', file)));
+    const a = D.decodeU8(v, { format, lean: true }), b = D.decodeU8(v, { format, lean: 2 });
+    lt += a.ms; gt += b.ms;
+    check(`light reads ${name} as lean does`, keyOf(a) === keyOf(b) && b.readings.length > 0, `${keyOf(a)} | light ${keyOf(b)}`);
+  }
+  const demo = D.demoBand();
+  const da = D.decodeU8(demo, { lean: true }), dl = D.decodeU8(demo, { lean: 2 });
+  check('light reads the demo band as lean does', keyOf(da) === keyOf(dl), `${keyOf(da)} | light ${keyOf(dl)}`);
+  check('…in less time (the real bursts together)', gt < 0.8 * lt, `lean ${Math.round(lt)} ms, light ${Math.round(gt)} ms`);
+  const B = (f, id, v) => D.encodeFrame(f, id, v);
+  let tl = 0, tg = 0, n = 0;
+  for (const fmt of [D.BINARY, D.ENHANCED_IFLOWS]) for (let i = 0; i < 24; i++) {
+    const id = 200 + i * 7, v = (i * 97) % 4096;
+    const u8 = D.synthIq({ fs: 240000, seconds: 1.4, snrDb: 4 + (i % 14) * 2, amp: 40, startSec: 0.4, frames: [B(fmt, id, v), B(fmt, id + 1, 5)], cfoHz: ((i * 37) % 17 - 8) * 500, seed: 700 + i });
+    const { ir, ii } = D.u8ToFloat(u8);
+    const want = [`${id}=${v}`, `${id + 1}=5`];
+    const got = r => want.filter(k => keyOf(r).split(' ').includes(k)).length;
+    tl += got(D.decodeWindow(ir, ii, { format: fmt, lean: true })); tg += got(D.decodeWindow(ir, ii, { format: fmt, lean: 2 })); n += 2;
+  }
+  check('light finds as many true readings as lean, 4–30 dB, both formats', tg >= tl && tl > n / 3, `lean ${tl}, light ${tg} of ${n}`);
+  // The pipeline compares light against lean as it compares lean against full.
+  const msgs = [];
+  const p = new D.Pipeline(m => msgs.push(m));
+  p.configure({ specHz: 0, scopeHz: 1, lean: true, compare: true, compareLean: 2 });
+  for (let i = 0; i < demo.length; i += 48000) p.feed(demo.subarray(i, i + 48000));
+  const cmp = msgs.filter(m => m.type === 'decode' && m.compare).map(m => m.compare);
+  check('compare with compareLean 2: lean posted, light checked, the pair said', cmp.length >= 3 && cmp.every(c => c.pair.join() === '1,2' && c.same), JSON.stringify(cmp.map(c => [c.same, c.pair])));
+}
+
+// ── ringS and capture: false, as RPi ALERT runs the pipeline ──────────────────
+
+{
+  const demo = D.demoBand();
+  const run = cfg => {
+    const out = [];
+    const p = new D.Pipeline(m => out.push(m));
+    p.configure(Object.assign({ specHz: 0, scopeHz: 1 }, cfg));
+    for (let i = 0; i < demo.length; i += 48000) p.feed(demo.subarray(i, i + 48000));
+    p.capture(2);
+    return { p, out, keys: out.filter(m => m.type === 'decode').flatMap(m => m.readings.map(r => `${r.sensorId}=${r.value}`)).join(' ') };
+  };
+  const a = run({}), b = run({ ringS: 5, capture: false });
+  check('a 5 s ring and no capture read the demo band exactly as before', a.keys === b.keys && a.keys.length > 0, `${a.keys} | ${b.keys}`);
+  check('…holding 5 s and no capture bytes', b.p.ringR.length === 5 * D.FS_IN && b.p.capU8 === null && a.p.capU8.length > 0);
+  check('…and a capture asked of it says why there is none', b.out.some(m => m.type === 'error' && /capture: false/.test(m.message)) && a.out.some(m => m.type === 'capture'));
+}
+
 // ── The Worker's source ──────────────────────────────────────────────────────
 
 {

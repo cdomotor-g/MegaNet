@@ -51,16 +51,17 @@ Where the port departs from the Kotlin, the code says so at the spot:
   `Pipeline` still filters every sample of the stick's window down to its channel:
   nearly all of a base station's work, and more the wider the window. A
   `BurstWatch` stands in front of one: `new BurstWatch(pipe)`, then `w.feed(u8)`
-  in place of `pipe.feed(u8)`. It keeps the last 1.6 s of the window as bytes and
+  in place of `pipe.feed(u8)`. It keeps the last 1.4 s of the window as bytes and
   25 times a second takes a look at the channel (2,048 samples at 240k, mixed to
   the channel and summed down from the window's rate, an FFT, the power within
   6 kHz). While that stays near the channel's floor the pipeline sleeps. When it
-  comes within 3 dB of the squelch, the pipeline is moved on to a second before
+  comes within 3 dB of the squelch, the pipeline is moved on to 0.8 s before
   (`Pipeline.skip()`: its clocks and the gate's block phase carried on, its filter
   history let go, nothing before the skip read into a decode window) and the kept
   bytes are put through it; from there it is the pipeline as always. It sleeps
-  again once the channel has been quiet a second, the squelch shut and every burst
-  decoded. Asleep, the squelch's floor follows the watch's own (the difference
+  again once the channel has been quiet half a second, the squelch shut and every
+  burst decoded (a decode window reaches 0.6 s before the squelch opened at most,
+  so 0.8 s is enough). Asleep, the squelch's floor follows the watch's own (the difference
   learned each time both ran, applied as of where a replay starts so a replay
   never moves it twice), the level reports carry the watch's looks, and the
   spectrum takes the end of each chunk. Ungated, or with a carrier that stays up,
@@ -72,6 +73,23 @@ Where the port departs from the Kotlin, the code says so at the spot:
   rig's and a Binary station's real bursts in their own quiet: the same readings
   and the same bursts, each the same length. Nothing on the website uses it yet;
   RPi ALERT 0.18 does, behind its *Between bursts* setting.
+- **Light decoding** (#259, `decodeWindow(…, { lean: 2 })`, `Pipeline` `lean: 2`).
+  Every carrier guess lies within ±10 kHz, and with a tone either side and the
+  signal's own ±5 kHz, nothing a guess reads is more than 16.5 kHz out. So light
+  filters the window to 48 kHz once (55 taps, flat to 16.5 kHz, stopped by 31.5),
+  runs the carrier search there (2,048-point FFTs, 23 Hz bins against 29), and
+  makes each of the nine guesses from 48 kHz (÷4, a 25-tap 5 kHz low-pass as wide
+  as the 121-tap one at 240k). A burst's decode takes about half of lean's time
+  (65 ms against 122 over synthesised windows; 61 against 128 on the rig). It is
+  another filter, so not bit for bit lean: over 600 synthesised windows from 4 to
+  30 dB both found 642 true readings, with 24.0 votes each against 24.2, and 573
+  ghosts against 568; the rig, both real Binary bursts and the demo band read the
+  same. `compare: true, compareLean: 2` on a lean pipeline checks light against
+  it, the decode's `compare.pair` saying which two (0 full, 1 lean, 2 light).
+- **RPi ALERT's pipeline** passes `ringS: 5` (5 s of decode ring rather than 8: a
+  3 s burst and its margins need 3.8) and `capture: false` (no bytes kept for the
+  card's *capture IQ*, which the Pi never asks for): the same messages, 10 MB less
+  a channel, and the work of re-quantising every sample gone.
 - **Lean decoding** (#259). A burst is decoded with 45 guesses: 3 carrier
   candidates × 3 tone hypotheses × 5 nudges of ±75 and ±150 Hz. Each guess used to
   filter the whole window again, which was two thirds of the decode. Lean filters

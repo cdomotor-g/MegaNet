@@ -428,9 +428,13 @@ const BaseStations = (function () {
   // The station's decoder (receivers.sdr.decoder, RPi ALERT 0.16+).
   const DECODERS = [['lean', 'Lean — about a third of the work (default from 0.17)'], ['full', 'Full — the original decoder'],
     ['compare', 'Compare — both on every burst, to check Lean']];
+  // RPi ALERT 0.19 and later: light, and lean checked against it.
+  const DECODERS_19 = [['light', 'Light — about half of Lean\'s work again'], ['compare-light', 'Compare light — Lean sent, Light checked on every burst']];
+  const decodersFor = s => (cmpVersion(s.version || '0', '0.19.0') >= 0 ? DECODERS.concat(DECODERS_19) : DECODERS);
   const DECODER_MEANING = 'How the station reads a burst. Lean filters each carrier guess once, about a third of the Full decoder\'s work, '
     + 'and read the same in 99.9% of 11,628 bursts at 18 Bateson. Compare runs both on every burst and counts where they differ — '
-    + 'the readings sent are still the chosen one\'s — so it costs more than either.';
+    + 'the readings sent are still the chosen one\'s — so it costs more than either. Light (RPi ALERT 0.19) filters the burst down to 48 kHz first: '
+    + 'about half of Lean\'s work again, as many true readings in every test; Compare light sends Lean\'s readings and checks Light against them.';
 
   // What the station's decoders do between bursts (receivers.sdr.watch, RPi ALERT 0.18+).
   const WATCHES = [['always', 'Filter every sample (as before)'], ['bursts', 'Filter only around bursts'], ['check', 'Check — both, and count where they differ']];
@@ -443,8 +447,10 @@ const BaseStations = (function () {
   function checksHtml(r) {
     const out = [], n = v => Number(v || 0).toLocaleString();
     const l = r.lean_check;
-    if (l && l.compared) out.push(`${termHtml('Lean check', 'The station decodes every burst both ways (Decoder: Compare) and counts bursts the two read differently.')}: `
-      + `${n(l.differ)} of ${n(l.compared)} bursts differ (${(100 * l.differ / l.compared).toFixed(2)}%)${l.time_pct != null ? ' · lean ' + l.time_pct + '% of the time' : ''}`);
+    // pair: which two (RPi ALERT 0.19: 'full-lean' or 'lean-light'); before, full against lean.
+    const [hv, lt] = l && l.pair === 'lean-light' ? ['Lean', 'Light'] : ['Full', 'Lean'];
+    if (l && l.compared) out.push(`${termHtml(lt + ' check', 'The station decodes every burst both ways (Decoder: Compare' + (lt === 'Light' ? ' light' : '') + ') and counts bursts the two read differently.')}: `
+      + `${n(l.differ)} of ${n(l.compared)} bursts differ (${(100 * l.differ / l.compared).toFixed(2)}%)${l.time_pct != null ? ' · ' + lt.toLowerCase() + ' ' + l.time_pct + '% of ' + hv.toLowerCase() + '\'s time' : ''}`);
     const w = r.watch_check;
     if (w && (w.both || w.only_always || w.only_watch)) out.push(`${termHtml('Around-bursts check', 'Between bursts: Check. Readings both ways, and readings only one of the two decoders got.')}: `
       + `${n(w.both)} read both ways, ${n(w.only_always)} only filtering always, ${n(w.only_watch)} only around bursts`
@@ -584,7 +590,7 @@ const BaseStations = (function () {
         ${inp('ppm', 'Correction, ppm', ' inputmode="numeric"')}
         ${inp('squelch', 'Squelch, dB', ' inputmode="numeric"')}
         ${sel('rate', 'Window', [['0', 'Automatic — the narrowest that holds the channels']].concat(WINDOWS))}
-        ${f.decoder ? sel('decoder', termHtml('Decoder', DECODER_MEANING), DECODERS) : ''}
+        ${f.decoder ? sel('decoder', termHtml('Decoder', DECODER_MEANING), decodersFor(s)) : ''}
         ${f.watch ? sel('watch', termHtml('Between bursts', WATCH_MEANING), WATCHES) : ''}
       </div>
       ${f.decoder ? `<p class="small qs-dim"><strong>Decoder:</strong> ${esc(DECODER_MEANING)}</p>` : ''}
@@ -1863,7 +1869,7 @@ const BaseStations = (function () {
   return { render, init, load, open, close, ask, askFrom, cancel, field, stick, resetForm, saveSettings,
            keyField, addKey, removeKey, authChanged, wfWindow, chWindow,
            // Pure, for test/basestations.mjs.
-           _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _checksHtml: checksHtml, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf,
+           _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _checksHtml: checksHtml, _decodersFor: decodersFor, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf,
            _chRows: chRows, _chVerdict: chVerdict };
 })();
 
