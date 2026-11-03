@@ -226,6 +226,13 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   lives in the private `cdomotor-g/flood-net-private` repository, never here
   (`tools/ingest/private.py`). Until #239's history rewrite runs, don't pull
   content out of old commits, and expect every commit ID to change when it does.
+- **Videos:** the 🎬 Videos (`explainers.js`) show real screenshots of the
+  app (`data/explainers/shots/`, listed in `tools/explainers/shots.json`). A
+  change that moves, renames or restyles what a shot shows takes that shot again
+  in the same push (`node tools/explainers/shoot.mjs --tab <tab id>`; free,
+  nothing voiced). `npm run explainers` fails a shot whose parts have gone. A
+  video's words are the owner's to approve: never mark one `"voice": "final"`
+  without the owner's OK on its issue — voicing spends ElevenLabs credits.
 - **Roadmap:** issue #113 is the single view of what is open, who does it and in
   what order. Its body is `roadmap/roadmap-113.md`, synced by CI on push — edit
   the file, never the issue. Whenever you open, close or edit an issue, update

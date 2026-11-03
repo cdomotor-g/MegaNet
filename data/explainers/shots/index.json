@@ -1,0 +1,221 @@
+{
+ "format": "floodnet-explainer-shots/1",
+ "shots": {
+  "capabilities": {
+   "name": "capabilities",
+   "image": "data/explainers/shots/capabilities.webp",
+   "device": "desk",
+   "path": "?tab=capabilities",
+   "width": 1440,
+   "height": 810,
+   "scale": 1.3333333333333333,
+   "bytes": 199462,
+   "taken": "2026-11-03T12:29:04Z",
+   "site": "floodwarning.net",
+   "stamp": "20261103t",
+   "targets": {
+    "facts": {
+     "x": 267,
+     "y": 253,
+     "w": 1085,
+     "h": 28
+    },
+    "search": {
+     "x": 265,
+     "y": 343,
+     "w": 589,
+     "h": 35
+    },
+    "groups": {
+     "x": 252,
+     "y": 403,
+     "w": 1116,
+     "h": 63
+    },
+    "list": {
+     "x": 252,
+     "y": 478,
+     "w": 1116,
+     "h": 332
+    }
+   }
+  },
+  "health": {
+   "name": "health",
+   "image": "data/explainers/shots/health.webp",
+   "device": "desk",
+   "path": "?tab=health",
+   "width": 1440,
+   "height": 810,
+   "scale": 1.3333333333333333,
+   "bytes": 106624,
+   "taken": "2026-11-03T12:34:51Z",
+   "site": "floodwarning.net",
+   "stamp": "20261103u",
+   "targets": {
+    "bulletin": {
+     "x": 267,
+     "y": 191,
+     "w": 1085,
+     "h": 619
+    },
+    "kinds": {
+     "x": 866,
+     "y": 131,
+     "w": 487,
+     "h": 37
+    }
+   }
+  },
+  "home": {
+   "name": "home",
+   "image": "data/explainers/shots/home.webp",
+   "device": "desk",
+   "path": "?tab=home",
+   "width": 1440,
+   "height": 810,
+   "scale": 1.3333333333333333,
+   "bytes": 89108,
+   "taken": "2026-11-03T12:25:29Z",
+   "site": "floodwarning.net",
+   "stamp": "20261103t",
+   "targets": {
+    "now": {
+     "x": 266,
+     "y": 115,
+     "w": 1088,
+     "h": 60
+    },
+    "status": {
+     "x": 399,
+     "y": 128,
+     "w": 381,
+     "h": 36
+    },
+    "fleets": {
+     "x": 847,
+     "y": 128,
+     "w": 490,
+     "h": 36
+    },
+    "most": {
+     "x": 266,
+     "y": 223,
+     "w": 1088,
+     "h": 154
+    },
+    "rest": {
+     "x": 266,
+     "y": 377,
+     "w": 1088,
+     "h": 433
+    }
+   }
+  },
+  "nearby": {
+   "name": "nearby",
+   "image": "data/explainers/shots/nearby.webp",
+   "device": "phone",
+   "path": "?tab=nearby",
+   "width": 390,
+   "height": 844,
+   "scale": 2,
+   "bytes": 88098,
+   "taken": "2026-11-03T12:28:23Z",
+   "site": "floodwarning.net",
+   "stamp": "20261103t",
+   "targets": {
+    "list": {
+     "x": 8,
+     "y": 328,
+     "w": 340,
+     "h": 516
+    },
+    "first": {
+     "x": 8,
+     "y": 328,
+     "w": 340,
+     "h": 60
+    },
+    "refresh": {
+     "x": 19,
+     "y": 184,
+     "w": 74,
+     "h": 35
+    }
+   }
+  },
+  "rf": {
+   "name": "rf",
+   "image": "data/explainers/shots/rf.webp",
+   "device": "desk",
+   "path": "?tab=rf",
+   "width": 1440,
+   "height": 810,
+   "scale": 1.3333333333333333,
+   "bytes": 108266,
+   "taken": "2026-11-03T12:27:41Z",
+   "site": "floodwarning.net",
+   "stamp": "20261103t",
+   "targets": {
+    "byRepeater": {
+     "x": 267,
+     "y": 287,
+     "w": 276,
+     "h": 23
+    },
+    "candidates": {
+     "x": 267,
+     "y": 679,
+     "w": 1085,
+     "h": 131
+    }
+   }
+  },
+  "station-card": {
+   "name": "station-card",
+   "image": "data/explainers/shots/station-card.webp",
+   "device": "desk",
+   "path": "?tab=stations&station=brisbane_city_al",
+   "width": 1440,
+   "height": 810,
+   "scale": 1.3333333333333333,
+   "bytes": 191118,
+   "taken": "2026-11-03T12:26:15Z",
+   "site": "floodwarning.net",
+   "stamp": "20261103t",
+   "targets": {
+    "card": {
+     "x": 275,
+     "y": 216,
+     "w": 340,
+     "h": 501
+    },
+    "title": {
+     "x": 286,
+     "y": 226,
+     "w": 115,
+     "h": 17
+    },
+    "owner": {
+     "x": 385,
+     "y": 279,
+     "w": 220,
+     "h": 22
+    },
+    "health": {
+     "x": 276,
+     "y": 312,
+     "w": 338,
+     "h": 142
+    },
+    "data": {
+     "x": 276,
+     "y": 453,
+     "w": 338,
+     "h": 357
+    }
+   }
+  }
+ }
+}

@@ -21409,6 +21409,11 @@ button.adm-danger:hover { border-color: var(--bad); }
 .xp-armed { margin: 0 0 var(--sp-2); }
 .xp-empty { margin-bottom: var(--sp-3); }
 .xp-fold { margin-top: var(--sp-3); }
+/* A screenshot scene's zoom (explainers.js drawShot): from the whole picture
+   to the part it is about. The zoomed transform is the element's own, so a
+   scene drawn still — not started, or with reduced motion — is drawn zoomed. */
+.xp-a-zoom { animation: xp-zoom var(--dur, 2.2s) cubic-bezier(.45,.05,.25,1) var(--d, 0s) both; }
+@keyframes xp-zoom { from { transform: translate(0px, 0px) scale(1); } }
 .xp-show.is-meeting { position: fixed; inset: 0; z-index: 2147483000; display: flex; flex-direction: column; justify-content: center;
   gap: 1.2vh; box-sizing: border-box; padding: 2vh 3vw; background: #000; color: #f2f7fb; overflow: hidden; }
 .xp-show.is-meeting .hb-player,

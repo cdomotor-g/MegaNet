@@ -7,7 +7,7 @@
 // tools/voice/speak.mjs before it spends a credit on one, and by
 // test/explainers.mjs on every file in data/explainers/ and on its fixture.
 //
-//   validate(x, { stationIds, tabIds, tabLabels })  → { errors, warnings }
+//   validate(x, { stationIds, tabIds, tabLabels, shots })  → { errors, warnings, words, secs }
 //   validateIndex(ix)                               → { errors, warnings }
 //   voicePathFor(file)        → { json, audio }    where a video's voice lives
 //   clipPathFor(key)          → { audio, json }    where one scene's voice is kept
@@ -36,8 +36,10 @@ export const VOICES = ['draft', 'final'];
 // are the bulletin's, drawn by the same hand.
 export const SCENES = {
   cover:   { fields: [] },
+  shot:    { fields: ['shot'] },
   feature: { fields: ['tab'] },
   figure:  { fields: ['figures'] },
+  tally:   { fields: ['items'] },
   map:     { fields: [] },
   list:    { fields: ['items'] },
   signoff: { fields: [] },
@@ -49,19 +51,37 @@ export const SOURCES = ['stations', 'rain', 'level', 'repeaters', 'tabs'];
 const MARKS = ['silent', 'battery', 'flip', 'carrier', 'receiver', 'repeater', 'sensor', 'signal', 'ok', 'note'];
 
 const LIMITS = {
-  scenes: [3, 12], secs: [3, 30],
+  scenes: [3, 16], secs: [3, 30],
   title: 70, summary: 160, say: 420, sub: 90, headline: 90, line: 160, kicker: 40, next: 60, point: 70, label: 40, unit: 12, note: 120, text: 160,
-  // Every word is said aloud. The welcome about ninety seconds in Graham's
-  // slow delivery; a how-to about a minute (EPIC #262, rule 5).
-  words: { welcome: 180, howto: 150 },
+  callout: 60, item: 44, icon: 8,
+  // Every word is said aloud, and how long it takes is who says it: Graham
+  // slowly, Turbo flat out. A welcome runs at most about two and a half
+  // minutes said; a how-to about a minute and a quarter (EPIC #262, rule 5;
+  // the owner, 3 Nov 2026: Turbo rattles off the rest, so it does not drag).
+  said: { welcome: 160, howto: 75 },
+  // …and a backstop on words, for a run so quick the time would not catch it.
+  words: { welcome: 400, howto: 190 },
 };
+// Words a second as each Droggie says them, measured off their own voices in
+// the bulletins' voice files (3 Nov 2026: Graham 1,047 words in 476 s, Turbo
+// 353 in 119): for the length a video will run, before a credit is spent on it.
+export const PACE_OF = { 'seasoned-hydrographer': 2.2, turbo: 3.0, 'new-recruit': 2.74, 'tech-wizard': 2.44, 'know-it-all': 2.6, 'bean-counter': 2.32, nitwit: 2.46 };
+const GAP = 0.45;                       // seconds of quiet between scenes (speak.mjs)
+const wordsNorm = t => String(t || '').split(/\s+/).filter(Boolean).map(w => w.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''));
+// The word a cue starts at, from `from` on (explainers.js cueIndex): -1 if it is not there.
+export function cueIndex(say, cue, from = 0) {
+  const words = wordsNorm(say), want = wordsNorm(cue).filter(Boolean);
+  if (!want.length) return -1;
+  for (let i = Math.max(0, from); i + want.length <= words.length; i++) if (want.every((w, k) => words[i + k] === w)) return i;
+  return -1;
+}
 // Words a second, said: the voices run about 2.4; a scene's own seconds are
 // what it plays for without them.
 const PACE = 3.2;
 
 const wordsOf = t => String(t || '').split(/\s+/).filter(Boolean);
 
-export function validate(x, { stationIds = null, tabIds = null, tabLabels = null, file = null } = {}) {
+export function validate(x, { stationIds = null, tabIds = null, tabLabels = null, file = null, shots = null } = {}) {
   const errors = [], warnings = [];
   const err = (where, msg) => errors.push(`${where}: ${msg}`);
   const warn = (where, msg) => warnings.push(`${where}: ${msg}`);
@@ -117,7 +137,7 @@ export function validate(x, { stationIds = null, tabIds = null, tabLabels = null
     if (scenes[0] && scenes[0].type !== 'cover') err('scenes[0]', 'the first scene is the cover');
     if (scenes[scenes.length - 1] && scenes[scenes.length - 1].type !== 'signoff') err(`scenes[${scenes.length - 1}]`, 'the last scene is the signoff');
   }
-  let words = 0;
+  let words = 0, said = 0;
   scenes.forEach((s, i) => {
     const W = `scenes[${i}]`;
     if (!isObj(s)) { err(W, 'not an object'); return; }
@@ -129,6 +149,7 @@ export function validate(x, { stationIds = null, tabIds = null, tabLabels = null
     if (str(W + '.say', s.say, LIMITS.say)) {
       const n = wordsOf(s.say).length;
       words += n;
+      said += n / (PACE_OF[s.presenter || x.presenter] || 2.4) + (i ? GAP : 0);
       // Rule 4: said once, a number or a date goes stale — draw it instead.
       if (/\d/.test(s.say)) warn(W + '.say', 'says a number — draw it (a figure counts live) so the voice, said once, does not go stale');
       if (/\bwarn(s|ing|ings)?\b[^.]*\bflood|\bflood[^.]*\bwarn/i.test(s.say)) warn(W + '.say', 'speaks of flood warnings — Flood-Net is not a flood warning service; say what it does');
@@ -140,7 +161,46 @@ export function validate(x, { stationIds = null, tabIds = null, tabLabels = null
     if (s.presenter != null) oneOf(W + '.presenter', s.presenter, PRESENTERS);
     list(W + '.stations', s.stations, 0, 8, { req: false }).forEach((id, k) => sid(`${W}.stations[${k}]`, id));
 
+    // Cues — the word a callout or an item appears on — are in the words, in order.
+    const cues = (whereList, list) => {
+      let from = 0;
+      list.forEach((it, k) => {
+        if (!it || it.cue == null) return;
+        if (typeof it.cue !== 'string' || !it.cue.trim()) { err(`${W}.${whereList}[${k}].cue`, 'not text'); return; }
+        const at = cueIndex(s.say, it.cue, from);
+        if (at < 0) err(`${W}.${whereList}[${k}].cue`, `"${it.cue}" is not in the words${from ? ' after the cue before it' : ''}`);
+        else from = at + 1;
+      });
+    };
     switch (s.type) {
+      case 'shot': {
+        const meta = shots && typeof s.shot === 'string' ? shots[s.shot] : null;
+        if (typeof s.shot !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(s.shot)) err(W + '.shot', `"${s.shot}" is not a shot's name`);
+        else if (shots && !meta) err(W + '.shot', `"${s.shot}" is no shot in data/explainers/shots/index.json — add it to tools/explainers/shots.json and take it (node tools/explainers/shoot.mjs ${s.shot})`);
+        if (s.focus != null && meta && !meta.targets[s.focus]) err(W + '.focus', `"${s.focus}" is not one of the shot's parts (${Object.keys(meta.targets).join(', ')})`);
+        if (s.zoom != null) num(W + '.zoom', s.zoom, 1, 4);
+        const cl = list(W + '.callouts', s.callouts, 0, 4, { req: false });
+        cl.forEach((c, k) => {
+          const C = `${W}.callouts[${k}]`;
+          if (!isObj(c)) { err(C, 'not an object'); return; }
+          str(C + '.text', c.text, LIMITS.callout);
+          if (typeof c.target !== 'string') err(C + '.target', 'missing');
+          else if (meta && !meta.targets[c.target]) err(C + '.target', `"${c.target}" is not one of the shot's parts (${Object.keys(meta.targets).join(', ')})`);
+        });
+        cues('callouts', cl);
+        break;
+      }
+      case 'tally': {
+        const it = list(W + '.items', s.items, 2, 16);
+        it.forEach((t, k) => {
+          const I = `${W}.items[${k}]`;
+          if (!isObj(t)) { err(I, 'not an object'); return; }
+          str(I + '.text', t.text, LIMITS.item);
+          str(I + '.icon', t.icon, LIMITS.icon, { req: false });
+        });
+        cues('items', it);
+        break;
+      }
       case 'cover':
         str(W + '.headline', s.headline, LIMITS.headline, { req: false });
         str(W + '.line', s.line, LIMITS.line, { req: false });
@@ -198,9 +258,11 @@ export function validate(x, { stationIds = null, tabIds = null, tabLabels = null
         break;
     }
   });
-  const cap = LIMITS.words[x.kind];
-  if (cap && words > cap) err('scenes', `${words} words said, more than ${cap} for a ${x.kind === 'howto' ? 'how-to' : 'welcome'} — cut a scene before thinning them all`);
-  return { errors, warnings, words };
+  const what = x.kind === 'howto' ? 'how-to' : 'welcome';
+  const cap = LIMITS.words[x.kind], secsCap = LIMITS.said[x.kind];
+  if (cap && words > cap) err('scenes', `${words} words said, more than ${cap} for a ${what} — cut a scene before thinning them all`);
+  if (secsCap && said > secsCap) err('scenes', `about ${Math.round(said)} s said, more than ${secsCap} for a ${what} — cut a scene, or hand a run of names to a quicker voice`);
+  return { errors, warnings, words, secs: Math.round(said) };
 }
 
 export function validateIndex(ix) {
@@ -320,8 +382,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     let x;
     try { x = JSON.parse(fs.readFileSync(path.join(REPO, file), 'utf8')); } catch (e) { console.log(`✗ ${file}: ${e.message}`); failed++; continue; }
     // A file outside data/explainers/ (a fixture, a draft elsewhere) is not held to its name.
-    const r = validate(x, { file: file.startsWith('data/explainers/') ? file : null });
-    console.log(`${r.errors.length ? '✗' : '✓'} ${file}: ${(x.scenes || []).length} scenes, ${r.words} words, ${x.voice}`);
+    const shotsFile = path.join(REPO, 'data', 'explainers', 'shots', 'index.json');
+    const shots = fs.existsSync(shotsFile) ? JSON.parse(fs.readFileSync(shotsFile, 'utf8')).shots : null;
+    const r = validate(x, { file: file.startsWith('data/explainers/') ? file : null, shots });
+    console.log(`${r.errors.length ? '✗' : '✓'} ${file}: ${(x.scenes || []).length} scenes, ${r.words} words, about ${r.secs} s said, ${x.voice}`);
     r.errors.forEach(e => console.log(`    error   ${e}`));
     r.warnings.forEach(w => console.log(`    warning ${w}`));
     if (r.errors.length) failed++;

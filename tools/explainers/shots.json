@@ -1,0 +1,75 @@
+{
+ "about": "The screenshots the Videos show: node tools/explainers/shoot.mjs takes them from the site (tools/explainers/README.md, Screenshots). Each target is a part of the page a scene may ring and name; npm run explainers fails a shot whose target is no longer on its page.",
+ "shots": [
+  {
+   "name": "home",
+   "path": "?tab=home",
+   "ready": "#home-now",
+   "targets": {
+    "now": "#home-now",
+    "status": "#home-now .hm-status",
+    "fleets": "#home-now .hm-fleets",
+    "most": ".hm-bigs",
+    "rest": ".hm-rest"
+   }
+  },
+  {
+   "name": "station-card",
+   "path": "?tab=stations&station=brisbane_city_al",
+   "ready": "#stn-card",
+   "settle": 4000,
+   "targets": {
+    "card": "#stn-card",
+    "title": "#stn-card-title",
+    "owner": "[id^='mn-owner-card-']",
+    "health": "[id^='mn-health-card-']",
+    "data": "[id^='mn-data-card-']"
+   }
+  },
+  {
+   "name": "health",
+   "path": "?tab=health",
+   "ready": "#hb-player",
+   "settle": 3000,
+   "targets": {
+    "bulletin": "#hb-player",
+    "kinds": ".hb-tools"
+   },
+   "css": ".hb-bigplay { display: none !important; }"
+  },
+  {
+   "name": "rf",
+   "path": "?tab=rf",
+   "ready": "#rf-table-wrap",
+   "settle": 3000,
+   "targets": {
+    "byRepeater": "#rf-focus-h",
+    "candidates": "#rf-table-wrap"
+   }
+  },
+  {
+   "name": "nearby",
+   "path": "?tab=nearby",
+   "device": "phone",
+   "ready": ".nb-list .nb-row",
+   "settle": 3000,
+   "targets": {
+    "list": ".nb-list",
+    "first": ".nb-list li:first-child",
+    "refresh": "#nb-gps"
+   }
+  },
+  {
+   "name": "capabilities",
+   "path": "?tab=capabilities",
+   "ready": "#cap-list",
+   "settle": 2500,
+   "targets": {
+    "facts": "ul.cap-facts",
+    "search": "#cap-q",
+    "groups": "ul.cap-jump-list",
+    "list": "#cap-g-around"
+   }
+  }
+ ]
+}

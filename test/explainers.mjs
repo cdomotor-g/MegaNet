@@ -37,6 +37,10 @@
 //     thrown out of full screen by the last scene)
 //   * voiced: 🔊 and the length as said; a voice file that is not this
 //     video's is not played
+//   * a shot scene draws the screenshot itself, zoomed to its part, and rings
+//     and names its callouts; a tally draws each item on its own word
+//   * the app still has every part each screenshot points at (else: take it
+//     again with tools/explainers/shoot.mjs — CLAUDE.md, Videos)
 //   * Copy link gives ?watch=<id>; Keep for no signal says what it needs with
 //     no saved copy; no videos yet says so; the bulletin still plays on
 //     Station Health; a phone has no sideways scroll
@@ -50,6 +54,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { validate, validateIndex, validateVoice, voicePathFor, clipPathFor, buildIndex, listFiles, VOICE_FORMAT } from '../tools/explainers/validate.mjs';
 import { sceneKey, explainerKeys, explainerHash, pendingExplainers, voiceExplainer, withLexicon } from '../tools/voice/speak.mjs';
+import { readManifest, openShot, targetBoxes } from '../tools/explainers/shoot.mjs';
+import { cueIndex } from '../tools/explainers/validate.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..');
@@ -68,10 +74,12 @@ const stationIds = new Set(readJson(path.join(REPO, 'stations.json')).stations.m
 const CORE = fs.readFileSync(path.join(REPO, 'core.js'), 'utf8');
 const TABS = [...CORE.matchAll(/\{ id: '([a-z0-9]+)',\s+label: '([^']+)'/g)].map(m => ({ id: m[1], label: m[2] }));
 const tabIds = new Set(TABS.map(t => t.id)), tabLabels = TABS.map(t => t.label);
+const SHOTS = readJson(path.join(REPO, 'data', 'explainers', 'shots', 'index.json')).shots;
 const FIXTURE = readJson(path.join(HERE, 'fixtures', 'explainer-all-scenes.json'));
 const CAST = withLexicon({ voices: {
   'seasoned-hydrographer': { voice_id: 'g', voice_name: 'Test Graham', model: 'eleven_v4', direction: '[slowly]' },
   'new-recruit': { voice_id: 'r', voice_name: 'Test Recruit', model: 'eleven_v4', direction: '[eager]' },
+  turbo: { voice_id: 't', voice_name: 'Test Turbo', model: 'eleven_v4', direction: '[quickly]' },
 }, lexicon: [] });
 
 // A voice file for a video, as speak.mjs writes one: each scene in `per`
@@ -101,7 +109,7 @@ console.log('Published videos');
     JSON.stringify(ix.explainers) === JSON.stringify(buildIndex(REPO).explainers), JSON.stringify({ index: ix.explainers, files: buildIndex(REPO).explainers }));
   for (const file of listFiles(REPO)) {
     const x = readJson(path.join(REPO, file));
-    const r = validate(x, { stationIds, tabIds, tabLabels, file });
+    const r = validate(x, { stationIds, tabIds, tabLabels, file, shots: SHOTS });
     ok(`${file} is valid`, !r.errors.length, r.errors.join('; '));
     if (VERBOSE && r.warnings.length) console.log(`       warnings: ${r.warnings.join('; ')}`);
     const vp = path.join(REPO, voicePathFor(file).json);
@@ -120,27 +128,32 @@ console.log('Published videos');
 console.log('The validator');
 {
   const file = 'data/explainers/fixture-all.json';
-  const r = validate(FIXTURE, { stationIds, tabIds, tabLabels, file });
+  const r = validate(FIXTURE, { stationIds, tabIds, tabLabels, file, shots: SHOTS });
   ok('the fixture — one of every scene — is valid', !r.errors.length, r.errors.join('; '));
   ok('…and draws no warning', !r.warnings.length, r.warnings.join('; '));
-  ok('…every scene type is in it', ['cover', 'feature', 'figure', 'map', 'list', 'signoff'].every(t => FIXTURE.scenes.some(s => s.type === t)));
+  ok('…every scene type is in it', ['cover', 'shot', 'feature', 'figure', 'tally', 'map', 'list', 'signoff'].every(t => FIXTURE.scenes.some(s => s.type === t)));
   const bad = (name, change, pattern, { warning = false } = {}) => {
     const x = clone(FIXTURE); change(x);
-    const got = validate(x, { stationIds, tabIds, tabLabels, file });
+    const got = validate(x, { stationIds, tabIds, tabLabels, file, shots: SHOTS });
     const list = warning ? got.warnings : got.errors;
     ok(name, list.some(e => pattern.test(e)), JSON.stringify(got));
   };
   bad('the first scene must be the cover', x => x.scenes.reverse(), /first scene is the cover/);
   bad('the last must be the signoff', x => x.scenes.pop(), /last scene is the signoff/);
-  bad('a feature\'s tab must be in TABS', x => { x.scenes[3].tab = 'nosuchtab'; }, /no tab in TABS/);
-  bad('a list does not warn — a video is not news of the network', x => { x.scenes[5].items[0].sev = 'warn'; }, /items\[0\]\.sev/);
+  bad('a feature\'s tab must be in TABS', x => { x.scenes[4].tab = 'nosuchtab'; }, /no tab in TABS/);
+  bad('a list does not warn — a video is not news of the network', x => { x.scenes[6].items[0].sev = 'warn'; }, /items\[0\]\.sev/);
   bad('markup in the words is refused', x => { x.scenes[1].say = 'Look <b>here</b>.'; }, /markup/);
   bad('the repository\'s name is refused', x => { x.scenes[1].say = 'Welcome to Mega' + 'Net.'; }, /Flood-Net/);
-  bad('a welcome of more than 180 words is refused', x => { x.scenes[2].say = Array(160).fill('word').join(' '); x.scenes[2].secs = 30; }, /more than 180/);
+  bad('a welcome of more than 400 words is refused, however quickly said', x => { for (const k of [1, 2, 6]) { x.scenes[k].presenter = 'turbo'; x.scenes[k].say = Array(140).fill('word').join(' '); x.scenes[k].secs = 30; } }, /more than 400/);
+  bad('…and one that would run past two and a half minutes said, by who says it', x => { for (const k of [1, 2, 6]) { x.scenes[k].say = Array(85).fill('word').join(' '); x.scenes[k].secs = 30; } }, /s said, more than 160/);
+  bad('a shot must be one taken', x => { x.scenes[3].shot = 'nosuchshot'; }, /no shot in data\/explainers\/shots/);
+  bad('a callout must point at one of the shot\'s parts', x => { x.scenes[3].callouts[0].target = 'nowhere'; }, /not one of the shot's parts/);
+  bad('a callout\'s cue must be in the words', x => { x.scenes[3].callouts[0].cue = 'not said'; }, /is not in the words/);
+  bad('…and the cues in the order they are said', x => { x.scenes[7].items.reverse(); }, /after the cue before it/);
   bad('a file not named for its id is refused', x => { x.id = 'other'; }, /not the file's own name/);
   bad('a number said is warned of', x => { x.scenes[1].say = 'There are 900 stations on file.'; }, /says a number/, { warning: true });
   bad('a flood warning is warned of', x => { x.scenes[1].say = 'It warns you of a flood before it comes.'; }, /not a flood warning service/, { warning: true });
-  bad('a long tab label said aloud is warned of', x => { x.scenes[3].say = 'Open Station Health every morning.'; }, /names the tab "Station Health"/, { warning: true });
+  bad('a long tab label said aloud is warned of', x => { x.scenes[4].say = 'Open Station Health every morning.'; }, /names the tab "Station Health"/, { warning: true });
   bad('a rushed scene is warned of', x => { x.scenes[2].secs = 3; }, /more than 3\.2 a second/, { warning: true });
   const ix = { format: 'floodnet-explainer-index/1', explainers: [
     { id: 'a', file: 'data/explainers/va.json', title: 't', summary: 's', kind: 'welcome', presenter: 'seasoned-hydrographer', voice: 'draft', secs: 9 },
@@ -155,6 +168,26 @@ console.log('The validator');
   ok('a voice file of the fixture is valid', !validateVoice(vf, FIXTURE).errors.length, validateVoice(vf, FIXTURE).errors.join('; '));
   const short = clone(vf); short.scenes[2].words.pop();
   ok('…one a word short is not', validateVoice(short, FIXTURE).errors.some(e => /times for/.test(e)));
+}
+
+// ── 2½. the screenshots ─────────────────────────────────────────────────────
+console.log('Screenshots');
+const MANIFEST = readManifest();
+{
+  for (const shot of MANIFEST.shots) {
+    const meta = SHOTS[shot.name];
+    ok(`${shot.name}: taken (node tools/explainers/shoot.mjs ${shot.name})`, !!meta);
+    if (!meta) continue;
+    const file = path.join(REPO, meta.image || '');
+    const head = fs.existsSync(file) ? fs.readFileSync(file).subarray(0, 12) : Buffer.alloc(0);
+    ok(`${shot.name}: its picture is a WebP beside the index`, head.toString('latin1', 0, 4) === 'RIFF' && head.toString('latin1', 8, 12) === 'WEBP', meta.image);
+    ok(`${shot.name}: every part the manifest names was found on it`, Object.keys(shot.targets || {}).every(t => meta.targets[t]), JSON.stringify(Object.keys(meta.targets)));
+  }
+  const extra = Object.keys(SHOTS).filter(n => !MANIFEST.shots.some(s => s.name === n));
+  ok('no shot in the index that the manifest has let go', !extra.length, extra.join(', '));
+  const used = listFiles(REPO).flatMap(f => readJson(path.join(REPO, f)).scenes.filter(s => s.type === 'shot').map(s => s.shot));
+  ok('every shot a video uses is in the manifest', used.every(n => MANIFEST.shots.some(s => s.name === n)), used.join(', '));
+  ok('a cue is found where the page finds it', cueIndex(FIXTURE.scenes[7].say, 'link budgets') === 5 && cueIndex(FIXTURE.scenes[7].say, 'Link budgets,', 6) === -1);
 }
 
 // ── 3. voicing that spends credits once ─────────────────────────────────────
@@ -190,7 +223,7 @@ console.log('Voicing');
   p = pendingExplainers(CAST, { repo });
   ok('a video whose voice is of these words is not pending', !p.todo.length, JSON.stringify(p));
   ok('…its forced re-voice is', pendingExplainers(CAST, { repo, force: ['data/explainers/va.json'] }).todo.some(t => t.force));
-  const a2 = clone(a); a2.scenes[3].say = 'Every morning the network checks itself, and what needs a look comes first.';
+  const a2 = clone(a); a2.scenes[4].say = 'Every morning the network checks itself, and what needs a look comes first.';
   put('data/explainers/va.json', a2);
   ok('…one scene\'s words changed, it is pending again', pendingExplainers(CAST, { repo }).todo.some(t => t.file === 'data/explainers/va.json'));
   put('data/explainers/voice/gone.json', '{}'); put('data/explainers/voice/clips/ffffffffffffffffffffffff.mp3', 'x');
@@ -198,10 +231,10 @@ console.log('Voicing');
   ok('a voice whose video has gone, and a kept scene nobody uses, are let go of',
     p.orphans.includes('data/explainers/voice/gone.json') && p.orphans.includes('data/explainers/voice/clips/ffffffffffffffffffffffff.mp3'), JSON.stringify(p.orphans));
   // Every scene kept but the changed one: voicing it says one.
-  explainerKeys(a2, CAST).forEach((key, i) => { if (i !== 3) { put(clipPathFor(key).audio, 'x'); put(clipPathFor(key).json, '{}'); } });
+  explainerKeys(a2, CAST).forEach((key, i) => { if (i !== 4) { put(clipPathFor(key).audio, 'x'); put(clipPathFor(key).json, '{}'); } });
   const logs = [];
   const dry = await voiceExplainer('data/explainers/va.json', CAST, { repo, dry: true, log: l => logs.push(l) });
-  const one = a2.scenes[3].say.length + '[slowly] '.length;
+  const one = a2.scenes[4].say.length + '[slowly] '.length;
   ok('with every scene kept but one, voicing it says one scene', dry.said === 1 && dry.kept === a2.scenes.length - 1, JSON.stringify(dry));
   ok('…and estimates the credits of that one', Math.abs(dry.credits - one * 0.4) < 2, `${dry.credits} for ${one} characters`);
   ok('…saying so before spending', /1 to say/.test(logs.join('\n')), logs.join('\n'));
@@ -231,14 +264,14 @@ console.log('Voicing');
     ok('…with its MP3 and every scene kept', fs.existsSync(path.join(repo2, v1.audio)) && v1.scenes.every(s => fs.existsSync(path.join(repo2, s.clip))));
     ok('…and nothing is pending after it', !pendingExplainers(CAST, { repo: repo2 }).todo.length);
     said.length = 0;
-    c.scenes[3].say = 'Every morning the network checks itself, and the worst comes first.';
+    c.scenes[4].say = 'Every morning the network checks itself, and the worst comes first.';
     fs.writeFileSync(path.join(repo2, 'data/explainers/vc.json'), JSON.stringify(c));
     const again = await voiceExplainer('data/explainers/vc.json', CAST, { repo: repo2, log: () => {}, say: fake });
     const v2 = readJson(path.join(repo2, 'data/explainers/voice/vc.json'));
     ok('one scene\'s words changed, voicing it again says that scene and no other', said.length === 1 && /the worst comes first/.test(said[0]) && again.kept === c.scenes.length - 1, `${said.length} said: ${said.join(' | ')}`);
     ok('…the voice file valid again', !validateVoice(v2, c).errors.length, validateVoice(v2, c).errors.join('; '));
-    ok('…the scenes kept are the same as before', v2.scenes.filter((s, i) => i !== 3).every((s, j) => s.key === v1.scenes.filter((_, i) => i !== 3)[j].key));
-    ok('…and the old scene, now unused, is let go of on the next run', pendingExplainers(CAST, { repo: repo2 }).orphans.some(o => o.includes(v1.scenes[3].key)));
+    ok('…the scenes kept are the same as before', v2.scenes.filter((s, i) => i !== 4).every((s, j) => s.key === v1.scenes.filter((_, i) => i !== 4)[j].key));
+    ok('…and the old scene, now unused, is let go of on the next run', pendingExplainers(CAST, { repo: repo2 }).orphans.some(o => o.includes(v1.scenes[4].key)));
     fs.rmSync(repo2, { recursive: true, force: true });
   }
 }
@@ -306,9 +339,17 @@ try {
   const net = await pg.evaluate(fx => { const svg = Explainers._draw(fx.scenes[2], fx, false); return { dots: (svg.match(/<circle /g) || []).length, stations: state.data.stations.length }; }, FIXTURE);
   ok('a map scene that names nothing draws the whole network', net.dots > net.stations * 0.8, JSON.stringify(net));
   const label = await pg.evaluate(() => TAB_LIST.find(t => t.id === 'health').label);
-  ok('a feature names its tab as TABS has it now', draws[3].wide.text.includes(label), `${label} not in: ${draws[3].wide.text.slice(0, 200)}`);
+  ok('a feature names its tab as TABS has it now', draws[4].wide.text.includes(label), `${label} not in: ${draws[4].wide.text.slice(0, 200)}`);
   const counted = await pg.evaluate(fx => { const svg = Explainers._draw(fx.scenes[1], fx, false); const m = /data-count="(\d+)"/.exec(svg); return { n: m && +m[1], stations: state.data.stations.length }; }, FIXTURE);
   ok('a figure counts the stations this page has loaded', counted.n === counted.stations, JSON.stringify(counted));
+  await until(pg, () => !!Explainers._shots());
+  const shotSvg = await pg.evaluate(fx => { const svg = Explainers._draw(fx.scenes[3], fx, false); return { image: (/<image href="([^"]+)"/.exec(svg) || [])[1] || '', rings: (svg.match(/stroke-width="4"/g) || []).length, zoom: /class="xp-a-zoom"/.test(svg), chips: (svg.match(/fill-opacity="\.95"/g) || []).length }; }, FIXTURE);
+  ok('a shot scene draws the screenshot itself, zoomed to its focus', /data\/explainers\/shots\/home\.webp/.test(shotSvg.image) && shotSvg.zoom, JSON.stringify(shotSvg));
+  ok('…and rings and names each callout', shotSvg.rings === 2 && shotSvg.chips === 2, JSON.stringify(shotSvg));
+  const tally = await pg.evaluate(fx => { const svg = Explainers._draw(fx.scenes[7], fx, false); return [...svg.matchAll(/class="hb-a-pop" style="--d:([\d.]+)s"/g)].map(m => +m[1]); }, FIXTURE);
+  ok('a tally draws each item, each on its own word, in order', tally.length === 4 && tally.every((t, i) => !i || t > tally[i - 1]), JSON.stringify(tally));
+  const loaded = await pg.evaluate(async href => { const im = new Image(); im.src = href; try { await im.decode(); return im.naturalWidth; } catch (_) { return 0; } }, shotSvg.image);
+  ok('…and the screenshot it draws is there to load, at the pixels it was taken at', loaded === Math.round(1440 * 4 / 3), String(loaded));
   // Play, and the clicker.
   await pg.evaluate(() => Explainers.play());
   await pg.waitForTimeout(500);
@@ -401,6 +442,16 @@ try {
     ok('a link to a video that is not there says so, and shows the ones there are', /no video called/.test(m.note) && !m.armed, JSON.stringify(m));
     ok('…with no page errors', !errors.length, errors.join('\n'));
     await context.close();
+  }
+  {
+    // Each screenshot's parts, still on its page in the app as it is now.
+    for (const shot of MANIFEST.shots) {
+      let missing = ['(the page did not open)'], err = '';
+      const { context, page: spg } = await openShot(browser, shot, server.origin + '/index.html', { policy: p => applyNetworkPolicy(p, server.origin) }).catch(e => { err = e.message; return {}; });
+      if (spg) { await spg.waitForTimeout(800); ({ missing } = await targetBoxes(spg, shot.targets || {})); }
+      ok(`the app still has every part ${shot.name} points at — if not, take it again: node tools/explainers/shoot.mjs ${shot.name}, and check its scene's words still hold`, !missing.length, err || missing.join(', '));
+      if (context) await context.close();
+    }
   }
   {
     // A phone.

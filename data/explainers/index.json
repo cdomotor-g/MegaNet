@@ -1,16 +1,16 @@
 {
  "format": "floodnet-explainer-index/1",
- "updated_at": "2026-11-03T11:12:12Z",
+ "updated_at": "2026-11-03T12:32:32Z",
  "explainers": [
   {
    "id": "welcome",
    "file": "data/explainers/welcome.json",
    "title": "Welcome to Flood-Net",
-   "summary": "A first look, with Graham: the stations, the repeaters and the radio paths between them, in one place — and where to start.",
+   "summary": "A first look, with Graham and Turbo: the stations, the repeaters and the radio paths between them, in one place — and where to start.",
    "kind": "welcome",
    "presenter": "seasoned-hydrographer",
    "voice": "draft",
-   "secs": 79,
+   "secs": 140,
    "updated": "2026-11-03"
   }
  ]

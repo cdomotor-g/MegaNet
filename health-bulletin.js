@@ -1635,7 +1635,18 @@ function makeShowPlayer(cfg = {}) {
   // colours, its type sizes, its way of wrapping words.
   const DRAW = Object.assign({ title: drawTitle, map: drawMap, battery: drawBattery, checks: drawChecks, carrier: drawCarrier,
                  triangulate: drawTriangulate, receivers: drawReceivers, trend: drawTrend, list: drawList, signoff: drawSignoff },
-    cfg.draw ? cfg.draw({ C, text, wrap, charsFor, d, dd, vtop, halo, sevC, fmtStat, who, portrait, SEV_ICON, drawMap, drawList, stationAt }) : {});
+    cfg.draw ? cfg.draw({ C, text, wrap, charsFor, d, dd, vtop, halo, sevC, fmtStat, who, portrait, SEV_ICON, drawMap, drawList, stationAt, wordAt }) : {});
+  // When, in seconds into its scene, a scene's word k is said: by the voice
+  // file's own times when the voices keep the time, else where revealCount
+  // reveals it — so what a scene draws on a word appears as the word does.
+  function wordAt(b, s, k) {
+    const sc = (b && b.scenes) || [], i = sc.indexOf(s);
+    const n = String((s && s.say) || '').split(/\s+/).filter(Boolean).length || 1;
+    const v = i >= 0 && voiced(b) && voiceOf(b), x = v && v.scenes[i];
+    if (x && Number.isFinite(x.words[k])) return Math.max(0, x.words[k] - x.start);
+    const secs = (i >= 0 ? secsOf(b, i) : (+(s && s.secs) || 8)) * 0.82;
+    return secs * Math.min(Math.max(0, k), n) / n;
+  }
 
   // ── playing ────────────────────────────────────────────────────────────────
 
@@ -2096,6 +2107,8 @@ function makeShowPlayer(cfg = {}) {
   // cfg.key, cfg.redrawn).
   const API = {
     B, ID, G, current, currentFile, entries, pick, redraw, resetPlay, playerHtml, anchorHtml, transcriptHtml, stageLabel,
+    // The scene drawn again where it is — something it draws has arrived.
+    redrawScene: () => { const b = current(), box = document.getElementById(`${ID}-svgbox`); if (!b || !box) return; box.innerHTML = sceneSvg(b, B.scene); stagePose(); syncAnims(); },
     totalSecs: b => totalSecs(b), fmtDur, voiceOf: b => voiceOf(b), who, portrait, go, play, pause, toggle, next, prev, startScene, syncAnims,
     reload: () => { B.index = null; B.indexErr = ''; loadIndex(); },
   };

@@ -25,12 +25,16 @@ rules below are about spending ElevenLabs credits once.
    said again; the rest are joined from what was kept.
 4. **Words that do not go stale.** Never *say* a number, a date or a tab's
    current label. Draw them: a `figure` counts the stations on file when it
-   plays, and a `feature` reads the tab's icon and label from `TABS`. Say
-   "every station on file", and show the number. The validator warns on a
-   digit in a `say`, and on a long tab label said aloud.
-5. **Short.** A welcome is at most 180 words said, about ninety seconds in
-   Graham's slow delivery. A how-to is at most 150, about a minute. Cut a
-   scene before you thin every scene.
+   plays, and a `shot` shows the tab as it is (taken again when it changes —
+   below). Say "every station on file", and show the number. The validator
+   warns on a digit in a `say`, and on a long tab label said aloud.
+5. **Short, by the clock.** How long a video runs is who says it: Graham
+   about 2.2 words a second, Turbo 3.0, the Recruit 2.7 (measured off their
+   bulletins; `PACE_OF` in `validate.mjs`). A welcome runs at most about two
+   and a half minutes said, a how-to a minute and a quarter; the validator
+   says how long each will run before a credit is spent. A run of names — the
+   capabilities, the sources — goes to a quick voice (Turbo), not a slow one.
+   Cut a scene before you thin every scene.
 6. **A recast does not re-voice it.** A Droggie recast in the cast file
    reaches a video only when the voice workflow is run by hand with `force`.
 7. **Estimate first.** `--dry-run` says which scenes would be said and about
@@ -83,16 +87,59 @@ The first scene is a `cover`, the last a `signoff`.
 | Type | Draws | Fields |
 | --- | --- | --- |
 | `cover` | the title card: a kicker, the title large, a line under it, a river drawn in, the presenter | `headline`? (else the video's title), `line`? (else its summary), `kicker`? |
-| `feature` | a tab sketched — the bar of tabs, the banner's search box, the tab's heading, the shape of what it shows — with one part ringed, and up to three lines beside it | `tab` (an id in `TABS`), `sketch`? (`map` `card` `chart` `list` `table` `player` `form` `tiles`), `lit`? (`rail` `search` `head` `main` `side`), `side`? (a side panel), `points[]`? (≤ 3, ≤ 70 each) |
+| `shot` | **the app itself**: a screenshot of a tab (below), zoomed in on one part, its callouts each ringed, numbered and named as its cue is said; a phone's in a phone's frame | `shot` (a name in `tools/explainers/shots.json`), `focus`? (a part to zoom to), `zoom`? (1–4, the most it zooms), `callouts[]`? (≤ 4: {`target` (a part), `text` ≤ 60, `cue`?}) |
+| `tally` | a quick run through a list: up to sixteen tiles, each popping up on the word that names it | `items[]` (2–16: {`text` ≤ 44, `icon`?, `cue`?}) |
+| `feature` | a tab sketched — the bar of tabs, the banner's search box, the tab's heading, the shape of what it shows — with one part ringed, and up to three lines beside it (a `shot` shows the real tab; a `feature` is for a page that cannot be shot signed out) | `tab` (an id in `TABS`), `sketch`? (`map` `card` `chart` `list` `table` `player` `form` `tiles`), `lit`? (`rail` `search` `head` `main` `side`), `side`? (a side panel), `points[]`? (≤ 3, ≤ 70 each) |
 | `figure` | up to three big numbers, counted up | `figures[]` {`of`? (`stations` `rain` `level` `repeaters` `tabs`: counted live), `value` (shown when there is nothing to count), `label` (≤ 40), `unit`?}, `note`? |
 | `map` | the bulletin's map: every station on file, marks and areas | `marks[]`?, `areas[]`? (`sev` `info` or `ok`), `focus`? |
 | `list` | the bulletin's list, a line each | `items[]` {`sev` `info` or `ok`, `text`} |
 | `signoff` | the presenter, their line, and where to go next | `line`?, `next`? (≤ 60), `tab`? (draws that tab's icon and label) |
 
-A `feature` is a drawing, never a screenshot: it does not go out of date when
-a tab is restyled, and its tab's name is read from `TABS` when it plays. The
-walkthrough scene that drives the real app — opening the tab and ringing the
-real control — comes with the first how-to (#265).
+A **cue** is a word or a few from the scene's own `say` — `"cue": "link
+budgets"` — and is when its callout or tile appears: on the word as the voice
+says it, or, playing silent, as the words are revealed. Cues are found in
+order (the validator refuses one that is not in the words, or out of order).
+The walkthrough scene that drives the real app — opening the tab and ringing
+the real control — comes with the first how-to (#265).
+
+## Screenshots
+
+A `shot` scene shows the app as it is, not a drawing of it (the owner, 3 Nov
+2026: *"it just needs to look a bit more like the site"*). Each shot is a line
+in `tools/explainers/shots.json` — its page (`path`, e.g. `?tab=stations&
+station=brisbane_city_al`), `desk` or `phone`, what to wait for (`ready`), any
+settings to store first (`store`), anything to hide (`css` — a ▶ in a still
+that does not play), and its **parts** (`targets`: a name and a CSS selector
+each, the things a scene may zoom to and call out).
+
+```bash
+node tools/explainers/shoot.mjs                 # every shot, from https://floodwarning.net/
+node tools/explainers/shoot.mjs home health      # the ones named
+node tools/explainers/shoot.mjs --tab stations  # every shot of a tab
+node tools/explainers/shoot.mjs --probe home    # what is on its page, with boxes, to choose parts
+# before a change is deployed: serve the checkout and shoot that
+python3 -m http.server 8080 &  node tools/explainers/shoot.mjs --base http://127.0.0.1:8080/
+```
+
+It writes `data/explainers/shots/<name>.webp` (1920×1080 for a desk, 780×1688
+for a phone) and `data/explainers/shots/index.json` (each shot's size, when
+and where it was taken, and the box of each part). Taken **signed out**, so
+nothing a signed-out visitor could not see is in a picture — no landholder
+details, no site codes (CLAUDE.md, *Private data*).
+
+**When the app changes, a shot does not.** So:
+
+- taking one again is **free** — nothing is voiced, no credits — and needs no
+  owner's OK unless the words over it are no longer true;
+- `npm run explainers` opens each shot's page in the app as it is now and
+  **fails a shot whose parts have gone**, naming the command to take it again;
+- a change that moves or restyles what a shot shows takes that shot again **in
+  the same push** (CLAUDE.md and AGENTS.md, *Videos*). A restyle the check
+  cannot see is the author's to notice: look at the shots of the tab you changed.
+
+If a change makes a final video's **words** wrong, say so on its issue: the
+words are the owner's to approve again, and voicing the changed scenes spends
+credits.
 
 ## The steps
 
@@ -144,6 +191,9 @@ scenes for when it is final again, and it plays silent meanwhile.
 | `data/explainers/index.json` | the list of them (`validate.mjs --write-index`; the voice workflow refreshes its lengths) |
 | `data/explainers/voice/<id>.json`, `.mp3` | its voice: the MP3 and when each scene and word starts |
 | `data/explainers/voice/clips/<key>.mp3`, `.json` | one scene as said, kept for the next voicing |
+| `tools/explainers/shots.json` | the screenshots, and the parts of each |
+| `tools/explainers/shoot.mjs` | takes them |
+| `data/explainers/shots/<name>.webp`, `index.json` | the screenshots, and where each part is on them |
 | `tools/explainers/validate.mjs` | what a video may hold |
 | `explainers.js` | the tab, its scenes and meeting mode |
 | `test/explainers.mjs` | `npm run explainers` |

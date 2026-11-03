@@ -87,7 +87,8 @@ const Explainers = (() => {
     panel, controls, key: meetingKey, redrawn, open: openStation, softFinish: true,
     chips: { label: 'On the map:', title: 'Pause and open this station on the Stations map' },
     stageLabel: b => `${b.title}, a video in ${(b.scenes || []).length} scenes. Space plays or pauses; arrow keys, Page Up and Page Down move between scenes; F fills the screen; M turns the sound off and on; the less-than and greater-than keys change the speed.`,
-    draw: H => ({ cover: H2(H, drawCover), feature: H2(H, drawFeature), figure: H2(H, drawFigure), signoff: H2(H, drawSignoff) }),
+    draw: H => ({ cover: H2(H, drawCover), feature: H2(H, drawFeature), figure: H2(H, drawFigure), signoff: H2(H, drawSignoff),
+                  shot: H2(H, drawShot), tally: H2(H, drawTally) }),
   });
   // A drawer given the stage's own hand (colours, type, wrapping) as its last
   // argument.
@@ -289,7 +290,10 @@ const Explainers = (() => {
     X.kept[f] = 'busy'; api.redraw();
     const v = api.voiceOf(b);
     const speakers = [...new Set([b.presenter, ...(b.scenes || []).map(s => s.presenter)].filter(Boolean))];
-    const urls = [INDEX, f, ...(v ? [voiceFileOf(f), `${v.audio}?h=${encodeURIComponent(v.hash || '')}`] : []), ...speakers.map(id => api.portrait(id))];
+    await loadShots();
+    const shots = [...new Set((b.scenes || []).filter(s => s.type === 'shot').map(s => s.shot))].map(n => SHOTS.index && SHOTS.index[n]).filter(Boolean);
+    const urls = [INDEX, f, ...(v ? [voiceFileOf(f), `${v.audio}?h=${encodeURIComponent(v.hash || '')}`] : []), ...speakers.map(id => api.portrait(id)),
+      ...(shots.length ? [SHOTS_INDEX, ...shots.map(shotUrl)] : [])];
     try {
       for (const u of urls) {
         const res = await fetch(u, { credentials: 'same-origin' });
@@ -542,6 +546,175 @@ const Explainers = (() => {
     return out;
   }
 
+  // ── shot: the app itself ──
+  // A screenshot of a tab, taken from the site by tools/explainers/shoot.mjs
+  // (data/explainers/shots/), with where each of its parts was on it. The
+  // scene zooms in on the part it is about (s.focus), then rings and names its
+  // callouts each as its cue is said. The app moves on and a picture does not:
+  // a shot is taken again — free, nothing voiced — when its tab changes, and
+  // npm run explainers fails one whose parts have gone (CLAUDE.md, Videos).
+  const SHOTS_INDEX = 'data/explainers/shots/index.json';
+  const SHOTS = { index: null, loading: null };
+  function loadShots() {
+    if (SHOTS.index || SHOTS.loading) return SHOTS.loading;
+    SHOTS.loading = fetch(SHOTS_INDEX, { cache: 'no-cache', credentials: 'same-origin' })
+      .then(r => (r.ok ? r.json() : null)).catch(() => null)
+      .then(j => { SHOTS.index = (j && j.shots) || {}; SHOTS.loading = null; P._api.redrawScene(); return SHOTS.index; });
+    return SHOTS.loading;
+  }
+  const shotUrl = m => `${m.image}?t=${encodeURIComponent(m.taken || '')}`;
+
+  // A cue — a word or a few from the scene's words — to the index of the word
+  // it starts at, looking from `from` on. tools/explainers/validate.mjs holds
+  // every cue to being there, in order.
+  const norm = w => String(w).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+  function cueIndex(s, cue, from = 0) {
+    const words = String(s.say || '').split(/\s+/).filter(Boolean).map(norm);
+    const want = String(cue || '').split(/\s+/).map(norm).filter(Boolean);
+    if (!want.length) return -1;
+    for (let i = Math.max(0, from); i + want.length <= words.length; i++) {
+      if (want.every((w, k) => words[i + k] === w)) return i;
+    }
+    return -1;
+  }
+  // When each of a list's items appears: at its cue, else spread through the
+  // words in order.
+  function cueTimes(s, b, H, items) {
+    const n = String(s.say || '').split(/\s+/).filter(Boolean).length || 1;
+    let from = 0;
+    return items.map((it, k) => {
+      let w = it && it.cue ? cueIndex(s, it.cue, from) : -1;
+      if (w < 0) w = Math.round((k + 0.5) * n / Math.max(1, items.length));
+      else from = w + 1;
+      return H.wordAt(b, s, w);
+    });
+  }
+
+  function drawShot(s, b, L, H) {
+    const { W, H: SH, F, pad, narrow } = L, C = H.C;
+    const meta = SHOTS.index && SHOTS.index[s.shot];
+    if (!meta) {
+      if (!SHOTS.index) loadShots();
+      return H.text(W / 2, SH / 2 - 30, SHOTS.index ? `No screenshot called “${s.shot}”` : 'Fetching the screenshot…', F.m, `text-anchor="middle" fill="${C.muted}"`);
+    }
+    const phone = meta.device === 'phone';
+    const calls = (s.callouts || []).slice(0, 4).filter(c => meta.targets[c.target]);
+    const top = pad * 0.5, bottom = SH - L.foot - 10, availH = bottom - top;
+    // Where the picture goes, and where the names go when they are not on it.
+    let img, side = null;
+    if (phone) {
+      const h = narrow ? availH * 0.6 : availH, w = h * meta.width / meta.height;
+      img = narrow ? { x: (W - w) / 2, y: top, w, h } : { x: pad + 30, y: top, w, h };
+      side = narrow ? { x: pad, y: img.y + h + 16, w: W - pad * 2, h: bottom - (img.y + h + 16) } : { x: img.x + w + 56, y: top, w: W - pad - (img.x + w + 56), h: availH };
+    } else if (narrow) {
+      const w = W - pad, h = w * meta.height / meta.width;
+      img = { x: pad / 2, y: top, w, h };
+      side = { x: pad, y: top + h + 18, w: W - pad * 2, h: bottom - (top + h + 18) };
+    } else {
+      const h0 = availH, w0 = h0 * meta.width / meta.height, w = Math.min(W - pad, w0), h = w * meta.height / meta.width;
+      img = { x: (W - w) / 2, y: top, w, h };
+    }
+    const sx = img.w / meta.width;
+    const box = t => ({ x: img.x + t.x * sx, y: img.y + t.y * sx, w: t.w * sx, h: t.h * sx });
+    // The zoom: the focus part brought to the middle, as large as fits with a
+    // margin round it, the picture still covering its frame.
+    let k = 1, tx = 0, ty = 0;
+    const ft = s.focus && meta.targets[s.focus];
+    if (ft) {
+      const f = box(ft);
+      k = Math.max(1, Math.min(s.zoom || 2.6, img.w / (f.w * 1.18), img.h / (f.h * 1.18)));
+      tx = img.x + img.w / 2 - k * (f.x + f.w / 2);
+      ty = img.y + img.h / 2 - k * (f.y + f.h / 2);
+      tx = Math.min(img.x * (1 - k), Math.max(img.x + img.w - k * (img.x + img.w), tx));
+      ty = Math.min(img.y * (1 - k), Math.max(img.y + img.h - k * (img.y + img.h), ty));
+    }
+    const after = b2 => ({ x: tx + k * b2.x, y: ty + k * b2.y, w: k * b2.w, h: k * b2.h });
+    const ZOOM_AT = 0.4, ZOOM_FOR = 2.2, zoomEnd = ft ? ZOOM_AT + ZOOM_FOR : 0.3;
+    const cid = `xp-clip-${escAttr(s.shot)}`;
+    let out = `<defs><clipPath id="${cid}"><rect x="${img.x.toFixed(1)}" y="${img.y.toFixed(1)}" width="${img.w.toFixed(1)}" height="${img.h.toFixed(1)}" rx="${phone ? 26 : 12}"/></clipPath></defs>`;
+    // A phone's frame round a phone's picture; a window's edge round a desk's.
+    if (phone) out += `<rect x="${(img.x - 12).toFixed(1)}" y="${(img.y - 12).toFixed(1)}" width="${(img.w + 24).toFixed(1)}" height="${(img.h + 24).toFixed(1)}" rx="36" fill="#05101a" stroke="${C.grid}" stroke-width="3"/>`;
+    else out += `<rect x="${(img.x - 3).toFixed(1)}" y="${(img.y - 3).toFixed(1)}" width="${(img.w + 6).toFixed(1)}" height="${(img.h + 6).toFixed(1)}" rx="14" fill="none" stroke="${C.grid}" stroke-width="3"/>`;
+    const zoomStyle = ft ? `style="transform-box:view-box;transform-origin:0 0;transform:translate(${tx.toFixed(1)}px,${ty.toFixed(1)}px) scale(${k.toFixed(3)});--d:${ZOOM_AT}s;--dur:${ZOOM_FOR}s" class="xp-a-zoom"` : '';
+    out += `<g clip-path="url(#${cid})"><g ${zoomStyle}><image href="${escAttr(shotUrl(meta))}" x="${img.x.toFixed(1)}" y="${img.y.toFixed(1)}" width="${img.w.toFixed(1)}" height="${img.h.toFixed(1)}" preserveAspectRatio="none"/></g></g>`;
+    // The callouts: a ring and a number on the part, its name beside it —
+    // beside it where there is room, else under it, over it, or in its own top
+    // corner when it fills the picture; in the margin for a phone's picture.
+    const times = cueTimes(s, b, H, calls);
+    const fs = narrow ? F.s : Math.round(F.s * 1.05), chipW = Math.min(narrow ? W - pad * 2 : 380, side ? side.w : 380), lh = fs * 1.25;
+    const placed = [];
+    const clash = r => placed.find(q => r.x < q.x + q.w + 8 && r.x + r.w + 8 > q.x && r.y < q.y + q.h + 8 && r.y + r.h + 8 > q.y);
+    const settle = (r, lo, hi) => {
+      for (let guard = 0; guard < 10; guard++) { const q = clash(r); if (!q) break; r.y = q.y + q.h + 12; }
+      if (r.y + r.h > hi) r.y = Math.max(lo, hi - r.h);
+      placed.push(r);
+      return r;
+    };
+    const near = (r, px, py) => ({ x: Math.max(r.x, Math.min(r.x + r.w, px)), y: Math.max(r.y, Math.min(r.y + r.h, py)) });
+    calls.forEach((c, i) => {
+      const tb = after(box(meta.targets[c.target]));
+      const t = Math.max(zoomEnd, times[i]);
+      const lines = H.wrap(c.text, H.charsFor(chipW - 64, fs), 3);
+      const ch = lines.length * lh + fs * 0.9;
+      const ring = { x: Math.max(img.x + 2, tb.x - 5), y: Math.max(img.y + 2, tb.y - 5) };
+      ring.w = Math.max(8, Math.min(img.x + img.w - 2, tb.x + tb.w + 5) - ring.x);
+      ring.h = Math.max(8, Math.min(img.y + img.h - 2, tb.y + tb.h + 5) - ring.y);
+      let r;
+      if (side) r = settle({ x: side.x, y: side.y + i * (ch + 14), w: chipW, h: ch }, side.y, side.y + side.h);
+      else {
+        const R = img.x + img.w, Bm = img.y + img.h, lo = img.y + 8, hi = Bm - 8;
+        const clampX = x => Math.max(img.x + 10, Math.min(R - chipW - 10, x));
+        const midY = Math.max(lo, Math.min(hi - ch, ring.y + ring.h / 2 - ch / 2));
+        if (R - (ring.x + ring.w) >= chipW + 28) r = settle({ x: ring.x + ring.w + 22, y: midY, w: chipW, h: ch }, lo, hi);
+        else if (ring.x - img.x >= chipW + 28) r = settle({ x: ring.x - chipW - 22, y: midY, w: chipW, h: ch }, lo, hi);
+        else if (Bm - (ring.y + ring.h) >= ch + 24) r = settle({ x: clampX(ring.x + 12), y: ring.y + ring.h + 16, w: chipW, h: ch }, lo, hi);
+        else if (ring.y - img.y >= ch + 24) r = settle({ x: clampX(ring.x + 12), y: ring.y - ch - 16, w: chipW, h: ch }, lo, hi);
+        else r = settle({ x: clampX(ring.x + 14), y: Math.max(lo, ring.y + 14), w: chipW, h: ch }, lo, hi);
+      }
+      // The leader: from the chip to the ring, nearest edge to nearest edge.
+      const inside = r.x >= ring.x && r.x + r.w <= ring.x + ring.w && r.y >= ring.y && r.y + r.h <= ring.y + ring.h;
+      const a = near(ring, r.x + r.w / 2, r.y + r.h / 2), z = near(r, a.x, a.y);
+      out += `<g class="hb-a-fade" ${H.d(t)}>
+        <rect x="${ring.x.toFixed(1)}" y="${ring.y.toFixed(1)}" width="${ring.w.toFixed(1)}" height="${ring.h.toFixed(1)}" rx="10" fill="none" stroke="${C.warn}" stroke-width="4"/>
+        ${inside ? '' : `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${z.x.toFixed(1)}" y2="${z.y.toFixed(1)}" stroke="${C.warn}" stroke-width="2.5"/>`}
+        <rect x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${r.w}" height="${r.h.toFixed(1)}" rx="12" fill="${C.ground}" fill-opacity=".95" stroke="${C.warn}" stroke-width="2"/>
+        <circle cx="${(r.x + 26).toFixed(1)}" cy="${(r.y + r.h / 2).toFixed(1)}" r="${(fs * 0.62).toFixed(1)}" fill="${C.warn}"/>
+        ${H.text(r.x + 26, r.y + r.h / 2 + fs * 0.34, String(i + 1), Math.round(fs * 0.8), `text-anchor="middle" font-weight="800" fill="${C.ground}"`)}
+        ${H.text(r.x + 52, r.y + fs * 0.45 + lh * 0.75, '', fs, `fill="${C.text}"`, lines, 1.25)}</g>`;
+    });
+    return out;
+  }
+
+  // ── tally: a quick run through a list, each item as it is said ──
+  function drawTally(s, b, L, H) {
+    const { W, H: SH, F, pad, narrow } = L, C = H.C;
+    const items = (s.items || []).slice(0, 16);
+    if (!items.length) return '';
+    const n = items.length;
+    const cols = narrow ? 2 : n <= 4 ? 2 : n <= 12 ? 3 : 4, rows = Math.ceil(n / cols), gap = narrow ? 12 : 16;
+    const top = pad * 0.6, bottom = SH - L.foot - 12;
+    const cw = (W - pad * 2 - gap * (cols - 1)) / cols;
+    const ch = Math.min(narrow ? 92 : 96, (bottom - top - gap * (rows - 1)) / rows);
+    // As large as lets every item stand whole on two lines.
+    let fs = Math.max(F.xs, Math.min(narrow ? F.s : F.m, ch * 0.3));
+    const iconOf = it => (it.icon ? fs * 1.7 : 0);
+    while (fs > F.xs && items.some(it => H.wrap(it.text, H.charsFor(cw - 32 - iconOf(it), fs), 2).some(l => l.endsWith('…')))) fs -= 1;
+    const y0 = top + Math.max(0, (bottom - top - (rows * ch + (rows - 1) * gap)) / 2);
+    const times = cueTimes(s, b, H, items);
+    let out = '';
+    items.forEach((it, i) => {
+      const x = pad + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
+      const iconW = it.icon ? fs * 1.7 : 0;
+      const lines = H.wrap(it.text, H.charsFor(cw - 32 - iconW, fs), 2);
+      const ty = y + ch / 2 - (lines.length - 1) * fs * 0.6 + fs * 0.35;
+      out += `<g class="hb-a-pop" ${H.d(times[i])}>
+        <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${cw.toFixed(1)}" height="${ch.toFixed(1)}" rx="14" fill="${C.ground2}" stroke="${C.grid}" stroke-width="2"/>
+        ${it.icon ? H.text(x + 16 + fs * 0.7, y + ch / 2 + fs * 0.38, it.icon, Math.round(fs * 1.15), 'text-anchor="middle"') : ''}
+        ${H.text(x + 16 + iconW, ty, '', fs, `fill="${C.text}" font-weight="600"`, lines, 1.2)}</g>`;
+    });
+    return out;
+  }
+
   // ── signoff: the presenter's line, and where to go next ──
   function drawSignoff(s, b, L, H) {
     const { W, H: SH, F, pad, narrow } = L, C = H.C;
@@ -567,6 +740,7 @@ const Explainers = (() => {
       document.addEventListener('fullscreenchange', fullscreenChanged);
       document.addEventListener('webkitfullscreenchange', fullscreenChanged);
     }
+    loadShots();
     P.init();
     if (typeof registerTabTeardown === 'function') registerTabTeardown('Videos', stop);
   }
@@ -581,7 +755,7 @@ const Explainers = (() => {
     render: () => P.render(), init, stop, bigPlay,
     meeting, wake, copyLink, keepIt, restoreFromUrl,
     // For the tests: the scenes' own drawers and the live counts.
-    _x: () => ({ ...X }), _liveCount: liveCount, _tabOf: tabOf, SKETCHES, PARTS, WORDS,
+    _x: () => ({ ...X }), _liveCount: liveCount, _tabOf: tabOf, _cueIndex: cueIndex, _shots: () => SHOTS.index, SKETCHES, PARTS, WORDS,
   };
 })();
 

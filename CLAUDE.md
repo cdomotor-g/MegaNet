@@ -57,6 +57,11 @@
 - The historical **inspection archive** (the workbook and its derived `data/inspections/` files) lives in the private `cdomotor-g/flood-net-private` repository, never here — `.gitignore` refuses it. The ingest tools find it through `tools/ingest/private.py`; its checks run in that repository. A session that needs it attaches that repository and clones it beside this one.
 - **Pending, #239:** this repository's git history still holds the old archive until the owner runs the rewrite (Part 2). Until then, don't pull content out of old commits, and expect every commit ID to change when it runs — the follow-up on #239 translates the IDs cited in the roadmap and docs.
 
+## Videos — their screenshots go stale
+- The 🎬 Videos (`explainers.js`, EPIC #262) show real screenshots of the app: `data/explainers/shots/`, each listed with the parts it points at in `tools/explainers/shots.json`. When you change a tab so that a screenshot of it no longer looks like it — the parts it points at moved, renamed or restyled — take the shot again **in the same push**: `node tools/explainers/shoot.mjs --tab <tab id>` (from the live site; before a deploy, `--base` a local server — `tools/explainers/README.md`, *Screenshots*). It is free: nothing is voiced.
+- `npm run explainers` fails a shot whose parts have gone from its page; a restyle it cannot see is yours to notice, so look at the shots of a tab you changed.
+- If a change makes a video's **words** wrong, say so on the video's issue — the words are the owner's to approve again, and voicing the changed scenes spends ElevenLabs credits. Never mark a video `"voice": "final"` without the owner's OK on its issue.
+
 ## Raising issues for AI agents
 - If a new issue is something an AI coding agent (e.g. Claude Code) could pick up and complete, recommend a model and effort level for it.
 - Put the recommendation as a tag at the very start of the issue title, so it's visible at a glance in issue lists — no need to open the issue to see it. Format: `[<Model>/<Effort>] <title>`.

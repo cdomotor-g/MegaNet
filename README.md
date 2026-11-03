@@ -6177,8 +6177,13 @@ Network Bulletin's own player (`makeShowPlayer`, `health-bulletin.js`): each
 scene drawn from a small file, the words revealed as they are said, *Read it
 instead* the whole script, and the stations a scene names a press away on the
 map. A drawing of a tab is a sketch, never a screenshot, its name read from the
-nav as it is now; a number in a video is counted when it plays — so the
-voices, said once, never go stale.
+nav as it is now; a **shot** is the app itself — a screenshot of a tab taken
+from the site by `tools/explainers/shoot.mjs`, zoomed in on the part a scene
+is about and each part ringed and named as it is said; a **tally** runs
+through a list, each tile on the word that names it; a number in a video is
+counted when it plays — so the voices, said once, never go stale. When a tab
+changes, its shots are taken again (free, nothing voiced), and `npm run
+explainers` fails a shot whose parts have gone from the app.
 
 **⛶ Full screen** (or F) is for a meeting room: the picture fills the screen,
 the words large under it, the bar hidden while it plays; a presentation
