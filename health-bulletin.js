@@ -899,7 +899,10 @@ function makeShowPlayer(cfg = {}) {
       const km = +s.focus.km || 80, dl = km / 111.32, dn = km / (111.32 * Math.cos(s.focus.lat * Math.PI / 180));
       bb = { s: s.focus.lat - dl, n: s.focus.lat + dl, w: s.focus.lon - dn, e: s.focus.lon + dn };
     } else {
-      const pts = [...marks, ...areas, ...links.flatMap(x => [x.a, x.z])];
+      let pts = [...marks, ...areas, ...links.flatMap(x => [x.a, x.z])];
+      // A scene that names nothing — a video's look at the whole network —
+      // shows every station on file, the farthest hundredth each way left out.
+      if (!pts.length) pts = networkExtent();
       bb = pts.reduce((o, p) => ({ s: Math.min(o.s, p.lat), n: Math.max(o.n, p.lat), w: Math.min(o.w, p.lon), e: Math.max(o.e, p.lon) }),
         { s: Infinity, n: -Infinity, w: Infinity, e: -Infinity });
       areas.forEach(a => { const dl = a.km / 111.32; bb.s = Math.min(bb.s, a.lat - dl); bb.n = Math.max(bb.n, a.lat + dl); });
@@ -1039,6 +1042,14 @@ function makeShowPlayer(cfg = {}) {
     });
     out += badges + labels + scaleBar(P, box, F);
     return out;
+  }
+  function networkExtent() {
+    const all = ((typeof state !== 'undefined' && state.data && state.data.stations) || [])
+      .filter(st => Number.isFinite(+st.lat) && Number.isFinite(+st.lon) && +st.lat !== 0);
+    if (!all.length) return [{ lat: -27.5, lon: 153 }];          // Brisbane, with nothing loaded
+    const q = (xs, f) => { const v = xs.slice().sort((a, b) => a - b); return v[Math.min(v.length - 1, Math.max(0, Math.round(f * (v.length - 1))))]; };
+    const la = all.map(st => +st.lat), lo = all.map(st => +st.lon);
+    return [{ lat: q(la, 0.01), lon: q(lo, 0.01) }, { lat: q(la, 0.99), lon: q(lo, 0.99) }];
   }
   function projector(bb, box) {
     const mid = (bb.s + bb.n) / 2, kx = Math.cos(mid * Math.PI / 180);

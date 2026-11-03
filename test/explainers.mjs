@@ -29,8 +29,9 @@
 //   * ?watch=<id> opens the tab on that video, armed to go full screen on its
 //     first ▶, and takes itself out of the address; no page errors
 //   * the cards, the Draft chip on a draft; every scene drawn wide and tall as
-//     SVG; a feature names its tab as TABS has it now; a figure counts the
-//     stations this page has loaded
+//     SVG; a map that names nothing draws the whole network; a feature names
+//     its tab as TABS has it now; a figure counts the stations this page has
+//     loaded
 //   * Play runs it; Page Down and Page Up move a scene; F fills the screen and
 //     Esc leaves; at the end, full screen, the stage stays (a meeting is not
 //     thrown out of full screen by the last scene)
@@ -302,6 +303,8 @@ try {
     return { i, type: s.type, wide: one(false), tall: one(true) };
   }), FIXTURE);
   ok('every scene is drawn as SVG, wide and tall', draws.every(d => !d.wide.bad && !d.tall.bad && !/could not be drawn|does not know how/.test(d.wide.text + d.tall.text)), JSON.stringify(draws.filter(d => d.wide.bad || d.tall.bad || /could not|does not know/.test(d.wide.text + d.tall.text)).map(d => d.type)));
+  const net = await pg.evaluate(fx => { const svg = Explainers._draw(fx.scenes[2], fx, false); return { dots: (svg.match(/<circle /g) || []).length, stations: state.data.stations.length }; }, FIXTURE);
+  ok('a map scene that names nothing draws the whole network', net.dots > net.stations * 0.8, JSON.stringify(net));
   const label = await pg.evaluate(() => TAB_LIST.find(t => t.id === 'health').label);
   ok('a feature names its tab as TABS has it now', draws[3].wide.text.includes(label), `${label} not in: ${draws[3].wide.text.slice(0, 200)}`);
   const counted = await pg.evaluate(fx => { const svg = Explainers._draw(fx.scenes[1], fx, false); const m = /data-count="(\d+)"/.exec(svg); return { n: m && +m[1], stations: state.data.stations.length }; }, FIXTURE);
