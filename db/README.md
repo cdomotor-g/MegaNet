@@ -715,18 +715,22 @@ before its first row, so two receivers posting one burst at once take turns
 rather than both storing it. ALERT2 self-reports and station-number readings
 carry the station's own time and keep the exact key.
 
-**An ALERT2 report the ELPRO gateway republished is one reading (`0097`).** The
-gateway relaying ALERT2 over MQTT publishes a station's last report again every
-15 minutes and on the hour, under a fresh publish time, until the station sends
-something new; the bridge filed each one as a reading until 2 November 2026,
-when `bridge/src/resends.js` started telling them apart by the relayed station's
-own `AlertTimestamp`. `0097` takes the same rule back over the messages still in
-`reading_raw`: per topic and sensor slot, the same stamp and value within 10 s of
-its first sighting is a copy (removed, and counted on that reading's
-`dup_count`), within 11 hours a repeat (removed), and otherwise a report (kept).
-It rebuilds `reading_hourly` and `reading_daily` for the buckets it changed, and
-leaves `reading_raw` and the readings from before the raw window alone.
-`tools/check_alert2_republished.sql` proves it.
+**ELPRO ALERT2 relay readings: one per transmission, copies counted (`0097`,
+`0098`).** `0097` took an ALERT2 set the gateway sent again with the same
+`AlertTimestamp` and value, minutes or hours later, for a republish and removed
+it. That was wrong — the bench stations transmit on their own rhythm (Station
+1000 every 15 minutes, 1001–1003 about hourly) and their stamps simply do not
+move — and `0098` puts those readings back, from `reading_raw`, through
+`ingest()`. What it keeps out is only what does repeat: the same stamp and value
+within 10 s of the slot's last reading is a copy, counted on that reading's
+`dup_count`, and a message with the same bytes as an earlier one (a retained
+hand-over or a redelivery) is not a message of its own — a row one stored for a
+copy is removed, and its other rows are re-linked to the original. It also puts
+back the legacy `Alert1` reports a bridge restart cut short (the bridge's own
+rule, walked over the whole feed), and rebuilds `reading_hourly` and
+`reading_daily` for the buckets it changed. The bridge has followed the same
+rule since 3 November (`bridge/src/resends.js`).
+`tools/check_alert2_restored.sql` proves the two together.
 
 A station that transmits both ways has two addresses, and they do not deduplicate
 against each other. That is correct — they are two transmissions — and it is the

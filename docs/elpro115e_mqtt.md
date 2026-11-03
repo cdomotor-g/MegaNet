@@ -213,16 +213,16 @@ a queue of 1, and each one is a single publish with one time, not a backlog. Lea
 on: it is the store-and-forward that keeps an outage's reports, and the bridge drops what it
 replays twice.
 
-**5 · The ALERT2 path republishes as well — on a timer.** Every ALERT2 set carries an
-`AlertTimestamp` (the relayed station's own stamp, seconds since its most recent 00:00 or
-12:00), and on the bench the same stamp and values come back about every 15 minutes and
-on the hour, each time with a fresh `timestamp`, for as long as the station sends nothing
-new — in the month to 2 November 2026, 22,261 values for about 2,100 reports. The bridge
-now stores each report once (see `bridge/README.md`). The bench stations' clocks keep
-none of UTC, AEST or AEDT, so the stamp says *which* report this is but not *when* it was
-sent; the reading is filed at the gateway's time for its first publish. If the unit's
-**Update Time** on these inputs is what drives the republishing, setting it to 0 and
-relying on **Sensitivity** would stop it — **record what you find**.
+**5 · The ALERT2 path does not republish — but the bench stamps stand still.** Every
+ALERT2 set carries an `AlertTimestamp` (the relayed station's own stamp, seconds since its
+most recent 00:00 or 12:00). On the bench the same stamp comes back for hours while the
+values move: each station has its own rhythm (Station 1000 every 15 minutes, 1001–1003
+about hourly) and the bench units' clocks do not always advance the stamp. These are real
+transmissions — on 2 November they were briefly taken for the gateway republishing and
+dropped, and were put back the next day (`0098`). What does repeat is the same burst
+published twice within a second or two (about half of 1001–1003's messages); the bridge
+counts the second as a copy of the first. The stamp says neither *when* a report was sent
+(the bench clocks keep none of UTC, AEST or AEDT) nor, on the bench, *which* report it is.
 
 **Optional: capture the whole ELPRO tree.** Setting the Topic Prefix one level deeper —
 `meganet/v1/<station>/logger/reading/elpro/` — puts *everything* the gateway emits under

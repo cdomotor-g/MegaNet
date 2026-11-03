@@ -1,6 +1,11 @@
 -- 0097_alert2_republished_readings.sql — An ALERT2 report the ELPRO gateway
 -- published again is one reading, not one per publish.
 --
+-- SUPERSEDED BY 0098. The premise below was wrong: the gateway does not
+-- republish ALERT2 — the bench stations transmit on their own rhythm and their
+-- stamps simply do not move — so most of the "repeats" this removed were real
+-- transmissions. 0098 puts them back. Kept as it ran, because it ran.
+--
 -- Forward-only, idempotent, no begin/commit — see db/README.md:
 --
 --   psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction \
