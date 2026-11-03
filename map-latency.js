@@ -3188,6 +3188,16 @@ const MapLatency = (() => {
     // it glows once.
     const legGlow = new Map(), nodeGlow = new Map();
     const solo = soloActive(), shown = new Map();
+    // A station grouped into one of MapCluster's bubbles flashes the bubble —
+    // its place and its size — and no pulse runs along a link with an end in
+    // one: the link is under the bubble, and the bubble lighting is the
+    // message landing (map-cluster.js). Not under Activity only, which hides
+    // the bubbles with every pin and draws each lit station itself.
+    const bub = id => (!solo && typeof MapCluster !== 'undefined' ? MapCluster.bubbleOf(id) : null);
+    // …and a bubble glows once, at its brightest station's: a replay lights
+    // hundreds of stations in one, and each stamping its own ring there
+    // painted the ring solid and cost the frame.
+    const glowKey = id => { const b = bub(id); return b ? 'b' + b.key : id; };
     for (const p of pulses) {
       const e0 = t - p.t0;
       for (const l of p.legs) {
@@ -3197,7 +3207,8 @@ const MapLatency = (() => {
       }
       for (const n of p.nodes) {
         const g = glowAt(e0 - n.end, p);
-        if (g > (nodeGlow.has(n.id) ? nodeGlow.get(n.id).g : 0)) nodeGlow.set(n.id, { n, g, kind: n.kind });
+        const k = g > 0 ? glowKey(n.id) : null;
+        if (k != null && g > (nodeGlow.has(k) ? nodeGlow.get(k).g : 0)) nodeGlow.set(k, { n, g, kind: n.kind });
         if (solo) {
           const from = p.still ? 0 : n.start;
           const a = shownAt(e0 - from, n.end - from, p);
@@ -3205,12 +3216,6 @@ const MapLatency = (() => {
         }
       }
     }
-    // A station grouped into one of MapCluster's bubbles flashes the bubble —
-    // its place and its size — and no pulse runs along a link with an end in
-    // one: the link is under the bubble, and the bubble lighting is the
-    // message landing (map-cluster.js). Not under Activity only, which hides
-    // the bubbles with every pin and draws each lit station itself.
-    const bub = id => (!solo && typeof MapCluster !== 'undefined' ? MapCluster.bubbleOf(id) : null);
     const inBubble = e => !!(e && (bub(e.fromId) || bub(e.toId != null ? e.toId : e.to)));
     const nodeLL = (id, ll) => { const b = bub(id); return b ? b.latlng : (pinAt(id) || ll); };
     // Off the pins and links as they are now: a rebuild since can have hidden
@@ -3230,7 +3235,31 @@ const MapLatency = (() => {
       const len = Math.hypot(bx - ax, by - ay);
       if (len > 1) fn(ax, ay, bx, by, len, ra + 3, len - rb - 3);
     };
-    legGlow.forEach(({ e, g, kind }) => { if (!inBubble(e)) span(e, (ax, ay, bx, by, len, a, b) => stroke(ax, ay, bx, by, len, a, b, 'glow', g, kind)); });
+    // The bubbles are in front of this canvas as they are of the pins
+    // (map-cluster.js): a bubble's ring and flare go behind the bubbles beside it,
+    // a pin's behind every bubble, and the pulses along the links behind them
+    // all — a glow over a neighbour hid its count for a minute. A pin kept
+    // over the bubbles (the card's station, the selection) has nothing in
+    // front of it. Each disc out to the bubble's pale edge, in this canvas's
+    // pixels, those on the screen only.
+    const discs = [];
+    if (!solo && typeof MapCluster !== 'undefined' && MapCluster.discs) {
+      for (const d of MapCluster.discs()) {
+        const [x, y] = at(d.latlng);
+        if (x + d.r > 0 && y + d.r > 0 && x - d.r < size.x && y - d.r < size.y) discs.push({ x, y, r: d.r, key: d.key });
+      }
+    }
+    const coverOf = id => {
+      if (!discs.length || MapCluster.overBubbles(id)) return null;
+      const b = bub(id);
+      return b ? discs.filter(d => d.key !== b.key) : discs;
+    };
+    const links = fn => {
+      const on = clipOut(discs, 0, 0, size.x, size.y);
+      fn();
+      if (on) pctx.restore();
+    };
+    links(() => legGlow.forEach(({ e, g, kind }) => { if (!inBubble(e)) span(e, (ax, ay, bx, by, len, a, b) => stroke(ax, ay, bx, by, len, a, b, 'glow', g, kind)); }));
     // Activity only: the map's own pins are hidden, and each station a pulse
     // has lit is drawn here as the map draws it, under its ring and its flare.
     if (solo) {
@@ -3246,11 +3275,11 @@ const MapLatency = (() => {
       const r = radius(n.id);
       if (r == null) return;
       const [x, y] = at(nodeLL(n.id));
-      ring(x, y, r, g, kind);
+      ring(x, y, r, g, kind, coverOf(n.id));
     });
     // The links first and the nodes over them, as the logo stacks them. A
     // missed link does not run: it is lit, pin to pin, for its time.
-    for (const p of pulses) {
+    links(() => { for (const p of pulses) {
       const e0 = t - p.t0;
       if (p.still && e0 >= p.stillMs) continue;
       for (const l of p.legs) {
@@ -3270,17 +3299,28 @@ const MapLatency = (() => {
         stroke(ax, ay, bx, by, len, head - TRAIL_PX, head, 'trail', 1, l.kind);
         stroke(ax, ay, bx, by, len, head - SPARK_PX, head, 'spark', 1, l.kind);
       }
-    }
+    } });
+    // A bubble flares once a frame, at its brightest station's, as it glows.
+    const flares = new Map();
     for (const p of pulses) {
       const e0 = t - p.t0;
       for (const n of p.nodes) {
         const f = p.still ? (e0 >= 0 && e0 < p.stillMs ? [0.9, 1] : null) : flareAt(e0 - n.start);
         if (!f) continue;
-        const [x, y] = at(nodeLL(n.id, n.ll));
         const b = bub(n.id);
-        flare(x, y, b ? b.radius : n.r, f[0], f[1], n.kind);
+        if (b) {
+          const k = 'b' + b.key, was = flares.get(k);
+          if (!was || f[0] > was.f[0]) flares.set(k, { n, b, f });
+          continue;
+        }
+        const [x, y] = at(nodeLL(n.id, n.ll));
+        flare(x, y, n.r, f[0], f[1], n.kind, coverOf(n.id));
       }
     }
+    flares.forEach(({ n, b, f }) => {
+      const [x, y] = at(b.latlng);
+      flare(x, y, b.radius, f[0], f[1], n.kind, coverOf(n.id));
+    });
     pctx.globalAlpha = 1;
     pctx.shadowBlur = 0;
     pctx.setLineDash([]);
@@ -3334,17 +3374,41 @@ const MapLatency = (() => {
     }
     return c;
   }
-  function stamp(c, x, y, half, alpha) {
+  // `cover`: the discs in front of it (drawPulses), kept clear of it.
+  function stamp(c, x, y, half, alpha, cover) {
     pctx.globalAlpha = Math.max(0, Math.min(1, alpha));
     pctx.shadowBlur = 0;
+    const clipped = !!cover && clipOut(cover, x - half, y - half, x + half, y + half);
     pctx.drawImage(c, x - half, y - half, 2 * half, 2 * half);
+    if (clipped) pctx.restore();
+  }
+
+  // What is drawn next kept off `discs` ({ x, y, r }, which do not overlap —
+  // MapCluster settles its bubbles apart), inside the box x0..x1, y0..y1 it
+  // is drawn in: the box with a hole for each disc that reaches into it.
+  // True when it saved the context to clip it, and the caller restores it.
+  function clipOut(discs, x0, y0, x1, y1) {
+    let on = false;
+    for (const d of discs || []) {
+      if (d.x + d.r <= x0 || d.x - d.r >= x1 || d.y + d.r <= y0 || d.y - d.r >= y1) continue;
+      if (!on) {
+        pctx.save();
+        pctx.beginPath();
+        pctx.rect(x0, y0, x1 - x0, y1 - y0);
+        on = true;
+      }
+      pctx.moveTo(d.x + d.r, d.y);
+      pctx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
+    }
+    if (on) pctx.clip('evenodd');
+    return on;
   }
 
   // A node's flare over a pin of radius r: the logo's halo and hot core
   // (.load-logo i::before, ::after), sized to the pin as the logo sizes them to
   // its node, in the colours of what is known of it — at opacity `op` and
   // scale `sc`.
-  function flare(x, y, r, op, sc, tone) {
+  function flare(x, y, r, op, sc, tone, cover) {
     const T = HOPS[tone] && HOPS[tone].halo ? HOPS[tone] : HOPS.heard;
     const s = Math.max(14, 2 * r + 2);
     const halo = 2.4 * s, core = 0.62 * s;
@@ -3369,14 +3433,14 @@ const MapLatency = (() => {
       ctx.shadowBlur = 8;
       ctx.beginPath(); ctx.arc(h, h, core, 0, 2 * Math.PI); ctx.fill();
     });
-    stamp(c, x, y, half * sc, op);
+    stamp(c, x, y, half * sc, op, cover);
   }
 
   // A node's afterglow: a ring round the pin with a soft halo outside it, the
   // pin itself left clear so its own colour still reads. Clipped to outside
   // the ring's inner edge: the stroke's shadow blurs inward too, and round a
   // radius-4 pin it washed the whole pin a quarter green.
-  function ring(x, y, r, g, tone) {
+  function ring(x, y, r, g, tone, cover) {
     const T = HOPS[tone] && HOPS[tone].ring ? HOPS[tone] : HOPS.heard;
     const R = r + 3;
     const half = Math.ceil(R + 12);
@@ -3400,7 +3464,7 @@ const MapLatency = (() => {
       ctx.shadowBlur = 8;
       ctx.beginPath(); ctx.arc(h, h, R, 0, 2 * Math.PI); ctx.stroke();
     });
-    stamp(c, x, y, half, g);
+    stamp(c, x, y, half, g, cover);
   }
 
   // The card's line again, in place — a repaint of the pane would take the

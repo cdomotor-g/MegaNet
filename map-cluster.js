@@ -44,6 +44,12 @@
 // every pin is its own: a station is a few hundred metres from its neighbours
 // there, and the ones on one site fan out as they always did (map-spider.js).
 //
+// A bubble is drawn at its stations' middle, which can be off its seed by up
+// to MERGE_PX, so two of them could come to lie over each other — one count
+// hiding the other — or over a pin left on its own, which then could be
+// neither seen nor pressed. So, settled last: any two whose discs, out to the
+// pale edge, come nearer than GAP_PX are one bubble, and again, until none do.
+//
 // ── What a bubble says ───────────────────────────────────────────────────────
 // Its count, and its colour by the colouring the pins wear (Bubble colour):
 //
@@ -56,7 +62,9 @@
 // With the pins in their role colours a bubble is always a mix: roles are
 // kinds, not a scale. Hovering one says what is in it; pressing it zooms to
 // its stations. A message from a station in a bubble flashes the bubble, and
-// its pulse does not run along the links inside it (map-latency.js).
+// its pulse does not run along the links inside it (map-latency.js). Its glow
+// stays behind the other bubbles: they are in front of the pulse canvas's
+// glows, flares and pulses (discs, overBubbles), as they are of the pins.
 
 const MapCluster = (function () {
   const LS_ON = 'mn-map-cluster';
@@ -65,13 +73,15 @@ const MapCluster = (function () {
   const MERGE_PX = 56;        // pins nearer than this on the screen share a bubble
   const MAX_ZOOM = 11;        // zoomed in past this, every station has its own pin
   const RING_W = 4.5;         // a mix's ring, in px
+  const EDGE_PX = 2.5;        // a bubble's pale edge, past its radius
+  const GAP_PX = 2;           // the least room between a bubble and the next, or a pin
   const WHITE = '#ffffff';
 
   // The words Map display and the legend use, on hover where they are used
   // and in the panel's own note (core.js's rule: hover never reaches a finger).
   const WORDS = {
     'Group nearby pins': `Zoomed out, stations closer together than about ${MERGE_PX} pixels on the screen are drawn as one `
-      + `bubble saying how many there are. Zoom in, or press a bubble, and they come apart; from zoom ${MAX_ZOOM + 1} every `
+      + `bubble saying how many there are, and bubbles that would overlap become one. Zoom in, or press a bubble, and they come apart; from zoom ${MAX_ZOOM + 1} every `
       + 'station has its own pin. The selected station, the map selection, a filter\'s matches and the stations a focused '
       + 'repeater serves always keep their own pins.',
     'Bubble colour': 'How a bubble is coloured while the pins are coloured by health or by ⏱️ Latency. With the pins in their '
@@ -102,6 +112,7 @@ const MapCluster = (function () {
     map: null,
     bubbles: [],          // the bubble layers on the map now
     byId: new Map(),      // station id → its bubble, for the pins in one
+    over: new Set(),      // the ids of the pins kept over the bubbles
     clustered: new Set(), // the markers in a bubble now
     drawn: null,          // the pins last handed to the fan-out and the stack
     hadBubbles: false,
@@ -136,7 +147,7 @@ const MapCluster = (function () {
         ctx.globalAlpha = o.mnDim ? 0.5 : 1;
         // A pale edge first, so a bubble reads over the lines and the tiles.
         ctx.beginPath();
-        ctx.arc(p.x, p.y, r + 2.5, 0, Math.PI * 2, false);
+        ctx.arc(p.x, p.y, r + EDGE_PX, 0, Math.PI * 2, false);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
         ctx.fill();
         let ink;
@@ -268,6 +279,55 @@ const MapCluster = (function () {
     for (const b of S.bubbles) b.remove();
     S.bubbles = [];
     S.byId = new Map();
+    S.over = new Set();
+  }
+
+  // How far out a group is drawn: a bubble to its pale edge, a pin to its ring.
+  const reachOf = g => (g.members.length > 1 ? radiusFor(g.members.length) + EDGE_PX
+    : (g.members[0].options.radius || 6) + 1);
+
+  // The groups again with every two that would touch made one (see the
+  // header), on the same zoom pixels. A grid of cells as wide as the furthest
+  // two can be apart and still touch keeps each pass to the near ones; a pass
+  // that made one moved its middle, so another follows until one makes none.
+  function settle(groups, most) {
+    const cell = 2 * (radiusFor(most) + EDGE_PX) + GAP_PX;
+    const at = g => `${Math.floor(g.cx / cell)},${Math.floor(g.cy / cell)}`;
+    const middle = g => { g.cx = g.sx / g.members.length; g.cy = g.sy / g.members.length; };
+    for (let pass = 0; pass < 64; pass++) {
+      const grid = new Map();
+      for (const g of groups) {
+        middle(g);
+        const k = at(g);
+        const list = grid.get(k);
+        if (list) list.push(g); else grid.set(k, [g]);
+      }
+      let merged = false;
+      for (const a of groups) {
+        if (a.gone || a.members.length < 2) continue;
+        const cx = Math.floor(a.cx / cell), cy = Math.floor(a.cy / cell);
+        for (let i = -1; i <= 1; i++) {
+          for (let j = -1; j <= 1; j++) {
+            const list = grid.get(`${cx + i},${cy + j}`);
+            if (!list) continue;
+            for (const b of list) {
+              if (b === a || b.gone) continue;
+              const need = reachOf(a) + reachOf(b) + GAP_PX;
+              const dx = b.cx - a.cx, dy = b.cy - a.cy;
+              if (dx * dx + dy * dy >= need * need) continue;
+              for (const m of b.members) a.members.push(m);
+              a.sx += b.sx; a.sy += b.sy;
+              b.gone = true;
+              middle(a);
+              merged = true;
+            }
+          }
+        }
+      }
+      if (!merged) break;
+      groups = groups.filter(g => !g.gone);
+    }
+    return groups;
   }
 
   // Group the pins for this zoom, draw the bubbles, and tell the pins which
@@ -282,7 +342,7 @@ const MapCluster = (function () {
     if (active()) {
       const z = map.getZoom();
       const seeds = new Map();
-      const groups = [];
+      let groups = [];
       const kept = [];
       for (const m of markers) {
         if (keepsOwnPin(m)) { kept.push(m); continue; }
@@ -316,6 +376,7 @@ const MapCluster = (function () {
           if (list) list.push(g); else seeds.set(k, [g]);
         }
       }
+      groups = settle(groups, markers.length);
       const Cls = bubbleClass();
       for (const g of groups) {
         if (g.members.length < 2) continue;
@@ -347,7 +408,13 @@ const MapCluster = (function () {
       // The pins that keep their own are drawn over the bubbles: a bubble of
       // a station's neighbours is often centred near it, and the card's gold
       // line ending on a bubble is a line ending on the wrong thing.
-      if (S.bubbles.length) for (const m of kept) if (m._map && m.bringToFront) m.bringToFront();
+      if (S.bubbles.length) {
+        for (const m of kept) {
+          if (!m._map || !m.bringToFront) continue;
+          m.bringToFront();
+          if (m.mnStationId != null) S.over.add(m.mnStationId);
+        }
+      }
     }
     // The pins that went into a bubble or came out of one are drawn again:
     // the canvas once, whole, rather than each of thousands of pins asking
@@ -502,14 +569,24 @@ const MapCluster = (function () {
   }
 
   // Where a message from this station is to flash (map-latency.js): its
-  // bubble's place and size, or null for a station with its own pin.
+  // bubble's place and size, and `key` to know it among discs(), or null for
+  // a station with its own pin.
   function bubbleOf(id) {
     const b = S.byId.get(id);
-    return b && b._map ? { latlng: b.getLatLng(), radius: b.options.radius } : null;
+    return b && b._map ? { latlng: b.getLatLng(), radius: b.options.radius, key: L.stamp(b) } : null;
   }
 
+  // What the pulse canvas is to keep its glows behind (map-latency.js): every
+  // bubble on the map, its disc out to the pale edge. A bubble is in front of
+  // the others' glows, the pins under it and the links, and a pin kept over
+  // the bubbles (overBubbles) in front of them all.
+  function discs() {
+    return S.bubbles.filter(b => b._map).map(b => ({ latlng: b.getLatLng(), r: b.options.radius + EDGE_PX, key: L.stamp(b) }));
+  }
+  const overBubbles = id => S.over.has(id);
+
   return {
-    attach, detach, rebuild, soon, setOn, setHow, sectionHtml, legendHtml, altText, bubbleOf, noteHtml, paintNote,
+    attach, detach, rebuild, soon, setOn, setHow, sectionHtml, legendHtml, altText, bubbleOf, discs, overBubbles, noteHtml, paintNote,
     on: () => S.on, how: () => S.how, active,
     // what is drawn, for test/clusters.mjs
     _state: () => ({
@@ -518,7 +595,7 @@ const MapCluster = (function () {
         at: b.getLatLng(), ids: b.mnCluster.members.map(m => m.mnStationId),
       })), clustered: S.clustered.size,
     }),
-    WORDS, MERGE_PX, MAX_ZOOM,
+    WORDS, MERGE_PX, MAX_ZOOM, EDGE_PX, GAP_PX,
   };
 })();
 

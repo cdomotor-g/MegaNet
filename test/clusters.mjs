@@ -21,7 +21,11 @@
 //   7. **⏱️ Latency** by age, on the same batch: Worst the furthest band down
 //      any of them is in, Average the band of their mean age.
 //   8. **A message** from a station in a bubble flashes the bubble — the flare's
-//      white-hot core at the bubble, not at the station under it.
+//      white-hot core at the bubble, not at the station under it — and its
+//      ring stays behind the bubble beside it rather than over its count.
+//
+// And at every zoom checked, no two bubbles overlap and no pin left on its own
+// is under one (map-cluster.js settles them apart).
 //
 // The datastore's station_health is stood in for by route; everything else
 // off-origin is refused (lib/network.mjs). Under automation the bubbles are
@@ -103,6 +107,30 @@ try {
   check('each bubble\'s count is the stations in it, and every bubble holds two or more',
     S.bubbles.every(b => b.n === b.ids.length && b.n >= 2) && S.bubbles.reduce((a, b) => a + b.n, 0) === S.clustered, '');
   check('the map\'s name says how many are grouped', /grouped into \d[\d,]* bubbles of nearby stations/.test(S.name), S.name);
+  const apart = await page.evaluate(async () => {
+    const map = state.map, c0 = map.getCenter(), z0 = map.getZoom();
+    const out = [];
+    for (const z of [5, 6, 7, 9]) {
+      await new Promise(r => { map.once('zoomend', r); map.setView([-27.4, 152.6], z, { animate: false }); });
+      const discs = MapCluster.discs().map(d => ({ p: map.latLngToLayerPoint(d.latlng), r: d.r }));
+      let touch = 0, under = 0;
+      for (let i = 0; i < discs.length; i++) {
+        for (let j = i + 1; j < discs.length; j++) {
+          if (discs[i].p.distanceTo(discs[j].p) < discs[i].r + discs[j].r) touch++;
+        }
+      }
+      for (const m of state.mapMarkers) {
+        if (!m._map || m._mnClustered || MapCluster.overBubbles(m.mnStationId)) continue;
+        const p = map.latLngToLayerPoint(m.getLatLng());
+        if (discs.some(d => p.distanceTo(d.p) < d.r + (m.options.radius || 6))) under++;
+      }
+      out.push({ z, bubbles: discs.length, touch, under });
+    }
+    await new Promise(r => { map.once('zoomend', r); map.setView(c0, z0, { animate: false }); });
+    return out;
+  });
+  check('no two bubbles overlap, and no pin left on its own is under a bubble, at zooms 5, 6, 7 and 9',
+    apart.every(a => a.bubbles > 0 && a.touch === 0 && a.under === 0), J(apart));
   const hit = await page.evaluate(() => {
     const m = state.mapMarkers.find(x => x._mnClustered);
     const r = m._renderer;
@@ -319,6 +347,43 @@ try {
   const hot = c => c && c[3] > 120 && c[0] > 200 && c[1] > 200 && c[2] > 200;
   check('the message flashes its bubble: the flare\'s white-hot core is on the bubble, not on the station under it',
     !flash.none && hot(flash.atBubble) && !hot(flash.atStation), J(flash));
+  // The bubble beside a lit one is in front of its ring: the two nearest
+  // bubbles, one lit, and the canvas read just inside the other's disc where
+  // the ring's halo would reach it, and on the ring on the far side.
+  const behind = await page.evaluate(async () => {
+    const map = state.map;
+    await new Promise(r => { map.once('zoomend', r); map.setView([-27.4, 152.6], 6, { animate: false }); });
+    await new Promise(r => setTimeout(r, 300));
+    const st = MapCluster._state();
+    const discs = MapCluster.discs().map(d => ({ ...d, p: map.latLngToContainerPoint(d.latlng) }));
+    let pair = null;
+    for (const b of st.bubbles) {
+      const own = MapCluster.bubbleOf(b.ids[0]);
+      const a = discs.find(d => d.key === own.key);
+      for (const o of discs) {
+        if (o === a) continue;
+        const gap = a.p.distanceTo(o.p) - a.r - o.r;
+        if (!pair || gap < pair.gap) pair = { gap, a, o, id: b.ids[0], r: own.radius };
+      }
+    }
+    if (!pair || pair.gap > 8) return { none: true, gap: pair && pair.gap };
+    MapLatency._fire(pair.id, { addr: 'test' });
+    await new Promise(r => setTimeout(r, 1500));   // past the flare, the ring at full
+    const cv = document.querySelector('.lat-pulse-canvas');
+    const dpr = window.devicePixelRatio || 1;
+    const alpha = q => cv.getContext('2d').getImageData(Math.round(q.x * dpr), Math.round(q.y * dpr), 1, 1).data[3];
+    const { a, o } = pair;
+    const d = a.p.distanceTo(o.p), ux = (o.p.x - a.p.x) / d, uy = (o.p.y - a.p.y) / d;
+    const into = a.r + pair.gap + 1;                // just inside the neighbour's edge
+    const ring = pair.r + 3;                          // the ring itself, away from the neighbour
+    return {
+      gap: Math.round(pair.gap * 10) / 10,
+      onNeighbour: alpha({ x: a.p.x + ux * into, y: a.p.y + uy * into }),
+      onRing: alpha({ x: a.p.x - ux * ring, y: a.p.y - uy * ring }),
+    };
+  });
+  check('a lit bubble\'s ring glows round it and stays behind the bubble beside it',
+    !behind.none && behind.onRing > 60 && behind.onNeighbour === 0, J(behind));
   await context.close();
 } finally {
   await browser.close();
