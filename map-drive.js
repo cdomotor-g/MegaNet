@@ -494,7 +494,8 @@ const MapDrive = (function () {
   }
 
   // A start typed in: a coordinate, a station by its name or number, or a
-  // place OpenStreetMap's gazetteer knows (through places.js, on its terms).
+  // street address or a place (through places.js, on its terms: the State's
+  // address locator for an address, OpenStreetMap's gazetteer otherwise).
   async function typed(form) {
     if (!job) return false;
     const box = form && form.querySelector('input');
@@ -596,7 +597,7 @@ const MapDrive = (function () {
         ${lastPill}
       </div>
       <form class="mn-drive-typed" onsubmit="MapDrive.typed(this); return false">
-        <label class="small" for="mn-drive-from">Or a town, a station or a coordinate</label>
+        <label class="small" for="mn-drive-from">Or an address, a town, a station or a coordinate</label>
         <span class="mn-drive-typed-row">
           <input id="mn-drive-from" type="text" autocomplete="off" spellcheck="false" placeholder="Gympie · Gatton AL · -26.19, 152.66">
           <button type="submit" class="pill">${pillText('↵', 'Start here')}</button>

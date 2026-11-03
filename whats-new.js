@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 177, date: '2026-11-03', items: [
+      '🏠 <strong>Street addresses</strong> in 📍 <em>Find a place</em>: type <em>12 Mary Street, Gympie</em> and the map goes '
+        + 'to the house, with a blue pin on the property — or just a street, <em>Old Gympie Rd</em>. Queensland addresses '
+        + 'come from the State\'s own address register; typed without the town (<em>12 Mary St</em>), it lists the towns that '
+        + 'have one, nearest the map first. <strong>Route on map</strong> takes an address as its start too.',
+    ] },
     { n: 176, date: '2026-11-03', items: [
       '👤 <strong>One person, one account.</strong> Somebody with two accounts — a personal address and a Bureau one, say — '
         + 'can be made one: an administrator presses <strong>Same person…</strong> on the Admin tab\'s users table, and '

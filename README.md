@@ -3062,6 +3062,16 @@ decimal, degrees and minutes, or degrees-minutes-seconds, with or without
 hemisphere letters, in either order — and the map goes there and drops a blue
 pin, with no network at all. Type a name and it lists, grouped:
 
+- **Street addresses** — for text shaped like an address (a house number
+  before a word, "12 Mary Street, Gympie", "3/18 Smith St Mackay", or a street
+  type after a name, "Old Gympie Rd"), the Queensland Government's address
+  locator (`QldCompositeLocator` on spatial-gis.information.qld.gov.au, keyless
+  and open to this origin), near the map's centre first: a house is pinned on
+  its property, a street at a point along it with its stretches one row, and
+  an address typed without its town lists the locator's suggestions — the
+  house number in each town that has one — placed by a second ask when
+  pressed. The gazetteer keeps OpenStreetMap's streets and houses for the same
+  text, which is what finds an address over the border.
 - **Catchments** — the 77 Queensland drainage basins the file carries, by name
   or basin number ("fitzroy", "130"); pressed, the basin is drawn in outline
   from `data/qld-basins.geojson` and the map fitted to it.
@@ -3083,9 +3093,10 @@ pin, with no network at all. Type a name and it lists, grouped:
   towns, localities, suburbs, airports, hills, rivers and creeks, council
   boundaries, each with its outline or course where OSM has one.
 
-The first three are the file's own and answer at once, offline; the last is a
-request, debounced, throttled to Nominatim's one a second and cached, and never
-made for a number. A lookup that cannot be made says so and leaves the file's
+The catchments, rivers and councils are the file's own and answer at once,
+offline; the addresses and the survey marks are requests to the State's
+services; the gazetteer is a request, debounced, throttled to Nominatim's one
+a second and cached, and never made for a number. A lookup that cannot be made says so and leaves the file's
 answers standing. ✕ beside the box, or ↺, takes the pin and the outline away.
 
 **Address ranges.** A term shaped `4021-4025` is a *window* over ALERT

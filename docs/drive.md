@@ -29,9 +29,11 @@ In this order:
 2. **Pritchard Road, Virginia** (the middle of the road, -27.37429,
    153.06059) for a station on the Brisbane hub (`hub_id = brisbane`).
 3. **Otherwise it asks.** The panel offers where you are, Pritchard Road, a
-   click or tap on the map, the start used last, or a town, a station (by its
-   name or number) or a coordinate typed in. A town is looked up in
-   OpenStreetMap's gazetteer through 📍 Find a place's own lookup, on its terms.
+   click or tap on the map, the start used last, or an address, a town, a
+   station (by its name or number) or a coordinate typed in. An address is
+   looked up in the Queensland Government's address register and a town in
+   OpenStreetMap's gazetteer, through 📍 Find a place's own lookups, on their
+   terms.
 
 **Change** on the panel picks another start at any time. The start chosen is
 remembered for the session as *the start used last*, never as the default.

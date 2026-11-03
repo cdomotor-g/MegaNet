@@ -36,6 +36,9 @@
 // this order:
 //
 //   Coordinate   what the text parses as — answered on the spot, offline
+//   Street       a street address or a street ("12 Mary Street, Gympie",
+//   addresses    "Old Gympie Rd"), asked of the State's address locator
+//                — only for text shaped like one; see "Street addresses"
 //   Catchments   the 77 Queensland drainage basins the file carries, by name
 //                or basin number; drawn from data/qld-basins.geojson
 //   Survey marks a permanent survey mark, benchmark or CORS site by its
@@ -50,7 +53,7 @@
 //                has one
 //
 // Catchments, rivers and councils are the file's own and cost nothing; the
-// survey marks and the gazetteer are requests.
+// addresses, the survey marks and the gazetteer are requests.
 //
 // ── Coordinates are parsed here, never looked up ─────────────────────────────
 // A coordinate is not a search. It is already the answer, and sending it to a
@@ -76,6 +79,23 @@
 //
 // Failure is quiet and says so: no network, a blocked host or a rate limit
 // leaves the file's own answers standing and puts one line in the list.
+//
+// ── Street addresses ────────────────────────────────────────────────────────
+// The whitelist below was dropping every street and house the gazetteer
+// returned, so "12 Mary Street, Gympie" found nothing — and OpenStreetMap
+// holds few Australian house numbers anyway. So text shaped like an address
+// (a house number before a word, or a street type after a name: "3/18 Smith
+// St", "Old Gympie Rd") is asked of the Queensland Government's own address
+// locator, QldCompositeLocator on the same host as the survey marks: every
+// property address in the State, keyless and open to this site's origin.
+// A house comes back as the point on its property; a street alone as a point
+// along each stretch of it, the stretches folded into one row. Typed without
+// its town ("12 Mary St") an address matches no one house, so the locator's
+// suggestions are asked instead — "12 Mary Street" in each town that has one,
+// nearest the map first — and the row pressed is placed by a second ask.
+// The gazetteer is still asked as well, and for address-shaped text keeps the
+// streets and houses it would otherwise drop: that is what finds an address
+// over the border.
 //
 // ── Survey marks ────────────────────────────────────────────────────────────
 // A mark's number is what a crew has in hand — off a plaque, a level book, a
@@ -107,6 +127,26 @@ const Places = (function () {
   const MARK_DEBOUNCE_MS = 400; // a pause before the survey register is asked
   const MARK_ZOOM   = 16;     // close enough to read the streets round a mark
   const SHAPE_DEG   = 0.001;  // the gazetteer's outlines, simplified to ~100 m
+  const ADDR_URL    = 'https://spatial-gis.information.qld.gov.au/arcgis/rest/services/Location/QldCompositeLocator/GeocodeServer';
+  const ADDR_ATTRIB = 'Queensland addresses © State of Queensland (Department of Resources)';
+  const ADDR_RATE_MS = 500;   // the State's service, asked no faster than this
+  const ADDR_MIN_SCORE = 80;  // the locator's own 0–100 match score; below it is a guess
+  const ADDR_ZOOM   = 17;     // a house: close enough to see the property
+  const STREET_ZOOM = 16;     // a street: the stretch of it, and the streets round it
+
+  // What makes text an address rather than a name. A house number before a
+  // word — "12 Mary", "3/18 Smith", "12-14 Mary", "Unit 3, 18 Smith" — or a
+  // street type after a name: "Mary St", "Old Gympie Road", but not the "St"
+  // in front of "St George", which has no name before it.
+  const STREET_WORD = '(?:street|st|road|rd|avenue|ave|drive|dr|drv|court|ct|crt|lane|ln|place|pl|parade|pde|'
+    + 'terrace|tce|crescent|cres|close|highway|hwy|boulevard|boulevarde|blvd|bvd|esplanade|esp|circuit|cct|'
+    + 'track|trk|way|motorway|mwy|freeway|fwy|bypass)';
+  const AFTER_NAME = new RegExp(`[a-z]{2,}\\.?\\s+${STREET_WORD}\\.?(?=$|[\\s,])`, 'i');
+  const HOUSE = /^(?:(?:unit|u|lot|shop|suite|flat|apt)\.?\s*\d+[a-z]?\s*[,/]?\s*)?\d+[a-z]?(?:\s*[-/]\s*\d+[a-z]?)?\s*,?\s+[a-z]{2,}/i;
+  // The roads, in OSM's words, the gazetteer's answers keep for an address.
+  const ROADS = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential',
+    'living_street', 'service', 'road', 'track', 'pedestrian',
+    'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link']);
 
   // What counts as a place worth offering. Nominatim's `category` is the OSM
   // key and `type` the value, so this is a whitelist of keys with an optional
@@ -156,6 +196,9 @@ const Places = (function () {
   let coord = null;             // what it parses as, if anything
   let local = null;             // the file's own answers: { catchments, rivers, councils }
   let gaz = { text: '', list: null, loading: false, error: '', asked: false };
+  let addr = { text: '', list: null, loading: false, error: '' };   // street addresses for the text
+  const addrCache = new Map();  // lowercased query and map cell → addresses (LRU)
+  let addrAt = 0;               // when the address locator was last asked
   let marks = { key: '', list: null, loading: false, error: '' };   // survey marks for the text
   let shown = null;             // the result the map is showing: { group, n, hit, q }
   let flownTo = null;           // the coordinate the map was last moved to, so a
@@ -503,26 +546,73 @@ const Places = (function () {
     return true;
   }
 
-  function keep(hit) {
+  // Is it shaped like a street address? See STREET_WORD.
+  function addressy(q) {
+    const s = String(q || '').trim();
+    return askable(s) && !parse(s) && (HOUSE.test(s) || AFTER_NAME.test(s));
+  }
+
+  // `loose` is for address-shaped text: the streets and houses kept as well.
+  function keep(hit, loose) {
+    if (loose && isAddressHit(hit)) return true;
     const allowed = KINDS[hit.category];
     if (allowed === undefined) return false;
     return allowed === null || allowed.has(hit.type);
   }
 
+  function isAddressHit(hit) {
+    return (hit.category === 'highway' && ROADS.has(hit.type)) || hit.category === 'building'
+        || (hit.category === 'place' && /^houses?$/.test(hit.type));
+  }
+
+  function kindOf(h) {
+    if (h.category === 'highway') return 'street';
+    if (isAddressHit(h)) return 'street address';
+    return KIND_LABEL[h.addresstype] || KIND_LABEL[h.type] || String(h.type || '').replace(/_/g, ' ');
+  }
+
   // "Gympie" out of "Gympie, Gympie Regional Council, Queensland, 4570,
   // Australia" — the name, then just enough of the address to tell two of them
-  // apart, because Queensland has more than one of most things.
+  // apart, because Queensland has more than one of most things. A house has no
+  // name, only its number in front of the street: "12, Mary Street, Gympie…"
+  // is "12 Mary Street".
   function shorten(hit) {
-    const name = hit.name || String(hit.display_name || '').split(',')[0].trim();
-    const rest = String(hit.display_name || '').split(',').map(x => x.trim()).slice(1);
+    const parts = String(hit.display_name || '').split(',').map(x => x.trim());
+    let name = hit.name || parts[0] || '';
+    let rest = parts.slice(1);
+    if (!hit.name && /^\d+[a-z]?(?:[-/]\d+[a-z]?)?$/i.test(parts[0] || '') && parts[1]) {
+      name = `${parts[0]} ${parts[1]}`;
+      rest = parts.slice(2);
+    }
     const where = rest.filter(x => x && x !== name && !/^\d{4}$/.test(x) && x !== 'Australia');
     return { name, where: where.slice(0, 2).join(', ') };
   }
 
-  function remember(key, list) {
-    cache.delete(key);
-    cache.set(key, list);
-    if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
+  // A street comes back once for each stretch of it that OSM maps as its own
+  // way — Gympie's Mary Street is two — and is one street to the person who
+  // typed it: one row, its box and its course the stretches' together.
+  function foldStreets(list) {
+    const out = [], by = new Map();
+    for (const h of list) {
+      const k = h.kind === 'street' ? `${h.name}|${h.where}`.toLowerCase() : null;
+      const first = k && by.get(k);
+      if (!first) { if (k) by.set(k, h); out.push(h); continue; }
+      if (first.bbox && h.bbox) {
+        first.bbox = [Math.min(first.bbox[0], h.bbox[0]), Math.max(first.bbox[1], h.bbox[1]),
+                      Math.min(first.bbox[2], h.bbox[2]), Math.max(first.bbox[3], h.bbox[3])];
+      }
+      const lines = g => (!g ? [] : g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : null);
+      const a = lines(first.shape), b = lines(h.shape);
+      if (a && b && (a.length || b.length)) first.shape = { type: 'MultiLineString', coordinates: [...a, ...b] };
+    }
+    return out;
+  }
+
+  function remember(key, list, store) {
+    const c = store || cache;
+    c.delete(key);
+    c.set(key, list);
+    if (c.size > CACHE_MAX) c.delete(c.keys().next().value);
   }
 
   // One request, throttled to the published rate. Resolves to a list — never
@@ -549,21 +639,22 @@ const Places = (function () {
       });
       const ctl = new AbortController();
       const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+      const loose = addressy(q);
       return fetch(`${URL_BASE}?${params}`, { signal: ctl.signal, headers: { Accept: 'application/json' } })
         .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
         .then(json => {
-          const list = (Array.isArray(json) ? json : []).filter(keep).slice(0, MAX_HITS).map(h => {
+          const list = foldStreets((Array.isArray(json) ? json : []).filter(h => keep(h, loose)).map(h => {
             const { name, where } = shorten(h);
             const bb = Array.isArray(h.boundingbox) ? h.boundingbox.map(Number) : null;   // [s, n, w, e]
             const shape = h.geojson && h.geojson.type && h.geojson.type !== 'Point' ? h.geojson : null;
             return {
               name, where,
-              kind: KIND_LABEL[h.addresstype] || KIND_LABEL[h.type] || String(h.type || '').replace(/_/g, ' '),
+              kind: kindOf(h),
               lat: parseFloat(h.lat), lon: parseFloat(h.lon),
               bbox: bb && bb.every(isFinite) ? bb : null,
               shape,
             };
-          }).filter(h => isFinite(h.lat) && isFinite(h.lon));
+          }).filter(h => isFinite(h.lat) && isFinite(h.lon))).slice(0, MAX_HITS);
           remember(key, list);
           return { ok: true, list };
         })
@@ -582,6 +673,158 @@ const Places = (function () {
       gaz = { text, list: res.list, loading: false, error: res.ok ? '' : res.error, asked: true };
       render();
     });
+  }
+
+  // ── Street addresses ───────────────────────────────────────────────────────
+
+  // A GET of JSON with the lookup's timeout. ArcGIS answers a refusal with a
+  // 200 and an `error` in the body, so that is a failure too.
+  function getJson(url) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+    return fetch(url, { signal: ctl.signal, headers: { Accept: 'application/json' } })
+      .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then(json => { if (json && json.error) throw new Error(json.error.message || 'refused'); return json; })
+      .finally(() => clearTimeout(t));
+  }
+
+  // "12 Mary Street, Gympie, Gympie Regional, QLD" → "Gympie, Gympie Regional":
+  // the locality and the council, without the State every one of them is in.
+  function addrWhere(label, name) {
+    return String(label || '').split(',').map(x => x.trim())
+      .filter(x => x && x !== name && x !== 'QLD' && x !== 'Queensland' && x !== 'Australia' && !/^\d{4}$/.test(x))
+      .slice(0, 2).join(', ');
+  }
+
+  // The locator's candidates as rows: houses and streets that match well
+  // enough, and nothing else — its place names are the gazetteer's to answer.
+  // A street comes back once for each stretch of it; those are one row,
+  // pinned on the first and boxed round them all.
+  function addressesFrom(json) {
+    const out = [], by = new Map();
+    for (const c of (json && json.candidates) || []) {
+      const a = c.attributes || {};
+      if (!(Number(c.score) >= ADDR_MIN_SCORE)) continue;
+      const house = /^(PointAddress|StreetAddress|StreetAddressExt|Subaddress)$/.test(a.Addr_type || '');
+      const street = a.Addr_type === 'StreetName' || (a.Addr_type === 'POI' && a.Loc_name === 'STREETNAME');
+      if (!house && !street) continue;
+      const lat = Number(c.location && c.location.y), lon = Number(c.location && c.location.x);
+      if (!isFinite(lat) || !isFinite(lon) || (!lat && !lon)) continue;
+      const name = a.ShortLabel || String(c.address || '').split(',')[0].trim();
+      const where = addrWhere(a.LongLabel || c.address, name);
+      const k = `${name}|${where}`.toLowerCase();
+      const seen = by.get(k);
+      if (seen) {
+        if (seen.bounds) seen.bounds = [Math.min(seen.bounds[0], lat), Math.max(seen.bounds[1], lat),
+                                        Math.min(seen.bounds[2], lon), Math.max(seen.bounds[3], lon)];
+        continue;
+      }
+      const row = { name, where, kind: house ? 'street address' : 'street', house,
+                    lat, lon, zoom: house ? ADDR_ZOOM : STREET_ZOOM, bounds: house ? null : [lat, lat, lon, lon] };
+      by.set(k, row);
+      out.push(row);
+    }
+    return out.slice(0, MAX_HITS);
+  }
+
+  // The locator's suggestions, for an address typed without its town: only
+  // the ones with a house number in them — the rest are its place names and
+  // facilities. They carry no position; pressed, placeAddress() asks for it.
+  function suggestionsFrom(json) {
+    return ((json && json.suggestions) || []).filter(s => s && s.text && s.magicKey && /\d/.test(s.text.split(',')[0]))
+      .slice(0, MAX_HITS).map(s => {
+        const name = s.text.split(',')[0].trim();
+        return { name, where: addrWhere(s.text, name), kind: 'street address', house: true,
+                 lat: null, lon: null, zoom: ADDR_ZOOM, bounds: null, text: s.text, magicKey: s.magicKey };
+      });
+  }
+
+  // One question to the locator, throttled and cached like the gazetteer's,
+  // nearest the map's centre first. Resolves — never rejects — to { ok, list,
+  // error }.
+  function askAddress(q, stale) {
+    const c = map && map.getCenter ? map.getCenter() : null;
+    const near = c ? `${c.lng.toFixed(1)},${c.lat.toFixed(1)}` : '';
+    const key = `${q.trim().toLowerCase()}|${near}`;
+    if (addrCache.has(key)) {
+      const list = addrCache.get(key);
+      remember(key, list, addrCache);
+      return Promise.resolve({ ok: true, list, cached: true });
+    }
+    const at = Math.max(Date.now(), addrAt + ADDR_RATE_MS);
+    addrAt = at;
+    const p = extra => new URLSearchParams({ f: 'json', ...(near ? { location: near } : {}), ...extra });
+    return new Promise(resolve => setTimeout(resolve, at - Date.now())).then(() => {
+      if (stale && stale()) return { ok: false, list: [], stale: true };
+      return getJson(`${ADDR_URL}/findAddressCandidates?${p({ SingleLine: q.trim(), outSR: '4326', maxLocations: '20',
+                       outFields: 'Addr_type,Loc_name,ShortLabel,LongLabel' })}`)
+        .then(json => {
+          const list = addressesFrom(json);
+          if (list.some(h => h.house) || !HOUSE.test(q.trim()) || (stale && stale())) return list;
+          // A house number and no house: the town is missing. Ask what it
+          // could be, and put the streets found after the houses suggested.
+          return getJson(`${ADDR_URL}/suggest?${p({ text: q.trim(), maxSuggestions: String(MAX_HITS * 2) })}`)
+            .then(s => [...suggestionsFrom(s), ...list].slice(0, MAX_HITS), () => list);
+        })
+        .then(list => { remember(key, list, addrCache); return { ok: true, list }; })
+        .catch(e => ({ ok: false, list: [],
+                       error: e && e.name === 'AbortError' ? 'the lookup timed out'
+                            : 'the State\'s address service could not be reached' }));
+    });
+  }
+
+  // A suggestion's position, asked for when it is pressed, and kept on the row
+  // so a second press asks nothing. Resolves to the row placed, or null.
+  function placeAddress(row) {
+    if (row.lat != null) return Promise.resolve(row);
+    return getJson(`${ADDR_URL}/findAddressCandidates?${new URLSearchParams({
+      f: 'json', SingleLine: row.text, magicKey: row.magicKey, outSR: '4326', maxLocations: '1',
+      outFields: 'Addr_type,Loc_name,ShortLabel,LongLabel' })}`)
+      .then(json => {
+        const c = ((json && json.candidates) || [])[0];
+        const lat = Number(c && c.location && c.location.y), lon = Number(c && c.location && c.location.x);
+        if (!isFinite(lat) || !isFinite(lon) || (!lat && !lon)) return null;
+        row.lat = lat; row.lon = lon;
+        return row;
+      })
+      .catch(() => null);
+  }
+
+  function lookupAddress(text) {
+    addr = { text, list: null, loading: true, error: '' };
+    render();
+    askAddress(text, () => addr.text !== text).then(res => {
+      if (addr.text !== text) return;
+      addr = { text, list: res.list, loading: false, error: res.ok ? '' : res.error };
+      render();
+    });
+  }
+
+  // For Route on map's typed start: an address placed by the State's locator
+  // when it is one — the first house, placed if it was only suggested — and
+  // the gazetteer's places otherwise, or when the locator has nothing.
+  function findAny(text) {
+    if (!addressy(text)) return ask(text, null);
+    return askAddress(text, null).then(res => {
+      const first = res.list && res.list[0];
+      if (!first) return ask(text, null);
+      return placeAddress(first).then(at => (at ? { ok: true, list: [at] } : ask(text, null)));
+    });
+  }
+
+  function addrHtml(q) {
+    if (coord || !addressy(q)) return '';
+    let body;
+    if (addr.text !== q || addr.loading) body = '<p class="small txt-muted places-status">Looking up the address…</p>';
+    else if (addr.error) body = `<p class="small txt-warn places-status">Address lookup unavailable — ${esc(addr.error)}.</p>`;
+    else if (addr.list && addr.list.length) {
+      const streets = addr.list.some(h => !h.house);
+      body = `<ul class="places-list">${addr.list.map((h, i) => rowHtml('addr', i, h.name, `${h.kind}${h.where ? ` · ${h.where}` : ''}`)).join('')}</ul>
+          <p class="small txt-muted places-credit">${esc(ADDR_ATTRIB)} — Queensland only.${streets ? ' A street on its own is pinned at a point along it.' : ''}</p>`;
+    } else if (!AFTER_NAME.test(q)) return '';   // "12 Mile Creek": a name with a number, not an address
+    else body = '<p class="small txt-muted places-status">No Queensland street address matches. The town after the street helps: <em>12 Mary Street, Gympie</em>.</p>';
+    return `<section class="places-group" aria-labelledby="places-g-addr">
+          <h3 class="places-group-h" id="places-g-addr">Street addresses</h3>${body}</section>`;
   }
 
   // ── Survey marks ────────────────────────────────────────────────────────────
@@ -796,11 +1039,18 @@ const Places = (function () {
       return { name: MapSurvey.describe(m).title, kind: markKind(m), where: '', lat: m.lat, lon: m.lon,
                zoom: MARK_ZOOM, mark: m, credit: MapSurvey.ATTRIBUTION };
     }
+    if (group === 'addr') {
+      const h = addr.list && addr.list[n];
+      if (!h) return null;
+      return { name: h.name, kind: h.kind, where: h.where, lat: h.lat, lon: h.lon, zoom: h.zoom,
+               bounds: h.bounds, maxZoom: STREET_ZOOM, row: h, credit: ADDR_ATTRIB };
+    }
     if (group === 'osm') {
       const h = gaz.list && gaz.list[n];
       if (!h) return null;
-      const zoom = /city/.test(h.kind) ? 11 : /town|suburb|airport|peak|locality|village/.test(h.kind) ? 13 : 12;
-      return { ...h, bounds: h.shape ? h.bbox : null, zoom };
+      const zoom = /address/.test(h.kind) ? ADDR_ZOOM : /street/.test(h.kind) ? STREET_ZOOM
+        : /city/.test(h.kind) ? 11 : /town|suburb|airport|peak|locality|village/.test(h.kind) ? 13 : 12;
+      return { ...h, bounds: h.shape ? h.bbox : null, zoom, maxZoom: /street|address/.test(h.kind) ? STREET_ZOOM : undefined };
     }
     return null;
   }
@@ -847,6 +1097,19 @@ const Places = (function () {
         draw(hit, true);
         told(hit);
       });
+    } else if (hit.lat == null && hit.row && hit.row.magicKey) {
+      // An address the locator only suggested: placed now it is wanted.
+      const mine = shown;
+      placeAddress(hit.row).then(at => {
+        if (shown !== mine || !map) return;
+        if (!at) {
+          if (typeof mapNote === 'function') mapNote(`${hit.name} could not be placed — the State's address service did not answer.`, 6000);
+          return;
+        }
+        hit.lat = at.lat; hit.lon = at.lon;
+        draw(hit, true);
+        told(hit);
+      });
     } else {
       draw(hit, true);
       told(hit);
@@ -882,12 +1145,12 @@ const Places = (function () {
         <div class="places-box">
           <input type="search" id="places-q" class="places-q" autocomplete="off" spellcheck="false"
                  aria-labelledby="places-h" aria-describedby="places-hint" aria-controls="places-results"
-                 placeholder="Town, river, catchment, survey mark or lat, lon"
+                 placeholder="Address, town, river, catchment, survey mark or lat, lon"
                  oninput="Places.input(this.value)" onkeydown="Places.key(event)">
           <button type="button" class="places-clear" onclick="Places.clear(true)" title="Clear the box and the pin on the map"
                   aria-label="Clear the place">✕</button>
         </div>
-        <p class="small places-hint" id="places-hint">A town, river or creek, catchment or basin number, council area, survey mark number (43906 or PSM 43906), or a coordinate. The map goes there; the stations are left as they are.</p>
+        <p class="small places-hint" id="places-hint">A street address (12 Mary Street, Gympie), town, river or creek, catchment or basin number, council area, survey mark number (43906 or PSM 43906), or a coordinate. The map goes there; the stations are left as they are.</p>
         <div class="places-results" id="places-results"></div>
       </div>`;
   }
@@ -915,6 +1178,8 @@ const Places = (function () {
     if (coord) {
       out.push(groupHtml('coord', 'Coordinate', [rowHtml('coord', 0, coord.text, flownTo === `${coord.lat},${coord.lon}` ? 'the map is here' : 'go here')], 0));
     }
+    const street = addressy(q);
+    out.push(addrHtml(q));
     const L0 = local || { catchments: [], rivers: [], councils: [] };
     const cap = (list, f) => list.slice(0, LOCAL_CAP).map(f);
     out.push(groupHtml('catchment', 'Catchments', cap(L0.catchments, (c, i) =>
@@ -931,9 +1196,10 @@ const Places = (function () {
       else if (gaz.list && gaz.list.length) {
         body = `<ul class="places-list">${gaz.list.map((h, i) => rowHtml('osm', i, h.name, `${h.kind}${h.where ? ` · ${h.where}` : ''}`)).join('')}</ul>
           <p class="small txt-muted places-credit">${esc(ATTRIB)}</p>`;
-      } else body = '<p class="small txt-muted places-status">No town, locality, river or airport by that name.</p>';
+      } else body = street ? '<p class="small txt-muted places-status">No street or place by that name in OpenStreetMap.</p>'
+                           : '<p class="small txt-muted places-status">No town, locality, river or airport by that name.</p>';
       out.push(`<section class="places-group" aria-labelledby="places-g-osm">
-          <h3 class="places-group-h" id="places-g-osm">Towns, localities and more</h3>${body}</section>`);
+          <h3 class="places-group-h" id="places-g-osm">${street ? 'Streets, towns and more' : 'Towns, localities and more'}</h3>${body}</section>`);
     }
     const html = out.filter(Boolean).join('');
     return html || '<p class="small txt-muted places-status">Nothing by that name in the station file. Keep typing for the gazetteer — three letters at least.</p>';
@@ -984,7 +1250,13 @@ const Places = (function () {
       return;
     }
     render();
-    if (askable(s) && gaz.text !== s) lookupTimer = setTimeout(() => lookup(s), DEBOUNCE_MS);
+    // One pause for both: the gazetteer for anything that could be a name,
+    // the State's address locator as well for anything shaped like an address.
+    const wantGaz = askable(s) && gaz.text !== s;
+    const wantAddr = addressy(s) && addr.text !== s;
+    if (wantGaz || wantAddr) {
+      lookupTimer = setTimeout(() => { if (wantGaz) lookup(s); if (wantAddr) lookupAddress(s); }, DEBOUNCE_MS);
+    }
   }
 
   // Enter in the box goes to the first thing listed; the arrow down steps into
@@ -1023,6 +1295,7 @@ const Places = (function () {
     clearTimeout(markTimer);
     query = ''; coord = null; local = null; flownTo = null;
     gaz = { text: '', list: null, loading: false, error: '', asked: false };
+    addr = { text: '', list: null, loading: false, error: '' };
     marks = { key: '', list: null, loading: false, error: '' };
     if (box) {
       const q = document.getElementById('places-q');
@@ -1034,10 +1307,12 @@ const Places = (function () {
   return {
     parse,
     parseSingle,
-    // The gazetteer's places for a name, through the same throttle and cache
-    // as the box's own lookups: { ok, list: [{ name, where, kind, lat, lon }],
-    // error }. For Route on map's typed start (map-drive.js).
-    find: text => ask(String(text || ''), null),
+    // The places for a name — or for an address, the State's locator's house
+    // or street first — through the same throttles and caches as the box's
+    // own lookups: { ok, list: [{ name, where, kind, lat, lon }], error }. For
+    // Route on map's typed start (map-drive.js).
+    find: text => findAny(String(text || '')),
+    addressy,
     readPaste,
     coordRole,
     // Called once from init.js: one listener on the document serves every
@@ -1084,6 +1359,8 @@ const Places = (function () {
         query, coord, flownTo,
         local: local ? { catchments: local.catchments.map(c => c.name), rivers: local.rivers.map(g => g.name), councils: local.councils.map(g => g.name) } : null,
         gaz: { text: gaz.text, loading: gaz.loading, error: gaz.error, n: gaz.list ? gaz.list.length : null },
+        addr: { text: addr.text, loading: addr.loading, error: addr.error,
+                list: addr.list ? addr.list.map(h => `${h.name}${h.where ? `, ${h.where}` : ''}`) : null },
         marks: { key: marks.key, loading: marks.loading, error: marks.error, list: marks.list ? marks.list.map(m => m.register) : null },
         shown: shown ? { group: shown.group, n: shown.n, name: shown.hit.name || shown.hit.text, shape: !!shown.hit.shape } : null,
         drawn: layer ? layer.getLayers().length : 0,

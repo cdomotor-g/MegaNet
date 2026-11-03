@@ -232,7 +232,7 @@ const Palette = (() => {
     const mq = markQuery(q);
     if (mq && mq.number) return [];
     return [{ kind: 'place', offer: true, icon: '🧭', label: `Find “${q}” as a place`,
-              sub: 'Towns, rivers and creeks, catchments and council areas — in 📍 Find a place',
+              sub: 'Addresses, towns, rivers and creeks, catchments and council areas — in 📍 Find a place',
               run: () => findPlace(q) }];
   }
 

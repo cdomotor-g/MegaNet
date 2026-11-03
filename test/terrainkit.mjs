@@ -630,6 +630,119 @@ ok('…a lookup overtaken before its turn not sent, and the last one answered',
 ok('a row pressed is marked as the place shown in its own list, and in no other',
   paced.mine === 1 && paced.other === 0, `${paced.mine} / ${paced.other}`);
 
+// A street address. The gazetteer's whitelist used to drop every street and
+// house it returned, so "12 Mary Street, Gympie" found nothing. Text shaped
+// like an address is asked of the State's address locator as well, and the
+// gazetteer keeps its streets for it. Both answer from stand-ins shaped as the
+// live services answer (QldCompositeLocator's candidates and suggestions,
+// Nominatim's jsonv2): the network policy blocks the real ones.
+const street = await page.evaluate(async () => {
+  const calls = [], real = window.fetch;
+  const json = body => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  const HOUSE = { address: '12 Mary Street, Gympie, Gympie Regional, QLD', score: 100, location: { x: 152.66504, y: -26.19057 },
+    attributes: { Addr_type: 'PointAddress', Loc_name: 'SINGLEHOUSE_AD', ShortLabel: '12 Mary Street',
+                  LongLabel: '12 Mary Street, Gympie, Gympie Regional, QLD' } };
+  const STRETCH = (x, y) => ({ address: 'Mary Street', score: 93.33, location: { x, y },
+    attributes: { Addr_type: 'POI', Loc_name: 'STREETNAME', ShortLabel: 'Mary Street', LongLabel: 'Mary Street, Gympie, Gympie Regional' } });
+  const PARISH = { address: 'St Mary', score: 77.5, location: { x: 152.7, y: -25.5 },
+    attributes: { Addr_type: 'POI', Loc_name: 'PLACE_NAME_Gaz', ShortLabel: 'St Mary', LongLabel: 'St Mary, Gazetteer Reference No: 32113, Type: Parish' } };
+  const ROAD = (lat, lon, bb, line, type) => ({ category: 'highway', type, addresstype: type, name: 'Mary Street',
+    display_name: 'Mary Street, Gympie, Queensland, 4570, Australia', lat, lon, boundingbox: bb, geojson: { type: 'LineString', coordinates: line } });
+  window.fetch = (url, opts) => {
+    const u = new URL(String(url), location.href);
+    if (/QldCompositeLocator\/GeocodeServer\/findAddressCandidates$/.test(u.pathname)) {
+      const q = u.searchParams.get('SingleLine'), mk = u.searchParams.get('magicKey');
+      calls.push({ op: 'find', q, mk, near: u.searchParams.get('location'), sr: u.searchParams.get('outSR') });
+      if (mk === 'amamoor') {
+        return json({ candidates: [{ address: '12 Mary Street, Amamoor, Gympie Regional, QLD', score: 100,
+          location: { x: 152.67372, y: -26.34636 }, attributes: { Addr_type: 'PointAddress' } }] });
+      }
+      if (/gympie/i.test(q)) return json({ candidates: [HOUSE, STRETCH(152.6616, -26.1899), STRETCH(152.6642, -26.1901), STRETCH(152.6593, -26.1889)] });
+      return json({ candidates: [PARISH] });   // "12 Mary St": no one house without its town
+    }
+    if (/QldCompositeLocator\/GeocodeServer\/suggest$/.test(u.pathname)) {
+      calls.push({ op: 'suggest', q: u.searchParams.get('text') });
+      return json({ suggestions: [
+        { text: '12 Mary Street, Amamoor, Gympie Regional, QLD', magicKey: 'amamoor', isCollection: false },
+        { text: 'St Mary, Gazetteer Reference No: 32113, Type: Parish, Fraser Coast Regional', magicKey: 'parish', isCollection: false },
+        { text: '12 Mary Street, Ayr, Burdekin Shire, QLD', magicKey: 'ayr', isCollection: false },
+      ] });
+    }
+    if (u.hostname.includes('nominatim')) {
+      calls.push({ op: 'osm', q: u.searchParams.get('q') });
+      return json([
+        ROAD('-26.1898', '152.6614', ['-26.1902', '-26.1894', '152.6603', '152.6625'], [[152.6603, -26.1902], [152.6625, -26.1894]], 'tertiary'),
+        ROAD('-26.1889', '152.6593', ['-26.1894', '-26.1883', '152.6584', '152.6603'], [[152.6584, -26.1883], [152.6603, -26.1894]], 'secondary'),
+        { category: 'shop', type: 'bakery', name: 'Mary Street Bakery', lat: '-26.19', lon: '152.66',
+          display_name: 'Mary Street Bakery, 1, Mary Street, Gympie, Queensland, 4570, Australia' },
+      ]);
+    }
+    return real(url, opts);
+  };
+  const box = document.getElementById('places-q');
+  const type = v => { box.value = v; box.dispatchEvent(new Event('input', { bubbles: true })); };
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const until = async (f, ms = 10000) => { const t = Date.now() + ms; while (Date.now() < t && !f()) await sleep(100); return f(); };
+  const rows = g => [...document.querySelectorAll(`#places-results .places-hit[data-group="${g}"]`)].map(b => b.textContent.replace(/\s+/g, ' ').trim());
+  const metresTo = (lat, lon) => { const c = state.map.getCenter(); return Math.round(acmaHaversineKm(c.lat, c.lng, lat, lon) * 1000); };
+  try {
+    const Q = '12 Mary Street, Gympie';
+    type(Q);
+    await until(() => { const d = Places.debug(); return d.addr.text === Q && d.addr.list && d.gaz.text === Q && d.gaz.n != null && !d.gaz.loading; });
+    const full = {
+      addr: Places.debug().addr.list,
+      groups: [...document.querySelectorAll('#places-results .places-group-h')].map(h => h.textContent.trim()),
+      osm: rows('osm'),
+      asked: calls.filter(c => c.op !== 'osm'),
+    };
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await sleep(700);
+    full.went = { shown: Places.debug().shown, m: metresTo(-26.19057, 152.66504), zoom: state.map.getZoom(),
+                  pins: document.querySelectorAll('.mn-place.mn-pin-blue').length };
+
+    const B = calls.length;
+    type('12 Mary St');
+    await until(() => { const d = Places.debug(); return d.addr.text === '12 Mary St' && d.addr.list && !d.addr.loading; });
+    const bare = { addr: Places.debug().addr.list, ops: calls.slice(B).filter(c => c.op !== 'osm').map(c => c.op) };
+    Places.go('addr', 0);
+    await until(() => metresTo(-26.34636, 152.67372) < 5);
+    bare.placed = { m: metresTo(-26.34636, 152.67372), byKey: calls.some(c => c.mk === 'amamoor'),
+                    pins: document.querySelectorAll('.mn-place.mn-pin-blue').length };
+
+    const T = calls.length;
+    type('Gympie');
+    await until(() => Places.debug().gaz.text === 'Gympie' && !Places.debug().gaz.loading);
+    const town = calls.slice(T).map(c => c.op);
+
+    const routed = await Places.find('12 Mary Street, Gympie');
+    return { full, bare, town, routed: routed.list.map(h => `${h.name}|${h.lat},${h.lon}`) };
+  } finally { window.fetch = real; }
+});
+ok('a street address is asked of the State\'s address locator, near the map, in WGS84',
+  street.full.asked.length === 1 && street.full.asked[0].op === 'find' && street.full.asked[0].q === '12 Mary Street, Gympie'
+    && /^-?\d+\.\d,-?\d+\.\d$/.test(street.full.asked[0].near || '') && street.full.asked[0].sr === '4326',
+  JSON.stringify(street.full.asked));
+ok('…listed first, the house and then its street, the street\'s three stretches one row',
+  street.full.groups[0] === 'Street addresses'
+    && JSON.stringify(street.full.addr) === JSON.stringify(['12 Mary Street, Gympie, Gympie Regional', 'Mary Street, Gympie, Gympie Regional']),
+  `${JSON.stringify(street.full.groups)} ${JSON.stringify(street.full.addr)}`);
+ok('…and OpenStreetMap\'s answers keep the street — its two ways one row — and still drop the bakery',
+  street.full.groups.includes('Streets, towns and more') && street.full.osm.length === 1 && /Mary Street street/.test(street.full.osm[0]),
+  JSON.stringify(street.full.osm));
+ok('Enter goes to the house: the map on it, close in, one blue pin',
+  street.full.went.shown && street.full.went.shown.group === 'addr' && street.full.went.shown.n === 0
+    && street.full.went.m < 5 && street.full.went.zoom >= 17 && street.full.went.pins === 1,
+  JSON.stringify(street.full.went));
+ok('an address without its town lists the State\'s suggestions with a house number, and none of its place names',
+  JSON.stringify(street.bare.ops) === JSON.stringify(['find', 'suggest'])
+    && JSON.stringify(street.bare.addr) === JSON.stringify(['12 Mary Street, Amamoor, Gympie Regional', '12 Mary Street, Ayr, Burdekin Shire']),
+  JSON.stringify(street.bare));
+ok('…and one pressed is placed by asking for it, and the map goes there',
+  street.bare.placed.byKey && street.bare.placed.m < 5 && street.bare.placed.pins === 1, JSON.stringify(street.bare.placed));
+ok('a town name is not sent to the address locator', street.town.every(op => op === 'osm'), JSON.stringify(street.town));
+ok('Route on map\'s typed start takes the house for an address',
+  street.routed.length === 1 && street.routed[0] === '12 Mary Street|-26.19057,152.66504', JSON.stringify(street.routed));
+
 await page.evaluate(() => { Places.clear(true); shutDock({ instant: true }); });
 ok('✕ takes the place pin with it',
    await page.evaluate(() => document.querySelectorAll('.mn-place').length === 0));
