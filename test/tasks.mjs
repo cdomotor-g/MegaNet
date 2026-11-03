@@ -34,7 +34,8 @@
 //                   sending exactly the tasks agreed, once; markup arriving in a
 //                   title is shown as text; a station not in the register goes
 //                   in the details; an owner can make only their own team's.
-//   Admin › Teams   every team and roster; make one; name an owner; take
+//   Admin › Teams   every team and roster; make one; name an owner — the Add
+//                   box offering the approved accounts not on it; take
 //                   somebody off; remove one with tasks refused in words; an
 //                   editor shown the panel's purpose and no control.
 //
@@ -257,6 +258,14 @@ function answer(fn, a) {
       store.teams = store.teams.filter(t => t.id !== a.p_id);
       return yes(teamsRead());
     }
+    // The Admin tab's Users panel; the Teams panel suggests its approved accounts.
+    case 'admin_users':
+      if (!p.admin) return no(403, '42501', 'administrators only');
+      return yes(Object.values(PEOPLE).map(x => ({ id: x.id, email: x.email, display_name: x.who, role: x.admin ? 'admin' : 'editor',
+        status: x.waiting ? 'pending' : 'approved', is_you: x.id === p.id })));
+    case 'admin_allowlist':
+      if (!p.admin) return no(403, '42501', 'administrators only');
+      return yes([]);
     default: return null;
   }
 }
@@ -777,11 +786,21 @@ try {
     J(calls('team_save').pop().a) === J({ p_id: null, p_name: 'Cairns electrical', p_hub_id: 'cairns', p_hands_out: false })
     && /Nobody is on it yet/.test(await q.evaluate(() => document.getElementById('adm-team-open').textContent)));
   const newId = await q.evaluate(() => AdminTeams._state().openId);
+  await q.evaluate(() => Admin.load());
+  out = await q.evaluate(id => ({ list: document.getElementById(`adm-team-add-${id}`).getAttribute('list'),
+    opts: [...document.querySelectorAll('#adm-team-people option')].map(o => [o.value, o.label]) }), newId);
+  ok('the Add somebody box offers every approved account by address, its name beside it, and no waiting one',
+    out.list === 'adm-team-people' && out.opts.length === Object.values(PEOPLE).filter(x => !x.waiting).length
+    && out.opts.some(o => o[0] === 'radio@example.test' && o[1] === 'Rae Radio')
+    && !out.opts.some(o => o[0] === 'waiting@example.test')
+    && J(out.opts.map(o => o[0])) === J(out.opts.map(o => o[0]).sort()), J(out));
   await q.fill(`#adm-team-add-${newId}`, 'radio@example.test');
   await q.check(`#adm-team-add-own-${newId}`);
   await q.click(`[data-k="add:${newId}"]`);
   await q.waitForFunction(() => /Rae Radio/.test(document.getElementById('adm-team-open').textContent), null, { timeout: 10_000 });
   ok('an administrator names an owner by address', J(calls('team_member_save').pop().a) === J({ p_team_id: newId, p_email: 'radio@example.test', p_owner: true }));
+  out = await q.evaluate(() => [...document.querySelectorAll('#adm-team-people option')].map(o => o.value));
+  ok('…and somebody on the team is offered no more', out.length && !out.includes('radio@example.test'), J(out));
   await q.uncheck(`[data-k="own:${newId}:u-rad"]`);
   await q.waitForFunction(id => !document.querySelector(`[data-k="own:${id}:u-rad"]`).checked && !document.querySelector(`[data-k="own:${id}:u-rad"]`).disabled, newId, { timeout: 10_000 });
   ok('…and makes them an owner no more, the box keeping focus',

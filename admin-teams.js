@@ -9,8 +9,11 @@
 //
 // After core.js and datastore.js (dbRpc), before admin.js, which draws it
 // into #adm-teams and loads it from Admin.init(). Reads tasks.js's
-// Tasks.WORDS at call time, so a word means one thing on both tabs. Nothing
-// here runs at load; auth.js calls authChanged() on every sign-in and out.
+// Tasks.WORDS at call time, so a word means one thing on both tabs, and
+// admin.js's Admin.accounts() — admin_users(), asked once for the Users panel —
+// for the approved accounts the Add somebody box suggests; Admin.load() calls
+// accountsChanged() when they come back. Nothing here runs at load; auth.js
+// calls authChanged() on every sign-in and out.
 //
 // This panel is not the security: team_save(), team_remove(),
 // team_member_save() and team_member_remove() refuse anybody
@@ -31,6 +34,22 @@ const AdminTeams = (function () {
   const teams = () => (read && Array.isArray(read.teams) ? read.teams : []);
   const team = id => teams().find(t => t.id === id) || null;
   const hubs = () => (read && Array.isArray(read.hubs) ? read.hubs : []);
+
+  // The accounts the open team's Add somebody box suggests: approved ones
+  // (by an administrator, or by the allowlist) not on it already, by address.
+  // admin_users() is the Users panel's; until it answers, nothing is offered.
+  const ADDABLE = new Set(['approved', 'automatic']);
+  function addable(t) {
+    const all = typeof Admin !== 'undefined' && Admin.accounts ? Admin.accounts() : null;
+    if (!Array.isArray(all) || !t) return [];
+    const on = new Set((Array.isArray(t.roster) ? t.roster : []).map(p => p.id));
+    return all.filter(u => u && u.email && ADDABLE.has(u.status) && !on.has(u.id))
+      .sort((a, b) => String(a.email).toLowerCase().localeCompare(String(b.email).toLowerCase()));
+  }
+  const suggestHtml = t => addable(t).map(u => {
+    const name = String(u.display_name || '').trim();
+    return `<option value="${escAttr(u.email)}"${name && name.toLowerCase() !== String(u.email).toLowerCase() ? ` label="${escAttr(name)}"` : ''}></option>`;
+  }).join('');
 
   // The words, from the Tasks tab's one list.
   const FALLBACK = {
@@ -101,12 +120,13 @@ const AdminTeams = (function () {
       <form class="adm-tok-form adm-team-add" onsubmit="event.preventDefault(); AdminTeams.addPerson('${escAttr(t.id)}')">
         <label>Add somebody, by the address of their Flood-Net account
           <input type="email" id="adm-team-add-${escAttr(t.id)}" maxlength="254" autocomplete="off" spellcheck="false"
-                 value="${escAttr(a.email)}" oninput="AdminTeams.addField('${escAttr(t.id)}', 'email', this.value)"></label>
+                 list="adm-team-people" value="${escAttr(a.email)}" oninput="AdminTeams.addField('${escAttr(t.id)}', 'email', this.value)"></label>
+        <datalist id="adm-team-people">${suggestHtml(t)}</datalist>
         <label class="check-label"><input type="checkbox" id="adm-team-add-own-${escAttr(t.id)}"${a.owner ? ' checked' : ''}
           onchange="AdminTeams.addField('${escAttr(t.id)}', 'owner', this.checked)"><span>As an owner</span></label>
         <button type="submit" class="primary exp-btn-sm" data-k="add:${escAttr(t.id)}"${busy ? ' disabled' : ''}>Add to ${esc(t.name)}</button>
       </form>
-      <p class="small txt-muted">They need an approved account first — waiting accounts are approved above.</p>`;
+      <p class="small txt-muted">They need an approved account first — waiting accounts are approved above. As you type, the approved accounts not on ${esc(t.name)} are offered.</p>`;
   }
 
   function openHtml() {
@@ -225,8 +245,15 @@ const AdminTeams = (function () {
     if (state.activeTab === 'admin') { repaint(); if (isAdmin()) load(); }
   }
 
+  // admin_users() answered: the open team's suggestions again, in place, so
+  // the box being typed in keeps its words and its caret.
+  function accountsChanged() {
+    const dl = document.getElementById('adm-team-people');
+    if (dl) dl.innerHTML = suggestHtml(team(openId));
+  }
+
   return {
-    render, load, authChanged,
+    render, load, authChanged, accountsChanged,
     open(id) {
       openId = openId === id ? null : id;
       edit = null;
@@ -299,7 +326,7 @@ const AdminTeams = (function () {
       await call('team_member_remove', { p_team_id: id, p_user_id: userId }, `${who} is off ${t.name}.`, `k:add:${id}`);
     },
     // For the tests.
-    _state: () => ({ teams: teams().length, openId, missing, error }),
+    _state: () => ({ teams: teams().length, openId, missing, error, offered: addable(team(openId)).map(u => u.email) }),
   };
 })();
 

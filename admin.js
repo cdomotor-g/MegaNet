@@ -17,8 +17,9 @@
 // push.js for Push, whose Notifications panel it draws among the cards; to
 // admin-links.js for AdminLinks, whose Base station connections it draws under
 // the dashboard; to admin-teams.js for AdminTeams, whose Teams panel (0095) it
-// draws under the ingest tokens and loads from init(); and to
-// station-history.js for StationHistory, whose Deleted stations panel it draws
+// draws under the ingest tokens and loads from init(), and which it tells when
+// the accounts its Add somebody box suggests come back (accountsChanged); and
+// to station-history.js for StationHistory, whose Deleted stations panel it draws
 // under the cards and loads from init().
 // Nothing here runs at load. auth.js calls Admin.authChanged() on every sign-in
 // and sign-out.
@@ -581,6 +582,8 @@ const Admin = (function () {
     }
     loading = false;
     repaint('people');
+    // The Teams panel suggests these accounts in its Add somebody box.
+    if (typeof AdminTeams !== 'undefined' && AdminTeams.accountsChanged) AdminTeams.accountsChanged();
   }
 
   async function act(fn, args, done) {
@@ -719,6 +722,9 @@ const Admin = (function () {
   }
 
   return { render, init, load, authChanged, saveUser, deleteUser, formField,
-           saveEntry, editEntry, removeEntry, forgetKey, clearLocal, decide, setSignup };
+           saveEntry, editEntry, removeEntry, forgetKey, clearLocal, decide, setSignup,
+           // What admin_users() last said (null before it answers), for the
+           // Teams panel's suggestions.
+           accounts: () => users };
 })();
 if (typeof window !== 'undefined') window.Admin = Admin;
