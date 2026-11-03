@@ -25,6 +25,17 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 183, date: '2026-11-03', items: [
+      '🫧 <strong>Nearby pins are grouped into bubbles</strong> on the <strong>Stations</strong> map until you zoom in — each '
+        + 'says how many stations are in it; press one to zoom in on them, and from zoom 12 every station has its own pin again. '
+        + 'With <em>Colour pins by health</em> or ⏱️ <em>Latency</em> on, a bubble takes the colour of its <strong>worst</strong> '
+        + 'station, their <strong>average</strong>, or a <strong>mix</strong> — a ring split by how many are in each colour; '
+        + 'choose under 🗺️ Map display, where <em>Group nearby pins into bubbles</em> also turns them off. A message from a '
+        + 'station in a bubble flashes the bubble. The station whose card is open, the map selection and a filter\'s matches '
+        + 'always keep their own pins.',
+      '⚡ The <strong>Stations</strong> tab is quicker again: opening it, zooming, and panning with a station\'s card open '
+        + 'do less work on a busy laptop.',
+    ] },
     { n: 182, date: '2026-11-03', items: [
       '🌧 <strong>A missed check is not a station unheard.</strong> When a station\'s rain tip or level change came in within '
         + 'half an hour of a check 🚦 <em>Station Health</em> missed, the station was on the air and only the check was lost. '

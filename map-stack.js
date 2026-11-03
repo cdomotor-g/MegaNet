@@ -129,6 +129,11 @@ const MapStack = (function () {
 
   function layout() {
     if (!map) return;
+    // Only pins that never move — the stations' and the photos' — is nothing
+    // to place: what moves is every other layer's. Laying out ~5,000 station
+    // pins to find that out was a fifth of a second of a slow laptop's every
+    // zoom and every rebuild of the Stations map.
+    if (!Object.keys(sets).some(k => !LAYERS[k].fixed)) return;
     const z = map.getZoom();
     const all = [];
     for (const layer of Object.keys(sets)) {

@@ -821,6 +821,53 @@ const MapLatency = (() => {
     return { cls: c.key, fill: sp.fill, ring: sp.ring, grow: sp.grow, weight: sp.weight, dash: sp.dash };
   }
 
+  // How a group of stations is coloured while this view colours the pins
+  // (map-cluster.js). The bands run best first — SNR's strongest first — so
+  // 'worst' is the furthest down its list any of them is; 'average' the band
+  // their mean figure falls in (their mean age, delay, share missed or SNR);
+  // Protocol, which is kinds and has no worse and no mean, takes the most
+  // common either way. A station with no band — never heard, quiet in the
+  // window, not known — counts in the words, and colours the bubble only when
+  // none of them has a band. Null with the view off.
+  function clusterStyle(list, how) {
+    if (!U.on || !list || !list.length) return null;
+    const mode = U.mode, bands = BANDS[mode] || [];
+    const by = new Map();
+    let worst = -1, sum = 0, n = 0;
+    for (const s of list) {
+      if (!s) continue;
+      const c = classOf(s);
+      const i = c.band ? bands.indexOf(c.band) : -1;
+      const sp = c.band ? null : SPECIAL[c.key];
+      const key = c.band ? c.band.k : c.key;
+      let q = by.get(key);
+      if (!q) {
+        q = { key, i, n: 0, band: c.band || null,
+              label: c.band ? c.band.label : (sp && sp.label) || UNKNOWN_LABEL[mode] || c.key,
+              fill: c.band ? c.band.fill : (sp && sp.fill) || null, ring: c.band ? null : (sp && sp.ring) || null };
+        by.set(key, q);
+      }
+      q.n++;
+      if (i > worst) worst = i;
+      if (c.band && Number.isFinite(c.value)) { sum += c.value; n++; }
+    }
+    const all = [...by.values()];
+    const parts = all.slice().sort((a, b) => (a.i < 0) - (b.i < 0) || a.i - b.i || b.n - a.n)
+      .map(q => ({ label: q.label, fill: q.fill, ring: q.ring, n: q.n }));
+    const banded = all.filter(q => q.i >= 0);
+    const common = qs => qs.reduce((a, q) => (q.n > a.n ? q : a));
+    let band = null, special = null;
+    if (banded.length) {
+      if (mode === 'protocol') band = common(banded).band;
+      else if (how === 'average' && n) band = classifyValue(mode, sum / n);
+      else band = bands[worst];
+    } else {
+      special = common(all);
+    }
+    if (band) return { fill: band.fill, ring: '#ffffff', label: band.label, parts };
+    return { fill: special.fill || '#ffffff', ring: special.ring || '#4f6478', label: special.label, parts };
+  }
+
   // What refreshMapLayers hands MapSymbols to draw beside a pin while the
   // signal bars are on, under whatever colours the pin — { cls, n, fill }: its
   // SNR band, how many of the four bars it lights and their colour. Null with
@@ -2026,12 +2073,19 @@ const MapLatency = (() => {
   // the station the card is on. Only a change counts — the card repaints on a
   // save, a filter keystroke, the trail — so "← The stations in view" stays
   // pressed until another station is picked.
+  // Painted on the next frame, if the pane is on screen by then: asking
+  // whether it is lays the page out, and this is asked in the middle of a
+  // press on a station, between the table's, the editor's and the card's
+  // rewrites — one layout of the page more than the frame was going to do.
+  let followRaf = 0;
   function follow(id) {
     const v = id || null;
     if (v === U.lastCard) return;
     U.lastCard = v;
     U.sel = v;
-    if (onScreen()) paint();
+    if (followRaf) return;
+    if (typeof requestAnimationFrame !== 'function') { if (onScreen()) paint(); return; }
+    followRaf = requestAnimationFrame(() => { followRaf = 0; if (onScreen()) paint(); });
   }
 
   // Back to the summary. The card stays where it is: it is the map's, and
@@ -3151,10 +3205,22 @@ const MapLatency = (() => {
         }
       }
     }
+    // A station grouped into one of MapCluster's bubbles flashes the bubble —
+    // its place and its size — and no pulse runs along a link with an end in
+    // one: the link is under the bubble, and the bubble lighting is the
+    // message landing (map-cluster.js). Not under Activity only, which hides
+    // the bubbles with every pin and draws each lit station itself.
+    const bub = id => (!solo && typeof MapCluster !== 'undefined' ? MapCluster.bubbleOf(id) : null);
+    const inBubble = e => !!(e && (bub(e.fromId) || bub(e.toId != null ? e.toId : e.to)));
+    const nodeLL = (id, ll) => { const b = bub(id); return b ? b.latlng : (pinAt(id) || ll); };
     // Off the pins and links as they are now: a rebuild since can have hidden
     // one (a filter), resized it (a band) or moved it (Move pin), and a glow
     // round nothing, or round where a station used to stand, says nothing.
-    const radius = id => { const m = pinFor(id); return m ? m.options.radius || 6 : null; };
+    const radius = id => {
+      const b = bub(id);
+      if (b) return b.radius;
+      const m = pinFor(id); return m ? m.options.radius || 6 : null;
+    };
     // A link's length on screen, short of the pins at both ends — what a glow
     // and a missed link light, so neither paints over a pin.
     const span = (e, fn) => {
@@ -3164,7 +3230,7 @@ const MapLatency = (() => {
       const len = Math.hypot(bx - ax, by - ay);
       if (len > 1) fn(ax, ay, bx, by, len, ra + 3, len - rb - 3);
     };
-    legGlow.forEach(({ e, g, kind }) => span(e, (ax, ay, bx, by, len, a, b) => stroke(ax, ay, bx, by, len, a, b, 'glow', g, kind)));
+    legGlow.forEach(({ e, g, kind }) => { if (!inBubble(e)) span(e, (ax, ay, bx, by, len, a, b) => stroke(ax, ay, bx, by, len, a, b, 'glow', g, kind)); });
     // Activity only: the map's own pins are hidden, and each station a pulse
     // has lit is drawn here as the map draws it, under its ring and its flare.
     if (solo) {
@@ -3179,7 +3245,7 @@ const MapLatency = (() => {
     nodeGlow.forEach(({ n, g, kind }) => {
       const r = radius(n.id);
       if (r == null) return;
-      const [x, y] = at(pinAt(n.id));
+      const [x, y] = at(nodeLL(n.id));
       ring(x, y, r, g, kind);
     });
     // The links first and the nodes over them, as the logo stacks them. A
@@ -3191,6 +3257,7 @@ const MapLatency = (() => {
         const e = p.still ? 0 : e0 - l.start;
         if (e < 0 || e > l.dur + l.tail) continue;
         const now = legAt(l);
+        if (inBubble(now) || inBubble(l)) continue;
         if (l.kind === 'missed') {
           if (now) span(now, (ax, ay, bx, by, len, a, b) => stroke(ax, ay, bx, by, len, a, b, 'trail', 1, l.kind));
           continue;
@@ -3209,8 +3276,9 @@ const MapLatency = (() => {
       for (const n of p.nodes) {
         const f = p.still ? (e0 >= 0 && e0 < p.stillMs ? [0.9, 1] : null) : flareAt(e0 - n.start);
         if (!f) continue;
-        const [x, y] = at(pinAt(n.id) || n.ll);
-        flare(x, y, n.r, f[0], f[1], n.kind);
+        const [x, y] = at(nodeLL(n.id, n.ll));
+        const b = bub(n.id);
+        flare(x, y, b ? b.radius : n.r, f[0], f[1], n.kind);
       }
     }
     pctx.globalAlpha = 1;
@@ -3536,7 +3604,7 @@ const MapLatency = (() => {
   }
 
   return {
-    attach, detach, reset, shown, opened, showBars, follow, pinStyle, barsFor,
+    attach, detach, reset, shown, opened, showBars, follow, pinStyle, barsFor, clusterStyle,
     legendHtml, liveLegendHtml, barsLegendHtml, altText, barsAltText, activityAltText, noteText,
     // the station list's Protocol column, while the pins are coloured by protocol
     protoColumn, protoCellHtml, protoWord: () => WORDS.Protocol,

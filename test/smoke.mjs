@@ -63,6 +63,9 @@ async function main() {
     });
     const page = await context.newPage();
     const { blocked } = await applyNetworkPolicy(page, server.origin);
+    // The Stations map as a person first sees it: nearby pins in bubbles
+    // (map-cluster.js), which are off under automation unless asked for.
+    await page.addInitScript(() => { try { localStorage.setItem('mn-map-cluster', 'on'); } catch (_) {} });
 
     // One buffer, drained around each step, so a message is attributed to the
     // tab that was open when it arrived.

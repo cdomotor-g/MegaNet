@@ -1073,6 +1073,16 @@ jobs:
         working-directory: test
         run: npm run slowlist
 
+      # The Stations map's bubbles (map-cluster.js): on by default, every
+      # station in one bubble or its own pin, a bubble pressed zooms in and
+      # regroups, the selected and matched keep their pins, the switch turns
+      # them off; coloured by worst, average or mix under health and ⏱️
+      # Latency; a message in a bubble flashes the bubble.
+      - name: Bubbles — nearby pins grouped until zoomed in
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run clusters
+
       # The left bar's views (nav-views.js, 0062): All, Simple and Field, a
       # tab the view leaves out never lost from the bar or the find box, the
       # Views tab signed out and signed in — an account's own view made,

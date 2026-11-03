@@ -18,6 +18,7 @@
    "path": "?tab=stations&station=brisbane_city_al",
    "ready": "#stn-card",
    "settle": 4000,
+   "store": { "mn-map-cluster": "on" },
    "targets": {
     "card": "#stn-card",
     "title": "#stn-card-title",

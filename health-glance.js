@@ -821,6 +821,28 @@ const HealthGlance = (() => {
     };
   }
 
+  // How a group of stations is coloured while the pins wear health
+  // (map-cluster.js): 'worst' the worst class among them — a fault before a
+  // watch before OK, and No data only when that is all there is; 'average'
+  // the class most of them are in, No data again only when nothing else is;
+  // and the classes counted, worst first, for the bubble's words and a mix.
+  // Null with the switch off or no answer yet.
+  function clusterStyle(ids, how) {
+    if (!state.mapHealth || !net.at || !ids || !ids.length) return null;
+    const by = new Map();
+    for (const id of ids) { const c = classOf(id); by.set(c, (by.get(c) || 0) + 1); }
+    const heard = [...by.keys()].filter(c => c !== 'nodata');
+    let cls;
+    if (!heard.length) cls = 'nodata';
+    else if (how === 'worst') cls = heard.reduce((a, c) => (RANK[c] > RANK[a] ? c : a));
+    else cls = heard.reduce((a, c) => (by.get(c) > by.get(a) || (by.get(c) === by.get(a) && RANK[c] > RANK[a]) ? c : a));
+    const fillOf = c => PIN[c].fill || (typeof MAP_PIN_PROPOSED_FILL !== 'undefined' ? MAP_PIN_PROPOSED_FILL : '#ffffff');
+    return {
+      fill: fillOf(cls), ring: PIN[cls].ring || '#ffffff', label: CLS[cls].word,
+      parts: ORDER.filter(c => by.has(c)).map(c => ({ label: CLS[c].word, fill: fillOf(c), ring: PIN[c].ring, n: by.get(c) })),
+    };
+  }
+
   function setPins(on) {
     state.mapHealth = !!on;
     try { localStorage.setItem('mn-map-health', on ? 'on' : 'off'); } catch (_) {}
@@ -1226,6 +1248,8 @@ const HealthGlance = (() => {
     stripClick, checksHtml,
     // the pins
     pinStyle, reset, setPins, askAgain, noteHtml, legendHtml, altText,
+    // …and a group of them, for MapCluster's bubbles
+    clusterStyle,
     // the counts, for Home and the Instrument look's banner
     onNet, askNet, counts,
     // …and only whether the batch has answered yet, which costs nothing

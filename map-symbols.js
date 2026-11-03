@@ -391,9 +391,15 @@ const MapSymbols = (function () {
     Pin = L.CircleMarker.extend({
       // A renderer without the routine (an SVG fallback) draws the circle it
       // always drew, which is a pin with less to say rather than no pin.
+      // A pin in one of MapCluster's bubbles is neither drawn nor hit: it is
+      // still on the map for everything that asks after it (map-cluster.js).
       _updatePath() {
+        if (this._mnClustered && this._renderer._updateMnPin) return;
         if (this._renderer._updateMnPin) this._renderer._updateMnPin(this);
         else this._renderer._updateCircle(this);
+      },
+      _containsPoint(p) {
+        return !this._mnClustered && L.CircleMarker.prototype._containsPoint.call(this, p);
       },
       _updateBounds() {
         L.CircleMarker.prototype._updateBounds.call(this);

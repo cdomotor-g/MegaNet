@@ -5273,6 +5273,7 @@ function mapDisplayControlsHtml() {
          station, a solid pink outline for the Bureau's forecast locations and
          a dashed one for its information locations. -->
     ${MapSymbols.sectionHtml()}
+    ${MapCluster.sectionHtml()}
     <!-- Signal bars beside the pins is ⏱️ Latency & signal's switch, not one of
          these — it needs the readings that pane fetches — but it is a thing
          drawn beside a pin, and this panel is where people look for one. So a
@@ -6064,7 +6065,8 @@ function mapLegendHtml() {
       </span>`).join('')}
     ${MapSymbols.legendHtml({ health })}
     ${MapLatency.barsLegendHtml()}
-    ${MapLatency.liveLegendHtml()}`),
+    ${MapLatency.liveLegendHtml()}
+    ${MapCluster.legendHtml()}`),
     // What the filter did to a pin, and a proposed station (0039): hollow, in
     // a dashed ring of its role's colour — planned, not built.
     mapLegendCard(`
@@ -6358,6 +6360,7 @@ function stopStationsMap() {
   StationTrail.detach();
   MapSpider.detach();
   MapStack.detach();
+  MapCluster.detach();
   MapLeader.detach();
   MapLocate.detach();
   MapMovePin.detach();
@@ -6485,6 +6488,9 @@ function initMap() {
   MapSpider.attach(state.map);
   // Before the layers whose pins it stacks, which hand them over as they draw.
   MapStack.attach(state.map);
+  // The bubbles nearby pins are grouped into, regrouped on every zoom: before
+  // the first refresh, which hands it the pins (map-cluster.js).
+  MapCluster.attach(state.map);
   // The line from the station card to its pin. Before the first refresh and
   // the card's repaint below, both of which ask it to redraw.
   MapLeader.attach(state.map);
@@ -6847,8 +6853,7 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
                          backboneHidden: allBackbone.length - backbone.length };
   updateMapLinkNote();
   if (!stations.length) {
-    MapSpider.setPins('stations', []);
-    MapStack.setPins('stations', []);
+    MapCluster.rebuild();                 // no pins, so no bubbles; and the fan-out and stack let go
     state.mapMatchLabels = new Set();
     MapLeader.sync();                     // its pin went with the rest
     return;
@@ -7060,6 +7065,9 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     // DOM node for a className to land on, but the name label is real DOM in
     // the tooltip pane, and applyMapLabels dims it off this flag.
     marker.mnFilterDim = dim;
+    // …and whether the filter named it or pulled it in: those keep their own
+    // pins whatever MapCluster groups (map-cluster.js).
+    marker.mnHit = hit || rel;
 
     // bindPopup takes a function so the HTML is built when the popup opens,
     // not for all ~3,174 markers on every refresh.
@@ -7096,9 +7104,12 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   // The grey and the outlines come from the Bureau's SLS: drawn without it
   // first, then again when it lands (MapSymbols.askSls — once a session).
   if (state.mapPinManual || state.mapPinSls) MapSymbols.askSls();
-  MapSpider.setPins('stations', state.mapMarkers);
-  // What every other layer's pins make room for (map-stack.js).
-  MapStack.setPins('stations', state.mapMarkers);
+  // Nearby pins into bubbles while the map is zoomed out (map-cluster.js),
+  // after the selection and focus styles, which say which pins keep their
+  // own; and the pins it leaves drawn handed to the fan-out (map-spider.js)
+  // and to what every other layer's pins make room for (map-stack.js) — with
+  // the bubbles, which take room too.
+  MapCluster.rebuild();
   // The 3-D view mirrors the lines and pins this function has just drawn rather
   // than deriving its own, so a rebuild of them is a rebuild of it — and it goes
   // *here*, after the selection and focus styles, because those change the
@@ -7160,6 +7171,9 @@ function updateMapAltName(pins, links, backbone, matched, related) {
   // And whose stations they are, and which kinds, when Map display is drawing
   // only some.
   if (MapSymbols.hiding()) bits.push(MapSymbols.drawingPhrase());
+  // …and how many are grouped into bubbles at this zoom (map-cluster.js).
+  const grouped = MapCluster.altText();
+  if (grouped) bits.push(grouped);
   el.setAttribute('aria-label', 'Station map — ' + bits.join(', ')
     + '. The same stations are listed in the table below.');
 }
@@ -7199,6 +7213,8 @@ function applyMapSelectionStyles() {
           opacity: 1, fillOpacity: 1 }
       : { ...base });
   }
+  // A pin picked into the selection keeps its own (map-cluster.js).
+  MapCluster.soon();
 }
 
 // Everything that changes the selection ends here: the pins, the list under the
@@ -7573,6 +7589,8 @@ function applyMapFocusStyles() {
     if (!base) continue;
     const dim = !!served && !served.has(m.mnStationId);
     m.mnFocusDimmed = dim;
+    // The stations a focused repeater serves keep their own pins (map-cluster.js).
+    m.mnFocusServed = !!served && served.has(m.mnStationId);
     const opacity     = dim ? MAP_FOCUS_DIM_OPACITY     : (m.mnSelected ? 1 : base.opacity);
     const fillOpacity = dim ? MAP_FOCUS_DIM_FILLOPACITY : (m.mnSelected ? 1 : base.fillOpacity);
     m.setStyle({ opacity, fillOpacity });
@@ -7594,6 +7612,9 @@ function applyMapFocusStyles() {
   // in the colour and at the opacity of the line they sit on, so a dim that did
   // not repaint them would leave a fan of full-strength arrows over faded lines.
   MapArrows.schedule();
+  // A focus that came or went changes which pins keep their own (a rebuild of
+  // the pins asks itself, after this).
+  MapCluster.soon();
 }
 
 // The selection as a file — the same columns the table shows when it has the
@@ -8130,6 +8151,8 @@ function selectStation(id) {
     fetchEditorStamp(null);
     rerenderStations();
     rerenderStationEditorCard();
+    // Its pin may go back into its bubble now it is not selected (map-cluster.js).
+    MapCluster.soon();
     return;
   }
   // Select the row and load it into the editor card. A deep copy becomes the
@@ -8506,6 +8529,7 @@ function repaintStnCard() {
     && state.data.stations.find(x => x.id === state.stnCard.id);
   if (!s) {
     state.stnCard.id = null; el.hidden = true; el.innerHTML = '';
+    MapCluster.soon();
     MapLeader.sync();
     StationTrail.sync();
     MapLatency.follow(null);
@@ -8567,6 +8591,9 @@ function repaintStnCard() {
   // …and its carrier fingerprint, kept per station for ten minutes, the
   // server judging hourly (health-drift.js).
   if (typeof HealthDrift !== 'undefined') HealthDrift.cardAsk(s);
+  // The card's station has its own pin, out of any bubble, for the leader to
+  // end on (map-cluster.js).
+  MapCluster.soon();
   MapLeader.sync();
   // The trail's pill says whether its station's card is up, and its name,
   // which a save may just have changed.
@@ -8605,6 +8632,7 @@ function closeStnCard(refocus = true) {
   state.stnCard.id = null;
   el.hidden = true;
   el.innerHTML = '';
+  MapCluster.soon();                        // its pin may go back into its bubble
   MapLeader.sync();                         // and the leader goes with it
   StationTrail.sync();                      // whose pill now brings it back
   MapLatency.follow(null);                  // ⏱️ Latency's pane goes back to the stations in view
@@ -10505,10 +10533,10 @@ function refreshAcmaLayer() {
     const mech = ACMA_MECH[t.mechanism] || { label: t.mechanism, color: '#666' };
     const icon = acmaSquareIcon(acmaPinPx(t.score), t.meganet ? ' mn' : '', acmaMechVar(t.mechanism));
     const m = L.marker([site.lat, site.lon], { icon }).addTo(A.layer);
-    m.bindPopup(acmaPopupHtml(d, site), { maxWidth: 300 });
+    // The popup's words when it opens, not for all 500 squares on every draw
+    // of the Stations map.
+    m.bindPopup(() => acmaPopupHtml(d, site), { maxWidth: 300 });
     m.on('click', () => acmaHighlightDevice(t.device_id));
-    m.bindTooltip(`${esc(t.client || 'Unknown licensee')} · ${mech.label} · ${t.score}`,
-      { direction: 'top', offset: [0, -ACMA_PIN_HIT_PX / 2] });
     // A divIcon marker is a keyboard stop Leaflet's `alt` option cannot name —
     // `alt` reaches IMG icons only, and this one is a <div>. Up to 500 of these
     // are on the map at once, so unnamed they are 500 unnamed tab stops between
@@ -10518,6 +10546,20 @@ function refreshAcmaLayer() {
     if (pinEl) pinEl.setAttribute('aria-label',
       `${t.client || 'Unknown licensee'} — ${mech.label}, score ${t.score}, `
       + `${t.distance_km} km from ${t.anchor_name}`);
+    // Its hover name, bound the first time the pointer or the keyboard comes
+    // to it and Leaflet's own after that: a tooltip and its listeners for each
+    // of 500 squares were a third of a second of a slow laptop's Stations tab,
+    // every time it opened, for the few anybody points at.
+    const tip = `${esc(t.client || 'Unknown licensee')} · ${mech.label} · ${t.score}`;
+    const wantTip = () => {
+      m.off('mouseover', wantTip);
+      if (pinEl) pinEl.removeEventListener('focus', wantTip);
+      if (m.getTooltip() || !m._map) return;
+      m.bindTooltip(tip, { direction: 'top', offset: [0, -ACMA_PIN_HIT_PX / 2] });
+      m.openTooltip();
+    };
+    m.on('mouseover', wantTip);
+    if (pinEl) pinEl.addEventListener('focus', wantTip);
     acmaPins.push(m);
   }
   // Several licensed devices commonly share one site, so these are the pins that

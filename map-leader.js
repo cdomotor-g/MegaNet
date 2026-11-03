@@ -195,13 +195,23 @@ const MapLeader = (function () {
 
   // The card, in the map container's pixels, or null when there is nothing to
   // hang a leader from: no card, a closed one, one not laid out.
-  function cardBox() {
+  //
+  // Measured afresh only when something can have moved it: the card painted
+  // or shut (sync), the card or the map resized, a zoom over. A pan does not
+  // move it — the card stands in the map's stage, not on the map — and a
+  // measure on every frame of a pan or a zoom's animation was two layouts of
+  // the page a frame on a laptop with nothing to spare.
+  let boxMemo = null;     // { card, box } as last measured
+  function cardBox(fresh = true) {
     const card = document.getElementById('stn-card');
-    if (!map || !card || card.hidden) return null;
+    if (!map || !card || card.hidden) { boxMemo = null; return null; }
+    if (!fresh && boxMemo && boxMemo.card === card) return boxMemo.box;
     const r = card.getBoundingClientRect();
-    if (!r.width || !r.height) return null;
+    if (!r.width || !r.height) { boxMemo = null; return null; }
     const m = map.getContainer().getBoundingClientRect();
-    return { left: r.left - m.left, top: r.top - m.top, right: r.right - m.left, bottom: r.bottom - m.top };
+    const box = { left: r.left - m.left, top: r.top - m.top, right: r.right - m.left, bottom: r.bottom - m.top };
+    boxMemo = { card, box };
+    return box;
   }
 
   // The station the card is on, and its pin: the marker's own position — a
@@ -221,9 +231,9 @@ const MapLeader = (function () {
 
   function follow(marker) {
     if (marker === tracked) return;
-    if (tracked) tracked.off('move', render);
+    if (tracked) tracked.off('move', moving);
     tracked = marker || null;
-    if (tracked) tracked.on('move', render);
+    if (tracked) tracked.on('move', moving);
   }
 
   // Where the leader leaves the card: the point on its top outline — the
@@ -319,7 +329,11 @@ const MapLeader = (function () {
     return s * s * (3 - 2 * s);
   }
 
-  function render() {
+  // A frame of a pan, a zoom's animation or a fanned pin: the card where it
+  // was last measured.
+  function moving() { render(false); }
+
+  function render(measure = true) {
     if (!map || !svg) return;
     const t = target();
     follow(t && t.marker);
@@ -332,7 +346,7 @@ const MapLeader = (function () {
     // Into the 3-D canvas while it is up, and back into the pane after.
     if (v && svg.parentNode !== v.el) v.el.appendChild(svg);
     let on = false;
-    const box = t && v ? cardBox() : null;
+    const box = t && v ? cardBox(measure !== false) : null;
     if (box) {
       const p = v.pin(t.latlng, t.marker);
       if (p && !covered(box, p)) { place(box, p, p.r); on = true; }
@@ -365,6 +379,15 @@ const MapLeader = (function () {
     if (fresh) drawIn();
   }
 
+  // A redraw sync() asked for, done now for whatever needs it drawn.
+  let syncRaf = 0;
+  function flush() {
+    if (!syncRaf) return;
+    cancelAnimationFrame(syncRaf);
+    syncRaf = 0;
+    render();
+  }
+
   function stopZoom() {
     if (zoomRaf) cancelAnimationFrame(zoomRaf);
     zoomRaf = null;
@@ -388,7 +411,7 @@ const MapLeader = (function () {
         const a = pos(ll, z0, c0), b = pos(ll, e.zoom, e.center);
         return L.point(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u);
       };
-      render();
+      render(false);
       if (k < 1) zoomRaf = requestAnimationFrame(frame);
       else { zoomRaf = null; at = null; }
     };
@@ -414,7 +437,8 @@ const MapLeader = (function () {
         pane.style.pointerEvents = 'none';    // a leader is never a click target
       }
       build(map.getPane(PANE));
-      map.on('move viewreset resize', render);
+      map.on('move', moving);
+      map.on('viewreset resize', render);
       map.on('zoomanim', onZoomAnim);
       map.on('zoomend', onZoomEnd);
       if (typeof ResizeObserver === 'function') {
@@ -427,8 +451,11 @@ const MapLeader = (function () {
     },
 
     detach() {
+      boxMemo = null;
+      if (syncRaf) { cancelAnimationFrame(syncRaf); syncRaf = 0; }
       if (map) {
-        map.off('move viewreset resize', render);
+        map.off('move', moving);
+        map.off('viewreset resize', render);
         map.off('zoomanim', onZoomAnim);
         map.off('zoomend', onZoomEnd);
       }
@@ -442,14 +469,23 @@ const MapLeader = (function () {
 
     // Redraw for whatever the card and the pins are now. Called by everything
     // that changes either: the card's paint and close, and the rebuild of the
-    // markers under a filter change.
-    sync() { render(); },
+    // markers under a filter change — on the next frame, once, however many
+    // of them call in this one: each is in the middle of rewriting the page,
+    // and measuring the card there laid the page out an extra time or two per
+    // press of a station. Anything that reads the leader (geometry, reveal)
+    // has it drawn first.
+    sync() {
+      if (syncRaf) return;
+      if (typeof requestAnimationFrame !== 'function') { render(); return; }
+      syncRaf = requestAnimationFrame(() => { syncRaf = 0; render(); });
+    },
 
     // Is the leader on screen, and between what? Nothing in the app draws from
     // this; it is here so the geometry can be asserted (test/stn-card.mjs),
     // because a line whose only witness is a picture is a line that can drift a
     // long way before anybody notices it has.
     geometry() {
+      flush();
       if (!map || !svg || !svg.classList.contains('is-on')) return null;
       const d = parts.lines[0].getAttribute('d') || '';
       const n = d.match(/-?[\d.]+/g) || [];
@@ -473,6 +509,7 @@ const MapLeader = (function () {
     // the card (Map3D.panPinTo) rather than the view shifted by the gap. The
     // 2-D map follows the camera when it stops, as it does after a drag.
     reveal() {
+      flush();
       if (!map || twin()) return;
       const t = target();
       const v = t && view();

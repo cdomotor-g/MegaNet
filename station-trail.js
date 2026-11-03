@@ -196,10 +196,22 @@ const StationTrail = (function () {
       <ol class="stn-trail-list" aria-labelledby="stn-trail-lead">${list.map(itemHtml).join('')}</ol>`;
   }
 
+  // Measured on the next frame rather than in the middle of whatever painted
+  // the pill: a press on a station rewrites the table, the editor and the card
+  // before it gets here, and measuring then lays the whole page out once more
+  // than the frame was going to — half a second of a slow laptop's press. A
+  // pill coming into view is measured at once, so it never shows where it was.
+  let placeRaf = 0;
+  function placeSoon() {
+    if (placeRaf || typeof requestAnimationFrame !== 'function') { if (!placeRaf) place(); return; }
+    placeRaf = requestAnimationFrame(() => { placeRaf = 0; place(); });
+  }
+
   function paint() {
     if (!root) return;
     const list = shown();
     const cur = list[0] || null;
+    const wasHidden = root.hidden;
     root.hidden = !cur;
     if (!cur) {
       if (open) setOpen(false);
@@ -222,7 +234,7 @@ const StationTrail = (function () {
       d.hidden = !open;
       if (open) d.innerHTML = listHtml(list);
     }
-    place();
+    if (wasHidden) place(); else placeSoon();
   }
 
   // ── The list, down and up ──────────────────────────────────────────────────
@@ -354,6 +366,7 @@ const StationTrail = (function () {
     // stood over. The trail itself is kept.
     detach() {
       window.removeEventListener('pointerdown', onAway, true);
+      if (placeRaf) { cancelAnimationFrame(placeRaf); placeRaf = 0; }
       open = false;
       if (ro) { ro.disconnect(); ro = null; }
       watched = null;
