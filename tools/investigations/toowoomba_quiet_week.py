@@ -451,6 +451,14 @@ TEMPLATE = r'''<!doctype html>
     main { max-width: 760px; margin: 0 auto; }
     a { color: var(--brand); }
     .crumb { font-size: 12.5px; color: var(--ink-2); margin: 0 0 .4rem; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: .4rem .8rem;
+              flex-wrap: wrap; margin: 0 0 .4rem; }
+    .topbar .crumb { margin: 0; }
+    .btn { display: inline-flex; align-items: center; min-height: 36px; padding: .3rem .8rem; border-radius: 6px;
+           border: 1px solid var(--axis); background: var(--panel); color: var(--ink); font-size: 12.5px;
+           font-weight: 600; text-decoration: none; white-space: nowrap; }
+    .btn:hover { border-color: var(--brand); color: var(--brand); }
+    .btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
     h1 { font-size: 22px; line-height: 1.25; margin: 0 0 .35rem; }
     h2 { font-size: 15px; margin: 1.1rem 0 .3rem; color: var(--brand); }
     p { margin: .35rem 0; }
@@ -520,7 +528,7 @@ TEMPLATE = r'''<!doctype html>
       .sheet + .sheet { margin-top: 0; padding-top: 0; border-top: 0; }
       figure, .tldr, dl.key { break-inside: avoid; }
       a { color: inherit; text-decoration: none; }
-      .crumb { display: none; }
+      .topbar { display: none; }
       .row { grid-template-columns: 200px 1fr; }
       .row.wide { grid-template-columns: 1fr 320px; }
     }
@@ -529,7 +537,11 @@ TEMPLATE = r'''<!doctype html>
 <body>
 <main>
 <section class="sheet">
-  <p class="crumb"><a href="./">Investigations</a> · <a href="../">Flood-Net</a></p>
+  <div class="topbar">
+    <p class="crumb"><a href="./">Investigations</a> · <a href="../">Flood-Net</a></p>
+    <!-- This page as printed, made by tools/investigations/pdf.mjs: run it again after this script. -->
+    <a class="btn" href="pdf/floodnet-investigation-02-toowoomba-quiet-week.pdf" download type="application/pdf" title="This report as two A4 pages">⬇ Download PDF</a>
+  </div>
   <h1>Toowoomba's quiet week: what changed when its repeater went off air</h1>
   <p class="meta">Investigation 02 · 29 October 2026 · Toowoomba AL (540162, rain 6598), repeater on 151.525 MHz,
     Brisbane hub · <span class="pill">Open: Toowoomba implicated, site fault not yet found</span></p>

@@ -48,6 +48,7 @@
     article h3 { font-size: 1.08rem; line-height: 1.35; margin: .1rem 0 .3rem; }
     article p { margin: .4rem 0 0; }
     .meta { font-size: .88rem; color: var(--dim); margin: 0; }
+    .links { font-size: .88rem; color: var(--dim); }
     .pill {
       display: inline-block; padding: 0 .5rem; border-radius: 999px; border: 1px solid var(--line);
       font-size: .8rem; color: var(--dim); white-space: nowrap;
@@ -81,6 +82,7 @@
       corrupted, and 87% of those were our own decoder reading one burst two ways. What is Hillcrest's is 1.6% of
       the relays we could check. The "off air" spell was our receiver hearing the whole channel about 2 dB
       weaker.</p>
+    <p class="links"><a href="pdf/floodnet-investigation-03-hillcrest-wine-glass.pdf" download type="application/pdf">⬇ Download PDF</a> · two A4 pages</p>
   </article>
 
   <article>
@@ -93,6 +95,7 @@
       traffic, back to the early-October level. Neither our receiver's update the day before nor anything else at our
       end caused it. Toowoomba's own carrier had been sending corrupted copies twice as often as the other repeaters
       on its channel, and it looks to have been failing since 15 October.</p>
+    <p class="links"><a href="pdf/floodnet-investigation-02-toowoomba-quiet-week.pdf" download type="application/pdf">⬇ Download PDF</a> · two A4 pages</p>
   </article>
 
   <article>
@@ -104,6 +107,7 @@
       Each arrives about a second after a clean copy, with its upper bits changed. Old ALERT frames have no checksum,
       and their check bits can't see damage in the last byte, so it gets through and reads high. The same fault
       explains Blackdown Tableland's odd-looking reset, and Emerald Radar is the only repeater both stations share.</p>
+    <p class="links"><a href="pdf/floodnet-investigation-01-corrupted-relay-copies.pdf" download type="application/pdf">⬇ Download PDF</a> · two A4 pages</p>
   </article>
 
   <h2>Adding one</h2>
@@ -114,7 +118,10 @@
       <code>tools/investigations/</code>.</li>
     <li>Keep it to two printed pages. Lead with the answer, then the evidence, and say what is established, what is
       likely and what is still open.</li>
-    <li>Add it to the top of this list, and to <code>sitemap.xml</code>.</li>
+    <li>Make its PDF with <code>node tools/investigations/pdf.mjs</code>, which prints the page to
+      <code>investigations/pdf/</code> and fails if it runs past two pages. Run it again whenever the page
+      changes.</li>
+    <li>Add it to the top of this list, with its PDF link, and to <code>sitemap.xml</code>.</li>
     <li>Never quote site codes or landholder contact details. They stay in the inspection records.</li>
   </ul>
 

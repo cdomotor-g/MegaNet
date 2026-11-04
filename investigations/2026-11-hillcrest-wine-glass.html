@@ -41,6 +41,14 @@
     main { max-width: 760px; margin: 0 auto; }
     a { color: var(--brand); }
     .crumb { font-size: 12.5px; color: var(--ink-2); margin: 0 0 .4rem; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: .4rem .8rem;
+              flex-wrap: wrap; margin: 0 0 .4rem; }
+    .topbar .crumb { margin: 0; }
+    .btn { display: inline-flex; align-items: center; min-height: 36px; padding: .3rem .8rem; border-radius: 6px;
+           border: 1px solid var(--axis); background: var(--panel); color: var(--ink); font-size: 12.5px;
+           font-weight: 600; text-decoration: none; white-space: nowrap; }
+    .btn:hover { border-color: var(--brand); color: var(--brand); }
+    .btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
     h1 { font-size: 22px; line-height: 1.25; margin: 0 0 .35rem; }
     h2 { font-size: 15px; margin: 1.1rem 0 .3rem; color: var(--brand); }
     p { margin: .35rem 0; }
@@ -119,7 +127,7 @@
       figure, .tldr, dl.key, table.tally { break-inside: avoid; }
       dl.key { grid-template-columns: max-content 1fr max-content 1fr; gap: .05rem .5rem; }
       a { color: inherit; text-decoration: none; }
-      .crumb { display: none; }
+      .topbar { display: none; }
       .row { grid-template-columns: 215px 1fr; }
       .row.wide { grid-template-columns: 1fr 270px; }
     }
@@ -128,7 +136,11 @@
 <body>
 <main>
 <section class="sheet">
-  <p class="crumb"><a href="./">Investigations</a> · <a href="../">Flood-Net</a></p>
+  <div class="topbar">
+    <p class="crumb"><a href="./">Investigations</a> · <a href="../">Flood-Net</a></p>
+    <!-- This page as printed, made by tools/investigations/pdf.mjs: run it again after this script. -->
+    <a class="btn" href="pdf/floodnet-investigation-03-hillcrest-wine-glass.pdf" download type="application/pdf" title="This report as two A4 pages">⬇ Download PDF</a>
+  </div>
   <h1>Hillcrest (Wine Glass): our busiest relay, and why it looked like our worst</h1>
   <p class="meta">Investigation 03 · 4 November 2026 · Hillcrest AL (Wine Glass) (540235, rain 6200, battery 6201),
     repeater on 151.500 MHz, Brisbane hub · <span class="pill">Open: critical flag not borne out, a small fault
@@ -813,10 +825,11 @@
       <ol>
         <li>Fix Station Health's transmitter figures: count the whole carrier, and leave out bursts read two ways (or
           have the decoder drop a lookalike with fewer votes). The Bit-Flip Sources and Backbone tabs and the
-          bulletins all read them.</li>
+          bulletins all read them (<a href="https://github.com/cdomotor-g/MegaNet/issues/272">#272</a>).</li>
         <li>Teach the carrier table that +120 to +240 Hz on 151.500 is Hillcrest's. It now credits 107
-          transmitters there as heard direct.</li>
-        <li>Find what raised our receiver's noise floor on 24 October, and keep the setting of 2 November.</li>
+          transmitters there as heard direct (<a href="https://github.com/cdomotor-g/MegaNet/issues/271">#271</a>).</li>
+        <li>Find what raised our receiver's noise floor on 24 October, and keep the setting of 2 November
+          (<a href="https://github.com/cdomotor-g/MegaNet/issues/273">#273</a>).</li>
         <li>No urgent visit is needed. At the next one, check Hillcrest's power supply and its receive side.</li>
       </ol>
     </div>

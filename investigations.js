@@ -9,8 +9,9 @@
 // its own that a crawler, a printer or a link from outside can read — and this
 // tab reads its <article>s, so an entry added there is on the tab with nothing
 // to change in the app. Each article's first .meta paragraph, its h3 link and
-// the paragraph after it are the card's three parts; a link that is not a page
-// beside the list is left out rather than followed.
+// the paragraph after it are the card's three parts, and a link to its PDF in
+// pdf/ (made by tools/investigations/pdf.mjs) its Download PDF button; a link
+// that is not a page or a PDF beside the list is left out rather than followed.
 //
 // After core.js (esc, escAttr). Nothing runs at load; switchTab calls render()
 // then init().
@@ -18,6 +19,7 @@
 const Investigations = (function () {
   const LIST = 'investigations/';
   const PAGE = /^[a-z0-9][a-z0-9-]*\.html$/;
+  const PDF = /^pdf\/floodnet-[a-z0-9-]+\.pdf$/;
 
   // 'idle' until the tab is first opened, then 'loading', 'ready' or 'error'.
   const S = { phase: 'idle', items: [], err: '' };
@@ -29,11 +31,13 @@ const Investigations = (function () {
       const href = link ? (link.getAttribute('href') || '').trim() : '';
       const paras = [...a.querySelectorAll('p')];
       const meta = a.querySelector('p.meta');
+      const pdf = [...a.querySelectorAll('a')].map(x => (x.getAttribute('href') || '').trim()).find(h => PDF.test(h));
       const pill = meta && meta.querySelector('.pill');
       const metaText = meta ? [...meta.childNodes].filter(n => n !== pill).map(n => n.textContent).join('') : '';
       return {
         title: link ? link.textContent.replace(/\s+/g, ' ').trim() : '',
         href: PAGE.test(href) ? LIST + href : '',
+        pdf: pdf ? LIST + pdf : '',
         meta: metaText.replace(/\s+/g, ' ').replace(/[\s·]+$/, '').trim(),
         status: pill ? pill.textContent.replace(/\s+/g, ' ').trim() : '',
         summary: (paras.find(p => p !== meta) || { textContent: '' }).textContent.replace(/\s+/g, ' ').trim(),
@@ -62,7 +66,9 @@ const Investigations = (function () {
         <h3 class="inv-title"><a href="${escAttr(i.href)}" target="_blank" rel="noopener">${esc(i.title)}</a></h3>
         <p>${esc(i.summary)}</p>
         <p><a class="btn" href="${escAttr(i.href)}" target="_blank" rel="noopener">📄 Read the report</a>
-          <span class="small txt-muted">Two printed pages. Print it, or save it as a PDF, from the browser.</span></p>
+          ${i.pdf ? `<a class="btn" href="${escAttr(i.pdf)}" download type="application/pdf">⬇ Download PDF</a>
+          <span class="small txt-muted">Two A4 pages.</span>`
+    : '<span class="small txt-muted">Two printed pages. Print it, or save it as a PDF, from the browser.</span>'}</p>
       </div>`;
   }
 

@@ -2833,7 +2833,7 @@ const HELP = {
     summary: 'Strange data we have looked into, and what was behind it: a <strong>write-up</strong> each, newest first, '
            + 'that leads with the answer, then the evidence, and says what is <strong>established</strong>, what is '
            + '<strong>likely</strong> and what is still <strong>open</strong>. Each is two printed pages with its figures, '
-           + 'and opens in a tab of its own to read, print or save as a PDF.',
+           + 'and opens in a tab of its own to read or print, or comes as a PDF with <strong>Download PDF</strong>.',
     watch: [
       'A write-up is dated, and says how sure it is. "Open" means the cause is narrowed, not proven — read its next '
       + 'steps before acting on it.',
