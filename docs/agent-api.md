@@ -972,7 +972,7 @@ A hop in `hops`:
 | `status` | `ok`, or `not modelled` — no figure is saved for the pair, and `detail` says how one is made |
 | `margin_db`, `margin_back_db` | the saved fade margin the way the traffic runs (from → to), and the other way, in dB |
 | `band`, `thresholds_db` | `margin_db` against the thresholds saved with it: `good` at `thresholds_db.good` (15 dB) or more, `ok` at `thresholds_db.ok` (6 dB), else `bad` |
-| `freq_mhz`, `verdict` | the frequency it was worked out at; the line of sight on the same profile — `clear`, `marginal` or `obstructed` |
+| `freq_mhz`, `verdict` | the frequency it was worked out at; the line of sight on the same profile — `clear`, `marginal` or `obstructed` (`marginal` is what the app calls *partly clear*: ground or cover inside the 60% Fresnel zone but under the line of sight) |
 | `model`, `computed_at` | the model it was worked out with, and when |
 | `stale`, `ends_changed`, `stale_reasons` | whether the map would not show it today; whether either end has changed since; and why, in words — `model`, `settings` (the field allowance, LiDAR ground), `moved`, `height`, `antenna`, `radio`, `frequency`, or `unreadable` |
 

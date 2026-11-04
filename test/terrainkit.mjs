@@ -940,9 +940,11 @@ if (sig) {
 // now: the title says it is a radio path, the rows at the head of the card
 // name the ends, the addresses and the channel, and the distance and the fade
 // margin are said once — by the readout, which drops its Path row because the
-// rows above it name the ends already. An obstruction the model has priced is
-// said beside the figure rather than painted over it: a yes or no on the
-// geometry, where the margin is the model's answer with the obstruction in it.
+// rows above it name the ends already. The box over the readout leads with the
+// fade margin's band — what says whether the link works — and says the line of
+// sight under it, with the path loss allowing for it: the line of sight is a
+// description of the geometry, and the margin is the model's answer with that
+// geometry in it, so the figure is never painted over by it.
 const pathCard = await page.evaluate(async ids => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const el = document.getElementById('path-profile-panel');
@@ -956,6 +958,8 @@ const pathCard = await page.evaluate(async ids => {
       want: p ? `txt-${lbMarginClass(p.margin).cls}` : null,
       text: v ? v.textContent.replace(/\s+/g, ' ').trim() : null,
       cls: v && v.querySelector('span') ? v.querySelector('span').className : '',
+      box: (el.querySelector('.path-readout > .path-verdict') || {}).textContent?.replace(/\s+/g, ' ').trim() || null,
+      boxCls: (el.querySelector('.path-readout > .path-verdict') || {}).className || '',
     };
   };
   MapBackbone.open('field', ids[0], ids[1]);
@@ -998,10 +1002,15 @@ if (pathCard) {
      !!pathCard.plain.text && pathCard.plain.text.startsWith(pathCard.plain.fig) && pathCard.plain.cls === pathCard.plain.want
        && pathCard.plain.want === marginRow.cls,
      JSON.stringify(pathCard.plain));
-  const named = r => !!r.text && (r.verdict === 'obstructed') === / · line of sight obstructed, priced in · /.test(r.text)
-    && r.cls === r.want;
-  ok('…and an obstruction the model priced named beside the figure, in the figure\'s colour, not painted over it',
-     named(pathCard.plain) && named(pathCard.low) && pathCard.low.verdict === 'obstructed',
+  const band = r => r.want ? r.want.replace(/^txt-/, '') : '';
+  const LOS = { clear: 'clear', marginal: 'partly clear', obstructed: 'obstructed' };
+  const led = r => !!r.box && r.boxCls.split(/\s+/).includes(band(r))
+    && r.box.startsWith(`${{ ok: 'Good', warn: 'Marginal', bad: 'Poor' }[band(r)]} fade margin`)
+    && r.box.includes(`Line of sight ${LOS[r.verdict]}:`)
+    && (r.verdict === 'clear') !== /path loss already allows for/.test(r.box)
+    && !/Marginal line of sight|priced in/.test(`${r.box} ${r.text}`) && r.cls === r.want;
+  ok('…the box leading with the fade margin\'s band in its colour, the line of sight said under it, and an obstruction allowed for, not painted over the figure',
+     led(pathCard.plain) && led(pathCard.low) && pathCard.low.verdict === 'obstructed',
      JSON.stringify({ plain: pathCard.plain, low: pathCard.low }));
 }
 
@@ -1305,7 +1314,8 @@ const noRadio = await page.evaluate(async () => {
       .find(x => x.textContent.trim() === 'Fade margin');
     if (dt) return { row: dt.nextElementSibling.textContent.replace(/\s+/g, ' ').trim(),
                      sig: (document.getElementById('path-sig-key') || {}).textContent || '',
-                     layer: !!document.getElementById('path-sig-under') };
+                     layer: !!document.getElementById('path-sig-under'),
+                     box: ((document.querySelector('#path-profile-panel .path-readout > .path-verdict strong') || {}).textContent || '').replace(/\s+/g, ' ').trim() };
     await new Promise(r => setTimeout(r, 300));
   }
   return null;
@@ -1314,6 +1324,8 @@ ok('two points on the ground get a stated reason, not a number',
    /both ends have to be stations/.test((noRadio || {}).row || ''), JSON.stringify(noRadio));
 ok('…and no signal along the line, with the key saying why',
    !!noRadio && !noRadio.layer && /No signal drawn/.test(noRadio.sig), JSON.stringify(noRadio));
+ok('…and with no margin to lead with, the box leads with the line of sight',
+   !!noRadio && /^(Clear|Partly clear|Obstructed) line of sight$/.test(noRadio.box), JSON.stringify(noRadio));
 await page.evaluate(() => { MapDraw.clearAll(); PathProfile.setOpen(false); });
 
 // ── 5. polar radio coverage ─────────────────────────────────────────────────

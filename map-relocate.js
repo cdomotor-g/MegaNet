@@ -1358,7 +1358,7 @@ const MapRelocate = (function () {
         <div class="table-wrap">
           <table class="sites-table">
             <caption class="sr-only">Every repeater from ${rank ? `new site ${rank}` : 'where it is now'}</caption>
-            <thead><tr><th scope="col">Repeater</th><th scope="col">km</th><th scope="col">LOS</th><th scope="col">Margin</th>${
+            <thead><tr><th scope="col">Repeater</th><th scope="col">km</th><th scope="col">${termHtml('LOS', PATH_LOS_MEANING)}</th><th scope="col">Margin</th>${
               rank ? '<th scope="col">Now</th>' : ''}<th scope="col"><span class="sr-only">Profile</span></th></tr></thead>
             <tbody>
               ${found.hubs.map((h, k) => {
@@ -1367,7 +1367,7 @@ const MapRelocate = (function () {
                   <td>${esc(h.name)}</td>
                   <td>${fig && fig.dKm != null ? fig.dKm.toFixed(1) : '—'}</td>
                   <td class="${fig && fig.verdict === 'obstructed' ? 'txt-bad' : fig && fig.verdict === 'marginal' ? 'txt-warn' : ''}">${
-                    !fig || fig.failed ? '—' : esc(fig.verdict || '—')}</td>
+                    !fig || fig.failed ? '—' : esc(fig.verdict ? pathVerdictWord(fig.verdict) : '—')}</td>
                   <td><span class="sites-band sites-band-${bandOf(fig)}">${
                     !fig || fig.failed ? '—' : dbText(fig.margin)}</span>${
                     fig && !fig.failed && fig.src !== 'card' ? '<span class="txt-muted" title="Screened only — not the card\'s figure">*</span>' : ''}</td>

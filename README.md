@@ -3941,8 +3941,10 @@ path's own mean height, the way the propagation model derives it, so N₀ = 301 
 sea level is the textbook 4/3 and a path at 600 m is a little less), **what
 stands on the ground** as a coloured band per land-cover class, the LOS between
 the two antennas, the **60% Fresnel zone**, and the stretches where terrain or
-cover intrudes into it — plus a plain-English verdict, *clear / marginal /
-obstructed*, an *Obstructions* list that says whether each one is ground or
+cover intrudes into it — plus a box that leads with the fade margin (*good /
+marginal / poor*) and says the line of sight under it (*clear / partly clear /
+obstructed*, a description of the geometry whose cost the path loss already
+counts), an *Obstructions* list that says whether each one is ground or
 cover, the elevation angle at each end, and the path loss the model computed. Antenna heights default
 from the station's `rm_systems[].antenna_height_m` and the frequency from the
 repeater's `rx_mhz`; both are editable, as is the **TX power** at A — the
@@ -4309,7 +4311,7 @@ path is opened in it. The two passes are never mixed in one ranking.
 
 **The score** is four figures, each 0–100, weighted by four sliders you own and
 all printed beside every result: **elevation** (across the candidates' range),
-**line of sight** (clear 1, marginal ½, obstructed 0, averaged over the sites),
+**line of sight** (clear 1, partly clear ½, obstructed 0, averaged over the sites),
 **fade margin** (site to repeater on each path, as a fraction of the map's own
 *good* band) and **road reserve** — on a Queensland road parcel scores 1, falling
 to 0 at 250 m, asked of the cadastre for the finalists only and only while its

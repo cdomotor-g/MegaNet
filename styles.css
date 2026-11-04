@@ -7899,7 +7899,15 @@ body .map-panel.is-driving {
 .path-verdict.ok strong   { color: var(--ok);   }
 .path-verdict.warn strong { color: var(--warn); }
 .path-verdict.bad strong  { color: var(--bad);  }
-.path-verdict span { color: var(--muted); }
+.path-verdict > span { color: var(--muted); }
+/* The line of sight, under the fade margin the box leads with: a line of its own. */
+.path-verdict > .path-verdict-los { flex-basis: 100%; }
+
+/* What the words over the figures mean — the box's hover meanings, written out. */
+.path-words { display: grid; grid-template-columns: minmax(8rem, max-content) 1fr; gap: var(--sp-1) var(--sp-3); margin: 0; font-size: var(--fs-sm); }
+.path-words dt { font-weight: 600; }
+.path-words dd { margin: 0; }
+@media (max-width: 560px) { .path-words { grid-template-columns: 1fr; } .path-words dd { margin-bottom: var(--sp-2); } }
 
 .path-stats {
   display: grid;

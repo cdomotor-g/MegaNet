@@ -51,7 +51,7 @@
 //   bulging up under it by d1·d2/(2ka), the 60% first-Fresnel envelope, and
 //   whatever stands on the ground (terrain plus the land cover's representative
 //   height) intruding into that envelope. This is what the chart shows and what
-//   "clear / marginal / obstructed" is read off.
+//   "clear / partly clear / obstructed" is read off (PATH_VERDICT).
 //
 //   the LOSS — Longley–Rice (ITM) point-to-point over the same profile, which
 //   is what Radio Mobile computes: free space, the reference attenuation for
@@ -620,14 +620,63 @@ function pathAnalyse(prof, opt) {
   };
 }
 
+// The line of sight, in three words, each with what it means on hover.
+//
+// The ids (clear / marginal / obstructed) are data: the agent API's `verdict`,
+// saved margins, the 3D view and the site finder's scoring read them, so they
+// stay. The words are what a person reads, and the middle one was "Marginal"
+// until it was found reading as a verdict on the link. It is not one: it is
+// the geometry, and at VHF nearly every long path has ground inside its 60%
+// Fresnel zone (113 m out from the line half way along 72 km at 151.5 MHz).
+// The card said "Marginal" in amber over a +23 dB fade margin, and the fade
+// margin's own 3–10 dB band is called Marginal too. So the middle word says
+// what the geometry is, and the profile card leads with the fade margin, which
+// is what says whether the link works (readoutHtml).
+//
+// "Obstructed" said "this path is blocked", which is not true at VHF: the
+// signal bends over a ridge, at a cost the path loss counts, and many such
+// links work. It says that now.
 const PATH_VERDICT = {
-  clear:      { label: 'Clear',      cls: 'ok',
-                note: 'Nothing on the ground reaches the 60% Fresnel zone the whole way.' },
-  marginal:   { label: 'Marginal',   cls: 'warn',
-                note: 'Ground or cover intrudes into the 60% Fresnel zone but stays below line of sight.' },
-  obstructed: { label: 'Obstructed', cls: 'bad',
-                note: 'Ground or cover rises above the line of sight — this path is blocked.' },
+  clear:      { label: 'Clear',        cls: 'ok',
+                note: 'Nothing on the ground reaches the 60% Fresnel zone the whole way.',
+                meaning: 'Nothing on the ground, and none of the trees or buildings on it, comes inside 60% of the first Fresnel zone — the '
+                  + 'room round the straight line between the two antennas that the signal needs. The path loses little more than it would '
+                  + 'in open space.' },
+  marginal:   { label: 'Partly clear', cls: 'warn',
+                note: 'Ground or cover reaches into the 60% Fresnel zone but stays under the line of sight.',
+                meaning: 'Ground, trees or buildings come inside 60% of the first Fresnel zone somewhere along the path, but stay under the '
+                  + 'straight line between the two antennas. That costs some signal, which the path loss counts. Most long VHF paths are '
+                  + 'like this: half way along 70 km at 150 MHz the zone reaches over 100 m out from the line.' },
+  obstructed: { label: 'Obstructed',   cls: 'bad',
+                note: 'Ground or cover rises above the line of sight, so the signal reaches the far end only by bending over it.',
+                meaning: 'Ground, trees or buildings stand above the straight line between the two antennas. The signal reaches the far end '
+                  + 'only by bending over them, which costs more than going past them — the path loss counts it. At VHF many of these '
+                  + 'links still work; the fade margin says whether this one does.' },
 };
+
+// A verdict id as the word a person reads ("partly clear"), lower case for
+// the middle of a sentence. Unknown ids come back as they are.
+function pathVerdictWord(id, lower = true) {
+  const v = PATH_VERDICT[id];
+  if (!v) return id || '';
+  return lower ? v.label.toLowerCase() : v.label;
+}
+
+// What a table's LOS column means, where one lists paths (the site finder,
+// the relocation finder).
+const PATH_LOS_MEANING = 'The line of sight between the two antennas, read off the ground profile: clear (nothing inside 60% of the '
+  + 'first Fresnel zone), partly clear (ground or cover inside it but under the straight line) or obstructed (above the line). '
+  + 'It describes the geometry; the margin beside it says whether the link works.';
+
+// What "fade margin" means, with the bands it is read against — the link
+// budget card's LB_MARGIN, so the words and the colours cannot disagree.
+function pathMarginMeaning() {
+  const good = typeof LB_MARGIN !== 'undefined' ? LB_MARGIN[0].min : 10;
+  const floor = typeof LB_MARGIN !== 'undefined' ? LB_MARGIN[1].min : 3;
+  return 'How far the signal arriving is above the weakest the receiver at the far end can decode (its RX threshold), in '
+    + `decibels, by the model, after everything the path costs. ${good} dB or more is good; ${floor} to ${good} is marginal — `
+    + `growth, rain or a season could eat it; under ${floor} is poor.`;
+}
 
 // ── Elevation profile (Stations map) ─────────────────────────────────────────
 // Draw a line on the map and see the ground under it, and what is growing on
@@ -966,16 +1015,16 @@ const PathProfile = (function () {
     }
     const e = cur.elvis;
     if (!e) return '';
-    const V = k => (PATH_VERDICT[k] ? PATH_VERDICT[k].label : k);
+    const V = k => pathVerdictWord(k);
     const res = e.finest == null ? ''
       : e.finest === e.coarsest
         ? `${e.finest < 1 ? `${Math.round(e.finest * 100)} cm` : `${e.finest} m`} data`
         : `${e.finest < 1 ? `${Math.round(e.finest * 100)} cm` : `${e.finest} m`}–${e.coarsest} m data`;
     const headline = e.changed
-      ? `<strong>The verdict changes.</strong> On the same ${e.asked} points the ~${
+      ? `<strong>The line-of-sight verdict changes.</strong> On the same ${e.asked} points the ~${
           cur.prof.resolution_m} m ground says <strong>${esc(V(e.base.verdict))}</strong> and
          Elvis says <strong>${esc(V(e.alt.verdict))}</strong>.`
-      : `<strong>The verdict holds.</strong> Both models call this path
+      : `<strong>The line-of-sight verdict holds.</strong> Both models call this path's line of sight
          <strong>${esc(V(e.alt.verdict))}</strong> on the same ${e.asked} points.`;
     return `
       <div class="filter-note">
@@ -990,7 +1039,7 @@ const PathProfile = (function () {
         ${e.got < e.asked ? `<p>${e.asked - e.got} point${e.asked - e.got === 1 ? '' : 's'}
           went unanswered and kept the tile height.</p>` : ''}
         <p>Both figures above are re-analysed on those ${e.asked} points, so the difference
-          between them is the elevation model and not the sampling. The verdict at the top of
+          between them is the elevation model and not the sampling. The line of sight at the top of
           this card is the full ${SAMPLES}-point run and may differ from either.
           ${esc(Elvis.attribution)}.</p>`)}
       </div>`;
@@ -1376,7 +1425,7 @@ const PathProfile = (function () {
     return `
       <div class="path-chart-wrap">
         <svg viewBox="0 0 ${W} ${H}" class="path-chart" role="img"
-             aria-label="Terrain profile over ${fmtKm(D / 1000)} — ${esc((PATH_VERDICT[an.verdict] || {}).label || an.verdict)}${
+             aria-label="Terrain profile over ${fmtKm(D / 1000)} — line of sight ${esc(pathVerdictWord(an.verdict))}${
                w && w.clearance != null
                  ? (w.clearance >= 0
                      ? `, worst clearance ${Math.round(w.clearance)} m under the line at ${fmtKm(w.d1 / 1000)}`
@@ -1638,16 +1687,15 @@ const PathProfile = (function () {
             : `no figure on file for ${esc(fmtTermList(r.missing))}`;
       return `<span class="txt-warn">not computed</span> <span class="small">${why}</span>`;
     }
-    // "Obstructed" is a yes or no on the geometry and the margin is what the
-    // model says is left after paying for it, so a figure that survives an
-    // obstruction says so beside it rather than being painted red over it —
-    // the verdict over the readout and a green figure under it would otherwise
-    // read as a contradiction. (The radio-path card said this when it was a
-    // card of its own; the rows are on this card now, and so is this.)
+    // The line of sight is the geometry and the margin is what the model says
+    // is left after paying for it, so the figure is in its own band's colour
+    // whatever the line of sight is. The box over the readout leads with this
+    // band and says the line of sight under it, and that the path loss allows
+    // for it (verdictHtml); the figure here said "line of sight obstructed,
+    // priced in" beside it when the box led with the line of sight.
     const cls = lbMarginClass(r.m);
     return `<span class="txt-${cls.cls}">${r.m > 0 ? '+' : ''}${r.m.toFixed(1)} dB</span>
-      <span class="small">${esc(cls.label.toLowerCase())}${an.verdict === 'obstructed' && an.itm
-        ? ' · line of sight obstructed, priced in' : ''} · ${esc(a.name)} → ${esc(b.name)}</span>`;
+      <span class="small">${esc(cls.label.toLowerCase())} · ${esc(a.name)} → ${esc(b.name)}</span>`;
   }
 
   // "a, b and c" — the budget card's fmtList, which lives inside its IIFE.
@@ -2104,19 +2152,56 @@ const PathProfile = (function () {
 
   // ── the panel ──
 
+  // The box over the figures: the answer, before any of the numbers.
+  //
+  // It leads with the fade margin, because that is what says whether the link
+  // works, and says the line of sight under it. It led with the line of sight
+  // until a VHF path with ground inside its Fresnel zone, as nearly every long
+  // one has, showed "Marginal" in amber over a +23 dB fade margin: the
+  // geometry was being read as the verdict on the link, and its cost is
+  // already in the path loss the margin is worked out after. With no margin to
+  // lead with — a point on the ground at one end, or no radio on file — the
+  // line of sight is the only answer there is, and it leads.
+  function verdictHtml(an, a, b) {
+    const V = PATH_VERDICT[an.verdict] || { label: an.verdict, cls: '', note: '', meaning: '' };
+    const los = text => termHtml(text, V.meaning);
+    const r = profileMargin(an, a, b);
+    if (r.m == null) {
+      return `
+        <div class="path-verdict ${V.cls}">
+          <strong>${los(V.label)} line of sight</strong>
+          <span class="small">${esc(V.note)}</span>
+        </div>`;
+    }
+    const band = lbMarginClass(r.m);
+    const note = V.note ? V.note[0].toLowerCase() + V.note.slice(1) : '';
+    return `
+        <div class="path-verdict ${band.cls}">
+          <strong>${esc(band.label)} ${termHtml('fade margin', pathMarginMeaning())}</strong>
+          <span class="small">${esc(band.note)}</span>
+          <span class="small path-verdict-los">Line of sight ${los(V.label.toLowerCase())}: ${esc(note)}${
+            an.verdict !== 'clear' ? ' The path loss already allows for what that costs.' : ''}</span>
+        </div>`;
+  }
+
+  // The words over the figures, for a finger or a keyboard that cannot hover
+  // (CLAUDE.md, "Plain words"): the same meanings the box's titles carry.
+  function wordsHtml() {
+    const rows = [['Fade margin', pathMarginMeaning()],
+      ...['clear', 'marginal', 'obstructed'].map(k => [`${PATH_VERDICT[k].label} line of sight`, PATH_VERDICT[k].meaning])];
+    return pathMoreHtml('path-words', 'What the words over the figures mean',
+      `<dl class="path-words">${rows.map(([t, m]) => `<dt>${esc(t)}</dt><dd>${esc(m)}</dd>`).join('')}</dl>`);
+  }
+
   // `ends` false leaves the Path row out: on a radio path the rows over the
   // readout name the two ends already, each a link to its station.
   function readoutHtml(an, a, b, ends = true) {
-    const v = PATH_VERDICT[an.verdict];
     const w = an.worst;
     const worstWhat = w.clearance < 0 ? (w.cover != null && w.los - w.bulged >= 0 ? 'cover' : 'ground') : null;
     const itm = an.itm;
     return `
       <div class="path-readout">
-        <div class="path-verdict ${v.cls}">
-          <strong>${v.label}</strong>
-          <span class="small">${esc(v.note)}</span>
-        </div>
+        ${verdictHtml(an, a, b)}
         <dl class="path-stats">
           <!-- Two lines, always, whatever the names are. It read
                "{A} → {B}" on one line and wrapped where the names happened to
@@ -2128,7 +2213,7 @@ const PathProfile = (function () {
           ${ends ? `<div><dt>Path</dt><dd class="path-ends" title="${escAttr(`${a.name} → ${b.name}`)}"><span>${
             esc(a.name)}</span><span>${esc(b.name)}</span></dd></div>` : ''}
           <div><dt>Distance</dt><dd>${fmtKm(an.D / 1000)}</dd></div>
-          <div><dt>Fade margin</dt><dd>${marginCellHtml(an, a, b)}</dd></div>
+          <div><dt>${termHtml('Fade margin', pathMarginMeaning())}</dt><dd>${marginCellHtml(an, a, b)}</dd></div>
           <div><dt>Path loss</dt><dd>${an.pathLoss_db != null
             ? `${an.pathLoss_db.toFixed(1)} dB <span class="small">${esc(itm.modeLabel.toLowerCase())}, ${(an.pathLoss_db - an.fspl_db).toFixed(1)} dB over free space</span>`
             : `<span class="txt-warn">not computed</span> <span class="small">${esc(an.itmError || '')}</span>`}</dd></div>
@@ -2151,6 +2236,7 @@ const PathProfile = (function () {
               <span class="small">A→B / B→A</span></dd></div>
             <div><dt>Frequency</dt><dd>${an.fMhz.toFixed(3)} MHz</dd></div>
           </dl>`)}
+        ${wordsHtml()}
       </div>`;
   }
 

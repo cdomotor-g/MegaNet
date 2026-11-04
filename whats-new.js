@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 194, date: '2026-11-04', items: [
+      '📡 The <strong>elevation profile</strong> and <strong>radio path</strong> cards now lead with the fade margin — '
+        + '<em>Good</em>, <em>Marginal</em> or <em>Poor</em>, which says whether the link works — and say the line of sight '
+        + 'under it. The middle line-of-sight word is now <em>Partly clear</em> instead of <em>Marginal</em>: ground or trees '
+        + 'inside the Fresnel zone but under the line of sight, as on most long VHF paths, and already counted in the path loss. '
+        + 'It no longer shows as a warning over a healthy margin. The site finder, relocation and best-repeater tables use the same words.',
+    ] },
     { n: 193, date: '2026-11-04', items: [
       '🪜 <strong>Hops to base</strong>, on the station card: press <em>Show hops to base</em> and the Stations map lights '
         + 'the way that station\'s readings travel — each repeater they pass through and the base stations they end at — and '

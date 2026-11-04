@@ -67,7 +67,7 @@
 // argued with rather than taken on trust:
 //
 //   Elevation      the candidate's ground height across the pool's range.
-//   Line of sight  per site, 1 for clear, ½ for marginal, 0 for obstructed —
+//   Line of sight  per site, 1 for clear, ½ for partly clear (id `marginal`), 0 for obstructed —
 //                  PATH_VERDICT's three words — averaged.
 //   Fade margin    per site, one way: the site to the repeater, the way its
 //                  readings go (nothing transmits back down to a gauge)
@@ -958,7 +958,9 @@ const MapSites = (function () {
 
   // ── Words ───────────────────────────────────────────────────────────────────
 
-  const VERDICT = { clear: 'clear', marginal: 'marginal', obstructed: 'obstructed' };
+  // The line of sight in the words the profile card uses (PATH_VERDICT): the
+  // ids are data, the words are what the table and the CSV say.
+  const VERDICT = { clear: pathVerdictWord('clear'), marginal: pathVerdictWord('marginal'), obstructed: pathVerdictWord('obstructed') };
 
   function dbText(v) { return v == null || !isFinite(v) ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`; }
 
@@ -1017,7 +1019,7 @@ const MapSites = (function () {
   function summaryHtml(r) {
     const s = r.s, n = found.targets.length;
     return `
-      <span>LOS <strong>${s.clear}</strong> clear${s.marginal ? `, ${s.marginal} marginal` : ''}${
+      <span>Line of sight <strong>${s.clear}</strong> clear${s.marginal ? `, ${s.marginal} partly clear` : ''}${
         s.obstructed ? `, <span class="txt-bad">${s.obstructed} obstructed</span>` : ''} of ${n}</span>
       <span>Fade margin worst <strong>${dbText(s.min)}</strong>, median ${dbText(s.median)} ·
         ${s.served} of ${n} at ${okDb()} dB or better</span>`;
@@ -1199,7 +1201,7 @@ const MapSites = (function () {
         <div class="table-wrap">
           <table class="sites-table">
             <caption class="sr-only">Every site against repeater site ${r.rank}</caption>
-            <thead><tr><th scope="col">Site</th><th scope="col">km</th><th scope="col">LOS</th><th scope="col">Margin</th><th scope="col"><span class="sr-only">Profile</span></th></tr></thead>
+            <thead><tr><th scope="col">Site</th><th scope="col">km</th><th scope="col">${termHtml('LOS', PATH_LOS_MEANING)}</th><th scope="col">Margin</th><th scope="col"><span class="sr-only">Profile</span></th></tr></thead>
             <tbody>
               ${found.targets.map((t, k) => {
                 const fig = figOf(r.c, k, true);
@@ -1424,7 +1426,7 @@ const MapSites = (function () {
         rows.push([
           r.rank, r.c.lat.toFixed(6), r.c.lon.toFixed(6), Math.round(r.c.ground), r.s.score.toFixed(1),
           q(whereText(r.c)), q(road), q(t.name), q(t.number), t.lat.toFixed(6), t.lon.toFixed(6),
-          fig.dKm != null ? fig.dKm.toFixed(2) : '', fig.failed ? '' : fig.colo ? 'co-located' : fig.verdict || '',
+          fig.dKm != null ? fig.dKm.toFixed(2) : '', fig.failed ? '' : fig.colo ? 'co-located' : fig.verdict ? VERDICT[fig.verdict] || fig.verdict : '',
           f1(fig.margin), fig.failed ? 'failed' : fig.src || '',
         ].join(','));
       });

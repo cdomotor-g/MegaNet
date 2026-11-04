@@ -603,7 +603,7 @@ const NetworkReview = (function () {
       if (f == null) return `<td class="nr-num txt-muted">…</td>`;
       if (f.err) return `<td class="nr-num txt-muted" title="${escAttr({ terrain: 'terrain unreachable', cover: 'land cover unreachable', radio: 'no radio system on file', model: 'the model refused the path' }[f.err] || f.err)}">—</td>`;
       const b = bandOf(f.m);
-      return `<td class="nr-num nr-${b}" title="${escAttr(`${fmtKm(f.dKm)} · ${f.v || ''}`)}">${fmtDb(f.m)}<span class="small txt-muted"> ${f.dKm.toFixed(1)} km</span></td>`;
+      return `<td class="nr-num nr-${b}" title="${escAttr(`${fmtKm(f.dKm)}${f.v ? ` · line of sight ${pathVerdictWord(f.v)}` : ''}`)}">${fmtDb(f.m)}<span class="small txt-muted"> ${f.dKm.toFixed(1)} km</span></td>`;
     };
     const rows = matrix.rows.map(r => {
       const s = rowSummary(r), m = measured ? measured.get(r.id) : null;

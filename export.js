@@ -1188,7 +1188,7 @@ function sitesKmlCandidate(data, r) {
   const desc = [
     `<b>#${r.rank} of ${data.results.length}</b> · ground ${Math.round(r.ground)} m · score ${Math.round(r.score)} of 100`,
     `<b>Position:</b> ${kmlEsc(stationLatLonText(r))} — ${kmlEsc(r.where)}`,
-    `<b>Line of sight:</b> ${c.clear} clear${c.marginal ? `, ${c.marginal} marginal` : ''}${
+    `<b>Line of sight:</b> ${c.clear} clear${c.marginal ? `, ${c.marginal} partly clear` : ''}${
       c.obstructed ? `, ${c.obstructed} obstructed` : ''} of ${n}`,
     `<b>Fade margin:</b> worst ${kmlEsc(sitesKmlDb(c.min))}, median ${kmlEsc(sitesKmlDb(c.median))} · ${
       c.served} of ${n} at ${data.okDb} dB or better`,

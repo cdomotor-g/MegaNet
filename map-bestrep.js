@@ -163,7 +163,7 @@ const MapBestRepeater = (function () {
       ok: `${O} to ${G} dB to spare — enough for most days, not for the worst; the fade margin layer's yellow.`,
       bad: `Under ${O} dB to spare — likely to drop readings in a storm; the fade margin layer's red.`,
       clear: 'Line of sight: nothing reaches into 60% of the first Fresnel zone between the two antennas.',
-      marginal: 'Line of sight: the ground or what stands on it reaches into the Fresnel zone, but not across the straight line.',
+      marginal: 'Line of sight: the ground or what stands on it reaches into 60% of the first Fresnel zone, but not across the straight line. It costs some signal, which the fade margin already counts; most long VHF paths are like this.',
       obstructed: 'Line of sight: the ground cuts the straight line between the two antennas, so the signal has to bend over it.',
       carries: 'This repeater\'s pass ranges already take one of the station\'s ALERT addresses, so it relays the station today.',
       free: 'ALERT addresses inside this repeater\'s pass ranges that no station in its hub holds and nobody has set aside — room '
@@ -176,7 +176,7 @@ const MapBestRepeater = (function () {
   const GLOSSARY = [
     ['hop', 'Its hop'], ['onward', 'On to base'], ['whole', 'Whole way'],
     ['good', 'Good'], ['ok', 'Ok'], ['bad', 'Poor'],
-    ['clear', 'Clear'], ['marginal', 'Marginal'], ['obstructed', 'Obstructed'],
+    ['clear', 'Clear'], ['marginal', 'Partly clear'], ['obstructed', 'Obstructed'],
     ['carries', 'Carries it now'], ['free', 'Free addresses'], ['unworked', 'Not worked out'],
   ];
 
@@ -646,7 +646,7 @@ const MapBestRepeater = (function () {
   function verdictHtml(v) {
     if (!v) return '';
     const cls = v === 'obstructed' ? 'txt-bad' : v === 'marginal' ? 'txt-warn' : '';
-    return `<span class="${cls}">${termHtml(v, words()[v])}</span>`;
+    return `<span class="${cls}">${termHtml(pathVerdictWord(v), words()[v])}</span>`;
   }
 
   function onwardHtml(c) {
@@ -1167,7 +1167,7 @@ const MapBestRepeater = (function () {
       const room = roomOf(c);
       rows.push([
         c.rank, q(c.hub.id), q(c.hub.name), q(c.hub.number), q(roleText(c.hub)), c.km.toFixed(2), Math.round(((c.brg % 360) + 360) % 360),
-        c.carries ? 'yes' : '', c.hub.isRep ? c.hub.f : '', f.failed ? '' : f1(f.margin), f.failed ? '' : (f.verdict || ''), q(f.failed || ''),
+        c.carries ? 'yes' : '', c.hub.isRep ? c.hub.f : '', f.failed ? '' : f1(f.margin), f.failed ? '' : q(f.verdict ? pathVerdictWord(f.verdict) : ''), q(f.failed || ''),
         q(c.onward && c.onward.kind === 'base' ? 'is a base' : r ? r.ids.map(nameOf).join(' > ') : 'none'),
         r ? r.hops.length : '', r && r.weakest ? f1(r.weakest.margin) : '', r ? r.unmodelled : '',
         f1(w.db), w.approx ? 'yes' : '', room ? room.free : '',

@@ -130,7 +130,7 @@ const Repeaters = (() => {
       layBasins: 'The 77 Queensland drainage basins, coloured by which way the water goes and named from zoom 7: which basin a repeater\'s stations are in.',
       // A link pressed on the map: its ground and its budget.
       pathCard: 'The ground between the two sites, cut along the straight line joining them with the curve of the earth added, and what the signal gains and loses on its way from one antenna to the other. A model of the path, not a measurement of it.',
-      verdict: 'Read off the picture. Clear: nothing on the ground reaches the 60% Fresnel zone the whole way. Marginal: ground or trees reach into it but stay under the line of sight. Obstructed: they rise above the line of sight.',
+      verdict: 'Read off the picture, and a description of the geometry rather than a verdict on the link — the fade margin is that. Clear: nothing on the ground reaches the 60% Fresnel zone the whole way. Partly clear: ground or trees reach into it but stay under the line of sight, as on most long VHF paths. Obstructed: they rise above the line of sight, and the signal bends over them. The path loss counts what either costs.',
       fresnel: 'The space round the straight line between the two antennas that the signal needs clear to arrive at full strength — fattest half way along. Ground or trees reaching into 60% of it start to cost signal.',
       fade: `How far the signal arriving is above the weakest the receiver can decode (its RX threshold), in decibels, by the model. ${fadeGood()} dB or more is good; ${fadeOk()} to ${fadeGood()} is marginal — growth, rain or a season could eat it; under ${fadeOk()} is poor.`,
       eirp: 'The power leaving the transmitting antenna: the radio\'s TX power, plus the antenna\'s gain, less what the cable up to it loses.',
@@ -157,7 +157,7 @@ const Repeaters = (() => {
     ['baseLink', 'Repeater to base station'], ['isolated', 'Linked to nothing'],
     ['layElev', 'Ground height as colour'], ['layCouncils', 'Council areas (LGA boundaries)'], ['layShade', 'Shade each council area'],
     ['layHubs', 'Maintenance hubs'], ['layBasins', 'River catchments'],
-    ['pathCard', 'Ground profile and link budget'], ['verdict', 'Clear, Marginal, Obstructed'], ['fresnel', '60% Fresnel zone'],
+    ['pathCard', 'Ground profile and link budget'], ['verdict', 'Clear, Partly clear, Obstructed'], ['fresnel', '60% Fresnel zone'],
     ['fade', 'Fade margin'], ['eirp', 'EIRP'], ['fspl', 'Free-space loss'], ['terrain', 'Terrain'], ['stats', 'Statistics'],
     ['floor', 'Obstruction floor'], ['allowance', 'Field allowance'], ['clutter', 'Ground cover'], ['pathLoss', 'Path loss'],
     ['received', 'Received signal'], ['threshold', 'RX threshold'],
