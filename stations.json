@@ -1865,7 +1865,7 @@
     },
     {
       "id": "ainsworth_rd_middle",
-      "name": "Ainsworth Rd (Middle",
+      "name": "Ainsworth Road (Middle Creek)",
       "station_number": "558120",
       "lat": -28.9162,
       "lon": 152.8841,
@@ -2374,7 +2374,7 @@
     },
     {
       "id": "alligator_ck_rd",
-      "name": "Alligator Ck Rd",
+      "name": "Alligator Creek Road TM",
       "station_number": "533218",
       "lat": -19.4035,
       "lon": 146.946,
@@ -2429,7 +2429,7 @@
     },
     {
       "id": "allora_dalrymple_cr",
-      "name": "Allora (Dalrymple Cr",
+      "name": "Allora (Dalrymple Creek) AL",
       "station_number": "41563",
       "lat": -28.0347,
       "lon": 151.987,
@@ -2789,7 +2789,7 @@
     },
     {
       "id": "amelia_cr_yarrowmer",
-      "name": "Amelia Cr (Yarrowmer",
+      "name": "Amelia Cr (Yarrowmere Rd) TM",
       "station_number": "536019",
       "lat": -21.0257,
       "lon": 145.7661,
@@ -3215,7 +3215,7 @@
     },
     {
       "id": "armidale_stephens_br",
-      "name": "Armidale-Stephens Br",
+      "name": "Armidale-Stephens Bridge (Dumaresq Creek)",
       "station_number": "556017",
       "lat": -30.5117,
       "lon": 151.67,
@@ -3457,7 +3457,7 @@
     },
     {
       "id": "auburn_river_andrew",
-      "name": "Auburn River (Andrew",
+      "name": "Auburn River (Andrews Road) TM",
       "station_number": "42123",
       "lat": -25.7453,
       "lon": 150.5891,
@@ -3568,7 +3568,7 @@
     },
     {
       "id": "augustus_downs_stati",
-      "name": "Augustus Downs Stati",
+      "name": "Augustus Downs Station",
       "station_number": "29001",
       "station_type": "manual_water_level",
       "lat": -18.5119,
@@ -4049,7 +4049,7 @@
     },
     {
       "id": "back_beach_rd_at_d",
-      "name": "Back Beach Rd at D",
+      "name": "Back Beach Road at Djenghi",
       "station_number": "900003",
       "lat": -16.9422,
       "lon": 145.8858,
@@ -4093,7 +4093,7 @@
     },
     {
       "id": "back_beach_rd_at_m",
-      "name": "Back Beach Rd at M",
+      "name": "Back Beach Road at Mourigan",
       "station_number": "900004",
       "lat": -16.9314,
       "lon": 145.8768,
@@ -4137,7 +4137,7 @@
     },
     {
       "id": "back_beach_rd_at_o",
-      "name": "Back Beach Rd at O",
+      "name": "Back Beach Road at Oombunghi",
       "station_number": "900005",
       "lat": -16.9673,
       "lon": 145.8877,
@@ -4185,7 +4185,7 @@
     },
     {
       "id": "back_beach_rd_at_r",
-      "name": "Back Beach Rd at R",
+      "name": "Back Beach Road at Reeves Creek",
       "station_number": "900006",
       "lat": -16.9236,
       "lon": 145.8736,
@@ -4539,7 +4539,7 @@
     },
     {
       "id": "ballera_jackson_rd",
-      "name": "Ballera Jackson Rd",
+      "name": "Ballera Jackson Road Crossing TM",
       "station_number": "545003",
       "station_type": "auto_water_level",
       "lat": -27.5006,
@@ -5426,7 +5426,7 @@
     },
     {
       "id": "barrackdale_choke_s",
-      "name": "Barrackdale Choke (S",
+      "name": "Barrackdale Choke (South)",
       "station_number": "900032",
       "lat": -27.5323,
       "lon": 148.7355,
@@ -5711,7 +5711,7 @@
     },
     {
       "id": "basalt_river_gregor",
-      "name": "Basalt River (Gregor",
+      "name": "Basalt River (Gregory Dev Rd) TM",
       "station_number": "530053",
       "lat": -19.6306,
       "lon": 145.7734,
@@ -9610,7 +9610,7 @@
     },
     {
       "id": "birdsville_police_st",
-      "name": "Birdsville Police St",
+      "name": "Birdsville Police Station",
       "station_number": "38002",
       "station_type": "manual_water_level",
       "lat": -25.9003,
@@ -10590,7 +10590,7 @@
     },
     {
       "id": "bloomfield_river_bri",
-      "name": "Bloomfield River Bri",
+      "name": "Bloomfield River Bridge TM",
       "station_number": "",
       "lat": -24.532,
       "lon": 150.92,
@@ -12758,7 +12758,7 @@
     },
     {
       "id": "bowraville_lanes_bri",
-      "name": "Bowraville Lanes Bri",
+      "name": "Bowraville Lanes Bridge (Nambucca River)",
       "station_number": "559001",
       "lat": -30.6433,
       "lon": 152.855,
@@ -12800,7 +12800,7 @@
     },
     {
       "id": "boyne_river_chahpin",
-      "name": "Boyne River (Chahpin",
+      "name": "Boyne River (McLaughlins Rd) TM",
       "station_number": "140030",
       "lat": -26.4514,
       "lon": 151.3874,
@@ -14103,7 +14103,7 @@
     },
     {
       "id": "brdley_ck_core",
-      "name": "BRdley Ck (Core",
+      "name": "Broadley Creek (Corea Plains Rd) TM",
       "station_number": "534046",
       "lat": -20.6863,
       "lon": 145.9473,
@@ -14224,7 +14224,7 @@
     },
     {
       "id": "brdwater_br_r",
-      "name": "BRdwater Br (R",
+      "name": "Broadwater Bridge (Richmond River)",
       "station_number": "558126",
       "lat": -29.0134,
       "lon": 153.4311,
@@ -14383,7 +14383,7 @@
     },
     {
       "id": "brdwater_tm",
-      "name": "BRdwater Tm",
+      "name": "Broadwater TM",
       "station_number": "529047",
       "lat": -18.0797,
       "lon": 141.1331,
@@ -14752,7 +14752,7 @@
     },
     {
       "id": "brunswick_hwyoldbr",
-      "name": "Brunswick HwyOldBr",
+      "name": "Brunswick Hwy (Old Brunswick River Bridge) Radar WL",
       "station_number": "551197",
       "lat": -28.5313,
       "lon": 153.539,
@@ -17894,8 +17894,8 @@
       "name": "Carbrook (Riedel Rd) AL",
       "station_number": "540236",
       "station_type": "auto_water_level",
-      "lat": -27.7,
-      "lon": 153.2833,
+      "lat": -27.694406,
+      "lon": 153.279496,
       "elevation_ahd": 8.9,
       "roles": [
         "field"
@@ -17904,7 +17904,11 @@
       "catchment_ids": [
         "logan_albert"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 6240,
+        "battery": 6241,
+        "water_level": 6243
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -18297,7 +18301,7 @@
     },
     {
       "id": "carpentaria_br_t",
-      "name": "Carpentaria Br T",
+      "name": "Carpentaria Bridge TM",
       "station_number": "530052",
       "lat": -18.7272,
       "lon": 144.3125,
@@ -18356,7 +18360,7 @@
     },
     {
       "id": "carroll_village_nam",
-      "name": "Carroll Village (Nam",
+      "name": "Carroll Village (Namoi River)",
       "station_number": "555024",
       "lat": -30.9833,
       "lon": 150.4417,
@@ -18541,7 +18545,7 @@
     },
     {
       "id": "casino_rd_br",
-      "name": "Casino Rd Br (",
+      "name": "Casino Road Bridge (Richmond River)",
       "station_number": "58179",
       "station_type": "auto_water_level",
       "lat": -28.8694,
@@ -19601,7 +19605,7 @@
     },
     {
       "id": "charters_towers_weir",
-      "name": "Charters Towers Weir",
+      "name": "Charters Towers Weir TM",
       "station_number": "534048",
       "lat": -19.9662,
       "lon": 146.3053,
@@ -19722,7 +19726,7 @@
     },
     {
       "id": "cherwell_river_rail",
-      "name": "Cherwell River (Rail",
+      "name": "Cherwell River (Highway Bridge) AL",
       "station_number": "140031",
       "lat": -25.2905,
       "lon": 152.416,
@@ -20306,7 +20310,7 @@
     },
     {
       "id": "chisholm_trail_oak_v",
-      "name": "Chisholm Trail Oak V",
+      "name": "Chisholm Trail Oak Valley TM",
       "station_number": "532138",
       "lat": -19.388,
       "lon": 146.8094,
@@ -21126,7 +21130,7 @@
     },
     {
       "id": "clearfield_old_tent",
-      "name": "Clearfield (Old Tent",
+      "name": "Clearfield (Old Tenterfield Road)",
       "station_number": "558121",
       "lat": -29.1745,
       "lon": 152.8775,
@@ -21946,7 +21950,7 @@
     },
     {
       "id": "comboyne_thone_rive",
-      "name": "Comboyne (Thone Rive",
+      "name": "Comboyne (Thone River)",
       "station_number": "560024",
       "lat": -31.6097,
       "lon": 152.4625,
@@ -24154,7 +24158,7 @@
     },
     {
       "id": "copmanhurst_clarenc",
-      "name": "Copmanhurst (Clarenc",
+      "name": "Copmanhurst (Clarence River)",
       "station_number": "58181",
       "lat": -29.5944,
       "lon": 152.7806,
@@ -29170,7 +29174,7 @@
     },
     {
       "id": "dumaresq_dam_d_s_du",
-      "name": "Dumaresq Dam D/S (Du",
+      "name": "Dumaresq Dam D/S (Dumaresq Creek)",
       "station_number": "556022",
       "lat": -30.4661,
       "lon": 151.6144,
@@ -30133,7 +30137,7 @@
     },
     {
       "id": "east_leichardt_dam_t",
-      "name": "East Leichardt Dam T",
+      "name": "East Leichardt Dam TM",
       "station_number": "529082",
       "lat": -20.7797,
       "lon": 139.7849,
@@ -31004,7 +31008,7 @@
     },
     {
       "id": "emu_ck_at_pierces",
-      "name": "Emu Ck at Pierces",
+      "name": "Emu Creek at Pierces Creek Road",
       "station_number": "140023",
       "station_type": "auto_water_level",
       "lat": -27.0644,
@@ -31543,7 +31547,7 @@
     },
     {
       "id": "eugowra_town_mandag",
-      "name": "Eugowra Town (Mandag",
+      "name": "Eugowra Town (Mandagery Creek)",
       "station_number": "65086",
       "lat": -33.4333,
       "lon": 148.3833,
@@ -32179,7 +32183,7 @@
     },
     {
       "id": "fanning_river_burde",
-      "name": "Fanning River (Burde",
+      "name": "Fanning River (Burdekin Downs Rd) TM",
       "station_number": "533219",
       "lat": -19.981,
       "lon": 146.4485,
@@ -32236,7 +32240,7 @@
     },
     {
       "id": "fanning_river_dotsw",
-      "name": "Fanning River (Dotsw",
+      "name": "Fanning River (Dotswood Rd) TM",
       "station_number": "533220",
       "lat": -19.7336,
       "lon": 146.4278,
@@ -33499,7 +33503,7 @@
     },
     {
       "id": "fletchervale_rd_wan",
-      "name": "Fletchervale Rd (Wan",
+      "name": "Fletchervale Rd (Wando Vale) TM",
       "station_number": "530054",
       "lat": -19.8319,
       "lon": 145.1988,
@@ -33537,7 +33541,7 @@
     },
     {
       "id": "flinders_cloncurry_j",
-      "name": "Flinders Cloncurry J",
+      "name": "Flinders Cloncurry Junction TM",
       "station_number": "529044",
       "lat": -18.5594,
       "lon": 140.7194,
@@ -33938,7 +33942,7 @@
     },
     {
       "id": "forbes_iron_br",
-      "name": "Forbes Iron Br (",
+      "name": "Forbes Iron Bridge (Lachlan River)",
       "station_number": "65088",
       "lat": -33.4,
       "lon": 148.0167,
@@ -34265,7 +34269,7 @@
     },
     {
       "id": "fosters_bellingen_r",
-      "name": "Fosters (Bellingen R",
+      "name": "Fosters (Bellingen River)",
       "station_number": "559047",
       "lat": -30.4417,
       "lon": 152.8852,
@@ -38614,7 +38618,7 @@
     },
     {
       "id": "gowan_green_bell_ri",
-      "name": "Gowan Green (Bell Ri",
+      "name": "Gowan Green (Bell River)",
       "station_number": "565018",
       "lat": -32.8006,
       "lon": 148.9803,
@@ -39695,7 +39699,7 @@
     },
     {
       "id": "gungas_rd_mulgum",
-      "name": "Gungas Rd (Mulgum",
+      "name": "Gungas Road (Mulgum Creek)",
       "station_number": "558123",
       "lat": -28.5732,
       "lon": 153.247,
@@ -40186,7 +40190,7 @@
     },
     {
       "id": "hamilton_river_stati",
-      "name": "Hamilton River Stati",
+      "name": "Hamilton River Station 2 TM",
       "station_number": "537041",
       "lat": -22.7727,
       "lon": 140.6373,
@@ -40247,7 +40251,7 @@
     },
     {
       "id": "hamilton_river_stati_2",
-      "name": "Hamilton River Stati",
+      "name": "Hamilton River Station 1 TM",
       "station_number": "537040",
       "lat": -22.7731,
       "lon": 140.6198,
@@ -41028,7 +41032,7 @@
     },
     {
       "id": "haughton_river_flin",
-      "name": "Haughton River (Flin",
+      "name": "Haughton River (Flinders Hwy) TM",
       "station_number": "533221",
       "lat": -19.8354,
       "lon": 146.6893,
@@ -41511,7 +41515,7 @@
     },
     {
       "id": "hinterland_way_at_ne",
-      "name": "Hinterland Way at Ne",
+      "name": "Hinterland Way at Newrybar",
       "station_number": "900041",
       "lat": -28.7602,
       "lon": 153.5339,
@@ -42333,7 +42337,7 @@
     },
     {
       "id": "hulberrts_br_tm",
-      "name": "HulbERRTS Br Tm",
+      "name": "Hulberts Bridge TM",
       "station_number": "530163",
       "lat": -20.6419,
       "lon": 142.6281,
@@ -45370,7 +45374,7 @@
     },
     {
       "id": "jindalee_centenary",
-      "name": "Jindalee (Centenary)",
+      "name": "Jindalee (Centenary Bridge)",
       "station_number": "40713",
       "station_type": "manual_water_level",
       "lat": -27.5283,
@@ -46085,7 +46089,7 @@
     },
     {
       "id": "kangy_angy_orchard",
-      "name": "Kangy Angy (Orchard",
+      "name": "Kangy Angy (Orchard Rd)",
       "station_number": "561132",
       "lat": -33.3333,
       "lon": 151.3901,
@@ -46341,7 +46345,7 @@
     },
     {
       "id": "karangi_orara_river",
-      "name": "Karangi (Orara River",
+      "name": "Karangi (Orara River)",
       "station_number": "559023",
       "lat": -30.2544,
       "lon": 153.0328,
@@ -46570,7 +46574,7 @@
     },
     {
       "id": "kataughal_rd_black",
-      "name": "Kataughal Rd (Black",
+      "name": "Kataughal Rd (Black River) TM",
       "station_number": "532150",
       "lat": -19.2817,
       "lon": 146.5922,
@@ -47161,7 +47165,7 @@
     },
     {
       "id": "kerewong_broken_bag",
-      "name": "Kerewong (Broken Bag",
+      "name": "Kerewong (Broken Bago)",
       "station_number": "560021",
       "lat": -31.5372,
       "lon": 152.6931,
@@ -47596,7 +47600,7 @@
     },
     {
       "id": "kilcare_heights_rese",
-      "name": "Kilcare Heights Rese",
+      "name": "Kilcare Heights Reservoir",
       "station_number": "561143",
       "lat": -33.5216,
       "lon": 151.3822,
@@ -48238,7 +48242,7 @@
     },
     {
       "id": "kincumber_mountain_r",
-      "name": "Kincumber Mountain R",
+      "name": "Kincumber Mountain Reservoir",
       "station_number": "561148",
       "lat": -33.4632,
       "lon": 151.3801,
@@ -48717,7 +48721,7 @@
     },
     {
       "id": "kogan_condamine_rd_a",
-      "name": "Kogan Condamine Rd A",
+      "name": "Kogan Condamine Rd AL",
       "station_number": "900016",
       "lat": -26.8926,
       "lon": 150.38,
@@ -49317,7 +49321,7 @@
     },
     {
       "id": "koree_island_hastin",
-      "name": "Koree Island (Hastin",
+      "name": "Koree Island (Hastings River)",
       "station_number": "560020",
       "lat": -31.4628,
       "lon": 152.6789,
@@ -50280,7 +50284,7 @@
     },
     {
       "id": "lake_cathie_sewerag",
-      "name": "Lake Cathie (Sewerag",
+      "name": "Lake Cathie (Sewerage Treatment Works)",
       "station_number": "560019",
       "lat": -31.5797,
       "lon": 152.8381,
@@ -51453,7 +51457,7 @@
     },
     {
       "id": "lismore_ballina_st",
-      "name": "Lismore (Ballina St",
+      "name": "Lismore (Ballina St Bridge)",
       "station_number": "58235",
       "lat": -28.8128,
       "lon": 153.2694,
@@ -51482,7 +51486,7 @@
     },
     {
       "id": "lismore_browns_ck_p",
-      "name": "Lismore (Browns Ck P",
+      "name": "Lismore (Browns Ck Pump Station)",
       "station_number": "",
       "lat": -28.8058,
       "lon": 153.2775,
@@ -52342,7 +52346,7 @@
     },
     {
       "id": "logans_crossing_cam",
-      "name": "Logans Crossing (Cam",
+      "name": "Logans Crossing (Camden Haven River)",
       "station_number": "560017",
       "lat": -31.6161,
       "lon": 152.6925,
@@ -52575,7 +52579,7 @@
     },
     {
       "id": "long_flat_hastings",
-      "name": "Long Flat (Hastings",
+      "name": "Long Flat (Hastings River)",
       "station_number": "560016",
       "lat": -31.4369,
       "lon": 152.4886,
@@ -52684,7 +52688,7 @@
     },
     {
       "id": "lorne_br_camden",
-      "name": "Lorne Br (Camden",
+      "name": "Lorne Bridge (Camden Haven River)",
       "station_number": "560025",
       "lat": -31.6629,
       "lon": 152.6108,
@@ -53360,7 +53364,7 @@
     },
     {
       "id": "lower_lawn_hill_cree",
-      "name": "Lower Lawn Hill Cree",
+      "name": "Lower Lawn Hill Creek TM",
       "station_number": "529063",
       "lat": -18.2369,
       "lon": 138.6428,
@@ -54342,7 +54346,7 @@
     },
     {
       "id": "macalister_bell_rd_j_2",
-      "name": "Macalister Bell Rd J",
+      "name": "Macalister Bell Rd Jimbour Ck AL",
       "station_number": "",
       "lat": -26.9594,
       "lon": 151.2174,
@@ -55396,7 +55400,7 @@
     },
     {
       "id": "mandagery_ck_at_e",
-      "name": "Mandagery Ck at E",
+      "name": "Mandagery Creek at Escort Rock",
       "station_number": "900051",
       "lat": -33.4016,
       "lon": 148.4086,
@@ -56497,7 +56501,7 @@
     },
     {
       "id": "maryvale_ck_niall_r",
-      "name": "Maryvale Ck (Niall R",
+      "name": "Maryvale Ck (Niall Rd) TM",
       "station_number": "530056",
       "lat": -19.4826,
       "lon": 145.2713,
@@ -57776,7 +57780,7 @@
     },
     {
       "id": "midgen_flat_at_newry",
-      "name": "Midgen Flat at Newry",
+      "name": "Midgen Flat at Newrybar",
       "station_number": "900040",
       "lat": -28.7115,
       "lon": 153.5618,
@@ -57961,7 +57965,7 @@
     },
     {
       "id": "mill_rd_black_river",
-      "name": "Mill Rd Black River",
+      "name": "Mill Rd Black River TM",
       "station_number": "532139",
       "lat": -19.2474,
       "lon": 146.5738,
@@ -60331,7 +60335,7 @@
     },
     {
       "id": "mossman_treatment_pl",
-      "name": "Mossman Treatment Pl",
+      "name": "Mossman Treatment Plant TM",
       "station_number": "531147",
       "station_type": "auto_rain_gauge",
       "lat": -16.4509,
@@ -64647,7 +64651,7 @@
     },
     {
       "id": "mt_warrnambool_repea",
-      "name": "Mt Warrnambool Repea",
+      "name": "Mt Warrnambool Repeater",
       "station_number": "900059",
       "lat": -38.3056,
       "lon": 142.7398,
@@ -65379,7 +65383,7 @@
     },
     {
       "id": "mummulgum_bingeebee",
-      "name": "Mummulgum (Bingeebee",
+      "name": "Mummulgum (Bingeebeebra Creek)",
       "station_number": "558119",
       "lat": -28.7883,
       "lon": 152.7728,
@@ -65408,7 +65412,7 @@
     },
     {
       "id": "mundays_lane_maria",
-      "name": "Mundays Lane (Maria",
+      "name": "Mundays Lane (Maria River)",
       "station_number": "560067",
       "lat": -31.3253,
       "lon": 152.8415,
@@ -68132,7 +68136,7 @@
     },
     {
       "id": "neumeyer_valley_stat",
-      "name": "Neumeyer Valley Stat",
+      "name": "Neumeyer Valley Station TM",
       "station_number": "529073",
       "lat": -18.4732,
       "lon": 140.2296,
@@ -68999,7 +69003,7 @@
     },
     {
       "id": "north_murwillumbah",
-      "name": "North Murwillumbah (",
+      "name": "North Murwillumbah (Tweed River)",
       "station_number": "",
       "lat": -28.3274,
       "lon": 143.402,
@@ -70925,7 +70929,7 @@
     },
     {
       "id": "pace_rd_rollingstone",
-      "name": "Pace Rd Rollingstone",
+      "name": "Pace Rd Rollingstone TM",
       "station_number": "532154",
       "lat": -19.0688,
       "lon": 146.3858,
@@ -72317,7 +72321,7 @@
     },
     {
       "id": "pearl_beach_reservoi",
-      "name": "Pearl Beach Reservoi",
+      "name": "Pearl Beach Reservoir",
       "station_number": "561151",
       "lat": -33.5364,
       "lon": 151.3064,
@@ -72840,7 +72844,7 @@
     },
     {
       "id": "picton_stonequarry",
-      "name": "Picton (Stonequarry",
+      "name": "Picton (Stonequarry Ck)",
       "station_number": "568172",
       "lat": -34.1791,
       "lon": 150.6111,
@@ -72871,7 +72875,7 @@
     },
     {
       "id": "picton_lakesland_roa",
-      "name": "Picton Lakesland Roa",
+      "name": "Picton Lakesland Road",
       "station_number": "568295",
       "lat": -34.1833,
       "lon": 150.55,
@@ -73427,7 +73431,7 @@
     },
     {
       "id": "point_rd_at_the_wa",
-      "name": "Point Rd at the Wa",
+      "name": "Point Road at the Waterfall/Old Cemetery",
       "station_number": "900023",
       "lat": -16.9045,
       "lon": 145.8628,
@@ -73638,7 +73642,7 @@
     },
     {
       "id": "port_macquarie_golf",
-      "name": "Port Macquarie (Golf",
+      "name": "Port Macquarie (Golf Club)",
       "station_number": "560014",
       "lat": -31.4844,
       "lon": 152.9161,
@@ -73667,7 +73671,7 @@
     },
     {
       "id": "port_macquarie_koal",
-      "name": "Port Macquarie (Koal",
+      "name": "Port Macquarie (Koala St)",
       "station_number": "560015",
       "lat": -31.4525,
       "lon": 152.9017,
@@ -73696,7 +73700,7 @@
     },
     {
       "id": "port_macquarie_wate",
-      "name": "Port Macquarie (Wate",
+      "name": "Port Macquarie (Water Supply Dam)",
       "station_number": "560013",
       "lat": -31.4631,
       "lon": 152.8989,
@@ -74207,7 +74211,7 @@
     },
     {
       "id": "purga_ck_washpoo",
-      "name": "Purga Ck (Washpoo",
+      "name": "Purga Creek (Washpool Road) AL",
       "station_number": "140845",
       "lat": -27.8182,
       "lon": 152.7549,
@@ -74239,7 +74243,7 @@
     },
     {
       "id": "putty_rd_colo_riv",
-      "name": "Putty Rd (Colo Riv",
+      "name": "Putty Road (Colo River)",
       "station_number": "63288",
       "lat": -33.432,
       "lon": 150.8285,
@@ -75232,9 +75236,8 @@
       "id": "ravensbourne_al",
       "name": "Ravensbourne AL",
       "station_number": "540299",
-      "station_type": "auto_rain_gauge",
-      "lat": -27.3627,
-      "lon": 152.1589,
+      "lat": -27.362847,
+      "lon": 152.158788,
       "elevation_ahd": 624.1,
       "roles": [
         "field"
@@ -75244,7 +75247,8 @@
         "brisbane"
       ],
       "alert_ids": {
-        "rainfall": 6782
+        "rainfall": 6782,
+        "battery": 6783
       },
       "satcom": {
         "enabled": false,
@@ -76094,7 +76098,7 @@
     },
     {
       "id": "redoak_stewarts_riv",
-      "name": "Redoak (Stewarts Riv",
+      "name": "Redoak (Stewarts River)",
       "station_number": "560012",
       "lat": -31.7275,
       "lon": 152.6389,
@@ -76140,7 +76144,7 @@
     },
     {
       "id": "reedy_springs_statio",
-      "name": "Reedy Springs Statio",
+      "name": "Reedy Springs Station TM",
       "station_number": "530046",
       "lat": -19.9659,
       "lon": 144.6834,
@@ -84941,7 +84945,7 @@
     },
     {
       "id": "stewart_ck_valley",
-      "name": "Stewart Ck Valley",
+      "name": "Stewart Creek Valley TM",
       "station_number": "531148",
       "lat": -16.3166,
       "lon": 145.3202,
@@ -85810,7 +85814,7 @@
     },
     {
       "id": "suffolkprk_servord",
-      "name": "SuffolkPrk(ServoRd",
+      "name": "Suffolk Park (Broken Hd Rd Crossing)",
       "station_number": "900043",
       "lat": -28.6883,
       "lon": 153.608,
@@ -85838,7 +85842,7 @@
     },
     {
       "id": "suhrs_ck_sandy_cree",
-      "name": "Suhrs Ck (Sandy Cree",
+      "name": "Suhrs Ck (Sandy Creek Rd) TM",
       "station_number": "533223",
       "lat": -20.0931,
       "lon": 146.9003,
@@ -87714,7 +87718,7 @@
     },
     {
       "id": "tatham_ellangowan_ro",
-      "name": "Tatham Ellangowan Ro",
+      "name": "Tatham Ellangowan Road (Sandy Creek)",
       "station_number": "558125",
       "lat": -28.9798,
       "lon": 153.1213,
@@ -89772,7 +89776,7 @@
     },
     {
       "id": "third_lane_macleay",
-      "name": "Third Lane (Macleay",
+      "name": "Third Lane (Macleay River)",
       "station_number": "559086",
       "lat": -31.0465,
       "lon": 152.8624,
@@ -91312,7 +91316,7 @@
     },
     {
       "id": "toorak_research_stat",
-      "name": "Toorak Research Stat",
+      "name": "Toorak Research Station TM",
       "station_number": "529089",
       "lat": -21.0314,
       "lon": 141.8003,
@@ -93388,7 +93392,7 @@
     },
     {
       "id": "upper_alligator_cree",
-      "name": "Upper Alligator Cree",
+      "name": "Upper Alligator Creek TM",
       "station_number": "532140",
       "station_type": "auto_rain_gauge",
       "lat": -19.4356,
@@ -94810,7 +94814,7 @@
     },
     {
       "id": "upper_gracemere_aler",
-      "name": "Upper Gracemere Aler",
+      "name": "Upper Gracemere AL",
       "station_number": "900030",
       "lat": -23.5517,
       "lon": 150.3987,
@@ -96030,7 +96034,7 @@
     },
     {
       "id": "upper_spence_ck_t",
-      "name": "Upper Spence Ck T",
+      "name": "Upper Spence Creek TM",
       "station_number": "531160",
       "lat": -16.3165,
       "lon": 145.0995,
@@ -96197,7 +96201,7 @@
     },
     {
       "id": "upper_walker_ck_t",
-      "name": "Upper Walker Ck T",
+      "name": "Upper Walker Creek TM",
       "station_number": "529050",
       "lat": -17.3522,
       "lon": 141.6461,
@@ -96275,7 +96279,7 @@
     },
     {
       "id": "upsalls_ck_br",
-      "name": "Upsalls Ck Br",
+      "name": "Upsalls Creek Bridge (Upsalls Creek)",
       "station_number": "560010",
       "lat": -31.6247,
       "lon": 152.6575,
@@ -96828,7 +96832,7 @@
     },
     {
       "id": "walker_ck_winton",
-      "name": "Walker Ck (Winton",
+      "name": "Walker Creek (Winton Road) TM",
       "station_number": "530044",
       "lat": -21.0647,
       "lon": 144.0169,
@@ -97176,7 +97180,7 @@
     },
     {
       "id": "wallaman_escarpment",
-      "name": "Wallaman Escarpment",
+      "name": "Wallaman Escarpment TM",
       "station_number": "532145",
       "lat": -18.648,
       "lon": 145.8745,
@@ -98486,7 +98490,7 @@
     },
     {
       "id": "waterhole_ck_at_m",
-      "name": "Waterhole Ck at M",
+      "name": "Waterhole Creek at Mackeys Creek Road",
       "station_number": "900057",
       "lat": -33.3551,
       "lon": 148.3855,
@@ -98515,7 +98519,7 @@
     },
     {
       "id": "waterlilyprk_ocean",
-      "name": "WaterlilyPrk(Ocean",
+      "name": "Waterlily Park (Ocean Shores)",
       "station_number": "900044",
       "lat": -28.5201,
       "lon": 153.5341,
@@ -98757,7 +98761,7 @@
     },
     {
       "id": "wellington_bell_riv",
-      "name": "Wellington (Bell Riv",
+      "name": "Wellington (Bell River)",
       "station_number": "562006",
       "station_type": "auto_water_level",
       "lat": -32.5554,
@@ -99090,7 +99094,7 @@
     },
     {
       "id": "whiporie_myall_cree",
-      "name": "Whiporie (Myall Cree",
+      "name": "Whiporie (Myall Creek)",
       "station_number": "558124",
       "lat": -29.2797,
       "lon": 152.9906,
@@ -99684,7 +99688,7 @@
     },
     {
       "id": "widgee_ck_pahlow_rd",
-      "name": "Widgee Ck (pahlow Rd",
+      "name": "Widgee Ck (Pahlow Rd Bridge) TM",
       "station_number": "140029",
       "lat": -26.1956,
       "lon": 152.4568,
@@ -99716,7 +99720,7 @@
     },
     {
       "id": "widgee_ck_wide_bay",
-      "name": "Widgee Ck (Wide Bay",
+      "name": "Widgee Ck (Wide Bay Hwy) AL",
       "station_number": "140028",
       "lat": -26.093143,
       "lon": 152.510523,
@@ -99863,7 +99867,7 @@
     },
     {
       "id": "wills_ck_selwyn",
-      "name": "Wills Ck (Selwyn",
+      "name": "Wills Creek (Selwyn Road) TM",
       "station_number": "537039",
       "lat": -22.4118,
       "lon": 139.9615,
@@ -101860,7 +101864,7 @@
     },
     {
       "id": "woolners_arm_doubtf",
-      "name": "Woolners Arm (Doubtf",
+      "name": "Woolners Arm (Doubtful Creek)",
       "station_number": "558118",
       "lat": -28.705,
       "lon": 152.8502,
@@ -102384,7 +102388,7 @@
     },
     {
       "id": "yammanie_minnamoolka",
-      "name": "Yammanie Minnamoolka",
+      "name": "Yammanie Minnamoolka TM",
       "station_number": "532146",
       "lat": -18.298,
       "lon": 145.2726,
@@ -115621,7 +115625,7 @@
     },
     {
       "id": "little_river_at_arthurville",
-      "name": "Little RIver at Arthurville",
+      "name": "Little River at Arthurville",
       "station_number": "900055",
       "lat": -32.571624,
       "lon": 148.724746,
@@ -254249,7 +254253,7 @@
     },
     {
       "id": "boggabilla_weir_d_s",
-      "name": "Boggabilla Weir D/S",
+      "name": "Boggabilla Weir D/S (Macintyre River)",
       "station_number": "553029",
       "station_type": "auto_water_level",
       "lat": -28.59111,
@@ -261552,7 +261556,7 @@
     },
     {
       "id": "capalaba_water_treat",
-      "name": "Capalaba Water Treat",
+      "name": "Capalaba Water Treatment Plant",
       "station_number": "40458",
       "station_type": "manual_rain_gauge",
       "lat": -27.53139,

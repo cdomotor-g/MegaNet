@@ -1837,6 +1837,26 @@ on the owner's answers, did the following:
   (`data/repeater-document.json`, `tools/ingest/repeater_document.py`). Five
   stations that held a neighbour's row lost it through `save_station()`.
 
+## Names Radio Mobile cut at 20 characters
+
+Radio Mobile keeps a unit's name in 20 characters, and the first import took the
+station names from it. On 4 November 2026 the 112 that could be completed were
+renamed, from ARRO's sites, the site list in `archive/`, the Bureau's SLS and
+station lists, HDB's flood peaks and the 2024 KMZ, and for a few the Bureau's
+rain and river pages. `data/station-names/README.md` explains how a cut was told
+from a short name somebody chose; `review.json` beside it has every rename and
+its reason, and what was left alone.
+
+```sh
+python3 tools/ingest/truncated_names.py --find   # names that still look cut
+python3 tools/ingest/truncated_names.py --sql \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+```
+
+A station is renamed only while it still has the name the review found, so a
+second run changes nothing. Each rename is stamped `station names cut at 20
+(claude)` and is in the station's history.
+
 ## AEP flood levels and frequencies
 
 `0033`. Two more lists on a station, on `0031`'s terms exactly: a table hanging

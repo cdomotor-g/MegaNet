@@ -23,7 +23,7 @@ root now replaces (see `../README.md`).
 | File | Why archived |
 |------|--------------|
 | `z_Sensors_with_Database_IDs_by_View_NATIONAL.csv` | 847 KB national sensor export. Its records are now baked into `stations.json` (`site` / `sensors`), so it is redundant (per `../README.md`). |
-| `fred_sites_newfile.csv` | Not referenced anywhere in the code or data. |
+| `fred_sites_newfile.csv` | A site list: name, number, position, basin, LGA. One of the lists `tools/ingest/truncated_names.py` reads for the full names of stations Radio Mobile cut at 20 characters (`../data/station-names/`). |
 | `QldBasin_2009Nov_reduced.txt`, `Qld Major Streams_reduced.txt`, `queensland-outline.txt` | Byte-for-byte duplicates of the matching `.svg` files now in `../assets/geo/`. |
 
 ## Original source documents

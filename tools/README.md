@@ -404,6 +404,22 @@ python3 tools/ingest/repeater_document.py --sql \
   | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
 ```
 
+## Station names Radio Mobile cut at 20 characters
+
+`ingest/truncated_names.py --find` lists the stations in `stations.json` whose
+name is another list's longer name cut at 20 characters (and maybe then
+shortened, Road to Rd), or has an open bracket, and that
+`data/station-names/review.json` has not decided yet. Run it after an import.
+`--sql` writes the review's renames, each guarded on the name it found, so a
+second run changes nothing. Standard library only;
+`data/station-names/README.md` explains the decisions.
+
+```bash
+python3 tools/ingest/truncated_names.py --find
+python3 tools/ingest/truncated_names.py --sql \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+```
+
 ## `ingest/` — the historical inspection workbook (#122)
 
 `ingest/xlsx.py` is a read-only .xlsx reader with nothing but the standard

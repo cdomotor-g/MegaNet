@@ -1,0 +1,950 @@
+{
+ "source": "Radio Mobile unit names, cut at 20 characters by the first import; full names from ARRO, the site list (archive/fred_sites_newfile.csv), the Bureau's SLS and QLD station lists, HDB's flood peaks, the 2024 FldWarn KMZ, and for a few the Bureau's rain and river pages and station metadata",
+ "checked": "2026-11-04",
+ "stamp": "station names cut at 20 (claude)",
+ "rules": [
+  "A name is a cut when another list gives its number a longer name whose first 20 characters, trailing space dropped, are the name, read with Rd, Ck and Br spelled out.",
+  "The full name is ARRO's where ARRO writes it in mixed case, then the site list's, then the Bureau's re-cased; a trailing Alert becomes AL and Tm becomes TM, as in the rest of the network.",
+  "A longer name that only spells out an abbreviation Flood-Net uses on purpose (AL for ALERT, TM, Br, Ck, Rd) is not a cut, and nor is a short form with its bracket closed."
+ ],
+ "names": [
+  {
+   "id": "ainsworth_rd_middle",
+   "number": "558120",
+   "was": "Ainsworth Rd (Middle",
+   "now": "Ainsworth Road (Middle Creek)",
+   "source": "site-list",
+   "why": "ARRO and the site list agree; shortened to Rd before the cut"
+  },
+  {
+   "id": "alligator_ck_rd",
+   "number": "533218",
+   "was": "Alligator Ck Rd",
+   "now": "Alligator Creek Road TM",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); ARRO, the Bureau's QLD station lists and the site list have the full name"
+  },
+  {
+   "id": "allora_dalrymple_cr",
+   "number": "41563",
+   "was": "Allora (Dalrymple Cr",
+   "now": "Allora (Dalrymple Creek) AL",
+   "source": "arro",
+   "why": "cut at 20 characters; ARRO has the full name"
+  },
+  {
+   "id": "amelia_cr_yarrowmer",
+   "number": "536019",
+   "was": "Amelia Cr (Yarrowmer",
+   "now": "Amelia Cr (Yarrowmere Rd) TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists and the site list have the full name"
+  },
+  {
+   "id": "armidale_stephens_br",
+   "number": "556017",
+   "was": "Armidale-Stephens Br",
+   "now": "Armidale-Stephens Bridge (Dumaresq Creek)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "auburn_river_andrew",
+   "number": "42123",
+   "was": "Auburn River (Andrew",
+   "now": "Auburn River (Andrews Road) TM",
+   "source": "arro",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "augustus_downs_stati",
+   "number": "29001",
+   "was": "Augustus Downs Stati",
+   "now": "Augustus Downs Station",
+   "source": "site-list",
+   "why": "cut at 20 characters; the site list and the QLD SLS have the full name"
+  },
+  {
+   "id": "back_beach_rd_at_d",
+   "number": "900003",
+   "was": "Back Beach Rd at D",
+   "now": "Back Beach Road at Djenghi",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); the site list has the full name"
+  },
+  {
+   "id": "back_beach_rd_at_m",
+   "number": "900004",
+   "was": "Back Beach Rd at M",
+   "now": "Back Beach Road at Mourigan",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); the site list has the full name"
+  },
+  {
+   "id": "back_beach_rd_at_o",
+   "number": "900005",
+   "was": "Back Beach Rd at O",
+   "now": "Back Beach Road at Oombunghi",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); the site list has the full name"
+  },
+  {
+   "id": "back_beach_rd_at_r",
+   "number": "900006",
+   "was": "Back Beach Rd at R",
+   "now": "Back Beach Road at Reeves Creek",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); the site list has the full name"
+  },
+  {
+   "id": "ballera_jackson_rd",
+   "number": "545003",
+   "was": "Ballera Jackson Rd",
+   "now": "Ballera Jackson Road Crossing TM",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); ARRO and the site list have the full name"
+  },
+  {
+   "id": "barrackdale_choke_s",
+   "number": "900032",
+   "was": "Barrackdale Choke (S",
+   "now": "Barrackdale Choke (South)",
+   "source": "site-list",
+   "why": "cut at 20 characters; the site list has the full name"
+  },
+  {
+   "id": "basalt_river_gregor",
+   "number": "530053",
+   "was": "Basalt River (Gregor",
+   "now": "Basalt River (Gregory Dev Rd) TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the site list and the QLD SLS have the full name"
+  },
+  {
+   "id": "birdsville_police_st",
+   "number": "38002",
+   "was": "Birdsville Police St",
+   "now": "Birdsville Police Station",
+   "source": "site-list",
+   "why": "cut at 20 characters; the Bureau's QLD station lists, the site list and the QLD SLS have the full name"
+  },
+  {
+   "id": "bloomfield_river_bri",
+   "number": "",
+   "was": "Bloomfield River Bri",
+   "now": "Bloomfield River Bridge TM",
+   "source": "site-list",
+   "why": "no number; the only Bloomfield River Bridge station in any list is 900008, Bloomfield River Bridge TM. Its position (-24.53, 150.92, inland of Gladstone) is 1,100 km from the bridge, so it is probably a stray copy of 900008"
+  },
+  {
+   "id": "boggabilla_weir_d_s",
+   "number": "553029",
+   "was": "Boggabilla Weir D/S",
+   "now": "Boggabilla Weir D/S (Macintyre River)",
+   "source": "sls-qld",
+   "why": "cut at 20 characters; the QLD SLS has the full name"
+  },
+  {
+   "id": "bowraville_lanes_bri",
+   "number": "559001",
+   "was": "Bowraville Lanes Bri",
+   "now": "Bowraville Lanes Bridge (Nambucca River)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "boyne_river_chahpin",
+   "number": "140030",
+   "was": "Boyne River (Chahpin",
+   "now": "Boyne River (McLaughlins Rd) TM",
+   "source": "arro",
+   "why": "ARRO, the site list (at this position to the metre) and the Bureau's river page (Boyne River at Mclaughlins Rd) all name 140030 for McLaughlins Rd; the cut Radio Mobile name said Chahpin…"
+  },
+  {
+   "id": "brdley_ck_core",
+   "number": "534046",
+   "was": "BRdley Ck (Core",
+   "now": "Broadley Creek (Corea Plains Rd) TM",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); ARRO and the site list have the full name"
+  },
+  {
+   "id": "brdwater_br_r",
+   "number": "558126",
+   "was": "BRdwater Br (R",
+   "now": "Broadwater Bridge (Richmond River)",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); the site list has the full name"
+  },
+  {
+   "id": "brdwater_tm",
+   "number": "529047",
+   "was": "BRdwater Tm",
+   "now": "Broadwater TM",
+   "source": "arro",
+   "why": "Road -> Rd was applied inside Broadwater; ARRO and the Bureau lists have BROADWATER TM"
+  },
+  {
+   "id": "brunswick_hwyoldbr",
+   "number": "551197",
+   "was": "Brunswick HwyOldBr",
+   "now": "Brunswick Hwy (Old Brunswick River Bridge) Radar WL",
+   "source": "site-list",
+   "why": "squeezed into 18 characters (HwyOldBr); the site list has the name"
+  },
+  {
+   "id": "capalaba_water_treat",
+   "number": "40458",
+   "was": "Capalaba Water Treat",
+   "now": "Capalaba Water Treatment Plant",
+   "source": "bureau-metadata",
+   "why": "the Bureau's own station record is CAPALABA WATER TREAT, cut at 20 too; the gauge is at Seqwater's Capalaba water treatment plant"
+  },
+  {
+   "id": "carpentaria_br_t",
+   "number": "530052",
+   "was": "Carpentaria Br T",
+   "now": "Carpentaria Bridge TM",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); ARRO, the Bureau's QLD station lists, the site list and the QLD SLS have the full name"
+  },
+  {
+   "id": "carroll_village_nam",
+   "number": "555024",
+   "was": "Carroll Village (Nam",
+   "now": "Carroll Village (Namoi River)",
+   "source": "site-list",
+   "why": "cut at 20 characters; the site list has the full name"
+  },
+  {
+   "id": "casino_rd_br",
+   "number": "58179",
+   "was": "Casino Rd Br (",
+   "now": "Casino Road Bridge (Richmond River)",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); ARRO and the site list have the full name"
+  },
+  {
+   "id": "charters_towers_weir",
+   "number": "534048",
+   "was": "Charters Towers Weir",
+   "now": "Charters Towers Weir TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists and the site list have the full name"
+  },
+  {
+   "id": "cherwell_river_rail",
+   "number": "140031",
+   "was": "Cherwell River (Rail",
+   "now": "Cherwell River (Highway Bridge) AL",
+   "source": "arro",
+   "why": "ARRO and the site list (at this position to the metre) name 140031 for the highway bridge; the cut Radio Mobile name said Rail…"
+  },
+  {
+   "id": "chisholm_trail_oak_v",
+   "number": "532138",
+   "was": "Chisholm Trail Oak V",
+   "now": "Chisholm Trail Oak Valley TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists and the site list have the full name"
+  },
+  {
+   "id": "clearfield_old_tent",
+   "number": "558121",
+   "was": "Clearfield (Old Tent",
+   "now": "Clearfield (Old Tenterfield Road)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "comboyne_thone_rive",
+   "number": "560024",
+   "was": "Comboyne (Thone Rive",
+   "now": "Comboyne (Thone River)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "copmanhurst_clarenc",
+   "number": "58181",
+   "was": "Copmanhurst (Clarenc",
+   "now": "Copmanhurst (Clarence River)",
+   "source": "site-list",
+   "why": "cut at 20 characters; the site list has the full name"
+  },
+  {
+   "id": "dumaresq_dam_d_s_du",
+   "number": "556022",
+   "was": "Dumaresq Dam D/S (Du",
+   "now": "Dumaresq Dam D/S (Dumaresq Creek)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "east_leichardt_dam_t",
+   "number": "529082",
+   "was": "East Leichardt Dam T",
+   "now": "East Leichardt Dam TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists and the site list have the full name"
+  },
+  {
+   "id": "emu_ck_at_pierces",
+   "number": "140023",
+   "was": "Emu Ck at Pierces",
+   "now": "Emu Creek at Pierces Creek Road",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); the site list has the full name"
+  },
+  {
+   "id": "eugowra_town_mandag",
+   "number": "65086",
+   "was": "Eugowra Town (Mandag",
+   "now": "Eugowra Town (Mandagery Creek)",
+   "source": "site-list",
+   "why": "cut at 20 characters; the site list has the full name"
+  },
+  {
+   "id": "fanning_river_burde",
+   "number": "533219",
+   "was": "Fanning River (Burde",
+   "now": "Fanning River (Burdekin Downs Rd) TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; the site list and the QLD SLS have the full name"
+  },
+  {
+   "id": "fanning_river_dotsw",
+   "number": "533220",
+   "was": "Fanning River (Dotsw",
+   "now": "Fanning River (Dotswood Rd) TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists, the site list and the QLD SLS have the full name"
+  },
+  {
+   "id": "fletchervale_rd_wan",
+   "number": "530054",
+   "was": "Fletchervale Rd (Wan",
+   "now": "Fletchervale Rd (Wando Vale) TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "flinders_cloncurry_j",
+   "number": "529044",
+   "was": "Flinders Cloncurry J",
+   "now": "Flinders Cloncurry Junction TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists, the site list and HDB's flood peaks have the full name"
+  },
+  {
+   "id": "forbes_iron_br",
+   "number": "65088",
+   "was": "Forbes Iron Br (",
+   "now": "Forbes Iron Bridge (Lachlan River)",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); ARRO and the site list have the full name"
+  },
+  {
+   "id": "fosters_bellingen_r",
+   "number": "559047",
+   "was": "Fosters (Bellingen R",
+   "now": "Fosters (Bellingen River)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "gowan_green_bell_ri",
+   "number": "565018",
+   "was": "Gowan Green (Bell Ri",
+   "now": "Gowan Green (Bell River)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "gungas_rd_mulgum",
+   "number": "558123",
+   "was": "Gungas Rd (Mulgum",
+   "now": "Gungas Road (Mulgum Creek)",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); the site list has the full name"
+  },
+  {
+   "id": "hamilton_river_stati",
+   "number": "537041",
+   "was": "Hamilton River Stati",
+   "now": "Hamilton River Station 2 TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists, the site list and the QLD SLS have the full name"
+  },
+  {
+   "id": "hamilton_river_stati_2",
+   "number": "537040",
+   "was": "Hamilton River Stati",
+   "now": "Hamilton River Station 1 TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists, the site list and the QLD SLS have the full name"
+  },
+  {
+   "id": "haughton_river_flin",
+   "number": "533221",
+   "was": "Haughton River (Flin",
+   "now": "Haughton River (Flinders Hwy) TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "hinterland_way_at_ne",
+   "number": "900041",
+   "was": "Hinterland Way at Ne",
+   "now": "Hinterland Way at Newrybar",
+   "source": "site-list",
+   "why": "cut at 20 characters; the site list has the full name"
+  },
+  {
+   "id": "hulberrts_br_tm",
+   "number": "530163",
+   "was": "HulbERRTS Br Tm",
+   "now": "Hulberts Bridge TM",
+   "source": "arro",
+   "why": "a find-and-replace mangled Hulberts; ARRO, the SLS and the Bureau's lists have HULBERTS BRIDGE TM"
+  },
+  {
+   "id": "jindalee_centenary",
+   "number": "40713",
+   "was": "Jindalee (Centenary)",
+   "now": "Jindalee (Centenary Bridge)",
+   "source": "bom-web",
+   "why": "the Bureau's river page names it Brisbane River at Jindalee (Centenary Bridge); the SLS has JINDALEE (CENT.) BRIDGE"
+  },
+  {
+   "id": "kangy_angy_orchard",
+   "number": "561132",
+   "was": "Kangy Angy (Orchard",
+   "now": "Kangy Angy (Orchard Rd)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "karangi_orara_river",
+   "number": "559023",
+   "was": "Karangi (Orara River",
+   "now": "Karangi (Orara River)",
+   "source": "arro",
+   "why": "the cut took only the closing bracket"
+  },
+  {
+   "id": "kataughal_rd_black",
+   "number": "532150",
+   "was": "Kataughal Rd (Black",
+   "now": "Kataughal Rd (Black River) TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; the site list has the full name"
+  },
+  {
+   "id": "kerewong_broken_bag",
+   "number": "560021",
+   "was": "Kerewong (Broken Bag",
+   "now": "Kerewong (Broken Bago)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "kilcare_heights_rese",
+   "number": "561143",
+   "was": "Kilcare Heights Rese",
+   "now": "Kilcare Heights Reservoir",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "kincumber_mountain_r",
+   "number": "561148",
+   "was": "Kincumber Mountain R",
+   "now": "Kincumber Mountain Reservoir",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "kogan_condamine_rd_a",
+   "number": "900016",
+   "was": "Kogan Condamine Rd A",
+   "now": "Kogan Condamine Rd AL",
+   "source": "site-list",
+   "why": "cut at 20 characters; the site list has the full name"
+  },
+  {
+   "id": "koree_island_hastin",
+   "number": "560020",
+   "was": "Koree Island (Hastin",
+   "now": "Koree Island (Hastings River)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "lake_cathie_sewerag",
+   "number": "560019",
+   "was": "Lake Cathie (Sewerag",
+   "now": "Lake Cathie (Sewerage Treatment Works)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "lismore_ballina_st",
+   "number": "58235",
+   "was": "Lismore (Ballina St",
+   "now": "Lismore (Ballina St Bridge)",
+   "source": "arro",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "lismore_browns_ck_p",
+   "number": "",
+   "was": "Lismore (Browns Ck P",
+   "now": "Lismore (Browns Ck Pump Station)",
+   "source": "bom-web",
+   "why": "no number; Radio Mobile unit 565, 620 m from 558100, which the site list calls Lismore (Browns Ck Pump Stn) and the Bureau's river page Browns Creek at Browns Ck Pump Station (Lismore). Probably a stray copy of 558100"
+  },
+  {
+   "id": "little_river_at_arthurville",
+   "number": "900055",
+   "was": "Little RIver at Arthurville",
+   "now": "Little River at Arthurville",
+   "source": "site-list",
+   "why": "not a cut: RIver typed with a capital I"
+  },
+  {
+   "id": "logans_crossing_cam",
+   "number": "560017",
+   "was": "Logans Crossing (Cam",
+   "now": "Logans Crossing (Camden Haven River)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "long_flat_hastings",
+   "number": "560016",
+   "was": "Long Flat (Hastings",
+   "now": "Long Flat (Hastings River)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "lorne_br_camden",
+   "number": "560025",
+   "was": "Lorne Br (Camden",
+   "now": "Lorne Bridge (Camden Haven River)",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); ARRO and the site list have the full name"
+  },
+  {
+   "id": "lower_lawn_hill_cree",
+   "number": "529063",
+   "was": "Lower Lawn Hill Cree",
+   "now": "Lower Lawn Hill Creek TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists and the site list have the full name"
+  },
+  {
+   "id": "macalister_bell_rd_j_2",
+   "number": "",
+   "was": "Macalister Bell Rd J",
+   "now": "Macalister Bell Rd Jimbour Ck AL",
+   "source": "sls-qld",
+   "why": "no number; Radio Mobile unit 595, at exactly the position of 541203 (Jimbour Ck AL here), which the SLS and the site list name Macalister Bell Rd Jimbour Ck AL. Probably a stray copy of 541203"
+  },
+  {
+   "id": "mandagery_ck_at_e",
+   "number": "900051",
+   "was": "Mandagery Ck at E",
+   "now": "Mandagery Creek at Escort Rock",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); the site list has the full name"
+  },
+  {
+   "id": "maryvale_ck_niall_r",
+   "number": "530056",
+   "was": "Maryvale Ck (Niall R",
+   "now": "Maryvale Ck (Niall Rd) TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists and the site list have the full name"
+  },
+  {
+   "id": "midgen_flat_at_newry",
+   "number": "900040",
+   "was": "Midgen Flat at Newry",
+   "now": "Midgen Flat at Newrybar",
+   "source": "site-list",
+   "why": "cut at 20 characters; the site list has the full name"
+  },
+  {
+   "id": "mill_rd_black_river",
+   "number": "532139",
+   "was": "Mill Rd Black River",
+   "now": "Mill Rd Black River TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "mossman_treatment_pl",
+   "number": "531147",
+   "was": "Mossman Treatment Pl",
+   "now": "Mossman Treatment Plant TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists and the site list have the full name"
+  },
+  {
+   "id": "mt_warrnambool_repea",
+   "number": "900059",
+   "was": "Mt Warrnambool Repea",
+   "now": "Mt Warrnambool Repeater",
+   "source": "site-list",
+   "why": "cut at 20 characters; the site list has the full name"
+  },
+  {
+   "id": "mummulgum_bingeebee",
+   "number": "558119",
+   "was": "Mummulgum (Bingeebee",
+   "now": "Mummulgum (Bingeebeebra Creek)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "mundays_lane_maria",
+   "number": "560067",
+   "was": "Mundays Lane (Maria",
+   "now": "Mundays Lane (Maria River)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "neumeyer_valley_stat",
+   "number": "529073",
+   "was": "Neumeyer Valley Stat",
+   "now": "Neumeyer Valley Station TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists, the site list and the QLD SLS have the full name"
+  },
+  {
+   "id": "north_murwillumbah",
+   "number": "",
+   "was": "North Murwillumbah (",
+   "now": "North Murwillumbah (Tweed River)",
+   "source": "arro",
+   "why": "no number; Radio Mobile unit 753 at the latitude of 58186, whose ARRO and site-list name this is. Its longitude is 143.402 where 58186's is 153.402, so it is probably a stray copy of 58186"
+  },
+  {
+   "id": "pace_rd_rollingstone",
+   "number": "532154",
+   "was": "Pace Rd Rollingstone",
+   "now": "Pace Rd Rollingstone TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "pearl_beach_reservoi",
+   "number": "561151",
+   "was": "Pearl Beach Reservoi",
+   "now": "Pearl Beach Reservoir",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "picton_stonequarry",
+   "number": "568172",
+   "was": "Picton (Stonequarry",
+   "now": "Picton (Stonequarry Ck)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "picton_lakesland_roa",
+   "number": "568295",
+   "was": "Picton Lakesland Roa",
+   "now": "Picton Lakesland Road",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "point_rd_at_the_wa",
+   "number": "900023",
+   "was": "Point Rd at the Wa",
+   "now": "Point Road at the Waterfall/Old Cemetery",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); the site list has the full name"
+  },
+  {
+   "id": "port_macquarie_golf",
+   "number": "560014",
+   "was": "Port Macquarie (Golf",
+   "now": "Port Macquarie (Golf Club)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "port_macquarie_koal",
+   "number": "560015",
+   "was": "Port Macquarie (Koal",
+   "now": "Port Macquarie (Koala St)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "port_macquarie_wate",
+   "number": "560013",
+   "was": "Port Macquarie (Wate",
+   "now": "Port Macquarie (Water Supply Dam)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "purga_ck_washpoo",
+   "number": "140845",
+   "was": "Purga Ck (Washpoo",
+   "now": "Purga Creek (Washpool Road) AL",
+   "source": "arro",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); ARRO has the full name"
+  },
+  {
+   "id": "putty_rd_colo_riv",
+   "number": "63288",
+   "was": "Putty Rd (Colo Riv",
+   "now": "Putty Road (Colo River)",
+   "source": "arro",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); ARRO and the site list have the full name"
+  },
+  {
+   "id": "redoak_stewarts_riv",
+   "number": "560012",
+   "was": "Redoak (Stewarts Riv",
+   "now": "Redoak (Stewarts River)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "reedy_springs_statio",
+   "number": "530046",
+   "was": "Reedy Springs Statio",
+   "now": "Reedy Springs Station TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists and the site list have the full name"
+  },
+  {
+   "id": "stewart_ck_valley",
+   "number": "531148",
+   "was": "Stewart Ck Valley",
+   "now": "Stewart Creek Valley TM",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); ARRO, the Bureau's QLD station lists and the site list have the full name"
+  },
+  {
+   "id": "suffolkprk_servord",
+   "number": "900043",
+   "was": "SuffolkPrk(ServoRd",
+   "now": "Suffolk Park (Broken Hd Rd Crossing)",
+   "source": "site-list",
+   "why": "squeezed into 18 characters (SuffolkPrk(ServoRd); the site list has the name"
+  },
+  {
+   "id": "suhrs_ck_sandy_cree",
+   "number": "533223",
+   "was": "Suhrs Ck (Sandy Cree",
+   "now": "Suhrs Ck (Sandy Creek Rd) TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; the site list has the full name"
+  },
+  {
+   "id": "tatham_ellangowan_ro",
+   "number": "558125",
+   "was": "Tatham Ellangowan Ro",
+   "now": "Tatham Ellangowan Road (Sandy Creek)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "third_lane_macleay",
+   "number": "559086",
+   "was": "Third Lane (Macleay",
+   "now": "Third Lane (Macleay River)",
+   "source": "site-list",
+   "why": "cut at 20 characters; the site list has the full name"
+  },
+  {
+   "id": "toorak_research_stat",
+   "number": "529089",
+   "was": "Toorak Research Stat",
+   "now": "Toorak Research Station TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists and the site list have the full name"
+  },
+  {
+   "id": "upper_alligator_cree",
+   "number": "532140",
+   "was": "Upper Alligator Cree",
+   "now": "Upper Alligator Creek TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "upper_gracemere_aler",
+   "number": "900030",
+   "was": "Upper Gracemere Aler",
+   "now": "Upper Gracemere AL",
+   "source": "site-list",
+   "why": "cut at 20 characters; the site list has the full name"
+  },
+  {
+   "id": "upper_spence_ck_t",
+   "number": "531160",
+   "was": "Upper Spence Ck T",
+   "now": "Upper Spence Creek TM",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); ARRO, the Bureau's QLD station lists and the site list have the full name"
+  },
+  {
+   "id": "upper_walker_ck_t",
+   "number": "529050",
+   "was": "Upper Walker Ck T",
+   "now": "Upper Walker Creek TM",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); ARRO, the Bureau's QLD station lists, the site list and HDB's flood peaks have the full name"
+  },
+  {
+   "id": "upsalls_ck_br",
+   "number": "560010",
+   "was": "Upsalls Ck Br",
+   "now": "Upsalls Creek Bridge (Upsalls Creek)",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); ARRO and the site list have the full name"
+  },
+  {
+   "id": "walker_ck_winton",
+   "number": "530044",
+   "was": "Walker Ck (Winton",
+   "now": "Walker Creek (Winton Road) TM",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); ARRO, the Bureau's QLD station lists and the site list have the full name"
+  },
+  {
+   "id": "wallaman_escarpment",
+   "number": "532145",
+   "was": "Wallaman Escarpment",
+   "now": "Wallaman Escarpment TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists and the site list have the full name"
+  },
+  {
+   "id": "waterhole_ck_at_m",
+   "number": "900057",
+   "was": "Waterhole Ck at M",
+   "now": "Waterhole Creek at Mackeys Creek Road",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); the site list has the full name"
+  },
+  {
+   "id": "waterlilyprk_ocean",
+   "number": "900044",
+   "was": "WaterlilyPrk(Ocean",
+   "now": "Waterlily Park (Ocean Shores)",
+   "source": "site-list",
+   "why": "squeezed into 18 characters (WaterlilyPrk(Ocean); the site list has the name"
+  },
+  {
+   "id": "wellington_bell_riv",
+   "number": "562006",
+   "was": "Wellington (Bell Riv",
+   "now": "Wellington (Bell River)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the site list and the NSW SLS have the full name"
+  },
+  {
+   "id": "whiporie_myall_cree",
+   "number": "558124",
+   "was": "Whiporie (Myall Cree",
+   "now": "Whiporie (Myall Creek)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "widgee_ck_pahlow_rd",
+   "number": "140029",
+   "was": "Widgee Ck (pahlow Rd",
+   "now": "Widgee Ck (Pahlow Rd Bridge) TM",
+   "source": "arro",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "widgee_ck_wide_bay",
+   "number": "140028",
+   "was": "Widgee Ck (Wide Bay",
+   "now": "Widgee Ck (Wide Bay Hwy) AL",
+   "source": "arro",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "wills_ck_selwyn",
+   "number": "537039",
+   "was": "Wills Ck (Selwyn",
+   "now": "Wills Creek (Selwyn Road) TM",
+   "source": "site-list",
+   "why": "cut at 20 characters and then shortened (Road to Rd, Creek to Ck, Bridge to Br); ARRO, the Bureau's QLD station lists, the site list and the QLD SLS have the full name"
+  },
+  {
+   "id": "woolners_arm_doubtf",
+   "number": "558118",
+   "was": "Woolners Arm (Doubtf",
+   "now": "Woolners Arm (Doubtful Creek)",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO and the site list have the full name"
+  },
+  {
+   "id": "yammanie_minnamoolka",
+   "number": "532146",
+   "was": "Yammanie Minnamoolka",
+   "now": "Yammanie Minnamoolka TM",
+   "source": "site-list",
+   "why": "cut at 20 characters; ARRO, the Bureau's QLD station lists and the site list have the full name"
+  }
+ ],
+ "left": [
+  {
+   "id": "bonshaw_dumaresq_r",
+   "name": "Bonshaw (Dumaresq R)",
+   "why": "a short form somebody chose, with its bracket closed (Dumaresq R); the same style runs through names longer than 20, such as Boggabilla (Macintyre R)"
+  },
+  {
+   "id": "kanowna_macintyre",
+   "name": "Kanowna (Macintyre)",
+   "why": "as Bonshaw: a short form with its bracket closed"
+  },
+  {
+   "id": "mungindi_barwon_r",
+   "name": "Mungindi (Barwon R)",
+   "why": "as Bonshaw: a short form with its bracket closed"
+  },
+  {
+   "id": "tintot_macintyre_r",
+   "name": "Tintot (Macintyre R)",
+   "why": "as Bonshaw: a short form with its bracket closed"
+  },
+  {
+   "id": "proposed_gatton_auto",
+   "name": "Proposed Gatton Auto",
+   "why": "a proposal entered in Flood-Net, not a Radio Mobile unit, and in no other list"
+  },
+  {
+   "id": "jubilee_pocket_new_t",
+   "name": "Jubilee Pocket NEW T",
+   "why": "no number and in no list: Radio Mobile unit 492, 1.3 km from Jubilee Pocket AL (533170) at 7.5 m. Probably Jubilee Pocket NEW TM, but nothing says so"
+  },
+  {
+   "id": "constitution_hill_al",
+   "name": "Constitution Hill AL",
+   "why": "not a cut: the Bureau's lists call it CONSTITUTION HILL REPEATER, a different name, not a longer one"
+  },
+  {
+   "id": "macalister_bell_rd_j",
+   "name": "Jimbour Ck AL",
+   "why": "not a cut: 541203 is Jimbour Ck AL here and MACALISTER BELL RD JIMBOUR CK AL in the SLS; somebody shortened it, and the short name says where it is"
+  }
+ ]
+}

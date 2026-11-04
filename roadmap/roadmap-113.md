@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-04** (revision 225 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-04** (revision 227 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -854,6 +854,15 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 227 — 2026-11-04: ✂️ 112 station names Radio Mobile cut at 20 characters, completed
+
+The owner: *"station names were truncated due to radio mobile limitations. Can you please go through the database and try and fix up these truncated names?"* **Opens nothing; closes nothing.**
+
+- **Renamed in the database**, each guarded on the name it had, stamped `station names cut at 20 (claude)` and in the station's history: *Augustus Downs Stati* → Augustus Downs Station, *Ainsworth Rd (Middle* → Ainsworth Road (Middle Creek), *BRdwater Br (R* → Broadwater Bridge (Richmond River), and 109 more. `stations.json` refreshed.
+- **How a cut was told** (`data/station-names/README.md`): another list gives the number a longer name whose first 20 characters are the name — ARRO, the site list in `archive/`, the SLS, the Bureau's QLD lists, HDB's peaks, the 2024 KMZ; the Bureau's rain and river pages and station metadata for the few none covered. *AL* for ALERT and a short form with its bracket closed are not cuts. `data/station-names/review.json` has every rename and reason, and what was left.
+- **For the owner to glance at**: four number-less Radio Mobile units look like stray copies of numbered stations (North Murwillumbah, Lismore Browns Ck, Macalister Bell Rd, Bloomfield River Bridge); 140030 and 140031 now carry the lists' McLaughlins Rd and Highway Bridge where Radio Mobile had *Chahpin…* and *Rail…*; *Jubilee Pocket NEW T* stays as it is, as no list names it.
+- `tools/ingest/truncated_names.py`: `--find` lists any name that still looks cut, for after an import; `--sql` writes the review.
 
 ### Revision 226 — 2026-11-04: 🔀 SoRT's cutover — its v1 moved to /SoRT/v1/
 
