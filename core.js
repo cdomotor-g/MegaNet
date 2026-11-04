@@ -3896,8 +3896,11 @@ const DB_SCHEMA = 'meganet';
 // days, not browsers (0099). 100: one person, one account — an account's
 // second addresses, Same person… and where the emails go (0100), applied by
 // db-migrate.yml on 3 November 2026, bumped after; whoami() and admin_users()
-// gain addresses, and the app reads them only where they are there.
-const DB_SCHEMA_VERSION = 100;
+// gain addresses, and the app reads them only where they are there. 101: the
+// Bureau's benchmarks (0101), applied by db-migrate.yml on 4 November 2026,
+// bumped after; the station card and the Level Survey read station_benchmark,
+// and a database without it answers none.
+const DB_SCHEMA_VERSION = 101;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
