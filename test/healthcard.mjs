@@ -717,7 +717,7 @@ try {
     const cls = label => { const r = [...el.querySelectorAll('.acma-row')].find(x => flat(x.firstElementChild.textContent) === label);
       return r ? [...r.querySelectorAll('[class*="txt-"]')].map(x => x.className).join(' ') : ''; };
     return { rows, text: flat(el.textContent), busy: !!el.querySelector('[aria-busy="true"]'),
-             cls: { Offset: cls('Offset'), Channel: cls('Channel'), Drift: cls('Drift'), Signal: cls('Signal'), 'Signal change': cls('Signal change') },
+             cls: { Offset: cls('Offset'), Frequency: cls('Frequency'), Drift: cls('Drift'), Signal: cls('Signal'), 'Signal change': cls('Signal change') },
              spark: !!el.querySelector('svg.hl-drift-spark'), snrSpark: !!el.querySelector('svg.hl-snr-spark'), door: (el.querySelector('button[onclick^="HealthDrift.open"]') || {}).getAttribute?.('onclick') || null,
              inIds: !!el.closest('.acma-sect') && !!el.closest('.acma-sect').querySelector('.stn-card-ids:not(.stn-card-carrier)') };
   }, sel);
@@ -736,8 +736,8 @@ try {
   check('…its offset in hertz and ppm against the rest, and that it is like the rest',
     cMoved && cMoved.rows.Offset === '+35 Hz · +0.23 ppm — like the rest', J(cMoved && cMoved.rows));
   check('…heard on another channel than its TX on record: said, flagged, and why (its relays were heard there)',
-    cMoved && /^heard on 152\.250 MHz — ⚠ its TX on record is 151\.500 MHz/.test(cMoved.rows.Channel || '')
-      && /Its relays were heard there/.test(cMoved.rows.Channel) && /txt-warn/.test(cMoved.cls.Channel), J(cMoved && cMoved.rows));
+    cMoved && /^heard on 152\.250 MHz — ⚠ its TX on record is 151\.500 MHz/.test(cMoved.rows.Frequency || '')
+      && /Its relays were heard there/.test(cMoved.rows.Frequency) && /txt-warn/.test(cMoved.cls.Frequency), J(cMoved && cMoved.rows));
   check('…drift too soon to judge, with what the server still needs',
     cMoved && /^too soon to judge/.test(cMoved.rows.Drift || '') && /it has 1 and 0/.test(cMoved.rows.Drift), J(cMoved && cMoved.rows));
   check('…what was measured — as a repeater, its relays — and a door to the Transmitter frequency panel on it',
@@ -749,7 +749,7 @@ try {
 
   const cDrift = await carrierCard(CF.drifting);
   check('a repeater on its own channel and drifting: ✓ its TX on record, and the server\'s critical drift said in red',
-    cDrift && /^heard on 151\.500 MHz — ✓ its TX on record$/.test(cDrift.rows.Channel || '') && /txt-ok/.test(cDrift.cls.Channel)
+    cDrift && /^heard on 151\.500 MHz — ✓ its TX on record$/.test(cDrift.rows.Frequency || '') && /txt-ok/.test(cDrift.cls.Frequency)
       && cDrift.rows.Drift === '⚠ drifting — +1.40 ppm against the 30 days before' && /txt-bad/.test(cDrift.cls.Drift), J(cDrift && { rows: cDrift.rows, cls: cDrift.cls }));
   check('…and fading (0083): its SNR as heard, how steady, the server\'s warning beside it, at how many base stations',
     cDrift && /^14\.2 dB over the noise · ±1\.1 dB burst to burst — ⚠ fading at 2 base stations that hear it on its own carrier, the last 7 days/.test(cDrift.rows.Signal || '')
@@ -761,7 +761,7 @@ try {
   check('a field station off the rest: the warning beside its offset, steady, its channel with nothing on record to check against',
     cOff && cOff.rows.Offset === '−455 Hz · −3.00 ppm — ⚠ off the rest' && /txt-warn/.test(cOff.cls.Offset)
       && cOff.rows.Drift === '+0.12 ppm against the 30 days before — steady'
-      && cOff.rows.Channel === 'heard on 151.525 MHz no TX on record to check it against' && !/cleared long ago/.test(cOff.text), J(cOff && { rows: cOff.rows, cls: cOff.cls }));
+      && cOff.rows.Frequency === 'heard on 151.525 MHz no TX on record to check it against' && !/cleared long ago/.test(cOff.text), J(cOff && { rows: cOff.rows, cls: cOff.cls }));
   check('…its signal steady in a week and over three months, heard by one base station',
     cOff && /^9\.8 dB over the noise · ±1\.6 dB burst to burst at 1 base station that hears it on its own carrier, the last 7 days$/.test(cOff.rows.Signal || '')
       && cOff.rows['Signal change'] === '+0.3 dB against the 30 days before — steady; −0.2 dB over three months — steady' && cOff.snrSpark,

@@ -559,15 +559,15 @@ const HealthDrift = (() => {
     if (f == null) return '';
     const rec = txOnRecord(s);
     const heard = `heard on ${esc(mhzText(f))} MHz`;
-    if (!rec.length) return line('Channel', `${heard}${note('no TX on record to check it against')}`);
+    if (!rec.length) return line('Frequency', `${heard}${note('no TX on record to check it against')}`);
     if (rec.some(t => Math.abs(t - f) < SAME_MHZ)) {
-      return line('Channel', `${heard} — <span class="txt-ok"><span aria-hidden="true">✓</span> its TX on record</span>`);
+      return line('Frequency', `${heard} — <span class="txt-ok"><span aria-hidden="true">✓</span> its TX on record</span>`);
     }
     const onRec = rec.map(t => `${mhzText(t)}`).join(' or ');
     const why = r.via === 'repeater'
       ? 'Its relays were heard there, so the record looks out of date.'
       : 'Either the record is out of date, or this was another transmitter relaying it — a repeater its pass ranges do not show.';
-    return line('Channel', `${heard} — <span class="txt-warn"><span aria-hidden="true">⚠</span> its TX on record is ${esc(onRec)} MHz</span>${note(esc(why))}`);
+    return line('Frequency', `${heard} — <span class="txt-warn"><span aria-hidden="true">⚠</span> its TX on record is ${esc(onRec)} MHz</span>${note(esc(why))}`);
   }
 
   function driftHtml(r, drift) {
@@ -706,7 +706,7 @@ const HealthDrift = (() => {
         Every burst a base station's SDR decodes comes on its transmitter's carrier, a few hundred hertz either side of the channel —
         each crystal's own, so it tells transmitters apart. The server puts each burst down to whoever sent it, this station or the
         repeater that relayed it, and measures each against the rest the same base stations hear. <b>Offset</b> is the last week's
-        (±${esc(String(S.warn))} ppm off the rest is a warning); <b>Channel</b> is the channel it was heard on, checked against the TX
+        (±${esc(String(S.warn))} ppm off the rest is a warning); <b>Frequency</b> is the frequency it was heard on, checked against the TX
         saved for it in the register; <b>Drift</b> is how far it has moved against the thirty days before (${esc(String(S.drift))} ppm
         is drift — usually an ageing crystal, or a site running hot or cold, and it tends to end in silence).
         <b>Signal</b> is how far above the receiver's noise its own bursts arrive — only those on its own carrier, never its repeater's
