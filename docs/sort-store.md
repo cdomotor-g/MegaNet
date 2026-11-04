@@ -20,12 +20,17 @@ SoRT is built to this; change it only together with SoRT's side.
 
 Every request except the CORS preflight carries the header
 `X-SoRT-Passphrase: <passphrase>`. The Worker accepts it when
-`sha256_hex('sort-forum-v1:' + passphrase)` is the hash it holds (below),
-compared in constant time.
+`sha256_hex('sort-forum-v1:' + normPass(passphrase))` is the hash it holds
+(below), compared in constant time. `normPass` keeps only the letters and
+digits, in capitals, so a sentence works however it is typed — *"Herons audit the
+staff gauge at noon"* and *"herons-audit the staff gauge at NOON."* are the same
+passphrase. (A header carries only plain characters, so
+SoRT sends it already reduced the same way.)
 
 | Request | Answer |
 | --- | --- |
 | `GET /check` | `200 {"ok":true}` |
+| `PUT /passphrase` with `{"sha256":"<64 hex>"}` | change the passphrase (the current one in the header): `200 {"ok":true}`; `400 {"error":"sha256"}` if the body isn't that; `409 {"error":"set in Cloudflare"}` while `SORT_PASS_SHA256` is set; any other method `405` — the hash is never read back |
 | `GET /files/<path>` | `200` the file's text, `Content-Type: application/json`, `ETag: "<etag>"`, `Cache-Control: no-store`; `404 {"error":"not found"}` if it was never saved |
 | `PUT /files/<path>` with `If-None-Match: *` | create: `200 {"etag":"\"…\""}` and the same `ETag` header |
 | `PUT /files/<path>` with `If-Match: "<etag>"` | replace the version with that etag (the one the last GET or PUT gave): `200 {"etag":"\"…\""}` and the same `ETag` header |
@@ -92,38 +97,43 @@ no gate, padlock or key codes** — SoRT checks for them before it saves.
 
 ## Changing the passphrase
 
-The hash the Worker holds is `PASS_SHA256` in `worker/sort.js`, unless the
-Worker has **`SORT_PASS_SHA256`**, which then replaces it — so a new passphrase
-needs no change to the code.
+**From SoRT:** *Sessions* → *Shared with the forum* → **Change the forum
+passphrase**, by anyone who has the current one. SoRT works out the new one's
+hash in the browser and sends only that (`PUT /passphrase`); the Worker keeps it
+in R2 at `_meganet/sort/passphrase.json` (`{"sha256", "changed_at"}`) — private,
+unlike this repository, so even a memorable sentence can't be tried offline
+against a published hash. Every isolate picks it up within 30 seconds; each forum
+computer asks for the new passphrase the next time it is refused.
 
-1. Choose the new passphrase (as random as the old one — about 100 bits, e.g.
-   eight words from a diceware list). Give it to the forum by a way that is not
-   email or chat in the open.
-2. Work out its hash, on any computer:
+Which hash is held, first that applies:
 
-   ```sh
-   printf '%s' 'sort-forum-v1:the new passphrase' | sha256sum
-   ```
+1. **`SORT_PASS_SHA256`** on the Worker (a *secret*), when it is set — the
+   owner's override. While it is set, `PUT /passphrase` answers `409`. A value
+   that is not 64 hex characters refuses everybody (`503 {"error":"passphrase
+   not set up"}`) rather than letting an old passphrase back in.
+2. **The forum's own**, in R2 — the usual case since 4 Nov 2026 (a flood
+   sentence, chosen by the owner). If R2 can't be read the answer is `503
+   {"error":"storage"}`, never a fall back to (3).
+3. **`PASS_SHA256` in `worker/sort.js`** — the starting passphrase's (random,
+   about 100 bits), used only while R2 holds none: the way back in if the R2
+   object is ever deleted.
 
-   (`printf '%s'`, not `echo`, so no newline goes into the hash; on a Mac,
-   `shasum -a 256`.) The 64 hex characters are the hash.
-3. Give it to the Worker as a **secret**: Cloudflare dashboard → **Workers &
-   Pages** → the `meganet` Worker → **Settings** → **Variables and Secrets** →
-   **Add** → **Type: Secret**, **Variable name:** `SORT_PASS_SHA256`, **Value:**
-   the hash → **Deploy**. Or, from a checkout signed in to Cloudflare:
-   `npx wrangler secret put SORT_PASS_SHA256` and paste it. A *secret*, not a
-   plain-text variable: the next deploy from the repository deletes plain-text
-   variables set in the dashboard.
-4. Check it: `curl -s https://floodwarning.net/api/sort/v1/check -H
-   'X-SoRT-Passphrase: the new passphrase'` answers `{"ok":true}`, and the old
-   one `{"error":"passphrase"}`. Each forum computer asks for the new
-   passphrase the next time it is refused.
+By hand, with the current passphrase (`read -rs` so neither is echoed or kept):
 
-Or ask an agent to change `PASS_SHA256` in `worker/sort.js` to the new hash —
-the hash only, never the passphrase. A `SORT_PASS_SHA256` that is set but is not
-64 hex characters refuses everybody (`503 {"error":"passphrase not set up"}`)
-rather than letting the old passphrase back in; delete the secret to go back to
-the one in the code.
+```sh
+read -rs CUR; read -rs NEW
+H=$(printf '%s' "sort-forum-v1:$(printf '%s' "$NEW" | tr a-z A-Z | tr -cd 'A-Z0-9')" | sha256sum | cut -c1-64)
+curl -s -X PUT https://floodwarning.net/api/sort/v1/passphrase \
+  -H "X-SoRT-Passphrase: $(printf '%s' "$CUR" | tr a-z A-Z | tr -cd 'A-Z0-9')" \
+  -H 'Content-Type: application/json' --data "{\"sha256\":\"$H\"}"
+unset CUR NEW H
+```
+
+The owner's override instead: Cloudflare dashboard → **Workers & Pages** → the
+`meganet` Worker → **Settings** → **Variables and Secrets** → **Add** → **Type:
+Secret**, **Variable name:** `SORT_PASS_SHA256`, **Value:** the hash → **Deploy**
+(a *secret*: the next deploy deletes plain-text variables set in the dashboard).
+Delete it to go back to the forum's own.
 
 ## Putting a file back
 

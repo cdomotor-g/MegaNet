@@ -20,7 +20,7 @@
 import crypto from 'node:crypto';
 import worker from '../worker/index.js';
 import {
-  handleSort, isSortPath, expectedHash, historyKey, PASS_SHA256, PASS_SALT, MAX_BYTES, PATH_RE,
+  handleSort, isSortPath, expectedHash, historyKey, PASS_SHA256, PASS_SALT, MAX_BYTES, PATH_RE, normPass, PASS_KEY, PASS_TTL_MS, resetPassMemo,
   FILES_PREFIX, HISTORY_PREFIX, SORT_RATE, SORT_AUTH_FAIL, ORIGINS,
 } from '../worker/sort.js';
 
@@ -38,8 +38,9 @@ const PASS = 'made-up-forum-words-for-the-tests-only';
 const PASS2 = 'another-made-up-forum-phrase';
 const WRONG = 'not-the-forum-passphrase-at-all';
 const sha = t => crypto.createHash('sha256').update(t).digest('hex');
-const HASH = sha(PASS_SALT + PASS);
-const HASH2 = sha(PASS_SALT + PASS2);
+const N = p => p.toUpperCase().replace(/[^A-Z0-9]/g, '');
+const HASH = sha(PASS_SALT + N(PASS));
+const HASH2 = sha(PASS_SALT + N(PASS2));
 const SECRETS = [PASS, PASS2, WRONG];
 
 const BASE = 'https://floodwarning.net/api/sort/v1';
@@ -121,7 +122,7 @@ check('the routes are /api/sort/v1 and below it, and nothing near it',
 }
 
 // ── The passphrase ───────────────────────────────────────────────────────────
-check('the code holds the contract\'s hash', PASS_SHA256 === '43d489a684d7d3059b89b3f59b60c314aaac74062a2c90e1c7abf7b29b2f6b7e' && PASS_SALT === 'sort-forum-v1:');
+check('the code holds a SHA-256 for the way back in, under the contract\'s salt', /^[0-9a-f]{64}$/.test(PASS_SHA256) && PASS_SALT === 'sort-forum-v1:');
 check('with no SORT_PASS_SHA256, the hash held to is the code\'s', expectedHash({}) === PASS_SHA256 && expectedHash({ SORT_PASS_SHA256: '' }) === PASS_SHA256 && expectedHash(undefined) === PASS_SHA256);
 check('with one, that — trimmed, in either case', expectedHash({ SORT_PASS_SHA256: ` ${HASH.toUpperCase()}\n` }) === HASH);
 check('one that is not a SHA-256 in hex is nothing to hold to (null), not a fall back to the code\'s',
@@ -440,6 +441,49 @@ check('one that is not a SHA-256 in hex is nothing to hold to (null), not a fall
   const broken = ENV({ SORT_RATE_LIMIT: { limit: async () => { throw new Error('binding down'); } } });
   const b = await go(broken, 'GET', '/check', { ip: '192.0.2.31' });
   check('a binding that errs falls back to the isolate\'s window rather than refusing', b.status === 200, b.text);
+}
+
+// ── A passphrase the forum sets itself (PUT /passphrase, its hash kept in R2) ─
+{
+  check('a passphrase is held to its letters and digits, in capitals', normPass(' The heron-audits, the gauge! ') === 'THEHERONAUDITSTHEGAUGE' && normPass('') === '');
+  const S1 = 'Wombats queue politely at the ford', S2 = 'a heron audits the staff gauge';
+  const env = { PHOTOS: bucket() };
+  resetPassMemo();
+  await env.PHOTOS.put(PASS_KEY, JSON.stringify({ sha256: sha(PASS_SALT + N(S1)) }));
+  const a = await go(env, 'GET', '/check', { pass: 'WOMBATS queue - politely, at the FORD.' });
+  check('with one in R2 (no SORT_PASS_SHA256), it is the one held to — typed however', a.status === 200, a.text);
+  const b = await go(env, 'GET', '/check', { pass: S2 });
+  check('… and any other is refused', b.status === 401, b.text);
+  const bad = await go(env, 'PUT', '/passphrase', { pass: S1, body: '{"sha256":"nope"}' });
+  check('PUT /passphrase wants {"sha256": 64 hex} (400 otherwise)', bad.status === 400 && bad.body.error === 'sha256', bad.text);
+  const wrong = await go(env, 'PUT', '/passphrase', { pass: S2, body: J({ sha256: sha(PASS_SALT + N(S2)) }) });
+  check('… and the current passphrase: a wrong one changes nothing (401)', wrong.status === 401 && JSON.parse((await env.PHOTOS.get(PASS_KEY).then(o => o.text()))).sha256 === sha(PASS_SALT + N(S1)), wrong.text);
+  const ch = await go(env, 'PUT', '/passphrase', { pass: S1, body: J({ sha256: sha(PASS_SALT + N(S2)).toUpperCase() }) });
+  check('with the right one it changes it: 200 {"ok":true}', ch.status === 200 && ch.text === '{"ok":true}', ch.text);
+  const o = await env.PHOTOS.get(PASS_KEY); const stored = JSON.parse(await o.text());
+  check('… only the new hash (lower case) and when, in R2', stored.sha256 === sha(PASS_SALT + N(S2)) && /^2026-/.test(stored.changed_at) && Object.keys(stored).length === 2, J(stored));
+  const c1 = await go(env, 'GET', '/check', { pass: S2 }), c2 = await go(env, 'GET', '/check', { pass: S1 });
+  check('the new one is in at once, the old one out', c1.status === 200 && c2.status === 401, `${c1.status} ${c2.status}`);
+  const get = await go(env, 'GET', '/passphrase', { pass: S2 });
+  check('GET /passphrase is 405 — the hash is never read back', get.status === 405 && !get.text.includes(stored.sha256), get.text);
+  const ov = await go({ PHOTOS: bucket(), SORT_PASS_SHA256: HASH }, 'PUT', '/passphrase', { body: J({ sha256: HASH2 }) });
+  check('with SORT_PASS_SHA256 on the Worker, it is the owner\'s: 409 {"error":"set in Cloudflare"}', ov.status === 409 && ov.body.error === 'set in Cloudflare', ov.text);
+  // Another isolate's memo: a change elsewhere is seen within PASS_TTL_MS.
+  resetPassMemo();
+  const env2 = { PHOTOS: bucket() };
+  await env2.PHOTOS.put(PASS_KEY, JSON.stringify({ sha256: sha(PASS_SALT + N(S1)) }));
+  await go(env2, 'GET', '/check', { pass: S1 });
+  await env2.PHOTOS.put(PASS_KEY, JSON.stringify({ sha256: sha(PASS_SALT + N(S2)) }));
+  const stale = await go(env2, 'GET', '/check', { pass: S1 });
+  now += PASS_TTL_MS + 1;
+  const fresh = await go(env2, 'GET', '/check', { pass: S2 });
+  check(`a change made elsewhere holds here within ${PASS_TTL_MS / 1000} s`, stale.status === 200 && fresh.status === 200, `${stale.status} ${fresh.status}`);
+  resetPassMemo();
+  const down = { PHOTOS: bucket() }; down.PHOTOS.failOn = (op, k) => op === 'get' && k === PASS_KEY;
+  const r = await go(down, 'GET', '/check', { pass: S1 });
+  check('if R2 can\'t say which passphrase is in force: 503, never the code\'s as a fall back', r.status === 503 && r.body.error === 'storage', r.text);
+  resetPassMemo();
+  SECRETS.push(S1, S2);
 }
 
 // ── The passphrase is in no log line and no answer ───────────────────────────

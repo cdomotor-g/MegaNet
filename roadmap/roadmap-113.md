@@ -859,6 +859,13 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 233 — 2026-11-04: 🔑 SoRT's forum passphrase — a flood sentence the forum can change itself
+
+The owner, on the SoRT thread: *"make the passphrase something that's sort of human readable … read like a sentence … flood related"*, picking one of the suggestions. **Opens nothing; closes nothing.**
+
+- `worker/sort.js`: a passphrase is held to its letters and digits in capitals (`normPass`), so a sentence works however it is typed. `PUT /api/sort/v1/passphrase` `{"sha256"}`, with the current passphrase, sets a new one: its hash is kept in R2 (`_meganet/sort/passphrase.json`), private — a memorable sentence's hash in this public repository could be tried offline. Which is held: `SORT_PASS_SHA256` (owner's secret) › the forum's own in R2 › `PASS_SHA256` in the code (the starting random one, now only the way back in). R2 unreadable is `503`, never a fall back. Each isolate re-reads within 30 s.
+- `npm run sortstore`: 110 (from 98) — the relaxed match, the change (right/wrong current passphrase, bad body, 409 under the override, never read back), another isolate within 30 s, R2 down → 503; red on a store that ignores the R2 hash (7 failures). `docs/sort-store.md`: *Changing the passphrase* rewritten (from SoRT, by hand, the override). `atlas.json`: the status line.
+
 ### Revision 232 — 2026-11-04: 🗂️ SoRT's forum sessions — a store behind the forum passphrase
 
 The owner asked for SoRT's sessions to be shared between every forum computer with a forum passphrase — no tokens or accounts: *"anyone with that passphrase could get into the sort scope builder and do their thing"*. **No issue; opens nothing, closes nothing.**

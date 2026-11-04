@@ -13,6 +13,7 @@
 //
 //   OPTIONS /api/sort/v1/…              the preflight: 204 for SoRT's and this origin
 //   GET     /api/sort/v1/check          200 {ok: true} — the passphrase is right
+//   PUT     /api/sort/v1/passphrase     {sha256}: the forum's new passphrase (its hash, kept in R2)
 //   GET     /api/sort/v1/files/<path>   200 the file's text, ETag; 404 {error: 'not found'}
 //   PUT     /api/sort/v1/files/<path>   the whole file as JSON text, at most 4 MB:
 //                                       If-None-Match: * to create, If-Match: "<etag>"
@@ -59,10 +60,13 @@ export const HISTORY_PREFIX = '_meganet/sort/history/';
 export const PATH_RE = /^(index\.json|stations\/[a-z0-9][a-z0-9-]{0,79}\.json)$/;
 export const MAX_BYTES = 4 * 1024 * 1024;
 
-// sha256_hex('sort-forum-v1:' + the forum passphrase). The owner's to change:
-// SORT_PASS_SHA256 on the Worker overrides it (docs/sort-store.md).
+// sha256_hex('sort-forum-v1:' + the forum passphrase, relaxed — normPass()).
+// Only the starting (random, ~100-bit) passphrase's, kept as a way back in:
+// once the forum sets its own (PUT /passphrase), that one's hash is kept in R2
+// (PASS_KEY), private, and this is not used. SORT_PASS_SHA256 on the Worker
+// overrides both (docs/sort-store.md).
 export const PASS_SALT = 'sort-forum-v1:';
-export const PASS_SHA256 = '43d489a684d7d3059b89b3f59b60c314aaac74062a2c90e1c7abf7b29b2f6b7e';
+export const PASS_SHA256 = 'b87a14ebb7e631669eee14b11e9fd377f169585dd35db9a35ad7f56ab3a57a89';
 const PASS_HEADER = 'X-SoRT-Passphrase';
 const PASS_MAX = 1024;
 
@@ -79,6 +83,33 @@ export function isSortPath(pathname) {
 }
 
 // ── Small helpers ────────────────────────────────────────────────────────────
+
+// What a passphrase is held to: its letters and digits, in capitals — so a
+// sentence works however it is typed ("Herons audit the gauge" = "herons-audit, the GAUGE").
+export function normPass(p) { return String(p || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+// The passphrase the forum set itself (PUT /passphrase): its hash, in R2 — not
+// in this public code, so even a memorable sentence can't be tried offline
+// against a published hash. Read at most every PASS_TTL_MS per isolate.
+export const PASS_KEY = '_meganet/sort/passphrase.json';
+export const PASS_TTL_MS = 30000;
+let passMemo = null;   // { hash, at }
+export function resetPassMemo() { passMemo = null; }
+async function storedHash(env, now) {
+  if (passMemo && now - passMemo.at < PASS_TTL_MS) return passMemo.hash;
+  const o = await env.PHOTOS.get(PASS_KEY);   // a throw is answered 503 by the caller
+  let hash = null;
+  if (o) { try { const j = JSON.parse(await o.text()); if (/^[0-9a-f]{64}$/.test(String(j.sha256 || ''))) hash = j.sha256; } catch (_) { hash = null; } }
+  passMemo = { hash, at: now };
+  return hash;
+}
+const overridden = env => { const v = env && env.SORT_PASS_SHA256; return !(v === undefined || v === null || v === ''); };
+// SORT_PASS_SHA256 if the Worker has it, else the forum's own (R2), else the code's.
+export async function wantHash(env, now) {
+  if (overridden(env)) return expectedHash(env);
+  if (env && env.PHOTOS) { const h = await storedHash(env, now); if (h) return h; }
+  return PASS_SHA256;
+}
 
 async function sha256Hex(text) {
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
@@ -257,14 +288,16 @@ export async function handleSort(request, env, ctx, deps = {}) {
   const key = await rateKey(request);
   if (!(await within(SORT_RATE, key, env, now))) return slowDown();
 
-  const want = expectedHash(env);
+  let want;
+  try { want = await wantHash(env, now); }
+  catch (e) { console.log(`[sort] reading the passphrase: ${(e && e.message) || e}`); return reply({ error: 'storage' }, 503); }
   if (!want) {
     console.log('[sort] SORT_PASS_SHA256 is set but is not a SHA-256 in hex: every request is refused until it is');
     return reply({ error: 'passphrase not set up' }, 503);
   }
   const given = request.headers.get(PASS_HEADER);
-  if (!given) return reply({ error: 'passphrase' }, 401);
-  const ok = given.length <= PASS_MAX && sameHex(await sha256Hex(PASS_SALT + given), want);
+  if (!given || !normPass(given)) return reply({ error: 'passphrase' }, 401);
+  const ok = given.length <= PASS_MAX && sameHex(await sha256Hex(PASS_SALT + normPass(given)), want);
   if (!ok) {
     if (!(await within(SORT_AUTH_FAIL, key, env, now))) return slowDown();
     return reply({ error: 'passphrase' }, 401);
@@ -273,6 +306,21 @@ export async function handleSort(request, env, ctx, deps = {}) {
   const rest = url.pathname.slice(PREFIX.length);
   if (rest === '/check') {
     if (request.method !== 'GET') return reply({ error: 'GET only' }, 405, { Allow: 'GET, OPTIONS' });
+    return reply({ ok: true }, 200);
+  }
+  // A new passphrase, set by someone with the current one: its hash only.
+  if (rest === '/passphrase') {
+    if (request.method !== 'PUT') return reply({ error: 'PUT only' }, 405, { Allow: 'PUT, OPTIONS' });
+    if (overridden(env)) return reply({ error: 'set in Cloudflare' }, 409);
+    if (!env || !env.PHOTOS) return reply({ error: 'storage' }, 503);
+    let body = null;
+    try { const t = await request.text(); if (t.length <= 1024) body = JSON.parse(t); } catch (_) { body = null; }
+    const h = body && typeof body.sha256 === 'string' ? body.sha256.trim().toLowerCase() : '';
+    if (!/^[0-9a-f]{64}$/.test(h)) return reply({ error: 'sha256' }, 400);
+    try { await env.PHOTOS.put(PASS_KEY, JSON.stringify({ sha256: h, changed_at: new Date(now).toISOString() }), { httpMetadata: { contentType: 'application/json' } }); }
+    catch (e) { console.log(`[sort] changing the passphrase: ${(e && e.message) || e}`); return reply({ error: 'storage' }, 503); }
+    passMemo = { hash: h, at: now };
+    console.log('[sort] the forum passphrase was changed');
     return reply({ ok: true }, 200);
   }
   if (!rest.startsWith('/files/')) return reply({ error: 'not found' }, 404);
