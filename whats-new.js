@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 197, date: '2026-11-04', items: [
+      '🎬 <strong>A how-to on finding a station</strong>: <em>Find a station and read its card</em> is on the '
+        + '<strong>Videos</strong> tab, about a minute long. Press <strong>▶ Show me on the app</strong> under it to be '
+        + 'walked through the search and a station\'s card on the real thing.',
+    ] },
     { n: 196, date: '2026-11-04', items: [
       '💵 <strong>Running costs</strong>, for administrators, on the <strong>Admin</strong> tab: every paid service '
         + 'Flood-Net runs on — Supabase, ElevenLabs, Fly.io, the domain, the Anthropic key, Cloudflare, Resend and the rest — '
