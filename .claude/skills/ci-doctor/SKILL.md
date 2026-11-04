@@ -137,5 +137,6 @@ lines, what you tried, and click-by-click steps if a person must act. Add it to
   example `CI doctor: Latency — the ring's shadow tinted small pins; clip it
   outside the pin`.
 - End with the run summary `CLAUDE.md` asks for. In a fresh session it is
-  Run 1. Say what was red, what you fixed (commit IDs), what you left and why,
-  and link any issues.
+  Run 1. What was red and what you fixed (commit IDs) go under ✅ Done, the
+  checks you re-ran under 🧪 Checks, what you left and why under 🚧 Not done,
+  and any issue you opened is linked where it belongs.
