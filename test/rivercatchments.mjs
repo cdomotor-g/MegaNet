@@ -188,6 +188,8 @@ try {
     rCard.slice(0, 220));
   await page.evaluate((id) => showStationCard(id), gStation.id);
   await page.waitForTimeout(300);
+  // Its section is on the card's Flood tab (station-card-view.js).
+  await page.evaluate((id) => StnCardView.reveal(`#mn-catch-card-${id}`), gStation.id);
   await page.click(`#mn-catch-card-${gStation.id} button`);
   await page.waitForFunction(() => { const s = RiverCatchments.shown(); return s && s.kind === 'station' && s.status !== 'loading'; },
     null, { timeout: 30_000 }).catch(() => {});

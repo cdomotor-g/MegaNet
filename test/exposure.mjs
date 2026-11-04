@@ -313,14 +313,15 @@ try {
 
   check('the card carries a site exposure section, keyed by the rounded position',
     !!jin && jin.key === `${Number(J.lat).toFixed(4)},${Number(J.lon).toFixed(4)}`, JSON.stringify(jin && jin.key));
-  check('…placed after the AEP section and before the SLS section',
+  // In the card's Site group (station-card-view.js): the ground under the
+  // station, after the land, the road and the mobile signal there.
+  check('…placed in Site & access, straight after the mobile coverage',
     await page.evaluate(() => {
-      const card = document.getElementById('stn-card');
-      const kids = [...card.children];
+      const grp = document.getElementById('stn-grp-site');
+      const kids = grp ? [...grp.children] : [];
       const exp = kids.findIndex(e => e.id && e.id.startsWith('mn-exposure-card-'));
-      const sls = kids.findIndex(e => e.id && e.id.startsWith('mn-sls-card-'));
-      const aep = kids.findIndex(e => e.classList.contains('stn-card-aep'));
-      return exp > 0 && sls === exp + 1 && (aep < 0 || aep === exp - 1);
+      const mob = kids.findIndex(e => e.id && e.id.startsWith('mn-mobile-card-'));
+      return exp > 0 && mob === exp - 1;
     }));
   check('in tidal water, from the tidal waterways map within 50 m',
     /^In tidal water/.test(jin.rows['Tidal water'] || '') && /within 50 m/.test(jin.rows['Tidal water']),
@@ -578,6 +579,8 @@ try {
   // Focused and pressed as a keyboard would; a missing button is a failed
   // check above, not a reason to stop the run.
   if (mog.retry) {
+    // On the card's Site tab (station-card-view.js), shown first.
+    await page.evaluate(() => StnCardView.reveal('#mn-exposure-card-moggill_al'));
     await page.focus('#mn-exposure-card-moggill_al .stn-card-exp-retry', { timeout: 5000 }).catch(() => {});
     await page.keyboard.press('Enter');
     await settle(page, 'moggill_al').catch(() => {});

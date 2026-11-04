@@ -349,6 +349,13 @@ const RiverDetails = (function () {
     return parts.length ? `${parts.join(' · ')} m` : '';
   }
 
+  // The newest edition's three, as one line — the station card's summary of
+  // its Flood group (station-card-view.js) — or '' for a station with none.
+  function floodClassesText(s) {
+    const flood = s && newestFirst(s.flood_classes || [], 'as_at')[0];
+    return flood ? classesText(flood) : '';
+  }
+
   function crossingText(c) {
     const where = [c.name, c.stream].filter(Boolean).join(', ');
     const h = c.height_m != null ? height(c.height_m, 1) : '';
@@ -557,7 +564,7 @@ const RiverDetails = (function () {
         + `(${rarest.label} AEP, ${oneIn(rarest.oneIn)}), by Manning’s equation. `
         + (est.recorded ? `The station is recorded as ${est.recorded === 'channel' ? 'in the channel' : 'on the floodplain'}. `
                         : 'Nobody has said whether the station is in the channel or on the floodplain, so both are given. ')
-        + 'The workings are under “Flood levels (AEP)” below.'
+        + 'The workings are in Flood, under “Flood levels (AEP)”.'
       : 'Every AEP level the sheet gives is at or below the ground, so there is no flow to estimate.';
     const note = est.recorded ? `${est.recorded} · indicative` : 'indicative';
     const fast = est.settings.some(t => t.fast)
@@ -956,6 +963,7 @@ const RiverDetails = (function () {
     aepCardHtml,
     velocityRowHtml,
     velocitySummary,
+    floodClassesText,
     editorHtml,
     addRow,
     removeRow,

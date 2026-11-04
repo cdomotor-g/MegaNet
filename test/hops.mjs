@@ -127,6 +127,8 @@ const pill0 = await page.evaluate(() => {
 });
 ok('the station card offers Show hops to base, among what the app does with the station',
   pill0.label === '🪜 Show hops to base' && pill0.pressed === 'false' && pill0.group === 'In Flood-Net', J(pill0));
+// Under the card's All actions (station-card-view.js), shown first.
+await page.evaluate(() => StnCardView.reveal('#stn-card .mn-hops-pill'));
 await page.click('#stn-card .mn-hops-pill');
 await page.waitForFunction(() => MapHops.active() && !!MapHops._plan(), null, { timeout: 10_000 });
 await page.waitForFunction(() => MapHops._evidence().relay !== 'loading', null, { timeout: 10_000 });
@@ -311,6 +313,8 @@ const cleared = await page.evaluate(() => ({
 ok('Clear takes them off: nothing drawn, the card hidden, every pin and line back, the pill Show again, the legend without it',
   !cleared.on && cleared.drawn === 0 && cleared.card && cleared.dim === 0 && cleared.lines === 0
     && cleared.pill === '🪜 Show hops to base' && !cleared.legend, J(cleared));
+// Under the card's All actions (station-card-view.js), shown first.
+await page.evaluate(() => StnCardView.reveal('#stn-card .mn-hops-pill'));
 await page.click('#stn-card .mn-hops-pill');
 await page.waitForFunction(() => MapHops.active(), null, { timeout: 5000 });
 await page.evaluate(() => document.querySelector('.mn-map-reset')?.click());

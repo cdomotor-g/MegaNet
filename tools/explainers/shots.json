@@ -118,6 +118,9 @@
    "settle": 4000,
    "steps": [
     {
+     "click": "#stn-card .stn-cv-allacts"
+    },
+    {
      "scroll": "[data-tour='card-position']"
     },
     {

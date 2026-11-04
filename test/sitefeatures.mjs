@@ -407,6 +407,8 @@ async function main() {
       document.querySelectorAll('.leaflet-mnSiteFeat-pane .mn-sf-pt').length)) === 1);
 
     await page.evaluate(() => MapDraw.setTool('line'));
+    // The pill is under the card's All actions (station-card-view.js).
+    await page.evaluate(() => StnCardView.reveal('#stn-card .mn-sitefeat-pill'));
     await page.click('#stn-card .mn-sitefeat-pill');
     await page.waitForSelector('.mn-sf-panel', { timeout: 10_000 });
     await settle(page);
@@ -708,7 +710,9 @@ async function main() {
 
     // A card row shows its feature; the Map display switch.
     await page.evaluate(id => showStationCard(id), STN);
-    await page.waitForSelector('#stn-card .stn-card-sitefeat .link-btn', { timeout: 10_000 });
+    // The rows are on the card's Site tab (station-card-view.js).
+    await page.waitForSelector('#stn-card .stn-card-sitefeat .link-btn', { state: 'attached', timeout: 10_000 });
+    await page.evaluate(() => StnCardView.reveal('#stn-card .stn-card-sitefeat'));
     await page.evaluate(() => state.map.setZoom(15, { animate: false }));
     await page.click('#stn-card .stn-card-sitefeat .link-btn');
     await settle(page);

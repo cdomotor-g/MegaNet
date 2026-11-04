@@ -674,6 +674,8 @@ try {
   check('the Thornton gauge\'s card names the council camera on its bridge, at this station',
     /^Flood & road cameras at/.test(card.head) && card.items[0] && card.items[0].cam === 'lockyer-valley-814'
       && /At this station · flood camera · Lockyer Valley Regional Council/.test(card.items[0].text), J(card));
+  // The cameras are on the card's Flood tab (station-card-view.js).
+  await page.evaluate(() => StnCardView.reveal('#mn-cams-card-thornton_school_roa'));
   await page.click('#mn-cams-card-thornton_school_roa button[data-cam="lockyer-valley-814"]');
   await waitShown();
   check('… and its button opens that camera', (await modal()).title === byId.get('lockyer-valley-814').name);

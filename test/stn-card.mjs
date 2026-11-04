@@ -300,6 +300,9 @@ async function main() {
     check('and lands on the pin when the zoom ends', !!zoomFit && zoomFit.atPin,
       zoomFit ? JSON.stringify({ ring: zoomFit.ring, pin: zoomFit.pin }) : 'no leader');
 
+    // The actions are measured where they are drawn: under All actions
+    // (station-card-view.js), shown for the measuring and put away after.
+    await page.evaluate(() => StnCardView.reveal('#stn-card .stn-card-actions'));
     const rows = await page.evaluate(() => {
       const s = state.data.stations.find(x => x.id === state.stnCard.id);
       const card = document.getElementById('stn-card');
@@ -398,6 +401,7 @@ async function main() {
         noJump:     !card.querySelector('button[onclick^="stnCardScrollToCarriers"]'),
       };
     });
+    await page.evaluate(() => StnCardView.go(''));
     check('the card carries the position, as the same figure Copy hands over',
       rows.position === rows.want, `${rows.position} vs ${rows.want}`);
     check('the station number and elevation, where the station has them',
@@ -484,6 +488,7 @@ async function main() {
 
     log('\nStation details ↓ selects, and is the first thing that scrolls to the editor\n');
 
+    await page.evaluate(() => StnCardView.reveal('#stn-card .mn-edit-station'));
     await page.click('#stn-card .mn-edit-station');
     // Smooth scroll — give it a moment to arrive.
     await page.waitForTimeout(700);
@@ -1178,6 +1183,113 @@ async function main() {
       legend.heads.join('|') === 'Base maps|Station pins|Stations & links|Overlay layers|Labels & export',
       legend.heads.join(' | '));
     await fresh.context.close();
+
+    // ── The card's two layouts and its search (station-card-view.js) ──────
+    log('\nThe card in groups: Tabs first, List remembered, and a search across it\n');
+    const cv = await openStations(browser, server, errors, { viewport: { width: 1440, height: 900 } });
+    const vp = cv.page;
+    const cvId = await vp.evaluate(`(() => { const m = ${lonePin(0)}; showStationCard(m.mnStationId); return m.mnStationId; })()`);
+    await vp.waitForSelector('#stn-card:not([hidden]) .stn-cv-top', { timeout: 10_000 });
+    const shown = () => vp.evaluate(() => [...document.querySelectorAll('#stn-card .stn-cv-body > .stn-grp')]
+      .filter(g => !g.hidden).map(g => g.dataset.grp));
+    const tabs0 = await vp.evaluate(() => ({
+      view: document.getElementById('stn-card').dataset.cv,
+      tabs: [...document.querySelectorAll('#stn-card .stn-cv-tab')].map(t => t.dataset.grp),
+      chosen: (document.querySelector('#stn-card .stn-cv-tab[aria-selected="true"]') || {}).id || '',
+      tabbable: [...document.querySelectorAll('#stn-card .stn-cv-tab')].filter(t => t.tabIndex === 0).length,
+      dock: [...document.querySelectorAll('#stn-card .stn-cv-dock > *')].map(b => b.textContent.trim()),
+      sticky: getComputedStyle(document.querySelector('#stn-card .stn-cv-top')).position,
+    }));
+    const home = await shown();
+    check('the card opens as Tabs, on Overview', tabs0.view === 'tabs' && tabs0.chosen === 'stn-cv-tab-overview' && tabs0.tabbable === 1, JSON.stringify(tabs0));
+    check('…with a tab for Flood, Radio and Site', ['overview', 'flood', 'radio', 'site'].every(x => tabs0.tabs.includes(x)), tabs0.tabs.join(','));
+    check('Overview shows the owner and the data, and nothing from another tab',
+      home.includes('about') && home.includes('data') && !home.some(g => ['flood', 'radio', 'site', 'kit', 'act'].includes(g)), home.join(','));
+    check('the box, the switch and the tabs stay at the top as it scrolls', tabs0.sticky === 'sticky');
+    check('Field data, Zoom, Directions and All actions along the foot',
+      tabs0.dock.length === 4 && /All actions/.test(tabs0.dock[3]), tabs0.dock.join(' | '));
+
+    await vp.click('#stn-cv-tab-radio');
+    const onRadio = await shown();
+    await vp.keyboard.press('ArrowRight');
+    const afterKey = await vp.evaluate(() => ({ at: StnCardView.current().at, focus: document.activeElement && document.activeElement.id }));
+    check('a tab shows its group alone', onRadio.join(',') === 'radio', onRadio.join(','));
+    check('→ goes to the next tab and shows it', afterKey.at === 'site' && afterKey.focus === 'stn-cv-tab-site', JSON.stringify(afterKey));
+    await vp.click('#stn-card .stn-cv-allacts');
+    const acts = await vp.evaluate(() => ({ shown: [...document.querySelectorAll('#stn-card .stn-cv-body > .stn-grp')].filter(g => !g.hidden).map(g => g.dataset.grp),
+      pressed: document.querySelector('#stn-card .stn-cv-allacts').getAttribute('aria-pressed'),
+      edit: document.querySelector('#stn-card .mn-edit-station').getClientRects().length > 0 }));
+    check('All actions shows every action, Station details first among them', acts.shown.join(',') === 'act' && acts.pressed === 'true' && acts.edit, JSON.stringify(acts));
+    await vp.evaluate(() => repaintStnCard());
+    check('a repaint leaves the card on the group it was on', (await shown()).join(',') === 'act');
+
+    // The search: one of the station's own addresses is in its Radio group.
+    const addr = await vp.evaluate(id => String(stationAlertIds(state.data.stations.find(s => s.id === id))[0]), cvId);
+    await vp.fill('#stn-cv-q', addr);
+    await vp.waitForTimeout(150);
+    const found = await vp.evaluate(() => ({
+      hits: document.getElementById('stn-cv-hits').textContent,
+      hitsShown: !document.getElementById('stn-cv-hits').hidden,
+      shown: [...document.querySelectorAll('#stn-card .stn-cv-body > .stn-grp')].filter(g => !g.hidden).map(g => g.dataset.grp),
+      heads: [...document.querySelectorAll('#stn-card .stn-cv-body > .stn-grp:not([hidden]) .stn-grp-head')].every(h => getComputedStyle(h).display !== 'none'),
+      missed: document.querySelectorAll('#stn-card .stn-cv-miss').length,
+      marked: typeof CSS !== 'undefined' && CSS.highlights && CSS.highlights.get('stn-cv-hit') ? CSS.highlights.get('stn-cv-hit').size : -1,
+      noTab: !document.querySelector('#stn-card .stn-cv-tab[aria-selected="true"]'),
+    }));
+    check('a word in the box shows the groups it is in, headed, and says where', found.hitsShown && /match/.test(found.hits) && /Radio/.test(found.hits)
+      && found.shown.includes('radio') && found.heads, JSON.stringify(found));
+    check('…only the rows that hold it, the word marked in each', found.missed > 0 && found.marked >= 1, JSON.stringify(found));
+    check('…and no tab is chosen while it shows them', found.noTab);
+    await vp.press('#stn-cv-q', 'Escape');
+    const cleared = await vp.evaluate(() => ({ q: document.getElementById('stn-cv-q').value, open: !document.getElementById('stn-card').hidden,
+      at: StnCardView.current().at, miss: document.querySelectorAll('#stn-card .stn-cv-miss').length }));
+    check('Escape in a full box clears it, and the card goes back to where it was', cleared.q === '' && cleared.open && cleared.at === 'act' && cleared.miss === 0, JSON.stringify(cleared));
+    await vp.fill('#stn-cv-q', 'zzqqxx');
+    await vp.waitForTimeout(150);
+    const none = await vp.evaluate(() => ({ none: !document.querySelector('#stn-card .stn-cv-none').hidden,
+      text: document.querySelector('#stn-card .stn-cv-none').textContent.replace(/\s+/g, ' ').trim(),
+      shown: [...document.querySelectorAll('#stn-card .stn-cv-body > .stn-grp')].filter(g => !g.hidden).length }));
+    check('a word nowhere on the card says so', none.none && /Nothing on this card matches “zzqqxx”/.test(none.text) && none.shown === 0, JSON.stringify(none));
+    await vp.fill('#stn-cv-q', '');
+
+    // reveal(): a tour ringing a part a tab hides.
+    await vp.click('#stn-cv-tab-overview');
+    const rev = await vp.evaluate(() => ({ moved: StnCardView.reveal('[data-tour="card-position"]'),
+      at: StnCardView.current().at, lit: document.querySelector('[data-tour="card-position"]').getBoundingClientRect().width > 0 }));
+    check('a part a tab hides is shown on asking (the tours)', rev.moved && rev.at === 'act' && rev.lit, JSON.stringify(rev));
+
+    // List: a summary, a page a group, remembered.
+    await vp.click('#stn-cv-tab-overview');
+    await vp.click('#stn-card .stn-cv-view:nth-child(2)');
+    const list = await vp.evaluate(() => ({ view: document.getElementById('stn-card').dataset.cv,
+      kept: localStorage.getItem('mn-stn-card-view'),
+      rows: [...document.querySelectorAll('#stn-card .stn-cv-index .stn-cv-row')].map(r => r.dataset.grp),
+      tabs: document.querySelectorAll('#stn-card .stn-cv-tab').length,
+      focus: document.activeElement && document.activeElement.textContent.trim() }));
+    check('List shows a summary, with a row for every group', list.view === 'list' && list.tabs === 0
+      && ['data', 'flood', 'radio', 'site', 'act'].every(x => list.rows.includes(x)), JSON.stringify(list));
+    check('…kept on this device, and focus stays on the switch', list.kept === 'list' && list.focus === 'List', JSON.stringify(list));
+    await vp.click('#stn-card .stn-cv-row[data-grp="flood"]');
+    const page1 = await vp.evaluate(() => ({ shown: [...document.querySelectorAll('#stn-card .stn-cv-body > .stn-grp')].filter(g => !g.hidden).map(g => g.dataset.grp),
+      back: !document.querySelector('#stn-card .stn-cv-back').hidden,
+      where: document.querySelector('#stn-card .stn-cv-where').textContent,
+      next: document.querySelector('#stn-card .stn-cv-next').textContent.trim(),
+      head: getComputedStyle(document.querySelector('#stn-grp-flood .stn-grp-head')).display }));
+    check('a row opens its group as a page, headed, with ‹ Summary and where it is', page1.shown.join(',') === 'flood' && page1.back
+      && /^Flood · \d+ of \d+$/.test(page1.where) && page1.head === 'flex', JSON.stringify(page1));
+    await vp.click('#stn-card .stn-cv-next');
+    const page2 = await vp.evaluate(() => StnCardView.current().at);
+    check('…and next goes to the next group', page2 === 'radio', page2);
+    await vp.click('#stn-card .stn-cv-backbtn');
+    check('‹ Summary goes back to the summary', (await vp.evaluate(() => StnCardView.current().at)) === '');
+    await vp.reload({ waitUntil: 'load' });
+    await vp.waitForFunction(() => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations), null, { timeout: LOAD_TIMEOUT });
+    await vp.evaluate(() => switchTab('stations'));
+    await vp.waitForFunction(() => !!state.map && state.mapMarkers.length > 0, null, { timeout: LOAD_TIMEOUT });
+    await vp.evaluate(id => showStationCard(id), cvId);
+    check('the next visit opens it as a List again', (await vp.evaluate(() => document.getElementById('stn-card').dataset.cv)) === 'list');
+    await vp.evaluate(() => { localStorage.removeItem('mn-stn-card-view'); });
+    await cv.context.close();
 
     check('nothing threw for the whole run', errors.length === 0, errors.slice(0, 3).join(' | '));
   } finally {

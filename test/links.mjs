@@ -300,6 +300,8 @@ async function main() {
     // ═══════════════════════════════════════════════════════════════════════
     log('\n3. Copy link, and the link it copies\n');
     await c1.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: server.origin });
+    // Under the card's All actions (station-card-view.js).
+    await page.evaluate(() => StnCardView.reveal('#stn-card .mn-copy-link'));
     await page.click('#stn-card .mn-copy-link');
     await page.waitForFunction(() => /Copied/.test((document.querySelector('#stn-card .mn-copy-link') || {}).textContent || ''),
       null, { timeout: 5_000 });

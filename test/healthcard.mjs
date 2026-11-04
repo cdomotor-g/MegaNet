@@ -165,7 +165,10 @@ const frames = page => page.evaluate(() => new Promise(r => requestAnimationFram
 // broken goes red on its own assertion instead of ending the run.
 const waitTrue = (page, fn, arg, timeout = 20_000) =>
   page.waitForFunction(fn, arg, { timeout }).then(() => true, () => false);
-const press = (page, sel) => page.click(sel, { timeout: 5_000 }).then(() => true, () => false);
+// A control on a tab the station card is not showing is shown first
+// (station-card-view.js): the health and the fingerprint are on different tabs.
+const press = (page, sel) => page.evaluate(s => { if (typeof StnCardView !== 'undefined') StnCardView.reveal(s); }, sel)
+  .then(() => page.click(sel, { timeout: 5_000 })).then(() => true, () => false);
 
 // Open a station's card and wait for its health section to stop asking.
 async function card(page, id) {

@@ -8673,6 +8673,7 @@ function repaintStnCard() {
     && state.data.stations.find(x => x.id === state.stnCard.id);
   if (!s) {
     state.stnCard.id = null; el.hidden = true; el.innerHTML = '';
+    StnCardView.closed();
     MapCluster.soon();
     MapLeader.sync();
     StationTrail.sync();
@@ -8680,7 +8681,9 @@ function repaintStnCard() {
     if (typeof Route !== 'undefined') Route.sync();
     return;
   }
-  const controls = () => [...el.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])')];
+  // The search box is a control too: a repaint while somebody types in it
+  // (an editor redraw, a fill that repaints) puts them back where they were.
+  const controls = () => [...el.querySelectorAll('button, a[href], input, [tabindex]:not([tabindex="-1"])')];
   const hadFocus = el.contains(document.activeElement);
   const at = hadFocus ? controls().indexOf(document.activeElement) : -1;
   el.hidden = false;
@@ -8689,7 +8692,14 @@ function repaintStnCard() {
   el.setAttribute('aria-labelledby', 'stn-card-title');
   el.tabIndex = -1;
   el.onkeydown = stnCardKey;
-  if (hadFocus) (controls()[at] || el).focus({ preventScroll: true });
+  // Which group is on show, and the word in the box (station-card-view.js) —
+  // before focus goes back, so it does not go back to a control a tab hides.
+  StnCardView.apply();
+  if (hadFocus) {
+    const c = controls()[at];
+    (c && c.getClientRects().length ? c : el).focus({ preventScroll: true });
+    if (c && c.matches('input.stn-cv-q')) { const n = c.value.length; try { c.setSelectionRange(n, n); } catch (_) {} }
+  }
   // The wind region is answered whether or not the wind layer is drawn: the
   // first card that asks pays for the polygons, every one after is free, and
   // the line fills itself in when they land. Its own element id, so it can
@@ -8781,6 +8791,7 @@ function closeStnCard(refocus = true) {
   state.stnCard.id = null;
   el.hidden = true;
   el.innerHTML = '';
+  StnCardView.closed();                     // no search marks left behind
   MapCluster.soon();                        // its pin may go back into its bubble
   MapLeader.sync();                         // and the leader goes with it
   StationTrail.sync();                      // whose pill now brings it back
@@ -8989,9 +9000,16 @@ function stnCardOwnerAsk(elId, s) {
   SLS.ensureData().then(fill, () => { stnCardOwnerFailed = true; fill(); });
 }
 
-// The card's body. acmaCardRow draws the label/value rows, so the two cards
-// that share a dress share a grammar. Networks are looked up by id, the way
-// the table shows them (stations carry radio_network_ids, not a name).
+// The card's body: every section, grouped by the question it answers, handed
+// to StnCardView (station-card-view.js), which lays the groups out as tabs or
+// as a list with pages, and searches them. acmaCardRow draws the label/value
+// rows, so the two cards that share a dress share a grammar. Networks are
+// looked up by id, the way the table shows them (stations carry
+// radio_network_ids, not a name).
+//
+// Every section keeps the id its module fills after its fetch, whichever
+// group it is in and whether or not that group is on show — a hidden group is
+// filled like a shown one, so a tab opens on what is already there.
 function stnCardHtml(s) {
   const idTypes  = stationAlertIdTypes(s);
   const located  = s.lat != null && s.lon != null;
@@ -9011,7 +9029,10 @@ function stnCardHtml(s) {
   const passing  = isRpt ? repeaterPassingCount(s) : null;
   const carriers = stationAlertIds(s).length ? findRepeaterMatches(s) : [];
   const selected = state.selectedId === s.id;
-  return `
+  const acts     = stationActionGroups(s);
+  const nCarried = carriers.length ? `${carriers.length} repeater${carriers.length === 1 ? '' : 's'}` : '';
+
+  const head = `
     <div class="acma-card-head">
       <span>
         <strong id="stn-card-title">${esc(s.name)}</strong><br>
@@ -9019,208 +9040,176 @@ function stnCardHtml(s) {
       </span>
       <button type="button" onclick="closeStnCard()"
               aria-label="Close the station card"><span aria-hidden="true">×</span></button>
-    </div>
-    <!-- A proposed station says so before anything else on its card (0039):
-         nothing below it is about a station on the ground yet. -->
-    ${stnCardProposalHtml(s)}
+    </div>`;
+
+  // Who owns it, first and always — "Not recorded" where nobody is on record
+  // (stnCardOwnerHtml); the SLS section in Flood quotes the document's own
+  // "Station owner" row word for word. Then its number and kind, which tell
+  // two stations of one name apart, and which the search box finds.
+  const about = `
     <div class="acma-sect">
-      <!-- Who owns it, first and always — "Not recorded" where nobody is on
-           record (stnCardOwnerHtml). The SLS section below quotes the
-           document's own "Station owner" row word for word. -->
       <div class="acma-row" data-tour="card-owner"><span>Owner</span><span id="${escAttr(ownerId)}"
           data-mn-owner="${escAttr(String(s.id))}">${stnCardOwnerHtml(s)}</span></div>
-    </div>
-    <!-- Its health (#218), straight after whose it is, because it is the line
-         somebody standing at the site came to the card for: when it was last
-         heard, its battery's night lows and what is wrong with it, each a door
-         into the Station Health tab on this station. One request, filled after
-         it by HealthGlance.ask, the way the SLS section is (health-glance.js).
-         Nothing for a proposed station, which has nothing to have heard. The
-         owner stays the card's first row, as it always is. -->
-    ${HealthGlance.cardHtml(s)}
-    <!-- The tasks still going here (0095, tasks.js), after its health — what
-         is wrong with it, then what is being done about it: for the people
-         tasks are for, and nothing at all for anybody else. Filled after the
-         fetch by Tasks.cardAsk, kept per station for a minute; for somebody
-         who may hand out tasks, a way to make one here. -->
-    ${typeof Tasks !== 'undefined' ? Tasks.cardHtml(s) : ''}
-    <!-- Data (stnCardDataHtml): Field data → and its ARRO admin page, then its neighbours
-         plotted with it (group-plots.js) — a river height gauge's river,
-         every gauge along it, and a rain gauge's surroundings, within the
-         distance its slider says, each in ARRO on one graph or out of the
-         datastore a strip each. The river row is filled again by
-         GroupPlots.cardAsk once the rivers around it have arrived. Nothing
-         for a station with no ARRO site id and neither kind of sensor. -->
-    ${stnCardDataHtml(s)}
-    <div class="acma-sect">
       ${acmaCardRow('Stn #', s.station_number ? esc(s.station_number)
         : s.proposed ? '<span class="txt-muted">none yet — proposed</span>' : null)}
       ${!s.proposed && s.station_type ? acmaCardRow('Type', esc(stationTypeLabel(s.station_type))) : ''}
-      ${acmaCardRow('Networks', nets ? esc(nets) : null)}
-      ${acmaCardRow('Position', located ? esc(stationLatLonText(s)) : null)}
-      <!-- A modelled height and a surveyed one are different claims, and the
-           card must not let them read alike (#198). elevation_source carries
-           the provenance in words for the 2,330 filled from Elvis; it is null
-           where somebody put a mark on the ground. -->
-      ${acmaCardRow('Elevation', s.elevation_ahd == null ? null
-        : s.elevation_source
-          ? `<span title="${escAttr(`${s.elevation_source}. A model of the ground, not a mark on it.`)}"
-              >${esc(s.elevation_ahd)} m AHD <span class="mn-pop-note">modelled</span></span>`
-          : `${esc(s.elevation_ahd)} m AHD`)}
-      <!-- Only where there is no surveyed figure, which is 2,334 of the 3,174
-           (#198). Where there *is* one it stands: a surveyed mark and a model
-           of the ground are answers to different questions, and the places
-           they disagree most are the incised creek sites where the coordinate
-           is the gauge in the channel and the mark is the hut on the bank.
-           Sorting that out is an audit over the whole file, not a second
-           number on a card — and it keeps this to one request for the
-           stations that have nothing, rather than one per card opened.
-           Filled after the fetch by elvisCardAsk, the way SLS.ask fills its
-           section and the wind line fills its span. -->
-      ${s.elevation_ahd == null && located ? `<div class="acma-row"><span>Elevation</span><span
-          id="${escAttr(elvisId)}" data-mn-elvis="${escAttr(`${s.lat},${s.lon}`)}"
-          >&nbsp;</span></div>` : ''}
-      ${passing != null ? acmaCardRow('Passing', String(passing)) : ''}
-      ${isRpt && s.repeater && s.repeater.delay_ms != null
-        ? acmaCardRow('Repeater delay', `${esc(s.repeater.delay_ms)} ms`) : ''}
-      ${wind ? `<div class="acma-row"><span>Wind region</span><span><span id="${escAttr(windId)}"
-          data-mn-wind="${escAttr(`${s.lat},${s.lon}`)}"
-          title="${escAttr(wind.title)}">${esc(wind.text)}</span> <span class="mn-pop-note">indicative</span></span></div>` : ''}
-      <!-- The other load on a site's structures, beside the wind: the peak flood
-           velocity flood-velocity.js estimates from the station's AEP levels,
-           flagged indicative the same way. Its workings are in the Flood levels
-           section below. Empty for a station neither AEP sheet names. -->
-      ${RiverDetails.velocityRowHtml(s)}
-      ${idTypes.length ? `<div class="stn-card-ids"><span class="small txt-muted">AlertID</span><br>${idTypes.map(t =>
-        `<span class="mn-pop-line mn-pop-indent">${esc(t.id)}${t.types.length ? ' — ' + esc(t.types.join(' / ')) : ''}</span>`).join('<br>')}</div>` : ''}
-      <!-- Every RX/TX pair the station has, the repeater's own first, one to a
-           line like the addresses above (0033, frequencies.js) — then what it
-           is assumed to transmit on, from the pass ranges of the repeaters
-           likely to hear it directly, and the channels the base stations
-           heard it on, painted in place when HealthGlance's readings land. -->
-      ${Frequencies.cardHtml(s)}
-      <!-- Its carrier fingerprint (#217, health-drift.js): where its carrier
-           sits against the rest, the channel it was heard on against the TX
-           above, and whether it is drifting. Filled by HealthDrift.cardAsk. -->
-      ${typeof HealthDrift !== 'undefined' ? HealthDrift.cardHtml(s) : ''}
-      ${acmaRepeaterPopupExtra(s)}
-    </div>
-    <!-- The land the station stands on: its lot, tenure, who holds that kind of
-         land, the council area, the address and the land use (site-land.js).
-         Next to the Owner row above because it answers the other ownership
-         question — whose ground, not whose station. Asked of the Queensland
-         cadastre when the card opens and filled by SiteLand.ask, the way the
-         exposure section below is; a station outside Queensland is told so. -->
-    ${located ? `<div class="acma-sect" id="${escAttr(landId)}"
-         data-mn-land="${escAttr(SiteLand.key(s))}">${SiteLand.html(s)}</div>` : ''}
-    <!-- The road and the bridge at the station, and who manages them — TMR,
-         the council, a park, a private owner — with who to call
-         (site-roads.js). Under the land because it finishes its answer: a
-         road reserve there is "council or TMR", and this says which. Filled by
-         SiteRoads.ask, the way the land section is; a station outside
-         Queensland is told so. -->
-    ${located ? `<div class="acma-sect" id="${escAttr(roadsId)}"
-         data-mn-roads="${escAttr(SiteRoads.key(s))}">${SiteRoads.html(s)}</div>` : ''}
-    <!-- The mobile signal at the station, for each carrier, estimated from the
-         ACMA register's transmitters over the app's terrain and graded on the
-         ACMA coverage map standard's scale (site-mobile.js): whether a phone
-         works here, and whether a modem on the mast would. Filled by
-         SiteMobile.ask, the way the road section is. -->
-    ${located ? `<div class="acma-sect" id="${escAttr(mobileId)}"
-         data-mn-mobile="${escAttr(SiteMobile.key(s))}">${SiteMobile.html(s)}</div>` : ''}
-    <!-- The flood classes, crossing and gauge survey recorded on the station
-         (0031), from the Bureau's river height station lists and whatever an
-         editor has added since. Its own section, like the SLS below it, and
-         empty for a station none of those lists names. river-details.js. -->
+    </div>`;
+
+  // Its health (#218): when it was last heard, its battery's night lows and
+  // what is wrong with it, each a door into the Station Health tab on this
+  // station; filled by HealthGlance.ask (health-glance.js). Nothing for a
+  // proposed station, which has nothing to have heard. Then the tasks still
+  // going here (0095, tasks.js) — what is wrong with it, then what is being
+  // done about it: for the people tasks are for, and nothing for anybody else.
+  const health = `${HealthGlance.cardHtml(s)}${typeof Tasks !== 'undefined' ? Tasks.cardHtml(s) : ''}`;
+
+  // The river: the flood classes, crossing and gauge survey
+  // recorded on the station (0031, river-details.js), the cameras on the same
+  // water (map-cameras.js, nothing at all for most stations), the catchment
+  // above the gauge (river-catchments.js), the modelled AEP levels (0033), and
+  // what the Bureau's Service Level Specification says (#180) — its own
+  // section, a different document talking, filled by SLS.ask; two for the 47
+  // on the state border, none for the 1,620 it does not carry.
+  const flood = `
     ${RiverDetails.cardHtml(s)}
-    <!-- The flood and road cameras at or near the station (map-cameras.js):
-         the flood camera a council or TMR has on the same crossing or gauge board, and
-         its latest picture a press away. Under the flood classes and the
-         crossing because it is the same water, seen. Nothing at all for a
-         station with no camera within 2 km, which is most of them; filled by
-         MapCameras.ask once the camera list is read. -->
     ${located ? `<div class="acma-sect stn-card-cams-sect" id="${escAttr(camsId)}"
          data-mn-cams="${escAttr(MapCameras.key(s))}">${MapCameras.html(s)}</div>` : ''}
-    <!-- The land that drains to the station, from the Bureau's Geofabric
-         catchments (river-catchments.js): its area, how it was found, and a
-         button that shades it on the map. Filled by RiverCatchments.ask once
-         its index is here, the way the mobile section is. -->
     ${RiverCatchments.cardHtml(s)}
-    <!-- The modelled AEP flood levels at the station (0033), its own section
-         because a model is talking, not the Bureau's lists: indicative levels,
-         the sheet's own confidence, and the velocity's workings. -->
     ${RiverDetails.aepCardHtml(s)}
-    <!-- What the water and the ground at the station are likely to do to what is
-         built there: tidal water, the Water Act's downstream limits, the coastal
-         hazard areas, acid sulfate soils (site-exposure.js). Its own section,
-         because it is a third kind of source — neither the Bureau's lists nor a
-         flood model, but the State's maps of the ground, read at a point — and
-         the only one of them asked of a live service, so it says for itself
-         when a map could not be read. Filled after the fetch by
-         SiteExposure.ask, the way the SLS below is; a station outside
-         Queensland is told so, in words, and nothing is asked for it. -->
+    <div class="acma-sect" id="${escAttr(slsId)}"
+         data-mn-sls="${escAttr(s.station_number || '')}">${sls.html}</div>`;
+
+  // How it talks: its networks, what a repeater passes and how long it holds
+  // a burst, the repeaters that carry it, its ALERT addresses, every RX/TX
+  // pair it has (0033, frequencies.js — then what it is assumed to transmit
+  // on, and the channels the base stations heard it on), its carrier
+  // fingerprint (#217, health-drift.js) and a repeater's ACMA licences.
+  const radioRows = [
+    acmaCardRow('Networks', nets ? esc(nets) : null),
+    passing != null ? acmaCardRow('Passing', String(passing)) : '',
+    isRpt && s.repeater && s.repeater.delay_ms != null ? acmaCardRow('Repeater delay', `${esc(s.repeater.delay_ms)} ms`) : '',
+    nCarried ? acmaCardRow('Carried by', nCarried) : '',
+    idTypes.length ? `<div class="stn-card-ids"><span class="small txt-muted">AlertID</span><br>${idTypes.map(t =>
+      `<span class="mn-pop-line mn-pop-indent">${esc(t.id)}${t.types.length ? ' — ' + esc(t.types.join(' / ')) : ''}</span>`).join('<br>')}</div>` : '',
+    Frequencies.cardHtml(s),
+    typeof HealthDrift !== 'undefined' ? HealthDrift.cardHtml(s) : '',
+    acmaRepeaterPopupExtra(s),
+  ].join('');
+  const radio = radioRows.trim() ? `<div class="acma-sect stn-card-radio">${radioRows}</div>` : '';
+
+  // Where it is and what is there: the position and the height — a modelled
+  // height and a surveyed one are different claims, and the card must not let
+  // them read alike (#198); elevation_source carries the provenance for the
+  // 2,330 filled from Elvis, and Elvis is asked (elvisCardAsk) only where
+  // there is no figure at all — the wind region and the flood's velocity, then the land it stands
+  // on (site-land.js), the road and bridge and who manages them
+  // (site-roads.js), the mobile signal (site-mobile.js), what the water and
+  // the ground are likely to do to what is built there (site-exposure.js),
+  // and, for signed-in editors, its ancillary features (0061) and the
+  // Bureau's benchmarks (0101).
+  const where = [
+    acmaCardRow('Position', located ? esc(stationLatLonText(s)) : null),
+    acmaCardRow('Elevation', s.elevation_ahd == null ? null
+      : s.elevation_source
+        ? `<span title="${escAttr(`${s.elevation_source}. A model of the ground, not a mark on it.`)}"
+            >${esc(s.elevation_ahd)} m AHD <span class="mn-pop-note">modelled</span></span>`
+        : `${esc(s.elevation_ahd)} m AHD`),
+    s.elevation_ahd == null && located ? `<div class="acma-row"><span>Elevation</span><span
+        id="${escAttr(elvisId)}" data-mn-elvis="${escAttr(`${s.lat},${s.lon}`)}"
+        >&nbsp;</span></div>` : '',
+    wind ? `<div class="acma-row"><span>Wind region</span><span><span id="${escAttr(windId)}"
+        data-mn-wind="${escAttr(`${s.lat},${s.lon}`)}"
+        title="${escAttr(wind.title)}">${esc(wind.text)}</span> <span class="mn-pop-note">indicative</span></span></div>` : '',
+    // The other load on a site's structures, beside the wind: the peak flood
+    // velocity flood-velocity.js estimates from the station's AEP levels,
+    // flagged indicative the same way; its workings are in Flood, under the
+    // Flood levels section. Empty for a station neither AEP sheet names.
+    RiverDetails.velocityRowHtml(s),
+  ].join('');
+  const site = `
+    ${where.trim() ? `<div class="acma-sect stn-card-where">${where}</div>` : ''}
+    ${located ? `<div class="acma-sect" id="${escAttr(landId)}"
+         data-mn-land="${escAttr(SiteLand.key(s))}">${SiteLand.html(s)}</div>` : ''}
+    ${located ? `<div class="acma-sect" id="${escAttr(roadsId)}"
+         data-mn-roads="${escAttr(SiteRoads.key(s))}">${SiteRoads.html(s)}</div>` : ''}
+    ${located ? `<div class="acma-sect" id="${escAttr(mobileId)}"
+         data-mn-mobile="${escAttr(SiteMobile.key(s))}">${SiteMobile.html(s)}</div>` : ''}
     ${located ? `<div class="acma-sect" id="${escAttr(expId)}"
          data-mn-exposure="${escAttr(SiteExposure.key(s))}">${SiteExposure.html(s)}</div>` : ''}
-    <!-- What the Bureau's Service Level Specification says about this station
-         (#180). Its own section rather than rows in the one above, because it
-         is a different document talking: those rows are what Flood-Net knows,
-         these are what the SLS says, and a flood class level is not the same
-         kind of fact as an antenna height. Empty for a station the SLS does
-         not carry, which is 1,620 of them, and two sections — one per state's
-         document — for the 47 on the border. Filled after the fetch by SLS.ask,
-         the way the wind region line is. -->
-    <div class="acma-sect" id="${escAttr(slsId)}"
-         data-mn-sls="${escAttr(s.station_number || '')}">${sls.html}</div>
-    <!-- The logger at the site — its LPU type, serial number and versions
-         (0090, station-lpu.js): approved accounts, filled after the fetch by
-         StationLpu.cardAsk, values the photo reader read marked 📷, and not
-         drawn at all when nothing is recorded. -->
-    ${typeof StationLpu !== 'undefined' ? StationLpu.cardHtml(s) : ''}
-    <!-- The equipment fitted here, as the station's register says once an
-         administrator has approved it (0036, photo-review.js): signed-in
-         editors only, filled after the fetch by PhotoReview.cardAsk, and
-         not drawn at all when the register has nothing. -->
-    ${typeof PhotoReview !== 'undefined' ? PhotoReview.cardHtml(s) : ''}
-    <!-- Where its ancillary features are — the orifice outlet, the pits, the
-         benchmarks, the gauge boards, the orifice run (0061,
-         site-features.js): signed-in editors only, filled after the fetch by
-         SiteFeatures.cardAsk, each row showing its feature on the map. The
-         📌 Site features pill below maps them. -->
     ${typeof SiteFeatures !== 'undefined' ? SiteFeatures.cardHtml(s) : ''}
-    <!-- The marks its gauge is levelled from, as the Bureau lists them — each
-         one's level and datum, what it is and where, and what it reads on the
-         gauge (0101, station-benchmarks.js): signed-in editors only, filled
-         after the fetch by StationBenchmarks.cardAsk, and not drawn at all
-         when the Bureau lists none. -->
-    ${typeof StationBenchmarks !== 'undefined' ? StationBenchmarks.cardHtml(s) : ''}
-    <!-- Who changed the station, what and when, with Restore (0056,
-         station-history.js): signed-in editors only, shut until opened, and
-         filled after the fetch by StationHistory.cardAsk. -->
-    ${typeof StationHistory !== 'undefined' ? StationHistory.cardHtml(s) : ''}
-    <!-- Every action the station offers, Station details first, in their
-         groups — each its own headed list with a rule between
-         (stationActionGroups). The rules are full-bleed, like the section
-         borders above them, so the card reads as one stack of bands rather
-         than a panel with boxes in it. MapBlast's and MapMovePin's pills close
-         any callout open when pressed — a phone's — and there may be none,
-         which is fine.
+    ${typeof StationBenchmarks !== 'undefined' ? StationBenchmarks.cardHtml(s) : ''}`;
 
-         role=group with a name on each, and the name is also the group's
-         visible heading — styles.css draws it from the aria-label, so the two
-         cannot disagree. Each group lays its pills out as a two-column list
-         (.pill-list), which is why the pills' labels are pillText spans. -->
+  // What is fitted and who changed it, each for the accounts it is for and
+  // nothing for anybody else: the logger (0090, station-lpu.js), the
+  // equipment register (0036, photo-review.js) and the history with Restore
+  // (0056, station-history.js).
+  const kit = [
+    typeof StationLpu !== 'undefined' ? StationLpu.cardHtml(s) : '',
+    typeof PhotoReview !== 'undefined' ? PhotoReview.cardHtml(s) : '',
+    typeof StationHistory !== 'undefined' ? StationHistory.cardHtml(s) : '',
+  ].join('');
+
+  // Every action the station offers, Station details first, in their groups —
+  // each its own headed list with a rule between (stationActionGroups).
+  // role=group with a name on each, and the name is also the group's visible
+  // heading — styles.css draws it from the aria-label, so the two cannot
+  // disagree. Each group lays its pills out as a two-column list (.pill-list),
+  // which is why the pills' labels are pillText spans.
+  const act = acts.length ? `
     <div class="acma-sect stn-card-actions">
-      ${stationActionGroups(s).map(g =>
+      ${acts.map(g =>
         `<div class="pill-row pill-list stn-card-group" role="group" aria-label="${escAttr(g.label)}" data-tour="card-${escAttr(g.label.toLowerCase().replace(/[^a-z0-9]+/g, '-'))}">
         ${g.pills.join('\n        ')}
       </div>`).join('\n      ')}
-    </div>
+    </div>` : '';
+
+  // Each group's line, on Overview's rows and the list's: what is in it, from
+  // the station's own record — nothing here waits for a fetch.
+  const types = [...new Set(idTypes.flatMap(t => t.types))];
+  const classes = RiverDetails.floodClassesText ? RiverDetails.floodClassesText(s) : '';
+  const nActs = acts.reduce((n, g) => n + g.pills.length, 0);
+  const lines = {
+    data:  types.length ? types.join(' · ') : 'Its readings, and the river and rain around it',
+    flood: classes ? `Flood classes ${classes}` : 'Flood classes, the warning service and flood levels',
+    radio: idTypes.length ? `AlertID${idTypes.length === 1 ? '' : 's'} ${idTypes.map(t => t.id).join(' · ')}${nCarried ? ` · carried by ${nCarried}` : ''}`
+      : 'Its frequencies and carrier fingerprint',
+    site:  located ? `${stationLatLonText(s)}${s.elevation_ahd != null ? ` · ${s.elevation_ahd} m AHD` : ''} · land, road, mobile`
+      : 'No position on record',
+    kit:   'Its logger, equipment and changes',
+    act:   `${nActs} — edit, find, copy, drive to and see it`,
+  };
+
+  // The everyday three along the foot, beside All actions: what this station
+  // can have of them.
+  const dirUrl = stationDirectionsUrl(s, appleDevice());
+  const dock = [
+    typeof ArroData !== 'undefined' && ArroData.fieldOpenStation
+      ? `<button type="button" class="stn-cv-dockbtn" onclick="fieldDataFromCard('${escAttr(s.id)}')"
+           title="Open the Field Data tab on this station"><span class="stn-cv-dockic" aria-hidden="true">🌡️</span><span>Field data</span></button>` : '',
+    located
+      ? `<button type="button" class="stn-cv-dockbtn" onclick="zoomToStation('${escAttr(s.id)}')"
+           title="Zoom the map all the way in on this station"><span class="stn-cv-dockic" aria-hidden="true">🔍</span><span>Zoom to it</span></button>` : '',
+    dirUrl
+      ? `<a class="stn-cv-dockbtn" href="${esc(dirUrl)}" target="_blank" rel="noopener"
+           title="Driving directions to this location from wherever you are"><span class="stn-cv-dockic" aria-hidden="true">🚗</span><span>Directions</span></a>` : '',
+  ].filter(Boolean);
+
+  const note = `
     <p class="small acma-card-note">
-      ${carriers.length ? `Carried by ${carriers.length} repeater${carriers.length === 1 ? '' : 's'}${selected
+      ${carriers.length ? `Carried by ${nCarried}${selected
         ? ` — <button type="button" class="link-btn" onclick="stnCardScrollToCarriers()">shown ${stationsCardsWhere()} ${stationsCardsArrow()}</button>` : ''}. ` : ''}
       ${typeof MapHops !== 'undefined' ? MapHops.cardNoteHtml(s) : ''}
       ${stnCardEditorNote(selected)}
     </p>`;
+
+  return StnCardView.frame(s, {
+    head,
+    // A proposed station says so before anything else on its card (0039):
+    // nothing in it is about a station on the ground yet. On every tab.
+    proposal: stnCardProposalHtml(s),
+    groups: { about, health, data: stnCardDataHtml(s), flood, radio, site, kit, act },
+    lines, dock, note,
+  });
 }
 
 // The card's last line: whether the station details are on this station too.

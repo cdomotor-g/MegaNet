@@ -140,6 +140,8 @@ async function main() {
     check('and a tooltip naming exactly what will be copied',
       (pop.title || '').includes(pop.want), pop.title);
 
+    // Under the card's All actions (station-card-view.js).
+    await page.evaluate(() => StnCardView.reveal('#stn-card .mn-copy-latlon'));
     await page.click('#stn-card .mn-copy-latlon');
     const copied = await page.evaluate(async () => ({
       clip:  await navigator.clipboard.readText(),

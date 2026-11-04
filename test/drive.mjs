@@ -470,6 +470,8 @@ try {
   }));
 
   // ── A desk, a Brisbane-hub station: Pritchard Road ──
+  // Under the card's All actions (station-card-view.js).
+  await page.evaluate(() => StnCardView.reveal('#stn-card .mn-drive-pill'));
   await page.click('#stn-card .mn-drive-pill');
   await settled(page);
   const pin = await pinOf(page, BRIS);

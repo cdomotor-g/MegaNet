@@ -355,7 +355,10 @@ try {
   // the river passing it. The file keeps the pair apart with " / ".
   const PALMVIEW = qld('540350');
   const parts = (v) => String(v).split(' / ');
+  // Read off the section as drawn: innerText has no lines in a group the
+  // card is not showing, so its Flood group is shown first (station-card-view.js).
   const predictionLines = (id) => page.evaluate((id) => {
+    StnCardView.reveal(`#mn-sls-card-${id}`);
     const rows = [...document.querySelectorAll(`#mn-sls-card-${id} .acma-row`)];
     const r = rows.find((x) => x.firstElementChild.textContent.trim() === 'Prediction');
     // Each target is its own line; within one, the card keeps phrases together
@@ -428,8 +431,8 @@ try {
   // ── New South Wales and the ACT ──────────────────────────────────────────
   // The NSW document's own entries, on stations that are only in it. Every
   // figure is checked against the file, as above.
-  const sections = (id) => page.evaluate((id) => [...document.querySelectorAll(
-    `#mn-sls-card-${id} .stn-card-sls`)].map((el) => {
+  const sections = (id) => page.evaluate((id) => (StnCardView.reveal(`#mn-sls-card-${id}`), [...document.querySelectorAll(
+    `#mn-sls-card-${id} .stn-card-sls`)]).map((el) => {
     const a = el.querySelector('a.mn-sls-doc');
     const rows = {};
     for (const r of el.querySelectorAll('.acma-row')) {

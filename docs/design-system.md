@@ -712,6 +712,24 @@ to write it down rather than let each of them re-derive a different half.
     element given either, so the one allowed is `scrollbar-width: none`, on a
     scroller that hides its bar on purpose.
 
+17. **A card with a lot in it is grouped by question, and searchable**
+    *(station-card-view.js)*. The station card's sections go in groups — the
+    owner, then Health, Data, Flood, Radio, Site & access, Kit & records and
+    Actions — each a question (*Is it working?*, *How does it talk?*) and each
+    with its own colour and icon (`--grp-*` and `--grp-*-tint`, in the contrast
+    contract), used on its tab, its row in the list and its heading alike. Two
+    layouts, chosen with **Tabs | List** beside the search box and kept per
+    device (`mn-stn-card-view`): *Tabs* opens on an Overview of the groups
+    people come for and a line from each of the rest, then a tab per group;
+    *List* is a summary, then each group as a page with ‹ Summary and next /
+    previous. The everyday actions stay along the foot in both. The search box
+    shows only the groups and the rows that hold the word, headed, the word
+    marked with the CSS Custom Highlight API so nothing is written into the
+    text — the sections are still filled by their modules after their fetches,
+    into ids that every layout keeps. A tab or a page only hides panels; it
+    never redraws, so an open fold stays open. A tour that rings a part a tab is
+    hiding asks `StnCardView.reveal()` first.
+
 **An implementation note that bit #138, and will bit anything that puts a
 `.sr-only` in a table cell.** `overflow` clips a descendant only when the scroll
 container is that descendant's **containing block**, and an absolutely

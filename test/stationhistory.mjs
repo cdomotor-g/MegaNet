@@ -345,6 +345,9 @@ async function main() {
           && /order=changed_at\.desc,id\.desc/.test(asked[0].search) && /limit=50/.test(asked[0].search), J(asked));
       check('…and, shut, says who changed it last and when',
         !S.open && /^History · last changed 3 Oct 2026, 2:12 pm by bob@example\.test$/.test(S.summary), S.summary);
+      // The history is on the card's Kit tab (station-card-view.js); the tab
+      // stays chosen for the stations opened after it.
+      await page.evaluate(() => StnCardView.reveal('#mn-hist-card-gatton'));
       await page.click('#mn-hist-card-gatton summary');
       S = await section(page, 'gatton');
       check('opened: six entries, newest first', S.open && J(S.entries.map(e => e.id)) === J([14, 12, 9, 8, 7, 3]), J(S.entries.map(e => e.id)));
@@ -457,6 +460,7 @@ async function main() {
       await page.evaluate(() => showStationCard('laidley'));
       await page.waitForFunction(() => /last changed/.test((document.querySelector('#mn-hist-card-laidley summary') || {}).textContent || ''),
                                  null, { timeout: 10_000 });
+      await page.evaluate(() => StnCardView.reveal('#mn-hist-card-laidley'));
       await page.click('#mn-hist-card-laidley summary');
       const nSaves = db.saves.length;
       await page.click('#mn-hist-card-laidley .stn-hist-row[data-field="proposed"] button.stn-hist-put');

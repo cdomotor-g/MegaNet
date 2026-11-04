@@ -77,6 +77,22 @@
   --ctl-unsaved:    #a85d00;
   --rx-bg: #eef4fb;
   --tx-bg: #eef8f1;
+  /* The station card's seven groups (station-card-view.js): each a colour for
+     its tab, its row in the list and its heading — the colour as text and as
+     an icon, on --panel and on its own pale ground. Categorical, like the
+     role colours, and cool or quiet on purpose: red, orange and amber on
+     this card mean something is wrong with the station, and a group is not
+     that. Health is a rose rather than a red for the same reason. In the
+     contrast contract (`npm run shell`). */
+  --grp-about:  #475569;  --grp-about-tint:  #edf1f5;
+  --grp-health: #b4235f;  --grp-health-tint: #fbeaf2;
+  --grp-data:   #0b5cab;  --grp-data-tint:   #e6f0fb;
+  --grp-flood:  #0b6a83;  --grp-flood-tint:  #def1f6;
+  --grp-radio:  #6d28d9;  --grp-radio-tint:  #f0eafd;
+  --grp-site:   #46710d;  --grp-site-tint:   #eaf3de;
+  --grp-kit:    #475569;  --grp-kit-tint:    #edf1f5;
+  --grp-act:    #334155;  --grp-act-tint:    #edf1f5;
+  --grp-overview: #16202a; --grp-overview-tint: #eef2f6;
   --map-line: #ff6f00;
   /* The sky behind the terrain in the 3-D view (Map3D). Tokens rather than
      literals in map-3d.js for the reason every other map colour here is one:
@@ -625,6 +641,15 @@
   --ctl-unsaved:    #f5b041;
   --rx-bg: #1d3242;
   --tx-bg: #19362a;
+  --grp-about:  #aebbcc;  --grp-about-tint:  #222d39;
+  --grp-health: #f58ab8;  --grp-health-tint: #36202c;
+  --grp-data:   #6aaeff;  --grp-data-tint:   #16283d;
+  --grp-flood:  #3fcbe6;  --grp-flood-tint:  #0e2f38;
+  --grp-radio:  #b99cff;  --grp-radio-tint:  #261f41;
+  --grp-site:   #a6d86a;  --grp-site-tint:   #1d2d15;
+  --grp-kit:    #aebbcc;  --grp-kit-tint:    #222d39;
+  --grp-act:    #cbd5e1;  --grp-act-tint:    #222d39;
+  --grp-overview: #e7eff7; --grp-overview-tint: #223040;
   --map-line: #ff9f43;
   --map-line-blocked: #ff6090;
   /* The 3-D sky, darkened — but only a little, and not to night. The ground in
@@ -9333,6 +9358,295 @@ body .map-panel.is-driving {
   border-top: 1px solid var(--border);
 }
 
+/* ── The station card's groups, tabs and search (station-card-view.js) ───────
+   The card's top — its name, the search box with Tabs | List beside it, and
+   the tabs or the back bar — stays at the top while the rest scrolls, in one
+   sticky band rather than three, so they cannot slide under each other. The
+   four everyday actions stay along the foot the same way. Each group's colour
+   is --grp (its tab, its row, its heading and its icon), set by the
+   data-grp the three carry. */
+.stn-cv-top {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.stn-cv-top > .acma-card-head {
+  position: static;
+  border-bottom: 0;
+  padding-bottom: .35rem;
+}
+
+.stn-card [data-grp] { --grp: var(--grp-overview); --grp-tint: var(--grp-overview-tint); }
+.stn-card [data-grp="about"]  { --grp: var(--grp-about);  --grp-tint: var(--grp-about-tint); }
+.stn-card [data-grp="health"] { --grp: var(--grp-health); --grp-tint: var(--grp-health-tint); }
+.stn-card [data-grp="data"]   { --grp: var(--grp-data);   --grp-tint: var(--grp-data-tint); }
+.stn-card [data-grp="flood"]  { --grp: var(--grp-flood);  --grp-tint: var(--grp-flood-tint); }
+.stn-card [data-grp="radio"]  { --grp: var(--grp-radio);  --grp-tint: var(--grp-radio-tint); }
+.stn-card [data-grp="site"]   { --grp: var(--grp-site);   --grp-tint: var(--grp-site-tint); }
+.stn-card [data-grp="kit"]    { --grp: var(--grp-kit);    --grp-tint: var(--grp-kit-tint); }
+.stn-card [data-grp="act"]    { --grp: var(--grp-act);    --grp-tint: var(--grp-act-tint); }
+
+.stn-cv-svg {
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.stn-cv-ic {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 7px;
+  background: var(--grp-tint);
+  color: var(--grp);
+}
+
+/* The search box, and Tabs | List beside it. */
+.stn-cv-tools {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  padding: 0 .6rem .45rem;
+}
+.stn-cv-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  padding-left: .45rem;
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-md, 8px);
+  background: var(--panel-sub);
+  color: var(--muted);
+}
+.stn-cv-search .stn-cv-q {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  height: 1.9rem;
+  margin: 0;
+  padding: 0 .4rem 0 0;
+  border: 0;
+  border-radius: 0 var(--r-md, 8px) var(--r-md, 8px) 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text);
+  font: inherit;
+  font-size: .85rem;
+}
+.stn-cv-search .stn-cv-q::placeholder { color: var(--muted); opacity: 1; }
+.stn-cv-views {
+  flex: none;
+  display: inline-flex;
+  border: 1px solid var(--ctl-border);
+  border-radius: var(--r-md, 8px);
+  overflow: hidden;
+}
+.stn-cv-views .stn-cv-view {
+  min-height: 1.9rem;
+  margin: 0;
+  padding: 0 .55rem;
+  border: 0;
+  border-radius: 0;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: .78rem;
+}
+.stn-cv-views .stn-cv-view + .stn-cv-view { border-left: 1px solid var(--ctl-border); }
+.stn-cv-views .stn-cv-view[aria-pressed="true"] { background: var(--subtle); color: var(--text); font-weight: 600; }
+.stn-cv-views .stn-cv-view:focus-visible { outline-offset: -3px; }
+
+/* Tabs: Overview and a tab for each group but Actions, which is the foot's. */
+.stn-cv-tabs {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0 .3rem;
+  border-top: 1px solid var(--border);
+}
+.stn-card .stn-cv-tab {
+  flex: 1 0 auto;
+  min-width: 3.3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .3rem;
+  margin: 0 0 -1px;
+  padding: .45rem .45rem .4rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: .74rem;
+  line-height: 1.2;
+}
+.stn-card .stn-cv-tab .stn-cv-svg { color: var(--grp); }
+.stn-card .stn-cv-tab:hover { background: var(--subtle); color: var(--text); }
+.stn-card .stn-cv-tab[aria-selected="true"] {
+  color: var(--grp);
+  border-bottom-color: var(--grp);
+  background: var(--grp-tint);
+  font-weight: 600;
+}
+.stn-card .stn-cv-tab:focus-visible { outline-offset: -3px; }
+
+/* The list's back bar, over a group's page. */
+.stn-cv-back {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .3rem .6rem .35rem;
+  border-top: 1px solid var(--border);
+}
+.stn-cv-back[hidden] { display: none; }
+.stn-cv-backbtn { display: inline-flex; align-items: center; gap: .15rem; font-weight: 600; }
+.stn-cv-where { margin-left: auto; text-align: right; }
+
+/* How many the word was found, and where. */
+.stn-cv-hits {
+  margin: 0;
+  padding: .3rem .6rem .35rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+}
+.stn-cv-hits[hidden] { display: none; }
+
+/* A group's panel. Its heading shows on a page of the list and over each
+   group a word was found in; on Overview and a tab, the tab names it. */
+.stn-grp[hidden] { display: none; }
+.stn-grp-head {
+  display: none;
+  align-items: center;
+  gap: .55rem;
+  padding: .55rem .6rem .3rem;
+}
+.stn-card[data-cv="list"][data-cv-mode="group"] .stn-grp-head,
+.stn-card[data-cv-mode="search"] .stn-grp-head { display: flex; }
+.stn-card[data-cv-mode="search"] .stn-grp + .stn-grp { border-top: 2px solid var(--border); }
+.stn-grp-names { display: flex; flex-direction: column; min-width: 0; }
+.stn-grp-h { margin: 0; font-size: .92rem; color: var(--grp); }
+.stn-grp-q { color: var(--muted); }
+.stn-grp-none { display: none; margin: 0; padding: .55rem .6rem; }
+.stn-card:not([data-cv-mode="search"]) .stn-grp:not(:has(.acma-sect:not(:empty))) .stn-grp-none { display: block; }
+.stn-cv-miss { display: none !important; }
+::highlight(stn-cv-hit) { background-color: var(--hit-bg); color: var(--hit-text); }
+
+/* Overview's rows to the other tabs, and the list's to every page. */
+.stn-cv-nav { padding: .4rem 0 0; border-bottom: 1px solid var(--border); }
+.stn-cv-nav[hidden] { display: none; }
+.stn-cv-nav-h {
+  margin: 0;
+  padding: 0 .6rem .3rem;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.stn-card .stn-cv-row {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  width: 100%;
+  margin: 0;
+  padding: .42rem .6rem;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+.stn-card .stn-cv-row:hover { background: var(--subtle); }
+.stn-card .stn-cv-row:focus-visible { outline-offset: -3px; }
+.stn-cv-row-t { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.stn-cv-row-h { font-weight: 600; }
+.stn-cv-row-s { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stn-cv-row-go { flex: none; color: var(--muted); display: inline-flex; }
+
+/* The list's next and previous, at the foot of a page. */
+.stn-cv-pager {
+  display: flex;
+  justify-content: space-between;
+  gap: .5rem;
+  padding: .5rem .6rem;
+  border-bottom: 1px solid var(--border);
+}
+.stn-cv-pager[hidden] { display: none; }
+
+.stn-cv-none { padding: 1rem .8rem; text-align: center; border-bottom: 1px solid var(--border); }
+.stn-cv-none[hidden] { display: none; }
+.stn-cv-none p { margin: 0 0 .3rem; }
+.stn-cv-none-h { font-weight: 600; }
+
+/* The foot: Field data, Zoom, Directions and All actions. */
+.stn-cv-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: .3rem;
+  padding: .35rem .45rem;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+}
+.stn-card .stn-cv-dockbtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .08rem;
+  min-height: 2.6rem;
+  margin: 0;
+  padding: .2rem .15rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md, 8px);
+  background: var(--panel-sub);
+  color: var(--text);
+  font-size: .74rem;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stn-card .stn-cv-dockbtn:hover { background: var(--subtle); }
+.stn-card .stn-cv-dockbtn[aria-pressed="true"] { border-color: var(--accent); background: var(--subtle); font-weight: 600; }
+.stn-cv-dockic { font-size: .95rem; line-height: 1; }
+
+/* What is scrolled to inside the card — a tour's part, Enter's first match —
+   lands under the band at its top and over the foot, not behind them:
+   apply() measures the two into these. */
+.stn-card { scroll-padding-top: var(--stn-cv-top, 0px); scroll-padding-bottom: var(--stn-cv-foot, 0px); }
+
+/* A phone's sheet is under half the map high, and a band of name, box and
+   tabs over a foot of four buttons left it no room for the card itself. So
+   there only the name and its close button stay at the top (the band's box
+   is dissolved, so its heading sticks to the card, not to the band), the box
+   and the tabs scroll with the rest, and the foot is one thin row. */
+@media (max-width: 560px) {
+  .stn-cv-top { display: contents; }
+  .stn-cv-top > .acma-card-head { position: sticky; top: 0; z-index: 3; }
+  .stn-cv-top > .stn-cv-tabs,
+  .stn-cv-top > .stn-cv-back,
+  .stn-cv-top > .stn-cv-hits { border-bottom: 1px solid var(--border); }
+  .stn-cv-dock { padding: .25rem .35rem; gap: .25rem; }
+  .stn-card .stn-cv-dockbtn { flex-direction: row; gap: .25rem; min-height: 2rem; font-size: .72rem; }
+  .stn-cv-dockic { font-size: .85rem; }
+}
+
 /* The ALERT id list sits under the label/value rows. */
 .stn-card-ids {
   margin-top: var(--sp-1);
@@ -9458,7 +9772,8 @@ body .map-panel.is-driving {
   border-top-color: var(--map-leader);
 }
 
-.stn-card.mn-leader-card > .acma-card-head {
+.stn-card.mn-leader-card > .acma-card-head,
+.stn-card.mn-leader-card > .stn-cv-top {
   box-shadow: inset 0 2px 0 var(--map-leader);
 }
 

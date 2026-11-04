@@ -315,15 +315,17 @@ try {
     await page.evaluate(() => document.getElementById('here-card').hidden));
   check('the station card’s section answers the same, from the same cache — nothing asked',
     asked.length === beforeCard && JSON.stringify(yan.rows) === JSON.stringify(here.rows), `${asked.length - beforeCard} new`);
-  // Right after the station's own facts. The Owner row has a section of its
-  // own now, first on the card, with the health section after it, so "right
-  // after the first section" stopped being where this is; what is held is the
-  // order the card means — the station, then its ground, then its road.
-  check('…placed right after the station’s own facts, the road and bridge section under it',
+  // Right after the station's own facts. The card is in groups now
+  // (station-card-view.js), and this is in Site & access: what is held is the
+  // order the group means — where the station is, then its ground, then its
+  // road.
+  check('…placed in Site & access right after where the station is, the road and bridge section under it',
     await page.evaluate(() => {
-      const kids = [...document.getElementById('stn-card').children];
+      const grp = document.getElementById('stn-grp-site');
+      const kids = grp ? [...grp.children] : [];
       const i = kids.findIndex(e => e.id && e.id.startsWith('mn-land-card-'));
-      return i > 0 && /Stn #/.test(kids[i - 1].textContent) && /^mn-roads-card-/.test(kids[i + 1].id || '');
+      return i > 0 && kids[i - 1].classList.contains('stn-card-where') && /Position/.test(kids[i - 1].textContent)
+        && /^mn-roads-card-/.test(kids[i + 1].id || '');
     }));
   check('the sources name each dataset asked, its custodian and its licence',
     yan.sources.some(t => /Cadastral data — Queensland series/.test(t) && /CC BY 4\.0/.test(t))
@@ -434,6 +436,8 @@ try {
 
   flags.healed = true;
   if (mog.retry) {
+    // On the card's Site tab (station-card-view.js), shown first.
+    await page.evaluate(sel => StnCardView.reveal(sel), `#${card('moggill_al')}`);
     await page.focus(`#${card('moggill_al')} .stn-card-exp-retry`, { timeout: 5000 }).catch(() => {});
     await page.keyboard.press('Enter');
     await settle(page, card('moggill_al')).catch(() => {});

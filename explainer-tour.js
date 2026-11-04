@@ -201,6 +201,9 @@ const VideoTour = (() => {
   function find(sel, cb, tries = 50) {
     let el = null;
     try { el = sel ? document.querySelector(sel) : null; } catch (_) { el = null; }
+    // A part of the station card that a tab or a page is hiding: that tab or
+    // page first (station-card-view.js), then it is there to ring.
+    if (el && !el.getBoundingClientRect().width && typeof StnCardView !== 'undefined') StnCardView.reveal(el);
     if (el && el.getBoundingClientRect().width) { cb(el); return; }
     if (tries > 0 && T.on) setTimeout(() => find(sel, cb, tries - 1), 200);
     else cb(null);

@@ -130,6 +130,11 @@ const TEXT_PAIRS = [
   ['--flood-minor', '--panel'], ['--flood-moderate', '--panel'], ['--flood-major', '--panel'],
   ['--hit-text', '--hit-bg'],
   ['--primary-text', '--primary'],
+  // The station card's seven groups and its Overview (station-card-view.js):
+  // each group's colour is its tab's name, its heading and its icon, on the
+  // card and on the group's own pale ground (a chosen tab, an icon's tile).
+  ...['about', 'health', 'data', 'flood', 'radio', 'site', 'kit', 'act', 'overview'].flatMap(g =>
+    [[`--grp-${g}`, '--panel'], [`--grp-${g}`, `--grp-${g}-tint`], ['--muted', `--grp-${g}-tint`]]),
   // The river-note buttons (#150 A4): river-blue text on the panel they sit
   // on. The permanent map label is NOT a pair here — like the pin labels it
   // paints its own fixed near-white ground with fixed ink, so its contrast is

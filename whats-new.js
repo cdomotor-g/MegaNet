@@ -25,6 +25,17 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 195, date: '2026-11-04', items: [
+      '🗂️ <strong>The station card, tidied into groups.</strong> A station\'s card on the <strong>Stations</strong> map now '
+        + 'opens on an <em>Overview</em> — who owns it, its health and its data — with a tab for each of the rest: '
+        + '<em>Flood</em>, <em>Radio</em>, <em>Site</em> (the land, road, mobile coverage and ground) and, for editors, '
+        + '<em>Kit</em> (the logger, equipment and history). Field data, Zoom, Directions and <em>All actions</em> stay along '
+        + 'the bottom. Prefer one thing at a time? <em>List</em>, beside the search box, shows a summary and opens each group '
+        + 'as a page of its own; the card remembers which you chose.',
+      '🔎 <strong>Search a station\'s card.</strong> Type in the box at the top of the card — <em>battery</em>, '
+        + '<em>gauge zero</em>, <em>Telstra</em>, an address — and it shows every group the word is in, only the rows that '
+        + 'hold it, marked, with how many and where. Escape clears it.',
+    ] },
     { n: 194, date: '2026-11-04', items: [
       '📡 The <strong>elevation profile</strong> and <strong>radio path</strong> cards now lead with the fade margin — '
         + '<em>Good</em>, <em>Marginal</em> or <em>Poor</em>, which says whether the link works — and say the line of sight '
