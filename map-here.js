@@ -8,8 +8,9 @@
 // stationLatLonText and copyLatLonPillHtml; across to terrain.js, land-cover.js,
 // map-wind.js, map-catchments.js, map-hubs.js, map-survey.js, site-land.js,
 // site-roads.js and site-mobile.js for the answers,
-// to app.js for the card furniture it shares with the station card, and to
-// station-editor.js for the proposed station it opens at the point. All of
+// to app.js for the card furniture it shares with the station card, to
+// map-leader.js for where a station it goes to lands clear of that card, and
+// to station-editor.js for the proposed station it opens at the point. All of
 // it from inside its own functions, so this file's position among the modules
 // is free.
 //
@@ -522,8 +523,10 @@ const MapHere = (function () {
     goToStation(id) {
       const s = id && state.data && state.data.stations.find(x => x.id === id);
       if (!s || s.lat == null) return;
-      map.setView([s.lat, s.lon], Math.max(map.getZoom(), 12), { animate: true });
+      // The card first, so the view can be taken in the map it leaves open.
       showStationCard(s.id);
+      const z = Math.max(map.getZoom(), 12);
+      map.setView(MapLeader.centreFor(L.latLng(s.lat, s.lon), z), z, { animate: true });
     },
 
     showBasin(id) {

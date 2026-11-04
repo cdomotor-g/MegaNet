@@ -8281,8 +8281,10 @@ function selectStation(id) {
 // points: the card's top edge to the pin, in gold (map-leader.js). No callout
 // at any width — on a desktop the leader replaced it, and on a phone a balloon
 // on a ~333 px map covers the map it is pointing at. The station goes in the
-// middle of the map, unless the card is covering the middle: then it goes just
-// clear of the card, where the leader can reach it.
+// middle of the map the card leaves open — the strip right of the card on a
+// desktop, above the sheet on a phone (MapLeader.centreFor) — and the map
+// stays where it is after that: widening or narrowing the card by its edge
+// does not move it again.
 //
 // This is also the keyboard's way onto the map — the pins are canvas and have
 // nothing to focus, the rows do: a row picked from the keyboard keeps focus

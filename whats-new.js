@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 191, date: '2026-11-04', items: [
+      '🎯 <strong>A station you go to lands where you can see it.</strong> Picking a station on the <strong>Stations</strong> '
+        + 'tab — from the list, the trail of stations you have looked at, <em>What is here</em>, a link — now puts it in the '
+        + 'middle of the map to the right of its card, rather than just clear of the card\'s edge (on a phone, in the middle '
+        + 'of the map above the card). Widening or narrowing the card by its edge leaves the map where it is.',
+    ] },
     { n: 190, date: '2026-11-04', items: [
       '🔎 <strong>Did you mean …?</strong> for station names. Type a name the way it sounds and, when nothing is spelt that '
         + 'way, Flood-Net offers the names that sound like it or are one slip of the fingers away: <em>jimpy</em> offers '

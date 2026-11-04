@@ -101,6 +101,7 @@ const MapLeader = (function () {
   const RING_GAP  = 6;     // px from the pin's edge out to the ring
   const MIN_LINE  = 6;     // px; a shorter line is not drawn, and the ring stands alone
   const CLEAR_PAD = 30;    // px of map reveal() leaves between a pin and the card
+  const OPEN_MIN  = 120;   // px: the narrowest strip of map centreFor() centres in
   const DRAW_MS   = 480;   // the draw-in, when the card moves to a new station
   const ZOOM_MS   = 250;   // leaflet.css: .leaflet-zoom-anim .leaflet-zoom-animated
   const PING_MS   = 2400;  // two pulses and a rest (styles.css, @keyframes mn-leader-ping)
@@ -275,6 +276,28 @@ const MapLeader = (function () {
     if (box.top - CLEAR_PAD > CLEAR_PAD)            opts.push({ x: 0, y: box.top - CLEAR_PAD - p.y });
     if (!opts.length) return null;
     return opts.reduce((a, b) => (Math.hypot(a.x, a.y) <= Math.hypot(b.x, b.y) ? a : b));
+  }
+
+  // The part of the map the card leaves open, in the map container's pixels:
+  // the strip beside it — right of it on a desktop, where it stands in the
+  // bottom-left corner — or, where the card is as wide as the map (the
+  // phone's sheet), the strip above it. Beside it while that strip is at
+  // least OPEN_MIN across, the card's height being the one thing about it
+  // that is still changing when it opens (its sections fill in, and it grows
+  // up from the corner); null when neither strip is that wide.
+  function openArea(box) {
+    const size = map.getSize();
+    const right = size.x - box.right, left = box.left;
+    if (Math.max(right, left) >= OPEN_MIN) {
+      return right >= left ? { x: box.right, y: 0, w: right, h: size.y }
+                           : { x: 0, y: 0, w: left, h: size.y };
+    }
+    const above = box.top, below = size.y - box.bottom;
+    if (Math.max(above, below) >= OPEN_MIN) {
+      return above >= below ? { x: 0, y: 0, w: size.x, h: above }
+                            : { x: 0, y: box.bottom, w: size.x, h: below };
+    }
+    return null;
   }
 
   function place(box, p, pinR) {
@@ -522,10 +545,21 @@ const MapLeader = (function () {
       else map.panBy([-d.x, -d.y]);
     },
 
-    // The centre for a view that puts `latlng` in the middle of the map at
-    // `zoom` — moved just far enough that the card is not over it, when it
-    // would be. For focusStationOnMap, which sets the view before the leader
-    // could ask for a pan.
+    // The centre for a view that puts `latlng` in the middle of the map the
+    // card leaves open, at `zoom`: the middle of the strip right of the card
+    // on a desktop, of the strip above the sheet on a phone, and of the whole
+    // map when no card is up. The middle of the whole map was where it went
+    // until the card was over it, and then just clear of the card's edge — a
+    // station pressed in the list landed hard against the card, with most of
+    // the open map off to one side of it.
+    //
+    // Called only by the moves that go to a station or a repeater
+    // (focusStationOnMap, focusRepeaterOnMap, the trail, a station in the
+    // address, What is here), after the card is painted, so the card it
+    // measures is the one that is up. Nothing calls it when the card changes
+    // size — its width handle (card-width.js), its sections filling in — so
+    // widening the card never moves the map out from under the person doing
+    // it; the next station they pick is centred in what the card leaves.
     //
     // Not in 3-D or in the twin: there the camera follows the 2-D map's
     // centre, at its own zoom and tilt, and a centre nudged by 2-D pixels is a
@@ -533,13 +567,13 @@ const MapLeader = (function () {
     // middle of the view, which the card does not reach on a desktop.
     centreFor(latlng, zoom) {
       if (!map || solid() || twin()) return latlng;
-      const t = target();
-      const box = t && cardBox();
-      if (!box) return latlng;
-      const r = t.marker && t.marker.getRadius ? t.marker.getRadius() : 5;
-      const d = clearance(box, map.getSize().divideBy(2), r);
-      if (!d) return latlng;
-      return map.unproject(map.project(latlng, zoom).subtract([d.x, d.y]), zoom);
+      const box = cardBox();
+      const area = box && openArea(box);
+      if (!area) return latlng;
+      const size = map.getSize();
+      const dx = area.x + area.w / 2 - size.x / 2;
+      const dy = area.y + area.h / 2 - size.y / 2;
+      return map.unproject(map.project(latlng, zoom).subtract([dx, dy]), zoom);
     },
 
     // A gold ring that closes in on a pin twice and goes: "this one", for the

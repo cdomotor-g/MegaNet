@@ -722,6 +722,43 @@ async function main() {
     check('with the pin put clear of the card, where the leader can reach it',
       !!rowLead && rowLead.pin.x > rowLead.box.right, rowLead ? JSON.stringify({ pin: rowLead.pin, box: rowLead.box }) : '');
 
+    // Not hard against the card's edge: in the middle of the map the card
+    // leaves open — the strip right of it, halfway down (MapLeader.centreFor).
+    // The station's own position, not its marker's, which a fan can move.
+    const mapNow = () => page.evaluate(() => {
+      const s = state.data.stations.find(x => x.id === state.stnCard.id);
+      const p = state.map.latLngToContainerPoint([s.lat, s.lon]);
+      const c = document.getElementById('stn-card').getBoundingClientRect();
+      const k = state.map.getContainer().getBoundingClientRect();
+      const size = state.map.getSize();
+      const m = state.map.getCenter();
+      return {
+        pin: { x: Math.round(p.x), y: Math.round(p.y) },
+        want: { x: Math.round((c.right - k.left + size.x) / 2), y: Math.round(size.y / 2) },
+        centre: { lat: m.lat, lng: m.lng, z: state.map.getZoom() }, w: Math.round(c.width),
+      };
+    });
+    const mid = await mapNow();
+    check('in the middle of the map right of the card, not just clear of its edge',
+      Math.abs(mid.pin.x - mid.want.x) <= 2 && Math.abs(mid.pin.y - mid.want.y) <= 2,
+      JSON.stringify({ pin: mid.pin, want: mid.want }));
+
+    // Widening the card by its edge (card-width.js) leaves the map where it
+    // is — only the next pick is centred in what the card leaves — and so
+    // does putting it back.
+    await page.focus('#stn-card + .mn-cardw');
+    await page.keyboard.press('PageUp');
+    await page.waitForTimeout(350);
+    const wider = await mapNow();
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(350);
+    const back = await mapNow();
+    const still = v => v.centre.z === mid.centre.z
+      && Math.abs(v.centre.lat - mid.centre.lat) < 1e-9 && Math.abs(v.centre.lng - mid.centre.lng) < 1e-9;
+    check('widening the card by its edge leaves the map where it was, and so does putting it back',
+      wider.w > mid.w + 50 && back.w === mid.w && still(wider) && still(back),
+      JSON.stringify({ w: [mid.w, wider.w, back.w], centre: [mid.centre, wider.centre, back.centre] }));
+
     // From the keyboard: Enter on a row's button. The table repaints under
     // the keyboard and used to drop focus to <body>; it finds the row again,
     // and the card's Escape returns to it.
