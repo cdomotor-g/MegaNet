@@ -99,8 +99,30 @@ A **cue** is a word or a few from the scene's own `say` — `"cue": "link
 budgets"` — and is when its callout or tile appears: on the word as the voice
 says it, or, playing silent, as the words are revealed. Cues are found in
 order (the validator refuses one that is not in the words, or out of order).
-The walkthrough scene that drives the real app — opening the tab and ringing
-the real control — comes with the first how-to (#265).
+## ▶ Show me on the app — the tour
+
+Any video with screenshots can also be played **over the app itself**
+(`explainer-tour.js`, #265): each `shot` scene opens the screenshot's tab
+(and its station — the `path` it was taken at) and spotlights each callout's
+part on the live page as its cue is said, the rest of the page dimmed, while
+the same voices play; every other scene is drawn small in a guide card that
+carries the presenter, the words and ⏮ ⏯ ⏭. **✋ Try it yourself** puts the
+card away to a pill that carries on from there; Esc or ✕ leaves.
+
+It only **navigates** — opens a tab, opens a station, scrolls a part into view.
+It never presses a button that saves, sends or uploads, never types into a
+form, and the dim lets every press through. So nothing about a scene needs
+writing twice: the screenshot, the MP4 and the tour are one script.
+
+The parts are found by the shot's own selectors (`selectors` in the shots'
+index, from `tools/explainers/shots.json`) — for the tours, **`data-tour`
+hooks** on the app (`data-tour="station-card"`, `"card-health"`,
+`"card-position"`, `"search"`, `"nearby-list"` …), so a restyle does not lose
+them. A shot whose page cannot be driven to (the search palette is a dialog)
+names live parts of its own, `tour`: the search scene rings the banner's search
+button and leaves the typing to the person. `npm run explainers` walks every
+published video's tour step by step and fails a part that is not lit on its
+own tab.
 
 ## Screenshots
 

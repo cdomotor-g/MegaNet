@@ -55,6 +55,7 @@ const Explainers = (() => {
     ['Scene', 'One drawing and the words said over it — a few seconds each. ⏮ and ⏭, the arrow keys and a clicker move a scene at a time.'],
     ['Full screen', 'For a meeting room: the picture fills the screen and the words are large under it. A presentation clicker’s next and back move a scene; Esc leaves.'],
     ['Keep for no signal', 'Fetches this video, its words and its voices now, so this device’s saved copy has them and it plays where there is no signal.'],
+    ['Show me on the app', 'The same video played over Flood-Net itself: each screenshot becomes the real tab, and each part is lit up on the page as it is named. It only opens tabs and stations — it never saves or changes anything — and ✋ Try it yourself hands it back to you.'],
     ['MP4', 'The same video as one ordinary video file, with its voices — for a laptop that cannot reach Flood-Net, or to put in a slide deck. Made from this player, a frame at a time; offered only when it matches the voices there are now.'],
   ];
   const meaning = w => (WORDS.find(x => x[0] === w) || [])[1] || '';
@@ -161,6 +162,7 @@ const Explainers = (() => {
         ${api.anchorHtml(b)}
       </div>
       <div class="button-group xp-tools">
+        ${(b.scenes || []).some(s => s.type === 'shot') && typeof VideoTour !== 'undefined' ? `<button class="ghost" onclick="Explainers.tour()" title="${escAttr(meaning('Show me on the app'))}">▶ ${termHtml('Show me on the app', meaning('Show me on the app'))}</button>` : ''}
         <button class="ghost" onclick="Explainers.meeting(true)" title="${escAttr(meaning('Full screen'))} (F)">⛶ ${termHtml('Full screen', meaning('Full screen'))}</button>
         <button class="ghost" onclick="Explainers.copyLink()" title="The address that opens this video ready to play — for a meeting room’s laptop, or a message">🔗 Copy link</button>
         <button class="ghost" onclick="Explainers.keepIt()"${k === 'busy' ? ' disabled' : ''} title="${escAttr(meaning('Keep for no signal'))}">📥 ${termHtml('Keep for no signal', meaning('Keep for no signal'))}</button>
@@ -342,6 +344,20 @@ const Explainers = (() => {
     document.documentElement.classList.toggle('xp-rendering', !!on);
     P._api.render(!!on);
     return !!el;
+  }
+
+  // ▶ Show me on the app (explainer-tour.js): this video over the app itself,
+  // its voices from the same MP3, the player here paused.
+  async function tour() {
+    const api = P._api, b = api.current();
+    if (!b || typeof VideoTour === 'undefined') return;
+    exitMeeting();
+    P.pause();
+    await loadShots();
+    const v = api.voiceOf(b);
+    VideoTour.start({ video: b, voice: v, shots: SHOTS.index || {}, sound: P._state().sound,
+      audioUrl: v ? `${v.audio}?h=${encodeURIComponent(v.hash || '')}` : null,
+      who: api.who, portrait: api.portrait, cueIndex, draw: s => P._draw(s, b, false) });
   }
 
   function bigPlay() {
@@ -773,7 +789,7 @@ const Explainers = (() => {
   return {
     ...P,
     render: () => P.render(), init, stop, bigPlay,
-    meeting, wake, copyLink, keepIt, restoreFromUrl, _render: renderMode,
+    meeting, wake, copyLink, keepIt, restoreFromUrl, tour, _render: renderMode,
     // For the tests: the scenes' own drawers and the live counts.
     _x: () => ({ ...X }), _liveCount: liveCount, _tabOf: tabOf, _cueIndex: cueIndex, _shots: () => SHOTS.index, SKETCHES, PARTS, WORDS,
   };

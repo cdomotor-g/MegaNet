@@ -6248,6 +6248,14 @@ counted when it plays — so the voices, said once, never go stale. When a tab
 changes, its shots are taken again (free, nothing voiced), and `npm run
 explainers` fails a shot whose parts have gone from the app.
 
+**▶ Show me on the app** plays a video over Flood-Net itself
+(`explainer-tour.js`): each screenshot becomes the real tab — and its station —
+and each part is spotlit on the live page as it is named, the rest dimmed,
+while the voices play and a small guide card carries the presenter and the
+words; **✋ Try it yourself** puts the card away, and it carries on when asked.
+It only opens tabs and stations and scrolls; it never saves, sends or changes
+anything. The parts are found by `data-tour` hooks on the app.
+
 **⛶ Full screen** (or F) is for a meeting room: the picture fills the screen,
 the words large under it, the bar hidden while it plays; a presentation
 clicker's Page Down and Page Up move a scene, and Esc leaves. **🔗 Copy link**

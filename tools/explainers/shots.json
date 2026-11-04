@@ -16,15 +16,18 @@
   {
    "name": "station-card",
    "path": "?tab=stations&station=brisbane_city_al",
-   "ready": "#stn-card",
+   "ready": "[data-tour='station-card']",
    "settle": 4000,
-   "store": { "mn-map-cluster": "on" },
+   "store": {
+    "mn-map-cluster": "on",
+    "mn-hint-display": "1"
+   },
    "targets": {
-    "card": "#stn-card",
+    "card": "[data-tour='station-card']",
     "title": "#stn-card-title",
-    "owner": "[id^='mn-owner-card-']",
-    "health": "[id^='mn-health-card-']",
-    "data": "[id^='mn-data-card-']"
+    "owner": "[data-tour='card-owner']",
+    "health": "[data-tour='card-health']",
+    "data": "[data-tour='card-data']"
    }
   },
   {
@@ -52,11 +55,11 @@
    "name": "nearby",
    "path": "?tab=nearby",
    "device": "phone",
-   "ready": ".nb-list .nb-row",
+   "ready": "[data-tour='nearby-list'] .nb-row",
    "settle": 3000,
    "targets": {
-    "list": ".nb-list",
-    "first": ".nb-list li:first-child",
+    "list": "[data-tour='nearby-list']",
+    "first": "[data-tour='nearby-list'] li:first-child",
     "refresh": "#nb-gps"
    }
   },
@@ -70,6 +73,64 @@
     "search": "#cap-q",
     "groups": "ul.cap-jump-list",
     "list": "#cap-g-around"
+   }
+  },
+  {
+   "name": "search",
+   "path": "?tab=stations",
+   "ready": "[data-tour='search']",
+   "settle": 2500,
+   "steps": [
+    {
+     "click": "[data-tour='search']"
+    },
+    {
+     "wait": 600
+    },
+    {
+     "type": [
+      "#pal-q",
+      "brisbane city"
+     ]
+    },
+    {
+     "wait": 1500
+    }
+   ],
+   "targets": {
+    "box": "#pal-q",
+    "results": "#pal-list",
+    "first": "#pal-list [role='option']"
+   },
+   "tour": {
+    "box": "[data-tour='search']",
+    "results": "[data-tour='search']",
+    "first": "[data-tour='search']"
+   },
+   "store": {
+    "mn-hint-display": "1"
+   }
+  },
+  {
+   "name": "station-card-lower",
+   "path": "?tab=stations&station=brisbane_city_al",
+   "ready": "[data-tour='station-card']",
+   "settle": 4000,
+   "steps": [
+    {
+     "scroll": "[data-tour='card-position']"
+    },
+    {
+     "wait": 800
+    }
+   ],
+   "targets": {
+    "card": "[data-tour='station-card']",
+    "position": "[data-tour='card-position']",
+    "imagery": "[data-tour='card-imagery-and-terrain']"
+   },
+   "store": {
+    "mn-hint-display": "1"
    }
   }
  ]

@@ -46,7 +46,7 @@
       "#259 a lighter off-air decoder: lean decoding is the live pipeline's default (0.12% of 11,628 live bursts read differently, a third of the time); part 2, BurstWatch, filters a channel only around its bursts (the same readings in every test, a sixth to a twentieth of the work between them), and light decoding (lean: 2) halves a burst's decode again; both in RPi ALERT 0.18–0.19 behind settings, waiting on their checks at the first base station"
     ],
     "next": [
-      "EPIC #262 explainers: the welcome is voiced and has its MP4 (#264, #268); next the station-card how-to with its walkthrough scene (#265), then the phone install (#266) and map layers (#267)",
+      "EPIC #262 explainers: ▶ Show me on the app (the tour over the real app) shipped with #265; its first how-to, find a station and read its card, waits on the owner's OK, then the phone install (#266) and map layers (#267)",
       "#252–#254 road routes: avoid closures, inspection runs, routes kept offline (EPIC #250)",
       "#238 QLDTraffic flood events and road closures on the Stations map",
       "#216 staff alerts: daily digest email and web push for critical findings",
@@ -59,6 +59,33 @@
       "#260 fold the ALERT twins stored before 0096 into one reading each (after #243 and #257)"
     ],
     "blocked": [
+      {
+        "id": "station-card-script",
+        "what": "#265's how-to, find a station and read its card: its words, a draft on the site at ?watch=station-card, are voiced only once the owner has read them and said yes",
+        "on": "human",
+        "kind": "decision",
+        "since": "2026-11-04",
+        "issue": "#265",
+        "holds": [
+          "#265 voiced (about 400 ElevenLabs credits, once)",
+          "#266",
+          "#267"
+        ],
+        "options": [
+          {
+            "what": "Watch the silent draft at https://floodwarning.net/?watch=station-card (and ▶ Show me on the app) or read the script on #265, and reply OK or with changes",
+            "by": "human",
+            "effort": "5 min",
+            "recommended": true
+          },
+          {
+            "what": "Ask for changes in plain words on #265; an agent redrafts it (no credits until it is final)",
+            "by": "agent",
+            "effort": "Low",
+            "model": "Opus5"
+          }
+        ]
+      },
       {
         "id": "report-route",
         "what": "#270 give the Worker its GitHub token (GITHUB_ISSUES_TOKEN) so /api/report files reports itself",

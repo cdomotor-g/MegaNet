@@ -41,6 +41,11 @@
 //     and names its callouts; a tally draws each item on its own word
 //   * the app still has every part each screenshot points at (else: take it
 //     again with tools/explainers/shoot.mjs — CLAUDE.md, Videos)
+//   * ▶ Show me on the app, walked step by step for every published video with
+//     screenshots: each part lit on its own tab as its cue comes, the other
+//     scenes drawn in the guide card, ✋ Try it yourself and back, leaving to
+//     the videos, and nothing written; on a phone the guide gets out of the
+//     part's way (#265)
 //   * ⤓ Download MP4 only when the index offers one; and, with ffmpeg, the
 //     fixture recorded small: H.264 and AAC, as long as its voices, a frame
 //     from inside each scene that scene, its captions beside it (#268)
@@ -510,6 +515,91 @@ try {
     ok('…and no page errors while it was drawn', !got.errors.length, got.errors.join('\n'));
     fs.rmSync(tmp, { recursive: true, force: true });
   } else console.log('  (no ffmpeg here — recording an MP4 is checked where there is)');
+  // ▶ Show me on the app, walked step by step (#265): every published video
+  // with screenshots, over the app itself — each part lit on its own tab as
+  // its cue comes, the drawings of the other scenes in the card, and nothing
+  // but navigating: not one request that is not a GET.
+  for (const file of listFiles(REPO)) {
+    const x = readJson(path.join(REPO, file));
+    if (!x.scenes.some(sc => sc.type === 'shot')) continue;
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, geolocation: { latitude: -27.47, longitude: 153.02 }, permissions: ['geolocation'] });
+    const pg = await context.newPage();
+    const errors = [], writes = [];
+    pg.on('pageerror', e => errors.push(e.message));
+    // A write: anything that is not a read, but for what the app does itself on
+    // any tab a person opens — its session check, its log of tabs visited
+    // (rpc/log_visit) and the land-cover lookup ArcGIS takes as a POST.
+    const writing = r => {
+      const m = r.method(), u = r.url();
+      if (m === 'GET' || m === 'HEAD' || m === 'OPTIONS') return false;
+      if (m !== 'POST') return true;
+      if (/\/api\/session$/.test(new URL(u).pathname) || /\/rpc\/log_visit$/.test(u) || /\/ImageServer\/getSamples$/.test(u)) return false;
+      return true;
+    };
+    pg.on('request', r => { if (writing(r)) writes.push(`${r.method()} ${r.url().slice(0, 100)}`); });
+    await applyNetworkPolicy(pg, server.origin);
+    await pg.goto(server.origin + `/index.html?watch=${x.id}`, { waitUntil: 'domcontentloaded' });
+    await pg.waitForFunction(() => typeof state !== 'undefined' && state.data && Array.isArray(state.data.stations), null, { timeout: LOAD_TIMEOUT });
+    await until(pg, id => !!document.querySelector('#xp-stage svg') && !!Explainers._shots() && Explainers._state().file === `data/explainers/${id}.json`, x.id);
+    const button = await pg.evaluate(() => [...document.querySelectorAll('.xp-tools button')].some(b => /Show me on the app/.test(b.textContent)));
+    ok(`${x.id}: ▶ Show me on the app is offered`, button);
+    await pg.evaluate(() => Explainers.tour());
+    await until(pg, () => !!document.getElementById('vt-guide') && VideoTour._state().on);
+    const missed = [];
+    for (let i = 0; i < x.scenes.length; i++) {
+      const sc = x.scenes[i];
+      if (sc.type !== 'shot') {
+        await pg.evaluate(i => VideoTour._at(i, 0.5), i);
+        if (!(await pg.evaluate(() => !!document.querySelector('#vt-mini svg')))) missed.push(`${i}: no drawing in the card`);
+        continue;
+      }
+      const meta = SHOTS[sc.shot], tab = new URLSearchParams(meta.path.replace(/^\?/, '')).get('tab');
+      const times = await pg.evaluate(i => VideoTour._cueTimes(i), i);
+      for (let k = 0; k < (sc.callouts || []).length; k++) {
+        await pg.evaluate(([i, t]) => VideoTour._at(i, t + 0.1), [i, times[k]]);
+        const lit = await pg.waitForFunction(k => { const s = VideoTour._state(); return s.lit && s.lit.n === k + 1 && s.lit.w > 4 ? s : null; }, k, { timeout: 15000 })
+          .then(h => h.jsonValue()).catch(() => null);
+        const on = await pg.evaluate(() => state.activeTab);
+        if (!lit) missed.push(`${i}.${k} ${sc.callouts[k].target}: not lit`);
+        else if (on !== tab) missed.push(`${i}.${k}: on ${on}, not ${tab}`);
+      }
+    }
+    ok(`${x.id}: walked step by step, every part lit on its own tab and every other scene drawn in the card`, !missed.length, missed.join('; '));
+    // ✋ Try it yourself, and back; then leave for the videos.
+    await pg.evaluate(() => VideoTour.away());
+    const awayState = await pg.evaluate(() => ({ guide: document.getElementById('vt-guide').hidden, pill: !document.getElementById('vt-pill').hidden, playing: VideoTour._state().playing }));
+    await pg.evaluate(() => VideoTour.back());
+    const backState = await pg.evaluate(() => ({ guide: !document.getElementById('vt-guide').hidden, pill: document.getElementById('vt-pill').hidden, playing: VideoTour._state().playing }));
+    ok(`${x.id}: ✋ Try it yourself puts the guide away to a pill, paused; the pill carries on`, awayState.guide && awayState.pill && !awayState.playing && backState.guide && backState.pill && backState.playing, JSON.stringify({ awayState, backState }));
+    await pg.evaluate(() => VideoTour.leave(true));
+    const left = await pg.evaluate(() => ({ host: !!document.getElementById('vt-host'), tab: state.activeTab, cls: document.documentElement.classList.contains('vt-on') }));
+    ok(`${x.id}: leaving takes the guide and the dim away, back to the videos`, !left.host && !left.cls && left.tab === 'videos', JSON.stringify(left));
+    ok(`${x.id}: the tour only navigated — nothing written, saved or sent but what opening a tab sends anyway`, !writes.length, writes.join('; '));
+    ok(`${x.id}: no page errors on the tour`, !errors.length, errors.join('\n'));
+    await context.close();
+  }
+  {
+    // On a phone, the guide gets out of the way of the part it is showing.
+    const x = readJson(path.join(REPO, 'data/explainers/station-card.json'));
+    const i = x.scenes.findIndex(sc => sc.type === 'shot' && sc.shot === 'station-card' && (sc.callouts || []).length);
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, geolocation: { latitude: -27.47, longitude: 153.02 }, permissions: ['geolocation'] });
+    const pg = await context.newPage();
+    await applyNetworkPolicy(pg, server.origin);
+    await pg.goto(server.origin + '/index.html?watch=station-card', { waitUntil: 'domcontentloaded' });
+    await pg.waitForFunction(() => typeof state !== 'undefined' && state.data && Array.isArray(state.data.stations), null, { timeout: LOAD_TIMEOUT });
+    await until(pg, () => !!document.querySelector('#xp-stage svg') && !!Explainers._shots() && Explainers._state().file === 'data/explainers/station-card.json');
+    await pg.evaluate(() => Explainers.tour());
+    const times = await pg.evaluate(i => VideoTour._cueTimes(i), i);
+    await pg.evaluate(([i, t]) => VideoTour._at(i, t + 0.1), [i, times[times.length - 1]]);
+    await pg.waitForFunction(() => { const s = VideoTour._state(); return s.lit && s.lit.w > 4; }, null, { timeout: 8000 }).catch(() => {});
+    await pg.waitForTimeout(900);
+    const overlap = await pg.evaluate(() => { const s = VideoTour._state(); if (!s.lit) return 'nothing lit';
+      const el = document.querySelector('[data-tour="card-health"]'), g = document.getElementById('vt-guide').getBoundingClientRect(), r = el.getBoundingClientRect();
+      const vis = { top: Math.max(0, r.top), bottom: Math.min(innerHeight, r.bottom) };
+      return vis.bottom <= vis.top ? 'off screen' : (r.right < g.left || r.left > g.right || vis.bottom < g.top || vis.top > g.bottom) ? '' : `guide ${Math.round(g.top)}–${Math.round(g.bottom)} over part ${Math.round(vis.top)}–${Math.round(vis.bottom)}`; });
+    ok('on a phone, the guide is not over the part it is showing', !overlap, overlap);
+    await context.close();
+  }
   {
     // Each screenshot's parts, still on its page in the app as it is now.
     for (const shot of MANIFEST.shots) {

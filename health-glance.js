@@ -946,7 +946,7 @@ const HealthGlance = (() => {
   // is not built, the band above says so, and there is nothing to have heard.
   function cardHtml(s) {
     if (!s || s.proposed) return '';
-    return `<div class="acma-sect stn-card-health" id="${esc(elId(s.id))}"
+    return `<div class="acma-sect stn-card-health" id="${esc(elId(s.id))}" data-tour="card-health"
          data-mn-health="${esc(s.id)}">${sectionHtml(s)}</div>`;
   }
 

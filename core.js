@@ -622,6 +622,9 @@ const HELP = {
       + 'voiced once they are approved. The voices are made once, so a video never spends anything to watch.',
       'Before a meeting somewhere the Wi-Fi may not work, press <strong>📥 Keep for no signal</strong> with a '
       + 'signal: the video, its words and its voices are kept on the device.',
+      '<strong>▶ Show me on the app</strong> plays the video over Flood-Net itself: each screenshot becomes the real tab, '
+      + 'and each part lights up on the page as it is named. It only opens tabs and stations; <em>✋ Try it yourself</em> '
+      + 'puts the guide away so you can do it, and Esc leaves.',
       'The numbers in a video (how many stations, and so on) are counted when it plays, from what this '
       + 'device has loaded — so they are always today\'s, and the voices never say them.',
       'The keys on the player: space plays and pauses, ← → or Page Up / Page Down move a scene, F is full '

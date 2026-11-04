@@ -230,7 +230,9 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   app (`data/explainers/shots/`, listed in `tools/explainers/shots.json`). A
   change that moves, renames or restyles what a shot shows takes that shot again
   in the same push (`node tools/explainers/shoot.mjs --tab <tab id>`; free,
-  nothing voiced). `npm run explainers` fails a shot whose parts have gone. A
+  nothing voiced). `npm run explainers` fails a shot whose parts have gone, and
+  walks every ▶ Show me on the app tour — keep the `data-tour="…"` hooks it
+  spotlights on whatever element does that job after a rework. A
   video's words are the owner's to approve: never mark one `"voice": "final"`
   without the owner's OK on its issue — voicing spends ElevenLabs credits.
 - **Roadmap:** issue #113 is the single view of what is open, who does it and in

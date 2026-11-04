@@ -1,0 +1,150 @@
+{
+ "format": "floodnet-explainer/1",
+ "id": "station-card",
+ "kind": "howto",
+ "title": "Find a station and read its card",
+ "summary": "The Recruit's first job, and Graham shows him: the search, a station's card — whose it is, its health, its plots — and the way in.",
+ "presenter": "seasoned-hydrographer",
+ "voice": "draft",
+ "updated": "2026-11-04",
+ "order": 1,
+ "scenes": [
+  {
+   "type": "cover",
+   "title": "Find a station and read its card",
+   "sub": "How to",
+   "presenter": "new-recruit",
+   "kicker": "FLOOD-NET · HOW TO",
+   "line": "The search, a station's card, and the way in.",
+   "say": "First day, and they've asked me to check on a station. Where do I even start?",
+   "secs": 6
+  },
+  {
+   "type": "shot",
+   "title": "Search for it",
+   "sub": "Up in the banner, on every tab",
+   "say": "Start with the search up top. Type a name, a station number or an ALERT address, and pick it from the list.",
+   "secs": 10,
+   "shot": "search",
+   "callouts": [
+    {
+     "target": "box",
+     "text": "The search, on every tab",
+     "cue": "search"
+    },
+    {
+     "target": "first",
+     "text": "Press the one you want",
+     "cue": "pick"
+    }
+   ],
+   "focus": "results"
+  },
+  {
+   "type": "shot",
+   "title": "Its card",
+   "sub": "Whose it is, and its health",
+   "focus": "card",
+   "say": "That opens its card on the map. First, whose station it is; then its health: when it was last heard, and anything wrong.",
+   "secs": 11,
+   "shot": "station-card",
+   "callouts": [
+    {
+     "target": "owner",
+     "text": "Whose station it is",
+     "cue": "whose"
+    },
+    {
+     "target": "health",
+     "text": "When it was last heard, and anything wrong",
+     "cue": "health"
+    }
+   ]
+  },
+  {
+   "type": "shot",
+   "title": "Its readings",
+   "sub": "And its neighbours'",
+   "presenter": "new-recruit",
+   "say": "And how do I see what it's been reading?",
+   "secs": 4,
+   "shot": "station-card",
+   "focus": "card"
+  },
+  {
+   "type": "shot",
+   "title": "Its plots",
+   "sub": "The river, and the rain round it",
+   "focus": "card",
+   "say": "Under Data: its readings, every gauge on the same river, and the rain gauges round it, each a plot a press away.",
+   "secs": 10,
+   "shot": "station-card",
+   "callouts": [
+    {
+     "target": "data",
+     "text": "Its readings, and its neighbours', plotted",
+     "cue": "readings"
+    }
+   ]
+  },
+  {
+   "type": "shot",
+   "title": "The way in",
+   "sub": "Directions, Street View, Google Earth",
+   "focus": "card",
+   "say": "Further down, the way in: directions to it, and Street View and Google Earth to see it before you go.",
+   "secs": 9,
+   "shot": "station-card-lower",
+   "callouts": [
+    {
+     "target": "position",
+     "text": "Directions, from where you are",
+     "cue": "directions"
+    },
+    {
+     "target": "imagery",
+     "text": "Street View and Google Earth",
+     "cue": "Street"
+    }
+   ]
+  },
+  {
+   "type": "shot",
+   "title": "Already out there?",
+   "sub": "Nearby, on a phone",
+   "presenter": "new-recruit",
+   "say": "What if I'm already out there?",
+   "secs": 3,
+   "shot": "nearby"
+  },
+  {
+   "type": "shot",
+   "title": "Nearby",
+   "sub": "The closest, by distance",
+   "say": "Then Nearby lists the stations closest to where you're standing. Press one, and it's the same card.",
+   "secs": 9,
+   "shot": "nearby",
+   "callouts": [
+    {
+     "target": "list",
+     "text": "The closest stations, by distance",
+     "cue": "closest"
+    },
+    {
+     "target": "first",
+     "text": "Press one for its card",
+     "cue": "Press"
+    }
+   ]
+  },
+  {
+   "type": "signoff",
+   "title": "That's the job",
+   "sub": "Now have a go",
+   "say": "That's the job. Now have a go yourself: press Show me on the app, and I'll walk you through it.",
+   "secs": 9,
+   "line": "Might as well do it properly.",
+   "next": "▶ Show me on the app"
+  }
+ ]
+}

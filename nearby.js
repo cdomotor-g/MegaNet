@@ -119,7 +119,7 @@ const Nearby = (() => {
           device and is never sent or kept.</p>
       </div>` : !rows.length ? `
       <div class="panel nb-empty"><p>No station with a position is left by the Stations tab's filters.</p></div>` : `
-      <ul class="nb-list" aria-labelledby="nb-h">
+      <ul class="nb-list" data-tour="nearby-list" aria-labelledby="nb-h">
         ${list.map(r => `
         <li>
           <button type="button" class="nb-row" data-id="${escAttr(r.s.id)}" onclick="Nearby.open('${escAttr(r.s.id)}')">

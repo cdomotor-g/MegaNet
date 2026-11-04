@@ -77,6 +77,8 @@ export async function openShot(browser, shot, base, { policy = null } = {}) {
   if (shot.css) await page.addStyleTag({ content: shot.css });
   for (const st of shot.steps || []) {
     if (st.click) await page.click(st.click);
+    // Typed into a box — a search, never a form that saves.
+    if (st.type) await page.fill(st.type[0], st.type[1]);
     if (st.call) await page.evaluate(([fn, args]) => window[fn](...args), [st.call[0], st.call.slice(1)]);
     if (st.scroll) await page.evaluate(sel => { const el = document.querySelector(sel); if (el) el.scrollIntoView({ block: 'start' }); }, st.scroll);
     if (st.wait) await page.waitForTimeout(st.wait);
@@ -121,9 +123,11 @@ async function shoot(browser, shot, base) {
     fs.mkdirSync(OUT, { recursive: true });
     const image = `data/explainers/shots/${shot.name}.webp`;
     fs.writeFileSync(path.join(REPO, image), Buffer.from(webp, 'base64'));
+    // The selectors too: a tour (explainer-tour.js) finds the same parts on
+    // the live page by them.
     return { name: shot.name, image, device: shot.device || 'desk', path: shot.path || '', width: dev.width, height: dev.height, scale: dev.scale,
       bytes: Buffer.from(webp, 'base64').length, taken: new Date().toISOString().replace(/\.\d+Z$/, 'Z'), site: new URL(base).host, stamp,
-      targets: out, errors: errors.slice(0, 3) };
+      targets: out, selectors: shot.targets || {}, ...(shot.tour ? { tour: shot.tour } : {}), ...(shot.steps ? { steps: shot.steps } : {}), errors: errors.slice(0, 3) };
   } finally { await context.close(); }
 }
 
@@ -159,18 +163,27 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       const todo = man.shots.filter(s => (!named.length && !tab) || named.includes(s.name) || (tab && new URLSearchParams(String(s.path || '').replace(/^\?/, '')).get('tab') === tab));
       if (!todo.length) throw new Error('no shot matches');
       const index = readIndex();
+      // Kept after every shot, and a shot that fails does not lose the others.
+      const save = () => {
+        for (const k of Object.keys(index.shots)) if (!man.shots.some(s => s.name === k)) { delete index.shots[k]; const f = path.join(OUT, `${k}.webp`); if (fs.existsSync(f)) fs.unlinkSync(f); console.log(`  let go of ${k}`); }
+        index.format = SHOT_FORMAT;
+        index.shots = Object.fromEntries(Object.entries(index.shots).sort(([a], [b]) => a.localeCompare(b)));
+        fs.mkdirSync(OUT, { recursive: true });
+        fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(index, null, 1) + '\n');
+      };
+      let failed = 0;
       for (const shot of todo) {
-        const meta = await shoot(browser, shot, base);
-        const { errors: _errs, ...kept } = meta;
-        index.shots[shot.name] = kept;
-        console.log(`  ${shot.name}: ${meta.width}×${meta.height} ${meta.device}, ${(meta.bytes / 1024).toFixed(0)} KB, targets ${Object.keys(meta.targets).join(', ')}${meta.errors.length ? ` — page errors: ${meta.errors.join(' | ')}` : ''}`);
+        try {
+          const meta = await shoot(browser, shot, base);
+          const { errors: _errs, ...kept } = meta;
+          index.shots[shot.name] = kept;
+          save();
+          console.log(`  ${shot.name}: ${meta.width}×${meta.height} ${meta.device}, ${(meta.bytes / 1024).toFixed(0)} KB, targets ${Object.keys(meta.targets).join(', ')}${meta.errors.length ? ` — page errors: ${meta.errors.join(' | ')}` : ''}`);
+        } catch (err) { failed++; console.error(`  ${shot.name}: not taken — ${err.message}`); }
       }
-      // Only the shots the manifest still has.
-      for (const k of Object.keys(index.shots)) if (!man.shots.some(s => s.name === k)) { delete index.shots[k]; const f = path.join(OUT, `${k}.webp`); if (fs.existsSync(f)) fs.unlinkSync(f); console.log(`  let go of ${k}`); }
-      index.format = SHOT_FORMAT;
-      index.shots = Object.fromEntries(Object.entries(index.shots).sort(([a], [b]) => a.localeCompare(b)));
-      fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(index, null, 1) + '\n');
+      save();
       console.log(`Wrote data/explainers/shots/index.json — ${Object.keys(index.shots).length} shots.`);
+      if (failed) process.exitCode = 1;
     }
   } catch (err) { console.error(err.message); process.exitCode = 1; }
   finally { await browser.close(); }

@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 187, date: '2026-11-04', items: [
+      '▶ <strong>Show me on the app</strong>, under a video on 🎬 <strong>Videos</strong>: the video played over Flood-Net '
+        + 'itself. Each screenshot becomes the real tab, and each part lights up on the page as it is named, while a small '
+        + 'guide card says it. It only opens tabs and stations — it never saves or changes anything — and ✋ <em>Try it '
+        + 'yourself</em> puts the guide away so you can have a go.',
+    ] },
     { n: 186, date: '2026-11-04', items: [
       '🎯 <strong>Best repeater</strong>, a new tool on the <strong>Stations</strong> map (in the side panel\'s strip, '
         + 'after 🚚 Relocate station): which repeater should a station talk to? Pick a station, or give a new site that is '

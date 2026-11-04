@@ -21506,6 +21506,46 @@ button.adm-danger:hover { border-color: var(--bad); }
 .xp-show.is-meeting.is-idle { cursor: none; }
 .xp-show.is-meeting.is-idle .hb-ctl { opacity: 0; }
 html.xp-meeting-on, html.xp-meeting-on body { overflow: hidden; }
+/* ── ▶ Show me on the app (explainer-tour.js, #265) ──────────────────────────
+   A video played over the app itself: a guide card in the corner (along the
+   foot on a phone) with the presenter, the words and the buttons, and a ring
+   round the part being named, the page dimmed round it. The dim lets every
+   press through — the tour only shows; the person can take over any time. */
+.vt-guide { position: fixed; right: 16px; bottom: 16px; z-index: 9001; box-sizing: border-box; width: min(400px, calc(100vw - 32px));
+  padding: .7rem .8rem .6rem; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); color: var(--text);
+  box-shadow: 0 10px 34px rgba(0,0,0,.32); }
+.vt-guide:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.vt-guide.vt-top { top: 16px; bottom: auto; }
+.vt-head { display: flex; gap: .6rem; align-items: center; }
+.vt-face { flex: none; width: 48px; height: 60px; object-fit: cover; border-radius: 8px; background: #0b2234; }
+.vt-heads { flex: 1 1 auto; min-width: 0; }
+.vt-who, .vt-step { margin: 0; }
+.vt-who b { color: var(--accent); }
+.vt-step { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vt-x { flex: none; min-width: 44px; min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: var(--text); font-size: 1.1rem; cursor: pointer; }
+.vt-mini { margin: .5rem 0 0; border-radius: 10px; overflow: hidden; background: #0b2234; }
+.vt-mini svg { display: block; width: 100%; height: auto; }
+.vt-say { margin: .5rem 0; line-height: 1.45; }
+.vt-ctl { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
+.vt-btn { min-width: 44px; min-height: 44px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-sub); color: var(--text); font-size: 1rem; cursor: pointer; }
+.vt-try { margin-left: auto; }
+.vt-end { margin-top: .5rem; padding-top: .5rem; border-top: 1px solid var(--border); }
+.vt-end p { margin: 0 0 .4rem; }
+.vt-pill { position: fixed; right: 16px; bottom: 16px; z-index: 9001; display: flex; gap: .3rem; padding: .3rem;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--panel); box-shadow: 0 6px 22px rgba(0,0,0,.28); }
+.vt-pill[hidden], .vt-guide[hidden], .vt-spot[hidden], .vt-chip[hidden] { display: none; }
+.vt-spot { position: fixed; z-index: 9000; box-sizing: border-box; border: 4px solid #ffb84d; border-radius: 12px;
+  box-shadow: 0 0 0 100vmax rgba(4,14,24,.5); pointer-events: none; transition: left .35s ease, top .35s ease, width .35s ease, height .35s ease; }
+.vt-chip { position: fixed; z-index: 9001; max-width: 300px; padding: .45rem .7rem; border: 2px solid #ffb84d; border-radius: 10px;
+  background: #0b2234; color: #f2f7fb; font-weight: 600; line-height: 1.3; pointer-events: none; }
+.vt-n { display: inline-grid; place-items: center; width: 1.5em; height: 1.5em; margin-right: .3rem; border-radius: 50%; background: #ffb84d; color: #0b2234; font-weight: 800; }
+@media (max-width: 560px) {
+  .vt-guide { left: 8px; right: 8px; bottom: 8px; width: auto; }
+  .vt-guide.vt-top { top: 8px; bottom: auto; }
+  .vt-pill { right: 8px; bottom: 8px; }
+  .vt-chip { max-width: calc(100vw - 32px); }
+}
+
 /* Recording an MP4 a frame at a time (#268): nothing eases between frames. */
 html.xp-rendering *, html.xp-rendering *::before, html.xp-rendering *::after { transition: none !important; }
 

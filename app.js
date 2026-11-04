@@ -4112,7 +4112,7 @@ function renderStationsHtml() {
                on purpose — #acma-card is three tabs' shared furniture, this
                is one map's. State-driven, so it is repainted from initMap()
                after every full render rather than dying with the div. -->
-          <div id="stn-card" class="acma-card stn-card" hidden></div>
+          <div id="stn-card" class="acma-card stn-card" data-tour="station-card" hidden></div>
           <!-- What is here (#186): the third card in this one rectangle, and
                the only one that is about the ground rather than about something
                on it. Same dress and same exclusion — opening any of the three
@@ -7406,7 +7406,7 @@ function stnCardDataHtml(s) {
   const pills = fieldDataPillHtml(s) + arroAdminPillHtml(s);
   const rows = typeof GroupPlots !== 'undefined' ? GroupPlots.cardRowsHtml(s) : '';
   if (!pills && !rows) return '';
-  return `<div class="acma-sect stn-card-data" id="mn-data-card-${escAttr(String(s.id))}">
+  return `<div class="acma-sect stn-card-data" data-tour="card-data" id="mn-data-card-${escAttr(String(s.id))}">
       <span class="small txt-muted stn-card-rhs-head"
         title="This station's data: its readings on the Field Data tab, its admin page in ARRO, and its neighbours plotted with it — in ARRO on one graph, or out of the Flood-Net datastore a strip each">Data</span>
       ${pills ? `<div class="pill-row stn-card-data-pills">${pills}</div>` : ''}
@@ -8886,7 +8886,7 @@ function stnCardHtml(s) {
       <!-- Who owns it, first and always — "Not recorded" where nobody is on
            record (stnCardOwnerHtml). The SLS section below quotes the
            document's own "Station owner" row word for word. -->
-      <div class="acma-row"><span>Owner</span><span id="${escAttr(ownerId)}"
+      <div class="acma-row" data-tour="card-owner"><span>Owner</span><span id="${escAttr(ownerId)}"
           data-mn-owner="${escAttr(String(s.id))}">${stnCardOwnerHtml(s)}</span></div>
     </div>
     <!-- Its health (#218), straight after whose it is, because it is the line
@@ -9064,7 +9064,7 @@ function stnCardHtml(s) {
          (.pill-list), which is why the pills' labels are pillText spans. -->
     <div class="acma-sect stn-card-actions">
       ${stationActionGroups(s).map(g =>
-        `<div class="pill-row pill-list stn-card-group" role="group" aria-label="${escAttr(g.label)}">
+        `<div class="pill-row pill-list stn-card-group" role="group" aria-label="${escAttr(g.label)}" data-tour="card-${escAttr(g.label.toLowerCase().replace(/[^a-z0-9]+/g, '-'))}">
         ${g.pills.join('\n        ')}
       </div>`).join('\n      ')}
     </div>
@@ -9476,7 +9476,7 @@ function filterQuickHtml() {
   const rows = searchRows();
   const n    = rows.length;
   return `
-    <textarea id="station-search-quick" class="filter-search filter-search--quick"
+    <textarea id="station-search-quick" data-tour="station-search" class="filter-search filter-search--quick"
               rows="1" spellcheck="false"
               aria-label="${n > 1 ? `Filter entry 1 of ${n}` : 'Search stations'}"
               title="Name, station # or ALERT address. Open Filters for the ranges, the fields each entry looks in, and the rest of the filters."

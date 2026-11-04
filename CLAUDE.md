@@ -60,6 +60,7 @@
 ## Videos — their screenshots go stale
 - The 🎬 Videos (`explainers.js`, EPIC #262) show real screenshots of the app: `data/explainers/shots/`, each listed with the parts it points at in `tools/explainers/shots.json`. When you change a tab so that a screenshot of it no longer looks like it — the parts it points at moved, renamed or restyled — take the shot again **in the same push**: `node tools/explainers/shoot.mjs --tab <tab id>` (from the live site; before a deploy, `--base` a local server — `tools/explainers/README.md`, *Screenshots*). It is free: nothing is voiced.
 - `npm run explainers` fails a shot whose parts have gone from its page; a restyle it cannot see is yours to notice, so look at the shots of a tab you changed.
+- The same parts are what **▶ Show me on the app** (`explainer-tour.js`) spotlights on the live page, mostly by `data-tour="…"` hooks. Keep a `data-tour` attribute on whatever element now does that job when you rework a tab; `npm run explainers` walks every tour and fails a step that is not lit.
 - If a change makes a video's **words** wrong, say so on the video's issue — the words are the owner's to approve again, and voicing the changed scenes spends ElevenLabs credits. Never mark a video `"voice": "final"` without the owner's OK on its issue.
 
 ## Raising issues for AI agents
