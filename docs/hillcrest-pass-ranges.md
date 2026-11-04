@@ -27,9 +27,14 @@ blocks, and the Scenic Rim block, to the repeaters that already carry them.
 | | **5391–5399** | Darlington School, Innisplain |
 | 6200–6274 | **6200–6274** (no change) | Hillcrest's own rain and battery, and Logan's block: 18 stations from Oxley Ck to Beenleigh |
 
-**If the repeater takes only eight ranges** (the most any repeater on the register holds),
-leave out 2065–2067 and 2179–2181. Those two are kept only to be cautious. Then watch them
-with the rest (see *Watch for a week after*).
+**An ERT-A2 takes all ten.** It has four address lists: one Pass list and up to three Reject
+lists. Each list holds up to 32 entries, and an entry is one address or a range (ELPRO,
+[ERT-A2 User Manual, Sept 2025](https://elprotech.com/wp-content/uploads/2024/11/EL-ERT-A2_Manual_Sept25.pdf),
+p. 27). Only one list can pass, so put all ten in that list: *Communication*, then *Address
+List* → List 1, *Address List Status* → Enable, *Address List Action* → Pass, then *Address
+List Entries*. Delete what is there, add the ten, and save in *Show/Save Configuration*. Grandchester
+(2065–2067) and Rosewood Detention Basin (2179–2181) are kept only to be cautious. They can
+come out later if the week's watch shows Constitution Hill carries them.
 
 What it does:
 
@@ -109,10 +114,9 @@ costs Hillcrest almost nothing.
 
 1. **Check in the Bureau's own data that each station below still arrives.** Each one sends
    a report every three hours, rain or not, so a gap shows within a day. If one goes quiet,
-   add its range back to Hillcrest.
-   - Kept only to be safe (or left out under the eight-range option): **Grandchester AL**
-     2065–2067, **Rosewood Detention Basin AL** 2179–2181.
-   - Taken off, with a weak modelled margin to Constitution Hill: **Meadow Flat Rd Bridge**
+   add its range back to Hillcrest. These are the stations taken off that have a weak modelled
+   margin to Constitution Hill:
+   - **Meadow Flat Rd Bridge**
      4837–4839, **Marburg AL** 2086–2088, **Limestone Park** 4828–4830, **South Ripley (Wards
      Rd)** 4813–4815 (all Ipswich City Council); **John Bray Park** 1956–1958, **Samford
      Valley** 1962–1964, **Lipscombe Rd** 1979–1981 (City of Moreton Bay); **Greys Plains Rd**
