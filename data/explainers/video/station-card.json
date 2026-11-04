@@ -1,0 +1,14 @@
+{
+ "format": "floodnet-explainer-video/1",
+ "explainer": "station-card",
+ "mp4": "data/explainers/video/station-card.mp4",
+ "vtt": "data/explainers/video/station-card.vtt",
+ "bytes": 4861071,
+ "duration": 62.73,
+ "width": 1920,
+ "height": 1080,
+ "fps": 30,
+ "voice_hash": "1bdb383527be2e58ba647e1bb2368fd4",
+ "sha256": "72976b3715ada9279c698e70ad9f441c",
+ "recorded_at": "2026-11-04T09:17:05Z"
+}
