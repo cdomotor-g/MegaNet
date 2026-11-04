@@ -180,6 +180,10 @@ const Admin = (function () {
 
   // ── Accounts waiting, and who may sign up (0062) ──
 
+  // How many wait for a decision — this panel's count, which the dashboard's
+  // tile shows too (admin-dashboard.js). null until the users have come back.
+  function waitingCount() { return users ? users.filter(u => u.status === 'pending').length : null; }
+
   // The confirmed accounts nobody has decided about yet and the allowlist does
   // not approve on its own — the ones an administrator was emailed about —
   // newest first; and, folded away under them, the sign-ups that have not
@@ -710,6 +714,8 @@ const Admin = (function () {
     }
     loading = false;
     repaint('people');
+    // The dashboard's Waiting for approval tile counts the same list.
+    if (typeof AdminDash !== 'undefined' && AdminDash.waitingChanged) AdminDash.waitingChanged();
     // The Teams panel suggests these accounts in its Add somebody box.
     if (typeof AdminTeams !== 'undefined' && AdminTeams.accountsChanged) AdminTeams.accountsChanged();
   }
@@ -893,7 +899,7 @@ const Admin = (function () {
     if (state.activeTab === 'admin' && isAdmin()) load();
   }
 
-  return { render, init, load, authChanged, saveUser, deleteUser, samePerson, freeAddress, formField,
+  return { render, init, load, authChanged, waitingCount, saveUser, deleteUser, samePerson, freeAddress, formField,
            saveEntry, editEntry, removeEntry, forgetKey, clearLocal, decide, setSignup,
            // What admin_users() last said (null before it answers), for the
            // Teams panel's suggestions.

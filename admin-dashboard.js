@@ -6,14 +6,17 @@
 //               sign in.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for state, esc, escAttr, announce and
-// registerTabTeardown; to datastore.js for dbRpc; to auth.js for Auth. admin.js
-// draws it (AdminDash.render into #adm-dash) and loads it (Admin.init);
+// Reaches back to core.js for state, esc, escAttr, termHtml, announce and
+// registerTabTeardown; to datastore.js for dbRpc; to auth.js for Auth; to
+// admin.js for Admin.waitingCount. admin.js draws it (AdminDash.render into
+// #adm-dash), loads it (Admin.init) and tells it when the users come back
+// (AdminDash.waitingChanged);
 // app.js's switchTab() and init.js call AdminDash.beacon(). Nothing here runs
 // at load.
 //
 // Everything on it comes from one call, meganet.admin_dashboard() (0043),
-// which refuses anybody meganet.is_admin() says no to. It is a reading of the
+// which refuses anybody meganet.is_admin() says no to — but for the Waiting
+// for approval tile, which counts the users admin.js already holds. It is a reading of the
 // database's own statistics — pg_stat_database, pg_stat_activity, the
 // relation sizes, pg_stat_statements — not a copy of Supabase's or
 // Cloudflare's dashboards, and it says where its numbers come from.
@@ -97,9 +100,10 @@ const AdminDash = (function () {
   // ── pieces ──
 
   // A stat tile: label, the number, one line under it, and an optional tone
-  // that is carried by a word as well as a colour (never colour alone).
-  function tile(label, value, sub, tone) {
-    return `<div class="adm-kpi${tone ? ` adm-kpi--${tone}` : ''}">
+  // that is carried by a word as well as a colour (never colour alone). An id
+  // lets one tile be redrawn on its own (waitingChanged).
+  function tile(label, value, sub, tone, id) {
+    return `<div class="adm-kpi${tone ? ` adm-kpi--${tone}` : ''}"${id ? ` id="${id}"` : ''}>
       <div class="adm-kpi-label">${label}</div>
       <div class="adm-kpi-value">${value}</div>
       ${sub ? `<div class="adm-kpi-sub">${sub}</div>` : ''}
@@ -164,6 +168,37 @@ const AdminDash = (function () {
       </details>`;
   }
 
+  // What the tiles' words mean (CLAUDE.md "Plain words"): the label's hover.
+  // The line under the tile says it in words too, for a finger or a keyboard.
+  const WORDS = {
+    waiting: 'Accounts that have confirmed their email address and are waiting for an administrator to approve or decline them. '
+      + 'Their address is not on the allowlist, so nobody let them in automatically (Bureau addresses never wait). '
+      + 'Until approved they cannot see the field photos or inspection records.',
+  };
+
+  // Accounts waiting for an administrator (0062), pulled out as its own tile:
+  // the count in the Waiting for approval panel below, read from the same list
+  // (Admin.load(), which every refresh here brings) so the two never disagree.
+  // Before that list is in, whoami's approvals_waiting, which counts the same
+  // accounts. Nobody waiting is a plain 0, not a blank.
+  function waitingTile() {
+    const listed = typeof Admin !== 'undefined' && Admin.waitingCount ? Admin.waitingCount() : null;
+    const n = listed != null ? listed
+      : (typeof Auth !== 'undefined' && Auth.approvalsWaiting ? Auth.approvalsWaiting() : 0);
+    const sub = n
+      ? `${n === 1 ? 'account' : 'accounts'} to approve or decline · <button type="button" class="link-btn"
+           onclick="document.getElementById('adm-waiting')?.scrollIntoView({ block: 'start' })">See the list</button>`
+      : 'Nobody is waiting';
+    return tile(termHtml('Waiting for approval', WORDS.waiting), num(n), sub, n ? 'warn' : null, 'adm-kpi-waiting');
+  }
+
+  // Admin.load() calls this when the users come back, so an approval below
+  // moves the number without redrawing the rest of the dashboard.
+  function waitingChanged() {
+    const el = document.getElementById('adm-kpi-waiting');
+    if (el) el.outerHTML = waitingTile();
+  }
+
   // ── sections ──
 
   function healthTiles(d) {
@@ -196,6 +231,7 @@ const AdminDash = (function () {
       ${tile('Cache hit', hit == null ? '—' : `${hit}%`,
              `${num(db.commits)} commits · ${num(db.rollbacks)} rollbacks · ${num(db.deadlocks)} deadlocks`,
              hit != null && hit < 99 ? 'warn' : null)}
+      ${waitingTile()}
       ${tile('Users active now', num(u.active_now),
              `${num(u.sessions_active)} live session${u.sessions_active === 1 ? '' : 's'} · seen 24 h: ${num(u.seen_24h)} · 7 d: ${num(u.seen_7d)} · ${num(u.total)} users`)}
       ${tile('Visitors today', num(today.signed_in + today.anonymous),
@@ -457,6 +493,6 @@ const AdminDash = (function () {
     if (delay) setTimeout(send, delay); else send();
   }
 
-  return { render, load, start, stop, sortBy, filterTables, authChanged, beacon, ago, VISITOR_KEY };
+  return { render, load, start, stop, sortBy, filterTables, authChanged, beacon, ago, waitingChanged, VISITOR_KEY };
 })();
 if (typeof window !== 'undefined') window.AdminDash = AdminDash;

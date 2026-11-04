@@ -176,6 +176,8 @@ async function main() {
         ]);
       }
       if (name === 'admin_allowlist') return reply([]);
+      // The dashboard, as little of it as draws its tiles.
+      if (name === 'admin_dashboard') return reply({ db: {}, connections: {}, users: {}, visits: { days: [] }, storage: [], api: [], tables: [] });
       if (name === 'admin_user_decide') return reply({ id: body.p_id, status: body.p_decision === 'approve' ? 'approved' : 'declined' });
       if (name === 'admin_set_signup') return reply(body.p_open ? 'open' : 'allowlist');
       if (name === 'account_merge') return reply({ kept: 'boss@bom.gov.au', folded_in: 'pat@council.example', teams: 1 });
@@ -498,6 +500,17 @@ async function main() {
         && J(list.buttons) === J(['Approve', 'Approve as editor', 'Decline']), J(list));
     check('…and the users table says each account\'s standing',
       J(list.standing) === J(['approved', 'waiting', 'waiting', 'unconfirmed']), J(list.standing));
+    const waitTile = () => p6.evaluate(() => {
+      const t = document.getElementById('adm-kpi-waiting');
+      return t && { n: t.querySelector('.adm-kpi-value')?.textContent.trim(), warn: t.classList.contains('adm-kpi--warn'),
+        label: t.querySelector('.adm-kpi-label')?.textContent.trim(), term: t.querySelector('.adm-kpi-label .term')?.getAttribute('title') || '',
+        sub: (t.querySelector('.adm-kpi-sub')?.textContent || '').replace(/\s+/g, ' ').trim() };
+    });
+    await p6.waitForSelector('#adm-kpi-waiting', { timeout: 10_000 });
+    const tw = await waitTile();
+    check('the dashboard pulls the accounts waiting out as a tile of its own, the same 2, marked and explained on hover',
+      tw && tw.n === '2' && tw.warn && /^Waiting for approval$/i.test(tw.label) && /confirmed their email address/.test(tw.term)
+        && /accounts to approve or decline/.test(tw.sub) && /See the list/.test(tw.sub), J(tw));
     const b6 = sent.length;
     await p6.click('#adm-waiting .adm-wait-row[data-user="u-pat"] button:has-text("Approve as editor")');
     await p6.waitForTimeout(400);
@@ -559,6 +572,16 @@ async function main() {
       null, { timeout: 10_000 });
     const mt = sentTo('rpc/my_mail_to', b6a).pop();
     check('…and choosing the address they sign in with sends my_mail_to(null), and says so', mt && mt.body.p_email === null, J(mt));
+    // Nobody left waiting: the tile says 0, plainly, rather than going blank.
+    await p6.evaluate(() => Auth.close && Auth.close());
+    await p6.route('**/rest/v1/rpc/admin_users', r => r.fulfill({ status: 200, contentType: 'application/json',
+      body: J([{ id: 'u-boss', email: 'boss@bom.gov.au', display_name: 'Boss', role: 'admin', status: 'automatic', is_you: true,
+                 created_at: '2026-09-01T00:00:00Z', confirmed_at: '2026-09-01T00:00:00Z', may_edit: true }]) }));
+    await p6.evaluate(() => Admin.load());
+    await p6.waitForFunction(() => document.querySelector('#adm-kpi-waiting .adm-kpi-value')?.textContent.trim() === '0', null, { timeout: 10_000 }).catch(() => {});
+    const tz = await waitTile();
+    check('…and with nobody waiting it shows 0, unmarked, and says nobody is waiting',
+      tz && tz.n === '0' && !tz.warn && /Nobody is waiting/.test(tz.sub), J(tz));
     await c6.close();
 
     // ═══════════════════════════════════════════════════════════════════════
