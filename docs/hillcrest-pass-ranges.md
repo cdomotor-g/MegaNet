@@ -1,4 +1,4 @@
-# Hillcrest (Wine Glass) pass ranges — what to set them to
+# Hillcrest (Wine Glass) pass ranges SUGGESTION
 
 *Hillcrest AL (Wine Glass), 540235, the repeater on 151.500 MHz at Logan · the station
 register as of 4 November 2026 · what Flood-Net's receiver heard, 5 October to 4 November
