@@ -19,7 +19,9 @@
 // admin-links.js for AdminLinks, whose Base station connections it draws under
 // the dashboard; to admin-teams.js for AdminTeams, whose Teams panel (0095) it
 // draws under the ingest tokens and loads from init(), and which it tells when
-// the accounts its Add somebody box suggests come back (accountsChanged); and
+// the accounts its Add somebody box suggests come back (accountsChanged); to
+// admin-costs.js for AdminCosts, whose Running costs it draws under the teams
+// and repaints with the rest on a sign-in or sign-out; and
 // to station-history.js for StationHistory, whose Deleted stations panel it draws
 // under the cards and loads from init().
 // Nothing here runs at load. auth.js calls Admin.authChanged() on every sign-in
@@ -659,6 +661,7 @@ const Admin = (function () {
         <div id="adm-people" class="stack">${peopleHtml()}</div>
         <div id="adm-tokens">${typeof AdminTokens !== 'undefined' ? AdminTokens.render() : ''}</div>
         <div id="adm-teams">${typeof AdminTeams !== 'undefined' ? AdminTeams.render() : ''}</div>
+        <div id="adm-costs">${typeof AdminCosts !== 'undefined' ? AdminCosts.render() : ''}</div>
         <div class="adm-cards">
           ${dataHtml()}
           <div class="panel">
@@ -698,6 +701,7 @@ const Admin = (function () {
     if (!which || which === 'people') set('adm-people', peopleHtml());
     if (!which || which === 'access') set('adm-access', accessHtml());
     if (!which || which === 'browser') set('adm-browser', browserHtml());
+    if (!which && typeof AdminCosts !== 'undefined') set('adm-costs', AdminCosts.render());
   }
 
   async function load() {

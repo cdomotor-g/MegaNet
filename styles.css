@@ -20281,6 +20281,18 @@ button.adm-danger:hover { border-color: var(--bad); }
 .adm-page .table-wrap[aria-labelledby="adm-roles-h"] table { min-width: 34rem; }
 .adm-page .table-wrap table.adm-tables { min-width: 44rem; }
 .adm-page .table-wrap table.bl-log     { min-width: 40rem; }
+/* Running costs (admin-costs.js): a wide table on a phone scrolls sideways
+   rather than folding words into letters; How sure is a chip whose word
+   carries the meaning, its border the colour. */
+.adm-page .table-wrap table.adm-costs-table { min-width: 52rem; }
+.adm-costs .adm-kpis { margin-bottom: .75rem; }
+.adm-costs-table th[scope="row"] { font-weight: 600; min-width: 11rem; }
+.adm-cost-for { font-weight: 400; margin-top: .15rem; max-width: 28ch; }
+.adm-cost-usd { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm-sure { padding: 0 .45em; border: 1px solid var(--border); border-radius: var(--r-pill); white-space: nowrap; font-size: var(--fs-sm); }
+.adm-sure--ok   { border-color: var(--ok); }
+.adm-sure--warn { border-color: var(--warn); }
+.adm-sure--bad  { border-color: var(--bad); }
 .adm-kpi {
   border: 1px solid var(--border);
   border-radius: var(--r-md);

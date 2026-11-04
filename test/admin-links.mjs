@@ -20,7 +20,11 @@
 //      the filters and their counts; another window asked for by its days.
 //   4. **The edges** — a station offline now is a gap still open, at the top
 //      of the log; a database without 0080 says which file to apply; an
-//      editor sees none of it and asks nothing.
+//      editor sees none of it and asks nothing, and sees no running costs.
+//
+// The layout checks also cover the Running costs panel (admin-costs.js): a
+// row a service, the total worked out from them, every chip's meaning on
+// hover and in the fold, and its table scrolling sideways on a phone.
 //
 // Run:  npm run adminlinks
 //       npm run adminlinks -- -v
@@ -197,19 +201,49 @@ async function main() {
       await page.click('#adm-tokens .adm-rcv-btn');
       check('…and closed again by the same click',
         await page.evaluate(() => document.getElementById('adm-rcv-11')?.hidden === true));
+      // Running costs (admin-costs.js): a row a service, the total worked out
+      // from the rows, every chip and marked word saying what it means, and
+      // the same meanings in the fold for a finger or a keyboard.
+      const costs = await page.evaluate(() => {
+        const root = document.getElementById('adm-costs');
+        const t = AdminCosts.totals();
+        const marked = [...root.querySelectorAll('.term, .term-chip')];
+        return {
+          width: Math.round(root.querySelector('table')?.getBoundingClientRect().width || 0),
+          rows: root.querySelectorAll('tbody tr').length,
+          services: AdminCosts.SERVICES.length,
+          known: root.querySelector('.adm-kpi-value')?.textContent.trim(),
+          want: `US$${t.lo === t.hi ? t.lo : `${t.lo}–${t.hi}`} a month`,
+          ask: t.ask.length,
+          marked: marked.length,
+          bare: marked.filter(el => !(el.getAttribute('title') || '').trim()).map(el => el.textContent),
+          fold: [...root.querySelectorAll('.adm-words dt')].map(el => el.textContent),
+          chips: [...new Set(marked.filter(el => el.matches('.term-chip')).map(el => el.textContent))],
+          links: [...root.querySelectorAll('tbody th a')].every(a => a.target === '_blank' && /noopener/.test(a.rel)),
+        };
+      });
+      check('Running costs: a row for every service, as wide as the page', costs.rows === costs.services && costs.rows >= 10
+        && costs.width >= box.links * 0.95, J(costs));
+      check('…the known total worked out from the rows, and the ones only a bill can say counted apart',
+        costs.known === costs.want && costs.ask >= 1, J(costs));
+      check('…every chip and marked word says what it means on hover, and the fold says it again',
+        costs.marked >= costs.rows && !costs.bare.length && costs.chips.every(c => costs.fold.includes(c)), J(costs));
+      check('…and a service\'s name opens its billing page in a new tab', costs.links, J(costs));
       await context.close();
     }
     {
       const { context, page } = await open({ viewport: { width: 390, height: 900 } });
       await page.waitForSelector('#adm-people table', { timeout: 15_000 });
       await page.waitForSelector('.bl-log', { timeout: 15_000 });
-      const phone = await page.evaluate(() => ['#adm-people table', '.bl-log', '#adm-dash ~ * table, .adm-tables'].map(q => {
+      const phone = await page.evaluate(() => ['#adm-people table', '.bl-log', '.adm-costs-table'].map(q => {
         const t = document.querySelector(q);
         const wrap = t?.closest('.table-wrap');
         return t ? { q, table: Math.round(t.getBoundingClientRect().width), wrap: Math.round(wrap.clientWidth), scrolls: wrap.scrollWidth > wrap.clientWidth + 1 } : { q };
       }));
-      check('on a phone the users table and the log keep their columns and scroll sideways in their wrappers',
-        phone.slice(0, 2).every(p => p.scrolls && p.table >= 500), J(phone));
+      check('on a phone the users table, the log and the running costs keep their columns and scroll sideways in their wrappers',
+        phone.every(p => p.scrolls && p.table >= 500), J(phone));
+      const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      check('…and the page itself does not scroll sideways', sideways <= 1, `${sideways}px`);
       await context.close();
     }
 
@@ -331,6 +365,12 @@ async function main() {
       const ed = await page.evaluate(() => document.getElementById('adm-links')?.textContent.trim() || '');
       check('an editor sees none of it, and nothing is asked for them',
         ed === '' && !asked.slice(n1).some(a => a.name === 'admin_base_station_links'), ed.slice(0, 80));
+      const cost = await page.evaluate(() => {
+        const root = document.getElementById('adm-costs');
+        return { text: (root?.textContent || '').split(/\s+/).join(' ').trim(), table: !!root?.querySelector('table') };
+      });
+      check('…nor the running costs: a line saying they are for administrators',
+        !cost.table && /for administrators/.test(cost.text), J(cost));
       await context.close();
     }
   } finally {
