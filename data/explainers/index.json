@@ -1,6 +1,6 @@
 {
  "format": "floodnet-explainer-index/1",
- "updated_at": "2026-11-04T08:53:35Z",
+ "updated_at": "2026-11-04T08:54:30Z",
  "explainers": [
   {
    "id": "welcome",
@@ -26,7 +26,7 @@
    "kind": "howto",
    "presenter": "seasoned-hydrographer",
    "voice": "final",
-   "secs": 71,
+   "secs": 61,
    "updated": "2026-11-04"
   }
  ]
