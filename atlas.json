@@ -88,6 +88,42 @@
         ]
       },
       {
+        "id": "elevenlabs-credits",
+        "what": "#274 ElevenLabs credits run short before they renew on 25 Nov: hold #265's voicing until after, or Creator for a month",
+        "on": "human",
+        "kind": "money",
+        "since": "2026-11-04",
+        "issue": "#274",
+        "holds": [
+          "#265 voiced this month",
+          "the last daily bulletins before 25 Nov voiced"
+        ],
+        "options": [
+          {
+            "what": "Hold #265's voicing until after 25 Nov (a comment on #265 before the scheduled session starts at 18:41 Brisbane, 4 Nov)",
+            "by": "human",
+            "effort": "2 min",
+            "pros": "costs nothing",
+            "cons": "about one daily bulletin around 24–25 Nov plays silent",
+            "recommended": true
+          },
+          {
+            "what": "Upgrade the ElevenLabs account to Creator for a month (US$22, 121,000 credits)",
+            "by": "human",
+            "effort": "5 min",
+            "pros": "nothing silent; #265 can be voiced now",
+            "cons": "US$16 more than Starter for the month"
+          },
+          {
+            "what": "Do nothing: the voices come back when the credits renew",
+            "by": "human",
+            "effort": "0",
+            "pros": "no spend, no step",
+            "cons": "two or three bulletins before 25 Nov play silent"
+          }
+        ]
+      },
+      {
         "id": "report-route",
         "what": "#270 give the Worker its GitHub token (GITHUB_ISSUES_TOKEN) so /api/report files reports itself",
         "on": "human",

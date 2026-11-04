@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-04** (revision 232 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-04** (revision 234 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -435,6 +435,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 > ~~**⚠️** These were originally listed as "independent — no sequencing dependency." They are logically independent but **mechanically serialised**~~ — **resolved the easy way: one agent did both in sequence**, #121 read #120's pane comment instead of picking a z-index blind, and the `MemMeter` third of the table had already been obsoleted by #144 (layers are counted generically off `liveMaps()`).
 
 ## Standalone issues
+- **#274** `[Standalone]` `[Human]` — **OPEN, opened revision 234** — ElevenLabs credits run short before they renew on 25 Nov. Starter's 40,000 for the month had about 12,400 left after the welcome was voiced; the 11–12 daily and 3 weekly bulletins due before the 25th need about 12,500–13,500, and #265's how-to about 400 more. Options on the issue: ⭐ hold #265's voicing until after the 25th (free; about one daily bulletin silent around 24–25 Nov), Creator for a month (US$22, 121,000 credits), or nothing (two or three silent). Click-by-click on the issue. **Unblocks:** #265 voiced and the last bulletins of November voiced. Found while costing the running services (the Admin tab's Running costs, `admin-costs.js`).
 - **#273** `[Standalone]` `[Human]` — **OPEN, opened revision 231** — find what raised the base station's noise floor on 24 October (about 3.7 dB, burst levels only 2.3; from the 10:00 hour, a settings change at 10:33, and again from about 19:00) and what lifted its levels about 5 dB at 16:00 on 2 November with no command logged. [investigation 03](https://floodwarning.net/investigations/2026-11-hillcrest-wine-glass) found the whole of 151.500 about 1.8 dB nearer the noise in between, and that is Hillcrest's *off air* and *back on air*. Click-by-click on the issue: Base Stations → *Signal across what it hears* and *Settings*, the Admin tab's *Base station connections*, and what changed at the site. **Unblocks:** an agent recording the good setting in `docs/base-stations.md`.
 - **#269** `[Standalone]` `[Human]` — **OPEN, opened revision 223** — identify ALERT2 concentrator **11762**, the one route Flood-Net hears about 1,650 legacy addresses by (the Tallai group of 3 Nov among them), and the ALERT2 repeaters on its way to our stick (10019, 11056, 10115, 11099, 10057, 10310; and 33300, the stick's other concentrator). None is on the register. A person who knows the Bureau's ALERT2 network replies on the issue with each site; *not* by setting a station's ALERT2 station address, which attributes readings. **Unblocks:** an agent putting them on the register so Signal Routes, Station Health and the bulletin can name the route a gap is on. Depends on nothing.
 - **#259** `[Standalone]` `[Opus5/High]` — **OPEN, opened revision 214** — a lighter off-air decoder, so cheaper industrial computers (a Toradex Verdin AM62, open-ALERT's trial) and a busy Pi 4 keep up. **Part 1 done at revision 215:** lean decoding (filter once per carrier guess) is the live pipeline's default, after RPi ALERT's compare at the first base station: 14 of 11,628 live bursts read differently (0.12%), lean in a third of the time. Between bursts, the rings are filled a block at a time (exactly the same messages, a quarter less work), and `specHz: 0` lets a pipeline skip the spectrum (another sixth). **Part 2 built at revision 218:** `BurstWatch` filters a channel only around its bursts (25 looks a second between them), reading the same as the pipeline alone in every case `npm run alertdsp` tries; RPi ALERT 0.18 carries it behind *Between bursts* (default *Always*, as before) with a *Check both* mode. **Revision 221:** light decoding (`lean: 2`, the burst filtered to 48 kHz once: half of lean's time, as many true readings in every test) for RPi ALERT 0.19 with a lean-against-light compare; the watch's pre-roll and hang-over shortened (a third less awake, the same readings); the Pi's pipeline keeps 5 s and no capture bytes. **Left:** the checks at the first base station, then the Pi's defaults, then this closes.
@@ -581,7 +582,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## Resource allocation summary
 
-> ## ⬛ Six AI rows, and nineteen `[Human]` issues.
+> ## ⬛ Six AI rows, and twenty `[Human]` issues.
 >
 > **Revision 163 opens and closes nothing** — at the owner's request, **three more looks, in pictures**: 🔲 **Tiles**, 🎚️ **Instrument** and 🪧 **Signs**, each Calm's shell drawn with a new set of pictograms (`glyphs.js`), and 🏠 **Home** (`home.js`), a new tab heading Start here — the network's counts, the six tools used most as big tiles, every other tool under them. Calm stays the default; Classic is untouched. See revision 163 below.
 >
@@ -765,7 +766,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### Human
 | Issues |
 |---|
-| #66, #156, #157, #158, #166, #185, #207, #210, #233, #234, #236, #237, #239, #255, #256, #261, #269, #270, #273 |
+| #66, #156, #157, #158, #166, #185, #207, #210, #233, #234, #236, #237, #239, #255, #256, #261, #269, #270, #273, #274 |
 
 > **The Human column shrank for a reason worth recording.** #145 was `[Human]` because applying a migration and creating a Storage bucket "needs the dashboard and the database password". That is no longer true: #149 applied `0010` and created the bucket from an agent session over the Supabase MCP connection, and verified both with read-only queries afterwards. **Before allocating anything else to a human on the grounds that it touches the live database, check whether that connection is available.** #146 and #148 were both allocated partly on that assumption, were re-noted at revision 15, and at revision 16 were done that way: `0011` applied over the same connection and verified with read-only queries. **Two migrations applied by an agent now, so this is a settled fact rather than one project's luck.** The Human column is #66, #156 and #157 — and each is `[Human]` for the right reason rather than the dashboard one: #156 is a product decision (which suggested features to want), and **#157 is the first one on this board that is `[Human]` because of the *toolchain*, not the credentials.** CRBasic Editor is Windows-only and Campbell's, and every `campbellsci.com` host is unreachable from the agent environment's egress policy, so a datalogger program cannot be compiled — or its instruction reference read — by any session, however it is allocated. That is a new category, and it is worth naming: the test above ("check whether that connection is available") does not dispose of it, because no connection would help.
 >
@@ -841,6 +842,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 36. **#256 (how long receptions stay) before settling #255 (compute size) for good; #255's look and upgrade can go first.** Small (#255) is enough today and for 30 days of receptions; keeping 90 means Medium within a few months. Neither blocks anything else, and #243 closing is not needed for either.
 37. **#261 (team owners, revision 216) any time; SoRT Forum first.** It gates nothing an agent waits on, but until it is done SoRT's task hand-off reaches administrators only. Owners from outside the Supabase team need #237's email to sign up, so #237 before them; owners already approved can be named now.
 38. **EPIC #262 (explainers, revision 219): ~~#263~~ (revision 220), ~~#264~~ and ~~#268~~ (revision 225) done; #265 next, then #266 and #267.** #265 adds the walkthrough scene to `explainers.js`. #263's player is `health-bulletin.js`, so a change to it goes one at a time with any change to the bulletin or its voicing (#247's bulletin half among them). Nothing on the board blocks it and it gates nothing; each script waits on the owner's OK before it is voiced, and each voiced video gets its MP4 by itself.
+39. **#274 (ElevenLabs credits, revision 234) before #265 is voiced this month.** The account renews on 25 Nov and is short by about a bulletin or two already; voicing #265 first (about 400 credits) adds one more silent bulletin. The owner's choice on #274 — hold #265 until after the 25th, or Creator for a month — decides whether #265's voicing waits. Gates nothing else; the bulletins keep running, silent if the credits are out.
 
 ## Priority (as stated on each epic/issue, where given)
 - **P2:** ~~#100 (epic) → #102/#103~~ — **the whole epic is closed**; ~~#152 (epic) → #153/#154/#155~~ — **that epic is closed too, at revision 55**; ~~#78 (epic) → #115/#116/#117/#149/#146/#148/#118~~ — **EPIC #78 is closed out; every child of it is shut**; ~~#122 (epic) → #123/#124/#125/#126/#159/#128/#127~~ — **the whole epic is closed**; ~~#129 (epic) → #130/#132/#133/#134/#135~~ — **all closed**
@@ -858,6 +860,14 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 234 — 2026-11-04: 💵 Running costs on the Admin tab; #274 opened
+
+The owner asked for every paid service Flood-Net uses and what each costs a month, on the Admin tab, then *"yes, open the ElevenLabs issue"*. **Opens #274; closes nothing.**
+
+- **Running costs** (`admin-costs.js`, administrators only): a row a service — the plan, what it likely costs a month, how sure (Confirmed, Estimate, Needs the bill, Free), what would make it cost more, the name a link to its billing page — and the total worked out from the rows: **about US$129–130 a month** before GST. The Claude plan (Max, US$100; about 95% Flood-Net's, the owner's reckoning) is most of it; then Supabase Pro US$25, ElevenLabs Starter US$6, the Fly.io bridge about US$2–3 and the domain about US$1 (Cloudflare Registrar). The Anthropic key is **not set** — `/api/briefing` answered 503 `not_configured` (`ANTHROPIC_API_KEY` missing) on 4 Nov — so the AI briefing costs Flood-Net nothing and runs on each person's own key. ✨ What's new 196.
+- **#274** `[Standalone]` `[Human]`: the ElevenLabs credits, found while costing the voices. Added to the standalone list, the Human row and sequencing item 39.
+- **Checks:** the cheap five; `npm run adminlinks` 37 (the rows and total, nothing unknown counted as such, every chip's meaning on hover and in the fold, the billing links, a phone's sideways scroll in the wrapper, an editor's one line). `atlas.json`: the blocker.
 
 ### Revision 233 — 2026-11-04: 🔑 SoRT's forum passphrase — a flood sentence the forum can change itself
 

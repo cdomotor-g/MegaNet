@@ -215,6 +215,8 @@ async function main() {
           known: root.querySelector('.adm-kpi-value')?.textContent.trim(),
           want: `US$${t.lo === t.hi ? t.lo : `${t.lo}–${t.hi}`} a month`,
           ask: t.ask.length,
+          asked: AdminCosts.SERVICES.filter(x => !x.month).length,
+          unknown: root.querySelectorAll('.adm-kpi-value')[1]?.textContent.trim(),
           marked: marked.length,
           bare: marked.filter(el => !(el.getAttribute('title') || '').trim()).map(el => el.textContent),
           fold: [...root.querySelectorAll('.adm-words dt')].map(el => el.textContent),
@@ -225,7 +227,7 @@ async function main() {
       check('Running costs: a row for every service, as wide as the page', costs.rows === costs.services && costs.rows >= 10
         && costs.width >= box.links * 0.95, J(costs));
       check('…the known total worked out from the rows, and the ones only a bill can say counted apart',
-        costs.known === costs.want && costs.ask >= 1, J(costs));
+        costs.known === costs.want && costs.ask === costs.asked && costs.unknown === String(costs.asked), J(costs));
       check('…every chip and marked word says what it means on hover, and the fold says it again',
         costs.marked >= costs.rows && !costs.bare.length && costs.chips.every(c => costs.fold.includes(c)), J(costs));
       check('…and a service\'s name opens its billing page in a new tab', costs.links, J(costs));

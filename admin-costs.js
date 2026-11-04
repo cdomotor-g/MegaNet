@@ -13,7 +13,9 @@
 // Where the figures come from, as read on CHECKED. The plans: Supabase's from
 // its connector (the organisation's plan), ElevenLabs's from the Bulletin
 // voices run log (tools/voice/speak.mjs prints the tier and the credits left),
-// and the rest from wrangler.toml, bridge/fly.toml and the docs —
+// the Anthropic key's from /api/briefing's own answer (503 not_configured), the
+// Claude plan, its share and the registrar from the owner, and the rest from
+// wrangler.toml, bridge/fly.toml and the docs —
 // docs/datastore-decision.md (Supabase Pro), docs/mqtt-provisioning.md
 // (HiveMQ, Fly.io), docs/accounts.md (Resend), docs/access.md (Cloudflare
 // Access, the Anthropic key's US$20 a day), docs/field-photos.md and
@@ -31,7 +33,7 @@ const AdminCosts = (function () {
   // colour, and the same meaning on hover and in the fold below.
   const SURE = {
     confirmed: { label: 'Confirmed', tone: 'ok',
-      meaning: 'The plan was read from the service itself (its connector or a run log) on the date at the foot, and the price from its price list. The bill may still add GST or usage on top.' },
+      meaning: 'The plan was read from the service itself (its connector, a run log or the Worker’s own answer) or given by the owner, on the date at the foot, and the price from its price list. The bill may still add GST or usage on top.' },
     estimate: { label: 'Estimate', tone: 'warn',
       meaning: 'Worked out from Flood-Net’s own settings and docs and the service’s price list, not read from a bill. The invoice may differ by a few dollars.' },
     ask: { label: 'Needs the bill', tone: 'bad',
@@ -56,6 +58,13 @@ const AdminCosts = (function () {
   // null where only the bill can say; `more` is what would make it cost more.
   const SERVICES = [
     {
+      name: 'Claude (Claude Code)', bill: 'https://claude.ai/settings/billing',
+      for: 'The scheduled sessions — the daily and weekly bulletins, the CI doctor every four hours, the nightly photo reader — and the work on Flood-Net itself.',
+      plan: () => 'Max (5×), US$100 a month before tax; about 95% of its use is Flood-Net’s (the owner, 4 Nov 2026)',
+      month: [95, 95], sure: 'confirmed',
+      more: 'The share is the owner’s reckoning of a plan used for other work too. Ultra, US$200 a month, if the scheduled sessions and the building outgrow Max.',
+    },
+    {
       name: 'Supabase', bill: 'https://supabase.com/dashboard/org/_/billing',
       for: 'The database, sign-in and accounts, and the data every tab and the agent API read.',
       plan: () => `Pro, one project; ${termHtml('compute', WORDS.compute)} covered by the plan’s US$10 credit`,
@@ -77,25 +86,18 @@ const AdminCosts = (function () {
       more: 'US$2.19 a month in Fly’s US regions, a little more in Sydney. A second machine, or a bigger one, about doubles it.',
     },
     {
-      name: 'floodwarning.net', bill: '',
+      name: 'floodwarning.net', bill: 'https://dash.cloudflare.com/?to=/:account/domains',
       for: 'The domain the site, the Worker and the agent API answer on.',
-      plan: () => 'A .net registration, registered 26 Feb 2026; its registrar is not recorded in the docs',
+      plan: () => 'A .net at Cloudflare Registrar, at cost; registered 26 Feb 2026, for a year as the owner remembers it',
       month: [1, 1], sure: 'estimate',
-      more: 'About US$12 a year at cost. If it was bought for one year, it renews about 26 Feb 2027 — a lapsed domain takes the whole site with it.',
+      more: 'About US$12 a year. It renews about 26 Feb 2027: check auto-renew is on and the card on file is current — a lapsed domain takes the whole site with it.',
     },
     {
       name: 'Anthropic API', bill: 'https://platform.claude.com',
       for: 'Station Health’s AI briefing on Flood-Net’s own key (/api/briefing), for editors and administrators.',
-      plan: () => 'Pay per use, held to US$20 a Brisbane day by the Worker and by the workspace’s own monthly spend limit',
-      month: null, sure: 'ask',
-      more: 'Nothing until the ANTHROPIC_API_KEY secret is set; then up to US$20 a day (about US$600 a month at the very most). The Console’s Usage page says what it is.',
-    },
-    {
-      name: 'Claude (Claude Code)', bill: 'https://claude.ai/settings/billing',
-      for: 'The scheduled sessions — the daily and weekly bulletins, the CI doctor every four hours, the nightly photo reader — and the work on Flood-Net itself.',
-      plan: () => 'The owner’s Claude plan, shared with other work',
-      month: null, sure: 'ask',
-      more: 'Not split out: the plan’s price is the cost, whatever share of it Flood-Net takes.',
+      plan: () => 'Not set up: on 4 Nov 2026 /api/briefing answered that ANTHROPIC_API_KEY is missing, so every briefing runs on the person’s own key',
+      month: [0, 0], sure: 'confirmed',
+      more: 'Set the key (docs/access.md) and the briefings are Flood-Net’s: pay per use at US$4 a million tokens in and US$20 out, probably well under a dollar a briefing (the tab shows each one’s cost), held to US$20 a Brisbane day.',
     },
     {
       name: 'Cloudflare', bill: 'https://dash.cloudflare.com/?to=/:account/billing',
@@ -203,12 +205,12 @@ const AdminCosts = (function () {
       <div class="panel adm-costs">
         ${head}
         <div class="adm-kpis">
-          <div class="adm-kpi"><div class="adm-kpi-label">Known so far</div>
+          <div class="adm-kpi"><div class="adm-kpi-label">${t.ask.length ? 'Known so far' : 'All told'}</div>
             <div class="adm-kpi-value">US$${total} <small>a month</small></div>
             <div class="adm-kpi-sub">${t.paid} paid services, before GST</div></div>
-          <div class="adm-kpi adm-kpi--warn"><div class="adm-kpi-label">Not known yet</div>
+          <div class="adm-kpi${t.ask.length ? ' adm-kpi--warn' : ''}"><div class="adm-kpi-label">Not known yet</div>
             <div class="adm-kpi-value">${t.ask.length}</div>
-            <div class="adm-kpi-sub">${esc(t.ask.join(' and '))}: only the bill says</div></div>
+            <div class="adm-kpi-sub">${t.ask.length ? `${esc(t.ask.join(' and '))}: only the bill says` : 'every service has a figure'}</div></div>
           <div class="adm-kpi"><div class="adm-kpi-label">Free for now</div>
             <div class="adm-kpi-value">${t.free}</div>
             <div class="adm-kpi-sub">until a limit in the last column</div></div>
