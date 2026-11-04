@@ -53,6 +53,18 @@
 //   what else it heard         a candidate whose *other* addresses were heard
 //                              on the same path is the likelier owner.
 //
+// Noise lands on every address in time. A week of the Raspberry Pi feed in
+// Nov 2026 held readings on 7,104 addresses, most of the register, 1,823 of
+// them heard once: decoder noise and corrupted copies, not stations. Counted
+// one an address, they pulled the median 170 km west of the receiver, onto the
+// register's own middle. So each address counts for the separate hours it was
+// heard in: a station's checks land on its address every few hours, all week,
+// and a stray lands once or twice. And a candidate further than FAR_KM from
+// where the receiver hears is never the owner, however many of its other
+// addresses were "heard" too: that is the noise again. Saddle Mtn AL, 1,350 km
+// from a Brisbane Pi, won address 5199 from Crafers West, further still, on
+// strays like that, and showed in Station Health as heard.
+//
 // What this does not do is force a winner. Two stations 6 km apart sharing
 // addresses stay ambiguous, and an address whose only owner on file is a
 // thousand kilometres from everything else this receiver hears is reported as
@@ -143,6 +155,27 @@ const SensorValues = (() => {
     const n = s.length;
     return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : null;
   }
+  // The UTC hour a timestamp falls in, as "2026-11-04T23". The datastore writes
+  // UTC, so that is the string's own start; anything else is parsed.
+  function hourKey(ts) {
+    const s = String(ts || '');
+    if (s.length >= 13 && s[10] === 'T' && (s.endsWith('Z') || s.endsWith('+00:00'))) return s.slice(0, 13);
+    const t = Date.parse(s);
+    return Number.isFinite(t) ? new Date(t).toISOString().slice(0, 13) : '';
+  }
+  // The median of [value, weight] pairs: the value half the weight lies either
+  // side of. With every weight 1 it is median() exactly.
+  function wmedian(xs) {
+    const s = xs.filter(x => x[1] > 0).sort((a, b) => a[0] - b[0]);
+    const half = s.reduce((n, x) => n + x[1], 0) / 2;
+    let acc = 0;
+    for (let i = 0; i < s.length; i++) {
+      acc += s[i][1];
+      if (acc > half) return s[i][0];
+      if (acc === half) return i + 1 < s.length ? (s[i][0] + s[i + 1][0]) / 2 : s[i][0];
+    }
+    return null;
+  }
   const placed = s => s && s.lat != null && s.lon != null && isFinite(s.lat) && isFinite(s.lon);
 
   // The ingress point a reading came in through, as the host it names.
@@ -174,11 +207,11 @@ const SensorValues = (() => {
     const byId = stationsById();
     const list = Array.isArray(rows) ? rows : [];
 
-    // Which addresses each path heard, and the uniquely-owned ones' stations.
+    // Which addresses each path heard, and in which hours.
     const heardOn = new Map();         // host -> Set(alert ids)
-    const anchorsOn = new Map();       // host -> [station]
-    const anchorsAll = [];
-    const seenAnchor = new Set();
+    const hoursOn = new Map();         // host -> Map(alert id -> Set(hour))
+    const hoursAll = new Map();        // alert id -> Set(hour), every path's
+    const addHour = (m, aid, hr) => { let s = m.get(aid); if (!s) m.set(aid, s = new Set()); s.add(hr); };
     for (const r of list) {
       if (r.alert_id == null) continue;
       // Every receiver that heard it: the kept copy's, and the ones whose
@@ -186,25 +219,29 @@ const SensorValues = (() => {
       // burst's copies within 8 s, so a receiver whose copies land second
       // still says where it listens (#232).
       const hostsHeard = new Set([hostOf(r.path), ...(Array.isArray(r.dup_paths) ? r.dup_paths.map(hostOf) : [])]);
-      const c = idx.get(r.alert_id);
+      const hr = hourKey(r.reading_ts || r.received_at);
+      addHour(hoursAll, r.alert_id, hr);
       for (const h of hostsHeard) {
-        if (!heardOn.has(h)) heardOn.set(h, new Set());
-        const set = heardOn.get(h);
-        if (set.has(r.alert_id)) continue;
-        set.add(r.alert_id);
-        if (c && c.length === 1 && placed(c[0].station)) {
-          if (!anchorsOn.has(h)) anchorsOn.set(h, []);
-          anchorsOn.get(h).push(c[0].station);
-          const k = c[0].station.id + '|' + r.alert_id;
-          if (!seenAnchor.has(k)) { seenAnchor.add(k); anchorsAll.push(c[0].station); }
-        }
+        if (!heardOn.has(h)) { heardOn.set(h, new Set()); hoursOn.set(h, new Map()); }
+        heardOn.get(h).add(r.alert_id);
+        addHour(hoursOn.get(h), r.alert_id, hr);
       }
     }
-    const centreOf = sts => sts.length >= MIN_ANCHORS
-      ? { lat: median(sts.map(s => s.lat)), lon: median(sts.map(s => s.lon)), n: sts.length } : null;
+    // The anchors: the uniquely-owned addresses heard, each with its station
+    // and the separate hours it was heard in — the weight it pulls with.
+    const anchorsOf = hm => {
+      const out = [];
+      hm.forEach((hrs, aid) => {
+        const c = idx.get(aid);
+        if (c && c.length === 1 && placed(c[0].station)) out.push({ st: c[0].station, w: hrs.size });
+      });
+      return out;
+    };
+    const centreOf = as => as.length >= MIN_ANCHORS
+      ? { lat: wmedian(as.map(a => [a.st.lat, a.w])), lon: wmedian(as.map(a => [a.st.lon, a.w])), n: as.length } : null;
     const centres = new Map();
-    anchorsOn.forEach((sts, h) => centres.set(h, centreOf(sts)));
-    const centreAll = centreOf(anchorsAll);
+    hoursOn.forEach((hm, h) => centres.set(h, centreOf(anchorsOf(hm))));
+    const centreAll = centreOf(anchorsOf(hoursAll));
     // A path with too few anchors of its own borrows everybody's: one network,
     // one corner of the country, is the usual case.
     const centreFor = h => centres.get(h) || centreAll;
@@ -228,21 +265,25 @@ const SensorValues = (() => {
       });
       cands.sort((a, b) => ((a.distKm == null ? Infinity : a.distKm) - (b.distKm == null ? Infinity : b.distKm))
                         || (b.siblings - a.siblings));
-      const a = cands[0], b = cands[1];
+      // Only a station within FAR_KM of where this receiver hears can be what
+      // it heard; the rest are out of the running, siblings or not.
+      const near = cands.filter(c => c.distKm == null || c.distKm <= FAR_KM);
+      const a = near[0] || cands[0], b = near[1];
       let conf, how;
-      if (cands.length === 1) {
-        if (a.distKm != null && a.distKm > FAR_KM) {
-          conf = 'far';
-          how = `the only station on file with this address, but ${Math.round(a.distKm).toLocaleString()} km from where this receiver hears — an unregistered station nearby is probably using it`;
-        } else {
-          conf = 'sole';
-          how = 'the only station on file with this address';
-        }
+      if (!near.length) {
+        conf = 'far';
+        how = cands.length === 1
+          ? `the only station on file with this address, but ${Math.round(a.distKm).toLocaleString()} km from where this receiver hears — an unregistered station nearby is probably using it`
+          : `the nearest of ${cands.length} stations sharing this address, and still ${Math.round(a.distKm).toLocaleString()} km from where this receiver hears`;
+      } else if (cands.length === 1) {
+        conf = 'sole';
+        how = 'the only station on file with this address';
+      } else if (near.length === 1) {
+        conf = 'resolved';
+        how = `the only one of ${cands.length} stations sharing this address within ${FAR_KM} km of where this receiver hears`;
       } else if (a.distKm != null && b.distKm != null && b.distKm - a.distKm >= GAP_KM) {
-        conf = a.distKm > FAR_KM ? 'far' : 'resolved';
-        how = conf === 'far'
-          ? `the nearest of ${cands.length} stations sharing this address, and still ${Math.round(a.distKm).toLocaleString()} km from where this receiver hears`
-          : `the nearest of ${cands.length} stations sharing this address to where this receiver hears — the next is ${Math.round(b.distKm - a.distKm).toLocaleString()} km further`;
+        conf = 'resolved';
+        how = `the nearest of ${cands.length} stations sharing this address to where this receiver hears — the next is ${Math.round(b.distKm - a.distKm).toLocaleString()} km further`;
       } else if (a.siblings > b.siblings) {
         conf = 'likely';
         how = `${cands.length} stations share this address; this one's other addresses were heard on the same path`;
@@ -252,7 +293,7 @@ const SensorValues = (() => {
       }
       // When every candidate agrees on what the address measures, the kind is
       // known even when the station is not.
-      const kinds = new Set(cands.map(c => c.kind));
+      const kinds = new Set(near.map(c => c.kind));
       const kind = conf === 'ambiguous' ? (kinds.size === 1 ? a.kind : null) : a.kind;
       const out = { st: a.station, types: a.types, kind, conf, how, others: cands.length - 1, distKm: a.distKm };
       memo.set(key, out);

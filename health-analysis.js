@@ -1807,8 +1807,16 @@ const HealthAnalysis = (() => {
     });
 
     // ── stations nobody heard, whose repeaters relayed others ──
+    // Only those a receiver here could hear: within FAR_KM of where one of them
+    // hears (the resolver's centres). A station further than that from every
+    // one is out of range, not unheard — the Emerald and Gladstone stations
+    // from a Pi in Brisbane — and saying it went unheard sends somebody to
+    // look at a station that is fine.
+    const hearsAt = rx.map(h => resolveRow.centreFor ? resolveRow.centreFor(h.host) : null).filter(Boolean);
+    const reachable = s => !placed(s) || !hearsAt.length || hearsAt.some(c => km(c, s) <= SensorValues.FAR_KM);
     const heardRepIds = new Set(repStats.filter(R => R.members.length >= 2).map(R => R.id));
     const notHeard = [];
+    let outOfRange = 0;
     if (heardRepIds.size) {
       for (const s of stations) {
         if (stationIds.has(s.id) || s.enabled === false || s.proposed) continue;
@@ -1821,6 +1829,7 @@ const HealthAnalysis = (() => {
         // are shared would have been heard under the other station's name.
         const idx = SensorValues.index();
         if (ids.some(a => (idx.get(a) || []).length > 1)) continue;
+        if (!reachable(s)) { outOfRange++; continue; }
         notHeard.push({ st: s, via: via.map(r => r.st.name) });
       }
     }
@@ -1828,8 +1837,9 @@ const HealthAnalysis = (() => {
       netFindings.push(finding('not-heard', 'info', {
         key: 'not-heard',
         title: `${plural(notHeard.length, 'station')} not heard at all`,
-        detail: `Registered, enabled, and on repeaters that relayed other stations' traffic in the window — but not one reading from them. Decommissioned, on a channel no receiver here is tuned to, or dead.`,
-        evidence: { stations: notHeard.slice(0, 50).map(n => ({ id: n.st.id, name: n.st.name, via: n.via.slice(0, 3) })), total: notHeard.length },
+        detail: `Registered, enabled, within range of a receiver here, and on repeaters that relayed other stations' traffic in the window — but not one reading from them. Decommissioned, on a channel no receiver here is tuned to, or dead.`
+              + (outOfRange ? ` ${plural(outOfRange, 'other station')} on those repeaters ${outOfRange === 1 ? 'is' : 'are'} more than ${SensorValues.FAR_KM} km from where every receiver here hears, so ${outOfRange === 1 ? 'it is' : 'they are'} left out: out of range, not unheard.` : ''),
+        evidence: { stations: notHeard.slice(0, 50).map(n => ({ id: n.st.id, name: n.st.name, via: n.via.slice(0, 3) })), total: notHeard.length, outOfRange },
       }));
     }
 

@@ -2,6 +2,16 @@
   "about": "Every change to Flood-Net's agent API (https://floodwarning.net/api/v1 and https://floodwarning.net/api/mcp) that someone using it would notice — a route, a field, a limit, a tool — newest first. Each entry is emailed once to everyone on the API notify list (sign up at https://floodwarning.net/api#notify). Served as JSON at https://floodwarning.net/api/v1/changelog and written up in docs/agent-api.md, under Changes. Add an entry in the same push as the change: it is what tells people.",
   "entries": [
     {
+      "id": "2026-11-04-out-of-range",
+      "date": "2026-11-04",
+      "title": "A station out of every receiver's range is no longer taken as heard",
+      "summary": "Station Health no longer takes stray readings for a station that no Flood-Net receiver could hear. Decoder noise and corrupted copies land on most ALERT addresses in a week, and a station more than 400 km from where every receiver hears was sometimes counted as heard on them: Saddle Mtn AL, near Cairns, showed as heard by a Pi in Brisbane. Now an address shared by two stations goes only to one within range, or to nobody, and where a receiver hears is worked out from how often each address is heard, not just whether it was. Such a station's card (GET /api/v1/stations/{id}/health, get_station_health) now says not heard instead of irregular, with no heard_by. The \"N stations not heard at all\" finding (GET /api/v1/health/findings) lists only stations within range of a receiver; its evidence gains outOfRange, how many on the same repeaters were left out as out of range. No route or kind has changed.",
+      "breaking": false,
+      "links": [
+        { "text": "Out of range is not heard", "url": "https://github.com/cdomotor-g/MegaNet/blob/main/docs/station-health.md#how-the-readings-are-read" }
+      ]
+    },
+    {
       "id": "2026-11-04-benchmarks",
       "date": "2026-11-04",
       "title": "A station's benchmarks, in numbers",

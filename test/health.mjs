@@ -205,9 +205,32 @@ try {
     const row = (a, v) => ({ addr: 'a:' + a, alert_id: a, reading_ts: '2026-10-01T00:00:00Z', value_raw: v, path: 'serial-monitor/test-pi-sdr0', station_id: null });
     const rows = near.map(([a]) => row(a, 130)).concat(far ? [row(far[0], 130)] : []);
     const res = SensorValues.resolver(rows);
+    // Noise lands on every address in time. Four addresses near a0 heard in
+    // ten separate hours each, and eight across the country heard once each:
+    // counted one an address the strays would outvote the stations; counted
+    // by the hours heard, where the receiver hears stays at a0.
+    const at = (a, h) => ({ addr: 'a:' + a, alert_id: a, reading_ts: new Date(Date.UTC(2026, 9, 1, h)).toISOString(), value_raw: 130, path: 'serial-monitor/test-pi-sdr0', station_id: null });
+    const strays = placed.filter(([, l]) => SensorValues.km(a0.lat, a0.lon, l[0].station.lat, l[0].station.lon) > 1000).slice(0, 8);
+    const noisy = near.flatMap(([a]) => Array.from({ length: 10 }, (_, h) => at(a, h))).concat(strays.map(([a], i) => at(a, i)));
+    const cN = SensorValues.resolver(noisy).centreFor('serial-monitor/test-pi');
+    const centreKm = cN ? SensorValues.km(a0.lat, a0.lon, cN.lat, cN.lon) : null;
+    // An address two far stations share goes to neither, however many of one station's
+    // other addresses strays put on the same path (Saddle Mtn AL and
+    // Crafers West on 5199, from a Pi in Brisbane).
+    const dist = s => SensorValues.km(a0.lat, a0.lon, s.lat, s.lon);
+    const shared = [...idx.entries()].find(([, l]) => l.length === 2 && l.every(c => c.station.lat != null && dist(c.station) > SensorValues.FAR_KM + 200)
+      && Math.abs(dist(l[0].station) - dist(l[1].station)) < SensorValues.GAP_KM
+      && stationAlertIds(l[0].station).some(x => (idx.get(x) || []).length === 1));
+    let sharedConf = null;
+    if (shared) {
+      const sib = stationAlertIds(shared[1][0].station).filter(x => (idx.get(x) || []).length === 1).slice(0, 3);
+      const r2 = near.flatMap(([a]) => Array.from({ length: 10 }, (_, h) => at(a, h))).concat(sib.map(x => row(x, 130)), [row(shared[0], 130)]);
+      sharedConf = SensorValues.resolver(r2)(row(shared[0], 130)).conf;
+    }
     return {
       conv, wild, rain, level, battAddr: batt && batt[0],
       nearConf: near.map(([a]) => res(row(a, 130)).conf), farConf: far ? res(row(far[0], 130)).conf : null, nNear: near.length,
+      strays: strays.length, centreKm, shared: shared && shared[0], sharedConf,
     };
   });
   ok('a battery count of 133 is 13.3 V', sv.conv && sv.conv.text === '13.3 V' && sv.conv.plausible === true, JSON.stringify(sv.conv));
@@ -216,6 +239,10 @@ try {
   ok('a level count stays a count — no scale is on file', sv.level && sv.level.value == null && sv.level.text === 'raw count', JSON.stringify(sv.level));
   ok('an address whose only owner is across the country from where the receiver hears is far',
     sv.nNear >= 3 && sv.nearConf.every(c => c === 'sole') && sv.farConf === 'far', JSON.stringify(sv));
+  ok('…where the receiver hears is weighted by the hours each address was heard, so a scatter of one-off strays across the country does not drag it off its stations',
+    sv.strays >= 6 && sv.centreKm != null && sv.centreKm < 60, JSON.stringify({ strays: sv.strays, centreKm: sv.centreKm }));
+  ok('…and an address shared by two stations both out of range goes to neither, though strays put one\'s other addresses on the same path',
+    sv.shared != null && sv.sharedConf === 'far', JSON.stringify({ shared: sv.shared, conf: sv.sharedConf }));
 
   const ml = await page.evaluate(async a => {
     switchTab('msglog');

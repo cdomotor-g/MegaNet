@@ -362,7 +362,8 @@ const Health = (() => {
           and the checks that went missing, batteries across their solar day, rain gauges and levels against their neighbours,
           receivers that stopped and repeaters that went unheard, stored readings that are corrupted copies rather than data, and which stations' checks
           land on top of each other — with the check time or repeater delay to change.
-          A missed check only counts against a station when a receiver that hears it was listening at the time.
+          A missed check only counts against a station when a receiver that hears it was listening at the time,
+          and a station more than ${SensorValues.FAR_KM} km from where every receiver hears is out of range: stray readings on its addresses are not taken for it.
           All of it is what Flood-Net's own receivers heard: a station not heard here may still be reporting to the Bureau,
           and ARRO, the Bureau's record, says whether it is.</p>
         <div id="hl-status" class="small hl-status" role="status">${statusHtml()}</div>
@@ -812,13 +813,14 @@ const Health = (() => {
         .addTo(layer);
       pts.push([S.st.lat, S.st.lon]);
     });
-    // Where each receiver hears: the median of the stations only it can hear.
+    // Where each receiver hears: the median of the stations only it can hear,
+    // each counted for the separate hours it was heard in (sensor-values.js).
     const centres = H.A.resolveRow && H.A.resolveRow.centres;
     if (centres) {
       centres.forEach((c, host) => {
         if (!c) return;
         L.circleMarker([c.lat, c.lon], { radius: 14, color: cssVar('--accent', '#0b5cab'), weight: 2, fill: false, dashArray: '5 4' })
-          .bindTooltip(`${esc(host)} hears around here (the middle of ${c.n} addresses only one station carries)`,
+          .bindTooltip(`${esc(host)} hears around here (the middle of ${c.n} addresses only one station carries, each counted for the hours it was heard, so stray one-off readings barely move it). A station more than ${SensorValues.FAR_KM} km from here is out of its range: readings on its addresses are taken for another station using them, not for it`,
             { direction: 'top', offset: [0, -14] })
           .addTo(layer);
       });

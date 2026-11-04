@@ -1579,6 +1579,16 @@ at [`GET /api/v1/changelog`](#get-apiv1changelog), newest first — both from
 in the same push. A change with nothing to notice (a fix inside, a faster
 answer) is not listed.
 
+- **4 November 2026 — A station out of every receiver's range is no longer
+  taken as heard.** Decoder noise and corrupted copies land on most ALERT
+  addresses in a week, and a station more than 400 km from where every
+  receiver hears was sometimes counted as heard on them — Saddle Mtn AL, near
+  Cairns, showed as heard by a Pi in Brisbane. Now an address two stations
+  share goes only to one within range, or to nobody, and where a receiver hears
+  is worked out from how often each address is heard. Such a station's card
+  (`get_station_health`) says *not heard*, not *irregular*. *N stations not
+  heard at all* lists only stations within range; its evidence gains
+  `outOfRange`. No route or kind has changed.
 - **4 November 2026 — A station's benchmarks, in numbers.** New:
   `GET /api/v1/stations/{id}/benchmarks` and the tool `get_benchmarks` — the
   survey marks the Bureau's HDB lists for a station's gauge (777 at 519

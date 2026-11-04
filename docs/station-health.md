@@ -353,6 +353,18 @@ hears that nobody else carries; a shared address resolves to the station near
 there (`sensor-values.js`, the same rule the Message Log uses), and an address
 whose only owner is more than 400 km away is a register problem, not a reading.
 
+**Out of range is not heard.** Noise lands on every address in time: a week of
+the Raspberry Pi feed in November 2026 held readings on 7,104 addresses, most of
+the register, 1,823 of them heard just once. So each address counts towards
+where a receiver hears for the separate hours it was heard in — a station's
+checks land on its address every few hours, all week, and a stray once or
+twice — which keeps the area on the receiver's own stations instead of the
+register's middle (it had drifted 170 km west of the Brisbane Pi). And a
+station more than 400 km from where every receiver hears is never taken as
+heard, however many of its addresses strays have landed on: an address it
+shares goes to a station within range or to nobody. Saddle Mtn AL, near Cairns
+and 1,350 km from the Pi, was "heard" that way until 4 November 2026.
+
 **Check schedules are learned, not assumed.** The period is read off the gaps
 between a station's reports, chosen among the intervals a logger is set to (15
 and 30 minutes, 1, 2, 3, 4, 6, 12 and 24 hours): a gap must be a whole number of
@@ -445,7 +457,7 @@ address numbers recur across the country.
 | **Address heard here, filed far away** | warning when it keeps a schedule, else note | the only station on file with it is more than 400 km from where the receiver hears | Fix the register: find the station here that uses it. |
 | **Address shared here** | note | two stations near each other share the address, so its readings cannot be attributed | Fix the register. |
 | **Address does not read like its sensor** | note | more than half of a "battery" address's readings (4+) are not a 12 V battery | Fix the register: another sensor, or another station, is on this address. |
-| **Not heard at all** | note | registered, enabled stations on repeaters within reach that relayed others' traffic, with not one reading | Confirm whether they are decommissioned, or check them. |
+| **Not heard at all** | note | registered, enabled stations within 400 km of where a receiver hears, on repeaters within reach that relayed others' traffic, with not one reading — those further from every receiver are out of range and only counted | Confirm whether they are decommissioned, or check them. |
 
 ## All stations — sparklines
 
