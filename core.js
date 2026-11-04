@@ -3899,8 +3899,10 @@ const DB_SCHEMA = 'meganet';
 // gain addresses, and the app reads them only where they are there. 101: the
 // Bureau's benchmarks (0101), applied by db-migrate.yml on 4 November 2026,
 // bumped after; the station card and the Level Survey read station_benchmark,
-// and a database without it answers none.
-const DB_SCHEMA_VERSION = 101;
+// and a database without it answers none. 102: the same benchmarks in numbers
+// for anybody (0102, station_benchmark_public), applied by db-migrate.yml on 4
+// November 2026, bumped after; only the agent API reads it.
+const DB_SCHEMA_VERSION = 102;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
