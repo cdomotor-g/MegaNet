@@ -119,7 +119,7 @@ if (VERBOSE) console.log(`  station ${pick.name} (${pick.id}), first hops ${pick
 // ── 1. the pill ──────────────────────────────────────────────────────────────
 console.log('\nThe pill');
 await page.evaluate(id => showStationCard(id), pick.id);
-await page.waitForSelector('#stn-card .mn-hops-pill', { timeout: 10_000 });
+await page.waitForSelector('#stn-card .mn-hops-pill', { state: 'attached', timeout: 10_000 });
 const pill0 = await page.evaluate(() => {
   const b = document.querySelector('#stn-card .mn-hops-pill');
   return { label: b.textContent.replace(/\s+/g, ' ').trim(), pressed: b.getAttribute('aria-pressed'),
