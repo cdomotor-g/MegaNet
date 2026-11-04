@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 185, date: '2026-11-04', items: [
+      '🎬 <strong>Videos</strong>, under <em>Start here</em>: <strong>Welcome to Flood-Net</strong>, a two-minute tour with '
+        + 'Graham and Turbo — the network, a station\'s card, how the network is each morning, the radio side, the field on a '
+        + 'phone, and a quick run through everything else and where its data comes from. For a meeting room, ⛶ '
+        + '<em>Full screen</em> fills the screen (a clicker moves a scene; Esc leaves), and 🔗 <em>Copy link</em> gives an '
+        + 'address that opens it ready to play. ⤓ <em>Download MP4</em> saves it as an ordinary video for a laptop or a slide deck.',
+    ] },
     { n: 184, date: '2026-11-03', items: [
       '📡 <strong>ACMA licence pins are hidden until you turn them on.</strong> The squares for the ACMA\'s licensed '
         + 'transmitters no longer cover the <strong>Stations</strong> map on every visit. To see them, open 🗺️ '

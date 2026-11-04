@@ -1,0 +1,91 @@
+# An MP4 of each 🎬 video, with its voices (#268, EPIC #262).
+#
+# After every Bulletin voices run (bulletin-voice.yml) — the one that says a
+# video once it is marked final — this records an MP4 of any voiced video whose
+# MP4 is missing or was made from another voice: tools/explainers/record.mjs
+# opens the Videos tab in Chromium, in its meeting layout, draws it a frame at a
+# time on the player's own clock and pipes the frames to ffmpeg with the video's
+# MP3. It writes data/explainers/video/<id>.mp4, .vtt (captions) and .json
+# (the voice it was made from), and the index's ⤓ Download MP4, then commits
+# them. No ElevenLabs credits: the voices are the ones already made.
+#
+# It runs on workflow_run because the voices are committed with that
+# workflow's own token, which starts no push-triggered workflow. Most runs
+# find nothing to do and stop at the first step.
+#
+# Run by hand: ids — video ids, comma-separated, or "all" to record again
+# even if up to date (after a change to how the videos are drawn, say).
+
+name: Video MP4s
+
+on:
+  workflow_run:
+    workflows: ['Bulletin voices']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      ids:
+        description: 'Record again even if up to date: "all", or video ids, comma-separated'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: explainer-video
+  cancel-in-progress: false
+
+jobs:
+  record:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: test/package-lock.json
+
+      - name: Which videos need an MP4
+        id: todo
+        env:
+          FORCE: ${{ inputs.ids }}
+        run: node tools/explainers/record.mjs --pending --list ${FORCE:+--force "$FORCE"} | tee -a "$GITHUB_OUTPUT"
+
+      - name: ffmpeg
+        if: ${{ steps.todo.outputs.ids != '' }}
+        run: ffmpeg -version >/dev/null 2>&1 || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+
+      - name: The test harness's Chromium
+        if: ${{ steps.todo.outputs.ids != '' }}
+        working-directory: test
+        run: npm ci && npx playwright-core install --with-deps chromium
+
+      - name: Record
+        if: ${{ steps.todo.outputs.ids != '' }}
+        run: node tools/explainers/record.mjs ${{ steps.todo.outputs.ids }}
+
+      - name: Commit the MP4s to main
+        if: ${{ steps.todo.outputs.ids != '' }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -A data/explainers/video data/explainers/index.json
+          if git diff --cached --quiet; then
+            echo "No MP4 changed — nothing to commit."
+            exit 0
+          fi
+          git commit -m "Video MP4s: ${{ steps.todo.outputs.ids }}" \
+                     -m "Recorded from the Videos tab a frame at a time, with its voices (tools/explainers/record.mjs, #268)."
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            echo "Push rejected (attempt $attempt); retrying after rebase."
+            sleep 10
+          done
+          exit 1

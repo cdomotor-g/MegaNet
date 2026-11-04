@@ -429,7 +429,7 @@ function makeShowPlayer(cfg = {}) {
   // played and at the end — a disc and nothing more, as on any video, so it
   // hides as little of the title card as it can. Its name says how long it
   // runs: as said with the sound on, as written with it off.
-  const bigPlayShown = () => !B.playing && (B.ended || (B.scene === 0 && B.t === 0));
+  const bigPlayShown = () => !B.render && !B.playing && (B.ended || (B.scene === 0 && B.t === 0));
   const bigPlayName = b => B.ended ? 'Watch again' : `Play the ${NOUN} · ${fmtDur(totalSecs(b))}`;
   function bigPlayButton(b) {
     return `<button class="hb-bigplay" title="${escAttr(bigPlayName(b))}" onclick="event.stopPropagation(); ${G}.bigPlay()">${bigPlayHtml(b)}</button>`;
@@ -708,7 +708,7 @@ function makeShowPlayer(cfg = {}) {
   // when it is playing; otherwise spread over the first four-fifths of the
   // scene's seconds.
   function revealCount(b, i, n) {
-    const v = voiced(b) && audioIs('ready') && voiceOf(b), x = v && v.scenes[i];
+    const v = voiced(b) && (audioIs('ready') || B.render) && voiceOf(b), x = v && v.scenes[i];
     if (x) { const at = x.start + B.t / 1000 + 0.05; return Math.min(n, x.words.filter(t => t <= at).length); }
     const secs = secsOf(b, i) * 0.82;
     return Math.min(n, Math.ceil(n * (B.t / 1000) / secs));
@@ -2103,6 +2103,28 @@ function makeShowPlayer(cfg = {}) {
     if (B.ro) { B.ro.disconnect(); B.ro = null; }
   }
 
+  // ── recording ──────────────────────────────────────────────────────────────
+  // A show drawn a frame at a time on its own clock, for an MP4
+  // (tools/explainers/record.mjs, #268): recording(true) stops the clock and the
+  // sound and hides the ▶; frame(i, ms) puts the stage at scene i, ms in — its
+  // motion at that moment, its words revealed as the voice file says them —
+  // without the sound playing.
+  function recording(on) {
+    B.render = !!on;
+    if (B.render) { stopClock(); stopAudio(); B.playing = false; }
+    drawBigPlay();
+  }
+  function frame(i, ms) {
+    const b = current();
+    if (!b) return false;
+    const n = (b.scenes || []).length;
+    i = Math.max(0, Math.min(n - 1, i));
+    B.playing = false; B.ended = false; B.t = Math.max(1, +ms || 0);
+    if (i !== B.scene || !document.querySelector(`#${ID}-svgbox svg`)) { B.scene = i; startScene(); }
+    else { stagePose(); syncAnims(); drawCaption(); }
+    return true;
+  }
+
   // What a show's own panel and hooks may use (cfg.panel, cfg.controls,
   // cfg.key, cfg.redrawn).
   const API = {
@@ -2111,6 +2133,7 @@ function makeShowPlayer(cfg = {}) {
     redrawScene: () => { const b = current(), box = document.getElementById(`${ID}-svgbox`); if (!b || !box) return; box.innerHTML = sceneSvg(b, B.scene); stagePose(); syncAnims(); },
     totalSecs: b => totalSecs(b), fmtDur, voiceOf: b => voiceOf(b), who, portrait, go, play, pause, toggle, next, prev, startScene, syncAnims,
     reload: () => { B.index = null; B.indexErr = ''; loadIndex(); },
+    render: recording, frame,
   };
 
   return {

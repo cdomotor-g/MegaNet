@@ -64,6 +64,8 @@
 //   months, and one is wanted in a meeting room whose Wi-Fi cannot be trusted
 //   (📥 Keep for no signal fetches it ahead). Each is asked for with its
 //   voice's hash (?h=), so a video voiced again is a new copy, not the old.
+//   Their MP4s (data/explainers/video/*.mp4) are not kept: a download, tens
+//   of megabytes, for a laptop or a slide deck, not for every device.
 //
 // And one thing that is not keeping at all: an administrator's notifications
 // (0066) arrive here, from the push service, whether or not a page is open —
@@ -96,6 +98,9 @@ const LEAFLET = /^https:\/\/unpkg\.com\/leaflet@[\d.]+\/dist\//;
 const OCR = /^https:\/\/unpkg\.com\/(?:tesseract\.js|tesseract\.js-core|@tesseract\.js-data\/eng)@[\d.]+\//;
 const LIBS = 'floodnet-libs';
 const VOICE_AUDIO = /\/data\/bulletins\/voice\/(?:daily|weekly)\/[^/]+\.mp3$/;
+// A video's MP4 (data/explainers/video/, #268): tens of megabytes, fetched only
+// when somebody downloads it — never kept on every device.
+const VIDEO_FILE = /\/data\/explainers\/video\/[^/]+\.mp4$/;
 
 const REFERENCE = new Set([
   // inspections.js — TABLES, LOOKUPS and the form itself
@@ -207,7 +212,7 @@ self.addEventListener('fetch', event => {
   if (LEAFLET.test(req.url)) { event.respondWith(versioned(event)); return; }
   if (OCR.test(req.url)) { event.respondWith(library(event)); return; }
   if (url.origin !== SCOPE.origin || url.pathname.startsWith(API) || url.pathname.startsWith('/cdn-cgi/')) return;
-  if (VOICE_AUDIO.test(url.pathname)) return;
+  if (VOICE_AUDIO.test(url.pathname) || VIDEO_FILE.test(url.pathname)) return;
   event.respondWith(url.searchParams.has('v') ? versioned(event) : file(event));
 });
 

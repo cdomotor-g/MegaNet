@@ -46,7 +46,7 @@
       "#259 a lighter off-air decoder: lean decoding is the live pipeline's default (0.12% of 11,628 live bursts read differently, a third of the time); part 2, BurstWatch, filters a channel only around its bursts (the same readings in every test, a sixth to a twentieth of the work between them), and light decoding (lean: 2) halves a burst's decode again; both in RPi ALERT 0.18–0.19 behind settings, waiting on their checks at the first base station"
     ],
     "next": [
-      "EPIC #262 explainers: 🎬 Videos shipped (#263); the welcome's second draft (#264) — real screenshots of the app, Turbo for the capabilities and sources — waits on the owner's OK, then voiced and its MP4 made (#268); the station-card how-to (#265) next",
+      "EPIC #262 explainers: the welcome is voiced and has its MP4 (#264, #268); next the station-card how-to with its walkthrough scene (#265), then the phone install (#266) and map layers (#267)",
       "#252–#254 road routes: avoid closures, inspection runs, routes kept offline (EPIC #250)",
       "#238 QLDTraffic flood events and road closures on the Stations map",
       "#216 staff alerts: daily digest email and web push for critical findings",
@@ -59,34 +59,6 @@
       "#260 fold the ALERT twins stored before 0096 into one reading each (after #243 and #257)"
     ],
     "blocked": [
-      {
-       "id": "welcome-script",
-       "what": "#264 the welcome video: its words, a draft on the site at ?watch=welcome, are voiced only once the owner has read them and said yes",
-       "on": "human",
-       "kind": "decision",
-       "since": "2026-11-03",
-       "issue": "#264",
-       "holds": [
-        "#264 voiced (about 840 ElevenLabs credits, once)",
-        "#268 the MP4 of it",
-        "the welcome shown in meetings with its voices"
-       ],
-       "options": [
-        {
-         "what": "Watch the silent draft at https://floodwarning.net/?watch=welcome or read the script on #264, and reply OK or with changes",
-         "by": "human",
-         "effort": "5 min",
-         "pros": "an agent then marks it final and the voice workflow says it",
-         "recommended": true
-        },
-        {
-         "what": "Ask for changes in plain words on #264; an agent rewrites the draft (no credits spent until it is final)",
-         "by": "agent",
-         "effort": "Low",
-         "model": "Opus5"
-        }
-       ]
-      },
       {
         "id": "accounts-email",
         "what": "#237 switch accounts on: Supabase sending through Resend, the sign-in settings and email templates, then a test drive",

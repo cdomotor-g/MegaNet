@@ -55,6 +55,7 @@ const Explainers = (() => {
     ['Scene', 'One drawing and the words said over it — a few seconds each. ⏮ and ⏭, the arrow keys and a clicker move a scene at a time.'],
     ['Full screen', 'For a meeting room: the picture fills the screen and the words are large under it. A presentation clicker’s next and back move a scene; Esc leaves.'],
     ['Keep for no signal', 'Fetches this video, its words and its voices now, so this device’s saved copy has them and it plays where there is no signal.'],
+    ['MP4', 'The same video as one ordinary video file, with its voices — for a laptop that cannot reach Flood-Net, or to put in a slide deck. Made from this player, a frame at a time; offered only when it matches the voices there are now.'],
   ];
   const meaning = w => (WORDS.find(x => x[0] === w) || [])[1] || '';
 
@@ -149,6 +150,10 @@ const Explainers = (() => {
       : 'Its words are approved; the voices are on their way, and it plays without them until they come.';
     const k = X.kept[f];
     const keptLine = k === 'busy' ? 'Keeping it…' : k === 'done' ? 'Kept on this device: it plays with no signal.' : k ? esc(k) : '';
+    // The MP4 (#268): offered only while it is of the voice there is now —
+    // the index lists it only then (tools/explainers/validate.mjs buildIndex).
+    const entry = api.entries(KIND).find(e => e.file === f), mp4 = entry && entry.video;
+    const download = mp4 ? `<a class="pill" href="${escAttr(mp4.mp4)}" download="floodnet-${escAttr(b.id)}.mp4" title="${escAttr(meaning('MP4'))}">⤓ ${termHtml('Download MP4', meaning('MP4'))} <span class="small">${esc((mp4.bytes / 1048576).toFixed(1))} MB</span></a>${mp4.vtt ? ` <a class="small" href="${escAttr(mp4.vtt)}" download="floodnet-${escAttr(b.id)}.vtt" title="The words with when each is said, for a video player that shows captions">captions</a>` : ''}` : '';
     return `<p class="small hb-issued">${state}</p>
       ${X.armed ? '<p class="small xp-armed" role="status">Opened from a link: <b>▶ plays it full screen</b>. Esc leaves full screen; a clicker’s next and back move a scene.</p>' : ''}
       <div class="xp-show${X.meeting ? ' is-meeting' : ''}" id="xp-show" onkeydown="Explainers.key(event)" onpointermove="Explainers.wake()">
@@ -159,6 +164,7 @@ const Explainers = (() => {
         <button class="ghost" onclick="Explainers.meeting(true)" title="${escAttr(meaning('Full screen'))} (F)">⛶ ${termHtml('Full screen', meaning('Full screen'))}</button>
         <button class="ghost" onclick="Explainers.copyLink()" title="The address that opens this video ready to play — for a meeting room’s laptop, or a message">🔗 Copy link</button>
         <button class="ghost" onclick="Explainers.keepIt()"${k === 'busy' ? ' disabled' : ''} title="${escAttr(meaning('Keep for no signal'))}">📥 ${termHtml('Keep for no signal', meaning('Keep for no signal'))}</button>
+        ${download}
         <span class="small xp-kept" role="status">${keptLine}</span>
       </div>
       <details class="hb-transcript"><summary>Read it instead</summary>${api.transcriptHtml(b)}</details>
@@ -242,7 +248,7 @@ const Explainers = (() => {
   // In a meeting the bar hides while it plays, and comes back on a move or a key.
   function wake() {
     const el = document.getElementById('xp-show');
-    if (!el || !X.meeting) return;
+    if (!el || !X.meeting || X.rendering) return;
     el.classList.remove('is-idle');
     clearTimeout(X.idle);
     X.idle = setTimeout(() => {
@@ -322,6 +328,20 @@ const Explainers = (() => {
     X.want = String(id).toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 60);
     X.armed = !!X.want;
     if (typeof switchTab === 'function') switchTab('videos');
+  }
+
+  // For an MP4 (tools/explainers/record.mjs): the meeting layout over the
+  // page, the bar hidden for good, nothing easing in between frames, the
+  // player's clock stopped — then Explainers._api.frame(i, ms), frame by frame.
+  function renderMode(on) {
+    X.rendering = !!on;
+    const el = document.getElementById('xp-show');
+    if (el) { el.classList.toggle('is-meeting', !!on); el.classList.toggle('is-idle', !!on); }
+    X.meeting = !!on;
+    document.documentElement.classList.toggle('xp-meeting-on', !!on);
+    document.documentElement.classList.toggle('xp-rendering', !!on);
+    P._api.render(!!on);
+    return !!el;
   }
 
   function bigPlay() {
@@ -753,7 +773,7 @@ const Explainers = (() => {
   return {
     ...P,
     render: () => P.render(), init, stop, bigPlay,
-    meeting, wake, copyLink, keepIt, restoreFromUrl,
+    meeting, wake, copyLink, keepIt, restoreFromUrl, _render: renderMode,
     // For the tests: the scenes' own drawers and the live counts.
     _x: () => ({ ...X }), _liveCount: liveCount, _tabOf: tabOf, _cueIndex: cueIndex, _shots: () => SHOTS.index, SKETCHES, PARTS, WORDS,
   };

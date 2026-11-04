@@ -41,6 +41,9 @@
 //     and names its callouts; a tally draws each item on its own word
 //   * the app still has every part each screenshot points at (else: take it
 //     again with tools/explainers/shoot.mjs — CLAUDE.md, Videos)
+//   * ⤓ Download MP4 only when the index offers one; and, with ffmpeg, the
+//     fixture recorded small: H.264 and AAC, as long as its voices, a frame
+//     from inside each scene that scene, its captions beside it (#268)
 //   * Copy link gives ?watch=<id>; Keep for no signal says what it needs with
 //     no saved copy; no videos yet says so; the bulletin still plays on
 //     Station Health; a phone has no sideways scroll
@@ -55,6 +58,7 @@ import { fileURLToPath } from 'node:url';
 import { validate, validateIndex, validateVoice, voicePathFor, clipPathFor, buildIndex, listFiles, VOICE_FORMAT } from '../tools/explainers/validate.mjs';
 import { sceneKey, explainerKeys, explainerHash, pendingExplainers, voiceExplainer, withLexicon } from '../tools/voice/speak.mjs';
 import { readManifest, openShot, targetBoxes } from '../tools/explainers/shoot.mjs';
+import { record, sceneAt, vttFor, pendingVideos } from '../tools/explainers/record.mjs';
 import { cueIndex } from '../tools/explainers/validate.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -276,6 +280,36 @@ console.log('Voicing');
   }
 }
 
+// ── 3½. the MP4 (#268) ──────────────────────────────────────────────────────
+console.log('The MP4');
+{
+  const vf = voiceFor(FIXTURE, 'data/explainers/fixture-all.json');
+  const mids = vf.scenes.map(sc => (sc.start + sc.end) / 2);
+  ok('each moment of the video is in its scene, by the voice file\'s times', mids.every((t, i) => sceneAt(vf, t).i === i) && sceneAt(vf, vf.duration + 1).i === vf.scenes.length - 1);
+  ok('…the gap after a scene still its own, and how far in counted from its start', sceneAt(vf, vf.scenes[0].end + 0.2).i === 0 && Math.abs(sceneAt(vf, vf.scenes[1].start + 0.5).ms - 500) < 1);
+  const vtt = vttFor(FIXTURE, vf);
+  const cues = vtt.split('\n\n').slice(1).filter(Boolean);
+  ok('the captions are WebVTT, a dozen words a cue at most, every word in them', vtt.startsWith('WEBVTT') && cues.every(c => c.split('\n')[2].split(' ').length <= 12)
+    && cues.map(c => c.split('\n')[2]).join(' ').split(' ').length === FIXTURE.scenes.reduce((n, s) => n + wordsOf(s).length, 0), vtt.slice(0, 300));
+  // The index offers an MP4 only while it is of the voice there is now.
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'xpv-'));
+  const put = (rel, obj) => { fs.mkdirSync(path.dirname(path.join(repo, rel)), { recursive: true }); fs.writeFileSync(path.join(repo, rel), typeof obj === 'string' ? obj : JSON.stringify(obj)); };
+  const x = clone(FIXTURE); x.id = 'vd';
+  const v = voiceFor(x, 'data/explainers/vd.json');
+  put('data/explainers/vd.json', x); put(v.audio, 'x'); put('data/explainers/voice/vd.json', v);
+  ok('a voiced video with no MP4 is to be recorded', pendingVideos({ repo }).includes('vd'));
+  put('data/explainers/video/vd.mp4', 'x');
+  put('data/explainers/video/vd.json', { mp4: 'data/explainers/video/vd.mp4', vtt: 'data/explainers/video/vd.vtt', bytes: 1, voice_hash: v.hash });
+  const ix1 = buildIndex(repo).explainers[0];
+  ok('…with one of its voice, it is not, and the index offers it', !pendingVideos({ repo }).includes('vd') && ix1.video && ix1.video.mp4 === 'data/explainers/video/vd.mp4', JSON.stringify(ix1));
+  put('data/explainers/voice/vd.json', { ...v, hash: 'another' });
+  const ix2 = buildIndex(repo).explainers[0];
+  ok('…voiced again, the old MP4 is not offered, and it is to be recorded again', !ix2.video && pendingVideos({ repo }).includes('vd'), JSON.stringify(ix2));
+  put('data/explainers/vd.json', { ...x, voice: 'draft' });
+  ok('…a draft is never recorded', !pendingVideos({ repo }).includes('vd'));
+  fs.rmSync(repo, { recursive: true, force: true });
+}
+
 // ── 4. in Chromium ──────────────────────────────────────────────────────────
 console.log('In Chromium');
 const { startServer } = await import('./lib/server.mjs');
@@ -298,11 +332,7 @@ function wav(secs, rate = 8000) {
   return w;
 }
 const fixVoice = voiceFor(FIXTURE, fixFile);
-async function page(opts = {}) {
-  const context = await browser.newContext({ viewport: opts.viewport || { width: 1440, height: 1000 }, timezoneId: 'Australia/Brisbane' });
-  const pg = await context.newPage();
-  const errors = [];
-  pg.on('pageerror', e => errors.push(e.message));
+async function routes(pg, opts = {}) {
   await applyNetworkPolicy(pg, server.origin);
   await pg.route('**/data/explainers/index.json', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(opts.index || fixIndex) }));
   await pg.route('**/' + fixFile, r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FIXTURE) }));
@@ -313,6 +343,13 @@ async function page(opts = {}) {
     if (opts.voice && u.pathname.endsWith(voicePathFor(fixFile).audio)) return r.fulfill({ status: 200, contentType: 'audio/wav', body: wav(opts.voice.duration) });
     return r.fulfill({ status: 404, body: 'not found' });
   });
+}
+async function page(opts = {}) {
+  const context = await browser.newContext({ viewport: opts.viewport || { width: 1440, height: 1000 }, timezoneId: 'Australia/Brisbane' });
+  const pg = await context.newPage();
+  const errors = [];
+  pg.on('pageerror', e => errors.push(e.message));
+  await routes(pg, opts);
   await pg.goto(server.origin + '/index.html' + (opts.query || ''), { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => typeof state !== 'undefined' && state.data && Array.isArray(state.data.stations), null, { timeout: LOAD_TIMEOUT });
   if (!opts.query) await pg.evaluate(() => switchTab('videos'));
@@ -443,6 +480,36 @@ try {
     ok('…with no page errors', !errors.length, errors.join('\n'));
     await context.close();
   }
+  {
+    // ⤓ Download MP4 — only when the index offers one.
+    const withMp4 = clone(fixIndex); withMp4.explainers[0].video = { mp4: 'data/explainers/video/fixture-all.mp4', vtt: 'data/explainers/video/fixture-all.vtt', bytes: 5 * 1048576 };
+    const { pg, context, errors } = await page({ index: withMp4 });
+    await until(pg, () => !!document.querySelector('#xp-stage svg'));
+    const dl = await pg.evaluate(() => { const a = document.querySelector('.xp-tools a[download$=".mp4"]'); return a ? { href: a.getAttribute('href'), name: a.getAttribute('download'), text: a.textContent.replace(/\s+/g, ' ').trim() } : null; });
+    ok('⤓ Download MP4 when the index offers one, named floodnet-…, with its size', dl && /fixture-all\.mp4$/.test(dl.href) && dl.name === 'floodnet-fixture-all.mp4' && /5\.0 MB/.test(dl.text), JSON.stringify(dl));
+    await pg.evaluate(f => Explainers.pick(f), draftFile);
+    await until(pg, () => Explainers._state().file === 'data/explainers/fixture-draft.json' && !!document.querySelector('#xp-stage svg'));
+    ok('…and none for a video the index offers none for', !(await pg.evaluate(() => !!document.querySelector('.xp-tools a[download$=".mp4"]'))));
+    ok('…with no page errors', !errors.length, errors.join('\n'));
+    await context.close();
+  }
+  if (spawnSync('ffmpeg', ['-version']).status === 0) {
+    // Recorded for real, small: the fixture, voiced, a frame at a time.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'xpr-'));
+    const sound = path.join(tmp, 'voice.wav');
+    fs.writeFileSync(sound, wav(fixVoice.duration));
+    const got = await record({ id: 'fixture-all', base: server.origin + '/', launch: () => launchBrowser(), width: 1280, height: 720, fps: 5, outDir: tmp,
+      setup: pg => routes(pg, { voice: fixVoice }), audio: sound, log: () => {} });
+    const probe = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration:stream=codec_name,width,height', '-of', 'json', path.join(tmp, 'fixture-all.mp4')]);
+    const pr = JSON.parse(String(probe.stdout || '{}'));
+    const dur = +((pr.format || {}).duration || 0), codecs = (pr.streams || []).map(st => st.codec_name).sort().join(',');
+    ok('recorded, the MP4 is H.264 with AAC, as long as its voices and the hold after', codecs === 'aac,h264' && Math.abs(dur - (fixVoice.duration + 1.5)) < 0.6, JSON.stringify(pr));
+    const at = t => got.frames[Math.round(t * 5)];
+    ok('…a frame from inside each scene is that scene', fixVoice.scenes.every((sc, i) => at((sc.start + sc.end) / 2) === i), JSON.stringify(got.frames));
+    ok('…with its captions and what it was made from beside it', fs.existsSync(path.join(tmp, 'fixture-all.vtt')) && got.meta.voice_hash === fixVoice.hash && got.meta.bytes > 1000, JSON.stringify(got.meta));
+    ok('…and no page errors while it was drawn', !got.errors.length, got.errors.join('\n'));
+    fs.rmSync(tmp, { recursive: true, force: true });
+  } else console.log('  (no ffmpeg here — recording an MP4 is checked where there is)');
   {
     // Each screenshot's parts, still on its page in the app as it is now.
     for (const shot of MANIFEST.shots) {

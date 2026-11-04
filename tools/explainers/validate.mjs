@@ -349,12 +349,22 @@ export function listFiles(repo) {
 export function buildIndex(repo, { now = new Date() } = {}) {
   const items = listFiles(repo).map(file => {
     const x = JSON.parse(fs.readFileSync(path.join(repo, file), 'utf8'));
-    let secs = (x.scenes || []).reduce((n, s) => n + (+s.secs || 0), 0);
+    let secs = (x.scenes || []).reduce((n, s) => n + (+s.secs || 0), 0), video = null;
     try {
       const vp = path.join(repo, voicePathFor(file).json);
-      if (fs.existsSync(vp)) { const v = JSON.parse(fs.readFileSync(vp, 'utf8')); if (!validateVoice(v, x).errors.length) secs = Math.round(v.duration); }
+      if (fs.existsSync(vp)) {
+        const v = JSON.parse(fs.readFileSync(vp, 'utf8'));
+        if (!validateVoice(v, x).errors.length) {
+          secs = Math.round(v.duration);
+          // Its MP4 (tools/explainers/record.mjs), only while it is of this voice.
+          const mp = path.join(repo, 'data', 'explainers', 'video', `${x.id}.json`);
+          const m = fs.existsSync(mp) ? JSON.parse(fs.readFileSync(mp, 'utf8')) : null;
+          if (x.voice === 'final' && m && m.voice_hash === v.hash && fs.existsSync(path.join(repo, m.mp4))) video = { mp4: m.mp4, vtt: m.vtt, bytes: m.bytes };
+        }
+      }
     } catch (_) { /* as written */ }
-    return { id: x.id, file, title: x.title, summary: x.summary, kind: x.kind, presenter: x.presenter, voice: x.voice, secs, updated: x.updated, order: Number.isFinite(x.order) ? x.order : 50 };
+    return { id: x.id, file, title: x.title, summary: x.summary, kind: x.kind, presenter: x.presenter, voice: x.voice, secs, updated: x.updated,
+      ...(video ? { video } : {}), order: Number.isFinite(x.order) ? x.order : 50 };
   });
   items.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'welcome' ? -1 : 1) || a.order - b.order || String(a.title).localeCompare(String(b.title)));
   return { format: INDEX_FORMAT, updated_at: now.toISOString().replace(/\.\d+Z$/, 'Z'), explainers: items.map(({ order, ...e }) => e) };

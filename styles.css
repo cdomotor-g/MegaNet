@@ -21454,6 +21454,8 @@ button.adm-danger:hover { border-color: var(--bad); }
 .xp-show.is-meeting.is-idle { cursor: none; }
 .xp-show.is-meeting.is-idle .hb-ctl { opacity: 0; }
 html.xp-meeting-on, html.xp-meeting-on body { overflow: hidden; }
+/* Recording an MP4 a frame at a time (#268): nothing eases between frames. */
+html.xp-rendering *, html.xp-rendering *::before, html.xp-rendering *::after { transition: none !important; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Site Map (site-map.js) — a guide to every other tab, and the gold line from

@@ -1,6 +1,6 @@
 {
  "format": "floodnet-explainer-index/1",
- "updated_at": "2026-11-03T23:58:06Z",
+ "updated_at": "2026-11-04T00:08:55Z",
  "explainers": [
   {
    "id": "welcome",
@@ -11,7 +11,12 @@
    "presenter": "seasoned-hydrographer",
    "voice": "final",
    "secs": 130,
-   "updated": "2026-11-03"
+   "updated": "2026-11-03",
+   "video": {
+    "mp4": "data/explainers/video/welcome.mp4",
+    "vtt": "data/explainers/video/welcome.vtt",
+    "bytes": 6303174
+   }
   }
  ]
 }

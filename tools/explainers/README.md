@@ -183,6 +183,28 @@ scenes for when it is final again, and it plays silent meanwhile.
 - **📥 Keep for no signal** — fetches the video, its words and its voices so
   the device's saved copy has them, for a venue whose Wi-Fi cannot be trusted.
 
+## The MP4
+
+Every voiced video also gets an MP4 (#268): `tools/explainers/record.mjs`
+opens the Videos tab in Chromium in its meeting layout and draws it **a frame
+at a time on the player's own clock** — each scene's motion at that moment,
+its words revealed as the voice file says them — piping the frames to ffmpeg
+with the video's own MP3. No credits: the voices are the ones already made.
+
+```bash
+node tools/explainers/record.mjs welcome      # one video (1920×1080 at 30 fps)
+node tools/explainers/record.mjs --pending    # every voiced video whose MP4 is missing or out of date
+```
+
+It writes `data/explainers/video/<id>.mp4` (H.264 + AAC, under 25 MiB),
+`.vtt` (captions) and `.json` (the voice it was made from), and the index
+offers ⤓ **Download MP4** only while that voice is the one there is now. The
+**Video MP4s** workflow (`explainer-video.yml`) runs it after every Bulletin
+voices run, so a video voiced again gets its MP4 again without anybody asking;
+run it by hand with `ids: all` after a change to how the videos are drawn.
+It is drawn with the tests' own network — the page from the checkout,
+nothing off-site — so its counts and map are the committed station list's.
+
 ## Files
 
 | File | What |
@@ -193,6 +215,8 @@ scenes for when it is final again, and it plays silent meanwhile.
 | `data/explainers/voice/clips/<key>.mp3`, `.json` | one scene as said, kept for the next voicing |
 | `tools/explainers/shots.json` | the screenshots, and the parts of each |
 | `tools/explainers/shoot.mjs` | takes them |
+| `tools/explainers/record.mjs`, `.github/workflows/explainer-video.yml` | the MP4s |
+| `data/explainers/video/<id>.mp4`, `.vtt`, `.json` | a video's MP4, its captions, and the voice it was made from |
 | `data/explainers/shots/<name>.webp`, `index.json` | the screenshots, and where each part is on them |
 | `tools/explainers/validate.mjs` | what a video may hold |
 | `explainers.js` | the tab, its scenes and meeting mode |
