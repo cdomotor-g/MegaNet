@@ -37,6 +37,15 @@
 // for every way the cameras faced from there — two photos taken a few seconds
 // apart, up the reach and down it, are one pin with two cones — up to six.
 //
+// Two markers, in two panes, as the 3-D view has always drawn it: the dot and
+// the cones under the network's canvas, so a station's pin is drawn over them
+// and the click on it is the station's; the badge over the canvas, the button.
+// Asked for over a gauge at Condamine whose pin, under one 8 px dot, opened 19
+// photos rather than its card: "the station pin should probably be on top of
+// those photo wedge things". A badge that would cover a station's pin stands
+// over the pin instead, on a short tick (map-stack.js), so nothing of a
+// photo's is ever on top of a station.
+//
 // ── In 3-D (#200) ────────────────────────────────────────────────────────────
 // The tilted map draws these same pins and asks for nothing itself: drawn()
 // is what this file put on the map, after the query, FieldPhotos.spots() and
@@ -46,14 +55,23 @@
 // off) are this file's in both modes, and so is the note that says which: the
 // 2-D map under the canvas follows the camera, so its zoom is the camera's.
 const MapPhotos = (function () {
-  // Its own pane, over the network's canvas (the overlay pane, 400) and the
-  // arrows (405), under the station pins (markerPane, 600). Over the canvas
-  // because a full-map <canvas> takes every click that lands on it: at 352,
-  // among the other context points, a pin could be seen and never pressed —
-  // map-sites.js learnt the same about its candidates. Under the pins because
-  // a photo taken beside a station must never cover the station.
+  // The badges' pane, over the network's canvas (the overlay pane, 400) and
+  // the arrows (405). Over the canvas because a full-map <canvas> takes every
+  // click that lands on it: at 352, among the other context points, a pin
+  // could be seen and never pressed — map-sites.js learnt the same about its
+  // candidates.
+  //
+  // The dots' and cones' pane, under that canvas and over the drive route
+  // (395). Under it because the station pins are drawn on it — every one of
+  // ~3,000 in that one canvas, not markers in Leaflet's marker pane (600) — so
+  // anything over the canvas is over the stations. A photo taken at a station,
+  // which is most of them, has its dot on the station's middle; drawn on top,
+  // it took the station's click. Nothing here takes the pointer: the canvas
+  // above it takes them all, and the badge is the button.
   const PANE   = 'mnPhotos';
   const PANE_Z = 420;
+  const FOOT_PANE = 'mnPhotoFeet';
+  const FOOT_Z    = 398;
   const MIN_ZOOM    = 12;
   const DEBOUNCE_MS = 250;
   const MERGE_PX    = 30;      // pins closer than this on screen are one
@@ -79,7 +97,7 @@ const MapPhotos = (function () {
     if (layer) { layer.remove(); layer = null; }
     const had = drawn.length > 0;
     drawn = [];
-    MapStack.setPins('photos', []);
+    MapStack.setMany({ photoDots: [[]], photos: [[]] });
     if (had) tell3d();
   }
 
@@ -116,9 +134,10 @@ const MapPhotos = (function () {
   }
 
   // The pin's markup, in its parts: a cone per heading, the dot on the point
-  // and the badge with the count. One pin here; the 3-D view lays the cones on
-  // the ground, puts the dot under the station pins and stands the badge up
-  // (map-3d.js says why they are apart there), and they are these same parts.
+  // and the badge with the count. Two markers here, the foot (the cones and
+  // the dot) and the badge; the 3-D view lays the cones on the ground, puts
+  // the dot under the station pins and stands the badge up (map-3d.js says why
+  // they are apart there), and they are these same parts.
   //
   // Each cone's turn is a custom property rather than an inline transform —
   // the design system's rule (#109): a token reaching the element, not a
@@ -132,10 +151,18 @@ const MapPhotos = (function () {
     return `<span class="mn-photo-badge"><span aria-hidden="true">📷</span><b>${g.n}</b></span>`;
   }
 
+  function footIcon(g) {
+    return L.divIcon({
+      className: 'mn-photo-foot',
+      html: `<span class="mn-photo-pin">${g.cones.map(coneHtml).join('')}${DOT_HTML}</span>`,
+      iconSize: [0, 0],
+      iconAnchor: [0, 0],
+    });
+  }
   function icon(g) {
     return L.divIcon({
       className: 'mn-photo-icon',
-      html: `<span class="mn-photo-pin">${g.cones.map(coneHtml).join('')}${DOT_HTML}${badgeHtml(g)}</span>`,
+      html: `<span class="mn-photo-pin">${badgeHtml(g)}</span>`,
       iconSize: [0, 0],
       iconAnchor: [0, 0],
     });
@@ -154,29 +181,35 @@ const MapPhotos = (function () {
     FieldPhotos.openSpot(g.ids, null, `${g.n} photo${g.n === 1 ? '' : 's'} taken here`);
   }
 
-  // The room a pin takes, in px round its point, for the pins of other layers
-  // that make room for it (map-stack.js): the dot and the badge standing up
-  // and right off it (styles.css), the badge as wide as its count. The cones
-  // are see-through and are not counted.
-  function roomOf(g) {
-    return [-4, -24, 32 + 7 * String(g.n).length, 7];
+  // The room a pin takes, in px round its point, for the pins it makes room
+  // for and the pins that make room for it (map-stack.js): the dot (8 px and
+  // its border) on the point, and the badge standing up and right off it
+  // (styles.css), as wide as its count. The cones are see-through and are not
+  // counted.
+  const DOT_ROOM = [-6, -6, 6, 6];
+  function badgeRoom(g) {
+    return [4, -24, 32 + 7 * String(g.n).length, -4];
   }
 
   function draw(groups) {
     if (layer) layer.remove();
-    layer = L.layerGroup([], { pane: PANE });
-    const room = new Map();
+    layer = L.layerGroup();
+    const room = new Map(), feet = [];
     for (const g of groups) {
+      feet.push(L.marker([g.lat, g.lon], { icon: footIcon(g), pane: FOOT_PANE, interactive: false, keyboard: false })
+        .addTo(layer));
       const m = L.marker([g.lat, g.lon], { icon: icon(g), pane: PANE, keyboard: true, riseOnHover: true,
                                            title: titleOf(g), alt: titleOf(g), bubblingMouseEvents: false })
         .on('click', () => open(g))
         .addTo(layer);
-      room.set(m, roomOf(g));
+      room.set(m, badgeRoom(g));
     }
     layer.addTo(map);
-    // Never moved — the dot is the photo's exact point and the cones are drawn
-    // from it — but a survey mark, a bridge or a camera stands clear of it.
-    MapStack.setPins('photos', [...room.keys()], m => room.get(m));
+    // The foot never moves — the dot is the photo's exact point and the cones
+    // are drawn from it — and a survey mark, a bridge or a camera stands clear
+    // of it. The badge stands clear of a station's pin; a survey mark, a
+    // bridge or a camera stands clear of it in turn.
+    MapStack.setMany({ photoDots: [feet, () => DOT_ROOM], photos: [[...room.keys()], m => room.get(m)] });
     drawn = groups.map(g => ({ lat: g.lat, lon: g.lon, ids: g.ids.slice(), n: g.n, cones: g.cones.slice(),
                                title: titleOf(g) }));
     tell3d();
@@ -238,6 +271,11 @@ const MapPhotos = (function () {
     attach(m) {
       map = m;
       if (!m.getPane(PANE)) m.createPane(PANE).style.zIndex = PANE_Z;
+      if (!m.getPane(FOOT_PANE)) {
+        const p = m.createPane(FOOT_PANE);
+        p.style.zIndex = FOOT_Z;
+        p.style.pointerEvents = 'none';
+      }
       m.on('moveend', sync);
       sync();
     },

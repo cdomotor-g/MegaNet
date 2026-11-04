@@ -1164,6 +1164,56 @@ async function browserHalf() {
     ok('a click on the pin opens the carousel over the photos taken there', v && v.ids.length === 2 && v.ids.includes(R.sw.id) && v.ids.includes(R.ne.id)
       && /2 photos taken here — photo 1 of 2/.test(await text('#fp-v-title')), J(v));
     await page.keyboard.press('Escape');
+    // A station's pin is on top of a photo taken at it. Asked for at
+    // Condamine, where a gauge's pin under a photo's dot opened 19 photos
+    // rather than its card: the dots and cones are a pane under the network's
+    // canvas, where the pins are drawn, and only the badge is over it — and a
+    // badge that would cover a pin stands over it (map-stack.js). The photo
+    // placed by hand is put on the Gatton ALERT station's own point for this,
+    // far enough from the others that it is a pin of its own, then put back.
+    const p2was = { lat: R.p2.lat, lon: R.p2.lon }, view16 = centre;
+    Object.assign(R.p2, PINNED.gatton_al);
+    await page.evaluate(() => FieldPhotos.changed());
+    await page.waitForFunction(([lat, lon]) => MapPhotos.drawn().some(d => d.lat === lat && d.lon === lon),
+      [PINNED.gatton_al.lat, PINNED.gatton_al.lon], { timeout: LOAD_TIMEOUT });
+    const under = await page.evaluate(() => {
+      const pane = n => state.map.getPane(n), z = n => (pane(n) ? +getComputedStyle(pane(n)).zIndex : null);
+      const box = state.map.getContainer().getBoundingClientRect();
+      const at = ll => { const p = state.map.latLngToContainerPoint(ll); return { x: box.left + p.x, y: box.top + p.y }; };
+      const st = state.mapMarkers.find(m => m.mnStationId === 'gatton_al');
+      const c = at(st.getLatLng());
+      const foot = [...document.querySelectorAll('.mn-photo-foot')]
+        .find(el => { const r = el.getBoundingClientRect(); return Math.hypot(r.left - c.x, r.top - c.y) < 1.5; });
+      const hit = document.elementFromPoint(c.x, c.y);
+      // Drawn there, though not hit-tested: elementsFromPoint leaves out what takes no pointer.
+      const dot = foot && foot.querySelector('.mn-photo-dot').getBoundingClientRect();
+      // MapStack's own box for a pin, and its 2 px of slack.
+      const pins = state.mapMarkers.map(m => {
+        const o = m.options, p = at(m.getLatLng()), r = o.radius + (o.weight || 0) / 2 + (o.mnOutline ? 3 : 0);
+        return { x0: p.x - r, y0: p.y - r, x1: p.x + r, y1: p.y + r };
+      });
+      const covered = [...document.querySelectorAll('.mn-photo-icon .mn-photo-badge')].map(b => b.getBoundingClientRect())
+        .filter(b => pins.some(p => b.left < p.x1 - 2 && b.right > p.x0 + 2 && b.top < p.y1 - 2 && b.bottom > p.y0 + 2)).length;
+      return { c, foot: !!foot, dotUnder: !!dot && c.x > dot.left && c.x < dot.right && c.y > dot.top && c.y < dot.bottom,
+               feet: z('mnPhotoFeet'), badges: z('mnPhotos'), canvas: z('overlayPane'),
+               feetTake: pane('mnPhotoFeet') ? getComputedStyle(pane('mnPhotoFeet')).pointerEvents : null,
+               hit: hit ? `${hit.tagName.toLowerCase()}.${[...hit.classList].join('.')}` : null,
+               onCanvas: !!hit && hit.tagName === 'CANVAS' && !!hit.closest('.leaflet-overlay-pane'), covered };
+    });
+    ok('the photos\' dots and cones are under the network\'s canvas and take no pointer; their badges are over it',
+      under.feet < under.canvas && under.badges > under.canvas && under.feetTake === 'none', J(under));
+    ok('…so on a photo taken at a station, the station\'s pin is what the pointer finds, the photo\'s dot under it',
+      under.foot && under.dotUnder && under.onCanvas, J(under));
+    ok('…and no badge covers a station\'s pin', under.covered === 0, J(under));
+    await page.mouse.click(under.c.x, under.c.y);
+    await page.waitForFunction(() => state.stnCard.id === 'gatton_al', null, { timeout: LOAD_TIMEOUT }).catch(() => {});
+    const card = await page.evaluate(() => state.stnCard.id);
+    ok('…and a click there opens the station\'s card, not the photos', card === 'gatton_al' && !(await viewer()), J(card));
+    await page.evaluate(() => closeStnCard(false));
+    Object.assign(R.p2, p2was);
+    await page.evaluate(c => { state.map.setView([c.lat, c.lon], c.z, { animate: false }); FieldPhotos.changed(); }, view16);
+    await page.waitForFunction(([lat, lon]) => MapPhotos.drawn().length === 3 && MapPhotos.drawn().some(d => d.lat === lat && d.lon === lon),
+      [p2was.lat, p2was.lon], { timeout: LOAD_TIMEOUT });
     await page.evaluate(() => state.map.setZoom(11, { animate: false }));
     await page.waitForFunction(() => MapPhotos._note().kind === 'zoom', null, { timeout: LOAD_TIMEOUT });
     ok('zoomed out past 12 there are no pins, and the note says to zoom in', (await page.$$('.mn-photo-icon')).length === 0

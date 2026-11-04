@@ -791,9 +791,10 @@ const Map3D = (function () {
   // by splitting the pin rather than by hiding part of it:
   //
   //   * the **dot** on the point, a circle in `mn-photos` under the station
-  //     pins. In 2-D the photos' pane is under the markers' so that a photo
-  //     taken beside a station never covers it, and a photo taken *at* one —
-  //     most of them — has its dot exactly on the station's middle.
+  //     pins. In 2-D the dot and the cones are a pane under the network's
+  //     canvas, where the station pins are drawn, so that a photo taken beside
+  //     a station never covers it, and a photo taken *at* one — most of them —
+  //     has its dot exactly on the station's middle.
   //   * the **cones**, a symbol per heading in the same source and also under
   //     the pins, drawn from 2-D's own outline (MapPhotos.conePath) and
   //     laid in the ground's plane — `icon-rotation-alignment` and

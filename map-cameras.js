@@ -54,8 +54,9 @@ const MapCameras = (function () {
   // copy, a checkout served locally — as bug-report.js reaches /api/report.
   const API_ORIGIN = 'https://floodwarning.net';
   // Its own pane over the network's canvas (overlay, 400), the way map-photos.js
-  // explains, and just under the field photos (420): a picture of our own at
-  // the same spot is the one on top. Both under the station pins (600).
+  // explains, and just under the field photos' badges (420): a picture of our
+  // own at the same spot is the one on top. The station pins are drawn on that
+  // canvas, so a tile that would cover one stands over it (map-stack.js).
   const PANE = 'mnCameras';
   const PANE_Z = 415;
   const MIN_ZOOM = 8;          // a view ~300 km across

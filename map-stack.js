@@ -40,10 +40,15 @@
 //   stations  never move: the network is what the map is for, and a pin
 //             fanned or focused or led to by the card's gold line is where its
 //             station is. Their rings are what everything else makes room for.
-//   photos    never move either: a photo's dot is on its exact point and its
-//             cones are drawn from there. Its badge already stands up off the
-//             point, out of a station pin's way; that badge is room taken.
-//   survey    a mark stands over a station pin or a photo badge.
+//   photoDots never move either: a photo's dot is on its exact point and its
+//             cones are drawn from there, under the station pins (map-photos.js).
+//   photos    the 📷 badge with the count, which stands up and right off its
+//             dot and, where that would cover a station's pin, stands over the
+//             pin instead — asked for in these words, over a gauge whose pin a
+//             photo badge covered at Condamine: "the station pin should
+//             probably be on top". A dot and the badges are one layer's pins
+//             to each other (KIN), so a badge never makes room for its own dot.
+//   survey    a mark stands over a station pin or a photo's dot or badge.
 //   bridges   over all of those — a gauge is very often on a bridge, and a
 //             benchmark on its deck.
 //   cameras   over everything: the tallest pin, and the one a council put on
@@ -81,12 +86,16 @@
 // and its hover label and callout are offset by the same.
 const MapStack = (function () {
   const LAYERS = {
-    stations: { rank: 0, fixed: true },
-    photos:   { rank: 1, fixed: true },
-    survey:   { rank: 2 },
-    bridges:  { rank: 3 },
-    cameras:  { rank: 4 },
+    stations:  { rank: 0, fixed: true },
+    photoDots: { rank: 1, fixed: true, kin: 'photos' },
+    photos:    { rank: 2 },
+    survey:    { rank: 3 },
+    bridges:   { rank: 4 },
+    cameras:   { rank: 5 },
   };
+  // Pins of one kin are left to each other, as one layer's are: the layer
+  // already arranges its own.
+  const kin = layer => LAYERS[layer].kin || layer;
   const GAP      = 4;    // px between a pin and the one it stands on
   const SLACK    = 2;    // px of overlap not worth moving for: edges touching
   const MAX_LIFT = 72;   // px — never further than this above its own point
@@ -119,18 +128,24 @@ const MapStack = (function () {
     return io.iconSize ? L.point(io.iconSize).divideBy(2) : L.point(0, 0);
   }
 
+  function keep(layer, markers, box) {
+    if (!LAYERS[layer]) return;
+    if (!markers || !markers.length) delete sets[layer];
+    else sets[layer] = markers.map(m => ({ m, box: (box && box(m)) || boxOf(m) }));
+  }
+
   // Where a pin belongs: its own point, or where MapSpider will put it back.
   function home(m) { return m._mnHome || m.getLatLng(); }
 
   const overlaps = (a, b) => a.x0 < b.x1 - SLACK && a.x1 > b.x0 + SLACK
                           && a.y0 < b.y1 - SLACK && a.y1 > b.y0 + SLACK;
   const inside = (r, p) => p.x >= r.x0 && p.x <= r.x1 && p.y >= r.y0 && p.y <= r.y1;
-  const moved = (r, dx, dy) => ({ x0: r.x0 + dx, y0: r.y0 + dy, x1: r.x1 + dx, y1: r.y1 + dy, layer: r.layer });
+  const moved = (r, dx, dy) => ({ x0: r.x0 + dx, y0: r.y0 + dy, x1: r.x1 + dx, y1: r.y1 + dy, layer: r.layer, kin: r.kin });
 
   function layout() {
     if (!map) return;
-    // Only pins that never move — the stations' and the photos' — is nothing
-    // to place: what moves is every other layer's. Laying out ~5,000 station
+    // Only pins that never move — the stations' and the photos' dots — is
+    // nothing to place: what moves is every other layer's. Laying out ~5,000 station
     // pins to find that out was a fifth of a second of a slow laptop's every
     // zoom and every rebuild of the Stations map.
     if (!Object.keys(sets).some(k => !LAYERS[k].fixed)) return;
@@ -140,7 +155,7 @@ const MapStack = (function () {
       const spec = LAYERS[layer];
       for (const p of sets[layer]) {
         const pt = map.project(home(p.m), z);
-        all.push({ m: p.m, box: p.box, layer, rank: spec.rank, fixed: !!spec.fixed, pt });
+        all.push({ m: p.m, box: p.box, layer, kin: kin(layer), rank: spec.rank, fixed: !!spec.fixed, pt });
       }
     }
     all.sort((a, b) => a.rank - b.rank || b.pt.y - a.pt.y || a.pt.x - b.pt.x);
@@ -155,10 +170,10 @@ const MapStack = (function () {
     // `at` is the box placed, `home` the box on the pin's own point: a pin
     // that has moved still stands for the place it came from.
     const put = (at, home) => { at.home = home; add(grid, at, at); add(homes, home, at); };
-    // What a box at r would overlap, leaving out its own layer's pins.
+    // What a box at r would overlap, leaving out its own kin's pins.
     const hits = r => {
       const out = new Set();
-      cells(r, k => { for (const o of grid.get(k) || []) if (o.layer !== r.layer && overlaps(r, o)) out.add(o); });
+      cells(r, k => { for (const o of grid.get(k) || []) if (o.kin !== r.kin && overlaps(r, o)) out.add(o); });
       return [...out];
     };
 
@@ -177,7 +192,8 @@ const MapStack = (function () {
     const centre = o => ({ x: (o.x0 + o.x1) / 2, y: (o.y0 + o.y1) / 2 });
 
     for (const p of all) {
-      const r = { x0: p.pt.x + p.box[0], y0: p.pt.y + p.box[1], x1: p.pt.x + p.box[2], y1: p.pt.y + p.box[3], layer: p.layer };
+      const r = { x0: p.pt.x + p.box[0], y0: p.pt.y + p.box[1], x1: p.pt.x + p.box[2], y1: p.pt.y + p.box[3],
+                  layer: p.layer, kin: p.kin };
       p.dx = 0; p.dy = 0; p.onto = false;
       const over = p.fixed ? [] : hits(r);
       if (!over.length) { put(r, r); continue; }
@@ -186,7 +202,7 @@ const MapStack = (function () {
       // whatever already stands there.
       const near = new Set();
       cells({ x0: p.pt.x, y0: p.pt.y, x1: p.pt.x, y1: p.pt.y }, k => {
-        for (const o of homes.get(k) || []) if (o.layer !== p.layer && inside(o.home, p.pt)) near.add(o);
+        for (const o of homes.get(k) || []) if (o.kin !== p.kin && inside(o.home, p.pt)) near.add(o);
       });
       const base = [...near].sort((a, b) => Math.hypot(centre(a.home).x - p.pt.x, centre(a.home).y - p.pt.y)
                       - Math.hypot(centre(b.home).x - p.pt.x, centre(b.home).y - p.pt.y))[0];
@@ -273,9 +289,15 @@ const MapStack = (function () {
     // marker's own size does not say it — a zero-sized icon whose pin is
     // drawn by CSS, a badge standing off its point.
     setPins(layer, markers, box) {
-      if (!LAYERS[layer]) return;
-      if (!markers || !markers.length) delete sets[layer];
-      else sets[layer] = markers.map(m => ({ m, box: (box && box(m)) || boxOf(m) }));
+      keep(layer, markers, box);
+      layout();
+    },
+
+    // Several layers' pins at once, laid out once: { layer: [markers, box] }.
+    // For a layer whose pin is two markers (a photo's dot and its badge), so
+    // the map is never laid out with one of them new and the other old.
+    setMany(bySet) {
+      for (const [layer, [markers, box]] of Object.entries(bySet)) keep(layer, markers, box);
       layout();
     },
 

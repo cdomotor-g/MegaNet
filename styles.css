@@ -19706,9 +19706,12 @@ body.has-sort-bridge .signin-nudge { display: none; }
 .adm-deleted-sub { display: block; color: var(--muted); font-size: var(--fs-xs); overflow-wrap: anywhere; }
 
 /* ── Field photos on the Stations map (map-photos.js) ── */
-.mn-photo-icon { background: none; border: 0; }
+.mn-photo-icon,
+.mn-photo-foot { background: none; border: 0; }
 /* The dot sits on the point; the badge stands up and to the right of it, so a
-   photo beside a station neither hides under its pin nor hides it. */
+   photo beside a station neither hides under its pin nor hides it. In 2-D the
+   dot and the cones (.mn-photo-foot) are a pane under the station pins and the
+   badge (.mn-photo-icon) one over them. */
 .mn-photo-pin { position: relative; display: block; width: 0; height: 0; }
 .mn-photo-dot {
   position: absolute;
@@ -19790,6 +19793,8 @@ body.has-sort-bridge .signin-nudge { display: none; }
   box-shadow: 0 0 0 1px rgba(255, 255, 255, .85);
 }
 .mn-stack-leg.is-above::after { top: -3px; bottom: auto; }
+/* A photo's badge stood off its point: the photo's own dot is at the leg's end. */
+.mn-photo-icon .mn-stack-leg.is-point::after { display: none; }
 
 /* ── The councils' cameras on the Stations map (map-cameras.js) ──
    A tile centred on the camera's point — where a field photo's dot sits on its
