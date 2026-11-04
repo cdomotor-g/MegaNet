@@ -3,12 +3,12 @@
  "explainer": "welcome",
  "mp4": "data/explainers/video/welcome.mp4",
  "vtt": "data/explainers/video/welcome.vtt",
- "bytes": 6271670,
+ "bytes": 6300245,
  "duration": 131.27,
  "width": 1920,
  "height": 1080,
  "fps": 30,
  "voice_hash": "b0bd10a7ad005dcfd0f080eb65712243",
- "sha256": "2293ec75503f37b47572ab18c6bf7d33",
- "recorded_at": "2026-11-04T00:53:32Z"
+ "sha256": "bdb58d8261253448955bcab494236ed6",
+ "recorded_at": "2026-11-04T08:53:24Z"
 }

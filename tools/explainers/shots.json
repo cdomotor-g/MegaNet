@@ -28,7 +28,8 @@
     "owner": "[data-tour='card-owner']",
     "health": "[data-tour='card-health']",
     "data": "[data-tour='card-data']"
-   }
+   },
+   "css": ".look-intro { display: none !important; }"
   },
   {
    "name": "health",
@@ -109,7 +110,8 @@
    },
    "store": {
     "mn-hint-display": "1"
-   }
+   },
+   "css": ".look-intro { display: none !important; }"
   },
   {
    "name": "station-card-lower",
@@ -134,7 +136,8 @@
    },
    "store": {
     "mn-hint-display": "1"
-   }
+   },
+   "css": ".look-intro { display: none !important; }"
   }
  ]
 }

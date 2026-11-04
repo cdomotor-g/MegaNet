@@ -1,6 +1,6 @@
 {
  "format": "floodnet-explainer-index/1",
- "updated_at": "2026-11-04T00:53:32Z",
+ "updated_at": "2026-11-04T08:53:35Z",
  "explainers": [
   {
    "id": "welcome",
@@ -15,7 +15,7 @@
    "video": {
     "mp4": "data/explainers/video/welcome.mp4",
     "vtt": "data/explainers/video/welcome.vtt",
-    "bytes": 6271670
+    "bytes": 6300245
    }
   },
   {
@@ -25,7 +25,7 @@
    "summary": "The Recruit's first job, and Graham shows him: the search, a station's card — whose it is, its health, its plots — and the way in.",
    "kind": "howto",
    "presenter": "seasoned-hydrographer",
-   "voice": "draft",
+   "voice": "final",
    "secs": 71,
    "updated": "2026-11-04"
   }

@@ -5,7 +5,7 @@
  "title": "Find a station and read its card",
  "summary": "The Recruit's first job, and Graham shows him: the search, a station's card — whose it is, its health, its plots — and the way in.",
  "presenter": "seasoned-hydrographer",
- "voice": "draft",
+ "voice": "final",
  "updated": "2026-11-04",
  "order": 1,
  "scenes": [
@@ -92,7 +92,7 @@
    "title": "The way in",
    "sub": "Directions, Street View, Google Earth",
    "focus": "card",
-   "say": "Further down, the way in: directions to it, and Street View and Google Earth to see it before you go.",
+   "say": "Under All actions, the way in: directions to it, and Street View and Google Earth to see it before you go.",
    "secs": 9,
    "shot": "station-card-lower",
    "callouts": [
