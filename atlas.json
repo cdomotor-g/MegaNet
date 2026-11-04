@@ -52,7 +52,7 @@
     ],
     "next": [
       "#271 and #272: put Hillcrest's carrier on 151.500 down to Hillcrest, and count a transmitter's corrupted copies over its whole carrier without bursts read two ways (investigation 03)",
-      "EPIC #262 explainers: ▶ Show me on the app (the tour over the real app) shipped with #265; its first how-to, find a station and read its card, waits on the owner's OK, then the phone install (#266) and map layers (#267)",
+      "EPIC #262 explainers: the first how-to, find a station and read its card, is voiced and on Videos with ▶ Show me on the app; next the phone install (#266) and map layers (#267), both pickable",
       "#252–#254 road routes: avoid closures, inspection runs, routes kept offline (EPIC #250)",
       "#238 QLDTraffic flood events and road closures on the Stations map",
       "#216 staff alerts: daily digest email and web push for critical findings",
@@ -66,41 +66,19 @@
     ],
     "blocked": [
       {
-        "id": "station-card-script",
-        "what": "#265's how-to, find a station and read its card — OK'd by the owner to be voiced, once the station card's new look (another thread's work, due 4 Nov) lands and its screenshots are retaken",
-        "on": "agent",
-        "kind": "other",
-        "since": "2026-11-04",
-        "issue": "#265",
-        "holds": [
-          "#265 voiced (about 400 ElevenLabs credits, once)",
-          "#266",
-          "#267"
-        ],
-        "options": [
-          {
-            "what": "The scheduled session (Sonnet, from 18:41 Brisbane 4 Nov) checks every two hours for the card's new look, then retakes the card's shots, voices the how-to, records its MP4 and closes #265",
-            "by": "agent",
-            "effort": "Med",
-            "model": "Sonnet5",
-            "recommended": true
-          }
-        ]
-      },
-      {
         "id": "elevenlabs-credits",
-        "what": "#274 ElevenLabs credits run short before they renew on 25 Nov: hold #265's voicing until after, or Creator for a month",
+        "what": "#274 ElevenLabs credits run short before they renew on 25 Nov: #265 is now voiced; hold #266's and #267's voicing until after, or Creator for a month",
         "on": "human",
         "kind": "money",
         "since": "2026-11-04",
         "issue": "#274",
         "holds": [
-          "#265 voiced this month",
-          "the last daily bulletins before 25 Nov voiced"
+          "the last daily bulletins before 25 Nov voiced",
+          "#266 and #267 voiced this month"
         ],
         "options": [
           {
-            "what": "Hold #265's voicing until after 25 Nov (a comment on #265 before the scheduled session starts at 18:41 Brisbane, 4 Nov)",
+            "what": "Hold #266's and #267's voicing until after 25 Nov (a comment on #274)",
             "by": "human",
             "effort": "2 min",
             "pros": "costs nothing",
@@ -111,7 +89,7 @@
             "what": "Upgrade the ElevenLabs account to Creator for a month (US$22, 121,000 credits)",
             "by": "human",
             "effort": "5 min",
-            "pros": "nothing silent; #265 can be voiced now",
+            "pros": "nothing silent; #266 and #267 can be voiced now",
             "cons": "US$16 more than Starter for the month"
           },
           {
