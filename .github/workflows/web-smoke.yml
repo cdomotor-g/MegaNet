@@ -1470,6 +1470,19 @@ jobs:
         working-directory: test
         run: npm run relocate
 
+      # The best repeater finder (map-bestrep.js), on the same hilly world and
+      # the committed register: the hubs offered every one within the distance
+      # and every one carrying the station now, each hop the card's arithmetic
+      # to the last bit and the fade margin layer's own figure for a link it
+      # carries, the routes on to a base the agent API's rules, hops with no
+      # figure said and worked out, a saved row read and a stale one refused,
+      # a re-sort with no terrain asked, a pin a real click picks, a new site
+      # typed and picked on the map, the station card's hand-off, and reset.
+      - name: Best repeater finder — a station, every mast near it, the way to a base
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run bestrep
+
       # The 3-D view (map-3d.js). Invisible to every check above it: `smoke`
       # opens the Stations tab and a ⛰️ button that does nothing at all passes,
       # `registry` looks for Leaflet maps and a WebGL context outliving its div

@@ -18,7 +18,7 @@
 // catch:
 //
 //   The panel       a pane of the side panel, its button straight after 🗼 and
-//                   straight before ℹ️, and Find new sites off until a station
+//                   straight before 🎯, and Find new sites off until a station
 //                   is picked — with a reason.
 //   The station     found by its number through the box, with a real click;
 //                   the repeaters that carry it ticked and the nearby others
@@ -162,7 +162,7 @@ const panel = await page.evaluate(() => {
     title: wrap && wrap.querySelector('.mn-mapctl-title')?.textContent,
     group: strip.find(b => b.dataset.dock === 'map-relocate')?.closest('.dock-group')?.dataset.group,
     afterSites: at('[data-dock="map-relocate"]') === at('[data-dock="map-sites"]') + 1,
-    beforeHere: at('.mn-map-here') === at('[data-dock="map-relocate"]') + 1,
+    beforeBest: at('[data-dock="map-bestrep"]') === at('[data-dock="map-relocate"]') + 1,
     runDisabled: document.getElementById('reloc-run')?.disabled,
     status: document.getElementById('reloc-status')?.textContent || '',
   };
@@ -170,8 +170,8 @@ const panel = await page.evaluate(() => {
 ok('a 🚚 Relocate station is a pane of the side panel, open from its button in the strip',
    panel.present && panel.docked && panel.shown && panel.showing === 'map-relocate'
      && panel.title === 'Relocate station', JSON.stringify(panel));
-ok('…in the tools group, straight after the repeater site finder and straight before What is here',
-   panel.group === 'tools' && panel.afterSites && panel.beforeHere, JSON.stringify(panel));
+ok('…in the tools group, straight after the repeater site finder and straight before the best repeater finder',
+   panel.group === 'tools' && panel.afterSites && panel.beforeBest, JSON.stringify(panel));
 ok('Find new sites is off with no station, and the panel says what is missing',
    panel.runDisabled === true && /Pick the station/.test(panel.status), panel.status);
 

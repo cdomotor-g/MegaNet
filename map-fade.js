@@ -123,6 +123,7 @@ const MapFade = (function () {
   let saved = null;         // Map pairKey → row, as read from the datastore
   let savedState = 'idle';  // idle | loading | ready | failed | absent
   let savedError = '';
+  let savedP = null;        // the read in flight or done — ready() hands it out
   let gen = 0;
   let queue = [], running = 0, persistTimer = null;
   let note = { pending: 0, done: 0, failed: 0, stale: 0, fromDb: 0, noRadio: 0 };
@@ -318,7 +319,7 @@ const MapFade = (function () {
     // re-read after a save is allowed through.
     if (savedState !== 'idle') return;
     savedState = 'loading';
-    readAllSaved()
+    savedP = readAllSaved()
       .then(rows => {
         saved = new Map();
         for (const r of rows) saved.set(pairKey(r.station_a_id, r.station_b_id), r);
@@ -669,6 +670,57 @@ const MapFade = (function () {
     // that serves the module rows of its own (mapfade.mjs) — as LandCover.seed
     // answers the cover.
     signature: sigFor,
+
+    // ── One link's figure, for a tool that is not the map (map-bestrep.js) ──
+    // The best repeater finder walks a repeater's routes on to a base and
+    // needs each hop's figure — the one this layer would paint on it, by the
+    // same rule: a saved row while its signature still holds, else this
+    // session's own, else nothing. A row whose signature no longer holds is
+    // said to be stale rather than handed over as a figure.
+    //
+    //   known(a, b) → { margin, verdict, from: 'saved' | 'session' }
+    //               | { margin: null, stale: true } | null
+    known(a, b) {
+      if (!a || !b || a.lat == null || b.lat == null) return null;
+      hydrate();
+      const sig = sigFor(a, b);
+      const row = saved && saved.get(pairKey(a.id, b.id));
+      if (row && row.signature === sig) {
+        const num = v => (v == null || v === '' ? null : Number(v));
+        const m = oneWay({ ab: num(row.margin_ab_db), ba: num(row.margin_ba_db) }, a, b);
+        if (m != null) return { margin: m, verdict: row.verdict || null, from: 'saved' };
+      }
+      const hit = mem.get(sig);
+      const m = hit ? oneWay(hit, a, b) : null;
+      if (m != null) return { margin: m, verdict: hit.v || null, from: 'session' };
+      return row && row.signature !== sig ? { margin: null, stale: true } : null;
+    },
+
+    // The same, worked out now when nobody has: the sweep's own computeOne,
+    // kept in this session's cache — so a drawn link worked out here is one
+    // the layer's Save will offer to the datastore. Resolves to known()'s
+    // shape, or null when the terrain or the model would not answer.
+    async work(a, b) {
+      const k = this.known(a, b);
+      if (k && k.margin != null) return k;
+      let hit = null;
+      try { hit = await computeOne(a, b); } catch (_) { hit = null; }
+      if (!hit) return null;
+      mem.set(sigFor(a, b), hit);
+      persistSoon();
+      pendingRows = null;
+      const m = oneWay(hit, a, b);
+      return m == null ? null : { margin: m, verdict: hit.v || null, from: 'session' };
+    },
+
+    // The datastore's saved figures asked for, once a page as ever; resolves
+    // when it has answered either way (savedState() says which).
+    ready() {
+      loadSaved();
+      return savedP ? savedP.then(() => savedState, () => savedState) : Promise.resolve(savedState);
+    },
+
+    savedState() { return savedState; },
 
     active() { return state.mapFade; },
 

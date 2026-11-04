@@ -4910,8 +4910,9 @@ function stationsMapPanels(map) {
     after: { id: 'map-draw-sel', html: () => MapDraw.selectionHtml() },
   });
   // 📡 Polar radio coverage is tools/20 — MapPolar.attach(), which runs later —
-  // 🗼 Repeater site finder tools/25, from MapSites.attach() after it, and
-  // 🚚 Station relocation finder tools/26, from MapRelocate.attach() after that.
+  // 🗼 Repeater site finder tools/25, from MapSites.attach() after it,
+  // 🚚 Station relocation finder tools/26, from MapRelocate.attach() after that,
+  // and 🎯 Best repeater tools/27, from MapBestRepeater.attach() after that.
   //
   // What is here (#186) — arm it, click the map, and the card in the opposite
   // corner says what the app knows about that point. A plain corner button
@@ -5167,6 +5168,7 @@ function clearStationsMapMarks() {
   try_(() => { if (MapPolar.active()) MapPolar.clear(); });
   try_(() => MapSites.clear());
   try_(() => MapRelocate.clear());
+  try_(() => MapBestRepeater.clear());
   try_(() => MapSpider.reset());
   try_(() => Places.clearMark());
   try_(() => MapRiverLines.clearSelection());
@@ -6179,6 +6181,7 @@ function mapLegendHtml() {
     MapPolar.active() ? mapPolarLegendHtml() : '',
     MapSites.active() ? MapSites.legendHtml() : '',
     MapRelocate.active() ? MapRelocate.legendHtml() : '',
+    MapBestRepeater.active() ? MapBestRepeater.legendHtml() : '',
     MapPeaks.active() ? `
     <span class="legend-item">
       <span class="legend-peak" aria-hidden="true">▲</span>
@@ -6386,6 +6389,7 @@ function stopStationsMap() {
   MapPolar.detach();
   MapSites.detach();
   MapRelocate.detach();
+  MapBestRepeater.detach();
   MapLatency.detach();
   Places.detach();
   MapRoads.detach();
@@ -6581,6 +6585,10 @@ function initMap() {
   // that has to move: its repeaters go in, and the ground round it comes out
   // coloured by how well they would hear it there.
   MapRelocate.attach(state.map);
+  // The best repeater finder: a station, or a site with nothing there yet,
+  // goes in, and every mast already standing near it comes out in order of
+  // how well it would hear it — and hand it on to a base.
+  MapBestRepeater.attach(state.map);
   // ⏱️ Latency: a pane rather than a switch in 🗺️ Map display, because what it
   // shows beside the pins — the stations in view summed up, and a picked
   // station's checks slot by slot — is the point of it, and it follows the map
@@ -9217,14 +9225,14 @@ function stationCarriersHtml() {
       <p class="small st-note">
         <strong>${esc(s.name)}</strong> has no ALERT address recorded, so there is nothing for a
         pass range to be open to. Telemetry-only stations reach the base another way.
-      </p>`;
+      </p>${bestRepeaterLinkHtml(s)}`;
   }
   if (!rows.length) {
     return `${header}
       <p class="small st-note txt-bad">
         <strong>No repeater's pass ranges cover ${ids.length === 1 ? 'address' : 'addresses'}
         ${ids.join(', ')}</strong> — this station is orphaned, and nothing is listening for it.
-      </p>`;
+      </p>${bestRepeaterLinkHtml(s)}`;
   }
 
   return `${header}
@@ -9264,7 +9272,19 @@ function stationCarriersHtml() {
             </tr>`).join('')}
         </tbody>
       </table>
-    </div>`;
+    </div>${bestRepeaterLinkHtml(s)}`;
+}
+
+// The way from "who carries it" to "who should": 🎯 Best repeater, on this
+// station, priced against every repeater and base near it (map-bestrep.js).
+function bestRepeaterLinkHtml(s) {
+  if (typeof MapBestRepeater === 'undefined' || s.lat == null || s.lon == null) return '';
+  return `
+    <p class="small st-note">
+      <button type="button" class="link-btn" onclick="MapBestRepeater.openFor('${escAttr(s.id)}')"
+              title="Price the path from ${escAttr(s.name)} to every repeater and base near it, and each one's route on to a base">🎯 Find the best repeater for it</button>
+      — every one within reach by fade margin, the whole way to a base.
+    </p>`;
 }
 
 function rerenderStationCarriersCard() {

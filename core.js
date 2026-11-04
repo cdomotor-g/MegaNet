@@ -168,7 +168,7 @@ const TABS = [
   ] },
   { group: 'Stations & networks', tabs: [
     { id: 'stations',   label: 'Stations',               icon: '📍',
-      find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb site features ancillary pits outlets geojson relocate relocation move station new site rain gauge exposure canopy trees buildings shed latency data age stale freshness message animation pulse flash landing live snr signal strength noise signal bars' },
+      find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb site features ancillary pits outlets geojson relocate relocation move station new site best repeater which repeater better path rain gauge exposure canopy trees buildings shed latency data age stale freshness message animation pulse flash landing live snr signal strength noise signal bars' },
     { id: 'passranges', label: 'ALERT IDs',              icon: '🔗',
       find: 'pass ranges pass range alert id ids alertids hop chain orphans gaps alertid address window coverage base allocate allocation reserve set aside spare unused free addresses fullness full blocks address space grid new id' },
     // 🔁 Repeaters (repeaters.js) beside ALERT IDs, whose By Repeater card it
@@ -817,8 +817,8 @@ const HELP = {
            + 'sections: <strong>Map</strong>, what the map shows (<strong>Layers</strong>, base maps first, '
            + 'the <strong>Legend</strong> and <strong>Latency</strong>), and <strong>Tools</strong>, what '
            + 'you point at it (<strong>Draw &amp; measure</strong>, <strong>Radio coverage</strong>, '
-           + '<strong>Repeater sites</strong>, <strong>Relocate station</strong> and <strong>What\'s '
-           + 'here?</strong>). With the names showing, a section\'s heading folds it away and back. A panel '
+           + '<strong>Repeater sites</strong>, <strong>Relocate station</strong>, <strong>Best '
+           + 'repeater</strong> and <strong>What\'s here?</strong>). With the names showing, a section\'s heading folds it away and back. A panel '
            + 'among them opens as a pane of the side panel, the way Stations does; a button does its one '
            + 'thing, and a mode wears a switch that says whether it is on. The foot of the rail stays put '
            + 'whatever is scrolled above it: <strong>Clear the selection</strong>, the <strong>3-D '
@@ -1069,6 +1069,19 @@ const HELP = {
       + 'a mapped building, or in water, is ruled out and hatched. Colour the ground by suitability, by '
       + 'fade margin, or by the change from where it is now, and point at a square for its figures. It '
       + 'only sees buildings somebody has mapped: look at the imagery before you go.',
+      '<strong>Best repeater</strong> answers which mast already standing a station should talk to — '
+      + 'for a new site nobody has set up yet, or a station that arrives badly. Pick the station (on '
+      + 'its card, by name or number, or <em>Find the best repeater for it</em> under Repeaters '
+      + 'listening), or give a new site as a lat, lon or with <em>Pick on the map</em>; choose its radio '
+      + 'and antenna if they are not its own. <em>Find the best repeater</em> prices the path to every '
+      + 'repeater and base within 60 km (the nearest 30, and every repeater carrying it now) the link '
+      + 'budget card\'s way, follows each repeater\'s best route on along the backbone to a base on the '
+      + 'fade margin layer\'s figures, and ranks them by the weaker of the two — a path is only as good '
+      + 'as its weakest hop — or by the station\'s own hop alone. Its first line says whether the best '
+      + 'beats what carries it now, and by how much. A hop on with no figure yet is said to be, and '
+      + '<em>Work out the missing hops</em> works them out. Pick a result for its path and its route on '
+      + 'the map; <em>Profile its hop</em> opens the path in the elevation profile, and <em>Allocate an '
+      + 'address here</em> takes a repeater with room to the ALERT IDs tab\'s Allocate card.',
       '<strong>Find a place</strong> (the blue 📍 in the strip) is where a place is looked for, '
       + 'not the filter box — which filters the stations, and would have cut the network down to '
       + 'the stations named after a town while you were only looking for the town. Paste a '

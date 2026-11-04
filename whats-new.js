@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 186, date: '2026-11-04', items: [
+      '🎯 <strong>Best repeater</strong>, a new tool on the <strong>Stations</strong> map (in the side panel\'s strip, '
+        + 'after 🚚 Relocate station): which repeater should a station talk to? Pick a station, or give a new site that is '
+        + 'not set up yet — a lat, lon or <em>Pick on the map</em> — and it works out the fade margin to every repeater and '
+        + 'base within 60 km, follows each repeater on to a base, and ranks them by the weaker hop, saying whether the best '
+        + 'beats what carries the station now. A station\'s card has <em>Find the best repeater for it</em> under '
+        + '<em>Repeaters listening</em>.',
+    ] },
     { n: 185, date: '2026-11-04', items: [
       '🎬 <strong>Videos</strong>, under <em>Start here</em>: <strong>Welcome to Flood-Net</strong>, a two-minute tour with '
         + 'Graham and Turbo — the network, a station\'s card, how the network is each morning, the radio side, the field on a '

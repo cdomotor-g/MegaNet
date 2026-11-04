@@ -6303,6 +6303,58 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   white-space: normal;
 }
 
+/* ── Best repeater finder (map-bestrep.js) ───────────────────────────────── */
+/* The site finder's dialog again (.sites-fs, .sites-results, the pins), and
+   only what is its own: the new-site row, the chips under a result, the
+   picking cursor and the fold that says the panel's words without a hover. */
+
+.bestrep-point { align-items: center; }
+
+.bestrep-point .polar-find {
+  flex: 1 1 9rem;
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
+}
+
+/* Armed is a state the map does not show until the click lands (#sites-circle). */
+#bestrep-arm.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.leaflet-container.mn-bestrep-picking { cursor: crosshair; }
+
+.bestrep-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-1);
+}
+
+.bestrep-chip {
+  padding: 0 .45em;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+
+.bestrep-chip.bestrep-now { border-color: var(--accent); }
+
+.bestrep-words {
+  margin-top: var(--sp-2);
+  font-size: .78rem;
+}
+
+.bestrep-words summary { cursor: pointer; font-weight: 600; }
+
+.bestrep-words dl { margin: var(--sp-1) 0 0; }
+
+.bestrep-words dt { font-weight: 600; margin-top: var(--sp-1); }
+
+.bestrep-words dd { margin: 0; color: var(--muted); }
+
 /* ── My location + heading (mobile only) ─────────────────────────────────── */
 
 .mn-locate a {

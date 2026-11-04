@@ -210,6 +210,10 @@ MegaNet/
 │                             ground round a station that has to move, coloured by
 │                             fade margin to its repeaters, open sky and cover, kept
 │                             off the buildings
+├── map-bestrep.js          ← MapBestRepeater — 🎯 the best repeater finder: a
+│                             station or a new site against every repeater and base
+│                             within reach, ranked by the weaker of its own hop and
+│                             the route on to a base
 ├── modal.js                ← Modal     — the shared dialog shell, and confirmDialog /
 │                             promptDialog: the app's own questions, in place of the
 │                             browser's confirm() and prompt() (#223)
@@ -4421,6 +4425,65 @@ not drawn in the ⛰️ 3-D view.
 
 `npm run relocate` holds it to this on the hilly world, with trees, water and
 buildings laid out round the station by the check.
+
+#### Best repeater finder
+
+The site finder places a new mast and the relocation finder moves a station.
+The commoner question comes before either: of the masts already standing,
+*which one should this station talk to?* A new gauge has no repeater yet, and
+somebody has to choose one before its addresses can be allocated; an existing
+one arrives badly, and the question is whether a repeater it does not use today
+would hear it better. **🎯 Best repeater**, in the strip straight after 🚚,
+answers it.
+
+**The station**: *Use the station on the card*, find it by name or number, or
+press *🎯 Find the best repeater for it* under its card's **Repeaters listening**
+(there for an orphaned station too). For a **new site** with nothing in the
+register, type a `lat, lon` or press *📍 Pick on the map* and click where it
+would stand. The radio is the station's own (a new site gets the network's
+commonest), and either it or the antenna height can be changed for the run.
+
+**Find the best repeater** prices the path from the station to every repeater
+and base within **60 km** (5–150) — the nearest 30, and every repeater that
+carries it now however far, so *now* is always in the table — **the link budget
+card's way**: `pathGround` at 256 samples, the land cover on it under the
+land-cover model, one way, station to hub. So the figure for a repeater that
+carries the station today is the figure the fade margin layer paints on that
+link, and the one the card gives when the path is opened in it.
+
+**On to a base**: from each repeater, the agent API's own rules
+(`worker/radio-path.js`), walked over the station file in memory — on to a
+repeater within the map's Max TX distance whose open windows take some of what
+this one passes on, or to a base within it, where the route ends; at most four
+repeaters, never a station twice, one past the fewest that reach a base. What a
+repeater passes on is the station's own addresses where it carries them already,
+its whole window where it does not. Each hop's figure is the fade margin
+layer's — the saved row while its signature holds, else one worked out in this
+browser — never one invented here; a hop with none is said to be, and **Work out
+the missing hops** works them out with the layer's own arithmetic and keeps
+them where its Save will find them. The best route is the API's best: every hop
+known, then the strongest weakest hop, then the fewest hops, then the shortest.
+
+**The ranking** is the weaker of the two figures — a path is only as good as
+its weakest hop — with the station's own hop standing alone, marked ≈, where a
+hop on has no figure; a repeater with no route to a base at all goes last.
+*Its own hop only* ranks by the first figure alone. The first line of the
+answer says whether the best beats the best repeater carrying the station now,
+and by how much. Each result says its distance and bearing, the line of sight,
+the route on and its weakest hop, *Carries it now*, what it listens on, and how
+many ALERT addresses are free in its windows; picked, its path and its route on
+are drawn on the map coloured by fade margin (dashed where the ground cuts the
+line, grey where a hop has no figure), with a table of every hop.
+**Profile its hop** opens the path in the elevation profile, and **Allocate an
+address here** takes a repeater with room to the ALERT IDs tab's Allocate card.
+**Save CSV** writes every one priced.
+
+**What it is not**: ~30 m terrain and omnidirectional antennas, the fade margin
+layer's model and nothing measured on the day. Frequencies are not matched, as
+the map does not match them; each row says what its repeater listens on. Not
+drawn in the ⛰️ 3-D view.
+
+`npm run bestrep` holds it to this on the hilly world.
 
 ---
 

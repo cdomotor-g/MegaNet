@@ -119,7 +119,7 @@ const PANEL_IDS = ['map-display-block', 'map-legend', 'map-latency-panel', 'map-
 const STRIP = ['dock-names',
                'dock-fold', 'stations', 'places', 'paths', 'twin',
                'dock-fold', 'map-display', 'map-legend', 'map-latency', 'mn-map-3d', 'mn-map-north', 'mn-map-tilt',
-               'dock-fold', 'map-draw', 'map-polar', 'map-sites', 'map-relocate', 'mn-map-here',
+               'dock-fold', 'map-draw', 'map-polar', 'map-sites', 'map-relocate', 'map-bestrep', 'mn-map-here',
                'mn-map-clear', 'mn-map-full',
                'help'];
 const BUTTONS = STRIP.filter(k => k.startsWith('mn-map-'));
@@ -288,7 +288,7 @@ try {
   check('the strip holds every one of the map\'s controls but ↺, in the corner\'s order, from the first render',
     JSON.stringify(s.strip) === JSON.stringify(STRIP), JSON.stringify(s.strip));
   const panels = {};
-  for (const id of ['display', 'legend', 'latency', 'draw', 'polar', 'sites', 'relocate', '3d']) panels[id] = await wrapAt(id);
+  for (const id of ['display', 'legend', 'latency', 'draw', 'polar', 'sites', 'relocate', 'bestrep', '3d']) panels[id] = await wrapAt(id);
   check('every panel is a pane of the side panel, whole, one of each',
     Object.values(panels).every(p => p.n === 1 && p.where === 'dock' && p.whole),
     JSON.stringify(panels));
@@ -1240,7 +1240,7 @@ try {
   // 24 px WCAG 2.2 sets as a target's least.
   check('…holding ❔, 🧹, the two 📍, 〽️ and every one of the map\'s controls, in the corner\'s order, each 36 px square',
     JSON.stringify(phone.strip) === JSON.stringify(PHONE_STRIP) && phone.square.every(([w, h]) => w === 36 && h === 36)
-      && phone.panels.length === 8 && phone.panels.every(x => x === 'pane') && phone.buttons.every(Boolean),
+      && phone.panels.length === 9 && phone.panels.every(x => x === 'pane') && phone.buttons.every(Boolean),
     JSON.stringify(phone));
   const phoneCorner = await cornerNow();
   check('…the map ending where the rail begins, measured to it, and only ↺ standing on it, at its top right',
@@ -1782,7 +1782,7 @@ try {
     const unfolded = await rail();
     check('a heading folds its section away, and back, remembered',
       folded.tools === 0 && folded.folded === 'tools' && folded.heads[2][1] === 'false'
-        && unfolded.tools === 5 && unfolded.folded === '' && unfolded.heads[2][1] === 'true', JSON.stringify({ folded, unfolded }));
+        && unfolded.tools === 6 && unfolded.folded === '' && unfolded.heads[2][1] === 'true', JSON.stringify({ folded, unfolded }));
     // The toggle: icons alone, and back.
     const wide = r.mapW;
     await page.click('#help-panel .dock-names');
