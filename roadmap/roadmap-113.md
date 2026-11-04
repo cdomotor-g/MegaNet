@@ -855,6 +855,13 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 226 — 2026-11-04: 🔀 SoRT's cutover — its v1 moved to /SoRT/v1/
+
+The SoRT scope builder's v2 is its default page now: `/SoRT/` forwards to `/SoRT/v2/`, and v1 is kept as it was in SoRT's `v1/index.html` (`/SoRT/v1/`; SoRT `da2ab83`). **Opens nothing; closes nothing.**
+
+- `atlas.json`: `sort-qld-map-layers` watches SoRT's `v1/index.html` instead of its root `index.html`, where v1's QLD Globe layer recipes now are. The recipes did not change.
+- Coming this way from SoRT: a forum can correct a station's name, number, hub, council or owner for its Word tables (Flood-Net is not changed), and *Report to Flood-Net* sends the corrections — through `/api/report` once it is switched on (`docs/bug-reports.md`; SoRT is on the allowed `cdomotor-g.github.io` origin), or GitHub's ready-made *New issue* page here until then. They arrive titled `[Standalone] [Sonnet5/Low] Correct <number> <name>: details from the SoRT forum`, and belong on this roadmap when they do.
+
 ### Revision 225 — 2026-11-04: 🎬 Welcome to Flood-Net, voiced and as an MP4 — #264 and #268 closed
 
 The owner on the second draft: *"OK, voice it and make the MP4, but first … say that it's just continually being developed and worked on, and more features are being added constantly … watch this space."* **Closes #264 and #268.**

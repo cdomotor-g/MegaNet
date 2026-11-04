@@ -876,7 +876,7 @@
       "what": "The QLD Globe recipes for the LiDAR contour and survey-mark layers: which ArcGIS services, sublayers resolved by name, and the server-rendered approach (map-contours.js, map-survey.js).",
       "how": "ported",
       "watch": [
-        "index.html",
+        "v1/index.html",
         "v2/js/map.js"
       ]
     },
