@@ -286,6 +286,9 @@ async function main() {
     // says so, because a ghost under the pointer fails silently.
     await page.waitForFunction(() => !document.querySelector('.leaflet-popup'),
       null, { timeout: 5000 });
+    // The map is narrower beside the card now, so the pin the click moved can
+    // sit off its edge: centre the map on it first, as a person would pan to it.
+    await page.evaluate(([lat, lon]) => state.map.setView([lat, lon], state.map.getZoom(), { animate: false }), [moved.lat, moved.lon]);
     const handle = await page.evaluate(async () => {
       const at = () => {
         const r = document.querySelector('.mn-movepin-icon').getBoundingClientRect();

@@ -649,7 +649,7 @@ try {
   await closeModal();
 
   // ── A crossing only QLDTraffic shows ───────────────────────────────────────
-  const tmrOnly = CATALOG.cameras.find(c => c.council === 'qldtraffic' && !c.also);
+  const tmrOnly = CATALOG.cameras.find(c => c.council === 'qldtraffic' && !c.also && (!c.owner || c.owner.includes('QLDTraffic')));
   await page.evaluate(id => MapCameras.openId(id), tmrOnly.id);
   await waitShown();
   const qv = await modal();

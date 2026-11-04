@@ -152,8 +152,8 @@ const VideoTour = (() => {
 
   // ── the spotlight ──────────────────────────────────────────────────────────
 
-  function light(el, n, text) {
-    T.lit = el ? { el, n, text } : null;
+  function light(el, n, text, sel) {
+    T.lit = el ? { el, n, text, sel } : null;
     const spot = $('vt-spot'), chip = $('vt-chip');
     if (!spot || !chip) return;
     if (!el || T.away) { spot.hidden = true; chip.hidden = true; return; }
@@ -169,6 +169,13 @@ const VideoTour = (() => {
     const step = () => {
       const spot = $('vt-spot'), chip = $('vt-chip');
       if (!T.on || !T.lit || !spot) return;
+      // A page that redraws the part (Home's counts landing) leaves the ring on
+      // a detached node: find the part again by its selector.
+      if (!document.body.contains(T.lit.el) && T.lit.sel) {
+        let again = null;
+        try { again = document.querySelector(T.lit.sel); } catch (_) { again = null; }
+        if (again) T.lit.el = again;
+      }
       const r = T.lit.el.getBoundingClientRect();
       if (!r.width || !document.body.contains(T.lit.el)) { spot.hidden = true; chip.hidden = true; }
       else {
@@ -229,7 +236,7 @@ const VideoTour = (() => {
     if (meta) {
       navigate(meta);
       // Its focus first, without a name, until the first callout's cue.
-      if (s.focus) find(selectorOf(meta, s.focus), el => { if (T.i === i && T.shown < 0) light(el, 0, ''); });
+      if (s.focus) find(selectorOf(meta, s.focus), el => { if (T.i === i && T.shown < 0) light(el, 0, '', selectorOf(meta, s.focus)); });
     }
     drawCard();
     if (typeof announce === 'function') announce(`Tour, ${i + 1} of ${scenes().length}: ${s.title}.`);
@@ -244,7 +251,7 @@ const VideoTour = (() => {
     if (k === T.shown || k < 0) return;
     T.shown = k;
     const c = s.callouts[k], i = T.i;
-    find(selectorOf(meta, c.target), el => { if (T.i === i && T.shown === k) light(el, k + 1, c.text); });
+    find(selectorOf(meta, c.target), el => { if (T.i === i && T.shown === k) light(el, k + 1, c.text, selectorOf(meta, c.target)); });
   }
 
   // ── the clock and the voices ───────────────────────────────────────────────
