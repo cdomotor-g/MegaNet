@@ -7,15 +7,23 @@
 //      Kilcoy, "beer burrum" Beerburrum. Each is one nobody could type their
 //      way to: the Stations filter itself finds nothing for it. Gibberish, a
 //      number and an address window offer nothing, and none of it is slow.
+//      One or two stations found is heard on a higher bar: "mckay", which
+//      finds McKays Track, offers Mackay; "yeppoon", spelt right, offers
+//      nothing; and over the names on file that find one or two, few offer
+//      anything at all.
 //   2. **Ctrl+K** — a name that finds nothing lists the stations that sound
 //      like it under "Did you mean?", the count says so, and Enter opens the
-//      first. Gibberish still offers only the place lookup.
+//      first. One that finds one station lists it first, the sound-alikes
+//      after it, and Enter opens the match. Gibberish still offers only the
+//      place lookup.
 //   3. **The Stations card** — the match note under the quick box offers the
 //      spelling, picking it puts it in the box in place of what was typed and
 //      the list then holds the stations it names; in a list of terms only the
-//      one that found nothing is replaced.
+//      one that found nothing is replaced; a term that found one station is
+//      offered the better-known spelling beside the count.
 //   4. **The pickers elsewhere** — Map Generator's and Link Budget's station
-//      boxes list the sound-alikes under "Nothing is spelt …".
+//      boxes list the sound-alikes under "Nothing is spelt …", or under the
+//      one match as "Or did you mean one of these?".
 //
 // Why a check of its own: a suggestion that has quietly stopped coming — a
 // rule in the key that no longer fires, a threshold moved — throws nothing,
@@ -104,6 +112,30 @@ async function main() {
     const loud = ear.nothing.filter(n => n.names.length);
     check('gibberish, a two-letter word, a number and an address window offer nothing', !loud.length, J(loud));
     check('a query is heard in well under a keystroke\'s time', ear.slowest < 400, `slowest ${ear.slowest.toFixed(1)} ms`);
+    const few = await page.evaluate(() => {
+      const all = state.data.stations;
+      const found = q => { const prep = prepareSearch(q); return all.filter(s => stationMatchesSearch(s, prep)); };
+      const offer = q => { const m = found(q); return { n: m.length, names: StationSuggest.suggest(q, all, { matched: m }).map(h => h.station.name) }; };
+      // Every fifth word on file that finds one or two stations, spelt right.
+      const words = [...new Set(all.flatMap(s => s.name.toLowerCase().split(/[^a-z]+/)).filter(w => w.length >= 4))];
+      let asked = 0, offered = 0;
+      words.forEach((w, i) => {
+        if (i % 5) return;
+        const m = found(w);
+        if (!m.length || m.length > StationSuggest.FEW) return;
+        asked++;
+        if (StationSuggest.suggest(w, all, { matched: m }).length) offered++;
+      });
+      return { mckay: offer('mckay'), grigor: offer('grigor'), yeppoon: offer('yeppoon'),
+               many: offer('gympie'), asked, offered };
+    });
+    check('one station found by chance ("mckay" is in McKays Track) still offers the name that was meant',
+      few.mckay.n === 1 && few.mckay.names.length && few.mckay.names.every(n => /mackay/i.test(n)), J(few.mckay));
+    check('…and a better-known spelling of a rare one ("grigor": Gregor)', few.grigor.n >= 1 && few.grigor.names.some(n => /gregor/i.test(n)), J(few.grigor));
+    check('a name spelt right that finds one station offers nothing ("yeppoon")', few.yeppoon.n === 1 && !few.yeppoon.names.length, J(few.yeppoon));
+    check('more than two found, and nothing is offered', few.many.n > 2 && !few.many.names.length, J(few.many));
+    check('over the names on file that find one or two stations, under one in six offers anything',
+      few.asked > 300 && few.offered / few.asked < 1 / 6, `${few.offered} of ${few.asked}`);
     const keys = await page.evaluate(() => [StationSuggest.key('Caboolture'), StationSuggest.key('kabooltcher'),
       StationSuggest.key('Gympie'), StationSuggest.key('jimpy'), StationSuggest.key('Augathella'), StationSuggest.key('orgathella')]);
     check('the key hears -ture as "cha", a soft g as j, and an r nobody says as nothing',
@@ -144,6 +176,17 @@ async function main() {
     await page.waitForTimeout(60);
     L = await look();
     check('a name that is found is not second-guessed', !L.groups.includes('Did you mean?') && L.groups[0] === 'Stations', J(L.groups));
+    await page.fill('#pal-q', 'mckay');
+    await page.waitForTimeout(60);
+    L = await look();
+    check('a name that finds one station lists it first, and the one that was meant under "Did you mean?"',
+      L.groups[0] === 'Stations' && /McKays/.test(L.labels[0]) && L.groups.includes('Did you mean?')
+        && L.labels.some(x => /^Mackay/.test(x)) && /1 station — or did you mean Mackay/.test(L.count), J(L));
+    check('…and Enter is still the match', /McKays/.test(L.active || ''), L.active);
+    await page.fill('#pal-q', 'yeppoon');
+    await page.waitForTimeout(60);
+    L = await look();
+    check('…but a name spelt right is left alone', !L.groups.includes('Did you mean?') && L.labels[0] === 'Yeppoon', J(L));
     await page.keyboard.press('Escape');
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -175,6 +218,20 @@ async function main() {
     after = await page.evaluate(() => ({ box: document.getElementById('station-search-quick').value,
       mool: filteredStations().filter(s => /mooloolah/i.test(s.name)).length, gatton: filteredStations().filter(s => /gatton/i.test(s.name)).length }));
     check('…and only that term is replaced, the rest as typed', after.box === 'Gatton, Mooloolah' && after.mool > 0 && after.gatton > 0, J(after));
+    await page.fill('#station-search-quick', 'mckay');
+    await page.waitForFunction(() => /Did you mean/.test((document.getElementById('map-match-note') || {}).textContent || ''), null, { timeout: 5_000 });
+    note = await page.evaluate(() => document.getElementById('map-match-note').textContent.replace(/\s+/g, ' ').trim());
+    check('a term that finds one station by chance is offered the spelling that was meant, beside the count',
+      /^1 of \d+ stations match/.test(note) && /Did you mean Mackay \(\d+ stations\)\?/.test(note), note);
+    await page.click('#map-match-note .search-suggest-pick');
+    await page.waitForTimeout(300);
+    after = await page.evaluate(() => ({ box: document.getElementById('station-search-quick').value,
+      names: filteredStations().map(s => s.name) }));
+    check('…and picking it searches for that', after.box === 'Mackay' && after.names.length > 1 && after.names.every(n => /mackay/i.test(n)), J(after));
+    await page.fill('#station-search-quick', 'yeppoon');
+    await page.waitForTimeout(400);
+    note = await page.evaluate(() => document.getElementById('map-match-note').textContent);
+    check('…while a name spelt right is not second-guessed', !/Did you mean/.test(note), note);
     await page.evaluate(() => clearSearch());
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -188,11 +245,23 @@ async function main() {
       const hits = document.getElementById('mg-stn-hits');
       return { mg: { lead: text(hits && hits.querySelector('.mg-hint')), hits: [...(hits ? hits.querySelectorAll('.mg-hit-name') : [])].map(text) } };
     });
+    await page.fill('#mg-stn-find', 'mckay');
+    await page.waitForTimeout(80);
+    pickers.mgFew = await page.evaluate(() => {
+      const text = el => (el ? el.textContent : '').replace(/\s+/g, ' ').trim();
+      const near = document.getElementById('mg-find-near');
+      const group = document.querySelector('#mg-stn-hits [aria-labelledby="mg-find-near"]');
+      return { lead: text(document.getElementById('mg-find-lead')), near: text(near),
+               names: [...(group ? group.querySelectorAll('.mg-hit-name') : [])].map(text) };
+    });
     await page.fill('#mg-stn-find', '');
     await page.evaluate(() => switchTab('stations'));
     await page.waitForFunction(() => !!state.map, null, { timeout: LOAD_TIMEOUT });
     check('Map Generator\'s station box lists the sound-alikes under "Nothing is spelt …"',
       /Nothing is spelt “kabooltcher” — did you mean one of these\?/.test(pickers.mg.lead) && pickers.mg.hits.some(x => /^Caboolture/.test(x)), J(pickers.mg));
+    check('…and under one match, "Or did you mean one of these?" with the name that was meant',
+      /^1 match “mckay”/.test(pickers.mgFew.lead) && pickers.mgFew.near === 'Or did you mean one of these?'
+        && pickers.mgFew.names.length && pickers.mgFew.names.every(n => /^Mackay|Mackay/.test(n)), J(pickers.mgFew));
     await page.evaluate(() => {
       const d = document.querySelector('#link-budget-panel > details.lb-panel');
       if (d && !d.open) d.open = true;

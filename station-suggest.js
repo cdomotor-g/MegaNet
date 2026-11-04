@@ -9,20 +9,22 @@
 // stationMatchesSearch) wants the letters: "jimpy" finds nothing, and the only
 // way on was trying the letters in every order until one stuck.
 //
-// So when a name finds nothing, the boxes that look stations up ask this for
-// the names that *sound* like what was typed, or that are one slip of the
-// fingers from it, and offer them:
+// So when a name finds nothing — or only one or two stations, see FEW — the
+// boxes that look stations up ask this for the names that *sound* like what
+// was typed, or that are one slip of the fingers from it, and offer them:
 //
 //   · Ctrl/Cmd+K (palette.js) lists the stations under "Did you mean?".
-//   · The Stations card's match note offers the spellings — "Gympie · 6" —
-//     and picking one puts it in the search box in place of what was typed.
+//   · The Stations card's match note offers the spellings — "Gympie (6
+//     stations)" — and picking one puts it in the search box in place of
+//     what was typed.
 //   · The station pickers elsewhere (Map Generator, Link Budget, the field
 //     photos and camera, ARRO Launcher) list the stations in place of
-//     "nothing matches".
+//     "nothing matches", or under the one or two that did.
 //
-// Nothing here filters. It only ever runs after the real matcher has come up
-// empty for a term, and what it offers is a station name taken from the file,
-// so picking one is a search that finds something.
+// Nothing here filters. It only ever runs after the real matcher has
+// answered, beside what it found and never instead of it, and what it offers
+// is a station name taken from the file, so picking one is a search that
+// finds something.
 //
 // How it hears a word (soundKey) — written for how Australian English says a
 // place name, not for how a dictionary spells it:
@@ -54,7 +56,7 @@
 // offers as the spelling is the run of its own words the query landed on,
 // written as the name writes them.
 //
-// Exposes: key (soundKey), suggest, phrases, stations, leadHtml, reset.
+// Exposes: FEW, key (soundKey), suggest, phrases, stations, leadHtml, reset.
 // Requires: nothing at load. core.js's esc at call time; asks app.js's
 //           abbrevExpansions when it is there.
 
@@ -77,6 +79,17 @@ const StationSuggest = (() => {
   // Fewer letters than this and anything is "close" to anything — so a word
   // this short, typed or on file, counts only when it is the same word.
   const MIN_LETTERS = 3;
+  // One or two stations found is the other case worth a second ear: what was
+  // typed can sit inside another name by chance — "mckay" is in "McKays
+  // Track" — and the name that was meant (Mackay) goes unoffered. But one or
+  // two is also what a name spelt right finds, so here the bar is higher: a
+  // spelling that sounds very close (FEW_SCORE) and that names more stations
+  // than were found — twice as many and one more, the better-known spelling.
+  // Over every word on file that finds one or two stations, that offers
+  // something for one in ten; the bar above would have offered for nine in
+  // ten, "Yeppoon" offering Yapunyah.
+  const FEW = 2;
+  const FEW_SCORE = 0.16;
 
   const VOWELS = 'aeiou';
   const isVowel = c => VOWELS.includes(c);
@@ -294,7 +307,7 @@ const StationSuggest = (() => {
   // list of stations. Thousands of names hold a few thousand distinct words,
   // so a typed word is scored once against each distinct word, not once per
   // station that uses it.
-  let _idx = { list: null, n: -1, rows: null, words: null };
+  let _idx = { list: null, n: -1, rows: null, words: null, counts: null };
   function index(stations) {
     if (_idx.list === stations && _idx.n === stations.length) return _idx;
     const words = new Set();
@@ -306,9 +319,9 @@ const StationSuggest = (() => {
         toks.push({ w, start: m.index, end: m.index + m[0].length });
         words.add(w);
       }
-      return { s, name, toks };
+      return { s, name, lower: name.toLowerCase(), toks };
     });
-    _idx = { list: stations, n: stations.length, rows, words: [...words].map(wordOf) };
+    _idx = { list: stations, n: stations.length, rows, words: [...words].map(wordOf), counts: new Map() };
     return _idx;
   }
 
@@ -341,14 +354,32 @@ const StationSuggest = (() => {
     return out;
   }
 
+  // How many names on file hold a phrase — what a search for it would find.
+  function phraseCount(phrase) {
+    const k = phrase.toLowerCase();
+    let n = _idx.counts.get(k);
+    if (n == null) {
+      n = 0;
+      for (const r of _idx.rows) if (r.lower.includes(k)) n++;
+      _idx.counts.set(k, n);
+    }
+    return n;
+  }
+
   // The stations whose names sound like `text`, nearest first:
   // [{ station, score, phrase }]. `filter(station)` leaves out what the box
-  // asking could not use (a station with no position, say). Empty when the
-  // text has too few letters to hear.
-  function suggest(text, stations, { limit = 5, filter = null } = {}) {
+  // asking could not use (a station with no position, say). `matched` is what
+  // the box's own search found for the text: nothing, or up to FEW stations,
+  // which are then left out and the higher bar applies; more than FEW, and
+  // nothing is offered. Empty when the text has too few letters to hear.
+  function suggest(text, stations, { limit = 5, filter = null, matched = null } = {}) {
     const qs = queryWords(text);
     const letters = qs.join('').length;
     if (!Array.isArray(stations) || !stations.length || letters < MIN_LETTERS) return [];
+    const found = Array.isArray(matched) ? matched.length : 0;
+    if (found > FEW) return [];
+    const got = found ? new Set(matched.map(s => s && s.id)) : null;
+    const typed = String(text || '').toLowerCase().trim();
     const { rows, words } = index(stations);
     const perWord = qs.map(q => scoresFor(q, words));
     const weights = qs.map(q => Math.max(q.length, 2));
@@ -359,6 +390,7 @@ const StationSuggest = (() => {
     for (const row of rows) {
       if (!row.toks.length) continue;
       if (filter && !filter(row.s)) continue;
+      if (got && (got.has(row.s.id) || row.lower.includes(typed))) continue;   // found already
       let sum = 0, lo = Infinity, hi = -1, ok = true;
       for (let k = 0; k < qs.length; k++) {
         let best = 1, at = -1;
@@ -377,8 +409,9 @@ const StationSuggest = (() => {
           if (v != null && v + 0.02 < score) { score = v + 0.02; lo = hi = i; }
         });
       }
-      if (score > MAX_SCORE || hi < 0) continue;
+      if (score > (found ? FEW_SCORE : MAX_SCORE) || hi < 0) continue;
       const phrase = row.name.slice(row.toks[lo].start, row.toks[hi].end);
+      if (found && phraseCount(phrase) < 2 * found + 1) continue;
       out.push({ station: row.s, score, phrase, at: lo, len: row.name.length });
     }
     // Nearest first; then the name the word starts, then the shorter name —
@@ -392,31 +425,33 @@ const StationSuggest = (() => {
   // The spellings to offer a search box: each distinct phrase the nearest
   // stations landed on, with how many stations a search for it would find.
   // [{ phrase, count, score }], nearest first.
-  function phrases(text, stations, { limit = 4 } = {}) {
-    const near = suggest(text, stations, { limit: 60 });
+  // `matched` as suggest() takes it.
+  function phrases(text, stations, { limit = 4, matched = null } = {}) {
+    const near = suggest(text, stations, { limit: 60, matched });
     const seen = new Map();
     for (const h of near) {
       const k = h.phrase.toLowerCase();
       if (!seen.has(k)) seen.set(k, { phrase: h.phrase, score: h.score });
     }
-    const names = index(stations).rows.map(r => r.name.toLowerCase());
-    return [...seen.entries()].slice(0, limit).map(([k, v]) => ({
-      phrase: v.phrase, score: v.score, count: names.filter(n => n.includes(k)).length,
+    return [...seen.values()].slice(0, limit).map(v => ({
+      phrase: v.phrase, score: v.score, count: phraseCount(v.phrase),
     }));
   }
 
   // For a box that lists stations to pick: the stations alone, nearest first,
-  // and the line that goes over them in place of "nothing matches".
+  // and the line that goes over them — in place of "nothing matches", or,
+  // with `found` stations listed above it, under them.
   function stations(text, list, opts) {
     return suggest(text, list, opts).map(h => h.station);
   }
-  function leadHtml(text) {
-    return `Nothing is spelt “${esc(String(text || '').trim())}” — did you mean one of these?`;
+  function leadHtml(text, found = 0) {
+    return found ? 'Or did you mean one of these?'
+      : `Nothing is spelt “${esc(String(text || '').trim())}” — did you mean one of these?`;
   }
 
   // The names again on the next ask — a station renamed or removed under the
   // same list (app.js refreshFilterOptions).
-  function reset() { _idx = { list: null, n: -1, rows: null, words: null }; }
+  function reset() { _idx = { list: null, n: -1, rows: null, words: null, counts: null }; }
 
-  return { key: soundKey, suggest, phrases, stations, leadHtml, reset, _wordScore: wordScore };
+  return { FEW, key: soundKey, suggest, phrases, stations, leadHtml, reset, _wordScore: wordScore };
 })();

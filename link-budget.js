@@ -223,13 +223,15 @@ const LinkBudget = (function () {
     if (!text && !armed(which)) return '';
     const found = text ? findHits(which) : { prep: null, hits: tableStations() };
     const prep  = found.prep;
-    // Nothing spelt that way: the names that sound like it (station-suggest.js).
-    const near  = text && !found.hits.length && typeof StationSuggest !== 'undefined'
-      ? StationSuggest.stations(text, state.data.stations, { limit: LB_FIND_CAP }) : [];
-    const hits  = near.length ? near : found.hits;
+    // Nothing spelt that way, or only one or two stations: the names that
+    // sound like it (station-suggest.js) — in place of the list, or under it.
+    const near  = text && typeof StationSuggest !== 'undefined' && found.hits.length <= StationSuggest.FEW
+      ? StationSuggest.stations(text, state.data.stations, { limit: LB_FIND_CAP, matched: found.hits }) : [];
+    const instead = !found.hits.length && near.length > 0;
+    const hits  = instead ? near : found.hits;
     const more  = hits.length > LB_FIND_CAP;
     const shown = more ? hits.slice(0, LB_FIND_CAP) : hits;
-    const lead  = near.length ? StationSuggest.leadHtml(text) : text
+    const lead  = instead ? StationSuggest.leadHtml(text) : text
       ? `${hits.length === 0 ? 'No station matches' : more ? `More than ${LB_FIND_CAP} match` : `${hits.length} match${hits.length === 1 ? '' : 'es'}`} “${esc(text)}”${more ? ' — keep typing to narrow it' : ''}`
       : `The <strong>Stations</strong> list holds ${hits.length.toLocaleString()} right now${
           more ? `; the first ${LB_FIND_CAP} are here. Narrow the filters, or type to search all of them`
@@ -240,24 +242,26 @@ const LinkBudget = (function () {
     }
     const otherSid = sidOf(which === 'a' ? 'b' : 'a');
     const mine     = sidOf(which);
+    const buttons  = list => list.map(st => {
+      const here  = st.id === mine;
+      const there = st.id === otherSid;
+      return `
+        <button type="button" class="lb-hit${here ? ' is-here' : ''}"
+                onclick="LinkBudget.pick('${which}','${escAttr(st.id)}')">
+          <span class="lb-hit-name">${prep ? markHits(st.name, prep.terms, prep.res) : esc(st.name)}</span>
+          <span class="small lb-hit-num">${prep
+            ? markHits(st.station_number || '', prep.terms)
+            : esc(st.station_number || '')}</span>
+          ${here ? '<span class="lb-hit-at">this end</span>'
+            : there ? `<span class="lb-hit-at">end ${which === 'a' ? 'B' : 'A'}</span>` : ''}
+        </button>`;
+    }).join('');
+    const also = !instead && near.length ? `
+      <p class="small lb-find-lead" id="lb-find-near-${which}">${StationSuggest.leadHtml(text, found.hits.length)}</p>
+      <div class="lb-hits" role="group" aria-labelledby="lb-find-near-${which}">${buttons(near)}</div>` : '';
     return `
       <p class="small lb-find-lead" id="lb-find-lead-${which}">${said}</p>
-      <div class="lb-hits" role="group" aria-labelledby="lb-find-lead-${which}">
-        ${shown.map(st => {
-          const here  = st.id === mine;
-          const there = st.id === otherSid;
-          return `
-            <button type="button" class="lb-hit${here ? ' is-here' : ''}"
-                    onclick="LinkBudget.pick('${which}','${escAttr(st.id)}')">
-              <span class="lb-hit-name">${prep ? markHits(st.name, prep.terms, prep.res) : esc(st.name)}</span>
-              <span class="small lb-hit-num">${prep
-                ? markHits(st.station_number || '', prep.terms)
-                : esc(st.station_number || '')}</span>
-              ${here ? '<span class="lb-hit-at">this end</span>'
-                : there ? `<span class="lb-hit-at">end ${which === 'a' ? 'B' : 'A'}</span>` : ''}
-            </button>`;
-        }).join('')}
-      </div>`;
+      <div class="lb-hits" role="group" aria-labelledby="lb-find-lead-${which}">${buttons(shown)}</div>${also}`;
   }
 
   // Where the Stations list is from this card. Beside the map the two are in

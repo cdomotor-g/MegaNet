@@ -15,9 +15,10 @@
 //             "4021-4025" finds the window, exactly as the box does. Enter
 //             opens the station through goToStation(): one step in the
 //             browser's history (route.js), its card up and the map on it.
-//             A name that finds nothing as it is spelt is heard instead
-//             (station-suggest.js): "jimpy" offers Gympie under "Did you
-//             mean?", after anything that did match.
+//             A name that finds nothing as it is spelt, or only one or two
+//             stations, is heard as well (station-suggest.js): "jimpy"
+//             offers Gympie under "Did you mean?", after anything that did
+//             match.
 //   Places    handed to 📍 Find a place rather than answered here: its
 //             parse() reads coordinates offline, and its list knows the
 //             catchments, rivers, councils and — with a request — towns. A
@@ -113,7 +114,8 @@ const Palette = (() => {
     if (q.length < 2 && !/^\d$/.test(q)) return { list: [], more: 0 };
     const prep = prepareSearch(q);
     const hits = data.stations.filter(s => stationMatchesSearch(s, prep));
-    if (!hits.length) return { list: [], more: 0, near: nearStations(q) };
+    const near = nearStations(q, hits);
+    if (!hits.length) return { list: [], more: 0, near };
     hits.sort((a, b) => rankStation(a, q) - rankStation(b, q) || a.name.localeCompare(b.name));
     const list = hits.slice(0, stationsOpen ? MAX_STATIONS_OPEN : MAX_STATIONS).map(s => ({
       kind: 'station', icon: '📍', label: s.name, sub: stationSub(s), run: () => goToStation(s.id),
@@ -134,16 +136,18 @@ const Palette = (() => {
       list.push({ kind: 'station', offer: true, icon: '🗒️', label: `All ${hits.length} matching stations`,
         sub: 'In the Stations list, the filter set to this', run: () => showAllStations(q) });
     }
-    return { list, more };
+    return { list, more, near };
   }
 
-  // Nothing is spelt the way it was typed: the names that sound like it, or
-  // are a slip of the fingers away (station-suggest.js) — "jimpy" offers
-  // Gympie. Offers, not matches: the count still says nothing matched, and a
-  // tab or an action that did match comes first and is what Enter opens.
-  function nearStations(q) {
-    if (typeof StationSuggest === 'undefined' || !/[a-z]/.test(q)) return [];
-    return StationSuggest.suggest(q, state.data.stations, { limit: MAX_STATIONS }).map(h => ({
+  // Nothing is spelt the way it was typed, or only one or two stations are:
+  // the names that sound like it, or are a slip of the fingers away
+  // (station-suggest.js) — "jimpy" offers Gympie, and "mckay", which finds
+  // McKays Track, offers Mackay as well. Offers, not matches: the count still
+  // says what matched, and a station, a tab or an action that did match comes
+  // first and is what Enter opens.
+  function nearStations(q, hits) {
+    if (typeof StationSuggest === 'undefined' || !/[a-z]/.test(q) || hits.length > StationSuggest.FEW) return [];
+    return StationSuggest.suggest(q, state.data.stations, { limit: MAX_STATIONS, matched: hits }).map(h => ({
       kind: 'suggest', offer: true, icon: '📍', label: h.station.name, sub: stationSub(h.station),
       run: () => goToStation(h.station.id),
     }));
@@ -389,7 +393,7 @@ const Palette = (() => {
     if (!found.length) return query.trim() ? `Nothing matches “${query.trim()}”` : '';
     const by = GROUPS.map(g => [g.title, found.filter(i => i.kind === g.key).length])
       .filter(([, k]) => k).map(([t, k]) => `${k} ${k === 1 ? t.toLowerCase().replace(/s$/, '') : t.toLowerCase()}`);
-    return by.join(', ');
+    return by.join(', ') + (near ? ` — or did you mean ${near.label}?` : '');
   }
 
   function listHtml() {

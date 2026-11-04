@@ -6723,16 +6723,20 @@ function updateMapMatchNote() {
 // A name somebody can say but not spell found nothing, and the note said so
 // and stopped there — the way on was trying the letters in every order until
 // one stuck. Now, for each term of the stack that is in no station on file
-// where its entry looks (unmatchedSearchTerms), the note offers the spellings
-// on file that sound like it or are a slip of the fingers away
-// (station-suggest.js): "Did you mean Gympie (6 stations)?". Picking one puts
-// it in the box in place of what was typed, and the filter runs on it.
+// where its entry looks (unmatchedSearchTerms), or in only one or two
+// (StationSuggest.FEW), the note offers the spellings on file that sound like
+// it or are a slip of the fingers away (station-suggest.js): "Did you mean
+// Gympie (6 stations)?". One or two is what a spelling that sits inside
+// another name by chance finds — "mckay" is in McKays Track — so Mackay is
+// offered beside it, on the higher bar that case keeps. Picking one puts it
+// in the box in place of what was typed, and the filter runs on it.
 //
 // Only a term with letters in it — a number or a window has nothing to sound
-// like — and only the first three, so a pasted list of names that are not on
-// file costs three lookups and not forty. Kept until the stack or the file
-// changes: the note is redrawn for reasons that have nothing to do with it.
-const SEARCH_SUGGEST_TERMS = 3;
+// like — and only the first few, so a pasted list of names costs a handful of
+// lookups and not forty. Kept until the stack or the file changes: the note
+// is redrawn for reasons that have nothing to do with it.
+const SEARCH_SUGGEST_TERMS = 3;   // terms with an offer, at most
+const SEARCH_SUGGEST_TRIES = 6;   // terms asked about, at most
 let _searchSuggestMemo = { sig: null, corpus: null, list: [] };
 let _searchSuggestPicks = [];   // the spellings on screen, so a click names one by number
 
@@ -6742,17 +6746,34 @@ function searchSuggestions() {
   const corpus = searchCorpus();
   if (_searchSuggestMemo.sig === _stackPrep.sig && _searchSuggestMemo.corpus === corpus) return _searchSuggestMemo.list;
   const list = [];
+  let tries = 0;
   outer: for (const { i, prep, fields, active } of stack) {
     if (!active || !fields.name) continue;
-    for (const term of unmatchedSearchTerms(prep, fields)) {
-      if (list.length >= SEARCH_SUGGEST_TERMS) break outer;
+    const missing = new Set(unmatchedSearchTerms(prep, fields));
+    for (let k = 0; k < prep.terms.length; k++) {
+      const term = prep.terms[k];
+      if (list.length >= SEARCH_SUGGEST_TERMS || tries >= SEARCH_SUGGEST_TRIES) break outer;
       if (!/[a-z]/.test(term)) continue;
-      const near = StationSuggest.phrases(term, state.data.stations, { limit: 3 });
+      const matched = missing.has(term) ? [] : searchTermStations(term, prep.res[k], fields, StationSuggest.FEW + 1);
+      if (matched.length > StationSuggest.FEW) continue;
+      tries++;
+      const near = StationSuggest.phrases(term, state.data.stations, { limit: 3, matched });
       if (near.length) list.push({ i, term, near });
     }
   }
   _searchSuggestMemo = { sig: _stackPrep.sig, corpus, list };
   return list;
+}
+
+// The stations one term of an entry finds, by the filter's own rule, up to
+// `cap` of them — enough to say whether it found more than a few.
+function searchTermStations(term, re, fields, cap) {
+  const prep = { terms: [term], nums: /^\d+$/.test(term) ? [term] : [], ranges: [], res: [re || null] };
+  const out = [];
+  for (const s of state.data.stations) {
+    if (stationMatchesSearch(s, prep, fields)) { out.push(s); if (out.length >= cap) break; }
+  }
+  return out;
 }
 
 // The offer, as words and buttons. With one term it is the question; with

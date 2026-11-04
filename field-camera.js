@@ -1609,15 +1609,16 @@ const FieldCamera = (function () {
   function hitsHtml() {
     const q = find.trim();
     if (!q) return '';
-    let list = hits(q), near = false;
-    // Nothing spelt that way: the names that sound like it (station-suggest.js).
-    if (!list.length && typeof StationSuggest !== 'undefined') {
-      list = StationSuggest.stations(q, stations(), { limit: 10, filter: located });
-      near = list.length > 0;
-    }
-    if (!list.length) return `<p class="small txt-muted">No station with a position matches “${esc(q)}”.</p>`;
-    return `${near ? `<p class="small txt-muted">${StationSuggest.leadHtml(q)}</p>` : ''}<div class="pill-row cam-hits">${list.map(s => `<button type="button" class="pill" onclick="FieldCamera.pickStation('${escAttr(s.id)}')">${esc(s.name)}
+    const list = hits(q);
+    // Nothing spelt that way, or only one or two stations: the names that
+    // sound like it (station-suggest.js) — in place of the list, or under it.
+    const near = typeof StationSuggest !== 'undefined' && list.length <= StationSuggest.FEW
+      ? StationSuggest.stations(q, stations(), { limit: 10, filter: located, matched: list }) : [];
+    if (!list.length && !near.length) return `<p class="small txt-muted">No station with a position matches “${esc(q)}”.</p>`;
+    const pills = some => `<div class="pill-row cam-hits">${some.map(s => `<button type="button" class="pill" onclick="FieldCamera.pickStation('${escAttr(s.id)}')">${esc(s.name)}
         <span class="cam-sug-sub">${esc(s.station_number || '')}${gps ? ` · ${fmtM(metres(gps.lat, gps.lon, s.lat, s.lon))}` : ''}</span></button>`).join('')}</div>`;
+    const also = near.length ? `<p class="small txt-muted">${StationSuggest.leadHtml(q, list.length)}</p>${pills(near)}` : '';
+    return list.length ? pills(list) + also : also;
   }
 
   function captionsHtml() {

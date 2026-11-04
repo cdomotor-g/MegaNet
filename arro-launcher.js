@@ -206,24 +206,36 @@ function arroResultsHtml() {
     return `<p class="small arro-flush">
       Type to search ${state.data.stations.length.toLocaleString()} stations.</p>`;
   }
-  let hits = arroSearchResults(), lead = '';
-  // Nothing spelt that way: the names that sound like it (station-suggest.js).
-  if (!hits.length && typeof StationSuggest !== 'undefined') {
-    hits = StationSuggest.stations(text, state.data.stations, { limit: ARRO_RESULT_MAX });
-    if (hits.length) lead = `<p class="small arro-flush">${StationSuggest.leadHtml(text)}</p>`;
+  const hits = arroSearchResults();
+  // Nothing spelt that way, or only one or two stations: the names that sound
+  // like it (station-suggest.js) — in place of the table, or under it.
+  const near = typeof StationSuggest !== 'undefined' && hits.length <= StationSuggest.FEW
+    ? StationSuggest.stations(text, state.data.stations, { limit: ARRO_RESULT_MAX, matched: hits }) : [];
+  if (!hits.length && !near.length) {
+    return `<p class="small arro-flush">No station matches that.</p>`;
   }
   if (!hits.length) {
-    return `<p class="small arro-flush">No station matches that.</p>`;
+    return `<p class="small arro-flush" id="arro-find-near">${StationSuggest.leadHtml(text)}</p>
+      ${arroTableHtml(near, `Stations that sound like “${esc(text)}”`, 'arro-find-near')}`;
   }
   const more  = hits.length > ARRO_RESULT_MAX;
   const shown = more ? hits.slice(0, ARRO_RESULT_MAX) : hits;
-  // Pattern 7a — the wrapper caps its height, so it scrolls, so it is a named
-  // region with a tab stop. Named off the panel's own heading rather than a
-  // second form of words.
-  return `${lead}
-    <div class="table-wrap medium" role="region" tabindex="0" aria-labelledby="arro-find-h">
+  return `${arroTableHtml(shown, `Stations matching “${esc(text)}”`, 'arro-find-h')}
+    ${more ? `<p class="small arro-hint">
+      Showing the first ${ARRO_RESULT_MAX} — narrow the search to see the rest.</p>` : ''}
+    ${near.length ? `<p class="small arro-flush" id="arro-find-near">${StationSuggest.leadHtml(text, hits.length)}</p>
+      ${arroTableHtml(near, `Stations that sound like “${esc(text)}”`, 'arro-find-near')}` : ''}`;
+}
+
+// One table of stations, each with its ARRO site id and the two ways on.
+// Pattern 7a — the wrapper caps its height, so it scrolls, so it is a named
+// region with a tab stop, named by `labelledBy`: the panel's own heading for
+// the matches, the line over them for the ones that sound like it.
+function arroTableHtml(shown, caption, labelledBy) {
+  return `
+    <div class="table-wrap medium" role="region" tabindex="0" aria-labelledby="${labelledBy}">
       <table>
-        <caption class="sr-only">${lead ? 'Stations that sound like' : 'Stations matching'} “${esc(text)}” — ${shown.length} shown</caption>
+        <caption class="sr-only">${caption} — ${shown.length} shown</caption>
         <colgroup>
           <col style="width:40%"><col style="width:13%">
           <col style="width:16%"><col style="width:11%"><col style="width:20%">
@@ -257,9 +269,7 @@ function arroResultsHtml() {
           }).join('')}
         </tbody>
       </table>
-    </div>
-    ${more ? `<p class="small arro-hint">
-      Showing the first ${ARRO_RESULT_MAX} — narrow the search to see the rest.</p>` : ''}`;
+    </div>`;
 }
 
 function arroRecentsHtml() {

@@ -1478,14 +1478,14 @@ const FieldPhotos = (function () {
       if (ok && located(s)) hits.push(s);
       if (hits.length >= 12) break;
     }
-    // Nothing spelt that way: the names that sound like it (station-suggest.js).
-    let lead = '';
-    if (!hits.length && typeof StationSuggest !== 'undefined') {
-      hits.push(...StationSuggest.stations(q, stations(), { limit: 12, filter: located }));
-      if (hits.length) lead = `<p class="small txt-muted">${StationSuggest.leadHtml(q)}</p>`;
-    }
-    if (!hits.length) return `<p class="small txt-muted">No station with a position matches “${esc(q)}”.</p>`;
-    return `${lead}<div class="fp-hits">${hits.map(s => `<button type="button" class="fp-hit" onclick="${onPick(s.id)}">${esc(s.name)} <span class="small">${esc(s.station_number || '')}</span></button>`).join('')}</div>`;
+    // Nothing spelt that way, or only one or two stations: the names that
+    // sound like it (station-suggest.js) — in place of the list, or under it.
+    const near = typeof StationSuggest !== 'undefined' && hits.length <= StationSuggest.FEW
+      ? StationSuggest.stations(q, stations(), { limit: 12, filter: located, matched: hits }) : [];
+    if (!hits.length && !near.length) return `<p class="small txt-muted">No station with a position matches “${esc(q)}”.</p>`;
+    const buttons = list => `<div class="fp-hits">${list.map(s => `<button type="button" class="fp-hit" onclick="${onPick(s.id)}">${esc(s.name)} <span class="small">${esc(s.station_number || '')}</span></button>`).join('')}</div>`;
+    const also = near.length ? `<p class="small txt-muted">${StationSuggest.leadHtml(q, hits.length)}</p>${buttons(near)}` : '';
+    return hits.length ? buttons(hits) + also : also;
   }
 
   function filterHtml() {

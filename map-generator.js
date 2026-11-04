@@ -1447,12 +1447,13 @@ function stationHitsHtml() {
     hits.push(s);
     if (hits.length > MG_FIND_CAP) break;      // one over, so "more than" is knowable
   }
-  // Nothing spelt that way: the names that sound like it (station-suggest.js).
-  const near  = !hits.length && typeof StationSuggest !== 'undefined'
-    ? StationSuggest.stations(text, state.data.stations, { limit: MG_FIND_CAP }) : [];
+  // Nothing spelt that way, or only one or two stations: the names that
+  // sound like it (station-suggest.js) — in place of the list, or under it.
+  const near  = hits.length <= (typeof StationSuggest !== 'undefined' ? StationSuggest.FEW : -1)
+    ? StationSuggest.stations(text, state.data.stations, { limit: MG_FIND_CAP, matched: hits }) : [];
   const more  = hits.length > MG_FIND_CAP;
-  const shown = near.length ? near : more ? hits.slice(0, MG_FIND_CAP) : hits;
-  const lead  = near.length ? StationSuggest.leadHtml(text)
+  const shown = !hits.length ? near : more ? hits.slice(0, MG_FIND_CAP) : hits;
+  const lead  = !hits.length && near.length ? StationSuggest.leadHtml(text)
     : hits.length === 0
     ? `No station matches “${esc(text)}”`
     : more ? `More than ${MG_FIND_CAP} match “${esc(text)}” — keep typing to narrow it`
@@ -1460,25 +1461,27 @@ function stationHitsHtml() {
   const said = /\?$/.test(lead) ? lead : `${lead}.`;
   if (!shown.length) return `<p class="mg-hint mg-find-none">${said}</p>`;
   const here = centreStation();
+  const buttons = list => list.map(st => {
+    const located = st.lat != null && st.lon != null;
+    const mine    = here && here.id === st.id;
+    return `
+      <button type="button" class="mg-hit${mine ? ' is-here' : ''}"
+              ${located ? '' : 'disabled'}
+              title="${located ? `Centre the sheet on ${escAttr(st.name)}`
+                               : 'This station has no position recorded, so there is nowhere to centre on'}"
+              onclick="MapGen.centreOnStation('${escAttr(st.id)}')">
+        <span class="mg-hit-name">${markHits(st.name, prep.terms, prep.res)}</span>
+        <span class="mg-hit-num">${markHits(st.station_number || '', prep.terms)}</span>
+        ${mine ? '<span class="mg-hit-at">centre</span>'
+               : located ? '' : '<span class="mg-hit-at">no position</span>'}
+      </button>`;
+  }).join('');
+  const also = hits.length && near.length ? `
+    <p class="mg-hint" id="mg-find-near">${StationSuggest.leadHtml(text, hits.length)}</p>
+    <div class="mg-hits" role="group" aria-labelledby="mg-find-near">${buttons(near)}</div>` : '';
   return `
     <p class="mg-hint" id="mg-find-lead">${said}</p>
-    <div class="mg-hits" role="group" aria-labelledby="mg-find-lead">
-      ${shown.map(st => {
-        const located = st.lat != null && st.lon != null;
-        const mine    = here && here.id === st.id;
-        return `
-          <button type="button" class="mg-hit${mine ? ' is-here' : ''}"
-                  ${located ? '' : 'disabled'}
-                  title="${located ? `Centre the sheet on ${escAttr(st.name)}`
-                                   : 'This station has no position recorded, so there is nowhere to centre on'}"
-                  onclick="MapGen.centreOnStation('${escAttr(st.id)}')">
-            <span class="mg-hit-name">${markHits(st.name, prep.terms, prep.res)}</span>
-            <span class="mg-hit-num">${markHits(st.station_number || '', prep.terms)}</span>
-            ${mine ? '<span class="mg-hit-at">centre</span>'
-                   : located ? '' : '<span class="mg-hit-at">no position</span>'}
-          </button>`;
-      }).join('')}
-    </div>`;
+    <div class="mg-hits" role="group" aria-labelledby="mg-find-lead">${buttons(shown)}</div>${also}`;
 }
 
 // The fields half of the Output area panel only — the #mg-minimap div above
