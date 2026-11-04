@@ -8,6 +8,11 @@ sites (approved accounts read them in the database, 0064), not for a public
 repository or the public site, so those files live in the private repository
 `cdomotor-g/flood-net-private`, under `inspections/`.
 
+The Bureau's benchmark details (`benchmarks/`, read by benchmarks.py) live there
+too: what each benchmark is and exactly where — a bolt in a tree beside a house,
+a nail in a gate post — is editors' in the database (0101, like the level
+surveys of 0060), and not for the open internet.
+
 The tools that read or write them (survey.py, extract.py, crosswalk.py,
 remarks.py, load.py) find it beside this checkout:
 
@@ -39,14 +44,18 @@ SAMPLE = os.path.join(INSPECTIONS, 'inspection_extract_sample.json')
 # checkout is.
 WORKBOOK_NAME = 'archive/QLD All Site Inspections.xlsx'
 
+# The Bureau's benchmark details report and what benchmarks.py reads out of it.
+BENCHMARKS = os.path.join(ROOT, 'benchmarks')
+
 
 def require(what: str = WORKBOOK) -> None:
     """Stop with a sentence, not a traceback, when the private checkout is missing."""
     if os.path.exists(what):
         return
     print(f'{os.path.relpath(what, os.path.dirname(REPO))} is not here.\n'
-          'The inspection archive lives in the private repository '
-          'cdomotor-g/flood-net-private (it carries site access codes). Clone it '
-          f'beside this one, at {ROOT},\nor set FLOODNET_PRIVATE to a checkout of it.',
+          'The inspection archive and the benchmark details live in the private '
+          'repository cdomotor-g/flood-net-private (site access codes, and where '
+          f'each benchmark is). Clone it beside this one, at {ROOT},\nor set '
+          'FLOODNET_PRIVATE to a checkout of it.',
           file=sys.stderr)
     raise SystemExit(2)

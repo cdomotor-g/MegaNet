@@ -25168,6 +25168,18 @@ select.kl-in { width: auto; font-family: inherit; }
    draws it empty and fills it), as the Equipment section is. */
 .stn-card-sitefeat:empty { display: none; }
 .stn-card-sf-h { display: block; margin-bottom: .25rem; }
+/* The Bureau's benchmarks (station-benchmarks.js, 0101): on the station card
+   and in the Level Survey's Datum step — a mark a line, its description and
+   comment under it, and the words fold below. */
+.stn-card-benchmarks:empty { display: none; }
+.stn-card-sb-h { display: block; margin-bottom: .25rem; }
+.sb-list { margin: var(--sp-2) 0; padding-left: 1.1rem; }
+.sb-list li { margin: var(--sp-2) 0; overflow-wrap: anywhere; }
+.sb-list button { margin-left: var(--sp-1); }
+.sb-words { margin: var(--sp-1) 0 var(--sp-2); }
+.sb-words dl { margin: var(--sp-1) 0 0; }
+.sb-words dt { font-weight: 600; }
+.sb-words dd { margin: 0 0 var(--sp-1); }
 .stn-card-sf-kind { display: inline-flex; align-items: center; gap: .3rem; }
 
 /* The legend's line: each kind drawn in view, its glyph and its name. */

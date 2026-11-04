@@ -327,6 +327,7 @@ its cache at all (`PGRST002`).
 | `meganet.level_num(jsonb)` | A reading as a phone sent it — a JSON number, or a string holding one — as numeric, else null (`0060`). Internal. |
 | `meganet.station_feature_kind` | What a station's site feature can be (`0061`): the orifice outlet, inspection pit, benchmark, gauge board, crest gauge and *other point* as `Point`, the orifice run, cable run, access track (`0067`) and *other line* as `LineString`, whether it has to be named (the two *other*s), its order and a sentence. A new kind is an insert. Public, like every vocabulary. |
 | `meganet.station_feature` | Where a station's ancillary features are (`0061`): station, kind, name, note, `geom` — GeoJSON, longitude first, WGS84, seven places, nothing but `type` and `coordinates` (a check over `station_feature_geom_problem()`) — `placed` (`map`, `gps`, `typed`, `mixed`) and the GPS's `accuracy_m`, who added and last changed it, and a soft delete. The kind and the shape are tied by a foreign key over a generated `geom_type`, so a benchmark cannot be a line however it is written; two live features of one kind at a station do not share a name. **Editors only** (RLS hides tombstones); nothing for `anon`. See **Site features**, below. |
+| `meganet.benchmark_extract`, `meganet.bureau_benchmark`, `meganet.station_benchmark` | The Bureau's benchmarks (`0101`): HDB's *Benchmark Details* report for its Queensland river height stations as printed — which report (one row, with the reader's meta), and every benchmark, keyed on the bureau number like the flood peaks: the station's name and basin as HDB has them, the mark's level and datum, what it is and where, and the comments. The view puts each on its live station with the gauge zero in force and `on_gauge_m`, the level less that zero where both are AHD or both State. **Editors only** — a benchmark's description is not for the open internet — and the report lives in the private repository. Written only by `load_benchmarks_doc()`. See **The Bureau's benchmarks**, below. |
 | `meganet.a2plan_site` | What a repeater site needs before it carries ALERT2, for the ALERT2 Transition Plan (`0065`): `fit` (a fit-out only), `retrofit` (power, antenna, enclosure, earthing, access) or `rebuild` (the structure), one row a station, who set it and when; no row is "not assessed". **The plan's list only** (`0076`; `0065` gave it to administrators), everybody on it seeing the same answer; nothing for `anon`, or for an administrator or member who is not on the list. |
 | `meganet.a2plan_scenario` | A saved ALERT2 Transition Plan scenario (`0065`): the card's settings (a JSON object of at most 64 KB the app checks again on load), a name, notes, `shared`. **Private to its author until shared, then everybody's on the plan's list to see** (`0076`; the select policy and `a2plan_read()` say the same); only its author changes or removes it. One author leaving the list leaves their shared scenarios shared and their private ones unseen. |
 | `meganet.a2plan_member` | Who sees the ALERT2 Transition Plan (`0076`): one row a person, `nominates` (may change the list), who added them and when. The owner nominates, starting with themselves (`select meganet.a2plan_member_save('their address', true)` from the SQL editor, a direct connection); being an administrator gives nothing here. **RLS on, no policy and no grant**: read through `a2plan_read()` and `whoami()` (`a2plan`, `a2plan_nominates`), written through the two functions below. |
@@ -369,7 +370,8 @@ station is public, but a record of who changed it, when, is a record of people.
 So are the level surveys (`0060`) — a benchmark's description and position, a
 crew's names — and what a station holds from them; and so are a station's site
 features (`0061`), for the same reason: where its benchmarks are, and where a
-line runs that somebody might dig through. Teams and tasks (`0095`) are never
+line runs that somebody might dig through — and the Bureau's benchmarks
+(`0101`), what each mark is and exactly where. Teams and tasks (`0095`) are never
 `anon`'s either: a team's name is an approved account's to read, its roster
 only its own people's and administrators', and a task only its team's, its
 maker's and the people who hand out tasks' — some approved accounts are
@@ -2236,6 +2238,47 @@ meet on the name.
 
 `tools/check_station_features.sql` proves all of it against a real Postgres, as
 two editors, a stranger, nobody signed in and the service key.
+
+## The Bureau's benchmarks
+
+`0101` holds the marks each river height station's gauge is levelled from, as
+the Bureau's report *Queensland Flood Warning River Height Stations — Benchmark
+Details* prints them: 777 benchmarks at 519 stations, printed from HDB on
+15/10/2026, each with its level, its datum (AHD, assumed, State or unknown —
+`meganet.gauge_datum`), what the mark is and where, and the office's comments.
+`tools/ingest/benchmarks.py` reads the report out of the private repository
+`cdomotor-g/flood-net-private` (`benchmarks/`), where it lives because the
+descriptions say where a mark is to the tree and the gate post. The station
+card lists them for an editor, and the 📏 Level Survey's Datum step offers each
+as the primary benchmark (`station-benchmarks.js`).
+
+```sh
+python3 tools/ingest/benchmarks.py --check     # the JSON still matches the report
+python3 tools/ingest/benchmarks.py --sql \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+```
+
+- **Keyed on the bureau number**, as the flood peaks are (`0037`), not hung off
+  `meganet.station`: it is the Bureau's record, not something an editor types,
+  and a gauge that is not a Flood-Net station keeps its marks for the day it is.
+  `load_benchmarks_doc()` makes the table match the document — upsert what is
+  in it, delete what is not, `updated_at` left alone on a row that did not
+  change — and nothing else writes it.
+- **On the gauge only where the datums agree.** `meganet.station_benchmark`
+  puts each benchmark on its live station through `bureau_key()`, with the
+  gauge zero in force (no end date and the latest start, else the one that
+  ended last — 0037's rule) and `on_gauge_m`, the level less that zero, when
+  both are AHD or both State. An assumed mark is never put on the gauge: an
+  assumed mark and an assumed zero need not share the assumption.
+- **No URL road.** The public flood peaks load from the file on `main`
+  (`load_flood_peaks_from_url()`); the database cannot read a private
+  repository, so the benchmarks go in as one `load_benchmarks_doc()` call,
+  through psql or the SQL editor — 110 KB, so the Supabase connector carries it
+  too.
+
+`tools/check_station_benchmarks.sql` proves it against a real Postgres: the
+load and its refusals, the view's join and its arithmetic, and nobody but an
+editor (and the service key) reading a row.
 
 ## Checking it from outside
 

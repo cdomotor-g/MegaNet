@@ -8588,6 +8588,8 @@ function repaintStnCard() {
   // …and its site features (site-features.js), kept per station for two
   // minutes, so a repaint asks nothing new.
   if (typeof SiteFeatures !== 'undefined') SiteFeatures.cardAsk(s);
+  // …and the Bureau's benchmarks there (station-benchmarks.js), on the same terms.
+  if (typeof StationBenchmarks !== 'undefined') StationBenchmarks.cardAsk(s);
   // And the station's history (station-history.js).
   if (typeof StationHistory !== 'undefined') StationHistory.cardAsk(s);
   // Its health (#218): one request for its readings, kept per station for a
@@ -9046,6 +9048,12 @@ function stnCardHtml(s) {
          SiteFeatures.cardAsk, each row showing its feature on the map. The
          📌 Site features pill below maps them. -->
     ${typeof SiteFeatures !== 'undefined' ? SiteFeatures.cardHtml(s) : ''}
+    <!-- The marks its gauge is levelled from, as the Bureau lists them — each
+         one's level and datum, what it is and where, and what it reads on the
+         gauge (0101, station-benchmarks.js): signed-in editors only, filled
+         after the fetch by StationBenchmarks.cardAsk, and not drawn at all
+         when the Bureau lists none. -->
+    ${typeof StationBenchmarks !== 'undefined' ? StationBenchmarks.cardHtml(s) : ''}
     <!-- Who changed the station, what and when, with Restore (0056,
          station-history.js): signed-in editors only, shut until opened, and
          filled after the fetch by StationHistory.cardAsk. -->

@@ -3540,6 +3540,11 @@ Side panel or modal showing full station record:
   benchmarks, gauge boards, orifice run and access tracks are, a row each that shows its
   feature on the map, and the **📌 Site features** pill that maps them
   (`site-features.js`, `0061`; see §30)
+- **Benchmarks**, for signed-in editors: the marks its gauge is levelled from,
+  as the Bureau's HDB *Benchmark Details* lists them — each one's level and
+  datum, what it is and where, the comments, and what it reads on the gauge
+  where the mark and the gauge zero share a datum; nothing at all for a station
+  the Bureau lists none for (`station-benchmarks.js`, `0101`)
 
 ### 13. In-App Bug / Idea Reporter
 The **🐞 Report a Bug** button in the header lets any user flag a problem or

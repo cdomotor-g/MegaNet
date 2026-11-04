@@ -656,6 +656,14 @@ const LevelSurvey = (function () {
     const bm = d.bm || {};
     const known = control && d.station && control.station === d.station.id ? (control.points || []).filter(p => p.kind === 'bm') : [];
     if (d.station && d.station.id && signedIn() && !(control && control.station === d.station.id)) loadControl(d.station.id);
+    // The Bureau's benchmarks at the station (0101, station-benchmarks.js),
+    // asked once and drawn when they arrive.
+    const sid = d.station && d.station.id;
+    const SB = typeof StationBenchmarks !== 'undefined' ? StationBenchmarks : null;
+    if (SB && sid && signedIn() && SB.rows(sid) == null) {
+      SB.ask(sid).then(() => { if (view === 'survey' && step === 'datum') repaint(); });
+    }
+    const bureau = SB && sid ? SB.listHtml(sid, { use: 'LevelSurvey.useBureauBm' }) : '';
     const unit = d.datum === 'AHD' ? 'm AHD' : d.datum === 'ASSUMED' ? 'm, assumed' : 'm on the gauge';
     return `
       <h3>📐 Datum and control</h3>
@@ -671,12 +679,13 @@ const LevelSurvey = (function () {
       ${known.length ? `<p class="small">Flood-Net holds ${known.length === 1 ? 'this benchmark' : 'these benchmarks'} for the station:</p>
         <ul class="lv-known">${known.map(p => `<li><strong>${esc(p.name)}</strong>${p.is_primary ? ' (primary)' : ''} — RL ${f3(Number(p.rl))} ${esc(p.datum || '')}
           <button type="button" onclick="LevelSurvey.useKnownBm('${escAttr(p.id)}')">Use</button></li>`).join('')}</ul>` : ''}
+      ${bureau}
       <div class="form-grid">
         <label>Name <input value="${attr(bm.name)}" oninput="LevelSurvey.set('bm.name', this.value)" autocomplete="off"></label>
         <label>RL (${unit}) <input inputmode="decimal" value="${attr(bm.rl == null ? '' : bm.rl)}" oninput="LevelSurvey.setNum('bm.rl', this.value)" autocomplete="off"></label>
         <label class="full">Where its RL came from <input value="${attr(bm.source)}" oninput="LevelSurvey.set('bm.source', this.value)" list="lv-sources" autocomplete="off"></label>
       </div>
-      <datalist id="lv-sources"><option value="Site pack"><option value="Station records"><option value="Previous survey"><option value="Assumed 100.000"><option value="GNSS, post-processed (report attached)"></datalist>
+      <datalist id="lv-sources"><option value="Site pack"><option value="Station records"><option value="Bureau benchmark details (HDB)"><option value="Previous survey"><option value="Assumed 100.000"><option value="GNSS, post-processed (report attached)"></datalist>
       <label class="lv-block">Description <span class="small txt-muted">— what it is, exactly where, so another crew finds it</span>
         <textarea rows="3" oninput="LevelSurvey.set('bm.description', this.value)" placeholder="${attr(L.suggestDesc('bm', { name: bm.name }, d))}…">${esc(bm.description || '')}</textarea></label>
       <div class="button-row">
@@ -757,6 +766,23 @@ const LevelSurvey = (function () {
     if (first && first.kind === 'bm') first.name = p.name;
     touch();
     repaint();
+  }
+  // One of the Bureau's benchmarks as the primary: its level in a datum the
+  // survey can book (StationBenchmarks.pick says which, and why), its
+  // description, and where the figure came from.
+  function useBureauBm(stationId, ord) {
+    const d = doc();
+    const p = d && d.station && d.station.id === stationId && typeof StationBenchmarks !== 'undefined'
+      ? StationBenchmarks.pick(stationId, ord) : null;
+    if (!p) return;
+    d.datum = p.datum;
+    d.bm = Object.assign({}, d.bm, { rl: p.rl, source: p.source, description: p.description || d.bm.description },
+                         p.name ? { name: p.name } : {});
+    const first = (d.rows || [])[0];
+    if (p.name && first && first.kind === 'bm') first.name = p.name;
+    touch();
+    repaint();
+    announce(`Primary benchmark set from the Bureau's list: ${f3(p.rl)} m.`);
   }
   function bmHere() {
     const d = doc();
@@ -1596,7 +1622,7 @@ const LevelSurvey = (function () {
     start, practise, open, home, go, remove, set, setNum, setDatum,
     findStation, nearMe, pickStation, clearStation,
     kitAdd, kitCancel, kitRead, kitSave, useKit, linkPeg, unlinkPeg, pegNow, linkTest,
-    useStationGz, useKnownBm, bmHere,
+    useStationGz, useKnownBm, useBureauBm, bmHere,
     addRow, editRow, doneRow, setRow, setMode, setKind, rowNow, startDesc, rowHere, moveRow, deleteRow, readInto,
     addPhoto, view: viewPicture, dropPicture, toggleTable,
     addWater, waterNow, send, exportOpen, openWhy, importFile, getReady, refreshLists,

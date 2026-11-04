@@ -2338,6 +2338,13 @@ jobs:
       - name: check_station_features.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_station_features.sql
+      # The Bureau's benchmarks (0101): the loader makes the table match a
+      # document and refuses one it cannot read, each benchmark on its station
+      # and on the gauge only where the datums agree, and nobody but an editor
+      # reading any of it. The report itself is private (flood-net-private).
+      - name: check_station_benchmarks.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_station_benchmarks.sql
       # A station's logger and the photo reader (0090): one type however it is
       # spelt, a new one only when confirmed and never a duplicate, editors
       # writing with the stamp they read and members reading, and the reader

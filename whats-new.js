@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 188, date: '2026-11-04', items: [
+      '📍 <strong>The Bureau\'s benchmarks</strong>, for editors: a station\'s card on the <strong>Stations</strong> map '
+        + 'now lists the marks its gauge is levelled from, as the Bureau\'s database holds them — 777 at 519 stations, each '
+        + 'with its level and datum, what it is and exactly where, the office\'s comments, and what it reads on the gauge. '
+        + 'On 📏 <strong>Level Survey</strong>, the <em>Datum</em> step lists the same marks, and <em>Use</em> makes one '
+        + 'your primary benchmark, its level and where it came from filled in.',
+    ] },
     { n: 187, date: '2026-11-04', items: [
       '▶ <strong>Show me on the app</strong>, under a video on 🎬 <strong>Videos</strong>: the video played over Flood-Net '
         + 'itself. Each screenshot becomes the real tab, and each part lights up on the page as it is named, while a small '
