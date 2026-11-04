@@ -64,9 +64,9 @@
     "blocked": [
       {
         "id": "station-card-script",
-        "what": "#265's how-to, find a station and read its card: its words, a draft on the site at ?watch=station-card, are voiced only once the owner has read them and said yes",
-        "on": "human",
-        "kind": "decision",
+        "what": "#265's how-to, find a station and read its card — OK'd by the owner to be voiced, once the station card's new look (another thread's work, due 4 Nov) lands and its screenshots are retaken",
+        "on": "agent",
+        "kind": "other",
         "since": "2026-11-04",
         "issue": "#265",
         "holds": [
@@ -76,16 +76,11 @@
         ],
         "options": [
           {
-            "what": "Watch the silent draft at https://floodwarning.net/?watch=station-card (and ▶ Show me on the app) or read the script on #265, and reply OK or with changes",
-            "by": "human",
-            "effort": "5 min",
-            "recommended": true
-          },
-          {
-            "what": "Ask for changes in plain words on #265; an agent redrafts it (no credits until it is final)",
+            "what": "The scheduled session (Sonnet, from 18:41 Brisbane 4 Nov) checks every two hours for the card's new look, then retakes the card's shots, voices the how-to, records its MP4 and closes #265",
             "by": "agent",
-            "effort": "Low",
-            "model": "Opus5"
+            "effort": "Med",
+            "model": "Sonnet5",
+            "recommended": true
           }
         ]
       },
