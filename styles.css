@@ -101,6 +101,13 @@
   --map-fade-good: #00e676;
   --map-fade-ok:   #ffab00;
   --map-fade-bad:  #e53935;
+  /* 🪜 Hops to base (map-hops.js): a hop heard, assumed, not heard — ⏱️
+     Latency's green and blue, a shade deeper here so the card's key holds 3:1
+     on its own ground (test/shell.mjs). On the map each also has its own
+     pattern — solid, dashed, dotted — over a white casing. */
+  --map-hop-heard:   #10913c;
+  --map-hop-assumed: #2f7fe0;
+  --map-hop-missed:  #e53935;
   /* Repeater backbone paths. Black by request — the white casing the map draws
      under it is what carries it on dark imagery, in both themes. Since #186 the
      black is a dashed line laid *over* the coloured core rather than the core
@@ -634,6 +641,9 @@
   --map-fade-good: #2bff9e;
   --map-fade-ok:   #ffc233;
   --map-fade-bad:  #ff5f52;
+  --map-hop-heard:   #2bff6a;
+  --map-hop-assumed: #5aa8ff;
+  --map-hop-missed:  #ff5f52;
   --map-backbone: #000000;
   --map-blast: #ff6659;
   --map-blast-ring: #ff8a80;
@@ -4128,6 +4138,77 @@ hr {
   display: inline-block;
   vertical-align: middle;
 }
+/* 🪜 Hops to base (map-hops.js): the card's key, each hop's mark in a route,
+   and the chevron on the map that says which way a hop runs. The swatches and
+   the marks repeat the map's second channel — solid, dashed, dotted — so the
+   colour is never the only thing that tells a hop's kind. */
+.hops-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+  list-style: none;
+  margin: var(--sp-1) 0;
+  padding: 0;
+  font-size: .8rem;
+}
+.hops-key li { display: inline-flex; align-items: center; gap: .4em; }
+.hops-swatch {
+  width: 1.6em;
+  height: 0;
+  border-top: 4px solid var(--map-hop-heard);
+  display: inline-block;
+  vertical-align: middle;
+}
+.hops-swatch-assumed { border-top: 3px dashed var(--map-hop-assumed); }
+.hops-swatch-missed  { border-top: 3px dotted var(--map-hop-missed); }
+.hops-table th { white-space: normal; text-overflow: clip; font-size: .8rem; }
+.hops-table td:first-child { white-space: normal; overflow-wrap: anywhere; }
+.hop-km { display: block; margin-top: .15em; }
+.hops-route {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.hops-route:hover .hop-stn { color: var(--accent); }
+.hop-line { display: flex; align-items: baseline; gap: .1em; line-height: 1.45; }
+.hop-line + .hop-line { padding-left: .2em; }
+.hop-stn { font-weight: 600; min-width: 0; }
+.hop-stn.hop-base { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.hop-mark {
+  display: inline-block;
+  flex: none;
+  min-width: 1.6em;
+  text-align: center;
+  font-weight: 700;
+  border-bottom: 3px solid currentColor;
+  line-height: 1;
+  margin: 0 .15em;
+}
+.hop-mark.hop-heard   { color: var(--map-hop-heard); }
+.hop-mark.hop-assumed { color: var(--map-hop-assumed); border-bottom-style: dashed; }
+.hop-mark.hop-missed  { color: var(--map-hop-missed); border-bottom-style: dotted; }
+tr.hops-picked td { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.hops-words { margin-top: var(--sp-2); font-size: .78rem; }
+.hops-words summary { cursor: pointer; font-weight: 600; }
+.hops-words dl { margin: var(--sp-1) 0 0; }
+.hops-words dt { font-weight: 600; margin-top: var(--sp-1); }
+.hops-words dd { margin: 0; color: var(--muted); }
+.mn-hop-dir { pointer-events: none; }
+.mn-hop-dir span {
+  display: block;
+  width: 16px;
+  height: 16px;
+  font-size: 13px;
+  line-height: 16px;
+  text-align: center;
+  text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff;
+}
 /* SoRT's warmed burnt orange for LiDAR contour lines — a hard-coded colour on
    purpose: the swatch matches the server-rendered image (MapContours draws the
    MapServer's own symbology), which no theme token can restyle. */
@@ -4164,6 +4245,8 @@ hr {
 .legend-line-fade-good { border-top-color: var(--map-fade-good); border-top-width: 3px; }
 .legend-line-fade-ok   { border-top-color: var(--map-fade-ok); }
 .legend-line-fade-bad  { border-top-color: var(--map-fade-bad); }
+/* 🪜 Hops to base in the legend: the heard green, at the weight it is drawn. */
+.legend-line-hop-heard { border-top-color: var(--map-hop-heard); border-top-width: 4px; }
 
 /* The wind-region key (#176). Ten regions, each with a sentence about what it
    costs, is a nested list rather than ten more chips in the legend's wrapped

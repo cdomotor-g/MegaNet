@@ -1492,6 +1492,22 @@ jobs:
         working-directory: test
         run: npm run bestrep
 
+      # 🪜 Hops to base (map-hops.js), on the committed register with the
+      # datastore answered by the check: the station card's pill pressed with
+      # a real click; every route from the station to a base through
+      # repeaters that carry its address, within the Max TX distance, four
+      # at most, no station twice; signed out with no relay week every hop
+      # assumed and no copies asked for; a line a hop, the route's pins lit
+      # and named and everything else faded; the card's words on hover and in
+      # a fold; a repeater the relay week heard relaying it heard and one that
+      # heard it come another way not; an editor's copies on a repeater's
+      # carrier and on the station's own each a heard hop into a base; the
+      # hops following the card, and Clear and ↺ taking them off.
+      - name: Hops to base — a station's routes, heard or assumed
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run hops
+
       # The 3-D view (map-3d.js). Invisible to every check above it: `smoke`
       # opens the Stations tab and a ⛰️ button that does nothing at all passes,
       # `registry` looks for Leaflet maps and a WebGL context outliving its div

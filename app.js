@@ -4216,6 +4216,10 @@ function renderStationsHtml() {
           ${carriers}
         </div>
         <div class="panel card-kind card-kind-links" id="blast-card" hidden></div>
+        <!-- 🪜 Hops to base (map-hops.js): each route from the station the
+             card lit them for to a base station, hop by hop — filled by
+             MapHops, and hidden while nothing is lit. -->
+        <div class="panel card-kind card-kind-links" id="hops-card" hidden></div>
         <!-- Every edit is looked at as it is made: the card goes gold and the
              field gilded while it differs from what was saved
              (editorUnsavedRefresh, station-editor.js). -->
@@ -5172,6 +5176,7 @@ function clearStationsMapMarks() {
   try_(() => MapSites.clear());
   try_(() => MapRelocate.clear());
   try_(() => MapBestRepeater.clear());
+  try_(() => MapHops.clear({ quiet: true }));
   try_(() => MapSpider.reset());
   try_(() => Places.clearMark());
   try_(() => MapRiverLines.clearSelection());
@@ -6185,6 +6190,7 @@ function mapLegendHtml() {
     MapSites.active() ? MapSites.legendHtml() : '',
     MapRelocate.active() ? MapRelocate.legendHtml() : '',
     MapBestRepeater.active() ? MapBestRepeater.legendHtml() : '',
+    MapHops.active() ? MapHops.legendHtml() : '',
     MapPeaks.active() ? `
     <span class="legend-item">
       <span class="legend-peak" aria-hidden="true">▲</span>
@@ -6393,6 +6399,7 @@ function stopStationsMap() {
   MapSites.detach();
   MapRelocate.detach();
   MapBestRepeater.detach();
+  MapHops.detach();
   MapLatency.detach();
   Places.detach();
   MapRoads.detach();
@@ -6592,6 +6599,9 @@ function initMap() {
   // goes in, and every mast already standing near it comes out in order of
   // how well it would hear it — and hand it on to a base.
   MapBestRepeater.attach(state.map);
+  // 🪜 Hops to base: a pane for its lines, and the hops of a station lit
+  // before the map was built again drawn on the new one.
+  MapHops.attach(state.map);
   // ⏱️ Latency: a pane rather than a switch in 🗺️ Map display, because what it
   // shows beside the pins — the stations in view summed up, and a picked
   // station's checks slot by slot — is the point of it, and it follows the map
@@ -7478,6 +7488,9 @@ function stationActionGroups(s, { editor = false } = {}) {
       twinPillHtml(s),
       fieldPhotosPillHtml(s),
       MapBlast.popupLinkHtml(s, { editor }),
+      // 🪜 Hops to base (map-hops.js) — the editor's with an id, put right in
+      // place when the hops come or go, as the blast pill's is.
+      typeof MapHops !== 'undefined' ? MapHops.pillHtml(s, { editor }) : '',
     ] },
     // The position handed over, driven to (#225) — or the drive drawn on the
     // map, for an editor (map-drive.js, #251) — and moved.
@@ -7705,7 +7718,11 @@ const MAP_FOCUS_DIM_LINE_MIX    = 0.2;   // fraction of a link's own opacity, wh
 // applyMapSelectionStyles. Runs after it so the selection ring still shows
 // through on a focused pin, and after every refreshMapLayers rebuild.
 function applyMapFocusStyles() {
-  const served = focusedRepeaterStationIds(state.mapFocusRepeaterId);
+  // 🪜 Hops to base, while lit, is the focus: its stations keep their pins and
+  // every one of the map's own lines recedes under the routes it draws over
+  // them (map-hops.js). A repeater focus underneath it comes back with it off.
+  const hops = typeof MapHops !== 'undefined' ? MapHops.litIds() : null;
+  const served = hops || focusedRepeaterStationIds(state.mapFocusRepeaterId);
   for (const m of state.mapMarkers) {
     const base = m.mnBaseStyle;
     if (!base) continue;
@@ -7721,8 +7738,9 @@ function applyMapFocusStyles() {
     if (l.mnBaseOpacity == null) continue;
     // A backbone line has a repeater at BOTH ends (mnLinkRepeaterId2); it stays
     // lit when the focused repeater is either of them.
-    const dim = !!served && l.mnLinkRepeaterId !== state.mapFocusRepeaterId
-                         && l.mnLinkRepeaterId2 !== state.mapFocusRepeaterId;
+    const dim = hops ? true
+      : !!served && l.mnLinkRepeaterId !== state.mapFocusRepeaterId
+                 && l.mnLinkRepeaterId2 !== state.mapFocusRepeaterId;
     l.mnFocusDimmed = dim;
     l.setStyle({ opacity: dim ? l.mnBaseOpacity * MAP_FOCUS_DIM_LINE_MIX : l.mnBaseOpacity });
   }
@@ -7785,6 +7803,8 @@ function mapLabelIds() {
   // are still ringed and still zoomed to without a name hanging off them.
   if (state.mapLabelMode === 'off') return wanted;
   for (const id of state.mapMatchLabels) wanted.add(id);
+  // The stations 🪜 Hops to base has lit are named, as a filter's matches are.
+  if (typeof MapHops !== 'undefined') for (const id of MapHops.labelIds()) wanted.add(id);
 
   const map = state.map;
   if (!map || !state.mapMarkers.length) return wanted;
@@ -8726,6 +8746,9 @@ function repaintStnCard() {
   StationTrail.sync();
   // ⏱️ Latency's pane is about the station on the card (map-latency.js).
   MapLatency.follow(s.id);
+  // …and 🪜 Hops to base, while lit, goes with the card to its new station
+  // (map-hops.js).
+  if (typeof MapHops !== 'undefined') MapHops.follow(s.id);
 }
 
 // Escape closes the card from anywhere inside it. On the card rather than on
@@ -9195,6 +9218,7 @@ function stnCardHtml(s) {
     <p class="small acma-card-note">
       ${carriers.length ? `Carried by ${carriers.length} repeater${carriers.length === 1 ? '' : 's'}${selected
         ? ` — <button type="button" class="link-btn" onclick="stnCardScrollToCarriers()">shown ${stationsCardsWhere()} ${stationsCardsArrow()}</button>` : ''}. ` : ''}
+      ${typeof MapHops !== 'undefined' ? MapHops.cardNoteHtml(s) : ''}
       ${stnCardEditorNote(selected)}
     </p>`;
 }

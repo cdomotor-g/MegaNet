@@ -191,6 +191,9 @@ const NONTEXT_PAIRS = [
   // their second channels (weight, dash, growth, the focus dim) carry them.
   ['--map-blast', '--panel'], ['--map-blast-ring', '--panel'],
   ['--map-line-blocked', '--panel'],
+  // 🪜 Hops to base's key (map-hops.js), on the card it is drawn on and on the
+  // plain panel; on the map a white casing and a pattern each carry them.
+  ...['--map-hop-heard', '--map-hop-assumed', '--map-hop-missed'].flatMap(t => [[t, '--panel'], [t, '--panel-links']]),
   // A control's edge and the focus ring on the Stations cards' grounds, and a
   // gilded field's own edge — the boundary of a changed box — on the gold card
   // it sits in.

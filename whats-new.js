@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 193, date: '2026-11-04', items: [
+      '🪜 <strong>Hops to base</strong>, on the station card: press <em>Show hops to base</em> and the Stations map lights '
+        + 'the way that station\'s readings travel — each repeater they pass through and the base stations they end at — and '
+        + 'fades everything else. A hop is green where something received says the readings took it (a repeater heard relaying '
+        + 'the station in the last week, or, for editors, a base station\'s receiver hearing it in the last 12 hours), blue and '
+        + 'dashed where only the pass ranges and backbone paths say so, and red and dotted where a repeater that carries its '
+        + 'address was heard bringing it in another way. Each route is listed hop by hop with the cards; press one to pick it '
+        + 'out on the map.',
+    ] },
     { n: 192, date: '2026-11-04', items: [
       '🔎 <strong>Did you mean …?</strong> now also speaks up when a name finds only one or two stations, and a '
         + 'better-known spelling sounds almost the same: <em>mckay</em> finds McKays Track, and offers Mackay beside it. '
