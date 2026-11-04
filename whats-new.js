@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 189, date: '2026-11-04', items: [
+      '📏 <strong>Benchmarks for SoRT</strong>, for editors: when SoRT\'s scope builder asks Flood-Net for a station\'s '
+        + 'benchmarks, Flood-Net opens with a card that shows exactly which marks would go — each one\'s level and datum, its '
+        + 'height on the gauge, what it is and where, and the comments — and <em>Send to SoRT</em> puts them in the SoRT tab '
+        + 'that asked, for its scope and Word tables, and nowhere else. If that tab can\'t be reached (signing in can cut the '
+        + 'link), <em>Copy for SoRT</em> copies them for its <em>Paste from Flood-Net</em> box.',
+    ] },
     { n: 188, date: '2026-11-04', items: [
       '📍 <strong>The Bureau\'s benchmarks</strong>, for editors: a station\'s card on the <strong>Stations</strong> map '
         + 'now lists the marks its gauge is levelled from, as the Bureau\'s database holds them — 777 at 519 stations, each '

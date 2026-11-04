@@ -13770,6 +13770,48 @@ details.qs-ctl[open] > summary { margin-bottom: .45rem; }
   .signin-nudge { left: 1rem; right: 1rem; width: auto; }
 }
 
+/* ── Benchmarks for SoRT (sort-benchmarks.js) ───────────────────────────────
+   SoRT's scope builder opened this tab to ask for a station's benchmarks: a
+   card over whatever tab is open, under the banner on the right, outside
+   #main-content so that no tab's render takes it away. Under the dialogs
+   (2000), so Sign in opens over it; over the map's full-screen panel (1900).
+   The visitor note stands aside while it is up — the card has its own Sign in.
+   On a phone it is the width of the screen less the gutters. */
+.sort-bridge {
+  position: fixed;
+  top: calc(var(--mn-chrome, 3.5rem) - var(--mn-footbar, 0px) + .75rem);
+  right: max(1rem, env(safe-area-inset-right));
+  z-index: 1980;
+  width: min(34rem, calc(100vw - 2rem));
+  max-height: calc(100vh - var(--mn-chrome, 3.5rem) - 1.5rem);
+  max-height: calc(100dvh - var(--mn-chrome, 3.5rem) - 1.5rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: .9rem 1rem 1rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, .28);
+}
+.sbr-h { margin: 0 0 .3rem; font-size: 1.05rem; line-height: var(--lh-tight); }
+.sort-bridge p { margin: .45rem 0; }
+.sort-bridge .button-group { margin-top: .7rem; }
+.sbr-marks { margin: .5rem 0; padding-left: 1.3rem; }
+.sbr-mark { margin: .5rem 0; overflow-wrap: anywhere; }
+.sbr-copybox { display: block; width: 100%; margin-top: .25rem; font-family: var(--font-mono); font-size: var(--fs-xs); word-break: break-all; }
+.sbr-words { margin-top: .75rem; }
+.sbr-words summary { cursor: pointer; color: var(--muted); }
+.sbr-words dl { margin: .4rem 0 0; }
+.sbr-words dt { font-weight: 600; }
+.sbr-words dd { margin: 0 0 .35rem; }
+body.has-sort-bridge .signin-nudge { display: none; }
+
+@media (max-width: 560px) {
+  .sort-bridge { left: 1rem; right: 1rem; width: auto; }
+}
+
 /* A count on a tab's button in the nav (navCountHtml, app.js): accounts
    waiting for an administrator on Admin. On the icon rail it sits on the
    icon's corner. */

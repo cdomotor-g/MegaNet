@@ -1787,6 +1787,17 @@ jobs:
         working-directory: test
         run: npm run tasks
 
+      # Chromium. 📏 Benchmarks for SoRT (sort-benchmarks.js): SoRT's request
+      # for a station's benchmarks (0101) read as untrusted, the fragment
+      # cleared and the request kept in the tab, signed out / not an editor /
+      # an editor, and Send posting the contract's message to SoRT's one origin
+      # — end to end from a page at https://cdomotor-g.github.io, and nothing
+      # to a page of any other origin — or Copy for SoRT without an opener.
+      - name: Benchmarks for SoRT — the request, who sees what, Send to SoRT's origin only
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run sortbenchmarks
+
       # Node, then Chromium. The TDMA Planner tab (tdma-planner.js): the AirLink
       # air-time formula and the two worked frames against the sources' figures, then the tab, its card and its CSVs.
       - name: TDMA Planner — the air-time formula, the two worked examples, the card

@@ -635,6 +635,9 @@ function renderAfterLoad() {
   // The station and the view a link named, now that there are stations to put
   // them on the map with (route.js, #211).
   if (typeof Route !== 'undefined') Route.afterLoad();
+  // SoRT's request for a station's benchmarks finds its station in the list
+  // now there is one (sort-benchmarks.js).
+  if (typeof SortBenchmarks !== 'undefined') SortBenchmarks.afterLoad();
 }
 
 // Parse-and-draw, as it always was. onFileLoad() and anything outside this file

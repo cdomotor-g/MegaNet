@@ -189,6 +189,13 @@ if (typeof window !== 'undefined') AdminTokens.restoreFromUrl();
 // it also puts back one kept from earlier in this browser tab.
 if (typeof window !== 'undefined') Tasks.restoreFromUrl();
 
+// …and its request for a station's benchmarks (0101): #benchmarks-for-sort=…
+// puts a card over whatever tab is open, for a signed-in editor to send the
+// marks back to the SoRT tab that asked (sort-benchmarks.js). After the first
+// render for Workbench's reason; it also puts back one kept from earlier in
+// this browser tab.
+if (typeof window !== 'undefined') SortBenchmarks.restoreFromUrl();
+
 // A video's link (explainers.js): ?watch=<id> opens 🎬 Videos on that video,
 // ready to play full screen on its first ▶ — for a meeting room's laptop.
 // After the first render for Workbench's reason.

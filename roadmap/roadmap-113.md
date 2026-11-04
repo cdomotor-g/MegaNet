@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-04** (revision 229 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-04** (revision 230 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -855,6 +855,14 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 230 — 2026-11-04: 📏 Benchmarks for SoRT — the hand-back
+
+The owner asked for SoRT's scope builder to pull in the Bureau's benchmarks Flood-Net loaded at 0101. **No issue; opens nothing, closes nothing.**
+
+- **The hand-back** (`sort-benchmarks.js`, the Atlas's `benchmarks-for-sort`): the reverse of SoRT's `#tasks=` hand-off, on its pattern. SoRT opens `floodwarning.net/#benchmarks-for-sort=<base64url JSON: v 1, source, nonce, station>` with its opener kept; the request is read as untrusted, the fragment cleared at once and the request kept in the tab's sessionStorage across a sign-in; the station found by id, else by bureau number (`bureau_key()`'s rule). A card over whatever tab is open says who asks: signed out *Sign in*; not an editor *Only Flood-Net editors can see the Bureau's benchmarks*; an editor the marks exactly as they will go, then **Send to SoRT** — `window.opener.postMessage(…, 'https://cdomotor-g.github.io')`, that origin only — or, with no opener, **Copy for SoRT** (`floodnet-benchmarks:` + base64url of the same message) for SoRT's *Paste from Flood-Net* box.
+- **Not the agent API**: the benchmarks stay editors only (0101's RLS); nothing is granted to `anon` and `worker/api.js` is untouched. The data leaves only for the one origin, at an editor's press.
+- `npm run sortbenchmarks` (60 assertions; in `all` and the smoke test): the request's validation, the exact message, the four states, end to end from a page at SoRT's origin and nothing to a page of another origin; confirmed red on four deliberate breaks. Docs: `db/README.md` (the benchmarks), `README.md`, `privacy.html`, `test/README.md`; `atlas.json` provides `benchmarks-for-sort`. ✨ What's new 189.
 
 ### Revision 229 — 2026-11-04: ▶ Show me on the app, and the first how-to's draft (#265)
 

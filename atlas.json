@@ -33,6 +33,7 @@
     "summary": "Live and in daily use (database schema 95): this week added teams and the tasks handed to them, with the SoRT scope builder's hand-off, a driving mode that follows a station's route in 3-D, the agent API's changelog and email list, ACMA licences and radio paths in the API, the Repeaters tab and cuts to database I/O, while account email, compute size and the ACMA download link wait on the owner.",
     "now": [
       "The Bureau's benchmarks (0101): HDB's Benchmark Details report, 777 benchmarks at 519 stations, read by tools/ingest/benchmarks.py and kept in the private repository, loaded on 4 Nov 2026: on a station's card for editors and offered as the primary benchmark in the Level Survey's Datum step, with what each reads on the gauge",
+      "Benchmarks for SoRT (benchmarks-for-sort): SoRT's scope builder opens #benchmarks-for-sort=…, a signed-in editor reviews the station's benchmarks and Send to SoRT posts them to the SoRT tab that asked (cdomotor-g.github.io only), or Copy for SoRT without an opener; never through the public API. SoRT's side is being built to the same contract",
       "Responsiveness pass for a laptop on a Teams call and a phone on one bar: the Stations tab opens in a third of the time on a slow CPU, the repeater delay plan is worked out in a worker, a saved station list is shown after 8 s of a slow download and downloaded only when it has changed (ETag), and the Stations map groups nearby pins into bubbles (worst, average or mix under health and Latency) until zoomed in",
       "Teams and tasks (0095) live: one team has its owner so far — an administrator names each team's owners on the Admin tab; SoRT's #tasks= hand-off lands on the Tasks tab for review",
       "One person, one account (0100): an account keeps a second address — found by a team's owner, where its emails can go, refused a sign-in of its own; the Admin tab's Same person… folds a second account in",
@@ -787,6 +788,17 @@
         ".github/workflows/bulletin-voice.yml",
         "tools/voice/speak.mjs"
       ]
+    },
+    {
+      "id": "benchmarks-for-sort",
+      "name": "Benchmarks for SoRT (the hand-back)",
+      "what": "SoRT's scope builder asks for one station's Bureau benchmarks (0101, editors only) without them ever reaching the public API: it calls window.open('https://floodwarning.net/#benchmarks-for-sort=<base64url of UTF-8 JSON {v:1, source:'sort', nonce [A-Za-z0-9_-]{8,64}, station:{id, number, name}}>', 'floodnet-sort-bridge'), keeping the opener. Flood-Net reads it as untrusted, clears the fragment and keeps it in the tab's sessionStorage across a sign-in, finds the station by id else by bureau number (bureau_key's rule), and shows a signed-in editor the marks exactly as they will go. Send to SoRT posts {type:'floodnet:benchmarks', v:1, nonce, station:{id, number, name}, printed_on, benchmarks:[{ord, level_m, datum (AHD|STATE|ASSUM|UNKNOWN), on_gauge_m, gauge_zero_m, gauge_datum, description, comment}] in ord order} by window.opener.postMessage to https://cdomotor-g.github.io and no other origin; with no opener, Copy for SoRT puts 'floodnet-benchmarks:' + base64url of the same JSON on the clipboard for SoRT's Paste from Flood-Net box. A non-editor is told only editors can see them and nothing is sent.",
+      "component": "field-work",
+      "paths": [
+        "sort-benchmarks.js",
+        "test/sort-benchmarks.mjs"
+      ],
+      "contract": "sort-benchmarks.js"
     }
   ],
   "consumes": [

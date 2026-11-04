@@ -2250,7 +2250,11 @@ Details* prints them: 777 benchmarks at 519 stations, printed from HDB on
 `cdomotor-g/flood-net-private` (`benchmarks/`), where it lives because the
 descriptions say where a mark is to the tree and the gate post. The station
 card lists them for an editor, and the 📏 Level Survey's Datum step offers each
-as the primary benchmark (`station-benchmarks.js`).
+as the primary benchmark (`station-benchmarks.js`). And an editor can send a
+station's benchmarks to the SoRT scope builder tab that asked for them — SoRT
+opens `#benchmarks-for-sort=…`, the editor reviews the marks and presses Send,
+and they go by `postMessage` to `https://cdomotor-g.github.io` alone
+(`sort-benchmarks.js`), never through the public agent API.
 
 ```sh
 python3 tools/ingest/benchmarks.py --check     # the JSON still matches the report

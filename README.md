@@ -3544,7 +3544,12 @@ Side panel or modal showing full station record:
   as the Bureau's HDB *Benchmark Details* lists them — each one's level and
   datum, what it is and where, the comments, and what it reads on the gauge
   where the mark and the gauge zero share a datum; nothing at all for a station
-  the Bureau lists none for (`station-benchmarks.js`, `0101`)
+  the Bureau lists none for (`station-benchmarks.js`, `0101`). SoRT's scope
+  builder can ask for them too: it opens Flood-Net at `#benchmarks-for-sort=…`,
+  a signed-in editor sees exactly what would go, and **Send to SoRT** posts the
+  station's marks to the SoRT tab that asked and nowhere else — or, with that
+  tab out of reach, **Copy for SoRT** for its *Paste from Flood-Net* box
+  (`sort-benchmarks.js`)
 
 ### 13. In-App Bug / Idea Reporter
 The **🐞 Report a Bug** button in the header lets any user flag a problem or
