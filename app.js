@@ -6703,18 +6703,108 @@ function mapMatchNoteHtml() {
   const owner = MapSymbols.drawnNoteShort();
   if (!mapFilterActive()) return `Showing all <strong>${total}</strong> stations${owner}.`;
   const matched = filteredStations();
-  if (!matched.length) return `No stations match — all pins shown unhighlighted${owner}.`;
+  const suggest = searchSuggestHtml(searchSuggestions());
+  if (!matched.length) return `No stations match — all pins shown unhighlighted${owner}.${suggest ? ` ${suggest}` : ''}`;
   const located = matched.filter(s => s.lat != null && s.lon != null).length;
   const related = relatedStations().length;
   return `<strong>${matched.length}</strong> of ${total} stations match` +
          (related ? ` · <strong>${related}</strong> more via pass range` : '') +
          (located < matched.length ? ` · ${matched.length - located} without a position` : '') +
-         (located > MAP_LABEL_CAP ? ` · labels on the closest ${MAP_LABEL_CAP}` : '') + owner;
+         (located > MAP_LABEL_CAP ? ` · labels on the closest ${MAP_LABEL_CAP}` : '') + owner +
+         (suggest ? ` · ${suggest}` : '');
 }
 
 function updateMapMatchNote() {
   const el = document.getElementById('map-match-note');
   if (el) el.innerHTML = mapMatchNoteHtml();
+}
+
+// ── Did you mean …? ──────────────────────────────────────────────────────────
+// A name somebody can say but not spell found nothing, and the note said so
+// and stopped there — the way on was trying the letters in every order until
+// one stuck. Now, for each term of the stack that is in no station on file
+// where its entry looks (unmatchedSearchTerms), the note offers the spellings
+// on file that sound like it or are a slip of the fingers away
+// (station-suggest.js): "Did you mean Gympie (6 stations)?". Picking one puts
+// it in the box in place of what was typed, and the filter runs on it.
+//
+// Only a term with letters in it — a number or a window has nothing to sound
+// like — and only the first three, so a pasted list of names that are not on
+// file costs three lookups and not forty. Kept until the stack or the file
+// changes: the note is redrawn for reasons that have nothing to do with it.
+const SEARCH_SUGGEST_TERMS = 3;
+let _searchSuggestMemo = { sig: null, corpus: null, list: [] };
+let _searchSuggestPicks = [];   // the spellings on screen, so a click names one by number
+
+function searchSuggestions() {
+  if (!state.data || typeof StationSuggest === 'undefined') return [];
+  const stack = prepareSearchStack();
+  const corpus = searchCorpus();
+  if (_searchSuggestMemo.sig === _stackPrep.sig && _searchSuggestMemo.corpus === corpus) return _searchSuggestMemo.list;
+  const list = [];
+  outer: for (const { i, prep, fields, active } of stack) {
+    if (!active || !fields.name) continue;
+    for (const term of unmatchedSearchTerms(prep, fields)) {
+      if (list.length >= SEARCH_SUGGEST_TERMS) break outer;
+      if (!/[a-z]/.test(term)) continue;
+      const near = StationSuggest.phrases(term, state.data.stations, { limit: 3 });
+      if (near.length) list.push({ i, term, near });
+    }
+  }
+  _searchSuggestMemo = { sig: _stackPrep.sig, corpus, list };
+  return list;
+}
+
+// The offer, as words and buttons. With one term it is the question; with
+// several each says which term it is about.
+function searchSuggestHtml(list) {
+  _searchSuggestPicks = [];
+  if (!list.length) return '';
+  // Which term, once there is more than one it could be about.
+  const terms = activeSearchStack().reduce((n, e) => n + e.prep.terms.length + e.prep.ranges.length, 0);
+  const many = list.length > 1 || terms > 1;
+  return list.map(({ i, term, near }) => {
+    const picks = near.map(p => {
+      const n = _searchSuggestPicks.push({ i, term, phrase: p.phrase }) - 1;
+      const count = `${p.count} station${p.count === 1 ? '' : 's'}`;
+      return `<button type="button" class="link-btn search-suggest-pick" onclick="pickSearchSuggestion(${n})"
+                title="${esc(`Search for “${p.phrase}” in place of “${term}” — ${count} ${p.count === 1 ? 'has' : 'have'} it in the name`)}"
+        >${esc(p.phrase)}</button> (${count})`;
+    });
+    const said = picks.length > 1 ? `${picks.slice(0, -1).join(', ')} or ${picks[picks.length - 1]}` : picks[0];
+    return `<span class="search-suggest">${many ? `“${esc(term)}”: did you mean` : 'Did you mean'} ${said}?</span>`;
+  }).join(' · ');
+}
+
+// The term in its entry swapped for the spelling picked — the chunk it came
+// from, cut where parseSearchTerms cuts, so the other terms and whatever
+// separated them stay exactly as they were typed.
+function replaceSearchTerm(text, term, phrase) {
+  let done = false;
+  const out = String(text || '').split(/([,;|\t\r\n]+)/).map((chunk, k) => {
+    if (done || k % 2 || chunk.trim().toLowerCase() !== term) return chunk;
+    done = true;
+    return chunk.match(/^\s*/)[0] + phrase + chunk.match(/\s*$/)[0];
+  });
+  return done ? out.join('') : String(text || '');
+}
+
+function pickSearchSuggestion(n) {
+  const pick = _searchSuggestPicks[n];
+  const row = pick && searchRows()[pick.i];
+  if (!row) return;
+  row.text = replaceSearchTerm(row.text, pick.term, pick.phrase);
+  const box = document.getElementById(`station-search-${pick.i}`);
+  if (box) { box.value = row.text; autoGrowSearch(box); }
+  if (!state.stationsListOpen) setStationsListOpen(true);
+  clearTimeout(state.mapSearchTimer);
+  stationsFilterChanged();        // and the quick box with it (syncQuickSearch)
+  // The button is gone with the note it was in, so the caret goes back to the
+  // box the spelling went into — the quick one while the Filters are shut.
+  const quick = document.getElementById('station-search-quick');
+  const into = pick.i === 0 && quick && quick.offsetParent ? quick : box;
+  if (into) into.focus({ preventScroll: true });
+  announce(`Searching for ${pick.phrase} — ${filteredStations().length} stations match`);
 }
 
 function updateMapLinkNote() {
@@ -9723,6 +9813,7 @@ function refreshFilterOptions() {
   state.filterOpts  = null;
   MapSymbols.reset();         // what a station measures, who owns it, who reads it
   state.searchIdx   = null;
+  if (typeof StationSuggest !== 'undefined') StationSuggest.reset();   // a renamed station sounds different
   state.repeaterIdx = null;
   state.passRelIdx  = null;   // an edited pass range re-wires the relation
   state.backboneIdx = null;   // and with it which repeater pairs share a window

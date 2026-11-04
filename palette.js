@@ -15,6 +15,9 @@
 //             "4021-4025" finds the window, exactly as the box does. Enter
 //             opens the station through goToStation(): one step in the
 //             browser's history (route.js), its card up and the map on it.
+//             A name that finds nothing as it is spelt is heard instead
+//             (station-suggest.js): "jimpy" offers Gympie under "Did you
+//             mean?", after anything that did match.
 //   Places    handed to 📍 Find a place rather than answered here: its
 //             parse() reads coordinates offline, and its list knows the
 //             catchments, rivers, councils and — with a request — towns. A
@@ -52,7 +55,8 @@
 //           goToStation, switchTab, setDockTab, navTerms, navHaystack,
 //           navScore, resetStationFilters, newSearchRow, renderMain,
 //           toggleTheme), modal.js, places.js, map-survey.js,
-//           station-trail.js, route.js, bug-report.js, looks.js.
+//           station-trail.js, station-suggest.js, route.js, bug-report.js,
+//           looks.js.
 
 const Palette = (() => {
   // Four stations, then a line to show the rest here: with hundreds of
@@ -109,6 +113,7 @@ const Palette = (() => {
     if (q.length < 2 && !/^\d$/.test(q)) return { list: [], more: 0 };
     const prep = prepareSearch(q);
     const hits = data.stations.filter(s => stationMatchesSearch(s, prep));
+    if (!hits.length) return { list: [], more: 0, near: nearStations(q) };
     hits.sort((a, b) => rankStation(a, q) - rankStation(b, q) || a.name.localeCompare(b.name));
     const list = hits.slice(0, stationsOpen ? MAX_STATIONS_OPEN : MAX_STATIONS).map(s => ({
       kind: 'station', icon: '📍', label: s.name, sub: stationSub(s), run: () => goToStation(s.id),
@@ -130,6 +135,18 @@ const Palette = (() => {
         sub: 'In the Stations list, the filter set to this', run: () => showAllStations(q) });
     }
     return { list, more };
+  }
+
+  // Nothing is spelt the way it was typed: the names that sound like it, or
+  // are a slip of the fingers away (station-suggest.js) — "jimpy" offers
+  // Gympie. Offers, not matches: the count still says nothing matched, and a
+  // tab or an action that did match comes first and is what Enter opens.
+  function nearStations(q) {
+    if (typeof StationSuggest === 'undefined' || !/[a-z]/.test(q)) return [];
+    return StationSuggest.suggest(q, state.data.stations, { limit: MAX_STATIONS }).map(h => ({
+      kind: 'suggest', offer: true, icon: '📍', label: h.station.name, sub: stationSub(h.station),
+      run: () => goToStation(h.station.id),
+    }));
   }
 
   // The marked option onto the first station that was not shown before, so
@@ -335,6 +352,7 @@ const Palette = (() => {
     { key: 'station', title: 'Stations' },
     { key: 'tab',     title: 'Tabs' },
     { key: 'action',  title: 'Actions' },
+    { key: 'suggest', title: 'Did you mean?' },
     { key: 'mark',    title: 'Survey marks' },
     { key: 'place',   title: 'Places' },
   ];
@@ -352,6 +370,7 @@ const Palette = (() => {
       ...st.list,
       ...answers.filter(i => i.kind === 'tab'),
       ...answers.filter(i => i.kind === 'action'),
+      ...(st.near || []),
       ...markItems(raw),
       ...placeItems(raw),
     ];
@@ -365,6 +384,8 @@ const Palette = (() => {
   function countText() {
     const found = matches();
     if (!found.length && marks.loading) return 'Looking up survey marks…';
+    const near = items.find(i => i.kind === 'suggest');
+    if (!found.length && near) return `Nothing matches “${query.trim()}” — did you mean ${near.label}?`;
     if (!found.length) return query.trim() ? `Nothing matches “${query.trim()}”` : '';
     const by = GROUPS.map(g => [g.title, found.filter(i => i.kind === g.key).length])
       .filter(([, k]) => k).map(([t, k]) => `${k} ${k === 1 ? t.toLowerCase().replace(/s$/, '') : t.toLowerCase()}`);
@@ -372,10 +393,11 @@ const Palette = (() => {
   }
 
   function listHtml() {
+    const near = items.some(i => i.kind === 'suggest');
     const none = !matches().length && !marks.loading
-      ? `<p class="pal-none small">${query.trim()
-        ? `Nothing matches <strong>${esc(query.trim())}</strong>. A station's name, number or ALERT address; a survey mark's number with PSM or BM in front; a coordinate; or a tab or an action.`
-        : 'Nothing to offer yet.'}</p>`
+      ? `<p class="pal-none small">${!query.trim() ? 'Nothing to offer yet.'
+        : near ? `Nothing matches <strong>${esc(query.trim())}</strong> as it is spelt — these stations sound like it.`
+        : `Nothing matches <strong>${esc(query.trim())}</strong>. A station's name, number or ALERT address; a survey mark's number with PSM or BM in front; a coordinate; or a tab or an action.`}</p>`
       : '';
     // Where the survey-mark lookup has got to, under the list: not an option,
     // so not counted and never what Enter opens. A failure is only worth a

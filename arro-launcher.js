@@ -206,7 +206,12 @@ function arroResultsHtml() {
     return `<p class="small arro-flush">
       Type to search ${state.data.stations.length.toLocaleString()} stations.</p>`;
   }
-  const hits = arroSearchResults();
+  let hits = arroSearchResults(), lead = '';
+  // Nothing spelt that way: the names that sound like it (station-suggest.js).
+  if (!hits.length && typeof StationSuggest !== 'undefined') {
+    hits = StationSuggest.stations(text, state.data.stations, { limit: ARRO_RESULT_MAX });
+    if (hits.length) lead = `<p class="small arro-flush">${StationSuggest.leadHtml(text)}</p>`;
+  }
   if (!hits.length) {
     return `<p class="small arro-flush">No station matches that.</p>`;
   }
@@ -215,10 +220,10 @@ function arroResultsHtml() {
   // Pattern 7a — the wrapper caps its height, so it scrolls, so it is a named
   // region with a tab stop. Named off the panel's own heading rather than a
   // second form of words.
-  return `
+  return `${lead}
     <div class="table-wrap medium" role="region" tabindex="0" aria-labelledby="arro-find-h">
       <table>
-        <caption class="sr-only">Stations matching “${esc(text)}” — ${shown.length} shown</caption>
+        <caption class="sr-only">${lead ? 'Stations that sound like' : 'Stations matching'} “${esc(text)}” — ${shown.length} shown</caption>
         <colgroup>
           <col style="width:40%"><col style="width:13%">
           <col style="width:16%"><col style="width:11%"><col style="width:20%">

@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 190, date: '2026-11-04', items: [
+      '🔎 <strong>Did you mean …?</strong> for station names. Type a name the way it sounds and, when nothing is spelt that '
+        + 'way, Flood-Net offers the names that sound like it or are one slip of the fingers away: <em>jimpy</em> offers '
+        + 'Gympie, <em>kabooltcher</em> Caboolture, <em>orgathella</em> Augathella. In Ctrl+K they are listed under '
+        + '<em>Did you mean?</em>; under the Stations card\'s search box, picking one puts the spelling in the box; and the '
+        + 'station boxes in Map Generator, Link Budget, Field Photos, the field camera and ARRO Launcher list them too.',
+    ] },
     { n: 189, date: '2026-11-04', items: [
       '📏 <strong>Benchmarks for SoRT</strong>, for editors: when SoRT\'s scope builder asks Flood-Net for a station\'s '
         + 'benchmarks, Flood-Net opens with a card that shows exactly which marks would go — each one\'s level and datum, its '

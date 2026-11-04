@@ -1447,16 +1447,21 @@ function stationHitsHtml() {
     hits.push(s);
     if (hits.length > MG_FIND_CAP) break;      // one over, so "more than" is knowable
   }
+  // Nothing spelt that way: the names that sound like it (station-suggest.js).
+  const near  = !hits.length && typeof StationSuggest !== 'undefined'
+    ? StationSuggest.stations(text, state.data.stations, { limit: MG_FIND_CAP }) : [];
   const more  = hits.length > MG_FIND_CAP;
-  const shown = more ? hits.slice(0, MG_FIND_CAP) : hits;
-  const lead  = hits.length === 0
+  const shown = near.length ? near : more ? hits.slice(0, MG_FIND_CAP) : hits;
+  const lead  = near.length ? StationSuggest.leadHtml(text)
+    : hits.length === 0
     ? `No station matches “${esc(text)}”`
     : more ? `More than ${MG_FIND_CAP} match “${esc(text)}” — keep typing to narrow it`
            : `${hits.length} match${hits.length === 1 ? '' : 'es'} “${esc(text)}”`;
-  if (!shown.length) return `<p class="mg-hint mg-find-none">${lead}.</p>`;
+  const said = /\?$/.test(lead) ? lead : `${lead}.`;
+  if (!shown.length) return `<p class="mg-hint mg-find-none">${said}</p>`;
   const here = centreStation();
   return `
-    <p class="mg-hint" id="mg-find-lead">${lead}.</p>
+    <p class="mg-hint" id="mg-find-lead">${said}</p>
     <div class="mg-hits" role="group" aria-labelledby="mg-find-lead">
       ${shown.map(st => {
         const located = st.lat != null && st.lon != null;

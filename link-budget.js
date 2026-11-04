@@ -221,21 +221,27 @@ const LinkBudget = (function () {
     if (!state.data) return '';
     const text = findQ(which).trim();
     if (!text && !armed(which)) return '';
-    const { prep, hits } = text ? findHits(which) : { prep: null, hits: tableStations() };
+    const found = text ? findHits(which) : { prep: null, hits: tableStations() };
+    const prep  = found.prep;
+    // Nothing spelt that way: the names that sound like it (station-suggest.js).
+    const near  = text && !found.hits.length && typeof StationSuggest !== 'undefined'
+      ? StationSuggest.stations(text, state.data.stations, { limit: LB_FIND_CAP }) : [];
+    const hits  = near.length ? near : found.hits;
     const more  = hits.length > LB_FIND_CAP;
     const shown = more ? hits.slice(0, LB_FIND_CAP) : hits;
-    const lead  = text
+    const lead  = near.length ? StationSuggest.leadHtml(text) : text
       ? `${hits.length === 0 ? 'No station matches' : more ? `More than ${LB_FIND_CAP} match` : `${hits.length} match${hits.length === 1 ? '' : 'es'}`} “${esc(text)}”${more ? ' — keep typing to narrow it' : ''}`
       : `The <strong>Stations</strong> list holds ${hits.length.toLocaleString()} right now${
           more ? `; the first ${LB_FIND_CAP} are here. Narrow the filters, or type to search all of them`
                : ''}`;
+    const said = /\?$/.test(lead) ? lead : `${lead}.`;
     if (!shown.length) {
-      return `<p class="small lb-find-none">${lead}.</p>`;
+      return `<p class="small lb-find-none">${said}</p>`;
     }
     const otherSid = sidOf(which === 'a' ? 'b' : 'a');
     const mine     = sidOf(which);
     return `
-      <p class="small lb-find-lead" id="lb-find-lead-${which}">${lead}.</p>
+      <p class="small lb-find-lead" id="lb-find-lead-${which}">${said}</p>
       <div class="lb-hits" role="group" aria-labelledby="lb-find-lead-${which}">
         ${shown.map(st => {
           const here  = st.id === mine;

@@ -1200,6 +1200,15 @@ jobs:
         working-directory: test
         run: npm run search
 
+      # "Did you mean …?" for a station's name (station-suggest.js): a name
+      # spelt the way it is said finds nothing in the filter, and a suggestion
+      # that has quietly stopped coming throws nothing either — the box just
+      # says "nothing matches" the way it always did.
+      - name: Did you mean — a name spelt by ear offers the station it sounds like
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run suggest
+
       # What the link budget card does with its two ends, and what it refuses to
       # do with them. Every failure here is a clean console: a search box that
       # hands back the wrong stations, a box that loses the caret on the third

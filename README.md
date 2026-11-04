@@ -3056,6 +3056,23 @@ Terms combine with OR. The box is a `<textarea>` (a single-line `<input>`
 strips the line breaks out of a pasted column, gluing `6128` and `6129` into
 `61286129`) that opens one line tall and grows with the paste.
 
+**Did you mean …? — a name spelt the way it sounds.** Many names on file are
+easier to say than to spell (Mooloolah, Goondiwindi, Caboolture), so when a
+name term finds nothing as typed, the note under the box offers the spellings
+on file that sound like it or are one slip of the fingers away — *jimpy*:
+"Did you mean Gympie (6 stations)?" — and picking one puts it in the box in
+place of what was typed (`station-suggest.js`). Ctrl+K lists the stations
+themselves under *Did you mean?*, and the station boxes in Map Generator, Link
+Budget, Field Photos, the field camera and ARRO Launcher list them under
+"Nothing is spelt …". The comparison hears a word the way Australian English
+says a place name: c/k/q are one sound, soft g is j, *-ture* is "cha", an r
+nobody sounds is dropped, *oo*/*ou*/*u* are one vowel and *ee*/*ie*/*y*
+another; then a vowel for a vowel costs less than a consonant for a
+consonant. It only ever runs after the filter has come up empty, so it never
+changes what a spelling that *is* on file finds — a spelling that happens to
+sit inside another name ("mckay" in *McKays Track*) finds that one instead.
+Held by `npm run suggest`.
+
 **Places have a box of their own: 📍 Find a place.** The blue pin in the side
 panel's strip, beside the stations' red one (`places.js`). It used to be the
 filter box that answered with places as well (#184), which made "Gympie" typed

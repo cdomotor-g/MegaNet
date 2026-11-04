@@ -1609,9 +1609,14 @@ const FieldCamera = (function () {
   function hitsHtml() {
     const q = find.trim();
     if (!q) return '';
-    const list = hits(q);
+    let list = hits(q), near = false;
+    // Nothing spelt that way: the names that sound like it (station-suggest.js).
+    if (!list.length && typeof StationSuggest !== 'undefined') {
+      list = StationSuggest.stations(q, stations(), { limit: 10, filter: located });
+      near = list.length > 0;
+    }
     if (!list.length) return `<p class="small txt-muted">No station with a position matches “${esc(q)}”.</p>`;
-    return `<div class="pill-row cam-hits">${list.map(s => `<button type="button" class="pill" onclick="FieldCamera.pickStation('${escAttr(s.id)}')">${esc(s.name)}
+    return `${near ? `<p class="small txt-muted">${StationSuggest.leadHtml(q)}</p>` : ''}<div class="pill-row cam-hits">${list.map(s => `<button type="button" class="pill" onclick="FieldCamera.pickStation('${escAttr(s.id)}')">${esc(s.name)}
         <span class="cam-sug-sub">${esc(s.station_number || '')}${gps ? ` · ${fmtM(metres(gps.lat, gps.lon, s.lat, s.lon))}` : ''}</span></button>`).join('')}</div>`;
   }
 
