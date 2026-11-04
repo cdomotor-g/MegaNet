@@ -1,0 +1,5 @@
+group,decoded,clean_with_twin,corrupted_separate,corrupted_same_burst
+151.525,22070,4127,220,598
+hillcrest,21923,4896,81,544
+no_carrier,13207,2936,74,585
+other,7601,2164,5,298

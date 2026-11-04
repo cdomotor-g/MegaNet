@@ -27,7 +27,7 @@
   </url>
   <url>
     <loc>https://floodwarning.net/investigations/</loc>
-    <lastmod>2026-10-29</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -40,6 +40,12 @@
   <url>
     <loc>https://floodwarning.net/investigations/2026-10-toowoomba-quiet-week</loc>
     <lastmod>2026-10-29</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://floodwarning.net/investigations/2026-11-hillcrest-wine-glass</loc>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
   </url>
