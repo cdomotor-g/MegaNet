@@ -201,7 +201,7 @@ export const LIMITS = Object.freeze({
 export const READABLE_RELATIONS = Object.freeze(new Set([
   'station', 'station_json', 'sensor', 'repeater', 'pass_range',
   'sls_location', 'sls_doc',
-  'station_flood_class', 'station_crossing', 'station_gauge_survey',
+  'station_flood_class', 'station_crossing', 'station_gauge_survey', 'station_benchmark_public',
   'station_bureau_listing', 'station_flood_effect', 'station_aep_level', 'station_frequency',
   'catchment', 'hub', 'radio_network', 'rm_system',
   'crossing_type', 'gauge_datum', 'bureau_index',
@@ -229,6 +229,8 @@ const ARRIVES_WITH = Object.freeze({
     meanwhile: 'the stations silent now are at GET /api/v1/health/silent' }),
   health_card_run: Object.freeze({ migration: 'db/migrations/0085_health_cards.sql',
     meanwhile: 'the stations silent now are at GET /api/v1/health/silent' }),
+  station_benchmark_public: Object.freeze({ migration: 'db/migrations/0102_benchmarks_public.sql',
+    meanwhile: 'the station\'s gauge zero and its datum are at GET /api/v1/stations/{id}/flood-levels' }),
 });
 
 const UNREACHABLE_HINT =
@@ -1174,6 +1176,7 @@ function stationLinks(rc, id) {
     health: `${base}/health`,
     readings: `${base}/readings`,
     flood_levels: `${base}/flood-levels`,
+    benchmarks: `${base}/benchmarks`,
     service_level: `${base}/service-level`,
     acma: `${base}/acma`,
     radio_path: `${base}/radio-path`,
@@ -1473,6 +1476,61 @@ async function serviceLevelEndpoint(rc, rawId) {
     ...(st.resolved_from ? { resolved_from: st.resolved_from } : {}),
     service_level: buildServiceLevel(st.doc, sls, slsDocs.ok ? slsDocs.value : []),
     source: 'meganet.sls_location (each Service Level Specification\'s six station schedules merged per Bureau number) and meganet.sls_doc (their editions)',
+    generated_at: new Date().toISOString(),
+  };
+}
+
+// ── Benchmarks: the Bureau's survey marks at a station, in numbers ───────────
+// HDB's Benchmark Details report (0101), as 0102's view publishes it: each
+// mark's number where its description gives one, its level and datum, and what
+// it reads on the gauge where the datums agree. What a mark is and exactly
+// where — "TBM bolt in gum 18m and 294deg from corner of pump shed" — and the
+// office's comments are editors' (meganet.station_benchmark) and never reach
+// this module: the view does not have them.
+
+export const BENCHMARK_COLUMNS = 'bureau_number,ord,mark,level_m,datum,gauge_zero_m,gauge_datum,gauge_zero_from,on_gauge_m,printed_on';
+const BENCHMARK_REPORT = 'Queensland Flood Warning River Height Stations — Benchmark Details (the Bureau\'s HDB)';
+const BENCHMARK_NOTES = [
+  'Each benchmark is a survey mark near the gauge whose level is known, that the gauge is levelled from — from the Bureau\'s HDB report Queensland Flood Warning River Height Stations — Benchmark Details.',
+  'level_m is metres in the benchmark\'s own datum, to the centimetre as the report prints it: AHD (Australian Height Datum), ASSUM (an assumed datum, local to the site), STATE (Queensland\'s State datum, used before AHD) or UNKNOWN.',
+  'on_gauge_m is what the mark reads on the river gauge: level_m less the gauge zero in force (gauge_zero), given only where the benchmark and the zero are both AHD or both State. An assumed or unknown datum is never put on the gauge.',
+  'mark is the survey mark\'s number where the description gives one — a PSM, SSM, PM, SD, CGC or numbered BM. A State mark\'s position is in the Queensland survey control register under that number.',
+  'What each mark is and exactly where, and the office\'s comments, are kept for Flood-Net\'s editors and are not served here.',
+];
+
+async function benchmarksEndpoint(rc, rawId) {
+  const st = await loadStationDoc(rc, rawId);
+  const [res, datums] = await Promise.all([
+    rc.up.select('station_benchmark_public', [['select', BENCHMARK_COLUMNS], ['station_id', `eq.${st.id}`], ['order', 'ord.asc']]),
+    settle(datumsOf(rc)),
+  ]);
+  const label = new Map((datums.ok ? datums.value : []).map(d => [d.code, d.label]));
+  const rows = res.rows || [];
+  const first = rows[0] || {};
+  const zero = rows.find(r => num(r.gauge_zero_m) != null);
+  return {
+    id: st.id,
+    name: st.doc.name,
+    station_number: st.doc.station_number || null,
+    ...(st.resolved_from ? { resolved_from: st.resolved_from } : {}),
+    count: rows.length,
+    benchmarks: rows.map(r => stripNulls({
+      ord: r.ord,
+      mark: r.mark || null,
+      level_m: num(r.level_m),
+      datum: r.datum,
+      datum_label: label.get(r.datum) || null,
+      on_gauge_m: num(r.on_gauge_m),
+    })),
+    gauge_zero: zero ? stripNulls({ m: num(zero.gauge_zero_m), datum: zero.gauge_datum || null,
+      datum_label: label.get(zero.gauge_datum) || null, since: zero.gauge_zero_from || null }) : null,
+    report: stripNulls({ title: BENCHMARK_REPORT, printed: first.printed_on || null,
+      bureau_number: first.bureau_number || null }),
+    notes: rows.length ? BENCHMARK_NOTES
+      : ['The Bureau\'s benchmark details list no benchmark for this station.', BENCHMARK_NOTES[4]],
+    source: 'meganet.station_benchmark_public (db/migrations/0102_benchmarks_public.sql): the numbers of meganet.bureau_benchmark, HDB\'s Benchmark Details as printed, on the live stations',
+    links: { flood_levels: stationLinks(rc, st.id).flood_levels, station: stationLinks(rc, st.id).station },
+    disclaimer: DISCLAIMER,
     generated_at: new Date().toISOString(),
   };
 }
@@ -3553,6 +3611,7 @@ export const ENDPOINTS = Object.freeze([
   { path: '/api/v1/stations/{id}/health', op: 'getStationHealth', summary: 'What Station Health says about one station over 3, 7 or 14 days: its findings, its check schedule day by day, its battery\'s night lows.' },
   { path: '/api/v1/stations/{id}/readings', op: 'getStationReadings', summary: 'Telemetry ingested into Flood-Net: raw, hourly or daily, bounded windows.' },
   { path: '/api/v1/stations/{id}/flood-levels', op: 'getStationFloodLevels', summary: 'Flood classes, SLS classes, crossings, gauge zero, flood effects, AEP levels and one AHD ladder.' },
+  { path: '/api/v1/stations/{id}/benchmarks', op: 'getStationBenchmarks', summary: 'The Bureau\'s benchmarks at a station in numbers: each mark\'s number, level and datum, and what it reads on the gauge.' },
   { path: '/api/v1/stations/{id}/service-level', op: 'getStationServiceLevel', summary: 'The station\'s entries in the Service Level Specifications (Queensland; New South Wales and the ACT).' },
   { path: '/api/v1/stations/{id}/acma', op: 'getStationAcmaLicences', summary: 'The ACMA licences Flood-Net records for a station, and the ACMA register\'s licences at sites within radius_m of it.' },
   { path: '/api/v1/acma', op: 'getAcmaLicencesNear', summary: 'The ACMA register\'s licences at sites within radius_m of a point — for a site not built yet, or a move.' },
@@ -3692,6 +3751,9 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
       '/api/v1/stations/{id}/flood-levels': op('getStationFloodLevels', 'Get flood levels',
         'Flood classes (by edition), the SLS classes, crossings, the gauge zero and datum, flood effects, AEP levels and one ladder in m AHD — with the datum caveats.',
         [idParam], ok('Flood levels.')),
+      '/api/v1/stations/{id}/benchmarks': op('getStationBenchmarks', 'Get a station\'s benchmarks',
+        'The survey marks the Bureau\'s HDB lists for the station\'s gauge, in numbers: each mark\'s number, level and datum, and what it reads on the gauge where it and the gauge zero are both AHD or both State. Not what a mark is or where.',
+        [idParam], ok('The station\'s benchmarks, in the order the report lists them.')),
       '/api/v1/stations/{id}/service-level': op('getStationServiceLevel', 'Get the SLS entries',
         'The station\'s entries in the Service Level Specifications (QLD; NSW and the ACT), one per document that lists it: gauge type, data type, priority, owner, schedules, flood classes and prediction — and the NSW gauge datum and AWRC number — with each edition.',
         [idParam], ok('The SLS entries.')),
@@ -3825,6 +3887,7 @@ async function routeRest(rc, sub, params) {
         case 'readings': return readingsEndpoint(rc, parts[1],
           allowParams(params, ['from', 'to', 'resolution', 'channel', 'limit', 'offset']));
         case 'flood-levels': none(); return floodLevelsEndpoint(rc, parts[1]);
+        case 'benchmarks': none(); return benchmarksEndpoint(rc, parts[1]);
         case 'service-level': none(); return serviceLevelEndpoint(rc, parts[1]);
         case 'acma': return acmaEndpoint(rc, parts[1], allowParams(params, ACMA_PARAMS));
         case 'radio-path': none(); return radioPathEndpoint(rc, parts[1]);
@@ -4292,6 +4355,13 @@ export const MCP_TOOLS = Object.freeze([
     description: 'A station\'s flood heights with their datum caveats: the Bureau\'s flood classes by edition, the SLS\'s classes, crossings, the gauge zero and its datum, flood effects, modelled AEP levels, and one ladder in m AHD where the gauge zero allows it.',
     inputSchema: { type: 'object', properties: { id: idArg }, required: ['id'], additionalProperties: false },
     route: a => [`/stations/${enc(a.id)}/flood-levels`, {}],
+  },
+  {
+    name: 'get_benchmarks',
+    title: 'Get a station\'s benchmarks',
+    description: 'The survey marks the Bureau\'s HDB lists for a station\'s gauge, in numbers: each benchmark\'s mark number where its description gives one (PSM 46757, CGC200041…), its level in metres and its datum (AHD, assumed, State or unknown), and what it reads on the gauge — its level less the gauge zero in force, only where both are AHD or both State — with that gauge zero. Not what a mark is or where: those are for Flood-Net\'s editors.',
+    inputSchema: { type: 'object', properties: { id: idArg }, required: ['id'], additionalProperties: false },
+    route: a => [`/stations/${enc(a.id)}/benchmarks`, {}],
   },
   {
     name: 'get_service_level',

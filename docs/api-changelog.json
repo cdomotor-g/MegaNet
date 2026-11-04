@@ -2,6 +2,19 @@
   "about": "Every change to Flood-Net's agent API (https://floodwarning.net/api/v1 and https://floodwarning.net/api/mcp) that someone using it would notice — a route, a field, a limit, a tool — newest first. Each entry is emailed once to everyone on the API notify list (sign up at https://floodwarning.net/api#notify). Served as JSON at https://floodwarning.net/api/v1/changelog and written up in docs/agent-api.md, under Changes. Add an entry in the same push as the change: it is what tells people.",
   "entries": [
     {
+      "id": "2026-11-04-benchmarks",
+      "date": "2026-11-04",
+      "title": "A station's benchmarks, in numbers",
+      "summary": "New: GET /api/v1/stations/{id}/benchmarks and the MCP tool get_benchmarks. They list the survey marks the Bureau's hydrological database (HDB) holds for a station's gauge, from its report Queensland Flood Warning River Height Stations — Benchmark Details (777 benchmarks at 519 stations, printed 15 October 2026): each benchmark's mark number where its description gives one (PSM 46757, CGC200041…), its level in metres and its datum (AHD, assumed, State or unknown), and what it reads on the gauge — its level less the gauge zero in force, only where the two are both AHD or both State — with that gauge zero. A station's links (GET /api/v1/stations/{id}) gain benchmarks. What each mark is and exactly where, and the office's comments, are kept for Flood-Net's editors and are not served. Nothing else has changed.",
+      "breaking": false,
+      "links": [
+        {
+          "text": "The benchmarks route",
+          "url": "https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md#get-apiv1stationsidbenchmarks"
+        }
+      ]
+    },
+    {
       "id": "2026-11-03-heard-near",
       "date": "2026-11-03",
       "title": "A missed check with the station's rain heard around it is a check lost, not a station unheard",

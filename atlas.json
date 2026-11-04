@@ -661,7 +661,7 @@
     {
       "id": "agent-api",
       "name": "Agent API (REST and MCP)",
-      "what": "Read-only public station data: search and stations near a point, a station's record and dossier, readings and the latest reading per station, health findings and silent stations, flood levels, service levels, ACMA licences, a station's radio path to the base stations with the fade margin saved for each hop, catchments, networks, and a changelog of every visible API change.",
+      "what": "Read-only public station data: search and stations near a point, a station's record and dossier, readings and the latest reading per station, health findings and silent stations, flood levels, a station's benchmarks in numbers (level, datum, what each reads on the gauge), service levels, ACMA licences, a station's radio path to the base stations with the fade margin saved for each hop, catchments, networks, and a changelog of every visible API change.",
       "component": "agent-api",
       "paths": [
         "worker/api.js",

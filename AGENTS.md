@@ -69,6 +69,10 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     or `bbox`. A 503 "not available yet" on either means database migration
     0085 has not been applied yet.
   - `get_flood_levels` — `GET /api/v1/stations/{id}/flood-levels`
+  - `get_benchmarks` — `GET /api/v1/stations/{id}/benchmarks`: the survey
+    marks the Bureau's HDB lists for a station's gauge, in numbers — each one's
+    mark number, level and datum, and what it reads on the gauge where it and
+    the gauge zero are both AHD or both State. Not what a mark is or where.
   - `get_service_level` — `GET /api/v1/stations/{id}/service-level`
   - `get_acma_licences` — `GET /api/v1/stations/{id}/acma?radius_m=&freq_mhz=&all=`:
     the radio licences at a station's site — the ACMA licence numbers Flood-Net

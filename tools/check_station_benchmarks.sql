@@ -1,7 +1,8 @@
--- check_station_benchmarks.sql — Prove the Bureau's benchmarks (0101) against a
--- real database: the loader makes the table match a document and refuses one
--- it cannot read, the view puts each benchmark on its station and on the gauge
--- only where the datums agree, and nobody but an editor reads any of it.
+-- check_station_benchmarks.sql — Prove the Bureau's benchmarks (0101, 0102)
+-- against a real database: the loader makes the table match a document and
+-- refuses one it cannot read, the view puts each benchmark on its station and
+-- on the gauge only where the datums agree, nobody but an editor reads a
+-- description, and anybody reads the numbers.
 --
 --   psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 -f tools/check_station_benchmarks.sql
 --
@@ -249,6 +250,49 @@ begin
   v_editor := pg_temp.as_who('editor', $q$select meganet.load_benchmarks_doc('{}'::jsonb)$q$);
   perform pg_temp.check_that('…and not even an editor may load a document',
     v_editor like 'error 42501%', v_editor);
+end
+$$;
+
+-- ── 4b. The numbers, for anybody (0102) ──────────────────────────────────────
+
+do $$
+declare
+  v_anon text; v_words text; v_edit text;
+begin
+  if pg_catalog.to_regclass('meganet.station_benchmark_public') is null then
+    return;
+  end if;
+  perform pg_temp.check_that('the published view is the numbers and nothing else: no description, no comment, no name as HDB spells it',
+    (select string_agg(a.attname, ',' order by a.attnum) from pg_catalog.pg_attribute a
+      where a.attrelid = 'meganet.station_benchmark_public'::regclass and a.attnum > 0 and not a.attisdropped)
+    = 'station_id,station_number,bureau_number,ord,mark,level_m,datum,gauge_zero_m,gauge_datum,gauge_zero_from,on_gauge_m,printed_on');
+  perform pg_temp.check_that('…the same rows and arithmetic as the editors'' view',
+    not exists (select station_id, ord, level_m, datum, gauge_zero_m, on_gauge_m from meganet.station_benchmark
+                 where station_id like '\_check\_bm\_%'
+                except
+                select station_id, ord, level_m, datum, gauge_zero_m, on_gauge_m from meganet.station_benchmark_public
+                 where station_id like '\_check\_bm\_%')
+    and (select count(*) from meganet.station_benchmark_public where station_id like '\_check\_bm\_%') = 5);
+  perform pg_temp.check_that('the mark''s number is read out of the description, the prefix in capitals',
+    (select mark from meganet.station_benchmark_public where station_id = '_check_bm_ahd' and ord = 0) = 'PSM 1234'
+    and (select mark from meganet.station_benchmark_public where station_id = '_check_bm_ahd' and ord = 1) is null
+    and meganet.benchmark_mark('PSm 169442 on west bank') = 'PSM 169442'
+    and meganet.benchmark_mark('benchmark CGC2000049') = 'CGC2000049'
+    and meganet.benchmark_mark('SD 89025, located 4.45m along') = 'SD 89025'
+    and meganet.benchmark_mark('MR BM 28K right bank') is null
+    and meganet.benchmark_mark(null) is null);
+  if not exists (select 1 from pg_catalog.pg_roles where rolname = 'authenticator') then
+    return;
+  end if;
+  v_anon  := pg_temp.as_who('anon', $q$select count(*)::text from meganet.station_benchmark_public where station_id like '\_check\_bm\_%'$q$);
+  v_words := pg_temp.as_who('anon', $q$select count(*)::text from meganet.station_benchmark$q$);
+  v_edit  := pg_temp.as_who('stranger', $q$select count(*)::text from meganet.station_benchmark_public where station_id like '\_check\_bm\_%'$q$);
+  perform pg_temp.check_that('anybody signed out reads the numbers — and still not the words',
+    v_anon = '5' and v_words like 'error 42501%', v_anon || ' / ' || v_words);
+  perform pg_temp.check_that('…and so does somebody signed in who is not an editor', v_edit = '5', v_edit);
+  perform pg_temp.check_that('…and nobody writes it',
+    not has_table_privilege('anon', 'meganet.station_benchmark_public', 'insert')
+    and not has_table_privilege('authenticated', 'meganet.station_benchmark_public', 'update'));
 end
 $$;
 

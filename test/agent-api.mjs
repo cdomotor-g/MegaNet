@@ -64,6 +64,8 @@ const COLUMNS = Object.fromEntries(Object.entries({
   station_flood_class: 'station_id ord as_at first_report_m crossing_height_m crossing_type minor_m crops_grazing_m moderate_m towns_m major_m note updated_at updated_by',
   station_crossing: 'station_id ord as_at stream name height_m crossing_type note updated_at updated_by',
   station_gauge_survey: 'station_id ord valid_from valid_to gauge_zero_m datum amtd_km catchment_area_km2 note updated_at updated_by',
+  // 0102: the Bureau's benchmarks in numbers — no description, no comment.
+  station_benchmark_public: 'station_id station_number bureau_number ord mark level_m datum gauge_zero_m gauge_datum gauge_zero_from on_gauge_m printed_on',
   station_bureau_listing: 'station_id ord section as_at note updated_at updated_by',
   station_flood_effect: 'station_id ord as_at height_m effect detail note updated_at updated_by',
   station_aep_level: 'station_id ord as_at source point_lat point_lon ground_m aep_1_m aep_0_5_m aep_0_2_m aep_0_066_m data_quality level_difference confidence setting slope slope_basis manning_n note updated_at updated_by',
@@ -218,6 +220,21 @@ if (!(RICH && MANUAL && SPARSE && LIST_WL)) {
 }
 
 const RICH_ADDRS = [...new Set((RICH.sensors || []).map(x => x.alert_id).filter(x => x != null))];
+
+// RICH's benchmarks, invented in 0102's view's shape (the real ones are the
+// Bureau's, read by tools/ingest/benchmarks.py out of the private repository):
+// an AHD mark with a number over RICH's AHD zero, an assumed one, which is
+// never put on the gauge, and an AHD mark with no number.
+const RICH_ZERO = newestOpen(RICH.gauge_survey.filter(g => g.datum === 'AHD' && !g.valid_to));
+function newestOpen(rows) { return rows.slice().sort((a, b) => String(b.valid_from || '').localeCompare(String(a.valid_from || '')))[0]; }
+const zr = Number(RICH_ZERO.gauge_zero_m);
+const BM_ROW = (ord, mark, level, datum, onGauge) => ({ station_id: RICH.id, station_number: RICH.station_number,
+  bureau_number: String(RICH.station_number).padStart(6, '0'), ord, mark, level_m: level, datum,
+  gauge_zero_m: zr, gauge_datum: 'AHD', gauge_zero_from: RICH_ZERO.valid_from || null, on_gauge_m: onGauge, printed_on: '2026-10-15' });
+T.station_benchmark_public.push(
+  BM_ROW(0, 'PSM 99001', Math.round((zr + 1.23) * 100) / 100, 'AHD', 1.23),
+  BM_ROW(1, null, 8.57, 'ASSUM', null),
+  BM_ROW(2, null, Math.round((zr + 6.4) * 100) / 100, 'AHD', 6.4));
 const WL_SENSOR = RICH.sensors.find(x => /^Water Level/.test(x.type) && x.alert_id != null) || RICH.sensors.find(x => x.alert_id != null);
 const WL_ADDR = `a:${WL_SENSOR.alert_id}`;
 const OTHER_ADDR = `a:${RICH_ADDRS.find(a => a !== WL_SENSOR.alert_id) ?? WL_SENSOR.alert_id}`;
@@ -1308,6 +1325,51 @@ section('API changelog');
   api.resetApiState();
 }
 
+section('Benchmarks');
+
+{
+  const r = await get(`/api/v1/stations/${RICH.id}/benchmarks`);
+  const b = r.json;
+  check('GET /stations/{id}/benchmarks answers the station\'s marks in the order printed', r.status === 200 && b.id === RICH.id
+    && b.count === 3 && b.benchmarks.map(x => x.ord).join() === '0,1,2', `${r.status} ${b && b.count}`);
+  check('…each with its number, level and datum, and on the gauge only where the datums agree',
+    b.benchmarks[0].mark === 'PSM 99001' && b.benchmarks[0].datum === 'AHD' && b.benchmarks[0].datum_label === 'Australian Height Datum'
+    && b.benchmarks[0].on_gauge_m === 1.23 && b.benchmarks[1].datum === 'ASSUM' && !('on_gauge_m' in b.benchmarks[1])
+    && !('mark' in b.benchmarks[2]) && b.benchmarks[2].on_gauge_m === 6.4, JSON.stringify(b.benchmarks));
+  check('…the gauge zero they were worked from, and the report it came from',
+    b.gauge_zero && b.gauge_zero.m === zr && b.gauge_zero.datum === 'AHD' && b.report.printed === '2026-10-15'
+    && /Benchmark Details/.test(b.report.title), JSON.stringify([b.gauge_zero, b.report]));
+  check('…and nothing of what a mark is or where — the answer has no description or comment anywhere',
+    !/description|comment/i.test(JSON.stringify(b.benchmarks)) && b.notes.some(n => /kept for Flood-Net's editors/.test(n)));
+  check('…and the station\'s links name the route', (await get(`/api/v1/stations/${RICH.id}`)).json.links.benchmarks
+    .endsWith(`/stations/${RICH.id}/benchmarks`));
+  const n = await get(`/api/v1/stations/${SPARSE.id}/benchmarks`);
+  check('a station the Bureau lists no benchmark for: none, said in words, and no gauge zero to quote', n.status === 200
+    && n.json.count === 0 && n.json.benchmarks.length === 0 && n.json.gauge_zero === null
+    && /list no benchmark/.test(n.json.notes[0]), JSON.stringify(n.json.notes));
+  const bad = await get('/api/v1/stations/no_such_station_here/benchmarks');
+  check('…and a station that is not there is a 404', bad.status === 404, bad.status);
+  const t = await rpc('tools/call', { name: 'get_benchmarks', arguments: { id: RICH.id } });
+  const out = t.json.result && t.json.result.structuredContent;
+  check('get_benchmarks answers what the route does', t.status === 200 && t.json.result.isError === false && out
+    && out.count === 3 && out.benchmarks[0].mark === 'PSM 99001', t.json.result && t.json.result.content[0].text.slice(0, 160));
+
+  // The Worker deploys on push; 0102 lands when somebody applies it.
+  const { station_benchmark_public: _notYet, ...before } = COLUMNS;
+  const beforeStub = new PostgrestStub({ base: api.SUPABASE_REST_URL, columns: before, tables: T });
+  globalThis.fetch = (input, init) => beforeStub.fetch(input, init);
+  try {
+    api.resetApiState();
+    const w = await get(`/api/v1/stations/${RICH.id}/benchmarks`);
+    check('before 0102 is applied: a 503 naming the missing relation and the migration', w.status === 503
+      && w.json.missing_relation === 'meganet.station_benchmark_public'
+      && w.json.migration === 'db/migrations/0102_benchmarks_public.sql', `${w.status} ${w.json && w.json.detail}`);
+  } finally {
+    globalThis.fetch = (input, init) => stub.fetch(input, init);
+    api.resetApiState();
+  }
+}
+
 section('Flood levels, SLS, readings');
 
 {
@@ -2077,7 +2139,7 @@ stub.requests = [];
 assetReads.length = 0;
 for (const p of ['/api/v1/', '/api/v1/stations?q=river&type=river', `/api/v1/stations?near=${RICH.lat},${RICH.lon}&manual=true`,
   `/api/v1/stations/${RICH.id}`, `/api/v1/stations/${RICH.id}/dossier`, `/api/v1/stations/${RICH.id}/readings?resolution=raw`,
-  `/api/v1/stations/${RICH.id}/flood-levels`, `/api/v1/stations/${MANUAL.id}/service-level`, '/api/v1/catchments',
+  `/api/v1/stations/${RICH.id}/flood-levels`, `/api/v1/stations/${RICH.id}/benchmarks`, `/api/v1/stations/${MANUAL.id}/service-level`, '/api/v1/catchments',
   `/api/v1/catchments/${RICH.catchment_ids[0]}`, '/api/v1/networks', `/api/v1/stations/${RICH.station_number}/readings`,
   '/api/v1/readings/latest', `/api/v1/readings/latest?type=river&network=${NETWORKED.radio_network_ids[0]}&basin=river&format=geojson`,
   `/api/v1/readings/latest?bbox=${RICH.lon - 1},${RICH.lat - 1},${RICH.lon + 1},${RICH.lat + 1}`, '/api/v1/stations?q=tide&format=geojson',
@@ -2260,7 +2322,7 @@ section('MCP');
   const list = await rpc('tools/list', {}, { headers: { 'MCP-Protocol-Version': '2025-06-18' } });
   const tools = list.json.result.tools;
   const expected = ['search_stations', 'get_station', 'get_station_dossier', 'stations_near', 'get_readings', 'get_latest_readings', 'get_silent_stations',
-    'get_station_health', 'get_health_findings', 'list_catchments', 'get_catchment', 'get_flood_levels', 'get_service_level',
+    'get_station_health', 'get_health_findings', 'list_catchments', 'get_catchment', 'get_flood_levels', 'get_benchmarks', 'get_service_level',
     'get_acma_licences', 'acma_licences_near', 'get_radio_path', 'list_networks'];
   check('tools/list has every tool', expected.every(n => tools.some(t => t.name === n)) && tools.length === expected.length, tools.map(t => t.name).join(', '));
   check('every tool is annotated read-only and has an object input schema', tools.every(t => t.annotations.readOnlyHint === true

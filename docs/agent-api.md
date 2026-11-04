@@ -238,6 +238,7 @@ says what to change; an unknown tool or malformed request is a JSON-RPC error.
 | `get_station_health` | What Station Health says about one station over 3, 7 or 14 days: its findings with what to do, its check schedule day by day, its battery's night lows and trend | `GET /api/v1/stations/{id}/health` |
 | `get_health_findings` | The same for a page of stations, worst first: by owner, station ids, network, basin, kind or bounding box | `GET /api/v1/health/findings` |
 | `get_flood_levels` | Flood classes, SLS classes, crossings, gauge zero, flood effects, AEP levels, one AHD ladder | `GET /api/v1/stations/{id}/flood-levels` |
+| `get_benchmarks` | The Bureau's benchmarks at a station in numbers: each mark's number, level and datum, and what it reads on the gauge | `GET /api/v1/stations/{id}/benchmarks` |
 | `get_service_level` | The station's Service Level Specification entry | `GET /api/v1/stations/{id}/service-level` |
 | `get_acma_licences` | The ACMA licences Flood-Net records for a station, each looked up in the register; the register's licences around it (licensee, frequencies, power, distance, whether on the station's frequency); the repeaters that relay it | `GET /api/v1/stations/{id}/acma` |
 | `acma_licences_near` | The register's licences around a point — for a site not built yet, or a move | `GET /api/v1/acma?near=` |
@@ -640,6 +641,37 @@ curl -s https://floodwarning.net/api/v1/stations/abergowrie_br_al/flood-levels |
 ```
 
 That note is the kind of thing to carry into a report rather than smooth over.
+
+### `GET /api/v1/stations/{id}/benchmarks`
+
+The survey marks the Bureau's HDB lists for the station's gauge — from its
+report *Queensland Flood Warning River Height Stations — Benchmark Details*
+(printed 15 October 2026: 777 benchmarks at 519 stations) — **in numbers**:
+each benchmark's `mark` number where its description gives one (a PSM, SSM, PM,
+SD, CGC or numbered BM), its `level_m` in its own `datum` (AHD, `ASSUM` an
+assumed datum, `STATE` Queensland's State datum, `UNKNOWN`), and `on_gauge_m`,
+what it reads on the river gauge: its level less the `gauge_zero` in force,
+given only where the benchmark and the zero are both AHD or both State. In the
+order the report lists them. What each mark is and exactly where, and the
+office's comments, are kept for Flood-Net's editors and are not served.
+
+```sh
+curl -s https://floodwarning.net/api/v1/stations/beaudesert_al/benchmarks | jq '{benchmarks, gauge_zero}'
+```
+
+```json
+{
+  "benchmarks": [
+    { "ord": 0, "level_m": 32.59, "datum": "STATE", "datum_label": "State datum", "on_gauge_m": 3.14 },
+    { "ord": 1, "level_m": 41.68, "datum": "STATE", "datum_label": "State datum", "on_gauge_m": 12.23 }
+  ],
+  "gauge_zero": { "m": 29.45, "datum": "STATE", "datum_label": "State datum", "since": "1993-03-19" }
+}
+```
+
+A station the report lists none for answers `count: 0` and says so in `notes`.
+Until `0102` is applied to a database the route answers **503** `"not available
+yet"`, naming the relation and the migration.
 
 ### `GET /api/v1/stations/{id}/service-level`
 
@@ -1547,6 +1579,14 @@ at [`GET /api/v1/changelog`](#get-apiv1changelog), newest first — both from
 in the same push. A change with nothing to notice (a fix inside, a faster
 answer) is not listed.
 
+- **4 November 2026 — A station's benchmarks, in numbers.** New:
+  `GET /api/v1/stations/{id}/benchmarks` and the tool `get_benchmarks` — the
+  survey marks the Bureau's HDB lists for a station's gauge (777 at 519
+  stations): each one's mark number where its description gives one (PSM
+  46757, CGC200041…), its level and datum, and what it reads on the gauge
+  where it and the gauge zero share a datum, with that zero. A station's
+  `links` gain `benchmarks`. What a mark is and where are kept for Flood-Net's
+  editors and are not served. Nothing else has changed.
 - **3 November 2026 — A missed check with the station's rain heard around it
   is a check lost, not a station unheard.** When a station's rain tip or level
   change arrived within half an hour of a check Flood-Net missed, the station

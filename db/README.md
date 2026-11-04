@@ -328,6 +328,7 @@ its cache at all (`PGRST002`).
 | `meganet.station_feature_kind` | What a station's site feature can be (`0061`): the orifice outlet, inspection pit, benchmark, gauge board, crest gauge and *other point* as `Point`, the orifice run, cable run, access track (`0067`) and *other line* as `LineString`, whether it has to be named (the two *other*s), its order and a sentence. A new kind is an insert. Public, like every vocabulary. |
 | `meganet.station_feature` | Where a station's ancillary features are (`0061`): station, kind, name, note, `geom` — GeoJSON, longitude first, WGS84, seven places, nothing but `type` and `coordinates` (a check over `station_feature_geom_problem()`) — `placed` (`map`, `gps`, `typed`, `mixed`) and the GPS's `accuracy_m`, who added and last changed it, and a soft delete. The kind and the shape are tied by a foreign key over a generated `geom_type`, so a benchmark cannot be a line however it is written; two live features of one kind at a station do not share a name. **Editors only** (RLS hides tombstones); nothing for `anon`. See **Site features**, below. |
 | `meganet.benchmark_extract`, `meganet.bureau_benchmark`, `meganet.station_benchmark` | The Bureau's benchmarks (`0101`): HDB's *Benchmark Details* report for its Queensland river height stations as printed — which report (one row, with the reader's meta), and every benchmark, keyed on the bureau number like the flood peaks: the station's name and basin as HDB has them, the mark's level and datum, what it is and where, and the comments. The view puts each on its live station with the gauge zero in force and `on_gauge_m`, the level less that zero where both are AHD or both State. **Editors only** — a benchmark's description is not for the open internet — and the report lives in the private repository. Written only by `load_benchmarks_doc()`. See **The Bureau's benchmarks**, below. |
+| `meganet.station_benchmark_public`, `meganet.benchmark_mark(text)` | The same benchmarks **in numbers, for anybody** (`0102`): each live station's marks in the order printed — the mark's number where its description gives one (`benchmark_mark()`: PSM, SSM, PM, SD, CGC or a numbered BM), its level and datum, the gauge zero in force and `on_gauge_m` where the datums agree, and the day the report was printed. No description, no comment, not HDB's spelling of the station's name. **Public** — deliberately not `security_invoker`, as `0023`'s chart views are not, its twelve columns fixed and checked when `0102` applies; read by the agent API's `GET /api/v1/stations/{id}/benchmarks`. |
 | `meganet.a2plan_site` | What a repeater site needs before it carries ALERT2, for the ALERT2 Transition Plan (`0065`): `fit` (a fit-out only), `retrofit` (power, antenna, enclosure, earthing, access) or `rebuild` (the structure), one row a station, who set it and when; no row is "not assessed". **The plan's list only** (`0076`; `0065` gave it to administrators), everybody on it seeing the same answer; nothing for `anon`, or for an administrator or member who is not on the list. |
 | `meganet.a2plan_scenario` | A saved ALERT2 Transition Plan scenario (`0065`): the card's settings (a JSON object of at most 64 KB the app checks again on load), a name, notes, `shared`. **Private to its author until shared, then everybody's on the plan's list to see** (`0076`; the select policy and `a2plan_read()` say the same); only its author changes or removes it. One author leaving the list leaves their shared scenarios shared and their private ones unseen. |
 | `meganet.a2plan_member` | Who sees the ALERT2 Transition Plan (`0076`): one row a person, `nominates` (may change the list), who added them and when. The owner nominates, starting with themselves (`select meganet.a2plan_member_save('their address', true)` from the SQL editor, a direct connection); being an administrator gives nothing here. **RLS on, no policy and no grant**: read through `a2plan_read()` and `whoami()` (`a2plan`, `a2plan_nominates`), written through the two functions below. |
@@ -2280,9 +2281,19 @@ python3 tools/ingest/benchmarks.py --sql \
   through psql or the SQL editor — 110 KB, so the Supabase connector carries it
   too.
 
+- **The numbers are public (`0102`).** `meganet.station_benchmark_public`
+  publishes each mark's number, level, datum, gauge zero and `on_gauge_m` to
+  anybody, and the agent API serves them (`/stations/{id}/benchmarks`); the
+  descriptions and comments stay in the editors' view. It reads past
+  `bureau_benchmark`'s policy on purpose, as `0023`'s chart views do, and its
+  columns are checked when it applies. The mark's number is
+  `benchmark_mark()`'s, the rule `station-benchmarks.js`'s `markName()` follows
+  — the two agree on all 777.
+
 `tools/check_station_benchmarks.sql` proves it against a real Postgres: the
-load and its refusals, the view's join and its arithmetic, and nobody but an
-editor (and the service key) reading a row.
+load and its refusals, the view's join and its arithmetic, nobody but an
+editor (and the service key) reading a description, and anybody reading the
+numbers.
 
 ## Checking it from outside
 
