@@ -82,6 +82,11 @@
 // cache for hours, and never the Bureau's own forecasts (whose terms do not
 // allow publishing them here). worker/rain-ahead.js, docs/station-health.md.
 //
+// A twelfth: /api/sort/v1/*, SoRT's forum sessions — a small file store for
+// the SoRT scope builder at cdomotor-g.github.io, behind one shared forum
+// passphrase, the files in the PHOTOS bucket under _meganet/sort/. Not part of
+// the agent API. worker/sort.js, docs/sort-store.md.
+//
 // And one that is not a door at all: scheduled() below, every minute
 // (wrangler.toml's [triggers]), sends the administrators' notifications —
 // worker/push.js, db/migrations/0066_push_notifications.sql — and every
@@ -97,6 +102,7 @@ import { isCameraPath, handleCameras } from './cameras.js';
 import { isDrivePath, handleDrive } from './drive.js';
 import { isNotifyPath, handleNotify, notifyDue, runNotify } from './notify.js';
 import { isRainAheadPath, handleRainAhead } from './rain-ahead.js';
+import { isSortPath, handleSort } from './sort.js';
 import { runPush } from './push.js';
 
 export { BriefingLedger } from './briefing.js';
@@ -592,6 +598,10 @@ export default {
     // (worker/rain-ahead.js): anybody, squares inside Australia only, the model
     // asked at most once every three hours per answer whoever is looking.
     if (isRainAheadPath(url.pathname)) return handleRainAhead(request, env, ctx);
+
+    // SoRT's forum sessions (worker/sort.js): whoever has the forum passphrase,
+    // a few files of JSON, each save conditional on the version last read.
+    if (isSortPath(url.pathname)) return handleSort(request, env, ctx);
 
     // Everything else is a static asset, and assets are served before this runs.
     // A request that gets here for any other path is a path that does not exist.

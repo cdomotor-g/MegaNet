@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-04** (revision 230 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-04** (revision 232 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -858,6 +858,13 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 232 — 2026-11-04: 🗂️ SoRT's forum sessions — a store behind the forum passphrase
+
+The owner asked for SoRT's sessions to be shared between every forum computer with a forum passphrase — no tokens or accounts: *"anyone with that passphrase could get into the sort scope builder and do their thing"*. **No issue; opens nothing, closes nothing.**
+
+- **The store** (`worker/sort.js`, `https://floodwarning.net/api/sort/v1`, the Atlas's `sort-session-store`): every request but the preflight carries `X-SoRT-Passphrase`, held to `sha256_hex('sort-forum-v1:' + passphrase)` in constant time — the hash in the code, or the Worker's `SORT_PASS_SHA256` when the owner sets one (no code change to change the passphrase). `GET /check`; `GET /files/<path>` with its `ETag`; `PUT /files/<path>`, the whole file as JSON up to 4 MB, `If-None-Match: *` to create and `If-Match` to replace — never a blind save, so two forum computers saving at once lose nothing (412 `changed`). `<path>` is `index.json` or `stations/<slug>.json`. In the `PHOTOS` bucket under `_meganet/sort/files/`, and each UTC hour's last save copied under `_meganet/sort/history/` to put a bad save right by hand (`docs/sort-store.md`). CORS for `cdomotor-g.github.io` and this origin only. Brakes `SORT_RATE_LIMIT` 120 a minute and `SORT_AUTH_FAIL` 10 wrong passphrases a minute per address (`wrangler.toml`). Not the agent API: nothing in `READABLE_RELATIONS`, nothing in its changelog.
+- `npm run sortstore` (98 assertions; in `all` and the smoke test): the passphrase and its override, every route and status, the paths refused, the size cap, create/replace/conflict, the hour's copy, CORS, both brakes, and no passphrase in a log line or an answer; confirmed red on eleven deliberate breaks. `npm run agentdocs` holds the two brakes in `wrangler.toml` to the module. Docs: `docs/sort-store.md`, `privacy.html` (*SoRT's forum sessions*), `README.md`, `test/README.md`; `atlas.json` provides `sort-session-store`. SoRT's side is being built to the same contract.
 
 ### Revision 231 — 2026-11-04: 🕵️ Investigation 03 — Hillcrest (Wine Glass); #271–#273 opened; a PDF of every investigation
 

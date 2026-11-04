@@ -24,7 +24,7 @@
        account tables 0005 and 0062, attribution meganet.actor() in 0004, the
        briefing ledger worker/briefing.js, the API limiter worker/api.js, an
        administrator's notification devices 0066 and worker/push.js, teams and
-       tasks 0095. A
+       tasks 0095, SoRT's forum sessions worker/sort.js. A
        change to any of those that changes what is kept, who sees it or for how
        long has to change this page in the same push. -->
   <style>
@@ -353,6 +353,23 @@
     until it is sent, copied or dismissed.
   </p>
 
+  <h2 id="sort-sessions">SoRT's forum sessions</h2>
+  <p>
+    SoRT's scope builder keeps the forums' work — the scope, the stations being
+    looked at and the notes — on Flood-Net's server, in our private storage at
+    Cloudflare (R2), so every computer at a forum works on the same files. They
+    are kept for whoever has the forum passphrase: anyone who types it can read
+    and change them, and there are no accounts. Nothing about who saved them is
+    kept with them — no name, no email address, no IP address; to slow down
+    guessing, our server counts the requests from each address, by a one-way
+    hash of it, for a minute at a time. Each save also keeps that hour's copy of
+    the file, so a bad save can be put right. The files hold no landholders'
+    names or contact details and no gate, padlock or key codes: SoRT checks for
+    them before it saves. Write to
+    <a href="mailto:privacy@floodwarning.net">privacy@floodwarning.net</a> to
+    have them, and their copies, deleted.
+  </p>
+
   <h2 id="bugs">Bug reports</h2>
   <p>
     <em>Report a Bug</em> fills in a new GitHub issue for you — the tab you were on,
@@ -395,8 +412,9 @@
   </p>
   <dl>
     <dt>Cloudflare</dt>
-    <dd>Serves the site and the server code, stores field photos (R2), and, where
-      it is switched on, runs the Access sign-in gate.</dd>
+    <dd>Serves the site and the server code, stores field photos and SoRT's
+      forum sessions (R2), and, where it is switched on, runs the Access sign-in
+      gate.</dd>
     <dt>Supabase</dt>
     <dd>The database, sign-in and file storage. The database is in Sydney,
       Australia.</dd>

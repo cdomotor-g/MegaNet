@@ -36,6 +36,7 @@
       "Hops to base (map-hops.js): Show hops to base on a station card lights the station's routes to the base stations on the Stations map, each hop heard (the public relay week; for editors, the receivers' copies of the last 12 hours) or assumed from the pass ranges and backbone paths",
       "The Bureau's benchmarks (0101): HDB's Benchmark Details report, 777 benchmarks at 519 stations, read by tools/ingest/benchmarks.py and kept in the private repository, loaded on 4 Nov 2026: on a station's card for editors and offered as the primary benchmark in the Level Survey's Datum step, with what each reads on the gauge",
       "Benchmarks for SoRT (benchmarks-for-sort): SoRT's scope builder opens #benchmarks-for-sort=…, a signed-in editor reviews the station's benchmarks and Send to SoRT posts them to the SoRT tab that asked (cdomotor-g.github.io only), or Copy for SoRT without an opener; never through the public API. SoRT's side is being built to the same contract",
+      "SoRT's forum sessions (sort-session-store): the Worker keeps SoRT's forum files at /api/sort/v1 behind one shared forum passphrase (no tokens, no accounts), each save conditional on the version last read and each hour's last save copied for putting a bad one right; SoRT's side is being built to the same contract",
       "Responsiveness pass for a laptop on a Teams call and a phone on one bar: the Stations tab opens in a third of the time on a slow CPU, the repeater delay plan is worked out in a worker, a saved station list is shown after 8 s of a slow download and downloaded only when it has changed (ETag), and the Stations map groups nearby pins into bubbles (worst, average or mix under health and Latency) until zoomed in",
       "Teams and tasks (0095) live: one team has its owner so far — an administrator names each team's owners on the Admin tab; SoRT's #tasks= hand-off lands on the Tasks tab for review",
       "One person, one account (0100): an account keeps a second address — found by a team's owner, where its emails can go, refused a sign-in of its own; the Admin tab's Same person… folds a second account in",
@@ -579,7 +580,7 @@
     {
       "id": "worker",
       "name": "floodwarning.net Worker",
-      "what": "The Cloudflare Worker in front of the app: Access sign-in turned into a database session, the /api/db proxy for networks that block Supabase, photos and the data archive in R2, Ask Claude, bug reports, council cameras, road routes, push and scheduled notifications.",
+      "what": "The Cloudflare Worker in front of the app: Access sign-in turned into a database session, the /api/db proxy for networks that block Supabase, photos and the data archive in R2, Ask Claude, bug reports, council cameras, road routes, SoRT's forum sessions behind the forum passphrase, push and scheduled notifications.",
       "paths": [
         "worker/index.js",
         "worker/photos.js",
@@ -590,6 +591,7 @@
         "worker/drive.js",
         "worker/push.js",
         "worker/notify.js",
+        "worker/sort.js",
         "wrangler.toml"
       ],
       "url": "https://floodwarning.net",
@@ -797,6 +799,18 @@
         "test/sort-benchmarks.mjs"
       ],
       "contract": "sort-benchmarks.js"
+    },
+    {
+      "id": "sort-session-store",
+      "name": "SoRT's forum sessions (the passphrase store)",
+      "what": "A small file store for the SoRT scope builder's forum sessions at https://floodwarning.net/api/sort/v1, behind one shared forum passphrase and no accounts: every request but the preflight carries X-SoRT-Passphrase, accepted when sha256_hex('sort-forum-v1:' + passphrase) is the Worker's hash (SORT_PASS_SHA256 if set, else the constant in worker/sort.js), else 401 {error:'passphrase'}. GET /check is 200 {ok:true}; GET /files/<path> the file's text with its ETag, no-store, or 404 {error:'not found'}; PUT /files/<path> the whole file as JSON, at most 4 MB (413 {error:'too large'}, 400 {error:'not JSON'}), with If-None-Match: * to create or If-Match: \"<etag>\" to replace, else or on a conflict 412 {error:'changed'}, and 200 {etag} with the ETag header. <path> is index.json or stations/[a-z0-9][a-z0-9-]{0,79}.json (else 400 {error:'path'}). CORS for https://cdomotor-g.github.io and https://floodwarning.net only (GET, PUT, OPTIONS; content-type, x-sort-passphrase, if-match, if-none-match; ETag exposed). 120 requests and 10 wrong passphrases a minute per address, then 429 {error:'slow down'}. Kept in R2 under _meganet/sort/files/, with each UTC hour's last save copied to _meganet/sort/history/<path>/<YYYY-MM-DDTHH>Z.json. Not part of the agent API.",
+      "component": "worker",
+      "paths": [
+        "worker/sort.js",
+        "docs/sort-store.md"
+      ],
+      "url": "https://floodwarning.net/api/sort/v1",
+      "contract": "docs/sort-store.md"
     }
   ],
   "consumes": [

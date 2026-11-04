@@ -1973,6 +1973,18 @@ jobs:
         working-directory: test
         run: npm run apinotify
 
+      # And /api/sort/v1 (worker/sort.js): SoRT's forum sessions, a file store
+      # behind one shared passphrase. What it must not do fails in silence — a
+      # file read or written without the passphrase, a path outside index.json
+      # and stations/, a blind save that loses another forum computer's work,
+      # a save with no hour's copy to put it right from, another site's page
+      # reading the answers, the brakes not holding, or the passphrase in a
+      # log line — because SoRT still saves. Offline: R2 is a stand-in.
+      - name: SoRT's forum sessions — the passphrase only, no blind save, the hour's copy, SoRT's pages only
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run sortstore
+
       # Route on map (#251): /api/drive (worker/drive.js) and the map's
       # 🛣️ (map-drive.js). What fails in silence: a route for somebody who is
       # not an editor, the router asked with the caller's session or faster

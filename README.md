@@ -389,6 +389,7 @@ MegaNet/
 ├── worker/                 ← the Cloudflare Worker in front of the site (wrangler.toml)
 │   ├── index.js                            (/api/db — the database proxy; /api/session — the gate's sign-in)
 │   ├── api.js                              (/api/v1, /api/mcp — the read-only agent API and MCP server)
+│   ├── sort.js                             (/api/sort/v1 — SoRT's forum sessions, behind the forum passphrase; docs/sort-store.md)
 │   └── cameras.js                          (/api/cameras — the councils' camera pictures, fetched live, never stored)
 │
 ├── bridge/                 ← the MQTT → Flood-Net subscriber (#B6; Node, one dependency)

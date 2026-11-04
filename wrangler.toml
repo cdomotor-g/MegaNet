@@ -151,6 +151,28 @@ namespace_id = "1105"
   limit = 30
   period = 60
 
+# SoRT's forum sessions (worker/sort.js, /api/sort/v1/*): every request from
+# one address, keyed on a hash of it, and — counted only on a wrong one — the
+# wrong passphrases from it, the brake on guessing. Not part of the agent API;
+# SORT_RATE and SORT_AUTH_FAIL in worker/sort.js hold the same numbers, and
+# test/agent-docs.mjs checks that they agree.
+
+[[ratelimits]]
+name = "SORT_RATE_LIMIT"
+namespace_id = "1107"
+
+  [ratelimits.simple]
+  limit = 120
+  period = 60
+
+[[ratelimits]]
+name = "SORT_AUTH_FAIL"
+namespace_id = "1108"
+
+  [ratelimits.simple]
+  limit = 10
+  period = 60
+
 # The administrators' notifications (worker/push.js, 0066): every minute the
 # Worker's scheduled() asks the database which devices have something to hear
 # and sends it through Apple's, Google's, Mozilla's or Microsoft's push
