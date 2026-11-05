@@ -55534,8 +55534,8 @@
       "id": "marburg_radar",
       "name": "Marburg Radar",
       "station_number": "",
-      "lat": -27.6061,
-      "lon": 152.5402,
+      "lat": -27.606298,
+      "lon": 152.540091,
       "elevation_ahd": 348.5,
       "roles": [
         "base"
@@ -72910,8 +72910,8 @@
       "name": "Pikes Creek AL",
       "station_number": "541191",
       "station_type": "auto_rain_gauge",
-      "lat": -28.6905,
-      "lon": 151.5389,
+      "lat": -28.690418,
+      "lon": 151.538884,
       "elevation_ahd": 665.5,
       "roles": [
         "field"
@@ -72921,7 +72921,8 @@
         "border_rivers"
       ],
       "alert_ids": {
-        "rainfall": 5773
+        "rainfall": 5773,
+        "battery": 5774
       },
       "satcom": {
         "enabled": false,
@@ -81343,8 +81344,8 @@
       "name": "Scottsdale AL",
       "station_number": "541190",
       "station_type": "auto_rain_gauge",
-      "lat": -28.432,
-      "lon": 151.8756,
+      "lat": -28.433514,
+      "lon": 151.874522,
       "elevation_ahd": 759.5,
       "roles": [
         "field"
@@ -81354,7 +81355,8 @@
         "balonne_condamine"
       ],
       "alert_ids": {
-        "rainfall": 5771
+        "rainfall": 5771,
+        "battery": 5772
       },
       "satcom": {
         "enabled": false,
@@ -90969,8 +90971,8 @@
       "name": "Tomerong Creek",
       "station_number": "568202",
       "station_type": "auto_water_level",
-      "lat": -35.0598,
-      "lon": 150.5815,
+      "lat": -35.058556,
+      "lon": 150.582293,
       "elevation_ahd": 36.8,
       "roles": [
         "field"
@@ -90978,7 +90980,9 @@
       "radio_network_ids": [],
       "catchment_ids": [],
       "alert_ids": {
-        "rainfall": 7034
+        "rainfall": 7033,
+        "battery": 7035,
+        "water_level": 7034
       },
       "satcom": {
         "enabled": false,
@@ -99787,7 +99791,11 @@
       "catchment_ids": [
         "brisbane"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 4846,
+        "battery": 4848,
+        "water_level": 4847
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -99797,6 +99805,26 @@
       "enabled": true,
       "notes": "",
       "legacy_unit_id": 1955,
+      "sensors": [
+        {
+          "alert_id": 4846,
+          "type": "Rainfall",
+          "sensor_id": "willowbank:4846",
+          "device_id": null
+        },
+        {
+          "alert_id": 4847,
+          "type": "Water Level",
+          "sensor_id": "willowbank:4847",
+          "device_id": null
+        },
+        {
+          "alert_id": 4848,
+          "type": "Battery",
+          "sensor_id": "willowbank:4848",
+          "device_id": null
+        }
+      ],
       "lga": "Ipswich City",
       "basin": "Brisbane River",
       "hub_id": "brisbane",
@@ -194385,8 +194413,10 @@
       "lon": 152.610556,
       "elevation_ahd": 138.38,
       "elevation_source": "Elvis 1 m (QLD Government)",
+      "owner": "Ipswich City Council",
       "roles": [
-        "field"
+        "field",
+        "repeater"
       ],
       "radio_network_ids": [],
       "catchment_ids": [
@@ -194403,7 +194433,29 @@
       },
       "rm_system_id": 1,
       "enabled": true,
-      "notes": "",
+      "notes": "Ipswich City Council repeater: legacy ELPRO repeater canister (5 W), Rx and Tx 151.500 MHz, CLV3 antenna on a 3 m rain tree. Repeater windows #1 2077-2079 (Greys Plains Rd), #2 4837-4839 (Meadow Flat Rd Bridge), #3 4846-4848 (Willowbank). Rptr Delay 200 ms, lead-in 150 ms, check time 3 h. Own IDs: rain 4809, battery 4810. Source: IRM's ICC pre-wet service, 11 Aug 2026 (arrival and departure Show Cfg screens). Added by Ralf Muller (IRM), 5 Nov 2026.",
+      "repeater": {
+        "acma_licence": "",
+        "rx_mhz": 151.5,
+        "tx_mhz": 151.5,
+        "delay_ms": 200,
+        "pass_ranges": [
+          {
+            "low": 2077,
+            "high": 2079
+          },
+          {
+            "low": 4837,
+            "high": 4839
+          },
+          {
+            "low": 4846,
+            "high": 4848
+          }
+        ],
+        "exclusions": [],
+        "notes": ""
+      },
       "site": {
         "db_id": 3115,
         "number": "540663",
@@ -194430,12 +194482,14 @@
         }
       ],
       "hub_id": "brisbane",
+      "TBRGbucketSize": 1,
       "bureau_listings": [
         {
           "section": "1",
           "as_at": "2026-09-25"
         }
-      ]
+      ],
+      "tower_height": 3.0
     },
     {
       "id": "mt_mary",

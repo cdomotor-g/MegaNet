@@ -126,7 +126,9 @@ the width and height) or `look.py tiles <file> --grid 3`.
 ### What to read
 
 - **The logger (LPU)** — which one it is, as a key from `lpu_type`:
-  `elpro_ert_a2` for an ELPRO / ERRTS ERT-A2; `campbell_cr300`, `…_cr310`,
+  `elpro_ert_a2` for an ELPRO / ERRTS ERT-A2; `elpro_legacy_alert_canister`
+  for the older ELPRO ALERT canister an ERT-A2 replaces (Mt Marrow AL has
+  one); `campbell_cr300`, `…_cr310`,
   `…_cr350`, `…_cr1000`, `…_cr1000x` and the rest for a Campbell Scientific
   logger. CR300, CR310 and CR350 are three different loggers a digit apart:
   read the digit off the unit, never infer it.
