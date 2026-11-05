@@ -131,6 +131,12 @@ const card1 = await page.evaluate(() => {
     zone: svg ? svg.querySelectorAll('polyline[stroke-dasharray="4 3"]').length : 0,
     viewW: svg ? Number(svg.getAttribute('viewBox').split(' ')[2]) : 0,
     boxW: (el.querySelector('.rptr-path-chart') || {}).clientWidth || 0,
+    // The ground past each end: where A and B stand across the plot, the
+    // veils over the plot past them, and the key's chip.
+    ax: svg ? Number(svg.dataset.aX) : null, bx: svg ? Number(svg.dataset.bX) : null,
+    veils: svg ? svg.querySelectorAll('.path-beyond').length : 0,
+    beyondGround: svg ? svg.querySelectorAll('path.path-beyond-ground').length : 0,
+    key: (el.querySelector('.path-key') || {}).textContent || '',
     heads, margins, terms, words, heavy,
     stn: !!el.querySelector('#rptr-path-stn'),
   };
@@ -140,6 +146,14 @@ ok('its heading names both ends, both ways', card1 && card1.title.includes(pick.
 ok('the ground is drawn: a chart with its words, the ground and the Fresnel zone either side of the line',
   card1 && card1.chart && card1.ground >= 1 && card1.zone === 2, J(card1 && { chart: card1.chart, ground: card1.ground, zone: card1.zone }));
 ok('the chart is drawn to the width its box has', card1 && Math.abs(card1.viewW - card1.boxW) <= 4, J(card1 && { viewW: card1.viewW, boxW: card1.boxW }));
+// The plot runs on a little past both ends, as the Stations map's card does:
+// A and B a little in from its edges (52 and 14 are pathChartSvg's margins),
+// the ground past them drawn, faded under a veil, and named in the key.
+ok('the chart runs on a little past both ends, the ground there drawn under a veil and named in the key',
+  card1 && card1.ax > 52 + 4 && card1.bx < card1.viewW - 14 - 4
+    && card1.ax - 52 < 0.12 * (card1.viewW - 66) && card1.viewW - 14 - card1.bx < 0.12 * (card1.viewW - 66)
+    && card1.veils === 2 && card1.beyondGround >= 2 && /Ground past each end · [\d.]+ k?m, for context/.test(card1.key),
+  J(card1 && { ax: card1.ax, bx: card1.bx, viewW: card1.viewW, veils: card1.veils, beyondGround: card1.beyondGround, key: card1.key }));
 ok('the link is drawn heavy on the map', card1 && card1.heavy === 1, J(card1 && card1.heavy));
 ok('between two repeaters it is priced both ways', R1.kind === 'repeater' && R1.ways.length === 2
   && R1.ways[0].from === pick.rr.a && R1.ways[1].from === pick.rr.b, J(R1.ways.map(w => [w.from, w.to])));
@@ -156,7 +170,7 @@ ok('the table shows the margins it worked out', card1 && card1.margins.length ==
   && card1.margins.every((s, i) => Math.abs(shown(s) - R1.ways[i].margin) <= 0.051), J(card1 && card1.margins));
 const thin = (card1 ? card1.terms : []).filter(t => t.title.length < 40 || t.title.toLowerCase() === t.text.toLowerCase());
 ok('every marked word on the card has a meaning', card1 && card1.terms.length >= 10 && !thin.length, J(thin.length ? thin : card1 && card1.terms.length));
-const want = ['Fade margin', 'EIRP', 'Path loss', 'RX threshold', '60% Fresnel zone', 'Field allowance'];
+const want = ['Fade margin', 'EIRP', 'Path loss', 'RX threshold', '60% Fresnel zone', 'Field allowance', 'Ground past each end'];
 ok('the page\'s word list carries the card\'s words', want.every(w => card1 && card1.words.includes(w)), J(want.filter(w => !(card1 && card1.words.includes(w)))));
 ok('the card offers the Stations map', card1 && card1.stn);
 

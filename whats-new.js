@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 209, date: '2026-11-05', items: [
+      '🔁 <strong>The Repeaters tab\'s link profile runs on past both ends too.</strong> Press a link on the Repeaters map '
+        + 'and its ground profile now shows a short, faded stretch of ground beyond each repeater or base station, the same '
+        + 'as the elevation profile on the Stations map — so you can see what each end stands on.',
+    ] },
     { n: 208, date: '2026-11-05', items: [
       '📡 <strong>Repeaters and base stations are modelled with a 4 m antenna</strong>, the height their radio system '
         + 'gives, instead of on an assumed 10 m mast — as Radio Mobile has them. Fade margins to and from them are lower, '

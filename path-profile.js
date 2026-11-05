@@ -36,6 +36,9 @@
 // files is free — the same answer M2 got for Alert2 <-> Serial, for the same
 // reason: init.js is still the only thing that runs.
 //
+// pathBeyond and pathBeyondOn fetch and lay out the ground past each end of a
+// path, which this card and the Repeaters tab's link card both draw.
+//
 // Moved out of app.js byte-for-byte by M3 (#134) of #129. The physics was then
 // rebuilt on the Longley–Rice model and the land-cover layer — see pathAnalyse.
 
@@ -352,6 +355,67 @@ function pathMoreHtml(id, summary, body) {
       <summary>${summary}</summary>
       <div class="path-more-body">${body}</div>
     </details>`;
+}
+
+// ── The ground past each end ──────────────────────────────────────────────
+// The two profile charts — the Stations map's card (PathProfile) and the
+// Repeaters tab's link card — used to stop dead at the two antennas, so what
+// an end stands on, the brow it is set back from or the slope falling away
+// behind it, could not be seen. So a short stretch past each end is fetched
+// too, on along the line's own bearing there: 5% of the path each side, never
+// less than 250 m (or 15% of a path too short for that) and never more than
+// 5 km, sampled about as finely as a profile of `samples` points samples the
+// path. It is ground to look at and nothing else: no analysis, fade margin or
+// signal sees it, and both charts draw it under a veil (PATH_BEYOND_MEANING).
+//
+// Asked for alongside the profile and waited for with it, so a chart is drawn
+// once at its final scale instead of shifting sideways when this lands.
+// Resolves — never rejects — to { a, b }, each side's samples ({ past, h, lat,
+// lon }, `past` metres beyond its end, farthest first on A's side and last on
+// B's, the end itself left out), or to null when neither side could be had:
+// the chart then ends at the antennas, as it did.
+function pathBeyond(pts, samples) {
+  if (!pts || pts.length < 2 || typeof Terrain === 'undefined') return Promise.resolve(null);
+  let D = 0;
+  for (let i = 1; i < pts.length; i++) D += acmaHaversineKm(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]) * 1000;
+  const e = Math.min(5000, Math.max(0.05 * D, Math.min(250, 0.15 * D)));
+  if (!(e > 1)) return Promise.resolve(null);
+  const n = Math.max(6, Math.min(64, Math.round(e / (D / ((samples || 256) - 1))) + 1));
+  // On from `end`, away from the vertex next to it.
+  const past = (end, next) => destPoint(end[0], end[1], (bearingDeg(end[0], end[1], next[0], next[1]) + 180) % 360, e / 1000);
+  const A = pts[0], B = pts[pts.length - 1];
+  const side = (prof, far) => (prof && prof.ok ? prof.distance_m.map((d, i) => ({
+    past: far ? prof.distance_m[prof.distance_m.length - 1] - d : d,
+    h: prof.terrain_m[i], lat: prof.lat[i], lon: prof.lon[i],
+  })) : []);
+  return Promise.all([
+    Terrain.profile([past(A, pts[1]), A], n),
+    Terrain.profile([B, past(B, pts[pts.length - 2])], n),
+  ]).then(([pa, pb]) => {
+    const a = side(pa, true).slice(0, -1), b = side(pb, false).slice(1);
+    return a.some(q => q.h != null) || b.some(q => q.h != null) ? { a, b } : null;
+  }).catch(() => null);
+}
+
+// pathBeyond's samples laid out along a path D metres long on the k-earth
+// the path was analysed on: `d1` from A (negative past A, over D past B), the
+// earth's bulge there — d1·d2/(2ka), negative out here because past the ends
+// the planet falls away under the line between them — and the ground with it.
+// `padA`/`padB` are how far each side reaches, `all` both sides in order, and
+// `sink` the lowest bulge (0 or less), which is how far a chart lowers its
+// floor so its curvature arc can follow the earth down past the ends and still
+// stand where it always has under the path. by null gives empty sides.
+function pathBeyondOn(by, D, k) {
+  const at = (q, end) => {
+    const d1 = end === 'A' ? -q.past : D + q.past;
+    const bulge = earthBulge(d1, D - d1, k);
+    return { d1, bulge, ground: q.h, bulged: q.h == null ? null : q.h + bulge, lat: q.lat, lon: q.lon, past: q.past, beyond: end };
+  };
+  const a = by ? by.a.map(q => at(q, 'A')) : [];
+  const b = by ? by.b.map(q => at(q, 'B')) : [];
+  const all = [...a, ...b];
+  return { a, b, all, padA: a.length ? a[0].past : 0, padB: b.length ? b[b.length - 1].past : 0,
+           sink: all.reduce((m, p) => Math.min(m, p.bulge), 0) };
 }
 
 // ── The ground a path is priced over ─────────────────────────────────────────
@@ -671,8 +735,8 @@ const PATH_LOS_MEANING = 'The line of sight between the two antennas, read off t
   + 'first Fresnel zone), partly clear (ground or cover inside it but under the straight line) or obstructed (above the line). '
   + 'It describes the geometry; the margin beside it says whether the link works.';
 
-// What the faded ground either side of the profile chart is (PathProfile's
-// beyondFor). On the chart's key and in the card's list of words.
+// What the faded ground either side of a profile chart is (pathBeyond). On
+// both charts' keys and in both cards' lists of words.
 const PATH_BEYOND_MEANING = 'The ground for a short way past each antenna, on along the same line — 5% of the path each '
   + 'side, at least 250 m and at most 5 km — so you can see what each end stands on: a brow, a slope, a valley behind it. '
   + 'Drawn faded because it is only for looking at: no figure on the card is worked out from it.';
@@ -847,50 +911,6 @@ const PathProfile = (function () {
   // Called on every draw-panel re-render. Cheap when nothing moved: the
   // signature is the debounce, so dragging a line out costs nothing and only a
   // finished (or edited, or re-selected) line fetches terrain.
-  // ── the ground past each end ──────────────────────────────────────────────
-  // The chart used to stop dead at the two antennas, so what an end stands on
-  // — the brow it is set back from, the slope falling away behind it — could
-  // not be seen. So a short stretch past each end is fetched too, on along the
-  // line's own bearing there: 5% of the path each side, never less than 250 m
-  // (or 15% of a path too short for that) and never more than 5 km, sampled
-  // about as finely as the path itself. It is ground to look at and nothing
-  // else: the analysis, the fade margin, the signal and the second opinion
-  // never see it, and the chart draws it under a veil (PATH_BEYOND_MEANING).
-  //
-  // Asked for alongside the profile and waited for with it, so the chart is
-  // drawn once at its final scale instead of shifting sideways when this
-  // lands. Resolves — never rejects — to { a, b } (each side's samples, `past`
-  // metres beyond its end, farthest first on A's side and last on B's) or to
-  // null when neither side could be had: the chart then ends at the antennas,
-  // as it did.
-  const BEYOND_FRAC = 0.05, BEYOND_MIN_M = 250, BEYOND_MAX_M = 5000;
-  function beyondReach(D) {
-    return Math.min(BEYOND_MAX_M, Math.max(BEYOND_FRAC * D, Math.min(BEYOND_MIN_M, 0.15 * D)));
-  }
-  function beyondFor(pts) {
-    if (!pts || pts.length < 2) return Promise.resolve(null);
-    let D = 0;
-    for (let i = 1; i < pts.length; i++) D += acmaHaversineKm(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]) * 1000;
-    const e = beyondReach(D);
-    if (!(e > 1)) return Promise.resolve(null);
-    const n = Math.max(6, Math.min(64, Math.round(e / (D / (SAMPLES - 1))) + 1));
-    // On from `end`, away from the vertex next to it.
-    const past = (end, next) => destPoint(end[0], end[1], (bearingDeg(end[0], end[1], next[0], next[1]) + 180) % 360, e / 1000);
-    const A = pts[0], B = pts[pts.length - 1];
-    const side = (prof, far) => (prof && prof.ok ? prof.distance_m.map((d, i) => ({
-      past: far ? prof.distance_m[prof.distance_m.length - 1] - d : d,
-      h: prof.terrain_m[i], lat: prof.lat[i], lon: prof.lon[i],
-    })) : []);
-    return Promise.all([
-      Terrain.profile([past(A, pts[1]), A], n),
-      Terrain.profile([B, past(B, pts[pts.length - 2])], n),
-    ]).then(([pa, pb]) => {
-      // Each without the end itself, which is the profile's own first or last sample.
-      const a = side(pa, true).slice(0, -1), b = side(pb, false).slice(1);
-      return a.some(s => s.h != null) || b.some(s => s.h != null) ? { a, b } : null;
-    }).catch(() => null);
-  }
-
   function sync() {
     const sh = target();
     const sig = sigOf(sh);
@@ -913,7 +933,7 @@ const PathProfile = (function () {
           return { lat: sh.pts[i][0], lon: sh.pts[i][1], elev: e.elev, agl: e.agl, mast: !!(e.station && stationIsMast(e.station)) };
         }), { samples: SAMPLES, freqMhz: freqFor(endpoint(sh, 0), endpoint(sh, 1)) })
       : Terrain.profile(sh.pts, SAMPLES).then(res => (res.ok ? { ok: true, prof: res, lidar: null, ends: null } : res));
-    Promise.all([ask, beyondFor(sh.pts)]).then(([res, beyond]) => {
+    Promise.all([ask, pathBeyond(sh.pts, SAMPLES)]).then(([res, beyond]) => {
       if (cur.sig !== mine) return;                 // the line moved on while we fetched
       cur.status = res.ok ? 'ready' : 'failed';
       cur.prof   = res.ok ? res.prof : null;
@@ -1189,21 +1209,9 @@ const PathProfile = (function () {
     const iw = W - L - R, ih = H - T - B;
     const D  = an.D;
 
-    // The ground past each end (beyondFor), when this is the card's own
-    // profile: on the same earth as the path, so its bulge is the same
-    // d1·d2/(2ka) — negative out here, because past the ends the planet falls
-    // away under the line between them.
-    const by = cur.prof === prof && cur.beyond ? cur.beyond : null;
-    const outside = (s, end) => {
-      const d1 = end === 'A' ? -s.past : D + s.past;
-      const bulge = earthBulge(d1, D - d1, an.k);
-      return { d1, bulge, ground: s.h, bulged: s.h == null ? null : s.h + bulge, lat: s.lat, lon: s.lon, past: s.past, beyond: end };
-    };
-    const extA = by ? by.a.map(s => outside(s, 'A')) : [];
-    const extB = by ? by.b.map(s => outside(s, 'B')) : [];
-    const ext = [...extA, ...extB];
-    const padA = extA.length ? extA[0].past : 0;
-    const padB = extB.length ? extB[extB.length - 1].past : 0;
+    // The ground past each end (pathBeyond), when this is the card's own
+    // profile, laid out on the same earth as the path (pathBeyondOn).
+    const { a: extA, b: extB, all: ext, padA, padB, sink } = pathBeyondOn(cur.prof === prof ? cur.beyond : null, D, an.k);
 
     // Everything that has to fit: ground with its curvature bulge, the cover on
     // it, both antennas, and the top of the Fresnel envelope.
@@ -1219,10 +1227,8 @@ const PathProfile = (function () {
     for (const p of ext) if (p.bulged != null) { lo = Math.min(lo, p.bulged); hi = Math.max(hi, p.bulged); }
     if (!isFinite(lo) || !isFinite(hi)) return '';
     const pad = Math.max(20, (hi - lo) * 0.1);
-    // The floor goes down by as far as the earth falls away past the ends, so
-    // the curvature arc can follow it down there and still stand where it
-    // always has under the path (see `earth`).
-    const sink = ext.reduce((m, p) => Math.min(m, p.bulge), 0);
+    // The floor goes down by as far as the earth falls away past the ends
+    // (`sink`, pathBeyondOn), so the curvature arc follows it down there.
     lo -= pad - sink; hi += pad;
 
     // How much more the chart stretches heights than distances. Said in the
@@ -3962,7 +3968,7 @@ const PathProfile = (function () {
       const r = svg.getBoundingClientRect();
       if (!r.width) return;
       const ux = (ev.clientX - r.left) * (g.W / r.width);
-      // Measured from A across to B: the plot runs on past both (beyondFor).
+      // Measured from A across to B: the plot runs on past both (pathBeyond).
       hoverAt((ux - g.xA) / ((g.xB - g.xA) || 1) * g.D);
     },
 

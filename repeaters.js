@@ -132,6 +132,8 @@ const Repeaters = (() => {
       pathCard: 'The ground between the two sites, cut along the straight line joining them with the curve of the earth added, and what the signal gains and loses on its way from one antenna to the other. A model of the path, not a measurement of it.',
       verdict: 'Read off the picture, and a description of the geometry rather than a verdict on the link — the fade margin is that. Clear: nothing on the ground reaches the 60% Fresnel zone the whole way. Partly clear: ground or trees reach into it but stay under the line of sight, as on most long VHF paths. Obstructed: they rise above the line of sight, and the signal bends over them. The path loss counts what either costs.',
       fresnel: 'The space round the straight line between the two antennas that the signal needs clear to arrive at full strength — fattest half way along. Ground or trees reaching into 60% of it start to cost signal.',
+      beyond: typeof PATH_BEYOND_MEANING !== 'undefined' ? PATH_BEYOND_MEANING
+        : 'The ground for a short way past each antenna, on along the same line, so you can see what each end stands on. Drawn faded: no figure on the card is worked out from it.',
       fade: `How far the signal arriving is above the weakest the receiver can decode (its RX threshold), in decibels, by the model. ${fadeGood()} dB or more is good; ${fadeOk()} to ${fadeGood()} is marginal — growth, rain or a season could eat it; under ${fadeOk()} is poor.`,
       eirp: 'The power leaving the transmitting antenna: the radio\'s TX power, plus the antenna\'s gain, less what the cable up to it loses.',
       fspl: 'What the signal loses spreading out over the distance, as though nothing stood in the way.',
@@ -158,6 +160,7 @@ const Repeaters = (() => {
     ['layElev', 'Ground height as colour'], ['layCouncils', 'Council areas (LGA boundaries)'], ['layShade', 'Shade each council area'],
     ['layHubs', 'Maintenance hubs'], ['layBasins', 'River catchments'],
     ['pathCard', 'Ground profile and link budget'], ['verdict', 'Clear, Partly clear, Obstructed'], ['fresnel', '60% Fresnel zone'],
+    ['beyond', 'Ground past each end'],
     ['fade', 'Fade margin'], ['eirp', 'EIRP'], ['fspl', 'Free-space loss'], ['terrain', 'Terrain'], ['stats', 'Statistics'],
     ['floor', 'Obstruction floor'], ['allowance', 'Field allowance'], ['clutter', 'Ground cover'], ['pathLoss', 'Path loss'],
     ['received', 'Received signal'], ['threshold', 'RX threshold'],
@@ -1293,14 +1296,21 @@ const Repeaters = (() => {
     if (P.sig === sig) return;
     const mine = ++S.pathGen;
     const stale = () => mine !== S.pathGen || S.path !== P;
-    Object.assign(P, { sig, status: 'loading', stage: 'ground', prof: null, an: null, lidar: null, error: '', cover: 'off', coverError: '' });
+    Object.assign(P, { sig, status: 'loading', stage: 'ground', prof: null, an: null, lidar: null, beyond: null, error: '', cover: 'off', coverError: '' });
     drawPath();
     const fMhz = radioFreq(a, b);
     const ra = endRadio(a), rb = endRadio(b);
     const end = (s, r) => ({ lat: s.lat, lon: s.lon, elev: s.elevation_ahd != null ? Number(s.elevation_ahd) : null, agl: r.agl, mast: stationIsMast(s) });
+    // The ground a little way past each end, for the chart to show what each
+    // end stands on (path-profile.js's pathBeyond) — asked for alongside the
+    // path's own and never priced.
+    const beyond = typeof pathBeyond === 'function'
+      ? pathBeyond([[a.lat, a.lon], [b.lat, b.lon]], PATH_SAMPLES) : Promise.resolve(null);
     let got;
     try { got = await pathGround(end(a, ra), end(b, rb), { samples: PATH_SAMPLES, freqMhz: fMhz }); }
     catch (err) { got = { ok: false, error: (err && err.message) || String(err) }; }
+    if (stale()) return;
+    P.beyond = got && got.ok ? await beyond : null;
     if (stale()) return;
     if (!got || !got.ok) { Object.assign(P, { status: 'failed', error: (got && got.error) || 'No terrain.' }); drawPath(); return; }
     // The cover as the profile card takes it: when its switch is on, and not
@@ -1414,7 +1424,7 @@ const Repeaters = (() => {
         : `Reading the ground along ${esc(fmtKm(pp.km))} of path…`}</p>`;
     } else {
       body = `
-        <div class="rptr-path-chart">${pathChartSvg(an, P.prof, a, b)}</div>
+        <div class="rptr-path-chart">${pathChartSvg(an, P.prof, a, b, P.beyond)}</div>
         <div class="rptr-path-grid">
           <div>${budgetHtml(an, ways, a, b)}</div>
           <div>${pathFactsHtml(pp, an, P)}</div>
@@ -1567,12 +1577,17 @@ const Repeaters = (() => {
   // ground with the earth's curve added, the land cover stood on it, the line
   // of sight and the 60% Fresnel zone round it, red where something reaches
   // into the zone — in the same colours, at this card's width. The heights
-  // are stretched against the distances, and the key says by how much.
-  function pathChartSvg(an, prof, a, b) {
+  // are stretched against the distances, and the key says by how much. And,
+  // like that card, a little way past each end (`by`, path-profile.js's
+  // pathBeyond), faded: the ground each end stands on, for looking at only.
+  function pathChartSvg(an, prof, a, b, by) {
     const W = Math.round(Math.max(320, Math.min(1600, S.pathW || 920)));
     const H = Math.round(Math.min(320, Math.max(200, W * 0.3)));
     const fs = 11, L = 52, R = 14, T = 24, B = 30;
     const iw = W - L - R, ih = H - T - B, D = an.D;
+    const out = typeof pathBeyondOn === 'function' ? pathBeyondOn(by || null, D, an.k)
+      : { a: [], b: [], all: [], padA: 0, padB: 0, sink: 0 };
+    const ext = out.all;
     let lo = Infinity, hi = -Infinity;
     for (const p of an.pts) {
       if (p.bulged != null) { lo = Math.min(lo, p.bulged); hi = Math.max(hi, p.bulged); }
@@ -1580,14 +1595,21 @@ const Repeaters = (() => {
       hi = Math.max(hi, p.los + 0.6 * p.r1);
       lo = Math.min(lo, p.los - 0.6 * p.r1);
     }
+    for (const p of ext) if (p.bulged != null) { lo = Math.min(lo, p.bulged); hi = Math.max(hi, p.bulged); }
     if (!isFinite(lo) || !isFinite(hi) || !(D > 0)) return '';
     const pad = Math.max(20, (hi - lo) * 0.1);
-    lo -= pad; hi += pad;
-    const x = d => L + (d / D) * iw;
+    // The floor lowered by as far as the earth falls away past the ends, so the
+    // curvature arc can follow it down there (pathBeyondOn's `sink`).
+    lo -= pad - out.sink; hi += pad;
+    // Along, from the far end of the ground past A to the far end of the
+    // ground past B: A and B stand a little in from the plot's edges.
+    const pxm = iw / (D + out.padA + out.padB);       // pixels per metre along
+    const x = d => L + (d + out.padA) * pxm;
     const y = m => T + (1 - (m - lo) / (hi - lo)) * ih;
     const xy = (d, m) => `${x(d).toFixed(1)},${y(m).toFixed(1)}`;
     const base = (T + ih).toFixed(1);
-    const pts = thinIdx(an.pts, D, iw).map(i => an.pts[i]);
+    const xA = x(0), xB = x(D);
+    const pts = thinIdx(an.pts, D, xB - xA).map(i => an.pts[i]);
 
     const sky = `<rect x="${L}" y="${T}" width="${iw}" height="${ih}" fill="var(--profile-sky)" stroke="var(--border)" stroke-width="1"/>`;
     // Gridlines on round heights.
@@ -1606,8 +1628,34 @@ const Repeaters = (() => {
       if (p.bulged == null) { if (run.length) runs.push(run); run = []; } else run.push(p);
     }
     if (run.length) runs.push(run);
-    const ground = runs.map(r => `<path d="M${x(r[0].d1).toFixed(1)},${base} L${r.map(p => xy(p.d1, p.bulged)).join(' L')} L${
-      x(r[r.length - 1].d1).toFixed(1)},${base} Z" fill="var(--terrain-fill)" stroke="var(--terrain-line)" stroke-width="1"/>`).join('');
+    // Filled, with the line along its top drawn on its own: an outline round
+    // the whole area would stand a wall at each antenna, now that the plot
+    // runs on past them.
+    const groundOf = (r, cls) => {
+      const top = r.map(p => xy(p.d1, p.bulged));
+      return `<path${cls ? ` class="${cls}"` : ''} d="M${x(r[0].d1).toFixed(1)},${base} L${top.join(' L')} L${
+        x(r[r.length - 1].d1).toFixed(1)},${base} Z" fill="var(--terrain-fill)" stroke="none"/>
+        <polyline points="${top.join(' ')}" fill="none" stroke="var(--terrain-line)" stroke-width="1"/>`;
+    };
+    const ground = runs.map(r => groundOf(r)).join('');
+    // The ground past each end, joined to the path's own end sample so the
+    // two meet without a step, and a veil over the plot past each antenna.
+    const sideRuns = side => {
+      const rs = [];
+      let r = [];
+      for (const p of side) {
+        if (p.bulged == null) { if (r.length) rs.push(r); r = []; } else r.push(p);
+      }
+      if (r.length) rs.push(r);
+      return rs.filter(q => q.length > 1);
+    };
+    const beyondGround = [
+      ...(out.a.length ? sideRuns([...out.a, an.pts[0]]) : []),
+      ...(out.b.length ? sideRuns([an.pts[an.pts.length - 1], ...out.b]) : []),
+    ].map(r => groundOf(r, 'path-beyond-ground')).join('');
+    const veil = !ext.length ? '' : [[L, xA], [xB, L + iw]].filter(([p, q]) => q - p > 1).map(([p, q]) => `
+      <rect class="path-beyond" x="${(p + 0.5).toFixed(1)}" y="${T + 0.5}" width="${(q - p - 1).toFixed(1)}" height="${ih - 1}"
+            fill="var(--panel)" opacity=".45" pointer-events="none"/>`).join('');
     // What stands on it: a band a class at a time, in the class's colour.
     const bands = [];
     const present = [];
@@ -1634,8 +1682,11 @@ const Repeaters = (() => {
       flush();
     }
     // The planet's curve along the bottom, drawn to the chart's own scale.
-    const arc = pts.filter(p => p.bulge != null).map(p => xy(p.d1, lo + p.bulge));
-    const earth = arc.length < 2 ? '' : `<path d="M${x(0).toFixed(1)},${base} L${arc.join(' L')} L${x(D).toFixed(1)},${base} Z"
+    // Past the ends it carries on down to the floor, which was lowered by just
+    // that much, so under the path it stands where it always has.
+    const arcPts = [...out.a, ...pts, ...out.b].filter(p => p.bulge != null);
+    const arc = arcPts.map(p => xy(p.d1, lo - out.sink + p.bulge));
+    const earth = arc.length < 2 ? '' : `<path d="M${x(arcPts[0].d1).toFixed(1)},${base} L${arc.join(' L')} L${x(arcPts[arcPts.length - 1].d1).toFixed(1)},${base} Z"
         fill="var(--profile-earth)" stroke="none"/><polyline points="${arc.join(' ')}" fill="none" stroke="var(--profile-earth-line)" stroke-width="1.5"/>`;
     const sag = pts.reduce((m, p) => (p.bulge > m ? p.bulge : m), 0);
     // Red where the ground or what is on it reaches into the 60% zone.
@@ -1661,14 +1712,14 @@ const Repeaters = (() => {
             stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="3 3"/>
       <circle cx="${x(w.d1).toFixed(1)}" cy="${y(w.surfBulged).toFixed(1)}" r="3.5" fill="var(--bad)"/>` : '';
     const ticks = (iw >= 1100 ? [0, .125, .25, .375, .5, .625, .75, .875, 1] : [0, .25, .5, .75, 1]).map(f => `
-      <text x="${x(D * f).toFixed(1)}" y="${H - 10}" font-size="${fs}" text-anchor="${f === 0 ? 'start' : f === 1 ? 'end' : 'middle'}"
+      <text x="${x(D * f).toFixed(1)}" y="${H - 10}" font-size="${fs}" text-anchor="${f === 0 && xA - L < 12 ? 'start' : f === 1 && W - xB < 30 ? 'end' : 'middle'}"
             style="fill:var(--muted)">${esc(fmtKm(D * f / 1000))}</text>`).join('');
     // The two ends named over the plot, each kept to its own half.
     const room = Math.max(6, Math.floor((iw / 2 - 10) / (fs * 0.58)));
     const cut = s => (s.length > room ? s.slice(0, room - 1) + '…' : s);
     const names = `<text x="${L}" y="${T - 8}" font-size="${fs}" font-weight="600" text-anchor="start" style="fill:var(--text)">${esc(cut(a.name))}</text>
       <text x="${W - R}" y="${T - 8}" font-size="${fs}" font-weight="600" text-anchor="end" style="fill:var(--text)">${esc(cut(b.name))}</text>`;
-    const stretch = (ih / (hi - lo)) / (iw / D);
+    const stretch = (ih / (hi - lo)) / pxm;
     const V = PATH_VERDICT[an.verdict] || { label: an.verdict };
     const said = w && w.clearance != null
       ? (w.clearance >= 0 ? `, worst clearance ${Math.round(w.clearance)} m under the line at ${fmtKm(w.d1 / 1000)}`
@@ -1679,9 +1730,10 @@ const Repeaters = (() => {
       return `<span><i class="path-key-cover" style="--dot:${LandCover.colourVar(c)}"></i> ${esc(cl ? cl.label : String(c))}${h != null ? ` · ${h} m` : ''}</span>`;
     }).join('');
     return `
-      <svg viewBox="0 0 ${W} ${H}" class="path-chart" role="img"
-           aria-label="${escAttr(`Ground profile over ${fmtKm(D / 1000)} from ${a.name} to ${b.name} — ${V.label}${said}. The figures are listed under the chart.`)}">
-        ${sky}${grid.join('')}${radio}${ground}${bands.join('')}${earth}${obstruction}${marker}${masts}
+      <svg viewBox="0 0 ${W} ${H}" class="path-chart" role="img" data-a-x="${xA.toFixed(1)}" data-b-x="${xB.toFixed(1)}"
+           aria-label="${escAttr(`Ground profile over ${fmtKm(D / 1000)} from ${a.name} to ${b.name} — ${V.label}${said}${ext.length
+             ? `, with the ground for ${fmtKm(Math.max(out.padA, out.padB) / 1000)} past each end drawn faded, for context` : ''}. The figures are listed under the chart.`)}">
+        ${sky}${grid.join('')}${radio}${ground}${beyondGround}${bands.join('')}${earth}${veil}${obstruction}${marker}${masts}
         <line x1="${L}" y1="${base}" x2="${W - R}" y2="${base}" stroke="var(--muted)" stroke-width="1"/>
         ${ticks}${names}
       </svg>
@@ -1691,6 +1743,8 @@ const Repeaters = (() => {
         <span><i class="path-key-gnd"></i> Ground (curvature k=${an.k.toFixed(2)} included)</span>
         ${earth ? `<span><i class="path-key-earth"></i> Earth curvature${sag > 0.5 ? ` · ${Math.round(sag)} m at mid-path` : ''}</span>` : ''}
         <span><i class="path-key-obs"></i> Inside the Fresnel zone</span>
+        ${ext.length ? `<span><i class="path-key-beyond"></i> ${term('beyond', 'Ground past each end')} · ${
+          esc(fmtKm(Math.max(out.padA, out.padB) / 1000))}, for context</span>` : ''}
         <span><i class="path-key-mast"></i> Antennas</span>
         ${coverKey}
         <span>Heights drawn ×${stretch >= 10 ? Math.round(stretch) : stretch.toFixed(1)} against distances</span>
