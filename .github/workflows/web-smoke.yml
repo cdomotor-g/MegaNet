@@ -1293,6 +1293,14 @@ jobs:
         working-directory: test
         run: npm run frequencies
 
+      # The banner that names the Stations map's mode (map-mode.js): each mode
+      # says what a click does now, and ✕ or Escape leaves it — one press, one
+      # thing, a dialog and full screen keeping theirs.
+      - name: Map mode — the map says which mode it is in, and ✕ or Escape leaves it
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run mapmode
+
       # The site exposure section on the station card (site-exposure.js): tidal
       # water, the Water Act's downstream limits, the coastal hazard areas and
       # acid sulfate soils, from the Queensland Government's map services, which

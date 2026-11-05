@@ -4109,6 +4109,9 @@ function renderStationsHtml() {
             the same list in both places.
           </p>
           <div id="map-note" class="map-note" hidden></div>
+          <!-- The mode the map is in, while it is in one (map-mode.js): what a
+               click does now, and ✕ / Escape to leave. -->
+          <div id="map-mode" class="map-mode" role="group" aria-label="Map mode" hidden></div>
           <div id="acma-card" class="acma-card" hidden></div>
           <!-- The Stations map's own card (#175): the station under the last
                pin click or row selection, bottom-left. Stations-only markup
@@ -6369,6 +6372,7 @@ function stopStationsMap() {
   // First, and before the container it drew into goes: a twin up in the map
   // is a WebGL context that must not outlive the map (map-twin.js).
   MapTwin.detach();
+  MapMode.detach();
   // The pill over the map's stage goes with the stage; the trail is kept.
   StationTrail.detach();
   MapSpider.detach();
@@ -6681,6 +6685,10 @@ function initMap() {
   // outlined on it (map-mini.js). Before the first refresh, which re-fits this
   // map and so moves the outline, and which asks it for its stations.
   MapMini.attach(state.map);
+  // The banner naming the mode the map is in, if it is in one (map-mode.js):
+  // after every module whose mode it names, so a mode that survives the
+  // rebuild (a draw tool, site features) is named on the new map at once.
+  MapMode.attach(state.map);
   // Shapes survive a tab switch, so a line drawn earlier still has a profile to
   // show on the map that has just been rebuilt.
   PathProfile.sync();

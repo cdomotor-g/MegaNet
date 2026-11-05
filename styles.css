@@ -5075,6 +5075,75 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   pointer-events: none;
 }
 
+/* The mode the map is in (map-mode.js): the row under the top row — the zoom
+   buttons, the station trail and ↺, with #map-note centred over it — the
+   width the twin's offer is. Over the Leaflet controls and the note, under
+   the cards. Accent-edged, so it
+   reads as the map's state rather than one more passing note. */
+.map-mode {
+  position: absolute;
+  top: 3.1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1060;
+  width: max-content;
+  max-width: calc(100% - 8.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  pointer-events: auto;
+}
+.map-mode[hidden] { display: none; }
+.map-mode-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: .25rem .3rem .25rem .8rem;
+  border: 2px solid var(--accent);
+  border-radius: 1.2rem;
+  background: var(--panel);
+  color: var(--text);
+  font-size: .82rem;
+  line-height: 1.35;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .3);
+}
+.map-mode-what { flex: 1 1 auto; min-width: 0; }
+.map-mode-esc { flex: none; color: var(--muted); white-space: nowrap; font-size: .78rem; }
+.map-mode-esc kbd {
+  font: inherit;
+  padding: 0 .3rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.map-mode-x {
+  flex: none;
+  min-width: 2rem;
+  min-height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.map-mode-x:hover { border-color: var(--accent); }
+.map-mode-x:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The note — the draw tools' how-to, the passing "Pin left where it was." —
+   goes just under the banner, and the twin's offer stands down until the mode
+   ends, as it already does while site features are armed (map-twin.js). */
+.has-map-mode .map-note { top: calc(3.1rem + var(--map-mode-h, 2.4rem) + .4rem); }
+.has-map-mode .map-twin-offer { display: none; }
+/* A finger has no Escape key: ✕ is the way out, and a 44 px one. Under the
+   zoom buttons, the width of the map. */
+@media (hover: none) and (pointer: coarse) {
+  .map-mode-esc { display: none; }
+  .map-mode-x { min-width: 44px; min-height: 44px; }
+}
+@media (max-width: 560px) {
+  .map-mode { top: 4.9rem; max-width: calc(100% - 1rem); }
+  .has-map-mode .map-note { top: calc(4.9rem + var(--map-mode-h, 3rem) + .4rem); }
+}
+
 /* ── On-map control panels (#164) ────────────────────────────────────────────
    The Stations map's own furniture: base map, map display, draw & measure and
    the legend, as four icons stacked in the map's top-right corner. Built by

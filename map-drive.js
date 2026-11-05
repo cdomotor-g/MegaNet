@@ -444,12 +444,14 @@ const MapDrive = (function () {
     c.addEventListener('click', onPickClick, true);
     if (!keyHandler) { keyHandler = onKey; document.addEventListener('keydown', keyHandler, true); }
     repaint();
+    if (typeof MapMode !== 'undefined') MapMode.sync();   // the banner over the map
     announce('Click the map where the drive starts. Escape stops.');
   }
 
   function stopPicking() {
     if (!picking) return;
     picking = false;
+    if (typeof MapMode !== 'undefined') MapMode.sync();
     pickDown = null;
     if (map) {
       const c = map.getContainer();

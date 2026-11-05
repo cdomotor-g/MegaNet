@@ -875,6 +875,7 @@ const SiteFeatures = (function () {
     draw();
     repaintButtons();
     twinSync();
+    if (typeof MapMode !== 'undefined') MapMode.sync();
   }
 
   // The twin holds its offer while the mode is armed (map-twin.js asks
@@ -941,6 +942,7 @@ const SiteFeatures = (function () {
     if (d && line && d.drawing) map.doubleClickZoom.disable();
     else map.doubleClickZoom.enable();
     drawEdit();
+    if (typeof MapMode !== 'undefined') MapMode.sync();   // the banner over the map says which
   }
 
   // ── The draft on the map ───────────────────────────────────────────────────

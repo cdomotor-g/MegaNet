@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 215, date: '2026-11-05', items: [
+      '🏷️ <strong>The Stations map says when it is in a mode.</strong> While a click on the map does something other '
+        + 'than open a station — a ✏️ draw tool, moving a pin, site features, the link budget picking its ends, '
+        + 'ℹ️ What’s here, the 🎯 Best repeater pick or choosing where a drive starts — a banner under the zoom buttons '
+        + 'names it and says what a click does now. ✕ on it, or Escape, leaves the mode. What’s here and the Best '
+        + 'repeater pick now leave on Escape too.',
+    ] },
     { n: 214, date: '2026-11-05', items: [
       '🗂️ <strong>The station card\'s rows are one line each.</strong> On every tab the label sits in a column of its own and '
         + 'the answer beside it, starting at the same place on every row, with a line between rows. A long explanation is '

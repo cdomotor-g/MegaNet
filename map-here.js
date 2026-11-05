@@ -378,6 +378,9 @@ const MapHere = (function () {
   // ── Arming ─────────────────────────────────────────────────────────────────
 
   function syncCursor() {
+    // Every way the arm goes on or off comes through here: the banner over the
+    // map (map-mode.js).
+    if (typeof MapMode !== 'undefined') MapMode.sync();   // the banner over the map
     if (!map) return;
     map.getContainer().classList.toggle('mn-here-picking', armed);
   }

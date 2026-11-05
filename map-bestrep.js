@@ -1074,6 +1074,7 @@ const MapBestRepeater = (function () {
   }
 
   function syncArm() {
+    if (typeof MapMode !== 'undefined') MapMode.sync();   // the banner over the map
     if (map) map.getContainer().classList.toggle('mn-bestrep-picking', armed);
     const b = document.getElementById('bestrep-arm');
     if (b) {

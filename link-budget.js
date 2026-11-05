@@ -1320,6 +1320,8 @@ const LinkBudget = (function () {
   }
 
   function rerender() {
+    // Picking on or off, or the end it waits for: the banner over the map.
+    if (typeof MapMode !== 'undefined') MapMode.sync();
     const el = document.getElementById('link-budget-panel');
     if (!el) return;
     const d = el.querySelector(':scope > details.lb-panel');

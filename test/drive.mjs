@@ -585,9 +585,13 @@ try {
   await page.click('.mn-drive-panel .link-btn');
   await pressText(page, 'Click the map');
   const picking = await page.evaluate(() => MapDrive.picking() && state.map.getContainer().classList.contains('mn-drive-picking'));
+  const named = await page.evaluate(() => MapMode.shown().join() === 'drive'
+    && /Where does the drive start\?/.test(document.getElementById('map-mode').textContent));
   await page.keyboard.press('Escape');
   const stopped = await page.evaluate(() => !MapDrive.picking() && !state.map.getContainer().classList.contains('mn-drive-picking'));
+  const gone = await page.evaluate(() => !MapMode.shown().length && document.getElementById('map-mode').hidden);
   check('Click the map arms a pick with a crosshair, and Escape puts it down', picking && stopped);
+  check('…the banner over the map naming the pick while it is armed, and gone with it (map-mode.js)', named && gone, J({ named, gone }));
   await pressText(page, 'Click the map');
   const spot = await page.evaluate(() => {
     const r = document.getElementById('leaflet-map').getBoundingClientRect();

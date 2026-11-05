@@ -174,6 +174,7 @@ const MapMovePin = (function () {
     if (typeof Map3D !== 'undefined' && Map3D.movePinChanged) Map3D.movePinChanged();
     if (typeof DigitalTwin !== 'undefined' && DigitalTwin.movePinChanged) DigitalTwin.movePinChanged();
     repaintPanel();
+    if (typeof MapMode !== 'undefined') MapMode.sync();   // the banner over the map
   }
 
   function addPanel() {

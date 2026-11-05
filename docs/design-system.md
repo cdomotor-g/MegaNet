@@ -1019,6 +1019,24 @@ top row beside the corner's zoom buttons, and in the twin — whose corner stand
 down — at the top of the stage beside the flood scale. Anything else that wants
 words on a map still has to ask first.
 
+**The other: the mode banner.** While the Stations map is in a mode — a click on
+the map or on a pin does something other than open that station — the banner
+(`#map-mode`, `map-mode.js`) says which, what a click does now, and how to
+leave: ✕, or Escape. It has asked first in the sense that matters: somebody
+turned the mode on. The modes are a draw tool (which turns the pins off), moving
+a pin, site features, the link budget picking its ends (on whenever its card is
+open), What's here, the Best repeater pick and the drive's start; DriveMode has
+its own HUD. It is the row under the top row — zoom, station trail, ↺ — the
+width the twin's offer is; `#map-note` (a draw tool's how-to, a passing "Pin
+left where it was.") stands just under it, and the twin's offer stands down. On
+a phone it runs across the map under the zoom buttons, with a 44 px ✕ and no
+Escape hint. **A new mode** adds an entry to `MODES` in `map-mode.js` (what it
+says, its own way out, whether it already takes Escape) and calls
+`MapMode.sync()` where it goes on and off; `npm run mapmode` is the check. The
+banner takes Escape only for the modes that do not take it themselves, in the
+capture phase and with `preventDefault`, so one press does one thing: a dialog
+and full screen keep theirs.
+
 ### Full screen — fix the anchor, never reparent
 
 *(Added by the Stations map's ⛶ button.)* When a surface needs to become the

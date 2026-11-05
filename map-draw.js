@@ -806,6 +806,7 @@ const MapDraw = (function () {
     }
     mapNote(D_.tool ? DRAW_TOOLS[D_.tool].hint : '', 0);
     rerenderPanel();
+    if (typeof MapMode !== 'undefined') MapMode.sync();   // the banner over the map (map-mode.js)
     // The 3-D view's cursor, and its double-click zoom while a line is out.
     tell3d();
   }

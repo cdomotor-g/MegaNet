@@ -427,6 +427,10 @@ async function main() {
     check('…the site is close, and beside the panel rather than under it',
       armed.zoom >= 17 && armed.pinX > armed.panelRight, J(armed));
     check('…and the panel lists what is mapped', armed.rows === 1, J(armed));
+    const banner = await page.evaluate(() => ({ shown: MapMode.shown(),
+      text: document.getElementById('map-mode').textContent.replace(/\s+/g, ' ') }));
+    check('…and the banner over the map names it, and the station (map-mode.js)',
+      banner.shown.join() === 'sitefeatures' && banner.text.includes('Site features at '), J(banner));
 
     // ── 4. A pit ───────────────────────────────────────────────────────────
     log('\nA pit, placed with a click\n');
@@ -438,6 +442,9 @@ async function main() {
       d && d.kind === 'pit' && d.pts.length === 0, J(d));
     check('…and the map takes every click while a point is placed',
       await page.evaluate(() => state.map.getContainer().classList.contains('mn-sf-placing')));
+    check('…which the banner says: a click places the feature, and station pins are off',
+      await page.evaluate(() => /click the map where the feature is; station pins can’t be opened/.test(
+        document.getElementById('map-mode').textContent)));
     const p0 = await at(page, pin);
     await page.mouse.click(p0.x + 60, p0.y + 40);
     await page.waitForTimeout(150);
