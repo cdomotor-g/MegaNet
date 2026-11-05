@@ -3099,9 +3099,9 @@ const Map3D = (function () {
   // camera, quietly, whenever the camera stops — the operator's own drag, tilt
   // and zoom, and the follow's own ease. Without that, "where the 2-D map is"
   // would be wherever 3-D was opened, and three things read it:
-  //   * the callers above: focusStationOnMap goes to max(zoom, 11), and a stale
+  //   * the callers above: focusStationOnMap goes to max(zoom, 16), and a stale
   //     zoom of 4 pulled a camera the operator had brought down to a street
-  //     back out to 10;
+  //     back out (to 10, when a row asked for 11);
   //   * a move to where the 2-D map already stands is no move at all to
   //     Leaflet — a zero pan, with no movestart — so a row whose station the
   //     camera had panned away from would go nowhere the second time;
@@ -3166,11 +3166,12 @@ const Map3D = (function () {
   // The camera to where the 2-D map has gone, keeping the tilt and the heading,
   // which are the operator's. The zoom is the 2-D map's less one (build() says
   // why) — but only when the 2-D zoom actually changed. A move that kept it (a
-  // row at max(zoom, 11) from a camera already closer than that) keeps the
+  // row at max(zoom, 16) from a camera already closer than that) keeps the
   // camera's own zoom, rather than rounding it to Leaflet's whole steps. Eased
   // when the place is in view and jumped to when it is not, which is Leaflet's
-  // own rule for a pan, and never animated for someone who has asked for less
-  // motion.
+  // own rule for a pan; jumped to as well when the zoom changes by more than
+  // Leaflet animates (zoomAnimationThreshold, 4), which is its rule for a zoom;
+  // and never animated for someone who has asked for less motion.
   //
   // The ease freezes the terrain height under the camera for its length and
   // settles it at the end — `freezeElevation`, which is what MapLibre's own
@@ -3179,6 +3180,14 @@ const Map3D = (function () {
   // the ease was aimed, and after the next jump project() and unproject()
   // answer for ground that is not under them any more (a pin drawn at one
   // place is reported seven pixels from it) until somebody drags the map.
+  //
+  // The frozen height is the start's, though, and the end settles the ground
+  // under the camera without moving the camera: the place aimed at lands off
+  // the middle by however far the two heights are apart, in pixels of the
+  // zoom it lands at. From the whole country down to a row's zoom 16 that was
+  // a station 26 px off the middle (it was half a pixel at 11). A jump puts
+  // the centre on the ground where it is, so a zoom Leaflet would not animate
+  // is not animated here either.
   function follow() {
     if (!map || !leafletLive() || drive) return;
     const c = leaflet.getCenter(), z = leaflet.getZoom();
@@ -3188,7 +3197,8 @@ const Map3D = (function () {
     const still = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     lfQuiet = true;
     try {
-      if (still || !map.getBounds().contains(to.center)) map.jumpTo(to);
+      const far = Math.abs(zoom - map.getZoom()) > (leaflet.options.zoomAnimationThreshold ?? 4);
+      if (still || far || !map.getBounds().contains(to.center)) map.jumpTo(to);
       else map.easeTo({ ...to, duration: 500, freezeElevation: true });
     } finally { lfQuiet = false; }
   }

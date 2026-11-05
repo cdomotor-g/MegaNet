@@ -1673,8 +1673,8 @@ try {
     const s = state.data.stations.find(x => x.id === id);
     return { tab: state.activeTab, z: state.map.getZoom(), inView: state.map.getBounds().contains([s.lat, s.lon]) };
   }, fromTab);
-  check('a station opened from another tab (a Pass Ranges row) is where a phone\'s map lands: zoom 11 or closer, the station in view',
-    fromTabView.tab === 'stations' && fromTabView.z >= 11 && fromTabView.inView, JSON.stringify(fromTabView));
+  check('a station opened from another tab (a Pass Ranges row) is where a phone\'s map lands: zoom 16 or closer, the station in view',
+    fromTabView.tab === 'stations' && fromTabView.z >= 16 && fromTabView.inView, JSON.stringify(fromTabView));
   await page.evaluate((id) => { closeStnCard(false); selectStation(id); shutDock({ instant: true }); }, fromTab);
 
   // ── 8. No sideways scroll with the side panel open ───────────────────────

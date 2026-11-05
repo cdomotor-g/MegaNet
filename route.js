@@ -291,7 +291,7 @@ const Route = (() => {
           state.map.setView([want.map.lat, want.map.lng], want.map.z, { animate: false });
         }
       } else if (s && s.lat != null && s.lon != null) {
-        const z = Math.max(state.map.getZoom() || 0, 11);
+        const z = Math.max(state.map.getZoom() || 0, MAP_STATION_ZOOM);
         state.map.setView(MapLeader.centreFor(L.latLng(s.lat, s.lon), z), z, { animate: false });
       }
     } finally {

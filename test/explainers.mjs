@@ -528,12 +528,16 @@ try {
     pg.on('pageerror', e => errors.push(e.message));
     // A write: anything that is not a read, but for what the app does itself on
     // any tab a person opens — its session check, its log of tabs visited
-    // (rpc/log_visit) and the land-cover lookup ArcGIS takes as a POST.
+    // (rpc/log_visit), the land-cover lookup ArcGIS takes as a POST, and the
+    // bridges near a station Overpass is asked for as one (api/interpreter):
+    // a station opened lands at zoom 16, past the zoom from which the
+    // digital twin fetches its ground ahead (MapTwin.prefetchZoom).
     const writing = r => {
       const m = r.method(), u = r.url();
       if (m === 'GET' || m === 'HEAD' || m === 'OPTIONS') return false;
       if (m !== 'POST') return true;
-      if (/\/api\/session$/.test(new URL(u).pathname) || /\/rpc\/log_visit$/.test(u) || /\/ImageServer\/getSamples$/.test(u)) return false;
+      if (/\/api\/session$/.test(new URL(u).pathname) || /\/rpc\/log_visit$/.test(u) || /\/ImageServer\/getSamples$/.test(u)
+          || /^https:\/\/overpass[.-][^/]+\/api\/interpreter$/.test(u)) return false;
       return true;
     };
     pg.on('request', r => { if (writing(r)) writes.push(`${r.method()} ${r.url().slice(0, 100)}`); });

@@ -66,11 +66,12 @@
 const StationTrail = (function () {
   const KEY     = 'mn-stn-trail';
   const MAX     = 100;
-  // How far in a pick from the list goes, at least: a few kilometres across,
-  // the station and what is round it, and past the zoom from which a station
-  // under the view has its twin's ground fetched ahead (MapTwin.prefetchZoom).
-  // Closer already stays as close; in the twin it stays in the twin.
-  const ZOOM_IN = 15;
+  // How far in a pick from the trail goes, at least: as far as a pick from the
+  // station list (MAP_STATION_ZOOM, app.js — read when the pick is made), past
+  // the zoom from which a station under the view has its twin's ground fetched
+  // ahead (MapTwin.prefetchZoom). Closer already stays as close; in the twin
+  // it stays in the twin.
+  const zoomIn = () => (typeof MAP_STATION_ZOOM === 'number' ? MAP_STATION_ZOOM : 16);
   const GAP     = 8;       // px: --sp-2, the gap every control on the map keeps
   const DROP_REM = 19;     // the list's width, where the map has it: a long name and its number
 
@@ -329,7 +330,7 @@ const StationTrail = (function () {
     const twin = twinUp();
     const max = map.getMaxZoom();
     const cap = Number.isFinite(max) ? max : 19;
-    const z = Math.min(cap, Math.max(map.getZoom() || 0, twin ? MapTwin.zoom : ZOOM_IN));
+    const z = Math.min(cap, Math.max(map.getZoom() || 0, twin ? MapTwin.zoom : zoomIn()));
     if (twin) map.setView([s.lat, s.lon], z, { animate: false });
     else map.setView(MapLeader.centreFor(L.latLng(s.lat, s.lon), z), z);
     announce(`${s.name} — selected and on the map${twin ? ', in its digital twin' : ''}, with its card up.`);
@@ -414,7 +415,7 @@ const StationTrail = (function () {
     ids() { return load().slice(); },
     shownIds() { return shown().map(s => s.id); },
     isOpen() { return open; },
-    zoomIn: ZOOM_IN,
+    get zoomIn() { return zoomIn(); },
     max: MAX,
   };
 })();

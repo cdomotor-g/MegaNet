@@ -7982,7 +7982,7 @@ void main() {
         // twin's first choice of station (map-twin.js), so the far station
         // goes on it and the map moves there at this zoom: the move's end is
         // the hand-over to its twin. Not goToStation(), which rebuilds the
-        // tab and the map and lands at zoom 11.
+        // tab and the map and lands short of the twin (MAP_STATION_ZOOM).
         if (typeof showStationCard === 'function') showStationCard(s.id);
         if (typeof state !== 'undefined' && state.map) {
           const z = Math.max(state.map.getZoom(), typeof MapTwin !== 'undefined' ? MapTwin.zoom : 17);

@@ -6753,6 +6753,17 @@ const MAP_PIN_R_RPT   = 8;         // because the ACMA squares size off the fiel
                                    // pin — see ACMA_PIN_PX.
 const MAP_HOME      = [-25.6, 134.3];   // middle of Australia — the opening view,
                                         // replaced by a fit to whatever is plotted
+// How far in the map goes, at least, when a station is picked — from the
+// list, a search, another tab, the trail or a link (focusStationOnMap,
+// StationTrail, Route). Zoom 16 is about 2 m a pixel in Queensland, so a
+// 1,000 px map is two kilometres across: the site, its track and the paddocks
+// round it. It is the closest every base map still draws sharp — Dark and
+// Light stop at 16, the topo at 17, Satellite at 18, and past those the tiles
+// are stretched — and one short of 17, where the digital twin is offered
+// (map-twin.js); "Zoom to station" is the way all the way in. It was 11, a
+// 50 km view of the region, until the minimap in the corner took over showing
+// where in the region a station is.
+const MAP_STATION_ZOOM = 16;
 
 // Is any station filter narrowing things down? Every grouped filter keeps its
 // Set canonical (empty when everything is ticked), so "not empty" already means
@@ -8398,15 +8409,15 @@ function focusStationOnMap(s, opener = document.activeElement) {
   if (!state.map) return;
   showStationCard(s.id, { opener });
   if (s.lat == null || s.lon == null) return;
-  const zoom = Math.max(state.map.getZoom() || 0, 11);
+  const zoom = Math.max(state.map.getZoom() || 0, MAP_STATION_ZOOM);
   state.map.setView(MapLeader.centreFor(L.latLng(s.lat, s.lon), zoom), zoom);
 }
 
 // "Zoom to station" — the station centred at the closest zoom the map has,
 // wherever the map was. It used to fit a 50 km box of context round the
-// station, which is what "Show on the map" (focusStationOnMap, zoom 11) is
-// for; the pill is pressed to see the station itself, so it goes all the way
-// in. How far in is the base layers' to say — Leaflet's getMaxZoom() is the
+// station; a pick (focusStationOnMap) now lands close already, at
+// MAP_STATION_ZOOM, one short of the twin, and the pill is pressed to see the
+// station itself, so it goes all the way in. How far in is the base layers' to say — Leaflet's getMaxZoom() is the
 // deepest zoom of the layers on the map: 17 on the topo base, 19 on the
 // satellite, OpenStreetMap and dark ones — and from 17 in, with the station
 // under the view, the map offers the station's digital twin (map-twin.js),

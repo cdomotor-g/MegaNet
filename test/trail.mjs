@@ -242,13 +242,13 @@ async function main() {
     const after = await page.evaluate(id => {
       const s = state.data.stations.find(x => x.id === id);
       const b = state.map.getBounds();
-      return { sel: state.selectedId, card: state.stnCard.id, zoom: state.map.getZoom(), inView: b.contains([s.lat, s.lon]),
+      return { sel: state.selectedId, card: state.stnCard.id, zoom: state.map.getZoom(), want: MAP_STATION_ZOOM, inView: b.contains([s.lat, s.lon]),
                ids: StationTrail.ids(), open: StationTrail.isOpen(), focus: document.activeElement.id,
                row: !!document.querySelector(`#stations-table-wrap tr[data-sid="${CSS.escape(id)}"].selected, #stations-table-wrap tr[data-sid="${CSS.escape(id)}"][aria-selected="true"]`) || state.selectedId === id,
                editor: state.editorId };
     }, a);
     check('a pick selects the station — the list and the editor with it', after.sel === a && after.editor === a, J(after));
-    check('…puts its card up and the map on it, zoomed in', after.card === a && after.inView && after.zoom >= 15, J(after));
+    check('…puts its card up and the map on it, as close as a pick from the list (zoom 16)', after.card === a && after.inView && after.want === 16 && after.zoom === after.want, J(after));
     check('…moves it to the head of the trail', after.ids[0] === a && after.ids.length === 4, J(after.ids));
     check('…and puts the list away, focus on the pill', !after.open && after.focus === 'stn-trail-pill', J(after));
     const zNow = await page.evaluate(() => { state.map.setZoom(17, { animate: false }); return state.map.getZoom(); });

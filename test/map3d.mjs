@@ -2433,17 +2433,19 @@ if (SA && SB && SC) {
   ok('a row of the station list takes the camera to its station', at(v1),
      `${SA.name}: ${Math.round(v1.off)} px from the middle of the view`);
   ok('…at the zoom the 2-D map went to, less the one step the two scales differ by',
-     near(v1.zoom, v1.lf.zoom - 1, 0.3) && v1.lf.zoom >= 11, JSON.stringify(v1));
+     near(v1.zoom, v1.lf.zoom - 1, 0.3) && v1.lf.zoom >= 16, JSON.stringify(v1));
   ok('…keeping the tilt and the heading the operator chose',
      near(v1.pitch, 55, 0.5) && near(v1.bearing, 25, 0.5), `${v1.pitch}°, ${v1.bearing}°`);
 
   // The operator brings the camera down closer than a row would put it. A row
-  // then keeps that zoom rather than pulling the camera back out to 11.
-  await page.evaluate(() => Map3D._map().jumpTo({ zoom: 13.4 }));
+  // then keeps that zoom rather than pulling the camera back out — 15.4 is
+  // the 2-D map's 16 (MAP_STATION_ZOOM, what a row asks for) to Leaflet, and
+  // a step closer than the 15 a row puts the camera at.
+  await page.evaluate(() => Map3D._map().jumpTo({ zoom: 15.4 }));
   await settle3();
   const v2 = await view3();
   ok('the 2-D map keeps up with the camera: same place, the zoom a step closer',
-     v2.lfOff <= 2 && v2.lf.zoom === 14, JSON.stringify(v2));
+     v2.lfOff <= 2 && v2.lf.zoom === 16, JSON.stringify(v2));
   await page.evaluate(id => selectStation(id), SB.id);
   await settle3();
   const v3 = await view3(SB);
@@ -2452,7 +2454,7 @@ if (SA && SB && SC) {
   // Near rather than equal: an ease settles the ground height under the camera
   // when it lands, and the zoom is re-read against it.
   ok('…and keeps the camera\'s own zoom, which was already closer than the row asks for',
-     near(v3.zoom, 13.4, 0.3) && v3.zoom > 13, String(v3.zoom));
+     near(v3.zoom, 15.4, 0.3) && v3.zoom > 15, String(v3.zoom));
 
   // Panned away by hand, then the same station asked for again (off, and on):
   // to a 2-D map left where the row put it, that is a pan of nothing.

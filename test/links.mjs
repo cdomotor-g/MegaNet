@@ -383,7 +383,7 @@ async function main() {
                  q: new URLSearchParams(location.search).get('tab') };
       }, B.id);
       check('a station alone means the Stations tab, its card up and the station in view, close in',
-        s.tab === 'stations' && s.q === 'stations' && s.inView && s.z >= 11, J(s));
+        s.tab === 'stations' && s.q === 'stations' && s.inView && s.z >= 16, J(s));
       await context.close();
     }
     {

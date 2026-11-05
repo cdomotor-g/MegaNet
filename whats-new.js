@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 213, date: '2026-11-05', items: [
+      '🔍 <strong>Picking a station now takes the map right in to it</strong> — from the station list, a search, a link, '
+        + 'the 📍 list of stations you have looked at, or another tab. It lands at street level, about two kilometres across, instead of '
+        + 'fifty: the closest every base map still draws sharp. The minimap in the bottom-right corner shows where it '
+        + 'is in the region, and <strong>Zoom to it</strong> on the card still goes all the way in.',
+    ] },
     { n: 212, date: '2026-11-05', items: [
       '<strong>🗒️ Copy compact</strong> is smaller again: the heading is one line, each of the figures at the top is one '
         + 'line with its label on the left and its value on the right, and the chart has nothing written over it — each '
