@@ -13,7 +13,7 @@
 //                  station card, flagged indicative throughout.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for esc, escAttr, acmaHaversineKm and announce,
+// Reaches back to core.js for esc, escAttr, termHtml, acmaHaversineKm and announce,
 // across to river-details.js for RiverDetails.currentSurvey and to app.js for
 // docUrl — all only from inside its own functions, so this file's position
 // among the modules is free (`npm run toplevel`). One file reaches into it:
@@ -57,6 +57,12 @@
 //                                               Acid Sulfate Soils (CSIRO 2011),
 //                                               as Queensland serves it
 //                                    /1850      acid sulfate soil sample sites
+//   Oceans/CoastalWaters/17                     the coastline (mean high water;
+//                                               river mouths closed off) — for
+//                                               the corrosivity rows
+//
+// and one file of this site's own, data/surf-coast.json: the stretches of that
+// coastline facing open ocean swell (see "Atmospheric corrosivity" below).
 //
 // Every one is CC BY — 4.0 for all but the acid sulfate soils series, which
 // data.qld.gov.au lists as CC BY 3.0 AU — and the card's "Sources and limits"
@@ -107,11 +113,13 @@
 // Staged, so a station asks only what can matter to it: coverage first (two
 // requests, three at the edge), then the four soil maps and — out of tidal
 // water — the three distance bands to the highest-tide line, then, only with
-// that line within 10 km, the Water Act limits, the four coastal hazard layers
-// and the sample sites (seven). Thirteen to seventeen requests for a coastal
-// station, nine or ten inland, none outside Queensland — every one a count or
-// a handful of attributes (the largest measured, the 113 sample sites within
-// 2 km of Cairns Harbour, is 38 KB). At most IN_FLIGHT at once across the
+// that line within 10 km, the Water Act limits, the four coastal hazard layers,
+// the sample sites and the coastline (eight). Fourteen to eighteen requests for
+// a coastal station, nine or ten inland, none outside Queensland, and this
+// site's own surf beaches file once a page. Every one but the coastline is a
+// count or a handful of attributes (the largest measured, the 113 sample sites
+// within 2 km of Cairns Harbour, is 38 KB); the coastline, generalised to
+// ~10 m, is a few to thirty kilobytes. At most IN_FLIGHT at once across the
 // whole app, each given TIMEOUT_MS; a card that moves to another station drops
 // the old one's queue.
 //
@@ -120,6 +128,31 @@
 // layer that failed is not asked again for FAIL_TTL, Elvis's rule and for its
 // reason — a blocked host costs one slow failure a minute, not one per click —
 // and "Try again" on the card clears that and asks at once.
+//
+// ── Atmospheric corrosivity (AS 4312) ───────────────────────────────────────
+// How corrosive the air is to steel and its coatings, which is mostly how far
+// the sea is and how rough: AS 4312:2019's grade, C1 (very low) to CX
+// (extreme), read off its Table 4.1 by the distance to the shoreline for each
+// kind of shore, the highest of them; and OTE's grouping of those grades into
+// three categories, each with its materials for a station's tower, enclosure
+// and orifice run (OTE's instruction, November 2026 — rounded to 100 m, 1 km and
+// 10 km, stricter than the table in places, never less). Both are copied from
+// the SoRT Scope Builder, where the forum chooses materials with them
+// (cdomotor-g/SoRT, v2/definitions.json guides.corrosion), and so is
+// data/surf-coast.json (SoRT's v2/data/surf-coast.json, made from the coastline
+// layer by its v2/tools/build-surf-coast.mjs: Point Danger to Agnes Water, the
+// ocean beaches of the sand islands, Coolangatta's north-facing bays). atlas.json
+// carries the link, so the Atlas says when SoRT's copy moves on.
+//
+// The distances: to a surf beach from that file, for every station (no
+// request); to any other shore from the Coastline layer within COAST_M, only
+// where the highest-tide line is within 10 km — the coastline cannot be nearer
+// than that line, and beyond 10 km every sheltered shore is C2 on the table.
+// The coastline and not the HAT line, because the HAT line runs up the tidal
+// rivers (Jindalee is 4 m from it) and a riverbank 20 km from the sea is not
+// what salts the air. North of the Tropic of Capricorn a shore is "tropical
+// quiet", south of it "temperate semi-sheltered" — the stricter of the
+// standard's two sheltered kinds, since nothing here tells a bay from a basin.
 //
 // ── What is deliberately not here ───────────────────────────────────────────
 // A prescription. The summary under the rows says what the maps add up to in
@@ -161,6 +194,57 @@ const SiteExposure = (function () {
   // open coast and the tidal reaches of the rivers alike (Jindalee, 20 km up
   // the Brisbane River, is 4 m from it).
   const HAT_BANDS = [['hat100', 100], ['hat1k', 1000], ['hat10k', 10000]];
+
+  // ── Atmospheric corrosivity: the standard's table and OTE's categories ────
+  // Copied from SoRT's v2/definitions.json guides.corrosion (see the header);
+  // change them there first.
+  const COAST_M    = 11000;       // the widest distance any kind of shore matters within (10 km), and a margin
+  const SURF_TOL_M = 40;          // a piece of the coastline this near a surf stretch is that beach
+  const TROPIC_LAT = -23.44;      // the Tropic of Capricorn: tropical quiet north of it
+  const SURF_URL   = 'data/surf-coast.json';
+  const SHORES = {
+    surf:            { label: 'surf beach',               a: 'a surf beach' },
+    temperate_semi:  { label: 'semi-sheltered shore',     a: 'a semi-sheltered shore' },
+    tropical_quiet:  { label: 'tropical quiet shore',     a: 'a tropical quiet shore' },
+    temperate_quiet: { label: 'quiet shore',              a: 'a quiet shore' },
+  };
+  // AS 4312:2019 Table 4.1 — the grade in each distance band (the upper edge,
+  // in metres) for each kind of shore. "C3*": C2 where the site is more than
+  // 50 m above sea level and more than 5 km from the shoreline.
+  const AS4312 = {
+    edges: [50, 100, 500, 1000, 10000, 100000],
+    bands: ['0–50 m', '50–100 m', '100–500 m', '0.5–1 km', '1–10 km', '10–100 km'],
+    grades: {
+      temperate_quiet: ['C4', 'C3', 'C3', 'C3', 'C2', 'C2'],
+      temperate_semi:  ['C5', 'C4', 'C4', 'C3', 'C3*', 'C2'],
+      tropical_quiet:  ['CX', 'CX', 'C5/C4', 'C3', 'C2', 'C2'],
+      surf:            ['CX', 'CX/C5', 'C5', 'C4', 'C3', 'C3*'],
+    },
+    beyond: 'C2',      // further than 100 km — "most areas of Australia at least 50 km from the coast"
+  };
+  // The grades, as the standard describes them (its section 3.2).
+  const GRADES = {
+    C1: ['very low', 'Inside heated or air-conditioned buildings with clean air; some semi-sheltered places far from the sea or industry.'],
+    C2: ['low', 'Dry, rural areas and other areas remote from the coast or pollution — most of Australia at least 50 km from the coast.'],
+    C3: ['medium', 'Mainly coastal areas with low salinity.'],
+    C4: ['high', 'Mainly on the coast.'],
+    C5: ['very high', 'Normally 50 m to 500 m inland from coasts exposed to surf or very rough seas.'],
+    CX: ['extreme', 'Offshore structures, and within 50 m inland of coasts exposed to surf or very rough seas.'],
+  };
+  const GRADE_RANK = { C1: 1, C2: 2, C3: 3, C4: 4, C5: 5, CX: 6 };
+  // OTE's three categories, most severe first: the distance within which each
+  // kind of shore puts a station in it.
+  const OTE = [
+    { cat: 'C5 and CX', materials: 'all stainless — a stainless steel tower, enclosure and orifice run',
+      within: { temperate_semi: 100, tropical_quiet: 1000, surf: 1000 } },
+    { cat: 'C4', materials: 'a standard galvanised tower, with a stainless steel enclosure and orifice run',
+      within: { temperate_quiet: 100, temperate_semi: 1000, surf: 10000 } },
+  ];
+  const OTE_ELSE = { cat: 'C3 and below',
+    materials: 'standard — a galvanised tower, aluminium enclosure and galvanised orifice run (a stainless orifice run in a polluted river)' };
+  // Which of OTE's categories a grade of the standard's falls in.
+  const oteOf = g => (GRADE_RANK[g] >= 5 ? 'C5 and CX' : GRADE_RANK[g] === 4 ? 'C4' : 'C3 and below');
+  const OTE_RANK = { 'C3 and below': 0, C4: 1, 'C5 and CX': 2 };
 
   // Queensland's extent, from the State's own layers and rounded outward: its
   // mainland runs from 138.0° to 153.55° east and down to 29.2° south, and the
@@ -235,6 +319,20 @@ const SiteExposure = (function () {
       licence: 'CC BY 4.0',
       page: 'https://doi.org/10.4225/08/512E79A0BC589',
     },
+    coast: {
+      name: 'the Queensland coastline',
+      title: 'Coastline — Queensland',
+      by: 'State of Queensland (Department of Natural Resources and Mines), 2017',
+      licence: 'CC BY 4.0',
+      page: 'https://www.data.qld.gov.au/dataset/coastline-queensland',
+    },
+    surf: {
+      name: 'the surf beaches file',
+      title: 'Queensland’s surf beaches — the coastline’s stretches that face open ocean swell, Point Danger to Agnes Water, made from the coastline above by the SoRT Scope Builder',
+      by: 'State of Queensland (Department of Natural Resources and Mines), 2017, as the SoRT Scope Builder derives it',
+      licence: 'CC BY 4.0',
+      page: 'https://github.com/cdomotor-g/SoRT/blob/main/v2/tools/build-surf-coast.mjs',
+    },
     sites: {
       name: 'the acid sulfate soil sample sites',
       title: 'Acid sulfate soil sites (SALI), in the Queensland soil and land resource map service',
@@ -248,6 +346,16 @@ const SiteExposure = (function () {
   const READING = [
     { title: 'Acid sulfate soils explained', page: 'https://www.qld.gov.au/environment/land/management/soil/acid-sulfate/explained' },
     { title: 'Impacts of acid sulfate soils', page: 'https://www.qld.gov.au/environment/land/management/soil/acid-sulfate/impacts' },
+  ];
+
+  // Where the corrosivity rows' grades and categories come from.
+  const CORROSION_READING = [
+    { title: 'AS 4312:2019 Atmospheric corrosivity zones in Australia — Standards Australia',
+      page: 'https://store.standards.org.au/product/as-4312-2019',
+      tail: '— the grades, and its Table 4.1 (as reproduced in Timber Queensland Technical Data Sheet 35, April 2020).' },
+    { title: 'Corrosion and the infrastructure options — the SoRT Scope Builder’s guide',
+      page: 'https://github.com/cdomotor-g/SoRT/blob/main/v2/README.md#corrosion-as-4312-and-otes-instruction',
+      tail: '— OTE’s instruction beside the standard’s table, band by band.' },
   ];
 
   // ── Reading an answer ────────────────────────────────────────────────────
@@ -281,7 +389,62 @@ const SiteExposure = (function () {
         .sort((a, b) => a.km - b.km);
       return { n: list.length, list: list.slice(0, 25) };
     },
+    // The surf beaches file: how far the nearest one is, in metres (anywhere —
+    // a surf beach 60 km off still puts an inland site in C3 on the table).
+    surf(j, lat, lon) {
+      if (!j || !Array.isArray(j.lines)) throw new Error(UNREADABLE);
+      surfLines = j.lines;
+      const f = flat(lat, lon);
+      let d2 = Infinity;
+      for (const l of j.lines) for (let i = 0; i < l.length - 1; i++) {
+        d2 = Math.min(d2, segD2(0, 0, f.x(l[i][0]), f.y(l[i][1]), f.x(l[i + 1][0]), f.y(l[i + 1][1])));
+      }
+      return { m: isFinite(d2) ? Math.sqrt(d2) : null };
+    },
+    // The coastline within COAST_M: the nearest shore of each sheltered kind,
+    // in metres — leaving out the pieces that are a surf beach (the surf row
+    // has those), and keeping only the two numbers, not the geometry.
+    shores(j, lat, lon) {
+      const f = flat(lat, lon);
+      const near = [];
+      for (const l of surfLines || []) for (let i = 0; i < l.length - 1; i++) {
+        const seg = [f.x(l[i][0]), f.y(l[i][1]), f.x(l[i + 1][0]), f.y(l[i + 1][1])];
+        if (segD2(0, 0, ...seg) < (COAST_M + 1000) ** 2) near.push(seg);
+      }
+      const onSurf = (x, y) => near.some(seg => segD2(x, y, ...seg) <= SURF_TOL_M ** 2);
+      const best = {};
+      for (const ft of features(j)) {
+        for (const p of (ft.geometry && ft.geometry.paths) || []) {
+          for (let i = 0; i < p.length - 1; i++) {
+            const ax = f.x(p[i][0]), ay = f.y(p[i][1]), bx = f.x(p[i + 1][0]), by = f.y(p[i + 1][1]);
+            if (onSurf((ax + bx) / 2, (ay + by) / 2)) continue;
+            const kind = (p[i][1] + p[i + 1][1]) / 2 > TROPIC_LAT ? 'tropical_quiet' : 'temperate_semi';
+            const d2 = segD2(0, 0, ax, ay, bx, by);
+            if (best[kind] == null || d2 < best[kind]) best[kind] = d2;
+          }
+        }
+      }
+      const out = {};
+      for (const [kind, d2] of Object.entries(best)) if (Math.sqrt(d2) <= COAST_M) out[kind] = Math.sqrt(d2);
+      return out;
+    },
   };
+
+  // The surf beaches, once loaded — the coastline's digest leaves them out.
+  let surfLines = null;
+  // A flat frame in metres round a point, good to a fraction of a per cent
+  // over the 11 km asked: plenty for "which band is it in".
+  function flat(lat, lon) {
+    const kx = 111320 * Math.cos(lat * Math.PI / 180), ky = 110574;
+    return { x: x => (x - lon) * kx, y: y => (y - lat) * ky };
+  }
+  // The squared distance from (px, py) to the segment (ax, ay)–(bx, by).
+  function segD2(px, py, ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy;
+    const t = L ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L)) : 0;
+    const x = ax + t * dx - px, y = ay + t * dy - py;
+    return x * x + y * y;
+  }
 
   // What is asked, one request each. `count` layers ask only how many polygons
   // the point is in; the rest name their fields (see the header for why that
@@ -309,12 +472,18 @@ const SiteExposure = (function () {
     assSite:   { src: 'sites', path: 'GeoscientificInformation/SoilsAndLandResource/MapServer/1850',
                  fields: 'project_code,site_id,obs_date,field_ph_available,laboratory_data_available,core_depth_m,landform_element,site_report_url',
                  distance: SITE_M, geometry: true, digest: DIGEST.points },
+    // The coastline, generalised to ~10 m: a few to thirty kilobytes within 11 km.
+    coast:     { src: 'coast', path: 'Oceans/CoastalWaters/MapServer/17', fields: 'feature_type',
+                 where: "feature_type IN ('Coastline','Coastline Junction')", distance: COAST_M,
+                 geometry: true, offset: 0.0001, digest: DIGEST.shores },
+    // This site's own file, not a query: asked once a page, read for every station.
+    surf:      { src: 'surf', local: SURF_URL, digest: DIGEST.surf },
   };
   const ASS_ORDER = ['ass25', 'ass50', 'ass100'];   // finest first
   // Asked only with the highest-tide line within the widest band: every one
   // of these lies along the coast and the estuaries, and inland they would be
   // seven requests answering "no".
-  const COASTAL   = ['limit', 'cmd', 'hat40', 'stHigh', 'stMed', 'stNone', 'assSite'];
+  const COASTAL   = ['limit', 'cmd', 'hat40', 'stHigh', 'stMed', 'stNone', 'assSite', 'coast'];
 
   // ── Distance ─────────────────────────────────────────────────────────────
 
@@ -353,6 +522,8 @@ const SiteExposure = (function () {
       spatialRel: 'esriSpatialRelIntersects',
     });
     if (spec.distance) { p.set('distance', String(spec.distance)); p.set('units', 'esriSRUnit_Meter'); }
+    if (spec.where) p.set('where', spec.where);
+    if (spec.offset) p.set('maxAllowableOffset', String(spec.offset));
     if (spec.count) {
       p.set('returnCountOnly', 'true');
     } else {
@@ -442,13 +613,21 @@ const SiteExposure = (function () {
   const failed  = r => !!(r && r.ok === false);
   const settled = r => !!r && (r.ok || Date.now() - r.at < FAIL_TTL);
 
+  // This site's own files (the surf beaches): fetched once a page, and again
+  // only after a failure.
+  const local = new Map();
+  function localJson(path) {
+    if (!local.has(path)) local.set(path, askJson(path).catch(e => { local.delete(path); throw e; }));
+    return local.get(path);
+  }
+
   function layer(k, name) {
     const a = entry(k);
     if (a.busy[name]) return a.busy[name];
     const spec = LAYERS[name];
     const [lat, lon] = pointOf(k);
-    const url = queryUrl(spec, lat, lon);
-    const p = schedule(k, () => askJson(url))
+    // A file of this site's is not the State's server, so it takes no place in its queue.
+    const p = (spec.local ? localJson(spec.local) : schedule(k, () => askJson(queryUrl(spec, lat, lon))))
       .then(json => ({ ok: true, v: (spec.digest || DIGEST.count)(json, lat, lon) }))
       .catch(e => (e === SUPERSEDED ? { superseded: true } : { ok: false, at: Date.now(), why: reason(e) }))
       .then(r => {
@@ -501,10 +680,11 @@ const SiteExposure = (function () {
     const cov = coverage(k, L);
     if (val(L.lga) && val(L.tidalIn) && !(val(L.lga).n || val(L.tidalIn).n)) out.push('lgaNear');
     if (cov !== 'in' && cov !== 'edge') return out;
-    out.push(...ASS_ORDER, 'assNat');
+    out.push(...ASS_ORDER, 'assNat', 'surf');
     if (!inTidal(L)) out.push(...HAT_BANDS.map(([n]) => n));
     const band = tideBand(L);
-    if (band && band.m !== Infinity) out.push(...COASTAL);
+    // The coastline once the surf beaches are known: its digest leaves them out.
+    if (band && band.m !== Infinity) out.push(...COASTAL.filter(n => n !== 'coast' || settled(L.surf)));
     return out;
   }
 
@@ -588,6 +768,16 @@ const SiteExposure = (function () {
          + 'river maps and are provisional — not checked on the ground.',
     sites: 'The nearest acid sulfate soil sample site in Queensland’s soil database within 2 km: where a core was '
          + 'taken and tested. The report opens the site’s own record.',
+    corr: 'How corrosive the air is to steel and its coatings, on AS 4312:2019’s scale from C1 (very low) to CX '
+        + '(extreme): read off the standard’s Table 4.1 by the distance to the nearest surf beach and to the nearest '
+        + 'other shore — a bay, a passage or a river mouth, “semi-sheltered” south of the Tropic of Capricorn and '
+        + '“tropical quiet” north of it — and the higher of the two. Surf beaches are the State coastline’s '
+        + 'stretches facing open ocean swell, Point Danger to Agnes Water. In a straight line, to the shoreline at mean '
+        + 'high water.',
+    ote: 'OTE is the Bureau team whose instruction (November 2026) groups AS 4312’s grades into three categories for a '
+       + 'station’s tower, enclosure and orifice run: C3 and below (a galvanised tower, aluminium enclosure and '
+       + 'galvanised orifice run), C4 (a stainless steel enclosure and orifice run) and C5 and CX (all stainless). Its '
+       + 'distances are rounded to 100 m, 1 km and 10 km and are stricter than the standard’s table in places, never less.',
     tide: 'Heights on this gauge that the Bureau’s lists tie to the tide: highest astronomical tide (HAT) from its '
         + 'crossing type T, and the tide levels among its flood effects. In AHD only where the gauge zero is surveyed '
         + 'in AHD.',
@@ -796,6 +986,77 @@ const SiteExposure = (function () {
     return row('ASS sample', `${esc(kmText(p.km))} away ${note(esc(bits.join(' · ')))}${link}`, TITLE.sites);
   }
 
+  // ── Atmospheric corrosivity ──────────────────────────────────────────────
+
+  // A distance as the corrosivity rows say it: tens of metres under 1 km,
+  // because there the table's bands are 50, 100 and 500 m.
+  const distText = m => (m < 1000 ? `${Math.max(10, Math.round(m / 10) * 10)} m` : kmText(m / 1000));
+  // One of OTE's round distances: 100 m, 1 km, 10 km.
+  const limText = m => (m < 1000 ? `${m} m` : `${+(m / 1000).toFixed(1)} km`);
+  const gradeRank = g => Math.max(...String(g).split('/').map(t => GRADE_RANK[t.replace(/[^A-Z0-9]/g, '')] || 0));
+  const gradeName = g => String(g).split('/').map(t => (GRADES[t] || [t])[0]).join(' or ');
+
+  // The table's grade for one kind of shore at m metres, with the C3* rule
+  // applied when the station's elevation is recorded.
+  function gradeAt(shore, m, elev) {
+    const i = AS4312.edges.findIndex(e => m < e);
+    let g = i < 0 ? AS4312.beyond : AS4312.grades[shore][i];
+    let why = '';
+    if (g === 'C3*') {
+      if (m > 5000 && elev != null && elev > 50) { g = 'C2'; why = 'C2 rather than C3: over 50 m above sea level and more than 5 km from the shore'; }
+      else { g = 'C3'; if (m > 5000 && elev == null) why = 'C2 if the site is over 50 m above sea level'; }
+    }
+    return { g, band: i < 0 ? 'over 100 km' : AS4312.bands[i], why };
+  }
+
+  // { pending } | { failed: src } | { grade, ote, oteBy, stricter, d } — the
+  // grade is the highest any kind of shore reaches; OTE's category is the
+  // first of its bands any shore is within.
+  function corrosion(s, L) {
+    if (failed(L.surf)) return { failed: 'surf' };
+    const surf = val(L.surf);
+    const band = tideBand(L);
+    if (!surf || band === undefined) return { pending: true };
+    const d = {};
+    if (surf.m != null) d.surf = surf.m;
+    if (band.m !== Infinity) {
+      if (failed(L.coast)) return { failed: 'coast' };
+      const c = val(L.coast);
+      if (!c) return { pending: true };
+      Object.assign(d, c);
+    }
+    const elev = num(s && s.elevation_ahd);
+    // Shores out of reach are more than 10 km off: C2 on the table, whatever their kind.
+    // A shore over 100 km off says no more than that, so it isn't named as the reason.
+    const grades = [{ shore: null, m: null, g: AS4312.beyond, band: '', why: '' },
+      ...Object.entries(d).filter(([, m]) => m < AS4312.edges[AS4312.edges.length - 1])
+        .map(([shore, m]) => ({ shore, m, ...gradeAt(shore, m, elev) }))];
+    const grade = grades.sort((x, y) => gradeRank(y.g) - gradeRank(x.g) || (x.m ?? Infinity) - (y.m ?? Infinity))[0];
+    let ote = OTE_ELSE, oteBy = null;
+    for (const b of OTE) {
+      const hit = Object.entries(b.within).filter(([t, lim]) => d[t] != null && d[t] < lim).sort((x, y) => d[x[0]] - d[y[0]])[0];
+      if (hit) { ote = b; oteBy = { shore: hit[0], m: d[hit[0]], within: hit[1] }; break; }
+    }
+    const stricter = OTE_RANK[ote.cat] > Math.max(...grade.g.split('/').map(oteOf).map(c => OTE_RANK[c]));
+    return { grade, ote, oteBy, stricter, d };
+  }
+
+  function corrosionRows(s, L) {
+    const c = corrosion(s, L);
+    if (c.pending) return row('Corrosivity', asking(), TITLE.corr);
+    if (c.failed) return row('Corrosivity', unread(c.failed), TITLE.corr);
+    const g = c.grade;
+    const meaning = String(g.g).split('/').map(t => `${t} — ${GRADES[t][0]}: ${GRADES[t][1]}`).join(' Or ');
+    const where = g.shore
+      ? `AS 4312 Table 4.1 · ${distText(g.m)} from ${SHORES[g.shore].a} (${g.band})`
+      : `AS 4312 · no shore within 10 km${c.d.surf != null ? `, the nearest surf beach ${distText(c.d.surf)} away` : ''}`;
+    const out = [row('Corrosivity',
+      `${termHtml(`${g.g.replace('*', '')} — ${gradeName(g.g)}`, meaning)} ${note(esc(where + (g.why ? ` · ${g.why}` : '')))}`, TITLE.corr)];
+    const by = c.oteBy ? `within ${limText(c.oteBy.within)} of ${SHORES[c.oteBy.shore].a}` : 'beyond OTE’s distances';
+    out.push(row('OTE category', `${esc(c.ote.cat)} ${note(esc(`— ${c.ote.materials} · ${by}${c.stricter ? ' · stricter than the standard’s table here' : ''}`))}`, TITLE.ote));
+    return out.join('');
+  }
+
   // ── What the station's own record says about the tide ─────────────────────
 
   const TIDE_RE = /\bHAT\b|highest astronomical|\bMHWS\b|mean high water|spring tide|storm tide|king tide/i;
@@ -890,6 +1151,13 @@ const SiteExposure = (function () {
       items.push(`In a mapped storm tide area, ${hi && hi.n ? 'more' : 'less'} than 1 m deep: a surge can put seawater `
         + 'over the site (mapped allowing for sea level rise to 2100).');
     }
+    const c = corrosion(s, L);
+    if (c.grade) {
+      const g = c.grade, gText = `${g.g.replace('*', '')} (${gradeName(g.g)})`;
+      const where = g.shore ? ` — ${distText(g.m)} from ${SHORES[g.shore].a}` : ' — no shore within 10 km';
+      items.push(`Salt in the air: AS 4312 grades this site ${gText}${where}. OTE’s instruction for station materials `
+        + `puts it in ${c.ote.cat}${c.stricter ? ', stricter here than the standard’s table' : ''}: ${c.ote.materials}.`);
+    }
     const levels = tideLevels(s);
     const hat = hatAhd(levels, zeroOf(s));
     const elev = num(s && s.elevation_ahd);
@@ -948,6 +1216,11 @@ const SiteExposure = (function () {
           drawn at 1:25 000 to 1:2 000 000 — a polygon edge is a line on a map, not on the ground.</p>
         <p class="stn-card-aep-line">The soil sentences in the summary are the State’s own:</p>
         <ul class="stn-card-exp-list">${READING.map(r => link(r.title, r.page, '— Queensland Government.')).join('')}</ul>
+        <p class="stn-card-aep-line">The corrosivity grades are AS 4312:2019’s, read off its Table 4.1 by distance; the
+          categories are OTE’s instruction, which is stricter than the table in places. Both indicative: local
+          conditions — strong onshore winds, spray from a headland, industry, a polluted river — can push a site up a
+          category, and the choice of materials is a design decision.</p>
+        <ul class="stn-card-exp-list">${CORROSION_READING.map(r => link(r.title, r.page, r.tail)).join('')}</ul>
         <p class="stn-card-aep-line"><a href="${esc(docs)}" target="_blank" rel="noopener"
           aria-label="What each row means, and its limits — the documentation, in a new tab"
           >What each row means, and its limits<span aria-hidden="true"> ↗</span></a></p>
@@ -1014,6 +1287,7 @@ const SiteExposure = (function () {
       const band = tideBand(L);
       const coastal = !!band && band.m !== Infinity;
       if (coastal) parts.push(limitRow(s, L), coastRow(L), stormRow(L));
+      parts.push(corrosionRows(s, L));
       parts.push(assRows(L));
       if (coastal) parts.push(siteRow(L, assVerdict(L)));
     }

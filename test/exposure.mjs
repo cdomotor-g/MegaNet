@@ -81,11 +81,12 @@ const LAYER = {
   'GeoscientificInformation/SoilsAndLandResource/MapServer/2002': 'ass100',
   'GeoscientificInformation/SoilsAndLandResource/MapServer/2052': 'assNat',
   'GeoscientificInformation/SoilsAndLandResource/MapServer/1850': 'assSite',
+  'Oceans/CoastalWaters/MapServer/17': 'coast',
 };
-const COASTAL = ['limit', 'cmd', 'hat40', 'stHigh', 'stMed', 'stNone', 'assSite'];
+const COASTAL = ['limit', 'cmd', 'hat40', 'stHigh', 'stMed', 'stNone', 'assSite', 'coast'];
 // The distance each question is asked within, as the module's header states it.
 const DISTANCE = { lga: null, lgaNear: 1000, tidalIn: 50, hat100: 100, hat1k: 1000, hat10k: 10000,
-                   limit: 20000, assSite: 2000 };
+                   limit: 20000, assSite: 2000, coast: 11000 };
 const COUNTED = new Set(['tidalIn', 'hat100', 'hat1k', 'hat10k', 'cmd', 'hat40', 'stHigh', 'stMed', 'stNone']);
 
 const FAIL_500 = { fail: 500 };
@@ -111,7 +112,7 @@ const SCENARIO = {
     limit: [{ name: 'Norman Creek', reference: 'Norman Creek (Stones Corners)', km: 3.0 },
             { name: 'Brisbane River', reference: 'AP-TEST', km: 12.0 }],
     cmd: 1, hat40: 1, stHigh: 1, stMed: 0, stNone: 0,
-    ass25: S1, ass50: null, ass100: LP, assNat: null,
+    ass25: S1, ass50: null, ass100: LP, assNat: null, coast: [],
     assSite: [{ km: 0.6, project_code: 'SEA', site_id: 1555, core_depth_m: 2, laboratory_data_available: 'Yes',
                 field_ph_available: 'Yes', site_report_url: REPORT },
               { km: 1.5, project_code: 'SEA', site_id: 1554, core_depth_m: 5.5, laboratory_data_available: 'Yes' }],
@@ -122,6 +123,7 @@ const SCENARIO = {
     lga: ['Sunshine Coast Regional'], tidalIn: 0, hat100: 0, hat1k: 1, hat10k: 1,
     limit: [], cmd: 0, hat40: 0, stHigh: 0, stMed: 0, stNone: 1,
     ass25: null, ass50: null, ass100: null, assNat: NAT_B, assSite: [],
+    coast: [{ east: 800 }],        // a bay shore 800 m off; the real surf beach file puts the sea 5 km away
   },
   // Inland: no tide within 10 km, no soil mapping, and so no coastal layer.
   abbieglassie_al: {
@@ -132,7 +134,7 @@ const SCENARIO = {
   coolangatta: {
     lga: [], tidalIn: 0, lgaNear: ['Gold Coast City'], hat100: 0, hat1k: 1, hat10k: 1,
     limit: [], cmd: 0, hat40: 0, stHigh: 0, stMed: 0, stNone: 0,
-    ass25: null, ass50: null, ass100: null, assNat: null, assSite: [],
+    ass25: null, ass50: null, ass100: null, assNat: null, assSite: [], coast: [],
   },
   // New South Wales, inside Queensland's box: coverage asked, nothing else.
   banora_sewerage_tre: { lga: [], tidalIn: 0, lgaNear: [] },
@@ -141,8 +143,8 @@ const SCENARIO = {
   moggill_al: {
     lga: ['Brisbane City'], tidalIn: 1,
     limit: [], cmd: 1, hat40: 0, stHigh: FAIL_500, stMed: 0, stNone: 0,
-    ass25: FAIL_NET, ass50: A1, ass100: null, assNat: null, assSite: [],
-    healed: { stHigh: 0, ass25: S1 },
+    ass25: FAIL_NET, ass50: A1, ass100: null, assNat: null, assSite: [], coast: FAIL_500,
+    healed: { stHigh: 0, ass25: S1, coast: [] },
   },
   // Slow, so a card can move on while its first questions are in flight.
   golden_beach_al: {
@@ -150,6 +152,7 @@ const SCENARIO = {
     lga: ['Sunshine Coast Regional'], tidalIn: 1,
     limit: [], cmd: 1, hat40: 1, stHigh: 0, stMed: 1, stNone: 0,
     ass25: null, ass50: null, ass100: null, assNat: NAT_B, assSite: [],
+    coast: [{ east: -30 }],        // the Pumicestone Passage, 30 m west
   },
 };
 const AWAY = 'awaba_stony_ck';          // New South Wales, far outside the box
@@ -179,6 +182,14 @@ function answer(sid, layer, fields, flags) {
   if (COUNTED.has(layer)) return { status: 200, body: { count: a } };
   if (layer === 'lga' || layer === 'lgaNear') {
     return { status: 200, body: featureSet(['lga'], a.map(n => ({ attributes: { lga: n } }))) };
+  }
+  if (layer === 'coast') {
+    // A straight north–south shore `east` metres from the station, 0.4° long, in the shape the layer returns.
+    const rows = a.map((c, i) => {
+      const x = Number(s.lon) + c.east / (111320 * Math.cos(Number(s.lat) * Math.PI / 180));
+      return { attributes: { feature_type: 'Coastline' }, geometry: { paths: [[[x, Number(s.lat) - 0.2], [x, Number(s.lat) + 0.2]]] }, _i: i };
+    }).map(({ _i, ...r }) => r);
+    return { status: 200, body: { ...featureSet(fields, rows), geometryType: 'esriGeometryPolyline', spatialReference: { wkid: 4326, latestWkid: 4326 } } };
   }
   if (layer === 'limit' || layer === 'assSite') {
     const rows = a.map(p => {
@@ -412,8 +423,21 @@ try {
       && jin.sources.some(t => /Watercourse identification map/.test(t)),
     JSON.stringify(jin.sources.slice(0, 4)));
 
+  // Atmospheric corrosivity: the real surf beaches file (data/surf-coast.json), the coastline stubbed.
+  check('corrosivity: AS 4312’s grade off its Table 4.1 — C3, 53 km from a surf beach and no other shore within 11 km',
+    /^C3 — medium AS 4312 Table 4\.1 · 53 km from a surf beach \(10–100 km\)$/.test(jin.rows['Corrosivity'] || ''), jin.rows['Corrosivity']);
+  check('…and OTE’s category for station materials, the same here',
+    /^C3 and below — standard/.test(jin.rows['OTE category'] || '') && /beyond OTE’s distances/.test(jin.rows['OTE category'])
+      && !/stricter/.test(jin.rows['OTE category']), jin.rows['OTE category']);
+  check('…said in the summary, with the materials',
+    jin.items.some(t => /^Salt in the air: AS 4312 grades this site C3 \(medium\) — 53 km from a surf beach\. OTE’s instruction for station materials puts it in C3 and below: standard/.test(t)),
+    JSON.stringify(jin.items));
+  check('…its sources named: the coastline, the surf beaches, the standard',
+    jin.sources.some(t => /^Coastline — Queensland/.test(t) && /CC BY 4\.0/.test(t))
+      && jin.sources.some(t => /surf beaches/.test(t)) && jin.sources.some(t => /AS 4312:2019/.test(t)),
+    JSON.stringify(jin.sources.filter(t => /Coast|surf|4312/.test(t))));
   const want = ['lga', 'tidalIn', 'ass25', 'ass50', 'ass100', 'assNat', ...COASTAL].sort();
-  check('in the tide it asks thirteen questions, one per layer, none of the tide-line bands',
+  check('in the tide it asks fourteen questions, one per layer, none of the tide-line bands',
     JSON.stringify(layersFor('jindalee_al')) === JSON.stringify(want), JSON.stringify(layersFor('jindalee_al')));
 
   // ── The outline, the names, the rules the tabs check holds ───────────────
@@ -461,7 +485,7 @@ try {
     asked.every(r => (DISTANCE[r.layer] ?? null) === r.distance && (r.distance == null || r.units === 'esriSRUnit_Meter')),
     JSON.stringify(asked.filter(r => (DISTANCE[r.layer] ?? null) !== r.distance).map(r => [r.layer, r.distance])));
   check('point answers come back in 4326 when geometry is asked for',
-    asked.filter(r => r.geometry === 'true').every(r => r.outSR === '4326' && ['limit', 'assSite'].includes(r.layer)));
+    asked.filter(r => r.geometry === 'true').every(r => r.outSR === '4326' && ['limit', 'assSite', 'coast'].includes(r.layer)));
 
   // ── Near the tide, the national atlas alone — by a real pin click ─────────
   log('\nNear the tide — a real pin click; the highest-tide line, the national atlas alone\n');
@@ -499,6 +523,11 @@ try {
   check('the summary: within 1 km of the highest tides, acid sulfate soils possible',
     pal.items.some(t => /^Within 1 km of where the highest tides reach/.test(t))
       && pal.items.some(t => /^Acid sulfate soils possible here/.test(t)), JSON.stringify(pal.items));
+  check('corrosivity: a bay shore 800 m off and a surf beach 5.2 km off are both C3 on the table — the nearer is named',
+    /^C3 — medium AS 4312 Table 4\.1 · 800 m from a semi-sheltered shore \(0\.5–1 km\)$/.test(pal.rows['Corrosivity'] || ''), pal.rows['Corrosivity']);
+  check('…where OTE’s instruction is stricter, and says so',
+    /^C4 — a standard galvanised tower, with a stainless steel enclosure and orifice run · within 1 km of a semi-sheltered shore · stricter than the standard’s table here$/.test(pal.rows['OTE category'] || ''),
+    pal.rows['OTE category']);
   check('out of the tide it asks the three tide-line bands as well',
     ['hat100', 'hat1k', 'hat10k'].every(l => layersFor('palmview_al').includes(l)), JSON.stringify(layersFor('palmview_al')));
 
@@ -513,6 +542,9 @@ try {
     inl.rows['Acid sulfate']);
   check('and no coastal row at all', ['Tidal limit', 'Coast', 'Storm tide', 'ASS sample'].every(l => !(l in inl.rows)),
     JSON.stringify(Object.keys(inl.rows)));
+  check('corrosivity inland: C2, no shore within 10 km — the surf beaches read from the file, the coastline never asked',
+    /^C2 — low AS 4312 · no shore within 10 km, the nearest surf beach 547 km away$/.test(inl.rows['Corrosivity'] || '')
+      && /^C3 and below/.test(inl.rows['OTE category'] || ''), JSON.stringify([inl.rows['Corrosivity'], inl.rows['OTE category']]));
   check('nine questions and none of the seven coastal ones',
     askedFor('abbieglassie_al').length === 9 && !askedFor('abbieglassie_al').some(r => COASTAL.includes(r.layer)),
     JSON.stringify(layersFor('abbieglassie_al')));
@@ -548,6 +580,10 @@ try {
   check('a station on the shore, off every local government area but within 1 km of one, is answered with a caveat',
     /Just off Queensland’s mapped land/.test(cool.text) && /Within 1 km of the highest-tide line/.test(cool.rows['Tidal water'] || ''),
     cool.text.slice(0, 200));
+  check('corrosivity behind Coolangatta’s beaches: 1.2 km from surf — C3 on the table, C4 for OTE',
+    /^C3 — medium AS 4312 Table 4\.1 · 1\.2 km from a surf beach \(1–10 km\)$/.test(cool.rows['Corrosivity'] || '')
+      && /^C4 — .* · within 10 km of a surf beach · stricter than the standard’s table here$/.test(cool.rows['OTE category'] || ''),
+    JSON.stringify([cool.rows['Corrosivity'], cool.rows['OTE category']]));
 
   // ── Failure ───────────────────────────────────────────────────────────────
   log('\nA source that fails says so by name, and Try again asks again\n');
@@ -564,6 +600,9 @@ try {
     /the storm tide hazard map \(answered HTTP 500\)/.test(mog.fail)
       && /Queensland’s acid sulfate soil maps \(unreachable/.test(mog.fail)
       && /Nothing on this card is claimed from them/.test(mog.fail), mog.fail);
+  check('a coastline that did not answer leaves corrosivity unread, naming it — and no OTE category from half the answer',
+    /^could not be read — the Queensland coastline$/.test(mog.rows['Corrosivity'] || '') && !('OTE category' in mog.rows)
+      && /the Queensland coastline \(answered HTTP 500\)/.test(mog.fail), JSON.stringify([mog.rows['Corrosivity'], mog.fail]));
   check('…with a Try again button', mog.retry);
   check('actual acid sulfate soil reads as already making acid',
     mog.items.some(t => /^Actual acid sulfate soil is mapped here/.test(t)), JSON.stringify(mog.items));
@@ -594,8 +633,10 @@ try {
     status: document.getElementById('app-status').textContent,
   }));
   const again = askedFor('moggill_al').slice(beforeRetry).map(r => r.layer).sort();
-  check('Try again, pressed from the keyboard, asks exactly the two that failed',
-    JSON.stringify(again) === JSON.stringify(['ass25', 'stHigh']), JSON.stringify(again));
+  check('Try again, pressed from the keyboard, asks exactly the three that failed',
+    JSON.stringify(again) === JSON.stringify(['ass25', 'coast', 'stHigh']), JSON.stringify(again));
+  check('…the coastline’s answer giving corrosivity back: C3, 60 km from a surf beach',
+    /^C3 — medium AS 4312 Table 4\.1 · 60 km from a surf beach \(10–100 km\)$/.test(healed.rows['Corrosivity'] || ''), healed.rows['Corrosivity']);
   check('…and their answers replace the failures',
     healed.rows['Storm tide'] === 'Not in a mapped storm tide area'
       && (healed.rows['Acid sulfate'] || '').includes(S1.map_code_meaning) && !healed.fail && !healed.retry,
@@ -640,7 +681,12 @@ try {
   await settle(page, 'golden_beach_al');
   const gold = askedFor('golden_beach_al').map(r => r.layer);
   check('coming back picks up where it stopped, asking nothing twice',
-    gold.length === new Set(gold).size && gold.length === 13, JSON.stringify(gold.sort()));
+    gold.length === new Set(gold).size && gold.length === 14, JSON.stringify(gold.sort()));
+  const gb = await read(page, 'golden_beach_al');
+  check('corrosivity on the Pumicestone Passage: 30 m from a semi-sheltered shore is C5, and OTE agrees',
+    /^C5 — very high AS 4312 Table 4\.1 · 30 m from a semi-sheltered shore \(0–50 m\)$/.test(gb.rows['Corrosivity'] || '')
+      && /^C5 and CX — all stainless/.test(gb.rows['OTE category'] || '') && !/stricter/.test(gb.rows['OTE category']),
+    JSON.stringify([gb.rows['Corrosivity'], gb.rows['OTE category']]));
   check('never more than four questions in flight at once', maxInFlight <= 4 && maxInFlight >= 2, String(maxInFlight));
   check('no scenario station asked a layer it should not have',
     !asked.some(r => r.unexpected), JSON.stringify(asked.filter(r => r.unexpected).map(r => [r.sid, r.layer])));

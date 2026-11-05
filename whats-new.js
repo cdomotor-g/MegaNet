@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 199, date: '2026-11-05', items: [
+      '🧂 <strong>Corrosivity</strong> on a Queensland station\'s card (<strong>Site</strong> tab, <strong>Site exposure — '
+        + 'tides and soils</strong>): how corrosive the air is to steel, as AS 4312\'s grade — C2 to CX, from how far the '
+        + 'site is from a surf beach and from any other shore — and <strong>OTE\'s category</strong> for the station\'s tower, '
+        + 'enclosure and orifice run, saying where OTE is stricter than the standard. The same categories the SoRT Scope '
+        + 'Builder uses.',
+    ] },
     { n: 198, date: '2026-11-05', items: [
       '💵 <strong>Costs to date</strong>, for administrators, at the top of the <strong>Admin</strong> tab\'s dashboard: '
         + 'everything paid for Flood-Net so far, with what it costs a month under it. <strong>Running costs</strong> below '

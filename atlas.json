@@ -981,6 +981,22 @@
         "date": "2026-11-01"
       },
       "on_change": "Read SoRT's payload as v2/js/tasks.js now writes it and bring tasks.js's parseHandoff() and test/tasks.mjs up to it. A payload with a new v needs a reader of its own beside v 1's, which links already sent still carry."
+    },
+    {
+      "id": "sort-corrosion",
+      "from": "sort",
+      "provider": "corrosion-guide",
+      "into": "stations-map",
+      "what": "The corrosion categories on a station card's Site exposure (site-exposure.js): AS 4312:2019 Table 4.1's grades by distance and kind of shore, OTE's three categories for a station's tower, enclosure and orifice run with their distances, and Queensland's ocean-facing surf beaches (data/surf-coast.json, a copy of SoRT's v2/data/surf-coast.json).",
+      "how": "vendored",
+      "watch": [
+        "v2/data/surf-coast.json",
+        "v2/tools/build-surf-coast.mjs"
+      ],
+      "since": {
+        "date": "2026-11-05"
+      },
+      "on_change": "Copy SoRT's v2/data/surf-coast.json over data/surf-coast.json; if guides.corrosion in its v2/definitions.json has changed (the bands or the standard's table), bring AS4312 and OTE in site-exposure.js and docs/site-exposure.md into step; npm run exposure; move this pin."
     }
   ],
   "asks": [

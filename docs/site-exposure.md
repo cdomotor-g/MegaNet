@@ -4,8 +4,9 @@ A section on every station card that says what the water and the ground at the
 station are likely to do to whatever is built there: whether it stands in or
 near tidal water, where the Water Act puts the nearest tidal limit, whether it is
 in the coastal management district, the erosion prone 40 m from the highest tide
-or a storm tide area, and what Queensland's acid sulfate soil mapping says about
-the ground under it — beside the tide levels the station's own record already
+or a storm tide area, how corrosive the air is to steel (AS 4312's grade, and
+OTE's category for a station's materials), and what Queensland's acid sulfate
+soil mapping says about the ground under it — beside the tide levels the station's own record already
 carries, and a short, plain-language reading of what they add up to.
 
 It is `site-exposure.js`, placed on the card by `stnCardHtml()` in `app.js`
@@ -30,13 +31,16 @@ says so under every summary, and this page says why below.
 | **Tidal limit** | The Water Act downstream limit on the station's own stream if one is mapped within 20 km, otherwise the nearest one, saying it is on another stream; the straight-line distance to it. *None mapped within 20 km* where there is none. | Watercourse identification map |
 | **Coast** | In or outside the coastal management district, and *within 40 m of HAT* where the point is in component 1 of the erosion prone area. | Coastal management district; erosion prone area |
 | **Storm tide** | *High hazard* (covered by more than 1 m) or *Medium hazard* (less), *Not in a mapped storm tide area*, or *Not mapped here* where the State had no LiDAR to map it from. | Storm tide hazard areas |
+| **Corrosivity** | AS 4312:2019's grade of how corrosive the air is to steel and its coatings, C2 to CX, read off the standard's Table 4.1 (below) by the distance to the nearest surf beach and to the nearest other shore, the higher of the two; with the shore and distance that decide it. *No shore within 10 km* inland. | The surf beaches file and the Queensland coastline |
+| **OTE category** | Which of OTE's three categories for a station's tower, enclosure and orifice run the site is in — *C3 and below* (standard), *C4* (stainless enclosure and orifice run), *C5 and CX* (all stainless) — with the materials, and *stricter than the standard's table here* where it is. | as above |
 | **Acid sulfate** | The finest acid sulfate soil map that covers the point (1:25 000, then 1:50 000, then 1:100 000), quoted in its own words with its scale and project code; or the national atlas's probability class where no finer map covers it, marked *inferred, not checked on the ground* at 1:2M; or *Not mapped here*, which is not the same as absent. | Acid sulfate soils series; national atlas |
 | **National atlas** | Beside a finer answer: the atlas's class if Queensland's copy has one there — which, by how the copy was made, it usually does not, and the row says so rather than reading the gap as a finding. | National atlas |
 | **ASS sample** | The nearest acid sulfate soil sample site within 2 km: how far, which project and site, how deep the core went, whether it has laboratory data or field pH, how many sites are within 2 km, and a link to the site's own report. Shown where there is one, or where the soil is mapped as likely and there is none. | Acid sulfate soil sites (SALI) |
 | **Tide on the gauge** | From the station record, not the services: HAT from the Bureau's crossing type **T**, and the tide levels among its flood effects (HAT, MHWS, a historic storm tide), each a height on the gauge — and in m AHD only where the gauge zero in force is surveyed in AHD. | The Bureau's river height station lists (0031, 0032) |
 
-The coastal rows (*Tidal limit*, *Coast*, *Storm tide*, *ASS sample*) are asked
-only where the highest-tide line is within 10 km: all of them lie along the coast
+The coastal rows (*Tidal limit*, *Coast*, *Storm tide*, *ASS sample*, and the
+coastline behind *Corrosivity*) are asked only where the highest-tide line is
+within 10 km: all of them lie along the coast
 and the estuaries, and inland they would be seven requests answering "no".
 
 ### The summary — *Indicative exposure*
@@ -50,6 +54,8 @@ A few sentences, each tied to a row above:
   to the site. Within 1 km: salt on the wind and salty groundwater are worth
   checking for. None within 10 km: these maps put no salt water here — and
   inland salinity is not something they cover.
+- **Salt in the air.** AS 4312's grade and what decides it, and OTE's category
+  with its materials — saying so where OTE is stricter than the standard.
 - **Storm tide.** In a mapped storm tide area: a surge can put seawater over the
   site, and the mapping allows for sea level rise to 2100.
 - **The station's ground against HAT.** Where the gauge's HAT can be put in AHD
@@ -122,6 +128,8 @@ its fields and every "is it here" question is `returnCountOnly`.
 | [Storm tide — high and medium hazard](https://www.data.qld.gov.au/dataset/storm-tide-queensland-series), and where it is not mapped | `…/CoastalManagement/MapServer/11`, `/12`, `/13` | as above | CC BY 4.0 |
 | [Acid sulfate soils series](https://www.data.qld.gov.au/dataset/acid-sulfate-soils-series) — 1:25 000, 1:50 000, 1:100 000 | `GeoscientificInformation/SoilsAndLandResource/MapServer/1902`, `/1952`, `/2002` | State of Queensland (Department of Environment and Science), 2020 | **CC BY 3.0 AU** |
 | [Atlas of Australian Acid Sulfate Soils](https://doi.org/10.4225/08/512E79A0BC589) (Fitzpatrick, Powell & Marvanek), as Queensland serves it | `…/SoilsAndLandResource/MapServer/2052` | CSIRO, 2011 | CC BY 4.0 |
+| [Coastline — Queensland](https://www.data.qld.gov.au/dataset/coastline-queensland) | `Oceans/CoastalWaters/MapServer/17` | State of Queensland (Department of Natural Resources and Mines), 2017 | CC BY 4.0 |
+| Queensland's surf beaches — the coastline's stretches facing open ocean swell, Point Danger to Agnes Water | `data/surf-coast.json`, this site's own, copied from the SoRT Scope Builder (`v2/data/surf-coast.json`, made by its [`v2/tools/build-surf-coast.mjs`](https://github.com/cdomotor-g/SoRT/blob/main/v2/tools/build-surf-coast.mjs)) | derived from the coastline above | CC BY 4.0 |
 | Acid sulfate soil sites (SALI), in the [Queensland soil and land resource map service](https://www.data.qld.gov.au/dataset/queensland-soil-and-land-resource-data-web-map-service) | `…/SoilsAndLandResource/MapServer/1850` | State of Queensland (Department of Natural Resources and Mines, Manufacturing and Regional and Rural Development), 2025 | CC BY 4.0 |
 
 The licences were read off data.qld.gov.au's catalogue and the atlas's DOI
@@ -131,6 +139,63 @@ series is **CC BY 3.0 AU**, not 4.0. Both require attribution, which the card's
 its custodian and its licence, linked.
 
 ---
+
+## Corrosivity — the standard's table and OTE's categories
+
+Copied from the SoRT Scope Builder, where a forum chooses a station's materials
+with them (`guides.corrosion` in its `v2/definitions.json`; its README's
+*Corrosion: AS 4312 and OTE's instruction* has both tables and the comparison).
+Change them there first, then here; `atlas.json` carries the link.
+
+AS 4312:2019 Table 4.1 (as reproduced in Timber Queensland Technical Data
+Sheet 35, April 2020) — the grade at each distance from the shoreline:
+
+| Shore | 0–50 m | 50–100 m | 100–500 m | 0.5–1 km | 1–10 km | 10–100 km |
+| --- | --- | --- | --- | --- | --- | --- |
+| Temperate quiet (Melbourne, Hobart) | C4 | C3 | C3 | C3 | C2 | C2 |
+| Temperate semi-sheltered (Adelaide, Brisbane, Perth) | C5 | C4 | C4 | C3 | C3\* | C2 |
+| Tropical quiet (Cairns, Townsville) | CX | CX | C5/C4 | C3 | C2 | C2 |
+| Surf (Sydney, Wollongong, Newcastle, Gold Coast) | CX | CX/C5 | C5 | C4 | C3 | C3\* |
+
+\* C2 where the site is more than 50 m above sea level and more than 5 km from
+the shoreline — applied when the station's elevation is recorded. Beyond
+100 km, C2.
+
+OTE's instruction (November 2026) — the category, by the distance within which
+each kind of shore puts a station in it:
+
+| Category | Materials | Temperate quiet | Semi-sheltered | Tropical quiet | Surf |
+| --- | --- | --- | --- | --- | --- |
+| C5 and CX | stainless steel tower, enclosure and orifice run | — | under 100 m | under 1 km | under 1 km |
+| C4 | galvanised tower; stainless steel enclosure and orifice run | under 100 m | 100 m – 1 km | — | 1 – 10 km |
+| C3 and below | galvanised tower, aluminium enclosure, galvanised orifice run (stainless in a polluted river) | further | further | further | further |
+
+OTE is stricter than the table in six of its 24 bands — most notably surf
+1–10 km (C3 on the table, C4 for OTE) and tropical quiet 0.5–1 km (C3 against
+C5 and CX) — and never less strict. The row says *stricter than the standard's
+table here* when it is.
+
+How the distances are found:
+
+- **To a surf beach**: from `data/surf-coast.json`, for every station, with no
+  request (it is fetched once a page and kept by the service worker). Each
+  stretch of the State's coastline was judged surf when four of thirteen rays
+  out to sea, north round to south, reach open water within 80 km and one of
+  them is between east-north-east and south-east, where the swell comes from:
+  the ocean beaches from Point Danger to Agnes Water, the ocean side of the sand
+  islands, and the north-facing bays behind headlands (Coolangatta, Rainbow
+  Bay, Noosa) — but not Moreton Bay, the Broadwater, Pumicestone Passage, the
+  Great Sandy Strait or Hervey Bay, which see open water only to the north.
+- **To any other shore**: the Coastline layer within 11 km (generalised to
+  ~10 m — a few to thirty kilobytes), only where the highest-tide line is within
+  10 km, leaving out the pieces within 40 m of a surf stretch. The coastline is
+  mean high water, the seaward edge of mangroves, with each river closed off at
+  its mouth by a "Coastline Junction" line — so a riverbank upstream is not the
+  shore, as it would be on the HAT line (Jindalee, 20 km up the Brisbane River,
+  is 4 m from that and 53 km from a surf beach). North of the Tropic of
+  Capricorn (23.44° S) a shore is *tropical quiet*, south of it *temperate
+  semi-sheltered*, the stricter of the standard's two sheltered kinds; none is
+  taken as *temperate quiet*.
 
 ## Limits
 
@@ -171,6 +236,12 @@ its custodian and its licence, linked.
 - **HAT on the gauge** comes from the Bureau's lists as recorded on the station,
   and goes into AHD only through a gauge zero surveyed in AHD — never an assumed
   datum — and only when the answer is somewhere a tide could be (−1 to 8 m AHD).
+- **Corrosivity** is the table read by distance alone. AS 4312 itself says local
+  conditions move a site — prevailing onshore winds over flat ground, spray
+  from a headland, industrial pollution, shelter — and a harbour inside a
+  closed-off estuary (Cairns Harbour) is measured to the estuary's mouth. The
+  surf beaches were classified once, by rays, not surveyed; the split between
+  tropical and temperate is a line of latitude.
 - **Not covered at all:** inland (dryland) salinity and saline groundwater away
   from the coast, atmospheric salt from surf beyond what distance implies, and
   anywhere outside Queensland. The national atlas covers all of Australia and
@@ -194,7 +265,9 @@ to raise:
   members in sea water's tidal and splash zones and in aggressive — sulfate-bearing
   or acidic — soils, from the site's own test results.
 - Atmospheric corrosivity for steel and coatings is zoned under AS 4312, where
-  nearness to salt water drives the category.
+  nearness to salt water drives the category. The card's grade is its Table 4.1
+  read by distance, and OTE's category is the Bureau's own grouping of it for
+  station materials — a starting point for the choice, not the choice.
 
 ---
 
@@ -206,10 +279,10 @@ Staged, so a station asks only what can matter to it, one request per layer:
 |---|---|---|
 | Coverage | local government area; tidal water within 50 m — and, if neither, a local government area within 1 km | 2–3 |
 | Soil and distance | the three acid sulfate soil maps and the national atlas; out of tidal water, the three HAT-line bands | 4–7 |
-| Coastal, only with the HAT line within 10 km | Water Act limits within 20 km; coastal management district; 40 m from HAT; storm tide high, medium and unmapped; sample sites within 2 km | 7 |
+| Coastal, only with the HAT line within 10 km | Water Act limits within 20 km; coastal management district; 40 m from HAT; storm tide high, medium and unmapped; sample sites within 2 km; the coastline within 11 km | 8 |
 
-Thirteen to seventeen requests for a coastal station, nine or ten inland, none
-outside Queensland — each a count or a handful of attributes, a few kilobytes at
+Fourteen to eighteen requests for a coastal station, nine or ten inland, none
+outside Queensland — and, once a page, this site's own surf beaches file — each a count or a handful of attributes, a few kilobytes at
 most (the largest measured, the 113 sample sites within 2 km of Cairns Harbour,
 is 38 KB). A point query answered in about a second when measured. At most four are in flight at once
 across the whole app, each is given 20 s, and a card that moves to another
