@@ -3901,8 +3901,12 @@ const DB_SCHEMA = 'meganet';
 // bumped after; the station card and the Level Survey read station_benchmark,
 // and a database without it answers none. 102: the same benchmarks in numbers
 // for anybody (0102, station_benchmark_public), applied by db-migrate.yml on 4
-// November 2026, bumped after; only the agent API reads it.
-const DB_SCHEMA_VERSION = 103;
+// November 2026, bumped after; only the agent API reads it. 103: the field
+// station receiver threshold to -110 dBm (0103). 104: Loudoun Br AL's second
+// copy retired and a note on it and the Loudoun Bridge gauge (0104), applied
+// by db-migrate.yml on 5 November 2026, bumped after; no shape the app reads
+// changes.
+const DB_SCHEMA_VERSION = 104;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
