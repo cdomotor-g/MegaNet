@@ -978,6 +978,16 @@ jobs:
         working-directory: test
         run: npm run minimap
 
+      # The Stations map's magnifier (map-magnify.js): a pin that got into the
+      # glass, a power that zooms the map as well, a glass's map still fetching
+      # tiles behind another tab, a pointer left hidden after the glass has
+      # gone — none of them throws. Driven with a real mouse at a desktop's
+      # width, and with a finger's pointer events on a phone.
+      - name: The magnifier — the ground under the pins, closer up, and nothing else
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run magnify
+
       # Where you are, in the address bar (route.js, #211), and the first load
       # saying what it is doing (#212). A link that opens on the wrong tab, a
       # back button that skips a step or replays every pan, a reload that loses

@@ -119,7 +119,7 @@ const PANEL_IDS = ['map-display-block', 'map-legend', 'map-latency-panel', 'map-
 const STRIP = ['dock-names',
                'dock-fold', 'stations', 'places', 'paths', 'twin',
                'dock-fold', 'map-display', 'map-legend', 'map-latency', 'mn-map-3d', 'mn-map-north', 'mn-map-tilt',
-               'dock-fold', 'map-draw', 'map-polar', 'map-sites', 'map-relocate', 'map-bestrep', 'mn-map-here',
+               'dock-fold', 'map-draw', 'map-polar', 'map-sites', 'map-relocate', 'map-bestrep', 'mn-map-here', 'mn-map-magnify',
                'mn-map-clear', 'mn-map-full',
                'help'];
 const BUTTONS = STRIP.filter(k => k.startsWith('mn-map-'));
@@ -308,7 +308,7 @@ try {
     buttons.filter(b => /north|tilt/.test(b.c)).every(b => !b.shown)
       && buttons.filter(b => !/north|tilt/.test(b.c)).every(b => b.shown), JSON.stringify(buttons));
   check('…the toggles say whether they are on, the one-shot buttons do not',
-    ['mn-map-here', 'mn-map-3d', 'mn-map-full'].every(c => ['true', 'false'].includes(buttons.find(b => b.c === c).pressed))
+    ['mn-map-here', 'mn-map-magnify', 'mn-map-3d', 'mn-map-full'].every(c => ['true', 'false'].includes(buttons.find(b => b.c === c).pressed))
       && ['mn-map-north', 'mn-map-tilt'].every(c => buttons.find(b => b.c === c).pressed === null),
     JSON.stringify(buttons.map(b => [b.c, b.pressed])));
   const groups = await page.evaluate(() => {
@@ -1782,7 +1782,7 @@ try {
     const unfolded = await rail();
     check('a heading folds its section away, and back, remembered',
       folded.tools === 0 && folded.folded === 'tools' && folded.heads[2][1] === 'false'
-        && unfolded.tools === 6 && unfolded.folded === '' && unfolded.heads[2][1] === 'true', JSON.stringify({ folded, unfolded }));
+        && unfolded.tools === 7 && unfolded.folded === '' && unfolded.heads[2][1] === 'true', JSON.stringify({ folded, unfolded }));
     // The toggle: icons alone, and back.
     const wide = r.mapW;
     await page.click('#help-panel .dock-names');

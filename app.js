@@ -3336,6 +3336,28 @@ function setDockTab(id, opts = {}) {
     renderTabs();
   }
   renderDock(opts);
+  dockTabInView(id);
+}
+
+// The button of a pane just opened, scrolled into the strip's sight when the
+// strip had been scrolled past it. A phone's rail is taller than a short
+// screen, so it scrolls, and a drawer opened from elsewhere — Station details
+// on the card opens 📍 — kept whatever scroll the rail had: the drawer's own
+// button half off the top, nothing beside the drawer saying which it is or
+// shutting it. Only the strip moves, only as far as it takes, and only when a
+// pane is opened, never on a repaint: a rail somebody scrolled down to reach
+// ⛶ stays where they put it.
+function dockTabInView(id) {
+  const strip = document.querySelector('#help-panel .dock-strip');
+  const tab = strip && strip.querySelector(`.dock-tab[data-dock="${CSS.escape(id)}"]`);
+  if (!tab || !tab.getClientRects().length || strip.scrollHeight <= strip.clientHeight) return;
+  const cs = getComputedStyle(strip);
+  const s = strip.getBoundingClientRect(), t = tab.getBoundingClientRect();
+  // The foot stands over the strip's bottom (its height is the scroll padding).
+  const top = s.top + (parseFloat(cs.scrollPaddingTop) || 0);
+  const bottom = s.bottom - (parseFloat(cs.scrollPaddingBottom) || 0);
+  if (t.top < top) strip.scrollTop -= top - t.top;
+  else if (t.bottom > bottom) strip.scrollTop += t.bottom - bottom;
 }
 
 // Shut it, keeping which pane it would open on.
@@ -4934,6 +4956,20 @@ function stationsMapPanels(map) {
     group: 'tools', order: 30, pressed: MapHere.armed(),
     onClick: () => MapHere.arm(),
   });
+  // The magnifier (map-magnify.js): a glass that follows the mouse — or is
+  // dragged by a finger — showing the ground under it closer up, with every
+  // pin, name, line and overlay left out, for what they sit on top of on the
+  // imagery. A switch rather than a pane: on, it has nothing to set but its
+  // power, which Shift + scroll (or a tap on the glass) changes where it is.
+  // Last in Tools, beside What's here?, the other one about the ground at a
+  // point rather than the network.
+  MapChrome.button(map, {
+    className: 'mn-map-magnify', icon: Glyphs.rail('magnify'), name: 'Magnifier',
+    title: 'Magnifier — a glass over the map showing the ground under the pins, names and lines, closer up. Shift + scroll changes how close; Esc puts it away',
+    ariaLabel: 'Magnifier — shows the ground under the pins, names and lines, closer up',
+    group: 'tools', order: 40, pressed: MapMagnify.on(),
+    onClick: () => MapMagnify.toggle(),
+  });
 
   // ── The 3-D view, as one cluster ───────────────────────────────────────────
   // In a corner — which this map's controls are not in at any width now
@@ -6387,6 +6423,7 @@ function stopStationsMap() {
   MapArrows.detach();
   MapElevation.detach();
   MapHere.detach();
+  MapMagnify.detach();
   MapDraw.detach();
   LinkBudget.detach();
   MapRiverLines.detach();
@@ -6685,6 +6722,9 @@ function initMap() {
   // outlined on it (map-mini.js). Before the first refresh, which re-fits this
   // map and so moves the outline, and which asks it for its stations.
   MapMini.attach(state.map);
+  // The magnifier's glass (map-magnify.js): after the minimap, which it stands
+  // over, and on again on the new map if it was on before the rebuild.
+  MapMagnify.attach(state.map);
   // The banner naming the mode the map is in, if it is in one (map-mode.js):
   // after every module whose mode it names, so a mode that survives the
   // rebuild (a draw tool, site features) is named on the new map at once.

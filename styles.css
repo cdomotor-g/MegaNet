@@ -9488,6 +9488,117 @@ body .map-panel.is-driving {
   color: var(--muted);
 }
 
+/* ── The magnifier (map-magnify.js) ──────────────────────────────────────────
+   A round glass inside the map's container, centred on the point it enlarges
+   (map-magnify.js moves it with a transform; the negative margins put its
+   middle on that point). The container is not a stacking context, so 685 is
+   compared in the stage's own: over the map pane (400, every pane inside it)
+   and the minimap (680), under the station card (690), Leaflet's corners
+   (1000) and the ACMA card (1100). The map's edge clips it, as it does the
+   map.
+
+   Its map is twice the glass each way and centred in it (map-magnify.js, "Why
+   the glass's map is larger than the glass"); the circle is cut by the lens
+   box's clip, and the ring is drawn outside it by the glass's own shadow, so
+   the clip cannot take the ring with it. */
+.mn-magnify {
+  --mn-mag-d: min(240px, 46vmin);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--mn-mag-d);
+  height: var(--mn-mag-d);
+  margin: calc(var(--mn-mag-d) / -2) 0 0 calc(var(--mn-mag-d) / -2);
+  z-index: 685;
+  border-radius: 50%;
+  /* White, then a dark hairline outside it: the ring reads on the darkest
+     satellite and the palest canvas alike. */
+  box-shadow: 0 0 0 3px #ffffff, 0 0 0 4.5px rgba(8, 15, 24, .7), 0 8px 22px rgba(8, 15, 24, .45);
+  background: var(--subtle);
+  /* A mouse goes through it: a click lands on whatever is under it. */
+  pointer-events: none;
+  will-change: transform;
+}
+
+.mn-magnify[hidden] { display: none; }
+
+.mn-magnify-lens {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  clip-path: circle(50%);
+}
+
+.mn-magnify-map {
+  position: absolute;
+  left: -50%;
+  top: -50%;
+  width: 200%;
+  height: 200%;
+  background: transparent;
+}
+
+/* The point it is enlarging — a fine cross with its middle left open, so the
+   one spot being looked at is not under the mark that shows where it is. */
+.mn-magnify-aim {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  background:
+    linear-gradient(#ffffff, #ffffff) center top / 2px 7px no-repeat,
+    linear-gradient(#ffffff, #ffffff) center bottom / 2px 7px no-repeat,
+    linear-gradient(#ffffff, #ffffff) left center / 7px 2px no-repeat,
+    linear-gradient(#ffffff, #ffffff) right center / 7px 2px no-repeat;
+  filter: drop-shadow(0 0 1px rgba(8, 15, 24, .95));
+}
+
+/* How close it is, on the ring at the bottom — and for a few seconds after it
+   comes on, how to change that. */
+.mn-magnify-power {
+  position: absolute;
+  left: 50%;
+  bottom: -.55rem;
+  transform: translateX(-50%);
+  padding: .05rem .5rem;
+  border-radius: 999px;
+  background: rgba(8, 15, 24, .82);
+  color: #ffffff;
+  font-size: .75rem;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* No pointer over the map while the glass follows it — the cross is where it
+   is. Over Leaflet's corners the pointer is back, for ↺ and the zoom
+   buttons; and never over the 3-D view or a twin, which have pointers of
+   their own (map-magnify.js takes the class off then too, on the next move). */
+.leaflet-container.mn-magnifying:not(:has(#map3d.is-on, #map-twin.is-on)),
+.leaflet-container.mn-magnifying:not(:has(#map3d.is-on, #map-twin.is-on)) .leaflet-pane,
+.leaflet-container.mn-magnifying:not(:has(#map3d.is-on, #map-twin.is-on)) .leaflet-interactive {
+  cursor: none !important;
+}
+
+.leaflet-container.mn-magnifying .leaflet-control-container { cursor: auto; }
+
+/* Hidden at once over the 3-D view and a twin, rather than at the next move. */
+.leaflet-container:has(#map3d.is-on, #map-twin.is-on) > .mn-magnify { display: none; }
+
+/* A touch screen has no hover to follow, so there the glass takes the finger:
+   dragged, it moves; tapped, it steps its power (map-magnify.js). Elsewhere
+   the map pans under it as ever. */
+@media (hover: none) {
+  .mn-magnify {
+    pointer-events: auto;
+    touch-action: none;
+  }
+}
+
 /* The action row is the card's last section — no rule under it. It carries no
    padding of its own either: its groups do, so the rule between two groups
    runs the full width of the card the way the section borders above it do,

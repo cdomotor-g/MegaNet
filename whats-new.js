@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 222, date: '2026-11-05', items: [
+      '🔍 <strong>A magnifier on the Stations map, to see what the pins are sitting on.</strong> Switch on '
+        + '<strong>Magnifier</strong> under Tools in the right-hand rail, and a round glass follows the mouse, showing '
+        + 'the map underneath closer up — the satellite or whichever base maps are ticked — with every pin, name, line '
+        + 'and overlay left out. Shift + scroll makes it closer or further (2× to 16×); Esc puts it away. On a phone, '
+        + 'drag the glass, or tap it to change how close.',
+    ] },
     { n: 221, date: '2026-11-05', items: [
       '⭕ <strong>The 🎯 Best repeater ring is easier to see.</strong> The dashed ring round the site, showing how far '
         + 'the tool looked, is red now and twice as thick — the thin blue one was easy to lose over the satellite photos.',

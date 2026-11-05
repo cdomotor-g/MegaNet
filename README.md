@@ -1342,6 +1342,7 @@ here.
 - Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, both ways on a repeater-to-repeater backbone hop, and growing with the zoom rather than burying a whole-state view
 - Map and station cards side by side on any window wider than 1,100 px — the map filling the page and the cards in the side panel beside it, whose width drags — and a six-column list there (name, station number, roles, AlertID, SLS catchment, last heard) instead of the eleven the stacked shape, which a tablet's window gets, has room for; on a phone the map fills the screen and the cards are the side panel's drawers over it, from the rail that ⋮ in the banner brings out
 - **What’s here?** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub, the land's tenure and council, the estimated mobile signal for each carrier, and the nearest station, repeater and survey mark
+- **Magnifier** — a round glass that follows the mouse and shows the map under it closer up (2× to 16×, Shift + scroll), with every pin, name, line and overlay left out, for what a station's pin and label are sitting on in the imagery; on a phone, drag it and tap it
 - **3-D view** — tilt the map and see the ground it is drawn on: the same base map draped over ~30 m SRTM terrain, the same pins and links on it, the Queensland property boundaries and road reserve on the ground when their switches are on, a polar coverage plot lying on the relief, your Draw & measure sketches on the ground (and its tools drawing there), pan, tilt, rotate and zoom, and the option to draw each hop's line of sight as a vertical sheet rising from the ground to the ray, and water rising through the ground's heights to show how the land lies (an animation, not flood modelling; on until turned off)
 - **Mobile coverage** — each carrier's own 4G coverage map, as Telstra, Optus and TPG give it to the ACCC: where a phone works outdoors and where only with an external antenna, one carrier at a time or the best of the three
 - **Flood & road cameras** — the ~600 cameras councils publish on their disaster dashboards and TMR publishes on QLDTraffic, a pin each; press one for its latest picture and how old it is. On for everybody, signed in or not, from zoom 8
@@ -1362,7 +1363,7 @@ here.
   headings fold them: **Stations & places** (the cards, Find a place, the path tools, the digital
   twin), **Map** — what the map shows (**Layers**, with the base map — OSM-Topo by default,
   OpenStreetMap, Satellite or Dark — the **Legend**, **Latency**) — and **Tools**, what you point at it
-  (**Draw & measure**, **Radio coverage**, **Repeater sites**, **Relocate station**, **What's here?**);
+  (**Draw & measure**, **Radio coverage**, **Repeater sites**, **Relocate station**, **What's here?**, **Magnifier**);
   and a foot that stays put: **Clear the selection**, the **3-D view** with its settings and camera,
   **Full screen** and **Help**. A panel opens as a pane of the side panel from its button in the rail;
   a button does its one thing, and a mode wears a switch. The icons are drawn in each look's own hand
