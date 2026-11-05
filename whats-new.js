@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 211, date: '2026-11-05', items: [
+      '📍 <strong>A station pin takes the click over anything drawn on top of it.</strong> The elevation profile\'s line '
+        + 'along a link you pressed, or a line or circle drawn with ✏️, used to take every click meant for a pin under it '
+        + '— both pins at the ends of a profile line could not be opened. Now a pin under the pointer always answers; the '
+        + 'drawn shapes still take clicks everywhere else.',
+    ] },
     { n: 210, date: '2026-11-05', items: [
       '🖱️ <strong>Station pins and links can be clicked again after a field station\'s card has been open.</strong> '
         + 'Since today\'s lines to the base stations that hear a station directly, opening such a card left a see-through '

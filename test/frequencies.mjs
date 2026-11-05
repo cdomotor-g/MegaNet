@@ -25,7 +25,9 @@
 //   5. **The pins under the lines**: real clicks. Once the lines have been
 //      drawn and gone a pin still opens its card, a line still opens its
 //      radio-path card, and a canvas another layer leaves in a pane over the
-//      links takes no click from the pins (the backstop in styles.css).
+//      links takes no click from the pins (the backstop in styles.css). A pin
+//      under the elevation profile's line or a circle drawn after it still
+//      takes the click (pinFirstCanvas, app.js).
 //
 // Run:  npm run frequencies
 //       npm run frequencies -- -v
@@ -476,6 +478,57 @@ async function main() {
     check('…and a real click on a line to a base still opens its radio-path card',
       await page.evaluate(() => { const c = MapBackbone.current(); return !!c && c.kind === 'direct' && c.bId === 'marburg_radar'; }),
       JSON.stringify(mid));
+
+    // The pins first for the pointer (pinFirstCanvas, app.js). The path just
+    // opened is drawn as the elevation profile's line, after the pins, ending
+    // dead on Marburg's pin — which, on Leaflet's own rule (the last drawn
+    // wins), could not be clicked until the line went.
+    await page.evaluate(v => { MapBackbone.closeCard(); closeStnCard(); state.map.setView(v[0], v[1], { animate: false }); }, MARBURG_VIEW);
+    await page.waitForTimeout(400);
+    const over = await page.evaluate(id => {
+      const s = state.data.stations.find(x => x.id === id);
+      const pt = state.map.latLngToLayerPoint([s.lat, s.lon]);
+      const r = state.map.options.renderer;
+      let last = null;
+      for (let o = r._drawFirst; o; o = o.next) if (o.layer.options.interactive && o.layer._containsPoint(pt)) last = o.layer;
+      return { pathOpen: !!(state.path && state.path.open), lastIsPin: !!last && last.mnStationId === id };
+    }, 'marburg_radar');
+    pin = await pinAt('marburg_radar');
+    await page.mouse.move(pin.x, pin.y);
+    await page.mouse.click(pin.x, pin.y);
+    await page.waitForTimeout(400);
+    check('a pin at the end of the elevation profile\'s line, drawn over it, still takes the click',
+      over.pathOpen && !over.lastIsPin && await page.evaluate(() => !!state.stnCard && state.stnCard.id === 'marburg_radar'),
+      JSON.stringify(over));
+    await page.evaluate(v => {
+      closeStnCard();
+      window.__overPin = 0;
+      const s = state.data.stations.find(x => x.id === 'marburg_radar');
+      window.__cover = L.circle([s.lat, s.lon], { radius: 3000, color: '#c2185b' })
+        .on('click', () => { window.__overPin++; }).addTo(state.map);
+      state.map.setView(v[0], v[1], { animate: false });
+    }, MARBURG_VIEW);
+    await page.waitForTimeout(400);
+    pin = await pinAt('marburg_radar');
+    await page.mouse.move(pin.x, pin.y);
+    await page.mouse.click(pin.x, pin.y);
+    await page.waitForTimeout(400);
+    const inside = await page.evaluate(() => ({ card: state.stnCard && state.stnCard.id, cover: window.__overPin,
+      cursor: state.map.getContainer().querySelector('.leaflet-overlay-pane canvas').classList.contains('leaflet-interactive') }));
+    check('…and so does a pin under a circle drawn after it, the circle not hearing the click',
+      inside.card === 'marburg_radar' && inside.cover === 0 && inside.cursor, JSON.stringify(inside));
+    const beside = await page.evaluate(id => {
+      const s = state.data.stations.find(x => x.id === id);
+      const p = state.map.latLngToContainerPoint([s.lat, s.lon]);
+      const box = state.map.getContainer().getBoundingClientRect();
+      return { x: box.left + p.x, y: box.top + p.y + 25 };
+    }, 'marburg_radar');
+    await page.evaluate(() => closeStnCard());
+    await page.mouse.click(beside.x, beside.y);
+    await page.waitForTimeout(300);
+    check('…while the circle off the pin still takes its own click',
+      await page.evaluate(() => window.__overPin === 1), JSON.stringify(beside));
+    await page.evaluate(() => { window.__cover.remove(); closeStnCard(); });
 
     await context.close();
 

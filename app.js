@@ -6437,6 +6437,57 @@ function stopStationsMap() {
   }
 }
 
+// The shared canvas, with the station pins first for the pointer. Leaflet's
+// canvas gives a click or a hover to the last-drawn layer under it, and the
+// pins are drawn after the links — so they won over the links, but lost to
+// whatever went on the map after them: a drawn line or circle (MapDraw), the
+// elevation profile's line along a link someone pressed, which ends dead on
+// both its pins. Those pins could not be clicked until the line went. Now a
+// pin under the pointer is what the click and the hover go to, whatever else
+// is drawn over it, and everything that is not a pin keeps Leaflet's own
+// order. Built on the first map, not at load (`npm run toplevel`). Leaflet is
+// pinned to 1.9.4 in index.html: these are its own `_onClick` and
+// `_handleMouseHover`, with the one choice changed.
+let PinFirstCanvas = null;
+function pinFirstCanvas(options) {
+  if (!PinFirstCanvas) {
+    PinFirstCanvas = L.Canvas.extend({
+      _pinFirstAt(point, e) {
+        const clicking = !!e && (e.type === 'click' || e.type === 'preclick');
+        let top = null, pin = null;
+        for (let o = this._drawFirst; o; o = o.next) {
+          const l = o.layer;
+          if (!l.options.interactive || !l._containsPoint(point)) continue;
+          if (clicking && this._map._draggableMoved(l)) continue;
+          top = l;
+          if (l.mnStationId != null) pin = l;
+        }
+        return pin || top;
+      },
+      _onClick(e) {
+        const hit = this._pinFirstAt(this._map.mouseEventToLayerPoint(e), e);
+        this._fireEvent(hit ? [hit] : false, e);
+      },
+      _handleMouseHover(e, point) {
+        if (this._mouseHoverThrottled) return;
+        const hit = this._pinFirstAt(point, null);
+        if (hit !== this._hoveredLayer) {
+          this._handleMouseOut(e);
+          if (hit) {
+            L.DomUtil.addClass(this._container, 'leaflet-interactive');
+            this._fireEvent([hit], e, 'mouseover');
+            this._hoveredLayer = hit;
+          }
+        }
+        this._fireEvent(this._hoveredLayer ? [this._hoveredLayer] : false, e);
+        this._mouseHoverThrottled = true;
+        setTimeout(() => { this._mouseHoverThrottled = false; }, 32);
+      },
+    });
+  }
+  return new PinFirstCanvas(options);
+}
+
 function initMap() {
   // Before the early return below, so a render that finds no container still
   // leaves a teardown registered for the render that built one. Keyed by name
@@ -6474,8 +6525,9 @@ function initMap() {
   // the default SVG renderer means ~6,300 SVG nodes rebuilt on every refresh.
   // A single canvas element instead. The renderer is created explicitly for
   // its tolerance: radio paths are clickable now, and a canvas hit-test
-  // confined to a 1.5 px core is a target nobody lands on.
-  state.map = L.map('leaflet-map', { preferCanvas: true, renderer: L.canvas({ tolerance: 5 }) });
+  // confined to a 1.5 px core is a target nobody lands on. The pins come first
+  // for the pointer, over anything drawn after them (pinFirstCanvas, above).
+  state.map = L.map('leaflet-map', { preferCanvas: true, renderer: pinFirstCanvas({ tolerance: 5 }) });
   // The one map still declared in the file that re-measures them all. It says
   // so the same way the other four do, so that stays true if it ever moves.
   registerLiveMap('Stations', () => state.map);
