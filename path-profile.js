@@ -3027,11 +3027,13 @@ const PathProfile = (function () {
   // key and the source under it. chartSvg() is the card's own drawing; it
   // leaves the cursor's scales behind, which belong to the chart on screen and
   // are put back.
-  // `bare` leaves the heading off — the summary says it over the chart already
-  // — and keeps the two ends named over it.
-  function paperSvg(rep, bare) {
+  // `opts.bare` leaves the heading off — the summaries say it over the chart
+  // already — and keeps the two ends named over it; `opts.W` and `opts.H` draw
+  // it at another size (the compact summary's shorter chart).
+  function paperSvg(rep, opts = {}) {
     const s = shown;
-    const { W, H } = PAPER;
+    const bare = !!opts.bare;
+    const W = opts.W || PAPER.W, H = opts.H || PAPER.H;
     const head = bare ? 50 : PAPER.head;
     const keep = hoverGeom;
     let chart;
@@ -3111,9 +3113,9 @@ const PathProfile = (function () {
   // The paper chart as a PNG, at twice its size so it prints sharp:
   // { blob, url, w, h } — the blob for the clipboard and a download, the data
   // URL for the document, which carries the picture inside it.
-  function paperPicture(rep, bare) {
+  function paperPicture(rep, opts) {
     return new Promise((resolve, reject) => {
-      const p = paperSvg(rep, bare);
+      const p = paperSvg(rep, opts);
       if (!p) { reject(new Error('There is no chart to copy.')); return; }
       const img = new Image();
       img.onload = () => {
@@ -3330,7 +3332,7 @@ const PathProfile = (function () {
       r.gain == null ? '' : `${lbDbd(r.gain)} dBd`];
     const lossRow = (e, r) => ['Line loss', r.loss == null ? '—' : `${+r.loss.toFixed(2)} dB${ed(e, 'loss_db')}`, ''];
     const tx = {
-      head: 'TRANSMITTER · A', name: a.name, sub: subOf(a),
+      head: 'TRANSMITTER · A', name: a.name, sub: subOf(a), role: roleOf(a),
       meter: sMeterOf(back, f),
       meterNote: back != null ? `${back.toFixed(1)} dBm heard back from ${b.name}`
         : noRadio ? `no radio at ${noRadio} — a point on the ground` : `no figure on file for the signal back from ${b.name}`,
@@ -3345,7 +3347,7 @@ const PathProfile = (function () {
       ],
     };
     const rxp = {
-      head: 'RECEIVER · B', name: b.name, sub: subOf(b),
+      head: 'RECEIVER · B', name: b.name, sub: subOf(b), role: roleOf(b),
       meter: sMeterOf(rx, f),
       meterNote: rx != null ? `${rx.toFixed(1)} dBm from ${a.name}`
         : noRadio ? `no radio at ${noRadio} — a point on the ground` : `no figure on file for the signal from ${a.name}`,
@@ -3564,6 +3566,158 @@ const PathProfile = (function () {
     return L.join('\n');
   }
 
+  // ── 🗒️ the compact summary: the same window, in brief ──
+  // For a page with room for a paragraph rather than a page. Every figure
+  // Radio Mobile's window shows, in its places, and very little else: no word
+  // under each figure, no captions to the meters, no key to the words, a
+  // shorter chart, and the heading one line. What it keeps besides is what a
+  // comparison needs that Radio Mobile keeps elsewhere — the Longley–Rice
+  // settings (its network properties) and the propagation mode — and the one
+  // sentence that makes the comparison work: what Radio Mobile's Rx relative
+  // should read for this path, without Flood-Net's own (✦) terms.
+  const COMPACT_CHART = { bare: true, W: 900, H: 210 };
+
+  // What the compact summary lays out: the summary's own figures, re-cut.
+  function compactOf(rep) {
+    const S = summaryOf(rep);
+    const n = S.nums, an = rep.an, P_ = an.prop;
+    const short = { 'Ground cover': 'Cover', 'Field allowance': 'Allowance' };
+    const grid = S.grid.map(r => r.map(c => ({ ...c, k: short[c.k] || c.k })));
+    const panel = P => ({ ...P, rows: P.rows.filter(([k]) => k !== 'Role') });
+    // Radio Mobile prices Longley–Rice alone: what it should read here is the
+    // margin with Flood-Net's own terms given back (the full report's note).
+    const own = n.cover + n.allowance + (n.floor > 0.05 ? n.floor : 0);
+    const rm = n.margin == null ? null : n.margin + own;
+    const mdvar = (ITM.MDVAR[P_.mdvar % 10] || String(P_.mdvar)).replace(/\s*\(.*\)$/, '');
+    const settings = [
+      ['Model', an.model === 'field' ? `Longley–Rice, field model (−${an.allowance_db} dB)` : 'Longley–Rice, land-cover model'],
+      ['Mode', an.itm ? an.itm.modeLabel : 'did not run'],
+      ['Climate', ITM.CLIMATE[P_.climate] || String(P_.climate)],
+      ['Polarization', P_.pol === 1 ? 'Vertical' : 'Horizontal'],
+      ['Variability', mdvar],
+      ['Time / locations / situations', `${P_.time} / ${P_.location} / ${P_.situation}%`],
+      ['Refractivity', `${P_.N0}`],
+      ['Conductivity', `${P_.sigma} S/m`],
+      ['Permittivity', `${P_.epsilon}`],
+      ['Terrain', P_.ground === 'lidar' ? '5 m LiDAR + ~30 m tiles' : `~${rep.prof.resolution_m || 30} m tiles`],
+    ];
+    const marks = [
+      n.floor > 0.05 ? `✦ obstruction floor +${n.floor.toFixed(1)} dB in the path loss` : '',
+      an.itm && an.itm.warnings.length ? `⚠ ${an.itm.warnings.join('; ')}` : '',
+      S.notes.some(x => x.startsWith('✎')) ? '✎ typed over on the card' : '',
+    ].filter(Boolean);
+    return { ...S, grid, tx: panel(S.tx), rx: panel(S.rx), settings, rm, own, marks };
+  }
+
+  // The compact summary as a document: the summary's look, at about half its
+  // height — the same tables, smaller type, tighter insets.
+  function compactHtml(rep, pic) {
+    const S = compactOf(rep);
+    const T = rep.tokens;
+    const tone = { ok: T['--ok'] || '#107c10', warn: T['--warn'] || '#9e5e00', bad: T['--bad'] || '#c7401a' };
+    const C = { ink: '#16202a', muted: '#566779', faint: '#7f8e9d', line: '#cfd8e2', rule: '#e6ebf1', soft: '#f5f8fb',
+                navy: '#0f3a5f', kick: '#9dc1e2', navySub: '#c6d9eb', accent: '#0b5cab' };
+    const grid = { ok: ['#f2f9f4', '#d3e8d9', '#dcefe2'], warn: ['#fdf8ee', '#efe0bf', '#f8e8c6'],
+                   bad: ['#fdf3f0', '#f0d2c8', '#f7dcd2'], none: ['#f5f8fb', '#dce3ea', '#e9eef3'] }[S.cls || 'none'];
+    const font = "font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;";
+    const W = 600;
+    const td = (style, html, attrs = '') => `<td ${attrs} style="${font}${style}">${html}</td>`;
+    const table = (pad, rows, style = '') => `<table width="100%" cellspacing="0" cellpadding="${pad}" border="0" style="border-collapse:collapse;${style}">${rows}</table>`;
+    const kick = (t, col = C.accent) => `<span style="${font}font-size:6.5pt;font-weight:bold;letter-spacing:1.2pt;color:${col}">${esc(t)}</span>`;
+
+    // One line: the path, and its answer.
+    const fig = rep.margin == null ? 'not computed' : `${signed(rep.margin, 1)} dB`;
+    const chip = rep.band
+      ? `&nbsp;<span style="${font}background:${tone[rep.band.cls]};color:#ffffff;font-size:7pt;font-weight:bold;letter-spacing:.6pt">&nbsp;${esc(rep.band.label.toUpperCase())}&nbsp;</span>` : '';
+    const header = table(6, `<tr>
+      ${td(`background:${C.navy};padding:6px 9px;vertical-align:middle;font-size:7pt;line-height:1.3`, `${kick('RADIO LINK', C.kick)}&nbsp;&nbsp;<b style="${font}font-size:10.5pt;color:#ffffff">${
+        esc(`${rep.a.name} → ${rep.b.name}`)}</b><br><span style="${font}font-size:7pt;color:${C.navySub}">${esc(rep.sub)}</span>`,
+        `bgcolor="${C.navy}" valign="middle"`)}
+      ${td(`background:${C.navy};padding:6px 9px;vertical-align:middle;text-align:right;white-space:nowrap;font-size:7pt;line-height:1.3`, `${kick('FADE MARGIN', C.kick)}<br><b style="${font}font-size:13pt;color:#ffffff">${esc(fig)}</b>${chip}`,
+        `bgcolor="${C.navy}" align="right" valign="middle"`)}
+    </tr>`, `background:${C.navy}`);
+
+    // Radio Mobile's three rows of five, a figure to a cell and nothing under it.
+    const gridCell = (c, i) => {
+      const bg = c.hot && c.tone ? grid[2] : grid[0];
+      const col = c.tone && (c.hot || c.tone !== 'ok') ? tone[c.tone] : C.ink;
+      return td(`background:${bg};vertical-align:top;padding:4px 6px;font-size:6.5pt;line-height:1.2;border-top:1px solid ${grid[1]};${i < 4 ? `border-right:1px solid ${grid[1]};` : ''}`,
+        `<div style="${font}margin:0;font-size:6.5pt;line-height:1.2;color:${C.muted}">${esc(c.k)}${c.flag ? ` <b style="color:${C.accent}">${c.flag}</b>` : ''}</div><div style="${font}margin:0;font-size:8.5pt;line-height:1.2;font-weight:bold;color:${col};white-space:nowrap">${esc(c.v)}</div>`,
+        `width="20%" valign="top" bgcolor="${bg}"`);
+    };
+    const figures = table(3, S.grid.map(r => `<tr>${r.map(gridCell).join('')}</tr>`).join(''), 'table-layout:fixed');
+
+    const imgW = W - 2, imgH = pic ? Math.round(pic.h * imgW / pic.w) : 0;
+    const chart = pic ? `<img src="${pic.url}" width="${imgW}" height="${imgH}" style="display:block;border:0" alt="${
+      escAttr(`Elevation profile, ${rep.a.name} to ${rep.b.name}, with the line of sight and the 60% Fresnel zone`)}">` : '';
+
+    // The two ends, row for row: the name, the meter under it, then Radio
+    // Mobile's rows.
+    const meterImg = P => {
+      const m = meterPicture(P.meter);
+      return m ? `<img src="${m.url}" width="${Math.round(m.w * 0.7)}" height="${Math.round(m.h * 0.7)}" style="border:0;vertical-align:middle" alt="${
+        escAttr(`Signal meter: ${P.meter ? P.meter.label : 'no reading'}`)}">` : '';
+    };
+    const head = (P, label, right) => td(`padding:4px 6px 1px;${right ? `border-left:1px solid ${C.line};` : ''}vertical-align:middle;font-size:7pt`,
+      `${kick(label)}&nbsp; <b style="${font}font-size:9pt;color:${C.ink}">${esc(P.name)}</b> <span style="${font}font-size:6.5pt;color:${C.faint}">${esc(P.role)}</span>`,
+      'colspan="3" valign="middle"');
+    const meter = (P, right) => td(`padding:1px 6px 3px;${right ? `border-left:1px solid ${C.line};` : ''}vertical-align:middle;font-size:7pt;line-height:1`, meterImg(P) || '&nbsp;', 'colspan="2" valign="middle"')
+      + td('padding:1px 6px 3px;text-align:right;white-space:nowrap;vertical-align:middle;font-size:7pt',
+        `<b style="${font}font-size:9pt;color:${P.meter ? C.ink : C.faint}">${esc(P.meter ? P.meter.label : '—')}</b>`, 'align="right" valign="middle"');
+    const cell = ([k, v1, v2], right) => {
+      const edge = `border-top:1px solid ${C.rule};${right ? `border-left:1px solid ${C.line};` : ''}`;
+      return td(`padding:1px 3px 1px 6px;${edge}font-size:7pt;color:${C.muted};white-space:nowrap`, esc(k), 'width="16%"')
+        + (v2
+          ? td(`padding:1px 3px;border-top:1px solid ${C.rule};font-size:7.5pt;font-weight:bold;color:${C.ink};white-space:nowrap`, esc(v1), 'width="18%"')
+            + td(`padding:1px 6px 1px 3px;border-top:1px solid ${C.rule};font-size:7.5pt;color:${C.ink};text-align:right;white-space:nowrap`, esc(v2), 'width="16%" align="right"')
+          : td(`padding:1px 6px 1px 3px;border-top:1px solid ${C.rule};font-size:7.5pt;font-weight:bold;color:${C.ink}`, esc(v1), 'colspan="2"'));
+    };
+    const ends = table(2, `
+      <tr>${head(S.tx, 'TX', false)}${head(S.rx, 'RX', true)}</tr>
+      <tr>${meter(S.tx, false)}${meter(S.rx, true)}</tr>
+      ${S.tx.rows.map((r, i) => `<tr>${cell(r, false)}${cell(S.rx.rows[i], true)}</tr>`).join('')}`,
+      `border-top:1px solid ${C.line};table-layout:fixed`);
+
+    // The foot: the net and the frequency, the settings Radio Mobile asks for,
+    // and what its Rx relative should read.
+    const rmLine = S.rm == null ? ''
+      : S.own > 0.05
+        ? `Radio Mobile has no ✦ terms (${S.own.toFixed(1)} dB here), so its <b>Rx relative</b> should read about <b style="color:${C.ink}">${esc(signed(S.rm, 1))} dB</b>.`
+        : `Radio Mobile runs the same Longley–Rice: its <b>Rx relative</b> should read about <b style="color:${C.ink}">${esc(signed(S.rm, 1))} dB</b>.`;
+    const foot = table(4, `<tr>${td(`background:${C.soft};padding:4px 6px;font-size:7pt;color:${C.muted};line-height:1.4`, `
+      ${kick('NET')}&nbsp; <b style="color:${C.ink}">${esc(S.net)}</b> &nbsp;&nbsp;${kick('FREQUENCY')}&nbsp; <b style="color:${C.ink}">${esc(S.freq[0])}</b> ${esc(S.freq[1])}<br>
+      ${S.settings.map(([k, v]) => `${esc(k)} <b style="color:${C.ink}">${esc(v)}</b>`).join(' · ')}
+      ${rmLine || S.marks.length ? `<br>${[rmLine, ...S.marks.map(esc), 'Indicative only.'].filter(Boolean).join(' ')}` : ''}`,
+      `bgcolor="${C.soft}"`)}</tr>`, `border-top:1px solid ${C.line}`);
+
+    const part = (html, attrs = '') => `<tr><td ${attrs} style="padding:0">${html}</td></tr>`;
+    return `<div style="${font}color:${C.ink}">
+      <table width="${W}" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:${W}px;border:1px solid ${C.line}">
+        ${part(header, `bgcolor="${C.navy}"`)}${part(figures)}${pic ? part(chart, 'bgcolor="#ffffff"') : ''}${part(ends)}${part(foot)}
+      </table>
+    </div>`;
+  }
+
+  // The compact summary as plain text: the same grid, tabs between the cells.
+  function compactText(rep) {
+    const S = compactOf(rep);
+    const meter = P => (P.meter ? P.meter.label : '—');
+    const L = [`RADIO LINK — ${rep.a.name} → ${rep.b.name} — fade margin ${rep.margin == null ? 'not computed' : `${signed(rep.margin, 1)} dB, ${rep.band.label}`}`, rep.sub, ''];
+    S.grid.forEach(r => L.push(r.map(c => `${c.k}${c.flag ? ` ${c.flag}` : ''}\t${c.v}`).join('\t')));
+    L.push('', `TX\t${S.tx.name}\t${meter(S.tx)}\tRX\t${S.rx.name}\t${meter(S.rx)}`);
+    S.tx.rows.forEach((t, i) => L.push([...t, ...S.rx.rows[i]].join('\t')));
+    L.push('', `Net\t${S.net}\t\tFrequency\t${S.freq[0]}\t${S.freq[1]}`);
+    L.push(S.settings.map(([k, v]) => `${k} ${v}`).join(' · '));
+    if (S.rm != null) {
+      L.push(S.own > 0.05
+        ? `Radio Mobile has no ✦ terms (${S.own.toFixed(1)} dB here), so its Rx relative should read about ${signed(S.rm, 1)} dB.`
+        : `Radio Mobile runs the same Longley–Rice: its Rx relative should read about ${signed(S.rm, 1)} dB.`);
+    }
+    S.marks.forEach(m => L.push(m));
+    L.push('✦ Flood-Net only. Indicative only.');
+    return L.join('\n');
+  }
+
   // A file, saved — the fallback when the clipboard is refused.
   function saveFile(blob, name) {
     const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: floodnetName(name) });
@@ -3597,20 +3751,29 @@ const PathProfile = (function () {
     try { return navigator.clipboard.write([new ClipboardItem(parts)]); } catch (e) { return Promise.reject(e); }
   }
 
-  // All of it, or with `brief` the summary: the path laid out as Radio
-  // Mobile's Radio Link window, the chart in it drawn bare and the picture
-  // alone with its heading, for whatever takes only a picture.
-  function copyReport(brief) {
+  // The three copies: all of it (the report), the path laid out as Radio
+  // Mobile's Radio Link window (the summary), and the same window in brief
+  // (compact). Each summary's chart is drawn bare inside it; the picture
+  // alone on the clipboard keeps its heading, for whatever takes only that.
+  const COPIES = {
+    report:  { text: reportText, html: reportHtml, chart: null, file: '', what: 'report',
+               done: 'Copied: the chart and every figure behind the fade margin. Paste it into Word or an email.' },
+    summary: { text: summaryText, html: summaryHtml, chart: { bare: true }, file: '-summary', what: 'summary',
+               done: 'Copied: the summary, laid out like Radio Mobile\'s Radio Link window. Paste it into Word or an email.' },
+    compact: { text: compactText, html: compactHtml, chart: COMPACT_CHART, file: '-compact', what: 'compact summary',
+               done: 'Copied: the compact summary — the Radio Link window in brief. Paste it into Word or an email.' },
+  };
+  // `kind` is 'report', 'summary' or 'compact'; nothing (the 📋 press) is the
+  // report, and true the summary, as it was.
+  function copyReport(kind) {
+    const c = COPIES[kind === true ? 'summary' : kind] || COPIES.report;
     const rep = reportOf();
     if (!rep) { Toast.show('Nothing to copy yet — the profile is still being drawn.'); return; }
     const pic = paperPicture(rep);
-    const text = brief ? summaryText(rep) : reportText(rep);
-    const inDoc = brief ? paperPicture(rep, true) : pic;
-    const html = inDoc.then(p => (brief ? summaryHtml(rep, p) : reportHtml(rep, p)),
-                            () => (brief ? summaryHtml(rep, null) : reportHtml(rep, null)));
-    const done = () => Toast.show(brief
-      ? 'Copied: the summary, laid out like Radio Mobile\'s Radio Link window. Paste it into Word or an email.'
-      : 'Copied: the chart and every figure behind the fade margin. Paste it into Word or an email.', { kind: 'done' });
+    const text = c.text(rep);
+    const inDoc = c.chart ? paperPicture(rep, c.chart) : pic;
+    const html = inDoc.then(p => c.html(rep, p), () => c.html(rep, null));
+    const done = () => Toast.show(c.done, { kind: 'done' });
     clipboardWrite({
       'text/html': html.then(h => new Blob([h], { type: 'text/html' })),
       'text/plain': new Blob([text], { type: 'text/plain' }),
@@ -3618,12 +3781,13 @@ const PathProfile = (function () {
     }).then(done, () => html.then(h => {
       if (copyByEvent(h, text)) { done(); return; }
       // Neither way was allowed: the same document, saved, opens in Word.
-      saveFile(new Blob([`<!doctype html><meta charset="utf-8"><title>${esc(rep.heading)}</title>${h}`], { type: 'text/html' }), `${rep.file}${brief ? '-summary' : ''}.html`);
-      Toast.show(`The browser would not copy, so the ${brief ? 'summary' : 'report'} was saved as a file instead — it opens in Word.`, { kind: 'note' });
+      saveFile(new Blob([`<!doctype html><meta charset="utf-8"><title>${esc(rep.heading)}</title>${h}`], { type: 'text/html' }), `${rep.file}${c.file}.html`);
+      Toast.show(`The browser would not copy, so the ${c.what} was saved as a file instead — it opens in Word.`, { kind: 'note' });
     }));
   }
 
-  function copySummary() { copyReport(true); }
+  function copySummary() { copyReport('summary'); }
+  function copyCompact() { copyReport('compact'); }
 
   function copyChart() {
     const rep = reportOf();
@@ -3644,17 +3808,20 @@ const PathProfile = (function () {
   }
 
   // The presses that start it, over the chart: the one thing on the card that
-  // hands the path on to somebody else. The summary is the path laid out as
-  // Radio Mobile's Radio Link window, to hold against it; the report is every
-  // figure behind the margin.
+  // hands the path on to somebody else. Smallest first: the compact summary is
+  // Radio Mobile's Radio Link window in brief, the summary is the same window
+  // in full with a key to its words, and the report is every figure behind
+  // the margin.
   function copyHtml() {
     return `
       <div class="path-copy">
+        <button type="button" id="path-copy-compact" onclick="PathProfile.copyCompact()"
+                title="Copy the Radio Link window in brief — Radio Mobile's figures in its places, a short chart, the transmitter and the receiver side by side, the settings and what Radio Mobile's Rx relative should read — about half the summary's height, ready to paste into Word or an email">🗒️ Copy compact</button>
         <button type="button" id="path-copy-brief" onclick="PathProfile.copySummary()"
                 title="Copy the path laid out like Radio Mobile's Radio Link window — its three rows of figures over the elevation profile, the transmitter and the receiver side by side, the net and the frequency — ready to paste into Word or an email and read across against Radio Mobile">📄 Copy a summary</button>
         <button type="button" id="path-copy" onclick="PathProfile.copyReport()"
                 title="Copy the elevation profile with the link drawn on it and every figure behind the fade margin — the two ends, their radios, the model's settings and the budget term by term — ready to paste into Word or an email">📋 Copy for a report</button>
-        <span class="small">To paste into Word: the summary is laid out like Radio Mobile's Radio Link window, to compare the two; the report is every figure behind the margin. The chart alone:
+        <span class="small">Compact and the summary are laid out like Radio Mobile's Radio Link window, for Word or an email; the report is every figure behind the margin. The chart alone:
           <button type="button" class="lb-link" onclick="PathProfile.copyChart()">copy</button> ·
           <button type="button" class="lb-link" onclick="PathProfile.downloadChart()">save as PNG</button></span>
       </div>`;
@@ -3809,10 +3976,10 @@ const PathProfile = (function () {
 
     // The path for a report (see "copy for a report"): all of it, its top
     // (the summary), the chart alone, or the chart saved as a file.
-    copyReport, copySummary, copyChart, downloadChart,
+    copyReport, copySummary, copyCompact, copyChart, downloadChart,
     // What a copy would carry, for anything that wants to check it: the plain
     // text, the document without its picture, the same two for the summary
-    // with the figures it lays out, the rows all are written from, and the
+    // and for the compact summary with the figures each lays out, the rows all are written from, and the
     // paper chart's SVG. Null with no single-hop profile drawn.
     report() {
       const r = reportOf();
@@ -3820,6 +3987,7 @@ const PathProfile = (function () {
       const p = paperSvg(r);
       return { text: reportText(r), html: reportHtml(r, null),
                brief: { text: summaryText(r), html: summaryHtml(r, null), rows: summaryOf(r) },
+               compact: { text: compactText(r), html: compactHtml(r, null), rows: compactOf(r) },
                rows: r, svg: p ? p.svg : null };
     },
 

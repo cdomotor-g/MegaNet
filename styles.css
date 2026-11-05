@@ -7733,8 +7733,8 @@ body .map-panel.is-driving {
   margin: var(--sp-2) 0 0;
 }
 
-/* 📄 Copy a summary and 📋 Copy for a report, over the chart, with the
-   chart-alone choices beside them. Wraps under them in a narrow column rather
+/* 🗒️ Copy compact, 📄 Copy a summary and 📋 Copy for a report, over the
+   chart, with the chart-alone choices beside them. Wraps under them in a narrow column rather
    than squeezing any. */
 .path-copy {
   display: flex;

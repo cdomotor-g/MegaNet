@@ -5267,7 +5267,14 @@ between the cells (`summaryOf` / `summaryHtml` / `summaryText`). It is built of
 tables with every inset given both as `cellpadding` and as `padding`, and the
 meters as small pictures, because that is what Word, LibreOffice and the mail
 programs keep of a pasted page. A point on the ground has no radio, so the
-figures that need one there read —.
+figures that need one there read —. **🗒️ Copy compact**, before it, is the same
+window in brief, at about half the height (`compactOf` / `compactHtml` /
+`compactText`): every figure Radio Mobile's window shows, in its places, with
+nothing under each figure; a shorter chart (`COMPACT_CHART`); the two ends
+without their meters' captions or the role rows (the role sits by the name);
+and one foot holding the net, the frequency, the Longley–Rice settings and the
+propagation mode, and what Radio Mobile's Rx relative should read without the ✦
+terms. The notes and the key to the words are what it leaves out.
 
 **The Stations map's controls.** Everything MapChrome would put in the map's
 top-right corner lives in the strip instead, at every width — a phone's rail

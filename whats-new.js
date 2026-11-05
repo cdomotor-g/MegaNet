@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 207, date: '2026-11-05', items: [
+      '<strong>🗒️ Copy compact</strong>, a third copy button over the elevation profile\'s chart: the same Radio Link layout '
+        + 'as 📄 Copy a summary at about half the height — every figure Radio Mobile\'s window shows, a shorter chart, the '
+        + 'transmitter and receiver side by side, the model settings on two lines and what Radio Mobile\'s Rx relative should '
+        + 'read for the path. The notes and the key to the words are left out.',
+    ] },
     { n: 206, date: '2026-11-05', items: [
       '📊 <strong>A tidier Radio tab.</strong> On a station\'s card, <strong>Radio</strong> now opens with a two-line summary: '
         + 'its best link, and any channel it was heard on that nothing explains. Under it, <em>Assumed TX</em>, <em>Links</em>, '

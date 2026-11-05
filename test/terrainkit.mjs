@@ -1147,6 +1147,24 @@ const report = await page.evaluate(ids => {
         rm: /Radio Mobile/.test(t) && /Rx relative/.test(r.brief.html) && /SETTINGS/.test(r.brief.html),
       };
     })(),
+    compact: (() => {
+      // The same window in brief: Radio Mobile's figures, the same numbers as
+      // the summary's, and what Radio Mobile's Rx relative should read.
+      const t = r.compact.text, c = r.compact.rows;
+      const want = ['Azimuth', 'Elev. angle', 'Obstruction at', 'Worst Fresnel', 'Distance', 'Free space', 'Obstruction',
+        'Statistics', 'Path loss', 'E field', 'Rx level', 'Rx relative', 'Tx system name', 'Rx system name', 'Tx power',
+        'Required E field', 'Radiated power', 'Rx sensitivity', 'Antenna height', 'Net', 'Frequency', 'Climate',
+        'Polarization', 'Variability', 'Refractivity', 'Conductivity', 'Permittivity'];
+      let at = 0;
+      const order = want.filter(l => { const i = t.indexOf(l, at); if (i < 0) return true; at = i; return false; });
+      const cells = rows => rows.flat().map(x => x.v).join('|');
+      return {
+        order,
+        same: cells(c.grid) === cells(r.brief.rows.grid),
+        rm: c.rm != null && Math.abs(c.rm - (p.margin + c.own)) < 1e-9 && t.includes(`should read about ${c.rm > 0 ? '+' : ''}${c.rm.toFixed(1)} dB`),
+        lean: !/WHAT THE WORDS MEAN/.test(r.compact.html) && /WHAT THE WORDS MEAN/.test(r.brief.html) && t.length < r.brief.text.length / 2,
+      };
+    })(),
   };
 }, PAIR);
 ok('📋 the report quotes the card\'s fade margin', !!report && report.textFig && report.rowsMargin === report.margin,
@@ -1168,6 +1186,10 @@ if (report) {
      !report.brief.order.length && report.brief.rm && !report.brief.report, JSON.stringify(report.brief));
   ok('…its Rx relative the card\'s fade margin, its losses adding up to the path loss, and E field less Required E field the margin',
      report.brief.relative && report.brief.sum && report.brief.efield && report.brief.back, JSON.stringify(report.brief));
+  ok('🗒️ the compact summary carries every Radio Mobile figure and setting, in order, with the summary\'s own numbers',
+     !report.compact.order.length && report.compact.same, JSON.stringify(report.compact));
+  ok('…says what Radio Mobile\'s Rx relative should read, and leaves out the key and the notes',
+     report.compact.rm && report.compact.lean, JSON.stringify(report.compact));
 }
 await page.evaluate(() => PathProfile.hoverOff());
 await page.click('#path-copy');
@@ -1232,6 +1254,34 @@ ok('📄 the summary press puts the summary\'s text, a document and the picture 
 if (brief) {
   ok('…the document the Radio Link window with the chart in it, and none of the report\'s tables', brief.img && brief.window && !brief.tables, JSON.stringify(brief));
   ok('…and says what it copied', /^Copied: the summary/.test(brief.toast), brief.toast);
+}
+// 🗒️ Copy compact: the same three ways, the window in brief.
+await page.click('#path-copy-compact');
+const compact = await page.evaluate(async () => {
+  const want = PathProfile.report().compact.text;
+  const until = Date.now() + 15000;
+  let it = null, text = '';
+  while (Date.now() < until) {
+    try { [it] = await navigator.clipboard.read(); } catch (_) { it = null; }
+    text = it && it.types.includes('text/plain') ? await (await it.getType('text/plain')).text() : '';
+    if (text === want && it.types.includes('text/html')) break;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  if (!it) return null;
+  const out = { types: it.types.slice(), text: text === want };
+  if (it.types.includes('text/html')) {
+    const h = await (await it.getType('text/html')).text();
+    out.img = /<img[^>]+src="data:image\/png;base64,/.test(h);
+    out.window = /RADIO LINK/.test(h) && /Rx relative/.test(h) && !/WHAT THE WORDS MEAN/.test(h);
+  }
+  out.toast = [...document.querySelectorAll('.toast-text')].map(t => t.textContent).pop() || '';
+  return out;
+});
+ok('🗒️ the compact press puts its text, a document and the picture on the clipboard',
+   !!compact && compact.text && ['text/html', 'text/plain', 'image/png'].every(t => compact.types.includes(t)), JSON.stringify(compact));
+if (compact) {
+  ok('…the document the window in brief with the chart in it', compact.img && compact.window, JSON.stringify(compact));
+  ok('…and says what it copied', /^Copied: the compact summary/.test(compact.toast), compact.toast);
 }
 
 // Shown on asking: the cards carry the answer, and the explaining behind a
