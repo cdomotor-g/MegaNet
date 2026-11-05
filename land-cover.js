@@ -44,7 +44,9 @@
 // never before — a 30 KB script for a feature most tabs never touch. Where the
 // map has a height, that height stands on the profile; where it does not (no
 // tile, decoder unavailable, offline) the class table's figure does, and the
-// legend says which. This is the one place MegaNet is ahead of Radio Mobile
+// legend says which. Crops are the exception: over a paddock the canopy map
+// reads 3–8 m of nothing, so a crop pixel takes its reading only from TREE_MIN
+// (10 m) up — a tree in the field, named Trees — and the crop figure below it. This is the one place MegaNet is ahead of Radio Mobile
 // rather than level with it: a real canopy height instead of a class constant
 // — the input ITU-R P.1812 validation work found as good as a 1 m surface
 // model, and better than a class map with 15 m trees.
@@ -53,10 +55,12 @@
 // sample(lat[], lon[]) resolves — never rejects — to
 //   { ok:false, error }                            nothing usable; say so
 //   { ok:true, cls[], canopy[], canopyOk, year, resolution_m, attribution,
-//     missing, partial }
+//     missing, partial, clsMap[] }
 // cls[i] is the class code at sample i, or null where the service had no
-// pixel (cloud, ocean edge, an answer that never came); canopy[i] the measured
-// canopy height in metres, or null where there is none. The profile card
+// pixel (cloud, ocean edge, an answer that never came) — Trees where the
+// canopy map stands a tree in a field or pasture (named()), with the class
+// map's own answer in clsMap; canopy[i] the measured canopy height in metres,
+// or null where there is none. The profile card
 // turns the pair into a height per sample with `heights(cls, canopy)` and
 // paints the classes with `colourVar(code)`. Every failure is loud: a path with no cover
 // data is drawn bare and *says* it is bare, because bare reads as clear.
@@ -135,11 +139,32 @@ const LandCover = (function () {
     return code === 2 || code === 4 || code === 5 || code === 7;
   }
 
+  // A canopy reading on a crop pixel is believed only from this height up.
+  // Over paddocks the canopy map is not quiet: across 11,861 crop pixels in
+  // eight Queensland farming districts (Jimbour, Dalby, Pittsworth, Lockyer,
+  // Bundaberg, Burdekin, Emerald, checked 2026-11-05) it read 1 m or more on
+  // three in four and 3–8 m on two in five, and the satellite photos under a
+  // sample of the 4–7 m readings were bare, ploughed or planted ground seven
+  // times out of eight. A ploughed paddock at Jimbour read 4–8 m end to end.
+  // At 10 m and up the readings were real trees — a creek line, a road's tree
+  // line, a paddock tree — five times in eight. So under 10 m a crop pixel
+  // stands at the crop figure, and from 10 m it is a tree and is drawn as one.
+  const TREE_MIN = 10;
+
+  // Whether the canopy map has found a tree standing in a pixel the class map
+  // calls a field or a pasture — a creek's gums through a paddock, a shelter
+  // belt — tall enough to be believed over the class.
+  function treeIn(code, ch) {
+    return (code === 5 || code === 11) && ch != null && ch >= TREE_MIN;
+  }
+
   // Heights for a whole class array; null where the class is unknown. With a
   // canopy array alongside, a measured canopy of a metre or more replaces the
-  // class figure on every vegetated sample — the map has looked, the table has
-  // guessed — while a built pixel keeps the larger of the two, since a canopy
-  // map does not see roofs.
+  // class figure on trees, flooded vegetation and rangeland — the map has
+  // looked, the table has guessed — and on crops only from TREE_MIN up, since
+  // under that the canopy map is reading the paddock's noise, not a crop. A
+  // built pixel keeps the larger of the two, since a canopy map does not see
+  // roofs.
   function heights(cls, canopy) {
     return cls.map((c, i) => {
       if (c == null) return null;
@@ -148,8 +173,18 @@ const LandCover = (function () {
       if (ch == null) return h;
       if (c === 7) return h == null ? ch : Math.max(h, ch);
       if (c === 1 || c === 8 || c === 9) return h;        // water, bare, snow: a canopy there is noise
+      if (c === 5) return treeIn(c, ch) ? ch : h;         // crops: a tree, or the crop's own height
       return ch;
     });
+  }
+
+  // The classes as the profile names them: a crop or rangeland pixel where
+  // the canopy map stands a tree (treeIn) is called Trees, so the band, the
+  // legend and the cursor say "16 m trees" over a creek's gums and not
+  // "16 m crops". The class map's own answer is kept beside it as clsMap.
+  function named(cls, canopy) {
+    if (!canopy) return cls;
+    return cls.map((c, i) => (treeIn(c, canopy[i]) ? 2 : c));
   }
 
   // ── canopy tiles ──
@@ -310,8 +345,8 @@ const LandCover = (function () {
   }
 
   return {
-    CLASSES, attribution: ATTRIB, canopyAttribution: CANOPY_ATTRIB,
-    heightOf, heights, colourVar, standsUp,
+    CLASSES, attribution: ATTRIB, canopyAttribution: CANOPY_ATTRIB, TREE_MIN,
+    heightOf, heights, named, colourVar, standsUp,
 
     // Every class's current height, for the editable table.
     table() {
@@ -367,6 +402,7 @@ const LandCover = (function () {
         const can = await canopyP;
         if (res.ok) { res.canopy = can; res.canopyOk = !!can; }
       }
+      if (res.ok && res.canopy) { res.clsMap = res.cls; res.cls = named(res.cls, res.canopy); }
       if (res.ok) remember(sig, res);
       return res;
     },

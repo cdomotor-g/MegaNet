@@ -2461,7 +2461,9 @@ const PathProfile = (function () {
         <p class="filter-hint">Representative heights — ITU-R P.1812's term: one figure stands for every pixel
           of its class. Trees and built area start from P.1812-6's defaults (15 m, 10 m suburban); the others
           are field estimates. Where the canopy map has measured a height, that height is used instead of the
-          Trees figure. Edit the table for the country you are in; it is remembered.
+          table's — except on crops, where the map reads a few metres over bare paddock: there it counts only
+          from ${LandCover.TREE_MIN} m up, as a tree standing in the field, and is drawn as Trees. Edit the table
+          for the country you are in; it is remembered.
           <button type="button" class="lb-link" onclick="PathProfile.resetCoverHeights()">Reset to defaults</button></p>
       </details>`;
   }

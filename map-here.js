@@ -238,11 +238,15 @@ const MapHere = (function () {
     if (facts.cover === 'loading') return acmaCardRow('Land cover', 'looking it up…');
     if (!facts.cover) return acmaCardRow('Land cover', 'unavailable — offline, or the service refused');
     const c = LandCover.CLASSES[facts.cover.code];
-    const stands = LandCover.heightOf(facts.cover.code);
     const canopy = facts.cover.canopy;
+    // The height the profile stands here, not the canopy map's raw reading: a
+    // crop pixel's few metres of canopy are the map's noise over a paddock and
+    // the profile does not use them (LandCover.heights).
+    const stands = LandCover.heights([facts.cover.code], canopy != null ? [canopy] : null)[0];
     const bits = [c ? c.label : `class ${facts.cover.code}`];
-    if (canopy != null && canopy > 0) bits.push(`canopy ${Math.round(canopy)} m`);
-    else if (stands != null && stands > 0) bits.push(`stands ~${stands} m`);
+    if (stands != null && stands > 0) {
+      bits.push(canopy != null && canopy >= 1 && stands === canopy ? `canopy ${Math.round(stands)} m` : `stands ~${stands} m`);
+    }
     return acmaCardRow('Land cover', bits.join(' · '));
   }
 

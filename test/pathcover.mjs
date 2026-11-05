@@ -207,6 +207,24 @@ const tagTrees = await tagAt(0.5), tagRange = await tagAt(0.15);
 ok('the cursor\'s tag gives the height of the cover under it — the trees mid-path', /^\d+ m · 15 m trees( · |$)/.test(tagTrees || ''), tagTrees);
 ok('…and the rangeland beside them', /^\d+ m · 1 m rangeland( · |$)/.test(tagRange || ''), tagRange);
 
+// The canopy map reads 3–8 m over bare paddock (a ploughed field at Jimbour
+// read 4–8 m end to end), so a crop pixel takes its reading only from
+// LandCover.TREE_MIN up — and is then a tree, named Trees. Every other class
+// keeps the rule it had.
+const paddock = await page.evaluate(() => ({
+  min: LandCover.TREE_MIN,
+  h: LandCover.heights([5, 5, 5, 11, 2, 7, 7, 1], [6, 9, 16, 6, 6, 6, 14, 13]),
+  named: LandCover.named([5, 5, 11, 11, 2, null], [6, 16, 6, 16, 6, 20]),
+}));
+ok('a crop pixel stands at the crop figure under the canopy map\'s paddock noise',
+   paddock.min === 10 && paddock.h[0] === 2 && paddock.h[1] === 2, JSON.stringify(paddock));
+ok('…and at the canopy map\'s height from 10 m up — a tree in the field', paddock.h[2] === 16, JSON.stringify(paddock.h));
+ok('rangeland and trees still take the canopy, built area the larger of the two, water neither',
+   paddock.h[3] === 6 && paddock.h[4] === 6 && paddock.h[5] === 10 && paddock.h[6] === 14 && paddock.h[7] === 0,
+   JSON.stringify(paddock.h));
+ok('a 10 m tree in a crop or rangeland pixel is named Trees, the rest keep their class',
+   JSON.stringify(paddock.named) === '[5,2,11,2,2,null]', JSON.stringify(paddock.named));
+
 console.log('\nThe budget that prices it');
 
 const label = (rows, re) => rows.find(r => re.test(r.label));

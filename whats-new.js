@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 219, date: '2026-11-05', items: [
+      '🌾 <strong>Crops on the elevation profile stand at crop height again.</strong> The tree-height map reads a few '
+        + 'metres over bare and planted paddocks — 4 to 8 m across a ploughed field — and the profile was standing every '
+        + 'crop on that. Now a crop stands at its own height (2 m, in the cover table) unless the map finds something 10 m '
+        + 'or taller there, which is a real tree — a creek line, a road\'s tree line — and is drawn and named as '
+        + '<strong>Trees</strong>, not "16 m crops". ℹ️ What’s here gives the same height.',
+    ] },
     { n: 218, date: '2026-11-05', items: [
       '⏎ <strong>Drawing a line, the red banner now says how to end it:</strong> click each corner, then press Enter to '
         + 'finish the line. The same goes for a site feature\'s line.',
