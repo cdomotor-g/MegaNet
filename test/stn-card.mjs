@@ -1258,6 +1258,73 @@ async function main() {
       at: StnCardView.current().at, lit: document.querySelector('[data-tour="card-position"]').getBoundingClientRect().width > 0 }));
     check('a part a tab hides is shown on asking (the tours)', rev.moved && rev.at === 'act' && rev.lit, JSON.stringify(rev));
 
+    // ── Rows one line each, a long note folded behind a tap (card-rows.js) ──
+    // Rows written the way every section writes them, put into the card after
+    // it is drawn — as a section filling in after its fetch does.
+    log('\nRows one line each, a long explanation folded behind a tap\n');
+    await vp.click('#stn-cv-tab-overview');
+    const probe = () => vp.evaluate(() => {
+      const sect = document.querySelector('#stn-card .stn-grp:not([hidden]) .acma-sect');
+      sect.insertAdjacentHTML('beforeend',
+        '<div class="acma-row" id="cr-probe-long"><span>Probe long</span><span>The answer <span class="mn-pop-note">a short tag</span>'
+        + ' <span class="mn-pop-note">and a long explanation that runs well past the line</span></span></div>'
+        + '<div class="acma-row" id="cr-probe-short"><span>Probe short</span><span>The answer <span class="mn-pop-note">indicative</span></span></div>'
+        + '<div class="acma-row" id="cr-probe-only"><span>Probe only</span><span><span class="mn-pop-note">a note that is the whole of the answer here</span></span></div>'
+        + '<div class="acma-row" id="cr-probe-mid"><span>Probe mid</span><span>One <span class="mn-pop-note">a long note in the middle of the value</span> two</span></div>');
+    });
+    const crState = () => vp.evaluate(() => {
+      const $ = id => document.getElementById(id);
+      const L = $('cr-probe-long');
+      const d = L && L.querySelector('details.cr-more');
+      const notes = L ? L.querySelectorAll('.mn-pop-note') : [];
+      return {
+        fold: !!L && L.classList.contains('cr-fold') && !!d, open: !!d && d.open,
+        tagOut: !!d && !d.contains(notes[0]), longIn: !!d && d.contains(notes[1]),
+        // checkVisibility: a shut <details> keeps its content laid out out of
+        // sight (content-visibility), so it still has client rects.
+        seen: !!notes[1] && (notes[1].checkVisibility ? notes[1].checkVisibility() : notes[1].getClientRects().length > 0),
+        named: !!d && /Probe long/.test(d.querySelector('summary').getAttribute('aria-label') || ''),
+        text: L ? L.lastElementChild.textContent.replace(/\s+/g, ' ').trim() : '',
+        grid: !!L && getComputedStyle(L).display === 'grid',
+        left: L ? getComputedStyle(L.lastElementChild).textAlign : '',
+        alone: ['cr-probe-short', 'cr-probe-only', 'cr-probe-mid'].every(id => $(id) && !$(id).querySelector('details')),
+      };
+    });
+    await probe();
+    await vp.waitForTimeout(50);
+    const cr0 = await crState();
+    check('a row is its label in a column and its answer beside it, from the left', cr0.grid && /^(left|start)$/.test(cr0.left), JSON.stringify(cr0));
+    check('…a long note at the end of a row folded shut behind its ›, the summary named for its row',
+      cr0.fold && !cr0.open && cr0.longIn && !cr0.seen && cr0.named, JSON.stringify(cr0));
+    check('…a short tag before it left on the line, and the row\'s words reading as they did',
+      cr0.tagOut && cr0.text === 'The answer a short tag and a long explanation that runs well past the line', JSON.stringify(cr0));
+    check('…a short note, a note that is the whole answer and a note mid-value left alone', cr0.alone, JSON.stringify(cr0));
+    await vp.fill('#stn-cv-q', 'runs well past');
+    await vp.waitForTimeout(150);
+    const crFound = await crState();
+    await vp.fill('#stn-cv-q', '');
+    await vp.waitForTimeout(150);
+    const crCleared = await crState();
+    check('a word in a folded note: the search opens its fold, and shuts it when the box is cleared',
+      crFound.open && crFound.seen && !crCleared.open, JSON.stringify({ found: crFound.open, cleared: crCleared.open }));
+    await vp.click('#cr-probe-long > span:first-child');
+    const crTap = await crState();
+    await vp.click('#cr-probe-long > span:first-child');
+    const crTap2 = await crState();
+    check('a tap on the row opens it, the explanation shown under the answer, and a second shuts it',
+      crTap.open && crTap.seen && !crTap2.open, JSON.stringify({ tap: crTap, again: crTap2.open }));
+    await vp.focus('#cr-probe-long summary');
+    await vp.keyboard.press('Enter');
+    const crKey = await crState();
+    await vp.evaluate(() => repaintStnCard());
+    await vp.waitForTimeout(50);
+    await probe();
+    await vp.waitForTimeout(50);
+    const crKept = await crState();
+    check('Enter on its › opens it from the keyboard, and it is still open when the card is drawn again',
+      crKey.open && crKept.fold && crKept.open, JSON.stringify({ key: crKey.open, kept: crKept.open }));
+    await vp.evaluate(() => repaintStnCard());
+
     // List: a summary, a page a group, remembered.
     await vp.click('#stn-cv-tab-overview');
     await vp.click('#stn-card .stn-cv-view:nth-child(2)');

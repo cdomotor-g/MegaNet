@@ -730,6 +730,25 @@ to write it down rather than let each of them re-derive a different half.
     never redraws, so an open fold stays open. A tour that rings a part a tab is
     hiding asks `StnCardView.reveal()` first.
 
+18. **On the station card, a row is one line** *(card-rows.js, 5 Nov 2026)*.
+    The label in a column of its own, the answer beside it starting at the same
+    place on every row, a rule between rows — never the answer pushed to the
+    right edge with its note running on after it, which made rows impossible
+    to tell apart. A long `.mn-pop-note` at the end of a row's value (over 24
+    characters) is folded behind a tap on the row, its › at the right edge;
+    a short one ("indicative", "here") stays on the line as the answer's tag.
+    So a section writes its rows as before — `acmaCardRow`, or
+    `<div class="acma-row"><span>label</span><span>value <span
+    class="mn-pop-note">note</span></span></div>` — and gets the fold for
+    free; a note that must always show is under 25 characters or not the
+    last thing in its value. Each section's heading (`.stn-card-rhs-head` and
+    its caption `.stn-card-rhs-snap`, `.stn-card-equip-h`, `.stn-card-sf-h`,
+    `.stn-card-sb-h`) sits on a shaded band the card's full width. Where an
+    answer sits on a scale, a small strip under it lights its place
+    (`.cr-scale`, words from `data-w` so the row's text is unchanged); a
+    verdict that all is well is a green tag (`.cr-tag.ok`). The ACMA card,
+    What is here and the path card keep the label-left, value-right rows.
+
 **An implementation note that bit #138, and will bit anything that puts a
 `.sr-only` in a table cell.** `overflow` clips a descendant only when the scroll
 container is that descendant's **containing block**, and an absolutely

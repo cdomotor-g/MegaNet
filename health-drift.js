@@ -541,6 +541,23 @@ const HealthDrift = (() => {
   const line = (label, html) => `<div class="acma-row"><span>${esc(label)}</span><span>${html}</span></div>`;
   const note = html => ` <span class="mn-pop-note hd-card-why">${html}</span>`;
 
+  // The verdict words, as tags: green where all is well, plain where it is
+  // worth a look but no warning — a warning keeps its colour and its ⚠. Their
+  // meanings are in one list, for the hover and for the fold at the block's
+  // foot (wordsHtml), with the lines they turn on.
+  const WORDS = () => ({
+    rest:   ['Like the rest', `Within ${num(S.warn * 0.8)} ppm of the other transmitters the same base stations hear. ${num(S.warn)} ppm off over a week is a warning.`],
+    near:   ['Near the line', `Between ${num(S.warn * 0.8)} and ${num(S.warn)} ppm off the rest: close to the warning line, not over it.`],
+    steadyC: ['Steady (carrier)', `Moved less than ${num(S.drift / 2)} ppm against the 30 days before. A move of ${num(S.drift)} ppm is drift, usually an ageing crystal.`],
+    moving: ['Moving', `Moved ${num(S.drift / 2)} ppm or more against the 30 days before, but less than the ${num(S.drift)} ppm that is drift.`],
+    steadyS: ['Steady (signal)', `Within ${num(S.snrWarn * 0.6)} dB of its signal over the 30 days before. A fall of ${num(S.snrWarn)} dB is a warning.`],
+    weaker: ['Weakening', `Down ${num(S.snrWarn * 0.6)} dB or more against the 30 days before, but less than the ${num(S.snrWarn)} dB that is a warning.`],
+    stronger: ['Stronger', `Up ${num(S.snrWarn)} dB or more against the 30 days before.`],
+  });
+  const tag = (text, key, ok) => `<span class="term-chip cr-tag${ok ? ' ok' : ''}" title="${esc(WORDS()[key][1])}">${esc(text)}</span>`;
+  const wordsHtml = () => `<details class="freq-fold freq-words hd-card-words"><summary>What the words mean</summary>
+      <dl>${Object.values(WORDS()).map(([w, m]) => `<dt>${esc(w)}</dt><dd>${esc(m)}</dd>`).join('')}</dl></details>`;
+
   function offsetHtml(r, off) {
     const ppm = fin(r.w_ppm), hz = fin(r.w_hz);
     if (ppm == null) {
@@ -549,8 +566,8 @@ const HealthDrift = (() => {
         ? note(`last on ${esc(new Date(last).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }))}`) : ''}`;
     }
     const verdict = off ? `<span class="${sevCls(off)}" title="${escAttr(off.title)}"><span aria-hidden="true">⚠</span> off the rest</span>`
-      : Math.abs(ppm) >= S.warn * 0.8 ? `near the ±${esc(String(S.warn))} ppm line`
-      : '<span class="txt-muted">like the rest</span>';
+      : Math.abs(ppm) >= S.warn * 0.8 ? tag(`near the ±${S.warn} ppm line`, 'near')
+      : tag('like the rest', 'rest', true);
     return `${hz == null ? '' : `${sgn(hz, 0)} Hz · `}${sgn(ppm, 2)} ppm — ${verdict}`;
   }
 
@@ -579,7 +596,7 @@ const HealthDrift = (() => {
     }
     if (change != null) {
       const a = Math.abs(change);
-      const word = a >= S.drift ? `<span class="txt-warn">drifting</span>` : a >= S.drift / 2 ? 'moving' : '<span class="txt-muted">steady</span>';
+      const word = a >= S.drift ? `<span class="txt-warn">drifting</span>` : a >= S.drift / 2 ? tag('moving', 'moving') : tag('steady', 'steadyC', true);
       return `${sgn(change, 2)} ppm ${vs} — ${word}`;
     }
     // Not judged yet: the server compares the last week with the thirty days
@@ -624,7 +641,7 @@ const HealthDrift = (() => {
         'it needs 3 days in the last week and 5 in the 30 before at one base station (10 and 10 for three months)');
     }
     const word = v => (v == null ? '' : v <= -S.snrWarn ? `<span class="${fade ? sevCls(fade) : 'txt-warn'}">fading</span>`
-      : v <= -S.snrWarn * 0.6 ? 'weakening' : v >= S.snrWarn ? 'stronger' : '<span class="txt-muted">steady</span>');
+      : v <= -S.snrWarn * 0.6 ? tag('weakening', 'weaker') : v >= S.snrWarn ? tag('stronger', 'stronger') : tag('steady', 'steadyS', true));
     const parts = [];
     if (wk != null) parts.push(`${sgn(wk, 1)} dB against the 30 days before — ${word(wk)}`);
     if (season != null) parts.push(`${sgn(season, 1)} dB over three months — ${word(season)}`);
@@ -652,8 +669,8 @@ const HealthDrift = (() => {
       ${kept ? line('Signal', signalHtml(r, fade)) + (fin(r.snr_db) == null && !sPts.length ? '' : line('Signal change', signalChangeHtml(r, fade)))
         : line('Signal', '<span class="txt-muted">not kept on this database yet</span>')}
       ${other.map(f => line('Also', `<span class="${sevCls(f)}"><span aria-hidden="true">⚠</span> ${esc(f.title)}</span>`)).join('')}
-      ${pts.length ? `<div class="hd-card-spark">${sparkSvg(pts)}${note(`its last 37 days against the rest; the band is ±${esc(String(S.warn))} ppm`)}</div>` : ''}
-      ${sPts.length ? `<div class="hd-card-spark hd-card-snr">${snrSparkSvg(sPts)}${note(`its signal's last 90 days against its usual, the receivers' own steps taken out; the band is ±${esc(String(S.snrWarn))} dB`)}</div>` : ''}
+      ${pts.length ? `<div class="acma-row hd-card-spark"><span>Last 37 days</span><span>${sparkSvg(pts)}<span class="hd-spark-cap">its carrier against the rest; the band is ±${esc(String(S.warn))} ppm</span></span></div>` : ''}
+      ${sPts.length ? `<div class="acma-row hd-card-spark hd-card-snr"><span>Last 90 days</span><span>${snrSparkSvg(sPts)}<span class="hd-spark-cap">its signal against its usual, the receivers' own steps taken out; the band is ±${esc(String(S.snrWarn))} dB</span></span></div>` : ''}
       ${note(`${esc(kindText(r))} · ${plural(Number(r.w_days) || 0, 'day')} in the last week, ${plural(Number(r.bursts) || 0, 'burst')}, `
         + `${plural(Number(r.receivers) || 0, 'base station')}`)}
     </div>`;
@@ -682,7 +699,8 @@ const HealthDrift = (() => {
       + note(`Its carrier against the other transmitters the same base stations hear, each receiver's own error taken out — so 0 is
         like the rest, not exactly on frequency; its signal against its own past at each base station, each receiver's own steps taken out.
         Judged hourly${at && Number.isFinite(at.getTime())
-          ? `, last at ${esc(at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}` : ''}${a.status === 'loading' ? ', asking again…' : ''}. ${door}`);
+          ? `, last at ${esc(at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}` : ''}${a.status === 'loading' ? ', asking again…' : ''}. ${door}`)
+      + wordsHtml();
   }
 
   // The card's block, under the ALERT IDs and frequencies (stnCardHtml). The

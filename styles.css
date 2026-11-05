@@ -9663,6 +9663,118 @@ body .map-panel.is-driving {
   margin-top: var(--sp-1);
 }
 
+/* The station card's rows, one line each (card-rows.js): the label in a
+   column of its own, the answer beside it from the same edge on every row, a
+   line between rows, and a long explanation folded behind a tap on the row
+   (›). The owner's pick of four mock-ups (5 November 2026): with the answer
+   pushed right and its note running on after it in the same paragraph, the
+   rows could not be told apart. On the station card only — the ACMA card,
+   What is here and the path card keep their label-left, value-right rows —
+   and never the Radio tab's Links, which are bars, not rows. */
+#stn-card .acma-row {
+  display: grid; grid-template-columns: minmax(5rem, 7.2rem) minmax(0, 1fr);
+  column-gap: var(--sp-3); align-items: baseline;
+  padding: .38rem 0;
+}
+#stn-card .acma-row + .acma-row { border-top: 1px solid var(--border); }
+#stn-card .acma-row > span:first-child { white-space: normal; overflow-wrap: anywhere; }
+#stn-card .acma-row > span:last-child { text-align: left; font-weight: 600; min-width: 0; }
+#stn-card .acma-row > span:last-child :is(.mn-pop-note, .txt-muted, .small, .hd-spark-cap) { font-weight: 400; }
+/* A height against what the water does there reads as a sentence. */
+#stn-card .stn-card-rhs-effects .acma-row > span:last-child { font-weight: 400; }
+/* The fold: the whole row is the tap, the › at its right edge. Shut, the
+   <details> is nothing but its summary, which sits out at the edge. */
+#stn-card .acma-row.cr-fold { position: relative; padding-right: 1.6rem; cursor: pointer; }
+#stn-card .cr-more { display: block; }
+#stn-card .cr-more > summary {
+  position: absolute; top: .22rem; right: 0; width: 1.5rem; height: 1.6rem;
+  display: grid; place-items: center; list-style: none; cursor: pointer;
+  border-radius: var(--r-sm); color: var(--muted);
+}
+#stn-card .cr-more > summary::-webkit-details-marker { display: none; }
+#stn-card .cr-more > summary::before { content: "\203A"; font-size: 1.1rem; line-height: 1; transition: transform .15s; }
+#stn-card .cr-more[open] > summary::before { transform: rotate(90deg); }
+#stn-card .cr-more[open] > summary,
+#stn-card .acma-row.cr-fold:hover .cr-more > summary { color: var(--accent); }
+#stn-card .cr-more > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#stn-card .cr-more[open] {
+  margin-top: .3rem; padding: .35rem .55rem; cursor: auto;
+  border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--panel-sub);
+}
+#stn-card .cr-more .mn-pop-note { display: block; font-size: .78rem; }
+#stn-card .cr-more .mn-pop-note + .mn-pop-note { margin-top: .2rem; }
+@media (prefers-reduced-motion: reduce) { #stn-card .cr-more > summary::before { transition: none; } }
+
+/* Each section's heading on a band the card's full width, shaded a step off
+   the card, with its caption ("Queensland cadastre — not a title search") in
+   the band under it — so where one section ends and the next begins is seen
+   before a word is read. The headings are each module's own; the band is
+   drawn here, over the section's padding. */
+#stn-card { --cr-band: color-mix(in srgb, var(--muted) 13%, var(--panel)); }
+#stn-card :is(.stn-card-rhs-head, .stn-card-equip-h, .stn-card-sf-h, .stn-card-sb-h),
+#stn-card .stn-card-carrier > .small:first-child,
+#stn-card .small:has(> .mn-sls-doc) {
+  display: block; margin: .45rem -.6rem .3rem; padding: .32rem .6rem;
+  background: var(--cr-band); color: var(--muted);
+  font-size: var(--fs-xs); font-weight: 650; letter-spacing: .05em; text-transform: uppercase;
+}
+#stn-card .acma-sect > :is(.stn-card-rhs-head, .stn-card-equip-h, .stn-card-sf-h, .stn-card-sb-h, .small:has(> .mn-sls-doc)):first-child,
+#stn-card .acma-sect > :first-child > :is(.stn-card-rhs-head, .stn-card-equip-h, .stn-card-sf-h, .stn-card-sb-h, .small:has(> .mn-sls-doc)):first-child { margin-top: -.45rem; }
+#stn-card .stn-card-rhs-head:has(+ .stn-card-rhs-snap) { margin-bottom: 0; padding-bottom: .05rem; }
+#stn-card .stn-card-rhs-head + .stn-card-rhs-snap {
+  margin: 0 -.6rem .3rem; padding: 0 .6rem .32rem; background: var(--cr-band);
+}
+
+/* The answer's own words, as tags (health-drift.js): green where all is well,
+   plain where it is worth a look but no warning. */
+.cr-tag {
+  display: inline-block; padding: 0 .4rem; border-radius: var(--r-sm);
+  font-size: .7rem; font-weight: 650; line-height: 1.55; white-space: nowrap;
+  color: var(--muted); box-shadow: inset 0 0 0 1px var(--border);
+}
+.cr-tag.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); box-shadow: none; }
+
+/* A small picture under an answer that sits on a scale — the wind region
+   A to D (map-wind.js), corrosivity C1 to CX with OTE's three categories
+   under it (site-exposure.js) — the station's place lit, and the words of
+   only its group under it. Its words are drawn from data-w, so a row's text,
+   and the card's search, are only the row's. */
+.cr-pic { display: block; }
+.cr-scale {
+  display: grid; gap: 2px; margin-top: .3rem; max-width: 16rem;
+  font-size: .66rem; font-weight: 400; font-variant-numeric: tabular-nums;
+}
+.cr-scale-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.cr-scale-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.cr-cell, .cr-group { font-style: normal; text-align: center; line-height: 1.35; }
+.cr-cell::before, .cr-group::before { content: attr(data-w); }
+.cr-cell {
+  padding: 1px 0; border-radius: 3px; color: var(--muted);
+  background: color-mix(in srgb, var(--cr-tint, var(--muted)) 15%, transparent);
+}
+.cr-cell.cr-ok   { --cr-tint: var(--ok); }
+.cr-cell.cr-warn { --cr-tint: var(--warn); }
+.cr-cell.cr-bad  { --cr-tint: var(--bad); }
+.cr-cell.is-lit { color: var(--panel); background: var(--cr-tint, var(--accent)); font-weight: 700; }
+.cr-group { padding-top: 1px; border-top: 1.5px solid var(--border); color: var(--muted); white-space: nowrap; }
+.cr-group.is-lit { border-top-color: var(--ok); color: var(--text); }
+/* Only the lit group says its words, so a one-cell group never wraps them:
+   from its left edge at the start of the scale, its right at the end. */
+.cr-group.cr-at-start { text-align: left; }
+.cr-group.cr-at-end { text-align: right; }
+.cr-group.cr-blank { border-top-color: transparent; }
+.cr-span-1 { grid-column: span 1; }
+.cr-span-2 { grid-column: span 2; }
+.cr-span-3 { grid-column: span 3; }
+
+/* The carrier fingerprint's lines as rows of their own: the 37 days' line
+   and the 90 days', each with what it shows. */
+#stn-card .acma-row.hd-card-spark { margin: 0; }
+#stn-card .acma-row.hd-card-spark { align-items: start; }
+.hd-card-spark > span:last-child { display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .5rem; min-width: 0; }
+.hd-spark-cap { flex: 1 1 9rem; min-width: 0; color: var(--muted); font-size: .74rem; }
+.hd-card-words { margin-top: .4rem; }
+
 /* The carrier fingerprint (health-drift.js), on the card and in the station
    editor: label/value rows a transmitter, each row's caveat on a line of its
    own under its value, and the 37 days' line beside what it shows. A station

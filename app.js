@@ -8761,6 +8761,11 @@ function repaintStnCard() {
   const at = hadFocus ? controls().indexOf(document.activeElement) : -1;
   el.hidden = false;
   el.innerHTML = stnCardHtml(s);
+  // Each row one line, its long explanation folded behind a tap (card-rows.js)
+  // — now, so focus goes back by the same count of controls, and then for
+  // every section that fills in after its fetch.
+  CardRows.watch(el);
+  CardRows.enhance(el);
   el.setAttribute('role', 'dialog');
   el.setAttribute('aria-labelledby', 'stn-card-title');
   el.tabIndex = -1;
@@ -9199,7 +9204,8 @@ function stnCardHtml(s) {
         >&nbsp;</span></div>` : '',
     wind ? `<div class="acma-row"><span>Wind region</span><span><span id="${escAttr(windId)}"
         data-mn-wind="${escAttr(`${s.lat},${s.lon}`)}"
-        title="${escAttr(wind.title)}">${esc(wind.text)}</span> <span class="mn-pop-note">indicative</span></span></div>` : '',
+        title="${escAttr(wind.title)}">${esc(wind.text)}</span> <span class="mn-pop-note">indicative</span><span
+        class="cr-pic" id="${escAttr(windId)}-scale">${MapWind.scaleHtml(wind.region)}</span></span></div>` : '',
     // The other load on a site's structures, beside the wind: the peak flood
     // velocity flood-velocity.js estimates from the station's AEP levels,
     // flagged indicative the same way; its workings are in Flood, under the
@@ -9207,7 +9213,7 @@ function stnCardHtml(s) {
     RiverDetails.velocityRowHtml(s),
   ].join('');
   const site = `
-    ${where.trim() ? `<div class="acma-sect stn-card-where">${where}</div>` : ''}
+    ${where.trim() ? `<div class="acma-sect stn-card-where"><span class="small txt-muted stn-card-rhs-head">Where it is</span>${where}</div>` : ''}
     ${located ? `<div class="acma-sect" id="${escAttr(landId)}"
          data-mn-land="${escAttr(SiteLand.key(s))}">${SiteLand.html(s)}</div>` : ''}
     ${located ? `<div class="acma-sect" id="${escAttr(roadsId)}"

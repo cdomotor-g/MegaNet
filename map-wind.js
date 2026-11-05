@@ -6,7 +6,7 @@
 //             can start from the map instead of from the Standard's figure.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
-// Reaches back to core.js for `state`; only from inside its own functions, so
+// Reaches back to core.js for `state` and `esc`; only from inside its own functions, so
 // this file's position among the modules is free, the same way #120 left it
 // for MapSurvey.
 //
@@ -293,7 +293,7 @@ const MapWind = (function () {
       // wind region wants to know what the letter costs them, and the provenance
       // sentence — which is the same on every station — reads better after it.
       const why = regionSummary(wr.region);
-      return { text: `${wr.region}${wr.area ? ` (${wr.area})` : ''}`,
+      return { text: `${wr.region}${wr.area ? ` (${wr.area})` : ''}`, region: wr.region,
                title: why ? `${why}\n\n${ASK_TITLE}` : ASK_TITLE };
     }
     if (askFailed) {
@@ -321,8 +321,24 @@ const MapWind = (function () {
       const st = regionState(lat, lon);
       if (el.tagName === 'INPUT') el.value = st.text; else el.textContent = st.text;
       el.title = st.title;
+      const scale = document.getElementById(`${elId}-scale`);
+      if (scale) scale.innerHTML = scaleHtml(st.region);
     };
     ensureData().then(fill, () => { askFailed = true; fill(); });
+  }
+
+  // The station card's picture of its region (card-rows.js's layout): the
+  // Standard's regions calm to cyclonic, A to D, the station's lit and the
+  // cyclonic three marked under them. Its words are the stylesheet's (data-w),
+  // so the row reads what it did. Empty until the region is known.
+  function scaleHtml(region) {
+    if (!region) return '';
+    const fam = /^A/.test(region) ? 'A' : region;
+    const cells = ['A', 'B1', 'B2', 'C', 'D'].map(r =>
+      `<i class="cr-cell${r === fam ? ' is-lit' : ''}" data-w="${r === 'A' && fam === 'A' ? region : r}"></i>`).join('');
+    const said = `Wind regions A, B1, B2, C and D, calm to cyclonic: this station is in ${region}; B2, C and D are cyclonic`;
+    return `<span class="cr-scale cr-scale-5" role="img" aria-label="${esc(said)}">${cells}`
+      + '<i class="cr-group cr-span-2 cr-blank" data-w=""></i><i class="cr-group cr-span-3" data-w="cyclonic"></i></span>';
   }
 
   const PROVENANCE = 'Geoscience Australia’s reading of AS/NZS 1170.2:2021 (CC-BY 4.0) — '
@@ -370,6 +386,9 @@ const MapWind = (function () {
     // What a region id means, in one line — the station card's tooltip and
     // anything else that has an id but no room for the key.
     regionSummary,
+
+    // The station card's picture of a region (scaleHtml above).
+    scaleHtml,
 
 
     attach(m) {

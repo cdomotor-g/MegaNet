@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 214, date: '2026-11-05', items: [
+      '🗂️ <strong>The station card\'s rows are one line each.</strong> On every tab the label sits in a column of its own and '
+        + 'the answer beside it, starting at the same place on every row, with a line between rows. A long explanation is '
+        + 'folded away: tap the row, or its ›, to read it. Each section\'s heading is on a shaded band across the card, the '
+        + 'corrosivity and the wind region have a small scale with the station\'s place lit, and the carrier fingerprint\'s '
+        + '“like the rest” and “steady” are green tags. The Radio tab\'s Links bars are as they were.',
+    ] },
     { n: 213, date: '2026-11-05', items: [
       '🔍 <strong>Picking a station now takes the map right in to it</strong> — from the station list, a search, a link, '
         + 'the 📍 list of stations you have looked at, or another tab. It lands at street level, about two kilometres across, instead of '

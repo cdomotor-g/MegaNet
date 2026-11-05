@@ -1041,6 +1041,22 @@ const SiteExposure = (function () {
     return { grade, ote, oteBy, stricter, d };
   }
 
+  // The grade on the standard's scale, C1 to CX, and OTE's three categories
+  // under it, the station's lit and only its category named — the two rows'
+  // answers at a glance, under the first. A picture of words already in the rows, so its own words are the
+  // stylesheet's (data-w): the row reads, and the card's search finds, what it
+  // did before.
+  function scaleHtml(grade, cat) {
+    const lit = String(grade).replace(/\*/g, '').split('/');
+    const tint = { C1: 'ok', C2: 'ok', C3: 'ok', C4: 'warn', C5: 'bad', CX: 'bad' };
+    const cells = Object.keys(GRADE_RANK).map(k =>
+      `<i class="cr-cell cr-${tint[k]}${lit.includes(k) ? ' is-lit' : ''}" data-w="${k}"></i>`).join('');
+    const groups = [['C3 and below', 'standard kit', 3, ' cr-at-start'], ['C4', 'stainless box', 1, ''], ['C5 and CX', 'all stainless', 2, ' cr-at-end']]
+      .map(([c, w, n, at]) => `<i class="cr-group cr-span-${n}${at}${c === cat ? ' is-lit' : ''}" data-w="${c === cat ? w : ''}"></i>`).join('');
+    const said = `AS 4312 grades C1 to CX: this site ${lit.join(' or ')}; OTE's category ${cat}`;
+    return `<span class="cr-scale cr-scale-6" role="img" aria-label="${esc(said)}">${cells}${groups}</span>`;
+  }
+
   function corrosionRows(s, L) {
     const c = corrosion(s, L);
     if (c.pending) return row('Corrosivity', asking(), TITLE.corr);
@@ -1051,7 +1067,7 @@ const SiteExposure = (function () {
       ? `AS 4312 Table 4.1 · ${distText(g.m)} from ${SHORES[g.shore].a} (${g.band})`
       : `AS 4312 · no shore within 10 km${c.d.surf != null ? `, the nearest surf beach ${distText(c.d.surf)} away` : ''}`;
     const out = [row('Corrosivity',
-      `${termHtml(`${g.g.replace('*', '')} — ${gradeName(g.g)}`, meaning)} ${note(esc(where + (g.why ? ` · ${g.why}` : '')))}`, TITLE.corr)];
+      `${termHtml(`${g.g.replace('*', '')} — ${gradeName(g.g)}`, meaning)}${scaleHtml(g.g, c.ote.cat)} ${note(esc(where + (g.why ? ` · ${g.why}` : '')))}`, TITLE.corr)];
     const by = c.oteBy ? `within ${limText(c.oteBy.within)} of ${SHORES[c.oteBy.shore].a}` : 'beyond OTE’s distances';
     out.push(row('OTE category', `${esc(c.ote.cat)} ${note(esc(`— ${c.ote.materials} · ${by}${c.stricter ? ' · stricter than the standard’s table here' : ''}`))}`, TITLE.ote));
     return out.join('');
