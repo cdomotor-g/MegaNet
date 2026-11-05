@@ -141,6 +141,9 @@ try {
   await page.waitForFunction(() => !!state.map, null, { timeout: LOAD_TIMEOUT });
   const groups = await page.evaluate(async id => {
     const st = state.data.stations.find(s => s.id === id);
+    // The register once held this station twice (migration 0104 retired the copy), so the
+    // copy is planted here: a station filed twice must still be one strip a gauge.
+    if (!state.data.stations.some(s => s.id === id + '_2')) state.data.stations.push({ ...st, id: id + '_2', name: st.name + ' (copy)' });
     await MapRiverLines.near(st.lat, st.lon);
     const rain = GroupPlots.gaugesOf(st, 'rain'), level = GroupPlots.gaugesOf(st, 'level');
     const river = GroupPlots.streamGroup(st);

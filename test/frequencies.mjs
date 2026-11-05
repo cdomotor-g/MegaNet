@@ -358,7 +358,9 @@ async function main() {
         && JSON.stringify(L.links.map(flat)) === JSON.stringify([
           'Marburg Radar · +34.1 dB Good', 'Bundamba (Barclay St) AL · +12.0 dB Good',
           'GATTON LVRC ENVIROMON BASESTATION · +4.2 dB Marginal', 'Constitution Hill · −1.7 dB Poor',
-          'Hillcrest AL (Wine Glass) · −18.0 dB Poor']), JSON.stringify(L && L.links));
+          'Hillcrest AL (Wine Glass) · −18.0 dB Poor',
+          // A repeater since decdc36 (Mt Marrow AL, stations.json); no figure is set for it here.
+          'Mt Marrow AL · no fade margin']), JSON.stringify(L && L.links));
     const bars = await page.evaluate(() => [...document.querySelectorAll('#stn-card .stn-card-links .freq-link')].map(e => {
       const i = e.querySelector('.freq-bar > i');
       return i ? [e.dataset.mnLink, i.className, parseFloat(i.style.getPropertyValue('--freq-from')),
@@ -367,7 +369,7 @@ async function main() {
     const bar = id => bars.find(b => b[0] === id) || [];
     const near = (a, b) => Math.abs(a - b) < 0.05;
     check('…each with a bar on one scale, −20 to +40 dB: out from 0 by its figure, in its band\'s colour',
-      bars.length === 9 && bar('marburg_radar')[1] === 'ok' && near(bar('marburg_radar')[2], 100 / 3) && near(bar('marburg_radar')[3], 34.1 / 0.6)
+      bars.length === 10 && bar('marburg_radar')[1] === 'ok' && near(bar('marburg_radar')[2], 100 / 3) && near(bar('marburg_radar')[3], 34.1 / 0.6)
         && bar('hillcrest_wine_glass')[1] === 'bad' && near(bar('hillcrest_wine_glass')[2], 2 / 0.6) && near(bar('hillcrest_wine_glass')[3], 30)
         && bar('gatton_lvrc_enviromon_basestation')[1] === 'warn'
         && bar('cogcc_bundall_base')[4] && near(bar('cogcc_bundall_base')[2], 0) && !bar('marburg_radar')[4], JSON.stringify(bars));

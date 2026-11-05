@@ -199,7 +199,18 @@ try {
     // Three stations near each other fix where a receiver hears; an address
     // whose only owner is far from them is called far.
     const placed = own.filter(([, l]) => l[0].station.lat != null);
-    const a0 = placed[0][1][0].station;
+    // A receiver's station, chosen by what the checks below need rather than by where the
+    // register happens to list it (retiring a record moves the order): three more within
+    // 40 km, one across the country, and two far stations sharing an address, about as far
+    // from it as each other.
+    const kmFrom = (a, c) => SensorValues.km(a.lat, a.lon, c.lat, c.lon);
+    const sharedFrom = a => [...idx.entries()].find(([, l]) => l.length === 2 && l.every(c => c.station.lat != null && kmFrom(a, c.station) > SensorValues.FAR_KM + 200)
+      && Math.abs(kmFrom(a, l[0].station) - kmFrom(a, l[1].station)) < SensorValues.GAP_KM
+      && stationAlertIds(l[0].station).some(x => (idx.get(x) || []).length === 1));
+    const a0 = placed.map(([, l]) => l[0].station).find(a =>
+      placed.filter(([, l]) => kmFrom(a, l[0].station) < 40).length >= 3
+      && placed.some(([, l]) => kmFrom(a, l[0].station) > 1200) && sharedFrom(a))
+      || placed[0][1][0].station;
     const near = placed.filter(([, l]) => SensorValues.km(a0.lat, a0.lon, l[0].station.lat, l[0].station.lon) < 40).slice(0, 4);
     const far = placed.find(([, l]) => SensorValues.km(a0.lat, a0.lon, l[0].station.lat, l[0].station.lon) > 1200);
     const row = (a, v) => ({ addr: 'a:' + a, alert_id: a, reading_ts: '2026-10-01T00:00:00Z', value_raw: v, path: 'serial-monitor/test-pi-sdr0', station_id: null });
@@ -217,10 +228,7 @@ try {
     // An address two far stations share goes to neither, however many of one station's
     // other addresses strays put on the same path (Saddle Mtn AL and
     // Crafers West on 5199, from a Pi in Brisbane).
-    const dist = s => SensorValues.km(a0.lat, a0.lon, s.lat, s.lon);
-    const shared = [...idx.entries()].find(([, l]) => l.length === 2 && l.every(c => c.station.lat != null && dist(c.station) > SensorValues.FAR_KM + 200)
-      && Math.abs(dist(l[0].station) - dist(l[1].station)) < SensorValues.GAP_KM
-      && stationAlertIds(l[0].station).some(x => (idx.get(x) || []).length === 1));
+    const shared = sharedFrom(a0);
     let sharedConf = null;
     if (shared) {
       const sib = stationAlertIds(shared[1][0].station).filter(x => (idx.get(x) || []).length === 1).slice(0, 3);
@@ -440,7 +448,7 @@ try {
     if (!pick) return null;
     // Seven minutes past midnight in the station's solar time, so the ghost
     // is the lowest of the last night.
-    const tg = Date.UTC(2026, 8, 2) - pick.st.lon / 15 * H + 7 * 60e3 + 41e3;
+    const tg = Math.round(Date.UTC(2026, 8, 2) - pick.st.lon / 15 * H + 7 * 60e3 + 41e3); // whole ms: reading_ts has no fraction, and the frame is looked up by its time
     const t0 = tg - 25 * H, now = tg + 9 * H;
     const rec = (aid, t, v) => ({ addr: 'a:' + aid, alert_id: aid, reading_ts: new Date(t).toISOString(), received_at: new Date(t + 2000).toISOString(),
       value_raw: v, protocol: 1, path: 'serial-monitor/test-pi-sdr2', dup_count: 0, dup_paths: [] });

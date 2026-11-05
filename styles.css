@@ -10248,7 +10248,6 @@ body .map-panel.is-driving {
 }
 #stn-card .cr-more .mn-pop-note { display: block; font-size: .78rem; }
 #stn-card .cr-more .mn-pop-note + .mn-pop-note { margin-top: .2rem; }
-@media (prefers-reduced-motion: reduce) { #stn-card .cr-more > summary::before { transition: none; } }
 
 /* Each section's heading on a band the card's full width, shaded a step off
    the card, with its caption ("Queensland cadastre — not a title search") in
@@ -20823,6 +20822,10 @@ body.has-sort-bridge .signin-nudge { display: none; }
     transition: none;
   }
 
+  #stn-card .cr-more > summary::before { transition: none; }
+  .adm-page .panel.adm-flash { animation: none; outline: 3px solid var(--accent); outline-offset: 2px; }
+  a.adm-kpi--go { transition: none; }
+
   .as-pin { animation: none; }
   .fw-pane.is-active, .fw-ledchip-dot { animation: none; }
   .fw-ledchip-dot { background: #ffe35a; }
@@ -21118,10 +21121,6 @@ a.adm-kpi--go:hover::after, a.adm-kpi--go:focus-visible::after { color: var(--ac
 .adm-page .panel { scroll-margin-top: 4.5rem; }
 @keyframes adm-flash { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: 0 0 0 3px transparent; } }
 .adm-page .panel.adm-flash { animation: adm-flash 1.6s ease-out; }
-@media (prefers-reduced-motion: reduce) {
-  .adm-page .panel.adm-flash { animation: none; outline: 3px solid var(--accent); outline-offset: 2px; }
-  a.adm-kpi--go { transition: none; }
-}
 
 .adm-meter {
   display: block;
