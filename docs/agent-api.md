@@ -1583,6 +1583,15 @@ at [`GET /api/v1/changelog`](#get-apiv1changelog), newest first — both from
 in the same push. A change with nothing to notice (a fix inside, a faster
 answer) is not listed.
 
+- **5 November 2026 — Fade margins are now measured from a −110 dBm receiver,
+  7 dB lower than before.** The field station receiver threshold — the weakest
+  signal a burst is taken as decoded at, which every fade margin is measured
+  from — is now −110 dBm, the figure Radio Mobile runs use; it was −117 dBm.
+  Every fade margin reads 7 dB less for the same path, and the `rm_systems`
+  presets give `rx_threshold_dbm` −110. The saved hop margins in
+  [`/radio-path`](#get-apiv1stationsidradio-path) were worked out again and
+  saved at the new figure the same day, so they are about 7 dB lower, and a hop
+  may have dropped a band. No route, field or tool changed.
 - **4 November 2026 — A station out of every receiver's range is no longer
   taken as heard.** Decoder noise and corrupted copies land on most ALERT
   addresses in a week, and a station more than 400 km from where every

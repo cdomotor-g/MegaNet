@@ -207,7 +207,7 @@ const Propagation = (function () {
         <span><i class="rp-sw rp-sw--cov-strong"></i>Strong (above −90 dBm)</span>
         <span><i class="rp-sw rp-sw--cov-good"></i>Good</span>
         <span><i class="rp-sw rp-sw--cov-weak"></i>Only just</span>
-        <span><i class="rp-sw rp-sw--cov-none"></i>Not heard (below −117 dBm)</span>
+        <span><i class="rp-sw rp-sw--cov-none"></i>Not heard (below −${-PH().SENS_DBM} dBm)</span>
         <span class="rp-aside">— at a field station\'s 4 m, from the story\'s first transmitter</span>
       </div>
       <h4>What happens</h4>

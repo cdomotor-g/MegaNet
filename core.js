@@ -3902,7 +3902,7 @@ const DB_SCHEMA = 'meganet';
 // and a database without it answers none. 102: the same benchmarks in numbers
 // for anybody (0102, station_benchmark_public), applied by db-migrate.yml on 4
 // November 2026, bumped after; only the agent API reads it.
-const DB_SCHEMA_VERSION = 102;
+const DB_SCHEMA_VERSION = 103;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
@@ -3990,6 +3990,12 @@ const RM_NET_DEFAULTS = {
 // off that grid; ≥30 means "at least 30". One region fitted alone (the 54
 // stations round Mt Stuart, which first set this) asked for 16 dB; hubs range
 // a good deal either side, and the Network Review's history check names them.
+//
+// All of that was fitted at the −117 dBm receiver threshold the radio systems
+// carried until 0103 took them to −110 (LB_DEFAULT_RX_DBM, link-budget.js).
+// The tests measured the real margin whatever the model assumes, so at −110
+// the field asks for about 7 dB less; 12 stays until the owner says to take the
+// re-fit up (docs/network-review.md, "The receiver threshold").
 //
 // LiDAR is the setting, not the default, because held against the same tests
 // it was no better: ground at 5 m is only as good as the antenna position laid

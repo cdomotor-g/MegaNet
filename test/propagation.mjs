@@ -89,6 +89,7 @@ const lift = (file, re, what) => {
   return m[1];
 };
 const LB_LOSS = Number(lift('link-budget.js', /const LB_DEFAULT_LOSS_DB = ([\d.]+);/, 'LB_DEFAULT_LOSS_DB'));
+const LB_RX = Number(lift('link-budget.js', /const LB_DEFAULT_RX_DBM = (-[\d.]+);/, 'LB_DEFAULT_RX_DBM'));
 const LB_MINS = [...lift('link-budget.js', /const LB_MARGIN = \[([\s\S]*?)\];/, 'LB_MARGIN').matchAll(/min:\s*(-?[\d.]+)/g)].map(m => Number(m[1]));
 const AGL = Number(lift('path-profile.js', /const PATH_DEFAULT_AGL = ([\d.]+);/, 'PATH_DEFAULT_AGL'));
 const NR_MAX = Number(lift('network-review.js', /const ATTEN_MAX = (\d+);/, 'ATTEN_MAX'));
@@ -259,7 +260,7 @@ console.log('\nThe scene — the made-up catchment and its stories\n');
 
 console.log('\nThe fade-margin test — the bench\'s arithmetic\n');
 {
-  ok('its receiver is the link budget card\'s −117 dBm', FD.RX_DBM === PH.SENS_DBM && FD.RX_DBM === -117);
+  ok('its receiver is the link budget card\'s −110 dBm', FD.RX_DBM === PH.SENS_DBM && FD.RX_DBM === LB_RX && LB_RX === -110);
   ok('its feeders, bands and whip are the link budget card\'s, its attenuator the Network Review\'s',
     FD.FEED_DB === LB_LOSS && FD.GOOD_DB === LB_MINS[0] && FD.FLOOR_DB === LB_MINS[1] && FD.FIELD_AGL === AGL
     && FD.ATTEN_MAX === NR_MAX && FD.STEPS.includes(NR_STEP),
@@ -276,7 +277,7 @@ console.log('\nThe fade-margin test — the bench\'s arithmetic\n');
   const B = FD.budget(o);
   const sum = FD.wattsToDbm(5) - 12 - FD.FEED_DB + dbi('col3') - FD.pathLossDb(30, 'light', 100) + FD.RX_GAIN_DBI - FD.FEED_DB;
   ok('the budget is a sum: transmitter − attenuator − feeder + antenna − path + repeater antenna − feeder',
-    near(B.rx, sum, 1e-9) && B.stages[B.stages.length - 1].level === B.rx && near(B.margin, B.rx + 117, 1e-12)
+    near(B.rx, sum, 1e-9) && B.stages[B.stages.length - 1].level === B.rx && near(B.margin, B.rx + 110, 1e-12)
     && B.stages.length === 7, `${B.rx.toFixed(3)} vs ${sum.toFixed(3)}`);
   let perDb = true, step3 = true, apart = true;
   for (const w of [1, 5, 25]) for (let a = 0; a < 30; a++) {
@@ -307,8 +308,8 @@ console.log('\nThe fade-margin test — the bench\'s arithmetic\n');
   ok('past it, ITU-R P.526\'s smooth Earth adds 0.49 dB a kilometre',
     near(FD.shadowDbPerKm(), 0.493, 0.001) && near(FD.pathLossDb(H + 10, 'light', 100) - near40, 10 * FD.shadowDbPerKm(), 1e-9),
     FD.shadowDbPerKm().toFixed(4));
-  ok('the bench opens on a margin the attenuator can find: 5 W, 3 dB collinear, 30 km of light timber, 28.0 dB',
-    near(FD.stationMargin(), 28.0, 0.05), FD.stationMargin().toFixed(3));
+  ok('the bench opens on a margin the attenuator can find: 5 W, 3 dB collinear, 18 km of light timber, 28.1 dB',
+    near(FD.stationMargin(), 28.1, 0.05), FD.stationMargin().toFixed(3));
 
   const r = FD.reading;
   const show = x => JSON.stringify({ reading: x.reading, hi: x.hi, sent: x.sent, atLeast: x.atLeast });
@@ -487,8 +488,8 @@ try {
   await page.click('#rp-fm-send');
   await page.waitForTimeout(1300);
   f = await fd();
-  ok('📡 at 24 dB: heard, at −113.0 dBm with 4.0 dB to spare', f.log.length === 1
-    && /^24 dB ✓ heard — −113\.0 dBm, 4\.0 dB to spare$/.test(f.log[0]), f.log[0]);
+  ok('📡 at 24 dB: heard, at −105.9 dBm with 4.1 dB to spare', f.log.length === 1
+    && /^24 dB ✓ heard — −105\.9 dBm, 4\.1 dB to spare$/.test(f.log[0]), f.log[0]);
   await page.evaluate(() => { const r = document.getElementById('rp-fm-att'); r.value = '30'; r.dispatchEvent(new Event('input')); });
   await page.click('#rp-fm-send');
   await page.waitForTimeout(1300);
@@ -506,12 +507,12 @@ try {
   }));
   let mt = await mtx();
   ok('the table: a row a 3 dB step and a column a transmitter, 7 dB apart, this setting marked',
-    mt.rows === 11 && mt.heads === 4 && /1\.0 dB to spare/.test(mt.here)
+    mt.rows === 11 && mt.heads === 4 && /1\.1 dB to spare/.test(mt.here)
     && near(mt.first[1] - mt.first[0], 7, 0.05) && near(mt.first[2] - mt.first[1], 7, 0.05), JSON.stringify(mt));
   await page.click('label[for="rp-fmw-25"]');
   f = await fd();
   ok('25 W: the fade margin 6.99 dB higher than at 5 W, and the tests sent at 5 W cleared',
-    f.s.w === 25 && near(f.s.margin - 28.035, 6.99, 0.01) && f.s.log.length === 0, f.s.margin.toFixed(2));
+    f.s.w === 25 && near(f.s.margin - 28.090, 6.99, 0.01) && f.s.log.length === 0, f.s.margin.toFixed(2));
   await page.click('label[for="rp-fmw-5"]');
   await page.click('label[for="rp-fmstep-5"]');
   mt = await mtx();

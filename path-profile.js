@@ -254,11 +254,12 @@ function radioOver(key) {
 // What a site starts from before anything is typed: its radio system's
 // figures, the antenna at the mast height at a repeater or base
 // (stationAntenna) — or, at a point on the ground, the 1 W field station most
-// of this network is, down to its line loss (LB_DEFAULT_LOSS_DB, link-budget.js,
-// read when this runs rather than when the file loads).
+// of this network is, down to its line loss and receiver threshold
+// (LB_DEFAULT_LOSS_DB and LB_DEFAULT_RX_DBM, link-budget.js, read when this runs
+// rather than when the file loads).
 function radioDefaults(st) {
   if (!st) {
-    return { tx_w: 1, loss_db: LB_DEFAULT_LOSS_DB, gain_dbi: 5.15, agl_m: PATH_DEFAULT_AGL, rx_dbm: -117 };
+    return { tx_w: 1, loss_db: LB_DEFAULT_LOSS_DB, gain_dbi: 5.15, agl_m: PATH_DEFAULT_AGL, rx_dbm: LB_DEFAULT_RX_DBM };
   }
   const sys = rmSystemOf(st);
   return {

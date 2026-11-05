@@ -2,6 +2,16 @@
   "about": "Every change to Flood-Net's agent API (https://floodwarning.net/api/v1 and https://floodwarning.net/api/mcp) that someone using it would notice — a route, a field, a limit, a tool — newest first. Each entry is emailed once to everyone on the API notify list (sign up at https://floodwarning.net/api#notify). Served as JSON at https://floodwarning.net/api/v1/changelog and written up in docs/agent-api.md, under Changes. Add an entry in the same push as the change: it is what tells people.",
   "entries": [
     {
+      "id": "2026-11-05-rx-threshold",
+      "date": "2026-11-05",
+      "title": "Fade margins are now measured from a −110 dBm receiver, 7 dB lower than before",
+      "summary": "Flood-Net's field station receiver threshold — the weakest signal a station's burst is taken as decoded at, which every fade margin is measured from — is now −110 dBm, the figure Radio Mobile runs use. It was −117 dBm. So every fade margin reads 7 dB less than it did for the same path. The rm_systems presets in the stations document now give rx_threshold_dbm −110. The saved hop margins in GET /api/v1/stations/{id}/radio-path were worked out again and saved at the new figure the same day, so they are about 7 dB lower than before, and a hop may have dropped a band (good is 15 dB or more, ok 6 dB or more). No route, field or tool changed.",
+      "breaking": false,
+      "links": [
+        { "text": "The receiver threshold", "url": "https://github.com/cdomotor-g/MegaNet/blob/main/docs/network-review.md#the-receiver-threshold-110-dbm-since-5-november-2026" }
+      ]
+    },
+    {
       "id": "2026-11-04-out-of-range",
       "date": "2026-11-04",
       "title": "A station out of every receiver's range is no longer taken as heard",

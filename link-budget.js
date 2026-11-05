@@ -81,6 +81,14 @@ function lbMarginClass(db) { return LB_MARGIN.find(m => db >= m.min); }
 // rm_systems row carries a figure of its own uses that instead of this.
 const LB_DEFAULT_LOSS_DB = 0.5;
 
+// Receiver threshold at an end nobody has set: the field stations' receiver
+// sensitivity, the level under which a burst is not decoded. −110 dBm, the
+// owner's call (November 2026) and the figure the Radio Mobile runs done for
+// the Bureau use; the two real rm_systems rows carry the same since 0103. It
+// was −117.001 dBm, as the Radio Mobile network file came. Every fade margin is
+// measured from it, so moving it moves every margin by the same decibels.
+const LB_DEFAULT_RX_DBM = -110;
+
 // Antenna gain, as a person reads it. Stored, priced and exported in dBi —
 // rm_systems.antenna_gain_dbi is Radio Mobile's own field, and a path loss is
 // reckoned between isotropic antennas, so the arithmetic wants dBi — but shown
@@ -1152,7 +1160,7 @@ const LinkBudget = (function () {
        'GlobCover ~300 m classes with a height and a “density” per class, plus unpublished forest and urban loss terms — usually switched off'],
       ['Terminal in trees or town', 'Field model: in the field allowance. Land-cover model: ITU-R P.2108 §3.1 height-gain loss when the antenna is below the cover',
        'Part of the same unpublished clutter term'],
-      ['Calibration', `Field model: ${FN_MODEL_DEFAULTS.allowance} dB off the bare-terrain loss, fitted to every station's attenuator tests on file (paths up to 35 km, each test read as the step it is) — typical error ±8 dB network-wide`,
+      ['Calibration', `Field model: ${FN_MODEL_DEFAULTS.allowance} dB off the bare-terrain loss, fitted to every station's attenuator tests on file (paths up to 35 km, each test read as the step it is) — typical error ±8 dB network-wide. Fitted when the receiver threshold was −117 dBm; the Network Review's history check re-fits it at today's`,
        'None — the figures are the model’s own; on the paths where both were checked they read about 2 dB high on average, as Flood-Net does'],
       ['Repeater &amp; base antennas', `At least a ${FN_MODEL_DEFAULTS.mastAgl} m mast (a setting), or the radio system’s height where it is more`,
        'Each unit’s own height, typed in per system or per unit'],

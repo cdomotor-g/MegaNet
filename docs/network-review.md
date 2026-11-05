@@ -295,7 +295,10 @@ and moved by a few decibels where the 24 m changed the ground near the mast.
 ## Against Radio Mobile, in one region
 
 The 54 stations round Mt Stuart were also modelled in Radio Mobile (53 of the
-paths). Each model against the same tests, Flood-Net at the network's 12 dB:
+paths). Each model against the same tests, Flood-Net at the network's 12 dB and
+the −117 dBm receiver threshold it ran at then (it is −110 dBm since 5 November
+2026, which reads every Flood-Net margin 7 dB lower — see *The receiver
+threshold*, below):
 
 | Model | Mean error | Typical error | RMS error | Within ±6 dB | Within ±10 dB | Pairs in order |
 |---|---:|---:|---:|---:|---:|---:|
@@ -360,7 +363,7 @@ were told:
 | | Radio Mobile run | Flood-Net |
 |---|---:|---:|
 | Marburg's antenna | 4 m | 10 m — the repeater and base mast minimum |
-| Marburg's receiver threshold | −110 dBm | −117 dBm — the field station radio system every station is on |
+| Marburg's receiver threshold | −110 dBm | −117 dBm — the field station radio system every station is on (−110 dBm since 5 November 2026) |
 | Obstruction (Longley–Rice over the terrain) | 15.9 dB | 0.1 dB |
 | Field allowance | — | 12.0 dB |
 | Path loss | 125.9 dB | 122.2 dB |
@@ -394,6 +397,32 @@ What this says:
 - **Same inputs, same figure**: the link budget card takes either end's antenna
   height and receiver threshold for the session, so a Radio Mobile set-up can
   be typed in and the two compared like for like.
+
+### The receiver threshold: −110 dBm since 5 November 2026
+
+The owner's call, the day after the worked case above: the field stations'
+receiver threshold — the level a burst has to arrive at to be decoded, which
+every fade margin is measured from — is **−110 dBm** across the board, the
+figure Radio Mobile's runs use. It was −117.001 dBm, as the Radio Mobile network
+file came. Migration `0103` moved both field station radio systems in the
+database, and the app's own starting figure for a point on the ground
+(`LB_DEFAULT_RX_DBM`, `link-budget.js`) moved with them.
+
+- **Every margin reads 7 dB less** than it did — the link budget card, the
+  fade-margin map, the site finder, this tab and the agent API alike. The
+  Greys Plains path above now reads **+27.1 dB**, and 7 dB of the gap to Radio
+  Mobile is gone.
+- **The 12 dB field allowance was fitted at −117 dBm.** The attenuator tests
+  measured the real margin whatever figure the model assumes, so the history
+  check now asks for an allowance about 7 dB smaller (around 5 dB) and
+  reads Flood-Net that much more cautious than the field on average. Taking the
+  re-fit up would put the field-calibrated margins back where they were; leaving
+  12 dB keeps the extra caution. That is the owner's to choose; until then the
+  allowance stays at 12 dB.
+- **Saved fade margins on the map went stale** the moment the threshold
+  changed — it is part of what each saved figure was worked out from — and the
+  re-sweep, run by hand straight after, worked out and saved 4,199 of the
+  4,200 within 150 km at the new figure.
 
 ## The ground: LiDAR, where it matters
 

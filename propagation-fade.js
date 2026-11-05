@@ -31,7 +31,7 @@
 // Stations map prices a real path over its real terrain; this one is a place
 // to try things.
 //
-// The receiver is the link budget card's −117 dBm, the feeders its
+// The receiver is the link budget card's −110 dBm (LB_DEFAULT_RX_DBM), the feeders its
 // LB_DEFAULT_LOSS_DB, the bands its LB_MARGIN, the field station's antenna
 // PATH_DEFAULT_AGL up and the attenuator's limit the Network Review's
 // ATTEN_MAX — restated here so the model loads into Node with no app around
@@ -59,7 +59,7 @@ const PropFade = (function () {
   // ── The model ──────────────────────────────────────────────────────────────
 
   const F_MHZ = 151.5;
-  const RX_DBM = -117;            // the link budget card's receiver (PropPhysics.SENS_DBM)
+  const RX_DBM = -110;            // the link budget card's receiver (PropPhysics.SENS_DBM)
   const FEED_DB = 0.5;            // LB_DEFAULT_LOSS_DB: a few metres of LMR-400, at each end
   const FIELD_AGL = 4;            // m, PATH_DEFAULT_AGL: the field station's antenna
   const RX_GAIN_DBI = 5.15;       // the repeater's 3 dBd collinear
@@ -229,7 +229,7 @@ const PropFade = (function () {
     w: 5,
     ant: 'col3',
     country: 'light',
-    km: 30,
+    km: 18,              // 28 dB of margin at −110 dBm: under the attenuator's 30, with room to find it
     hb: 100,
     atten: 0,
     step: 3,

@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 203, date: '2026-11-05', items: [
+      '📶 <strong>Fade margins now measured from −110 dBm.</strong> The field stations\' receiver threshold — the weakest '
+        + 'signal a burst is decoded at — is now −110 dBm across the board, the figure Radio Mobile runs use (it was −117). '
+        + 'Every fade margin in the app reads <strong>7 dB less</strong> for the same path: the link budget card, the fade-margin '
+        + 'map, the site finder and the <strong>Network Review</strong>. The margins saved on the map have been worked out again '
+        + 'at the new figure.',
+    ] },
     { n: 202, date: '2026-11-05', items: [
       '🌙 <strong>Moved a pin? Its fade margins catch up overnight.</strong> When a station\'s pin is moved, or its ground '
         + 'height, antenna or radio changes, the fade margins on its links go stale and the <strong>Stations</strong> map shows '

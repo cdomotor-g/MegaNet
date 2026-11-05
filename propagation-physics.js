@@ -65,7 +65,7 @@ const PropPhysics = (function () {
   const TAIL_MS = 500 - LEAD_MS - FRAME_MS;
   const KEYING_MS = LEAD_MS + FRAME_MS + TAIL_MS;
   const CAPTURE_DB = 6;                    // FM capture: this far ahead, the stronger wins
-  const SENS_DBM = -117;                   // a good VHF receiver at 300 baud, roughly
+  const SENS_DBM = -110;                   // the field stations' receiver (link-budget.js LB_DEFAULT_RX_DBM)
   const K_FACTOR = 4 / 3;                  // the standard atmosphere bends radio over the bulge
   const R_EARTH_KM = 6371;
 
