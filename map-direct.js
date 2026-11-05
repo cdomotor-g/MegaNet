@@ -238,9 +238,10 @@ const MapDirect = (function () {
     links: ['Links', 'Every radio path out of this station the map knows: the repeaters whose pass ranges carry it, within '
       + 'the Max TX distance, and the base stations within it that listen on its channel and so hear it with no repeater '
       + 'between. Best fade margin first.'],
-    margin: ['Fade margin', 'How many decibels (dB) its signal arrives above what the receiver needs, at the reliability the '
+    margin: ['Modelled fade margin', 'How many decibels (dB) its signal arrives above what the receiver needs, at the reliability the '
       + 'link budget is set to. Good is 10 dB or more, Marginal 3 or more, Poor below that. Worked out over the terrain — '
-      + 'the figure the radio-path card gives — a model, not a measurement. The bars draw it on one scale, −20 to +40 dB.'],
+      + 'the figure the radio-path card gives — a model, not a measurement: the real link can be several dB better or worse, '
+      + 'so treat it as a guide and test it on site before relying on it. The bars draw it on one scale, −20 to +40 dB.'],
     second: ['Second-hand', 'A repeater that carries it, but most likely hears it through a nearer repeater that carries it '
       + 'too, rather than from the station itself.'],
     unchecked: ['Channel not checked', 'The base station has no receive channel on record, so nobody has checked that it '
@@ -353,7 +354,7 @@ const MapDirect = (function () {
     const weakHtml = weak.length ? `<details class="freq-fold"${fold}><summary>${word('weak')} <b class="freq-count">${weak.length}</b></summary>`
       + `<div class="freq-fold-body">${axisHtml()}${weak.map(r => itemHtml(st, r, true)).join('')}</div></details>` : '';
     return S(axisHtml() + (rows.length ? rows.map(r => itemHtml(st, r, false)).join('') : '<span class="txt-muted">none heard</span>')
-      + weakHtml + notes.join('') + keyHtml(), word('margin', 'Fade margin, dB'));
+      + weakHtml + notes.join('') + keyHtml(), word('margin', 'Modelled fade margin, dB'));
   }
 
   // The summary's first line, at the top of the Radio tab (frequencies.js):

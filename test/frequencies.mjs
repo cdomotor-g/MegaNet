@@ -393,10 +393,10 @@ async function main() {
       margin: document.querySelector('#stn-card .stn-card-links .freq-h > span .term')?.title || '',
       fold: [...document.querySelectorAll('#stn-card .freq-words dt')].map(e => e.textContent),
     }));
-    check('…Links and Fade margin say what they mean on hover, the bands in words under the bars, and every word in a fold',
+    check('…Links and Modelled fade margin say what they mean on hover, the bands in words under the bars, and every word in a fold',
       /fade margin/.test(linkWords.links) && /Good is 10 dB or more, Marginal 3 or more/.test(linkWords.margin)
         && /Good 10\+ Marginal 3–10 Poor under 3 modelled, not measured/.test(L.text)
-        && ['Assumed TX', 'Links', 'Fade margin', 'Too weak to hear it direct', 'Heard on', 'Not explained'].every(w => linkWords.fold.includes(w)),
+        && ['Assumed TX', 'Links', 'Modelled fade margin', 'Too weak to hear it direct', 'Heard on', 'Not explained'].every(w => linkWords.fold.includes(w)),
       JSON.stringify(linkWords));
     const drawn = await page.evaluate(() => MapDirect._drawn().map(d => d.to).sort());
     check('the map draws a line to each base station that hears it, and to nothing else',
