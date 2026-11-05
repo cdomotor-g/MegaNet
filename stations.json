@@ -834,7 +834,7 @@
       "antenna_type": "omni.ant",
       "antenna_gain_dbi": 5.15,
       "antenna_height_m": 4,
-      "rx_threshold_dbm": -117.001
+      "rx_threshold_dbm": -110
     },
     {
       "id": 2,
@@ -845,7 +845,7 @@
       "antenna_type": "omni.ant",
       "antenna_gain_dbi": 5.15,
       "antenna_height_m": 2,
-      "rx_threshold_dbm": -117.001
+      "rx_threshold_dbm": -110
     },
     {
       "id": 3,

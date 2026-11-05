@@ -1,8 +1,8 @@
 Radio Mobile
 $System
 System ID,System name,Tx power(W),Line loss(dB),Supplemental Line loss(dB/m),Antenna type,Antenna gain(dBi),Antenna height(m),Rx threshold(dBm)
-1,Field Station 1W,1,1,0,omni.ant,5.15,4,-117.001
-2,Field Station 5W,5,1,0,omni.ant,5.15,2,-117.001
+1,Field Station 1W,1,1,0,omni.ant,5.15,4,-110
+2,Field Station 5W,5,1,0,omni.ant,5.15,2,-110
 3,System 3,,,,omni.ant,,,
 4,System 4,,,,omni.ant,,,
 5,System 5,,,,omni.ant,,,
