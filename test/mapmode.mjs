@@ -14,6 +14,8 @@
 //   4. **One press, one thing**: Escape with a dialog open leaves the mode
 //      alone; Escape on the full-screen map with What's here armed leaves
 //      What's here and keeps full screen.
+//      It is seen: solid red with white words, and the map framed in the same
+//      red while the mode lasts.
 //   5. **Where it sits**: inside the map, under the zoom buttons, the station
 //      trail and ↺, the note under it; at 375 px across the map under the zoom
 //      buttons, with no sideways scroll.
@@ -93,10 +95,32 @@ async function main() {
       return { below: n.top >= m.bottom - 1, text: document.getElementById('map-note').textContent };
     });
     check('…the tool\'s how-to still in the note, under the banner', note.below && /Click each corner/.test(note.text), J(note));
+    // Seen, not just there: the map's red, white on it, and the map framed in
+    // the same red while the mode lasts (the owner could not find the first,
+    // panel-grey banner over the satellite imagery on the dark theme).
+    const frame = () => page.evaluate(() => {
+      const css = getComputedStyle(document.documentElement);
+      const row = document.querySelector('#map-mode .map-mode-row');
+      const after = getComputedStyle(document.getElementById('leaflet-map'), '::after');
+      const probe = document.createElement('i');
+      probe.style.color = css.getPropertyValue('--mode-bg');
+      document.body.appendChild(probe);
+      const red = getComputedStyle(probe).color;
+      probe.remove();
+      return { red, fill: row ? getComputedStyle(row).backgroundColor : null,
+               ink: row ? getComputedStyle(row).color : null,
+               frame: after.content !== 'none' && after.borderTopStyle === 'solid' ? after.borderTopColor : null,
+               width: parseFloat(after.borderTopWidth) || 0 };
+    });
+    let fr = await frame();
+    check('…on the map\'s red, in white, with the map framed in the same red',
+      fr.fill === fr.red && fr.ink === 'rgb(255, 255, 255)' && fr.frame === fr.red && fr.width >= 3, J(fr));
     await page.keyboard.press('Escape');
     await settle(page);
     b = await banner(page);
     check('…Escape leaves it, and the banner goes', b.hidden && await page.evaluate(() => !state.draw.tool), J(b));
+    fr = await frame();
+    check('…and the frame goes with it', !fr.frame, J(fr));
 
     await page.evaluate(() => MapHere.arm(true));
     await settle(page);

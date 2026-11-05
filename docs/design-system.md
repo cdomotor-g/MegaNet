@@ -1023,7 +1023,12 @@ words on a map still has to ask first.
 the map or on a pin does something other than open that station — the banner
 (`#map-mode`, `map-mode.js`) says which, what a click does now, and how to
 leave: ✕, or Escape. It has asked first in the sense that matters: somebody
-turned the mode on. The modes are a draw tool (which turns the pins off), moving
+turned the mode on. It is the map's alarm to look at — solid `--mode-bg` red
+with `--mode-ink` white words and a white ✕ — and the map is framed in the same
+red for as long as the mode lasts, because the first banner, panel-grey with an
+accent edge, was not seen over the satellite imagery on the dark theme. Red
+there means "a click does something else now", not "something is wrong"; the
+words say which. The modes are a draw tool (which turns the pins off), moving
 a pin, site features, the link budget picking its ends (on whenever its card is
 open), What's here, the Best repeater pick and the drive's start; DriveMode has
 its own HUD. It is the row under the top row — zoom, station trail, ↺ — the

@@ -241,6 +241,12 @@
      a warning line outside a panel actually sits. 4.82:1 on --bg now, 5.18:1
      on --panel. The other three status colours already cleared both. */
   --warn: #9e5e00;
+  /* The Stations map's mode banner and the frame round the map while it is in
+     a mode (map-mode.js): a red that is the map's own alarm, white on it.
+     5.62:1. A ground of its own rather than --bad, which is a text colour and
+     in the dark theme a pale one; in the contrast contract (npm run shell). */
+  --mode-bg: #c62828;
+  --mode-ink: #ffffff;
   /* The three flood classes on the station card (river-details.js): green,
      yellow, red, as the classes are coloured on a flood warning. Tokens of
      their own rather than --ok/--warn/--bad because they are a legend, not a
@@ -696,6 +702,8 @@
   --ok:   #3ecf8e;
   --bad:  #ff6b6b;
   --warn: #ffb347;
+  --mode-bg: #d32f2f;             /* 4.98:1 under white; 3.3:1 as a frame on the dark ground */
+  --mode-ink: #ffffff;
   --flood-minor:    #57d657;
   --flood-moderate: #ffd84d;
   --flood-major:    #ff6b6b;
@@ -834,6 +842,7 @@
   --ctl-border: #34414e;
   --accent: #00449a;
   --warn: #6e4100;
+  --mode-bg: #b71c1c;             /* 6.57:1 */
   --flood-moderate: #5b4c00;
 }
 
@@ -5078,8 +5087,17 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 /* The mode the map is in (map-mode.js): the row under the top row — the zoom
    buttons, the station trail and ↺, with #map-note centred over it — the
    width the twin's offer is. Over the Leaflet controls and the note, under
-   the cards. Accent-edged, so it
-   reads as the map's state rather than one more passing note. */
+   the cards.
+
+   It has to be seen. The first one was a panel-coloured pill with an accent
+   edge, and on the dark theme over the satellite imagery it was one more grey
+   thing on the map: the owner looked for it and did not find it. So it is the
+   map's alarm now — solid red, white words, a white ✕ — the map is framed in
+   the same red for as long as the mode lasts, so a glance at any edge says
+   the map is not itself, and the banner pulses twice as a mode starts (the one
+   reduced-motion policy at the foot of this sheet stills that). Red here is
+   "a click does something else now", not "something is wrong": the banner's
+   own words say which. */
 .map-mode {
   position: absolute;
   top: 3.1rem;
@@ -5098,36 +5116,60 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  padding: .25rem .3rem .25rem .8rem;
-  border: 2px solid var(--accent);
-  border-radius: 1.2rem;
-  background: var(--panel);
-  color: var(--text);
-  font-size: .82rem;
+  padding: .35rem .35rem .35rem .9rem;
+  border: 2px solid var(--mode-ink);
+  border-radius: 1.3rem;
+  background: var(--mode-bg);
+  color: var(--mode-ink);
+  font-size: .86rem;
   line-height: 1.35;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, .3);
+  box-shadow: 0 0 0 2px var(--mode-bg), 0 4px 16px rgba(0, 0, 0, .45);
+  animation: mn-mode-in 1.1s ease-out 2;
+}
+.map-mode-row strong { font-weight: 700; }
+@keyframes mn-mode-in {
+  0%   { box-shadow: 0 0 0 2px var(--mode-bg), 0 0 0 2px color-mix(in srgb, var(--mode-bg) 75%, transparent), 0 4px 16px rgba(0, 0, 0, .45); }
+  100% { box-shadow: 0 0 0 2px var(--mode-bg), 0 0 0 18px color-mix(in srgb, var(--mode-bg) 0%, transparent), 0 4px 16px rgba(0, 0, 0, .45); }
 }
 .map-mode-what { flex: 1 1 auto; min-width: 0; }
-.map-mode-esc { flex: none; color: var(--muted); white-space: nowrap; font-size: .78rem; }
+.map-mode-esc { flex: none; white-space: nowrap; font-size: .8rem; font-weight: 600; }
 .map-mode-esc kbd {
   font: inherit;
-  padding: 0 .3rem;
-  border: 1px solid var(--border);
+  padding: 0 .35rem;
+  border: 1px solid var(--mode-ink);
   border-radius: 4px;
+  background: transparent;     /* not the app's key cap, which is a pale one */
+  color: inherit;
+  box-shadow: none;
 }
+/* White, with the red ✕ on it: the one thing on the bar to press. */
 .map-mode-x {
   flex: none;
-  min-width: 2rem;
-  min-height: 2rem;
-  border: 1px solid var(--border);
+  min-width: 2.1rem;
+  min-height: 2.1rem;
+  border: 2px solid var(--mode-ink);
   border-radius: 999px;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--mode-ink);
+  color: var(--mode-bg);
   font: inherit;
+  font-weight: 700;
+  font-size: .95rem;
   cursor: pointer;
 }
-.map-mode-x:hover { border-color: var(--accent); }
-.map-mode-x:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.map-mode-x:hover { background: color-mix(in srgb, var(--mode-ink) 85%, var(--mode-bg)); }
+.map-mode-x:focus-visible { outline: 3px solid var(--mode-ink); outline-offset: 2px; }
+/* The frame: the map's edge in the banner's red for as long as it is up, over
+   the panes and the 3-D view, under the Leaflet controls, taking no pointer. */
+.has-map-mode #leaflet-map::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 950;
+  border: 4px solid var(--mode-bg);
+  border-radius: inherit;
+  box-shadow: inset 0 0 24px color-mix(in srgb, var(--mode-bg) 45%, transparent);
+  pointer-events: none;
+}
 /* The note — the draw tools' how-to, the passing "Pin left where it was." —
    goes just under the banner, and the twin's offer stands down until the mode
    ends, as it already does while site features are armed (map-twin.js). */

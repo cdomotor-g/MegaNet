@@ -107,6 +107,8 @@ const TEXT_PAIRS = [
   ['--ok', '--bg'], ['--ok', '--panel'],
   ['--bad', '--bg'], ['--bad', '--panel'],
   ['--warn', '--bg'], ['--warn', '--panel'],
+  // The Stations map's mode banner: its words, white on its own red (map-mode.js).
+  ['--mode-ink', '--mode-bg'],
   ['--role-field', '--panel'], ['--role-repeater', '--panel'],
   ['--role-base', '--panel'], ['--role-satcom', '--panel'],
   // The Stations cards' grounds (.card-kind): each card restates --panel as

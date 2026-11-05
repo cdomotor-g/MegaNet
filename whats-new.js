@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 216, date: '2026-11-05', items: [
+      '🟥 <strong>The map\'s mode banner is red now, and the map is framed in red while a mode is on.</strong> The first '
+        + 'one was grey and easy to miss over the satellite photos. It pulses twice as a mode starts (not if your device '
+        + 'is set to reduce motion); ✕ or Escape still leaves.',
+    ] },
     { n: 215, date: '2026-11-05', items: [
       '🏷️ <strong>The Stations map says when it is in a mode.</strong> While a click on the map does something other '
         + 'than open a station — a ✏️ draw tool, moving a pin, site features, the link budget picking its ends, '
