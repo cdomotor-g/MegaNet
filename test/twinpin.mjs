@@ -245,7 +245,7 @@ try {
 
     await page.evaluate(() => switchTab('stations'));
     await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0, null, { timeout: LOAD_TIMEOUT });
-    await page.evaluate(([lat, lon]) => { showStationCard('gatton'); state.map.setView([lat, lon], 17, { animate: false }); }, moved);
+    await page.evaluate(([lat, lon]) => { MapTwin.setEnabled(true); showStationCard('gatton'); state.map.setView([lat, lon], 17, { animate: false }); }, moved);
     await page.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return el && !el.hidden; }, null, { timeout: LOAD_TIMEOUT });
     await page.click('#map-twin-offer .map-twin-offer-open');
     await page.waitForFunction(() => MapTwin.active() && DigitalTwin.debug().built && !DigitalTwin.debug().status.endsWith('…'), null, { timeout: BUILD_TIMEOUT });

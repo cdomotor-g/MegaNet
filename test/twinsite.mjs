@@ -558,7 +558,7 @@ async function browserHalf() {
     await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0, null, { timeout: LOAD_TIMEOUT });
     CUR = { lat: g.lat, lon: g.lon };
     const catalogBefore = seen.catalog;
-    await page.evaluate(([id, lat, lon]) => { showStationCard(id); state.map.setView([lat, lon], 17, { animate: false }); }, ['gatton', g.lat, g.lon]);
+    await page.evaluate(([id, lat, lon]) => { MapTwin.setEnabled(true); showStationCard(id); state.map.setView([lat, lon], 17, { animate: false }); }, ['gatton', g.lat, g.lon]);
     await page.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return el && !el.hidden && /10 cm/.test(el.textContent); }, null, { timeout: LOAD_TIMEOUT });
     const offer = await page.evaluate(() => ({ text: document.getElementById('map-twin-offer').textContent.replace(/\s+/g, ' ').trim(), active: MapTwin.active(), zoom: state.map.getZoom() }));
     ok('zoom 17 on Gatton: a card offers its twin and names the flight over it — and the map is still the map',

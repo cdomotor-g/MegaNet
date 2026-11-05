@@ -1105,8 +1105,8 @@ async function browserHalf(FS) {
     // 233 m by the 8 October 2026 snapshot it was out of the offer's reach, and
     // the offer went to the station nearest that old spot — Proposed Gatton
     // Auto, whose borrowed floods made twelve marks of seven.
-    await page.evaluate(() => { const g = state.data.stations.find(x => x.id === 'gatton'); state.selectedId = 'gatton'; state.map.setView([g.lat, g.lon], 18, { animate: false }); });
-    // Zoom 18 offers the twin; pressing the offer hands the map over.
+    await page.evaluate(() => { MapTwin.setEnabled(true); const g = state.data.stations.find(x => x.id === 'gatton'); state.selectedId = 'gatton'; state.map.setView([g.lat, g.lon], 18, { animate: false }); });
+    // Zoom 18 offers the twin (once ticked: it starts off); pressing the offer hands the map over.
     await page.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return !!el && !el.hidden; }, null, { timeout: LOAD_TIMEOUT });
     await page.click('#map-twin-offer .map-twin-offer-open');
     await page.waitForFunction(() => { const el = document.querySelector('#map-twin.is-on #twin-flood'); return !!el && !el.hidden; }, null, { timeout: BUILD_TIMEOUT });
@@ -1205,7 +1205,7 @@ async function browserHalf(FS) {
       switchTab('stations');
     });
     await hp.waitForFunction(() => !!state.map, null, { timeout: LOAD_TIMEOUT });
-    await hp.evaluate(() => { const g = state.data.stations.find(x => x.id === 'gatton'); state.selectedId = 'gatton'; state.map.setView([g.lat, g.lon], 18, { animate: false }); });
+    await hp.evaluate(() => { MapTwin.setEnabled(true); const g = state.data.stations.find(x => x.id === 'gatton'); state.selectedId = 'gatton'; state.map.setView([g.lat, g.lon], 18, { animate: false }); });
     await hp.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return !!el && !el.hidden; }, null, { timeout: LOAD_TIMEOUT });
     await hp.tap('#map-twin-offer .map-twin-offer-open');
     await hp.waitForFunction(() => {

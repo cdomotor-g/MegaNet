@@ -1374,6 +1374,19 @@ try {
   });
   await page.evaluate(() => DigitalTwin.clearCaches());
 
+  // The offer starts off, and off it fetches nothing ahead either: zoom 17
+  // with the station on the card and nothing stored is still just the map.
+  const demBeforeOff = seen.dem.length;
+  await page.evaluate(([id, lat, lon]) => { showStationCard(id); state.map.setView([lat, lon], 17, { animate: false }); },
+    [linked.id, linked.lat, linked.lon]);
+  await sleep(1500);
+  const cold = await page.evaluate(() => { const o = document.getElementById('map-twin-offer');
+    return { auto: state.mapTwinAuto, offer: !!o && !o.hidden, active: MapTwin.active(), stored: localStorage.getItem('mn-map-twin-offer') }; });
+  ok('the offer starts off: zoom 17 on a station shows no card and fetches nothing ahead',
+    cold.auto === false && !cold.offer && !cold.active && cold.stored === null && seen.dem.length === demBeforeOff,
+    `${JSON.stringify(cold)} requests +${seen.dem.length - demBeforeOff}`);
+  await page.evaluate(() => { state.map.setView(state.map.getCenter(), 10, { animate: false }); MapTwin.setEnabled(true); });
+
   // Zoom 15 with the station on the card: fetched ahead, nothing handed over.
   const demBeforePrefetch = seen.dem.length;
   await page.evaluate(([id, lat, lon]) => { showStationCard(id); state.map.setView([lat, lon], 15, { animate: false }); },

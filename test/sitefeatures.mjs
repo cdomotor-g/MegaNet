@@ -786,10 +786,14 @@ async function main() {
     await settle(phone.page);
     await phone.page.evaluate(() => SiteFeatures.add('orifice_run'));
     await phone.page.waitForTimeout(300);
+    // The offer starts off; it is ticked for this look only, and put back.
     const folded = await phone.page.evaluate(() => {
+      MapTwin.setEnabled(true);
       const offer = document.getElementById('map-twin-offer');
-      return { folded: SiteFeatures._session().folded, h: document.querySelector('.mn-sf-panel').getBoundingClientRect().height,
-               offer: !!offer && !offer.hidden, zoom: state.map.getZoom() };
+      const r = { folded: SiteFeatures._session().folded, h: document.querySelector('.mn-sf-panel').getBoundingClientRect().height,
+                  offer: !!offer && !offer.hidden, zoom: state.map.getZoom() };
+      MapTwin.setEnabled(false);
+      return r;
     });
     check('the panel folds itself to its head and its Save while a line is drawn', folded.folded && folded.h < 200, J(folded));
     check('…and the twin’s offer waits, at a zoom it would make one', !folded.offer && folded.zoom >= 17, J(folded));

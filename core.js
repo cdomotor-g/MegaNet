@@ -963,7 +963,8 @@ const HELP = {
       + 'starts put away. It steps aside for the station card and the digital twin. In the 3-D view it stays, '
       + 'flat, in the same corner: it follows the camera, the outline on it is the ground the camera can see — '
       + 'a wedge widening away from you when the view is tilted — and a click or a drag on it sends the camera there.',
-      '<strong>From zoom 17 the map offers the station\'s digital twin</strong> — the ground to '
+      '<strong>From zoom 17 the map can offer the station\'s digital twin</strong>, once '
+      + '<em>Offer the digital twin at close zoom</em> is ticked in Layers (it starts off) — the ground to '
       + '1 m where the State holds LiDAR, the aerial imagery, the station as built and the radio paths '
       + 'as this map colours them — whenever a station is under the view: the one on the card, the '
       + 'selected one, or the nearest to the centre. It never jumps there by itself: a card on the map '
@@ -971,7 +972,7 @@ const HELP = {
       + '<em>Open the digital twin</em> hands the rectangle over. ← Map or Escape gives the map back at '
       + 'the same zoom; wheeling out steps one zoom out. <strong>🔍 Zoom to station</strong> goes all '
       + 'the way in, which is where the card appears, and <strong>🧊 Digital twin</strong> on a '
-      + 'station\'s card opens its twin in one press. The switch is in Layers; ⛰️ 3-D is the '
+      + 'station\'s card opens its twin in one press, ticked or not. ⛰️ 3-D is the '
       + 'same idea at network scale, and offers it at the same zoom.',
       '<strong>Digital twin, in the side panel\'s rail, is the twin\'s pane</strong> — what the Digital Twin tab '
       + 'used to be: find a station and open its twin, the scene\'s settings (the patch, the '
@@ -1430,8 +1431,8 @@ const HELP = {
       + 'shows the rain hour by hour.',
       'In the Calm look the map starts quiet: the pale <strong>Light</strong> base map (<strong>Dark</strong> '
       + 'in the dark theme), every link in one colour, and waterways, survey marks, wind regions, road '
-      + 'parcels, property boundaries, the backbone paths, the arrowheads, the forecast outlines and the '
-      + 'digital twin up close all off. The top of Layers names whichever are still off, with '
+      + 'parcels, property boundaries, the backbone paths, the arrowheads and the forecast outlines '
+      + 'all off. The top of Layers names whichever are still off, with '
       + '<em>Turn them all on</em>; tick any one to have it back, and it stays the way you leave it.',
     ],
     figure: {
@@ -3077,8 +3078,9 @@ const TWIN_HELP = {
     + 'up: the ground is an elevation model, the imagery is draped on it, the station is built from '
     + 'its record, and the water is a level surface at the recorded levels. None of it is a survey, '
     + 'a flood map or a forecast; check anything that matters on site.',
-    '<strong>The twin is inside the Stations map.</strong> From zoom 17 with a station under '
-    + 'the view a card on the map offers it, saying what aerial imagery covers the station and when '
+    '<strong>The twin is inside the Stations map.</strong> With <em>Offer the digital twin at close '
+    + 'zoom</em> ticked in Layers (it starts off), from zoom 17 with a station under the view a card '
+    + 'on the map offers it, saying what aerial imagery covers the station and when '
     + 'it was flown; press Open the digital twin and the map hands its rectangle over, and ← Map or '
     + 'Escape gives it back at the same zoom. 🧊 Digital twin on a station\'s card, or a station '
     + 'picked in this pane, goes straight there. This pane is the rest of it: the settings, the '
@@ -4159,7 +4161,6 @@ const CALM_MAP_OFF = [
   ['mapSurvey',   'mn-survey',              'survey marks'],
   ['mapRoads',    'mn-roads',               'road parcels'],
   ['mapLots',     'mn-property-boundaries', 'property boundaries'],
-  ['mapTwinAuto', 'mn-map-twin',            'the digital twin up close'],
   ['mapArrows',   'mn-map-arrows',          'arrowheads on the links'],
   ['mapShowBackbone', 'mn-map-backbone',    'the backbone paths'],
 ];
@@ -4169,6 +4170,12 @@ function mapLayerStored(key) {
   let v = null;
   try { v = localStorage.getItem(key); } catch (_) {}
   return v == null ? lookStored() === 'classic' : v !== 'off';
+}
+
+// The digital twin's card at close zoom (map-twin.js): only once ticked.
+const TWIN_OFFER_KEY = 'mn-map-twin-offer';
+function twinOfferStored() {
+  try { return localStorage.getItem(TWIN_OFFER_KEY) === 'on'; } catch (_) { return false; }
 }
 
 // Pins coloured by health (#218): what the switch says if it has been set,
@@ -4375,10 +4382,12 @@ const state = {
   // requests for a view nobody asked a question about, so "no extra requests
   // fire with the layer off" has to stay true of a cold page load. The
   // opacity is a preference rather than a cost, so that one is remembered.
-  // The Digital Twin taking the map over at close zoom (map-twin.js). On by
-  // default and remembered, for mapRivers' reason: it is how an operator
-  // reads the map, and a switch they turned off should stay off.
-  mapTwinAuto:        mapLayerStored('mn-map-twin'),
+  // The Digital Twin's card at close zoom (map-twin.js). Off for everybody,
+  // in every look, until they tick it in Layers, and remembered once they do.
+  // It has its own key, not the 'mn-map-twin' it once shared with the Calm
+  // look's quiet layers: an 'on' stored there may be Turn them all on's rather
+  // than a choice to have this card, so everybody starts again from off.
+  mapTwinAuto:        twinOfferStored(),
   mapElvisCov:        false,
   mapElvisCovOpacity: Math.max(0.1, Math.min(1,
                         Number(localStorage.getItem('mn-elvis-cov-op')) || 0.6)),

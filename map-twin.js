@@ -65,8 +65,11 @@
 //
 // ── What it costs, and when ───────────────────────────────────────────────
 //
-// The offer is on by default and is a switch in 🗺️ Map display. Nothing is
-// fetched until a station qualifies. From zoom 14 with a station under the
+// The offer is off until it is ticked — Offer the digital twin at close zoom,
+// in 🗺️ Map display — for everybody and in every look (the owner's call,
+// November 2026), and remembered once it is. Off, the twin is still one press
+// away: 🧊 Digital twin on a station's card, or the 🧊 pane of the side panel.
+// Nothing is fetched until a station qualifies. From zoom 14 with a station under the
 // view the twin's ground and imagery are fetched ahead (DigitalTwin.prefetch)
 // into the same bounded caches a build reads, so the hand-over, when it is
 // asked for, is a build from memory rather than a wait — which is what makes
@@ -103,7 +106,8 @@ const MapTwin = (function () {
   const dismissed = new Set();   // stations put away with ×, until the map is next zoomed out past ZOOM
   const told = new Set();        // stations the live region has already announced an offer for
 
-  function enabled() { return typeof state === 'undefined' || state.mapTwinAuto !== false; }
+  // Off until ticked (core.js, twinOfferStored).
+  function enabled() { return typeof state !== 'undefined' && state.mapTwinAuto === true; }
 
   function stationById(id) {
     return (state.data && state.data.stations || []).find(s => s.id === id) || null;
@@ -483,7 +487,7 @@ const MapTwin = (function () {
     // the map, not something they are doing right now.
     setEnabled(on) {
       state.mapTwinAuto = !!on;
-      try { localStorage.setItem('mn-map-twin', on ? 'on' : 'off'); } catch (_) {}
+      try { localStorage.setItem(TWIN_OFFER_KEY, on ? 'on' : 'off'); } catch (_) {}
       sync();
       const note = document.getElementById('map-twin-note');
       if (note) note.innerHTML = noteHtml();

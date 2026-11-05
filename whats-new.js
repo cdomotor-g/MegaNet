@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 226, date: '2026-11-05', items: [
+      '🛰️ <strong>The digital twin card no longer comes up by itself when you zoom in close.</strong> The '
+        + '"High-resolution imagery here" / "Digital twin available" card across the top of the Stations map is now '
+        + 'off for everybody until you turn it on: tick <em>Offer the digital twin at close zoom</em> in '
+        + '🗺️ Map display. With it off, 🧊 Digital twin on a station\'s card still opens the twin.',
+    ] },
     { n: 225, date: '2026-11-05', items: [
       '⟳ <strong>A little wheel in the top-right corner spins while something is happening.</strong> It comes up '
         + 'whenever Flood-Net is loading from the database or the web (blue), saving to it (green) or working something '

@@ -318,7 +318,7 @@ async function main() {
       } else {
         const g = () => page.evaluate(geometry);
         await page.evaluate(() => DigitalTwin._infoFold(null));
-        await page.evaluate(() => { showStationCard('abbieglassie_al'); showStationCard('gatton'); state.map.setView([-27.555, 152.275], 18, { animate: false }); });
+        await page.evaluate(() => { MapTwin.setEnabled(true); showStationCard('abbieglassie_al'); showStationCard('gatton'); state.map.setView([-27.555, 152.275], 18, { animate: false }); });
         await page.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return !!el && !el.hidden; }, null, { timeout: LOAD_TIMEOUT });
         await page.click('#map-twin-offer .map-twin-offer-open');
         await page.waitForFunction(() => { const d = DigitalTwin.debug(); return MapTwin.active() && d.built && !d.status.endsWith('…') && d.flood && !d.flood.none; }, null, { timeout: BUILD_TIMEOUT });
@@ -381,7 +381,7 @@ async function main() {
       const gl = await page.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); });
       if (gl) {
         await page.evaluate(() => DigitalTwin._infoFold(null));
-        await page.evaluate(() => { showStationCard('abbieglassie_al'); showStationCard('gatton'); state.map.setView([-27.555, 152.275], 18, { animate: false }); });
+        await page.evaluate(() => { MapTwin.setEnabled(true); showStationCard('abbieglassie_al'); showStationCard('gatton'); state.map.setView([-27.555, 152.275], 18, { animate: false }); });
         await page.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return !!el && !el.hidden; }, null, { timeout: LOAD_TIMEOUT });
         await page.tap('#map-twin-offer .map-twin-offer-open');
         await page.waitForFunction(() => { const d = DigitalTwin.debug(); return MapTwin.active() && d.built && !d.status.endsWith('…'); }, null, { timeout: BUILD_TIMEOUT });

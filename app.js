@@ -5570,7 +5570,7 @@ function mapDisplayControlsHtml() {
          layers because it is the same ground, at the scale where 1 m LiDAR is
          the difference between a bank and a gauge in a channel. -->
     <label class="filter-check"
-           title="From zoom 17 in, with a station under the view, a card on the map offers that station's digital twin and says what aerial imagery covers it. Press Open the digital twin for the site's ground in 3-D, the imagery, the station as built and the radio paths; ← Map or Escape to come back.">
+           title="Off until you tick it. From zoom 17 in, with a station under the view, a card on the map offers that station's digital twin and says what aerial imagery covers it. Press Open the digital twin for the site's ground in 3-D, the imagery, the station as built and the radio paths; ← Map or Escape to come back. Off, 🧊 Digital twin on a station's card still opens it.">
       <input type="checkbox" ${state.mapTwinAuto ? 'checked' : ''}
              onchange="MapTwin.setEnabled(this.checked)">
       Offer the digital twin at close zoom (${MapTwin.zoom}+)

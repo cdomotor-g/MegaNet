@@ -597,7 +597,7 @@ async function browserHalf() {
     ok('leaving the tab takes the layer and its words with it',
       await page.evaluate(() => TwinCadastre.debug().status === 'off' && !document.querySelector('canvas.twin-cad-labels')));
     await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 0, null, { timeout: LOAD_TIMEOUT });
-    await page.evaluate(([lat, lon]) => { showStationCard('gatton'); state.map.setView([lat, lon], 17, { animate: false }); }, [CUR.lat, CUR.lon]);
+    await page.evaluate(([lat, lon]) => { MapTwin.setEnabled(true); showStationCard('gatton'); state.map.setView([lat, lon], 17, { animate: false }); }, [CUR.lat, CUR.lon]);
     await page.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return el && !el.hidden; }, null, { timeout: LOAD_TIMEOUT });
     await page.click('#map-twin-offer .map-twin-offer-open');
     await page.waitForFunction(() => MapTwin.active() && DigitalTwin.debug().built && TwinCadastre.debug().status === 'ok', null, { timeout: BUILD_TIMEOUT });

@@ -507,7 +507,9 @@ zoom 14 a station under the view has its ground and imagery fetched ahead
 into the same bounded caches the tab uses, so the hand-over, when it is asked
 for, is a build from memory rather than a wait. The catalogue is asked once a
 station and remembered for the session. The switch — **Offer the digital twin
-at close zoom** — is in Layers, on by default and remembered.
+at close zoom** — is in Layers. It starts off for everybody, in every look, and
+is remembered once ticked (`mn-map-twin-offer`); off, the twin still opens from
+🧊 Digital twin on a station's card and from the 🧊 pane.
 
 ⛰️ 3-D and the twin are one idea at two scales, and neither replaces the
 other: a map camera cannot be put at eye height, and a site twin cannot show

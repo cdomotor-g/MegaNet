@@ -285,6 +285,10 @@ ok('…which reports that the mode is off',
 // .3 s fade made the fade late.
 ok('Rising water is on until it is turned off', await page.evaluate(() => state.map3dWater === true));
 await page.evaluate(() => Map3D.setWater(false));
+// The digital twin's offer starts off now (map-twin.js). This file was written
+// with it on — standing over the 3-D view at close zoom, where the rising
+// water's scale stands under it (9b) — so it is ticked here, before anything.
+await page.evaluate(() => MapTwin.setEnabled(true));
 
 // ── 2. pressing it starts a real 3-D map ────────────────────────────────────
 console.log('\nPressing ⛰️ starts a 3-D map');
