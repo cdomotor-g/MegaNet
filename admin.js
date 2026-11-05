@@ -131,7 +131,7 @@ const Admin = (function () {
            under a list that fell back to a file is the case worth seeing. -->
       <div class="panel">
         <div class="panel-header">
-          <h2>Data source</h2>
+          <h2 id="adm-src-h">Data source</h2>
           <button class="exp-btn-sm" onclick="dbCheck()"
                   aria-label="Re-test the datastore connection">Re-test</button>
         </div>

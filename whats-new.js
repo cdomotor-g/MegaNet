@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 198, date: '2026-11-05', items: [
+      '💵 <strong>Costs to date</strong>, for administrators, at the top of the <strong>Admin</strong> tab\'s dashboard: '
+        + 'everything paid for Flood-Net so far, with what it costs a month under it. <strong>Running costs</strong> below '
+        + 'now has a <em>To date</em> column, and the date each service started.',
+      '👆 <strong>Every tile on the dashboard opens its detail.</strong> Tap <em>Costs to date</em>, <em>Visitors today</em>, '
+        + '<em>Database size</em> or any other tile and the page goes straight to the panel below with the full picture. '
+        + 'No more scrolling to find it.',
+    ] },
     { n: 197, date: '2026-11-04', items: [
       '🎬 <strong>A how-to on finding a station</strong>: <em>Find a station and read its card</em> is on the '
         + '<strong>Videos</strong> tab, about a minute long. Press <strong>▶ Show me on the app</strong> under it to be '

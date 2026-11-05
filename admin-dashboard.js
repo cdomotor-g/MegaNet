@@ -102,12 +102,56 @@ const AdminDash = (function () {
   // A stat tile: label, the number, one line under it, and an optional tone
   // that is carried by a word as well as a colour (never colour alone). An id
   // lets one tile be redrawn on its own (waitingChanged).
-  function tile(label, value, sub, tone, id) {
-    return `<div class="adm-kpi${tone ? ` adm-kpi--${tone}` : ''}"${id ? ` id="${id}"` : ''}>
+  //
+  // `go` makes the whole tile a link to the panel below that has its detail:
+  // one heading id, or several joined with | tried in turn (a panel drawn only
+  // once its data is in falls back to the section that holds it). The tile is
+  // an <a> so it can hold its lines; AdminDash.go scrolls instead of changing
+  // the address, so nothing else that reads the hash is disturbed. `extra` goes
+  // between the number and the line under it (the costs tile's month).
+  function tile(label, value, sub, tone, id, go, extra = '') {
+    const cls = `adm-kpi${tone ? ` adm-kpi--${tone}` : ''}${go ? ' adm-kpi--go' : ''}`;
+    const inner = `
       <div class="adm-kpi-label">${label}</div>
       <div class="adm-kpi-value">${value}</div>
-      ${sub ? `<div class="adm-kpi-sub">${sub}</div>` : ''}
-    </div>`;
+      ${extra}
+      ${sub ? `<div class="adm-kpi-sub">${sub}</div>` : ''}`;
+    if (!go) return `<div class="${cls}"${id ? ` id="${id}"` : ''}>${inner}</div>`;
+    const first = go.split('|')[0];
+    return `<a class="${cls}" href="#${escAttr(first)}" data-go="${escAttr(go)}"${id ? ` id="${id}"` : ''}
+      onclick="return AdminDash.go(event, this.dataset.go)">${inner}<span class="sr-only"> — show the details below</span></a>`;
+  }
+
+  // A tile's click: the first of its targets that is on the page, scrolled to
+  // the top of the view (smoothly, unless the person asked for less motion),
+  // its heading given the focus so a keyboard carries on from there, and its
+  // panel ringed for a moment so the eye finds it.
+  function go(e, targets) {
+    if (e && e.preventDefault) e.preventDefault();
+    const el = String(targets || '').split('|').map(id => document.getElementById(id)).find(Boolean);
+    if (!el) return false;
+    const panel = el.closest('.panel') || el;
+    const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    panel.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'start' });
+    if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
+    el.focus({ preventScroll: true });
+    panel.classList.remove('adm-flash');
+    void panel.offsetWidth;
+    panel.classList.add('adm-flash');
+    setTimeout(() => panel.classList.remove('adm-flash'), 1600);
+    return false;
+  }
+
+  // Everything paid for Flood-Net so far, big, and a month now under it — from
+  // the Running costs panel (admin-costs.js), which the tile opens.
+  function costsTile() {
+    if (typeof AdminCosts === 'undefined') return '';
+    const s = AdminCosts.summary();
+    const month = s.month.lo === s.month.hi ? `US$${s.month.lo}` : AdminCosts.bigUsd(s.month.lo, s.month.hi);
+    return tile(termHtml('Costs to date', AdminCosts.WORDS.todate), AdminCosts.bigUsd(s.lo, s.hi, s.guessed.length > 0),
+      `since ${esc(AdminCosts.day(s.since))}${s.guessed.length ? ` · ${esc(s.guessed.join(' and '))}’s start a guess` : ''} · before GST`,
+      null, 'adm-kpi-costs', 'adm-costs-h',
+      `<div class="adm-kpi-value2">${month} <small>a month</small></div>`);
   }
 
   function meter(used, limit, label) {
@@ -186,10 +230,10 @@ const AdminDash = (function () {
     const n = listed != null ? listed
       : (typeof Auth !== 'undefined' && Auth.approvalsWaiting ? Auth.approvalsWaiting() : 0);
     const sub = n
-      ? `${n === 1 ? 'account' : 'accounts'} to approve or decline · <button type="button" class="link-btn"
-           onclick="document.getElementById('adm-waiting')?.scrollIntoView({ block: 'start' })">See the list</button>`
+      ? `${n === 1 ? 'account' : 'accounts'} to approve or decline · <span class="adm-kpi-go">See the list</span>`
       : 'Nobody is waiting';
-    return tile(termHtml('Waiting for approval', WORDS.waiting), num(n), sub, n ? 'warn' : null, 'adm-kpi-waiting');
+    return tile(termHtml('Waiting for approval', WORDS.waiting), num(n), sub, n ? 'warn' : null, 'adm-kpi-waiting',
+      'adm-waiting|adm-people');
   }
 
   // Admin.load() calls this when the users come back, so an approval below
@@ -221,24 +265,30 @@ const AdminDash = (function () {
     return `<div class="adm-kpis">
       ${tile('Health', problems.length ? '⚠ Check' : '✓ Healthy',
              problems.length ? esc(problems.join('; ')) : `Postgres ${esc(String(db.version || '').split(' ')[0])} · up ${span(up)}`,
-             problems.length ? 'warn' : 'ok')}
+             problems.length ? 'warn' : 'ok', null, 'adm-src-h')}
+      ${costsTile()}
       ${tile('Database size', bytes(db.size_bytes),
-             `${meter(db.size_bytes, DB_LIMIT, 'Database size')}${pct(db.size_bytes, DB_LIMIT)}% of the 8 GB disk included on Pro`)}
+             `${meter(db.size_bytes, DB_LIMIT, 'Database size')}${pct(db.size_bytes, DB_LIMIT)}% of the 8 GB disk included on Pro`,
+             null, null, 'adm-vol-h')}
       ${tile('File storage', bytes(storageBytes),
-             `${meter(storageBytes, STORAGE_LIMIT, 'File storage')}${num(storageObjs)} files · ${pct(storageBytes, STORAGE_LIMIT)}% of the 100 GB included on Pro`)}
+             `${meter(storageBytes, STORAGE_LIMIT, 'File storage')}${num(storageObjs)} files · ${pct(storageBytes, STORAGE_LIMIT)}% of the 100 GB included on Pro`,
+             null, null, 'adm-bkt-h|adm-vol-h')}
       ${tile('Connections', `${num(c.active)} <small>active</small>`,
-             `${num(c.total)} open of ${num(db.max_connections)} · ${num(c.idle_in_tx)} idle in transaction`)}
+             `${num(c.total)} open of ${num(db.max_connections)} · ${num(c.idle_in_tx)} idle in transaction`,
+             null, null, 'adm-src-h')}
       ${tile('Cache hit', hit == null ? '—' : `${hit}%`,
              `${num(db.commits)} commits · ${num(db.rollbacks)} rollbacks · ${num(db.deadlocks)} deadlocks`,
-             hit != null && hit < 99 ? 'warn' : null)}
+             hit != null && hit < 99 ? 'warn' : null, null, 'adm-tbl-h')}
       ${waitingTile()}
       ${tile('Users active now', num(u.active_now),
-             `${num(u.sessions_active)} live session${u.sessions_active === 1 ? '' : 's'} · seen 24 h: ${num(u.seen_24h)} · 7 d: ${num(u.seen_7d)} · ${num(u.total)} users`)}
+             `${num(u.sessions_active)} live session${u.sessions_active === 1 ? '' : 's'} · seen 24 h: ${num(u.seen_24h)} · 7 d: ${num(u.seen_7d)} · ${num(u.total)} users`,
+             null, null, 'adm-users-h|adm-people')}
       ${tile('Visitors today', num(today.signed_in + today.anonymous),
-             `${num(today.signed_in)} signed in · ${num(today.anonymous)} anonymous · ${num(v.active_15m)} in the last 15 min`)}
+             `${num(today.signed_in)} signed in · ${num(today.anonymous)} anonymous · ${num(v.active_15m)} in the last 15 min`,
+             null, null, 'adm-vis-h')}
       ${tile('API calls', num(calls('anon') + calls('authenticated') + calls('service_role')),
              api.length ? `anonymous ${num(calls('anon'))} · signed in ${num(calls('authenticated'))} · service ${num(calls('service_role'))}`
-                        : 'pg_stat_statements is not readable here')}
+                        : 'pg_stat_statements is not readable here', null, null, 'adm-api-h')}
     </div>`;
   }
 
@@ -493,6 +543,6 @@ const AdminDash = (function () {
     if (delay) setTimeout(send, delay); else send();
   }
 
-  return { render, load, start, stop, sortBy, filterTables, authChanged, beacon, ago, waitingChanged, VISITOR_KEY };
+  return { render, load, start, stop, go, sortBy, filterTables, authChanged, beacon, ago, waitingChanged, VISITOR_KEY };
 })();
 if (typeof window !== 'undefined') window.AdminDash = AdminDash;

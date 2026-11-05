@@ -110,7 +110,10 @@ async function main() {
         const a = answer(body);
         return a === 404 ? reply(404, { message: 'Could not find the function meganet.admin_base_station_links' }) : reply(200, a);
       }
-      const map = { whoami: WHO[who], admin_users: USERS, admin_allowlist: ALLOW, admin_ingest_tokens: TOKENS,
+      // The dashboard, as little of it as draws its tiles and the panels they open.
+      const DASH = { db: { size_bytes: 9e8, schema_version: null, max_connections: 60 }, connections: { total: 8, active: 2 },
+                     users: { active_now: 1, total: 2 }, visits: { days: [] }, storage: [], api: [], tables: [] };
+      const map = { whoami: WHO[who], admin_users: USERS, admin_allowlist: ALLOW, admin_ingest_tokens: TOKENS, admin_dashboard: DASH,
                     admin_ingest_token_requests: [], push_mine: { devices: [], waiting: 0 }, my_prefs: { nav_views: null } };
       if (name in map) return reply(200, map[name]);
       return reply(404, { message: 'not stood in for' });
@@ -212,11 +215,13 @@ async function main() {
           width: Math.round(root.querySelector('table')?.getBoundingClientRect().width || 0),
           rows: root.querySelectorAll('tbody tr').length,
           services: AdminCosts.SERVICES.length,
-          known: root.querySelector('.adm-kpi-value')?.textContent.trim(),
+          paidToDate: root.querySelectorAll('.adm-kpi-value')[0]?.textContent.trim(),
+          paidWant: AdminCosts.bigUsd(AdminCosts.summary().lo, AdminCosts.summary().hi, AdminCosts.summary().guessed.length > 0),
+          known: root.querySelectorAll('.adm-kpi-value')[1]?.textContent.trim(),
           want: `US$${t.lo === t.hi ? t.lo : `${t.lo}–${t.hi}`} a month`,
           ask: t.ask.length,
           asked: AdminCosts.SERVICES.filter(x => !x.month).length,
-          unknown: root.querySelectorAll('.adm-kpi-value')[1]?.textContent.trim(),
+          unknown: root.querySelectorAll('.adm-kpi-value')[2]?.textContent.trim(),
           marked: marked.length,
           bare: marked.filter(el => !(el.getAttribute('title') || '').trim()).map(el => el.textContent),
           fold: [...root.querySelectorAll('.adm-words dt')].map(el => el.textContent),
@@ -226,11 +231,52 @@ async function main() {
       });
       check('Running costs: a row for every service, as wide as the page', costs.rows === costs.services && costs.rows >= 10
         && costs.width >= box.links * 0.95, J(costs));
-      check('…the known total worked out from the rows, and the ones only a bill can say counted apart',
-        costs.known === costs.want && costs.ask === costs.asked && costs.unknown === String(costs.asked), J(costs));
+      check('…paid to date and the month worked out from the rows, and the ones only a bill can say counted apart',
+        costs.paidToDate === costs.paidWant && costs.known === costs.want && costs.ask === costs.asked && costs.unknown === String(costs.asked), J(costs));
       check('…every chip and marked word says what it means on hover, and the fold says it again',
         costs.marked >= costs.rows && !costs.bare.length && costs.chips.every(c => costs.fold.includes(c)), J(costs));
       check('…and a service\'s name opens its billing page in a new tab', costs.links, J(costs));
+
+      // The dashboard at the top: Costs to date, big, with a month under it, and
+      // every tile a link to the panel below that has its detail.
+      await page.waitForSelector('#adm-kpi-costs', { timeout: 15_000 });
+      const dash = await page.evaluate(() => {
+        const s = AdminCosts.summary();
+        const t = document.getElementById('adm-kpi-costs');
+        const tiles = [...document.querySelectorAll('#adm-dash .adm-kpis > *')];
+        return {
+          value: t.querySelector('.adm-kpi-value')?.textContent.trim(),
+          want: AdminCosts.bigUsd(s.lo, s.hi, s.guessed.length > 0),
+          month: t.querySelector('.adm-kpi-value2')?.textContent.replace(/\s+/g, ' ').trim(),
+          term: t.querySelector('.adm-kpi-label .term')?.getAttribute('title') || '',
+          sub: t.querySelector('.adm-kpi-sub')?.textContent.replace(/\s+/g, ' ').trim(),
+          tiles: tiles.length,
+          links: tiles.filter(x => x.tagName === 'A' && x.dataset.go
+            && x.dataset.go.split('|').some(id => document.getElementById(id))).length,
+          nested: tiles.filter(x => x.querySelector('a, button')).length,
+        };
+      });
+      check('the dashboard leads with Costs to date: what has been paid so far, big, and a month now under it',
+        dash.value === dash.want && /^≈? ?US\$[\d,]+$/.test(dash.value) && /^≈? ?US\$\d+ a month$/.test(dash.month || '')
+          && /paid for Flood-Net so far/.test(dash.term) && /^since \d+ \w+ 20\d\d/.test(dash.sub || ''), J(dash));
+      check('…and every tile on it is a link to a panel that is on the page, with nothing clickable inside it',
+        dash.tiles >= 10 && dash.links === dash.tiles && dash.nested === 0, J(dash));
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      const landed = async (tile, heading) => {
+        await page.click(tile);
+        await page.waitForTimeout(250);
+        return page.evaluate(h => {
+          const el = document.getElementById(h), panel = el?.closest('.panel');
+          return { focus: document.activeElement?.id, top: Math.round(panel?.getBoundingClientRect().top ?? -999),
+                   ring: !!panel?.classList.contains('adm-flash'), hash: location.hash };
+        }, heading);
+      };
+      const toCosts = await landed('#adm-kpi-costs', 'adm-costs-h');
+      check('…Costs to date opens Running costs: its panel at the top of the view, its heading focused, ringed a moment, the address untouched',
+        toCosts.focus === 'adm-costs-h' && toCosts.top >= 0 && toCosts.top < 160 && toCosts.ring && !/adm-/.test(toCosts.hash), J(toCosts));
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const toVisits = await landed('#adm-dash a.adm-kpi--go[data-go="adm-vis-h"]', 'adm-vis-h');
+      check('…and Visitors today opens Visitors, last 30 days', toVisits.focus === 'adm-vis-h' && toVisits.top >= 0 && toVisits.top < 160, J(toVisits));
       await context.close();
     }
     {

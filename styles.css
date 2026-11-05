@@ -20284,7 +20284,8 @@ button.adm-danger:hover { border-color: var(--bad); }
 /* Running costs (admin-costs.js): a wide table on a phone scrolls sideways
    rather than folding words into letters; How sure is a chip whose word
    carries the meaning, its border the colour. */
-.adm-page .table-wrap table.adm-costs-table { min-width: 52rem; }
+.adm-page .table-wrap table.adm-costs-table { min-width: 58rem; }
+.adm-cost-since { font-weight: 400; white-space: normal; text-align: right; }
 .adm-costs .adm-kpis { margin-bottom: .75rem; }
 .adm-costs-table th[scope="row"] { font-weight: 600; min-width: 11rem; }
 .adm-cost-for { font-weight: 400; margin-top: .15rem; max-width: 28ch; }
@@ -20307,6 +20308,26 @@ button.adm-danger:hover { border-color: var(--bad); }
 .adm-kpi--warn { border-left: 4px solid var(--warn); }
 .adm-kpi--ok   .adm-kpi-value { color: var(--ok); }
 .adm-kpi--warn .adm-kpi-value { color: var(--warn); }
+/* The second, smaller figure under a tile's number (Costs to date's month). */
+.adm-kpi-value2 { font-size: 1rem; font-weight: 600; line-height: 1.25; margin: 0 0 .2rem; }
+.adm-kpi-value2 small { font-size: .8rem; font-weight: 400; color: var(--muted); }
+/* A dashboard tile that opens its detail below (AdminDash.go): the whole tile
+   is the link, with a › in its corner and the accent on hover and focus. */
+a.adm-kpi--go { display: block; position: relative; color: inherit; text-decoration: none; cursor: pointer;
+  padding-right: 1.6rem; transition: border-color .15s, box-shadow .15s; }
+a.adm-kpi--go::after { content: '›'; position: absolute; top: .35rem; right: .6rem; font-size: 1.15rem; line-height: 1;
+  color: var(--muted); }
+a.adm-kpi--go:hover, a.adm-kpi--go:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+a.adm-kpi--go:hover::after, a.adm-kpi--go:focus-visible::after { color: var(--accent); }
+.adm-kpi-go { color: var(--accent); text-decoration: underline; }
+/* Where a tile lands: clear of the banner, and ringed for a moment. */
+.adm-page .panel { scroll-margin-top: 4.5rem; }
+@keyframes adm-flash { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: 0 0 0 3px transparent; } }
+.adm-page .panel.adm-flash { animation: adm-flash 1.6s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .adm-page .panel.adm-flash { animation: none; outline: 3px solid var(--accent); outline-offset: 2px; }
+  a.adm-kpi--go { transition: none; }
+}
 
 .adm-meter {
   display: block;
