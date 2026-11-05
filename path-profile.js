@@ -3624,122 +3624,248 @@ const PathProfile = (function () {
     return { ...S, grid, tx: panel(S.tx, an.groundA), rx: panel(S.rx, an.groundB), settings, rm, own, marks };
   }
 
-  // The compact summary as a document: the summary's look, at about half its
-  // height — the same tables, smaller type, tighter insets.
-  function compactHtml(rep, pic) {
+  // The compact summary as one picture. A document pasted into Teams, a chat
+  // or a web mail comes apart — each keeps what it likes of the tables and
+  // drops the rest, so the figures slide out from under their labels — but a
+  // picture lands as it is, anywhere. So the window in brief is drawn here, on
+  // a canvas at twice its size so it stays sharp: a one-line heading (the
+  // path, when it was worked out, the fade margin); Radio Mobile's three rows
+  // of five, the label at the left of each cell and the figure at its right;
+  // the short chart; the two ends side by side, row for row; and the foot —
+  // the net, the frequency, the Longley–Rice settings and what Radio Mobile's
+  // Rx relative should read. `chart` is the chart drawn bare at the compact
+  // size (paperPicture with COMPACT_CHART), or null: the picture goes without
+  // it rather than not at all.
+  // { blob, w, h, words } — `words` every piece of text drawn, in reading
+  // order and as drawn, for anything that wants to check what it says.
+  const COMPACT = { W: 900, k: 2, head: 44, row: 30, endHead: 32, meter: 24, endRow: 24, line: 19, pad: 9 };
+  const COMPACT_FONT = "'Segoe UI', Calibri, Arial, Helvetica, sans-serif";
+
+  function compactPicture(rep, chart) {
+    const loaded = chart ? new Promise(res => {
+      const img = new Image();
+      img.onload = () => res(img);
+      img.onerror = () => res(null);
+      img.src = chart.url;
+    }) : Promise.resolve(null);
+    const fail = () => new Error('This browser cannot draw the compact summary as a picture.');
+    return loaded.then(img => new Promise((resolve, reject) => {
+      let p;
+      try { p = drawCompact(rep, img ? { img, w: chart.w, h: chart.h } : null); } catch (e) { reject(e); return; }
+      if (!p) { reject(fail()); return; }
+      p.canvas.toBlob(blob => (blob ? resolve({ blob, w: p.w, h: p.h, words: p.words }) : reject(fail())), 'image/png');
+    }));
+  }
+
+  function drawCompact(rep, chart) {
     const S = compactOf(rep);
     const T = rep.tokens;
+    const { W, k, head, row, endHead, meter: meterH, endRow, line, pad } = COMPACT;
     const tone = { ok: T['--ok'] || '#107c10', warn: T['--warn'] || '#9e5e00', bad: T['--bad'] || '#c7401a' };
     const C = { ink: '#16202a', muted: '#566779', faint: '#7f8e9d', line: '#cfd8e2', rule: '#e6ebf1', soft: '#f5f8fb',
                 navy: '#0f3a5f', kick: '#9dc1e2', navySub: '#c6d9eb', accent: '#0b5cab' };
-    const grid = { ok: ['#f2f9f4', '#d3e8d9', '#dcefe2'], warn: ['#fdf8ee', '#efe0bf', '#f8e8c6'],
+    const tint = { ok: ['#f2f9f4', '#d3e8d9', '#dcefe2'], warn: ['#fdf8ee', '#efe0bf', '#f8e8c6'],
                    bad: ['#fdf3f0', '#f0d2c8', '#f7dcd2'], none: ['#f5f8fb', '#dce3ea', '#e9eef3'] }[S.cls || 'none'];
-    const font = "font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;";
-    const W = 600;
-    const td = (style, html, attrs = '') => `<td ${attrs} style="${font}${style}">${html}</td>`;
-    const table = (pad, rows, style = '') => `<table width="100%" cellspacing="0" cellpadding="${pad}" border="0" style="border-collapse:collapse;${style}">${rows}</table>`;
-    const kick = (t, col = C.accent) => `<span style="${font}font-size:6.5pt;font-weight:bold;letter-spacing:1.2pt;color:${col}">${esc(t)}</span>`;
+    const c = document.createElement('canvas');
+    const g = c.getContext('2d');
+    if (!g) return null;
 
-    // One line: the path, and its answer.
+    // Text, measured and drawn. A kicker (the small capitals over a part) is
+    // spaced out where the browser can space a canvas's letters.
+    const spaced = 'letterSpacing' in g;
+    const setFont = o => {
+      g.font = `${o.bold ? 'bold ' : ''}${o.size || 12}px ${COMPACT_FONT}`;
+      if (spaced) g.letterSpacing = o.kick ? '1.2px' : '0px';
+    };
+    const width = (t, o) => { setFont(o); return g.measureText(t).width; };
+    const clip = (t, o, max) => {
+      if (max == null || width(t, o) <= max) return t;
+      let s = t;
+      while (s.length > 1 && width(`${s}…`, o) > max) s = s.slice(0, -1);
+      return `${s.trimEnd()}…`;
+    };
+    const words = [];
+    // One piece of text, its middle at y, cut with an ellipsis where it would
+    // run past `o.max`. The width drawn.
+    const put = (t, x, y, o = {}) => {
+      const s = clip(String(t), o, o.max);
+      setFont(o);
+      g.fillStyle = o.col || C.ink;
+      g.textAlign = o.align || 'left';
+      g.textBaseline = 'middle';
+      g.fillText(s, x, y);
+      if (!o.quiet) words.push(s);
+      return g.measureText(s).width;
+    };
+    const rect = (x, y, w, h, fill) => { g.fillStyle = fill; g.fillRect(x, y, w, h); };
+    const hline = (x1, x2, y, col) => rect(x1, y, x2 - x1, 1, col);
+    const vline = (x, y1, y2, col) => rect(x, y1, 1, y2 - y1, col);
+
+    // The foot's paragraphs, wrapped to the width: runs of one look each, cut
+    // at spaces (a no-break space keeps a setting with its value).
+    const nb = s => String(s).replace(/ /g, ' ');
+    const muted = { size: 12, col: C.muted }, strong = { size: 12, bold: true, col: C.ink };
+    const kicker = t => ({ t, size: 10, bold: true, col: C.accent, kick: true });
+    const paras = [
+      [kicker('NET'), { t: '  ', ...muted }, { t: S.net, ...strong }, { t: '      ', ...muted },
+       kicker('FREQUENCY'), { t: '  ', ...muted }, { t: S.freq[0], ...strong }, { t: ` ${S.freq[1]}`, ...muted }],
+      S.settings.flatMap(([key, v], i) => [
+        ...(i ? [{ t: ' · ', ...muted }] : []), { t: `${nb(key)} `, ...muted }, { t: nb(v), ...strong }]),
+      [
+        ...(S.rm == null ? [] : S.own > 0.05
+          ? [{ t: `Radio Mobile has no ✦ terms (${S.own.toFixed(1)} dB here), so its `, ...muted }, { t: 'Rx relative', ...strong },
+             { t: ' should read about ', ...muted }, { t: `${signed(S.rm, 1)} dB`, ...strong }, { t: '. ', ...muted }]
+          : [{ t: 'Radio Mobile runs the same Longley–Rice: its ', ...muted }, { t: 'Rx relative', ...strong },
+             { t: ' should read about ', ...muted }, { t: `${signed(S.rm, 1)} dB`, ...strong }, { t: '. ', ...muted }]),
+        ...S.marks.map(m => ({ t: `${m.replace(/[.\s]*$/, '.')} `, ...muted })),
+        { t: '✦ Flood-Net only. Indicative only.', ...muted },
+      ],
+    ];
+    const footW = W - 2 * pad - 2;
+    const wrap = runs => {
+      const lines = [[]];
+      let x = 0;
+      for (const r of runs) {
+        for (const piece of r.t.split(/( +)/)) {
+          if (!piece) continue;
+          const w = width(piece, r);
+          const blank = /^ +$/.test(piece);
+          if (x + w > footW && x > 0 && !blank) { lines.push([]); x = 0; }
+          if (blank && x === 0) continue;
+          lines[lines.length - 1].push({ ...r, t: piece, x });
+          x += w;
+        }
+      }
+      return lines;
+    };
+    const laid = paras.map(wrap);
+    const footH = pad * 2 + laid.reduce((t, ls) => t + ls.length * line, 0) + (laid.length - 1) * 3;
+
+    const chartH = chart ? Math.round(chart.h * W / chart.w) : 0;
+    const endsH = endHead + meterH + S.tx.rows.length * endRow + 6;
+    const H = head + 3 * row + chartH + endsH + footH + 1;
+    c.width = W * k; c.height = H * k;
+    g.setTransform(k, 0, 0, k, 0, 0);
+    rect(0, 0, W, H, '#ffffff');
+
+    // The heading: the path at the left, the answer at the right — drawn
+    // right to left, so the path's names get what is left over.
+    rect(0, 0, W, head, C.navy);
+    const my = head / 2;
     const fig = rep.margin == null ? 'not computed' : `${signed(rep.margin, 1)} dB`;
-    const chip = rep.band
-      ? `&nbsp;<span style="${font}background:${tone[rep.band.cls]};color:#ffffff;font-size:7pt;font-weight:bold;letter-spacing:.6pt">&nbsp;${esc(rep.band.label.toUpperCase())}&nbsp;</span>` : '';
-    // The distance, the bearing and the frequency are in the figures and the
-    // foot already, so the heading keeps only when it was worked out.
-    const header = table(3, `<tr>
-      ${td(`background:${C.navy};padding:3px 7px;vertical-align:middle;font-size:6.5pt;line-height:1.2;white-space:nowrap`, `${kick('RADIO LINK', C.kick)}&nbsp; <b style="${font}font-size:9pt;color:#ffffff">${
-        esc(`${rep.a.name} → ${rep.b.name}`)}</b>&nbsp;&nbsp;<span style="${font}font-size:6.5pt;color:${C.navySub}">Flood-Net, ${esc(rep.stamp)}</span>`,
-        `bgcolor="${C.navy}" valign="middle"`)}
-      ${td(`background:${C.navy};padding:3px 7px;vertical-align:middle;text-align:right;white-space:nowrap;font-size:6.5pt;line-height:1.2`, `${kick('FADE MARGIN', C.kick)}&nbsp; <b style="${font}font-size:10pt;color:#ffffff">${esc(fig)}</b>${chip}`,
-        `bgcolor="${C.navy}" align="right" valign="middle"`)}
-    </tr>`, `background:${C.navy}`);
-
-    // Radio Mobile's three rows of five, one line each: the label at the left
-    // of its cell and the figure at the right. Two table cells to a figure,
-    // the rule only after the pair — a word processor keeps a cell's own
-    // alignment, but not two alignments inside one cell.
-    const gridCell = (c, i) => {
-      const bg = c.hot && c.tone ? grid[2] : grid[0];
-      const col = c.tone && (c.hot || c.tone !== 'ok') ? tone[c.tone] : C.ink;
-      const edge = `background:${bg};vertical-align:middle;padding:2px 5px;font-size:6.5pt;line-height:1.15;white-space:nowrap;border-top:1px solid ${grid[1]};`;
-      return td(`${edge}text-align:left;padding-right:2px`,
-        `<span style="${font}font-size:6.5pt;color:${C.muted}">${esc(c.k)}${c.flag ? ` <b style="color:${C.accent}">${c.flag}</b>` : ''}</span>`,
-        `align="left" valign="middle" bgcolor="${bg}"`)
-        + td(`${edge}text-align:right;padding-left:2px;${i < 4 ? `border-right:1px solid ${grid[1]};` : ''}`,
-          `<b style="${font}font-size:8pt;color:${col}">${esc(c.v)}</b>`,
-          `align="right" valign="middle" bgcolor="${bg}"`);
-    };
-    const figures = table(2, S.grid.map(r => `<tr>${r.map(gridCell).join('')}</tr>`).join(''));
-
-    const imgW = W - 2, imgH = pic ? Math.round(pic.h * imgW / pic.w) : 0;
-    const chart = pic ? `<img src="${pic.url}" width="${imgW}" height="${imgH}" style="display:block;border:0" alt="${
-      escAttr(`Elevation profile, ${rep.a.name} to ${rep.b.name}, with the line of sight and the 60% Fresnel zone`)}">` : '';
-
-    // The two ends, row for row: the name, the meter under it, then Radio
-    // Mobile's rows.
-    const meterImg = P => {
-      const m = meterPicture(P.meter);
-      return m ? `<img src="${m.url}" width="${Math.round(m.w * 0.7)}" height="${Math.round(m.h * 0.7)}" style="border:0;vertical-align:middle" alt="${
-        escAttr(`Signal meter: ${P.meter ? P.meter.label : 'no reading'}`)}">` : '';
-    };
-    const head = (P, label, right) => td(`padding:4px 6px 1px;${right ? `border-left:1px solid ${C.line};` : ''}vertical-align:middle;font-size:7pt`,
-      `${kick(label)}&nbsp; <b style="${font}font-size:9pt;color:${C.ink}">${esc(P.name)}</b> <span style="${font}font-size:6.5pt;color:${C.faint}">${esc(P.role)}</span>`,
-      'colspan="3" valign="middle"');
-    const meter = (P, right) => td(`padding:1px 6px 3px;${right ? `border-left:1px solid ${C.line};` : ''}vertical-align:middle;font-size:7pt;line-height:1`, meterImg(P) || '&nbsp;', 'colspan="2" valign="middle"')
-      + td('padding:1px 6px 3px;text-align:right;white-space:nowrap;vertical-align:middle;font-size:7pt',
-        `<b style="${font}font-size:9pt;color:${P.meter ? C.ink : C.faint}">${esc(P.meter ? P.meter.label : '—')}</b>`, 'align="right" valign="middle"');
-    const cell = ([k, v1, v2], right) => {
-      const edge = `border-top:1px solid ${C.rule};${right ? `border-left:1px solid ${C.line};` : ''}`;
-      return td(`padding:1px 3px 1px 6px;${edge}font-size:7pt;color:${C.muted};white-space:nowrap`, esc(k), 'width="16%"')
-        + (v2
-          ? td(`padding:1px 3px;border-top:1px solid ${C.rule};font-size:7.5pt;font-weight:bold;color:${C.ink};white-space:nowrap`, esc(v1), 'width="18%"')
-            + td(`padding:1px 6px 1px 3px;border-top:1px solid ${C.rule};font-size:7.5pt;color:${C.ink};text-align:right;white-space:nowrap`, esc(v2), 'width="16%" align="right"')
-          : td(`padding:1px 6px 1px 3px;border-top:1px solid ${C.rule};font-size:7.5pt;font-weight:bold;color:${C.ink}`, esc(v1), 'colspan="2"'));
-    };
-    const ends = table(2, `
-      <tr>${head(S.tx, 'TX', false)}${head(S.rx, 'RX', true)}</tr>
-      <tr>${meter(S.tx, false)}${meter(S.rx, true)}</tr>
-      ${S.tx.rows.map((r, i) => `<tr>${cell(r, false)}${cell(S.rx.rows[i], true)}</tr>`).join('')}`,
-      `border-top:1px solid ${C.line};table-layout:fixed`);
-
-    // The foot: the net and the frequency, the settings Radio Mobile asks for,
-    // and what its Rx relative should read.
-    const rmLine = S.rm == null ? ''
-      : S.own > 0.05
-        ? `Radio Mobile has no ✦ terms (${S.own.toFixed(1)} dB here), so its <b>Rx relative</b> should read about <b style="color:${C.ink}">${esc(signed(S.rm, 1))} dB</b>.`
-        : `Radio Mobile runs the same Longley–Rice: its <b>Rx relative</b> should read about <b style="color:${C.ink}">${esc(signed(S.rm, 1))} dB</b>.`;
-    const foot = table(4, `<tr>${td(`background:${C.soft};padding:4px 6px;font-size:7pt;color:${C.muted};line-height:1.4`, `
-      ${kick('NET')}&nbsp; <b style="color:${C.ink}">${esc(S.net)}</b> &nbsp;&nbsp;${kick('FREQUENCY')}&nbsp; <b style="color:${C.ink}">${esc(S.freq[0])}</b> ${esc(S.freq[1])}<br>
-      ${S.settings.map(([k, v]) => `${esc(k)} <b style="color:${C.ink}">${esc(v)}</b>`).join(' · ')}
-      ${rmLine || S.marks.length ? `<br>${[rmLine, ...S.marks.map(esc), 'Indicative only.'].filter(Boolean).join(' ')}` : ''}`,
-      `bgcolor="${C.soft}"`)}</tr>`, `border-top:1px solid ${C.line}`);
-
-    const part = (html, attrs = '') => `<tr><td ${attrs} style="padding:0">${html}</td></tr>`;
-    return `<div style="${font}color:${C.ink}">
-      <table width="${W}" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:${W}px;border:1px solid ${C.line}">
-        ${part(header, `bgcolor="${C.navy}"`)}${part(figures)}${pic ? part(chart, 'bgcolor="#ffffff"') : ''}${part(ends)}${part(foot)}
-      </table>
-    </div>`;
-  }
-
-  // The compact summary as plain text: the same grid, tabs between the cells.
-  function compactText(rep) {
-    const S = compactOf(rep);
-    const meter = P => (P.meter ? P.meter.label : '—');
-    const L = [`RADIO LINK — ${rep.a.name} → ${rep.b.name} — fade margin ${rep.margin == null ? 'not computed' : `${signed(rep.margin, 1)} dB, ${rep.band.label}`}`, rep.sub, ''];
-    S.grid.forEach(r => L.push(r.map(c => `${c.k}${c.flag ? ` ${c.flag}` : ''}\t${c.v}`).join('\t')));
-    L.push('', `TX\t${S.tx.name}\t${meter(S.tx)}\tRX\t${S.rx.name}\t${meter(S.rx)}`);
-    S.tx.rows.forEach((t, i) => L.push([...t, ...S.rx.rows[i]].join('\t')));
-    L.push('', `Net\t${S.net}\t\tFrequency\t${S.freq[0]}\t${S.freq[1]}`);
-    L.push(S.settings.map(([k, v]) => `${k} ${v}`).join(' · '));
-    if (S.rm != null) {
-      L.push(S.own > 0.05
-        ? `Radio Mobile has no ✦ terms (${S.own.toFixed(1)} dB here), so its Rx relative should read about ${signed(S.rm, 1)} dB.`
-        : `Radio Mobile runs the same Longley–Rice: its Rx relative should read about ${signed(S.rm, 1)} dB.`);
+    let rx = W - 12;
+    if (rep.band) {
+      const label = rep.band.label.toUpperCase();
+      const o = { size: 10.5, bold: true, kick: true };
+      const cw = width(label, o) + 14;
+      g.fillStyle = tone[rep.band.cls];
+      g.beginPath();
+      if (g.roundRect) g.roundRect(rx - cw, my - 10, cw, 20, 3); else g.rect(rx - cw, my - 10, cw, 20);
+      g.fill();
+      put(label, rx - cw / 2, my + 0.5, { ...o, col: '#ffffff', align: 'center', quiet: true });
+      rx -= cw + 9;
     }
-    S.marks.forEach(m => L.push(m));
-    L.push('✦ Flood-Net only. Indicative only.');
-    return L.join('\n');
+    rx -= put(fig, rx, my, { size: 18, bold: true, col: '#ffffff', align: 'right', quiet: true }) + 9;
+    rx -= put('FADE MARGIN', rx, my, { size: 10, bold: true, col: C.kick, kick: true, align: 'right', quiet: true });
+    let lx = 12;
+    lx += put('RADIO LINK', lx, my, { size: 10, bold: true, col: C.kick, kick: true }) + 10;
+    const stamp = `Flood-Net, ${rep.stamp}`;
+    const stampO = { size: 11, col: C.navySub };
+    const room = rx - 24 - lx, stampW = width(stamp, stampO) + 12;
+    const nameW = put(`${rep.a.name} → ${rep.b.name}`, lx, my, { size: 16, bold: true, col: '#ffffff', max: room - (room - stampW > 160 ? stampW : 0) });
+    if (room - nameW >= stampW) put(stamp, lx + nameW + 12, my + 1, stampO);
+    // The answer after the path, in reading order.
+    words.push('FADE MARGIN', fig);
+    if (rep.band) words.push(rep.band.label.toUpperCase());
+
+    // Radio Mobile's three rows of five.
+    const cw = W / 5;
+    S.grid.forEach((r, ri) => {
+      const y = head + ri * row;
+      r.forEach((cell, i) => {
+        const x = i * cw;
+        rect(x, y, cw, row, cell.hot && cell.tone ? tint[2] : tint[0]);
+        if (i) vline(x, y, y + row, tint[1]);
+        const vo = { size: 14, bold: true, col: cell.tone && (cell.hot || cell.tone !== 'ok') ? tone[cell.tone] : C.ink };
+        const vw = Math.min(width(cell.v, vo), cw - 16);
+        const lo = { size: 12, col: C.muted };
+        const fw = cell.flag ? width(` ${cell.flag}`, { size: 12, bold: true }) : 0;
+        const lw = put(cell.k, x + 8, y + row / 2, { ...lo, max: cw - 16 - vw - 8 - fw });
+        if (cell.flag) put(cell.flag, x + 8 + lw + 4, y + row / 2, { size: 12, bold: true, col: C.accent });
+        put(cell.v, x + cw - 8, y + row / 2, { ...vo, align: 'right', max: cw - 16 });
+      });
+      if (ri) hline(0, W, y, tint[1]);
+    });
+    let y = head + 3 * row;
+    hline(0, W, y - 1, tint[1]);
+
+    // The chart, as drawn for the compact summary.
+    if (chart) { g.drawImage(chart.img, 0, y, W, chartH); y += chartH; }
+
+    // The two ends, row for row: the name, the meter, then Radio Mobile's rows.
+    hline(0, W, y, C.line);
+    const hw = W / 2;
+    const top = y;
+    const meterAt = (m, x, my_) => {
+      const { seg, gap, h } = METER;
+      for (let i = 0; i < S_SEGMENTS; i++) {
+        const over = i >= 9, lit = !!m && i < m.lit;
+        g.fillStyle = lit ? (over ? '#d8463a' : '#2a9d50') : (over ? '#f2d8d4' : '#dfe5ec');
+        const sx = x + i * (seg + gap);
+        g.beginPath();
+        if (g.roundRect) g.roundRect(sx, my_ - h / 2, seg, h, 2); else g.rect(sx, my_ - h / 2, seg, h);
+        g.fill();
+      }
+    };
+    const ends = [[S.tx, 'TX'], [S.rx, 'RX']];
+    ends.forEach(([P, label], s) => {
+      const x0 = s * hw, x1 = x0 + hw - 10;
+      const hy = top + endHead / 2 + 2;
+      let x = x0 + 10;
+      x += put(label, x, hy, { size: 10, bold: true, col: C.accent, kick: true }) + 9;
+      const roleO = { size: 11, col: C.faint };
+      const roleW = P.role ? Math.min(width(P.role, roleO), (x1 - x) * 0.4) + 9 : 0;
+      const nw = put(P.name, x, hy, { size: 15, bold: true, max: x1 - x - roleW });
+      if (P.role) put(P.role, x + nw + 9, hy + 1, { ...roleO, max: x1 - x - nw - 9 });
+      const my_ = top + endHead + meterH / 2;
+      meterAt(P.meter, x0 + 10, my_);
+      put(P.meter ? P.meter.label : '—', x1, my_, { size: 15, bold: true, col: P.meter ? C.ink : C.faint, align: 'right' });
+    });
+    const v1At = Math.round(hw * 0.34);
+    S.tx.rows.forEach((_, i) => {
+      const ry = top + endHead + meterH + i * endRow;
+      ends.forEach(([P], s) => {
+        const [key, v1, v2] = P.rows[i];
+        const x0 = s * hw, x1 = x0 + hw - 10, vx = x0 + v1At;
+        hline(x0, x0 + hw, ry, C.rule);
+        const cy = ry + endRow / 2;
+        put(key, x0 + 10, cy, { size: 12, col: C.muted, max: vx - x0 - 18 });
+        const v2W = v2 ? Math.min(width(v2, { size: 13 }), x1 - vx - 60) : 0;
+        put(v1, vx, cy, { size: 13, bold: true, max: x1 - vx - (v2 ? v2W + 10 : 0) });
+        if (v2) put(v2, x1, cy, { size: 13, align: 'right', max: v2W });
+      });
+    });
+    vline(hw, top, top + endsH, C.line);
+    y = top + endsH;
+
+    // The foot.
+    hline(0, W, y, C.line);
+    rect(0, y + 1, W, footH, C.soft);
+    let fy = y + 1 + pad;
+    laid.forEach((ls, pi) => {
+      words.push(paras[pi].map(r => r.t).join('').replace(/ /g, ' ').trim());
+      ls.forEach(pieces => {
+        pieces.forEach(p => put(p.t, pad + 1 + p.x, fy + line / 2, { ...p, quiet: true }));
+        fy += line;
+      });
+      fy += 3;
+    });
+
+    // A frame round it all, as the window has.
+    g.strokeStyle = C.line;
+    g.lineWidth = 1;
+    g.strokeRect(0.5, 0.5, W - 1, H - 1);
+    return { canvas: c, w: W, h: H, words };
   }
 
   // A file, saved — the fallback when the clipboard is refused.
@@ -3775,19 +3901,18 @@ const PathProfile = (function () {
     try { return navigator.clipboard.write([new ClipboardItem(parts)]); } catch (e) { return Promise.reject(e); }
   }
 
-  // The three copies: all of it (the report), the path laid out as Radio
-  // Mobile's Radio Link window (the summary), and the same window in brief
-  // (compact). Each summary's chart is drawn bare inside it; the picture
-  // alone on the clipboard keeps its heading, for whatever takes only that.
+  // The two documents: all of it (the report), and the path laid out as Radio
+  // Mobile's Radio Link window (the summary). The summary's chart is drawn
+  // bare inside it; the picture alone on the clipboard keeps its heading, for
+  // whatever takes only that. The same window in brief is a picture of its own
+  // (copyCompact).
   const COPIES = {
     report:  { text: reportText, html: reportHtml, chart: null, file: '', what: 'report',
                done: 'Copied: the chart and every figure behind the fade margin. Paste it into Word or an email.' },
     summary: { text: summaryText, html: summaryHtml, chart: { bare: true }, file: '-summary', what: 'summary',
                done: 'Copied: the summary, laid out like Radio Mobile\'s Radio Link window. Paste it into Word or an email.' },
-    compact: { text: compactText, html: compactHtml, chart: COMPACT_CHART, file: '-compact', what: 'compact summary',
-               done: 'Copied: the compact summary — the Radio Link window in brief. Paste it into Word or an email.' },
   };
-  // `kind` is 'report', 'summary' or 'compact'; nothing (the 📋 press) is the
+  // `kind` is 'report' or 'summary'; nothing (the 📋 press) is the
   // report, and true the summary, as it was.
   function copyReport(kind) {
     const c = COPIES[kind === true ? 'summary' : kind] || COPIES.report;
@@ -3811,7 +3936,21 @@ const PathProfile = (function () {
   }
 
   function copySummary() { copyReport('summary'); }
-  function copyCompact() { copyReport('compact'); }
+  // 🗒️ The window in brief, as one picture and nothing else: given a document
+  // or text beside it, Teams and the chat programs paste those instead, and a
+  // document comes apart there. Where the browser will not copy a picture, it
+  // is saved as a file.
+  function copyCompact() {
+    const rep = reportOf();
+    if (!rep) { Toast.show('Nothing to copy yet — the profile is still being drawn.'); return; }
+    const pic = paperPicture(rep, COMPACT_CHART).catch(() => null).then(chart => compactPicture(rep, chart));
+    clipboardWrite({ 'image/png': pic.then(p => p.blob) }).then(
+      () => Toast.show('Copied: the compact summary, as a picture. Paste it into Teams, Word or an email — it lands just as it looks.', { kind: 'done' }),
+      () => pic.then(p => {
+        saveFile(p.blob, `${rep.file}-compact.png`);
+        Toast.show('The browser would not copy a picture, so the compact summary was saved as a file instead.', { kind: 'note' });
+      }, e => Toast.show(e.message, { kind: 'failed' })));
+  }
 
   function copyChart() {
     const rep = reportOf();
@@ -3840,12 +3979,12 @@ const PathProfile = (function () {
     return `
       <div class="path-copy">
         <button type="button" id="path-copy-compact" onclick="PathProfile.copyCompact()"
-                title="Copy the Radio Link window in brief — Radio Mobile's figures in its places, a short chart, the transmitter and the receiver side by side, the settings and what Radio Mobile's Rx relative should read — about half the summary's height, ready to paste into Word or an email">🗒️ Copy compact</button>
+                title="Copy the Radio Link window in brief as one picture — Radio Mobile's figures in its places, a short chart, the transmitter and the receiver side by side, the settings and what Radio Mobile's Rx relative should read. A picture keeps its layout wherever it is pasted: Teams, Word, an email">🗒️ Copy compact</button>
         <button type="button" id="path-copy-brief" onclick="PathProfile.copySummary()"
                 title="Copy the path laid out like Radio Mobile's Radio Link window — its three rows of figures over the elevation profile, the transmitter and the receiver side by side, the net and the frequency — ready to paste into Word or an email and read across against Radio Mobile">📄 Copy a summary</button>
         <button type="button" id="path-copy" onclick="PathProfile.copyReport()"
                 title="Copy the elevation profile with the link drawn on it and every figure behind the fade margin — the two ends, their radios, the model's settings and the budget term by term — ready to paste into Word or an email">📋 Copy for a report</button>
-        <span class="small">Compact and the summary are laid out like Radio Mobile's Radio Link window, for Word or an email; the report is every figure behind the margin. The chart alone:
+        <span class="small">Compact and the summary are laid out like Radio Mobile's Radio Link window: compact is a picture, so it pastes the same into Teams, Word or an email; the summary is a document for Word or an email; the report is every figure behind the margin. The chart alone:
           <button type="button" class="lb-link" onclick="PathProfile.copyChart()">copy</button> ·
           <button type="button" class="lb-link" onclick="PathProfile.downloadChart()">save as PNG</button></span>
       </div>`;
@@ -4003,16 +4142,27 @@ const PathProfile = (function () {
     copyReport, copySummary, copyCompact, copyChart, downloadChart,
     // What a copy would carry, for anything that wants to check it: the plain
     // text, the document without its picture, the same two for the summary
-    // and for the compact summary with the figures each lays out, the rows all are written from, and the
-    // paper chart's SVG. Null with no single-hop profile drawn.
+    // with the figures it lays out, the figures the compact picture lays out,
+    // the rows all are written from, and the paper chart's SVG. Null with no
+    // single-hop profile drawn.
     report() {
       const r = reportOf();
       if (!r) return null;
       const p = paperSvg(r);
       return { text: reportText(r), html: reportHtml(r, null),
                brief: { text: summaryText(r), html: summaryHtml(r, null), rows: summaryOf(r) },
-               compact: { text: compactText(r), html: compactHtml(r, null), rows: compactOf(r) },
+               compact: { rows: compactOf(r) },
                rows: r, svg: p ? p.svg : null };
+    },
+    // The compact picture as 🗒️ would copy it: { w, h, words } — its size in
+    // picture points (the PNG is twice that) and every piece of text drawn on
+    // it, in reading order. Null with no single-hop profile drawn.
+    async compactPicture() {
+      const r = reportOf();
+      if (!r) return null;
+      const chart = await paperPicture(r, COMPACT_CHART).catch(() => null);
+      const p = await compactPicture(r, chart);
+      return { w: p.w, h: p.h, words: p.words, chart: !!chart };
     },
 
     // The fade margin the readout is quoting, for anything that wants to

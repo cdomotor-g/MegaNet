@@ -1101,7 +1101,7 @@ if (shared && shared.tagA === 'A') {
 // unresolved in it. Then the real press, read back off the clipboard: a
 // document with the chart inside it as a picture, the same report as plain
 // text, and the picture on its own.
-const report = await page.evaluate(ids => {
+const report = await page.evaluate(async ids => {
   const r = PathProfile.report();
   const p = PathProfile.shownMargin();
   if (!r || !p) return null;
@@ -1147,22 +1147,29 @@ const report = await page.evaluate(ids => {
         rm: /Radio Mobile/.test(t) && /Rx relative/.test(r.brief.html) && /SETTINGS/.test(r.brief.html),
       };
     })(),
-    compact: (() => {
-      // The same window in brief: Radio Mobile's figures, the same numbers as
-      // the summary's, and what Radio Mobile's Rx relative should read.
-      const t = r.compact.text, c = r.compact.rows;
+    compact: await (async () => {
+      // The same window in brief, drawn as one picture: Radio Mobile's
+      // figures, the same numbers as the summary's, and what Radio Mobile's
+      // Rx relative should read — read off the words the picture draws.
+      const pic = await PathProfile.compactPicture();
+      const t = pic ? pic.words.join('\n') : '', c = r.compact.rows;
       const want = ['Azimuth', 'Elev. angle', 'Obstruction at', 'Worst Fresnel', 'Distance', 'Free space', 'Obstruction',
         'Statistics', 'Path loss', 'E field', 'Rx level', 'Rx relative', 'Tx system name', 'Rx system name', 'Tx power',
         'Required E field', 'Radiated power', 'Rx sensitivity', 'Antenna height', 'Net', 'Frequency', 'Climate',
         'Polarization', 'Variability', 'Refractivity', 'Conductivity', 'Permittivity'];
       let at = 0;
-      const order = want.filter(l => { const i = t.indexOf(l, at); if (i < 0) return true; at = i; return false; });
+      const low = t.toLowerCase();
+      const order = want.filter(l => { const i = low.indexOf(l.toLowerCase(), at); if (i < 0) return true; at = i; return false; });
       const cells = rows => rows.flat().map(x => x.v).join('|');
+      const drawn = pic ? pic.words : [];
       return {
         order,
         same: cells(c.grid) === cells(r.brief.rows.grid),
+        // Every figure of the three rows drawn whole, not cut short to fit.
+        whole: c.grid.flat().every(x => drawn.includes(x.v)) && drawn.includes(`${r.rows.a.name} → ${r.rows.b.name}`),
         rm: c.rm != null && Math.abs(c.rm - (p.margin + c.own)) < 1e-9 && t.includes(`should read about ${c.rm > 0 ? '+' : ''}${c.rm.toFixed(1)} dB`),
-        lean: !/WHAT THE WORDS MEAN/.test(r.compact.html) && /WHAT THE WORDS MEAN/.test(r.brief.html) && t.length < r.brief.text.length / 2,
+        lean: !/what the words mean/i.test(t) && /WHAT THE WORDS MEAN/.test(r.brief.html) && t.length < r.brief.text.length / 2,
+        size: pic ? [pic.w, pic.h, pic.chart] : null,
       };
     })(),
   };
@@ -1186,8 +1193,10 @@ if (report) {
      !report.brief.order.length && report.brief.rm && !report.brief.report, JSON.stringify(report.brief));
   ok('…its Rx relative the card\'s fade margin, its losses adding up to the path loss, and E field less Required E field the margin',
      report.brief.relative && report.brief.sum && report.brief.efield && report.brief.back, JSON.stringify(report.brief));
-  ok('🗒️ the compact summary carries every Radio Mobile figure and setting, in order, with the summary\'s own numbers',
+  ok('🗒️ the compact picture carries every Radio Mobile figure and setting, in order, with the summary\'s own numbers',
      !report.compact.order.length && report.compact.same, JSON.stringify(report.compact));
+  ok('…each figure and the path\'s name drawn whole, over the short chart',
+     report.compact.whole && !!report.compact.size && report.compact.size[0] === 900 && report.compact.size[2], JSON.stringify(report.compact));
   ok('…says what Radio Mobile\'s Rx relative should read, and leaves out the key and the notes',
      report.compact.rm && report.compact.lean, JSON.stringify(report.compact));
 }
@@ -1255,34 +1264,33 @@ if (brief) {
   ok('…the document the Radio Link window with the chart in it, and none of the report\'s tables', brief.img && brief.window && !brief.tables, JSON.stringify(brief));
   ok('…and says what it copied', /^Copied: the summary/.test(brief.toast), brief.toast);
 }
-// 🗒️ Copy compact: the same three ways, the window in brief.
+// 🗒️ Copy compact: the window in brief as one picture, and nothing else on
+// the clipboard — a document or text beside it is what Teams pastes instead.
 await page.click('#path-copy-compact');
 const compact = await page.evaluate(async () => {
-  const want = PathProfile.report().compact.text;
   const until = Date.now() + 15000;
-  let it = null, text = '';
+  let it = null, toast = '';
   while (Date.now() < until) {
-    try { [it] = await navigator.clipboard.read(); } catch (_) { it = null; }
-    text = it && it.types.includes('text/plain') ? await (await it.getType('text/plain')).text() : '';
-    if (text === want && it.types.includes('text/html')) break;
+    toast = [...document.querySelectorAll('.toast-text')].map(t => t.textContent).pop() || '';
+    if (/^Copied: the compact summary/.test(toast)) {
+      try { [it] = await navigator.clipboard.read(); } catch (_) { it = null; }
+      if (it) break;
+    }
     await new Promise(r => setTimeout(r, 200));
   }
-  if (!it) return null;
-  const out = { types: it.types.slice(), text: text === want };
-  if (it.types.includes('text/html')) {
-    const h = await (await it.getType('text/html')).text();
-    out.img = /<img[^>]+src="data:image\/png;base64,/.test(h);
-    out.window = /RADIO LINK/.test(h) && /Rx relative/.test(h) && !/WHAT THE WORDS MEAN/.test(h);
+  if (!it) return { toast };
+  const out = { types: it.types.slice(), toast };
+  if (it.types.includes('image/png')) {
+    const bmp = await createImageBitmap(await it.getType('image/png'));
+    out.png = [bmp.width, bmp.height];
   }
-  out.toast = [...document.querySelectorAll('.toast-text')].map(t => t.textContent).pop() || '';
   return out;
 });
-ok('🗒️ the compact press puts its text, a document and the picture on the clipboard',
-   !!compact && compact.text && ['text/html', 'text/plain', 'image/png'].every(t => compact.types.includes(t)), JSON.stringify(compact));
-if (compact) {
-  ok('…the document the window in brief with the chart in it', compact.img && compact.window, JSON.stringify(compact));
-  ok('…and says what it copied', /^Copied: the compact summary/.test(compact.toast), compact.toast);
-}
+ok('🗒️ the compact press puts one picture on the clipboard, and nothing beside it',
+   !!compact.types && compact.types.length === 1 && compact.types[0] === 'image/png', JSON.stringify(compact));
+ok('…drawn at twice its size, the same picture the check above read', !!compact.png && compact.png[0] === 1800
+   && !!report && !!report.compact.size && compact.png[1] === report.compact.size[1] * 2, JSON.stringify(compact));
+ok('…and says what it copied', /^Copied: the compact summary/.test(compact.toast), compact.toast);
 
 // Shown on asking: the cards carry the answer, and the explaining behind a
 // click. The budget's answer block says the figure the corner chip says; the

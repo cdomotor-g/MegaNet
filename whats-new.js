@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 223, date: '2026-11-05', items: [
+      '🗒️ <strong>Copy compact now copies a picture.</strong> On the elevation profile, it puts the Radio Link summary '
+        + 'on the clipboard as one image, so it pastes into Teams, Word or an email looking exactly as it does here — '
+        + 'nothing slides out of line. 📄 Copy a summary is still there when you want text and tables you can edit.',
+    ] },
     { n: 222, date: '2026-11-05', items: [
       '🔍 <strong>A magnifier on the Stations map, to see what the pins are sitting on.</strong> Switch on '
         + '<strong>Magnifier</strong> under Tools in the right-hand rail, and a round glass follows the mouse, showing '

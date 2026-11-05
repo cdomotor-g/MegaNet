@@ -5270,17 +5270,23 @@ tables with every inset given both as `cellpadding` and as `padding`, and the
 meters as small pictures, because that is what Word, LibreOffice and the mail
 programs keep of a pasted page. A point on the ground has no radio, so the
 figures that need one there read —. **🗒️ Copy compact**, before it, is the same
-window in brief, at under half the height (`compactOf` / `compactHtml` /
-`compactText`): a one-line heading (the path, when it was worked out, the fade
-margin); every figure Radio Mobile's window shows, in its places, one line to a
-cell with the label at its left and the figure at its right (two table cells a
-figure, since a word processor keeps one alignment to a cell); a shorter chart
+window in brief, at under half the height, drawn as **one picture** and put on
+the clipboard alone (`compactOf` / `compactPicture`): a document pasted into
+Teams, a chat or a web mail comes apart there, and given text or a document
+beside a picture those programs paste that instead, so the picture is all it
+carries — where the browser will not copy a picture it is saved as a PNG. It is
+drawn on a canvas at twice its size, so it stays sharp: a one-line heading (the
+path, when it was worked out, the fade margin); every figure Radio Mobile's
+window shows, in its places, one line to a cell with the label at its left and
+the figure at its right; a shorter chart
 with nothing written over it (`COMPACT_CHART`, `ends: false` — the ground under
 each end rides with its antenna height instead); the two ends without their
 meters' captions or the role rows (the role sits by the name);
 and one foot holding the net, the frequency, the Longley–Rice settings and the
 propagation mode, and what Radio Mobile's Rx relative should read without the ✦
-terms. The notes and the key to the words are what it leaves out.
+terms. The notes and the key to the words are what it leaves out. Every text
+it draws is cut with an ellipsis at its cell's edge rather than run over the
+next one, and `PathProfile.compactPicture()` hands a check the words drawn.
 
 **The Stations map's controls.** Everything MapChrome would put in the map's
 top-right corner lives in the strip instead, at every width — a phone's rail
