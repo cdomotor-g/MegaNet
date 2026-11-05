@@ -2,7 +2,8 @@
 // (map-mode.js): what a click does now, with ✕ and "Esc leaves".
 //
 //   1. **Nothing to say**: a map in no mode has no banner.
-//   2. **Each mode names itself**: a draw tool (and that station pins are off),
+//   2. **Each mode names itself**: a draw tool (and that station pins are off;
+//      for a line, that Enter finishes it — and a real Enter does),
 //      What's here, the Best repeater pick, the link budget picking its ends
 //      (and which end), moving a pin (and whose). The drive's start and site
 //      features are checked in drive.mjs and sitefeatures.mjs, which already
@@ -87,8 +88,30 @@ async function main() {
     await settle(page);
     b = await banner(page);
     check('a draw tool: what it is, and that station pins are off till it is left, with Esc and ✕',
-      J(b.modes) === '["draw"]' && /Drawing a line/.test(b.text) && /station pins can’t be opened until you leave/.test(b.text)
+      J(b.modes) === '["draw"]' && /Drawing a line/.test(b.text) && /station pins can’t be opened until you leave/i.test(b.text)
         && /Esc leaves/.test(b.text) && b.x[0] === 'Leave: Drawing a line', J(b));
+    check('…and how a line ends: press Enter to finish the line',
+      /click each corner, then press Enter to finish the line\. Station pins/.test(b.text), J(b.text));
+    // …which is true: two real clicks on the map, then a real Enter, is a line.
+    const before = await page.evaluate(() => (state.draw.shapes || []).length);
+    const spot = await page.evaluate(() => {
+      const r = state.map.getContainer().getBoundingClientRect();
+      return { x: r.left + r.width * 0.35, y: r.top + r.height * 0.6 };
+    });
+    await page.mouse.click(spot.x, spot.y);
+    await page.waitForTimeout(350);
+    await page.mouse.click(spot.x + 90, spot.y + 40);
+    await page.waitForTimeout(350);
+    await page.keyboard.press('Enter');
+    await settle(page);
+    const lined = await page.evaluate(() => {
+      const sh = state.draw.shapes || [];
+      const last = sh[sh.length - 1];
+      return { n: sh.length, kind: last && last.kind, pts: last && last.pts && last.pts.length, tool: state.draw.tool };
+    });
+    check('…and Enter does: two clicks and Enter are a line of two points, the tool still on',
+      lined.n === before + 1 && lined.kind === 'line' && lined.pts === 2 && lined.tool === 'line', J({ before, ...lined }));
+    await page.evaluate(() => { const sh = state.draw.shapes || []; if (sh.length) MapDraw.remove(sh[sh.length - 1].id); });
     const note = await page.evaluate(() => {
       const n = document.getElementById('map-note').getBoundingClientRect();
       const m = document.getElementById('map-mode').getBoundingClientRect();

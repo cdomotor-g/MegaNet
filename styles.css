@@ -5175,10 +5175,10 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
    ends, as it already does while site features are armed (map-twin.js). */
 .has-map-mode .map-note { top: calc(3.1rem + var(--map-mode-h, 2.4rem) + .4rem); }
 .has-map-mode .map-twin-offer { display: none; }
-/* A finger has no Escape key: ✕ is the way out, and a 44 px one. Under the
-   zoom buttons, the width of the map. */
+/* A finger has no Escape key, nor an Enter to finish a line with: ✕ is the
+   way out, and a 44 px one. Under the zoom buttons, the width of the map. */
 @media (hover: none) and (pointer: coarse) {
-  .map-mode-esc { display: none; }
+  .map-mode-esc, .map-mode-key { display: none; }
   .map-mode-x { min-width: 44px; min-height: 44px; }
 }
 @media (max-width: 560px) {

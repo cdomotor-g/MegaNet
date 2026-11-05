@@ -489,6 +489,9 @@ async function main() {
       d && d.drawing && d.pts.length === 0, J(d));
     check('…with every click the map’s, and the double-click the line’s rather than a zoom',
       drawingOn.cls && !drawingOn.dbl, J(drawingOn));
+    check('…the banner saying so, and that Enter finishes it (map-mode.js)',
+      await page.evaluate(() => /click the map for each point of the line, then press Enter to finish it\. Station pins/.test(
+        document.getElementById('map-mode').textContent)));
     let q = await at(page, pin);
     await page.mouse.click(q.x + 6, q.y + 5);
     await page.waitForTimeout(120);

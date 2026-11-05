@@ -25,6 +25,10 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 218, date: '2026-11-05', items: [
+      '⏎ <strong>Drawing a line, the red banner now says how to end it:</strong> click each corner, then press Enter to '
+        + 'finish the line. The same goes for a site feature\'s line.',
+    ] },
     { n: 217, date: '2026-11-05', items: [
       '🏷️ <strong>Station names on one spot hang one under the other.</strong> Where two or three stations share a '
         + 'point on the Stations map — Jimbour Ck AL and Macalister Bell Rd Jimbour Ck AL, say — their names used to sit '

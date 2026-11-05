@@ -68,6 +68,7 @@ const MapMode = (function () {
     text:   ['✏️', 'Adding a note'],
   };
   const NO_PINS = 'station pins can’t be opened until you leave';
+  const PINS_OFF = 'Station pins can’t be opened until you leave';
 
   const nameOf = id => {
     const s = id && state.data && (state.data.stations || []).find(x => x.id === id);
@@ -87,6 +88,11 @@ const MapMode = (function () {
         const t = state.draw && state.draw.tool;
         if (!t) return null;
         const [icon, title] = DRAW[t] || ['✏️', 'Drawing'];
+        // A line has no last click: Enter ends it (MapDraw's onKey), and a
+        // keyboard is where that is news. A finger has Finish line in the panel
+        // and the double-tap the note under the banner gives.
+        if (t === 'line') return { icon, title, how: 'click each corner', keys: ', then press Enter to finish the line',
+                                   tail: `. ${PINS_OFF}.` };
         return { icon, title, how: `clicks on the map draw; ${NO_PINS}.` };
       },
       leave() { MapDraw.setTool(''); },
@@ -107,7 +113,8 @@ const MapMode = (function () {
         const id = SiteFeatures.armed();
         if (!id) return null;
         const title = `Site features at ${nameOf(id)}`;
-        if (classOn('mn-sf-drawing')) return { icon: '🧰', title, how: `click the map for each point of the line; ${NO_PINS}.` };
+        if (classOn('mn-sf-drawing')) return { icon: '🧰', title, how: 'click the map for each point of the line',
+                                               keys: ', then press Enter to finish it', tail: `. ${PINS_OFF}.` };
         if (classOn('mn-sf-placing')) return { icon: '🧰', title, how: `click the map where the feature is; ${NO_PINS}.` };
         return { icon: '🧰', title, how: 'add or change them in its panel.' };
       },
@@ -185,7 +192,7 @@ const MapMode = (function () {
     el.innerHTML = on.map(m => `
       <div class="map-mode-row" data-mode="${esc(m.key)}">
         <span class="map-mode-what"><span aria-hidden="true">${esc(m.icon)}</span>
-          <strong>${esc(m.title)}</strong> — ${esc(m.how)}</span>
+          <strong>${esc(m.title)}</strong> — ${esc(m.how)}${m.keys ? `<span class="map-mode-key">${esc(m.keys)}</span>` : ''}${esc(m.tail || '')}</span>
         <span class="map-mode-esc"><kbd>Esc</kbd> leaves</span>
         <button type="button" class="map-mode-x" data-mode="${esc(m.key)}"
                 aria-label="Leave: ${esc(m.title)}" title="Leave: ${esc(m.title)}">✕</button>
