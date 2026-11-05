@@ -2,8 +2,9 @@
 //
 //   MapMagnify  the Stations map's magnifier: a round glass that follows the
 //               mouse (or is dragged by a finger) and shows the ground under
-//               it closer up — the base maps alone, with every pin, name,
-//               line, shape and overlay this app draws left out of it.
+//               it closer up — the base maps, with each station's pin shrunk
+//               to a dot, its name, where the map names it, barely there,
+//               and every line, shape and overlay this app draws left out.
 //
 // After core.js and map-controls.js, before init.js — index.html holds the
 // order and the reasons. Reaches back to core.js for announce, removeMap,
@@ -21,7 +22,15 @@
 // Layers and ticking them back afterwards. The glass is the quick way: switch
 // it on, point, and what is under all of it is there, larger.
 //
-// ── How it shows the ground and nothing else ─────────────────────────────────
+// At first the pins went too, and that lost where the station is: the point
+// of looking is the mast or the hut *at* the pin. So the pins came back, asked
+// for as "keep the pin, but really small" and the name "barely visible": a
+// dot two-fifths of the pin's size in the pin's own colour and ring, and the
+// name the map gives it at a fifth of its strength, under the dot. Lines,
+// shapes and overlays stay out — they were never what was in the way of one
+// station.
+//
+// ── How it shows the ground and the pins, and nothing else ───────────────────
 // The glass is a second, small Leaflet map holding only fresh copies of the
 // base maps the main map has on — the same blend, opacities and stacking order
 // (map.mnBases, map-controls.js) — and, with Satellite, the State imagery that
@@ -29,6 +38,16 @@
 // hide and nothing a new layer could forget to hide. Esri's place and road
 // names over Satellite, Dark and Light are left out as well: they are writing
 // over the ground too.
+//
+// The dots and the faint names are not in that map: they are painted on a
+// canvas of their own over it, the glass's size, every time the glass moves
+// (drawPins), off the main map's own pins (state.mapMarkers) — where each one
+// is, its fill, its ring, its shape, whether a filter has dimmed it, and
+// whether the map is naming it just now. Read rather than copied, so a
+// restyle, a filter or a label switched on is in the glass at its next move,
+// with nothing to keep in step. A pin in one of the map's bubbles (map-
+// cluster.js) is still its own dot in the glass, which is closer than the
+// map: the bubble is how the map shows a crowd at its own distance.
 //
 // Its zoom is the main map's plus log2 of the power, and its layers are let go
 // to 22, past the main map's 19, stretching each host's own closest tiles. So
@@ -72,6 +91,10 @@ const MapMagnify = (function () {
   const POWERS = [2, 4, 8, 16];
   const MAX_ZOOM = 22;
   const HINT_MS = 4500;
+  const PIN_SCALE = 0.4;    // a pin in the glass, against its size on the map
+  const PIN_MIN_R = 1.6;    // …but never smaller than this, in px
+  const NAME_ALPHA = 0.2;   // a name in the glass: barely there
+  const NAME_GAP = 3;       // px from the dot's edge down to its name
 
   let map = null;           // the Stations map
   let on = false;           // survives a rebuild of the map, not leaving the tab
@@ -80,6 +103,8 @@ const MapMagnify = (function () {
   let glass = null;         // the glass, in the map's container
   let lens = null;          // the map inside it
   let badge = null;
+  let pinsCv = null;        // the canvas the dots and the names are painted on
+  let painted = { pins: 0, names: 0, r: 0, alpha: 0 };   // the last paint, for checks
   let layers = null;        // { base name: [its layers] }, the glass's own copies
   let at = null;            // the glass's centre, in the map container's px
   let raf = 0;
@@ -172,9 +197,11 @@ const MapMagnify = (function () {
     if (glass || !map) return;
     glass = L.DomUtil.create('div', 'mn-magnify', map.getContainer());
     glass.setAttribute('aria-hidden', 'true');
-    glass.innerHTML = '<div class="mn-magnify-lens"><div class="mn-magnify-map"></div></div>'
+    glass.innerHTML = '<div class="mn-magnify-lens"><div class="mn-magnify-map"></div>'
+      + '<canvas class="mn-magnify-pins"></canvas></div>'
       + '<span class="mn-magnify-aim"></span><span class="mn-magnify-power"></span>';
     badge = glass.querySelector('.mn-magnify-power');
+    pinsCv = glass.querySelector('.mn-magnify-pins');
     // Nothing done to the glass reaches the map under it — on a touch screen,
     // where the glass takes the pointer (styles.css), a finger dragging it
     // must not pan the map too, and a tap on it must not open the pin beneath.
@@ -207,7 +234,8 @@ const MapMagnify = (function () {
     lens = removeMap(lens);
     layers = null;
     if (glass) glass.remove();
-    glass = badge = null;
+    glass = badge = pinsCv = null;
+    painted = { pins: 0, names: 0, r: 0, alpha: 0 };
     drag = null;
     shownBefore = false;
     if (map) map.getContainer().classList.remove('mn-magnifying');
@@ -247,10 +275,102 @@ const MapMagnify = (function () {
       shownBefore = true;
     }
     lens.setView(map.containerPointToLatLng(at), zoom(), { animate: false });
+    drawPins();
     const p = `${shownPower()}×`;
     badge.textContent = performance.now() < hintUntil
       ? `${p} · ${touchOnly() ? 'tap the glass to change' : 'Shift + scroll to change'}`
       : p;
+  }
+
+  // ── The pins, small, and their names, faint ────────────────────────────────
+  // Painted fresh on every update, names first and the dots over them, so a
+  // name never lies across a dot. A point in the glass is its map's point less
+  // the half-glass its map stands out past the glass on every side. Only the
+  // pins inside the glass's square, and a name's width round it, are looked
+  // at: a bounds test is cheap, and ~4,900 projections a frame would not be.
+  function drawPins() {
+    if (!pinsCv || !lens || !glass) return;
+    const d = glass.clientWidth;
+    const dpr = window.devicePixelRatio || 1;
+    const px = Math.max(1, Math.round(d * dpr));
+    if (pinsCv.width !== px || pinsCv.height !== px) { pinsCv.width = px; pinsCv.height = px; }
+    const ctx = pinsCv.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, px, px);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    painted = { pins: 0, names: 0, r: 0, alpha: NAME_ALPHA };
+    const markers = (typeof state !== 'undefined' && state.mapMarkers) || [];
+    if (!markers.length || !d) return;
+
+    const off = (lens.getContainer().clientWidth - d) / 2;
+    const pad = 120;   // a name hanging into the glass from a pin just outside it
+    const box = L.latLngBounds(
+      lens.containerPointToLatLng([off - pad, off + d + pad]),
+      lens.containerPointToLatLng([off + d + pad, off - pad]));
+    const shown = [];
+    for (const m of markers) {
+      if (!m._map || !m.mnStation) continue;
+      const ll = m.getLatLng();
+      if (!box.contains(ll)) continue;
+      const p = lens.latLngToContainerPoint(ll);
+      const o = m.options;
+      const r = Math.max(PIN_MIN_R, (m.mnRadius || o.radius || 5) * PIN_SCALE);
+      const tip = m.getTooltip();
+      shown.push({ m, o, r, x: p.x - off, y: p.y - off, name: tip && tip.options.permanent ? m.mnStation.name : null });
+    }
+    if (!shown.length) return;
+
+    // The names: the map's own label, small print on its white ground, the
+    // whole of it at NAME_ALPHA. A dimmed pin's name in the lighter ink the
+    // map gives it.
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const fs = Math.round(rem * 0.72 * 10) / 10;
+    const family = getComputedStyle(glass).fontFamily || 'sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 1;
+    for (const s of shown) {
+      if (!s.name) continue;
+      const dim = !!(s.m.mnFilterDim || s.m.mnFocusDimmed);
+      ctx.font = `${dim ? 400 : 600} ${fs}px ${family}`;
+      const w = ctx.measureText(s.name).width + 10, h = Math.round(fs * 1.5);
+      const x = s.x - w / 2, y = s.y + s.r + NAME_GAP;
+      if (x > d || x + w < 0 || y > d || y + h < 0) continue;
+      ctx.globalAlpha = NAME_ALPHA;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, y, w, h, 3); else ctx.rect(x, y, w, h);
+      ctx.fillStyle = 'rgba(255, 255, 255, .93)';
+      ctx.fill();
+      ctx.strokeStyle = dim ? 'rgba(0, 0, 0, .12)' : 'rgba(0, 0, 0, .25)';
+      ctx.stroke();
+      ctx.fillStyle = dim ? '#616161' : '#1a1a1a';
+      ctx.fillText(s.name, s.x, y + h / 2 + .5);
+      painted.names++;
+    }
+
+    // The dots: the pin's fill and ring, its shape, its dim — a hairline ring
+    // at this size, so the colour is what reads.
+    for (const s of shown) {
+      const { o, r, x, y } = s;
+      if (x + r < 0 || x - r > d || y + r < 0 || y - r > d) continue;
+      ctx.beginPath();
+      if (o.mnShape === 'triangle') {
+        const w = r * Math.sqrt(3) / 2;
+        ctx.moveTo(x, y - r); ctx.lineTo(x + w, y + r / 2); ctx.lineTo(x - w, y + r / 2); ctx.closePath();
+      } else {
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+      }
+      ctx.globalAlpha = o.fillOpacity == null ? 1 : o.fillOpacity;
+      ctx.fillStyle = o.fillColor || o.color || '#3388ff';
+      ctx.fill();
+      ctx.globalAlpha = o.opacity == null ? 1 : o.opacity;
+      ctx.strokeStyle = o.color || '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      painted.pins++;
+      painted.r = Math.max(painted.r, r);
+    }
+    ctx.globalAlpha = 1;
   }
 
   // The badge says how to change the power for a while after the glass comes
@@ -394,7 +514,7 @@ const MapMagnify = (function () {
     if (map) schedule();
     if (quiet || !map) return;
     announce(on
-      ? `Magnifier on, ${power} times. The glass shows the ground with the pins, names and lines left out. `
+      ? `Magnifier on, ${power} times. The glass shows the ground with the pins as small dots, their names faint, and the lines left out. `
         + (touchOnly() ? 'Drag the glass to move it.' : 'Move the mouse over the map; Shift and scroll changes how close.')
       : 'Magnifier off.');
   }
@@ -446,8 +566,9 @@ const MapMagnify = (function () {
     on: () => on,
 
     // For checks: what the glass is showing, counted rather than read off its
-    // pixels — where it is, how close, which base layers are in it and
-    // whether anything else ever got in.
+    // pixels — where it is, how close, which base layers are in it, whether
+    // anything else ever got into its map, and the dots and names painted
+    // over it at its last move (how many, the largest dot, the names' alpha).
     drawn() {
       const lensLayers = [];
       if (lens) lens.eachLayer(l => lensLayers.push(l));
@@ -462,6 +583,7 @@ const MapMagnify = (function () {
         tileLayers: lensLayers.filter(l => l instanceof L.TileLayer).length,
         bases: layers ? Object.keys(layers).filter(n => layers[n].some(l => lens && lens.hasLayer(l))) : [],
         badge: badge ? badge.textContent : '',
+        pins: painted.pins, names: painted.names, pinR: painted.r, nameAlpha: painted.alpha,
       };
     },
     map: () => lens,

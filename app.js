@@ -4957,16 +4957,16 @@ function stationsMapPanels(map) {
     onClick: () => MapHere.arm(),
   });
   // The magnifier (map-magnify.js): a glass that follows the mouse — or is
-  // dragged by a finger — showing the ground under it closer up, with every
-  // pin, name, line and overlay left out, for what they sit on top of on the
-  // imagery. A switch rather than a pane: on, it has nothing to set but its
+  // dragged by a finger — showing the ground under it closer up, the pins as
+  // small dots and their names faint, every line and overlay left out, for
+  // what they sit on top of on the imagery. A switch rather than a pane: on, it has nothing to set but its
   // power, which Shift + scroll (or a tap on the glass) changes where it is.
   // Last in Tools, beside What's here?, the other one about the ground at a
   // point rather than the network.
   MapChrome.button(map, {
     className: 'mn-map-magnify', icon: Glyphs.rail('magnify'), name: 'Magnifier',
-    title: 'Magnifier — a glass over the map showing the ground under the pins, names and lines, closer up. Shift + scroll changes how close; Esc puts it away',
-    ariaLabel: 'Magnifier — shows the ground under the pins, names and lines, closer up',
+    title: 'Magnifier — a glass over the map showing the ground under the pins, names and lines, closer up: the pins as small dots, their names faint. Shift + scroll changes how close; Esc puts it away',
+    ariaLabel: 'Magnifier — shows the ground under the pins, names and lines, closer up, the pins as small dots',
     group: 'tools', order: 40, pressed: MapMagnify.on(),
     onClick: () => MapMagnify.toggle(),
   });

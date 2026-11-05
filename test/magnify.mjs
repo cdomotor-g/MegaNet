@@ -6,8 +6,10 @@
 //   2. **On** — one glass, in the map's container, in the middle of the map;
 //      4× (two levels closer than the map); its map holding base-map tiles and
 //      nothing else — the main map's blend, and no pin, name, line or overlay;
-//      the badge saying how to change it; over the panes and the minimap and
-//      under the station card and Leaflet's corners (685); taking no pointer.
+//      over that map, the stations' pins as small dots and their names faint;
+//      2 cm (76 px) wider than it was; the badge saying how to change it; over
+//      the panes and the minimap and under the station card and Leaflet's
+//      corners (685); taking no pointer.
 //   3. **Following** — a real mouse over the map moves the glass's centre to
 //      the pointer and the glass's map to the ground under it; the pointer is
 //      hidden over the map and back over Leaflet's corners.
@@ -22,8 +24,8 @@
 //   8. **A phone** — the glass takes the finger: dragged, it moves and the map
 //      does not; tapped, it steps the power.
 //
-// Why a check of its own: every failure here is a page that looks fine. A pin
-// that got into the glass, a glass that zooms the map with the power, a lens
+// Why a check of its own: every failure here is a page that looks fine. A line
+// that got into the glass, a pin drawn full size or not at all, a glass that zooms the map with the power, a lens
 // still fetching tiles behind another tab, a pointer left hidden after the
 // glass has gone — none of them throws.
 //
@@ -149,6 +151,50 @@ async function main() {
     });
     check('…no pin, name, line or shape in it', lensStuff.markers === 0
       && lensStuff.panes.every(p => /leaflet-(map|tile)-pane/.test(p)), J(lensStuff));
+    // Over that map, the pins as small dots — every pin near the glass's middle
+    // on the map is one in the glass.
+    const under = await page.evaluate(() => {
+      const g = document.querySelector('.mn-magnify').getBoundingClientRect();
+      const box = state.map.getContainer().getBoundingClientRect();
+      const cx = g.left + g.width / 2 - box.left, cy = g.top + g.height / 2 - box.top;
+      let near = 0, r = 0;
+      for (const m of state.mapMarkers) {
+        if (!m._map) continue;
+        const p = state.map.latLngToContainerPoint(m.getLatLng());
+        // The glass at 4× shows a quarter of its width of the map.
+        if (Math.hypot(p.x - cx, p.y - cy) > g.width / 8) continue;
+        near++;
+        r = Math.max(r, m.mnRadius || 0);
+      }
+      const cv = document.querySelector('.mn-magnify-pins');
+      const cr = cv.getBoundingClientRect();
+      return { near, r, cv: { w: Math.round(cr.width), z: getComputedStyle(cv).zIndex,
+               inLens: !!cv.closest('.mn-magnify-lens'), inMap: !!cv.closest('.mn-magnify-map') } };
+    });
+    check('…the stations under it drawn as small dots, under half their size on the map',
+      under.near > 0 && S.m.pins >= under.near && S.m.pinR > 0 && S.m.pinR < under.r / 2,
+      J({ under, pins: S.m.pins, pinR: S.m.pinR }));
+    check('…on a layer of their own over the glass\'s map and inside its circle, not in that map',
+      under.cv.inLens && !under.cv.inMap && under.cv.z === '1' && near(under.cv.w, S.centre.d, 1), J(under.cv));
+    // Close in on one station, where the map names the pins in view: its name
+    // is in the glass too, faint.
+    const named = await page.evaluate(() => {
+      const m = state.mapMarkers.find(x => x._map && x.mnStation && x.mnStation.name);
+      state.map.setView(m.getLatLng(), 15, { animate: false });
+      return m.mnStation.name;
+    });
+    await settle(page);
+    await page.waitForTimeout(250);
+    const N = await page.evaluate(() => ({
+      m: MapMagnify.drawn(),
+      named: state.mapMarkers.filter(m => m._map && m.getTooltip() && m.getTooltip().options.permanent).length,
+    }));
+    check('…their names, where the map names them, painted faint (a fifth of full strength)',
+      N.named > 0 && N.m.pins > 0 && N.m.names > 0 && N.m.nameAlpha > 0 && N.m.nameAlpha <= 0.25,
+      J({ named, mapNames: N.named, pins: N.m.pins, names: N.m.names, alpha: N.m.nameAlpha }));
+    await page.evaluate(() => state.map.setView([-27.47, 153.02], 12, { animate: false }));
+    await settle(page);
+    check('…the glass 2 cm (76 px) wider than the 240 px it was', near(S.centre.d, 316, 1), J(S.centre));
     check('…the badge saying how to change it', /^4× · Shift \+ scroll/.test(S.m.badge), J(S.m.badge));
     check('…over the panes and the minimap, under the station card and the corners, taking no pointer',
       S.z === '685' && S.pe === 'none', J({ z: S.z, pe: S.pe }));
@@ -340,7 +386,8 @@ async function main() {
     for (const f of failed) log(`  ✗ ${f.label}${f.detail ? `\n      ${f.detail}` : ''}`);
     process.exit(1);
   }
-  log('\nPASS — the Stations map\'s magnifier shows the ground under the pins and nothing else,\n'
+  log('\nPASS — the Stations map\'s magnifier shows the ground under the pins, the pins small\n'
+    + '       and their names faint, and no line or overlay,\n'
     + '       follows the mouse or the finger, changes its power without zooming the map,\n'
     + '       and goes away with Escape and with the tab.');
 }

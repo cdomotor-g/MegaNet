@@ -1149,8 +1149,9 @@ const HELP = {
       'The <strong>Magnifier</strong>, under Tools in the rail, is for what the network is drawn on '
       + 'top of. Switch it on and a round glass follows the mouse, showing the map under it closer '
       + 'up — whichever base maps are ticked in Layers, the satellite and the State\'s own aerial '
-      + 'photos among them — with every pin, name, line and overlay left out, so a mast, a hut or a '
-      + 'track under a station\'s pin and label can be seen. It starts at 4×; Shift + scroll makes it '
+      + 'photos among them — with each station\'s pin shrunk to a small dot, its name barely there, '
+      + 'and every line and overlay left out, so a mast, a hut or a track under a station\'s pin '
+      + 'and label can be seen, and still which station it is. It starts at 4×; Shift + scroll makes it '
       + '2×, 8× or 16×, and it is remembered. A click goes through the glass as if it were not there. '
       + 'Esc, or the switch again, puts it away. On a phone, drag the glass to move it and tap it to '
       + 'change how close.',
