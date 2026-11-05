@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 206, date: '2026-11-05', items: [
+      '📊 <strong>A tidier Radio tab.</strong> On a station\'s card, <strong>Radio</strong> now opens with a two-line summary: '
+        + 'its best link, and any channel it was heard on that nothing explains. Under it, <em>Assumed TX</em>, <em>Links</em>, '
+        + '<em>Heard on</em> and <em>Protocol</em> each have a heading, and everything lines up on the left. Every link gets a '
+        + 'bar of its fade margin on one scale, shaded Poor, Marginal and Good, so the strong one stands out at a glance; the '
+        + 'base stations too weak to hear it fold away behind a count, and <em>What the words mean</em> at the foot explains the rest.',
+    ] },
     { n: 205, date: '2026-11-05', items: [
       '<strong>📄 Copy a summary</strong>, over the elevation profile\'s chart, now pastes the path laid out like '
         + '<strong>Radio Mobile\'s Radio Link window</strong>: the same three rows of figures over the chart — azimuth, '

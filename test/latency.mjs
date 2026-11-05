@@ -518,13 +518,13 @@ try {
   // …and the card says it too, under Heard on.
   await page.evaluate(id => MapLatency.focus(id), R.steady2);
   await waitTrue(page, () => {
-    const row = [...document.querySelectorAll('.stn-card-freqs .acma-row')].find(x => /Protocol/.test(x.firstElementChild.textContent));
+    const row = document.querySelector('.stn-card-freqs .stn-card-protocol');
     return row && !/asking the datastore/.test(row.textContent);
   });
   const prCard = await page.evaluate(() => {
-    const row = [...document.querySelectorAll('.stn-card-freqs .acma-row')].find(x => /Protocol/.test(x.firstElementChild.textContent));
+    const row = document.querySelector('.stn-card-freqs .stn-card-protocol');
     return row ? { text: row.textContent.replace(/\s+/g, ' ').trim(), bar: row.querySelectorAll('.lat-proto-bar > i').length,
-                   term: (row.querySelector('.term') || {}).title || '', key: !!row.querySelector('.lat-key') } : null;
+                   term: (row.querySelector('.freq-body .term') || {}).title || '', key: !!row.querySelector('.lat-key') } : null;
   });
   check('the station\'s card says it under Heard on: both ways, how many readings each way over the pins\' window (the week, here), a bar of the shares',
     prCard && /Both ways/.test(prCard.text) && /legacy ALERT/.test(prCard.text) && /inside ALERT2/.test(prCard.text)

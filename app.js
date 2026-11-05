@@ -9097,8 +9097,11 @@ function stnCardHtml(s) {
   // a burst, the repeaters that carry it, its ALERT addresses, every RX/TX
   // pair it has (0033, frequencies.js — then what it is assumed to transmit
   // on, and the channels the base stations heard it on), its carrier
-  // fingerprint (#217, health-drift.js) and a repeater's ACMA licences.
+  // fingerprint (#217, health-drift.js) and a repeater's ACMA licences — and
+  // before all of it, the two-line summary of its best link and what was
+  // heard (frequencies.js), which stays hidden until it has something to say.
   const radioRows = [
+    Frequencies.summaryHtml(s),
     acmaCardRow('Networks', nets ? esc(nets) : null),
     passing != null ? acmaCardRow('Passing', String(passing)) : '',
     isRpt && s.repeater && s.repeater.delay_ms != null ? acmaCardRow('Repeater delay', `${esc(s.repeater.delay_ms)} ms`) : '',

@@ -91,7 +91,7 @@ const MapDirect = (function () {
   const maxKm = () => Math.max(0, Number(state.mapMaxLinkKm) || 0);
   const kmOf = (a, b) => acmaHaversineKm(a.lat, a.lon, b.lat, b.lon);
   const key = (a, b) => `${a}>${b}`;
-  const db = v => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`;
+  const db = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)} dB`;
   const drawnOnMap = s => typeof MapSymbols === 'undefined' || !MapSymbols.drawn || MapSymbols.drawn(s);
 
   // A field station on the radio: what has links to list. Not one that is a
@@ -232,14 +232,25 @@ const MapDirect = (function () {
     });
   }
 
+  // What its words mean: on hover, and in the block's "What the words mean"
+  // fold (frequencies.js) — [word, meaning].
   const WORDS = {
-    links: 'Every radio path out of this station the map knows: the repeaters whose pass ranges carry it, within the Max TX '
-      + 'distance, and the base stations within it that listen on its channel and so hear it with no repeater between. Each '
-      + 'with its fade margin — how many decibels its signal arrives above what the receiver needs, at the reliability the link '
-      + 'budget is set to — the best first. Good is 10 dB or more, Marginal 3 or more, Poor below that. A base station under '
-      + '0 dB is too weak to count as hearing it, and is named on one line under the rest. Worked out over the terrain, the '
-      + 'same figure the radio-path card gives; a model, not a measurement.',
+    links: ['Links', 'Every radio path out of this station the map knows: the repeaters whose pass ranges carry it, within '
+      + 'the Max TX distance, and the base stations within it that listen on its channel and so hear it with no repeater '
+      + 'between. Best fade margin first.'],
+    margin: ['Fade margin', 'How many decibels (dB) its signal arrives above what the receiver needs, at the reliability the '
+      + 'link budget is set to. Good is 10 dB or more, Marginal 3 or more, Poor below that. Worked out over the terrain — '
+      + 'the figure the radio-path card gives — a model, not a measurement. The bars draw it on one scale, −20 to +40 dB.'],
+    second: ['Second-hand', 'A repeater that carries it, but most likely hears it through a nearer repeater that carries it '
+      + 'too, rather than from the station itself.'],
+    unchecked: ['Channel not checked', 'The base station has no receive channel on record, so nobody has checked that it '
+      + 'listens on the one this station is assumed to transmit on.'],
+    weak: ['Too weak to hear it direct', 'Base stations in range, on its channel, whose fade margin is under 0 dB: the '
+      + 'signal arrives below what the receiver needs, so they are not counted as hearing it.'],
+    off: ['On another channel', 'Base stations in range that are on record as listening on a different channel, so they '
+      + 'cannot hear it, and are not counted.'],
   };
+  const word = (k, text) => termHtml(text || WORDS[k][0], WORDS[k][1]);
 
   // The figure, in the link budget's bands — Good, Marginal, Poor — as the
   // radio-path card and the profile word it.
@@ -247,17 +258,45 @@ const MapDirect = (function () {
     const f = r.fig;
     if (!f || f.phase === 'asking') return '<span class="txt-muted" aria-busy="true">working out…</span>';
     if (f.phase !== 'ok') return '<span class="txt-muted">no fade margin</span>';
-    const m = typeof lbMarginClass === 'function' ? lbMarginClass(f.margin) : { cls: 'ok', label: '' };
+    const m = band(f.margin);
     return `<strong class="txt-${m.cls}">${esc(db(f.margin))}</strong> <span class="small">${esc(m.label)}</span>`;
+  }
+  const band = v => (typeof lbMarginClass === 'function' ? lbMarginClass(v) : { cls: 'ok', label: '' });
+
+  // ── The bars ──
+  // Every link's fade margin on one scale, −20 to +40 dB, with the bands
+  // shaded behind it and a tick at 0, so the strong link stands out before a
+  // word is read. Fixed, so one station's card and the next read alike; a
+  // figure past an end runs to that end, with an arrow.
+  const LO = -20, HI = 40, TICKS = [-20, 0, 10, 20, 40];
+  const pct = v => ((Math.max(LO, Math.min(HI, v)) - LO) / (HI - LO)) * 100;
+  const signed = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)}`;
+  // Where 0 and the band edges fall, for the shading — and below, each tick's
+  // and each bar's place — as custom properties styles.css reads: the tab's
+  // rule is no inline style but a token override (`npm run tabs`).
+  function scaleStyle() {
+    const good = typeof LB_MARGIN !== 'undefined' ? LB_MARGIN[0].min : 10;
+    const fair = typeof LB_MARGIN !== 'undefined' ? LB_MARGIN[1].min : 3;
+    return ` style="--freq-zero:${pct(0).toFixed(2)}%;--freq-fair:${pct(fair).toFixed(2)}%;--freq-good:${pct(good).toFixed(2)}%"`;
+  }
+  const axisHtml = () => `<span class="freq-axis" aria-hidden="true">${TICKS.map(v =>
+    `<span style="--freq-at:${pct(v).toFixed(2)}%">${signed(v)}</span>`).join('')}</span>`;
+  function barHtml(r) {
+    const f = r.fig;
+    if (!f || f.phase !== 'ok') return '<span class="freq-bar" aria-hidden="true"></span>';
+    const m = band(f.margin), z = pct(0), p = pct(f.margin);
+    const cut = f.margin < LO ? '<span class="freq-cut">◂</span>' : f.margin > HI ? '<span class="freq-cut freq-cut-hi">▸</span>' : '';
+    return `<span class="freq-bar" role="img" aria-label="${escAttr(`Fade margin ${db(f.margin)}, ${m.label}`)}">`
+      + `<i class="${m.cls}" style="--freq-from:${Math.min(z, p).toFixed(2)}%;--freq-len:${Math.abs(p - z).toFixed(2)}%"></i>${cut}</span>`;
   }
 
   // What the link is, under its name, in a few words a finger can read.
-  function whyText(r) {
-    const where = fmtKm(r.km);
+  function whyHtml(r) {
+    const where = esc(fmtKm(r.km));
     if (r.kind === 'carrier') {
-      return `${isBase(r.s) ? 'base and repeater' : 'repeater'} · ${where} · carries it${r.direct ? '' : ', likely second-hand'}`;
+      return `${isBase(r.s) ? 'base and repeater' : 'repeater'} · ${where} · carries it${r.direct ? '' : `, likely ${word('second', 'second-hand')}`}`;
     }
-    const ch = r.check === 'match' ? `on ${r.tx.map(chan).join(', ')} MHz` : 'channel not checked';
+    const ch = r.check === 'match' ? `on ${esc(r.tx.map(chan).join(', '))} MHz` : word('unchecked', 'channel not checked');
     return `base station · ${where} · hears it direct · ${ch}`;
   }
 
@@ -266,38 +305,73 @@ const MapDirect = (function () {
       title="Open the elevation profile and link budget for this path">${esc(r.s.name || r.s.id)}</button>`;
   }
 
+  // One link: its name and figure, its bar, and what it is. A base too weak
+  // to hear it gives its distance only.
+  function itemHtml(st, r, weak) {
+    return `<div class="freq-link stn-link${weak ? ' freq-link-weak' : ''}" data-mn-link="${escAttr(r.s.id)}" data-mn-link-kind="${r.kind}">`
+      + `${nameBtn(st, r)}<span class="freq-fig">${figHtml(r)}</span>${barHtml(r)}`
+      + `<span class="mn-pop-note freq-why">${weak ? esc(fmtKm(r.km)) : whyHtml(r)}</span></div>`;
+  }
+
   const weakOf = r => r.kind === 'base' && r.fig && r.fig.phase === 'ok' && r.fig.margin < HEAR_DB;
 
-  // The card's Links line: under Assumed, in frequencies.js's block. Each
-  // repeater that carries it, and each base station that hears it direct, on
-  // a line; the base stations in range too weak to, on one line under them.
-  // Empty for a station with no links to list.
+  // The bands, in words, under the bars — the key a finger can read.
+  function keyHtml() {
+    const B = typeof LB_MARGIN !== 'undefined' ? LB_MARGIN : [{ min: 10, label: 'Good', cls: 'ok' }, { min: 3, label: 'Marginal', cls: 'warn' },
+      { min: -Infinity, label: 'Poor', cls: 'bad' }];
+    const range = i => (i === 0 ? `${B[0].min}+` : B[i].min === -Infinity ? `under ${B[i - 1].min}` : `${B[i].min}–${B[i - 1].min}`);
+    return `<span class="freq-key">${B.map((b, i) => `<span><span class="freq-dot ${b.cls}" aria-hidden="true"></span>${esc(b.label)} ${range(i)}</span>`).join(' ')}`
+      + ' <span>modelled, not measured</span></span>';
+  }
+
+  // The card's Links, under Assumed TX, in frequencies.js's block: each
+  // repeater that carries it and each base station that hears it direct, a
+  // bar each, the best first; the base stations in range too weak to, in a
+  // fold under them; those on another channel named on a line. Empty for a
+  // station with no links to list.
   function rowHtml(st) {
     const L = linksOf(st);
     if (!L) return '';
     const all = rowsOf(st, L);
     const rows = all.filter(r => !weakOf(r));
     const weak = all.filter(weakOf);
-    const notes = [];
     const list = (xs, one) => `${xs.slice(0, 3).map(one).join(', ')}${xs.length > 3 ? ` and ${xs.length - 3} more` : ''}`;
-    if (weak.length) {
-      notes.push(`Too weak to hear it direct: ${list(weak, r => `${r.s.name || r.s.id} (${fmtKm(r.km)}, ${db(r.fig.margin)})`)}.`);
-    }
+    const notes = [];
     if (L.off.length) {
-      notes.push(`Not counted, on another channel: ${list(L.off, o => `${o.s.name || o.s.id} (${o.rx.map(chan).join(', ')} MHz)`)}.`);
+      notes.push(`<span class="mn-pop-note freq-why">${word('off')}, not counted: ${esc(list(L.off, o =>
+        `${o.s.name || o.s.id} (${o.rx.map(chan).join(', ')} MHz)`))}</span>`);
     }
-    if (L.far) notes.push(`${L.far} more repeater${L.far === 1 ? '' : 's'} carrying it past the Max TX distance (${L.maxKm} km).`);
-    const label = `<span>${termHtml('Links', WORDS.links)}</span>`;
-    const noteHtml = notes.map(n => ` <span class="mn-pop-note freq-why">${esc(n)}</span>`).join('');
-    if (!all.length) {
-      return `<div class="acma-row stn-card-links">${label}<span><span class="txt-muted">none within ${esc(String(L.maxKm))} km</span>${noteHtml}</span></div>`;
+    if (L.far) {
+      notes.push(`<span class="mn-pop-note freq-why">${esc(`${L.far} more repeater${L.far === 1 ? '' : 's'} carrying it past the Max TX `
+        + `distance (${L.maxKm} km).`)}</span>`);
     }
+    const S = (html, right = '') => (typeof Frequencies !== 'undefined' && Frequencies.section
+      ? Frequencies.section('links', WORDS.links[0], WORDS.links[1], html, right, scaleStyle()) : '');
+    if (!all.length) return S(`<span class="txt-muted">none within ${esc(String(L.maxKm))} km</span>${notes.join('')}`);
     ask(st, L);
-    const key_ = ' <span class="mn-pop-note freq-why">Fade margin: dB to spare above what the receiver needs — Good 10 or more, '
-      + 'Marginal 3 or more, Poor under 3. Modelled, not measured.</span>';
-    return `<div class="acma-row stn-card-links">${label}<span>${rows.map(r => `
-      <span class="freq-val stn-link" data-mn-link="${escAttr(r.s.id)}" data-mn-link-kind="${r.kind}">${nameBtn(st, r)} · ${figHtml(r)}</span>
-      <span class="mn-pop-note freq-why">${esc(whyText(r))}</span>`).join('')}${rows.length ? '' : '<span class="txt-muted">none heard</span>'}${noteHtml}${key_}</span></div>`;
+    const fold = typeof Frequencies !== 'undefined' && Frequencies.foldAttrs ? Frequencies.foldAttrs(st.id, 'weak') : '';
+    const weakHtml = weak.length ? `<details class="freq-fold"${fold}><summary>${word('weak')} <b class="freq-count">${weak.length}</b></summary>`
+      + `<div class="freq-fold-body">${axisHtml()}${weak.map(r => itemHtml(st, r, true)).join('')}</div></details>` : '';
+    return S(axisHtml() + (rows.length ? rows.map(r => itemHtml(st, r, false)).join('') : '<span class="txt-muted">none heard</span>')
+      + weakHtml + notes.join('') + keyHtml(), word('margin', 'Fade margin, dB'));
+  }
+
+  // The summary's first line, at the top of the Radio tab (frequencies.js):
+  // its best link, and when that is a base station's, whether the repeaters
+  // do any better than Poor. Empty until a figure has landed.
+  function summaryHtml(st) {
+    const L = linksOf(st);
+    if (!L) return '';
+    const rows = rowsOf(st, L).filter(r => !weakOf(r) && r.fig && r.fig.phase === 'ok');
+    if (!rows.length) return '';
+    const best = rows[0], m = band(best.fig.margin);
+    const what = best.kind === 'base' ? 'direct to base' : isBase(best.s) ? 'a base and repeater' : 'a repeater';
+    const reps = rows.filter(r => r.kind === 'carrier');
+    const poor = typeof LB_MARGIN !== 'undefined' ? LB_MARGIN[1].min : 3;
+    const after = best.kind === 'base' && reps.length && reps.every(r => r.fig.margin < poor)
+      ? (reps.length === 1 ? ' Its repeater link is Poor.' : ` All ${reps.length} repeater links are Poor.`) : '';
+    return `<p><span class="freq-dot ${m.cls}" aria-hidden="true"></span>${rows.length === 1 ? 'Its only link' : 'Best link'}: `
+      + `<b>${esc(best.s.name || best.s.id)}</b>, ${what}, <strong class="txt-${m.cls}">${esc(db(best.fig.margin))}</strong> ${esc(m.label)}.${after}</p>`;
   }
 
   // ── The lines on the map ────────────────────────────────────────────────────
@@ -403,9 +477,10 @@ const MapDirect = (function () {
     sync() { if (onId) redraw(); },
 
     rowHtml,
+    summaryHtml,
     open,
     channelHtml,
-    words: () => ({ ...WORDS }),
+    words: () => Object.fromEntries(Object.entries(WORDS).map(([k, v]) => [k, v.slice()])),
     active,
 
     legendHtml() {

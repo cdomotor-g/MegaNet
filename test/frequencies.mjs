@@ -13,12 +13,15 @@
 //      removing a row hands focus back to + Add. A base station gets a section
 //      of its own; a field station gets none.
 //   3. **The card**: the primary pair and the others, a line each.
-//   4. **Links** (map-direct.js): under Assumed, every repeater that carries
-//      a field station within the Max TX distance and every base station in
-//      range on its channel, the best fade margin first; a base on record as
-//      listening elsewhere left out and named, and the ones too weak to hear
-//      it on one line. While its card is open the map draws a line to each
-//      base that hears it — and only those — and the line goes with the card.
+//   4. **Links** (map-direct.js): under Assumed TX, every repeater that
+//      carries a field station within the Max TX distance and every base
+//      station in range on its channel, the best fade margin first, each with
+//      a bar on one scale; a base on record as listening elsewhere left out
+//      and named, and the ones too weak to hear it in a fold that a repaint
+//      leaves open. The Radio tab opens with a summary: its best link, and a
+//      channel nothing explains. While its card is open the map draws a line
+//      to each base that hears it — and only those — and the line goes with
+//      the card.
 //
 // Run:  npm run frequencies
 //       npm run frequencies -- -v
@@ -222,14 +225,22 @@ async function main() {
       const block = document.querySelector('#stn-card .stn-card-freqs');
       if (!block) return null;
       const rows = {};
-      block.querySelectorAll('.acma-row').forEach(r => {
-        rows[r.firstElementChild.textContent.trim()] = {
-          vals: [...r.querySelectorAll('.freq-val')].map(e => e.textContent.trim()),
-          notes: [...r.querySelectorAll('.freq-why')].map(e => e.textContent.replace(/\s+/g, ' ').trim()),
-          text: r.lastElementChild.textContent.replace(/\s+/g, ' ').trim(),
-          title: r.firstElementChild.title,
+      const flat = e => e.textContent.replace(/\s+/g, ' ').trim();
+      const link = e => `${flat(e.querySelector('.link-btn'))} · ${flat(e.querySelector('.freq-fig'))}`;
+      block.querySelectorAll('.freq-sec').forEach(r => {
+        const h = r.querySelector('.freq-h').firstElementChild, body = r.querySelector('.freq-body');
+        rows[h.textContent.trim()] = {
+          vals: [...body.querySelectorAll('.freq-val')].map(e => e.textContent.trim()),
+          notes: [...body.querySelectorAll('.freq-why')].map(flat),
+          counts: [...body.querySelectorAll('.freq-n')].map(flat),
+          links: [...body.querySelectorAll(':scope > .freq-link')].map(link),
+          weak: [...body.querySelectorAll('.freq-fold .freq-link')].map(link),
+          text: flat(body),
+          title: h.title,
         };
       });
+      const sum = document.querySelector('#stn-card .freq-sum');
+      rows.summary = sum ? [...sum.querySelectorAll('p')].map(flat) : null;
       return rows;
     });
 
@@ -246,19 +257,28 @@ async function main() {
       && !document.querySelector('#stn-card .stn-card-freqs [aria-busy]'), null, { timeout: 10_000 });
     let card = await freqCard();
     check('the card says what it is assumed to transmit on: its direct carrier\'s RX, and whose',
-      card && card.Assumed && card.Assumed.vals.join('|') === 'TX 151.500 MHz'
-        && /^Kroombit Repeater AL \(28\.\d km\) listens there$/.test(card.Assumed.notes[0])
-        && !/Banana|Hopeful/.test(card.Assumed.text) && /Max TX distance \(100 km/.test(card.Assumed.title),
-      JSON.stringify(card && card.Assumed));
+      card && card['Assumed TX'] && card['Assumed TX'].vals.join('|') === '151.500 MHz'
+        && /^Kroombit Repeater AL \(28\.\d km\) listens there$/.test(card['Assumed TX'].notes[0])
+        && !/Banana|Hopeful/.test(card['Assumed TX'].text) && /Max TX distance \(100 km/.test(card['Assumed TX'].title),
+      JSON.stringify(card && card['Assumed TX']));
     check('…and the channels its readings were heard on, most heard first, only its own rows counted',
       card && card['Heard on'] && card['Heard on'].vals.join('|') === '151.500 MHz|152.400 MHz|151.5375 MHz',
       JSON.stringify(card && card['Heard on']));
     const hn = (card && card['Heard on'] && card['Heard on'].notes) || [];
-    check('…each saying how often and what is known to be on it: direct or a carrier\'s relay, or neither',
-      /^ALERT · 3 readings, last .+ — direct, or relayed by Kroombit Repeater AL$/.test(hn[0] || '')
-        && /^ALERT · 1 reading, last .+ — relayed by Banana Range AL and Mt Hopeful AL$/.test(hn[1] || '')
-        && /^ALERT2 · 1 reading, last .+ — neither its assumed TX nor a channel its carriers transmit on$/.test(hn[2] || ''),
-      JSON.stringify(hn));
+    check('…each saying how often and what is known to be on it: direct or a carrier\'s relay, or not explained',
+      card['Heard on'].counts.join('|') === '3|1|1'
+        && /^ALERT · last .+ · direct, or relayed by Kroombit Repeater AL$/.test(hn[0] || '')
+        && /^ALERT · last .+ · relayed by Banana Range AL and Mt Hopeful AL$/.test(hn[1] || '')
+        && /^ALERT2 · last .+ · not explained$/.test(hn[2] || ''),
+      JSON.stringify(card['Heard on']));
+    const shares = await page.evaluate(() => [...document.querySelectorAll('#stn-card .stn-card-heard .freq-share > i')]
+      .map(i => [parseFloat(i.style.getPropertyValue('--freq-share')), i.className]));
+    check('…with a bar of each channel\'s share of them, a channel nothing explains in amber',
+      shares.length === 3 && Math.abs(shares[0][0] - 60) < 0.2 && Math.abs(shares[1][0] - 20) < 0.2
+        && shares[2][1] === 'warn' && shares[0][1] === '', JSON.stringify(shares));
+    check('the Radio tab opens with a summary that says so',
+      card.summary && card.summary.includes('1 ALERT2 reading on 151.5375 MHz is not explained.'),
+      JSON.stringify(card.summary));
     check('…and the reading on an address it shares, put down to nobody, said and not counted',
       /^1 more reading came on an address it shares, put down to no station, and is not counted\.$/.test(hn[3] || ''),
       JSON.stringify(hn));
@@ -273,11 +293,11 @@ async function main() {
     await page.evaluate(() => { state.mapMaxLinkKm = 20; repaintStnCard(); });
     card = await freqCard();
     check('with the Max TX distance under its nearest carrier, nothing is assumed, and it says why',
-      card && /^none within 20 km/.test(card.Assumed.text)
-        && /Kroombit Repeater AL, is 28\.\d km off — past the Max TX distance\./.test(card.Assumed.text),
-      JSON.stringify(card && card.Assumed));
+      card && /^none within 20 km/.test(card['Assumed TX'].text)
+        && /Kroombit Repeater AL, is 28\.\d km off — past the Max TX distance\./.test(card['Assumed TX'].text),
+      JSON.stringify(card && card['Assumed TX']));
     check('…and nothing heard is called direct or relayed by a link it no longer assumes',
-      card && /^ALERT · 3 readings, last .+ — relayed by Kroombit Repeater AL$/.test(card['Heard on'].notes[0] || ''),
+      card && /^ALERT · last .+ · relayed by Kroombit Repeater AL$/.test(card['Heard on'].notes[0] || ''),
       JSON.stringify(card && card['Heard on'].notes));
     await page.evaluate(() => { state.mapMaxLinkKm = 100; });
 
@@ -292,7 +312,7 @@ async function main() {
       null, { timeout: 10_000 }).catch(() => {});
     card = await freqCard();
     check('a station no repeater carries says so, and a datastore that cannot be reached says that',
-      card && card.Assumed && card.Assumed.text === 'no repeater carries its AlertIDs'
+      card && card['Assumed TX'] && card['Assumed TX'].text === 'no repeater carries its AlertIDs'
         && card['Heard on'] && /^could not ask the datastore/.test(card['Heard on'].text),
       JSON.stringify(card));
     mode = 'ok';
@@ -327,26 +347,57 @@ async function main() {
     const keys = card ? Object.keys(card) : [];
     const L = card && card.Links;
     const flat = v => v.replace(/\s+/g, ' ');
-    check('the card lists them under Assumed, best fade margin first, in the link budget\'s bands',
-      L && keys.indexOf('Links') === keys.indexOf('Assumed') + 1
-        && JSON.stringify(L.vals.map(flat)) === JSON.stringify([
+    check('the card lists them under Assumed TX, best fade margin first, in the link budget\'s bands',
+      L && keys.indexOf('Links') === keys.indexOf('Assumed TX') + 1
+        && JSON.stringify(L.links.map(flat)) === JSON.stringify([
           'Marburg Radar · +34.1 dB Good', 'Bundamba (Barclay St) AL · +12.0 dB Good',
-          'GATTON LVRC ENVIROMON BASESTATION · +4.2 dB Marginal', 'Constitution Hill · -1.7 dB Poor',
-          'Hillcrest AL (Wine Glass) · -18.0 dB Poor']), JSON.stringify(L && L.vals));
+          'GATTON LVRC ENVIROMON BASESTATION · +4.2 dB Marginal', 'Constitution Hill · −1.7 dB Poor',
+          'Hillcrest AL (Wine Glass) · −18.0 dB Poor']), JSON.stringify(L && L.links));
+    const bars = await page.evaluate(() => [...document.querySelectorAll('#stn-card .stn-card-links .freq-link')].map(e => {
+      const i = e.querySelector('.freq-bar > i');
+      return i ? [e.dataset.mnLink, i.className, parseFloat(i.style.getPropertyValue('--freq-from')),
+        parseFloat(i.style.getPropertyValue('--freq-len')), !!e.querySelector('.freq-cut')] : [e.dataset.mnLink];
+    }));
+    const bar = id => bars.find(b => b[0] === id) || [];
+    const near = (a, b) => Math.abs(a - b) < 0.05;
+    check('…each with a bar on one scale, −20 to +40 dB: out from 0 by its figure, in its band\'s colour',
+      bars.length === 9 && bar('marburg_radar')[1] === 'ok' && near(bar('marburg_radar')[2], 100 / 3) && near(bar('marburg_radar')[3], 34.1 / 0.6)
+        && bar('hillcrest_wine_glass')[1] === 'bad' && near(bar('hillcrest_wine_glass')[2], 2 / 0.6) && near(bar('hillcrest_wine_glass')[3], 30)
+        && bar('gatton_lvrc_enviromon_basestation')[1] === 'warn'
+        && bar('cogcc_bundall_base')[4] && near(bar('cogcc_bundall_base')[2], 0) && !bar('marburg_radar')[4], JSON.stringify(bars));
+    check('the Radio tab\'s summary names its best link',
+      card.summary && card.summary[0] === 'Best link: Marburg Radar, direct to base, +34.1 dB Good.', JSON.stringify(card.summary));
     check('…each saying what it is, in words a finger can read',
       L && L.notes[0] === 'base station · 24.1 km · hears it direct · channel not checked'
         && L.notes[1] === 'repeater · 43.4 km · carries it'
         && L.notes[3] === 'base and repeater · 62.4 km · carries it, likely second-hand', JSON.stringify(L && L.notes));
-    check('…the base stations too weak to hear it on one line, and those on another channel named',
-      L && L.notes.includes('Too weak to hear it direct: 18 Bateson (57.0 km, -3.2 dB), CoGCC Bundall Base Station (98.4 km, '
-        + '-44.3 dB), CoGCC Ashmore Base Station (96.0 km, -45.8 dB) and 1 more.')
-        && L.notes.includes('Not counted, on another channel: SRRC Base Station (152.400 MHz), BoM Mt Stapylton Base Station (151.950 MHz).'),
-      JSON.stringify(L && L.notes));
-    const linkTitle = await page.evaluate(() => document.querySelector('#stn-card .stn-card-links .term')?.title || '');
-    check('…and Links says what it means on hover, and the bands in words under it',
-      /fade margin/.test(linkTitle)
-      && L && /^Fade margin: dB to spare above what the receiver needs — Good 10 or more, Marginal 3 or more, Poor under 3\./
-        .test(L.notes[L.notes.length - 1]));
+    const fold = () => page.evaluate(() => {
+      const d = document.querySelector('#stn-card .stn-card-links details.freq-fold');
+      return d ? { open: d.open, head: d.querySelector('summary').textContent.replace(/\s+/g, ' ').trim() } : null;
+    });
+    let fw = await fold();
+    check('…the base stations too weak to hear it in a fold, closed, its count on it, best first inside',
+      fw && !fw.open && fw.head === 'Too weak to hear it direct 4'
+        && JSON.stringify(L.weak) === JSON.stringify(['18 Bateson · −3.2 dB Poor', 'CoGCC Bundall Base Station · −44.3 dB Poor',
+          'CoGCC Ashmore Base Station · −45.8 dB Poor', 'CoGCC Carrara Base Station · −48.3 dB Poor']),
+      JSON.stringify([fw, L.weak]));
+    await page.click('#stn-card .stn-card-links details.freq-fold > summary');
+    await page.evaluate(id => MapDirect._set(id, 'marburg_radar', 34.1), GP);
+    fw = await fold();
+    check('…which stays open when a figure lands and the block is drawn again', fw && fw.open, JSON.stringify(fw));
+    check('…and those on another channel named, on a line',
+      L.notes.includes('On another channel, not counted: SRRC Base Station (152.400 MHz), BoM Mt Stapylton Base Station (151.950 MHz)'),
+      JSON.stringify(L.notes));
+    const linkWords = await page.evaluate(() => ({
+      links: document.querySelector('#stn-card .stn-card-links .freq-h .term')?.title || '',
+      margin: document.querySelector('#stn-card .stn-card-links .freq-h > span .term')?.title || '',
+      fold: [...document.querySelectorAll('#stn-card .freq-words dt')].map(e => e.textContent),
+    }));
+    check('…Links and Fade margin say what they mean on hover, the bands in words under the bars, and every word in a fold',
+      /fade margin/.test(linkWords.links) && /Good is 10 dB or more, Marginal 3 or more/.test(linkWords.margin)
+        && /Good 10\+ Marginal 3–10 Poor under 3 modelled, not measured/.test(L.text)
+        && ['Assumed TX', 'Links', 'Fade margin', 'Too weak to hear it direct', 'Heard on', 'Not explained'].every(w => linkWords.fold.includes(w)),
+      JSON.stringify(linkWords));
     const drawn = await page.evaluate(() => MapDirect._drawn().map(d => d.to).sort());
     check('the map draws a line to each base station that hears it, and to nothing else',
       JSON.stringify(drawn) === JSON.stringify(['gatton_lvrc_enviromon_basestation', 'marburg_radar']), JSON.stringify(drawn));

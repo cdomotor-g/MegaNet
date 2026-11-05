@@ -9671,12 +9671,119 @@ body .map-panel.is-driving {
 .hd-card-why { display: block; }
 .hd-card-body > .hd-card-why { margin-top: .3rem; }
 
-/* Assumed and Heard on, under a station's frequencies on its card
-   (frequencies.js): a channel a line, and what is known about it on a line of
-   its own under it, as the carrier fingerprint's caveats are. */
+/* The Radio tab's frequencies block (frequencies.js, and map-direct.js's
+   Links): Frequencies, Assumed TX, Links, Heard on and Protocol, each a small
+   heading over its content — everything from the left edge, the figures down
+   the right — with a rule between them. They were label/value rows, the
+   value pushed right and its notes wrapping ragged under it, and a field
+   station's Links read as one block of text. */
+.stn-card-freqs .freq-sec {
+  display: grid; gap: .15rem;
+  margin-top: var(--sp-2); padding-top: var(--sp-2);
+  border-top: 1px solid var(--border);
+}
+.freq-h {
+  display: flex; justify-content: space-between; gap: var(--sp-2);
+  font-size: var(--fs-xs); font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--muted);
+}
+.freq-h .term { text-transform: uppercase; }
+.freq-body { display: grid; gap: .1rem; min-width: 0; }
 .stn-card-freqs .freq-val,
 .stn-card-freqs .freq-why { display: block; }
 .stn-card-freqs .freq-why + .freq-val { margin-top: .2rem; }
+.stn-card-freqs .freq-val { font-weight: 600; font-variant-numeric: tabular-nums; }
+.stn-card-freqs .mn-pop-line { display: inline; }
+
+/* Links: each one its name and figure on a line, then a bar of its fade
+   margin on one scale for every link (−20 to +40 dB, map-direct.js), then
+   what it is. The bands are shaded behind the bar — Poor, Marginal, Good —
+   at the edges map-direct.js sets on the section (--freq-fair, --freq-good,
+   --freq-zero), so the strong link stands out before a word is read. */
+.freq-axis {
+  position: relative; display: block; height: 1.1em; margin-top: .1rem;
+  font-size: .66rem; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.freq-axis > span { position: absolute; top: 0; left: var(--freq-at, 0); transform: translateX(-50%); white-space: nowrap; }
+.freq-axis > span:first-child { transform: none; }
+.freq-axis > span:last-child { transform: translateX(-100%); }
+.freq-link {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline;
+  column-gap: var(--sp-2); row-gap: .15rem; padding-block: .25rem;
+}
+.freq-link > .link-btn { overflow-wrap: anywhere; }
+.freq-link > .freq-bar,
+.freq-link > .freq-why { grid-column: 1 / -1; }
+.freq-fig { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.freq-bar {
+  position: relative; display: block; height: 10px; border-radius: var(--r-sm); overflow: hidden;
+  background: linear-gradient(to right,
+    color-mix(in srgb, var(--bad) 13%, transparent) 0 var(--freq-fair, 38.33%),
+    color-mix(in srgb, var(--warn) 17%, transparent) var(--freq-fair, 38.33%) var(--freq-good, 50%),
+    color-mix(in srgb, var(--ok) 14%, transparent) var(--freq-good, 50%) 100%);
+}
+.freq-bar::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: var(--freq-zero, 33.33%); width: 1.5px;
+  background: var(--muted);
+}
+.freq-bar > i { position: absolute; top: 2px; bottom: 2px; left: var(--freq-from, 0); width: var(--freq-len, 0); border-radius: 2px; }
+.freq-bar > i.ok   { background: var(--ok); }
+.freq-bar > i.warn { background: var(--warn); }
+.freq-bar > i.bad  { background: var(--bad); }
+.freq-cut { position: absolute; left: 1px; top: 50%; transform: translateY(-50%); font-size: .7rem; line-height: 1; color: var(--text); }
+.freq-cut-hi { left: auto; right: 1px; }
+.freq-link-weak > .link-btn { color: var(--muted); }
+.freq-key {
+  display: flex; flex-wrap: wrap; gap: 0 var(--sp-3); margin-top: .2rem;
+  font-size: var(--fs-xs); color: var(--muted);
+}
+.freq-dot {
+  display: inline-block; width: .55rem; height: .55rem; margin-right: .3rem; border-radius: 50%;
+  vertical-align: .02em; background: var(--muted);
+}
+.freq-dot.ok { background: var(--ok); }
+.freq-dot.warn { background: var(--warn); }
+.freq-dot.bad { background: var(--bad); }
+
+/* The base stations too weak to hear it, and the block's words: a fold each,
+   a count on the closed one. */
+.freq-fold {
+  margin-top: .3rem; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--panel-sub);
+}
+.freq-fold > summary {
+  cursor: pointer; padding: .45rem .55rem; font-size: var(--fs-xs); color: var(--muted);
+}
+.freq-fold[open] > summary { border-bottom: 1px solid var(--border); }
+.freq-count { color: var(--text); font-variant-numeric: tabular-nums; margin-left: .15rem; }
+.freq-fold-body { display: grid; padding: .3rem .55rem .45rem; }
+.freq-words dl { margin: 0; padding: .3rem .55rem .5rem; display: grid; gap: .35rem; font-size: var(--fs-xs); }
+.freq-words dt { font-weight: 600; }
+.freq-words dd { margin: 0; color: var(--muted); }
+
+/* Heard on: each channel, a bar of its share of the readings, and the count,
+   with what it came in as and how it got there under them. */
+.freq-ch {
+  display: grid; grid-template-columns: auto minmax(2.5rem, 1fr) auto; align-items: center;
+  column-gap: var(--sp-2); padding-block: .2rem;
+}
+.freq-ch > .freq-why { grid-column: 1 / -1; }
+.freq-share {
+  display: block; height: 8px; border-radius: var(--r-sm); overflow: hidden;
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+}
+.freq-share > i { display: block; width: var(--freq-share, 0); height: 100%; background: var(--accent); }
+.freq-share > i.warn { background: var(--warn); }
+.freq-n { font-variant-numeric: tabular-nums; text-align: right; }
+
+/* The summary at the top of the Radio tab: its best link, and what it was
+   heard on. Hidden while it has nothing to say. */
+.freq-sum {
+  display: grid; gap: .2rem; margin-bottom: var(--sp-2); padding: .4rem .6rem;
+  border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--panel-sub);
+}
+.freq-sum:empty { display: none; }
+.freq-sum > p { margin: 0; }
 /* …and Protocol under them: how its readings came in, the pin's key before
    the word and a slim bar of the shares under the note — legacy orange, both
    ways striped, ALERT2 purple (MapLatency.protoBarHtml). Literal colours, as

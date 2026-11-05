@@ -9,7 +9,10 @@
 //                 protocol its readings came in on — legacy ALERT or ALERT2.
 //                 Under Assumed, map-direct.js's Links: every repeater that
 //                 carries it and every base station that hears it direct,
-//                 with each one's fade margin, the best first.
+//                 with each one's fade margin as a bar, the best first. Each
+//                 part a heading over its content, and at the top of the
+//                 Radio tab a two-line summary: its best link, and whether
+//                 everything it was heard on is explained.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, hintToggleHtml, fmtKm and
@@ -140,20 +143,65 @@ const Frequencies = (function () {
     return shown.join(' and ');
   }
 
-  const row = (label, title, html) => `<div class="acma-row"><span title="${escAttr(title)}">${esc(label)}</span><span>${html}</span></div>`;
+  // ── The block's parts ──────────────────────────────────────────────────────
+  // Each one a heading over its content — the word, its meaning on hover, and
+  // what the column on the right is — with everything from the left edge and
+  // the figures down the right. They were label/value rows once, the value
+  // pushed right and its notes wrapping ragged under it; a field station's
+  // Links alone ran to a block nobody could read.
+
+  // What the words mean: on hover, and the same list in the block's "What the
+  // words mean" fold, for a finger. Assumed TX's is built from the Max TX
+  // distance; Links' are map-direct.js's (MapDirect.words).
+  const WORDS = {
+    heard: 'The channels Flood-Net’s base stations heard its readings on — directly or through a repeater — '
+      + 'as each receiver recorded beside the reading. Measured, not the register’s word.',
+    readings: 'How many of its readings came in on each channel, from the readings its card already asked for. '
+      + 'The bar is each channel’s share of them.',
+    unexplained: 'Readings came in on a channel that is neither what it is assumed to transmit on nor one that a '
+      + 'repeater carrying it transmits on. Worth a look.',
+    pairs: 'The receive (RX) and transmit (TX) channels on record for it: a repeater’s own pair first, marked '
+      + 'primary, then every other channel it uses.',
+  };
+  const assumedWord = maxKm => 'What it is taken to transmit on: the RX of each repeater whose pass ranges carry its '
+    + `AlertIDs and that likely hears it directly — within the Max TX distance (${maxKm} km, the map's slider) and not `
+    + 'fed by a nearer repeater that carries it too. Worked out from the register, not measured.';
+
+  // One part: `key` names it (data-freq, and its class stn-card-<key>).
+  // map-direct.js draws Links with it too.
+  const section = (key, label, title, html, right = '', bodyAttrs = '') => `<div class="freq-sec stn-card-${key}" data-freq="${key}">`
+    + `<div class="freq-h">${termHtml(label, title)}${right ? `<span>${right}</span>` : ''}</div>`
+    + `<div class="freq-body"${bodyAttrs}>${html}</div></div>`;
   // A value's caveat, on a line of its own under it.
   const note = text => ` <span class="mn-pop-note freq-why">${esc(text)}</span>`;
   const muted = text => `<span class="txt-muted">${esc(text)}</span>`;
+  const dot = cls => `<span class="freq-dot ${cls}" aria-hidden="true"></span>`;
+  const joinAnd = xs => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+
+  // Which folds are open — by station and name — so a repaint (a fade margin
+  // landing) does not snap one shut under the reader's finger.
+  const openFolds = new Set();
+  const foldOpen = (id, name) => (openFolds.has(`${id}|${name}`) ? ' open' : '');
+  const foldAttrs = (id, name) => ` data-mn-fold="${escAttr(`${id}|${name}`)}"${foldOpen(id, name)}`;
+  let folding = false;
+  function trackFolds() {
+    if (folding || typeof document === 'undefined') return;
+    folding = true;
+    // toggle does not bubble: caught on the way down.
+    document.addEventListener('toggle', e => {
+      const d = e.target;
+      if (!d || !d.dataset || !d.dataset.mnFold) return;
+      if (d.open) openFolds.add(d.dataset.mnFold); else openFolds.delete(d.dataset.mnFold);
+    }, true);
+  }
 
   function assumedHtml(C) {
     if (!C) return '';
-    const title = 'What it is taken to transmit on: the RX of each repeater whose pass ranges carry its AlertIDs and '
-      + `that likely hears it directly — within the Max TX distance (${C.maxKm} km, the map's slider) and not fed by a `
-      + 'nearer repeater that carries it too. Worked out from the register, not measured.';
-    if (!C.all.length) return row('Assumed', title, muted('no repeater carries its AlertIDs'));
+    const S = html => section('assumed', 'Assumed TX', assumedWord(C.maxKm), html);
+    if (!C.all.length) return S(muted('no repeater carries its AlertIDs'));
     if (!C.direct.length) {
       const nearest = C.all.filter(c => c.km != null).sort((a, b) => a.km - b.km)[0];
-      return row('Assumed', title, muted(`none within ${C.maxKm} km`) + note(nearest
+      return S(muted(`none within ${C.maxKm} km`) + note(nearest
         ? `The nearest repeater carrying it, ${names([nearest], false)}, is ${fmtKm(nearest.km)} off — past the Max TX distance.`
         : 'The repeaters carrying it have no position to measure from.'));
     }
@@ -165,21 +213,22 @@ const Frequencies = (function () {
       byRx.get(k).push(c);
     }
     if (!byRx.size) {
-      return row('Assumed', title, muted('unknown') + note(`${names(C.direct, true)} `
+      return S(muted('unknown') + note(`${names(C.direct, true)} `
         + `${C.direct.length === 1 ? 'carries' : 'carry'} it, with no RX on record.`));
     }
-    return row('Assumed', title, [...byRx].map(([k, cs]) =>
-      `<span class="freq-val">TX ${esc(k)} MHz</span>${note(`${names(cs, true)} ${cs.length === 1 ? 'listens' : 'listen'} there`)}`).join(''));
+    return S([...byRx].map(([k, cs]) =>
+      `<span class="freq-val">${esc(k)} MHz</span>${note(`${names(cs, true)} ${cs.length === 1 ? 'listens' : 'listen'} there`)}`).join(''));
   }
 
-  // What is known to be on a channel it was heard on.
+  // What is known to be on a channel it was heard on: { how, odd } — odd when
+  // it is neither its assumed TX nor a channel a carrier transmits on.
   function onChannel(f, C) {
-    if (!C) return '';
+    if (!C) return { how: '', odd: false };
     const assumed = C.direct.some(c => same(c.rx, f));
     const relays = C.all.filter(c => same(c.tx, f));
-    if (relays.length) return `${assumed ? 'direct, or ' : ''}relayed by ${names(relays, false)}`;
-    if (assumed) return 'direct — its assumed TX';
-    return C.all.length ? 'neither its assumed TX nor a channel its carriers transmit on' : '';
+    if (relays.length) return { how: `${assumed ? 'direct, or ' : ''}relayed by ${names(relays, false)}`, odd: false };
+    if (assumed) return { how: 'direct — its assumed TX', odd: false };
+    return { how: '', odd: C.all.length > 0 };
   }
 
   function heardHtml(s, C) {
@@ -187,26 +236,32 @@ const Frequencies = (function () {
     const a = HealthGlance.channels(s.id);
     const base = a && a.status === 'ok' && a.n
       ? ` From ${a.capped ? 'its newest 1,000 readings' : 'its readings in the datastore'}${a.since ? `, since ${day(a.since)}` : ''}.` : '';
-    const title = 'The channels Flood-Net’s base stations heard its readings on — directly or through a repeater — '
-      + 'as each receiver recorded beside the reading. Measured, not the register’s word.' + base;
+    const S = (html, right) => section('heard', 'Heard on', WORDS.heard + base, html, right);
     if (!a || a.status === 'asking') {
-      return row('Heard on', title, '<span class="txt-muted" aria-busy="true">asking the datastore…</span>');
+      return S('<span class="txt-muted" aria-busy="true">asking the datastore…</span>');
     }
     if (a.status === 'error') {
-      return row('Heard on', title, muted('could not ask the datastore') + note('The Health section above says why, with Try again.'));
+      return S(muted('could not ask the datastore') + note('The Health section above says why, with Try again.'));
     }
     const shared = a.shared ? `${a.shared.toLocaleString()} more reading${a.shared === 1 ? ' came on an address it shares, put down to no station, and is'
       : 's came on addresses it shares, put down to no station, and are'} not counted.` : '';
     if (!a.list.length) {
-      return row('Heard on', title, muted('nothing recorded')
+      return S(muted('nothing recorded')
         + note(shared || 'No base station has put a channel beside any of its readings in the datastore.'));
     }
-    return row('Heard on', title, a.list.map(c => {
-      const what = [PROTOCOL[c.protocol] || '', `${plural(c.n, 'reading')}${c.last != null ? `, last ${day(c.last)}` : ''}`]
-        .filter(Boolean).join(' · ');
+    const total = a.list.reduce((t, c) => t + c.n, 0);
+    return S(a.list.map(c => {
       const on = onChannel(c.mhz, C);
-      return `<span class="freq-val">${esc(chan(c.mhz))} MHz</span>${note(on ? `${what} — ${on}` : what)}`;
-    }).join('') + (shared ? note(shared) : ''));
+      const share = total ? c.n / total : 0;
+      const bits = [PROTOCOL[c.protocol] || '', c.last != null ? `last ${day(c.last)}` : ''].filter(Boolean).map(esc);
+      if (on.odd) bits.push(`<span class="txt-warn">${termHtml('not explained', WORDS.unexplained)}</span>`);
+      else if (on.how) bits.push(esc(on.how));
+      return `<div class="freq-ch"><span class="freq-val">${esc(chan(c.mhz))} MHz</span>`
+        + `<span class="freq-share" role="img" aria-label="${escAttr(`${plural(c.n, 'reading')}, ${Math.round(share * 100)} % of them`)}">`
+        + `<i class="${on.odd ? 'warn' : ''}" style="--freq-share:${Math.max(2, share * 100).toFixed(1)}%"></i></span>`
+        + `<span class="freq-n">${esc(c.n.toLocaleString())}</span>`
+        + `<span class="mn-pop-note freq-why">${bits.join(' · ')}</span></div>`;
+    }).join('') + (shared ? note(shared) : ''), termHtml('Readings', WORDS.readings));
   }
 
   // How its readings came in: legacy ALERT, inside ALERT2, some each way, or
@@ -220,42 +275,91 @@ const Frequencies = (function () {
       || typeof MapLatency === 'undefined' || !MapLatency.windowSpan) return '';
     const [span, label] = MapLatency.windowSpan();
     const a = HealthGlance.protocol(s.id, Date.now() - span);
-    const title = `${MapLatency.protoWord()} Counted over the last ${label}, the window ⏱️ Latency & signal colours the pins over.`;
+    const S = html => section('protocol', 'Protocol',
+      `${MapLatency.protoWord()} Counted over the last ${label}, the window ⏱️ Latency & signal colours the pins over.`, html);
     if (!a || a.status === 'asking') {
-      return row('Protocol', title, '<span class="txt-muted" aria-busy="true">asking the datastore…</span>');
+      return S('<span class="txt-muted" aria-busy="true">asking the datastore…</span>');
     }
     if (a.status === 'error') {
-      return row('Protocol', title, muted('could not ask the datastore') + note('The Health section above says why, with Try again.'));
+      return S(muted('could not ask the datastore') + note('The Health section above says why, with Try again.'));
     }
     const kind = p => `<span class="freq-val">${MapLatency.protoKeyHtml(p.key)} ${MapLatency.protoTermHtml(p.key)}</span>`;
     if (a.p.n) {
-      return row('Protocol', title, kind(a.p) + note(`${MapLatency.protoText(a.p)}, in the last ${label}`)
-        + MapLatency.protoBarHtml(a.p));
+      return S(kind(a.p) + note(`${MapLatency.protoText(a.p)}, in the last ${label}`) + MapLatency.protoBarHtml(a.p));
     }
     // Nothing in the window: the card's week says how it came in before.
     if (a.week.n) {
-      return row('Protocol', title, kind(a.week)
+      return S(kind(a.week)
         + note(`nothing in the last ${label}; since ${day(a.since)}${a.capped ? ' (its newest 1,000 readings)' : ''}: ${MapLatency.protoText(a.week)}`));
     }
-    return row('Protocol', title, muted(a.shared ? 'not told apart' : 'nothing recorded') + note(a.shared
+    return S(muted(a.shared ? 'not told apart' : 'nothing recorded') + note(a.shared
       ? 'Its readings came on addresses it shares with other stations, and nothing heard with them says they were this station’s.'
       : 'None of its readings in the datastore says a radio format.'));
   }
 
+  // The block's "What the words mean": every word it marks, for a finger —
+  // only those of the parts on show.
+  function wordsHtml(s, C, parts) {
+    const list = [];
+    if (parts.pairs) list.push(['Frequencies', WORDS.pairs]);
+    if (C) list.push(['Assumed TX', assumedWord(C.maxKm)]);
+    if (parts.links && typeof MapDirect !== 'undefined' && MapDirect.words) list.push(...Object.values(MapDirect.words()));
+    if (parts.heard) list.push(['Heard on', WORDS.heard], ['Readings', WORDS.readings], ['Not explained', WORDS.unexplained]);
+    if (!list.length) return '';
+    return `<details class="freq-fold freq-words"${foldAttrs(s.id, 'words')}><summary>What the words mean</summary>`
+      + `<dl>${list.map(([w, m]) => `<dt>${esc(w)}</dt><dd>${esc(m)}</dd>`).join('')}</dl></details>`;
+  }
+
   // The block's inside: the pairs on record, one to a line the way the AlertID
-  // block lists addresses, then Assumed, the Links beside it (map-direct.js:
-  // its repeaters and the base stations that hear it direct, by fade margin),
-  // Heard on and Protocol. paint() redraws it.
+  // block lists addresses, then Assumed TX, the Links under it (map-direct.js:
+  // its repeaters and the base stations that hear it direct, by fade margin,
+  // a bar each), Heard on and Protocol, and what their words mean. paint()
+  // redraws it.
   function innerHtml(s) {
     const lines = pairs(s).map(f => {
       const what = [f.primary ? 'primary' : '', f.label || '', f.acma_licence ? `licence ${f.acma_licence}` : '']
         .filter(Boolean).join(', ');
-      return `<span class="mn-pop-line mn-pop-indent">${esc(pairText(f))}${what
+      return `<span class="mn-pop-line">${esc(pairText(f))}${what
         ? ` <span class="mn-pop-note">${esc(what)}</span>` : ''}</span>`;
     });
     const C = carriersOf(s);
-    return `<span class="small txt-muted">Frequencies</span>${lines.length ? '<br>' + lines.join('<br>') : ''}`
-      + assumedHtml(C) + (typeof MapDirect !== 'undefined' ? MapDirect.rowHtml(s) : '') + heardHtml(s, C) + protoHtml(s);
+    const links = typeof MapDirect !== 'undefined' ? MapDirect.rowHtml(s) : '';
+    const heard = heardHtml(s, C);
+    return (lines.length ? section('pairs', 'Frequencies', WORDS.pairs, lines.join('<br>')) : '')
+      + assumedHtml(C) + links + heard + protoHtml(s)
+      + wordsHtml(s, C, { pairs: lines.length > 0, links: !!links, heard: !!heard });
+  }
+
+  // ── The summary, at the top of the Radio tab ──────────────────────────────
+  // Two lines before the detail: its best link (map-direct.js), and what was
+  // heard — a channel nothing explains, or that all of it is explained. Empty
+  // until there is something to say; painted with the block.
+
+  function heardSumHtml(s, C) {
+    if (!C || !C.all.length || typeof HealthGlance === 'undefined' || !HealthGlance.channels) return '';
+    const a = HealthGlance.channels(s.id);
+    if (!a || a.status !== 'ok' || !a.list.length) return '';
+    const odd = a.list.filter(c => onChannel(c.mhz, C).odd);
+    if (odd.length) {
+      return `<p>${dot('warn')}${odd.map(c => `${esc(plural(c.n, `${PROTOCOL[c.protocol] ? `${PROTOCOL[c.protocol]} ` : ''}reading`))} on `
+        + `${esc(chan(c.mhz))} MHz ${c.n === 1 ? 'is' : 'are'} ${termHtml('not explained', WORDS.unexplained)}.`).join(' ')}</p>`;
+    }
+    const chs = a.list.map(c => chan(c.mhz));
+    return `<p>${dot('ok')}Heard on ${esc(joinAnd(chs))} MHz, ${chs.length === 1 ? 'the channel' : 'channels'} its links use.</p>`;
+  }
+
+  function summaryInner(s) {
+    return (typeof MapDirect !== 'undefined' && MapDirect.summaryHtml ? MapDirect.summaryHtml(s) : '')
+      + heardSumHtml(s, carriersOf(s));
+  }
+
+  const sumId = id => `mn-freqs-sum-${id}`;
+
+  // The summary's place: an empty box (hidden while empty) for any station on
+  // the radio, so paint() can fill it when the figures and readings land.
+  function summaryHtml(s) {
+    if (s.proposed || !radio(s)) return '';
+    return `<div class="freq-sum" id="${escAttr(sumId(s.id))}" data-mn-freqs="${escAttr(String(s.id))}">${summaryInner(s)}</div>`;
   }
 
   const cardId = id => `mn-freqs-card-${id}`;
@@ -265,6 +369,7 @@ const Frequencies = (function () {
   function cardHtml(s) {
     if (!pairs(s).length && !radio(s)) return '';
     watch();
+    trackFolds();
     return `<div class="stn-card-ids stn-card-freqs" id="${escAttr(cardId(s.id))}"
          data-mn-freqs="${escAttr(String(s.id))}">${innerHtml(s)}</div>`;
   }
@@ -279,10 +384,19 @@ const Frequencies = (function () {
     HealthGlance.onHeard(id => { if (id != null) paint(id); });
   }
   function paint(id) {
-    const el = document.getElementById(cardId(id));
-    if (!el || el.dataset.mnFreqs !== String(id)) return;
     const s = state.data && state.data.stations.find(x => x.id === id);
-    if (s) el.innerHTML = innerHtml(s);
+    if (!s) return;
+    const el = document.getElementById(cardId(id));
+    if (el && el.dataset.mnFreqs === String(id)) {
+      // The folds as they are on screen now: a tap a moment ago may not have
+      // reached trackFolds yet (toggle is queued), and must not be lost.
+      for (const d of el.querySelectorAll('details[data-mn-fold]')) {
+        if (d.open) openFolds.add(d.dataset.mnFold); else openFolds.delete(d.dataset.mnFold);
+      }
+      el.innerHTML = innerHtml(s);
+    }
+    const sum = document.getElementById(sumId(id));
+    if (sum && sum.dataset.mnFreqs === String(id)) sum.innerHTML = summaryInner(s);
   }
 
   // ── The editor ────────────────────────────────────────────────────────────
@@ -453,7 +567,10 @@ const Frequencies = (function () {
     FIELDS,
     pairs,
     cardHtml,
+    summaryHtml,
+    section,
     carriersOf,
+    foldAttrs,
     // The block drawn again in place, when something it shows has landed —
     // a link's fade margin (map-direct.js).
     repaint: paint,
