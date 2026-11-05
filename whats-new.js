@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 200, date: '2026-11-05', items: [
+      '🇦🇺 <strong>Costs in Australian dollars.</strong> <em>Costs to date</em> on the <strong>Admin</strong> dashboard and '
+        + '<strong>Running costs</strong> below it now show A$, the way the card statement does: each US$ bill at the '
+        + 'Reserve Bank\'s exchange rate for the month it was paid, with the 3% card fee for a payment in another currency '
+        + 'on top. The bill\'s own US$ figure sits under each one, and <em>The exchange rates behind the A$ figures</em> '
+        + 'lists every month\'s rate.',
+    ] },
     { n: 199, date: '2026-11-05', items: [
       '🧂 <strong>Corrosivity</strong> on a Queensland station\'s card (<strong>Site</strong> tab, <strong>Site exposure — '
         + 'tides and soils</strong>): how corrosive the air is to steel, as AS 4312\'s grade — C2 to CX, from how far the '

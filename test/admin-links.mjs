@@ -216,9 +216,24 @@ async function main() {
           rows: root.querySelectorAll('tbody tr').length,
           services: AdminCosts.SERVICES.length,
           paidToDate: root.querySelectorAll('.adm-kpi-value')[0]?.textContent.trim(),
-          paidWant: AdminCosts.bigUsd(AdminCosts.summary().lo, AdminCosts.summary().hi, AdminCosts.summary().guessed.length > 0),
+          paidWant: AdminCosts.bigAud(AdminCosts.summary().lo, AdminCosts.summary().hi, AdminCosts.summary().guessed.length > 0),
           known: root.querySelectorAll('.adm-kpi-value')[1]?.textContent.trim(),
-          want: `US$${t.lo === t.hi ? t.lo : `${t.lo}–${t.hi}`} a month`,
+          want: `A$${t.lo === t.hi ? t.lo : `${t.lo}–${t.hi}`} a month`,
+          heads: [...root.querySelectorAll('thead th')].slice(1, 3).map(el => el.textContent.trim()),
+          // The month column adds up: the rows' own A$ figures, not the US$ total converted.
+          column: AdminCosts.SERVICES.filter(x => x.month && x.month[1]).map(x => [...root.querySelectorAll('tbody tr')]
+            .find(tr => tr.querySelector('th').textContent.startsWith(x.name))?.querySelectorAll('td')[0]?.firstChild?.textContent),
+          // Each charge at its own month's rate with the card fee: five Claude
+          // charges from 22 Jun 2026, the pay-as-you-go bridge a month at a
+          // time from 19 Aug, and a year's domain charged twice by 1 Mar 2027.
+          monthly: AdminCosts.paidSoFar({ paid: { since: '2026-06-22', every: 'month', each: [95, 95] } }, '2026-11-05'),
+          use: AdminCosts.paidSoFar({ paid: { since: '2026-08-19', every: 'use', each: [2, 3] } }, '2026-11-05'),
+          yearly: AdminCosts.paidSoFar({ paid: { since: '2026-02-26', every: 'year', each: [11, 13] } }, '2027-03-01'),
+          oct: AdminCosts.toAud(100, '2026-10'), later: AdminCosts.toAud(100, '2031-01'), fee: AdminCosts.CARD_FEE,
+          rates: Object.keys(AdminCosts.USD_PER_AUD).sort(),
+          lastRate: AdminCosts.USD_PER_AUD[Object.keys(AdminCosts.USD_PER_AUD).sort().pop()],
+          fx: [...root.querySelectorAll('.adm-fx dt')].map(el => el.textContent),
+          foot: [...root.querySelectorAll('.term')].map(el => el.textContent),
           ask: t.ask.length,
           asked: AdminCosts.SERVICES.filter(x => !x.month).length,
           unknown: root.querySelectorAll('.adm-kpi-value')[2]?.textContent.trim(),
@@ -233,6 +248,19 @@ async function main() {
         && costs.width >= box.links * 0.95, J(costs));
       check('…paid to date and the month worked out from the rows, and the ones only a bill can say counted apart',
         costs.paidToDate === costs.paidWant && costs.known === costs.want && costs.ask === costs.asked && costs.unknown === String(costs.asked), J(costs));
+      const sumCol = costs.column.reduce((a, c) => { const [lo, hi = lo] = String(c).split('–').map(Number); return [a[0] + lo, a[1] + hi]; }, [0, 0]);
+      check('…in Australian dollars: both money columns say A$, and the month column adds up to the total',
+        J(costs.heads) === J(['A month (A$)', 'To date (A$)']) && /^≈? ?A\$[\d,]+$/.test(costs.paidToDate || '')
+          && costs.want === `A$${sumCol[0] === sumCol[1] ? sumCol[0] : `${sumCol[0]}–${sumCol[1]}`} a month`, J({ heads: costs.heads, column: costs.column, want: costs.want }));
+      check('…each charge at the exchange rate of its month with the 3% card fee: US$475 of Claude since 22 Jun is A$695, the bridge\'s US$5–8 A$7–11, two years of the domain A$32–38',
+        J(costs.monthly) === J({ lo: 695, hi: 695, usd: { lo: 475, hi: 475 }, charges: 5 })
+          && J(costs.use) === J({ lo: 7, hi: 11, usd: { lo: 5, hi: 8 }, charges: 0 })
+          && J(costs.yearly) === J({ lo: 32, hi: 38, usd: { lo: 22, hi: 26 }, charges: 2 })
+          && costs.fee === 0.03 && Math.abs(costs.oct - 100 / 0.6989 * 1.03) < 1e-9, J({ m: costs.monthly, u: costs.use, y: costs.yearly, oct: costs.oct }));
+      check('…a month past the table at the latest month\'s rate, and every month\'s rate listed in its fold, with the exchange rate and card fee explained',
+        Math.abs(costs.later - 100 / costs.lastRate * 1.03) < 1e-9 && costs.fx.length === costs.rates.length
+          && costs.foot.includes('exchange rate') && costs.foot.includes('card fee')
+          && costs.fold.includes('Exchange rate') && costs.fold.includes('Card fee'), J({ fx: costs.fx, later: costs.later, foot: costs.foot }));
       check('…every chip and marked word says what it means on hover, and the fold says it again',
         costs.marked >= costs.rows && !costs.bare.length && costs.chips.every(c => costs.fold.includes(c)), J(costs));
       check('…and a service\'s name opens its billing page in a new tab', costs.links, J(costs));
@@ -246,7 +274,7 @@ async function main() {
         const tiles = [...document.querySelectorAll('#adm-dash .adm-kpis > *')];
         return {
           value: t.querySelector('.adm-kpi-value')?.textContent.trim(),
-          want: AdminCosts.bigUsd(s.lo, s.hi, s.guessed.length > 0),
+          want: AdminCosts.bigAud(s.lo, s.hi, s.guessed.length > 0),
           month: t.querySelector('.adm-kpi-value2')?.textContent.replace(/\s+/g, ' ').trim(),
           term: t.querySelector('.adm-kpi-label .term')?.getAttribute('title') || '',
           sub: t.querySelector('.adm-kpi-sub')?.textContent.replace(/\s+/g, ' ').trim(),
@@ -256,9 +284,9 @@ async function main() {
           nested: tiles.filter(x => x.querySelector('a, button')).length,
         };
       });
-      check('the dashboard leads with Costs to date: what has been paid so far, big, and a month now under it',
-        dash.value === dash.want && /^≈? ?US\$[\d,]+$/.test(dash.value) && /^≈? ?US\$\d+ a month$/.test(dash.month || '')
-          && /paid for Flood-Net so far/.test(dash.term) && /^since \d+ \w+ 20\d\d/.test(dash.sub || ''), J(dash));
+      check('the dashboard leads with Costs to date: what has been paid so far in A$, big, and a month now under it',
+        dash.value === dash.want && /^≈? ?A\$[\d,]+$/.test(dash.value) && /^≈? ?A\$\d+ a month$/.test(dash.month || '')
+          && /paid for Flood-Net so far, in Australian dollars/.test(dash.term) && /^since \d+ \w+ 20\d\d.*with the card fee, before GST$/.test(dash.sub || ''), J(dash));
       check('…and every tile on it is a link to a panel that is on the page, with nothing clickable inside it',
         dash.tiles >= 10 && dash.links === dash.tiles && dash.nested === 0, J(dash));
       await page.emulateMedia({ reducedMotion: 'reduce' });

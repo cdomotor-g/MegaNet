@@ -20285,7 +20285,7 @@ button.adm-danger:hover { border-color: var(--bad); }
    rather than folding words into letters; How sure is a chip whose word
    carries the meaning, its border the colour. */
 .adm-page .table-wrap table.adm-costs-table { min-width: 58rem; }
-.adm-cost-since { font-weight: 400; white-space: normal; text-align: right; }
+.adm-cost-sub { font-weight: 400; white-space: normal; text-align: right; }
 .adm-costs .adm-kpis { margin-bottom: .75rem; }
 .adm-costs-table th[scope="row"] { font-weight: 600; min-width: 11rem; }
 .adm-cost-for { font-weight: 400; margin-top: .15rem; max-width: 28ch; }

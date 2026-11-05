@@ -142,14 +142,14 @@ const AdminDash = (function () {
     return false;
   }
 
-  // Everything paid for Flood-Net so far, big, and a month now under it — from
-  // the Running costs panel (admin-costs.js), which the tile opens.
+  // Everything paid for Flood-Net so far, big, and a month now under it, in A$
+  // — from the Running costs panel (admin-costs.js), which the tile opens.
   function costsTile() {
     if (typeof AdminCosts === 'undefined') return '';
     const s = AdminCosts.summary();
-    const month = s.month.lo === s.month.hi ? `US$${s.month.lo}` : AdminCosts.bigUsd(s.month.lo, s.month.hi);
-    return tile(termHtml('Costs to date', AdminCosts.WORDS.todate), AdminCosts.bigUsd(s.lo, s.hi, s.guessed.length > 0),
-      `since ${esc(AdminCosts.day(s.since))}${s.guessed.length ? ` · ${esc(s.guessed.join(' and '))}’s start a guess` : ''} · before GST`,
+    const month = s.month.lo === s.month.hi ? `A$${s.month.lo}` : AdminCosts.bigAud(s.month.lo, s.month.hi);
+    return tile(termHtml('Costs to date', AdminCosts.WORDS.todate), AdminCosts.bigAud(s.lo, s.hi, s.guessed.length > 0),
+      `since ${esc(AdminCosts.day(s.since))}${s.guessed.length ? ` · ${esc(s.guessed.join(' and '))}’s start a guess` : ''} · with the card fee, before GST`,
       null, 'adm-kpi-costs', 'adm-costs-h',
       `<div class="adm-kpi-value2">${month} <small>a month</small></div>`);
   }
