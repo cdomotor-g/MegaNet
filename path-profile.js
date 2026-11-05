@@ -669,6 +669,12 @@ const PATH_LOS_MEANING = 'The line of sight between the two antennas, read off t
   + 'first Fresnel zone), partly clear (ground or cover inside it but under the straight line) or obstructed (above the line). '
   + 'It describes the geometry; the margin beside it says whether the link works.';
 
+// What the faded ground either side of the profile chart is (PathProfile's
+// beyondFor). On the chart's key and in the card's list of words.
+const PATH_BEYOND_MEANING = 'The ground for a short way past each antenna, on along the same line — 5% of the path each '
+  + 'side, at least 250 m and at most 5 km — so you can see what each end stands on: a brow, a slope, a valley behind it. '
+  + 'Drawn faded because it is only for looking at: no figure on the card is worked out from it.';
+
 // What "fade margin" means, with the bands it is read against — the link
 // budget card's LB_MARGIN, so the words and the colours cannot disagree.
 function pathMarginMeaning() {
@@ -839,11 +845,55 @@ const PathProfile = (function () {
   // Called on every draw-panel re-render. Cheap when nothing moved: the
   // signature is the debounce, so dragging a line out costs nothing and only a
   // finished (or edited, or re-selected) line fetches terrain.
+  // ── the ground past each end ──────────────────────────────────────────────
+  // The chart used to stop dead at the two antennas, so what an end stands on
+  // — the brow it is set back from, the slope falling away behind it — could
+  // not be seen. So a short stretch past each end is fetched too, on along the
+  // line's own bearing there: 5% of the path each side, never less than 250 m
+  // (or 15% of a path too short for that) and never more than 5 km, sampled
+  // about as finely as the path itself. It is ground to look at and nothing
+  // else: the analysis, the fade margin, the signal and the second opinion
+  // never see it, and the chart draws it under a veil (PATH_BEYOND_MEANING).
+  //
+  // Asked for alongside the profile and waited for with it, so the chart is
+  // drawn once at its final scale instead of shifting sideways when this
+  // lands. Resolves — never rejects — to { a, b } (each side's samples, `past`
+  // metres beyond its end, farthest first on A's side and last on B's) or to
+  // null when neither side could be had: the chart then ends at the antennas,
+  // as it did.
+  const BEYOND_FRAC = 0.05, BEYOND_MIN_M = 250, BEYOND_MAX_M = 5000;
+  function beyondReach(D) {
+    return Math.min(BEYOND_MAX_M, Math.max(BEYOND_FRAC * D, Math.min(BEYOND_MIN_M, 0.15 * D)));
+  }
+  function beyondFor(pts) {
+    if (!pts || pts.length < 2) return Promise.resolve(null);
+    let D = 0;
+    for (let i = 1; i < pts.length; i++) D += acmaHaversineKm(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]) * 1000;
+    const e = beyondReach(D);
+    if (!(e > 1)) return Promise.resolve(null);
+    const n = Math.max(6, Math.min(64, Math.round(e / (D / (SAMPLES - 1))) + 1));
+    // On from `end`, away from the vertex next to it.
+    const past = (end, next) => destPoint(end[0], end[1], (bearingDeg(end[0], end[1], next[0], next[1]) + 180) % 360, e / 1000);
+    const A = pts[0], B = pts[pts.length - 1];
+    const side = (prof, far) => (prof && prof.ok ? prof.distance_m.map((d, i) => ({
+      past: far ? prof.distance_m[prof.distance_m.length - 1] - d : d,
+      h: prof.terrain_m[i], lat: prof.lat[i], lon: prof.lon[i],
+    })) : []);
+    return Promise.all([
+      Terrain.profile([past(A, pts[1]), A], n),
+      Terrain.profile([B, past(B, pts[pts.length - 2])], n),
+    ]).then(([pa, pb]) => {
+      // Each without the end itself, which is the profile's own first or last sample.
+      const a = side(pa, true).slice(0, -1), b = side(pb, false).slice(1);
+      return a.some(s => s.h != null) || b.some(s => s.h != null) ? { a, b } : null;
+    }).catch(() => null);
+  }
+
   function sync() {
     const sh = target();
     const sig = sigOf(sh);
     if (sig === cur.sig) { rerender(); return; }
-    cur = { sig, status: sh ? 'loading' : 'idle', prof: null, error: '',
+    cur = { sig, status: sh ? 'loading' : 'idle', prof: null, error: '', beyond: null,
             cover: null, coverStatus: 'idle', coverError: '',
             // The second opinion is never fetched with the profile — it is
             // twenty seconds of somebody else's service for a question most
@@ -861,13 +911,14 @@ const PathProfile = (function () {
           return { lat: sh.pts[i][0], lon: sh.pts[i][1], elev: e.elev, agl: e.agl, mast: !!(e.station && stationIsMast(e.station)) };
         }), { samples: SAMPLES, freqMhz: freqFor(endpoint(sh, 0), endpoint(sh, 1)) })
       : Terrain.profile(sh.pts, SAMPLES).then(res => (res.ok ? { ok: true, prof: res, lidar: null, ends: null } : res));
-    ask.then(res => {
+    Promise.all([ask, beyondFor(sh.pts)]).then(([res, beyond]) => {
       if (cur.sig !== mine) return;                 // the line moved on while we fetched
       cur.status = res.ok ? 'ready' : 'failed';
       cur.prof   = res.ok ? res.prof : null;
       cur.lidar  = res.ok ? res.lidar : null;
       cur.ends   = res.ok ? res.ends : null;
       cur.error  = res.ok ? '' : res.error;
+      cur.beyond = res.ok ? beyond : null;
       rerender();
       announce();
       if (res.ok) fetchCover(mine);
@@ -1136,6 +1187,22 @@ const PathProfile = (function () {
     const iw = W - L - R, ih = H - T - B;
     const D  = an.D;
 
+    // The ground past each end (beyondFor), when this is the card's own
+    // profile: on the same earth as the path, so its bulge is the same
+    // d1·d2/(2ka) — negative out here, because past the ends the planet falls
+    // away under the line between them.
+    const by = cur.prof === prof && cur.beyond ? cur.beyond : null;
+    const outside = (s, end) => {
+      const d1 = end === 'A' ? -s.past : D + s.past;
+      const bulge = earthBulge(d1, D - d1, an.k);
+      return { d1, bulge, ground: s.h, bulged: s.h == null ? null : s.h + bulge, lat: s.lat, lon: s.lon, past: s.past, beyond: end };
+    };
+    const extA = by ? by.a.map(s => outside(s, 'A')) : [];
+    const extB = by ? by.b.map(s => outside(s, 'B')) : [];
+    const ext = [...extA, ...extB];
+    const padA = extA.length ? extA[0].past : 0;
+    const padB = extB.length ? extB[extB.length - 1].past : 0;
+
     // Everything that has to fit: ground with its curvature bulge, the cover on
     // it, both antennas, and the top of the Fresnel envelope.
     let lo = Infinity, hi = -Infinity;
@@ -1147,9 +1214,14 @@ const PathProfile = (function () {
         lo = Math.min(lo, p.los - 0.6 * p.r1);
       }
     }
+    for (const p of ext) if (p.bulged != null) { lo = Math.min(lo, p.bulged); hi = Math.max(hi, p.bulged); }
     if (!isFinite(lo) || !isFinite(hi)) return '';
     const pad = Math.max(20, (hi - lo) * 0.1);
-    lo -= pad; hi += pad;
+    // The floor goes down by as far as the earth falls away past the ends, so
+    // the curvature arc can follow it down there and still stand where it
+    // always has under the path (see `earth`).
+    const sink = ext.reduce((m, p) => Math.min(m, p.bulge), 0);
+    lo -= pad - sink; hi += pad;
 
     // How much more the chart stretches heights than distances. Said in the
     // key, because a profile drawn at true scale would put a 1 km range on a
@@ -1157,12 +1229,18 @@ const PathProfile = (function () {
     // wave spreads in into the near-upright line the signal draws. `flatAt`
     // is how far out from A that circle bends by under a pixel from the top of
     // the chart to the bottom — the sagitta dz²/2d, in pixels along.
-    const stretch = D > 0 && hi > lo ? (ih / (hi - lo)) / (iw / D) : 1;
+    //
+    // Along, the plot runs from the far end of the ground past A to the far
+    // end of the ground past B, so A and B stand a little in from its edges.
+    const X0 = -padA, XS = D + padA + padB;
+    const pxm = XS > 0 ? iw / XS : 0;                  // pixels per metre along
+    const stretch = D > 0 && hi > lo ? (ih / (hi - lo)) / pxm : 1;
     const reachZ  = flat ? 0 : Math.max(hi - an.txZ, an.txZ - lo);
-    const scale = { stretch, reachZ, flatAt: D > 0 ? reachZ * reachZ * (iw / D) / 2 : Infinity };
+    const scale = { stretch, reachZ, flatAt: D > 0 ? reachZ * reachZ * pxm / 2 : Infinity };
 
-    const x = d => L + (D > 0 ? d / D : 0) * iw;
+    const x = d => L + (d - X0) * pxm;
     const y = m => T + (1 - (m - lo) / (hi - lo)) * ih;
+    const xA = x(0), xB = x(D);                        // the two antennas, across the plot
 
     // What is drawn. A LiDAR ground is a sample every 5 m — eight thousand on a
     // 40 km hop, far more than the chart has pixels — so past THIN_AT samples
@@ -1172,7 +1250,7 @@ const PathProfile = (function () {
     const keep = [];
     if (an.pts.length <= THIN_AT) for (let i = 0; i < an.pts.length; i++) keep.push(i);
     else {
-      const buckets = 2 * iw, top = new Map();
+      const buckets = Math.max(1, Math.round(2 * (xB - xA))), top = new Map();
       an.pts.forEach((p, i) => {
         const k = Math.min(buckets - 1, Math.floor((D > 0 ? p.d1 / D : 0) * buckets));
         const h = p.surfBulged != null ? p.surfBulged : p.bulged;
@@ -1190,8 +1268,14 @@ const PathProfile = (function () {
     // the dot on Google Earth's profile does, so the number in its tag and the
     // line it sits on are the same reading. A sample over a tile gap has no
     // ground and no y, and sampleAt() steps past it rather than inventing one.
+    // `xA`/`xB` are where the path itself starts and ends across the plot, and
+    // `beyond` the ground past each end, which the cursor reads too.
     hoverGeom = {
-      W, L, T, iw, ih, D,
+      W, L, T, iw, ih, D, xA, xB,
+      beyond: ext.filter(p => p.bulged != null).map(p => ({
+        d1: p.d1, x: x(p.d1), y: y(p.bulged), ground: p.ground, cover: null, cls: null,
+        lat: p.lat, lon: p.lon, lidar: false, past: p.past, beyond: p.beyond,
+      })),
       pts: keep.map(i => {
         const p = an.pts[i];
         return {
@@ -1216,8 +1300,11 @@ const PathProfile = (function () {
     if (sigOn) {
       const upper = pts.map(p => `${x(p.d1).toFixed(1)},${y(p.los + 0.6 * p.r1).toFixed(1)}`);
       const lower = pts.slice().reverse().map(p => `${x(p.d1).toFixed(1)},${y(p.los - 0.6 * p.r1).toFixed(1)}`);
+      // L and iw here are the path's own stretch of the plot, A to B — the
+      // signal is priced along the path and nowhere past it — and PL the
+      // plot's left edge, where its tag goes.
       sigGeom = {
-        key: sig.key, L, T, iw, ih, lo, hi, D,
+        key: sig.key, L: xA, PL: L, T, iw: xB - xA, ih, lo, hi, D,
         txZ: an.txZ, rxZ: an.rxZ, fMhz: an.fMhz,
         end: sig.end, loss: an.pathLoss_db,
         zone: `M${upper.join(' L')} L${lower.join(' L')} Z`,
@@ -1247,10 +1334,14 @@ const PathProfile = (function () {
     // costs a metre and a half there, and bows up hard on a 100 km one because
     // it costs 150. A curve drawn to look impressive at every length would be
     // a decoration; this one is a reading.
-    const arc = pts.filter(p => p.bulge != null)
-                      .map(p => `${x(p.d1).toFixed(1)},${y(lo + p.bulge).toFixed(1)}`);
+    //
+    // Past the ends it carries on down — the bulge is negative there — to the
+    // floor, which was lowered by just that much (`sink`), so under the path
+    // the arc stands exactly where it would with nothing drawn past the ends.
+    const arcPts = [...extA, ...pts, ...extB].filter(p => p.bulge != null);
+    const arc = arcPts.map(p => `${x(p.d1).toFixed(1)},${y(lo - sink + p.bulge).toFixed(1)}`);
     const earth = arc.length < 2 ? '' : `
-      <path d="M${x(0).toFixed(1)},${(T + ih).toFixed(1)} L${arc.join(' L')} L${x(D).toFixed(1)},${(T + ih).toFixed(1)} Z"
+      <path d="M${x(arcPts[0].d1).toFixed(1)},${(T + ih).toFixed(1)} L${arc.join(' L')} L${x(arcPts[arcPts.length - 1].d1).toFixed(1)},${(T + ih).toFixed(1)} Z"
             fill="var(--profile-earth)" stroke="none"/>
       <polyline points="${arc.join(' ')}" fill="none"
                 stroke="var(--profile-earth-line)" stroke-width="1.5"/>`;
@@ -1282,11 +1373,38 @@ const PathProfile = (function () {
     const lidarLine = lidarRuns.filter(r => r.length > 1).map(r => `<polyline points="${
       r.map(p => `${x(p.d1).toFixed(1)},${y(p.bulged).toFixed(1)}`).join(' ')}" fill="none"
       stroke="var(--profile-lidar)" stroke-width="2.5"/>`).join('');
-    const ground = runs.map(r => {
-      const top = r.map(p => `${x(p.d1).toFixed(1)},${y(p.bulged).toFixed(1)}`).join(' L');
-      return `<path d="M${x(r[0].d1).toFixed(1)},${(T + ih).toFixed(1)} L${top} L${x(r[r.length - 1].d1).toFixed(1)},${(T + ih).toFixed(1)} Z"
-                    fill="var(--terrain-fill)" stroke="var(--terrain-line)" stroke-width="1"/>`;
-    }).join('');
+    // The area filled, and the line along its top drawn on its own: an outline
+    // round the whole area would stand a wall at each antenna now that the
+    // plot runs on past them.
+    const groundOf = (r, cls) => {
+      const top = r.map(p => `${x(p.d1).toFixed(1)},${y(p.bulged).toFixed(1)}`);
+      return `<path${cls ? ` class="${cls}"` : ''} d="M${x(r[0].d1).toFixed(1)},${(T + ih).toFixed(1)} L${top.join(' L')} L${x(r[r.length - 1].d1).toFixed(1)},${(T + ih).toFixed(1)} Z"
+                    fill="var(--terrain-fill)" stroke="none"/>
+              <polyline points="${top.join(' ')}" fill="none" stroke="var(--terrain-line)" stroke-width="1"/>`;
+    };
+    const ground = runs.map(r => groundOf(r)).join('');
+
+    // The ground past each end, joined to the path's own end sample so the two
+    // meet without a step, and a veil over each side of the plot past the
+    // antennas: drawn, and plainly not part of the path.
+    const outRuns = side => {
+      const out = [];
+      let r = [];
+      for (const p of side) {
+        if (p.bulged == null) { if (r.length) out.push(r); r = []; }
+        else r.push(p);
+      }
+      if (r.length) out.push(r);
+      return out.filter(r => r.length > 1);
+    };
+    const endA = an.pts[0], endB = an.pts[an.pts.length - 1];
+    const beyondGround = !ext.length ? '' : [
+      ...(extA.length ? outRuns([...extA, endA]) : []),
+      ...(extB.length ? outRuns([endB, ...extB]) : []),
+    ].map(r => groundOf(r, 'path-beyond-ground')).join('');
+    const veil = !ext.length ? '' : [[L, xA], [xB, L + iw]].filter(([a, b]) => b - a > 1).map(([a, b]) => `
+      <rect class="path-beyond" x="${(a + 0.5).toFixed(1)}" y="${T + 0.5}" width="${(b - a - 1).toFixed(1)}" height="${ih - 1}"
+            fill="var(--panel)" opacity=".45" pointer-events="none"/>`).join('');
 
     // What stands on the ground: a band from the terrain up to the cover's
     // height, one polygon per run of the same class, painted in that class's
@@ -1366,12 +1484,13 @@ const PathProfile = (function () {
                  <text x="${L - 6}" y="${(y(m) + 3.5).toFixed(1)}" font-size="${fs}" text-anchor="end"
                        style="fill:var(--muted)">${m}</text>`);
     }
-    // The end labels are anchored inwards so neither runs off the viewBox.
+    // The end labels are anchored inwards so neither runs off the viewBox —
+    // or centred under their antenna, when the ground past it leaves the room.
     // Full screen has the width for eight intervals rather than four.
     const ticks = size && iw >= 1100 ? [0, .125, .25, .375, .5, .625, .75, .875, 1] : [0, .25, .5, .75, 1];
     const xticks = ticks.map(f => `
       <text x="${x(D * f).toFixed(1)}" y="${H - 10}" font-size="${fs}"
-            text-anchor="${f === 0 ? 'start' : f === 1 ? 'end' : 'middle'}"
+            text-anchor="${f === 0 && xA - L < 12 ? 'start' : f === 1 && W - xB < 30 ? 'end' : 'middle'}"
             style="fill:var(--muted)">${fmtKm(D * f / 1000)}</text>`).join('');
 
     const w = an.worst;
@@ -1426,6 +1545,7 @@ const PathProfile = (function () {
     return `
       <div class="path-chart-wrap">
         <svg viewBox="0 0 ${W} ${H}" class="path-chart" role="img"
+             data-a-x="${xA.toFixed(1)}" data-b-x="${xB.toFixed(1)}"
              aria-label="Terrain profile over ${fmtKm(D / 1000)} — line of sight ${esc(pathVerdictWord(an.verdict))}${
                w && w.clearance != null
                  ? (w.clearance >= 0
@@ -1433,12 +1553,14 @@ const PathProfile = (function () {
                      : `, ${w.cover != null ? 'cover' : 'terrain'} ${Math.round(-w.clearance)} m above the line at ${fmtKm(w.d1 / 1000)}`)
                  : ''}${an.coverUsed ? `, with ${present.length} land-cover class${present.length === 1 ? '' : 'es'} drawn on the ground` : ''}${
                sigOn ? `, and the signal run along the line from A to B, coloured by what is left over B's receiver threshold: ${
-                 sigDb(sig.end)} arriving at B` : ''}. The same figures are listed under the chart.">
+                 sigDb(sig.end)} arriving at B` : ''}${ext.length ? `, with the ground for ${
+                 fmtKm(Math.max(padA, padB) / 1000)} past each end drawn faded, for context` : ''}. The same figures are listed under the chart.">
           ${sky}
           ${grid.join('')}
           ${radio}
           ${sigOn ? '<g id="path-sig-under" pointer-events="none"></g>' : ''}
           ${ground}
+          ${beyondGround}
           ${lidarLine}
           ${bands.join('')}
           <!-- Over the ground, not under it: the terrain area fills all the way
@@ -1446,6 +1568,7 @@ const PathProfile = (function () {
                top, the band reads as what it is — the planet the terrain is
                sitting on — which is where Radio Mobile puts it too. -->
           ${earth}
+          ${veil}
           ${flat ? '' : obstruction}
           ${marker}
           ${masts}
@@ -1464,6 +1587,8 @@ const PathProfile = (function () {
           ${lidarLine ? '<span><i class="path-key-lidar"></i> 5 m LiDAR</span>' : ''}
           ${earth ? `<span><i class="path-key-earth"></i> Earth curvature${sag > 0.5 ? ` · ${Math.round(sag)} m at mid-path` : ''}</span>` : ''}
           ${flat ? '' : '<span><i class="path-key-obs"></i> Inside the Fresnel zone</span>'}
+          ${ext.length ? `<span class="path-key-beyond-item"><i class="path-key-beyond"></i> ${
+            termHtml('Ground past each end', PATH_BEYOND_MEANING)} · ${fmtKm(Math.max(padA, padB) / 1000)}, for context</span>` : ''}
           ${coverKey}
           ${flat || !sig ? '' : `<span id="path-sig-key">${sigKeyHtml(!sigOn ? 'none' : sigRows ? 'ready' : 'pending')}</span>`}
           ${size ? '' : `<button type="button" class="lb-link path-full-open" id="path-full-open"
@@ -1535,6 +1660,7 @@ const PathProfile = (function () {
   }
 
   function groundLabel(p) {
+    if (p.beyond) return `${heightLabel(p)} ground · ${fmtKm(p.past / 1000)} past ${p.beyond}`;
     const bits = [`${heightLabel(p)} ground`];
     const cv = coverLabel(p);
     if (cv) bits.push(`${cv} on it`);
@@ -1553,9 +1679,24 @@ const PathProfile = (function () {
   // addEventListener would not, and that is a plausible edit rather than a
   // hypothetical one.
   function hoverAt(d) {
-    if (!hoverGeom || !(d >= -1)) { hideCursor(); return; }
-    const p = sampleAt(Math.max(0, Math.min(hoverGeom.D, d)));
+    const g = hoverGeom;
+    if (!g || !Number.isFinite(d)) { hideCursor(); return; }
+    const p = (d < 0 || d > g.D ? beyondAt(d) : null) || sampleAt(Math.max(0, Math.min(g.D, d)));
     if (p) paintCursor(p); else hideCursor();
+  }
+
+  // Past an end, the sample of the ground drawn there nearest the pointer —
+  // or null when the path's own end sample is nearer, or nothing is drawn
+  // past that end, and the cursor stays on the end.
+  function beyondAt(d) {
+    const g = hoverGeom;
+    const end = d < 0 ? 0 : g.D;
+    let best = null;
+    for (const p of g.beyond) {
+      if ((d < 0) !== (p.d1 < 0)) continue;
+      if (!best || Math.abs(p.d1 - d) < Math.abs(best.d1 - d)) best = p;
+    }
+    return best && Math.abs(best.d1 - d) < Math.abs(end - d) ? best : null;
   }
 
   function hideCursor() {
@@ -1590,7 +1731,8 @@ const PathProfile = (function () {
     txt.textContent = heightLabel(p);
     const cv = coverLabel(p);
     if (cv) txt.textContent += ` · ${cv}`;
-    const m = sigAt(p.d1);
+    if (p.beyond) txt.textContent += ` · past ${p.beyond}`;
+    const m = p.beyond ? null : sigAt(p.d1);
     if (m != null) {
       const db = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
       db.textContent = ` · ${sigDb(m)}`;
@@ -2132,7 +2274,7 @@ const PathProfile = (function () {
       sigTagWas = text;
       txt.textContent = text;
       const tw = txt.getComputedTextLength ? txt.getComputedTextLength() : text.length * 6;
-      const x0 = g.L + 6, y0 = g.T + 6;
+      const x0 = (g.PL != null ? g.PL : g.L) + 6, y0 = g.T + 6;
       box.setAttribute('x', x0); box.setAttribute('y', y0);
       box.setAttribute('width', (tw + 26).toFixed(1));
       tdot.setAttribute('cx', x0 + 10); tdot.setAttribute('cy', y0 + 9);
@@ -2189,7 +2331,8 @@ const PathProfile = (function () {
   // (CLAUDE.md, "Plain words"): the same meanings the box's titles carry.
   function wordsHtml() {
     const rows = [['Fade margin', pathMarginMeaning()],
-      ...['clear', 'marginal', 'obstructed'].map(k => [`${PATH_VERDICT[k].label} line of sight`, PATH_VERDICT[k].meaning])];
+      ...['clear', 'marginal', 'obstructed'].map(k => [`${PATH_VERDICT[k].label} line of sight`, PATH_VERDICT[k].meaning]),
+      ['Ground past each end', PATH_BEYOND_MEANING]];
     return pathMoreHtml('path-words', 'What the words over the figures mean',
       `<dl class="path-words">${rows.map(([t, m]) => `<dt>${esc(t)}</dt><dd>${esc(m)}</dd>`).join('')}</dl>`);
   }
@@ -2912,6 +3055,7 @@ const PathProfile = (function () {
     ];
     if (an.worst && an.worst.ratio < 0.6) items.push(['worst', 'Worst point']);
     if (rep.prof.lidar && rep.prof.lidar.some(Boolean)) items.push(['lidar', '5 m LiDAR']);
+    if (/class="path-beyond"/.test(chart)) items.push(['beyond', 'Ground past each end, for context']);
     if (an.coverUsed) {
       const seen = [];
       for (const p of an.pts) if (p.cls != null && !seen.includes(p.cls)) seen.push(p.cls);
@@ -2926,6 +3070,8 @@ const PathProfile = (function () {
       if (k === 'mast')  return `<line x1="${x + 11}" y1="${y - 7}" x2="${x + 11}" y2="${y + 7}" stroke="var(--map-repeater)" stroke-width="2.5"/>`;
       if (k === 'worst') return `<circle cx="${x + 11}" cy="${y}" r="4" fill="var(--bad)"/>`;
       if (k === 'lidar') return `<line x1="${x}" y1="${y}" x2="${x + 22}" y2="${y}" stroke="var(--profile-lidar)" stroke-width="2.5"/>`;
+      if (k === 'beyond') return `<rect x="${x}" y="${y - 6}" width="22" height="12" fill="var(--terrain-fill)" stroke="var(--terrain-line)"/>
+        <rect x="${x}" y="${y - 6}" width="22" height="12" fill="var(--panel)" opacity=".45"/>`;
       return `<rect x="${x}" y="${y - 6}" width="22" height="12" fill="${LandCover.colourVar(Number(k.slice(6)))}" opacity=".85"/>`;
     };
     let kx = 52, ky = head + H + 20;
@@ -3286,7 +3432,8 @@ const PathProfile = (function () {
       const r = svg.getBoundingClientRect();
       if (!r.width) return;
       const ux = (ev.clientX - r.left) * (g.W / r.width);
-      hoverAt((ux - g.L) / (g.iw || 1) * g.D);
+      // Measured from A across to B: the plot runs on past both (beyondFor).
+      hoverAt((ux - g.xA) / ((g.xB - g.xA) || 1) * g.D);
     },
 
     // A distance along the path, in metres. MapDraw calls this when the pointer

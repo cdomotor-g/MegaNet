@@ -159,8 +159,11 @@ try {
         y: dot ? Number(dot.getAttribute('cy')) : null,
         text: txt ? txt.textContent : null,
         // The plot's own x range, so an assertion can talk in fractions along
-        // the path rather than in pixels of whatever width the panel gave it.
-        scale: box && vb ? { left: box.left, width: box.width, vbw: vb.width } : null,
+        // the path rather than in pixels of whatever width the panel gave it —
+        // and where A and B stand on it, a little in from its edges now that
+        // the ground past each end is drawn.
+        scale: box && vb ? { left: box.left, width: box.width, vbw: vb.width,
+                             ax: Number(svg.dataset.aX), bx: Number(svg.dataset.bX) } : null,
       };
     };
     // The map's marker: the circleMarker MapDraw puts down, and its label.
@@ -211,16 +214,18 @@ try {
   check('the chart is drawn with a cursor on it, and nothing showing until the pointer arrives',
     first.shown === false && !!first.scale, JSON.stringify(first));
 
-  // A fraction along the plot, in client pixels. The chart is drawn in viewBox
+  // A fraction along the path, in client pixels: 0 at A, 1 at B, and past
+  // either end for the ground drawn beyond it. The chart is drawn in viewBox
   // units and stretched to the panel's width, so this is the same conversion
   // the app has to do in reverse — which is why an assertion in fractions is
   // worth more here than one in pixels.
   const L_ = 52, R_ = 14;                                  // chartSvg's own margins
+  const along = (s, t) => s.ax + t * (s.bx - s.ax);        // viewBox x, t along A → B
   const hoverChart = async (t) => {
     await showChart();
     const s = (await page.evaluate(() => window.__cursor())).scale;
     const k = s.width / s.vbw;                             // client px per viewBox unit
-    const ux = L_ + t * (s.vbw - L_ - R_);
+    const ux = along(s, t);
     const box = await page.evaluate(() => {
       const r = document.querySelector('svg.path-chart').getBoundingClientRect();
       return { left: r.left, top: r.top, height: r.height };
@@ -242,8 +247,13 @@ try {
       && half.c.scale.left + half.c.scale.width <= wrapRight + 1,
     JSON.stringify({ ...half.c.scale, wrapRight }));
   const cardW = half.c.scale.vbw;                          // the viewBox the card drew
-  check('the dot sits halfway across the plot too',
-    Math.abs(half.c.x - (L_ + 0.5 * (cardW - L_ - R_))) < 12, String(half.c.x));
+  const cs = half.c.scale;
+  check('the chart runs on past both antennas, a little way, to show the ground beyond them',
+    cs.ax > L_ + 8 && cs.bx < cardW - R_ - 8
+      && cs.ax - L_ < 0.12 * (cardW - L_ - R_) && cardW - R_ - cs.bx < 0.12 * (cardW - L_ - R_),
+    JSON.stringify(cs));
+  check('the dot sits halfway between the two ends too',
+    Math.abs(half.c.x - along(cs, 0.5)) < 12, String(half.c.x));
   check('and the same point is marked on the map, halfway along the line',
     !!half.m && Math.abs(half.m.lon - (HOP.lonA + SPAN * 0.5)) < SPAN * 0.03,
     JSON.stringify(half.m));
@@ -264,6 +274,28 @@ try {
   // down the plot. SVG y grows downward.
   check('and the dot rode the ground down with it — lower ground, lower on the plot',
     quarter.c.y > half.c.y, JSON.stringify({ quarter: quarter.c.y, half: half.c.y }));
+
+  // ── Past the ends: the ground beyond, read but not priced ────────────────
+  // The ramp carries on past B, so the ground there is higher than B's 1,000 m,
+  // and past A lower than A's 0 m. Halfway out into the ground drawn past each
+  // end: the tag says the height and which end it is past, and the marker on
+  // the map is off the end of the line.
+  const pastB = await hoverChart(1 + 0.5 * (cs.vbw - R_ - cs.bx) / (cs.bx - cs.ax));
+  const pastBm = /^(\d+) m · past B$/.exec(pastB.c.text || '');
+  check('past B, the cursor reads the ground beyond it, higher up the ramp than B, and says it is past B',
+    !!pastBm && Number(pastBm[1]) > 1005 && pastB.c.x > cs.bx, JSON.stringify(pastB.c));
+  check('…and the marker on the map is beyond the east end of the line, saying how far past B',
+    !!pastB.m && pastB.m.lon > HOP.lonB && /^\d+ m ground · \d+ m past B$/.test(pastB.m.label || ''),
+    JSON.stringify(pastB.m));
+  const pastA = await hoverChart(-0.5 * (cs.ax - L_) / (cs.bx - cs.ax));
+  check('past A the same, below A’s 0 m, with the marker west of the line',
+    /^-\d+ m · past A$/.test(pastA.c.text || '') && pastA.c.x < cs.ax
+      && !!pastA.m && pastA.m.lon < HOP.lonA && / past A$/.test(pastA.m.label || ''),
+    JSON.stringify({ c: pastA.c, m: pastA.m }));
+  const veils = await page.evaluate(() => document.querySelectorAll('svg.path-chart .path-beyond').length);
+  check('the two stretches past the ends are drawn under a veil, and the key names them',
+    veils === 2 && await page.evaluate(() => /Ground past each end/.test(document.querySelector('.path-key').textContent)),
+    String(veils));
 
   // ── Leaving the chart takes both halves away ─────────────────────────────
   await showChart();
@@ -298,8 +330,8 @@ try {
     onLine.c.shown === true, JSON.stringify(onLine.c));
   check('and it reads three quarters of the ramp, from the map’s side',
     /^(7[34]\d|7[56]\d) m$/.test(onLine.c.text || ''), String(onLine.c.text));
-  check('the dot is three quarters across the plot',
-    Math.abs(onLine.c.x - (L_ + 0.75 * (cardW - L_ - R_))) < 25, String(onLine.c.x));
+  check('the dot is three quarters of the way from A to B',
+    Math.abs(onLine.c.x - along(cs, 0.75)) < 25, String(onLine.c.x));
 
   // Well off the line — beyond the snap distance, on the same map.
   await showMap();
@@ -328,16 +360,18 @@ try {
     const svg = document.querySelector('#path-full svg.path-chart');
     const r = svg.getBoundingClientRect();
     return { left: r.left, top: r.top, width: r.width, height: r.height, vbw: svg.viewBox.baseVal.width,
+             ax: Number(svg.dataset.aX), bx: Number(svg.dataset.bX),
              n: document.querySelectorAll('svg.path-chart').length };
   });
   check('a click on the chart opens it full screen, wider than the card draws it, and only there',
     big.n === 1 && big.vbw > cardW && Math.abs(big.width - big.vbw) < 3, JSON.stringify(big));
-  await page.mouse.move(big.left + (L_ + 0.5 * (big.vbw - L_ - R_)) * (big.width / big.vbw), big.top + big.height * 0.5);
+  const bigMid = along(big, 0.5);
+  await page.mouse.move(big.left + bigMid * (big.width / big.vbw), big.top + big.height * 0.5);
   await page.waitForTimeout(120);
   const bigHalf = await page.evaluate(() => ({ c: window.__cursor(), m: window.__mapDot() }));
-  check('full screen, halfway across still reads 500 m, with the dot halfway across the wider plot',
+  check('full screen, halfway between the ends still reads 500 m, with the dot halfway along the wider plot',
     /^(4[89]\d|5[01]\d) m$/.test(bigHalf.c.text || '')
-      && Math.abs(bigHalf.c.x - (L_ + 0.5 * (big.vbw - L_ - R_))) < 12
+      && Math.abs(bigHalf.c.x - bigMid) < 12
       && !!bigHalf.m && Math.abs(bigHalf.m.lon - (HOP.lonA + SPAN * 0.5)) < SPAN * 0.03,
     JSON.stringify(bigHalf));
   await page.keyboard.press('Escape');

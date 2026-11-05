@@ -8084,6 +8084,14 @@ body .map-panel.is-driving {
   border: 1px solid var(--profile-earth-line);
 }
 
+/* The ground past each end of the profile: the ground chip under the same
+   veil the chart lays over it (a panel-coloured wash at .45). */
+.path-key-beyond {
+  height: 8px !important;
+  background: linear-gradient(color-mix(in srgb, var(--panel) 45%, transparent), color-mix(in srgb, var(--panel) 45%, transparent)), var(--terrain-fill);
+  border: 1px solid color-mix(in srgb, var(--terrain-line) 55%, var(--panel));
+}
+
 /* Where a cover band is drawn from the terrain up, the chart is asked to say
    so in words too; this is the line that does. */
 .path-cover-note { margin: .2rem 0 0; }

@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 204, date: '2026-11-05', items: [
+      '〽️ <strong>The elevation profile runs on past both ends.</strong> The chart now shows the ground for a short way '
+        + 'beyond the transmitter and the receiver — 5% of the path each side, at least 250 m and at most 5 km — so you can '
+        + 'see what each end stands on. It is drawn faded because it is only for looking at: no figure on the card uses it. '
+        + 'Point at it for the height there.',
+    ] },
     { n: 203, date: '2026-11-05', items: [
       '📶 <strong>Fade margins now measured from −110 dBm.</strong> The field stations\' receiver threshold — the weakest '
         + 'signal a burst is decoded at — is now −110 dBm across the board, the figure Radio Mobile runs use (it was −117). '
