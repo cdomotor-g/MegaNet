@@ -825,9 +825,11 @@ const MapBestRepeater = (function () {
         <button type="button" class="sites-result-main" onclick="MapBestRepeater.select('${escAttr(c.hub.id)}')"
                 aria-pressed="${on ? 'true' : 'false'}"
                 title="Show this one's path and its route on to a base on the map">
-          <span class="sites-rank" aria-hidden="true">${c.rank}</span>
-          <span class="sites-result-text">
+          <span class="bestrep-head">
+            <span class="sites-rank" aria-hidden="true">${c.rank}</span>
             <strong>${esc(c.hub.name)}</strong>
+          </span>
+          <span class="sites-result-text bestrep-body">
             <span class="small txt-muted">${esc(roleText(c.hub))}${c.hub.number ? ` ${esc(c.hub.number)}` : ''} · ${c.km.toFixed(1)} km ${compass(c.brg)}</span>
             <span class="small">${term('hop')} ${hopLine}</span>
             ${f && !f.failed ? `<span class="small">${term('onward')} ${onwardHtml(c)}</span>` : ''}
@@ -934,7 +936,7 @@ const MapBestRepeater = (function () {
                   title="Every repeater and base priced, with every figure, as rows">Save CSV</button>
         </div>
         <p class="filter-note" id="bestrep-status">${statusHtml()}</p>
-        ${results.length ? `<ol class="sites-results">${list.map(resultHtml).join('')}</ol>` : ''}
+        ${results.length ? `<ol class="sites-results bestrep-results">${list.map(resultHtml).join('')}</ol>` : ''}
         ${results.length > SHOWN ? `<button type="button" class="link-btn" onclick="MapBestRepeater.toggleAll()">${
           showAll ? `Show the best ${SHOWN} only` : `Show all ${results.length}`}</button>` : ''}
         ${glossaryHtml()}
@@ -958,7 +960,7 @@ const MapBestRepeater = (function () {
     return `
       <span class="legend-item">
         <span class="legend-site" aria-hidden="true">1</span>
-        <span class="small">Best repeater — every repeater and base within ${found.km} km of ${esc(found.site.name)} (dashed ring),
+        <span class="small">Best repeater — every repeater and base within ${found.km} km of ${esc(found.site.name)} (red dashed ring),
           its path coloured by fade margin: green ${goodDb()} dB or better, yellow ${okDb()}, red below, dashed where the
           ground cuts the line. The numbered pins are the best first; the one picked has its route on to a base drawn,
           grey where a hop has no figure.</span>
@@ -990,9 +992,11 @@ const MapBestRepeater = (function () {
     lineLayer = L.layerGroup([], { pane: LINE_PANE }).addTo(map);
     layer = L.layerGroup([], { pane: PANE }).addTo(map);
     const accent = cssVar('--accent', '#0b5cab');
+    // The search ring: red and 3 px, because a thin blue one was lost over the
+    // satellite photos. Its own token (--bestrep-ring), not --map-fade-bad.
     L.circle([s.lat, s.lon], {
-      pane: LINE_PANE, radius: (found ? found.km : km()) * 1000, color: accent, weight: 1.5, opacity: 0.8,
-      dashArray: '6 6', fill: false, interactive: false,
+      pane: LINE_PANE, radius: (found ? found.km : km()) * 1000, color: cssVar('--bestrep-ring', '#d50000'),
+      weight: 3, opacity: 0.8, dashArray: '6 6', fill: false, interactive: false,
     }).addTo(lineLayer);
     L.circleMarker([s.lat, s.lon], {
       pane: LINE_PANE, radius: 9, color: accent, weight: 2.5, opacity: 0.95, fill: true, fillColor: accent,

@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 221, date: '2026-11-05', items: [
+      '⭕ <strong>The 🎯 Best repeater ring is easier to see.</strong> The dashed ring round the site, showing how far '
+        + 'the tool looked, is red now and twice as thick — the thin blue one was easy to lose over the satellite photos.',
+      '🎯 <strong>Each repeater in the Best repeater list starts on a shaded band</strong> — its number and name — so '
+        + 'you can see where one ends and the next begins. The one you picked is on a blue band.',
+    ] },
     { n: 220, date: '2026-11-05', items: [
       '🌾 <strong>Pasture is treated like crops, and 🚚 Relocate station no longer sees trees in empty paddocks.</strong> '
         + 'Rangeland (grass and grazing country) on the elevation profile now stands at its own 1 m unless the tree-height '

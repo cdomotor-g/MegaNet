@@ -233,6 +233,11 @@
      resolves it with cssVar() for the Leaflet options, which cannot take
      var(). */
   --bf-base: #ff8c00;
+  /* The dashed ring round the site on the 🎯 Best repeater map (map-bestrep.js):
+     how far it looked. Red so it shows over the satellite photos and the street
+     map alike, one value in both themes like --bf-base. A token of its own, not
+     --map-fade-bad, because the ring is not a fade margin. */
+  --bestrep-ring: #d50000;
   --accent: #0b5cab;
   --ok:   #107c10;
   --bad:  #c7401a;
@@ -6563,6 +6568,32 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 }
 
 .bestrep-chip.bestrep-now { border-color: var(--accent); }
+
+/* Each hub in the 🎯 Best repeater list (map-bestrep.js) starts with its
+   number and name on a shaded band across the row — the station card's
+   section band (--cr-band's mix) — so where one hub ends and the next begins
+   is seen before a word is read. The band is the badge's height and a little
+   more, so the badge sits inside it; the lines under it start under the name.
+   The one picked is on a blue band, as its pin and path are on the map. */
+.bestrep-results .sites-result-main {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+
+.bestrep-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: .2rem var(--sp-2);
+  border-radius: var(--r-sm, 4px);
+  background: color-mix(in srgb, var(--muted) 13%, var(--panel));
+}
+
+.sites-result.is-on .bestrep-head { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); }
+
+.bestrep-body { padding: var(--sp-1) var(--sp-2) var(--sp-1) calc(1.4rem + 2 * var(--sp-2)); }
 
 .bestrep-words {
   margin-top: var(--sp-2);
