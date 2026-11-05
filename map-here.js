@@ -240,8 +240,8 @@ const MapHere = (function () {
     const c = LandCover.CLASSES[facts.cover.code];
     const canopy = facts.cover.canopy;
     // The height the profile stands here, not the canopy map's raw reading: a
-    // crop pixel's few metres of canopy are the map's noise over a paddock and
-    // the profile does not use them (LandCover.heights).
+    // crop or rangeland pixel's few metres of canopy are the map's noise over
+    // a paddock and the profile does not use them (LandCover.heights).
     const stands = LandCover.heights([facts.cover.code], canopy != null ? [canopy] : null)[0];
     const bits = [c ? c.label : `class ${facts.cover.code}`];
     if (stands != null && stands > 0) {

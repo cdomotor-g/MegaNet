@@ -52,7 +52,10 @@
 //
 //   Trees    Esri's Global Canopy Height 2020 (ETH Zürich, 10 m, ±5 m) on a
 //            10 m lattice — LandCover.canopyAt, the tiles the profile card
-//            already reads, and no request per point.
+//            already reads, and no request per point — with the land-cover
+//            class under every point (LandCover.classAt, one picture of the
+//            class map) so a crop or rangeland reading under LandCover.
+//            TREE_MIN, which over a paddock is the map's noise, is not a tree.
 //   Roofs    the State's buildings where there is a State to ask: the
 //            outlines Queensland generates from its LiDAR's building class
 //            (roof heights and all, by project area, not statewide), the
@@ -527,20 +530,26 @@ const MapRelocate = (function () {
         lon[v * N + u] = st.lon + (u - H) * LAT_M / k.lon;
       }
     }
-    return { H, N, lat, lon, top: new Float32Array(N * N), kind: new Uint8Array(N * N), canopyOk: false };
+    return { H, N, lat, lon, top: new Float32Array(N * N), kind: new Uint8Array(N * N), canopyOk: false, classOk: false };
   }
 
   async function siteData(st, r, cells) {
     const lat = latticeFor(st, r);
     const box = boxAround(st, r + OBST_R);
-    const [canopy, cover, bld] = await Promise.all([
+    const [canopy, grid, cover, bld] = await Promise.all([
       LandCover.canopyAt(lat.lat, lat.lon).catch(() => null),
+      // The class under every lattice point, in one picture of the class map,
+      // so a paddock's few metres of canopy-map noise are not read as trees
+      // all round a candidate (LandCover.believed).
+      LandCover.classAt(lat.lat, lat.lon).catch(() => null),
       LandCover.sample(cells.map(c => c.lat), cells.map(c => c.lon)).catch(e => ({ ok: false, error: reasonOf(e) })),
       buildingsAround(box).catch(e => ({ sources: [], list: [], error: reasonOf(e) })),
     ]);
     if (Array.isArray(canopy)) {
       lat.canopyOk = canopy.some(v => v != null);
-      canopy.forEach((h, n) => { if (h != null && h >= TREE_MIN_M) { lat.top[n] = h; lat.kind[n] = 1; } });
+      lat.classOk = !!(grid && grid.ok);
+      const trees = LandCover.believed(lat.classOk ? grid.cls : null, canopy);
+      trees.forEach((h, n) => { if (h != null && h >= TREE_MIN_M) { lat.top[n] = h; lat.kind[n] = 1; } });
     }
     lat.lat = lat.lon = null;            // coordinates done with; the lattice is offsets from here on
     const k = metresPerDeg(st.lat);
@@ -1197,8 +1206,11 @@ const MapRelocate = (function () {
       : `<span class="txt-warn">${esc(s.label)} could not be read — ${esc(s.error || 'no answer')}</span>`));
     const cov = found.site.cover;
     return `Buildings: ${parts.join(' · ') || 'none asked'}${b.qld ? '' : ' — outside Queensland only OpenStreetMap is asked'}.
-      Trees: ${found.site.lattice.canopyOk ? 'the 2020 canopy height map, 10 m'
-        : '<span class="txt-warn">the canopy height map could not be read — open sky and clear ground are left out of the score</span>'}.
+      Trees: ${!found.site.lattice.canopyOk
+        ? '<span class="txt-warn">the canopy height map could not be read — open sky and clear ground are left out of the score</span>'
+        : found.site.lattice.classOk
+          ? `the 2020 canopy height map, 10 m — over crops and pasture only from ${LandCover.TREE_MIN} m up, since under that it reads bare paddock as a few metres of trees`
+          : '<span class="txt-warn">the 2020 canopy height map, 10 m, unchecked — the land cover under it could not be read, so a paddock’s few metres of noise may count as trees</span>'}.
       Land cover: ${cov && cov.ok ? `Sentinel-2 ${esc(String(cov.year))}` : '<span class="txt-warn">could not be read — water is not ruled out</span>'}.`;
   }
 

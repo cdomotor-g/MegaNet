@@ -44,9 +44,10 @@
 // never before — a 30 KB script for a feature most tabs never touch. Where the
 // map has a height, that height stands on the profile; where it does not (no
 // tile, decoder unavailable, offline) the class table's figure does, and the
-// legend says which. Crops are the exception: over a paddock the canopy map
-// reads 3–8 m of nothing, so a crop pixel takes its reading only from TREE_MIN
-// (10 m) up — a tree in the field, named Trees — and the crop figure below it. This is the one place MegaNet is ahead of Radio Mobile
+// legend says which. Crops and rangeland are the exception: over a paddock or
+// a pasture the canopy map reads 3–8 m of nothing, so such a pixel takes its
+// reading only from TREE_MIN (10 m) up — a tree in the field, named Trees —
+// and its class figure below it. This is the one place MegaNet is ahead of Radio Mobile
 // rather than level with it: a real canopy height instead of a class constant
 // — the input ITU-R P.1812 validation work found as good as a 1 m surface
 // model, and better than a class map with 15 m trees.
@@ -139,16 +140,22 @@ const LandCover = (function () {
     return code === 2 || code === 4 || code === 5 || code === 7;
   }
 
-  // A canopy reading on a crop pixel is believed only from this height up.
-  // Over paddocks the canopy map is not quiet: across 11,861 crop pixels in
+  // A canopy reading on a crop or rangeland pixel is believed only from this
+  // height up. Over paddocks the canopy map is not quiet: across 11,861 crop pixels in
   // eight Queensland farming districts (Jimbour, Dalby, Pittsworth, Lockyer,
   // Bundaberg, Burdekin, Emerald, checked 2026-11-05) it read 1 m or more on
   // three in four and 3–8 m on two in five, and the satellite photos under a
   // sample of the 4–7 m readings were bare, ploughed or planted ground seven
   // times out of eight. A ploughed paddock at Jimbour read 4–8 m end to end.
   // At 10 m and up the readings were real trees — a creek line, a road's tree
-  // line, a paddock tree — five times in eight. So under 10 m a crop pixel
-  // stands at the crop figure, and from 10 m it is a tree and is drawn as one.
+  // line, a paddock tree — five times in eight. Rangeland (grazing country,
+  // checked the same day at Jimbour, Pittsworth, Lockyer, Bundaberg, Roma and
+  // Warwick) is the same: under its 1–9 m readings the photos showed open
+  // grass, a road verge, a sports oval — something that tall only 2 times in
+  // 16 — and at 10 m and up a tree about five times in eight. So under 10 m a
+  // crop or rangeland pixel stands at its class figure, and from 10 m it is a
+  // tree and is drawn as one. (Built area was checked too and is left as it
+  // is: its 15 m+ readings were a town's real trees seven times in eight.)
   const TREE_MIN = 10;
 
   // Whether the canopy map has found a tree standing in a pixel the class map
@@ -160,9 +167,9 @@ const LandCover = (function () {
 
   // Heights for a whole class array; null where the class is unknown. With a
   // canopy array alongside, a measured canopy of a metre or more replaces the
-  // class figure on trees, flooded vegetation and rangeland — the map has
-  // looked, the table has guessed — and on crops only from TREE_MIN up, since
-  // under that the canopy map is reading the paddock's noise, not a crop. A
+  // class figure on trees and flooded vegetation — the map has looked, the
+  // table has guessed — and on crops and rangeland only from TREE_MIN up,
+  // since under that the canopy map is reading a paddock's noise. A
   // built pixel keeps the larger of the two, since a canopy map does not see
   // roofs.
   function heights(cls, canopy) {
@@ -173,7 +180,7 @@ const LandCover = (function () {
       if (ch == null) return h;
       if (c === 7) return h == null ? ch : Math.max(h, ch);
       if (c === 1 || c === 8 || c === 9) return h;        // water, bare, snow: a canopy there is noise
-      if (c === 5) return treeIn(c, ch) ? ch : h;         // crops: a tree, or the crop's own height
+      if (c === 5 || c === 11) return treeIn(c, ch) ? ch : h;   // a tree, or the field's own height
       return ch;
     });
   }
@@ -185,6 +192,20 @@ const LandCover = (function () {
   function named(cls, canopy) {
     if (!canopy) return cls;
     return cls.map((c, i) => (treeIn(c, canopy[i]) ? 2 : c));
+  }
+
+  // The canopy readings that are trees, for something that wants the trees
+  // themselves rather than a profile's surface — the relocation finder's open
+  // sky and clear ground. A field or pasture's reading under TREE_MIN is
+  // nothing (0); every other reading stands as the map gave it, and so does
+  // every reading where the class is unknown, which is the most this can do
+  // without a class.
+  function believed(cls, canopy) {
+    if (!canopy) return canopy;
+    return canopy.map((h, i) => {
+      const c = cls ? cls[i] : null;
+      return h != null && (c === 5 || c === 11) && h < TREE_MIN ? 0 : h;
+    });
   }
 
   // ── canopy tiles ──
@@ -316,6 +337,53 @@ const LandCover = (function () {
       .finally(() => clearTimeout(timer));
   }
 
+  // The class map over a whole patch in ONE request — exportImage of the box
+  // round the points, raw class codes at the map's own 10 m (Web Mercator, the
+  // service's grid), LERC-compressed — read at each point's pixel. For a
+  // lattice of thousands of points, where getSamples would be one request per
+  // 256: the relocation finder's 4 km square is ~170,000 points and ~18 KB
+  // here. Checked against getSamples on 256 points of a Jimbour path: the
+  // same class at 255, the other on a class boundary. null per point where
+  // the map has no pixel; null overall when the request fails.
+  const GRID_MAX = 4000;                  // the service's maxImageWidth/Height
+  function mercX(lo) { return lo * Math.PI / 180 * 6378137; }
+  function mercY(la) { return Math.log(Math.tan(Math.PI / 4 + la * Math.PI / 360)) * 6378137; }
+  function fetchGrid(lat, lon, year) {
+    const xs = lon.map(mercX), ys = lat.map(mercY);
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (let i = 0; i < xs.length; i++) {
+      if (xs[i] < x0) x0 = xs[i]; if (xs[i] > x1) x1 = xs[i];
+      if (ys[i] < y0) y0 = ys[i]; if (ys[i] > y1) y1 = ys[i];
+    }
+    x0 -= 20; y0 -= 20; x1 += 20; y1 += 20;
+    const res = Math.max(10, (x1 - x0) / GRID_MAX, (y1 - y0) / GRID_MAX);
+    const W = Math.ceil((x1 - x0) / res), H = Math.ceil((y1 - y0) / res);
+    const top = y0 + H * res;
+    const q = new URLSearchParams({
+      bbox: [x0, y0, x0 + W * res, top].join(','), bboxSR: '3857', imageSR: '3857', size: `${W},${H}`,
+      format: 'lerc', pixelType: 'U8', interpolation: 'RSP_NearestNeighbor', time: timeParam(year),
+      renderingRule: JSON.stringify({ rasterFunction: 'None' }), f: 'image',
+    });
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = setTimeout(() => ctl && ctl.abort(), FETCH_MS);
+    return fetch(`${SERVICE}/exportImage?${q}`, { signal: ctl ? ctl.signal : undefined })
+      .then(r => (r.ok ? r.arrayBuffer() : null))
+      .then(buf => {
+        if (!buf) return null;
+        const d = Lerc.decode(buf);
+        if (!d || !d.pixels || !d.pixels[0] || d.width !== W || d.height !== H) return null;
+        const px = d.pixels[0];
+        return xs.map((x, i) => {
+          const c = Math.min(W - 1, Math.floor((x - x0) / res)), r = Math.min(H - 1, Math.floor((top - ys[i]) / res));
+          const n = r * W + c;
+          if (d.mask && !d.mask[n]) return null;
+          return CLASSES[px[n]] ? px[n] : null;
+        });
+      })
+      .catch(() => null)
+      .finally(() => clearTimeout(timer));
+  }
+
   // Rough length of the path, for picking the canopy tile level.
   function spanOf(lat, lon) {
     const n = lat.length - 1;
@@ -346,7 +414,7 @@ const LandCover = (function () {
 
   return {
     CLASSES, attribution: ATTRIB, canopyAttribution: CANOPY_ATTRIB, TREE_MIN,
-    heightOf, heights, named, colourVar, standsUp,
+    heightOf, heights, named, believed, colourVar, standsUp,
 
     // Every class's current height, for the editable table.
     table() {
@@ -422,6 +490,28 @@ const LandCover = (function () {
         return got && !Array.isArray(got) && Array.isArray(got.canopy) ? got.canopy : null;
       }
       return canopy(lat, lon, 0).catch(() => null);
+    },
+
+    // The class at each of any set of points, from one picture of the class
+    // map over their box (fetchGrid) rather than a sample per point — for a
+    // lattice, beside canopyAt, so believed() can tell a paddock's noise from
+    // a tree. Resolves — never rejects — to { ok:true, cls[], year } or
+    // { ok:false, error }; a seeded sampler answers with its classes.
+    async classAt(lat, lon) {
+      if (!lat || !lon || !lat.length || lat.length !== lon.length) return { ok: false, error: 'No points to look at.' };
+      if (seeded) {
+        const got = seeded(lat, lon);
+        return { ok: true, cls: Array.isArray(got) ? got : got.cls, year: 'seeded' };
+      }
+      const fail = { ok: false, error: 'Land cover could not be fetched — offline, blocked, or the service is unavailable.' };
+      if (typeof fetch !== 'function' || !(await loadLerc())) return fail;
+      for (const year of candidateYears()) {
+        const cls = await fetchGrid(lat, lon, year).catch(() => null);
+        if (!cls) return fail;                               // the service is not answering; stop asking
+        if (cls.every(c => c == null)) continue;             // no map for that year yet — try the one before
+        return { ok: true, cls, year };
+      }
+      return fail;
     },
 
     // Tests cannot reach the service; they hand in a sampler that answers

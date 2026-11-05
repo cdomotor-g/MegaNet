@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 220, date: '2026-11-05', items: [
+      '🌾 <strong>Pasture is treated like crops, and 🚚 Relocate station no longer sees trees in empty paddocks.</strong> '
+        + 'Rangeland (grass and grazing country) on the elevation profile now stands at its own 1 m unless the tree-height '
+        + 'map finds 10 m or more there — under that, the map was reading open grass as a few metres of trees. '
+        + 'Relocate station now checks the land cover under every tree it counts the same way: round Jimbour '
+        + 'Ck AL it had three quarters of the ground as trees, and now has a fifth, which is what the photo shows.',
+    ] },
     { n: 219, date: '2026-11-05', items: [
       '🌾 <strong>Crops on the elevation profile stand at crop height again.</strong> The tree-height map reads a few '
         + 'metres over bare and planted paddocks — 4 to 8 m across a ploughed field — and the profile was standing every '

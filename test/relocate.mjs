@@ -218,6 +218,10 @@ ok('…and Find new sites is on', picked.run === false);
 
 // The trees and the water, through the land cover's own seam: classes and
 // canopy for whatever points are asked — the places, and the 10 m lattice.
+// The open ground is a paddock to the west and pasture to the east, and the
+// canopy map reads them 6 m and 4 m, as it does real paddocks: noise, which
+// must not stand as trees round every place (LandCover.believed) — so every
+// "nothing above the rim" check below is also a check of that.
 await page.evaluate(({ st, TREES, WATER, k }) => {
   LandCover.seed((lat, lon) => {
     const cls = [], canopy = [];
@@ -225,8 +229,8 @@ await page.evaluate(({ st, TREES, WATER, k }) => {
       const x = (lon[i] - st.lon) * k.lon, y = (lat[i] - st.lat) * k.lat;
       const tree = Math.hypot(x - TREES.x, y - TREES.y) <= TREES.r;
       const water = y >= WATER.y0 && y <= WATER.y1;
-      cls.push(water ? 1 : tree ? 2 : 11);
-      canopy.push(tree ? TREES.h : 0);
+      cls.push(water ? 1 : tree ? 2 : x < 0 ? 5 : 11);
+      canopy.push(tree ? TREES.h : water ? 0 : x < 0 ? 6 : 4);
     }
     return { cls, canopy };
   });
@@ -247,6 +251,8 @@ console.log('\nThe lattice');
 const t0 = Date.now();
 const A = await run();
 ok('the run finishes', A.status.kind === 'done', JSON.stringify(A.status) + ' ' + A.text);
+ok('…and says the trees were checked against the land cover, crops and pasture only from 10 m up',
+   /over crops and pasture only from 10 m up/.test(A.text), A.text.slice(-400));
 if (VERBOSE) console.log(`         ${A.cells.length} places × ${A.hubs.length} repeater(s) in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 const R = 500;
 ok('the places are a lattice ~32 across the 500 m circle', A.step === Math.round(2 * R / 32), `step ${A.step} m`);
