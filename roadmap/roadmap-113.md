@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-05** (revision 236 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-05** (revision 237 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -860,6 +860,14 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 237 — 2026-11-05: 🪪 Loudoun Br AL was in the register twice
+
+The owner, on the re-sweep's report that Loudoun Br AL had moved 28.5 km and a screenshot of two pins at Loudoun Bridge: *"leave it for now … put in a note against the station … there looks to be 2 stations in the database … could potentially be merged if you see no real difference."* No issue. **Opens nothing; closes nothing.**
+
+- **`0104_loudoun_duplicate`**: `loudoun_br_al_2` — no station number, the same ALERT addresses (6128–6130) and the same four sensor ids as `loudoun_br_al` (541155), the same Bureau site, nothing else attached — retired the way the app's Delete does it (`deleted_at`, every row kept, `restore_station()` brings it back). The record kept has the Bureau listings, flood classes, crossing, effects, AEP levels and peaks.
+- **The position stays** (the owner's call): beside the Condamine at Loudoun Bridge, 18 m from the state's river gauge 422333A, where the Bureau's 2024 list put it on 23 October — the 28.5 km "move" the re-sweep reported was that import, from the Loudoun Bridge Alert (Decoupled RG) rain gauge's position. The copy's position, 1.3 km north and away from the river, was the hand-read gauge Loudoun Bridge's (41339), which is the other pin in the owner's screenshot: a different gauge with its own numbers, so not merged. **Notes** on both say so, written only where a station had none; `stations.json` moves with it.
+- `core.js` `DB_SCHEMA_VERSION` to 104 once `db-migrate.yml` has applied it.
 
 ### Revision 236 — 2026-11-05: 🌙 the fade margins re-swept every night
 
