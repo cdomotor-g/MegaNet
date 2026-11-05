@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 212, date: '2026-11-05', items: [
+      '<strong>🗒️ Copy compact</strong> is smaller again: the heading is one line, each of the figures at the top is one '
+        + 'line with its label on the left and its value on the right, and the chart has nothing written over it — each '
+        + 'end\'s ground height now sits beside its antenna height instead.',
+    ] },
     { n: 211, date: '2026-11-05', items: [
       '📍 <strong>A station pin takes the click over anything drawn on top of it.</strong> The elevation profile\'s line '
         + 'along a link you pressed, or a line or circle drawn with ✏️, used to take every click meant for a pin under it '

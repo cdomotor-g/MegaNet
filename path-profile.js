@@ -3042,7 +3042,8 @@ const PathProfile = (function () {
     const s = shown;
     const bare = !!opts.bare;
     const W = opts.W || PAPER.W, H = opts.H || PAPER.H;
-    const head = bare ? 50 : PAPER.head;
+    const named = opts.ends !== false;
+    const head = !named ? 8 : bare ? 50 : PAPER.head;
     const keep = hoverGeom;
     let chart;
     try { chart = chartSvg(s.an, s.prof, false, null, { W, H }); } finally { hoverGeom = keep; }
@@ -3109,8 +3110,8 @@ const PathProfile = (function () {
       <rect x="0" y="0" width="${W}" height="${total}" fill="#ffffff"/>
       ${bare ? '' : `<text x="16" y="28" font-size="19" font-weight="700" fill="${ink}">${esc(fit(rep.heading, W - 32, 19))}</text>
       <text x="16" y="50" font-size="13" fill="${muted}">${esc(fit(rep.sub, W - 32, 13))}</text>`}
-      ${endText(a, an.groundA, an.aglA, 'A, transmitter', 52, 'start')}
-      ${endText(b, an.groundB, an.aglB, 'B, receiver', W - 14, 'end')}
+      ${named ? endText(a, an.groundA, an.aglA, 'A, transmitter', 52, 'start') : ''}
+      ${named ? endText(b, an.groundB, an.aglB, 'B, receiver', W - 14, 'end') : ''}
       ${inner}
       ${key}
       <text x="16" y="${total - 10}" font-size="11" fill="${muted}">${esc(fit(foot, W - 32, 11))}</text>
@@ -3583,7 +3584,7 @@ const PathProfile = (function () {
   // settings (its network properties) and the propagation mode — and the one
   // sentence that makes the comparison work: what Radio Mobile's Rx relative
   // should read for this path, without Flood-Net's own (✦) terms.
-  const COMPACT_CHART = { bare: true, W: 900, H: 210 };
+  const COMPACT_CHART = { bare: true, ends: false, W: 900, H: 210 };
 
   // What the compact summary lays out: the summary's own figures, re-cut.
   function compactOf(rep) {
@@ -3591,7 +3592,10 @@ const PathProfile = (function () {
     const n = S.nums, an = rep.an, P_ = an.prop;
     const short = { 'Ground cover': 'Cover', 'Field allowance': 'Allowance' };
     const grid = S.grid.map(r => r.map(c => ({ ...c, k: short[c.k] || c.k })));
-    const panel = P => ({ ...P, rows: P.rows.filter(([k]) => k !== 'Role') });
+    // The ground under each end rides with its antenna height: the chart has
+    // no room over it to say so.
+    const panel = (P, ground) => ({ ...P, rows: P.rows.filter(([k]) => k !== 'Role')
+      .map(r => (r[0] === 'Antenna height' ? [r[0], r[1], `ground ${ground.toFixed(1)} m`] : r)) });
     // Radio Mobile prices Longley–Rice alone: what it should read here is the
     // margin with Flood-Net's own terms given back (the full report's note).
     const own = n.cover + n.allowance + (n.floor > 0.05 ? n.floor : 0);
@@ -3614,7 +3618,7 @@ const PathProfile = (function () {
       an.itm && an.itm.warnings.length ? `⚠ ${an.itm.warnings.join('; ')}` : '',
       S.notes.some(x => x.startsWith('✎')) ? '✎ typed over on the card' : '',
     ].filter(Boolean);
-    return { ...S, grid, tx: panel(S.tx), rx: panel(S.rx), settings, rm, own, marks };
+    return { ...S, grid, tx: panel(S.tx, an.groundA), rx: panel(S.rx, an.groundB), settings, rm, own, marks };
   }
 
   // The compact summary as a document: the summary's look, at about half its
@@ -3637,23 +3641,32 @@ const PathProfile = (function () {
     const fig = rep.margin == null ? 'not computed' : `${signed(rep.margin, 1)} dB`;
     const chip = rep.band
       ? `&nbsp;<span style="${font}background:${tone[rep.band.cls]};color:#ffffff;font-size:7pt;font-weight:bold;letter-spacing:.6pt">&nbsp;${esc(rep.band.label.toUpperCase())}&nbsp;</span>` : '';
-    const header = table(6, `<tr>
-      ${td(`background:${C.navy};padding:6px 9px;vertical-align:middle;font-size:7pt;line-height:1.3`, `${kick('RADIO LINK', C.kick)}&nbsp;&nbsp;<b style="${font}font-size:10.5pt;color:#ffffff">${
-        esc(`${rep.a.name} → ${rep.b.name}`)}</b><br><span style="${font}font-size:7pt;color:${C.navySub}">${esc(rep.sub)}</span>`,
+    // The distance, the bearing and the frequency are in the figures and the
+    // foot already, so the heading keeps only when it was worked out.
+    const header = table(3, `<tr>
+      ${td(`background:${C.navy};padding:3px 7px;vertical-align:middle;font-size:6.5pt;line-height:1.2;white-space:nowrap`, `${kick('RADIO LINK', C.kick)}&nbsp; <b style="${font}font-size:9pt;color:#ffffff">${
+        esc(`${rep.a.name} → ${rep.b.name}`)}</b>&nbsp;&nbsp;<span style="${font}font-size:6.5pt;color:${C.navySub}">Flood-Net, ${esc(rep.stamp)}</span>`,
         `bgcolor="${C.navy}" valign="middle"`)}
-      ${td(`background:${C.navy};padding:6px 9px;vertical-align:middle;text-align:right;white-space:nowrap;font-size:7pt;line-height:1.3`, `${kick('FADE MARGIN', C.kick)}<br><b style="${font}font-size:13pt;color:#ffffff">${esc(fig)}</b>${chip}`,
+      ${td(`background:${C.navy};padding:3px 7px;vertical-align:middle;text-align:right;white-space:nowrap;font-size:6.5pt;line-height:1.2`, `${kick('FADE MARGIN', C.kick)}&nbsp; <b style="${font}font-size:10pt;color:#ffffff">${esc(fig)}</b>${chip}`,
         `bgcolor="${C.navy}" align="right" valign="middle"`)}
     </tr>`, `background:${C.navy}`);
 
-    // Radio Mobile's three rows of five, a figure to a cell and nothing under it.
+    // Radio Mobile's three rows of five, one line each: the label at the left
+    // of its cell and the figure at the right. Two table cells to a figure,
+    // the rule only after the pair — a word processor keeps a cell's own
+    // alignment, but not two alignments inside one cell.
     const gridCell = (c, i) => {
       const bg = c.hot && c.tone ? grid[2] : grid[0];
       const col = c.tone && (c.hot || c.tone !== 'ok') ? tone[c.tone] : C.ink;
-      return td(`background:${bg};vertical-align:top;padding:4px 6px;font-size:6.5pt;line-height:1.2;border-top:1px solid ${grid[1]};${i < 4 ? `border-right:1px solid ${grid[1]};` : ''}`,
-        `<div style="${font}margin:0;font-size:6.5pt;line-height:1.2;color:${C.muted}">${esc(c.k)}${c.flag ? ` <b style="color:${C.accent}">${c.flag}</b>` : ''}</div><div style="${font}margin:0;font-size:8.5pt;line-height:1.2;font-weight:bold;color:${col};white-space:nowrap">${esc(c.v)}</div>`,
-        `width="20%" valign="top" bgcolor="${bg}"`);
+      const edge = `background:${bg};vertical-align:middle;padding:2px 5px;font-size:6.5pt;line-height:1.15;white-space:nowrap;border-top:1px solid ${grid[1]};`;
+      return td(`${edge}text-align:left;padding-right:2px`,
+        `<span style="${font}font-size:6.5pt;color:${C.muted}">${esc(c.k)}${c.flag ? ` <b style="color:${C.accent}">${c.flag}</b>` : ''}</span>`,
+        `align="left" valign="middle" bgcolor="${bg}"`)
+        + td(`${edge}text-align:right;padding-left:2px;${i < 4 ? `border-right:1px solid ${grid[1]};` : ''}`,
+          `<b style="${font}font-size:8pt;color:${col}">${esc(c.v)}</b>`,
+          `align="right" valign="middle" bgcolor="${bg}"`);
     };
-    const figures = table(3, S.grid.map(r => `<tr>${r.map(gridCell).join('')}</tr>`).join(''), 'table-layout:fixed');
+    const figures = table(2, S.grid.map(r => `<tr>${r.map(gridCell).join('')}</tr>`).join(''));
 
     const imgW = W - 2, imgH = pic ? Math.round(pic.h * imgW / pic.w) : 0;
     const chart = pic ? `<img src="${pic.url}" width="${imgW}" height="${imgH}" style="display:block;border:0" alt="${
