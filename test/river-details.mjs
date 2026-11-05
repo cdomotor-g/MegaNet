@@ -162,11 +162,18 @@ async function main() {
       const rows = [...sect.querySelectorAll(':scope > .acma-row')].map(r =>
         [r.children[0].textContent.trim(), r.children[1].textContent.replace(/\s+/g, ' ').trim()]);
       const earlier = sect.querySelector('.stn-card-rhs-earlier');
+      // The Bureau lists row, line by line (each list sits on its own line).
+      const listRow = [...sect.querySelectorAll(':scope > .acma-row')]
+        .find(r => r.children[0].textContent.trim() === 'Bureau lists');
+      const listLines = listRow ? listRow.children[1].innerHTML.split(/<br\s*\/?>/i).map(h => {
+        const d = document.createElement('div'); d.innerHTML = h;
+        return d.textContent.replace(/\s+/g, ' ').trim();
+      }) : null;
       const effects = sect.querySelector('.stn-card-rhs-effects');
       const block = sect.querySelector('.stn-card-rhs-classes');
       const head = sect.querySelector('.stn-card-rhs-head');
       const colour = sel => { const e = block && block.querySelector(sel); return e ? getComputedStyle(e).color : null; };
-      return { rows, earlier: earlier ? earlier.querySelectorAll('.acma-row').length : 0,
+      return { rows, listLines, earlier: earlier ? earlier.querySelectorAll('.acma-row').length : 0,
                afterHead: head && head.nextElementSibling ? head.nextElementSibling.textContent.trim() : '',
                classesHead: block ? [...block.querySelectorAll(':scope > span')].slice(0, 2).map(e => e.textContent.trim()).join(' ') : '',
                classLines: block ? [...block.querySelectorAll('.mn-pop-line')].map(e => e.textContent.trim()) : [],
@@ -184,11 +191,12 @@ async function main() {
 
     const listed = card && card.rows.find(r => r[0] === 'Bureau lists');
     const labels = { 1: 'FloodWarn rainfall', 2: 'Daily rainfall', 3: 'River height' };
-    check('the indexes that list it are named, in section order',
-      listed && [...new Set(full.bureau_listings.map(l => l.section))].sort()
-        .map(k => labels[k]).join(' · ')
-        === listed[1].replace(/ as at .*$/, '').replace(/ \d{2}\/\d{2}\/\d{4}/g, ''),
-      JSON.stringify({ listed, rows: full.bureau_listings }));
+    const named = card && card.listLines && card.listLines.filter(l => !/^as at /.test(l))
+      .map(l => l.replace(/ as at .*$/, '').replace(/ \d{2}\/\d{2}\/\d{4}/g, ''));
+    check('the indexes that list it are named, one a line, in section order',
+      listed && named && [...new Set(full.bureau_listings.map(l => l.section))].sort()
+        .map(k => labels[k]).join('\n') === named.join('\n') && !listed[1].includes('·'),
+      JSON.stringify({ listed, lines: card && card.listLines, rows: full.bureau_listings }));
     check('its AWRC number, stream and URBS label are on the card, as recorded',
       card && FIELDS.every((k, i) => {
         const r = card.rows.find(x => x[0] === ['AWRC number', 'Stream', 'URBS label'][i]);

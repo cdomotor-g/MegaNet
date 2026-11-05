@@ -402,8 +402,11 @@ const RiverDetails = (function () {
     const parts = newest.map(l => esc(indexLabel(l.section))
       + (!one && l.as_at ? ` <span class="mn-pop-note">${esc(date(l.as_at))}</span>` : '')
       + (l.note ? ` <span class="mn-pop-note">${esc(l.note)}</span>` : ''));
-    const asAt = one && newest[0].as_at ? ` <span class="mn-pop-note">as at ${esc(date(newest[0].as_at))}</span>` : '';
-    return parts.join(' · ') + asAt;
+    // One list a line. When several share a date it goes on a line of its
+    // own at the end, so it reads as belonging to all of them.
+    const asAt = one && newest[0].as_at
+      ? `${newest.length > 1 ? '<br>' : ' '}<span class="mn-pop-note">as at ${esc(date(newest[0].as_at))}</span>` : '';
+    return parts.join('<br>') + asAt;
   }
 
   // The section on the station card. Empty for a station that is in none of
