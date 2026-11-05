@@ -1150,6 +1150,280 @@ header p {
   border-color: rgba(255, 255, 255, .5);
 }
 
+/* ── ⟳ The busy wheel (busy.js) ──────────────────────────────────────────────
+   Last in the banner's row, in a slot that is always there and always this
+   wide, so nothing moves when the wheel comes and goes. Three parts turn: an
+   outer ring with a comet's tail, fast; an inner pair of arcs the other way,
+   slower; and a drop in the middle that falls in while loading, rises out
+   while saving and beats while working something out. All three are HTML
+   boxes moved by transform alone, which the browser does off the page's own
+   thread — so the wheel keeps turning while a long sum has that thread tied
+   up. The outer ring wears the first kind going (saving, working, loading)
+   and the inner one the next, so two at once show as two colours. */
+.busy-slot {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 2rem;
+}
+
+.busy {
+  --busy-load: var(--accent);
+  --busy-save: var(--ok);
+  --busy-work: var(--warn);
+  --busy-on: var(--panel);           /* the count's figures, on its colour */
+  --busy-a: var(--busy-load);
+  --busy-b: var(--busy-a);
+  position: relative;
+  flex: 0 0 auto;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  visibility: hidden;
+  opacity: 0;
+  transform: scale(.3);
+  transition: opacity .14s ease-in, transform .14s ease-in, visibility 0s linear .14s;
+}
+/* Up: a quick pop, a little past full size and back. */
+.busy[data-state="spin"],
+.busy[data-state="tick"] {
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+  transition: opacity .08s ease-out, transform .2s cubic-bezier(.3, 1.8, .55, 1), visibility 0s;
+}
+.busy:focus-visible { outline: 2px solid var(--busy-a); outline-offset: 2px; }
+
+/* The classic banner is the app's blue: the same three, lightened to read on it. */
+:root[data-shell="classic"] .busy {
+  --busy-load: #a9d8ff;
+  --busy-save: #8ef0b5;
+  --busy-work: #ffd27a;
+  --busy-on: #0b2a4a;
+}
+/* The Instrument look's banner is dark in either theme and restates only the
+   accent, so the other two are lightened for it the same way. */
+:root[data-look="instrument"] .busy {
+  --busy-save: #4ade80;
+  --busy-work: #fbbf24;
+}
+.busy[data-kind="save"]  { --busy-a: var(--busy-save); }
+.busy[data-kind="work"]  { --busy-a: var(--busy-work); }
+.busy[data-kind2="load"] { --busy-b: var(--busy-load); }
+.busy[data-kind2="save"] { --busy-b: var(--busy-save); }
+.busy[data-kind2="work"] { --busy-b: var(--busy-work); }
+
+.busy-ring {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity .12s;
+}
+.busy-out {
+  inset: 0;
+  background: conic-gradient(from 0deg,
+    transparent 0 18%,
+    color-mix(in srgb, var(--busy-a) 30%, transparent) 50%,
+    var(--busy-a) 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
+}
+/* The comet's head, round, at the front of its tail. */
+.busy-out::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  margin-left: -1.5px;
+  border-radius: 50%;
+  background: var(--busy-a);
+}
+.busy-in {
+  inset: 6px;
+  border: 2px solid transparent;
+  border-top-color: var(--busy-b);
+  border-bottom-color: var(--busy-b);
+}
+.busy-drop {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: var(--busy-a);
+  opacity: 0;
+}
+/* Turning only while it spins: nothing moves while it is put away. */
+.busy[data-state="spin"] :is(.busy-ring, .busy-drop) { opacity: 1; }
+.busy[data-state="spin"] .busy-out  { animation: busy-turn .5s linear infinite; }
+.busy[data-state="spin"] .busy-in   { animation: busy-turn .8s linear infinite reverse; }
+.busy[data-state="spin"] .busy-drop { animation: busy-beat .5s ease-in-out infinite alternate; }
+.busy[data-state="spin"][data-kind="load"] .busy-drop { animation: busy-fall .5s ease-in infinite; }
+.busy[data-state="spin"][data-kind="save"] .busy-drop { animation: busy-rise .5s ease-out infinite; }
+
+/* How many things are going, once it is more than one; it hops as one ends. */
+.busy-n {
+  position: absolute;
+  right: -6px;
+  bottom: -5px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  border-radius: 7px;
+  background: var(--busy-a);
+  color: var(--busy-on);
+  font: 700 9px/13px system-ui, sans-serif;
+  text-align: center;
+  pointer-events: none;
+}
+.busy-n:empty { display: none; }
+.busy-n.hop { animation: busy-hop .22s ease-out; }
+
+/* Done: the rings go, a tick draws itself in, green, and a ripple runs out
+   from it like a drop landing in water. It stays drawn ("out") while the
+   wheel fades, so the rings do not come back on the way out. */
+.busy-tick {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: var(--busy-save);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 18;
+  stroke-dashoffset: 18;
+  opacity: 0;
+}
+.busy:not([data-state="spin"]) .busy-n { opacity: 0; }
+.busy[data-state="tick"] .busy-tick { animation: busy-tick .2s ease-out forwards; }
+.busy[data-state="out"] .busy-tick { stroke-dashoffset: 0; opacity: 1; }
+.busy::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--busy-save);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+.busy[data-state="tick"]::after { animation: busy-splash .4s ease-out forwards; }
+
+@keyframes busy-turn { to { transform: rotate(360deg); } }
+@keyframes busy-fall {
+  0%   { transform: translateY(-10px) scale(.5); opacity: 0; }
+  35%  { opacity: 1; }
+  100% { transform: translateY(0) scale(1.1); opacity: 0; }
+}
+@keyframes busy-rise {
+  0%   { transform: translateY(0) scale(1.1); opacity: 0; }
+  40%  { opacity: 1; }
+  100% { transform: translateY(-10px) scale(.5); opacity: 0; }
+}
+@keyframes busy-beat { from { transform: scale(.6); } to { transform: scale(1.35); } }
+@keyframes busy-hop  { 40% { transform: translateY(-3px) scale(1.15); } }
+@keyframes busy-tick { to { stroke-dashoffset: 0; opacity: 1; } }
+@keyframes busy-splash {
+  from { transform: scale(.55); opacity: .9; }
+  to   { transform: scale(1.7); opacity: 0; }
+}
+@keyframes busy-glow { from { opacity: 1; } to { opacity: .3; } }
+
+/* The card it opens: what is happening now, and what the colours mean. */
+.busy-pop {
+  position: fixed;
+  right: .5rem;
+  z-index: 1995;
+  width: min(22rem, calc(100vw - 1rem));
+  max-height: calc(100vh - 6rem);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: .6rem .8rem .7rem;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .22);
+  font-size: .85rem;
+  line-height: 1.4;
+}
+.busy-pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  margin-bottom: .35rem;
+}
+.busy-pop-x {
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.busy-pop-x:hover { background: var(--subtle); color: var(--text); }
+.busy-pop-sub {
+  margin: .6rem 0 .25rem;
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.busy-pop-idle { margin: .1rem 0; color: var(--ok); }
+.busy-pop-now,
+.busy-pop-key {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: .3rem;
+}
+.busy-pop-now li,
+.busy-pop-key li {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  overflow-wrap: anywhere;
+}
+.busy-dot {
+  flex: 0 0 auto;
+  width: .6rem;
+  height: .6rem;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateY(.05rem);
+}
+.busy-dot[data-kind="save"] { background: var(--ok); }
+.busy-dot[data-kind="work"] { background: var(--warn); }
+.busy-dot-tick {
+  width: .6rem;
+  height: auto;
+  background: none;
+  color: var(--ok);
+  font-weight: 700;
+  line-height: 1;
+}
+
 /* The icon is decoration while the label is showing, and the whole button once
    the label is gone — it grows to match at the breakpoint below. */
 .hdr-ico {
@@ -20557,6 +20831,12 @@ body.has-sort-bridge .signin-nudge { display: none; }
      no sheen sweeping it and no pulse through it, just the logo. */
   .ll-vivid, .ll-sheen, .ll-mesh path, .load-logo i::before, .load-logo i::after { animation: none; }
   .ll-sheen, .ll-mesh, .load-logo i { display: none; }
+
+  /* The busy wheel (busy.js) is load-bearing — it is how the page says "wait
+     a moment" — so it keeps a signal, but not a motion: its rings stand
+     still and its light fades slowly up and down instead. */
+  .busy[data-state="spin"] .busy-out { animation: busy-glow 1.4s ease-in-out infinite alternate !important; }
+  .busy .busy-in, .busy .busy-drop { animation: none !important; }
 
   *,
   *::before,

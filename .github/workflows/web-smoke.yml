@@ -1388,6 +1388,15 @@ jobs:
         working-directory: test
         run: npm run tooltips
 
+      # The busy wheel at the far right of the banner (busy.js): up for a fetch
+      # or a "…" status line that takes a moment, blue, green or amber for
+      # loading, saving or working it out, put away with a ✓, never for a quick
+      # answer, and its slot the same width either way so nothing moves.
+      - name: Busy wheel — up while something loads, saves or is worked out, then a ✓
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run busy
+
       # A capped table's card made taller by the handle on its bottom edge
       # (card-grip.js): there only while rows are hidden, taking no room, the
       # drag, the floor, the height kept and put back on a redraw, double-click

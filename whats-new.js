@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 225, date: '2026-11-05', items: [
+      '⟳ <strong>A little wheel in the top-right corner spins while something is happening.</strong> It comes up '
+        + 'whenever Flood-Net is loading from the database or the web (blue), saving to it (green) or working something '
+        + 'out on this device (amber), with a number on it when several things are going at once, and closes into a ✓ '
+        + 'when it is done. Press it while it spins to see what it is doing.',
+    ] },
     { n: 224, date: '2026-11-05', items: [
       '🔍 <strong>The magnifier keeps the pins now, small.</strong> Inside the glass each station is a small dot in its '
         + 'pin\'s colour, and its name, where the map shows one, is barely there — so you can see the ground under it '

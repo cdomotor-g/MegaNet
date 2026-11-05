@@ -317,11 +317,18 @@ const Maintenance = (function () {
   const refPath = t => `${t}?select=*&order=ord`;
   const refPaths = () => LOOKUPS.map(refPath);
 
+  // A failed load is shown, with Try again, rather than asked for again on
+  // every repaint — the same loop inspections.js has the same guard against:
+  // the repaint that shows the failure runs init(), which comes straight back
+  // here. A visit to the tab after this long asks again; retry() asks at once.
+  const REFS_RETRY_MS = 15000;
+
   // Fetched once per session. Never rejects: every caller wants to render the
   // failure, not catch it.
   function loadRefs() {
     const s = S();
     if (s.refs || s.refsLoading) return;
+    if (s.refsError && Date.now() - (s.refsFailedAt || 0) < REFS_RETRY_MS) return;
     s.refsLoading = true;
     s.refsError = null;
     repaint();
@@ -341,6 +348,7 @@ const Maintenance = (function () {
         // Deliberately not console.error, for the same reason as #116: a
         // blocked or sleeping datastore is a state this tab renders.
         s.refsError = (err && err.message) || String(err);
+        s.refsFailedAt = Date.now();
         repaint();
         wake();
       });

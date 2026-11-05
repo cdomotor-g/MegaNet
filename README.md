@@ -221,6 +221,9 @@ MegaNet/
 │                             window, in place of alert() (#223)
 ├── tooltips.js             ← Tooltips  — a title's words above the pointer, in place
 │                             of the browser's tooltip under it, which it covers
+├── busy.js                 ← Busy      — the wheel in the banner's top-right corner
+│                             that spins while something loads, saves or is worked
+│                             out, and closes into a ✓
 ├── packets.js              ← Packets   — ALERT / ERTS codec, and its tab
 ├── log-follow.js           ← LogFollow — follows a log file as it grows (PuTTY's,
 │                             for a computer that blocks Web Serial)

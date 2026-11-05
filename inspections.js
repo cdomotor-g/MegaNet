@@ -709,9 +709,17 @@ const Inspections = (function () {
   }
   const refPaths = () => refWant().map(([, path]) => path);
 
+  // A failed load is shown, with Try again, rather than asked for again on
+  // every repaint: the repaint that shows the failure runs init(), which comes
+  // straight back here, and with nothing in the way that was hundreds of
+  // requests a second for as long as the datastore was out of reach. A visit to
+  // the tab after this long asks again; Try again (retry) asks at once.
+  const REFS_RETRY_MS = 15000;
+
   function loadRefs() {
     const s = S();
     if (s.refs || s.refsLoading) return;
+    if (s.refsError && Date.now() - (s.refsFailedAt || 0) < REFS_RETRY_MS) return;
     s.refsLoading = true;
     s.refsError = null;
     repaint();
@@ -731,6 +739,7 @@ const Inspections = (function () {
         // Deliberately not console.error: a blocked or sleeping datastore is a
         // state this tab renders, not a fault to shout about.
         s.refsError = (err && err.message) || String(err);
+        s.refsFailedAt = Date.now();
         repaint();
         wake();
       });

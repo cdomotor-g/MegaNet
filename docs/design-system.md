@@ -1266,6 +1266,52 @@ The nav's find box keeps its own `role="status"` region for the result count.
 That is deliberate: it is a count attached to a list, and it is read where the
 list is.
 
+### "Hold on a moment" — the busy wheel (`busy.js`)
+
+A little wheel at the far right of the banner spins while the app is doing
+something somebody may have to wait for, and closes into a ✓ with a ripple when
+it is done. It is the one app-wide "wait a moment"; a tab's own status line
+still says *what* it is doing, where it is doing it.
+
+| Colour | Word | What it means |
+|---|---|---|
+| Blue | Loading | Fetching something from the database or the web — a station list, photos, map data |
+| Green | Saving | Sending a change to the database — a station you edited, a photo, a setting |
+| Amber | Working it out | A sum this device is doing — a path profile, a coverage map, a drive |
+
+The outer ring wears the first kind going (saving, then working, then loading)
+and the inner ring the next, so two kinds at once show as two colours; a number
+on it counts the jobs once there is more than one. Pressing it opens a card
+that lists what is happening, live, and this key — the tooltip's words, for a
+finger or a keyboard. The meanings live once, in `Busy.KEY`.
+
+**Almost nothing has to call it.** Three things reach it:
+
+1. **Every `fetch()`.** `Busy.start()` (first in `init.js`) wraps it. A GET is
+   loading; a POST, PATCH, PUT or DELETE is saving, except a database function
+   whose name does not say it changes anything (`task_list`), which is loading.
+   Reading the body is part of the job. A background request that should not
+   spin it — a poll nobody is waiting on — passes `{ busy: false }` in its
+   options.
+2. **A status line that says "…".** Any `role="status"` element on screen whose
+   words end in "…" ("Working out the drive…"), and anything marked
+   `aria-busy="true"`. So the house convention is the hook: *a line saying the
+   page is working on something ends with an ellipsis, and goes or changes
+   when it is done.* A line for a state somebody waits on rather than work —
+   "Waiting for a GPS fix…", "Watching the log…" — starts with Waiting,
+   Watching or Listening, and does not count. A line unchanged for a minute is
+   taken to be left behind and stops counting.
+3. **`Busy.run(kind, label, promise)`** or `const end = Busy.begin(kind,
+   label)` for work that says nothing on the page. `kind` is `load`, `save` or
+   `work`.
+
+It comes up only once something has taken 100 ms, and then stays at least
+450 ms, so a cached read does not flicker it. The rings are HTML boxes turned
+by `transform`, which the browser runs off the page's own thread: the wheel
+keeps turning while a long sum has the page frozen. Under reduced motion it
+does not turn; its ring fades slowly up and down instead (*Reduced motion*,
+below).
+
 ### Reduced motion
 
 **One policy, one block**, at the foot of `styles.css`: anything decorative

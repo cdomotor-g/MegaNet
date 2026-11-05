@@ -75,6 +75,9 @@ export async function openShot(browser, shot, base, { policy = null } = {}) {
   // What would mislead in a still: a ▶ that does not play, a pill that
   // only says something is new on this device.
   if (shot.css) await page.addStyleTag({ content: shot.css });
+  // …and the busy wheel (busy.js), which caught in a still is a spinner that
+  // never stops. Every shot, so no shot has to remember it.
+  await page.addStyleTag({ content: '#busy { visibility: hidden !important; }' });
   for (const st of shot.steps || []) {
     if (st.click) await page.click(st.click);
     // Typed into a box — a search, never a form that saves.
