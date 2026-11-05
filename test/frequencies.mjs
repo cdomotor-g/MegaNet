@@ -13,6 +13,12 @@
 //      removing a row hands focus back to + Add. A base station gets a section
 //      of its own; a field station gets none.
 //   3. **The card**: the primary pair and the others, a line each.
+//   4. **Links** (map-direct.js): under Assumed, every repeater that carries
+//      a field station within the Max TX distance and every base station in
+//      range on its channel, the best fade margin first; a base on record as
+//      listening elsewhere left out and named, and the ones too weak to hear
+//      it on one line. While its card is open the map draws a line to each
+//      base that hears it — and only those — and the line goes with the card.
 //
 // Run:  npm run frequencies
 //       npm run frequencies -- -v
@@ -291,6 +297,75 @@ async function main() {
       JSON.stringify(card));
     mode = 'ok';
 
+    log('\nLinks — its repeaters, and the base stations that hear it direct\n');
+    // Greys Plains Rd AL (540317): carried by Bundamba (43 km), Hillcrest
+    // (60 km) and Constitution Hill (62 km, a base too), assumed to transmit
+    // on 151.500; Marburg Radar (24 km) is a base with no RX on record, SRRC
+    // and Mt Stapylton are bases on record on 152.400 and 151.950. The page is
+    // offline, so the fade margins are set by hand.
+    const GP = 'grey_s_plains_rd_a';
+    const FIG = { marburg_radar: 34.1, bundamba_barclay_st: 12, gatton_lvrc_enviromon_basestation: 4.2,
+                  constitution_hill: -1.7, hillcrest_wine_glass: -18, '18_bateson': -3.2,
+                  cogcc_bundall_base: -44.3, cogcc_ashmore_base: -45.8, cogcc_carrara_base: -48.3 };
+    await page.evaluate(([id, fig]) => {
+      state.mapMaxLinkKm = 100;
+      for (const [b, m] of Object.entries(fig)) MapDirect._set(id, b, m);
+      showStationCard(id);
+      StnCardView.go('radio');
+    }, [GP, FIG]);
+    const lk = await page.evaluate(id => MapDirect._links(id), GP);
+    const ids = xs => (xs || []).map(x => x.id || x);
+    check('its links: the repeaters carrying it within the Max TX distance, and the base stations in range',
+      lk && ['bundamba_barclay_st', 'hillcrest_wine_glass', 'constitution_hill'].every(x => ids(lk.carriers).includes(x))
+        && ['marburg_radar', 'gatton_lvrc_enviromon_basestation', '18_bateson'].every(x => ids(lk.bases).includes(x))
+        && !ids(lk.bases).includes('constitution_hill'), JSON.stringify(lk));
+    check('…a base on record on another channel is left out; one with no RX on record is counted, unchecked',
+      lk && lk.off.includes('srrc_base') && lk.off.includes('mt_stapylton_base') && lk.tx.join() === '151.5'
+        && lk.bases.find(b => b.id === 'marburg_radar').check === 'unchecked'
+        && lk.bases.find(b => b.id === 'cogcc_bundall_base').check === 'match', JSON.stringify(lk));
+    card = await freqCard();
+    const keys = card ? Object.keys(card) : [];
+    const L = card && card.Links;
+    const flat = v => v.replace(/\s+/g, ' ');
+    check('the card lists them under Assumed, best fade margin first, in the link budget\'s bands',
+      L && keys.indexOf('Links') === keys.indexOf('Assumed') + 1
+        && JSON.stringify(L.vals.map(flat)) === JSON.stringify([
+          'Marburg Radar · +34.1 dB Good', 'Bundamba (Barclay St) AL · +12.0 dB Good',
+          'GATTON LVRC ENVIROMON BASESTATION · +4.2 dB Marginal', 'Constitution Hill · -1.7 dB Poor',
+          'Hillcrest AL (Wine Glass) · -18.0 dB Poor']), JSON.stringify(L && L.vals));
+    check('…each saying what it is, in words a finger can read',
+      L && L.notes[0] === 'base station · 24.1 km · hears it direct · channel not checked'
+        && L.notes[1] === 'repeater · 43.4 km · carries it'
+        && L.notes[3] === 'base and repeater · 62.4 km · carries it, likely second-hand', JSON.stringify(L && L.notes));
+    check('…the base stations too weak to hear it on one line, and those on another channel named',
+      L && L.notes.includes('Too weak to hear it direct: 18 Bateson (57.0 km, -3.2 dB), CoGCC Bundall Base Station (98.4 km, '
+        + '-44.3 dB), CoGCC Ashmore Base Station (96.0 km, -45.8 dB) and 1 more.')
+        && L.notes.includes('Not counted, on another channel: SRRC Base Station (152.400 MHz), BoM Mt Stapylton Base Station (151.950 MHz).'),
+      JSON.stringify(L && L.notes));
+    const linkTitle = await page.evaluate(() => document.querySelector('#stn-card .stn-card-links .term')?.title || '');
+    check('…and Links says what it means on hover, and the bands in words under it',
+      /fade margin/.test(linkTitle)
+      && L && /^Fade margin: dB to spare above what the receiver needs — Good 10 or more, Marginal 3 or more, Poor under 3\./
+        .test(L.notes[L.notes.length - 1]));
+    const drawn = await page.evaluate(() => MapDirect._drawn().map(d => d.to).sort());
+    check('the map draws a line to each base station that hears it, and to nothing else',
+      JSON.stringify(drawn) === JSON.stringify(['gatton_lvrc_enviromon_basestation', 'marburg_radar']), JSON.stringify(drawn));
+    check('…with a key in the legend while it does',
+      await page.evaluate(() => !!document.querySelector('.legend-line-direct')));
+    await page.click('#stn-card .stn-link[data-mn-link="marburg_radar"] button');
+    check('a name opens that path\'s radio-path card, direct to base',
+      await page.evaluate(() => { const c = MapBackbone.current(); return !!c && c.kind === 'direct' && c.bId === 'marburg_radar'; }));
+    await page.evaluate(() => { state.mapMaxLinkKm = 20; refreshMapLayers({ skipFit: true }); });
+    check('a shorter Max TX distance takes the lines past it off the map',
+      await page.evaluate(() => MapDirect._drawn().length === 0));
+    await page.evaluate(() => { state.mapMaxLinkKm = 100; refreshMapLayers({ skipFit: true }); });
+    await page.evaluate(() => closeStnCard());
+    check('…and the lines go with the card',
+      await page.evaluate(() => MapDirect._drawn().length === 0 && !document.querySelector('.legend-line-direct')));
+    check('a repeater\'s card has no Links line, and draws none',
+      await page.evaluate(id => { showStationCard(id); return !document.querySelector('#stn-card .stn-card-links') && MapDirect._drawn().length === 0; },
+        repeater.id));
+
     await context.close();
 
     log('\nThe phone\n');
@@ -308,6 +383,18 @@ async function main() {
       });
     }));
     check('…and no box spills out of its row', !spill);
+    await phone.page.evaluate(([id, fig]) => {
+      for (const [b, m] of Object.entries(fig)) MapDirect._set(id, b, m);
+      showStationCard(id);
+      StnCardView.go('radio');
+    }, [GP, FIG]);
+    const pw = await phone.page.evaluate(() => {
+      const row = document.querySelector('#stn-card .stn-card-links');
+      const card = document.getElementById('stn-card').getBoundingClientRect();
+      const out = row ? [...row.querySelectorAll('*')].some(e => { const b = e.getBoundingClientRect(); return b.width && b.right > card.right + 1; }) : true;
+      return [document.documentElement.scrollWidth, document.documentElement.clientWidth, out];
+    });
+    check('at 375 px the card\'s Links fit, and the page does not scroll sideways', pw[0] <= pw[1] && !pw[2], JSON.stringify(pw));
     await phone.context.close();
 
     check('nothing threw for the whole run', errors.length === 0, errors.join(' | '));

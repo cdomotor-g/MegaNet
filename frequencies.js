@@ -7,6 +7,9 @@
 //                 under them, what it is *assumed* to transmit on, what it
 //                 was *heard on* (see "Assumed, and heard on" below), and the
 //                 protocol its readings came in on — legacy ALERT or ALERT2.
+//                 Under Assumed, map-direct.js's Links: every repeater that
+//                 carries it and every base station that hears it direct,
+//                 with each one's fade margin, the best first.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, hintToggleHtml, fmtKm and
@@ -240,7 +243,9 @@ const Frequencies = (function () {
   }
 
   // The block's inside: the pairs on record, one to a line the way the AlertID
-  // block lists addresses, then Assumed, Heard on and Protocol. paint() redraws it.
+  // block lists addresses, then Assumed, the Links beside it (map-direct.js:
+  // its repeaters and the base stations that hear it direct, by fade margin),
+  // Heard on and Protocol. paint() redraws it.
   function innerHtml(s) {
     const lines = pairs(s).map(f => {
       const what = [f.primary ? 'primary' : '', f.label || '', f.acma_licence ? `licence ${f.acma_licence}` : '']
@@ -250,7 +255,7 @@ const Frequencies = (function () {
     });
     const C = carriersOf(s);
     return `<span class="small txt-muted">Frequencies</span>${lines.length ? '<br>' + lines.join('<br>') : ''}`
-      + assumedHtml(C) + heardHtml(s, C) + protoHtml(s);
+      + assumedHtml(C) + (typeof MapDirect !== 'undefined' ? MapDirect.rowHtml(s) : '') + heardHtml(s, C) + protoHtml(s);
   }
 
   const cardId = id => `mn-freqs-card-${id}`;
@@ -449,6 +454,9 @@ const Frequencies = (function () {
     pairs,
     cardHtml,
     carriersOf,
+    // The block drawn again in place, when something it shows has landed —
+    // a link's fade margin (map-direct.js).
+    repaint: paint,
     editorHtml,
     addRow,
     removeRow,

@@ -297,6 +297,52 @@ and height for both ends before trusting either. Neither models antenna patterns
 interference or the tree that grew last year. Confirm on air before building on
 either.
 
+### One path, side by side: Greys Plains Rd AL to Marburg Radar
+
+A worked case of "check the register before trusting either" (November 2026).
+For this 24 km path Flood-Net gives **+34.1 dB** and a Radio Mobile run of the
+same path gives **+23.4 dB**. The two models agree on everything they both
+compute — free space 103.7 dB, the statistics 6.3 dB — and differ in what they
+were told:
+
+| | Radio Mobile run | Flood-Net |
+|---|---:|---:|
+| Marburg's antenna | 4 m | 10 m — the repeater and base mast minimum |
+| Marburg's receiver threshold | −110 dBm | −117 dBm — the field station radio system every station is on |
+| Obstruction (Longley–Rice over the terrain) | 15.9 dB | 0.1 dB |
+| Field allowance | — | 12.0 dB |
+| Path loss | 125.9 dB | 122.2 dB |
+| **Fade margin** | **+23.4 dB** | **+34.1 dB** |
+
+So 7 dB of the 10.7 dB gap is the receiver threshold, and 3.7 dB is the path
+loss — itself two large terms going opposite ways. Flood-Net's own Longley–Rice,
+run with Radio Mobile's inputs (Marburg at 4 m, −110 dBm, no allowance), gives
+**+5.3 dB** — *lower* than Radio Mobile, with 34 dB of obstruction. The reason is
+the last 100 m: the terrain tile 95 m in front of Marburg's antenna reads 354 m,
+5.5 m above Marburg's surveyed 348.5 m, and at 4 m the line of sight just
+grazes it. At 10 m it clears (0.1 dB). Sampled more finely (512 points rather
+than 256) the tile at the end itself reads 356 m, the end is stood on it, and
+the obstruction is gone again at 4 m (+39.2 dB).
+
+Radio Mobile's elevation angle for the path (0.580°, against Flood-Net's
+0.435°) says its two ends sit further apart in height than the surveyed
+heights Flood-Net uses — most likely each stood on its own terrain map — so it
+meets that edge, and the one near Greys Plains it reports at 0.30 km, a
+different way again.
+
+What this says:
+
+- **One path is not a calibration point**, least of all this one: a few metres
+  of mast or hilltop move it by 30 dB in either model. The allowance was fitted
+  on 473 margins measured on site; a model's figure is not one of them.
+- **The gap is the register's**: Marburg's real antenna height, the ground
+  height the antenna stands on, and its receiver's real sensitivity. Recorded
+  — a base-station radio system with its own height and threshold — every
+  path into Marburg is priced on them, in both models.
+- **Same inputs, same figure**: the link budget card takes either end's antenna
+  height and receiver threshold for the session, so a Radio Mobile set-up can
+  be typed in and the two compared like for like.
+
 ## The ground: LiDAR, where it matters
 
 The link budget card's propagation settings have a **Ground** setting: the

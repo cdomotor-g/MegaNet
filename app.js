@@ -6191,6 +6191,7 @@ function mapLegendHtml() {
     MapRelocate.active() ? MapRelocate.legendHtml() : '',
     MapBestRepeater.active() ? MapBestRepeater.legendHtml() : '',
     MapHops.active() ? MapHops.legendHtml() : '',
+    MapDirect.active() ? MapDirect.legendHtml() : '',
     MapPeaks.active() ? `
     <span class="legend-item">
       <span class="legend-peak" aria-hidden="true">▲</span>
@@ -6400,6 +6401,7 @@ function stopStationsMap() {
   MapRelocate.detach();
   MapBestRepeater.detach();
   MapHops.detach();
+  MapDirect.detach();
   MapLatency.detach();
   Places.detach();
   MapRoads.detach();
@@ -6602,6 +6604,10 @@ function initMap() {
   // 🪜 Hops to base: a pane for its lines, and the hops of a station lit
   // before the map was built again drawn on the new one.
   MapHops.attach(state.map);
+  // A field station's card draws a line to each base station that hears it
+  // direct, with no repeater between: a pane for them, and the card's station's
+  // drawn on the new map (map-direct.js).
+  MapDirect.attach(state.map);
   // ⏱️ Latency: a pane rather than a switch in 🗺️ Map display, because what it
   // shows beside the pins — the stations in view summed up, and a picked
   // station's checks slot by slot — is the point of it, and it follows the map
@@ -7099,6 +7105,9 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   // Every line is queued; now the four profile slots can work the whole list.
   MapLos.kick();
   MapFade.kick();
+  // The card's station's lines to the bases that hear it direct, which a new
+  // Max TX distance or a station taken off the map changes (map-direct.js).
+  MapDirect.sync();
 
 
   for (const s of stations) {
@@ -8678,6 +8687,7 @@ function repaintStnCard() {
     MapLeader.sync();
     StationTrail.sync();
     MapLatency.follow(null);
+    MapDirect.follow(null);
     if (typeof Route !== 'undefined') Route.sync();
     return;
   }
@@ -8759,6 +8769,9 @@ function repaintStnCard() {
   // …and 🪜 Hops to base, while lit, goes with the card to its new station
   // (map-hops.js).
   if (typeof MapHops !== 'undefined') MapHops.follow(s.id);
+  // …and the lines to the base stations that hear it direct are its own
+  // (map-direct.js).
+  MapDirect.follow(s.id);
 }
 
 // Escape closes the card from anywhere inside it. On the card rather than on
@@ -8796,6 +8809,7 @@ function closeStnCard(refocus = true) {
   MapLeader.sync();                         // and the leader goes with it
   StationTrail.sync();                      // whose pill now brings it back
   MapLatency.follow(null);                  // ⏱️ Latency's pane goes back to the stations in view
+  MapDirect.follow(null);                   // and its lines to the bases that hear it direct go
   // The address drops the station, in place: closing is not a step to go
   // back through (route.js).
   if (typeof Route !== 'undefined') Route.sync();

@@ -227,7 +227,7 @@ function repeaterDelayLabel(station) {
 
 const MapBackbone = (function () {
   let opener = null;   // element focus goes back to on Escape
-  let cur = null;      // { kind: 'field' | 'backbone', aId, bId } while open
+  let cur = null;      // { kind: 'field' | 'backbone' | 'direct', aId, bId } while open
 
   function stationById(id) {
     return state.data ? state.data.stations.find(s => s.id === id) : null;
@@ -367,6 +367,15 @@ const MapBackbone = (function () {
            clash;
   }
 
+  // A field station straight to a base station that hears it, with no
+  // repeater between — the line map-direct.js draws while the station's card
+  // is open.
+  function directRows(a, b) {
+    return row('Field station', stationLink(a)) +
+           row('Base station', stationLink(b)) +
+           row('Repeaters between', 'none — the base station hears it direct');
+  }
+
   function backboneTitle(a, b) {
     return isBaseHop(a, b) ? 'Repeater to base path' : 'Repeater backbone path';
   }
@@ -376,7 +385,8 @@ const MapBackbone = (function () {
   // some other line. The rows keep the map cards' label/value grammar
   // (.acma-row), because they quote the same kind of figure.
   //
-  //   title    'Radio path', or which kind of backbone path it is
+  //   title    'Radio path' (or '— direct to base', map-direct.js's kind), or
+  //            which kind of backbone path it is
   //   rows     who is at each end, the addresses it carries, its channel
   //   interim  () → the distance and a fade margin, for the card to show
   //            while it has no readout of its own — the ground still on its
@@ -390,12 +400,13 @@ const MapBackbone = (function () {
     const a = stationById(cur.aId), b = stationById(cur.bId);
     if (!a || !b || !onProfile(a, b)) return null;
     const backbone = cur.kind === 'backbone';
+    const direct = cur.kind === 'direct';
     return {
-      title: backbone ? backboneTitle(a, b) : 'Radio path',
+      title: backbone ? backboneTitle(a, b) : direct ? 'Radio path — direct to base' : 'Radio path',
       rows: `
         <div class="path-card-rows">
-          ${backbone ? backboneRows(a, b) : fieldRows(a, b)}
-          ${row('Frequency', freqHtml(a, b))}
+          ${backbone ? backboneRows(a, b) : direct ? directRows(a, b) : fieldRows(a, b)}
+          ${row('Frequency', direct && typeof MapDirect !== 'undefined' ? MapDirect.channelHtml(a, b) : freqHtml(a, b))}
         </div>`,
       interim: () => `
         <div class="path-card-rows">

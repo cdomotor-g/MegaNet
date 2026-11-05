@@ -4272,6 +4272,9 @@ tr.hops-picked td { background: color-mix(in srgb, var(--accent) 12%, transparen
 .legend-line-fade-bad  { border-top-color: var(--map-fade-bad); }
 /* 🪜 Hops to base in the legend: the heard green, at the weight it is drawn. */
 .legend-line-hop-heard { border-top-color: var(--map-hop-heard); border-top-width: 4px; }
+/* A field station's line to a base station that hears it direct (map-direct.js):
+   dashed, in the good band's colour, as most of them are drawn. */
+.legend-line-direct { border-top-color: var(--map-fade-good); border-top-width: 3px; border-top-style: dashed; }
 
 /* The wind-region key (#176). Ten regions, each with a sentence about what it
    costs, is a nested list rather than ten more chips in the legend's wrapped

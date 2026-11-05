@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 201, date: '2026-11-05', items: [
+      '📶 <strong>Links</strong> on a field station\'s card (<strong>Radio</strong> tab, under <em>Assumed</em>): every '
+        + 'repeater that carries it and every base station that hears it direct, each with its fade margin, the best first. '
+        + 'Tap a name for the elevation profile and link budget of that path.',
+      '🗺️ <strong>Direct to base on the map.</strong> While a field station\'s card is open, a dashed line runs to each base '
+        + 'station in range that listens on its channel and can hear it with no repeater between — coloured by fade margin. '
+        + 'Only for the station on the card, so the map stays readable.',
+    ] },
     { n: 200, date: '2026-11-05', items: [
       '🇦🇺 <strong>Costs in Australian dollars.</strong> <em>Costs to date</em> on the <strong>Admin</strong> dashboard and '
         + '<strong>Running costs</strong> below it now show A$, the way the card statement does: each US$ bill at the '
