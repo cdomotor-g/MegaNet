@@ -4006,12 +4006,17 @@ const RM_NET_DEFAULTS = {
 // on it, and finer ground also has Longley–Rice — a model built on coarse
 // terrain profiles — read every bank beside a 4 m antenna as a horizon.
 //
-// mastAgl is there because every station in the register is on the 4 m field
-// station radio system, repeaters and bases included. A repeater on a hilltop
-// modelled with a 4 m whip sits in the terrain model's own summit pixels; at
-// 10 m it is where the mast puts it. The register is the fix — a repeater
-// whose radio system says higher keeps its own figure.
-const FN_MODEL_DEFAULTS = { model: 'field', ground: '30m', allowance: 12, mastAgl: 10 };
+// mastAgl, the least antenna height a repeater or base is modelled at, was
+// 10 m from the calibration until 5 November 2026: every station in the
+// register is on the 4 m field station radio system, repeaters and bases
+// included, and a 4 m whip on a hilltop sits in the terrain model's own summit
+// pixels. The owner set it back to 4 m — the radio system's own height, about
+// right for most sites — so it raises nothing on that system now, and is kept
+// on the card as a what-if. The 12 dB allowance above was fitted at 10 m (and
+// at −117 dBm); both changes ask for a smaller one (docs/network-review.md,
+// "Repeater and base masts: 4 m"). The register is the fix for a real mast: a
+// repeater whose radio system says higher keeps its own figure.
+const FN_MODEL_DEFAULTS = { model: 'field', ground: '30m', allowance: 12, mastAgl: 4 };
 
 // ── Diagnostics & error capture ─────────────────────────────────────────────────
 // Registered as early as possible so a bug report can carry what actually went

@@ -60,7 +60,7 @@ export const FADE_DEFAULT_MHZ = 151.5;                 // path-profile.js PATH_D
 export const FADE_DEFAULT_AGL_M = 4;                   // path-profile.js PATH_DEFAULT_AGL
 // core.js FN_MODEL_DEFAULTS: the model, its ground, the field allowance (dB)
 // and the least height a repeater or base antenna is modelled at (m).
-export const FADE_SETTINGS = Object.freeze({ model: 'field', ground: '30m', allowance: 12, mastAgl: 10 });
+export const FADE_SETTINGS = Object.freeze({ model: 'field', ground: '30m', allowance: 12, mastAgl: 4 });
 // core.js RM_NET_DEFAULTS, as pathPropOf (path-profile.js) reads them.
 export const FADE_PROPAGATION = Object.freeze({
   climate: 2, N0: 301, epsilon: 15, sigma: 0.005, pol: 1, mdvar: 0, time: 50, location: 50, situation: 70,

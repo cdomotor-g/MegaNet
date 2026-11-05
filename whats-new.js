@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 208, date: '2026-11-05', items: [
+      '📡 <strong>Repeaters and base stations are modelled with a 4 m antenna</strong>, the height their radio system '
+        + 'gives, instead of on an assumed 10 m mast — as Radio Mobile has them. Fade margins to and from them are lower, '
+        + 'most by a few dB and some hilltop sites by much more. The <strong>Repeater &amp; base mast</strong> setting in '
+        + 'the link budget\'s propagation settings still takes another height for a what-if.',
+    ] },
     { n: 207, date: '2026-11-05', items: [
       '<strong>🗒️ Copy compact</strong>, a third copy button over the elevation profile\'s chart: the same Radio Link layout '
         + 'as 📄 Copy a summary at about half the height — every figure Radio Mobile\'s window shows, a shorter chart, the '

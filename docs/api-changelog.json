@@ -2,6 +2,16 @@
   "about": "Every change to Flood-Net's agent API (https://floodwarning.net/api/v1 and https://floodwarning.net/api/mcp) that someone using it would notice — a route, a field, a limit, a tool — newest first. Each entry is emailed once to everyone on the API notify list (sign up at https://floodwarning.net/api#notify). Served as JSON at https://floodwarning.net/api/v1/changelog and written up in docs/agent-api.md, under Changes. Add an entry in the same push as the change: it is what tells people.",
   "entries": [
     {
+      "id": "2026-11-05-mast-4m",
+      "date": "2026-11-05",
+      "title": "Repeaters and base stations are now modelled with a 4 m antenna, not a 10 m mast",
+      "summary": "Every fade margin into or out of a repeater or base station is now worked out with its antenna 4 m above the ground, the height its radio system gives, as Radio Mobile runs have it. Until now Flood-Net raised every repeater and base to an assumed 10 m mast. Most of those margins are lower than before: by about 5 dB on average, and by much more where a repeater stands on a summit whose edge a 4 m antenna does not clear. A field station's own end is unchanged, and so is the 12 dB field allowance. In GET /api/v1/stations/{id}/radio-path, model.current_words now says 4 m; a saved hop margin worked out at 10 m is given as stale, its stale_reasons saying the antenna was modelled at 10 m then and would be at 4 m now, until the nightly re-sweep saves it again. No route, field or tool changed.",
+      "breaking": false,
+      "links": [
+        { "text": "Repeater and base masts", "url": "https://github.com/cdomotor-g/MegaNet/blob/main/docs/network-review.md#repeater-and-base-masts-4-m-since-5-november-2026" }
+      ]
+    },
+    {
       "id": "2026-11-05-rx-threshold",
       "date": "2026-11-05",
       "title": "Fade margins are now measured from a −110 dBm receiver, 7 dB lower than before",

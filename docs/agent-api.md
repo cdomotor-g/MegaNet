@@ -1064,7 +1064,7 @@ Fifteen Mile AL, a field station:
     { "date": "2014-11-27", "date_precision": "day", "this_visit_db": 21, "this_visit_range_db": [21, 24] }
   ], "note": "…" },
   "model": { "current": "itm-p2p/3",
-    "current_words": "the field model: Longley–Rice over the bare terrain at 256 points, less a 12 dB allowance measured on site, with repeaters and bases on at least a 10 m mast",
+    "current_words": "the field model: Longley–Rice over the bare terrain at 256 points, less a 12 dB allowance measured on site, with repeaters and bases on at least a 4 m mast",
     "saved_models": { "itm-p2p/2": 3 }, "note": "…" },
   "rules": { "first_hops": 5, "first_hop_km": 150, "backbone_km": 100, "repeaters_per_route": 4, "beyond_fewest": 1, "routes_listed": 3 }
 }
@@ -1583,6 +1583,19 @@ at [`GET /api/v1/changelog`](#get-apiv1changelog), newest first — both from
 in the same push. A change with nothing to notice (a fix inside, a faster
 answer) is not listed.
 
+- **5 November 2026 — Repeaters and base stations are now modelled with a 4 m
+  antenna, not a 10 m mast.** Every fade margin into or out of a repeater or
+  base station is worked out with its antenna 4 m above the ground, the height
+  its radio system gives, as Radio Mobile runs have it; Flood-Net used to raise
+  every repeater and base to an assumed 10 m mast. Most of those margins are
+  lower: by about 5 dB on average, and by much more where a repeater stands on a
+  summit whose edge a 4 m antenna does not clear. A field station's own end is
+  unchanged, and so is the 12 dB field allowance. In
+  [`/radio-path`](#get-apiv1stationsidradio-path), `model.current_words` now
+  says 4 m, and a saved hop margin worked out at 10 m is given as stale — its
+  `stale_reasons` say the antenna was modelled at 10 m then and would be at 4 m
+  now — until the nightly re-sweep saves it again. No route, field or tool
+  changed.
 - **5 November 2026 — Fade margins are now measured from a −110 dBm receiver,
   7 dB lower than before.** The field station receiver threshold — the weakest
   signal a burst is taken as decoded at, which every fade margin is measured

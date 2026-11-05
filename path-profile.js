@@ -145,7 +145,9 @@ function stationIsMast(st) {
 // model's own summit pixels — 20 to 40 dB of diffraction that no mast on that
 // hill suffers (FN_MODEL_DEFAULTS has the measurements). A system that says
 // more than the mast height wins, so a register that records the real mast
-// is never overruled. { agl, sysAgl, mast } — mast true when it was raised.
+// is never overruled. The mast height is 4 m by default since 5 November 2026
+// (it was 10 m), so on the 4 m system it raises nothing unless the card's
+// setting asks. { agl, sysAgl, mast } — mast true when it was raised.
 function stationAntenna(st, sys) {
   const own = sys && sys.antenna_height_m != null ? Number(sys.antenna_height_m) : PATH_DEFAULT_AGL;
   const mastAgl = stationIsMast(st) ? pathPropOf().mastAgl : 0;

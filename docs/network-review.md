@@ -140,7 +140,7 @@ Hub by hub the spread is wide: of the 37 hubs with five tested stations or
 more, **15 ask for an allowance 10 dB or more from the network's** — from about
 32 dB more hopeful to 10 dB less. A hub whose stations all read better than
 modelled is a register entry short of something — a mast taller than the
-assumed 10 m, an antenna better than an omni, a position off its summit; one
+one modelled, an antenna better than an omni, a position off its summit; one
 whose stations read worse, the opposite. Several of the furthest out have short
 paths, so the long-link explanation does not cover them, and most stand on
 remote summits the LiDAR does not reach (below). The fix is the register's, and
@@ -211,8 +211,9 @@ still the end's height wherever it is at or above the tile.
 Every station in the register is on the 4 m field-station radio system,
 repeaters and bases included. A repeater on a summit modelled with a 4 m antenna
 sits among the terrain model's summit pixels, and pays for it. The propagation
-settings carry a **repeater & base mast** height — 10 m by default — and a
-station with the repeater or base role is modelled at least that high. A radio
+settings carry a **repeater & base mast** height — 10 m at the calibration, 4 m
+since 5 November 2026 (*Repeater and base masts*, below) — and a station with
+the repeater or base role is modelled at least that high. A radio
 system that says more keeps its own figure, so the fix is in the register: give a
 repeater whose mast is known a radio system with its real height, and the
 assumption is gone for that site. The matrix's hub list and the link budget's
@@ -362,7 +363,7 @@ were told:
 
 | | Radio Mobile run | Flood-Net |
 |---|---:|---:|
-| Marburg's antenna | 4 m | 10 m — the repeater and base mast minimum |
+| Marburg's antenna | 4 m | 10 m — the repeater and base mast minimum then (4 m since 5 November 2026) |
 | Marburg's receiver threshold | −110 dBm | −117 dBm — the field station radio system every station is on (−110 dBm since 5 November 2026) |
 | Obstruction (Longley–Rice over the terrain) | 15.9 dB | 0.1 dB |
 | Field allowance | — | 12.0 dB |
@@ -423,6 +424,35 @@ database, and the app's own starting figure for a point on the ground
   changed — it is part of what each saved figure was worked out from — and the
   re-sweep, run by hand straight after, worked out and saved 4,199 of the
   4,200 within 150 km at the new figure.
+
+### Repeater and base masts: 4 m since 5 November 2026
+
+The owner's call, the same day: a repeater or base station is modelled with its
+antenna at **4 m**, its radio system's own height, as Radio Mobile's runs have
+it. It was raised to a 10 m mast (*3. Repeaters and bases on a mast*, above).
+The setting is still on the link budget card, for a what-if, and a radio system
+that records a taller mast still keeps its own figure.
+
+- **Every margin into or out of a repeater or base falls** — by about 5 dB on
+  average over the 134 paths of the step table above, and by up to 27 dB where
+  a repeater sits on a summit whose edge a 4 m antenna does not clear. A field
+  station's own end is unchanged.
+- **Greys Plains Rd AL** now reads **−6.7 dB** to Marburg Radar (+27.1 dB at
+  10 m), and −8.1, −9.5 and −24.0 dB to the three repeaters that carry it —
+  every link under 0 dB, for a station the base stations hear (405 readings on
+  151.500 MHz on its card). Without the allowance the four read +5.3, +3.9,
+  +2.5 and −12.0 dB; Radio Mobile's run gives Marburg +23.4.
+- **With both changes Flood-Net's inputs are Radio Mobile's** — −110 dBm and
+  4 m antennas — so what is left between them is the 12 dB field allowance and
+  the terrain each runs over.
+- **The allowance was fitted at −117 dBm and 10 m masts.** Each change asks for
+  a smaller one — about 7 dB less for the threshold, and roughly 5 dB less again
+  for the masts — which puts the refit somewhere near nought; an estimate, which
+  the history check above measures. Until the owner chooses, 12 dB stays, and
+  Flood-Net reads well below the field on average.
+- **Saved fade margins went stale** — an end's antenna height is part of what
+  each was worked out from — and the nightly re-sweep works them out again and
+  saves them.
 
 ## The ground: LiDAR, where it matters
 

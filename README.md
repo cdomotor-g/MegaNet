@@ -4091,9 +4091,10 @@ described below; against the same measurements it read 41 dB too low, because at
 VHF a canopy is largely transparent and it charged the same trees twice. Under
 both, an end whose surveyed height is below the terrain tile under it is stood on
 the tile — the tiles are a surface, and an antenna below it starts the path in a
-pit — and a repeater or base is modelled on at least a 10 m mast (*Repeater &
-base mast*), because every station in the register is on the 4 m field-station
-radio system. The fade-margin map, the profile's readout, the site finder, the
+pit — and a repeater or base can be modelled on a taller mast than its radio
+system gives (*Repeater & base mast*): 4 m by default since 5 November 2026,
+the field-station radio system's own height; it was 10 m, because every station
+in the register is on that 4 m system. The fade-margin map, the profile's readout, the site finder, the
 Network Review tab and polar coverage all follow the card's setting. The card's
 *Ground* setting prices a path over the ~30 m tiles (the default) or over
 Geoscience Australia's 5 m LiDAR round its ends and wherever the ground comes

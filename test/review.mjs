@@ -169,6 +169,10 @@ ok('…its four panels', ['Path margins across a network', 'Flood-Net, Radio Mob
 
 // ── the matrix ───────────────────────────────────────────────────────────────
 console.log('\nThe matrix');
+// The repeater and base mast at 10 m, the setting's figure before 5 November
+// 2026, so a mast the tab assumes is held to what it says; the default is
+// 4 m now, at which a 4 m radio system assumes nothing (The register, below).
+await page.evaluate(() => { state.link.prop = { ...(state.link.prop || {}), mastAgl: 10 }; });
 await page.selectOption('#nr-hub-pick', HUB_A);
 await page.click('button:has-text("Add to the review")');
 await page.selectOption('#nr-hub-pick', HUB_B);
@@ -361,6 +365,15 @@ const reg = await page.evaluate(() => {
 ok('every repeater and base on a radio system under the mast is counted as assumed', reg.assumed === reg.want && reg.masts > 0,
    `${reg.assumed} of ${reg.masts}, expected ${reg.want}`);
 ok('…and the panel says how many', new RegExp(`${reg.assumed} of the register's ${reg.masts}`).test(reg.text), reg.text.slice(0, 200));
+const atDefault = await page.evaluate(() => {
+  state.link.prop = { ...(state.link.prop || {}), mastAgl: FN_MODEL_DEFAULTS.mastAgl };
+  const c = NetworkReview.registerChecks();
+  const masts = state.data.stations.filter(s => !s.deleted_at && stationIsMast(s));
+  const want = masts.filter(s => { const sys = rmSystemOf(s); return (sys && sys.antenna_height_m != null ? Number(sys.antenna_height_m) : 4) < FN_MODEL_DEFAULTS.mastAgl; }).length;
+  return { mast: FN_MODEL_DEFAULTS.mastAgl, assumed: c.assumed.length, want };
+});
+ok('at the default 4 m mast, a repeater or base on a 4 m radio system is not counted as assumed',
+   atDefault.mast === 4 && atDefault.assumed === atDefault.want, JSON.stringify(atDefault));
 ok('pass-range links over 150 km are counted, longest first', reg.long === 0 || reg.longest > 150, `${reg.long}, longest ${reg.longest} km`);
 
 // ── every row of a long read ─────────────────────────────────────────────────
