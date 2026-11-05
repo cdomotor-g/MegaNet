@@ -22,6 +22,10 @@
 //      channel nothing explains. While its card is open the map draws a line
 //      to each base that hears it — and only those — and the line goes with
 //      the card.
+//   5. **The pins under the lines**: real clicks. Once the lines have been
+//      drawn and gone a pin still opens its card, a line still opens its
+//      radio-path card, and a canvas another layer leaves in a pane over the
+//      links takes no click from the pins (the backstop in styles.css).
 //
 // Run:  npm run frequencies
 //       npm run frequencies -- -v
@@ -416,6 +420,62 @@ async function main() {
     check('a repeater\'s card has no Links line, and draws none',
       await page.evaluate(id => { showStationCard(id); return !document.querySelector('#stn-card .stn-card-links') && MapDirect._drawn().length === 0; },
         repeater.id));
+
+    // The lines' pane is over the pins and links (400). With the map's
+    // preferCanvas it used to get a canvas of its own the size of the map,
+    // kept after the lines went: every click meant for a pin or a link landed
+    // on it, and the map could only be panned until a reload. Real clicks,
+    // because a click from code goes round the sheet.
+    log('\nThe pins under the lines\n');
+    const pinAt = id => page.evaluate(id => {
+      const s = state.data.stations.find(x => x.id === id);
+      const p = state.map.latLngToContainerPoint([s.lat, s.lon]);
+      const box = state.map.getContainer().getBoundingClientRect();
+      const el = document.elementFromPoint(box.left + p.x, box.top + p.y);
+      return { x: box.left + p.x, y: box.top + p.y, on: !!el && !!el.closest('.leaflet-overlay-pane') };
+    }, id);
+    const MARBURG_VIEW = [[-27.62, 152.33], 11];
+    await page.evaluate(id => { closeStnCard(); showStationCard(id); }, GP);
+    await page.waitForFunction(() => MapDirect._drawn().length > 0, null, { timeout: 5000 });
+    await page.evaluate(v => { closeStnCard(); state.map.setView(v[0], v[1], { animate: false }); }, MARBURG_VIEW);
+    await page.waitForTimeout(400);
+    let pin = await pinAt('marburg_radar');
+    await page.mouse.click(pin.x, pin.y);
+    await page.waitForTimeout(400);
+    check('once the lines have been drawn and gone, a real click on a pin still opens its card',
+      pin.on && await page.evaluate(() => !!state.stnCard && state.stnCard.id === 'marburg_radar'), JSON.stringify(pin));
+    // The backstop in styles.css: a path some other layer puts in a pane of
+    // its own over the links, with nothing said about the pointer.
+    await page.evaluate(v => {
+      closeStnCard();
+      if (!state.map.getPane('mnCheckSheet')) state.map.createPane('mnCheckSheet').style.zIndex = 450;
+      window.__sheet = L.polyline([[-27.0, 152.0], [-27.1, 152.1]], { pane: 'mnCheckSheet' }).addTo(state.map);
+      state.map.setView(v[0], v[1], { animate: false });
+    }, MARBURG_VIEW);
+    await page.waitForTimeout(400);
+    pin = await pinAt('marburg_radar');
+    await page.mouse.click(pin.x, pin.y);
+    await page.waitForTimeout(400);
+    check('…as it does with a canvas some other layer leaves in a pane over the links',
+      pin.on && await page.evaluate(() => !!state.stnCard && state.stnCard.id === 'marburg_radar'), JSON.stringify(pin));
+    await page.evaluate(() => { window.__sheet.remove(); closeStnCard(); });
+    await page.evaluate(([id, v]) => {
+      MapBackbone.closeCard(); closeStnCard(); showStationCard(id); state.map.setView(v[0], v[1], { animate: false });
+    }, [GP, MARBURG_VIEW]);
+    await page.waitForFunction(() => MapDirect._drawn().length > 0, null, { timeout: 5000 });
+    await page.waitForTimeout(400);
+    const mid = await page.evaluate(id => {
+      const a = state.data.stations.find(x => x.id === id), b = state.data.stations.find(x => x.id === 'marburg_radar');
+      const p = state.map.latLngToContainerPoint([(a.lat + b.lat) / 2, (a.lon + b.lon) / 2]);
+      const box = state.map.getContainer().getBoundingClientRect();
+      return { x: box.left + p.x, y: box.top + p.y };
+    }, GP);
+    await page.mouse.move(mid.x, mid.y);
+    await page.mouse.click(mid.x, mid.y);
+    await page.waitForTimeout(400);
+    check('…and a real click on a line to a base still opens its radio-path card',
+      await page.evaluate(() => { const c = MapBackbone.current(); return !!c && c.kind === 'direct' && c.bId === 'marburg_radar'; }),
+      JSON.stringify(mid));
 
     await context.close();
 

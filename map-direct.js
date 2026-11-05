@@ -66,6 +66,16 @@ const MapDirect = (function () {
   // Over the network's links (400), their arrowheads (405) and 🎯's lines
   // (408), under 🪜 Hops to base (409): this is the card's station's own
   // answer, and the hops, when somebody lights them, are the bigger one.
+  //
+  // SVG, and a pane that takes no pointer, never the map's shared canvas
+  // pattern: with preferCanvas, a path in a pane of its own gets a canvas of
+  // its own, the size of the map, and this pane is over the links (400). That
+  // sheet took every click and hover meant for a pin or a link under it — and
+  // stayed after the lines went, since Leaflet keeps a pane's renderer, so the
+  // map could only be panned until the page was reloaded. An SVG path in a
+  // pane with pointer-events off answers only on its own stroke (Leaflet puts
+  // pointer-events back on each interactive path), which is all a line wants.
+  // map-rivers.js and site-features.js say the same; styles.css backs it up.
   const PANE = 'mnDirectLines', PANE_Z = 407;
   const HEAR_DB  = 0;     // a margin at or above this: likely heard
   const MAX_WORK = 12;    // links worked out for one station
@@ -73,6 +83,7 @@ const MapDirect = (function () {
   const DASH = '10 6';
 
   let map = null, layer = null;
+  let renderer = null;    // this map's SVG renderer in PANE (attach)
   let onId = null;        // the field station the lines are drawn for
   // `${from}>${to}` → { phase: 'asking' | 'ok' | 'none', margin, verdict }
   const figs = new Map();
@@ -409,9 +420,9 @@ const MapDirect = (function () {
       const band = typeof lbMarginClass === 'function' ? lbMarginClass(f.margin).cls : 'ok';
       const c = cssVar(BAND_TOKEN[band][0], BAND_TOKEN[band][1]);
       const ll = [[st.lat, st.lon], [base.s.lat, base.s.lon]];
-      L_().polyline(ll, { pane: PANE, color: '#ffffff', weight: 8 * scale, opacity: 0.9, interactive: false })
+      L_().polyline(ll, { pane: PANE, renderer, color: '#ffffff', weight: 8 * scale, opacity: 0.9, interactive: false })
         .addTo(layer);
-      const line = L_().polyline(ll, { pane: PANE, color: c, weight: 5 * scale, opacity: 1, dashArray: DASH, lineCap: 'butt' })
+      const line = L_().polyline(ll, { pane: PANE, renderer, color: c, weight: 5 * scale, opacity: 1, dashArray: DASH, lineCap: 'butt' })
         .addTo(layer);
       line.mnDirect = { from: st.id, to: base.s.id, margin: f.margin, band };
       line.bindTooltip(() => tipHtml(st, base.s, f, base), { sticky: true, direction: 'top', className: 'mn-link-tip' });
@@ -453,13 +464,16 @@ const MapDirect = (function () {
       if (!m.getPane(PANE)) {
         const p = m.createPane(PANE);
         p.style.zIndex = PANE_Z;
+        p.style.pointerEvents = 'none';
       }
+      renderer = L_().svg({ pane: PANE });
       draw();
     },
 
     detach() {
       clearLayer();
       map = null;
+      renderer = null;
     },
 
     // The card is on this station now (null: closed). Its lines follow it.

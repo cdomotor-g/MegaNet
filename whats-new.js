@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 210, date: '2026-11-05', items: [
+      '🖱️ <strong>Station pins and links can be clicked again after a field station\'s card has been open.</strong> '
+        + 'Since today\'s lines to the base stations that hear a station directly, opening such a card left a see-through '
+        + 'layer over the whole Stations map: pins and links stopped answering and the map could only be panned until the '
+        + 'page was reloaded. Fixed — no reload needed any more.',
+    ] },
     { n: 209, date: '2026-11-05', items: [
       '🔁 <strong>The Repeaters tab\'s link profile runs on past both ends too.</strong> Press a link on the Repeaters map '
         + 'and its ground profile now shows a short, faded stretch of ground beyond each repeater or base station, the same '

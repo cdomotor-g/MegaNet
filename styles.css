@@ -12674,6 +12674,19 @@ body.mn-dock-dragging {
   border-radius: 6px;
 }
 
+/* The pins and links are one canvas in the overlay pane, hit-tested by
+   Leaflet. A canvas in any other pane of this map is a sheet the size of the
+   map: over the overlay pane it takes every click and hover meant for a pin or
+   a link, the map can only be panned, and it stays until a reload (Leaflet
+   keeps a pane's renderer after its last path goes). A layer here that wants
+   the pointer draws SVG in its own pane (map-direct.js, map-rivers.js) or uses
+   the shared canvas (site-features.js); this keeps one that forgets from
+   locking the map. Child combinators, so the minimap's own panes are left
+   alone. */
+#leaflet-map > .leaflet-map-pane > .leaflet-pane:not(.leaflet-overlay-pane) > canvas {
+  pointer-events: none;
+}
+
 /* The map's own rectangle, and the positioning anchor for everything drawn over
    it — the note strip, the ACMA, path and station cards. It exists because the
    credit line moved off the map and into the panel under it (#186): a card
