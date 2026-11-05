@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 217, date: '2026-11-05', items: [
+      '🏷️ <strong>Station names on one spot hang one under the other.</strong> Where two or three stations share a '
+        + 'point on the Stations map — Jimbour Ck AL and Macalister Bell Rd Jimbour Ck AL, say — their names used to sit '
+        + 'on top of each other, the longest hiding the rest. Now they hang in a column under the pin, and a name that '
+        + 'would cover a neighbour’s steps down under it instead.',
+    ] },
     { n: 216, date: '2026-11-05', items: [
       '🟥 <strong>The map\'s mode banner is red now, and the map is framed in red while a mode is on.</strong> The first '
         + 'one was grey and easy to miss over the satellite photos. It pulses twice as a mode starts (not if your device '

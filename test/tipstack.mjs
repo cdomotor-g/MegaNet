@@ -17,7 +17,12 @@
 //   * a name standing aside while a pin's own name shows takes no room;
 //   * a zoom, jumped or animated, ends stacked;
 //   * a permanent label (a pin's name) is neither moved nor stepped round;
-//   * and a real mouse on a radio path's sticky label stacks with the rest.
+//   * a real mouse on a radio path's sticky label stacks with the rest;
+//   * and pins' own names on one point hang in a column under it instead of
+//     over each other — the second fault of the kind, "Macalister Bell Rd
+//     Jimbour Ck AL" laid over "Jimbour Ck AL" — stepping the way they hang,
+//     never further than 72 px from the pin, the rest settling back when one
+//     goes; held both with names opened here and on the real pair.
 //
 // The names are opened here the way their layers open them — the same
 // classes, direction and offsets — rather than through each layer's stubbed
@@ -86,7 +91,9 @@ try {
     window.__close = (key) => { if (tips[key]) { tips[key].remove(); delete tips[key]; } };
     // Each open name's box on screen, and where its point is on screen —
     // what a layer alone would have done with it is the point, the offset
-    // and the margin Leaflet's stylesheet gives a top tooltip.
+    // and the margin Leaflet's stylesheet gives a top tooltip. For a name
+    // hung below its point (direction bottom) the same sum is where its
+    // top edge would be alone, so natBottom is read against its top.
     window.__read = () => new Promise(res => requestAnimationFrame(() => {
       const box = map.getContainer().getBoundingClientRect();
       const out = {};
@@ -223,6 +230,84 @@ try {
   await page.evaluate(() => window.__fixed.remove());
   for (const k of ['road', 'river']) await close(k);
 
+  // ── Pins' own names on one point stand in a column under it ───────────────
+  // A station's name hangs below its pin (app.js applyMapLabels: permanent,
+  // direction bottom, mn-pin-label). Two stations on one point hung theirs
+  // from the same spot, the longer over the shorter. Opened here as that
+  // binds them; the real pair on the Stations map is held at the end.
+  const pin = (key, text, dx, dy, dir = 'bottom') =>
+    open(key, 'mn-pin-label', dir === 'bottom' ? 6 : -8, text, dx, dy, { permanent: true, direction: dir });
+  const LONG = 'Macalister Bell Rd Jimbour Ck AL', SHORT = 'Jimbour Ck AL';
+  await pin('pinA', SHORT, 0, 0);
+  r = await read();
+  const pinAlone = r.pinA;
+  check('a pin’s name alone hangs where its pin put it, to the pixel',
+    near(r.pinA.top, r.pinA.natBottom) && centred(r.pinA), J(r.pinA));
+  await pin('pinB', LONG, 0, 0);
+  r = await read();
+  check('two pins’ names on one point: neither over the other',
+    overlaps(r).length === 0, J({ overlaps: overlaps(r), r }));
+  check('…the one already showing stays where it was, the other hangs under it ' + GAP + ' px clear',
+    near(r.pinA.top, pinAlone.top) && near(r.pinB.top - r.pinA.bottom, GAP), J(r));
+  check('…both still centred under the pin', centred(r.pinA) && centred(r.pinB), J(r));
+  await pin('pinC', 'Jimbour Ck TM', 0, 0);
+  r = await read();
+  check('a third on the same point: a column of three, none over another, each ' + GAP + ' px under the last',
+    overlaps(r).length === 0 && near(r.pinB.top - r.pinA.bottom, GAP) && near(r.pinC.top - r.pinB.bottom, GAP), J(r));
+  await pin('road', 'Some Road Station AL', 70, 0);
+  r = await read();
+  check('a neighbour’s name that only meets the column’s edge steps straight down, keeping its own left-right place',
+    overlaps(r).length === 0 && centred(r.road) && r.road.top > r.road.natBottom, J({ overlaps: overlaps(r), r }));
+  await close('road');
+
+  await close('pinA');
+  r = await read();
+  check('one goes: the rest settle back up, the highest onto its own pin',
+    near(r.pinB.top, r.pinB.natBottom) && near(r.pinC.top - r.pinB.bottom, GAP) && overlaps(r).length === 0, J(r));
+  await close('pinC');
+  r = await read();
+  check('…and down to one: it is on its own pin', near(r.pinB.top, r.pinB.natBottom), J(r.pinB));
+
+  // A hover name is not stepped round by pins' names, nor they round it.
+  await pin('pinA', SHORT, 0, 0);
+  r = await read();
+  const colBefore = { a: r.pinA.top, b: r.pinB.top };
+  await open('river', 'mn-river-label mn-rl-tip', -8, RIVER, 0, 10);
+  r = await read();
+  check('a hover name over a column of pins’ names: it is on its point, and the column has not moved',
+    atHome(r.river) && near(r.pinA.top, colBefore.a) && near(r.pinB.top, colBefore.b), J({ r, colBefore }));
+  await close('river');
+
+  // A name above its pin (a repeater's on the message log) steps up instead.
+  await pin('pinC', 'Mt Mackay AL', 0, 0, 'top');
+  await pin('pinD', 'Mt Mackay AL Repeater', 0, 0, 'top');
+  r = await read();
+  check('two names above one pin: the second stands over the first, neither over the other',
+    atHome(r.pinC) && near(r.pinC.top - r.pinD.bottom, GAP) && overlaps(r).length === 0, J(r));
+  for (const k of ['pinC', 'pinD']) await close(k);
+
+  // Never further than MAX_SHIFT from its pin: past that a name reads as
+  // another pin's, so it stays where it was.
+  for (let i = 2; i < 8; i++) await pin('pin' + i, 'Station number ' + i + ' AL', 0, 0);
+  r = await read();
+  const pinKeys = Object.keys(r).filter(k => k.startsWith('pin'));
+  const drop = k => r[k].top - r[k].natBottom;
+  const column = [pinKeys.find(k => drop(k) <= 1), ...pinKeys.filter(k => drop(k) > 1)];
+  check('eight names on one point: none further than 72 px below its pin',
+    pinKeys.every(k => drop(k) <= 72 + 1), J(pinKeys.map(k => [k, Math.round(drop(k))])));
+  check('…the ones that fit, a column of four or more, none over another; the rest stay on the pin',
+    column.length >= 4 && column.length < pinKeys.length
+      && overlaps(Object.fromEntries(column.map(k => [k, r[k]]))).length === 0,
+    J(pinKeys.map(k => [k, Math.round(drop(k))])));
+  await page.evaluate(() => state.map.setZoom(state.map.getZoom() + 1));
+  await page.waitForTimeout(600);
+  const zoomed = await read();
+  check('…a zoom, animated: the column is the same column after it',
+    pinKeys.every(k => near(zoomed[k].top - zoomed[k].natBottom, r[k].top - r[k].natBottom, 1.5)),
+    J(pinKeys.map(k => [k, Math.round(r[k].top - r[k].natBottom), Math.round(zoomed[k].top - zoomed[k].natBottom)])));
+  for (const k of pinKeys) await close(k);
+  await page.evaluate(() => state.map.setZoom(state.map.getZoom() - 1, { animate: false }));
+
   // ── A real mouse ──────────────────────────────────────────────────────────
   // A radio path's label is a sticky tooltip bound to the line (app.js
   // MAP_LINK_TIP): it opens and follows the pointer on Leaflet's own mouse
@@ -260,6 +345,52 @@ try {
   r = await read();
   check('…and the mouse off the line: its label goes and the road’s is back on its point',
     !(await page.evaluate(() => !!document.querySelector('.leaflet-tooltip.mn-link-tip'))) && atHome(r.road), J(r.road));
+
+  // ── The report's own pair, on the Stations map ────────────────────────────
+  // Jimbour Ck AL and Macalister Bell Rd Jimbour Ck AL are two stations on one
+  // point; zoomed in on them, the map names both (auto mode) and the longer
+  // name was laid over the shorter. Read back as the map drew them.
+  const PAIR = ['macalister_bell_rd_j', 'macalister_bell_rd_j_2'];
+  const readPair = () => page.evaluate((ids) => new Promise(res => requestAnimationFrame(() => {
+    const map = state.map, box = map.getContainer().getBoundingClientRect();
+    const out = {};
+    for (const m of state.mapMarkers) {
+      const id = m.mnStation && m.mnStation.id;
+      if (!ids.includes(id)) continue;
+      const t = m.getTooltip(), el = t && t.getElement();
+      if (!el) { out[id] = null; continue; }
+      const r = el.getBoundingClientRect(), p = map.latLngToContainerPoint(m.getLatLng());
+      out[id] = { left: r.left, right: r.right, top: r.top, bottom: r.bottom, text: el.textContent,
+        ax: box.left + p.x,
+        natTop: box.top + p.y + t.options.offset[1] + (parseFloat(getComputedStyle(el).marginTop) || 0) };
+    }
+    res(out);
+  })), PAIR);
+  const here = await page.evaluate((ids) => {
+    const s = state.data.stations.find(x => x.id === ids[0]);
+    return s && { lat: s.lat, lon: s.lon };
+  }, PAIR);
+  if (!here) {
+    check('the report’s pair is in the register', false, PAIR.join(', '));
+  } else {
+    await page.evaluate((c) => state.map.setView([c.lat, c.lon], 15, { animate: false }), here);
+    await page.waitForTimeout(500);
+    let p = await readPair();
+    const [a, b] = PAIR.map(id => p[id]);
+    check('zoomed in on Jimbour Ck: both stations on the point are named', !!a && !!b, J(p));
+    if (a && b) {
+      const [hi, lo] = a.top <= b.top ? [a, b] : [b, a];
+      check('…and the two names do not meet: one hangs under the other, ' + GAP + ' px clear',
+        !meet(a, b) && near(lo.top - hi.bottom, GAP), J(p));
+      check('…the upper one where its pin put it, both centred under the pin',
+        near(hi.top, hi.natTop) && centred(a) && centred(b), J(p));
+    }
+    await page.evaluate(() => state.map.setZoom(16));
+    await page.waitForTimeout(600);
+    p = await readPair();
+    check('…and after an animated zoom in, still one under the other',
+      !!p[PAIR[0]] && !!p[PAIR[1]] && !meet(p[PAIR[0]], p[PAIR[1]]), J(p));
+  }
 
   check('no pageerror', errors.length === 0, errors.join(' | '));
 } finally {
