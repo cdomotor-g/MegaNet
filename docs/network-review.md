@@ -237,8 +237,60 @@ reading says.
 
 The fade-margin map's saved rows carry the model they were computed on (`itm-p2p/3`
 and the allowance), so every row saved before a change of allowance is stale until
-it is computed and saved again: turn the fade-margin layer on in the Stations
-map, let it sweep, and press Save.
+it is computed and saved again. Nobody has to do that by hand any more: the
+nightly re-sweep below does it. To do it straight away, turn the fade-margin
+layer on in the Stations map, let it sweep, and press Save — or run the re-sweep
+from GitHub (below).
+
+### The nightly re-sweep
+
+A saved fade margin carries a signature of everything it was worked out from:
+both ends' positions, ground heights, antenna heights and radios, the
+frequency, the model and its settings. **Move a station's pin** — to where the
+station really stands, in the Stations map or the Digital Twin — correct a
+ground height or an antenna, change a radio system, and every saved figure on
+that station's links stops matching. The map leaves those links in the plain
+colour and counts them as stale; the agent API's radio paths say *stale*.
+
+Every night at 02:23 Brisbane time, **Fade margin re-sweep**
+(`.github/workflows/fade-resweep.yml`) works them out again and saves them.
+`tools/fade/resweep.mjs` opens the app from the repository in a headless
+browser — the station list and the saved margins from the database, as any
+visitor gets them — and calls the layer's own sweep, `MapFade.resweep()`
+(`map-fade.js`): every link up to 150 km long (the agent API's reach for a
+station's repeaters, past the map's 100 km Max TX distance) whose saved figure
+has gone stale, the stale ones first, and every one nobody has saved. Same
+code, same terrain, same model as the map and the link budget card, at the
+app's own defaults — so what it saves is what the API calls fresh. The rows go
+to `meganet.save_link_fade()` with the project's secret key, under the
+thresholds the network was last saved under.
+
+- **What it leaves alone.** Links longer than 150 km — almost all of them
+  pass-range pairs hundreds of kilometres apart that share an address by
+  accident (#236), which the map does not draw and a terrain profile cannot
+  make true; they are counted in the summary. A link with no radio system on
+  file at one end has no margin to give. A saved row for a pair that is no
+  longer a link at all: nothing paints from it.
+- **What it reports.** The run's summary page (Actions → *Fade margin
+  re-sweep* → the run) lists how many links were current, stale and never
+  saved, why the stale ones had gone stale, **which stations moved and how
+  far**, how many were saved, and the links that could not be worked out
+  (terrain unreachable, or the model refused the path).
+- **Running it now.** Actions → *Fade margin re-sweep* → **Run workflow**.
+  Tick *Trial run* to work them out and save nothing; *At most this many
+  links* caps a run. From a terminal:
+  `SUPABASE_SECRET_KEY=… node tools/fade/resweep.mjs` (`--dry-run`,
+  `--limit N`, `--km N`, `--json FILE`; `cd test && npm ci` first).
+- **What it needs.** The repository secret `SUPABASE_SECRET_KEY` — the one
+  Station health and the field photo syncs use. Without it the run says so
+  and does nothing.
+
+The first trial, on 5 November 2026, found 196 stale figures within 150 km —
+Marburg Radar's 25 links after its pin was moved 24 m, a few dozen more from
+other moved pins, and 171 rows from before the field calibration — and 366
+links never saved; it worked out 561 of the 562 in 17 seconds. On Marburg's
+links the new figures matched the 3 November sweep to 0.1 dB on most paths
+and moved by a few decibels where the 24 m changed the ground near the mast.
 
 ## Against Radio Mobile, in one region
 

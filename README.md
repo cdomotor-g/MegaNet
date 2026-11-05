@@ -473,6 +473,7 @@ MegaNet/
 │   ├── check_base_stations.sql (psql: prove base stations checking in, being asked, the team keys (0049) and the waterfall (0068) — 60 checks, rolls back)
 │   ├── check_health_findings.sql (psql: prove the health findings kept between visits — base stations, receivers, station reports (0059) — 39 checks, rolls back)
 │   ├── health/report.mjs    (Station Health's own health-analysis.js, run every fifteen minutes by station-health.yml, its findings reported to the database)
+│   ├── fade/resweep.mjs     (the fade-margin map's own sweep, run every night by fade-resweep.yml: links whose stations moved or changed, worked out again and saved)
 │   ├── bulletin/            (📺 Network Bulletin: the scheduled task's brief, and gather → draft → validate → publish into data/bulletins/)
 │   ├── field-photos/        (the Dropbox and Google Drive → Flood-Net photo sync, run by field-photos-dropbox.yml and field-photos-gdrive.yml)
 │   ├── meganet_agent.py     (Claude-API agent that answers questions over stations.json)

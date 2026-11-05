@@ -1,0 +1,110 @@
+# The fade-margin map's sweep-and-save, every night, with nobody at the map.
+#
+# A saved fade margin carries a signature of everything it was worked out
+# from — both ends' positions, ground heights, antennas and radios, the
+# frequency, the model (map-fade.js). Move a station's pin, correct a ground
+# height, change a radio system, and every saved figure on that station's links
+# stops matching: the map leaves them grey and the agent API's radio paths call
+# them stale, until somebody sweeps the layer and presses Save. This does it
+# instead. tools/fade/resweep.mjs opens the app from this checkout in headless
+# Chromium, has the layer's own sweep work out every stale link and every link
+# nobody has saved (up to 150 km, the agent API's reach), and saves them with
+# meganet.save_link_fade(). The run's summary page lists the stations that
+# moved and the links that could not be worked out.
+#
+# Why a workflow and not the Worker's cron: a link is a terrain profile and a
+# Longley–Rice run in the browser's own code — seconds of CPU per link — which
+# the Workers Free plan's 10 ms cannot give; station-health.yml's reason.
+#
+# Until the secret exists it does nothing and says so. What it needs (Settings →
+# Secrets and variables → Actions → Repository secrets):
+#
+#   SUPABASE_SECRET_KEY    the project's secret key — the one station-health.yml
+#                          and the field photo syncs use
+#
+# The key is used for one call only, save_link_fade(), from Node; it never
+# enters the page. Run it by hand from Actions → Fade margin re-sweep → Run
+# workflow; tick "trial run" to work them out and save nothing.
+
+name: Fade margin re-sweep
+
+on:
+  schedule:
+    - cron: '23 16 * * *'   # 02:23 in Brisbane, after the evening's edits
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Trial run: work them out, save nothing'
+        type: boolean
+        default: false
+      limit:
+        description: 'At most this many links (blank: all of them)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+# One at a time: two sweeps saving the same rows would only race each other.
+concurrency:
+  group: fade-resweep
+  cancel-in-progress: false
+
+jobs:
+  resweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      TZ: Australia/Brisbane
+      LANG: en_AU.UTF-8
+    steps:
+      - name: Is there a key to save with?
+        id: key
+        run: |
+          if [ -z "$SUPABASE_SECRET_KEY" ]; then
+            echo "::notice::SUPABASE_SECRET_KEY is not set — nothing is re-swept. docs/network-review.md ('The nightly re-sweep') has the steps."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The whole page, as a visitor loads it — the app's scripts, its styles
+      # and the files they ask for — so the checkout is whole, but one commit deep.
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.ok == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.key.outputs.ok == 'true'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: test/package-lock.json
+
+      - name: Install the checks' packages (the server and the browser)
+        if: steps.key.outputs.ok == 'true'
+        working-directory: test
+        run: npm ci
+
+      - name: Cache Chromium
+        if: steps.key.outputs.ok == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('test/package-lock.json') }}
+
+      - name: Install Chromium
+        if: steps.key.outputs.ok == 'true'
+        working-directory: test
+        run: npx playwright-core install --with-deps chromium
+
+      - name: Re-sweep and save
+        if: steps.key.outputs.ok == 'true'
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          args=()
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          if [[ "$LIMIT" =~ ^[0-9]+$ ]] && [ "$LIMIT" -gt 0 ]; then args+=(--limit "$LIMIT"); fi
+          node tools/fade/resweep.mjs "${args[@]}"

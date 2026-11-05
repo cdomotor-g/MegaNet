@@ -60,8 +60,9 @@ Documentation: [`docs/agent-api.md`](docs/agent-api.md).
   (`/api/v1/stations/{id}/radio-path`) — the repeaters that pass its
   addresses, the routes on along the backbone, every hop's saved fade margin
   and whether it is stale (and why), the best path and its weakest hop, and the
-  margins measured at site visits. The saved figures are all stale today: say
-  so when you quote one.
+  margins measured at site visits. A figure that has gone stale (a station
+  moved, a radio changed) is worked out again overnight: say so when you
+  quote a stale one.
 - What changed in the API: `GET /api/v1/changelog`, newest first.
 - For a map, `format=geojson` (tool argument `format: "geojson"`) on station
   search, `stations_near` and the latest readings answers a GeoJSON

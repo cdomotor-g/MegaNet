@@ -81,6 +81,20 @@
 // Changing a threshold re-colours immediately and costs nothing: the margins
 // are already computed, and a band is a comparison. Only the margins are
 // expensive, and only they are swept.
+//
+// ── Nobody at the map: the nightly re-sweep ──────────────────────────────────
+//
+// A stale row stayed stale until an editor turned the layer on, let it sweep
+// and pressed Save — so every pin moved to where its station really stands
+// (map-move-pin.js) left that station's links grey on the map and "stale" in
+// the agent API's radio paths until somebody remembered. resweep() below is
+// the same sweep with nobody at the map: every saved row whose signature no
+// longer holds, and every link the map draws at its Max TX distance that has
+// never been saved, worked out by the same computeOne and handed back as the
+// rows Save would send. tools/fade/resweep.mjs opens the app headless, calls
+// it and saves the rows; .github/workflows/fade-resweep.yml runs that every
+// night. It saves under the app's own defaults — the model, the ground, the
+// reliability a fresh browser has — which is what the agent API calls fresh.
 const MapFade = (function () {
   const STORE       = 'mn-fade-v3';  // /3: each way in pair order, no worse-of-two
   const SAMPLES     = 256;  // PathProfile's own figure, and that is the point:
@@ -403,20 +417,50 @@ const MapFade = (function () {
       const row = saved && saved.get(key);
       if (row && row.signature === sig && Number(row.margin_db) === round1(m)
           && Number(row.good_db) === G() && Number(row.ok_db) === O()) continue;
-      const [x, y] = a.id < b.id ? [a, b] : [b, a];
-      out.push({
-        station_a_id: x.id, station_b_id: y.id, kind,
-        margin_db: round1(m),
-        margin_ab_db: round1(hit.ab),
-        margin_ba_db: round1(hit.ba),
-        distance_km: round1(acmaHaversineKm(a.lat, a.lon, b.lat, b.lon)),
-        freq_mhz: freqFor(a, b),
-        verdict: hit.v || null,
-        signature: sig,
-        model: MODEL,
-      });
+      out.push(rowFor(a, b, kind, hit, m, sig));
     }
     return out;
+  }
+
+  // The row Save sends for one link — `a` the end that transmits, as the line
+  // runs — and the nightly re-sweep sends the same.
+  function rowFor(a, b, kind, hit, m, sig) {
+    const [x, y] = a.id < b.id ? [a, b] : [b, a];
+    return {
+      station_a_id: x.id, station_b_id: y.id, kind,
+      margin_db: round1(m),
+      margin_ab_db: round1(hit.ab),
+      margin_ba_db: round1(hit.ba),
+      distance_km: round1(acmaHaversineKm(a.lat, a.lon, b.lat, b.lon)),
+      freq_mhz: freqFor(a, b),
+      verdict: hit.v || null,
+      signature: sig,
+      model: MODEL,
+    };
+  }
+
+  // What changed between a saved row's signature and the one its link has
+  // now, in sigFor's order: the model, each end (lat, lon, ground height,
+  // antenna height, then the radio's four figures), the frequency, and the
+  // settings after it. `moved` names each end whose position changed, with
+  // where it was — the nightly re-sweep's report says which pins moved.
+  function staleWhy(oldSig, newSig) {
+    const o = String(oldSig || '').split('|'), n = String(newSig).split('|');
+    const why = new Set(), moved = [];
+    if (o[0] !== n[0]) why.add('model');
+    for (const k of [1, 2]) {
+      const oe = String(o[k] || '').split(','), ne = String(n[k] || '').split(',');
+      if (oe[0] !== ne[0] || oe[1] !== ne[1]) {
+        why.add('moved');
+        moved.push({ end: k, lat: Number(oe[0]), lon: Number(oe[1]) });
+      }
+      if (oe[2] !== ne[2]) why.add('ground');
+      if (oe[3] !== ne[3]) why.add('antenna');
+      if (oe.slice(4).join(',') !== ne.slice(4).join(',')) why.add('radio');
+    }
+    if (o[3] !== n[3]) why.add('frequency');
+    if (o.slice(4).join('|') !== n.slice(4).join('|')) why.add('settings');
+    return { why: [...why], moved };
   }
 
   function round1(n) { return n == null || !isFinite(n) ? null : Math.round(n * 10) / 10; }
@@ -556,7 +600,7 @@ const MapFade = (function () {
     if (note.fromDb) bits.push(`<span class="txt-ok">${note.fromDb} from the datastore</span>`);
     if (note.done)   bits.push(`${note.done} computed here`);
     if (note.pending) bits.push(`${note.pending} still computing…`);
-    if (note.stale)   bits.push(`<span class="txt-warn">${note.stale} saved ${note.stale === 1 ? 'figure has' : 'figures have'} gone stale — the radios or the positions moved since</span>`);
+    if (note.stale)   bits.push(`<span class="txt-warn">${note.stale} saved ${note.stale === 1 ? 'figure has' : 'figures have'} gone stale — the radios or the positions moved since; the nightly re-sweep works ${note.stale === 1 ? 'it' : 'them'} out again and saves ${note.stale === 1 ? 'it' : 'them'}</span>`);
     if (note.noRadio) bits.push(`${note.noRadio} with no radio system on file — no margin to give`);
     if (note.failed)  bits.push(`<span class="txt-warn">${note.failed} could not be computed — ${P_.model === 'cover' ? 'terrain or land cover' : 'terrain'} unreachable, or the model refused the path</span>`);
     // The one way left for the map and the card to disagree, said out loud
@@ -711,6 +755,114 @@ const MapFade = (function () {
       pendingRows = null;
       const m = oneWay(hit, a, b);
       return m == null ? null : { margin: m, verdict: hit.v || null, from: 'session' };
+    },
+
+    // ── The nightly re-sweep (tools/fade/resweep.mjs) ──
+    // Every link no longer than `maxKm` (the map's Max TX distance unless
+    // told) whose saved row's signature no longer holds — a pin moved, a
+    // ground height or an antenna corrected, a radio changed, the model moved
+    // on — or that nobody has saved, worked out by computeOne in neighbourhood
+    // order, the stale ones first. Past `maxKm` nothing is worked out, stale or
+    // not: those are mostly the pass-range pairs hundreds of kilometres apart
+    // that share an address by accident (#236), which the map does not draw
+    // and a terrain profile cannot make true; they are counted (staleBeyond).
+    // A row whose pair is no link at all any more is left alone — nothing
+    // paints from it, and its signature can never match again. Resolves to the rows for save_link_fade, the
+    // thresholds to save them under, and a report: how many were fresh, stale
+    // and never saved, which stations moved and how far, and what could not
+    // be worked out. `limit` caps how many are worked out (the rest are
+    // `left` for the next run); `onProgress(done, total)` is told as it goes.
+    async resweep({ limit = 0, maxKm = 0, onProgress = null } = {}) {
+      const st = await this.ready();
+      if (st === 'failed') throw new Error(`the datastore did not answer: ${savedError}`);
+      if (!state.data || !Array.isArray(state.data.stations)) throw new Error('no station list');
+      hydrate();
+      const km = maxKm > 0 ? maxKm : state.mapMaxLinkKm;
+      const cap = limit > 0 ? limit : Infinity;
+      const byId = new Map(state.data.stations.map(s => [s.id, s]));
+      const nameOf = id => { const s = byId.get(id); return (s && s.name) || id; };
+      const bare = e => e.txW == null && e.gain == null && e.thr == null;
+      const counts = { links: 0, fresh: 0, stale: 0, unsaved: 0, staleBeyond: 0, noRadio: 0, computed: 0, failed: 0, left: 0 };
+      const why = {}, moved = new Map(), failed = [];
+
+      // The links the map draws, one per pair, the way the first of them runs.
+      const drawn = new Map();
+      for (const l of allLinks()) {
+        const key = pairKey(l.a.id, l.b.id);
+        if (!drawn.has(key)) drawn.set(key, l);
+      }
+      counts.links = drawn.size;
+
+      const jobs = [];
+      for (const [key, l] of drawn) {
+        const { a, b, kind } = l;
+        const sig = sigFor(a, b);
+        const row = saved && saved.get(key);
+        if (row && row.signature === sig) { counts.fresh++; continue; }
+        if (acmaHaversineKm(a.lat, a.lon, b.lat, b.lon) > km) { if (row) counts.staleBeyond++; continue; }
+        if (bare(endSys(a)) || bare(endSys(b))) { counts.noRadio++; continue; }
+        if (row) {
+          counts.stale++;
+          const w = staleWhy(row.signature, sig);
+          for (const k of w.why) why[k] = (why[k] || 0) + 1;
+          for (const mv of w.moved) {
+            const [lo, hi] = a.id < b.id ? [a, b] : [b, a];
+            const s = mv.end === 1 ? lo : hi;
+            const was = moved.get(s.id) || {
+              id: s.id, name: s.name || s.id, links: 0,
+              from: [mv.lat, mv.lon], to: [s.lat, s.lon],
+              metres: isFinite(mv.lat) && isFinite(mv.lon)
+                ? Math.round(acmaHaversineKm(mv.lat, mv.lon, s.lat, s.lon) * 1000) : null,
+            };
+            was.links++;
+            moved.set(s.id, was);
+          }
+        } else {
+          counts.unsaved++;
+        }
+        jobs.push({ a, b, kind, sig, stale: !!row });
+      }
+
+      // Stale first — they are what the map is showing grey — then a
+      // neighbourhood at a time, for kick()'s reason: the tile caches.
+      const cell = j => {
+        const lat = (j.a.lat + j.b.lat) / 2, lon = (j.a.lon + j.b.lon) / 2;
+        return Math.round(lat * 4) * 100000 + Math.round(lon * 4);
+      };
+      jobs.sort((x, y) => (y.stale - x.stale) || (cell(x) - cell(y)));
+      const todo = jobs.slice(0, cap);
+      counts.left = jobs.length - todo.length;
+
+      const rows = [];
+      let next = 0, done = 0;
+      const worker = async () => {
+        while (next < todo.length) {
+          const job = todo[next++];
+          let hit = mem.get(job.sig) || null;
+          if (!hit || oneWay(hit, job.a, job.b) == null) {
+            try { hit = await computeOne(job.a, job.b); } catch (_) { hit = null; }
+            if (hit) mem.set(job.sig, hit);
+          }
+          const m = hit ? oneWay(hit, job.a, job.b) : null;
+          if (m == null) {
+            counts.failed++;
+            if (failed.length < 50) failed.push({ a: job.a.id, b: job.b.id, names: `${nameOf(job.a.id)} → ${nameOf(job.b.id)}`, stale: job.stale });
+          } else {
+            counts.computed++;
+            rows.push(rowFor(job.a, job.b, job.kind, hit, m, job.sig));
+          }
+          done++;
+          if (onProgress) { try { onProgress(done, todo.length); } catch (_) {} }
+        }
+      };
+      await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+      persistSoon();
+      pendingRows = null;
+      return {
+        model: MODEL, good: G(), ok: O(), maxKm: km,
+        counts, why, rows, failed,
+        moved: [...moved.values()].sort((x, y) => y.links - x.links || String(x.name).localeCompare(String(y.name))),
+      };
     },
 
     // The datastore's saved figures asked for, once a page as ever; resolves

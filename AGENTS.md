@@ -125,9 +125,10 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     network's area (`register_extract.source_date` says when): say that date,
     and check a licence on the ACMA's own register before relying on it;
   - a radio path's fade margins are modelled, saved from the Stations map, and
-    say whether they are `stale`; every one is today (worked out with the
-    land-cover model, which reads much too low) — say so when you quote one,
-    and quote the measured attenuator tests beside it;
+    say whether they are `stale` — a station moved or a radio changed since
+    it was worked out; Flood-Net works stale ones out again every night. Say
+    so when you quote a stale one, and quote the measured attenuator tests
+    beside any of them;
   - "not recorded" is never zero.
 - **Fair use:** cache what you fetch, and ask about the stations you need rather
   than walking the whole network — the API answers a station, or a page of

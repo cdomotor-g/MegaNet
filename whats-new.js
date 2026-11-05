@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 202, date: '2026-11-05', items: [
+      '🌙 <strong>Moved a pin? Its fade margins catch up overnight.</strong> When a station\'s pin is moved, or its ground '
+        + 'height, antenna or radio changes, the fade margins on its links go stale and the <strong>Stations</strong> map shows '
+        + 'them in the plain link colour. Now they are worked out again and saved every night, so by the morning the map is '
+        + 'coloured again, with nobody pressing Save.',
+    ] },
     { n: 201, date: '2026-11-05', items: [
       '📶 <strong>Links</strong> on a field station\'s card (<strong>Radio</strong> tab, under <em>Assumed</em>): every '
         + 'repeater that carries it and every base station that hears it direct, each with its fade margin, the best first. '

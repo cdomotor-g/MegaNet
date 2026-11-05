@@ -1110,6 +1110,149 @@ ok('…the note saying they came from the datastore',
 ok('…and that the figure is one way', /one way: field station to repeater/.test(read1.note), read1.note.slice(-420));
 await oneWay.close();
 
+// ── The nightly re-sweep: a moved pin, worked out again with nobody at the map ─
+// A moved pin makes every saved figure on its station's links stop matching,
+// and until somebody swept the layer and pressed Save they stayed grey.
+// MapFade.resweep() is that sweep for tools/fade/resweep.mjs, run every night
+// by .github/workflows/fade-resweep.yml. Three rows are served: one current,
+// one saved before its field station moved ~111 m north, and one stale on a
+// link longer than the sweep's reach — under thresholds of 18 and 7, so the
+// rows it hands back are seen to be banded by the network's rule, not 15/6.
+// No map is drawn: the sweep is about the network, not the screen.
+
+const night = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const page5 = await night.newPage();
+let nightRows = [];
+await applyNetworkPolicy(page5, server.origin);
+await page5.route(/elevation-tiles-prod\/terrarium\//, route =>
+  route.fulfill({ status: 200, contentType: 'image/png', body: tile,
+                  headers: { 'Access-Control-Allow-Origin': '*' } }));
+await page5.route(/\/link_fade_margin/, route =>
+  route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(nightRows) }));
+page5.on('pageerror', e => errors.push(String(e)));
+await page5.goto(server.url(), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+await page5.waitForFunction(() => typeof state !== 'undefined' && !!state.data,
+  null, { timeout: LOAD_TIMEOUT });
+const NIGHT_KM = 50;
+const nightPick = await page5.evaluate((km) => {
+  const radio = s => { const sys = rmSystemOf(s); return !!(sys && sys.tx_power_w != null && sys.antenna_gain_dbi != null); };
+  const links = passRangeLinks(state.data.stations)
+    .filter(l => l.s.lat != null && l.r.lat != null && radio(l.s) && radio(l.r));
+  const near = links.filter(l => l.km < km - 10);
+  const far = links.find(l => l.km > km + 10 && l.km < 100);
+  const fresh = near[0];
+  const moved = near.find(l => l.s.id !== fresh.s.id && l.r.id !== fresh.r.id);
+  const row = (l, sig, i) => {
+    const [a, b] = l.s.id < l.r.id ? [l.s.id, l.r.id] : [l.r.id, l.s.id];
+    return { station_a_id: a, station_b_id: b, kind: 'field', margin_db: 10 + i, margin_ab_db: 10 + i, margin_ba_db: 10 + i,
+             verdict: 'clear', signature: sig, good_db: 18, ok_db: 7, computed_at: '2026-11-0' + (i + 1) + 'T00:00:00Z' };
+  };
+  return {
+    fresh: fresh && { s: fresh.s.id, r: fresh.r.id },
+    moved: moved && { s: moved.s.id, r: moved.r.id, now: MapFade.signature(moved.s, moved.r) },
+    far: far && { s: far.s.id, r: far.r.id },
+    rows: fresh && moved && far ? [
+      row(fresh, MapFade.signature(fresh.s, fresh.r), 0),
+      row(moved, MapFade.signature({ ...moved.s, lat: moved.s.lat - 0.001 }, moved.r), 1),
+      row(far, 'itm-p2p/2|an older model', 2),
+    ] : [],
+  };
+}, NIGHT_KM);
+ok('a current link, a link whose station moved, and a stale link past the reach, to serve rows for',
+   nightPick.rows.length === 3, JSON.stringify(nightPick).slice(0, 300));
+nightRows = nightPick.rows;
+const night1 = nightPick.rows.length === 3 ? await page5.evaluate(async ({ km }) => {
+  const r = await MapFade.resweep({ limit: 3, maxKm: km });
+  return {
+    counts: r.counts, why: r.why, moved: r.moved, good: r.good, ok: r.ok, model: r.model,
+    rows: r.rows.map(x => ({ pair: x.station_a_id + '|' + x.station_b_id, sig: x.signature, m: x.margin_db, kind: x.kind })),
+    drew: !!state.map,
+  };
+}, { km: NIGHT_KM }) : null;
+const pairOf = p => (p.s < p.r ? `${p.s}|${p.r}` : `${p.r}|${p.s}`);
+if (night1) {
+  const c = night1.counts;
+  ok('the sweep runs with no map drawn', night1.drew === false);
+  ok('the current row is left alone, the moved one is stale, the one past the reach is counted and not worked out',
+     c.fresh === 1 && c.stale === 1 && c.staleBeyond === 1, JSON.stringify(c));
+  ok('…and it is the moved station\'s link that is worked out first, under its signature as the station stands now',
+     night1.rows.length >= 1 && night1.rows[0].pair === pairOf(nightPick.moved) && night1.rows[0].sig === nightPick.moved.now
+       && typeof night1.rows[0].m === 'number' && night1.rows[0].kind === 'field',
+     JSON.stringify(night1.rows[0]));
+  ok('…neither the current link nor the one past the reach among what it hands back',
+     !night1.rows.some(x => x.pair === pairOf(nightPick.fresh) || x.pair === pairOf(nightPick.far)),
+     night1.rows.map(x => x.pair).join(', '));
+  ok('why it had gone stale: the station moved, and nothing else',
+     JSON.stringify(night1.why) === '{"moved":1}', JSON.stringify(night1.why));
+  ok('…and which station, and how far — about 111 m',
+     night1.moved.length === 1 && night1.moved[0].id === nightPick.moved.s
+       && night1.moved[0].metres >= 100 && night1.moved[0].metres <= 125 && night1.moved[0].links === 1,
+     JSON.stringify(night1.moved));
+  ok('a limit is a limit: three worked out, the rest left for the next run',
+     c.computed + c.failed === 3 && night1.rows.length === c.computed && c.left === c.stale + c.unsaved - 3,
+     JSON.stringify(c));
+  ok('the rows are banded by the thresholds the network was saved under, 18 and 7, under the model of the day',
+     night1.good === 18 && night1.ok === 7 && /^itm-p2p\//.test(night1.model), `${night1.good}/${night1.ok} ${night1.model}`);
+}
+await night.close();
+
+// The tool's own parts, which need no browser: its arguments, its chunks, the
+// save — with a fetch that records rather than sends — its summary, its reach
+// (the agent API's), and the workflow that runs it.
+{
+  const RS = await import('../tools/fade/resweep.mjs');
+  const fsm = await import('node:fs');
+  const read = f => fsm.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+  const d = RS.parseArgs([]);
+  ok('the tool: saving, every link, out to the agent API\'s reach unless told',
+     d.dryRun === false && d.limit === 0 && d.km === RS.RELAY_KM, JSON.stringify(d));
+  const a = RS.parseArgs(['--dry-run', '--limit', '5', '--km', '100', '--json', 'x.json']);
+  ok('…--dry-run, --limit, --km and --json read', a.dryRun && a.limit === 5 && a.km === 100 && a.json === 'x.json', JSON.stringify(a));
+  const refused = [['--limit', '0'], ['--limit', 'two'], ['--km', '900'], ['--bogus']].filter(v => {
+    try { RS.parseArgs(v); return false; } catch (_) { return true; }
+  });
+  ok('…and a nonsense argument refused, not guessed at', refused.length === 4, `${refused.length} of 4 refused`);
+  const relay = /relayKmMax:\s*(\d+)/.exec(read('worker/api.js'));
+  ok('its reach is the agent API\'s for a station\'s repeaters (worker/api.js relayKmMax)',
+     relay && Number(relay[1]) === RS.RELAY_KM, `${relay && relay[1]} vs ${RS.RELAY_KM}`);
+  ok('rows go a chunk of 400 at a time, the app\'s own size',
+     JSON.stringify(RS.chunks(new Array(950).fill(0)).map(c => c.length)) === '[400,400,150]');
+  const calls = [];
+  const fake = async (url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push({ url, init, body });
+    return new Response(JSON.stringify({ written: body.p_rows.length - (calls.length === 1 ? 1 : 0), sent: body.p_rows.length }), { status: 200 });
+  };
+  const got = await RS.save(fake, { url: 'https://db.example.com', secret: 'sb_secret_test', rows: new Array(450).fill({}), good: 18, ok: 7 });
+  ok('…to save_link_fade, in the meganet schema, with the key and the network\'s thresholds',
+     calls.length === 2 && calls.every(c => c.url === 'https://db.example.com/rest/v1/rpc/save_link_fade'
+       && c.init.headers.apikey === 'sb_secret_test' && c.init.headers['Content-Profile'] === 'meganet'
+       && c.body.p_good_db === 18 && c.body.p_ok_db === 7),
+     JSON.stringify(calls.map(c => [c.url, c.body.p_rows.length, c.body.p_good_db, c.body.p_ok_db])));
+  ok('…counting what the database took against what was sent', got.written === 449 && got.sent === 450, JSON.stringify(got));
+  let threw = '';
+  try {
+    await RS.save(async () => new Response(JSON.stringify({ message: 'not authorised to save link fade margins' }), { status: 403 }),
+      { url: 'https://db.example.com', secret: 'x', rows: [{}], good: 15, ok: 6 });
+  } catch (e) { threw = e.message; }
+  ok('…and a refusal is an error with the database\'s own words, not a quiet nothing', /403 not authorised/.test(threw), threw);
+  const text = RS.summary({
+    model: 'itm-p2p/3', good: 15, ok: 6, maxKm: 150, rows: new Array(26).fill({}),
+    counts: { links: 6484, fresh: 3638, stale: 26, unsaved: 1, staleBeyond: 921, noRadio: 0, computed: 26, failed: 1, left: 0 },
+    why: { moved: 25, ground: 1 },
+    moved: [{ id: 'x', name: 'Marburg Radar', metres: 24, links: 25 }],
+    failed: [{ names: 'Clarke Range 2 AL → Clarke Range AL Repeater', stale: false }],
+  }, { saved: { written: 26, sent: 26 } });
+  ok('the summary names the moved station, how far, the links, what was saved and what could not be worked out',
+     /\| Marburg Radar \| 24 m \| 25 \|/.test(text) && /Saved to the database: \*\*26\*\* of 26/.test(text)
+       && /a station moved \(25\)/.test(text) && /Clarke Range 2 AL/.test(text) && /921 stale figures are on links longer than 150 km/.test(text),
+     text.slice(0, 400));
+  const wf = read('.github/workflows/fade-resweep.yml');
+  ok('the workflow runs it every night with the secret key, and stands down without one',
+     /schedule:\s*\n\s*- cron: '\d+ \d+ \* \* \*'/.test(wf) && /node tools\/fade\/resweep\.mjs/.test(wf)
+       && /SUPABASE_SECRET_KEY: \$\{\{ secrets\.SUPABASE_SECRET_KEY \}\}/.test(wf) && /steps\.key\.outputs\.ok == 'true'/.test(wf));
+}
+
 ok('nothing threw for the whole run', errors.length === 0, errors.join('\n         '));
 
 await context.close();
@@ -1121,6 +1264,7 @@ console.log(failures
   : `\nPASS — ${passes} assertions: arming a tool from its panel does not also draw with it,\n`
     + '       the budget puts the map down once it has both ends, Escape gets out of the pick,\n'
     + '       the margin is in the corner, the chart has a sky and an earth under it, built\n'
-    + '       area is no longer red, the fade bands are set, banded and remembered, and the\n'
-    + '       figure the map colours a link by is the figure the card gives for it.');
+    + '       area is no longer red, the fade bands are set, banded and remembered, the\n'
+    + '       figure the map colours a link by is the figure the card gives for it, and a\n'
+    + '       moved station\'s links are worked out again overnight with nobody at the map.');
 process.exit(failures ? 1 : 0);

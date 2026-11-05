@@ -982,13 +982,14 @@ systems, the frequency, the model and its settings — and the map shows a figur
 only while the register still matches it. This builds the same signature, at
 the app's default settings, and gives every figure all the same, with
 `stale: true` and the reasons where it no longer matches: a stale figure is
-still evidence. **Today every saved figure is stale.** They were worked out on
-3–4 September 2026 with the land-cover model (`itm-p2p/2`), which Flood-Net's
-calibration against attenuator tests found reads about 41 dB below the margins
-measured on site, on average ([`network-review.md`](network-review.md)); the
-map now uses the field model (`itm-p2p/3`). Until the fade-margin layer is
-worked out and saved again, quote them as stale — they are much too low — and
-set `measured` beside them. For a "Fade margin over 20 dB" line, read
+still evidence. The figures were worked out again with the field model
+(`itm-p2p/3`) on 3 November 2026, and every night since 5 November the ones
+that have gone stale — on links up to 150 km long, as far as this route looks for a repeater — are worked out again and
+saved ([`network-review.md`](network-review.md), *The nightly re-sweep*), so a
+stale hop is usually a change made since the last night. A figure still under
+the land-cover model (`itm-p2p/2`, September 2026) reads about 41 dB below the
+margins measured on site, on average: quote it as stale and much too low. Set
+`measured` beside any of them. For a "Fade margin over 20 dB" line, read
 `best_path.weakest_hop.margin_db` and its `stale`, and the newest of
 `measured.tests`.
 
@@ -1525,13 +1526,16 @@ quote it:
 - **Kinds are derived.** `rain`/`river` come from the record's ALERT addresses,
   location types and the Bureau's river height list; see
   [`/api/v1/stations`](#get-apiv1stations).
-- **Saved fade margins are modelled, and today all stale.** A radio path's
-  figures are the Stations map's Longley–Rice margins as an editor saved them,
-  each with the model it was worked out with and whether the register still
-  matches it (`stale`, `stale_reasons`). Every one now was worked out on 3–4
-  September 2026 with the land-cover model, which reads far below measured
-  margins; say so when you quote one, and quote the attenuator tests
-  (`measured`) beside it. A hop with no saved figure is `not modelled`, never
+- **Saved fade margins are modelled, and kept current overnight.** A radio
+  path's figures are the Stations map's Longley–Rice margins as Flood-Net saved
+  them, each with the model it was worked out with and whether the register
+  still matches it (`stale`, `stale_reasons`). They were worked out again with
+  the field model on 3 November 2026, and since 5 November a figure that goes
+  stale — a station moved, a ground height, antenna or radio changed — is
+  worked out again and saved every night
+  ([`network-review.md`](network-review.md), *The nightly re-sweep*). Say so
+  when you quote a stale one, and quote the attenuator tests (`measured`)
+  beside any of them. A hop with no saved figure is `not modelled`, never
   zero.
 - **The ACMA register is an extract, and a subset.** The licences come from the
   ACMA's Register of Radiocommunications Licences as Flood-Net last took it

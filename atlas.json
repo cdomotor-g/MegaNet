@@ -41,7 +41,7 @@
       "Teams and tasks (0095) live: one team has its owner so far — an administrator names each team's owners on the Admin tab; SoRT's #tasks= hand-off lands on the Tasks tab for review",
       "One person, one account (0100): an account keeps a second address — found by a team's owner, where its emails can go, refused a sign-in of its own; the Admin tab's Same person… folds a second account in",
       "Agent API changelog and notify list shipped; emails start once #237's Resend parts are done",
-      "Agent API radio paths to base, for SoRT's Fade Margin question: live, with fresh fade margins since the fade-resweep blocker cleared on 4 Nov 2026 (#235: the Stations map's layer swept under the 12 dB field model and saved to the datastore); 15 links are still stale (Save is greyed out for them) and 2 failed to compute, the map still wants a visual check; #235 closed — re-sweep after each #234/#233 batch",
+      "Agent API radio paths to base, for SoRT's Fade Margin question: live, with fresh fade margins since the fade-resweep blocker cleared on 4 Nov 2026 (#235: the Stations map's layer swept under the 12 dB field model and saved to the datastore); 15 links are still stale (Save is greyed out for them) and 2 failed to compute, the map still wants a visual check; #235 closed — since 5 Nov a nightly re-sweep works stale fade margins out again and saves them (a moved pin, a #234/#233 batch), with nobody at the map",
       "Photo reader: nightly reading of field photos for logger and equipment details",
       "#243 R2 data archive: one restored-day self-test left, then close",
       "One ALERT burst heard several ways is one reading (0096, #232 closed): copies within 8 s counted on it",
