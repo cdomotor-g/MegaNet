@@ -1127,11 +1127,26 @@ const report = await page.evaluate(ids => {
     svgCursor: !!r.svg && /path-cursor|onmousemove/.test(r.svg),
     stillHover: (() => { PathProfile.hoverAt(100); return !!document.querySelector('#path-profile-panel #path-cursor:not([style*="none"])'); })(),
     file: r.rows.file,
-    brief: {
-      top: r.text.startsWith(r.brief.text),
-      tables: /THE TWO ENDS|LINK BUDGET/.test(r.brief.text) || /<table|Link budget/.test(r.brief.html),
-      margin: r.brief.html.includes('Fade margin:') && r.brief.html.includes('Line of sight:'),
-    },
+    brief: (() => {
+      // Laid out as Radio Mobile's Radio Link window: its labels in its order,
+      // and figures that add up the way Radio Mobile's do.
+      const t = r.brief.text, n = r.brief.rows.nums;
+      const want = ['Azimuth', 'Elev. angle', 'Obstruction at', 'Worst Fresnel', 'Distance', 'Free space', 'Obstruction',
+        'Statistics', 'Path loss', 'E field', 'Rx level', 'Rx relative', 'TRANSMITTER', 'RECEIVER', 'Tx system name',
+        'Rx system name', 'Tx power', 'Required E field', 'Radiated power', 'Rx sensitivity', 'Antenna height', 'Net', 'Frequency'];
+      let at = 0;
+      const order = want.filter(l => { const i = t.indexOf(l, at); if (i < 0) return true; at = i; return false; });
+      const relative = (t.match(/Rx relative\t([-+]\d+\.\d) dB/) || [])[1];
+      return {
+        order,
+        relative: relative === `${p.margin > 0 ? '+' : ''}${p.margin.toFixed(1)}`,
+        sum: Math.abs(n.fs + n.obs + n.stats + n.cover + n.allowance + n.floor - n.pathLoss) < 0.01,
+        efield: Math.abs((n.eRx - n.eReq) - n.margin) < 0.01,
+        back: n.back != null,
+        report: /THE TWO ENDS|LINK BUDGET/.test(t) || /Link budget —|The two ends/.test(r.brief.html),
+        rm: /Radio Mobile/.test(t) && /Rx relative/.test(r.brief.html) && /SETTINGS/.test(r.brief.html),
+      };
+    })(),
   };
 }, PAIR);
 ok('📋 the report quotes the card\'s fade margin', !!report && report.textFig && report.rowsMargin === report.margin,
@@ -1149,8 +1164,10 @@ if (report) {
      !report.svgVar && report.svgNames && !report.svgCursor, JSON.stringify(report));
   ok('…drawn without taking the cursor away from the chart on the card', report.stillHover);
   ok('…and a file name that says Flood-Net', /^floodnet-path-/.test(report.file), report.file);
-  ok('📄 the summary is the report\'s top — the margin and the verdict, none of the tables',
-     report.brief.top && report.brief.margin && !report.brief.tables, JSON.stringify(report.brief));
+  ok('📄 the summary is laid out as Radio Mobile\'s Radio Link window — its labels, in its order, none of the report\'s tables',
+     !report.brief.order.length && report.brief.rm && !report.brief.report, JSON.stringify(report.brief));
+  ok('…its Rx relative the card\'s fade margin, its losses adding up to the path loss, and E field less Required E field the margin',
+     report.brief.relative && report.brief.sum && report.brief.efield && report.brief.back, JSON.stringify(report.brief));
 }
 await page.evaluate(() => PathProfile.hoverOff());
 await page.click('#path-copy');
@@ -1186,7 +1203,8 @@ if (pasted) {
      pasted.text && !!pasted.png && pasted.png[0] === 2400 && pasted.png[1] > 900, JSON.stringify(pasted));
   ok('…and says it did', /^Copied/.test(pasted.toast), pasted.toast);
 }
-// 📄 Copy a summary: the same three ways, the document stopping at the chart.
+// 📄 Copy a summary: the same three ways, the document laid out as Radio
+// Mobile's Radio Link window with the chart inside it.
 await page.click('#path-copy-brief');
 const brief = await page.evaluate(async () => {
   const want = PathProfile.report().brief.text;
@@ -1203,7 +1221,8 @@ const brief = await page.evaluate(async () => {
   if (it.types.includes('text/html')) {
     const h = await (await it.getType('text/html')).text();
     out.img = /<img[^>]+src="data:image\/png;base64,/.test(h);
-    out.tables = /<table|Link budget/.test(h);
+    out.tables = /Link budget —|The two ends/.test(h);
+    out.window = /RADIO LINK/.test(h) && /TRANSMITTER/.test(h) && /RECEIVER/.test(h);
   }
   out.toast = [...document.querySelectorAll('.toast-text')].map(t => t.textContent).pop() || '';
   return out;
@@ -1211,8 +1230,8 @@ const brief = await page.evaluate(async () => {
 ok('📄 the summary press puts the summary\'s text, a document and the picture on the clipboard',
    !!brief && brief.text && ['text/html', 'text/plain', 'image/png'].every(t => brief.types.includes(t)), JSON.stringify(brief));
 if (brief) {
-  ok('…the document carrying the chart and no table under it', brief.img && !brief.tables, JSON.stringify(brief));
-  ok('…and says what it copied', /^Copied: the fade margin/.test(brief.toast), brief.toast);
+  ok('…the document the Radio Link window with the chart in it, and none of the report\'s tables', brief.img && brief.window && !brief.tables, JSON.stringify(brief));
+  ok('…and says what it copied', /^Copied: the summary/.test(brief.toast), brief.toast);
 }
 
 // Shown on asking: the cards carry the answer, and the explaining behind a

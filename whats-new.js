@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 205, date: '2026-11-05', items: [
+      '<strong>📄 Copy a summary</strong>, over the elevation profile\'s chart, now pastes the path laid out like '
+        + '<strong>Radio Mobile\'s Radio Link window</strong>: the same three rows of figures over the chart — azimuth, '
+        + 'Fresnel clearance, free-space and obstruction loss, path loss, E field, Rx level and Rx relative — then the '
+        + 'transmitter and the receiver side by side with their signal meters, power, EIRP and ERP, sensitivity and '
+        + 'antenna heights, and the net and the frequency at the foot. Open the two side by side and read across, cell by cell.',
+    ] },
     { n: 204, date: '2026-11-05', items: [
       '〽️ <strong>The elevation profile runs on past both ends.</strong> The chart now shows the ground for a short way '
         + 'beyond the transmitter and the receiver — 5% of the path each side, at least 250 m and at most 5 km — so you can '

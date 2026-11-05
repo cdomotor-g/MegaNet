@@ -5247,10 +5247,27 @@ the obstruction floor). All of it is written from one list of rows
 (`reportOf` in `path-profile.js`), so the document and the text cannot differ.
 Where the browser refuses the clipboard it falls back to a copy event, and then
 to saving the document as a file; *copy* and *save as PNG* beside it take the
-chart alone. **📄 Copy a summary**, beside it, copies the same three ways but
-only the report's top — the heading, the fade margin, the line-of-sight verdict
-and the chart — without the tables under it, for a page that wants the answer
-rather than the working.
+chart alone. **📄 Copy a summary**, beside it, copies the same three ways the
+path laid out as Radio Mobile's *Radio Link* window, so the two can be read
+across cell by cell: a heading with the fade margin; Radio Mobile's three rows
+of five (azimuth, elevation angle, obstruction at, worst Fresnel, distance; free
+space, obstruction with its propagation mode, statistics; path loss, E field, Rx
+level in dBm and µV, Rx relative) over the chart, drawn without its heading; the
+transmitter and the receiver side by side, row for row, each under an S-meter
+(S9 = −93 dBm at VHF, 6 dB a unit, then +10s; the transmitter's is the signal
+heard back the other way, as Radio Mobile's is) with role, radio system, power,
+line loss, gain in dBi and dBd, EIRP and ERP, required E field, sensitivity in
+µV and dBm and antenna height; and the net and the frequency at the foot, the
+Longley–Rice settings under them. Flood-Net's own terms — the ground cover and
+the field allowance — stand where Radio Mobile has Urban and Forest, marked ✦,
+and the obstruction floor is said under Obstruction; the note under it says what
+Radio Mobile's Rx relative should read without them, and a key says what the
+words mean (a pasted page has no hover). Its text is the same grid with tabs
+between the cells (`summaryOf` / `summaryHtml` / `summaryText`). It is built of
+tables with every inset given both as `cellpadding` and as `padding`, and the
+meters as small pictures, because that is what Word, LibreOffice and the mail
+programs keep of a pasted page. A point on the ground has no radio, so the
+figures that need one there read —.
 
 **The Stations map's controls.** Everything MapChrome would put in the map's
 top-right corner lives in the strip instead, at every width — a phone's rail

@@ -2739,9 +2739,9 @@ const PathProfile = (function () {
   // it as a picture), plain text, and the picture alone — and whatever it is
   // pasted into takes the richest one it can: Word and the mail programs the
   // document, a plain editor the text, a paint program the picture.
-  // 📄 Copy a summary beside it puts the same top on the clipboard — the
-  // heading, the margin, the verdict and the chart — without the tables, for a
-  // page that wants the answer rather than the working.
+  // 📄 Copy a summary beside it puts the path on the clipboard laid out as
+  // Radio Mobile's Radio Link window (see "the summary" below), so the two can
+  // be held against each other.
   //
   // The picture is drawn again for paper rather than lifted off the card: at
   // one size whatever the column is, in the light theme's colours whatever the
@@ -3015,6 +3015,7 @@ const PathProfile = (function () {
       sub: `${fmtKm(an.D / 1000)} @ ${String(Math.round(azAB) % 360).padStart(3, '0')}° · ${an.fMhz.toFixed(3)} MHz · Flood-Net, ${stamp}`,
       stamp, a, b, an, prof, tokens,
       margin: pm.m, band, why, pct,
+      ra, rb, azAB, azBA, freqSrc,
       verdict: v,
       radio: rp ? pairsOf(rp.rows) : [],
       ends, path, model, budget, notes,
@@ -3026,9 +3027,12 @@ const PathProfile = (function () {
   // key and the source under it. chartSvg() is the card's own drawing; it
   // leaves the cursor's scales behind, which belong to the chart on screen and
   // are put back.
-  function paperSvg(rep) {
+  // `bare` leaves the heading off — the summary says it over the chart already
+  // — and keeps the two ends named over it.
+  function paperSvg(rep, bare) {
     const s = shown;
-    const { W, H, head } = PAPER;
+    const { W, H } = PAPER;
+    const head = bare ? 50 : PAPER.head;
     const keep = hoverGeom;
     let chart;
     try { chart = chartSvg(s.an, s.prof, false, null, { W, H }); } finally { hoverGeom = keep; }
@@ -3046,8 +3050,8 @@ const PathProfile = (function () {
       return t.length > max ? `${t.slice(0, max - 1)}…` : t;
     };
     const endText = (e, ground, agl, role, x, anchor) => `
-      <text x="${x}" y="76" font-size="13" font-weight="700" text-anchor="${anchor}" fill="${ink}">${esc(fit(`${role} · ${e.name}`, W / 2 - 70, 13))}</text>
-      <text x="${x}" y="93" font-size="12" text-anchor="${anchor}" fill="${muted}">${esc(`ground ${ground.toFixed(1)} m · antenna ${agl.toFixed(1)} m AGL`)}</text>`;
+      <text x="${x}" y="${head - 24}" font-size="13" font-weight="700" text-anchor="${anchor}" fill="${ink}">${esc(fit(`${role} · ${e.name}`, W / 2 - 70, 13))}</text>
+      <text x="${x}" y="${head - 7}" font-size="12" text-anchor="${anchor}" fill="${muted}">${esc(`ground ${ground.toFixed(1)} m · antenna ${agl.toFixed(1)} m AGL`)}</text>`;
     // The key, wrapped to the width: a swatch drawn as the chart draws the thing.
     const items = [
       ['los', 'Line of sight, A → B'], ['fres', '60% Fresnel zone'], ['gnd', `Ground (earth curvature included, k = ${an.k.toFixed(2)})`],
@@ -3093,8 +3097,8 @@ const PathProfile = (function () {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${total}" width="${W}" height="${total}"
       font-family="Segoe UI, Calibri, Arial, Helvetica, sans-serif">
       <rect x="0" y="0" width="${W}" height="${total}" fill="#ffffff"/>
-      <text x="16" y="28" font-size="19" font-weight="700" fill="${ink}">${esc(fit(rep.heading, W - 32, 19))}</text>
-      <text x="16" y="50" font-size="13" fill="${muted}">${esc(fit(rep.sub, W - 32, 13))}</text>
+      ${bare ? '' : `<text x="16" y="28" font-size="19" font-weight="700" fill="${ink}">${esc(fit(rep.heading, W - 32, 19))}</text>
+      <text x="16" y="50" font-size="13" fill="${muted}">${esc(fit(rep.sub, W - 32, 13))}</text>`}
       ${endText(a, an.groundA, an.aglA, 'A, transmitter', 52, 'start')}
       ${endText(b, an.groundB, an.aglB, 'B, receiver', W - 14, 'end')}
       ${inner}
@@ -3107,9 +3111,9 @@ const PathProfile = (function () {
   // The paper chart as a PNG, at twice its size so it prints sharp:
   // { blob, url, w, h } — the blob for the clipboard and a download, the data
   // URL for the document, which carries the picture inside it.
-  function paperPicture(rep) {
+  function paperPicture(rep, bare) {
     return new Promise((resolve, reject) => {
-      const p = paperSvg(rep);
+      const p = paperSvg(rep, bare);
       if (!p) { reject(new Error('There is no chart to copy.')); return; }
       const img = new Image();
       img.onload = () => {
@@ -3133,10 +3137,8 @@ const PathProfile = (function () {
 
   // The report as a document: inline styles only, because that is all Word
   // and the mail programs keep of a pasted page. `pic` may be null — the
-  // figures go without the chart rather than not at all. `brief` stops after
-  // the chart: the heading, the margin, the verdict and the picture, which is
-  // what 📄 Copy a summary carries.
-  function reportHtml(rep, pic, brief) {
+  // figures go without the chart rather than not at all.
+  function reportHtml(rep, pic) {
     const T = rep.tokens;
     const tone = { ok: T['--ok'] || '#107c10', warn: T['--warn'] || '#9e5e00', bad: T['--bad'] || '#c7401a' };
     const font = 'font-family:Calibri,Arial,Helvetica,sans-serif;';
@@ -3173,24 +3175,23 @@ const PathProfile = (function () {
         <b style="color:${tone[rep.verdict.cls] || tone.warn}">${esc(rep.verdict.label)}</b> — ${esc(rep.verdict.note)}${
           rep.an.verdict === 'obstructed' && rep.margin != null ? ' The model has priced the obstruction; the margin is what is left after it.' : ''}</p>
       ${pic ? `<p style="margin:0 0 6pt"><img src="${pic.url}" width="${imgW}" height="${imgH}" alt="${escAttr(`Elevation profile, ${rep.a.name} to ${rep.b.name}, with the line of sight and the 60% Fresnel zone`)}"></p>` : ''}
-      ${brief ? '' : `${rep.radio.length ? h(rep.title) + pairs(rep.radio) : ''}
+      ${rep.radio.length ? h(rep.title) + pairs(rep.radio) : ''}
       ${h('The two ends')}${ends}
       ${h('The path')}${pairs(rep.path)}
       ${h('Propagation model and settings')}${pairs(rep.model)}
       ${h('Link budget — how the fade margin is worked out')}${budget}
-      ${rep.notes.map(n => `<p style="${font}font-size:9.5pt;margin:6pt 0 0">${esc(n)}</p>`).join('')}`}
+      ${rep.notes.map(n => `<p style="${font}font-size:9.5pt;margin:6pt 0 0">${esc(n)}</p>`).join('')}
     </div>`;
   }
 
   // The same, as plain text: tab between columns, so a table pasted into a
-  // spreadsheet lands in cells. `brief` as for the document.
-  function reportText(rep, brief) {
+  // spreadsheet lands in cells.
+  function reportText(rep) {
     const L = [];
     const sec = t => { L.push('', t.toUpperCase()); };
     L.push(rep.heading, rep.sub, '');
     L.push(`Fade margin: ${rep.margin == null ? `not computed — ${rep.why}` : `${signed(rep.margin, 1)} dB — ${rep.band.label}, ${rep.a.name} → ${rep.b.name}, at ${rep.pct}`}`);
     L.push(`Line of sight: ${rep.verdict.label} — ${rep.verdict.note}`);
-    if (brief) return L.join('\n');
     if (rep.radio.length) { sec(rep.title); rep.radio.forEach(([l, v]) => L.push(`${l}\t${v}`)); }
     sec('The two ends');
     L.push('\tA — transmitter\tB — receiver');
@@ -3203,6 +3204,363 @@ const PathProfile = (function () {
     rep.budget.forEach(([l, v, unit, note, kind]) => L.push(`${l}\t${kind === 'result' ? signed(v, 1) : signed(v, 2)}\t${unit}\t${note}`));
     L.push('');
     rep.notes.forEach(n => L.push(n));
+    return L.join('\n');
+  }
+
+  // ── 📄 the summary, laid out as Radio Mobile's Radio Link window ──
+  // Whoever checks a path here against the same path in Radio Mobile has its
+  // Radio Link window open beside them, so the summary is laid out the way
+  // that window is: three rows of five figures — where the far end is, what
+  // the path costs, what arrives — over the chart; under it the transmitter
+  // and the receiver side by side, each under its signal meter; and the net
+  // and the frequency at the foot. The same figures in the same places and
+  // the same units, to at least the same decimals, so the two can be read
+  // across cell by cell.
+  //
+  // Flood-Net prices two things Radio Mobile does not — the ground cover at the
+  // ends and the field allowance — and they stand where Radio Mobile keeps its
+  // own two extras, Urban and Forest, marked ✦. The obstruction floor, the
+  // third, is said under Obstruction, the term it tops up. The note under the
+  // window says what Radio Mobile's Rx relative should read without them.
+  //
+  // The transmitter's meter is the signal the other way — B transmitting on
+  // its own radio, A listening — as Radio Mobile's is, over the same path loss
+  // (every term in it is the same both ways).
+  //
+  // Word keeps inline styles and tables of a pasted page and not much else, so
+  // it is tables all the way down — no grid, no flex, no rounded corners — and
+  // every colour is written out.
+
+  // A receiver's S-meter: S9 is −93 dBm (5 µV into 50 Ω) above 30 MHz and
+  // −73 dBm below it (IARU Region 1), six decibels a unit down to S1, and over
+  // S9 in tens. { label, lit } — lit of the meter's 13 segments, S1 to S9 and
+  // then +10 to +40.
+  const S_SEGMENTS = 13;
+  function sMeterOf(dbm, fMhz) {
+    if (dbm == null || !isFinite(dbm)) return null;
+    const s9 = fMhz > 30 ? -93 : -73;
+    if (dbm >= s9) {
+      const over = Math.floor((dbm - s9) / 10) * 10;
+      return { label: over ? `S9+${over}` : 'S9', lit: Math.min(S_SEGMENTS, 9 + over / 10) };
+    }
+    const s = 9 - Math.ceil((s9 - dbm) / 6);
+    return { label: s >= 1 ? `S${s}` : 'under S1', lit: Math.max(0, s) };
+  }
+
+  // The field strength that puts `dbm` into an isotropic antenna — Radio
+  // Mobile's "E field": E (dBµV/m) = P (dBm) + 20 log f (MHz) + 77.2.
+  const eFieldOf = (dbm, fMhz) => (dbm == null || !isFinite(dbm) ? null : dbm + 20 * Math.log10(fMhz) + 77.21);
+  const wattsOf = dbm => Math.pow(10, (dbm - 30) / 10);
+  const fmtW = w => `${w >= 100 ? w.toFixed(0) : w >= 10 ? w.toFixed(1) : w.toFixed(2)} W`;
+  const uvOf = dbm => {
+    const uv = Math.pow(10, (dbm + 107) / 20);
+    return `${uv < 1 ? uv.toFixed(4) : uv < 100 ? uv.toFixed(2) : uv.toFixed(0)} µV`;
+  };
+  const fx = (v, dp, unit) => (v == null || !isFinite(v) ? '—' : `${v.toFixed(dp)}${unit ? ` ${unit}` : ''}`);
+
+  // What the summary's words mean, for the key under it: a pasted page has no
+  // hover. The Radio Mobile words kept as Radio Mobile writes them, so the two
+  // windows read the same. Asked for, not built at load: the bands are the
+  // link budget's, and link-budget.js loads after this file.
+  const summaryWords = () => [
+    ['Rx relative', `The fade margin: how far the received signal is above the weakest the receiver can use (its Rx sensitivity). ${
+      LB_MARGIN.map(m => (isFinite(m.min) ? `${m.label} ${m.min} dB or more` : `${m.label} below that`)).join(', ')}.`],
+    ['Worst Fresnel', 'The tightest room under the straight line between the antennas, in radii of the first Fresnel zone (F1). 0.6 F1 or more is clear; below 0 the ground or cover is above the line.'],
+    ['Obstruction', 'What the ground costs beyond free space, as the Longley–Rice model prices it — with the way the signal gets there: line of sight, diffraction (bending over) or troposcatter.'],
+    ['Statistics', 'What is held back so the figure holds for the share of time and situations asked for.'],
+    ['E field', 'The strength of the signal in the air at the receiving antenna. Required E field is the least the receiver can use.'],
+    ['EIRP / ERP', 'The power the antenna sends out, counted against an antenna that radiates equally every way (EIRP) or against a dipole (ERP, 2.15 dB less).'],
+    ['S9, S9+10', 'The signal meter on a radio: S9 is −93 dBm (5 µV) at VHF, each S-unit below it 6 dB, and above it +10, +20 dB over S9.'],
+    ['✦', 'Flood-Net’s own: Radio Mobile has no such term. Its Urban and Forest stand in these two places.'],
+  ];
+
+  // The summary's figures, in the window's places. Strings to show, and the
+  // numbers behind the ones a check wants to add up.
+  function summaryOf(rep) {
+    const { an, a, b, prof } = rep;
+    // A radio only where there is a station: a point on the ground has none,
+    // and the card does not invent one for it (profileMargin).
+    const none = { txW: null, gain: null, loss: null, thr: null };
+    const ra = a.isStation ? rep.ra : none, rb = b.isStation ? rep.rb : none;
+    const noRadio = !a.isStation ? 'A' : !b.isStation ? 'B' : null;
+    const itm = an.itm, P_ = an.prop, w = an.worst, f = an.fMhz;
+    const has = (...xs) => xs.every(x => x != null && isFinite(x));
+    const L = an.pathLoss_db;
+    const txA = wattsToDbm(ra.txW), txB = wattsToDbm(rb.txW);
+    const eirpA = has(txA, ra.gain, ra.loss) ? txA + ra.gain - ra.loss : null;
+    const eirpB = has(txB, rb.gain, rb.loss) ? txB + rb.gain - rb.loss : null;
+    const rx = has(eirpA, L, rb.gain, rb.loss) ? eirpA - L + rb.gain - rb.loss : null;
+    const back = has(eirpB, L, ra.gain, ra.loss) ? eirpB - L + ra.gain - ra.loss : null;
+    const eRx = has(eirpA, L) ? eFieldOf(eirpA - L, f) : null;
+    const eReq = has(rb.thr, rb.gain, rb.loss) ? eFieldOf(rb.thr - rb.gain + rb.loss, f) : null;
+    const cover = an.model === 'field' ? 0 : an.clutterA_db + an.clutterB_db;
+    const allowance = an.model === 'field' ? an.allowance_db : 0;
+    const floor = an.floor_db > 0.05 ? an.floor_db : 0;
+    const ed = (e, k) => (radioIsOver(e.key, k) ? ' ✎' : '');
+    const edited = [[a, ra], [b, rb]].some(([e]) => ['tx_w', 'gain_dbi', 'loss_db', 'rx_dbm', 'agl_m'].some(k => radioIsOver(e.key, k)))
+      || state.radio.freqMhz != null;
+    const cell = (k, v, n, extra) => ({ k, v, n: n || '', ...extra });
+    const grid = [
+      [cell('Azimuth', `${rep.azAB.toFixed(2)}°`, 'true, A → B'),
+       cell('Elev. angle', `${an.elevA_deg.toFixed(3)}°`, 'A to B'),
+       cell('Obstruction at', `${(w.d1 / 1000).toFixed(2)} km`, 'worst point, from A'),
+       cell('Worst Fresnel', `${w.ratio.toFixed(2)} F1`, `line of sight ${rep.verdict.label.toLowerCase()}`, { tone: rep.verdict.cls }),
+       cell('Distance', `${(an.D / 1000).toFixed(2)} km`)],
+      [cell('Free space', fx(itm && itm.A_fs_db, 1, 'dB')),
+       cell('Obstruction', fx(itm && itm.A_ref_db, 1, 'dB'),
+            itm ? `${itm.modeLabel}${floor ? ` · ✦ floor +${floor.toFixed(1)} dB` : ''}` : 'the model did not run'),
+       cell('Ground cover', fx(cover, 1, 'dB'), an.model === 'field' ? 'not in the field model'
+            : an.coverUsed ? `${an.clutterA_db.toFixed(1)} at A · ${an.clutterB_db.toFixed(1)} at B` : 'land cover off', { flag: '✦' }),
+       cell('Field allowance', fx(allowance, 1, 'dB'), an.model === 'field' ? 'measured on site' : 'not in the cover model', { flag: '✦' }),
+       cell('Statistics', fx(itm && itm.A_var_db, 1, 'dB'), `${P_.situation}% of situations`)],
+      [cell('Path loss', fx(L, 1, 'dB'), itm && itm.warnings.length
+            ? `⚠ ${itm.warnings.length} model warning${itm.warnings.length === 1 ? '' : 's'}` : ''),
+       cell('E field', fx(eRx, 1, 'dBµV/m'), 'at B'),
+       cell('Rx level', fx(rx, 1, 'dBm'), 'into the receiver'),
+       cell('Rx level', rx == null ? '—' : uvOf(rx), 'into 50 Ω'),
+       cell('Rx relative', rep.margin == null ? '—' : `${signed(rep.margin, 1)} dB`,
+            rep.band ? rep.band.label : 'not computed', { tone: rep.band ? rep.band.cls : null, hot: true })],
+    ];
+    const roleOf = e => (e.station
+      ? (e.station.roles || []).map(r => ({ field: 'Field station', repeater: 'Repeater', base: 'Base station' }[r] || r)).join(', ') || 'Station'
+      : 'A point on the ground');
+    const subOf = e => (e.station && e.station.station_number ? `Station ${e.station.station_number}` : '');
+    const sysOf = e => (e.sys ? e.sys.name : e.isStation ? 'none on file' : '—');
+    const gainRow = (e, r) => ['Antenna gain', r.gain == null ? '—' : `${+r.gain.toFixed(2)} dBi${ed(e, 'gain_dbi')}`,
+      r.gain == null ? '' : `${lbDbd(r.gain)} dBd`];
+    const lossRow = (e, r) => ['Line loss', r.loss == null ? '—' : `${+r.loss.toFixed(2)} dB${ed(e, 'loss_db')}`, ''];
+    const tx = {
+      head: 'TRANSMITTER · A', name: a.name, sub: subOf(a),
+      meter: sMeterOf(back, f),
+      meterNote: back != null ? `${back.toFixed(1)} dBm heard back from ${b.name}`
+        : noRadio ? `no radio at ${noRadio} — a point on the ground` : `no figure on file for the signal back from ${b.name}`,
+      rows: [
+        ['Role', roleOf(a), ''],
+        ['Tx system name', sysOf(a), ''],
+        ['Tx power', ra.txW == null ? '—' : `${ra.txW} W${ed(a, 'tx_w')}`, txA == null ? '' : `${txA.toFixed(2)} dBm`],
+        lossRow(a, ra),
+        gainRow(a, ra),
+        ['Radiated power', eirpA == null ? '—' : `EIRP ${fmtW(wattsOf(eirpA))}`, eirpA == null ? '' : `ERP ${fmtW(wattsOf(eirpA - LB_DIPOLE_DBI))}`],
+        ['Antenna height', `${an.aglA.toFixed(1)} m${ed(a, 'agl_m')}`, ''],
+      ],
+    };
+    const rxp = {
+      head: 'RECEIVER · B', name: b.name, sub: subOf(b),
+      meter: sMeterOf(rx, f),
+      meterNote: rx != null ? `${rx.toFixed(1)} dBm from ${a.name}`
+        : noRadio ? `no radio at ${noRadio} — a point on the ground` : `no figure on file for the signal from ${a.name}`,
+      rows: [
+        ['Role', roleOf(b), ''],
+        ['Rx system name', sysOf(b), ''],
+        ['Required E field', fx(eReq, 1, 'dBµV/m'), ''],
+        gainRow(b, rb),
+        lossRow(b, rb),
+        ['Rx sensitivity', rb.thr == null ? '—' : `${uvOf(rb.thr)}${ed(b, 'rx_dbm')}`, rb.thr == null ? '' : `${+rb.thr.toFixed(2)} dBm`],
+        ['Antenna height', `${an.aglB.toFixed(1)} m${ed(b, 'agl_m')}`, ''],
+      ],
+    };
+    // The net: the radio networks the two ends share, else each end's own.
+    const netsOf = e => (e.station && e.station.radio_network_ids) || [];
+    const both = netsOf(a).filter(id => netsOf(b).includes(id));
+    const net = both.length ? both.map(netName).join(', ')
+      : netsOf(a).length || netsOf(b).length
+        ? [netsOf(a).length ? `A: ${netsOf(a).map(netName).join(', ')}` : '', netsOf(b).length ? `B: ${netsOf(b).map(netName).join(', ')}` : ''].filter(Boolean).join(' · ')
+        : 'none on file';
+    const settings = [
+      ['Model', `Longley–Rice point-to-point · ${an.model === 'field' ? `field model (−${an.allowance_db} dB allowance)` : 'land-cover model'}`],
+      ['Climate', ITM.CLIMATE[P_.climate] || String(P_.climate)],
+      ['Polarization', P_.pol === 1 ? 'Vertical' : 'Horizontal'],
+      ['Variability', ITM.MDVAR[P_.mdvar % 10] || String(P_.mdvar)],
+      ['% time / locations / situations', `${P_.time} / ${P_.location} / ${P_.situation}`],
+      ['Refractivity', `${P_.N0} N-units`],
+      ['Conductivity', `${P_.sigma} S/m`],
+      ['Permittivity', `${P_.epsilon}`],
+      ['Ground', `${P_.ground === 'lidar' ? '5 m LiDAR at the ends, ' : ''}${prof.attribution}`],
+    ];
+    const rm = rep.notes.find(n => n.startsWith('Radio Mobile runs'));
+    const notes = [
+      rm || '',
+      itm && itm.warnings.length ? `Model warnings: ${itm.warnings.join('; ')}.` : '',
+      edited ? '✎ typed over on the card, not the station’s own radio system.' : '',
+      'Indicative only. Antenna patterns are not modelled.',
+    ].filter(Boolean);
+    return {
+      grid, tx, rx: rxp, net,
+      freq: [`${f.toFixed(3)} MHz`, rep.freqSrc],
+      settings, notes,
+      cls: rep.band ? rep.band.cls : null,
+      nums: { fs: itm ? itm.A_fs_db : null, obs: itm ? itm.A_ref_db : null, stats: itm ? itm.A_var_db : null,
+              cover, allowance, floor: an.floor_db, pathLoss: L, rx, back, eRx, eReq, margin: rep.margin },
+    };
+  }
+
+  // The signal meter as a picture. A word processor squashes a row of tiny
+  // coloured cells into one block, but keeps a picture as it is. Null where
+  // the browser cannot draw one — the reading beside it still says it.
+  const METER = { seg: 13, gap: 3, h: 9 };
+  function meterPicture(m) {
+    const { seg, gap, h } = METER, k = 2;
+    const w = S_SEGMENTS * seg + (S_SEGMENTS - 1) * gap;
+    try {
+      const c = document.createElement('canvas');
+      c.width = w * k; c.height = h * k;
+      const g = c.getContext('2d');
+      if (!g) return null;
+      for (let i = 0; i < S_SEGMENTS; i++) {
+        const over = i >= 9, lit = !!m && i < m.lit;
+        g.fillStyle = lit ? (over ? '#d8463a' : '#2a9d50') : (over ? '#f2d8d4' : '#dfe5ec');
+        const x = i * (seg + gap) * k;
+        if (g.roundRect) { g.beginPath(); g.roundRect(x, 0, seg * k, h * k, 2 * k); g.fill(); }
+        else g.fillRect(x, 0, seg * k, h * k);
+      }
+      return { url: c.toDataURL('image/png'), w, h };
+    } catch (_) { return null; }
+  }
+
+  // The summary as a document, for Word and the mail programs. `pic` is the
+  // chart drawn bare (no heading over it), or null — the window goes without
+  // the chart rather than not at all.
+  //
+  // One table, a row a part of the window, each part a table of its own. Every
+  // cell's inset is said twice, the same: as the table's cellpadding, which is
+  // what LibreOffice reads, and as the cell's padding, which is what Word and
+  // the browsers read.
+  function summaryHtml(rep, pic) {
+    const S = summaryOf(rep);
+    const T = rep.tokens;
+    const tone = { ok: T['--ok'] || '#107c10', warn: T['--warn'] || '#9e5e00', bad: T['--bad'] || '#c7401a' };
+    const C = { ink: '#16202a', muted: '#566779', faint: '#7f8e9d', line: '#cfd8e2', rule: '#e6ebf1', soft: '#f5f8fb',
+                navy: '#0f3a5f', kick: '#9dc1e2', navySub: '#c6d9eb', accent: '#0b5cab' };
+    const grid = { ok: ['#f2f9f4', '#d3e8d9', '#dcefe2'], warn: ['#fdf8ee', '#efe0bf', '#f8e8c6'],
+                   bad: ['#fdf3f0', '#f0d2c8', '#f7dcd2'], none: ['#f5f8fb', '#dce3ea', '#e9eef3'] }[S.cls || 'none'];
+    const font = "font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;";
+    const W = 600;
+    const td = (style, html, attrs = '') => `<td ${attrs} style="${font}${style}">${html}</td>`;
+    const table = (pad, rows, style = '') => `<table width="100%" cellspacing="0" cellpadding="${pad}" border="0" style="border-collapse:collapse;${style}">${rows}</table>`;
+    const kickStyle = `font-size:7.5pt;font-weight:bold;letter-spacing:1.4pt;color:${C.accent}`;
+    const div = (style, html) => `<div style="${font}margin:0;${style}">${html}</div>`;
+
+    // The heading: which path, and its answer.
+    const fig = rep.margin == null ? 'not computed' : `${signed(rep.margin, 1)} dB`;
+    const chip = rep.band
+      ? `<span style="${font}background:${tone[rep.band.cls]};color:#ffffff;font-size:8pt;font-weight:bold;letter-spacing:.8pt">&nbsp;${esc(rep.band.label.toUpperCase())}&nbsp;</span>`
+      : '';
+    const kicker = `RADIO LINK${rep.title !== 'Elevation profile' ? ` · ${rep.title.toUpperCase()}` : ''}`;
+    const header = table(12, `<tr>
+      ${td(`background:${C.navy};padding:12px 14px;vertical-align:middle`, `
+        ${div(`font-size:7.5pt;font-weight:bold;letter-spacing:1.4pt;color:${C.kick}`, esc(kicker))}
+        ${div('font-size:15pt;font-weight:bold;color:#ffffff;margin:2pt 0 1pt', esc(`${rep.a.name} → ${rep.b.name}`))}
+        ${div(`font-size:8.5pt;color:${C.navySub}`, esc(rep.sub))}`, `bgcolor="${C.navy}" valign="middle"`)}
+      ${td(`background:${C.navy};padding:12px 14px;vertical-align:middle;text-align:right;white-space:nowrap`, `
+        ${div(`font-size:7.5pt;font-weight:bold;letter-spacing:1.4pt;color:${C.kick};text-align:right`, 'FADE MARGIN')}
+        ${div('font-size:19pt;font-weight:bold;color:#ffffff;margin:0 0 2pt;text-align:right', esc(fig))}
+        ${chip ? div('text-align:right', chip) : ''}`, `bgcolor="${C.navy}" align="right" valign="middle"`)}
+    </tr>`, `background:${C.navy}`);
+
+    // Radio Mobile's three rows of five: the figure large, its unit beside it
+    // smaller, and a word under it on what it is.
+    const gridCell = (c, i) => {
+      const bg = c.hot && c.tone ? grid[2] : grid[0];
+      const col = c.tone && (c.hot || c.tone !== 'ok') ? tone[c.tone] : C.ink;
+      const at = c.v.indexOf(' ');
+      const num = at < 0 ? c.v : c.v.slice(0, at), unit = at < 0 ? '' : c.v.slice(at + 1);
+      return td(`background:${bg};vertical-align:top;padding:7px 8px;border-top:1px solid ${grid[1]};${i < 4 ? `border-right:1px solid ${grid[1]};` : ''}`, `
+        ${div(`font-size:7.5pt;color:${C.muted}`, `${esc(c.k)}${c.flag ? ` <b style="color:${C.accent}">${c.flag}</b>` : ''}`)}
+        ${div(`font-size:12pt;font-weight:bold;color:${col};margin:1pt 0 0;white-space:nowrap`, `${esc(num)}${
+          unit ? `<span style="${font}font-size:8pt;font-weight:normal;color:${C.muted}">&nbsp;${esc(unit)}</span>` : ''}`)}
+        ${c.n ? div(`font-size:7pt;color:${C.faint};margin:1pt 0 0`, esc(c.n)) : ''}`,
+      `width="20%" valign="top" bgcolor="${bg}"`);
+    };
+    const figures = table(7, S.grid.map(r => `<tr>${r.map(gridCell).join('')}</tr>`).join(''), 'table-layout:fixed');
+
+    // 598: the table's width inside its border, so the chart fills it.
+    const imgW = W - 2, imgH = pic ? Math.round(pic.h * imgW / pic.w) : 0;
+    const chart = pic ? `<img src="${pic.url}" width="${imgW}" height="${imgH}" style="display:block;border:0" alt="${
+      escAttr(`Elevation profile, ${rep.a.name} to ${rep.b.name}, with the line of sight and the 60% Fresnel zone`)}">` : '';
+
+    // The transmitter and the receiver side by side, row for row, as one table
+    // of six columns — a word processor lines two panels up only if they are
+    // the same rows.
+    const meterCell = (P, right) => {
+      const m = meterPicture(P.meter);
+      return td(`padding:3px 8px 0;${right ? `border-left:1px solid ${C.line};` : ''}vertical-align:middle`,
+        m ? `<img src="${m.url}" width="${m.w}" height="${m.h}" style="border:0;vertical-align:middle" alt="${escAttr(`Signal meter: ${P.meter ? P.meter.label : 'no reading'}`)}">` : '&nbsp;',
+        'colspan="2" valign="middle"')
+        + td(`padding:3px 8px 0;text-align:right;white-space:nowrap;vertical-align:middle;font-size:12pt;font-weight:bold;color:${P.meter ? C.ink : C.faint}`,
+          esc(P.meter ? P.meter.label : '—'), 'align="right" valign="middle"');
+    };
+    const side = (right, html, style = '') => td(`padding:3px 8px;${right ? `border-left:1px solid ${C.line};` : ''}vertical-align:top;${style}`, html, 'colspan="3" valign="top"');
+    const row = ([k, v1, v2], right) => {
+      const edge = `border-top:1px solid ${C.rule};${right ? `border-left:1px solid ${C.line};` : ''}`;
+      return td(`padding:3px 4px 3px 8px;${edge}font-size:8.5pt;color:${C.muted};white-space:nowrap;vertical-align:top`, esc(k), 'width="17%" valign="top"')
+        + (v2
+          ? td(`padding:3px 4px;border-top:1px solid ${C.rule};font-size:9pt;font-weight:bold;color:${C.ink};vertical-align:top`, esc(v1), 'width="19%" valign="top"')
+            + td(`padding:3px 8px 3px 4px;border-top:1px solid ${C.rule};font-size:9pt;color:${C.ink};text-align:right;white-space:nowrap;vertical-align:top`, esc(v2), 'width="14%" align="right" valign="top"')
+          : td(`padding:3px 8px 3px 4px;border-top:1px solid ${C.rule};font-size:9pt;font-weight:bold;color:${C.ink};vertical-align:top`, esc(v1), 'colspan="2" valign="top"'));
+    };
+    const ends = table(4, `
+      <tr>${side(false, div(kickStyle, esc(S.tx.head)), 'padding-top:9px')}${side(true, div(kickStyle, esc(S.rx.head)), 'padding-top:9px')}</tr>
+      <tr>${meterCell(S.tx, false)}${meterCell(S.rx, true)}</tr>
+      <tr>${side(false, div(`font-size:7pt;color:${C.faint}`, esc(S.tx.meterNote)))}${side(true, div(`font-size:7pt;color:${C.faint}`, esc(S.rx.meterNote)))}</tr>
+      <tr>${[S.tx, S.rx].map((P, i) => side(i === 1, `${div(`font-size:12pt;font-weight:bold;color:${C.ink}`, esc(P.name))}${
+        div(`font-size:8pt;color:${C.muted}`, esc(P.sub) || '&nbsp;')}`, 'padding-top:6px')).join('')}</tr>
+      ${S.tx.rows.map((r, i) => `<tr>${row(r, false)}${row(S.rx.rows[i], true)}</tr>`).join('')}
+      <tr>${side(false, '&nbsp;', 'font-size:3pt;padding:0')}${side(true, '&nbsp;', 'font-size:3pt;padding:0')}</tr>`,
+      `border-top:1px solid ${C.line};table-layout:fixed`);
+
+    // The net and the frequency, as the window's foot.
+    const foot = (k, v, n, right) => td(`background:${C.soft};padding:8px 9px;${right ? `border-left:1px solid ${C.line};` : ''}vertical-align:top`, `
+      ${div(kickStyle, esc(k.toUpperCase()))}
+      ${div(`font-size:11pt;font-weight:bold;color:${C.ink};margin:1pt 0 0`, `${esc(v)}${
+        n ? `<span style="${font}font-size:8pt;font-weight:normal;color:${C.faint}">&nbsp;&nbsp;${esc(n)}</span>` : ''}`)}`,
+      `width="50%" valign="top" bgcolor="${C.soft}"`);
+    const footer = table(8, `<tr>${foot('Net', S.net, '', false)}${foot('Frequency', S.freq[0], S.freq[1], true)}</tr>`,
+      `border-top:1px solid ${C.line};table-layout:fixed`);
+    const settings = table(8, `<tr>${td(`padding:8px 9px;font-size:7.5pt;color:${C.muted};line-height:1.45`, `
+      <span style="${font}${kickStyle}">SETTINGS</span>&nbsp;&nbsp;${
+        S.settings.map(([k, v]) => `${esc(k)} <b style="color:${C.ink}">${esc(v)}</b>`).join(' &nbsp;·&nbsp; ')}`)}</tr>`,
+      `border-top:1px solid ${C.rule}`);
+
+    const part = (html, attrs = '') => `<tr><td ${attrs} style="padding:0">${html}</td></tr>`;
+    const notes = S.notes.map(n => `<p style="${font}font-size:8pt;color:${C.muted};margin:5pt 0 0">${esc(n)}</p>`).join('');
+    const words = `<table width="${W}" cellspacing="0" cellpadding="2" border="0" style="border-collapse:collapse;margin-top:6pt">
+      <tr>${td('padding:2px 0', div(kickStyle, 'WHAT THE WORDS MEAN'), 'colspan="2"')}</tr>
+      ${summaryWords().map(([k, m]) => `<tr>
+        ${td(`padding:2px 8px 2px 0;font-size:7.5pt;font-weight:bold;color:${C.ink};white-space:nowrap;vertical-align:top`, esc(k), 'width="96" valign="top"')}
+        ${td(`padding:2px 0;font-size:7.5pt;color:${C.muted};vertical-align:top`, esc(m), 'valign="top"')}
+      </tr>`).join('')}
+    </table>`;
+
+    return `<div style="${font}color:${C.ink}">
+      <table width="${W}" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;width:${W}px;border:1px solid ${C.line}">
+        ${part(header, `bgcolor="${C.navy}"`)}${part(figures)}${pic ? part(chart, 'bgcolor="#ffffff"') : ''}${part(ends)}${part(footer)}${part(settings)}
+      </table>
+      ${notes}
+      ${words}
+    </div>`;
+  }
+
+  // The summary as plain text, in the window's order: tab between columns, so
+  // pasted into a spreadsheet it lands in the same grid of cells.
+  function summaryText(rep) {
+    const S = summaryOf(rep);
+    const L = [];
+    L.push(`RADIO LINK — ${rep.heading}`, rep.sub);
+    L.push(`Fade margin: ${rep.margin == null ? `not computed — ${rep.why}` : `${signed(rep.margin, 1)} dB — ${rep.band.label}`} · Line of sight: ${rep.verdict.label}`);
+    L.push('');
+    S.grid.forEach(r => L.push(r.map(c => `${c.k}${c.flag ? ` ${c.flag}` : ''}\t${c.v}`).join('\t')));
+    L.push('');
+    L.push(`${S.tx.head}\t\t\t${S.rx.head}`);
+    L.push(`Signal\t${S.tx.meter ? S.tx.meter.label : '—'}\t${S.tx.meterNote}\tSignal\t${S.rx.meter ? S.rx.meter.label : '—'}\t${S.rx.meterNote}`);
+    L.push(`Name\t${S.tx.name}\t${S.tx.sub}\tName\t${S.rx.name}\t${S.rx.sub}`);
+    S.tx.rows.forEach((t, i) => L.push([...t, ...S.rx.rows[i]].join('\t')));
+    L.push('');
+    L.push(`Net\t${S.net}\t\tFrequency\t${S.freq[0]}\t${S.freq[1]}`);
+    L.push(`Settings\t${S.settings.map(([k, v]) => `${k} ${v}`).join(' · ')}`);
+    L.push('');
+    S.notes.forEach(n => L.push(n));
+    L.push('', 'What the words mean');
+    summaryWords().forEach(([k, m]) => L.push(`${k}\t${m}`));
     return L.join('\n');
   }
 
@@ -3239,16 +3597,19 @@ const PathProfile = (function () {
     try { return navigator.clipboard.write([new ClipboardItem(parts)]); } catch (e) { return Promise.reject(e); }
   }
 
-  // All of it, or with `brief` the top of it: the margin, the verdict and the
-  // chart, without the tables under them.
+  // All of it, or with `brief` the summary: the path laid out as Radio
+  // Mobile's Radio Link window, the chart in it drawn bare and the picture
+  // alone with its heading, for whatever takes only a picture.
   function copyReport(brief) {
     const rep = reportOf();
     if (!rep) { Toast.show('Nothing to copy yet — the profile is still being drawn.'); return; }
     const pic = paperPicture(rep);
-    const text = reportText(rep, brief);
-    const html = pic.then(p => reportHtml(rep, p, brief), () => reportHtml(rep, null, brief));
+    const text = brief ? summaryText(rep) : reportText(rep);
+    const inDoc = brief ? paperPicture(rep, true) : pic;
+    const html = inDoc.then(p => (brief ? summaryHtml(rep, p) : reportHtml(rep, p)),
+                            () => (brief ? summaryHtml(rep, null) : reportHtml(rep, null)));
     const done = () => Toast.show(brief
-      ? 'Copied: the fade margin, the line of sight and the chart. Paste it into Word or an email.'
+      ? 'Copied: the summary, laid out like Radio Mobile\'s Radio Link window. Paste it into Word or an email.'
       : 'Copied: the chart and every figure behind the fade margin. Paste it into Word or an email.', { kind: 'done' });
     clipboardWrite({
       'text/html': html.then(h => new Blob([h], { type: 'text/html' })),
@@ -3283,17 +3644,17 @@ const PathProfile = (function () {
   }
 
   // The presses that start it, over the chart: the one thing on the card that
-  // hands the path on to somebody else. The summary is the report's top — the
-  // margin, the verdict and the chart — for a page that wants the answer and
-  // not the working.
+  // hands the path on to somebody else. The summary is the path laid out as
+  // Radio Mobile's Radio Link window, to hold against it; the report is every
+  // figure behind the margin.
   function copyHtml() {
     return `
       <div class="path-copy">
         <button type="button" id="path-copy-brief" onclick="PathProfile.copySummary()"
-                title="Copy the heading, the fade margin, the line of sight and the elevation profile with the link drawn on it — the top of the report, without the tables — ready to paste into Word or an email">📄 Copy a summary</button>
+                title="Copy the path laid out like Radio Mobile's Radio Link window — its three rows of figures over the elevation profile, the transmitter and the receiver side by side, the net and the frequency — ready to paste into Word or an email and read across against Radio Mobile">📄 Copy a summary</button>
         <button type="button" id="path-copy" onclick="PathProfile.copyReport()"
                 title="Copy the elevation profile with the link drawn on it and every figure behind the fade margin — the two ends, their radios, the model's settings and the budget term by term — ready to paste into Word or an email">📋 Copy for a report</button>
-        <span class="small">To paste into Word: the summary is the fade margin, the line of sight and the chart; the report adds every figure behind the margin. The chart alone:
+        <span class="small">To paste into Word: the summary is laid out like Radio Mobile's Radio Link window, to compare the two; the report is every figure behind the margin. The chart alone:
           <button type="button" class="lb-link" onclick="PathProfile.copyChart()">copy</button> ·
           <button type="button" class="lb-link" onclick="PathProfile.downloadChart()">save as PNG</button></span>
       </div>`;
@@ -3450,15 +3811,15 @@ const PathProfile = (function () {
     // (the summary), the chart alone, or the chart saved as a file.
     copyReport, copySummary, copyChart, downloadChart,
     // What a copy would carry, for anything that wants to check it: the plain
-    // text, the document without its picture, the same two for the summary,
-    // the rows all are written from, and the paper chart's SVG. Null with no
-    // single-hop profile drawn.
+    // text, the document without its picture, the same two for the summary
+    // with the figures it lays out, the rows all are written from, and the
+    // paper chart's SVG. Null with no single-hop profile drawn.
     report() {
       const r = reportOf();
       if (!r) return null;
       const p = paperSvg(r);
       return { text: reportText(r), html: reportHtml(r, null),
-               brief: { text: reportText(r, true), html: reportHtml(r, null, true) },
+               brief: { text: summaryText(r), html: summaryHtml(r, null), rows: summaryOf(r) },
                rows: r, svg: p ? p.svg : null };
     },
 
