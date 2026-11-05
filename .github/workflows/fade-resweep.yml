@@ -52,7 +52,9 @@ concurrency:
 
 jobs:
   resweep:
-    runs-on: ubuntu-latest
+    # Pinned, as web-smoke.yml's browser job is: ubuntu-latest moved to 26.04,
+    # where test/'s Playwright cannot install Chromium's system libraries.
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}

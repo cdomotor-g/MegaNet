@@ -1251,6 +1251,11 @@ await night.close();
   ok('the workflow runs it every night with the secret key, and stands down without one',
      /schedule:\s*\n\s*- cron: '\d+ \d+ \* \* \*'/.test(wf) && /node tools\/fade\/resweep\.mjs/.test(wf)
        && /SUPABASE_SECRET_KEY: \$\{\{ secrets\.SUPABASE_SECRET_KEY \}\}/.test(wf) && /steps\.key\.outputs\.ok == 'true'/.test(wf));
+  // ubuntu-latest moved to 26.04, where test/'s Playwright cannot install
+  // Chromium's libraries: the first run failed at that step and saved nothing.
+  ok('…on the Ubuntu web-smoke.yml\'s browser job runs on, not ubuntu-latest',
+     /runs-on: ubuntu-24\.04/.test(wf) && !/runs-on: ubuntu-latest/.test(wf)
+       && /runs-on: ubuntu-24\.04/.test(read('.github/workflows/web-smoke.yml')));
 }
 
 ok('nothing threw for the whole run', errors.length === 0, errors.join('\n         '));
