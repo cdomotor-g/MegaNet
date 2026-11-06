@@ -4527,7 +4527,11 @@ are drawn on the map coloured by fade margin (dashed where the ground cuts the
 line, grey where a hop has no figure), with a table of every hop.
 **Profile its hop** opens the path in the elevation profile, and **Allocate an
 address here** takes a repeater with room to the ALERT IDs tab's Allocate card.
-**Save CSV** writes every one priced.
+**Save CSV** writes every one priced. **📋 Copy for a report** puts the ones
+listed — the best eight, or all of them after *Show all* — on the clipboard as a
+document for Word or an email and as tab-separated text for a spreadsheet: a row
+each with every figure, the picked one's hops on to a base, how it was worked
+out and what the words mean.
 
 **What it is not**: ~30 m terrain and omnidirectional antennas, the fade margin
 layer's model and nothing measured on the day. Frequencies are not matched, as

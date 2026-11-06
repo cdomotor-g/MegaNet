@@ -29,7 +29,8 @@
 //                   terrain asked for.
 //   The map         a path for every hub priced, the picked one heavier with
 //                   its route on; a pin is what a real click lands on, and
-//                   picks it; the legend says what it all is.
+//                   picks it; the legend says what it all is; Copy for a
+//                   report puts the hubs listed on the clipboard, a row each.
 //   Saved figures   a hop the datastore holds under the signature in force is
 //                   read from it; one whose signature has moved is stale, not
 //                   a figure.
@@ -369,6 +370,32 @@ const head = lines.find(l => l.startsWith('rank,'));
 ok('Save CSV writes every hub priced, one row each, under named columns',
    lines.filter(l => !l.startsWith('#') && !l.startsWith('rank,')).length === RS.length
    && /hop_margin_db/.test(head) && /whole_way_db/.test(head) && /route_on/.test(head) && /^# Flood-Net/.test(lines[0]), head);
+
+// Copy for a report: the rows the panel lists, a line each in the plain text
+// (tab between columns, for a spreadsheet) and a row each in the document,
+// on the clipboard for real.
+await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: server.origin });
+await page.evaluate(() => { document.getElementById('toasts')?.replaceChildren(); return navigator.clipboard.writeText(''); });
+await page.locator('#bestrep-copy').click();
+await page.waitForFunction(() => /Copied/.test(document.getElementById('toasts')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+const copied = await page.evaluate(async () => ({
+  clip: await navigator.clipboard.readText(),
+  html: MapBestRepeater.reportHtml(),
+  listed: [...document.querySelectorAll('.bestrep-results > li .bestrep-head strong')].map(e => e.textContent),
+  inHtml: [...document.querySelectorAll('.bestrep-results > li .bestrep-head strong')].every(e => MapBestRepeater.reportHtml().includes(esc(e.textContent))),
+  toast: document.getElementById('toasts')?.textContent || '',
+}));
+const clipLines = copied.clip.split('\n');
+const at = clipLines.findIndex(l => l.startsWith('Rank\tRepeater or base\t'));
+const tableRows = at < 0 ? [] : clipLines.slice(at + 1, at + 1 + copied.listed.length);
+ok('📋 Copy for a report puts the listed repeaters on the clipboard, a row each in rank order, tab between columns',
+   /^Best repeater for /.test(clipLines[0]) && at > 0 && copied.listed.length > 0
+   && tableRows.every((l, i) => l.split('\t')[0] === String(i + 1) && l.split('\t')[1].startsWith(copied.listed[i]) && l.split('\t').length === 9)
+   && clipLines[at + 1 + copied.listed.length] === '' && /WHAT THE WORDS MEAN/.test(copied.clip) && /Copied/.test(copied.toast),
+   JSON.stringify({ head: clipLines.slice(0, 6), listed: copied.listed, toast: copied.toast }));
+ok('…and the document beside it has the same rows, the hops on and the words',
+   (copied.html.match(/<tr>/g) || []).length >= copied.listed.length + 1 && /(Every hop from|The hop from) /.test(copied.html)
+   && /What the words mean/.test(copied.html) && copied.inHtml);
 
 // A typed antenna height takes the answer away: it is not the question asked.
 await page.fill('#bestrep-agl', '9');

@@ -17,7 +17,7 @@
 // for LandCover.sample, map-fade.js for MapFade.known, work and ready,
 // map-backbone.js for repeaterOpenWindows, map-draw.js for MapDraw,
 // map-controls.js for MapChrome.panel, address-space.js for
-// AddressSpace.figures and allocateIn, and app.js for findRepeaterMatches,
+// AddressSpace.figures and allocateIn, toast.js for Toast, and app.js for findRepeaterMatches,
 // stationAlertIds, switchTab, setDockTab, rerenderMapLegend and mapNote. All of
 // it from inside its own functions, so this file's position among the modules
 // is free.
@@ -934,6 +934,8 @@ const MapBestRepeater = (function () {
           <button type="button" onclick="MapBestRepeater.clear()" ${s || found ? '' : 'disabled'}>Clear</button>
           <button type="button" onclick="MapBestRepeater.save()" ${results.length ? '' : 'disabled'}
                   title="Every repeater and base priced, with every figure, as rows">Save CSV</button>
+          <button type="button" id="bestrep-copy" onclick="MapBestRepeater.copyReport()" ${results.length ? '' : 'disabled'}
+                  title="Copy the repeaters and bases listed below — the best ${SHOWN}, or all of them after Show all — with every figure, the picked one's hops on to a base, how it was worked out and what the words mean, ready to paste into Word, an email or a spreadsheet">📋 Copy for a report</button>
         </div>
         <p class="filter-note" id="bestrep-status">${statusHtml()}</p>
         ${results.length ? `<ol class="sites-results bestrep-results">${list.map(resultHtml).join('')}</ol>` : ''}
@@ -1182,6 +1184,205 @@ const MapBestRepeater = (function () {
     return rows.join('\n') + '\n';
   }
 
+  // ── Copy for a report ───────────────────────────────────────────────────────
+  // The answer as somebody writing it up needs it: the repeaters and bases the
+  // panel lists — the best eight, or all of them once Show all is pressed —
+  // a row each with every figure, the picked one's hops on to a base, how it
+  // was worked out, and what the words mean, since the hover does not travel.
+  // One press puts it on the clipboard twice, as path-profile.js's Copy for a
+  // report does: a document (inline styles only, all Word and the mail
+  // programs keep of a pasted page) and plain text with a tab between columns,
+  // so the table pasted into a spreadsheet lands in cells. Whatever it is
+  // pasted into takes the richer one it can. Both are written from one list of
+  // rows (reportOf), so they cannot say different things. Save CSV stays the
+  // one with every hub priced, in columns for a program.
+
+  const TONE = { good: '#107c10', ok: '#9e5e00', bad: '#c7401a', none: '#4f6478' };
+
+  // HTML to the words a person reads in it — verdictLine is written for the panel.
+  function plain(html) {
+    const d = document.createElement('div');
+    d.innerHTML = html;
+    return d.textContent.replace(/\s+/g, ' ').trim();
+  }
+
+  function bandWord(v) {
+    const b = bandOfDb(v);
+    return b === 'none' ? '' : (GLOSSARY.find(g => g[0] === b) || [b, b])[1];
+  }
+
+  function onwardText(c) {
+    const o = c.onward;
+    if (!o) return '';
+    if (o.kind === 'base') return 'It is a base station — the readings arrive here.';
+    if (o.kind === 'none') return `No route on to a base — no base within ${linkKm()} km of it, and no repeater it could hand on to.`;
+    const r = o.best, n = r.hops.length;
+    const via = r.ids.slice(1, -1).map(nameOf);
+    const path = `${via.length ? `via ${via.join(' → ')} to ` : 'straight to '}${nameOf(r.ids[r.ids.length - 1])}`;
+    const fig = r.complete
+      ? `weakest hop ${dbText(r.weakest.margin)} (${bandWord(r.weakest.margin)})`
+      : `${r.unmodelled} of ${n} hop${n === 1 ? '' : 's'} not worked out${r.weakest ? `, the rest no worse than ${dbText(r.weakest.margin)}` : ''}`;
+    return `${path} · ${n} hop${n === 1 ? '' : 's'} · ${fig}`;
+  }
+
+  function reportOf() {
+    if (!found || !results.length) return null;
+    const s = found.site, h = found.here;
+    const listed = showAll ? results : results.slice(0, SHOWN);
+    const who = s.kind === 'point' ? `a new site at ${stationLatLonText(s)}` : `${s.name}${s.number ? ` (${s.number})` : ''}`;
+    const stamp = new Date().toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' });
+    const rows = listed.map(c => {
+      const f = c.first && !c.first.failed ? c.first : null;
+      const w = f ? wholeOf(c) : { db: null, approx: false };
+      const room = roomOf(c);
+      const notes = [];
+      if (c.carries) notes.push('carries it now');
+      if (room && !c.carries) notes.push(`${room.free} address${room.free === 1 ? '' : 'es'} free`);
+      if (c.hub.isRep) notes.push(`listens on ${c.hub.f.toFixed(3)} MHz`);
+      return {
+        rank: c.rank,
+        name: `${c.hub.name}${c.hub.number ? ` (${c.hub.number})` : ''}`,
+        role: roleText(c.hub),
+        where: `${c.km.toFixed(1)} km ${compass(c.brg)}`,
+        hop: f ? f.margin : null,
+        hopText: f ? `${dbText(f.margin)}${bandWord(f.margin) ? ` (${bandWord(f.margin)})` : ''}`
+          : `not priced — ${c.first ? c.first.failed : 'not worked out'}`,
+        los: f && f.verdict ? pathVerdictWord(f.verdict, false) : '—',
+        onward: f ? onwardText(c) : '—',
+        whole: w.db,
+        wholeText: w.db == null ? (w.noRoute ? '— no route on' : '—') : `${w.approx ? '≈ ' : ''}${dbText(w.db)}`,
+        notes: notes.join('; '),
+      };
+    });
+    // The picked one's hops, as the panel's table under its row: the picked
+    // one, else the best.
+    const pick = results.find(c => c.hub.id === selectedId) || results[0];
+    const r = pick.onward && pick.onward.kind === 'route' ? pick.onward.best : null;
+    const pf = pick.first && !pick.first.failed ? pick.first : null;
+    const srcText = x => (x.margin == null ? (x.stale ? 'stale' : 'not worked out') : x.src === 'saved' ? 'saved' : 'worked out in this browser');
+    const hops = [[`${s.name} → ${pick.hub.name}`, pick.km.toFixed(1), pf ? pf.margin : null,
+                   pf ? 'worked out here' : (pick.first ? pick.first.failed : '')]]
+      .concat(r ? r.hops.map(x => [`${nameOf(x.from)} → ${nameOf(x.to)}`, x.km != null ? x.km.toFixed(1) : '—', x.margin, srcText(x)]) : []);
+    const failed = found.cands.filter(c => c.first && c.first.failed).length;
+    const how = [
+      ['Station', s.kind === 'point' ? `A new site at ${stationLatLonText(s)}` : `${who} at ${stationLatLonText(s)}`],
+      ['Radio at the station', `${h.sysName}${h.own ? '' : !h.common ? ' (picked for this search)' : ' (the network\'s commonest radio)'}, antenna ${h.agl} m above the ground`],
+      ['Searched', `Every repeater and base within ${found.km} km — ${found.cands.length} priced${found.over ? `, the nearest ${MAX_HUBS}; ${found.over} more further out were left out` : ''}${
+        failed ? `; ${failed} could not be priced` : ''}`],
+      ['Ranked by', RANKS[rankMode()]],
+      ['Fade margin', `Good ${goodDb()} dB or more · Ok ${okDb()} to ${goodDb()} dB · Poor under ${okDb()} dB`],
+      ['Route on to a base', `Hops of at most ${linkKm()} km, at most ${MAX_REPEATERS} repeaters, the best route the agent API would pick`],
+    ];
+    if (found.missing.size) how.push(['Hops with no figure', `${found.missing.size} hop${found.missing.size === 1 ? '' : 's'} on to a base had no fade margin worked out yet; a whole way marked ≈ is the station's own hop alone`]);
+    const w = words();
+    return {
+      heading: `Best repeater for ${who}`,
+      sub: `Flood-Net, ${stamp} · ${listed.length < results.length ? `the best ${listed.length} of ${results.length} priced` : `all ${results.length} priced`}`,
+      answer: plain(verdictLine()),
+      rows, hops, how,
+      hopsHeading: pick.onward && pick.onward.kind === 'base' ? `The hop from ${s.name} to ${pick.hub.name}`
+        : `Every hop from ${s.name} through ${pick.hub.name} to a base`,
+      words: GLOSSARY.map(([k, label]) => [label, w[k]]),
+      caveat: CAVEAT,
+      file: `best-repeater-${slug(s.name)}-${found.km}km`,
+    };
+  }
+
+  const COLS = ['Rank', 'Repeater or base', 'Role', 'Distance', 'Its hop', 'Line of sight', 'On to base', 'Whole way', 'Notes'];
+
+  function reportHtml(rep) {
+    const font = 'font-family:Calibri,Arial,Helvetica,sans-serif;';
+    const cell = 'border:1px solid #c8d1db;padding:3pt 6pt;vertical-align:top;text-align:left;';
+    const headCell = `${cell}background:#eef3f8;font-weight:bold;`;
+    const table = 'border-collapse:collapse;' + font + 'font-size:9.5pt';
+    const h = t => `<h3 style="${font}font-size:12pt;color:#0b5cab;margin:14pt 0 4pt">${esc(t)}</h3>`;
+    const fig = (v, text) => `<b style="color:${TONE[bandOfDb(v)]}">${esc(text)}</b>`;
+    const pairs = list => `<table style="${table}" width="100%">${
+      list.map(([l, v]) => `<tr><th style="${headCell}width:28%">${esc(l)}</th><td style="${cell}">${esc(v)}</td></tr>`).join('')}</table>`;
+    const main = `<table style="${table}" width="100%">
+      <tr>${COLS.map(t => `<th style="${headCell}">${esc(t)}</th>`).join('')}</tr>
+      ${rep.rows.map(x => `<tr>
+        <td style="${cell}text-align:right">${x.rank}</td>
+        <td style="${cell}"><b>${esc(x.name)}</b></td>
+        <td style="${cell}">${esc(x.role)}</td>
+        <td style="${cell}white-space:nowrap">${esc(x.where)}</td>
+        <td style="${cell}white-space:nowrap">${x.hop != null ? fig(x.hop, x.hopText) : esc(x.hopText)}</td>
+        <td style="${cell}">${esc(x.los)}</td>
+        <td style="${cell}">${esc(x.onward)}</td>
+        <td style="${cell}white-space:nowrap">${x.whole != null ? fig(x.whole, x.wholeText) : esc(x.wholeText)}</td>
+        <td style="${cell}">${esc(x.notes)}</td>
+      </tr>`).join('')}
+    </table>`;
+    const hops = `<table style="${table}" width="100%">
+      <tr><th style="${headCell}">Hop</th><th style="${headCell}text-align:right">km</th><th style="${headCell}">Fade margin</th><th style="${headCell}">Figure</th></tr>
+      ${rep.hops.map(([l, k, m, src]) => `<tr><td style="${cell}">${esc(l)}</td><td style="${cell}text-align:right">${esc(k)}</td>
+        <td style="${cell}white-space:nowrap">${m != null ? fig(m, dbText(m)) : '—'}</td><td style="${cell}">${esc(src)}</td></tr>`).join('')}
+    </table>`;
+    return `<div style="${font}font-size:10.5pt;color:#16202a">
+      <h2 style="${font}font-size:15pt;margin:0 0 2pt">${esc(rep.heading)}</h2>
+      <p style="${font}font-size:9.5pt;color:#4f6478;margin:0 0 8pt">${esc(rep.sub)}</p>
+      <p style="${font}font-size:11pt;margin:0 0 8pt">${esc(rep.answer)}</p>
+      ${main}
+      ${h(rep.hopsHeading)}${hops}
+      ${h('How it was worked out')}${pairs(rep.how)}
+      ${h('What the words mean')}${pairs(rep.words)}
+      <p style="${font}font-size:9.5pt;margin:8pt 0 0">${esc(rep.caveat)}</p>
+    </div>`;
+  }
+
+  function reportText(rep) {
+    const L = [rep.heading, rep.sub, '', rep.answer, '', COLS.join('\t')];
+    rep.rows.forEach(x => L.push([x.rank, x.name, x.role, x.where, x.hopText, x.los, x.onward, x.wholeText, x.notes].join('\t')));
+    L.push('', rep.hopsHeading.toUpperCase(), 'Hop\tkm\tFade margin\tFigure');
+    rep.hops.forEach(([l, k, m, src]) => L.push(`${l}\t${k}\t${m != null ? dbText(m) : '—'}\t${src}`));
+    L.push('', 'HOW IT WAS WORKED OUT');
+    rep.how.forEach(([l, v]) => L.push(`${l}\t${v}`));
+    L.push('', 'WHAT THE WORDS MEAN');
+    rep.words.forEach(([l, v]) => L.push(`${l}\t${v}`));
+    L.push('', rep.caveat);
+    return L.join('\n') + '\n';
+  }
+
+  // The clipboard, the old way: a copy event that writes what it is given —
+  // for a browser without the asynchronous clipboard, or one that refused it.
+  function copyByEvent(html, text) {
+    const put = e => {
+      e.clipboardData.setData('text/html', html);
+      e.clipboardData.setData('text/plain', text);
+      e.preventDefault();
+    };
+    document.addEventListener('copy', put, true);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
+    document.removeEventListener('copy', put, true);
+    return ok;
+  }
+
+  function copyReport() {
+    const rep = reportOf();
+    if (!rep) { Toast.show('Nothing to copy yet — find the best repeater first.'); return; }
+    const html = reportHtml(rep), text = reportText(rep);
+    const n = rep.rows.length;
+    const done = () => Toast.show(`Copied: ${n === 1 ? 'the one repeater' : `the ${n} repeaters and bases`} listed, with every figure. `
+      + 'Paste it into Word or an email — or a spreadsheet, where the table lands in cells.', { kind: 'done' });
+    const write = navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined'
+      ? (() => {
+          try {
+            return navigator.clipboard.write([new ClipboardItem({
+              'text/html': new Blob([html], { type: 'text/html' }),
+              'text/plain': new Blob([text], { type: 'text/plain' }),
+            })]);
+          } catch (e) { return Promise.reject(e); }
+        })()
+      : Promise.reject(new Error('no asynchronous clipboard'));
+    write.then(done, () => {
+      if (copyByEvent(html, text)) { done(); return; }
+      // Neither way was allowed: the same document, saved, opens in Word.
+      dlText(`${rep.file}.html`, `<!doctype html><meta charset="utf-8"><title>${esc(rep.heading)}</title>${html}`, 'text/html');
+      Toast.show('The browser would not copy, so the report was saved as a file instead — it opens in Word.', { kind: 'note' });
+    });
+  }
+
   // ── The API ─────────────────────────────────────────────────────────────────
 
   return {
@@ -1345,6 +1546,10 @@ const MapBestRepeater = (function () {
     },
 
     csvText,
+    copyReport,
+    // The two the button puts on the clipboard, for the checks.
+    reportText() { const rep = reportOf(); return rep ? reportText(rep) : ''; },
+    reportHtml() { const rep = reportOf(); return rep ? reportHtml(rep) : ''; },
 
     // One setter for every other control on the panel. An empty box means
     // "follow the default", not nought.

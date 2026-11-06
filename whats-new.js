@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 230, date: '2026-11-06', items: [
+      '📋 <strong>Copy the Best repeater answer for a report.</strong> In 🎯 Best repeater, once it has found the '
+        + 'best repeater, press <em>📋 Copy for a report</em> beside Save CSV: it copies the repeaters and bases the '
+        + 'panel lists — the best eight, or all of them after Show all — as a table with every figure, the picked '
+        + 'one\'s hops on to a base, how it was worked out and what the words mean. Paste it into Word or an email; '
+        + 'pasted into a spreadsheet, the table lands in cells.',
+    ] },
     { n: 229, date: '2026-11-06', items: [
       '📍 <strong>Drop a pin by tapping the map.</strong> In 📍 Find a place, press <em>Tap the map to drop pins</em>: '
         + 'every click on the map (a tap on a phone) leaves a numbered pin there, until you press it again, ✕ in the '
