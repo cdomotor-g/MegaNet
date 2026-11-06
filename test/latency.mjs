@@ -1060,6 +1060,9 @@ try {
     document.querySelector('#map-latency-panel [data-lat-f="rp-play"]').click();
     const t0 = performance.now();
     while (!MapLatency._replay().done && performance.now() - t0 < 8000) await new Promise(r => requestAnimationFrame(r));
+    // Two frames, so the canvas has been drawn for the last message before a
+    // pixel is read off it; on a slow runner the read raced the draw.
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     const at = MapLatency._replay();
     const cv = document.querySelector('.lat-pulse-canvas');
     const dpr = window.devicePixelRatio || 1;

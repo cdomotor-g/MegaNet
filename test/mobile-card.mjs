@@ -169,7 +169,12 @@ async function settle(id) {
     const rows = {};
     for (const r of el.querySelectorAll('.acma-row')) {
       const [k, v] = r.children;
-      rows[k.textContent.trim()] = v.innerText.replace(/\s+/g, ' ').trim();
+      // textContent, not innerText: a long note is folded behind a tap on the
+      // card (card-rows.js), and innerText leaves out what is folded. A space
+      // after each element keeps the words from running together.
+      const w = v.cloneNode(true);
+      for (const e of w.querySelectorAll('*')) e.after(' ');
+      rows[k.textContent.trim()] = w.textContent.replace(/\s+/g, ' ').trim();
     }
     return {
       rows, key: el.dataset.mnMobile,
@@ -291,6 +296,10 @@ try {
   // ── Terrain that will not come ────────────────────────────────────────────
   if (VERBOSE) console.log('Terrain unavailable');
   terrainUp = false;
+  // The browser keeps a decoded image by its address and would hand the profile
+  // its tiles back without asking the network, so the outage would never show.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
   const Q = dest(...P, 270, 4);          // a new point, so no tile it needs is cached
   await page.evaluate(() => Terrain.clear());
   const down = await pick(...Q);
