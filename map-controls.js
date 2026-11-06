@@ -630,6 +630,9 @@ function mapAttributionBelow(map) {
     strip.addEventListener('focusout', mapAttributionResized);
   }
   strip.textContent = '';
+  // The 3-D view's credits, if they were in it, went with the text; it puts
+  // them back as it is attached to the new map (map-3d.js, creditBelow).
+  strip.classList.remove('has-3d');
   strip.appendChild(box);
   return strip;
 }
@@ -640,9 +643,13 @@ function mapAttributionBelow(map) {
 // could only half read; once it is open the links are links. Anywhere the line
 // is not cut short — every window wider than a phone, where it wraps — a tap
 // does nothing but what the link under it does.
+//
+// While the 3-D view is up the line is its credits instead (map-3d.js,
+// creditBelow), and the one it carries is the one a tap reads.
 function mapAttributionTap(e) {
   const strip = e.currentTarget;
-  const line = strip.querySelector('.leaflet-control-attribution');
+  const line = (strip.classList.contains('has-3d') && strip.querySelector('.mn-map3d-credit'))
+    || strip.querySelector('.leaflet-control-attribution');
   const open = strip.classList.contains('is-open');
   if (!open && !(line && line.scrollWidth > line.clientWidth + 1)) return;
   if (open && e.target.closest && e.target.closest('a')) return;

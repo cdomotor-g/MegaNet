@@ -3092,7 +3092,12 @@ it; a place moves the map and leaves the stations alone, so it has its own tool
 and the filter box is the stations' again. Paste a coordinate into it —
 decimal, degrees and minutes, or degrees-minutes-seconds, with or without
 hemisphere letters, in either order — and the map goes there and drops a blue
-pin, with no network at all. Type a name and it lists, grouped:
+pin, with no network at all. Every place gone to leaves a **numbered** pin and
+the next one adds another, so a handful of places can be marked for a meeting
+and talked about as "pin 2": they are listed under the box, each with its ✕,
+kept on the device over a reload, copied out one to a line by 📋 Copy the
+list, left alone by ↺ and 🧹, and drawn in the 3-D view as well. Type a name
+and it lists, grouped:
 
 - **Street addresses** — for text shaped like an address (a house number
   before a word, "12 Mary Street, Gympie", "3/18 Smith St Mackay", or a street

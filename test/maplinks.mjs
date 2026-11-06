@@ -496,8 +496,16 @@ try {
       && inPane.d < 0.2 && inPane.filtering === false, JSON.stringify(inPane));
   await page.evaluate(() => Places.clear(true));
   await page.waitForTimeout(200);
-  check('…and ✕ takes the pin away with the text', await page.evaluate(() =>
-    document.querySelectorAll('.mn-place').length === 0 && document.getElementById('places-q').value === ''));
+  const afterX = await page.evaluate(() => ({
+    pins: document.querySelectorAll('.mn-place').length, q: document.getElementById('places-q').value,
+    listed: [...document.querySelectorAll('#places-pins .places-pin-go')].map(b => b.textContent.replace(/\s+/g, ' ').trim()),
+  }));
+  check('…and ✕ empties the box and leaves the pin, numbered and listed under it',
+    afterX.pins === 1 && afterX.q === '' && afterX.listed.length === 1 && /Pin 1: -26\.66/.test(afterX.listed[0]), JSON.stringify(afterX));
+  await page.click('#places-pins .places-pin-x');
+  await page.waitForTimeout(200);
+  check('…which its own ✕ in the list takes off the map', await page.evaluate(() =>
+    document.querySelectorAll('.mn-place').length === 0 && !document.querySelector('#places-pins .places-pin-row')));
 
   // ── 8. Find a control, measured on screen ────────────────────────────────
   // getClientRects(), never el.hidden: see the header. A row with the

@@ -107,6 +107,20 @@
 // height are why anybody looks a mark up. A mark number is never sent to
 // Nominatim, by the same rule as a station number.
 //
+// ── The pins stay ───────────────────────────────────────────────────────────
+// Every place gone to leaves a numbered pin, and the next one adds a pin
+// rather than moving the last: a handful of places marked for a meeting —
+// "pin 2 is the gate, pin 3 the hill we could put a repeater on"
+// — is what the tool is asked for as often as finding one place is. So the
+// pins are this tool's own list, like the text in its box: listed under the
+// box, each with its ✕, numbered in the order they were dropped and never
+// renumbered (pin 3 stays pin 3 when pin 2 is taken off), kept on this device
+// over a reload, copied out as text for the minutes, and left alone by ↺ and
+// 🧹, which clear what was drawn *about* a search — a place's outline, the
+// river it lit, a survey mark's callout — and not the places somebody chose
+// to mark. The 3-D view draws them too (Map3D.placesChanged): its canvas
+// covers every Leaflet pane, and a pin under it is a pin that "did not land".
+//
 // The same service answers the other way round for the Field Camera
 // (field-camera.js): locality() names the town or locality a point is in, for
 // the corner of a photo's stamp — through the same throttle, a few hundred
@@ -126,6 +140,13 @@ const Places = (function () {
   const LOCAL_CAP   = 6;      // rows shown per group of the file's own
   const MARK_DEBOUNCE_MS = 400; // a pause before the survey register is asked
   const MARK_ZOOM   = 16;     // close enough to read the streets round a mark
+  const PINS_KEY    = 'mn-places-pins';   // the pins, kept on this device (see "The pins stay")
+  const PINS_MAX    = 60;     // more than a meeting needs; past it one has to come off first
+  const PIN_ZOOM    = 15;     // a pin gone to from the list, close enough to see what is round it
+  // What the list's heading means, on hover; the hint under the box says the
+  // same where a finger can read it.
+  const PINS_MEANING = 'Every place you go to here leaves a numbered pin. The pins stay on this device, '
+    + 'over a reload, until you take them off with their ✕ — ↺ and 🧹 leave them where they are.';
   const SHAPE_DEG   = 0.001;  // the gazetteer's outlines, simplified to ~100 m
   const ADDR_URL    = 'https://spatial-gis.information.qld.gov.au/arcgis/rest/services/Location/QldCompositeLocator/GeocodeServer';
   const ADDR_ATTRIB = 'Queensland addresses © State of Queensland (Department of Resources)';
@@ -191,7 +212,11 @@ const Places = (function () {
   const cache = new Map();      // lowercased query → results (LRU by re-insert)
   let lastAt = 0;               // when the last request went out, for the throttle
   let map = null;
-  let layer = null;             // the pin and the outline of the one place shown
+  let layer = null;             // the outline or course of the one place shown
+  let pins = null;              // the pins dropped: [{ n, lat, lon, name, text, kind, where, credit, mark }],
+                                // read from the device on first use (pinList)
+  let pinLayer = null;          // one Leaflet marker per pin, on `map`
+  const pinMarkers = new Map(); // pin number → its marker, to open its callout
   let query = '';               // what is in the box
   let coord = null;             // what it parses as, if anything
   let local = null;             // the file's own answers: { catchments, rivers, councils }
@@ -935,17 +960,21 @@ const Places = (function () {
 
   // ── On the map ──────────────────────────────────────────────────────────────
 
+  // A pin's callout: what the place is, where, the copy and map pills — and
+  // the way to take the pin off, since a pin is now kept until somebody does.
   function markerHtml(p) {
     const s = { lat: p.lat, lon: p.lon, name: p.name || p.text };
     return `
       <div class="mn-place-pop">
-        <h4>${esc(p.name || 'Coordinate')}</h4>
+        <h4>${p.n ? `<span class="mn-place-pop-n">${p.n}</span> ` : ''}${esc(p.name || 'Coordinate')}</h4>
         <p class="small">${p.kind ? `${esc(p.kind)}${p.where ? ` · ${esc(p.where)}` : ''}<br>` : ''}
           ${esc(stationLatLonText(s))}<br>
           <span class="txt-muted">${esc(p.credit || (p.name ? ATTRIB : 'Typed into Find a place — not a station.'))}</span></p>
         <div class="pill-row pill-list">
           ${copyLatLonPillHtml(s)}
           ${mapViewPills(s).join('\n          ')}
+          ${p.n ? `<button type="button" class="pill" onclick="Places.removePin(${p.n})"
+                   title="Take pin ${p.n} off the map">✕ Take pin ${p.n} off</button>` : ''}
         </div>
       </div>`;
   }
@@ -956,10 +985,161 @@ const Places = (function () {
     return (typeof cssVar === 'function' && cssVar('--place-ink', '')) || '#1a6fd6';
   }
 
-  // Draw what `hit` is — a pin, and its outline or course where it has one —
-  // replacing whatever this tool drew before. `move` is whether the map goes
-  // there: a result pressed, yes; the same one drawn again on a new map (a
-  // render of the tab), no. Returns the layer.
+  // ── The pins ───────────────────────────────────────────────────────────────
+  // See "The pins stay" at the top. Read from the device the first time they
+  // are wanted; a survey mark's own record (`mark`) is not kept over a reload,
+  // so a mark's pin from yesterday opens a place's callout rather than the
+  // mark's — its name and coordinate are what matter in a meeting.
+  function pinList() {
+    if (pins) return pins;
+    pins = [];
+    try {
+      const saved = JSON.parse(localStorage.getItem(PINS_KEY) || '[]');
+      if (Array.isArray(saved)) {
+        for (const p of saved) {
+          const lat = Number(p && p.lat), lon = Number(p && p.lon), n = Number(p && p.n);
+          if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
+          if (!(n >= 1) || pins.some(q => q.n === n)) continue;
+          const str = v => (typeof v === 'string' ? v.slice(0, 200) : '');
+          pins.push({ n: Math.floor(n), lat, lon, name: str(p.name), text: str(p.text), kind: str(p.kind),
+                      where: str(p.where), credit: str(p.credit), mark: null });
+        }
+      }
+    } catch (_) { /* nothing kept, or nothing readable: no pins */ }
+    return pins;
+  }
+
+  function savePins() {
+    try {
+      if (!pins || !pins.length) { localStorage.removeItem(PINS_KEY); return; }
+      localStorage.setItem(PINS_KEY, JSON.stringify(pins.map(({ mark, ...p }) => p)));
+    } catch (_) { /* full, or private: the pins last as long as the page */ }
+  }
+
+  function pinByNumber(n) {
+    return pinList().find(p => p.n === Number(n)) || null;
+  }
+
+  // The pin already at a point, to the centimetre: the same place gone to
+  // twice is one pin, not two.
+  function pinAt(lat, lon) {
+    return pinList().find(p => Math.abs(p.lat - lat) < 1e-7 && Math.abs(p.lon - lon) < 1e-7) || null;
+  }
+
+  // The pin a result leaves, or the one already there. Numbered one past the
+  // highest still on the map, so the numbers people are using stay theirs.
+  function dropPin(hit) {
+    if (hit.lat == null || hit.lon == null) return null;
+    const there = pinAt(hit.lat, hit.lon);
+    if (there) { if (hit.mark) there.mark = hit.mark; return there; }
+    const list = pinList();
+    if (list.length >= PINS_MAX) {
+      if (typeof mapNote === 'function') mapNote(`${PINS_MAX} pins is as many as Find a place keeps — take one off to drop another.`, 7000);
+      return null;
+    }
+    const pin = {
+      n: list.reduce((m, p) => Math.max(m, p.n), 0) + 1,
+      lat: hit.lat, lon: hit.lon,
+      name: hit.name || '', text: hit.text || '', kind: hit.kind || '', where: hit.where || '',
+      credit: hit.credit || '', mark: hit.mark || null,
+    };
+    list.push(pin);
+    savePins();
+    return pin;
+  }
+
+  // The marker's own picture: 2-D's blue 📍 with its number beside the head.
+  // A zero-size box at the point, as .mn-peak's is — the same markup in 3-D.
+  function pinIconHtml(p) {
+    return `<span class="mn-place mn-pin-blue" aria-hidden="true">📍</span><span class="mn-place-n" aria-hidden="true">${p.n}</span>`;
+  }
+
+  function pinTitle(p) {
+    return `Pin ${p.n}: ${p.name || p.text || stationLatLonText({ lat: p.lat, lon: p.lon })}`;
+  }
+
+  // Every pin on the map, again — a pin dropped, taken off, or a map built
+  // new — and the 3-D view told, since it draws them as well.
+  function drawPins() {
+    if (pinLayer) pinLayer.remove();
+    pinLayer = null;
+    pinMarkers.clear();
+    if (map) {
+      pinLayer = L.layerGroup().addTo(map);
+      for (const p of pinList()) {
+        const m = L.marker([p.lat, p.lon], {
+          title: pinTitle(p),
+          icon: L.divIcon({ className: 'mn-place-icon', html: pinIconHtml(p), iconSize: [0, 0], iconAnchor: [0, 0] }),
+          zIndexOffset: 1500,
+        });
+        // A survey mark's pin opens the mark's own callout — its report, its
+        // height, its condition — rather than a place's.
+        if (p.mark && typeof MapSurvey !== 'undefined') m.on('click', () => MapSurvey.reveal(p.mark));
+        else m.bindPopup(() => markerHtml(p), { maxWidth: 320 });
+        m.addTo(pinLayer);
+        pinMarkers.set(p.n, m);
+      }
+    }
+    if (typeof Map3D !== 'undefined' && Map3D.placesChanged) Map3D.placesChanged();
+  }
+
+  // The list of them under the box: number, name and where, a press to go
+  // back to one, its ✕, and the two things done to all of them.
+  function pinsHtml() {
+    const list = pinList();
+    if (!list.length) return '';
+    const rows = list.map(p => {
+      const where = stationLatLonText({ lat: p.lat, lon: p.lon });
+      const name = p.name || where;
+      const kind = p.name ? where : (p.kind || 'coordinate');
+      return `<li class="places-pin-row">
+          <button type="button" class="places-hit places-pin-go" data-pin="${p.n}" onclick="Places.goPin(${p.n})"
+                  title="Take the map to pin ${p.n}"><span class="places-pin-n" aria-hidden="true">${p.n}</span><span class="places-hit-text"><span class="sr-only">Pin ${p.n}: </span><span class="places-hit-name">${esc(name)}</span> <span class="places-hit-kind">${esc(kind)}</span></span></button>
+          <button type="button" class="places-pin-x" data-pin-x="${p.n}" onclick="Places.removePin(${p.n})"
+                  title="Take pin ${p.n} off the map" aria-label="Take pin ${p.n} off the map">✕</button>
+        </li>`;
+    }).join('');
+    return `<section class="places-group places-pins" aria-labelledby="places-g-pins">
+        <h3 class="places-group-h" id="places-g-pins">${termHtml('Pins on the map', PINS_MEANING)} · ${list.length}</h3>
+        <ul class="places-list">${rows}</ul>
+        <div class="pill-row places-pins-tools">
+          <button type="button" class="pill" onclick="Places.copyPins()" title="Copy every pin's number, name and coordinate, one to a line">📋 Copy the list</button>
+          <button type="button" class="pill" onclick="Places.clearPins()" title="Take every pin off the map">Take them all off</button>
+        </div>
+      </section>`;
+  }
+
+  // Write the list. A ✕ pressed hands the focus to the next pin's ✕, or the
+  // one before it, or the box once there are none — never to the page.
+  function renderPins(focusAfter) {
+    const el = document.getElementById('places-pins');
+    if (!el) return;
+    const a = document.activeElement;
+    const had = a && el.contains(a) && a.dataset ? (a.dataset.pin || a.dataset.pinX ? a : null) : null;
+    el.innerHTML = pinsHtml();
+    let to = null;
+    if (focusAfter != null) {
+      const list = pinList();
+      const next = list.find(p => p.n > focusAfter) || list.slice().reverse().find(p => p.n < focusAfter);
+      to = next ? el.querySelector(`[data-pin-x="${next.n}"]`) : document.getElementById('places-q');
+    } else if (had) {
+      to = el.querySelector(had.dataset.pin ? `[data-pin="${had.dataset.pin}"]` : `[data-pin-x="${had.dataset.pinX}"]`);
+    }
+    if (to) to.focus({ preventScroll: true });
+  }
+
+  function openPin(p) {
+    if (p && typeof Map3D !== 'undefined' && Map3D.openPlace && Map3D.openPlace(p.n)) return;
+    const m = p && pinMarkers.get(p.n);
+    if (m && m.openPopup && !p.mark) m.openPopup();
+    else if (p && p.mark && typeof MapSurvey !== 'undefined') MapSurvey.reveal(p.mark);
+  }
+
+  // Draw the outline or course of what `hit` is, replacing whatever this tool
+  // drew round the last one — and, when `move`, leave its pin and take the map
+  // there. `move` is whether somebody asked to go: a result pressed, yes; the
+  // same one drawn again on a new map (a render of the tab), no. Returns the
+  // pin it left, or null.
   function draw(hit, move) {
     if (!map) return null;
     if (layer) layer.remove();
@@ -972,36 +1152,22 @@ const Places = (function () {
                        fillColor: c, fillOpacity: /Polygon/.test(f.geometry.type) ? 0.08 : 0 }),
       }).addTo(layer);
     }
-    // A survey mark's pin opens the mark's own callout — its report, its
-    // height, its condition — rather than a place's.
+    if (!move) return null;
     const mark = hit.mark && typeof MapSurvey !== 'undefined' ? hit.mark : null;
-    if (hit.lat != null && hit.lon != null) {
-      const pin = L.marker([hit.lat, hit.lon], {
-        title: hit.name || hit.text,
-        icon: L.divIcon({
-          className: 'mn-place-icon',
-          html: '<span class="mn-place mn-pin-blue" aria-hidden="true">📍</span>',
-          iconSize: [0, 0], iconAnchor: [0, 0],
-        }),
-        zIndexOffset: 1500,
-      });
-      if (mark) pin.on('click', () => MapSurvey.reveal(mark));
-      else pin.bindPopup(() => markerHtml(hit), { maxWidth: 320 });
-      pin.addTo(layer);
+    const pin = dropPin(hit);
+    drawPins();
+    renderPins();
+    const b = hit.bounds;
+    if (b && (b[1] - b[0] > 1e-4 || b[3] - b[2] > 1e-4)) {
+      map.fitBounds([[b[0], b[2]], [b[1], b[3]]], { padding: [28, 28], maxZoom: hit.maxZoom || 14 });
+    } else if (hit.lat != null) {
+      // A mark's callout opens straight after, and its pan to fit would
+      // stop an animated move part-way, short of the mark.
+      map.setView([hit.lat, hit.lon], Math.max(map.getZoom(), hit.zoom || 12), mark ? { animate: false } : undefined);
     }
-    if (move) {
-      const b = hit.bounds;
-      if (b && (b[1] - b[0] > 1e-4 || b[3] - b[2] > 1e-4)) {
-        map.fitBounds([[b[0], b[2]], [b[1], b[3]]], { padding: [28, 28], maxZoom: hit.maxZoom || 14 });
-      } else if (hit.lat != null) {
-        // A mark's callout opens straight after, and its pan to fit would
-        // stop an animated move part-way, short of the mark.
-        map.setView([hit.lat, hit.lon], Math.max(map.getZoom(), hit.zoom || 12), mark ? { animate: false } : undefined);
-      }
-      if (mark) MapSurvey.reveal(mark);
-      else if (hit.lat != null && !hit.shape) layer.eachLayer(l => { if (l.openPopup) l.openPopup(); });
-    }
-    return layer;
+    if (mark) MapSurvey.reveal(mark);
+    else if (pin && !hit.shape) openPin(pin);
+    return pin;
   }
 
   // ── The results, as a thing to go to ─────────────────────────────────────
@@ -1077,8 +1243,7 @@ const Places = (function () {
         const c = at || [b.getCenter().lat, b.getCenter().lng];
         hit.lat = c[0]; hit.lon = c[1];
         hit.maxZoom = 12;
-        draw(hit, true);
-        told(hit);
+        told(hit, draw(hit, true));
       }).catch(() => { if (typeof mapNote === 'function') mapNote('The catchment outlines could not be loaded.', 5000); });
     } else if (isRiver(group, hit) && typeof MapRiverLines !== 'undefined') {
       // A river: the rivers layer selects it, lit from end to end, and the map
@@ -1094,8 +1259,7 @@ const Places = (function () {
           hit.maxZoom = 12;
           hit.riverSelected = true;
         }
-        draw(hit, true);
-        told(hit);
+        told(hit, draw(hit, true));
       });
     } else if (hit.lat == null && hit.row && hit.row.magicKey) {
       // An address the locator only suggested: placed now it is wanted.
@@ -1107,12 +1271,10 @@ const Places = (function () {
           return;
         }
         hit.lat = at.lat; hit.lon = at.lon;
-        draw(hit, true);
-        told(hit);
+        told(hit, draw(hit, true));
       });
     } else {
-      draw(hit, true);
-      told(hit);
+      told(hit, draw(hit, true));
     }
     render();
   }
@@ -1122,13 +1284,18 @@ const Places = (function () {
     return group === 'river' || (group === 'osm' && /river|creek|stream|canal/.test(hit.kind || ''));
   }
 
-  function told(hit) {
+  // What the map now shows, said once — the coordinate not twice over when
+  // the place *is* a coordinate.
+  function told(hit, pin) {
     const where = hit.lat != null ? stationLatLonText({ lat: hit.lat, lon: hit.lon }) : '';
-    const name = hit.name || hit.text || 'That place';
+    const name = hit.name || (where ? '' : hit.text) || '';
+    const what = [name, where].filter(Boolean).join(' — ') || 'That place';
     if (typeof mapNote === 'function') {
-      mapNote(`${name}${where ? ` — ${where}` : ''}. Not a station: the blue pin clears with ✕ in Find a place, or with ↺.`, 7000);
+      mapNote(pin
+        ? `Pin ${pin.n}: ${what}. Not a station — the pin stays until you take it off in 📍 Find a place.`
+        : `${what}. Not a station.`, 7000);
     }
-    announce(`${name} — the map is there, marked with a blue pin.`);
+    announce(pin ? `Pin ${pin.n}: ${what} — the map is there.` : `${what} — the map is there.`);
   }
 
   // ── The pane ────────────────────────────────────────────────────────────────
@@ -1147,11 +1314,12 @@ const Places = (function () {
                  aria-labelledby="places-h" aria-describedby="places-hint" aria-controls="places-results"
                  placeholder="Address, town, river, catchment, survey mark or lat, lon"
                  oninput="Places.input(this.value)" onkeydown="Places.key(event)">
-          <button type="button" class="places-clear" onclick="Places.clear(true)" title="Clear the box and the pin on the map"
-                  aria-label="Clear the place">✕</button>
+          <button type="button" class="places-clear" onclick="Places.clear(true)" title="Clear the box — the pins stay"
+                  aria-label="Clear the box">✕</button>
         </div>
-        <p class="small places-hint" id="places-hint">A street address (12 Mary Street, Gympie), town, river or creek, catchment or basin number, council area, survey mark number (43906 or PSM 43906), or a coordinate. The map goes there; the stations are left as they are.</p>
+        <p class="small places-hint" id="places-hint">A street address (12 Mary Street, Gympie), town, river or creek, catchment or basin number, council area, survey mark number (43906 or PSM 43906), or a coordinate. The map goes there and leaves a numbered pin; the next place adds another. The stations are left as they are.</p>
         <div class="places-results" id="places-results"></div>
+        <div class="places-pins-box" id="places-pins">${pinsHtml()}</div>
       </div>`;
   }
 
@@ -1176,7 +1344,8 @@ const Places = (function () {
     if (!q) return '';
     const out = [];
     if (coord) {
-      out.push(groupHtml('coord', 'Coordinate', [rowHtml('coord', 0, coord.text, flownTo === `${coord.lat},${coord.lon}` ? 'the map is here' : 'go here')], 0));
+      const at = pinAt(coord.lat, coord.lon);
+      out.push(groupHtml('coord', 'Coordinate', [rowHtml('coord', 0, coord.text, at ? `pin ${at.n} is here` : 'drop a pin here')], 0));
     }
     const street = addressy(q);
     out.push(addrHtml(q));
@@ -1241,9 +1410,16 @@ const Places = (function () {
       // at "-26.12 152.5" and so on, and a map that lurches at each of them is
       // a map nobody can read. A paste, which is what this is mostly for, is
       // one event and moves once.
+      //
+      // Settled again on the text it last went to, it stays put — unless the
+      // pin it left there has since been taken off: the same coordinate
+      // pasted again after that is somebody asking for the pin back, and the
+      // row saying "the map is here" over a map with nothing on it was how a
+      // pin came to look as if it had not landed.
       const key = `${coord.lat},${coord.lon}`;
       coordTimer = setTimeout(() => {
-        if (!coord || `${coord.lat},${coord.lon}` !== key || flownTo === key) return;
+        if (!coord || `${coord.lat},${coord.lon}` !== key) return;
+        if (flownTo === key && pinAt(coord.lat, coord.lon)) return;
         flownTo = key;
         go('coord', 0);
       }, COORD_SETTLE_MS);
@@ -1271,8 +1447,9 @@ const Places = (function () {
     }
   }
 
-  // The pin and the outline off the map, the list left as it is (↺, which
-  // clears what is drawn on the map and leaves the tools' own contents).
+  // The outline off the map, the list left as it is (↺, which clears what is
+  // drawn on the map and leaves the tools' own contents) — and the pins left
+  // too, which are this tool's contents: somebody chose each one.
   function clearMark() {
     if (layer) { layer.remove(); layer = null; }
     // The river it selected goes with the pin it drew.
@@ -1287,8 +1464,8 @@ const Places = (function () {
     render();
   }
 
-  // Everything: the box, the list and the mark. `box` also empties the field,
-  // for the ✕ beside it; the field's own emptying calls this without it.
+  // The box, the list and the outline — not the pins. `box` also empties the
+  // field, for the ✕ beside it; the field's own emptying calls this without it.
   function clear(box) {
     clearTimeout(lookupTimer);
     clearTimeout(coordTimer);
@@ -1327,6 +1504,74 @@ const Places = (function () {
     clear,
     clearMark,
 
+    // ── The pins (see "The pins stay") ──
+    // Back to one: the map to it, close in, and its callout open.
+    goPin(n) {
+      const p = pinByNumber(n);
+      if (!p || !map) return;
+      map.setView([p.lat, p.lon], Math.max(map.getZoom(), PIN_ZOOM));
+      openPin(p);
+      announce(`${pinTitle(p)} — the map is there.`);
+    },
+    // One off, from its ✕ in the list or in its callout.
+    removePin(n) {
+      const list = pinList();
+      const i = list.findIndex(p => p.n === Number(n));
+      if (i < 0) return;
+      const [p] = list.splice(i, 1);
+      savePins();
+      if (map) map.closePopup();
+      // The outline of the place it marked goes with it.
+      if (shown && shown.hit && shown.hit.lat === p.lat && shown.hit.lon === p.lon) clearMark();
+      drawPins();
+      renderPins(p.n);
+      render();
+      announce(`Pin ${p.n} taken off the map. ${list.length ? `${list.length} left.` : 'No pins left.'}`);
+    },
+    // All of them, once asked: a meeting's worth of pins is not one press away
+    // from gone.
+    clearPins({ ask = true } = {}) {
+      const list = pinList();
+      if (!list.length) return;
+      const go_ = () => {
+        pins = [];
+        savePins();
+        if (map) map.closePopup();
+        clearMark();
+        drawPins();
+        renderPins(0);
+        announce('Every pin taken off the map.');
+      };
+      if (!ask || typeof confirmDialog !== 'function') { go_(); return; }
+      confirmDialog({ title: 'Take every pin off?', message: `All ${list.length} pin${list.length === 1 ? '' : 's'} on the map go, on this device. "📋 Copy the list" first keeps them as text.`,
+                      confirm: 'Take them all off', danger: true })
+        .then(yes => { if (yes) go_(); });
+    },
+    // The list as text, one pin to a line, for the minutes or a message.
+    copyPins() {
+      const list = pinList();
+      if (!list.length) return Promise.resolve(false);
+      const text = list.map(p => {
+        const where = `${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}`;
+        return `Pin ${p.n}: ${p.name ? `${p.name} — ` : ''}${where}`;
+      }).join('\n');
+      return copyToClipboard(text).then(okay => {
+        const say = okay ? `${list.length} pin${list.length === 1 ? '' : 's'} copied, one to a line.` : 'The list could not be copied here.';
+        if (typeof mapNote === 'function') mapNote(say, 4000);
+        announce(say);
+        return okay;
+      });
+    },
+    // For the 3-D view (map-3d.js): what each pin is, where, and its picture.
+    pins() {
+      return pinList().map(p => ({ n: p.n, lat: p.lat, lon: p.lon, title: pinTitle(p), html: pinIconHtml(p) }));
+    },
+    // …and the callout a pin pressed there opens: the same as 2-D's.
+    pinPopupHtml(n) {
+      const p = pinByNumber(n);
+      return p ? markerHtml(p) : '';
+    },
+
     // From Ctrl+K (palette.js): a mark it found for the text now in this
     // tool's box — the same answer, so the same object — gone to as if
     // pressed here.
@@ -1341,7 +1586,10 @@ const Places = (function () {
     attach(m) {
       map = m;
       layer = null;
+      pinLayer = null;
       if (shown && shown.hit) draw(shown.hit, false);
+      drawPins();
+      renderPins();
     },
 
     // …and as it is taken down. The box, the list and the place shown are
@@ -1350,6 +1598,9 @@ const Places = (function () {
     detach() {
       if (layer) layer.remove();
       layer = null;
+      if (pinLayer) pinLayer.remove();
+      pinLayer = null;
+      pinMarkers.clear();
       map = null;
     },
 
@@ -1363,7 +1614,11 @@ const Places = (function () {
                 list: addr.list ? addr.list.map(h => `${h.name}${h.where ? `, ${h.where}` : ''}`) : null },
         marks: { key: marks.key, loading: marks.loading, error: marks.error, list: marks.list ? marks.list.map(m => m.register) : null },
         shown: shown ? { group: shown.group, n: shown.n, name: shown.hit.name || shown.hit.text, shape: !!shown.hit.shape } : null,
-        drawn: layer ? layer.getLayers().length : 0,
+        // What is drawn for the place shown: its outline or course, and its pin.
+        drawn: (layer ? layer.getLayers().length : 0)
+          + (pinLayer && shown && shown.hit && shown.hit.lat != null && pinAt(shown.hit.lat, shown.hit.lon) ? 1 : 0),
+        pins: pinList().map(p => ({ n: p.n, lat: p.lat, lon: p.lon, name: p.name || p.text })),
+        pinsDrawn: pinLayer ? pinLayer.getLayers().length : 0,
       };
     },
   };

@@ -6195,8 +6195,8 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   line-height: 1;
 }
 
-/* The box's own ✕ stands down for the one beside it, which takes the pin off
-   the map as well — two of them side by side was one too many. */
+/* The box's own ✕ stands down for the one beside it, which also takes the
+   place's outline off the map — two of them side by side was one too many. */
 .places-q::-webkit-search-cancel-button { display: none; }
 
 .places-hint { margin: 0; color: var(--muted); }
@@ -6254,9 +6254,55 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 .places-status,
 .places-credit { margin: .2rem 0 0 .45rem; }
 
+/* The pins dropped (places.js, "The pins stay"): a row each — its number in
+   the badge the map shows beside the pin's head, the name and where, and its
+   own ✕ — and the two things done to all of them under the list. */
+.places-pins-box:empty { display: none; }
+.places-pins { margin-top: var(--sp-1); }
+
+.places-pin-row {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.places-pin-go { flex: 1 1 auto; min-width: 0; align-items: center; }
+
+.places-pin-n,
+.mn-place-pop-n {
+  flex: 0 0 auto;
+  display: inline-block;
+  min-width: 1.35em;
+  padding: 0 .3em;
+  border-radius: 999px;
+  background: var(--place-ink);
+  color: #fff;
+  font-size: .75rem;
+  font-weight: 700;
+  line-height: 1.35em;
+  text-align: center;
+}
+
+.places-pin-x {
+  flex: 0 0 auto;
+  min-width: 2rem;
+  padding: 0 .4rem;
+  font: inherit;
+  line-height: 1;
+  color: var(--muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.places-pin-x:hover { color: var(--text); background: var(--subtle); }
+.places-pins-tools { margin-top: var(--sp-1); }
+
 @media (pointer: coarse) {
   /* EPIC #107's floor for a finger, on a row that is otherwise a line. */
   .places-hit { min-height: 2.75rem; align-items: center; }
+  .places-pin-x { min-width: 2.75rem; }
 }
 
 /* The one pin the tool drops. A divIcon at a zero anchor, for the reason
@@ -6281,6 +6327,31 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 .mn-place.mn-pin-blue {
   filter: hue-rotate(218deg) saturate(1.15) drop-shadow(0 1px 2px rgba(0, 0, 0, .5));
 }
+
+/* The pin's number, up and to the right of its head — what people say in a
+   meeting ("pin 3") — in the list's badge, ringed white to stand off any base
+   map. The same markup in 3-D (map-3d.js, syncPlaces). */
+.mn-place-n {
+  position: absolute;
+  left: 5px;
+  bottom: 13px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  border: 1.5px solid #fff;
+  border-radius: 8px;
+  background: var(--place-ink);
+  color: #fff;
+  font: 700 10px/13px system-ui, sans-serif;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .45);
+}
+
+/* In 3-D the marker is MapLibre's, a zero-size box at the point as 2-D's is,
+   so the pin and its number hang off it the same way. */
+.mn-place-icon.mn-place-3d { width: 0; height: 0; cursor: pointer; }
 
 .mn-place-pop h4 {
   margin: 0 0 var(--sp-1);
@@ -9708,8 +9779,10 @@ body .map-panel.is-driving {
    the caveat along the foot — 1.5rem, #map3d's --twin-caveat-h — as
    MapLibre's furniture does.
 
-   MapLibre's bottom-right corner — the zoom, the compass and the credits'
-   ⓘ — would be under it, so it stands on it instead: `--map3d-mini` is how
+   MapLibre's bottom-right corner — the zoom and the compass, and the
+   credits' ⓘ while driving (the rest of the time the credits are in the line
+   under the map, map-3d.js creditBelow) — would be under it, so it stands on
+   it instead: `--map3d-mini` is how
    far up the minimap reaches and `--map3d-mini-w` how far in from the right,
    both measured by map-3d.js (placeHud), which adds `has-mini` while the
    minimap is there. The rising water's scale stands on that corner already,
@@ -11490,6 +11563,25 @@ body.mn-cardw-dragging {
   color: var(--muted);
   text-decoration: underline;
 }
+
+/* While the 3-D view is up the line carries its credits — terrain, imagery,
+   cadastre — in place of the flat map's, whose layers are under its canvas
+   (map-3d.js, creditBelow), and MapLibre's own ⓘ over the map is put away:
+   opened, it was three lines across the middle of the map, standing on the
+   minimap. While driving the line is off screen, so the ⓘ comes back. */
+.mn-map-attrib.has-3d .leaflet-control-attribution { display: none; }
+
+.mn-map3d-credit {
+  font-size: .72rem;
+  color: var(--muted);
+}
+
+.mn-map3d-credit a {
+  color: var(--muted);
+  text-decoration: underline;
+}
+
+#map3d.credit-below:not(.is-driving) .maplibregl-ctrl-attrib { display: none; }
 
 /* Folded 1200 → 1400 by #109's breakpoint pass, and *up* rather than down,
    which is the direction that removes the marginal case instead of moving it.
@@ -13284,14 +13376,17 @@ body.mn-dock-dragging {
     cursor: pointer;
   }
 
-  .mn-map-attrib .leaflet-control-attribution {
+  .mn-map-attrib .leaflet-control-attribution,
+  .mn-map-attrib .mn-map3d-credit {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
   .mn-map-attrib.is-open .leaflet-control-attribution,
-  .mn-map-attrib:focus-within .leaflet-control-attribution {
+  .mn-map-attrib:focus-within .leaflet-control-attribution,
+  .mn-map-attrib.is-open .mn-map3d-credit,
+  .mn-map-attrib:focus-within .mn-map3d-credit {
     white-space: normal;
   }
 }

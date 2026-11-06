@@ -697,8 +697,12 @@ const street = await page.evaluate(async () => {
     };
     box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     await sleep(700);
+    // Every place gone to leaves a pin of its own now, so the pins counted
+    // are the ones at the house — one, however many were dropped before it.
+    const pinsAt = (lat, lon) => Places.debug().pins.filter(p => acmaHaversineKm(p.lat, p.lon, lat, lon) < 0.005).length;
     full.went = { shown: Places.debug().shown, m: metresTo(-26.19057, 152.66504), zoom: state.map.getZoom(),
-                  pins: document.querySelectorAll('.mn-place.mn-pin-blue').length };
+                  pins: pinsAt(-26.19057, 152.66504),
+                  drawn: Places.debug().pinsDrawn === Places.debug().pins.length };
 
     const B = calls.length;
     type('12 Mary St');
@@ -707,7 +711,7 @@ const street = await page.evaluate(async () => {
     Places.go('addr', 0);
     await until(() => metresTo(-26.34636, 152.67372) < 5);
     bare.placed = { m: metresTo(-26.34636, 152.67372), byKey: calls.some(c => c.mk === 'amamoor'),
-                    pins: document.querySelectorAll('.mn-place.mn-pin-blue').length };
+                    pins: pinsAt(-26.34636, 152.67372) };
 
     const T = calls.length;
     type('Gympie');
@@ -731,7 +735,7 @@ ok('…and OpenStreetMap\'s answers keep the street — its two ways one row —
   JSON.stringify(street.full.osm));
 ok('Enter goes to the house: the map on it, close in, one blue pin',
   street.full.went.shown && street.full.went.shown.group === 'addr' && street.full.went.shown.n === 0
-    && street.full.went.m < 5 && street.full.went.zoom >= 17 && street.full.went.pins === 1,
+    && street.full.went.m < 5 && street.full.went.zoom >= 17 && street.full.went.pins === 1 && street.full.went.drawn,
   JSON.stringify(street.full.went));
 ok('an address without its town lists the State\'s suggestions with a house number, and none of its place names',
   JSON.stringify(street.bare.ops) === JSON.stringify(['find', 'suggest'])
@@ -743,9 +747,16 @@ ok('a town name is not sent to the address locator', street.town.every(op => op 
 ok('Route on map\'s typed start takes the house for an address',
   street.routed.length === 1 && street.routed[0] === '12 Mary Street|-26.19057,152.66504', JSON.stringify(street.routed));
 
-await page.evaluate(() => { Places.clear(true); shutDock({ instant: true }); });
-ok('✕ takes the place pin with it',
-   await page.evaluate(() => document.querySelectorAll('.mn-place').length === 0));
+const kept = await page.evaluate(() => {
+  Places.clear(true);
+  const after = { pins: document.querySelectorAll('.mn-place').length, listed: Places.debug().pins.map(p => p.n) };
+  Places.clearPins({ ask: false });
+  shutDock({ instant: true });
+  return { ...after, cleared: document.querySelectorAll('.mn-place').length };
+});
+ok('✕ empties the box and leaves the pins, numbered in the order they were dropped',
+   kept.pins >= 2 && kept.pins === kept.listed.length && kept.listed.every((n, i) => n === i + 1), JSON.stringify(kept));
+ok('…and Take them all off takes every one', kept.cleared === 0, JSON.stringify(kept));
 
 // ── 4. the fade margin on the profile card ──────────────────────────────────
 console.log('\nThe fade margin on the profile card');

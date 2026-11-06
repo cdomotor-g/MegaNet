@@ -985,10 +985,9 @@ const hudNow = () => page.evaluate(() => {
     mouse: viewMoveWords(false), touch: viewMoveWords(true),
   };
 });
-// The minimap is put away for this section. Over its one button the credits
-// still come down into the hint's way, as they did over the bare corner, and
-// that is what is held here; over the minimap open the hint stands beside it
-// (6c).
+// The minimap is put away for this section; over the minimap open the hint
+// stands beside it (6c). The credits are not in its way at all: they are in
+// the line under the map (map-3d.js, creditBelow), asserted below.
 await page.evaluate(() => document.querySelector('.mn-map-mini-fold').click());
 await page.waitForTimeout(200);
 let H = await hudNow();
@@ -1007,21 +1006,29 @@ H = await hudNow();
 ok('…and the "?" brings it back', H.shown && !H.folded && H.q.expanded === 'true', JSON.stringify({ shown: H.shown, q: H.q }));
 ok('…saying how the view is moved in the twin\'s own words, and where the compass and tilt buttons are',
    !!H.text && H.text.startsWith(H.words) && /compass and tilt buttons under ⛰️/.test(H.text), H.text);
-ok('…standing above the credits and the scale bar, and clear of the zoom and compass in the other corner',
-   !!H.hud && !!H.scale && !!H.attrib && !!H.nav && H.hud.bottom <= Math.min(H.scale.top, H.attrib.top) + 0.5
-     && H.hud.right <= H.nav.left + 0.5, JSON.stringify({ hud: H.hud, scale: H.scale, attrib: H.attrib, nav: H.nav }));
-// The credits open across the foot when the map is built and close to an ⓘ on
-// the first drag (MapLibre's compact attribution): the hint goes down with them.
-const credits = open => page.evaluate(o => document.querySelector('#map3d .maplibregl-ctrl-attrib').classList.toggle('maplibregl-compact-show', o), open);
-await credits(true);
-await page.waitForTimeout(200);
-const raised = await hudNow();
-await credits(false);
-await page.waitForTimeout(200);
-const dropped = await hudNow();
-ok('…and goes down with the credits when they close to their ⓘ',
-   dropped.hud.bottom > raised.hud.bottom + 10 && dropped.hud.bottom <= Math.min(dropped.scale.top, dropped.attrib.top) + 0.5,
-   JSON.stringify({ open: raised.hud.bottom, closed: dropped.hud.bottom, attrib: dropped.attrib }));
+ok('…standing above the scale bar, and clear of the zoom and compass in the other corner',
+   !!H.hud && !!H.scale && !!H.nav && H.hud.bottom <= H.scale.top + 0.5
+     && H.hud.right <= H.nav.left + 0.5, JSON.stringify({ hud: H.hud, scale: H.scale, nav: H.nav }));
+// The credits are not over the map at all. MapLibre opens its compact
+// credits across the foot when the map is built, and in the bottom-right
+// corner — which stands on the minimap — that was three lines across the
+// middle of the map. So the line under the map carries this view's credits
+// in place of 2-D's while it is up, and MapLibre's ⓘ is put away.
+const creditsNow = () => page.evaluate(() => {
+  const strip = document.querySelector('.mn-map-attrib');
+  const line = strip && strip.querySelector('.mn-map3d-credit');
+  const mlc = document.querySelector('#map3d .maplibregl-ctrl-attrib');
+  const lf = strip && strip.querySelector('.leaflet-control-attribution');
+  const host = document.getElementById('map3d').getBoundingClientRect();
+  const lr = line ? line.getBoundingClientRect() : null;
+  return { has3d: !!strip && strip.classList.contains('has-3d'), text: line ? line.textContent : '',
+           below: !!lr && lr.height > 0 && lr.top >= host.bottom - 0.5,
+           onMap: !!mlc && mlc.getClientRects().length > 0, flat: !!lf && lf.getClientRects().length > 0,
+           same: !!line && !!mlc && line.textContent === (mlc.querySelector('.maplibregl-ctrl-attrib-inner') || {}).textContent };
+});
+const CR = await creditsNow();
+ok('the credits are in the line under the map — this view\'s own, in place of 2-D\'s — and none over the map',
+   CR.has3d && CR.below && /Terrain/.test(CR.text) && CR.same && !CR.onMap && !CR.flat, JSON.stringify(CR));
 ok('…and a drag that starts on it is a drag of the map: it takes no pointer', H.passesThrough);
 ok('the canvas\'s name says how the keys move it', H.canvasName.includes(H.keys), H.canvasName);
 ok('the 3-D panel says it too, for a mouse, a finger and the keys',
@@ -1068,7 +1075,8 @@ const miniNow = () => page.evaluate(() => {
   return {
     wrap: wb, onTop: !!under && wrap.contains(under), host: b(host), hasMini: host.classList.contains('has-mini'),
     nav: b(document.querySelector('#map3d .maplibregl-ctrl-bottom-right .maplibregl-ctrl-group')),
-    attrib: b(document.querySelector('#map3d .maplibregl-ctrl-attrib')),
+    attribOnMap: !!document.querySelector('#map3d .maplibregl-ctrl-attrib')
+      && document.querySelector('#map3d .maplibregl-ctrl-attrib').getClientRects().length > 0,
     hud: b(document.getElementById('map3d-hud')), q: b(document.getElementById('map3d-hud-q')),
     openBtn: b(document.querySelector('.mn-map-mini-open')),
     cam: { lat: c.lat, lng: c.lng, z: m.getZoom(), bearing: m.getBearing() }, lf: { lat: lc.lat, lng: lc.lng },
@@ -1088,9 +1096,9 @@ ok('the minimap is over the 3-D canvas, in its bottom-right corner: the thing un
    MN.onTop && !!MN.wrap && MN.wrap.right <= MN.host.right && MN.host.right - MN.wrap.right < 30
      && MN.wrap.bottom <= MN.host.bottom && MN.host.bottom - MN.wrap.bottom < 40,
    JSON.stringify({ wrap: MN.wrap, host: MN.host, onTop: MN.onTop }));
-ok('…MapLibre’s zoom, compass and credits standing on it rather than under it',
-   MN.hasMini && !!MN.nav && !!MN.attrib && MN.nav.bottom <= MN.wrap.top + 0.5 && MN.attrib.bottom <= MN.wrap.top + 0.5,
-   JSON.stringify({ wrap: MN.wrap, nav: MN.nav, attrib: MN.attrib }));
+ok('…MapLibre’s zoom and compass standing on it rather than under it, and no credits over the map to cover',
+   MN.hasMini && !!MN.nav && MN.nav.bottom <= MN.wrap.top + 0.5 && !MN.attribOnMap,
+   JSON.stringify({ wrap: MN.wrap, nav: MN.nav, attribOnMap: MN.attribOnMap }));
 ok('…and the hint and its "?" clear of it',
    !!MN.hud && !!MN.q && (MN.hud.right <= MN.wrap.left + 0.5 || MN.hud.bottom <= MN.wrap.top + 0.5) && MN.q.right <= MN.wrap.left,
    JSON.stringify({ wrap: MN.wrap, hud: MN.hud, q: MN.q }));
@@ -1183,12 +1191,12 @@ const MF = await miniNow();
 await page.evaluate(() => document.querySelector('.mn-map-mini-open').click());
 await page.waitForTimeout(400);
 MN = await miniNow();
-ok('put away, the zoom, compass and credits stand on its one button',
-   MF.hasMini && !MF.mini && !!MF.openBtn && MF.nav.bottom <= MF.openBtn.top + 0.5 && MF.attrib.bottom <= MF.openBtn.top + 0.5,
-   JSON.stringify({ openBtn: MF.openBtn, nav: MF.nav, attrib: MF.attrib }));
+ok('put away, the zoom and compass stand on its one button',
+   MF.hasMini && !MF.mini && !!MF.openBtn && MF.nav.bottom <= MF.openBtn.top + 0.5 && !MF.attribOnMap,
+   JSON.stringify({ openBtn: MF.openBtn, nav: MF.nav, attribOnMap: MF.attribOnMap }));
 ok('…and brought back, it opens on the camera, with them standing on it again',
    MN.drawn.camera && !!MN.mini && near(MN.mini.lat, MN.cam.lat, miniPx(MN.mini.z)) && near(MN.mini.lng, MN.cam.lng, miniPx(MN.mini.z))
-     && MN.nav.bottom <= MN.wrap.top + 0.5 && MN.attrib.bottom <= MN.wrap.top + 0.5,
+     && MN.nav.bottom <= MN.wrap.top + 0.5 && !MN.attribOnMap,
    JSON.stringify({ cam: MN.cam, mini: MN.mini, wrap: MN.wrap, nav: MN.nav }));
 
 // ── 7. a pin clicked in 3-D paints a card that is on screen (#193) ──────────
@@ -2733,7 +2741,6 @@ const chrome = () => page.evaluate(() => {
     shownCaveat: cav ? [...cav.querySelectorAll('[aria-hidden="true"]')].filter(s => getComputedStyle(s).display !== 'none').map(s => s.textContent) : [],
     under: under ? under.className : null,
     nav: b(document.querySelector('#map3d .maplibregl-ctrl-bottom-right .maplibregl-ctrl-group')),
-    attrib: b(document.querySelector('#map3d .maplibregl-ctrl-attrib')),
     bar: b(document.querySelector('#map3d .maplibregl-ctrl-scale')),
     labels: [...document.querySelectorAll('#map3d-water-labels .twin-scale-label')].map(x => ({ m: Number(x.dataset.m), text: x.textContent, pressed: x.getAttribute('aria-pressed') })),
     play: (document.getElementById('map3d-water-play') || {}).textContent || '',
@@ -2762,10 +2769,10 @@ ok('along the foot, in red and in so many words: not flood modelling',
      && C1.shownCaveat.length === 1 && /^⚠ Not flood modelling/.test(C1.shownCaveat[0])
      && /not a flood map, a flood level or a forecast/.test(C1.caveatText),
    JSON.stringify({ caveat: C1.caveat, shown: C1.shownCaveat }));
-ok('…with MapLibre’s credits, scale bar, zoom and compass standing on it',
-   C1.hasWater && C1.nav && C1.attrib && C1.bar && C1.nav.bottom <= C1.caveat.top + 0.5
-     && C1.attrib.bottom <= C1.caveat.top + 0.5 && C1.bar.bottom <= C1.caveat.top + 0.5,
-   JSON.stringify({ caveat: C1.caveat, nav: C1.nav, attrib: C1.attrib, bar: C1.bar }));
+ok('…with MapLibre’s scale bar, zoom and compass standing on it (its credits are under the map)',
+   C1.hasWater && C1.nav && C1.bar && C1.nav.bottom <= C1.caveat.top + 0.5
+     && C1.bar.bottom <= C1.caveat.top + 0.5,
+   JSON.stringify({ caveat: C1.caveat, nav: C1.nav, bar: C1.bar }));
 const C1mini = await page.evaluate(() => { const r = MapMini.element().getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; });
 ok('…and the minimap standing on it too, with the zoom and compass on the minimap',
    !!C1.caveat && C1mini.bottom <= C1.caveat.top + 0.5 && C1.nav.bottom <= C1mini.top + 0.5,
@@ -2898,6 +2905,38 @@ ok('…from a shut side panel: opened on the 3-D settings, and shut again after 
 await page.evaluate(() => setDockTab('stations'));
 await btn3d.click();
 await tilted3d();
+
+// ── 📍 Find a place's pins, and the rings that stood in the sky ────────────
+// Find a place's pins are Leaflet markers, under this canvas: in 3-D a place
+// gone to moved the camera there and its pin was nowhere to be seen. So they
+// are drawn here as well (map-3d.js, syncPlaces), numbered as in 2-D. And the
+// information locations' dashed rings are placed cooperatively, never
+// "always": an always-shown billboard has no depth in MapLibre, and past the
+// far plane that ends the ground and the circle pins it stood in the sky as a
+// ring with no pin in it. Cooperative placement holds it to MapLibre's own
+// distance cut-off.
+console.log('\nFind a place\'s pins over the 3-D view; no rings past the ground');
+const PL = await page.evaluate(async () => {
+  setDockTab('places', { instant: true });
+  const c = state.map.getCenter();
+  const box = document.getElementById('places-q');
+  box.value = `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;
+  box.dispatchEvent(new Event('input', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 1200));
+  const els = [...document.querySelectorAll('#map3d .mn-place-3d')];
+  const out = { onCanvas: els.map(e => e.dataset.mnPlacePin + ':' + ((e.querySelector('.mn-place-n') || {}).textContent || '')),
+                listed: Places.debug().pins.map(p => p.n) };
+  Places.clearPins({ ask: false });
+  Places.clear(true);
+  out.after = document.querySelectorAll('#map3d .mn-place-3d').length;
+  setDockTab('stations');
+  return out;
+});
+ok('a place gone to in 3-D leaves its numbered pin over the canvas, and Take them all off takes it away',
+   PL.listed.length === 1 && PL.onCanvas.length === 1 && PL.onCanvas[0] === `${PL.listed[0]}:${PL.listed[0]}` && PL.after === 0,
+   JSON.stringify(PL));
+ok('the dashed rings are placed cooperatively, so MapLibre\'s distance cut-off ends them where the ground ends',
+   await page.evaluate(() => Map3D._map().getLayoutProperty('mn-stations-outline-dash', 'icon-overlap')) === 'cooperative');
 
 console.log('\nLeaving the tab takes the WebGL context with it');
 

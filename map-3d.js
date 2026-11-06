@@ -276,6 +276,8 @@ const Map3D = (function () {
   let photoPins = [];    // the field photos' badges: [{ marker, pin }] (syncPhotos)
   let photoKey  = null;  // what they were last built from, so a pan that finds the same photos rebuilds nothing
   let pinMarker = null;  // the move-pin mode's pin, draggable on the terrain (syncMovePin)
+  let placePins = [];    // 📍 Find a place's numbered pins, as ml.Markers (syncPlaces)
+  let placePop  = null;  // …and the callout one of them opened
   let pinDragging = false; // …while a drag of it is under way, when the mode's own echo must not move it
   let drawPins  = [];    // Draw & measure's pins, notes and measurements, as ml.Markers (syncDrawPins)
   let drawKey   = null;  // what they and the `mn-draw` source were last built from
@@ -1168,6 +1170,70 @@ const Map3D = (function () {
     foldCredit();
   }
 
+  // ── The credits, under the map ────────────────────────────────────────
+  // 2-D's credits left the map for the line under it long ago
+  // (mapAttributionBelow, map-controls.js) because a box of them over the
+  // map is in the way of whatever wants that corner. This view's had stayed
+  // on it, in MapLibre's bottom-right corner — which stands on the minimap —
+  // so opened, they were three lines across the middle of the map, over the
+  // ground being looked at. So, while this view is up, the line under the map
+  // carries *its* credits in place of 2-D's (whose layers are under this
+  // canvas and not being looked at): MapLibre's own words, copied as MapLibre
+  // writes them (a MutationObserver on its list, which it rewrites as sources
+  // come and go), and MapLibre's ⓘ put away (`credit-below`, styles.css).
+  // Except while driving: the line is not on screen then (the drive has the
+  // whole panel), and the credits are the ⓘ over the map, folded (foldCredit).
+  let creditObs = null;
+
+  function creditStrip() {
+    const lf = leaflet && leaflet.getContainer && leaflet.getContainer();
+    const after = lf && ((lf.closest && lf.closest('.mn-map-stage')) || lf);
+    const strip = after && after.nextElementSibling;
+    return strip && strip.classList.contains('mn-map-attrib') ? strip : null;
+  }
+
+  function creditBelow() {
+    if (creditObs) { creditObs.disconnect(); creditObs = null; }
+    const inner = host && host.querySelector('.maplibregl-ctrl-attrib-inner');
+    if (inner && typeof MutationObserver === 'function') {
+      creditObs = new MutationObserver(syncCredit);
+      creditObs.observe(inner, { childList: true, subtree: true, characterData: true });
+    }
+    syncCredit();
+  }
+
+  function syncCredit() {
+    const strip = creditStrip();
+    const inner = host && host.querySelector('.maplibregl-ctrl-attrib-inner');
+    const on = !!(strip && map && inner && state.map3d);
+    if (host) host.classList.toggle('credit-below', on);
+    if (!strip) return;
+    let line = strip.querySelector('.mn-map3d-credit');
+    if (!on) {
+      if (line) line.remove();
+      strip.classList.remove('has-3d');
+      return;
+    }
+    if (!line) {
+      line = document.createElement('div');
+      line.className = 'mn-map3d-credit';
+      strip.appendChild(line);
+    }
+    if (line.innerHTML !== inner.innerHTML) line.innerHTML = inner.innerHTML;
+    strip.classList.add('has-3d');
+  }
+
+  function dropCredit() {
+    if (creditObs) { creditObs.disconnect(); creditObs = null; }
+    const strip = creditStrip();
+    if (strip) {
+      const line = strip.querySelector('.mn-map3d-credit');
+      if (line) line.remove();
+      strip.classList.remove('has-3d', 'is-open');
+    }
+    if (host) host.classList.remove('credit-below');
+  }
+
   // The credits, folded to their ⓘ while driving. MapLibre opens them the
   // first time they have anything to say — as the sources load, after the
   // drive has started — and folds them at the first drag, and a drive never
@@ -1271,6 +1337,51 @@ const Map3D = (function () {
     }
     for (const [id, m] of tags) if (!keep.has(id)) { try { m.remove(); } catch (_) {} tags.delete(id); }
     return shown;
+  }
+
+  // ── 📍 Find a place's pins (places.js) ──────────────────────────────────
+  // Leaflet markers, and so under this canvas like every other 2-D pane: with
+  // 3-D on, a place gone to moved the camera there and left its pin out of
+  // sight, which read as a pin that had not landed. So each pin is drawn here
+  // as well — read from Places.pins(), never kept here — as a DOM marker in
+  // 2-D's own markup (the blue 📍 and its number), standing on the terrain,
+  // faded where a hill is in front of it as the photos' badges are. Pressed,
+  // it opens 2-D's callout, the same words and the same ✕ to take it off.
+  const PLACE_COVERED = 0.4;
+
+  function syncPlaces() {
+    for (const m of placePins) { try { m.remove(); } catch (_) {} }
+    placePins = [];
+    if (placePop) { try { placePop.remove(); } catch (_) {} placePop = null; }
+    if (!map || !ready || !ml || typeof Places === 'undefined' || !Places.pins) return;
+    for (const p of Places.pins()) {
+      const el = document.createElement('div');
+      el.className = 'mn-place-icon mn-place-3d';
+      el.innerHTML = p.html;
+      el.title = p.title;
+      el.setAttribute('aria-label', p.title);
+      el.setAttribute('role', 'button');
+      el.tabIndex = 0;
+      el.dataset.mnPlacePin = String(p.n);
+      const press = e => {
+        e.stopPropagation(); e.preventDefault();
+        if (placePop) { try { placePop.remove(); } catch (_) {} }
+        const html = Places.pinPopupHtml(p.n);
+        if (!html) return;
+        // Offset up the pin, so the callout's tip is at the pin's head and
+        // not over the point it marks.
+        placePop = new ml.Popup({ className: 'mn-place-popup', maxWidth: '320px', offset: [0, -26] })
+          .setLngLat([p.lon, p.lat]).setHTML(html).addTo(map);
+        const pop = placePop;
+        pop.on('close', () => { if (placePop === pop) placePop = null; });
+      };
+      el.addEventListener('click', press);
+      el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') press(e); });
+      const marker = new ml.Marker({ element: el, anchor: 'center', opacityWhenCovered: String(PLACE_COVERED) })
+        .setLngLat([p.lon, p.lat]).addTo(map);
+      placePins.push(marker);
+    }
+    standOnGround();
   }
 
   // ── The pin being moved (map-move-pin.js) ───────────────────────────────
@@ -1726,6 +1837,7 @@ const Map3D = (function () {
       for (const m of sitePins) m.setLngLat(m.getLngLat());
       for (const p of photoPins) p.marker.setLngLat(p.marker.getLngLat());
       for (const m of drawPins) m.setLngLat(m.getLngLat());
+      for (const m of placePins) m.setLngLat(m.getLngLat());
       if (pinMarker && !pinDragging) pinMarker.setLngLat(pinMarker.getLngLat());
       if (map.loaded() && !map.isMoving()) { standing = false; return; }
       map.once('render', again);
@@ -2413,10 +2525,23 @@ const Map3D = (function () {
             'circle-stroke-opacity': ['get', 'op'],
             'circle-stroke-opacity-transition': { duration: 0, delay: 0 },
           } },
+        //
+        // "cooperative", not "always" (icon-allow-overlap): MapLibre gives a
+        // symbol it is told to always show no depth at all — a billboarded
+        // icon is drawn at z 0 — so the far plane that ends the terrain and
+        // the circle pins with it never ended these. Tilted towards the
+        // horizon, every information location out past the last of the
+        // ground (853 of them across the state) stood in the sky as a ring
+        // with no pin in it. Placed cooperatively, an icon is held to
+        // placement's own distance cut-off — nothing further than five times
+        // the camera's distance to the middle of the view, where a pin is a
+        // fifth of its size and under a pixel — and to the edge of the
+        // screen. Nothing on this map collides with it: every symbol layer
+        // here ignores placement, so no ring is ever hidden by another.
         { id: 'mn-stations-outline-dash', type: 'symbol', source: 'mn-stations',
           filter: ['!=', ['get', 'dash'], ''],
           layout: { 'icon-image': ['get', 'dash'],
-                    'icon-allow-overlap': true, 'icon-ignore-placement': true },
+                    'icon-overlap': 'cooperative', 'icon-ignore-placement': true },
           paint: { 'icon-opacity': ['get', 'op'],
                    'icon-opacity-transition': { duration: 0, delay: 0 } } },
         { id: 'mn-stations', type: 'circle', source: 'mn-stations',
@@ -3255,6 +3380,8 @@ const Map3D = (function () {
     });
     map.addControl(new ml.NavigationControl({ visualizePitch: true }), 'bottom-right');
     map.addControl(new ml.ScaleControl({ unit: 'metric' }), 'bottom-left');
+    // The credits, in the line under the map rather than over it (creditBelow).
+    creditBelow();
     // The canvas is what takes focus and the keys, and MapLibre names it
     // "Map". Its name says how it is driven, as the twin's canvas does.
     map.getCanvas().setAttribute('aria-label', `Three-dimensional map. ${viewKeyWords()}`);
@@ -3307,6 +3434,8 @@ const Map3D = (function () {
       syncPhotos();
       // And a pin being moved, armed before 3-D was opened.
       syncMovePin();
+      // And the pins Find a place has dropped.
+      syncPlaces();
       // And whatever Draw & measure has on the map, with its tool if armed.
       syncDraw();
       // And the stations' site features, with SiteFeatures asked to look
@@ -4178,6 +4307,18 @@ const Map3D = (function () {
     photosChanged() { syncPhotos(); },
     // The move-pin mode's pin changed: armed, moved, saved or cancelled.
     movePinChanged() { syncMovePin(); },
+    // Find a place dropped a pin, took one off, or drew them all again on a
+    // new 2-D map. Two early returns while 3-D is shut.
+    placesChanged() { syncPlaces(); },
+    // …and wants one's callout open: here, where the 2-D one would be under
+    // this canvas. False while 3-D is shut, so 2-D opens its own.
+    openPlace(n) {
+      if (!map || !ready || !state.map3d) return false;
+      const m = placePins.find(x => x.getElement().dataset.mnPlacePin === String(n));
+      if (!m) return false;
+      m.getElement().click();
+      return true;
+    },
     // Draw & measure drew again (MapDraw.render, setTool), or with `live`
     // only what is being clicked out moved — the ghost, the snap's ring, the
     // profile cursor. Two early returns while 3-D is shut.
@@ -4558,6 +4699,13 @@ const Map3D = (function () {
     if (pinMarker) { try { pinMarker.remove(); } catch (_) {} }
     pinMarker = null;
     pinDragging = false;
+    // And Find a place's pins, which stay its own and come back with the next map.
+    for (const m of placePins) { try { m.remove(); } catch (_) {} }
+    placePins = [];
+    if (placePop) { try { placePop.remove(); } catch (_) {} }
+    placePop = null;
+    // And the credits, which the line under the map gives back to 2-D's.
+    dropCredit();
     // And Draw & measure's markers; its shapes are in state and come back
     // with the next map.
     dropDraw();

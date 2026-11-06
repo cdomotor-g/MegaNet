@@ -592,8 +592,12 @@ try {
   await page.click('.places-clear');
   await page.waitForTimeout(200);
   const cleared = await page.evaluate(() => ({ popup: window.__popupText(), pin: document.querySelectorAll('.mn-place-icon').length }));
-  check('✕ in Find a place takes the pin and the mark’s callout away together',
-    cleared.popup === null && cleared.pin === 0, JSON.stringify(cleared));
+  check('✕ in Find a place takes the mark’s callout away and leaves its numbered pin',
+    cleared.popup === null && cleared.pin === 1, JSON.stringify(cleared));
+  await page.evaluate(() => Places.clearPins({ ask: false }));
+  await page.waitForTimeout(100);
+  check('…which goes with the rest when they are all taken off',
+    await page.evaluate(() => document.querySelectorAll('.mn-place-icon').length === 0));
 
   await page.fill('#places-q', 'bcc12419');
   await page.waitForSelector('section[aria-labelledby="places-g-mark"] .places-hit', { timeout: 10_000 });

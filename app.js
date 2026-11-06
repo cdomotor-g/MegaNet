@@ -5234,7 +5234,8 @@ function clearStationsMapMarks() {
 // clicked and the river selected, puts the map's cards away, and takes off
 // everything drawn on top of the stations — the drawings (a clicked link is
 // one), the link budget's ends, the polar plot, the site finders' answers, the
-// found place's pin. The map stays where it is, zoomed where it was, filtered
+// found place's outline (its numbered pins are Find a place's own, and stay).
+// The map stays where it is, zoomed where it was, filtered
 // as it was.
 //
 // The station in Station details goes the way a second click on its row puts
