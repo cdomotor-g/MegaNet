@@ -8432,6 +8432,7 @@ body .map-panel.is-driving {
 .rl-end {
   flex: 1 1 19rem;
   min-width: 0;
+  container-type: inline-size;
   padding: .5rem .65rem .4rem;
   box-shadow: inset -1px 0 0 var(--border), inset 0 -1px 0 var(--border);
 }
@@ -8497,6 +8498,67 @@ body .map-panel.is-driving {
   text-align: right;
   white-space: nowrap;
 }
+/* A narrow end — a phone, or a side panel dragged thin — has no room for three
+   columns: the second figure goes under the first, so neither is broken a
+   letter at a time. */
+@container (max-width: 22rem) {
+  .rl-end-rows > div { grid-template-columns: minmax(6.5rem, 42%) minmax(0, 1fr); }
+  .rl-end-rows dd.rl-v2 { grid-column: 2; text-align: left; font-size: .8rem; color: var(--muted); }
+}
+
+/* A figure of your own: a row that opens the box (PathProfile.editEnd) takes
+   the press anywhere on it, and its figure is a button that reads as the
+   figure it was — the window still reads as Radio Mobile's. The cue is on
+   hover and focus, and the line under the two ends says so for a finger. */
+.rl-end-rows > div.is-edit { cursor: pointer; border-radius: 3px; }
+.rl-end-rows > div.is-edit:hover { background: var(--subtle); }
+.rl-edit {
+  position: relative;
+  font: inherit;
+  font-weight: 700;
+  line-height: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-bottom: 1px dashed transparent;
+  border-radius: 0;
+  padding: 0;
+  min-height: 0;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+/* Out of the flow, so the pencil takes no room until it shows. */
+.rl-edit::after { content: '✎'; position: absolute; left: 100%; padding-left: .3em; font-weight: 400; color: var(--accent); opacity: 0; pointer-events: none; }
+.rl-end-rows > div.is-edit:hover .rl-edit,
+.rl-edit:hover,
+.rl-edit:focus-visible { color: var(--accent); border-bottom-color: currentColor; }
+.rl-end-rows > div.is-edit:hover .rl-edit::after,
+.rl-edit:hover::after,
+.rl-edit:focus-visible::after { opacity: 1; }
+.rl-edit-hint {
+  margin: 0;
+  padding: .3rem .65rem;
+  font-size: .78rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+/* The box itself: a label, the figure and its unit on a line, and what the
+   station's own figure is under it. */
+.rl-e-form { gap: .55rem; }
+.rl-e-field {
+  display: grid;
+  grid-template-columns: minmax(7rem, 36%) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .15rem .5rem;
+  font-size: .9rem;
+}
+.rl-e-field > span:first-child { color: var(--muted); }
+.rl-e-field input, .rl-e-field select { font-size: 1rem; min-width: 0; width: 100%; }
+.rl-e-sys { grid-template-columns: minmax(7rem, 36%) minmax(0, 1fr); }
+.rl-e-unit { font-size: .82rem; font-weight: 400; color: var(--muted); }
+.rl-e-own { grid-column: 2 / -1; font-size: .78rem; color: var(--muted); }
+.rl-e-preview { margin: 0; color: var(--text); }
 
 /* The foot: the net and the frequency, the settings, what Radio Mobile
    should read. */

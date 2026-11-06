@@ -5205,7 +5205,16 @@ three rows of five figures, the chart, the transmitter and the receiver, the
 net, the frequency and the settings — and reflows with the pane: cells wrap,
 and the receiver goes under the transmitter when there is no room beside it.
 Each end's name has the link budget's search box under it, so another station
-is picked there. A bar over the cards keeps 🗒️ *Copy like RM* (the window as a
+is picked there. Every figure in TX and RX is a button, and so is the frequency:
+press one and a box comes up over the card with that end's figures in it (A's
+TX power, line loss, antenna gain and height; B's antenna gain, line loss, Rx
+sensitivity and height), the one pressed under the caret, the station's own
+figure under each box, a list of radio systems to start from, and the radiated
+power or the required E field worked out as you type. What is typed is the
+site's own override for the session (`state.radio`), the same one the boxes
+under *More about this path* and the link budget write, so every card prices
+from it; *Back to its own figures* takes it off. A point on the ground has no
+radio, so only its antenna height is offered. A bar over the cards keeps 🗒️ *Copy like RM* (the window as a
 picture) and 📄 *Copy for a report* (the window as a document, with every
 figure behind the margin under it) at the top of the pane as it scrolls. Under the map it goes back into the column
 between the list and *Repeaters listening*, where the render emitted it. `#stations-main.is-split` then

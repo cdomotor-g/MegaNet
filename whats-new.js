@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 233, date: '2026-11-06', items: [
+      '✎ <strong>Type your own figures straight into the radio link.</strong> In 〽️ Radio link, press any figure '
+        + 'under TX or RX — TX power, line loss, antenna gain, antenna height, Rx sensitivity — or the frequency: a box '
+        + 'comes up with that end\'s figures, the station\'s own under each, and the radiated power or required E field '
+        + 'worked out as you type. <em>Use these figures</em> and the fade margin, the signal meters and the link budget '
+        + 'all follow; a figure you typed is marked ✎, and <em>Back to its own figures</em> puts the station\'s back. '
+        + 'They last until the page is reloaded and never change the station\'s record. On a phone the two figures '
+        + 'on a row now sit one under the other instead of being squeezed.',
+    ] },
     { n: 232, date: '2026-11-06', items: [
       '〽️ <strong>Path tools is now Radio link, and it looks like Radio Mobile\'s Radio Link window.</strong> Its top '
         + 'is the path and its fade margin in a dark band, Radio Mobile\'s three rows of figures, the elevation profile, '

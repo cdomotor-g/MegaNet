@@ -2751,6 +2751,226 @@ const PathProfile = (function () {
     return `<div class="rl-win rl-win-bare"><div class="rl-ends">${end('a', 'TX', a)}${end('b', 'RX', b)}</div></div>`;
   }
 
+  // ── a figure of your own, from the window ──
+  // Every row of TX and RX the fade margin is worked from is a button: press
+  // it and a box comes up over the card with that end's figures in it, the
+  // one pressed under the caret. What is typed goes where the boxes under
+  // "More about this path" and the link budget's put it — the site's own
+  // overrides in state.radio (writeRadio) — so it is the figure every card
+  // prices that station at, for the session, and blanking a box, or "Back to
+  // its own figures", gives the station's radio system back. The rows worked
+  // out from others (Radiated power, Required E field) open the box on the
+  // figure that moves them, and the system's name on a list of the other
+  // systems, to start from one. A point on the ground has no radio, so only
+  // its antenna height is offered. The frequency in the foot is a button too.
+
+  // The window's row → the figure it opens on.
+  const RL_EDIT = {
+    'Tx power': 'tx_w', 'Line loss': 'loss_db', 'Antenna gain': 'gain_dbi', 'Antenna height': 'agl_m',
+    'Rx sensitivity': 'rx_dbm', 'Radiated power': 'tx_w', 'Required E field': 'rx_dbm',
+    'Tx system name': 'sys', 'Rx system name': 'sys',
+  };
+  // What each end's box offers: the figures the window shows at that end. The
+  // margin is A → B, so A's receiver and B's transmitter move nothing here
+  // (⇄ Flip direction swaps the two).
+  const RL_FIELDS = { A: ['tx_w', 'loss_db', 'gain_dbi', 'agl_m'], B: ['gain_dbi', 'loss_db', 'rx_dbm', 'agl_m'] };
+  const RL_FIELD = {
+    tx_w:     { label: 'TX power', unit: 'W', step: '0.1', min: '0.001' },
+    loss_db:  { label: 'Line loss', unit: 'dB', step: '0.1', min: '0' },
+    gain_dbi: { label: 'Antenna gain', unit: 'dBi', step: '0.05' },
+    rx_dbm:   { label: 'Rx sensitivity', unit: 'dBm', step: '0.5', max: '0' },
+    agl_m:    { label: 'Antenna height', unit: 'm AGL', step: '0.5', min: '0' },
+  };
+  const RL_WHY = {
+    'Radiated power': 'Worked out from the TX power, the line loss and the antenna gain — press to change those',
+    'Required E field': 'Worked out from the Rx sensitivity, the antenna gain and the line loss — press to change those',
+    'Tx system name': 'Start from another radio system\'s figures, or type your own',
+    'Rx system name': 'Start from another radio system\'s figures, or type your own',
+  };
+
+  function rlEditable(e, k) { return !!k && (k === 'agl_m' || e.isStation); }
+
+  // A figure as a box shows it: no float dust (0.1 + 0.2), nothing for none.
+  const rlNum = v => (v == null || !isFinite(v) ? '' : String(+Number(v).toFixed(4)));
+
+  function rlEndOf(which) {
+    const sh = target();
+    return sh ? endpoint(sh, which === 'B' ? 1 : 0) : null;
+  }
+
+  // What the box's figures would make of the rows worked out from them.
+  function rlPreview(which, v, fMhz) {
+    const has = (...xs) => xs.every(x => x != null && isFinite(x));
+    if (which === 'A') {
+      const tx = v.tx_w > 0 ? wattsToDbm(v.tx_w) : null;
+      if (!has(tx, v.gain_dbi, v.loss_db)) return 'Radiated power: — (it needs the TX power, line loss and antenna gain)';
+      const eirp = tx + v.gain_dbi - v.loss_db;
+      return `Radiated power: EIRP ${fmtW(wattsOf(eirp))} · ERP ${fmtW(wattsOf(eirp - LB_DIPOLE_DBI))}`;
+    }
+    if (!has(v.rx_dbm, v.gain_dbi, v.loss_db)) return 'Required E field: — (it needs the Rx sensitivity, antenna gain and line loss)';
+    return `Rx sensitivity ${uvOf(v.rx_dbm)} · Required E field ${fx(eFieldOf(v.rx_dbm - v.gain_dbi + v.loss_db, fMhz), 1, 'dBµV/m')}`;
+  }
+
+  function editEnd(which, focusK) {
+    const e = rlEndOf(which);
+    if (!e) return;
+    const fields = e.isStation ? RL_FIELDS[which] : ['agl_m'];
+    const fMhz = shown && shown.rep ? shown.rep.an.fMhz : radioFreq(e.station, null);
+    const own = k => (e.def[k] == null ? 'none on file' : `${rlNum(e.def[k])} ${RL_FIELD[k].unit}`);
+    const from = e.isStation ? (e.sys ? `its own, ${e.sys.name}` : 'none on file') : 'the default';
+    const box = k => {
+      const F = RL_FIELD[k];
+      return `
+        <label class="rl-e-field">
+          <span>${esc(F.label)}</span>
+          <input type="number" id="rl-e-${k}" data-k="${k}" step="${F.step}"${F.min ? ` min="${F.min}"` : ''}${F.max ? ` max="${F.max}"` : ''}
+                 value="${rlNum(radioVal(e.key, e.def, k))}" placeholder="${escAttr(rlNum(e.def[k]) || 'not set')}">
+          <b class="rl-e-unit">${esc(F.unit)}</b>
+          <span class="rl-e-own">${radioIsOver(e.key, k) ? '✎ yours · ' : ''}${esc(e.isStation && e.sys ? 'its own' : 'default')}: ${esc(own(k))}</span>
+        </label>`;
+    };
+    const systems = e.isStation ? ((state.data && state.data.rm_systems) || []) : [];
+    const pick = systems.length ? `
+        <label class="rl-e-field rl-e-sys">
+          <span>Start from</span>
+          <select id="rl-e-sys">
+            <option value="">The figures below</option>
+            ${systems.map(r => `<option value="${escAttr(String(r.id))}">${esc(r.name)}${e.sys && r.id === e.sys.id ? ' — its own' : ''}</option>`).join('')}
+          </select>
+        </label>` : '';
+    Modal.ask({
+      title: `${which === 'A' ? 'TX' : 'RX'} — ${e.name}`,
+      role: 'dialog',
+      describedBy: 'rl-e-desc',
+      html: `
+        <p id="rl-e-desc" class="ask-text">${e.isStation
+          ? `Type your own figures over ${esc(e.name)}'s (${esc(from)}). Leave a box blank for its own figure.`
+          : 'A point on the ground has no radio, so its antenna height is the one figure to set. Leave it blank for the default.'}</p>
+        <form class="ask-form rl-e-form" novalidate>
+          ${pick}
+          ${fields.map(box).join('')}
+          <p class="small rl-e-preview" id="rl-e-preview" aria-live="polite"></p>
+          <p class="small txt-bad" id="rl-e-err" role="alert" hidden></p>
+          <p class="filter-hint">For this session, and shared: the link budget and every path with ${esc(e.name)} at either end
+            price from the same figures. Nothing is saved to the station's record.</p>
+          <div class="modal-foot">
+            <button type="button" data-ask="own"${fields.some(k => radioIsOver(e.key, k)) ? '' : ' disabled'}>Back to its own figures</button>
+            <button type="button" data-ask="no">Cancel</button>
+            <button type="submit" class="primary">Use these figures</button>
+          </div>
+        </form>`,
+      focus: focusK === 'sys' ? '#rl-e-sys' : `#rl-e-${fields.includes(focusK) ? focusK : fields[0]}`,
+      wire: (card, answer) => {
+        const input = k => card.querySelector(`#rl-e-${k}`);
+        const read = () => Object.fromEntries(fields.map(k => {
+          const s = input(k).value.trim();
+          return [k, s === '' ? e.def[k] : Number(s)];
+        }));
+        const preview = () => {
+          const p = card.querySelector('#rl-e-preview');
+          if (p) p.textContent = e.isStation ? rlPreview(which, read(), fMhz) : '';
+        };
+        preview();
+        card.querySelectorAll('input[data-k]').forEach(i => i.addEventListener('input', preview));
+        const sel = card.querySelector('#rl-e-sys');
+        if (sel) {
+          sel.addEventListener('change', () => {
+            const sys = systems.find(r => String(r.id) === sel.value);
+            if (!sys) return;
+            const vals = { tx_w: sys.tx_power_w, loss_db: sys.line_loss_db, gain_dbi: sys.antenna_gain_dbi,
+                           rx_dbm: sys.rx_threshold_dbm, agl_m: stationAntenna(e.station, sys).agl };
+            for (const k of fields) input(k).value = rlNum(vals[k]);
+            preview();
+          });
+        }
+        card.querySelector('[data-ask="no"]').addEventListener('click', () => answer(undefined));
+        card.querySelector('[data-ask="own"]').addEventListener('click', () => answer({ own: true }));
+        card.querySelector('form').addEventListener('submit', ev => {
+          ev.preventDefault();
+          const out = {}, bad = [];
+          for (const k of fields) {
+            const s = input(k).value.trim();
+            const n = s === '' ? null : Number(s);
+            if (n != null && !isFinite(n)) bad.push(`${RL_FIELD[k].label} is not a number.`);
+            else if (k === 'tx_w' && n != null && !(n > 0)) bad.push('TX power has to be more than 0 W.');
+            else if (k === 'agl_m' && n != null && n < 0) bad.push('Antenna height cannot be below the ground.');
+            else out[k] = n;
+          }
+          const err = card.querySelector('#rl-e-err');
+          if (bad.length) { err.textContent = bad.join(' '); err.hidden = false; return; }
+          answer({ vals: out });
+        });
+      },
+      // Told once focus is back on the row that opened it, so the repaint
+      // after the write puts it back there (rerender, by the row's id).
+      done: v => {
+        if (!v) return;
+        const o = radioOver(e.key);
+        for (const k of fields) {
+          const n = v.own ? null : v.vals[k];
+          // The station's own figure typed back in is the station's own, not
+          // an override of it: no ✎ for a figure nobody changed.
+          if (n == null || (e.def[k] != null && Math.abs(n - e.def[k]) < 1e-9)) delete o[k]; else o[k] = n;
+        }
+        radioChanged();
+        // The page's announcer — this file's own announce() is the profile's
+        // news to the other cards.
+        if (typeof window.announce === 'function') window.announce(v.own ? `${e.name} is back on its own figures.` : `${e.name}'s figures changed.`);
+      },
+    });
+  }
+
+  // The frequency in the foot: one for every card, as the box under "More
+  // about this path" sets it (setFreq). Blank, or "Back to the default", is
+  // the repeater on either end, else the network's band.
+  function editFreq() {
+    const sh = target();
+    if (!sh) return;
+    const a = endpoint(sh, 0), b = endpoint(sh, 1);
+    const rep = [a.station, b.station].map(st => st && st.repeater && st.repeater.rx_mhz > 0 ? st.repeater.rx_mhz : null).find(Boolean);
+    const def = rep || PATH_DEFAULT_MHZ;
+    const now = state.radio.freqMhz > 0 ? state.radio.freqMhz : def;
+    Modal.ask({
+      title: 'Frequency',
+      role: 'dialog',
+      describedBy: 'rl-e-desc',
+      html: `
+        <p id="rl-e-desc" class="ask-text">The frequency every card prices this path at. Leave it blank for the default:
+          ${esc(rlNum(def))} MHz, ${rep ? 'the repeater\'s channel' : 'the network\'s band'}.</p>
+        <form class="ask-form rl-e-form" novalidate>
+          <label class="rl-e-field">
+            <span>Frequency</span>
+            <input type="number" id="rl-e-freq" step="0.0125" min="1" value="${rlNum(now)}" placeholder="${escAttr(rlNum(def))}">
+            <b class="rl-e-unit">MHz</b>
+          </label>
+          <p class="small txt-bad" id="rl-e-err" role="alert" hidden></p>
+          <p class="filter-hint">For this session, and shared with the link budget.</p>
+          <div class="modal-foot">
+            <button type="button" data-ask="own"${state.radio.freqMhz != null ? '' : ' disabled'}>Back to the default</button>
+            <button type="button" data-ask="no">Cancel</button>
+            <button type="submit" class="primary">Use this frequency</button>
+          </div>
+        </form>`,
+      focus: '#rl-e-freq',
+      wire: (card, answer) => {
+        card.querySelector('[data-ask="no"]').addEventListener('click', () => answer(undefined));
+        card.querySelector('[data-ask="own"]').addEventListener('click', () => answer({ v: '' }));
+        card.querySelector('form').addEventListener('submit', ev => {
+          ev.preventDefault();
+          const s = card.querySelector('#rl-e-freq').value.trim();
+          if (s !== '' && !(Number(s) > 0)) {
+            const err = card.querySelector('#rl-e-err');
+            err.textContent = 'The frequency has to be a number of MHz above 0.';
+            err.hidden = false;
+            return;
+          }
+          answer({ v: s !== '' && Math.abs(Number(s) - def) < 1e-9 ? '' : s });
+        });
+      },
+      done: v => { if (v) PathProfile.setFreq(v.v); },
+    });
+  }
+
   function rlWindowHtml(rep) {
     const S = compactOf(rep);
     const words = new Map(rlWords());
@@ -2770,6 +2990,17 @@ const PathProfile = (function () {
     };
     const grid = `<div class="rl-grid" data-tour="path-rl-figures">${
       S.grid.map(r => `<div class="rl-row">${r.map(cell).join('')}</div>`).join('')}</div>`;
+    // A row that opens the box (editEnd) is a button in its figure's place,
+    // and the whole row takes the press: a label is as likely to be aimed at.
+    const row = (W, E) => ([k, v1, v2]) => {
+      const f = rlEditable(E, RL_EDIT[k]) ? RL_EDIT[k] : null;
+      const id = `rl-edit-${W}-${k.toLowerCase().replace(/[^a-z]+/g, '-')}`;
+      const tip = RL_WHY[k] || `Type your own ${f ? RL_FIELD[f].label : k} for ${E.name} — for this card, the link budget and every path with it`;
+      const val = f ? `<button type="button" class="rl-edit" id="${id}" title="${escAttr(tip)}">${esc(v1)}</button>` : esc(v1);
+      return `
+          <div${f ? ` class="is-edit" onclick="PathProfile.editEnd('${W}', '${f}')"` : ''}><dt>${termHtml(k, mean(k))}</dt><dd>${val}</dd>${
+            v2 ? `<dd class="rl-v2">${esc(v2)}</dd>` : ''}</div>`;
+    };
     const end = (which, tag, P) => `
       <section class="rl-end" aria-label="${tag === 'TX' ? 'Transmitter' : 'Receiver'} — end ${which.toUpperCase()}">
         <div class="rl-end-head">
@@ -2780,8 +3011,7 @@ const PathProfile = (function () {
         </div>
         ${rlMeterHtml(P.meter)}
         ${findHostHtml(which)}
-        <dl class="rl-end-rows">${P.rows.map(([k, v1, v2]) => `
-          <div><dt>${termHtml(k, mean(k))}</dt><dd>${esc(v1)}</dd>${v2 ? `<dd class="rl-v2">${esc(v2)}</dd>` : ''}</div>`).join('')}
+        <dl class="rl-end-rows">${P.rows.map(row(which.toUpperCase(), which === 'a' ? rep.a : rep.b)).join('')}
         </dl>
       </section>`;
     const rmLine = S.rm == null ? ''
@@ -2792,7 +3022,8 @@ const PathProfile = (function () {
       <div class="rl-foot">
         <p class="rl-netfreq">
           <span><span class="rl-kick">Net</span> <b>${esc(S.net)}</b></span>
-          <span><span class="rl-kick">Frequency</span> <b>${esc(S.freq[0])}</b> <span class="rl-faint">${esc(S.freq[1])}</span></span>
+          <span><span class="rl-kick">Frequency</span> <button type="button" class="rl-edit" id="rl-edit-freq" onclick="PathProfile.editFreq()"
+            title="Type your own frequency — for this card and the link budget">${esc(S.freq[0])}</button> <span class="rl-faint">${esc(S.freq[1])}</span></span>
         </p>
         <p class="rl-settings">${S.settings.map(([k, v]) =>
           `<span>${termHtml(k, mean(k))} <b>${esc(v)}</b></span>`).join(' · ')}</p>
@@ -2809,6 +3040,7 @@ const PathProfile = (function () {
         ${shown.warn}
         ${chart}
         <div class="rl-ends">${end('a', 'TX', S.tx)}${end('b', 'RX', S.rx)}</div>
+        <p class="rl-edit-hint">✎ Press a figure in TX or RX, or the frequency, to type your own.</p>
         ${foot}
       </div>`;
   }
@@ -4502,6 +4734,10 @@ const PathProfile = (function () {
       if (sh) radioCommit(writeRadio, endpoint(sh, which === 'B' ? 1 : 0).key, k, v);
     },
     setAgl(which, v) { PathProfile.setRadio(which, 'agl_m', v); },
+    // The radio link window's rows and its frequency, pressed: a box over the
+    // card to type a figure of your own ("a figure of your own, from the window").
+    editEnd,
+    editFreq,
     // The frequency, which is one for every card, as the radio figures are.
     setFreq(v) {
       const n = Number(v);

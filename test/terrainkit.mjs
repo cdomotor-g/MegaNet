@@ -1105,6 +1105,66 @@ if (shared && shared.tagA === 'A') {
        && af.pathTx === b0.pathTx && af.pathFlag !== 'edited', JSON.stringify(af));
 }
 
+// A figure of your own, from the radio link window: a row of TX or RX is a
+// button, and a real press on it opens a box over the card on that end's
+// figures, the one pressed under the caret. Twice A's TX power, typed and
+// Entered, is +3.01 dB on the profile's margin and on the budget's — the same
+// overrides the boxes under the window write — and the row says ✎, with focus
+// back on it. Required E field opens B's box on its Rx sensitivity; Cancel
+// changes nothing; "Back to its own figures" puts the station's back; the
+// frequency in the foot opens a box of its own.
+const rlOpen = async sel => {
+  await page.locator(sel).click();
+  await page.waitForSelector('#app-ask .rl-e-form', { timeout: 5000 }).catch(() => {});
+  return page.evaluate(() => ({
+    title: document.getElementById('app-ask-title')?.textContent || '',
+    focus: document.activeElement ? document.activeElement.id : '',
+    boxes: [...document.querySelectorAll('#app-ask input[data-k]')].map(i => i.dataset.k),
+    preview: document.getElementById('rl-e-preview')?.textContent || '',
+  }));
+};
+const rlMargins = () => page.evaluate(() => ({ prof: (PathProfile.shownMargin() || {}).margin, budget: LinkBudget.current().margin }));
+const rlWait = () => page.waitForFunction(() => !document.querySelector('#app-ask .rl-e-form')
+  && !!document.querySelector('#path-profile-panel .rl-end-rows .rl-edit'), null, { timeout: 15000 }).catch(() => {});
+if (shared && shared.tagA === 'A') {
+  await page.waitForSelector('#rl-edit-A-tx-power', { timeout: 20000 }).catch(() => {});
+  const rl0 = await rlMargins();
+  const txBox = await rlOpen('#rl-edit-A-tx-power');
+  ok('pressing TX power in the radio link window opens A\'s figures in a box, TX power under the caret',
+     /^TX — /.test(txBox.title) && txBox.focus === 'rl-e-tx_w' && txBox.boxes.join() === 'tx_w,loss_db,gain_dbi,agl_m'
+       && /EIRP .* W · ERP .* W/.test(txBox.preview), JSON.stringify(txBox));
+  await page.fill('#rl-e-tx_w', String(shared.base * 2));
+  await page.keyboard.press('Enter');
+  await rlWait();
+  const rl1 = await rlMargins();
+  const rlRow = await page.evaluate(() => ({ text: document.getElementById('rl-edit-A-tx-power')?.textContent || '',
+                                             focus: document.activeElement ? document.activeElement.id : '' }));
+  const near = (x, y) => x != null && y != null && Math.abs(x - y) < 0.01;
+  ok('…twice the power, Entered, is +3.01 dB on the profile\'s margin and on the budget\'s',
+     near(rl1.prof - rl0.prof, 10 * Math.log10(2)) && near(rl1.budget - rl0.budget, 10 * Math.log10(2)), JSON.stringify({ rl0, rl1 }));
+  ok('…the row shows the new figure marked ✎, and focus is back on it',
+     rlRow.text.includes(`${shared.base * 2} W`) && /✎/.test(rlRow.text) && rlRow.focus === 'rl-edit-A-tx-power', JSON.stringify(rlRow));
+  const eBox = await rlOpen('#rl-edit-B-required-e-field');
+  ok('Required E field opens B\'s figures on its Rx sensitivity',
+     /^RX — /.test(eBox.title) && eBox.focus === 'rl-e-rx_dbm' && eBox.boxes.join() === 'gain_dbi,loss_db,rx_dbm,agl_m'
+       && /Required E field .* dBµV\/m/.test(eBox.preview), JSON.stringify(eBox));
+  await page.fill('#rl-e-rx_dbm', '-80');
+  await page.locator('#app-ask [data-ask="no"]').click();
+  await rlWait();
+  ok('…and Cancel changes nothing', near((await rlMargins()).prof, rl1.prof));
+  await rlOpen('#rl-edit-A-tx-power');
+  await page.locator('#app-ask [data-ask="own"]').click();
+  await rlWait();
+  const rl2 = await rlMargins();
+  const rlBack = await page.evaluate(() => document.getElementById('rl-edit-A-tx-power')?.textContent || '');
+  ok('"Back to its own figures" puts the station\'s own TX power back, on both cards',
+     near(rl2.prof, rl0.prof) && near(rl2.budget, rl0.budget) && !/✎/.test(rlBack), JSON.stringify({ rl0, rl2, rlBack }));
+  const fBox = await rlOpen('#rl-edit-freq');
+  ok('the frequency in the foot opens a box of its own', fBox.title === 'Frequency' && fBox.focus === 'rl-e-freq', JSON.stringify(fBox));
+  await page.keyboard.press('Escape');
+  await rlWait();
+}
+
 // 📋 Copy for a report. What it carries is written from one list of rows, so
 // it is held as rows: the fade margin the card quotes, a budget column that
 // adds up to it term by term, the two ends where they are, every setting
