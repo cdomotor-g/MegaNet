@@ -507,6 +507,54 @@ try {
   check('…which its own ✕ in the list takes off the map', await page.evaluate(() =>
     document.querySelectorAll('.mn-place').length === 0 && !document.querySelector('#places-pins .places-pin-row')));
 
+  // 📍 Tap the map to drop pins: a mode the banner over the map names, each
+  // click on the map a numbered pin where it landed, Escape out of it — and ↺
+  // takes every pin off with the rest of what it clears. Over open sea, so no
+  // station pin or link is under the clicks.
+  const viewWas = await page.evaluate(() => ({ c: state.map.getCenter(), z: state.map.getZoom() }));
+  await page.evaluate(() => state.map.setView([-23.2, 155.6], 9, { animate: false }));
+  await page.waitForTimeout(300);
+  await page.click('#places-drop');
+  await page.waitForTimeout(200);
+  const armedDrop = await page.evaluate(() => ({ dropping: Places.debug().dropping, banner: MapMode.shown(),
+    pressed: document.getElementById('places-drop').getAttribute('aria-pressed') }));
+  check('Tap the map to drop pins turns on, pressed, and the banner over the map names it',
+    armedDrop.dropping === true && armedDrop.pressed === 'true' && armedDrop.banner.includes('places'), JSON.stringify(armedDrop));
+  const mb = await page.locator('#leaflet-map').boundingBox();
+  const spots = [[0.42, 0.55], [0.58, 0.55]].map(([fx, fy]) => [mb.x + mb.width * fx, mb.y + mb.height * fy]);
+  const want = [];
+  for (const [x, y] of spots) {
+    want.push(await page.evaluate(([px, py]) => {
+      const r = state.map.getContainer().getBoundingClientRect();
+      const ll = state.map.containerPointToLatLng([px - r.left, py - r.top]);
+      return [ll.lat, ll.lng];
+    }, [x, y]));
+    await page.mouse.click(x, y);
+    await page.waitForTimeout(250);
+  }
+  const dropped = await page.evaluate(() => ({ pins: Places.debug().pins, drawn: document.querySelectorAll('.mn-place-n').length,
+    z: state.map.getZoom() }));
+  // Within two pixels of the spot clicked: a mouse lands on a whole pixel,
+  // and at zoom 9 a pixel is a quarter of a kilometre.
+  const tol = 2 * 360 / (256 * 2 ** dropped.z);
+  const close = (p, w) => !!p && Math.abs(p.lat - w[0]) < tol && Math.abs(p.lon - w[1]) < tol;
+  check('…and each click on the map leaves a numbered pin where it landed, the map left where it was',
+    dropped.pins.length === 2 && dropped.drawn === 2 && dropped.pins.map(p => p.n).join() === '1,2'
+      && close(dropped.pins[0], want[0]) && close(dropped.pins[1], want[1]),
+    JSON.stringify({ dropped, want }));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  check('Escape stops it, and the banner goes', await page.evaluate(() =>
+    !Places.debug().dropping && !MapMode.shown().includes('places')
+      && document.getElementById('places-drop').getAttribute('aria-pressed') === 'false'));
+  await page.click('.mn-map-reset');
+  await page.waitForTimeout(400);
+  check('↺ takes every pin off the map and out of the list', await page.evaluate(() =>
+    Places.debug().pins.length === 0 && document.querySelectorAll('.mn-place').length === 0
+      && !document.querySelector('#places-pins .places-pin-row')));
+  await page.evaluate(v => state.map.setView([v.c.lat, v.c.lng], v.z, { animate: false }), viewWas);
+  await page.waitForTimeout(300);
+
   // ── 8. Find a control, measured on screen ────────────────────────────────
   // getClientRects(), never el.hidden: see the header. A row with the
   // attribute set and `display: flex` still on it is a row that is on screen.

@@ -388,6 +388,7 @@ const MapMovePin = (function () {
     if (state.draw && state.draw.tool) MapDraw.setTool('');
     LinkBudget.setPicking(false);
     if (typeof MapHere !== 'undefined' && MapHere.armed && MapHere.armed()) MapHere.arm(false);
+    if (typeof Places !== 'undefined' && Places.dropping && Places.dropping()) Places.arm(false);
 
     // The coordinates are edited in the card, so the card has to be on this
     // station: Save writes into its boxes, and an operator who cannot see the

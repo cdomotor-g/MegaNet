@@ -790,6 +790,8 @@ const MapDraw = (function () {
     cancelPending();
     snapCache = null;                 // the pins may have been rebuilt since
     D_.tool = D_.tool === tool ? '' : tool;
+    // Find a place's Tap the map to drop pins answers the same click.
+    if (D_.tool && typeof Places !== 'undefined' && Places.dropping && Places.dropping()) Places.arm(false);
     if (map) {
       // While a tool is armed, clicks have to reach the map: station pins and
       // ACMA squares would otherwise swallow the one near the site you are

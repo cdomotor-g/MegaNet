@@ -8,7 +8,7 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for `state` and esc; across, at runtime only, to the
 // modules whose modes it names (MapDraw, MapMovePin, SiteFeatures, LinkBudget,
-// MapHere, MapBestRepeater, MapDrive) through their public functions, and to
+// MapHere, Places, MapBestRepeater, MapDrive) through their public functions, and to
 // modal.js's #app-modal. Nothing executes at load (`npm run toplevel`).
 // initMap() attaches it, stopStationsMap() detaches it, and each of those
 // modules calls MapMode.sync() where its mode goes on or off.
@@ -138,6 +138,14 @@ const MapMode = (function () {
         return { icon: 'ℹ️', title: 'What’s here?', how: 'click the map to see what’s known about that spot.' };
       },
       leave() { MapHere.arm(false); },
+    },
+    {
+      key: 'places', own: false,
+      on() {
+        if (!Places.dropping()) return null;
+        return { icon: '📍', title: 'Dropping pins', how: 'each click or tap on the map leaves a numbered pin there; station pins still open.' };
+      },
+      leave() { Places.arm(false); },
     },
     {
       key: 'bestrep', own: false,

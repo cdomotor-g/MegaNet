@@ -1445,6 +1445,8 @@ const LinkBudget = (function () {
     },
     setPicking(v) {
       S().picking = !!v;
+      // Find a place's Tap the map to drop pins answers the same click.
+      if (v && typeof Places !== 'undefined' && Places.dropping && Places.dropping()) Places.arm(false);
       // Disarming the map disarms the end that was waiting on it: an armed end
       // that no longer answers clicks is a card claiming a mode it does not
       // have. MapMovePin calls this on its way in for exactly that reason.

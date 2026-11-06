@@ -5190,6 +5190,7 @@ function clearStationsMapMarks() {
   try_(() => { if (state.draw.tool) MapDraw.setTool(''); });
   try_(() => { if (MapMovePin.armed()) MapMovePin.cancel(); });
   try_(() => LinkBudget.setPicking(false));
+  try_(() => { if (Places.dropping()) Places.arm(false); });
 
   // 2. The cards on the map, and the radio path on the profile card at the
   //    head of the path tools. `false` on the three that take it: nothing is
@@ -5217,7 +5218,8 @@ function clearStationsMapMarks() {
   try_(() => MapBestRepeater.clear());
   try_(() => MapHops.clear({ quiet: true }));
   try_(() => MapSpider.reset());
-  try_(() => Places.clearMark());
+  // Find a place's outline and every pin it dropped, as ↺ always took its pin.
+  try_(() => Places.resetMap());
   try_(() => MapRiverLines.clearSelection());
 
   // 4. The selection, the focus and the blast ring that rides on it. The blast
@@ -5234,8 +5236,8 @@ function clearStationsMapMarks() {
 // clicked and the river selected, puts the map's cards away, and takes off
 // everything drawn on top of the stations — the drawings (a clicked link is
 // one), the link budget's ends, the polar plot, the site finders' answers, the
-// found place's outline (its numbered pins are Find a place's own, and stay).
-// The map stays where it is, zoomed where it was, filtered
+// found place's outline and its numbered pins. The map stays where it is,
+// zoomed where it was, filtered
 // as it was.
 //
 // The station in Station details goes the way a second click on its row puts

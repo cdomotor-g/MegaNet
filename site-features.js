@@ -745,6 +745,7 @@ const SiteFeatures = (function () {
     if (state.draw && state.draw.tool && typeof MapDraw !== 'undefined') MapDraw.setTool('');
     if (typeof LinkBudget !== 'undefined' && LinkBudget.setPicking && state.link && state.link.picking) LinkBudget.setPicking(false);
     if (typeof MapHere !== 'undefined' && MapHere.armed && MapHere.armed()) MapHere.arm(false);
+    if (typeof Places !== 'undefined' && Places.dropping && Places.dropping()) Places.arm(false);
     if (typeof MapMovePin !== 'undefined' && MapMovePin.armed && MapMovePin.armed()) MapMovePin.cancel();
   }
 
@@ -1192,6 +1193,7 @@ const SiteFeatures = (function () {
     if (state.draw && state.draw.tool) return false;                       // a draw tool owns its clicks
     if (state.link && state.link.picking) return false;                    // …and the link budget its pick
     if (typeof MapHere !== 'undefined' && MapHere.armed && MapHere.armed()) return false;
+    if (typeof Places !== 'undefined' && Places.dropping && Places.dropping()) return false;
     // Under ⛰️ 3-D or the twin, the flat map's coordinate for a pixel is not
     // the ground the operator pointed at (map-move-pin.js says it at length).
     if (typeof Map3D !== 'undefined' && Map3D.active && Map3D.active()) return false;

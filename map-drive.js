@@ -425,6 +425,7 @@ const MapDrive = (function () {
     if (state.draw && state.draw.tool && typeof MapDraw !== 'undefined') MapDraw.setTool('');
     if (typeof LinkBudget !== 'undefined' && LinkBudget.setPicking && state.link && state.link.picking) LinkBudget.setPicking(false);
     if (typeof MapHere !== 'undefined' && MapHere.armed && MapHere.armed()) MapHere.arm(false);
+    if (typeof Places !== 'undefined' && Places.dropping && Places.dropping()) Places.arm(false);
     if (typeof MapMovePin !== 'undefined' && MapMovePin.armed && MapMovePin.armed()) MapMovePin.cancel();
   }
 

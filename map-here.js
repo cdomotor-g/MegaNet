@@ -501,6 +501,7 @@ const MapHere = (function () {
         if (state.draw && state.draw.tool) MapDraw.setTool('');
         LinkBudget.setPicking(false);
         if (MapMovePin.armed()) MapMovePin.cancel();
+        if (typeof Places !== 'undefined' && Places.dropping && Places.dropping()) Places.arm(false);
       }
       syncCursor();
       syncBtn();

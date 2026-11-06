@@ -25,12 +25,18 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 229, date: '2026-11-06', items: [
+      '📍 <strong>Drop a pin by tapping the map.</strong> In 📍 Find a place, press <em>Tap the map to drop pins</em>: '
+        + 'every click on the map (a tap on a phone) leaves a numbered pin there, until you press it again, ✕ in the '
+        + 'banner over the map, or Esc. It works in the 3-D view too. ↺ takes all the pins off, along with everything '
+        + 'else it clears.',
+    ] },
     { n: 228, date: '2026-11-06', items: [
       '📍 <strong>Find a place keeps every pin you drop, numbered.</strong> Each place you go to leaves a blue pin '
         + 'with a number on it, and the next place adds another instead of moving the last — so you can mark a few '
         + 'spots and talk about "pin 2" in a meeting. They are listed under the box, each with its ✕, stay over a '
-        + 'reload on this device, and 📋 Copy the list puts them on the clipboard one to a line. ↺ no longer takes '
-        + 'them off. They show in the 3-D view too, which they did not before.',
+        + 'reload on this device, and 📋 Copy the list puts them on the clipboard one to a line. They show in the '
+        + '3-D view too, which they did not before.',
       '⛰️ <strong>The 3-D view\'s credits are in the line under the map</strong>, as the flat map\'s are, instead of '
         + 'a box over the middle of the map above the minimap. And the pink rings that floated in the sky past the '
         + 'horizon when you tilted the view — far-off stations\' outlines drawn without their pins — are gone.',

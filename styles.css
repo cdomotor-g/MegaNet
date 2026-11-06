@@ -6299,6 +6299,10 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 .places-pin-x:hover { color: var(--text); background: var(--subtle); }
 .places-pins-tools { margin-top: var(--sp-1); }
 
+/* 📍 Tap the map to drop pins: a pill under the hint, worn pressed while
+   it is on — the banner over the map says so too (map-mode.js). */
+.places-drop-row { margin: 0; }
+
 @media (pointer: coarse) {
   /* EPIC #107's floor for a finger, on a row that is otherwise a line. */
   .places-hit { min-height: 2.75rem; align-items: center; }
@@ -7067,7 +7071,8 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
    moved and nothing is saved yet", and a mark that means "you asked about
    this spot" must not be mistaken for it. Cyan, still, and it takes no
    pointer — there is nothing to drag. */
-.leaflet-container.mn-here-picking {
+.leaflet-container.mn-here-picking,
+.leaflet-container.mn-place-dropping {
   cursor: crosshair;
 }
 

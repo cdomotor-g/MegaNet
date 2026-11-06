@@ -1074,6 +1074,7 @@ const MapBestRepeater = (function () {
     return (state.draw && state.draw.tool)
       || (state.link && state.link.picking)
       || (typeof MapHere !== 'undefined' && MapHere.armed && MapHere.armed())
+      || (typeof Places !== 'undefined' && Places.dropping && Places.dropping())
       || (typeof MapMovePin !== 'undefined' && MapMovePin.armed && MapMovePin.armed());
   }
 
@@ -1267,6 +1268,7 @@ const MapBestRepeater = (function () {
         if (typeof LinkBudget !== 'undefined' && LinkBudget.setPicking) LinkBudget.setPicking(false);
         if (typeof MapMovePin !== 'undefined' && MapMovePin.armed && MapMovePin.armed()) MapMovePin.cancel();
         if (typeof MapHere !== 'undefined' && MapHere.armed && MapHere.armed()) MapHere.arm(false);
+        if (typeof Places !== 'undefined' && Places.dropping && Places.dropping()) Places.arm(false);
       }
       syncArm();
       if (armed) announce('Pick on the map is armed. Click the map where the new station would stand.');

@@ -639,6 +639,7 @@ const MapRiverLines = (function () {
   function pointerTaken() {
     return !!((state.draw && state.draw.tool) || (state.link && state.link.picking)
       || (typeof MapHere !== 'undefined' && MapHere.armed && MapHere.armed())
+      || (typeof Places !== 'undefined' && Places.dropping && Places.dropping())
       || (typeof MapMovePin !== 'undefined' && MapMovePin.armed && MapMovePin.armed()));
   }
 

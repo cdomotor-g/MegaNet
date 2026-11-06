@@ -3096,8 +3096,11 @@ pin, with no network at all. Every place gone to leaves a **numbered** pin and
 the next one adds another, so a handful of places can be marked for a meeting
 and talked about as "pin 2": they are listed under the box, each with its ✕,
 kept on the device over a reload, copied out one to a line by 📋 Copy the
-list, left alone by ↺ and 🧹, and drawn in the 3-D view as well. Type a name
-and it lists, grouped:
+list, taken off by ↺ and 🧹 with everything else they clear, and drawn in the
+3-D view as well. **📍 Tap the map to drop pins**, under the box, drops them
+where there is nothing to search for: while it is on, each click on the map
+leaves a pin there, and the banner over the map says so, with ✕ and Esc to
+stop. Type a name and it lists, grouped:
 
 - **Street addresses** — for text shaped like an address (a house number
   before a word, "12 Mary Street, Gympie", "3/18 Smith St Mackay", or a street

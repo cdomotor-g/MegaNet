@@ -115,11 +115,18 @@
 // pins are this tool's own list, like the text in its box: listed under the
 // box, each with its ✕, numbered in the order they were dropped and never
 // renumbered (pin 3 stays pin 3 when pin 2 is taken off), kept on this device
-// over a reload, copied out as text for the minutes, and left alone by ↺ and
-// 🧹, which clear what was drawn *about* a search — a place's outline, the
-// river it lit, a survey mark's callout — and not the places somebody chose
-// to mark. The 3-D view draws them too (Map3D.placesChanged): its canvas
+// over a reload, and copied out as text for the minutes. ↺ and 🧹 take them
+// off with everything else they clear, as they took the one pin before — the
+// owner's call. The 3-D view draws them too (Map3D.placesChanged): its canvas
 // covers every Leaflet pane, and a pin under it is a pin that "did not land".
+//
+// A pin can also be dropped where there is nothing to search for: 📍 Tap the
+// map to drop pins, under the box, is a mode like What is here — while it is
+// on, each click on the map (a tap on a phone) leaves a pin there, numbered
+// like the rest, until it is turned off, ✕ in the banner over the map is
+// pressed, or Escape. Station pins still open their cards. In 3-D the
+// renderer's own coordinate for the ground under the pointer is used
+// (dropAt, from map-3d.js), never the flat map's for that pixel.
 //
 // The same service answers the other way round for the Field Camera
 // (field-camera.js): locality() names the town or locality a point is in, for
@@ -145,8 +152,8 @@ const Places = (function () {
   const PIN_ZOOM    = 15;     // a pin gone to from the list, close enough to see what is round it
   // What the list's heading means, on hover; the hint under the box says the
   // same where a finger can read it.
-  const PINS_MEANING = 'Every place you go to here leaves a numbered pin. The pins stay on this device, '
-    + 'over a reload, until you take them off with their ✕ — ↺ and 🧹 leave them where they are.';
+  const PINS_MEANING = 'Every place you go to here, or tap with Tap the map to drop pins on, leaves a numbered '
+    + 'pin. The pins stay on this device, over a reload, until you take them off with their ✕ or reset the map with ↺.';
   const SHAPE_DEG   = 0.001;  // the gazetteer's outlines, simplified to ~100 m
   const ADDR_URL    = 'https://spatial-gis.information.qld.gov.au/arcgis/rest/services/Location/QldCompositeLocator/GeocodeServer';
   const ADDR_ATTRIB = 'Queensland addresses © State of Queensland (Department of Resources)';
@@ -216,6 +223,7 @@ const Places = (function () {
   let pins = null;              // the pins dropped: [{ n, lat, lon, name, text, kind, where, credit, mark }],
                                 // read from the device on first use (pinList)
   let pinLayer = null;          // one Leaflet marker per pin, on `map`
+  let dropArmed = false;        // 📍 Tap the map to drop pins is on (see "The pins stay")
   const pinMarkers = new Map(); // pin number → its marker, to open its callout
   let query = '';               // what is in the box
   let coord = null;             // what it parses as, if anything
@@ -1128,6 +1136,70 @@ const Places = (function () {
     if (to) to.focus({ preventScroll: true });
   }
 
+  // ── Tap the map to drop pins ───────────────────────────────────────────────
+  // The 2-D map's own click. Not the one 3-D uses: that view stops the click
+  // before it reaches Leaflet and calls dropAt() with the terrain's point.
+  function onMapClick(e) {
+    if (!dropArmed || !e || !e.latlng) return;
+    dropAt(e.latlng.lat, e.latlng.lng);
+  }
+
+  // A pin where the map was tapped: no lookup, no move — the next tap is the
+  // next pin — and a line over the map to say which number it got.
+  function dropAt(lat, lon) {
+    if (!dropArmed || !isFinite(lat) || !isFinite(lon)) return false;
+    const r6 = v => Math.round(v * 1e6) / 1e6;
+    const at = { lat: r6(lat), lon: r6(lon) };
+    const pin = dropPin({ name: '', text: stationLatLonText(at), lat: at.lat, lon: at.lon,
+                          kind: 'tapped on the map', credit: 'Dropped by tapping the map in Find a place — not a station.' });
+    drawPins();
+    renderPins();
+    if (pin) {
+      const where = stationLatLonText(at);
+      if (typeof mapNote === 'function') mapNote(`Pin ${pin.n} dropped — ${where}. Tap again for another; ✕ over the map stops.`, 5000);
+      announce(`Pin ${pin.n} dropped at ${where}.`);
+    }
+    return true;
+  }
+
+  // Every other way a click on the map is taken, off, as What is here does on
+  // its way in: two modes armed at once is one click doing two things.
+  function takeMap() {
+    if (state.draw && state.draw.tool && typeof MapDraw !== 'undefined') MapDraw.setTool('');
+    if (typeof LinkBudget !== 'undefined' && LinkBudget.setPicking && state.link && state.link.picking) LinkBudget.setPicking(false);
+    if (typeof MapHere !== 'undefined' && MapHere.armed && MapHere.armed()) MapHere.arm(false);
+    if (typeof MapMovePin !== 'undefined' && MapMovePin.armed && MapMovePin.armed()) MapMovePin.cancel();
+    if (typeof MapBestRepeater !== 'undefined' && MapBestRepeater.armed && MapBestRepeater.armed()) MapBestRepeater.arm(false);
+  }
+
+  // The switch under the box, the cursor over the map and the banner on it.
+  function syncDrop() {
+    if (map) map.getContainer().classList.toggle('mn-place-dropping', dropArmed);
+    const b = document.getElementById('places-drop');
+    if (b) {
+      b.setAttribute('aria-pressed', String(dropArmed));
+      b.classList.toggle('is-on', dropArmed);
+      b.innerHTML = dropArmed ? '📍 Dropping pins — tap the map · press to stop' : '📍 Tap the map to drop pins';
+      b.title = dropArmed ? 'Stop dropping pins where the map is tapped' : 'Each tap on the map leaves a numbered pin there, until you turn this off';
+    }
+    if (typeof MapMode !== 'undefined') MapMode.sync();
+  }
+
+  function arm(on) {
+    const want = on == null ? !dropArmed : !!on;
+    if (want === dropArmed) { syncDrop(); return; }
+    dropArmed = want;
+    if (dropArmed) {
+      takeMap();
+      // On a phone the side panel is over the map: it steps aside, or there
+      // would be nothing to tap. The banner over the map says how to stop.
+      if (typeof isPhoneNav === 'function' && isPhoneNav() && typeof shutDock === 'function') shutDock();
+    }
+    syncDrop();
+    announce(dropArmed ? 'Dropping pins: each click on the map leaves a numbered pin. Escape stops.'
+                       : 'Stopped dropping pins.');
+  }
+
   function openPin(p) {
     if (p && typeof Map3D !== 'undefined' && Map3D.openPlace && Map3D.openPlace(p.n)) return;
     const m = p && pinMarkers.get(p.n);
@@ -1317,7 +1389,11 @@ const Places = (function () {
           <button type="button" class="places-clear" onclick="Places.clear(true)" title="Clear the box — the pins stay"
                   aria-label="Clear the box">✕</button>
         </div>
-        <p class="small places-hint" id="places-hint">A street address (12 Mary Street, Gympie), town, river or creek, catchment or basin number, council area, survey mark number (43906 or PSM 43906), or a coordinate. The map goes there and leaves a numbered pin; the next place adds another. The stations are left as they are.</p>
+        <p class="small places-hint" id="places-hint">A street address (12 Mary Street, Gympie), town, river or creek, catchment or basin number, council area, survey mark number (43906 or PSM 43906), or a coordinate. The map goes there and leaves a numbered pin; the next place adds another — or tap the map to drop them yourself. The stations are left as they are.</p>
+        <div class="pill-row places-drop-row">
+          <button type="button" class="pill places-drop${dropArmed ? ' is-on' : ''}" id="places-drop" aria-pressed="${dropArmed}"
+                  onclick="Places.arm()" title="Each tap on the map leaves a numbered pin there, until you turn this off">📍 Tap the map to drop pins</button>
+        </div>
         <div class="places-results" id="places-results"></div>
         <div class="places-pins-box" id="places-pins">${pinsHtml()}</div>
       </div>`;
@@ -1447,9 +1523,8 @@ const Places = (function () {
     }
   }
 
-  // The outline off the map, the list left as it is (↺, which clears what is
-  // drawn on the map and leaves the tools' own contents) — and the pins left
-  // too, which are this tool's contents: somebody chose each one.
+  // The outline off the map, the list and the pins left as they are: ✕ beside
+  // the box, a pin taken off, and the start of ↺'s own clear (resetMap, below).
   function clearMark() {
     if (layer) { layer.remove(); layer = null; }
     // The river it selected goes with the pin it drew.
@@ -1503,6 +1578,25 @@ const Places = (function () {
     go,
     clear,
     clearMark,
+    // ↺ and 🧹 (app.js, clearStationsMapMarks): the outline, every pin and the
+    // tap-to-drop switch, without asking — they clear everything they clear
+    // without asking. The box and its list stay, as the other tools' do.
+    resetMap() {
+      if (dropArmed) { dropArmed = false; syncDrop(); }
+      const had = pinList().length;
+      pins = [];
+      savePins();
+      clearMark();
+      drawPins();
+      renderPins();
+      return had;
+    },
+
+    // ── Tap the map to drop pins ──
+    arm,
+    dropping() { return dropArmed; },
+    // From the 3-D view's click on bare ground, with the terrain's coordinate.
+    dropAt,
 
     // ── The pins (see "The pins stay") ──
     // Back to one: the map to it, close in, and its callout open.
@@ -1587,15 +1681,23 @@ const Places = (function () {
       map = m;
       layer = null;
       pinLayer = null;
+      // A new map is a new render of the tab, not somebody tapping: the
+      // switch goes off, as What is here's does.
+      dropArmed = false;
+      map.on('click', onMapClick);
       if (shown && shown.hit) draw(shown.hit, false);
       drawPins();
       renderPins();
+      syncDrop();
     },
 
     // …and as it is taken down. The box, the list and the place shown are
     // kept: they are the tool's, and the tool is in the side panel, which
     // outlives the map.
     detach() {
+      if (map) map.off('click', onMapClick);
+      dropArmed = false;
+      syncDrop();
       if (layer) layer.remove();
       layer = null;
       if (pinLayer) pinLayer.remove();
@@ -1619,6 +1721,7 @@ const Places = (function () {
           + (pinLayer && shown && shown.hit && shown.hit.lat != null && pinAt(shown.hit.lat, shown.hit.lon) ? 1 : 0),
         pins: pinList().map(p => ({ n: p.n, lat: p.lat, lon: p.lon, name: p.name || p.text })),
         pinsDrawn: pinLayer ? pinLayer.getLayers().length : 0,
+        dropping: dropArmed,
       };
     },
   };

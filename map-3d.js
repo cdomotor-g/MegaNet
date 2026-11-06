@@ -3583,6 +3583,13 @@ const Map3D = (function () {
         stopBubbling(e);
         return;
       }
+      // Find a place's Tap the map to drop pins, by the same bridge and for
+      // the same reason: the pin goes on the ground under the pointer.
+      if (typeof Places !== 'undefined' && Places.dropping && Places.dropping()
+          && Places.dropAt(e.lngLat.lat, e.lngLat.lng)) {
+        stopBubbling(e);
+        return;
+      }
       // Empty ground with nothing armed is left to bubble into the Leaflet
       // container below, where the 2-D map's own click handler clears the
       // focused repeater and the ACMA highlight. Neither of those reads a
