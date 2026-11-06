@@ -651,6 +651,47 @@ try {
   check('a term that is only in the ACMA block leaves that block and nothing else',
     acmaOnly.acma === true && acmaOnly.rows === 0, JSON.stringify(acmaOnly));
 
+  // A word that names a group brings the whole group in, the rows that never
+  // say it included (applyMapDisplayFind). "links" is in the Stations & links
+  // heading, so Hide stations that don't match comes with it, and Max TX
+  // distance — a slider whose own words are only "Max TX distance".
+  await page.fill('#map-display-find', 'links');
+  await page.waitForTimeout(300);
+  const group = await panel();
+  const sl = group.sections['Stations & links'] || '';
+  check('a word in a heading brings in everything under that heading',
+    /Hide stations that don't match/.test(sl) && /Max TX distance/.test(sl)
+      && /Colour pins by health/.test(sl) && /Link colour/.test(sl),
+    sl.slice(0, 200));
+  // "radio paths" is in the first control of a card, so the card comes whole:
+  // its sliders and its sub-switches, and not the cards beside it.
+  await page.fill('#map-display-find', 'radio paths');
+  await page.waitForTimeout(300);
+  const cardHit = await panel();
+  const rp = cardHit.sections['Stations & links'] || '';
+  check('…and a word in a card\'s first control brings in the rest of that card',
+    /Link opacity/.test(rp) && /Max TX distance/.test(rp) && /Arrows along the links/.test(rp)
+      && !/Hide stations that don't match/.test(rp) && !/Link colour/.test(rp),
+    rp.slice(0, 200));
+  // Words from different levels together narrow, as words in one row do.
+  await page.fill('#map-display-find', 'overlay wind');
+  await page.waitForTimeout(300);
+  const mixed = await panel();
+  check('…and a heading\'s word with a row\'s word is that row in that section',
+    mixed.heads.join('|') === 'Overlay layers' && /Wind regions/.test(mixed.text)
+      && !/Elevation shading/.test(mixed.text),
+    `${mixed.heads.join(' | ')}: ${mixed.text.slice(0, 160)}`);
+  // The four pin styles are side by side, not one control and what hangs off
+  // it: the first names "river", and the grey and the black stay out.
+  await page.fill('#map-display-find', 'river');
+  await page.waitForTimeout(300);
+  const peers = await panel();
+  const pins = peers.sections['Station pins'] || '';
+  check('…but the pin styles lend each other no name',
+    /Triangles for river height/.test(pins) && !/Grey for gauges read by hand/.test(pins)
+      && !/Black for TM stations/.test(pins),
+    pins.slice(0, 200));
+
   await page.fill('#map-display-find', 'qqzz');
   await page.waitForTimeout(300);
   const nothing = await panel();

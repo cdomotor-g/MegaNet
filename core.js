@@ -1179,7 +1179,10 @@ const HELP = {
       'The <strong>Layers</strong> panel has a <strong>Find a control</strong> box at the '
       + 'top of it. Type into it and the panel filters down to the rows that match — against the '
       + 'label, its note and its tooltip, so "wind", "dB", "contour" and "licence" all land '
-      + 'somewhere. It filters what is drawn and switches nothing off; in the side panel the '
+      + 'somewhere. A word that names a group brings in the whole group, even the rows that never '
+      + 'say it: "links" shows everything under <strong>Stations &amp; links</strong>, and "radio paths" '
+      + 'shows that switch with its sliders and the switches under it. '
+      + 'It filters what is drawn and switches nothing off; in the side panel the '
       + 'pane is the full height of the window, so there is plenty for it to filter.',
       'Where the station cards go follows the width of the window. Above 1,100 px they are in '
       + 'the <strong>side panel</strong> beside the map (📍, and 〽️ for the radio link), the map '

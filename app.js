@@ -5307,7 +5307,10 @@ function mapDisplayControlsHtml() {
          want still has to go looking for it. The box filters the panel to the
          rows that match, headings and all, and matches against what each row
          *says* — its label, its note and its tooltip — so "wind", "dB",
-         "contour" and "licence" all land somewhere. It filters what is drawn
+         "contour" and "licence" all land somewhere — and against the names of
+         the groups it is in, so a word that names a heading or a card brings
+         in everything under it ("links": the whole of Stations & links;
+         applyMapDisplayFind). It filters what is drawn
          and changes nothing about what is on: a hidden switch is still doing
          whatever it was doing, and the "nothing matches" line says so. A
          type="search" field, so the browsers that draw a ✕ in one give the
@@ -5828,12 +5831,13 @@ function mapDisplayRows(root) {
 // which moves rows without rebuilding.
 const MAPD_CARD_CLASSES = ['mapd-card', 'mapd-card-top', 'mapd-card-end'];
 
-function markMapDisplayCards(root = document.getElementById('map-display-block')) {
-  if (!root) return;
+// Which card each element of the panel is in: element → card number, over the
+// whole list whatever the find box has hidden. Headings, the find box and Send
+// view to Map Generator are in none.
+function mapDisplayCardOf(root) {
   const card = new Map();
   let n = 0, prev = null;
   for (const el of root.children) {
-    el.classList.remove(...MAPD_CARD_CLASSES);
     if (el.id === 'map-display-find-row' || el.id === 'map-display-find-none') continue;
     // A heading closes the card; Send view to Map Generator is an action under
     // the last card, not a setting, and stands bare.
@@ -5850,6 +5854,13 @@ function markMapDisplayCards(root = document.getElementById('map-display-block')
     card.set(el, n);
     prev = el;
   }
+  return card;
+}
+
+function markMapDisplayCards(root = document.getElementById('map-display-block')) {
+  if (!root) return;
+  for (const el of root.children) el.classList.remove(...MAPD_CARD_CLASSES);
+  const card = mapDisplayCardOf(root);
   const shown = [...card.keys()].filter(el => !el.hidden);
   shown.forEach((el, i) => {
     el.classList.add('mapd-card');
@@ -5858,19 +5869,56 @@ function markMapDisplayCards(root = document.getElementById('map-display-block')
   });
 }
 
+// What a heading or a card's first control is called: the words on it, and
+// not its tooltip, its note or the choices in its menu — "Auto — when few
+// enough are in view" is not what anybody calls the Station names menu. A card
+// with a title of its own (Link colour, Show these stations) is called that.
+function mapDisplayName(el) {
+  const title = el.querySelector('.mapd-card-title');
+  if (title) return title.textContent || '';
+  let out = '';
+  (function walk(n) {
+    for (const c of n.childNodes) {
+      if (c.nodeType === Node.TEXT_NODE) out += c.nodeValue;
+      else if (c.nodeType === Node.ELEMENT_NODE && !c.matches('select, .filter-note, details')) walk(c);
+    }
+  })(el);
+  return out;
+}
+
 function applyMapDisplayFind() {
   const root = document.getElementById('map-display-block');
   if (!root) return;
   // Every word has to appear somewhere in the row, in any order: "link colour"
   // finds the radio group whether the row reads "Link colour" or "colour the
   // links", and "wind region" finds the switch and its note between them.
+  //
+  // A row also answers to the names of the groups it is in — its section's
+  // heading, and the first control of its card — so a word that names a group
+  // brings in the whole group, the rows that never say the word included
+  //: "links" is the whole of Stations & links, Max TX
+  // distance among it, and "radio paths" is that switch's whole card, its
+  // sliders and its sub-switches. The words can come from any of the three,
+  // so "overlay wind" is the one switch in Overlay layers. Two cards are rows
+  // side by side rather than a control and what hangs off it, and lend no
+  // name: the base maps (one row per base; the Base maps heading is their
+  // name) and a card whose first control says so (data-find-peers — the four
+  // pin styles, four answers to one question).
   const terms = mapDisplayFind.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const card = mapDisplayCardOf(root);
+  const cardName = new Map();
+  for (const [el, n] of card) {
+    if (cardName.has(n)) continue;
+    const peers = el.classList.contains('mn-base-row') || el.hasAttribute('data-find-peers');
+    cardName.set(n, peers ? '' : mapDisplayName(el).toLowerCase());
+  }
   let shown = 0;
   for (const g of mapDisplayRows(root)) {
+    const head = g.head ? mapDisplayName(g.head).toLowerCase() : '';
     let any = false;
     for (const row of g.rows) {
       const hit = !terms.length || (() => {
-        const text = mapDisplayRowText(row);
+        const text = head + ' \n ' + (cardName.get(card.get(row[0])) || '') + ' \n ' + mapDisplayRowText(row);
         return terms.every(t => text.includes(t));
       })();
       for (const el of row) el.hidden = !hit;

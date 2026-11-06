@@ -743,12 +743,15 @@ const MapSymbols = (function () {
   // Its own section, under its own heading, ahead of Stations & links: what a
   // pin looks like comes before which pins and lines are drawn. The four
   // switches are one card in the panel (.mapd-join, app.js markMapDisplayCards):
-  // they are four answers to one question, and the note counts all four.
+  // they are four answers to one question, and the note counts all four. Which
+  // is why the first lends the others no name in the find box
+  // (data-find-peers, app.js applyMapDisplayFind): "river" is the triangles
+  // switch, not the grey and the black with it.
   function sectionHtml() {
     if (needSls()) askSls();
     return `
     <div class="map-display-h">Station pins</div>
-    <label class="filter-check"
+    <label class="filter-check" data-find-peers
            title="A station that measures a water level — a river height gauge, or a storage or tide gauge — is a triangle. A rain gauge, or a station that measures neither, is a circle. A station that measures both is a triangle.">
       <input type="checkbox" ${state.mapPinShapes ? 'checked' : ''}
              onchange="MapSymbols.setShapes(this.checked)">

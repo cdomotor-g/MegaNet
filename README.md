@@ -2013,7 +2013,13 @@ switch they want still has to go looking for it. A **Find a control** box at the
 top filters the panel to the rows that match, headings and all. It matches
 against what each row *says* — its label, its note and its tooltip — so "wind",
 "dB", "contour" and "licence" all land somewhere, and every word typed has to
-appear somewhere in the row, in any order. The ACMA block is filtered whole
+appear somewhere in the row, in any order. A row also answers to the names of
+the groups it sits in — its section's heading and the first control of its
+boxed card — so a word that names a group brings in the whole group, rows that
+never say the word included: "links" is all of Stations & links, Max TX distance
+among it, and "radio paths" is that switch with its sliders and sub-switches.
+The base maps and the four pin styles are rows side by side rather than a
+control and what hangs off it, so the first of them lends the rest no name. The ACMA block is filtered whole
 rather than row by row: it is one subject, and half a licence panel is harder to
 read than none of it.
 
