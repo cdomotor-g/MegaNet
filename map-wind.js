@@ -322,7 +322,7 @@ const MapWind = (function () {
       if (el.tagName === 'INPUT') el.value = st.text; else el.textContent = st.text;
       el.title = st.title;
       const scale = document.getElementById(`${elId}-scale`);
-      if (scale) scale.innerHTML = scaleHtml(st.region);
+      if (scale) scale.innerHTML = scaleHtml(st.region, scale.dataset.who);
     };
     ensureData().then(fill, () => { askFailed = true; fill(); });
   }
@@ -330,13 +330,15 @@ const MapWind = (function () {
   // The station card's picture of its region (card-rows.js's layout): the
   // Standard's regions calm to cyclonic, A to D, the station's lit and the
   // cyclonic three marked under them. Its words are the stylesheet's (data-w),
-  // so the row reads what it did. Empty until the region is known.
-  function scaleHtml(region) {
+  // so the row reads what it did. Empty until the region is known. `who` is
+  // what the picture is of in its spoken words: this station, or, on What is
+  // here, this point.
+  function scaleHtml(region, who = 'this station') {
     if (!region) return '';
     const fam = /^A/.test(region) ? 'A' : region;
     const cells = ['A', 'B1', 'B2', 'C', 'D'].map(r =>
       `<i class="cr-cell${r === fam ? ' is-lit' : ''}" data-w="${r === 'A' && fam === 'A' ? region : r}"></i>`).join('');
-    const said = `Wind regions A, B1, B2, C and D, calm to cyclonic: this station is in ${region}; B2, C and D are cyclonic`;
+    const said = `Wind regions A, B1, B2, C and D, calm to cyclonic: ${who || 'this station'} is in ${region}; B2, C and D are cyclonic`;
     return `<span class="cr-scale cr-scale-5" role="img" aria-label="${esc(said)}">${cells}`
       + '<i class="cr-group cr-span-2 cr-blank" data-w=""></i><i class="cr-group cr-span-3" data-w="cyclonic"></i></span>';
   }

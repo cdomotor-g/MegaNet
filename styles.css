@@ -10213,59 +10213,61 @@ body .map-panel.is-driving {
    line between rows, and a long explanation folded behind a tap on the row
    (›). The owner's pick of four mock-ups (5 November 2026): with the answer
    pushed right and its note running on after it in the same paragraph, the
-   rows could not be told apart. On the station card only — the ACMA card,
-   What is here and the path card keep their label-left, value-right rows —
-   and never the Radio tab's Links, which are bars, not rows. */
-#stn-card .acma-row {
+   rows could not be told apart. On the station card and What is here (the
+   owner asked, 6 November 2026, for the two to read alike: the same rows,
+   the same rules between them and the same shaded headings) — the ACMA card
+   and the path card keep their label-left, value-right rows — and never the
+   Radio tab's Links, which are bars, not rows. */
+:is(#stn-card, #here-card) .acma-row {
   display: grid; grid-template-columns: minmax(5rem, 7.2rem) minmax(0, 1fr);
   column-gap: var(--sp-3); align-items: baseline;
   padding: .38rem 0;
 }
-#stn-card .acma-row + .acma-row { border-top: 1px solid var(--border); }
-#stn-card .acma-row > span:first-child { white-space: normal; overflow-wrap: anywhere; }
-#stn-card .acma-row > span:last-child { text-align: left; font-weight: 600; min-width: 0; }
-#stn-card .acma-row > span:last-child :is(.mn-pop-note, .txt-muted, .small, .hd-spark-cap) { font-weight: 400; }
+:is(#stn-card, #here-card) .acma-row + .acma-row { border-top: 1px solid var(--border); }
+:is(#stn-card, #here-card) .acma-row > span:first-child { white-space: normal; overflow-wrap: anywhere; }
+:is(#stn-card, #here-card) .acma-row > span:last-child { text-align: left; font-weight: 600; min-width: 0; }
+:is(#stn-card, #here-card) .acma-row > span:last-child :is(.mn-pop-note, .txt-muted, .small, .hd-spark-cap) { font-weight: 400; }
 /* A height against what the water does there reads as a sentence. */
-#stn-card .stn-card-rhs-effects .acma-row > span:last-child { font-weight: 400; }
+:is(#stn-card, #here-card) .stn-card-rhs-effects .acma-row > span:last-child { font-weight: 400; }
 /* The fold: the whole row is the tap, the › at its right edge. Shut, the
    <details> is nothing but its summary, which sits out at the edge. */
-#stn-card .acma-row.cr-fold { position: relative; padding-right: 1.6rem; cursor: pointer; }
-#stn-card .cr-more { display: block; }
-#stn-card .cr-more > summary {
+:is(#stn-card, #here-card) .acma-row.cr-fold { position: relative; padding-right: 1.6rem; cursor: pointer; }
+:is(#stn-card, #here-card) .cr-more { display: block; }
+:is(#stn-card, #here-card) .cr-more > summary {
   position: absolute; top: .22rem; right: 0; width: 1.5rem; height: 1.6rem;
   display: grid; place-items: center; list-style: none; cursor: pointer;
   border-radius: var(--r-sm); color: var(--muted);
 }
-#stn-card .cr-more > summary::-webkit-details-marker { display: none; }
-#stn-card .cr-more > summary::before { content: "\203A"; font-size: 1.1rem; line-height: 1; transition: transform .15s; }
-#stn-card .cr-more[open] > summary::before { transform: rotate(90deg); }
-#stn-card .cr-more[open] > summary,
-#stn-card .acma-row.cr-fold:hover .cr-more > summary { color: var(--accent); }
-#stn-card .cr-more > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-#stn-card .cr-more[open] {
+:is(#stn-card, #here-card) .cr-more > summary::-webkit-details-marker { display: none; }
+:is(#stn-card, #here-card) .cr-more > summary::before { content: "\203A"; font-size: 1.1rem; line-height: 1; transition: transform .15s; }
+:is(#stn-card, #here-card) .cr-more[open] > summary::before { transform: rotate(90deg); }
+:is(#stn-card, #here-card) .cr-more[open] > summary,
+:is(#stn-card, #here-card) .acma-row.cr-fold:hover .cr-more > summary { color: var(--accent); }
+:is(#stn-card, #here-card) .cr-more > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+:is(#stn-card, #here-card) .cr-more[open] {
   margin-top: .3rem; padding: .35rem .55rem; cursor: auto;
   border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--panel-sub);
 }
-#stn-card .cr-more .mn-pop-note { display: block; font-size: .78rem; }
-#stn-card .cr-more .mn-pop-note + .mn-pop-note { margin-top: .2rem; }
+:is(#stn-card, #here-card) .cr-more .mn-pop-note { display: block; font-size: .78rem; }
+:is(#stn-card, #here-card) .cr-more .mn-pop-note + .mn-pop-note { margin-top: .2rem; }
 
 /* Each section's heading on a band the card's full width, shaded a step off
    the card, with its caption ("Queensland cadastre — not a title search") in
    the band under it — so where one section ends and the next begins is seen
    before a word is read. The headings are each module's own; the band is
    drawn here, over the section's padding. */
-#stn-card { --cr-band: color-mix(in srgb, var(--muted) 13%, var(--panel)); }
-#stn-card :is(.stn-card-rhs-head, .stn-card-equip-h, .stn-card-sf-h, .stn-card-sb-h),
-#stn-card .stn-card-carrier > .small:first-child,
-#stn-card .small:has(> .mn-sls-doc) {
+:is(#stn-card, #here-card) { --cr-band: color-mix(in srgb, var(--muted) 13%, var(--panel)); }
+:is(#stn-card, #here-card) :is(.stn-card-rhs-head, .stn-card-equip-h, .stn-card-sf-h, .stn-card-sb-h),
+:is(#stn-card, #here-card) .stn-card-carrier > .small:first-child,
+:is(#stn-card, #here-card) .small:has(> .mn-sls-doc) {
   display: block; margin: .45rem -.6rem .3rem; padding: .32rem .6rem;
   background: var(--cr-band); color: var(--muted);
   font-size: var(--fs-xs); font-weight: 650; letter-spacing: .05em; text-transform: uppercase;
 }
-#stn-card .acma-sect > :is(.stn-card-rhs-head, .stn-card-equip-h, .stn-card-sf-h, .stn-card-sb-h, .small:has(> .mn-sls-doc)):first-child,
-#stn-card .acma-sect > :first-child > :is(.stn-card-rhs-head, .stn-card-equip-h, .stn-card-sf-h, .stn-card-sb-h, .small:has(> .mn-sls-doc)):first-child { margin-top: -.45rem; }
-#stn-card .stn-card-rhs-head:has(+ .stn-card-rhs-snap) { margin-bottom: 0; padding-bottom: .05rem; }
-#stn-card .stn-card-rhs-head + .stn-card-rhs-snap {
+:is(#stn-card, #here-card) .acma-sect > :is(.stn-card-rhs-head, .stn-card-equip-h, .stn-card-sf-h, .stn-card-sb-h, .small:has(> .mn-sls-doc)):first-child,
+:is(#stn-card, #here-card) .acma-sect > :first-child > :is(.stn-card-rhs-head, .stn-card-equip-h, .stn-card-sf-h, .stn-card-sb-h, .small:has(> .mn-sls-doc)):first-child { margin-top: -.45rem; }
+:is(#stn-card, #here-card) .stn-card-rhs-head:has(+ .stn-card-rhs-snap) { margin-bottom: 0; padding-bottom: .05rem; }
+:is(#stn-card, #here-card) .stn-card-rhs-head + .stn-card-rhs-snap {
   margin: 0 -.6rem .3rem; padding: 0 .6rem .32rem; background: var(--cr-band);
 }
 
@@ -20822,7 +20824,7 @@ body.has-sort-bridge .signin-nudge { display: none; }
     transition: none;
   }
 
-  #stn-card .cr-more > summary::before { transition: none; }
+  :is(#stn-card, #here-card) .cr-more > summary::before { transition: none; }
   .adm-page .panel.adm-flash { animation: none; outline: 3px solid var(--accent); outline-offset: 2px; }
   a.adm-kpi--go { transition: none; }
 

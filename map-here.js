@@ -305,14 +305,20 @@ const MapHere = (function () {
         <button type="button" onclick="MapHere.close()"
                 aria-label="Close the what-is-here card"><span aria-hidden="true">×</span></button>
       </div>
+      <!-- Each section headed on the station card's shaded band, and its rows
+           laid out the station card's way (card-rows.js; styles.css draws
+           both for #here-card as for #stn-card), so the two cards read alike.
+           The land, road and mobile sections bring their own headings. -->
       <div class="acma-sect">
+        <span class="small txt-muted stn-card-rhs-head">Where it is</span>
         ${elevRow()}
         ${elvisRow()}
         ${coverRow()}
         <div class="acma-row"><span>Wind region</span><span><span id="${windId}"
             data-mn-wind="${escAttr(`${lat},${lon}`)}"
             title="${escAttr(wind.title)}">${esc(wind.text)}</span>
-            <span class="mn-pop-note">indicative</span></span></div>
+            <span class="mn-pop-note">indicative</span><span class="cr-pic" id="${windId}-scale"
+            data-who="this point">${MapWind.scaleHtml(wind.region, 'this point')}</span></span></div>
         ${basinRow()}
         ${hubRow()}
       </div>
@@ -334,6 +340,7 @@ const MapHere = (function () {
       <div class="acma-sect" id="${MOBILE_ID}"
            data-mn-mobile="${escAttr(SiteMobile.key(here))}">${SiteMobile.html(here)}</div>
       <div class="acma-sect">
+        <span class="small txt-muted stn-card-rhs-head">Nearby</span>
         ${awayRow('Nearest station', near, `MapHere.goToStation('${near ? escAttr(near.s.id) : ''}')`,
                   'Show this station on the map and open its card')}
         ${awayRow('Nearest repeater', rpt, `MapHere.goToStation('${rpt ? escAttr(rpt.s.id) : ''}')`,
@@ -372,6 +379,9 @@ const MapHere = (function () {
     if (!at) { el.hidden = true; el.innerHTML = ''; return; }
     el.innerHTML = cardHtml();
     el.hidden = false;
+    // The station card's rows (card-rows.js): a long note folded behind a tap
+    // on its row, and the rows the sections fill in later seen to as they land.
+    if (typeof CardRows !== 'undefined') { CardRows.watch(el); CardRows.enhance(el); }
     // Asked after the paint, as repaintStnCard asks: the section fills itself
     // in as the answers land, and a repaint with them in hand asks nothing.
     SiteLand.ask(LAND_ID, landPoint());

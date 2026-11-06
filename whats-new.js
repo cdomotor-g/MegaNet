@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 227, date: '2026-11-06', items: [
+      'ℹ️ <strong>What is here now reads like a station card.</strong> Its answers sit in one column with a line '
+        + 'between each, every section has a shaded heading (Where it is, Land, Road and bridge, Mobile coverage, '
+        + 'Nearby), the wind region shows its A–D scale, and a long explanation folds behind a tap on its row (›).',
+    ] },
     { n: 226, date: '2026-11-05', items: [
       '🛰️ <strong>The digital twin card no longer comes up by itself when you zoom in close.</strong> The '
         + '"High-resolution imagery here" / "Digital twin available" card across the top of the Stations map is now '

@@ -44,6 +44,9 @@
 // section is drawn again: the open ones are remembered, by station and label,
 // for the session.
 //
+// What is here (map-here.js) is laid out the same way, so its render() calls
+// watch() and enhance() on #here-card as well.
+//
 // After core.js. app.js's repaintStnCard() calls watch() and enhance();
 // nothing runs at load.
 
@@ -57,7 +60,9 @@ const CardRows = (() => {
   const flat = t => String(t || '').replace(/\s+/g, ' ').trim();
   const stationId = () => (typeof state !== 'undefined' && state.stnCard && state.stnCard.id) || '';
   const labelOf = row => flat(row.firstElementChild && row.firstElementChild.textContent);
-  const keyOf = row => `${stationId()}\u0001${labelOf(row)}`;
+  // What is here's rows are remembered under one key of their own, not the
+  // station whose card was open last.
+  const keyOf = row => `${row.closest('#here-card') ? 'here' : stationId()}\u0001${labelOf(row)}`;
   const isNote = n => n.nodeType === 1 && n.classList.contains('mn-pop-note');
   const isBlank = n => n.nodeType === 3 && !n.nodeValue.trim();
 
