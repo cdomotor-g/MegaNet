@@ -8241,6 +8241,317 @@ body .map-panel.is-driving {
 .path-body,
 .lb-body { padding-top: .5rem; }
 
+/* ── 〽️ The radio link: the top of the path tools ───────────────────────────
+   Laid out as 🗒️ Copy like RM's picture is, which is Radio Mobile's Radio Link
+   window (PathProfile.rlWindowHtml): a navy band with the path and its fade
+   margin, three rows of five figures, the chart, the transmitter and the
+   receiver side by side, the net, the frequency and the settings at the foot.
+   It reflows with the pane rather than shrinking: a row's cells wrap under
+   each other when five will not fit, a lone one on its line taking the whole
+   of it, and the receiver goes under the transmitter when two will not fit
+   side by side. The band and the meters keep the window's own colours in
+   every theme; the rest is the page's tokens. */
+:root {
+  --rl-band: #0f3a5f;
+  --rl-band-kick: #9dc1e2;
+  --rl-band-sub: #c6d9eb;
+  --rl-lit: #2a9d50;
+  --rl-lit-over: #d8463a;
+  --rl-unlit: #dfe5ec;
+  --rl-unlit-over: #f2d8d4;
+}
+[data-theme="dark"] {
+  --rl-band: #123b60;
+  --rl-unlit: #2b3a4a;
+  --rl-unlit-over: #4a2a2a;
+}
+
+.rl-kick {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* The heading band — the card's <summary>, so a click on it folds the card. */
+.path-panel.rl > summary.rl-band,
+.rl-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .3rem .9rem;
+  padding: .55rem .75rem;
+  margin: -.1rem 0 0;
+  border-radius: 6px;
+  background: var(--rl-band);
+  color: #ffffff;
+}
+.path-panel.rl[open] > summary.rl-band { border-radius: 6px 6px 0 0; }
+.path-panel.rl > summary.rl-band::before { content: none; }
+/* At the specificity of `.path-panel > summary span` (muted, for the other
+   cards' summaries), which would otherwise grey the band's words out. */
+.rl-band .rl-kick,
+.path-panel.rl > summary.rl-band .rl-kick { color: var(--rl-band-kick); }
+.path-panel.rl > summary.rl-band .rl-band-path,
+.path-panel.rl > summary.rl-band .rl-band-fm,
+.path-panel.rl > summary.rl-band .rl-chip { color: #ffffff; }
+.path-panel.rl > summary.rl-band .rl-band-sub { color: var(--rl-band-sub); }
+.rl-band h3.rl-kick { margin: 0; font-size: .68rem; }
+.rl-band h3.rl-kick::before { content: 'Radio link · '; }
+.rl-band-l {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .1rem .6rem;
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+.rl-band-path {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+  overflow-wrap: anywhere;
+}
+.path-panel.rl > summary .rl-band-sub,
+.rl-band-sub {
+  font-size: .76rem;
+  color: var(--rl-band-sub);
+}
+.rl-band-r {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  margin-left: auto;
+  white-space: nowrap;
+}
+.rl-band-fm {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+.rl-chip {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: .12rem .45rem;
+  border-radius: 3px;
+  color: #ffffff;
+  background: var(--muted);
+}
+.rl-chip.tone-ok   { background: #107c10; }
+.rl-chip.tone-warn { background: #9e5e00; }
+.rl-chip.tone-bad  { background: #c7401a; }
+.path-panel.rl .path-body { padding-top: 0; }
+
+/* The window: the figures, the chart, the two ends and the foot, framed. */
+.rl-win {
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 6px 6px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.rl-win-bare {
+  border-top: 1px solid var(--border);
+  border-radius: 6px;
+  margin: .5rem 0;
+}
+
+/* Radio Mobile's three rows of five: the label at the left of a cell, the
+   figure at its right. A row is its own wrapping line, so the three bands of
+   meaning — where B is, what the path costs, what arrives — stay three. */
+.rl-grid { border-bottom: 1px solid var(--border); }
+.rl-row {
+  display: flex;
+  flex-wrap: wrap;
+  background: color-mix(in srgb, var(--ok) 5%, var(--panel));
+}
+.rl-row + .rl-row { border-top: 1px solid var(--border); }
+.rl-cell {
+  flex: 1 1 10.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0 .5rem;
+  min-width: 0;
+  padding: .32rem .55rem;
+  box-shadow: inset -1px 0 0 var(--border), inset 0 -1px 0 var(--border);
+}
+.rl-k {
+  font-size: .82rem;
+  color: var(--muted);
+}
+.rl-flag { color: var(--accent); }
+.rl-v {
+  font-size: .95rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  margin-left: auto;
+}
+.rl-cell.tone-ok   .rl-v { color: var(--ok); }
+.rl-cell.tone-warn .rl-v { color: var(--warn); }
+.rl-cell.tone-bad  .rl-v { color: var(--bad); }
+.rl-cell.is-hot.tone-ok   { background: color-mix(in srgb, var(--ok) 14%, var(--panel)); }
+.rl-cell.is-hot.tone-warn { background: color-mix(in srgb, var(--warn) 14%, var(--panel)); }
+.rl-cell.is-hot.tone-bad  { background: color-mix(in srgb, var(--bad) 14%, var(--panel)); }
+.rl-cell-warn {
+  flex-basis: 100%;
+  font-size: .72rem;
+}
+
+/* The chart inside the window: its own key and notes under it, as on any
+   profile card, with the window's inset. */
+.rl-win > .path-chart-wrap,
+.rl-win > .path-chart,
+.rl-win > .path-warn,
+.rl-win > .filter-note { margin-left: .5rem; margin-right: .5rem; }
+
+/* The chart's key in columns, as the window's is, rather than a line an
+   item in a narrow pane. */
+.rl-win .path-key {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+  gap: .2rem .9rem;
+  margin: .3rem .6rem .2rem;
+}
+.rl-win > .path-more { margin: .2rem .6rem .45rem; }
+
+/* The transmitter and the receiver: side by side while there is room for
+   two, the receiver under the transmitter when there is not. */
+.rl-ends {
+  display: flex;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border);
+}
+.rl-win-bare .rl-ends { border-top: 0; }
+.rl-end {
+  flex: 1 1 19rem;
+  min-width: 0;
+  padding: .5rem .65rem .4rem;
+  box-shadow: inset -1px 0 0 var(--border), inset 0 -1px 0 var(--border);
+}
+.rl-end-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .1rem .55rem;
+}
+.rl-end-name {
+  font-size: 1.05rem;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.rl-end-role {
+  font-size: .8rem;
+  color: var(--muted);
+}
+.rl-end-s {
+  margin-left: auto;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+.rl-meter {
+  display: flex;
+  gap: 3px;
+  margin: .3rem 0 .35rem;
+}
+.rl-meter > i {
+  flex: 0 1 13px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--rl-unlit);
+}
+.rl-meter > i.is-over { background: var(--rl-unlit-over); }
+.rl-meter > i.is-lit { background: var(--rl-lit); }
+.rl-meter > i.is-over.is-lit { background: var(--rl-lit-over); }
+.rl-find .lb-find { margin: .15rem 0 .35rem; }
+.rl-find .lb-find-hint { font-size: .74rem; }
+.rl-end-rows { margin: 0; }
+.rl-end-rows > div {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 38%) 1fr auto;
+  gap: 0 .5rem;
+  align-items: baseline;
+  padding: .2rem 0;
+  border-top: 1px solid var(--border);
+}
+.rl-end-rows dt {
+  font-size: .84rem;
+  color: var(--muted);
+}
+.rl-end-rows dd {
+  margin: 0;
+  font-size: .88rem;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rl-end-rows dd.rl-v2 {
+  font-weight: 400;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* The foot: the net and the frequency, the settings, what Radio Mobile
+   should read. */
+.rl-foot {
+  padding: .45rem .65rem .5rem;
+  background: var(--subtle);
+  font-size: .82rem;
+  color: var(--muted);
+}
+.rl-foot p { margin: 0; }
+.rl-foot p + p { margin-top: .3rem; }
+.rl-foot b { color: var(--text); }
+.rl-netfreq {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .2rem 1.4rem;
+  font-size: .92rem;
+}
+.rl-faint { color: var(--muted); font-size: .82rem; }
+.rl-settings > span { white-space: nowrap; }
+
+/* Everything else the card says about the path, under the window. */
+.rl-more {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-2);
+  border-top: 1px dashed var(--border);
+}
+.rl-more-h {
+  margin: 0 0 .25rem;
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* The copy bar: at the top of the 〽️ pane, kept there as it scrolls —
+   pulled out over the pane's own padding so it meets the pane's edges and
+   nothing scrolls past above it. Under the map it is an ordinary row. */
+.path-toolbar {
+  align-items: center;
+  margin: 0;
+}
+.dock-pane .path-toolbar {
+  position: sticky;
+  top: calc(-1 * var(--sp-2));
+  z-index: 6;
+  margin: calc(-1 * var(--sp-2)) calc(-1 * var(--sp-2)) 0;
+  padding: var(--sp-2);
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .06);
+}
+.path-toolbar-chart { color: var(--muted); }
+
 /* ── The Stations card: the list and its filters, one card ────────────────
    Its head is one row: the list's toggle (the heading, with the live count),
    the Filters toggle beside it, and + Propose and + New at the far end. Under

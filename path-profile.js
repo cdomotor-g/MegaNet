@@ -348,7 +348,8 @@ function radioCommit(fn, ...args) {
 // The toggle only writes the state, so a <details open> that Chromium toggles
 // as it is inserted (#160) writes `true` over `true` and nothing more.
 function pathMoreHtml(id, summary, body) {
-  const open = !!(state.link.more && state.link.more[id]);
+  // Open unless somebody has shut it (state.link.more, core.js).
+  const open = !(state.link.more && state.link.more[id] === false);
   return `
     <details class="path-more" data-more="${escAttr(id)}" ${open ? 'open' : ''}
              ontoggle="state.link.more[this.dataset.more] = this.open">
@@ -1605,7 +1606,7 @@ const PathProfile = (function () {
         </div>
         <!-- What the chart is drawn from and how to read it, for whoever asks:
              the key above is what reading it needs. -->
-        ${pathMoreHtml('path-chart', flat ? 'Where the ground comes from'
+        ${chartNotes(pathMoreHtml('path-chart', flat ? 'Where the ground comes from'
           : `About this chart — ${sigOn ? 'the signal’s colours, ' : ''}the ellipse, where the ground comes from`, `
           ${sigOn ? `<p class="filter-hint path-sig-note">The signal runs A → B (⇄ Flip direction for B → A), priced
             the way the fade margin is: the same model over the ground from the transmitter to each point on the line, for a
@@ -1620,8 +1621,19 @@ const PathProfile = (function () {
             Math.round(prof.distance_m[1] - prof.distance_m[0])} m` : `sampled every ~${prof.resolution_m} m`} at zoom ${prof.zoom} over ${prof.tiles} tile${prof.tiles === 1 ? '' : 's'}${
             prof.capped ? ', zoom reduced to stay inside the tile budget for a path this long' : ''}.${lidarNote()}${
             an.coverUsed && cur.cover ? ` ${esc(LandCover.attribution)}${cur.cover.year !== 'seeded' ? ` (${cur.cover.year})` : ''}, on the same sample points.${
-            an.canopyUsed ? ` ${esc(LandCover.canopyAttribution)}.` : ''}` : ''}</p>`)}
+            an.canopyUsed ? ` ${esc(LandCover.canopyAttribution)}.` : ''}` : ''}</p>`))}
       </div>`;
+  }
+
+  // The chart's notes — how to read it, why the ellipse, where the ground
+  // comes from — under the chart, or kept back for the card to put further
+  // down: the radio link at the top of the card (rlWindowHtml) is the
+  // window's figures, chart and ends with nothing long between them, and the
+  // notes go under it with the rest of the explaining.
+  let notesApart = false, keptNotes = '';
+  function chartNotes(html) {
+    keptNotes = html;
+    return notesApart ? '' : html;
   }
 
   // ── the cursor ──────────────────────────────────────────────────────────────
@@ -2559,10 +2571,10 @@ const PathProfile = (function () {
     const interim = () => (rp ? rp.interim() + rp.note : '');
 
     if (cur.status === 'loading') {
-      return `${head}${interim()}<p class="filter-note">Sampling terrain along ${fmtKm(MapDraw.lineKm(sh.pts))} of path…</p>`;
+      return `${rlEndsBareHtml(a, b)}${head}${interim()}<p class="filter-note">Sampling terrain along ${fmtKm(MapDraw.lineKm(sh.pts))} of path…</p>`;
     }
     if (cur.status === 'failed') {
-      return `${head}${interim()}
+      return `${rlEndsBareHtml(a, b)}${head}${interim()}
         <div class="path-fail">
           <strong>Terrain data unavailable.</strong>
           <span class="small">${esc(cur.error)}</span>
@@ -2570,7 +2582,7 @@ const PathProfile = (function () {
           <button onclick="PathProfile.refresh()">Try again</button>
         </div>`;
     }
-    if (cur.status !== 'ready' || !cur.prof) return head + interim();
+    if (cur.status !== 'ready' || !cur.prof) return rlEndsBareHtml(a, b) + head + interim();
 
     const prof = cur.prof;
     const warn = prof.partial ? `
@@ -2589,11 +2601,12 @@ const PathProfile = (function () {
         ${warn}`;
       if (an.ok) shown = { an, prof, a, b, flat: true, sig: null, warn: legs, datum: '' };
       return `${head}${legs}
-        ${an.ok ? chartHere() : `<p class="filter-note">${esc(an.error)}</p>`}`;
+        ${an.ok ? chartHere() : `<p class="filter-note">${esc(an.error)}</p>`}
+        ${rlEndsBareHtml(a, b)}`;
     }
 
     const an = pathAnalyse(prof, mainOpts(a, b));
-    if (!an.ok) return `${head}${interim()}<p class="filter-note">${esc(an.error)}</p>`;
+    if (!an.ok) return `${rlEndsBareHtml(a, b)}${head}${interim()}<p class="filter-note">${esc(an.error)}</p>`;
 
     const lifted = [[an.liftA_m, a], [an.liftB_m, b]].filter(([m]) => m > 0.5)
       .map(([m, e]) => `${esc(e.name)} ${m.toFixed(1)} m`);
@@ -2609,13 +2622,18 @@ const PathProfile = (function () {
     const datum = pathMoreHtml('path-heights', 'About the heights — survey and terrain datums', datumText);
 
     shown = { an, prof, a, b, flat: false, sig: signalIn(an, a, b), warn, datum };
+    shown.rep = reportOf();
+    // The top of the card is the radio link, laid out as Radio Mobile's
+    // window (rlWindowHtml); everything else the card says about the path is
+    // under it, its explaining open (pathMoreHtml) until somebody shuts it.
     return `
+      ${shown.rep ? rlWindowHtml(shown.rep) : `${warn}${chartHere()}`}
+      <section class="rl-more" aria-labelledby="rl-more-h">
+        <h4 class="rl-more-h" id="rl-more-h">More about this path</h4>
       ${head}
       ${readoutHtml(an, a, b, !rp)}
+      ${shown.rlAfter || ''}
       ${rp ? rp.note : ''}
-      ${copyHtml()}
-      ${warn}
-      ${chartHere()}
       ${endsFormHtml(a, b, an)}
       ${datum}
       ${elvisHtml(an)}
@@ -2634,7 +2652,195 @@ const PathProfile = (function () {
           cur.elvisStatus === 'loading' ? 'Asking Elvis…'
           : cur.elvisStatus === 'ready' ? 'Check again with Elvis'
           : 'Check this path against 1 m data'}</button>
+      </div>
+      </section>`;
+  }
+
+  // ── 〽️ the radio link, at the top of the card ────────────────────────────
+  // Whoever checks a path here has Radio Mobile's Radio Link window in their
+  // head, if not open beside them — so the top of the card is laid out the
+  // way 🗒️ Copy like RM lays its picture out, which is that window's: the
+  // path and its fade margin in a band, three rows of five figures, the
+  // chart, the transmitter and the receiver side by side under their signal
+  // meters, and the net, the frequency and the model's settings at the foot.
+  // Drawn in the page rather than as a picture, so it reflows with the pane:
+  // the cells of a row wrap under each other when there is no room for five,
+  // and the receiver goes under the transmitter when there is no room for two
+  // side by side. Everything else the card says is under it (bodyHtml).
+  //
+  // Each end's name has the link budget's own search box under it
+  // (LinkBudget.findHtml — the same box, the same matcher, the same arming),
+  // so another station is picked where its name is: two ends picked there
+  // draw the line, and the card follows it.
+
+  // The words the window uses, and what each means here — one list for the
+  // hover and for the fold under the window that a finger can read. Radio
+  // Mobile's words, kept as Radio Mobile writes them.
+  function rlWords() {
+    return [
+      ...summaryWords(),
+      ['Azimuth', 'The compass bearing from A to B, in degrees clockwise from true north.'],
+      ['Elev. angle', 'How far above or below level A has to look to see B, allowing for the curve of the earth.'],
+      ['Obstruction at', 'How far from A the worst point on the path is: where the ground or cover comes closest to the line between the antennas.'],
+      ['Free space', 'What the distance alone costs, with nothing in the way.'],
+      ['Path loss', 'Everything the path costs between the two antennas: free space, the ground, the statistics and Flood-Net’s own ✦ terms.'],
+      ['Rx level', 'The signal arriving at the receiver, after its antenna and cable — in dBm, and as the voltage it puts across 50 Ω.'],
+      ['Mode', 'How Longley–Rice reckons the signal gets there: line of sight, diffraction (bending over the ground) or troposcatter.'],
+      ['Climate', 'Longley–Rice’s radio climate, which sets how much the signal wanders over time.'],
+      ['Variability', 'Which kind of reliability the statistics are worked for: Spot is one message at one time and place.'],
+      ['Time / locations / situations', 'The share of time, of places and of situations the figure is held to hold for.'],
+      ['Refractivity', 'How much the air bends radio waves over the curve of the earth (N-units); 301 is the usual figure.'],
+      ['Conductivity', 'How well the ground conducts, in siemens per metre — it matters for the ground reflection.'],
+      ['Permittivity', 'The ground’s relative permittivity — with the conductivity, what the ground does to a signal reflected off it.'],
+      ['Terrain', 'The elevation data the profile is drawn from, and how far apart its points are.'],
+      ['Required E field', 'The weakest field strength in the air the receiver can use, with its antenna and cable.'],
+      ['Rx sensitivity', 'The weakest signal the receiver can decode: the threshold the fade margin is measured from.'],
+      ['Radiated power', 'The power the antenna sends out: EIRP against an antenna that radiates equally every way, ERP against a dipole (2.15 dB less).'],
+    ];
+  }
+
+  // The window's heading: which path, and its answer. The <summary> of the
+  // card, so a click on it folds the card as the heading always did; the
+  // card's title (#path-card-title, which focus announces) is the small
+  // capitals over the path's two ends.
+  function bandHtml(sh, rp) {
+    const rep = shown && !shown.flat ? shown.rep : null;
+    const a = endpoint(sh, 0), b = endpoint(sh, 1);
+    const fig = rep && rep.margin != null ? `${signed(rep.margin, 1)} dB` : '—';
+    const band = rep && rep.band;
+    return `
+      <summary class="rl-band">
+        <div class="rl-band-l">
+          <h3 id="path-card-title" class="rl-kick">${rp ? esc(rp.title) : 'Elevation profile'}</h3>
+          <span class="rl-band-path">${esc(a.name)} → ${esc(b.name)}</span>
+          <span class="rl-band-sub">${esc(MapDraw.measure(sh))}${rep ? ` · ${rep.an.fMhz.toFixed(3)} MHz · Flood-Net, ${esc(rep.stamp)}` : ''}</span>
+        </div>
+        <div class="rl-band-r">
+          <span class="rl-kick">${termHtml('Fade margin', pathMarginMeaning())}</span>
+          <b class="rl-band-fm">${esc(fig)}</b>
+          ${band ? `<span class="rl-chip tone-${band.cls}">${esc(band.label)}</span>` : ''}
+        </div>
+      </summary>`;
+  }
+
+  // An end's search box, from the link budget, in a host of its own: the
+  // budget repaints the host's insides (its syncFinds), this card's repaint
+  // carries the host across whole (rerender).
+  function findHostHtml(which) {
+    return typeof LinkBudget !== 'undefined' && LinkBudget.findHtml
+      ? `<div class="rl-find" data-lb-find="${which}">${LinkBudget.findHtml(which)}</div>` : '';
+  }
+
+  // A signal meter: Radio Mobile's thirteen segments, S1 to S9 in green and
+  // +10 to +40 over it in red, as many lit as the signal reaches.
+  function rlMeterHtml(m) {
+    const segs = Array.from({ length: S_SEGMENTS }, (_, i) =>
+      `<i class="${i >= 9 ? 'is-over' : ''}${m && i < m.lit ? ' is-lit' : ''}"></i>`).join('');
+    return `<span class="rl-meter" role="img" aria-label="Signal meter: ${escAttr(m ? m.label : 'no reading')}">${segs}</span>`;
+  }
+
+  // The two ends with nothing worked out yet — the ground on its way, a
+  // dog-leg, no line at all: the names and the boxes to pick another, so a
+  // station can be picked whatever the card is waiting on.
+  function rlEndsBareHtml(a, b) {
+    const end = (which, tag, e) => `
+      <section class="rl-end" aria-label="${tag === 'TX' ? 'Transmitter' : 'Receiver'} — end ${which.toUpperCase()}">
+        <div class="rl-end-head"><span class="rl-kick">${tag}</span> <b class="rl-end-name">${esc(e.name)}</b></div>
+        ${findHostHtml(which)}
+      </section>`;
+    return `<div class="rl-win rl-win-bare"><div class="rl-ends">${end('a', 'TX', a)}${end('b', 'RX', b)}</div></div>`;
+  }
+
+  function rlWindowHtml(rep) {
+    const S = compactOf(rep);
+    const words = new Map(rlWords());
+    const mean = k => words.get(k) || '';
+    const cell = c => {
+      const tone = c.tone && (c.hot || c.tone !== 'ok') ? ` tone-${c.tone}` : '';
+      // A model warning is said on the cell itself, as Radio Mobile's (3) is;
+      // the other notes are the cell's title.
+      const warn = /^⚠/.test(c.n) ? c.n : '';
+      return `
+          <div class="rl-cell${c.hot ? ' is-hot' : ''}${tone}"${c.n && !warn ? ` title="${escAttr(c.n)}"` : ''}>
+            <span class="rl-k">${termHtml(c.k, mean(c.k))}${c.flag
+              ? ` <b class="rl-flag term" title="${escAttr(mean('✦'))}">${c.flag}</b>` : ''}</span>
+            <b class="rl-v">${esc(c.v)}</b>
+            ${warn ? `<span class="rl-cell-warn txt-warn">${esc(warn)}</span>` : ''}
+          </div>`;
+    };
+    const grid = `<div class="rl-grid" data-tour="path-rl-figures">${
+      S.grid.map(r => `<div class="rl-row">${r.map(cell).join('')}</div>`).join('')}</div>`;
+    const end = (which, tag, P) => `
+      <section class="rl-end" aria-label="${tag === 'TX' ? 'Transmitter' : 'Receiver'} — end ${which.toUpperCase()}">
+        <div class="rl-end-head">
+          <span class="rl-kick">${tag}</span>
+          <b class="rl-end-name">${esc(P.name)}</b>
+          <span class="rl-end-role">${esc(P.role)}</span>
+          <b class="rl-end-s" title="${escAttr(P.meterNote)}">${esc(P.meter ? P.meter.label : '—')}</b>
+        </div>
+        ${rlMeterHtml(P.meter)}
+        ${findHostHtml(which)}
+        <dl class="rl-end-rows">${P.rows.map(([k, v1, v2]) => `
+          <div><dt>${termHtml(k, mean(k))}</dt><dd>${esc(v1)}</dd>${v2 ? `<dd class="rl-v2">${esc(v2)}</dd>` : ''}</div>`).join('')}
+        </dl>
+      </section>`;
+    const rmLine = S.rm == null ? ''
+      : S.own > 0.05
+        ? `Radio Mobile has no ✦ terms (${S.own.toFixed(1)} dB here), so its <b>Rx relative</b> should read about <b>${signed(S.rm, 1)} dB</b>.`
+        : `Radio Mobile runs the same Longley–Rice: its <b>Rx relative</b> should read about <b>${signed(S.rm, 1)} dB</b>.`;
+    const foot = `
+      <div class="rl-foot">
+        <p class="rl-netfreq">
+          <span><span class="rl-kick">Net</span> <b>${esc(S.net)}</b></span>
+          <span><span class="rl-kick">Frequency</span> <b>${esc(S.freq[0])}</b> <span class="rl-faint">${esc(S.freq[1])}</span></span>
+        </p>
+        <p class="rl-settings">${S.settings.map(([k, v]) =>
+          `<span>${termHtml(k, mean(k))} <b>${esc(v)}</b></span>`).join(' · ')}</p>
+        <p class="rl-rm">${rmLine} ${S.marks.map(m => esc(m.replace(/[.\s]*$/, '.'))).join(' ')} ✦ Flood-Net only. Indicative only.</p>
       </div>`;
+    const chart = chartHere(true);
+    // What goes under the window, in the card's "More about this path": the
+    // chart's notes and the key to the window's words.
+    shown.rlAfter = `${keptNotes}${pathMoreHtml('rl-words', 'What the words in the radio link mean',
+      `<dl class="path-words">${rlWords().map(([t, m]) => `<dt>${esc(t)}</dt><dd>${esc(m)}</dd>`).join('')}</dl>`)}`;
+    return `
+      <div class="rl-win" data-tour="path-rl">
+        ${grid}
+        ${shown.warn}
+        ${chart}
+        <div class="rl-ends">${end('a', 'TX', S.tx)}${end('b', 'RX', S.rx)}</div>
+        ${foot}
+      </div>`;
+  }
+
+  // ── the copy bar, over the pane ──
+  // The two copies and the chart's own, in a bar of their own at the head of
+  // the path tools — kept at the top of the side panel's pane as it scrolls
+  // (styles.css), so a copy is one press from anywhere in a long card. They
+  // hand the path on to somebody else: 🗒️ Copy like RM is the radio link
+  // above as one picture, which lands as it looks anywhere it is pasted, and
+  // 📄 Copy for a report the same window as a document with every figure
+  // behind the margin under it and how Flood-Net works it out.
+  function toolbarHtml() {
+    return `
+      <div class="path-copy path-toolbar" id="path-toolbar" role="toolbar" aria-label="Copy the radio link">
+        <button type="button" id="path-copy-compact" onclick="PathProfile.copyCompact()" disabled
+                title="Copy the radio link as one picture laid out like Radio Mobile's Radio Link window — its figures in its places, a short chart, the transmitter and the receiver side by side, the settings and what Radio Mobile's Rx relative should read. A picture keeps its layout wherever it is pasted: Teams, Word, an email">🗒️ Copy like RM</button>
+        <button type="button" id="path-copy-brief" onclick="PathProfile.copySummary()" disabled
+                title="Copy the radio link as a document for Word or an email — the Radio Link window with its chart, then every figure behind the fade margin: the two ends, the path, the model and its settings, the budget term by term, what this models next to Radio Mobile and what the words mean">📄 Copy for a report</button>
+        <span class="small path-toolbar-chart">Chart:
+          <button type="button" class="lb-link" id="path-copy-chart" onclick="PathProfile.copyChart()" disabled>copy</button> ·
+          <button type="button" class="lb-link" id="path-save-chart" onclick="PathProfile.downloadChart()" disabled>save as PNG</button></span>
+      </div>`;
+  }
+
+  // Each press is there only while there is a one-hop profile to copy.
+  function syncToolbar() {
+    const ready = !!(shown && !shown.flat);
+    for (const id of ['path-copy-compact', 'path-copy-brief', 'path-copy-chart', 'path-save-chart']) {
+      const b = document.getElementById(id);
+      if (b) b.disabled = !ready;
+    }
   }
 
   // ── full screen ──
@@ -2651,12 +2857,15 @@ const PathProfile = (function () {
   // the card repaints this too (rerender), so the ground or the cover landing,
   // a flip or another line selected shows up in either place.
 
-  function chartHere() {
+  // `apart` keeps the chart's notes back for the caller (chartNotes).
+  function chartHere(apart = false) {
+    keptNotes = '';
     if (full) {
       return `<p class="filter-note path-full-away">The chart is open full screen.
         <button type="button" class="lb-link" onclick="Modal.close()">Bring it back here</button></p>`;
     }
-    return chartSvg(shown.an, shown.prof, shown.flat, shown.sig);
+    notesApart = apart;
+    try { return chartSvg(shown.an, shown.prof, shown.flat, shown.sig); } finally { notesApart = false; }
   }
 
   // The plot's size: the width of its box, and the height the window has left
@@ -2845,7 +3054,9 @@ const PathProfile = (function () {
     const rp = typeof MapBackbone !== 'undefined' ? MapBackbone.section() : null;
     const ra = endRadio(a), rb = endRadio(b);
     const pm = profileMargin(an, a, b);
-    const tokens = paperTokens();
+    // The light theme's colours, for the copies only — asked on the first
+    // use: the card asks for the rest of this on every paint (rlWindowHtml).
+    let tokens = null;
 
     // Where each end is: the line's own point, or — on the LiDAR ground — where
     // a mast was stood on the highest ground within its position's rounding.
@@ -3024,7 +3235,8 @@ const PathProfile = (function () {
     return {
       title, heading: `${title} — ${a.name} → ${b.name}`,
       sub: `${fmtKm(an.D / 1000)} @ ${String(Math.round(azAB) % 360).padStart(3, '0')}° · ${an.fMhz.toFixed(3)} MHz · Flood-Net, ${stamp}`,
-      stamp, a, b, an, prof, tokens,
+      stamp, a, b, an, prof,
+      get tokens() { return tokens || (tokens = paperTokens()); },
       margin: pm.m, band, why, pct,
       ra, rb, azAB, azBA, freqSrc,
       verdict: v,
@@ -3439,7 +3651,11 @@ const PathProfile = (function () {
   // cell's inset is said twice, the same: as the table's cellpadding, which is
   // what LibreOffice reads, and as the cell's padding, which is what Word and
   // the browsers read.
-  function summaryHtml(rep, pic) {
+  // `more` is 📄 Copy for a report: the window, then every figure behind the
+  // margin in the same dress (moreHtml, below) — the two ends, the path, the
+  // model and its settings, the budget term by term, what this models next to
+  // Radio Mobile — and the key to the words last.
+  function summaryHtml(rep, pic, more = false) {
     const S = summaryOf(rep);
     const T = rep.tokens;
     const tone = { ok: T['--ok'] || '#107c10', warn: T['--warn'] || '#9e5e00', bad: T['--bad'] || '#c7401a' };
@@ -3539,7 +3755,7 @@ const PathProfile = (function () {
     const notes = S.notes.map(n => `<p style="${font}font-size:8pt;color:${C.muted};margin:5pt 0 0">${esc(n)}</p>`).join('');
     const words = `<table width="${W}" cellspacing="0" cellpadding="2" border="0" style="border-collapse:collapse;margin-top:6pt">
       <tr>${td('padding:2px 0', div(kickStyle, 'WHAT THE WORDS MEAN'), 'colspan="2"')}</tr>
-      ${summaryWords().map(([k, m]) => `<tr>
+      ${(more ? rlWords() : summaryWords()).map(([k, m]) => `<tr>
         ${td(`padding:2px 8px 2px 0;font-size:7.5pt;font-weight:bold;color:${C.ink};white-space:nowrap;vertical-align:top`, esc(k), 'width="96" valign="top"')}
         ${td(`padding:2px 0;font-size:7.5pt;color:${C.muted};vertical-align:top`, esc(m), 'valign="top"')}
       </tr>`).join('')}
@@ -3550,13 +3766,50 @@ const PathProfile = (function () {
         ${part(header, `bgcolor="${C.navy}"`)}${part(figures)}${pic ? part(chart, 'bgcolor="#ffffff"') : ''}${part(ends)}${part(footer)}${part(settings)}
       </table>
       ${notes}
+      ${more ? moreHtml(rep, { font, td, div, kickStyle, C, tone, W }) : ''}
       ${words}
     </div>`;
   }
 
+  // What the report carries under the window, in the window's own dress:
+  // small capitals over each part, a label and its figure a row, hairlines
+  // between. Tables all the way down, for the summary's reason.
+  function moreHtml(rep, { font, td, div, kickStyle, C, tone, W }) {
+    const h = t => `<p style="${font}${kickStyle};margin:16pt 0 4pt">${esc(t.toUpperCase())}</p>`;
+    const box = rows => `<table width="${W}" cellspacing="0" cellpadding="4" border="0" style="border-collapse:collapse;width:${W}px;border:1px solid ${C.line}">${rows}</table>`;
+    const key = (t, w) => td(`padding:4px 8px;border-top:1px solid ${C.rule};font-size:8.5pt;color:${C.muted};vertical-align:top`, t, `${w ? `width="${w}" ` : ''}valign="top"`);
+    const val = (t, style = '') => td(`padding:4px 8px;border-top:1px solid ${C.rule};font-size:9pt;color:${C.ink};vertical-align:top;${style}`, t, 'valign="top"');
+    const head = (t, style = '') => td(`padding:5px 8px;background:${C.soft};font-size:7.5pt;font-weight:bold;letter-spacing:1pt;color:${C.accent};vertical-align:top;${style}`, t, `bgcolor="${C.soft}" valign="top"`);
+    const pairs = rows => box(rows.map(([l, v]) => `<tr>${key(esc(l), '34%')}${val(esc(v))}</tr>`).join(''));
+    const ends = box(`<tr>${head('&nbsp;')}${head('A — TRANSMITTER')}${head('B — RECEIVER')}</tr>${
+      rep.ends.map(([l, x, y]) => `<tr>${key(esc(l), '24%')}${val(esc(x))}${val(esc(y))}</tr>`).join('')}`);
+    const budget = box(`<tr>${head('TERM')}${head('VALUE', 'text-align:right')}${head('UNIT')}${head('NOTE')}</tr>${
+      rep.budget.map(([l, v, unit, note, kind]) => {
+        const strong = kind ? 'font-weight:bold;' : '';
+        const bg = kind === 'result' ? `background:${C.soft};` : '';
+        const col = kind === 'result' && rep.band ? `color:${tone[rep.band.cls]};` : '';
+        return `<tr>${key(`<span style="${font}${strong}color:${C.ink}">${esc(l)}</span>`, '26%')}${
+          val(esc(kind === 'result' ? signed(v, 1) : signed(v, 2)), `${strong}${bg}${col}text-align:right;white-space:nowrap`)}${
+          val(esc(unit), bg)}${val(esc(note), `${bg}font-size:8.5pt;color:${C.muted}`)}</tr>`;
+      }).join('')}`);
+    const cmp = typeof LinkBudget !== 'undefined' && LinkBudget.comparison ? LinkBudget.comparison() : null;
+    const compare = cmp ? `${h('What this models, next to Radio Mobile — and what neither does')}
+      ${div(`font-size:8.5pt;color:${C.muted};margin:0 0 5pt;width:${W}px`, cmp.intro)}
+      ${box(`<tr>${head('&nbsp;')}${head('FLOOD-NET')}${head('RADIO MOBILE')}</tr>${
+        cmp.rows.map(([k, mine, rm]) => `<tr>${key(k, '22%')}${val(mine, 'font-size:8.5pt')}${val(rm, 'font-size:8.5pt')}</tr>`).join('')}`)}` : '';
+    return `
+      ${rep.radio.length ? h(rep.title) + pairs(rep.radio) : ''}
+      ${h('The two ends')}${ends}
+      ${h('The path')}${pairs(rep.path)}
+      ${h('Propagation model and settings')}${pairs(rep.model)}
+      ${h('Link budget — how the fade margin is worked out')}${budget}
+      ${rep.notes.map(n => div(`font-size:8.5pt;color:${C.muted};margin:5pt 0 0;width:${W}px`, esc(n))).join('')}
+      ${compare}`;
+  }
+
   // The summary as plain text, in the window's order: tab between columns, so
   // pasted into a spreadsheet it lands in the same grid of cells.
-  function summaryText(rep) {
+  function summaryText(rep, more = false) {
     const S = summaryOf(rep);
     const L = [];
     L.push(`RADIO LINK — ${rep.heading}`, rep.sub);
@@ -3573,9 +3826,36 @@ const PathProfile = (function () {
     L.push(`Settings\t${S.settings.map(([k, v]) => `${k} ${v}`).join(' · ')}`);
     L.push('');
     S.notes.forEach(n => L.push(n));
+    if (more) L.push(...moreText(rep));
     L.push('', 'What the words mean');
-    summaryWords().forEach(([k, m]) => L.push(`${k}\t${m}`));
+    (more ? rlWords() : summaryWords()).forEach(([k, m]) => L.push(`${k}\t${m}`));
     return L.join('\n');
+  }
+
+  // The report's parts under the window, as plain text: tab between columns.
+  function moreText(rep) {
+    const L = [];
+    const sec = t => { L.push('', t.toUpperCase()); };
+    if (rep.radio.length) { sec(rep.title); rep.radio.forEach(([l, v]) => L.push(`${l}\t${v}`)); }
+    sec('The two ends');
+    L.push('\tA — transmitter\tB — receiver');
+    rep.ends.forEach(([l, x, y]) => L.push(`${l}\t${x}\t${y}`));
+    sec('The path');
+    rep.path.forEach(([l, v]) => L.push(`${l}\t${v}`));
+    sec('Propagation model and settings');
+    rep.model.forEach(([l, v]) => L.push(`${l}\t${v}`));
+    sec('Link budget — how the fade margin is worked out');
+    rep.budget.forEach(([l, v, unit, note, kind]) => L.push(`${l}\t${kind === 'result' ? signed(v, 1) : signed(v, 2)}\t${unit}\t${note}`));
+    L.push('');
+    rep.notes.forEach(n => L.push(n));
+    const cmp = typeof LinkBudget !== 'undefined' && LinkBudget.comparison ? LinkBudget.comparison() : null;
+    if (cmp) {
+      sec('What this models, next to Radio Mobile — and what neither does');
+      L.push(plainOf(cmp.intro));
+      L.push('\tFlood-Net\tRadio Mobile');
+      cmp.rows.forEach(([k, mine, rm]) => L.push(`${plainOf(k)}\t${plainOf(mine)}\t${plainOf(rm)}`));
+    }
+    return L;
   }
 
   // ── 🗒️ the compact summary: the same window, in brief ──
@@ -3906,16 +4186,18 @@ const PathProfile = (function () {
   // bare inside it; the picture alone on the clipboard keeps its heading, for
   // whatever takes only that. The same window in brief is a picture of its own
   // (copyCompact).
+  //
+  // There were two, 📋 Copy for a report (every figure, in plain tables) and
+  // 📄 Copy a summary (the window); the window read better, so 📄 Copy for a
+  // report is now the window with every figure under it in its dress, and
+  // the plain one has gone. reportHtml and reportText stay, for the check
+  // that reads the rows they are written from.
   const COPIES = {
-    report:  { text: reportText, html: reportHtml, chart: null, file: '', what: 'report',
-               done: 'Copied: the chart and every figure behind the fade margin. Paste it into Word or an email.' },
-    summary: { text: summaryText, html: summaryHtml, chart: { bare: true }, file: '-summary', what: 'summary',
-               done: 'Copied: the summary, laid out like Radio Mobile\'s Radio Link window. Paste it into Word or an email.' },
+    report: { text: r => summaryText(r, true), html: (r, p) => summaryHtml(r, p, true), chart: { bare: true }, file: '-report', what: 'report',
+              done: 'Copied: the report — the Radio Link window and every figure behind the fade margin. Paste it into Word or an email.' },
   };
-  // `kind` is 'report' or 'summary'; nothing (the 📋 press) is the
-  // report, and true the summary, as it was.
-  function copyReport(kind) {
-    const c = COPIES[kind === true ? 'summary' : kind] || COPIES.report;
+  function copyReport() {
+    const c = COPIES.report;
     const rep = reportOf();
     if (!rep) { Toast.show('Nothing to copy yet — the profile is still being drawn.'); return; }
     const pic = paperPicture(rep);
@@ -3935,7 +4217,7 @@ const PathProfile = (function () {
     }));
   }
 
-  function copySummary() { copyReport('summary'); }
+  function copySummary() { copyReport(); }
   // 🗒️ The window in brief, as one picture and nothing else: given a document
   // or text beside it, Teams and the chat programs paste those instead, and a
   // document comes apart there. Where the browser will not copy a picture, it
@@ -3970,26 +4252,6 @@ const PathProfile = (function () {
     paperPicture(rep).then(p => saveFile(p.blob, `${rep.file}.png`), e => Toast.show(e.message, { kind: 'failed' }));
   }
 
-  // The presses that start it, over the chart: the one thing on the card that
-  // hands the path on to somebody else. Smallest first: the compact summary is
-  // Radio Mobile's Radio Link window in brief, the summary is the same window
-  // in full with a key to its words, and the report is every figure behind
-  // the margin.
-  function copyHtml() {
-    return `
-      <div class="path-copy">
-        <button type="button" id="path-copy-compact" onclick="PathProfile.copyCompact()"
-                title="Copy the Radio Link window in brief as one picture — Radio Mobile's figures in its places, a short chart, the transmitter and the receiver side by side, the settings and what Radio Mobile's Rx relative should read. A picture keeps its layout wherever it is pasted: Teams, Word, an email">🗒️ Copy compact</button>
-        <button type="button" id="path-copy-brief" onclick="PathProfile.copySummary()"
-                title="Copy the path laid out like Radio Mobile's Radio Link window — its three rows of figures over the elevation profile, the transmitter and the receiver side by side, the net and the frequency — ready to paste into Word or an email and read across against Radio Mobile">📄 Copy a summary</button>
-        <button type="button" id="path-copy" onclick="PathProfile.copyReport()"
-                title="Copy the elevation profile with the link drawn on it and every figure behind the fade margin — the two ends, their radios, the model's settings and the budget term by term — ready to paste into Word or an email">📋 Copy for a report</button>
-        <span class="small">Compact and the summary are laid out like Radio Mobile's Radio Link window: compact is a picture, so it pastes the same into Teams, Word or an email; the summary is a document for Word or an email; the report is every figure behind the margin. The chart alone:
-          <button type="button" class="lb-link" onclick="PathProfile.copyChart()">copy</button> ·
-          <button type="button" class="lb-link" onclick="PathProfile.downloadChart()">save as PNG</button></span>
-      </div>`;
-  }
-
   // The card is the radio path's when the line is a path clicked on the map
   // (MapBackbone.section): its title says which kind of path, and the note
   // beside it names the two ends — the way round the profile is drawn now,
@@ -3998,15 +4260,14 @@ const PathProfile = (function () {
     const sh = target();
     if (!sh) return '';
     const rp = typeof MapBackbone !== 'undefined' ? MapBackbone.section() : null;
-    const ends = rp ? `${esc(endpoint(sh, 0).name)} → ${esc(endpoint(sh, 1).name)} · ` : '';
+    // The body first: it is what works the margin out, and the band over it
+    // quotes it.
+    const body = bodyHtml(rp);
     return `
-      <details class="path-panel" ${P().open ? 'open' : ''}
+      <details class="path-panel rl" ${P().open ? 'open' : ''}
                ontoggle="PathProfile.setOpen(this.open)">
-        <summary>
-          <h3 id="path-card-title">${rp ? esc(rp.title) : 'Elevation profile'}</h3>
-          <span class="small">${ends}${esc(MapDraw.measure(sh))}</span>
-        </summary>
-        <div class="path-body">${bodyHtml(rp)}</div>
+        ${bandHtml(sh, rp)}
+        <div class="path-body">${body}</div>
       </details>`;
   }
 
@@ -4019,15 +4280,21 @@ const PathProfile = (function () {
   // ✏️ is, because where the ✏️ is — the side panel's strip, or a phone's rail —
   // is the side panel's business and can move again.
   function emptyHtml() {
+    const lb = typeof LinkBudget !== 'undefined' && LinkBudget.endName ? LinkBudget : null;
+    const named = w => ({ name: (lb && lb.endName(w)) || 'not set' });
     return `
-      <div class="path-empty-head">
-        <h3 id="path-card-title">Elevation profile</h3>
-        <span class="small">No path yet</span>
+      <div class="rl-band path-empty-head">
+        <div class="rl-band-l">
+          <h3 id="path-card-title" class="rl-kick">Elevation profile</h3>
+          <span class="rl-band-path">No path yet</span>
+        </div>
       </div>
+      ${rlEndsBareHtml(named('a'), named('b'))}
       <p class="small path-empty">
-        Draw a <strong>Line</strong> on the map with ✏️ <strong>Draw &amp; measure</strong>, or click
-        a radio path between two stations, and the ground between its two ends is drawn here — with
-        the line of sight, the Fresnel zone over it and what stands in the way.
+        Find a station at each end above, draw a <strong>Line</strong> on the map with ✏️
+        <strong>Draw &amp; measure</strong>, or click a radio path between two stations, and the ground
+        between the two ends is drawn here — with the line of sight, the Fresnel zone over it, what
+        stands in the way and the fade margin.
       </p>`;
   }
 
@@ -4058,7 +4325,18 @@ const PathProfile = (function () {
     const typed = back && f.tagName === 'INPUT' && f !== committed ? f.value : null;
     committed = null;
     shown = null;
+    // The two ends' search boxes are the link budget's (LinkBudget.findHtml),
+    // kept up to date by it as they are typed in, and a box being typed in is
+    // never redrawn under the caret — so the boxes there are now are carried
+    // across this repaint whole, into the places the new markup has for them.
+    const finds = {};
+    for (const h of el.querySelectorAll('[data-lb-find]')) finds[h.dataset.lbFind] = h;
     el.innerHTML = sh ? panelHtml() : emptyHtml();
+    for (const h of el.querySelectorAll('[data-lb-find]')) {
+      const old = finds[h.dataset.lbFind];
+      if (old && old !== h) h.replaceWith(old);
+    }
+    syncToolbar();
     if (back) {
       const to = (back !== 'summary' && document.getElementById(back)) || el.querySelector('summary');
       if (to && typed != null && to.id === back && to.value !== typed) to.value = typed;
@@ -4108,7 +4386,7 @@ const PathProfile = (function () {
   }
 
   return {
-    sync, rerender,
+    sync, rerender, toolbarHtml,
 
     // ── the cursor's three doors ──
     // A pointer over the chart. The SVG is drawn in viewBox units and stretched
@@ -4151,6 +4429,7 @@ const PathProfile = (function () {
       const p = paperSvg(r);
       return { text: reportText(r), html: reportHtml(r, null),
                brief: { text: summaryText(r), html: summaryHtml(r, null), rows: summaryOf(r) },
+               full: { text: summaryText(r, true), html: summaryHtml(r, null, true) },
                compact: { rows: compactOf(r) },
                rows: r, svg: p ? p.svg : null };
     },

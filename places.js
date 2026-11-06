@@ -236,6 +236,8 @@ const Places = (function () {
   let shown = null;             // the result the map is showing: { group, n, hit, q }
   let flownTo = null;           // the coordinate the map was last moved to, so a
                                 // second settle of the same text does not move it
+  let typedCoord = false;       // the coordinate in the box was typed, not pasted:
+                                // it waits for Enter (input())
   let lookupTimer = 0, coordTimer = 0, markTimer = 0;
   let index = null;             // rivers and councils from the file, built once per file
 
@@ -1385,7 +1387,7 @@ const Places = (function () {
           <input type="search" id="places-q" class="places-q" autocomplete="off" spellcheck="false"
                  aria-labelledby="places-h" aria-describedby="places-hint" aria-controls="places-results"
                  placeholder="Address, town, river, catchment, survey mark or lat, lon"
-                 oninput="Places.input(this.value)" onkeydown="Places.key(event)">
+                 oninput="Places.input(this.value, event)" onkeydown="Places.key(event)">
           <button type="button" class="places-clear" onclick="Places.clear(true)" title="Clear the box — the pins stay"
                   aria-label="Clear the box">✕</button>
         </div>
@@ -1421,7 +1423,8 @@ const Places = (function () {
     const out = [];
     if (coord) {
       const at = pinAt(coord.lat, coord.lon);
-      out.push(groupHtml('coord', 'Coordinate', [rowHtml('coord', 0, coord.text, at ? `pin ${at.n} is here` : 'drop a pin here')], 0));
+      out.push(groupHtml('coord', 'Coordinate', [rowHtml('coord', 0, coord.text,
+        at ? `pin ${at.n} is here` : typedCoord ? 'press Enter to drop a pin here' : 'drop a pin here')], 0));
     }
     const street = addressy(q);
     out.push(addrHtml(q));
@@ -1466,10 +1469,17 @@ const Places = (function () {
 
   // Called from the box on every keystroke. Coordinates and the file's own
   // answers are there at once — no network, works offline — and an entry that
-  // is *nothing but* a coordinate takes the map with it, because that is what
-  // pasting one into a box is asking for. A name waits for a pause and then,
-  // only if it looks like one, is asked about.
-  function input(text) {
+  // is *nothing but* a coordinate, pasted in whole, takes the map with it,
+  // because that is what pasting one into a box is asking for. One typed a
+  // key at a time waits for Enter (or its row pressed): see below. A name
+  // waits for a pause and then, only if it looks like one, is asked about.
+  //
+  // `ev` is the box's input event, for its inputType: a key pressed is
+  // insertText / insertCompositionText / delete…; a paste, a drop or an
+  // autocomplete is insertFrom… / insertReplacementText; a value set by code
+  // (another tool handing the box a coordinate) comes with no inputType at
+  // all and counts as whole.
+  function input(text, ev) {
     query = String(text || '');
     const s = query.trim();
     clearTimeout(lookupTimer);
@@ -1479,13 +1489,17 @@ const Places = (function () {
     local = localFor(s);
     noteMarks(s);
     if (coord) {
+      typedCoord = typedKey(ev);
       render();
       // The list says so at once — the parse is arithmetic and costs nothing —
-      // but the *map* waits for the typing to stop. Typed a character at a
-      // time, "-26.1234, 152.5678" is a valid coordinate at "-26.1 152", again
-      // at "-26.12 152.5" and so on, and a map that lurches at each of them is
-      // a map nobody can read. A paste, which is what this is mostly for, is
-      // one event and moves once.
+      // but the *map* waits. Typed a character at a time, "-26.1234, 152.5678"
+      // is a valid coordinate at "-26.1 152", again at "-26.12 152.5" and so
+      // on, and since a place gone to leaves a numbered pin, a settle timer
+      // dropped one at every pause in the typing — four pins on the way to
+      // one. So typing never moves the map: the row says "press Enter", and
+      // Enter (key(), below) or the row itself goes there. A paste, which is
+      // what this is mostly for, is one event and moves once, as before.
+      if (typedCoord) return;
       //
       // Settled again on the text it last went to, it stays put — unless the
       // pin it left there has since been taken off: the same coordinate
@@ -1509,6 +1523,12 @@ const Places = (function () {
     if (wantGaz || wantAddr) {
       lookupTimer = setTimeout(() => { if (wantGaz) lookup(s); if (wantAddr) lookupAddress(s); }, DEBOUNCE_MS);
     }
+  }
+
+  // A key pressed rather than a whole value put in — see input().
+  function typedKey(ev) {
+    const t = ev && typeof ev.inputType === 'string' ? ev.inputType : '';
+    return /^(insertText|insertCompositionText|delete)/.test(t);
   }
 
   // Enter in the box goes to the first thing listed; the arrow down steps into

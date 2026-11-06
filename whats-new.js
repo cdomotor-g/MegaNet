@@ -25,6 +25,21 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 232, date: '2026-11-06', items: [
+      '〽️ <strong>Path tools is now Radio link, and it looks like Radio Mobile\'s Radio Link window.</strong> Its top '
+        + 'is the path and its fade margin in a dark band, Radio Mobile\'s three rows of figures, the elevation profile, '
+        + 'the transmitter and the receiver with their signal meters, and the net, frequency and settings — the same '
+        + 'layout 🗒️ Copy like RM copies. Drag the pane wider and the figures line up five to a row and the receiver '
+        + 'moves beside the transmitter. Find another station at either end in the box under its name. Everything '
+        + 'else — the working, the settings, what each word means — is further down, open to read.',
+      '📄 <strong>Copy for a report</strong> (it was 📄 Copy a summary) now carries everything: the Radio Link window, '
+        + 'then the two ends, the path, the model and its settings, the budget term by term, and what Flood-Net '
+        + 'models next to Radio Mobile. 🗒️ <strong>Copy like RM</strong> is the old Copy compact. The old 📋 Copy for '
+        + 'a report has gone. Both buttons stay at the top of the pane however far down you scroll.',
+      '📍 <strong>Find a place waits for Enter when you type a coordinate.</strong> Typing one a key at a time used to '
+        + 'drop a new pin at every pause; now the row says <em>press Enter to drop a pin here</em>. A pasted '
+        + 'coordinate still goes straight there.',
+    ] },
     { n: 231, date: '2026-11-06', items: [
       '📡 <strong>25 W transmitters.</strong> Field Station 25W is a radio system now, beside 1 W and 5 W: pick it '
         + 'under <em>Radio system</em> in the Repeater site finder and Polar radio coverage, and for a station in its '

@@ -479,7 +479,19 @@ try {
   await page.waitForTimeout(400);
   await page.click('#help-panel .dock-tab[data-dock="places"]');
   await page.waitForTimeout(300);
-  await page.fill('#places-q', '-26.66, 150.19');
+  // Typed a key at a time, a coordinate is a valid one many times on the way
+  // ("-26.6, 15", "-26.66, 150.1"…), and each pause used to drop a numbered
+  // pin. Typing waits for Enter; the row says so.
+  await page.click('#places-q');
+  await page.keyboard.type('-26.66, 150.19', { delay: 300 });
+  await page.waitForTimeout(500);
+  const typedOnly = await page.evaluate(() => ({
+    pins: document.querySelectorAll('.mn-place.mn-pin-blue').length,
+    row: ((document.querySelector('#places-results .places-hit') || {}).textContent || '').replace(/\s+/g, ' ').trim(),
+  }));
+  check('a coordinate typed a key at a time drops no pin until Enter, and its row says to press Enter',
+    typedOnly.pins === 0 && /press Enter/.test(typedOnly.row), JSON.stringify(typedOnly));
+  await page.press('#places-q', 'Enter');
   await page.waitForTimeout(900);
   const inPane = await page.evaluate(() => {
     const c = state.map.getCenter();
@@ -491,7 +503,7 @@ try {
       filtering: anyStationFilterActive(),
     };
   });
-  check('the same text in the blue pin\'s pane is a place: listed, gone to, pinned in blue — and nothing filtered',
+  check('…and Enter takes the map there: listed, gone to, one pin in blue — and nothing filtered',
     inPane.showing === 'places' && inPane.rows.some(r => /-26\.66, 150\.19/.test(r)) && inPane.pins === 1
       && inPane.d < 0.2 && inPane.filtering === false, JSON.stringify(inPane));
   await page.evaluate(() => Places.clear(true));

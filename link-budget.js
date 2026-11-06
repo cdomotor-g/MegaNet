@@ -383,6 +383,7 @@ const LinkBudget = (function () {
     const existing = MapDraw.findLine(pa, pb);
     if (existing) MapDraw.focus(existing.id);
     else MapDraw.addLine([pa, pb], [a.sid || null, b.sid || null]);
+    noteLine();
     // The panel is open and empty for as long as the terrain tiles take, which
     // on a long path over ground nobody has looked at yet is several seconds.
     // It says "sampling terrain…" itself, but that line is below the fold from
@@ -669,7 +670,9 @@ const LinkBudget = (function () {
       return `
         <div class="lb-end lb-end-empty${armed(which) ? ' is-armed' : ''}">
           <div class="lb-end-head"><span class="lb-tag">${tag}</span> <em>not set</em></div>
-          ${findHtml(which)}
+          <p class="small lb-src">${armed(which) ? `End ${tag} is waiting for a pick.`
+            : `Find it under ${which === 'a' ? 'TX' : 'RX'} in the radio link above, or
+               <button type="button" class="lb-link" onclick="LinkBudget.arm('${which}')">pick it off the map or the list</button>.`}</p>
         </div>`;
     }
     const f = (k, label, step, unit) => {
@@ -702,7 +705,6 @@ const LinkBudget = (function () {
           <span class="lb-tag">${tag}</span>
           <strong>${esc(e.name)}</strong>
         </div>
-        ${findHtml(which)}
         <p class="small lb-src">${e.kind === 'station'
           ? `Station${e.sysName ? ` · ${esc(e.sysName)}` : ''}${e.freq ? ` · repeater ${e.freq} MHz` : ''}`
           : 'Hypothetical point — nothing is written back to the station data'}</p>
@@ -1148,9 +1150,18 @@ const LinkBudget = (function () {
   // kept as a table because "the same model" is a claim that deserves to be
   // checked line by line, and the lines where it is *not* the same still
   // matter to anyone deciding on the figure.
-  function comparisonHtml() {
+  // What this models next to Radio Mobile, as rows — [term, Flood-Net, Radio
+  // Mobile], each a piece of this file's own markup — and the paragraph over
+  // them: the card's table, and 📄 Copy for a report's (PathProfile).
+  const COMPARISON_INTRO = `The figure is a <strong>model output</strong>: the same public-domain propagation model Radio
+          Mobile runs, over ~30 m terrain, less an allowance calibrated on margins measured in the field — so it reads
+          a few decibels <em>below</em> Radio Mobile's “Rx relative” for the same path, and close to what an
+          attenuator on site finds. It is as good as its inputs. The rows that say <em>not modelled</em> are where
+          one path can stray from the average, and an antenna pattern pointed the wrong way costs more than any of
+          them — confirm on air before anything is built on it.`;
+  function comparisonRows() {
     const N = RM_NET_DEFAULTS;
-    const rows = [
+    return [
       ['Propagation model', 'Longley–Rice ITM v1.2.2, point-to-point — NTIA’s reference code ported line for line and held to it at 10<sup>−6</sup> dB',
        'The same ITM, except line-of-sight paths, where Radio Mobile substitutes its own two-ray method'],
       ['Terrain', 'SRTM/GMTED ~30 m tiles, 256 samples along the great circle; an end is never stood below the tile under it — or, as a setting, Geoscience Australia’s 5 m LiDAR at the ends and obstacles, a repeater or base stood on its top',
@@ -1172,15 +1183,17 @@ const LinkBudget = (function () {
       ['Ducting, rain, multipath fading', '<em>Not modelled</em> beyond the model’s own time variability', 'The same — nothing beyond ITM'],
       ['Interference / noise floor', '<em>Not modelled</em> — see the RF Environment tab for ACMA co-channel risk', 'Not modelled'],
     ];
+  }
+
+  // Open until somebody shuts it, like every other explaining on the path
+  // tools (pathMoreHtml).
+  function comparisonHtml() {
+    const rows = comparisonRows();
     return `
-      <details class="lb-compare">
+      <details class="lb-compare" ${S().compareOpen === false ? '' : 'open'}
+               ontoggle="state.link.compareOpen = this.open">
         <summary>What this models, next to Radio Mobile — and what neither does</summary>
-        <p class="small">The figure is a <strong>model output</strong>: the same public-domain propagation model Radio
-          Mobile runs, over ~30 m terrain, less an allowance calibrated on margins measured in the field — so it reads
-          a few decibels <em>below</em> Radio Mobile's “Rx relative” for the same path, and close to what an
-          attenuator on site finds. It is as good as its inputs. The rows that say <em>not modelled</em> are where
-          one path can stray from the average, and an antenna pattern pointed the wrong way costs more than any of
-          them — confirm on air before anything is built on it.</p>
+        <p class="small">${COMPARISON_INTRO}</p>
         <div class="table-wrap">
           <table class="lb-compare-table">
             <caption class="sr-only">What this budget models against what Radio Mobile models, term by term</caption>
@@ -1238,7 +1251,7 @@ const LinkBudget = (function () {
         ? `End ${S_.target.toUpperCase()} is waiting: pick a station or a spot on the map, a row in the list, or search in its box.`
         : S_.picking
           ? 'Click a station to fill it in from its Radio Mobile system, or click empty ground for a hypothetical site.'
-          : 'Search for either end below, or set both from a line drawn in Draw &amp; measure.'}</p>`}
+          : 'Find either end under TX and RX in the radio link above, or set both from a line drawn in Draw &amp; measure.'}</p>`}
       <div class="lb-ends">
         ${endpointCard('a', S_.a)}
         ${endpointCard('b', S_.b)}
@@ -1326,7 +1339,7 @@ const LinkBudget = (function () {
     if (!el) return;
     const d = el.querySelector(':scope > details.lb-panel');
     // First paint only — after this the element is never replaced (#160).
-    if (!d) { el.innerHTML = panelHtml(); return; }
+    if (!d) { el.innerHTML = panelHtml(); syncFinds(); return; }
     // Replacing an open <details> re-fires toggle on insertion in current
     // Chromium — the self-sustaining loop setOpen's guard breaks — and
     // replacing it in the same breath as a click eats the click. So from here
@@ -1341,6 +1354,66 @@ const LinkBudget = (function () {
     const body = d.querySelector(':scope > .lb-body');
     if (body) keepFocus(() => { body.innerHTML = S().open ? bodyHtml() : ''; });
     syncMarginChip();
+    syncFinds();
+  }
+
+  // The two ends' search boxes, wherever they are drawn: under TX and RX in
+  // the radio link at the top of the path tools (PathProfile), each in a host
+  // of its own ([data-lb-find]). Repainted with the card — arming an end,
+  // filling it, clearing it all change them — and kept under the caret the
+  // way the card's own boxes are (keepFocus). The profile's repaint carries
+  // the hosts across whole, so typing is never redrawn by it.
+  //
+  // With no line drawn yet the radio link names its two ends from this card
+  // (PathProfile's empty state), so an end filled or cleared here is named
+  // there too; once there is a line, the names over the boxes are the line's.
+  function syncFinds() {
+    const noLine = typeof PathProfile !== 'undefined' && !PathProfile.target();
+    for (const host of document.querySelectorAll('[data-lb-find]')) {
+      const w = host.dataset.lbFind === 'b' ? 'b' : 'a';
+      keepFocus(() => { host.innerHTML = findHtml(w); });
+      const name = noLine && host.closest('.rl-end') && host.closest('.rl-end').querySelector('.rl-end-name');
+      if (name) name.textContent = S()[w] ? S()[w].name : 'not set';
+    }
+  }
+
+  // The ends the radio link is showing are the profile's — the line drawn —
+  // and a box under one of them is there to change that end of *that* path.
+  // So before an end is armed from it, the budget takes the line's two ends
+  // if it is on any others (the line drawn in Draw & measure, say, which
+  // never told it): the station picked then replaces this end and keeps the
+  // other, and the line follows. Quietly — no scroll, no reveal — unlike
+  // fromProfile, which is a press asking to be taken to the card.
+  //
+  // Once per line: a line the budget has already taken, or drew itself, is
+  // not taken again — so after Clear A, or Clear both ends, arming an end
+  // means "pick it afresh", not "put the old one back".
+  function lineSig(sh) {
+    return sh ? `${sh.id}:${sh.pts.map(p => `${p[0].toFixed(6)},${p[1].toFixed(6)}`).join(';')}` : '';
+  }
+  function noteLine() {
+    const sh = typeof PathProfile !== 'undefined' ? PathProfile.target() : null;
+    S().lineSig = lineSig(sh);
+  }
+  function adoptProfile() {
+    const sh = typeof PathProfile !== 'undefined' ? PathProfile.target() : null;
+    if (!sh || sh.pts.length !== 2) return;
+    if (S().lineSig === lineSig(sh)) return;
+    S().lineSig = lineSig(sh);
+    const ids = sh.snappedTo || [];
+    const want = i => {
+      const sid = i === 0 ? ids[0] : ids[ids.length - 1];
+      const st = sid && state.data ? state.data.stations.find(x => x.id === sid) : null;
+      return { st, lat: sh.pts[i][0], lon: sh.pts[i][1] };
+    };
+    const same = (e, w) => !!e && (w.st ? e.sid === w.st.id
+      : !e.sid && Math.abs(e.lat - w.lat) < 1e-6 && Math.abs(e.lon - w.lon) < 1e-6);
+    const wa = want(0), wb = want(1);
+    if (same(S().a, wa) && same(S().b, wb)) return;
+    const take = w => (w.st ? stationEndpoint(w.st) : pointEndpoint(w.lat, w.lon));
+    if (!same(S().a, wa)) { S().a = take(wa); fillGround(S().a); }
+    if (!same(S().b, wb)) { S().b = take(wb); fillGround(S().b); }
+    drawMarkers();
   }
 
   // A repaint must not eat what somebody is in the middle of typing. The body
@@ -1380,7 +1453,11 @@ const LinkBudget = (function () {
     const el = document.getElementById(id);
     if (!el || el.disabled) return;
     const at = document.activeElement;
-    if (at && at !== document.body && !document.getElementById('link-budget-panel').contains(at)) return;
+    const ours = ['link-budget-panel', 'path-profile-panel'].some(x => {
+      const host = document.getElementById(x);
+      return host && host.contains(at);
+    });
+    if (at && at !== document.body && !ours) return;
     el.focus({ preventScroll: true });
   }
 
@@ -1426,6 +1503,14 @@ const LinkBudget = (function () {
 
     panelHtml, rerender,
 
+    // An end's search box, for the radio link at the top of the path tools
+    // (PathProfile), which draws it under that end's name; the name of what
+    // is at an end, for that card before there is a line; and what this
+    // models next to Radio Mobile, for 📄 Copy for a report.
+    findHtml,
+    endName(which) { const e = S()[which === 'b' ? 'b' : 'a']; return e ? e.name : ''; },
+    comparison() { return { intro: COMPARISON_INTRO, rows: comparisonRows() }; },
+
     setOpen(v) {
       // Idempotent, and that is load-bearing rather than tidy (#160): current
       // Chromium fires a toggle event when a parsed `<details open>` is
@@ -1465,6 +1550,7 @@ const LinkBudget = (function () {
     arm(which) {
       if (which !== 'a' && which !== 'b') return;
       if (S().target === which && S().picking) return;
+      adoptProfile();
       S().target = which;
       S().picking = true;
       rerender();
@@ -1650,6 +1736,7 @@ const LinkBudget = (function () {
       };
       S().open = true;
       S().a = pick(0); S().b = pick(1);
+      noteLine();
       // Both ends have just been replaced wholesale, so a half-typed search
       // against the old ones is a question about something that is no longer
       // on the card. The arm goes with them for the same reason.

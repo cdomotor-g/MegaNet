@@ -354,10 +354,10 @@ const Capabilities = (function () {
     { key: 'radio', icon: '📡', name: 'Radio planning',
       blurb: 'Will a path work, where should a repeater go, and what to set on it.',
       items: [
-        { name: 'Path profile', tab: 'stations', where: 'side panel › Path tools', open: { dock: 'paths' },
+        { name: 'Path profile', tab: 'stations', where: 'side panel › Radio link', open: { dock: 'paths' },
           what: 'The ground, trees, Fresnel zone and line of sight between two points, with a verdict and the obstructions.',
           src: 'Geoscience Australia (LiDAR), Esri (land cover)', find: 'elevation profile fresnel' },
-        { name: 'Link budget', tab: 'stations', where: 'side panel › Path tools', open: { dock: 'paths' },
+        { name: 'Link budget', tab: 'stations', where: 'side panel › Radio link', open: { dock: 'paths' },
           what: 'The fade margin between any two stations or points, by the Longley–Rice model, with the radio figures to change.',
           find: 'itm fade margin' },
         { name: 'Radio coverage', tab: 'stations', where: 'map › 📡 Radio coverage', open: { panel: 'polar' },

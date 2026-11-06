@@ -1212,44 +1212,14 @@ if (report) {
      report.compact.rm && report.compact.lean, JSON.stringify(report.compact));
 }
 await page.evaluate(() => PathProfile.hoverOff());
-await page.click('#path-copy');
-const pasted = await page.evaluate(async () => {
-  const until = Date.now() + 15000;
-  let items = [];
-  while (Date.now() < until) {
-    try { items = await navigator.clipboard.read(); } catch (_) { items = []; }
-    if (items.length && items[0].types.includes('text/html')) break;
-    await new Promise(r => setTimeout(r, 200));
-  }
-  const it = items[0];
-  if (!it) return null;
-  const out = { types: it.types.slice() };
-  if (it.types.includes('text/html')) {
-    const h = await (await it.getType('text/html')).text();
-    out.img = /<img[^>]+src="data:image\/png;base64,/.test(h);
-    out.budget = /Link budget — how the fade margin is worked out/.test(h);
-  }
-  if (it.types.includes('text/plain')) out.text = (await (await it.getType('text/plain')).text()) === PathProfile.report().text;
-  if (it.types.includes('image/png')) {
-    const bmp = await createImageBitmap(await it.getType('image/png'));
-    out.png = [bmp.width, bmp.height];
-  }
-  out.toast = [...document.querySelectorAll('.toast-text')].map(t => t.textContent).pop() || '';
-  return out;
-});
-ok('the press puts a document, plain text and a picture on the clipboard',
-   !!pasted && ['text/html', 'text/plain', 'image/png'].every(t => pasted.types.includes(t)), JSON.stringify(pasted));
-if (pasted) {
-  ok('…the document carrying the chart as a picture and the budget under it', pasted.img && pasted.budget, JSON.stringify(pasted));
-  ok('…the text the report\'s own, and the picture drawn at twice its size',
-     pasted.text && !!pasted.png && pasted.png[0] === 2400 && pasted.png[1] > 900, JSON.stringify(pasted));
-  ok('…and says it did', /^Copied/.test(pasted.toast), pasted.toast);
-}
-// 📄 Copy a summary: the same three ways, the document laid out as Radio
-// Mobile's Radio Link window with the chart inside it.
+// 📄 Copy for a report: the Radio Link window with every figure behind the
+// margin under it in the window's dress — three ways, a document with the
+// chart inside it as a picture, the same as plain text, and the chart alone.
+// (📋, the plain-tables report, has gone; the rows it was written from are
+// what the window's parts are written from, held above.)
 await page.click('#path-copy-brief');
 const brief = await page.evaluate(async () => {
-  const want = PathProfile.report().brief.text;
+  const want = PathProfile.report().full.text;
   const until = Date.now() + 15000;
   let it = null, text = '';
   while (Date.now() < until) {
@@ -1263,19 +1233,27 @@ const brief = await page.evaluate(async () => {
   if (it.types.includes('text/html')) {
     const h = await (await it.getType('text/html')).text();
     out.img = /<img[^>]+src="data:image\/png;base64,/.test(h);
-    out.tables = /Link budget —|The two ends/.test(h);
     out.window = /RADIO LINK/.test(h) && /TRANSMITTER/.test(h) && /RECEIVER/.test(h);
+    out.parts = ['THE TWO ENDS', 'THE PATH', 'PROPAGATION MODEL AND SETTINGS', 'LINK BUDGET — HOW THE FADE MARGIN IS WORKED OUT',
+                 'WHAT THIS MODELS, NEXT TO RADIO MOBILE — AND WHAT NEITHER DOES', 'WHAT THE WORDS MEAN'].filter(x => !h.includes(x));
+    out.order = h.indexOf('RECEIVER') < h.indexOf('THE TWO ENDS');
+  }
+  if (it.types.includes('image/png')) {
+    const bmp = await createImageBitmap(await it.getType('image/png'));
+    out.png = [bmp.width, bmp.height];
   }
   out.toast = [...document.querySelectorAll('.toast-text')].map(t => t.textContent).pop() || '';
   return out;
 });
-ok('📄 the summary press puts the summary\'s text, a document and the picture on the clipboard',
+ok('📄 the report press puts the report\'s text, a document and the chart\'s picture on the clipboard',
    !!brief && brief.text && ['text/html', 'text/plain', 'image/png'].every(t => brief.types.includes(t)), JSON.stringify(brief));
 if (brief) {
-  ok('…the document the Radio Link window with the chart in it, and none of the report\'s tables', brief.img && brief.window && !brief.tables, JSON.stringify(brief));
-  ok('…and says what it copied', /^Copied: the summary/.test(brief.toast), brief.toast);
+  ok('…the document the Radio Link window with the chart in it, then every part behind the margin',
+     brief.img && brief.window && !brief.parts.length && brief.order, JSON.stringify(brief));
+  ok('…the picture the chart drawn at twice its size', !!brief.png && brief.png[0] === 2400 && brief.png[1] > 900, JSON.stringify(brief));
+  ok('…and says what it copied', /^Copied: the report/.test(brief.toast), brief.toast);
 }
-// 🗒️ Copy compact: the window in brief as one picture, and nothing else on
+// 🗒️ Copy like RM: the window in brief as one picture, and nothing else on
 // the clipboard — a document or text beside it is what Teams pastes instead.
 await page.click('#path-copy-compact');
 const compact = await page.evaluate(async () => {
@@ -1303,34 +1281,35 @@ ok('…drawn at twice its size, the same picture the check above read', !!compac
    && !!report && !!report.compact.size && compact.png[1] === report.compact.size[1] * 2, JSON.stringify(compact));
 ok('…and says what it copied', /^Copied: the compact summary/.test(compact.toast), compact.toast);
 
-// Shown on asking: the cards carry the answer, and the explaining behind a
-// click. The budget's answer block says the figure the corner chip says; the
-// working, the profile's geometry and the chart's notes start shut, their
-// words still in the page; and a disclosure opened stays open through the
-// repaint a changed figure causes, then shuts when asked.
+// The explaining, open to read: with the radio link at the top saying the
+// answer, the working under it starts open (the owner's call, November 2026).
+// The budget's answer block says the figure the corner chip says; the
+// working, the profile's geometry, the chart's notes and the datums start
+// open; and a disclosure shut stays shut through the repaint a changed figure
+// causes, then opens again when asked.
 const more = await page.evaluate(async () => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const d = id => document.querySelector(`[data-more="${id}"]`);
-  const shut = ['lb-working', 'lb-model', 'path-figures', 'path-chart', 'path-heights'].map(id => [id, d(id) ? d(id).open : null]);
+  const open = ['lb-working', 'lb-model', 'path-figures', 'path-chart', 'path-heights'].map(id => [id, d(id) ? d(id).open : null]);
   const result = (document.querySelector('.lb-result-db') || {}).textContent;
   const chip = (document.getElementById('lb-margin-chip') || {}).textContent;
   const tableInPage = !!(d('lb-working') && d('lb-working').querySelector('.lb-table .lb-margin'));
-  d('lb-working').open = true;
+  d('lb-working').open = false;
   await sleep(50);                         // toggle is dispatched a task later
   LinkBudget.setField('a', 'tx_w', '3');
-  const kept = d('lb-working').open && state.link.more['lb-working'] === true;
-  d('lb-working').open = false;
+  const kept = d('lb-working').open === false && state.link.more['lb-working'] === false;
+  d('lb-working').open = true;
   await sleep(50);
   LinkBudget.setField('a', 'tx_w', '');
-  return { shut, result, chip, tableInPage, kept, shutAgain: d('lb-working').open === false && !state.link.more['lb-working'] };
+  return { open, result, chip, tableInPage, kept, openAgain: d('lb-working').open === true && state.link.more['lb-working'] === true };
 });
 ok('the link budget\'s answer says the corner chip\'s figure', !!more.result && more.result === more.chip,
    `${more.result} against ${more.chip}`);
-ok('…the working, the model note, the profile\'s geometry, the chart\'s notes and the datums start shut',
-   more.shut.every(([, open]) => open === false), JSON.stringify(more.shut));
-ok('…with the term-by-term table still in the page behind the working', more.tableInPage);
-ok('a disclosure opened stays open through a repaint, and shuts when asked',
-   more.kept && more.shutAgain, JSON.stringify(more));
+ok('…the working, the model note, the profile\'s geometry, the chart\'s notes and the datums start open',
+   more.open.every(([, o]) => o === true), JSON.stringify(more.open));
+ok('…with the term-by-term table in the page under the working', more.tableInPage);
+ok('a disclosure shut stays shut through a repaint, and opens again when asked',
+   more.kept && more.openAgain, JSON.stringify(more));
 
 // Full screen: the same chart, drawn again at the size the window gives it,
 // with the readout over it — and only one chart in the page at a time, since

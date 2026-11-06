@@ -1059,7 +1059,8 @@ try {
         rows: !!(el && el.querySelector('.path-card-rows')),
         visible: !!el && el.checkVisibility(),
         inPane: !!(el && el.closest('#dock-pane-paths')),
-        first: !!(el && wrap && wrap.firstElementChild === el),
+        // The first card: the copy bar (#path-toolbar) stands over the cards.
+        first: !!(el && wrap && wrap.querySelector(':scope > .panel') === el),
         onMap: !!document.querySelector('.mn-map-stage #path-profile-panel, .mn-map-stage .path-card-rows'),
         focusIn: !!(el && el.contains(a)),
         focusTag: a ? (a.id || a.tagName) : null,

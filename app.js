@@ -2582,7 +2582,7 @@ function dockSkeleton(panel) {
           <h2 class="sr-only">Stations — filters, station list and station details</h2>
         </div>
         <div class="dock-pane dock-pane-stations" id="${dockPaneId('paths')}" data-dock="paths" hidden>
-          <h2 class="sr-only">Path tools — radio path, elevation profile and link budget</h2>
+          <h2 class="sr-only">Radio link — elevation profile, fade margin and link budget</h2>
         </div>
         <div class="dock-pane dock-pane-map dock-pane-places" id="${dockPaneId('places')}" data-dock="places" hidden>
           ${Places.paneHtml()}
@@ -2784,8 +2784,8 @@ function dockStripGroups() {
   places.push({ key: 'places', kind: 'tab', icon: Glyphs.rail('places'), name: 'Find a place',
                 label: 'Find a place — a town, river, catchment, council area, survey mark or coordinate' });
   if (here) {
-    places.push({ key: 'paths', kind: 'tab', icon: Glyphs.rail('paths'), name: 'Path tools',
-                  label: 'Path tools — radio path, elevation profile and link budget (fade margin)' });
+    places.push({ key: 'paths', kind: 'tab', icon: Glyphs.rail('paths'), name: 'Radio link',
+                  label: 'Radio link — the elevation profile and fade margin between two points, and the link budget' });
   }
   // The digital twin's pane: what was the Digital Twin tab's left column —
   // the finder, the scene's settings, the ground truth and the .glb — beside
@@ -4232,6 +4232,9 @@ function renderStationsHtml() {
              announces when a click on the map sends it here; Escape hands
              focus back. -->
         <div class="stn-cards" id="stations-path-cards">
+          <!-- The copies, in a bar of their own over the cards: kept at the
+               top of the 〽️ pane as it scrolls (PathProfile.toolbarHtml). -->
+          ${PathProfile.toolbarHtml()}
           <div class="panel card-kind card-kind-links" id="path-profile-panel"
                role="region" aria-labelledby="path-card-title" tabindex="-1"
                onkeydown="MapBackbone.onKey(event)"></div>

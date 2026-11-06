@@ -810,9 +810,12 @@ const HELP = {
            + '<strong>Collapse »</strong> at its top for icons alone, and « for the names again, the way '
            + 'the left bar folds. Its first section, <strong>Stations &amp; places</strong>, holds '
            + '<strong>Stations</strong> — the list with its filters, and the station details, one column '
-           + 'that scrolls on its own — <strong>Find a place</strong>, <strong>Path tools</strong> (the '
-           + '<strong>radio path</strong> you clicked, the <strong>elevation profile</strong> and the '
-           + '<strong>link budget</strong> with its fade margin, in a pane of their own) and the '
+           + 'that scrolls on its own — <strong>Find a place</strong>, <strong>Radio link</strong> (the '
+           + '<strong>radio path</strong> you clicked or the two stations you picked, laid out like Radio '
+           + 'Mobile\'s Radio Link window — its figures, the <strong>elevation profile</strong>, the '
+           + 'transmitter and the receiver — with the <strong>link budget</strong> and its working under it, '
+           + 'in a pane of their own; 🗒️ <strong>Copy like RM</strong> and 📄 <strong>Copy for a report</strong> '
+           + 'stay at the top of it as it scrolls) and the '
            + '<strong>Digital twin</strong>. (The 🔭 AR station finder is a tab of its own now, '
            + '<strong>Look Around</strong>, in the left bar.) Press the button of the pane that is showing '
            + 'and the side panel shuts, giving the map the width; drag its left edge (or focus it and use '
@@ -841,7 +844,7 @@ const HELP = {
            + 'and the side panel is put away behind <strong>⋮</strong> at the top right: press it and '
            + 'the strip comes out as a rail of icons down the right-hand edge, beside the map rather than '
            + 'on it, with every button of the desktop\'s rail in it, and press it again to put the rail '
-           +            + 'away. A pane opens as a drawer beside the rail — the cards and the path tools too — '
+           +            + 'away. A pane opens as a drawer beside the rail — the cards and the radio link too — '
            + 'and pressing its button again, tapping the dimmed page or pressing Escape puts it '
            + 'away. The <strong>Stations</strong> card is the list and its filters in one: its head '
            + 'carries the live row count, the <strong>Filters</strong> toggle and + Propose and + New; '
@@ -868,7 +871,7 @@ const HELP = {
            + 'ask for a link budget. The profile says how to draw a path until there is one. '
            + 'The cards are coloured by what they are about: blue for the list (every station), '
            + 'violet for the links between stations (Repeaters listening, the blast radius and the '
-           + 'path tools), teal for the editor (the one station picked). The editor turns gold-orange '
+           + 'radio link), teal for the editor (the one station picked). The editor turns gold-orange '
            + 'once anything in it is changed and not saved: each changed field is gilded, and a bar at '
            + 'the foot of the card, kept in view while you scroll, counts the changes, names them — '
            + 'press a name to go to it — and has its own Save. A field put back as it was loses its '
@@ -1163,7 +1166,7 @@ const HELP = {
       + 'station — a base opens no window of its own to share, so on those the distance is the '
       + 'whole test. For backbone the slider is the <em>match</em> — moving it changes which '
       + 'pairs qualify, not just which are drawn. Clicking any radio path — field link or '
-      + 'backbone — opens a card about that hop at the top of the path tools (〽️ in the side '
+      + 'backbone — opens a card about that hop at the top of the radio link (〽️ in the side '
       + 'panel, or under the map), above the elevation profile and link budget it points at the '
       + 'same hop; × or Escape closes it. Its fade margin is the elevation profile\'s own figure — one way, '
       + 'the way the traffic runs: field station to repeater, repeater to base, since nothing transmits '
@@ -1179,7 +1182,7 @@ const HELP = {
       + 'somewhere. It filters what is drawn and switches nothing off; in the side panel the '
       + 'pane is the full height of the window, so there is plenty for it to filter.',
       'Where the station cards go follows the width of the window. Above 1,100 px they are in '
-      + 'the <strong>side panel</strong> beside the map (📍, and 〽️ for the path tools), the map '
+      + 'the <strong>side panel</strong> beside the map (📍, and 〽️ for the radio link), the map '
       + 'filling the height of the window and the cards scrolling on their own — the single '
       + 'column put the map\'s own answer below the fold, so reading it cost you the map. At or '
       + 'below 1,100 px they are under the map in one long page, because two 400 px columns are '
@@ -4751,7 +4754,9 @@ const state = {
   // the radio at each end is state.radio's, and the profile is recomputed from
   // whichever line is current rather than stored.
   path: {
-    open:    false,
+    // Open: the radio link is the top of the path tools, and what they are
+    // opened for.
+    open:    true,
     // Ground cover on the profile (see LandCover): trees, buildings and crops
     // sampled along the path and stood on the terrain, in the Fresnel check and
     // in the propagation model both. On by default — it is one request per
@@ -4766,7 +4771,10 @@ const state = {
   // Link budget card. The endpoints have to outlive a tab switch — half an hour
   // of what-ifs should not be thrown away by looking at the Pass Ranges tab.
   link: {
-    open:    false,
+    // Open, like the radio link over it — and not picking: a card that is
+    // open by default must not quietly take the map's clicks. Opening it by
+    // hand arms the pick, as it always has (LinkBudget.setOpen).
+    open:    true,
     picking: false,  // map clicks are setting endpoints
     // { kind:'station'|'point', key, …, def:{}, over:{} } — see LinkBudget. An
     // end's `over` is its site's object in state.radio, not a copy of it.
@@ -4795,17 +4803,22 @@ const state = {
       mastAgl:    FN_MODEL_DEFAULTS.mastAgl,      // m, repeaters and bases
     },
     // Which of the card's disclosures are open: the propagation settings, the
-    // cover-height table and why the Fresnel zone is an ellipse. Shut by
-    // default — they are the premises, and the figure is what the card is
-    // opened for.
-    propOpen:  false,
-    coverOpen: false,
-    zoneOpen:  false,
+    // cover-height table, why the Fresnel zone is an ellipse and what this
+    // models next to Radio Mobile. Open by default (the owner's call, November
+    // 2026): with the radio link at the top saying the answer, the working
+    // under it is there to be read, not hunted for.
+    propOpen:    true,
+    coverOpen:   true,
+    zoneOpen:    true,
+    compareOpen: true,
     // …and every other "more" disclosure on the path tools (pathMoreHtml,
     // path-profile.js), by id: the explanations, sources and working behind
-    // the figures, shut until somebody opens one, and kept open across the
-    // repaints every change makes until they shut it again.
+    // the figures — open until somebody shuts one (false here), and kept
+    // shut across the repaints every change makes until they open it again.
     more:      {},
+    // The line the budget last took its two ends from, or drew (LinkBudget's
+    // adoptProfile) — so the radio link's boxes take a new line's ends once.
+    lineSig:   '',
     // Which end the next station pick fills: a click on the map, or a row in
     // the Stations list under it. null is the original behaviour — A, then B,
     // then A again. Putting the caret in an end's search box arms that end,

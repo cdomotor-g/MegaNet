@@ -5060,7 +5060,7 @@ One column on the right of every tab, the *side panel* (`#help-panel`, called
 "the dock" in the code): a strip of buttons on the screen's edge and, open, one
 pane beside it. ❔ is the help described below; 📍, on the Stations tab, is the
 Stations cards (the red pin, a station's wherever the app draws one); the blue 📍
-under it is Find a place; 〽️ is the path tools (the elevation profile and the link budget);
+under it is Find a place; 〽️ is the radio link (the elevation profile and the link budget);
 🧊 is the digital twin's pane (🔭 the AR station finder was beside it until it became the
 Look Around tab, §23);
 and under them, on that tab, every one of the Stations map's own
@@ -5197,9 +5197,17 @@ Stations pane while the window is wider than 1,100 px, or a phone's, where
 the pane is a drawer over a map that fills the screen. The elevation
 profile and the link budget are a wrapper of their own
 inside it (`#stations-path-cards`), and
-beside the map that goes to a pane of its own, 〽️ *Path tools*, under 📍: they
-answer a question asked of the map rather than of the list, and they are the
-cards the map sends people to. Under the map it goes back into the column
+beside the map that goes to a pane of its own, 〽️ *Radio link* (it was *Path
+tools*), under 📍: they answer a question asked of the map rather than of the
+list, and they are the cards the map sends people to. The top of it is laid out
+as Radio Mobile's Radio Link window — the path and its fade margin in a band,
+three rows of five figures, the chart, the transmitter and the receiver, the
+net, the frequency and the settings — and reflows with the pane: cells wrap,
+and the receiver goes under the transmitter when there is no room beside it.
+Each end's name has the link budget's search box under it, so another station
+is picked there. A bar over the cards keeps 🗒️ *Copy like RM* (the window as a
+picture) and 📄 *Copy for a report* (the window as a document, with every
+figure behind the margin under it) at the top of the pane as it scrolls. Under the map it goes back into the column
 between the list and *Repeaters listening*, where the render emitted it. `#stations-main.is-split` then
 means "the cards are in the side panel", and the map fills the height of the
 window on its own — a phone's included, where it is edge to edge under the
