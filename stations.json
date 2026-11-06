@@ -849,14 +849,14 @@
     },
     {
       "id": 3,
-      "name": "System 3",
-      "tx_power_w": null,
-      "line_loss_db": null,
+      "name": "Field Station 25W",
+      "tx_power_w": 25,
+      "line_loss_db": 0.5,
       "supp_loss_db_m": 0,
       "antenna_type": "omni.ant",
-      "antenna_gain_dbi": null,
-      "antenna_height_m": null,
-      "rx_threshold_dbm": null
+      "antenna_gain_dbi": 5.15,
+      "antenna_height_m": 4,
+      "rx_threshold_dbm": -110
     },
     {
       "id": 4,

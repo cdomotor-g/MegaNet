@@ -4208,7 +4208,7 @@ budget's, the elevation profile's, the signal run along the profile's line and
 the radio path card's at the head of them — is taken off one set of radio
 figures per site: TX power, antenna gain, line loss, antenna height and RX
 threshold, each the station's `rm_systems` figure until somebody types over it
-(the threshold is −110 dBm on both field station systems since `0103`; a point
+(the threshold is −110 dBm on the 1, 5 and 25 W field station systems since `0103` and `0105`; a point
 on the ground starts from the same, `LB_DEFAULT_RX_DBM`),
 plus one frequency for every card (`state.radio`, and `radioKey` … `radioChanged`
 in `path-profile.js`). It was three sets: the budget kept its overrides on its
