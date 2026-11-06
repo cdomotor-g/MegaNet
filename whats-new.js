@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 231, date: '2026-11-06', items: [
+      '📡 <strong>25 W transmitters.</strong> Field Station 25W is a radio system now, beside 1 W and 5 W: pick it '
+        + 'under <em>Radio system</em> in the Repeater site finder and Polar radio coverage, and for a station in its '
+        + 'editor — where <em>Radio system</em> is a list of the systems by name instead of a number to type.',
+    ] },
     { n: 230, date: '2026-11-06', items: [
       '📋 <strong>Copy the Best repeater answer for a report.</strong> In 🎯 Best repeater, once it has found the '
         + 'best repeater, press <em>📋 Copy for a report</em> beside Save CSV: it copies the repeaters and bases the '

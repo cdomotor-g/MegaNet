@@ -293,7 +293,7 @@ function runExport() {
     '$Coverage',
     'AntAzt,Area,Color area,Contour,Color contour,D min,D max,Azt min,Azt max,Azt inc,Threshold mode,Visual color,Sensor h,Target h',
     '0,1,FFFF,1,0,0.01,50,0,360,1,1,FFFF,2,2',
-    '$Net', `Nbr nets,Nbr units,Nbr systems`, `${repeaters.length},${units.length},${Math.max(systems.length, 2)}`,
+    '$Net', `Nbr nets,Nbr units,Nbr systems`, `${repeaters.length},${units.length},${systems.length || 3}`,
     'Net ID,Net name,Visible,Minimum fx,Max Fx,Refractivity,Conductivity,Permittivity,Polarization,Climate,Stat. mode,%Time,%Location,%Situation,Topology,Max Rebro,%Urban or Tree',
     ...repeaters.map((r, i) => [
       i + 1, csvEscape(r.name), d.Visible, d['Minimum fx'], d['Max Fx'], d.Refractivity,
@@ -318,7 +318,7 @@ function runExport() {
   ].join('\n');
 
   // FloodNet_System.csv
-  // The two systems this network is, for a document that arrived without them.
+  // The three systems this network is, for a document that arrived without them.
   // Line loss is the half a decibel and the threshold the −110 dBm (0103) the
   // real rm_systems rows now carry — these
   // stand in for those rows, so a figure they disagreed on would export a
@@ -326,6 +326,7 @@ function runExport() {
   const sysDefs = systems.length ? systems : [
     { id: 1, name: 'Field Station 1W', tx_power_w: 1, line_loss_db: 0.5, supp_loss_db_m: 0, antenna_type: 'omni.ant', antenna_gain_dbi: 5.15, antenna_height_m: 4, rx_threshold_dbm: -110 },
     { id: 2, name: 'Field Station 5W', tx_power_w: 5, line_loss_db: 0.5, supp_loss_db_m: 0, antenna_type: 'omni.ant', antenna_gain_dbi: 5.15, antenna_height_m: 2, rx_threshold_dbm: -110 },
+    { id: 3, name: 'Field Station 25W', tx_power_w: 25, line_loss_db: 0.5, supp_loss_db_m: 0, antenna_type: 'omni.ant', antenna_gain_dbi: 5.15, antenna_height_m: 4, rx_threshold_dbm: -110 },
   ];
   const systemCsv = [
     'Radio Mobile', '$System',

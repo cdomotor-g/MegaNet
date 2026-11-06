@@ -663,7 +663,13 @@ function editorForm(s) {
            (0090, station-lpu.js) — kept in a table of its own, read by
            approved accounts, and saved by editorSave() after the station. -->
       ${typeof StationLpu !== 'undefined' ? StationLpu.editorHtml(s) : ''}
-      <label>RM System ID<input type="number" id="ef-rmsys" value="${s.rm_system_id || 1}"></label>
+      ${efFieldHtml({ id: 'ef-rmsys', caption: 'Radio system', hint: 'ef-h-rmsys',
+        control: `<select id="ef-rmsys">${editorRmSystemOptions(s.rm_system_id)}</select>` })}
+      <div class="full small ef-hint hint-fold" id="ef-h-rmsys" hidden>
+        The transmitter this station is priced with in the link budget, the fade-margin map and the
+        site finder: its power (1, 5 or 25 W), antenna gain, cable loss and receiver threshold, from
+        the Radio Mobile file. The station's own mast height, where it has one, wins over the system's.
+      </div>
       ${efFieldHtml({ id: 'ef-bucket', caption: 'TBRG bucket size (mm/tip)', hint: 'ef-h-bucket',
         control: `<input type="number" step="0.1" min="0" id="ef-bucket" value="${s.TBRGbucketSize ?? ''}" placeholder="not recorded">` })}
       <div class="full small ef-hint hint-fold" id="ef-h-bucket" hidden>
@@ -766,6 +772,25 @@ function editorForm(s) {
 // render. Rather than repainting the whole card when they arrive (which would
 // throw away anything typed since), the callback rebuilds this one select in
 // place, keeping whatever it was set to.
+// The radio systems a station can be on (meganet.rm_system: Field Station 1W,
+// 5W and 25W since 0105), by name. This was a number box until the 25 W
+// system came, and showed 1 for a station with none (#172); a system with no
+// figures yet says so, and an id the list does not hold still shows, as itself.
+function editorRmSystemOptions(currentId) {
+  const cur  = currentId == null ? '' : String(currentId);
+  const list = (state.data && state.data.rm_systems) || [];
+  const opts = list.map(r => {
+    const id   = String(r.id);
+    const bare = r.tx_power_w == null || r.antenna_gain_dbi == null || r.line_loss_db == null || r.rx_threshold_dbm == null;
+    return `<option value="${escAttr(id)}"${id === cur ? ' selected' : ''}>${esc(r.name || `System ${id}`)}${
+      bare ? ' — no figures on file' : ''}</option>`;
+  });
+  if (cur && !list.some(r => String(r.id) === cur)) {
+    opts.push(`<option value="${escAttr(cur)}" selected>System ${esc(cur)} — not on file</option>`);
+  }
+  return [`<option value=""${cur ? '' : ' selected'}>— none —</option>`, ...opts].join('');
+}
+
 function editorInspConfigOptions(currentKey) {
   const cur  = currentKey || '';
   const list = Inspections.configs();
