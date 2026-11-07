@@ -73,6 +73,62 @@ const BaseStations = (function () {
   // each channel's decoder works through the whole of it. Set here, exactly
   // that one; automatic, the narrowest that holds the stick's channels.
   const WINDOWS = [['240000', '240 kHz — the lightest'], ['960000', '960 kHz'], ['1200000', '1.2 MHz'], ['1440000', '1.44 MHz'], ['1920000', '1.92 MHz'], ['2400000', '2.4 MHz']];
+  // RPi ALERT 0.20: the narrowest and the widest window Automatic may take
+  // (receivers.sdr.sampleRateMin / sampleRateMax, and a stick's own; 0 no limit).
+  const LIMITS = [['0', 'No limit']].concat(WINDOWS.map(([v, t]) => [v, t.replace(' — the lightest', '')]));
+  const WIDTH = Object.fromEntries(LIMITS.slice(1));
+  const WINDOW_WORDS = {
+    window: ['Window', 'The slice of the band a stick hears at once. Every channel\'s decoder works through all of it, so a wider window costs the Pi more and hears no channel better. Automatic takes the narrowest that holds the stick\'s channels.'],
+    min: ['No narrower than', 'With the window on Automatic: the narrowest it may take. Wider shows more of the band on the waterfall, and costs the Pi more.'],
+    max: ['No wider than', 'With the window on Automatic: the widest it may take. Keeps a stick\'s work down whatever channels it has; a channel the window cannot hold is not decoded, and the stick says so below.'],
+    chans: ['Channels', 'The frequencies a stick decodes at once, its own first. A stick with none of its own decodes the channels set for every stick — listening to one far from the others is what makes a window wide.'],
+  };
+  const FMT_SHORT = { BINARY: 'ABF', ENHANCED_IFLOWS: 'EIF', ASCII: 'ASCII' };
+  const FMT_OF = { abf: 'BINARY', binary: 'BINARY', eif: 'ENHANCED_IFLOWS', iflows: 'ENHANCED_IFLOWS', enhanced_iflows: 'ENHANCED_IFLOWS', ascii: 'ASCII' };
+  // 151.500, 151.5375: three decimals, four where the channel needs them.
+  const mhzOf = hz => { const t = (hz / 1e6).toFixed(4); return t.endsWith('0') ? t.slice(0, -1) : t; };
+  // A channel list → its text: "151.500, 151.525, 152.400 EIF" (a format
+  // shown only where it is not the stick's own).
+  function chansText(list, fmt) {
+    return list.map(c => mhzOf(c.freqHz) + (c.format && c.format !== fmt ? ' ' + FMT_SHORT[c.format] : '')).join(', ');
+  }
+  // Its text → [{ freqHz, format? }], or throws why. At most 8, none twice; the
+  // station holds them to its own rules (how far apart) and says if not.
+  function parseChans(text, who) {
+    const items = String(text).split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
+    if (!items.length) throw new Error(who + 'at least one channel, in MHz');
+    if (items.length > 8) throw new Error(who + 'at most 8 channels on one stick');
+    const out = [];
+    for (const it of items) {
+      const m = /^(\d+(?:\.\d+)?)(?:\s*mhz)?(?:\s+([a-z_ ]+))?$/i.exec(it);
+      const f = m && FMT_OF[String(m[2] || '').trim().toLowerCase().replace(/\s+/g, '_')];
+      if (!m || (m[2] && !f)) throw new Error(who + '"' + it + '" is not a channel — a frequency in MHz, e.g. 151.5375, or 152.4 EIF in another format');
+      const hz = Math.round(Number(m[1]) * 1e6);
+      if (hz < 24e6 || hz > 1766e6) throw new Error(who + 'a frequency of 24–1766 MHz');
+      if (out.some(c => c.freqHz === hz)) throw new Error(who + mhzOf(hz) + ' MHz is listed twice');
+      out.push(f ? { freqHz: hz, format: f } : { freqHz: hz });
+    }
+    return out;
+  }
+  // A stick's channels as its settings hold them: [own channel, ...more].
+  const chansOf = (first, more) => (first ? [{ freqHz: first }] : []).concat((more || []).map(m => (m.format ? { freqHz: m.freqHz, format: m.format } : { freqHz: m.freqHz })));
+  const moreOf = list => list.slice(1).map(c => (c.format ? { freqHz: c.freqHz, format: c.format } : { freqHz: c.freqHz }));
+
+  // A stick now, from its status: what it decodes, in what window and why,
+  // and what its window leaves out.
+  function stickNowHtml(r) {
+    const ch = Array.isArray(r.channels) && r.channels.length ? r.channels : (r.freq_hz ? [{ freq_hz: r.freq_hz, format: r.format, in_band: true }] : []);
+    if (!ch.length || !r.sample_rate) return '';
+    const w = r.window || {}, width = WIDTH[String(r.sample_rate)] || (r.sample_rate / 1e3) + ' kHz';
+    const lim = [w.min ? 'no narrower than ' + WIDTH[String(w.min)] : '', w.max ? 'no wider than ' + WIDTH[String(w.max)] : ''].filter(Boolean).join(', ');
+    const how = w.auto === false ? 'as set' : w.capped ? 'automatic, the widest allowed — ' + lim
+      : w.needs && r.sample_rate > w.needs ? 'automatic, the narrowest allowed — ' + lim : 'automatic' + (lim ? ', ' + lim : '');
+    const heard = ch.filter(c => c.in_band !== false), out = ch.filter(c => c.in_band === false);
+    const why = { outside: 'outside the window', spike: 'it would sit on the DC spike', mirror: 'another channel\'s mirror image lands on it' };
+    return `<p class="small qs-dim">Now: ${esc(heard.map(c => mhzOf(c.freq_hz)).join(', ') || 'nothing')} MHz in a ${esc(width)} window (${esc(how)}).</p>`
+      + (out.length ? `<p class="small txt-warn">Not decoded: ${esc(out.map(c => mhzOf(c.freq_hz) + ' — ' + (why[c.why] || 'it does not fit beside the others')).join('; '))}`
+        + (w.needs && w.needs > r.sample_rate ? esc('. A ' + (WIDTH[String(w.needs)] || w.needs) + ' window holds them all' + (w.capped ? ': raise No wider than to let it.' : '.')) : '') + '</p>' : '');
+  }
   const VERBS = {
     status: 'send its whole status', log: 'show its log', 'config.set': 'change settings',
     'device.restart': 'restart a receiver', 'device.rescan': 'look for receivers', 'device.forget': 'remove an unplugged receiver',
@@ -462,20 +518,27 @@ const BaseStations = (function () {
     const sd = (cfg.receivers || {}).sdr || {};
     const f = {
       name: cfg.name || '', enabled: (cfg.meganet || {}).enabled !== false, receptions: (cfg.meganet || {}).receptions !== false,
-      sdrOn: sd.enabled !== false, freq: sd.freqHz ? (sd.freqHz / 1e6).toFixed(4) : '', format: sd.format || 'BINARY',
+      sdrOn: sd.enabled !== false, freq: sd.freqHz ? chansText(chansOf(sd.freqHz, sd.moreChannels), sd.format) : '', format: sd.format || 'BINARY',
       gain: sd.gainDb == null ? 'auto' : String(sd.gainDb), ppm: String(sd.ppm || 0), squelch: String(sd.squelchDb ?? 8), rate: String(sd.sampleRate || 0),
       // RPi ALERT 0.16 and later (MegaNet #259); absent on older stations, and then not offered.
       decoder: sd.decoder || '',
       // RPi ALERT 0.18 and later (MegaNet #259 part 2).
       watch: sd.watch || '',
+      // RPi ALERT 0.20 and later: the window's limits; null where the station has none.
+      rmin: sd.sampleRateMin === undefined ? null : String(sd.sampleRateMin || 0), rmax: sd.sampleRateMax === undefined ? null : String(sd.sampleRateMax || 0),
       audio: (cfg.audio || {}).enabled === false ? 'off' : ((cfg.audio || {}).mode || 'auto'), volume: String((cfg.audio || {}).volume ?? 80),
       kiosk: (cfg.kiosk || {}).mode || 'auto', tz: (cfg.system || {}).timezone || '',
     };
     const own = (cfg.receivers || {}).sdrDevices || [];
     for (const r of rx.filter(x => x.kind === 'sdr')) {
       const e = stickEntry(own, r) || {};
-      f['s:' + r.key] = { name: e.name || '', freq: e.freqHz ? (e.freqHz / 1e6).toFixed(4) : '', format: e.format || '',
-        gain: e.gainDb === undefined ? '' : e.gainDb === null ? 'auto' : String(e.gainDb), rate: e.sampleRate === undefined ? '' : String(e.sampleRate), on: e.enabled !== false };
+      // Its channels: its own list, if it has its own channel or more channels
+      // (the rest from every stick's), or blank — every stick's.
+      const ownChans = e.freqHz !== undefined || e.moreChannels !== undefined;
+      const chans = ownChans ? chansText(chansOf(e.freqHz !== undefined ? e.freqHz : sd.freqHz, e.moreChannels !== undefined ? e.moreChannels : sd.moreChannels), e.format || sd.format) : '';
+      f['s:' + r.key] = { name: e.name || '', freq: chans, freq0: chans, format: e.format || '',
+        gain: e.gainDb === undefined ? '' : e.gainDb === null ? 'auto' : String(e.gainDb), rate: e.sampleRate === undefined ? '' : String(e.sampleRate),
+        rmin: e.sampleRateMin === undefined ? '' : String(e.sampleRateMin), rmax: e.sampleRateMax === undefined ? '' : String(e.sampleRateMax), on: e.enabled !== false };
     }
     return f;
   }
@@ -505,8 +568,14 @@ const BaseStations = (function () {
       if (f.enabled !== ((cfg.meganet || {}).enabled !== false)) put('meganet.enabled', f.enabled);
       if (f.receptions !== ((cfg.meganet || {}).receptions !== false)) put('meganet.receptions', f.receptions);
       if (f.sdrOn !== (sd.enabled !== false)) put('receivers.sdr.enabled', f.sdrOn);
-      const hz = Math.round(num(f.freq, 'the frequency is 24–1766 MHz', 24, 1766) * 1e6);
-      if (hz !== sd.freqHz) put('receivers.sdr.freqHz', hz);
+      // Every stick's channels: the first its own channel, the rest more
+      // channels — each sent only if it changed (a first channel changed
+      // alone keeps Flood-Net's standard ones around it, as the station does).
+      const list = parseChans(f.freq, '');
+      if (list[0].freqHz !== sd.freqHz) put('receivers.sdr.freqHz', list[0].freqHz);
+      if (sd.moreChannels !== undefined || list.length > 1) {
+        if (canon(moreOf(list)) !== canon(sd.moreChannels || [])) put('receivers.sdr.moreChannels', moreOf(list));
+      }
       if (f.format !== sd.format) put('receivers.sdr.format', f.format);
       const gain = /^(auto|agc)$/i.test(f.gain.trim()) ? null : num(f.gain, 'the gain is 0–60 dB, or auto', 0, 60);
       if (gain !== (sd.gainDb ?? null)) put('receivers.sdr.gainDb', gain);
@@ -517,6 +586,12 @@ const BaseStations = (function () {
       if (Number(f.rate) !== (sd.sampleRate || 0)) put('receivers.sdr.sampleRate', Number(f.rate));
       if (sd.decoder !== undefined && f.decoder && f.decoder !== sd.decoder) put('receivers.sdr.decoder', f.decoder);
       if (sd.watch !== undefined && f.watch && f.watch !== sd.watch) put('receivers.sdr.watch', f.watch);
+      if (f.rmin != null && f.rmax != null) {
+        const lo = Number(f.rmin), hi = Number(f.rmax);
+        if (Number(f.rate) === 0 && lo && hi && lo > hi) throw new Error('No narrower than is wider than No wider than — make the narrowest the narrower');
+        if (lo !== (sd.sampleRateMin || 0)) put('receivers.sdr.sampleRateMin', lo);
+        if (hi !== (sd.sampleRateMax || 0)) put('receivers.sdr.sampleRateMax', hi);
+      }
       // Each stick's own, as the station's page builds them: entries for
       // sticks not shown are kept; a blank field is the shared setting.
       const sticks = rx.filter(x => x.kind === 'sdr');
@@ -533,12 +608,22 @@ const BaseStations = (function () {
           const e = Object.assign({}, before, { key: r.key });
           delete e.serial;
           const was = JSON.stringify(Object.keys(e).sort().map(k => [k, e[k]]));
-          for (const k of ['name', 'freqHz', 'format', 'gainDb', 'sampleRate', 'enabled']) delete e[k];
+          for (const k of ['name', 'format', 'gainDb', 'sampleRate', 'sampleRateMin', 'sampleRateMax', 'enabled']) delete e[k];
           if (v.name && v.name.trim()) e.name = v.name.trim();
-          if (v.freq && v.freq.trim()) e.freqHz = Math.round(num(v.freq, r.name + ': a frequency of 24–1766 MHz', 24, 1766) * 1e6);
+          // Its channels, as typed: blank is every stick's; untouched, as they were.
+          if (v.freq0 === undefined || (v.freq || '').trim() !== (v.freq0 || '').trim()) {
+            delete e.freqHz; delete e.moreChannels;
+            if (v.freq && v.freq.trim()) {
+              const list = parseChans(v.freq, r.name + ': ');
+              e.freqHz = list[0].freqHz; e.moreChannels = moreOf(list);
+            }
+          }
           if (v.format) e.format = v.format;
           if (v.gain && v.gain.trim()) e.gainDb = /^(auto|agc)$/i.test(v.gain.trim()) ? null : num(v.gain, r.name + ': a gain of 0–60 dB, or auto', 0, 60);
           if (v.rate !== undefined && v.rate !== '') e.sampleRate = Number(v.rate);
+          if (v.rmin !== undefined && v.rmin !== '') e.sampleRateMin = Number(v.rmin);
+          if (v.rmax !== undefined && v.rmax !== '') e.sampleRateMax = Number(v.rmax);
+          if (e.sampleRateMin && e.sampleRateMax && e.sampleRateMin > e.sampleRateMax) throw new Error(r.name + ': No narrower than is wider than No wider than');
           if (v.on === false) e.enabled = false;
           if (bySerial && JSON.stringify(Object.keys(e).sort().map(k => [k, e[k]])) === was) continue;
           if (Object.keys(e).length > 1) listOut.push(e);
@@ -584,28 +669,30 @@ const BaseStations = (function () {
       <h4>RTL-SDR — every stick</h4>
       <div class="bs-form">
         ${chk('sdrOn', 'Use RTL-SDR sticks')}
-        ${inp('freq', 'Frequency, MHz', ' inputmode="decimal"')}
+        ${inp('freq', termHtml('Channels, MHz', WINDOW_WORDS.chans[1]), ' inputmode="decimal" placeholder="151.500, 151.525"')}
         ${sel('format', 'Frame format', Object.entries(FORMATS))}
         ${inp('gain', 'Gain, dB (or auto)')}
         ${inp('ppm', 'Correction, ppm', ' inputmode="numeric"')}
         ${inp('squelch', 'Squelch, dB', ' inputmode="numeric"')}
-        ${sel('rate', 'Window', [['0', 'Automatic — the narrowest that holds the channels']].concat(WINDOWS))}
+        ${sel('rate', termHtml('Window', WINDOW_WORDS.window[1]), [['0', 'Automatic — the narrowest that holds the channels']].concat(WINDOWS))}
+        ${f.rmin != null ? sel('rmin', termHtml(WINDOW_WORDS.min[0], WINDOW_WORDS.min[1]), LIMITS) + sel('rmax', termHtml(WINDOW_WORDS.max[0], WINDOW_WORDS.max[1]), LIMITS) : ''}
         ${f.decoder ? sel('decoder', termHtml('Decoder', DECODER_MEANING), decodersFor(s)) : ''}
         ${f.watch ? sel('watch', termHtml('Between bursts', WATCH_MEANING), WATCHES) : ''}
       </div>
       ${f.decoder ? `<p class="small qs-dim"><strong>Decoder:</strong> ${esc(DECODER_MEANING)}</p>` : ''}
       ${f.watch ? `<p class="small qs-dim"><strong>Between bursts:</strong> ${esc(WATCH_MEANING)}</p>` : ''}
+      ${Object.values(WINDOW_WORDS).filter(([w]) => f.rmin != null || (w !== WINDOW_WORDS.min[0] && w !== WINDOW_WORDS.max[0])).map(([w, m]) => `<p class="small qs-dim"><strong>${esc(w)}:</strong> ${esc(m)}</p>`).join('')}
       ${sticks.length ? `<h4>Each stick <span class="small qs-dim">(blank: as above)</span></h4>${sticks.map(r => {
         const v = f['s:' + r.key] || {};
         const k = escAttr(r.key);
-        const more = Array.isArray(r.channels) && r.channels.length > 1 ? r.channels.length - 1 : 0;
         return `<fieldset class="bs-stick"><legend>${esc(r.name)} <span class="small qs-dim">${esc(r.usb_port ? 'USB port ' + r.usb_port : r.key)}</span></legend>
-          ${more ? `<p class="small qs-dim">Its own channel below; ${more === 1 ? 'its other channel is' : 'its ' + more + ' other channels are'} set on the station.</p>` : ''}<div class="bs-form">
+          ${stickNowHtml(r)}<div class="bs-form">
           <label>Name <input type="text" maxlength="60" value="${esc(v.name)}" placeholder="${esc(r.name)}" oninput="BaseStations.stick('${k}', 'name', this.value)"></label>
-          <label>Frequency, MHz <input type="text" inputmode="decimal" value="${esc(v.freq)}" placeholder="${esc(f.freq)}" oninput="BaseStations.stick('${k}', 'freq', this.value)"></label>
+          <label>${termHtml('Channels, MHz', WINDOW_WORDS.chans[1])} <input type="text" inputmode="decimal" value="${esc(v.freq)}" placeholder="${esc(f.freq)}" oninput="BaseStations.stick('${k}', 'freq', this.value)"></label>
           <label>Format <select onchange="BaseStations.stick('${k}', 'format', this.value)"><option value="">As above</option>${Object.entries(FORMATS).map(([fv, t]) => `<option value="${fv}"${v.format === fv ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
           <label>Gain, dB <input type="text" value="${esc(v.gain)}" placeholder="${esc(f.gain)}" oninput="BaseStations.stick('${k}', 'gain', this.value)"></label>
-          <label>Window <select onchange="BaseStations.stick('${k}', 'rate', this.value)"><option value="">As above</option>${[['0', 'Automatic']].concat(WINDOWS).map(([wv, t]) => `<option value="${wv}"${v.rate === wv ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+          <label>${termHtml('Window', WINDOW_WORDS.window[1])} <select onchange="BaseStations.stick('${k}', 'rate', this.value)"><option value="">As above</option>${[['0', 'Automatic']].concat(WINDOWS).map(([wv, t]) => `<option value="${wv}"${v.rate === wv ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+          ${f.rmin != null ? ['rmin', 'rmax'].map(lk => `<label>${termHtml(WINDOW_WORDS[lk === 'rmin' ? 'min' : 'max'][0], WINDOW_WORDS[lk === 'rmin' ? 'min' : 'max'][1])} <select onchange="BaseStations.stick('${k}', '${lk}', this.value)"><option value="">As above</option>${LIMITS.map(([wv, t]) => `<option value="${wv}"${v[lk] === wv ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`).join('') : ''}
           <label class="ser-check"><input type="checkbox"${v.on !== false ? ' checked' : ''} onchange="BaseStations.stick('${k}', 'on', this.checked)"> Use this stick</label>
         </div></fieldset>`;
       }).join('')}` : ''}
@@ -1869,7 +1956,7 @@ const BaseStations = (function () {
   return { render, init, load, open, close, ask, askFrom, cancel, field, stick, resetForm, saveSettings,
            keyField, addKey, removeKey, authChanged, wfWindow, chWindow,
            // Pure, for test/basestations.mjs.
-           _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _checksHtml: checksHtml, _decodersFor: decodersFor, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf,
+           _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _stickNowHtml: stickNowHtml, _parseChans: parseChans, _checksHtml: checksHtml, _decodersFor: decodersFor, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf,
            _chRows: chRows, _chVerdict: chVerdict };
 })();
 

@@ -407,8 +407,30 @@ try {
       light: B._checksHtml({ lean_check: { compared: 900, differ: 3, time_pct: 52, pair: 'lean-light' } }),
       offered: [B._decodersFor({ version: '0.18.0' }).length, B._decodersFor({ version: '0.19.0' }).length],
       checks: B._checksHtml({ lean_check: { compared: 11628, differ: 14, time_pct: 34 }, watch_check: { both: 120, only_always: 1, only_watch: 0, awake_pct: 9, time_pct: 31 } }) };
+    // RPi ALERT 0.20: the window's limits, and each stick's channels as a list.
+    const w20 = JSON.parse(JSON.stringify(cfg));
+    Object.assign(w20.receivers.sdr, { sampleRateMin: 0, sampleRateMax: 0, moreChannels: [{ freqHz: 151525000 }, { freqHz: 152400000, format: 'ENHANCED_IFLOWS' }] });
+    w20.receivers.sdrDevices = [{ key: odd, name: 'Second stick', freqHz: 151500000, moreChannels: [{ freqHz: 151525000 }], ppm: 3, sampleRateMax: 240000 }];
+    const fw20 = B._formFrom(w20, rx);
+    const lim = (patchF) => B._patchFrom(w20, patchF, rx);
+    const g20 = JSON.parse(JSON.stringify(fw20));
+    g20.rmax = '960000';
+    g20['s:' + stick1] = Object.assign({}, g20['s:' + stick1], { freq: '151.5, 151.5375 abf', rmax: '240000' });
+    g20['s:' + odd] = Object.assign({}, g20['s:' + odd], { rmax: '' });
+    const cross = JSON.parse(JSON.stringify(fw20)); cross.rmin = '1440000'; cross.rmax = '240000';
+    const shared = JSON.parse(JSON.stringify(fw20)); shared.freq = '151.500, 151.525';
+    const window20 = {
+      shown: [fw20.rmin, fw20.rmax, fw20.freq, fw20['s:' + odd].freq, fw20['s:' + odd].rmax, fw20['s:' + stick1].freq],
+      none: [B._formFrom(cfg, rx).rmin, B._formFrom(cfg, rx).rmax],
+      same: lim(fw20), changed: lim(g20), cross: lim(cross), shared: lim(shared),
+      old: B._patchFrom(cfg, Object.assign({}, f, { rmax: '240000' }), rx),
+      bad: [() => B._parseChans('151.5, 151.5', ''), () => B._parseChans('151.5 FM', ''), () => B._parseChans('', '')].map(fn => { try { fn(); return ''; } catch (e) { return e.message; } }),
+      now: B._stickNowHtml({ sample_rate: 240000, window: { auto: true, needs: 960000, min: 0, max: 240000, capped: true },
+        channels: [{ freq_hz: 151500000, in_band: true }, { freq_hz: 151537500, in_band: true }, { freq_hz: 151575000, in_band: false, why: 'spike' }] }),
+      nowPlain: B._stickNowHtml({ sample_rate: 960000, window: { auto: true, needs: 960000 }, channels: [{ freq_hz: 151500000, in_band: true }, { freq_hz: 151575000, in_band: true }] }),
+    };
     return {
-      decoder, watch,
+      decoder, watch, window20,
       serialShown: f4['s:' + stick1].gain, serialSame, serialRenamed,
       liveness: [
         B._liveness({ managed: true, mode: 'manage', idle_s: 60, last_seen_at: t(20) }).k,
@@ -458,6 +480,24 @@ try {
     pure.watch.checks);
   ok('Light is offered from RPi ALERT 0.19, and its check says so',
     pure.watch.offered.join() === '3,5' && /Light check.*3 of 900 bursts differ \(0\.33%\) · light 52% of lean's time/.test(pure.watch.light), JSON.stringify([pure.watch.offered, pure.watch.light]));
+  const w20 = pure.window20, wp = ((w20.changed || {}).patch || {}).receivers || {};
+  ok('RPi ALERT 0.20\'s window limits are offered where the station has them, every stick\'s channels shown as a list',
+    w20.shown.join('|') === '0|0|151.500, 151.525, 152.400 EIF|151.500, 151.525|240000|' && w20.none.join() === ','
+      && Object.keys(w20.same.patch).length === 0, JSON.stringify([w20.shown, w20.none, w20.same]));
+  ok('…a limit changed is sent alone, a stick\'s channels typed become its own channel and more channels, and "As above" gives a limit back',
+    JSON.stringify(wp.sdr) === '{"sampleRateMax":960000}'
+      && (wp.sdrDevices || []).some(d => d.key === STICK_1 && d.freqHz === 151500000 && JSON.stringify(d.moreChannels) === '[{"freqHz":151537500,"format":"BINARY"}]' && d.sampleRateMax === 240000)
+      && (wp.sdrDevices || []).some(d => d.key === ODD_KEY && d.sampleRateMax === undefined && d.ppm === 3 && d.freqHz === 151500000),
+    JSON.stringify(wp));
+  ok('…limits that cross are refused on the form; a station without them is sent none; every stick\'s list edited sends the more channels that changed',
+    /No narrower than is wider than/.test(w20.cross.error || '') && Object.keys(w20.old.patch).length === 0
+      && JSON.stringify(w20.shared.patch) === '{"receivers":{"sdr":{"moreChannels":[{"freqHz":151525000}]}}}', JSON.stringify([w20.cross, w20.old, w20.shared]));
+  ok('…a channel list that does not read is refused with the reason',
+    /listed twice/.test(w20.bad[0]) && /not a channel/.test(w20.bad[1]) && /at least one channel/.test(w20.bad[2]), w20.bad.join(' | '));
+  ok('a stick says what it decodes now, in what window and why, and what the widest allowed leaves out',
+    /Now: 151\.500, 151\.5375 MHz in a 240 kHz window \(automatic, the widest allowed — no wider than 240 kHz\)/.test(w20.now)
+      && /Not decoded: 151\.575 — it would sit on the DC spike\. A 960 kHz window holds them all: raise No wider than to let it\./.test(w20.now)
+      && /Now: 151\.500, 151\.575 MHz in a 960 kHz window \(automatic\)\./.test(w20.nowPlain), w20.now + ' || ' + w20.nowPlain);
   ok('the settings form untouched is no change at all', pure.same.patch && Object.keys(pure.same.patch).length === 0, JSON.stringify(pure.same));
   const p = (pure.changed || {}).patch || {};
   ok('a changed form is the smallest patch that says so',
@@ -640,7 +680,7 @@ try {
   const detail = (await text('#bs-detail')).replace(/\s+/g, ' ');
   ok('its health', /mt-stuart/.test(detail) && /192\.168\.1\.40/.test(detail) && /58\.4 °C/.test(detail) && /under-voltage since boot/.test(detail), detail.slice(0, 400));
   ok('a stick hearing two channels says each, with what each decoded', /151\.5000 MHz ALERT Binary \(410 decoded\), 151\.6250 MHz Enhanced iFLOWS \(2 decoded\)/.test(detail)
-    && /its other channel is set on the station/.test(detail), detail.slice(detail.indexOf('Receivers'), detail.indexOf('Receivers') + 400));
+    && /Now: 151\.500, 151\.625 MHz in a 960 kHz window \(automatic\)/.test(detail), detail.slice(detail.indexOf('Receivers'), detail.indexOf('Receivers') + 400));
   ok('its receivers, with the heartbeat\'s state over the status\'s', /RTL-SDR 1/.test(detail) && /receiving/.test(detail) && /151\.5000 MHz/.test(detail)
     && /usb_claim_interface error -6/.test(detail) && /412 decoded/.test(detail), detail.slice(0, 600));
   ok('…the one the database found deaf saying so beside what it has decoded',

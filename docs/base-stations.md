@@ -81,6 +81,20 @@ the station sent it, and carries a 0.4 entry's into the stick's own when the
 stick is changed; a patch written by hand is where this bites — give `ppm` in
 the entry of every stick with a correction of its own.
 
+**Each stick's channels and window.** The settings form lists the channels
+every stick decodes (its own channel first, then its more channels: `151.500,
+151.525, 152.400 EIF`, a format named only where it is not the stick's) and each
+stick's own list — blank, it follows every stick's. A stick decoding a channel
+far from the others needs a wider window, and every channel's decoder works
+through all of it, so that is what makes a stick costly; the list shows what
+was hiding there. From RPi ALERT 0.20, *No narrower than* and *No wider than*
+keep a window on *Automatic* between two widths, for every stick or one: a
+widest keeps a stick light whatever it is given, and a channel it cannot hold
+is not decoded. Under each stick, *Now:* says what it decodes, in what window
+and why (`window` in its status: `auto`, `needs`, `min`, `max`, `capped`), and
+what its window leaves out — the station plans the window, so a change shows
+there with its next check-in.
+
 **Each request is done once.** The check-in hands a request over once (it is
 `sent` from then on, and never handed over again), at most ten a check-in. A
 request not collected within **ten minutes expires** rather than running hours

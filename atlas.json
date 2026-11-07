@@ -878,13 +878,13 @@
       "from": "rpi-alert",
       "provider": "channel-planner",
       "into": "network-health",
-      "what": "RPi ALERT's SDR channel plan (each stick's sample-rate windows and usable band), mirrored in base-stations.js WINDOWS and the waterfall's edges, and in sdr-pi.js's channel rules.",
+      "what": "RPi ALERT's SDR channel plan (each stick's sample-rate windows and usable band, and from 0.20 the narrowest and widest window Automatic may take), mirrored in base-stations.js WINDOWS and LIMITS, the waterfall's edges, and in sdr-pi.js's channel rules.",
       "how": "protocol",
       "watch": [
         "agent/web/sdr-plan.js"
       ],
       "since": {
-        "date": "2026-10-26"
+        "date": "2026-11-08"
       },
       "on_change": "Match WINDOWS in base-stations.js (and sdr-pi.js where the rule is shared) to the new RATES and USABLE; run cd test && npm run basestations && npm run sdrpi; bump the version stamp."
     },
