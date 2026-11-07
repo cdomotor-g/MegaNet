@@ -88,6 +88,8 @@ const OUTLINE_NONE_ALLOWED = [
     because: 'a script-focus target; the ring is restored on :focus-visible directly below' },
   { selector: '.hl-page [tabindex="-1"]:focus:not(:focus-visible)',
     because: 'Station Health\'s script-focus headings, #main-content\'s pattern: only a mouse loses the ring, :focus-visible keeps it' },
+  { selector: '.busy:focus-visible',
+    because: 'the busy wheel\'s button is a taller press area than the 24px wheel drawn in it; the ring is drawn on .busy-face, the wheel\'s own square, directly below (3c26199)' },
   { selector: '.fp-cmp-wedge:focus-visible',
     because: 'an SVG path has no box — the ring would be its bounding box, beside the wedge; the wedge\'s own edge goes solid white at 3px' },
 ];
