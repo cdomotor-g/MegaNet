@@ -116,8 +116,8 @@ const MapTails = (function () {
 
   // ── How they look ──
   const REPEATER_SHARE = 0.7;   // the repeater end's tail, as a share of the field end's
-  const TAIL_W = 1.8;           // px, × the Sunlight theme's stroke scale
-  const CASE_W = 3.8;
+  const TAIL_W = 2.4;           // px, × the Sunlight theme's stroke scale
+  const CASE_W = 4.8;
   const TAIL_ALPHA = 0.95;      // at the pin; nothing at the tail's far end
   const CASE_ALPHA = 0.55;
   const FOCUS_DIM = 0.2;        // applyMapFocusStyles' dim, for a dimmed line's tails

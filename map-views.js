@@ -110,8 +110,8 @@ const MapViews = (function () {
   const MAX_SAVED = 12;          // views a person can keep
   const NAME_MAX = 40;           // characters in a kept view's name
   const EPS = 0.004;             // an opacity that moved less than this is not repainted
-  const AUTO_TARGET = 0.045;     // share of the screen auto-contrast aims to cover in solid line
-  const AUTO_MIN = 0.12;         // …and the faintest and strongest it will go
+  const AUTO_TARGET = 0.055;     // share of the screen auto-contrast aims to cover in solid line
+  const AUTO_MIN = 0.16;         // …and the faintest and strongest it will go
   const AUTO_MAX = 0.9;
   const AUTO_STEP = 0.015;       // a new figure closer than this to the last is not applied
   const BAL_TOL = 3;             // a view's Balance still counts as in force within this many points
@@ -134,7 +134,7 @@ const MapViews = (function () {
     paths: 'every',
     draw: 'lines',
     flow: { mode: 'all', speed: 1, under: 0.35, playing: null },
-    tails: { len: 24, spot: 120, follow: true, backboneFull: true },
+    tails: { len: 24, spot: 90, follow: true, backboneFull: true },
     auto: false,
     balance: 50,
   };
@@ -489,7 +489,7 @@ const MapViews = (function () {
     if (ch.has('balance')) applyTileFilter();
     if (ch.has('auto')) {
       if (next.auto) recomputeAuto({ restyle: false });
-      else { S.autoOp = null; S.autoN = 0; }
+      else { S.autoOp = null; S.autoBb = null; S.autoN = 0; }
     }
     if (ch.has('paths')) {
       // The build reads MapPaths, which reads these settings.
@@ -521,6 +521,18 @@ const MapViews = (function () {
     return Number.isFinite(v) ? clamp(v, 0, 1) : 0.25;
   }
   const balMul = b => 0.45 + 1.1 * b / 100;
+  // The backbone under auto-contrast: a few dozen paths, the ones every
+  // reading crosses, so they are not drawn as faint as the thousands of
+  // field paths the figure was worked out for — a multiple of it, between
+  // these two.
+  // Worked out from the backbone's own share of the screen, so a hundred
+  // repeater paths round a city are drawn fainter than ten in the bush.
+  const BB_TARGET = 0.02, BB_AUTO_MIN = 0.3, BB_AUTO_MAX = 0.9;
+  // Tails & spotlight draws almost nothing whole, so what it does draw
+  // whole — the paths the spotlight or the pointer lights, and the
+  // backbone — is drawn strong whatever the strength figure is: the point
+  // of the mode is that those stand out.
+  const LIT_MIN = 0.85;
 
   // What every line in one pass shares, worked out once for the pass.
   function context() {
@@ -530,6 +542,7 @@ const MapViews = (function () {
     return {
       cfg, flat,
       base: cfg.auto && S.autoOp != null ? S.autoOp : manualOp(),
+      bbBase: cfg.auto && S.autoBb != null ? S.autoBb : cfg.auto && S.autoOp != null ? S.autoOp : manualOp(),
       bal: balMul(cfg.balance),
       mix: casingMix(),
       tails: flat && cfg.draw === 'tails' && has(T, 'isLit') ? T : null,
@@ -538,7 +551,20 @@ const MapViews = (function () {
   }
   function fullWith(line, x) {
     const role = line && line.mnLinkRole;
-    return clamp(x.base * x.bal * (CASING_ROLES.has(role) ? x.mix : 1), 0, 1);
+    const base = BACKBONE_ROLES.has(role) ? x.bbBase : x.base;
+    return clamp(base * x.bal * (CASING_ROLES.has(role) ? x.mix : 1), 0, 1);
+  }
+  // A line's strength in this drawing: its full strength times the mode's
+  // factor, lifted to the Tails floor when Tails draws it whole.
+  function drawnWith(line, x, full) {
+    const m = modeWith(line, x);
+    let op = clamp(full * m, 0, 1);
+    if (x.tails && m === 1) {
+      const role = line && line.mnLinkRole;
+      const floor = FIELD_ROLES.has(role) ? LIT_MIN : 0;
+      op = Math.max(op, floor * (CASING_ROLES.has(role) ? x.mix : 1));
+    }
+    return op;
   }
   function modeWith(line, x) {
     const role = line && line.mnLinkRole;
@@ -558,7 +584,7 @@ const MapViews = (function () {
   const fullOpacity = line => fullWith(line, context());
   function lineOpacity(line) {
     const x = context();
-    return clamp(fullWith(line, x) * modeWith(line, x), 0, 1);
+    return drawnWith(line, x, fullWith(line, x));
   }
 
   // Every line with a role (or only the ones given — the spotlight hands over
@@ -570,7 +596,7 @@ const MapViews = (function () {
     for (const l of list || lines()) {
       if (!l || !l.mnLinkRole) continue;
       const full = fullWith(l, x);
-      const op = clamp(full * modeWith(l, x), 0, 1);
+      const op = drawnWith(l, x, full);
       if (l.mnFullOpacity == null || Math.abs(l.mnFullOpacity - full) > EPS) fullMoved = true;
       l.mnFullOpacity = full;
       l.mnBaseOpacity = op;
@@ -624,7 +650,7 @@ const MapViews = (function () {
     const sz = map.getSize();
     const W = sz.x, H = sz.y;
     if (!(W > 1 && H > 1)) return null;
-    let sum = 0, n = 0;
+    let sum = 0, n = 0, bb = 0;
     for (const l of lines()) {
       if (!l || (l.mnLinkRole !== 'core' && l.mnLinkRole !== 'backbone')) continue;
       const pts = pointsOf(l);
@@ -638,23 +664,27 @@ const MapViews = (function () {
       }
       if (len > 0.5) {
         n++;
-        sum += len * (((l.options && l.options.weight) || CORE_W) + 2);
+        const ink = len * (((l.options && l.options.weight) || CORE_W) + 2);
+        sum += ink;
+        if (l.mnLinkRole === 'backbone') bb += ink;
       }
     }
-    return { cov: sum / (W * H), n };
+    return { cov: sum / (W * H), bbCov: bb / (W * H), n };
   }
   // A new figure for what is on screen; applied (and the lines restyled, if
   // asked) only when it moved by more than AUTO_STEP. Held while the 3-D
   // view or the twin is up.
   function recomputeAuto(o = {}) {
-    if (!C().auto) { S.autoOp = null; S.autoN = 0; return false; }
+    if (!C().auto) { S.autoOp = null; S.autoBb = null; S.autoN = 0; return false; }
     if (!S.map || !isFlat()) { paintReadouts(); return false; }
     const m = measure();
     if (!m) return false;
     S.autoN = m.n;
     const op = clamp(AUTO_TARGET / Math.max(m.cov, 1e-4), AUTO_MIN, AUTO_MAX);
-    const moved = S.autoOp == null || Math.abs(op - S.autoOp) > AUTO_STEP;
-    if (moved) S.autoOp = op;
+    const bbOp = clamp(BB_TARGET / Math.max(m.bbCov, 1e-4), BB_AUTO_MIN, BB_AUTO_MAX);
+    const moved = S.autoOp == null || Math.abs(op - S.autoOp) > AUTO_STEP
+      || S.autoBb == null || Math.abs(bbOp - S.autoBb) > AUTO_STEP;
+    if (moved) { S.autoOp = op; S.autoBb = bbOp; }
     paintReadouts();
     if (moved && o.restyle) restyle();
     return moved;
@@ -688,7 +718,16 @@ const MapViews = (function () {
   }
   function applyTileFilter() {
     const pane = tilePane();
-    if (pane) pane.style.filter = tileFilter(C().balance);
+    const b = C().balance;
+    if (pane) pane.style.filter = tileFilter(b);
+    // The base maps' own roads and place names (map-controls.js draws them in
+    // a pane of their own, over the tiles): greyed with the photo, and faded
+    // as well, or the orange roads stay the loudest thing on the map.
+    const labels = S.map && typeof S.map.getPane === 'function' ? S.map.getPane('mnBaseLabels') : null;
+    if (labels) {
+      labels.style.filter = tileFilter(b);
+      labels.style.opacity = b > 50 ? String(+(1 - (b - 50) / 50 * 0.6).toFixed(3)) : '';
+    }
   }
   // In words, not a bare number: which side is stronger and by how much.
   function balanceWords(b) {
@@ -1131,6 +1170,8 @@ const MapViews = (function () {
       if (typeof map.off === 'function') map.off('moveend zoomend resize', onMove);
       const pane = tilePane();
       if (pane) pane.style.filter = '';
+      const labels = typeof map.getPane === 'function' ? map.getPane('mnBaseLabels') : null;
+      if (labels) { labels.style.filter = ''; labels.style.opacity = ''; }
     }
     if (S.mq) {
       try {

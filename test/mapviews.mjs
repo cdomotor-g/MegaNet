@@ -425,7 +425,7 @@ try {
     fresh.stored === null && fresh.pick === null, J({ stored: fresh.stored, pick: fresh.pick }));
   check('the drawing settings open as today\'s map: every path, lines, the person\'s own opacity, Balance even',
     J(fresh.settings) === J({ paths: 'every', draw: 'lines', flow: { mode: 'all', speed: 1, under: 0.35, playing: null },
-      tails: { len: 24, spot: 120, follow: true, backboneFull: true }, auto: false, balance: 50 }), J(fresh.settings));
+      tails: { len: 24, spot: 90, follow: true, backboneFull: true }, auto: false, balance: 50 }), J(fresh.settings));
   check('…every field line straight, none thinned, each core at the Link opacity and its casing at the casing mix',
     fresh.cores > 500 && fresh.offCore === 0 && fresh.offCasing === 0 && fresh.curved === 0 && fresh.thinned === 0,
     J({ cores: fresh.cores, offCore: fresh.offCore, offCasing: fresh.offCasing, curved: fresh.curved, thinned: fresh.thinned }));

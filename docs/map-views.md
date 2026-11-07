@@ -189,7 +189,7 @@ One JSON object in `mn-map-drawing`, deep-merged and clamped on every change:
   paths: 'every' | 'best' | 'lod' | 'bundle' | 'areas',
   draw:  'lines' | 'flow' | 'tails',
   flow:  { mode: 'all' | 'turns' | 'live', speed: 1 /* 0.3–2.5 */, under: 0.35 /* 0–1 */, playing: null },
-  tails: { len: 24 /* 8–70 px */, spot: 120 /* 60–260 px */, follow: true, backboneFull: true },
+  tails: { len: 24 /* 8–70 px */, spot: 90 /* 60–260 px */, follow: true, backboneFull: true },
   auto: false,
   balance: 50, /* 0–100 */
 }
