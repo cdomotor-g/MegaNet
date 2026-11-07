@@ -45,6 +45,11 @@ const MapOverlay = (function () {
   //                         in ms (performance.now())
   //   opts.animating()      optional: true while the module wants a frame
   //                         every animation frame; asked again each frame
+  //   opts.wanted()         optional: false while the module has nothing to
+  //                         show (its mode not chosen) — the canvas is then
+  //                         kept at one pixel, so an overlay nobody uses costs
+  //                         no memory (a full-screen canvas on a phone is
+  //                         ten-odd MB); asked at every placing and painting
   // The handle:
   //   at(lat, lng)        → [x, y] on the canvas, in CSS pixels
   //   fromContainer(x, y) → [x, y] on the canvas for a container point (a
@@ -70,15 +75,23 @@ const MapOverlay = (function () {
     ctx = canvas.getContext('2d');
 
     function size() { return map.getSize(); }
+    const wanted = () => typeof o.wanted !== 'function' || !!o.wanted();
+    // Full size while wanted, one pixel while not.
+    function fit() {
+      const s = size();
+      const dpr = window.devicePixelRatio || 1;
+      const on = wanted();
+      const w = on ? Math.max(1, Math.round(s.x * dpr)) : 1, h = on ? Math.max(1, Math.round(s.y * dpr)) : 1;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w; canvas.height = h;
+        canvas.style.width = `${on ? s.x : 1}px`; canvas.style.height = `${on ? s.y : 1}px`;
+      }
+      return on;
+    }
     function place() {
       if (gone || !canvas) return;
       const s = size();
-      const dpr = window.devicePixelRatio || 1;
-      const w = Math.max(1, Math.round(s.x * dpr)), h = Math.max(1, Math.round(s.y * dpr));
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w; canvas.height = h;
-        canvas.style.width = `${s.x}px`; canvas.style.height = `${s.y}px`;
-      }
+      fit();
       origin = map.containerPointToLayerPoint([0, 0]);
       L.DomUtil.setPosition(canvas, origin);
       hidden = false;
@@ -99,10 +112,11 @@ const MapOverlay = (function () {
       if (gone || !ctx) return;
       const s = size();
       const dpr = window.devicePixelRatio || 1;
+      const on = fit();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, s.x, s.y);
       ctx.globalAlpha = 1;
-      if (hidden || !origin) return;
+      if (hidden || !origin || !on) return;
       try { o.draw(ctx, handle, t); } catch (e) {
         // One bad frame must not take the map with it; say so once.
         if (!paint.warned) { paint.warned = true; console.error('MapOverlay draw failed', o.pane, e); }

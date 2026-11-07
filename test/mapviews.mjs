@@ -434,6 +434,12 @@ try {
     fresh.pressed.length === 0 && /Your own mix/.test(fresh.now) && !fresh.undo, J({ pressed: fresh.pressed, now: fresh.now }));
   check('…easements and land tenure off', fresh.easements === false && fresh.tenure === false);
 
+  // With Views untouched its five overlays hold one pixel each: a full-screen
+  // canvas on a phone is ten-odd MB, and nobody has asked for these yet.
+  const idle = await page.evaluate(() => ['mn-areas-canvas', 'mn-paths-canvas', 'mn-flow-canvas', 'mn-spot-canvas', 'mn-tails-canvas']
+    .map(c => { const el = document.querySelector('canvas.' + c); return el ? el.width * el.height : -1; }));
+  check('the five Views overlays cost one pixel each until their drawing is chosen', idle.every(n => n === 1), J(idle));
+
   // The two folds start shut, so the older Layers rows are not pushed a screen
   // down, and each summary still says what is chosen; opening one is kept.
   const folds = await page.evaluate(() => [...document.querySelectorAll('#map-views-block details.mv-fold')]

@@ -879,7 +879,8 @@ const MapFlow = (function () {
     S.wasBlocked = blocked();
     // Never animating as far as MapOverlay is concerned: this module paces
     // its own frames (see the header) and asks for them one at a time.
-    S.h = MapOverlay.create(map, { pane: PANE, z: PANE_Z, className: 'mn-flow-canvas', draw, animating: () => false });
+    S.h = MapOverlay.create(map, { pane: PANE, z: PANE_Z, className: 'mn-flow-canvas', draw, animating: () => false,
+      wanted: () => cfg().draw === 'flow' });
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisible);
     try {
       if (window.matchMedia) {

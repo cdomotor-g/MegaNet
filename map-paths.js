@@ -798,8 +798,10 @@ const MapPaths = (function () {
     detach();
     if (typeof MapOverlay === 'undefined') return;
     S.map = map;
-    S.areasH = MapOverlay.create(map, { pane: PANE_AREAS, z: Z_AREAS, className: 'mn-areas-canvas', draw: drawAreas });
-    S.xH = MapOverlay.create(map, { pane: PANE_X, z: Z_X, className: 'mn-paths-canvas', draw: drawX });
+    S.areasH = MapOverlay.create(map, { pane: PANE_AREAS, z: Z_AREAS, className: 'mn-areas-canvas', draw: drawAreas,
+      wanted: () => mode() === 'areas' });
+    S.xH = MapOverlay.create(map, { pane: PANE_X, z: Z_X, className: 'mn-paths-canvas', draw: drawX,
+      wanted: () => mode() !== 'every' });
     map.on('zoomend', onZoom);
   }
 

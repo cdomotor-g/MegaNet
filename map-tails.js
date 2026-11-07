@@ -839,8 +839,10 @@ const MapTails = (function () {
     S.cfg = readCfg();
     S.wasBlocked = blocked();
     // The spotlight's canvas first, so it is the lower of the two in the pane.
-    S.spotH = MapOverlay.create(map, { pane: PANE, z: PANE_Z, className: 'mn-spot-canvas', draw: drawSpot, animating: () => false });
-    S.tails = MapOverlay.create(map, { pane: PANE, z: PANE_Z, className: 'mn-tails-canvas', draw: drawTails, animating: () => false });
+    S.spotH = MapOverlay.create(map, { pane: PANE, z: PANE_Z, className: 'mn-spot-canvas', draw: drawSpot, animating: () => false,
+      wanted: () => chosen() });
+    S.tails = MapOverlay.create(map, { pane: PANE, z: PANE_Z, className: 'mn-tails-canvas', draw: drawTails, animating: () => false,
+      wanted: () => chosen() });
     map.on('moveend zoomend', onSettle);
     sync();
   }
