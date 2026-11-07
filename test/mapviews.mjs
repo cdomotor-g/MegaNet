@@ -134,7 +134,7 @@ const SPEC = {
     riverLines: true, riverCatchment: false, rain: false, elev: false, catchments: false, lots: false,
     easements: false, tenure: false, roads: false, roadOwners: false, councils: false, survey: false, hubs: false,
     wind: false, cameras: true, photos: true, siteFeatures: true, twinOffer: false,
-    drawing: { paths: 'lod', draw: 'lines', auto: true, balance: 50 } },
+    drawing: { paths: 'lod', draw: 'flow', auto: true, balance: 50 } },
   site: { base: 'Satellite', links: true, roles: ALL, backbone: true, arrows: false, colour: 'freq', health: true,
     lots: true, easements: true, roads: true, survey: true, photos: true, siteFeatures: true, cameras: true,
     twinOffer: true, riverLines: true, rain: false, elev: false, catchments: false, tenure: false, roadOwners: false,
@@ -147,7 +147,7 @@ const SPEC = {
   weak: { links: true, colour: 'fade', backbone: true, arrows: false, health: false,
     drawing: { paths: 'every', draw: 'lines', auto: true, balance: 85 } },
   backbone: { roles: { field: false, repeater: true, base: true }, links: true, backbone: true, arrows: true,
-    hubs: true, drawing: { draw: 'lines', auto: true, balance: 60 } },
+    hubs: true, drawing: { draw: 'flow', auto: true, balance: 60 } },
   traffic: { backbone: true, health: true, arrows: false,
     drawing: { paths: 'best', draw: 'flow', flowMode: 'live', auto: true, balance: 65 } },
   rivers: { base: 'OSM-Topo', links: false, backbone: false, arrows: false, roles: FIELD_ONLY, outlines: true,
@@ -381,7 +381,7 @@ try {
   check('Layers has the Views block, headed Views, with a chip button for every built-in view',
     place.views && place.heading === 'Views' && place.chips === place.builtIn && place.builtIn >= 10, J(place));
   check('…its chips in the spec\'s groups, then Your views',
-    J(place.groups) === J(['Everyone', 'Instrument technicians', 'Flood forecasters', 'Property services', 'Your views']),
+    J(place.groups) === J(['Everyone', 'Technicians', 'Flood', 'Property', 'Your views']),
     J(place.groups));
   check('…every chip saying on hover what the view does', place.titled);
   check('…above the Find a control box, in the page and on screen', place.before && place.above, J(place));
@@ -440,18 +440,29 @@ try {
     .map(c => { const el = document.querySelector('canvas.' + c); return el ? el.width * el.height : -1; }));
   check('the five Views overlays cost one pixel each until their drawing is chosen', idle.every(n => n === 1), J(idle));
 
-  // The two folds start shut, so the older Layers rows are not pushed a screen
-  // down, and each summary still says what is chosen; opening one is kept.
+  // The detailed drawing controls sit in one fold that starts shut, so the
+  // older Layers rows are not pushed a screen down; its summary still says
+  // what is chosen, and opening it is kept. The quick settings (which paths,
+  // how drawn, Balance) open under the view in force instead.
   const folds = await page.evaluate(() => [...document.querySelectorAll('#map-views-block details.mv-fold')]
     .map(d => ({ id: d.id, open: d.open, says: d.querySelector('summary').textContent.replace(/\s+/g, ' ').trim() })));
-  check('the drawing and line-strength folds start shut, their summaries naming the choice',
-    folds.length === 2 && folds.every(f => !f.open)
-      && /Every path · Lines/.test(folds[0].says) && /Your Link opacity · Balance even/.test(folds[1].says), J(folds));
-  await page.click('#mv-card-paths > summary');
+  check('the More drawing settings fold starts shut, its summary naming the choice',
+    folds.length === 1 && !folds[0].open && /More drawing settings Every path · Lines · Your Link opacity/.test(folds[0].says), J(folds));
+  const quick = await page.evaluate(() => {
+    const o = document.getElementById('mv-open');
+    return { open: !!o, groups: o ? [...o.querySelectorAll('.mv-q-h')].map(e => e.textContent.trim()) : [],
+      pressed: o ? [...o.querySelectorAll('.mv-seg-b[aria-pressed="true"]')].map(b => b.id) : [] };
+  });
+  check('…and the quick settings show for your own mix: which paths, how drawn, Balance, with what is on pressed',
+    quick.open && J(quick.groups) === J(['Which paths', 'Draw them as', 'Balance'])
+      && J(quick.pressed) === J(['mv-q-paths-every', 'mv-q-draw-lines', 'mv-q-balance-even']), J(quick));
+  await page.click('#mv-card-more > summary');
   await settle(200);
-  const foldKept = await page.evaluate(() => { MapViews.rerender(); return { open: document.getElementById('mv-card-paths').open,
+  const foldKept = await page.evaluate(() => { MapViews.rerender(); return { open: document.getElementById('mv-card-more').open,
     stored: localStorage.getItem('mn-map-views-open') }; });
-  check('…and one opened stays open through a redraw, remembered on the device', foldKept.open && /"paths":true/.test(foldKept.stored), J(foldKept));
+  check('…and the fold opened stays open through a redraw, remembered on the device', foldKept.open && /"more":true/.test(foldKept.stored), J(foldKept));
+  await page.click('#mv-card-more > summary');
+  await settle(200);
 
   const words = await page.evaluate(() => {
     const v = document.getElementById('map-views-block');
@@ -537,7 +548,7 @@ try {
   const kept = await page.evaluate(() => ({
     saved: MapViews.saved(), active: MapViews.active(),
     stored: JSON.parse(localStorage.getItem('mn-map-saved-views') || '[]').map(v => v.name),
-    chip: (() => { const c = document.querySelector('#map-views-block .mv-chip--saved'); return c && { text: c.textContent.trim(), pressed: c.getAttribute('aria-pressed') }; })(),
+    chip: (() => { const c = document.querySelector('#map-views-block .mv-chip--saved'); return c && { text: (c.querySelector('b') || c).textContent.trim(), pressed: c.getAttribute('aria-pressed') }; })(),
     box: document.getElementById('mv-save-name').value,
   }));
   const keptId = kept.saved[0] && kept.saved[0].id;
@@ -551,7 +562,7 @@ try {
   await openLayers();
   const back = await page.evaluate(() => ({
     saved: MapViews.saved().map(v => v.name), active: MapViews.active(),
-    pressed: [...document.querySelectorAll('#map-views-block .mv-chip[aria-pressed="true"]')].map(b => b.textContent.trim()),
+    pressed: [...document.querySelectorAll('#map-views-block .mv-chip[aria-pressed="true"]')].map(b => (b.querySelector('b') || b).textContent.trim()),
     balance: MapViews.settings().balance, colour: state.mapLinkColour,
   }));
   check('after a reload the kept view is there, still in force and pressed',

@@ -130,6 +130,8 @@
      itself, so a backbone path still reads as a backbone path while its colour
      goes on saying whatever the link colouring says. */
   --map-backbone: #000000;
+  /* The backbone under Flow (map-flow.js): amber, over a dark edge, glowing. */
+  --map-backbone-flow: #ffb703;
   /* Views' Areas, no lines (map-paths.js): one colour per repeater's area, and
      the ring its field stations' pins wear. Eight, so repeaters less than
      60 km apart never share one. Opaque: the area is filled at 0.32 in code. */
@@ -4631,6 +4633,10 @@ tr.hops-picked td { background: color-mix(in srgb, var(--accent) 12%, transparen
 .legend-area { box-shadow: 0 0 0 2px color-mix(in srgb, var(--dot) 35%, transparent); }
 .legend-line-flow { border-top: 2px dashed var(--map-line); }
 .legend-line-flow-live { border-top: 2px dotted var(--map-line); }
+.legend-line-flow-backbone {
+  border-top: 3px solid var(--map-backbone-flow);
+  box-shadow: 0 0 4px var(--map-backbone-flow), 0 1px 0 rgba(12, 14, 18, .5);
+}
 .legend-line-tails {
   height: 3px;
   border-top: 0;
@@ -11947,6 +11953,173 @@ details.mv-fold[open] > summary.mv-card-h { margin-bottom: .25rem; }
 }
 
 [data-theme="sunlight"] .mv-chip[aria-pressed="true"] { border-color: var(--accent); }
+
+/* ── Views as role cards (picked 7 Nov 2026) ─────────────────────────────────
+   A card per job: its pictogram and name, then a row per view — a small
+   picture of what the view shows, its name and one line, and a tick. The view
+   in force (or the one last picked) opens under its row with its tags and the
+   quick settings: which paths, how they are drawn, the Balance. These rules
+   come after the chip rules above and outrank them on purpose: a row keeps
+   the .mv-chip class the checks and the focus code look for. */
+.mapd-views {
+  --mv-role-everyone: #7a5cd6;
+  --mv-role-tech: var(--accent);
+  --mv-role-flood: #0f8f8f;
+  --mv-role-property: #b36a1e;
+  --mv-role-saved: var(--muted);
+}
+[data-theme="dark"] .mapd-views {
+  --mv-role-everyone: #b49bff;
+  --mv-role-flood: #3fd0c9;
+  --mv-role-property: #f0a35a;
+}
+.mv-groups { gap: var(--sp-2); }
+.mv-role {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--mv-card-bg);
+  overflow: hidden;
+}
+.mv-role-h.mv-group-h {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  margin: 0;
+  padding: .4rem .55rem;
+  font-size: .82rem;
+  color: var(--text);
+}
+.mv-role-ic {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 5px;
+  color: var(--panel);
+  background: var(--mv-role, var(--accent));
+}
+.mv-role-ic svg { width: .9rem; height: .9rem; }
+.mv-role--everyone { --mv-role: var(--mv-role-everyone); }
+.mv-role--tech     { --mv-role: var(--mv-role-tech); }
+.mv-role--flood    { --mv-role: var(--mv-role-flood); }
+.mv-role--property { --mv-role: var(--mv-role-property); }
+.mv-role--saved    { --mv-role: var(--mv-role-saved); }
+.mv-rows.mv-chips { display: grid; gap: 0; }
+.mv-row.mv-chip {
+  display: grid;
+  grid-template-columns: 3.1rem minmax(0, 1fr) 1rem;
+  align-items: center;
+  gap: .55rem;
+  width: 100%;
+  padding: .35rem .55rem;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-weight: 400;
+}
+.mv-row.mv-chip:hover { background: color-mix(in srgb, var(--mv-role, var(--accent)) 8%, transparent); }
+.mv-row.mv-chip[aria-pressed="true"],
+.mv-row.mv-chip[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--mv-role, var(--accent)) 14%, transparent);
+  box-shadow: inset 3px 0 0 var(--mv-role, var(--accent));
+  color: var(--text);
+}
+.mv-thumb {
+  display: block;
+  width: 3.1rem;
+  height: 2.1rem;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 14%, transparent);
+}
+.mv-thumb svg { display: block; width: 100%; height: 100%; }
+.mv-row-text { min-width: 0; display: grid; }
+.mv-row-text b { font-weight: 600; font-size: .85rem; line-height: 1.2; }
+.mv-row-line {
+  font-size: .74rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mv-tick {
+  width: .9rem;
+  height: .9rem;
+  border-radius: 50%;
+  border: 2px solid var(--ctl-border, var(--border));
+}
+.mv-row.mv-chip[aria-pressed="true"] .mv-tick {
+  border-color: var(--mv-role, var(--accent));
+  background: radial-gradient(var(--mv-role, var(--accent)) 42%, transparent 48%);
+}
+.mv-row.mv-chip[aria-expanded="true"]:not([aria-pressed="true"]) .mv-tick { border-style: dashed; }
+/* A kept view's row and its ✕: one line across the card. */
+.mv-role .mv-saved { display: flex; width: 100%; border-top: 1px solid var(--border); }
+.mv-role .mv-saved > .mv-row.mv-chip { border-top: 0; flex: 1; min-width: 0; }
+.mv-role .mv-chip-x { border: 0; border-left: 1px solid var(--border); border-radius: 0; padding: 0 .6rem; }
+.mv-role .mv-none { padding: .4rem .55rem .5rem; border-top: 1px solid var(--border); }
+
+/* What opens under the view in force. */
+.mv-open {
+  display: grid;
+  gap: .4rem;
+  padding: .4rem .55rem .55rem;
+  border-top: 1px solid color-mix(in srgb, var(--mv-role, var(--accent)) 30%, var(--border));
+  background: color-mix(in srgb, var(--mv-role, var(--accent)) 10%, transparent);
+  box-shadow: inset 3px 0 0 var(--mv-role, var(--accent));
+}
+.mv-groups > .mv-open,
+#map-views-block > .mv-open {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: var(--sp-2);
+}
+.mv-open .mv-now { margin: 0; font-size: .8rem; }
+.mv-tags { display: flex; flex-wrap: wrap; gap: .25rem; }
+.mv-tag {
+  padding: .05rem .45rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: .72rem;
+  line-height: 1.5;
+}
+.mv-q { display: grid; gap: .15rem; }
+.mv-q-h { font-size: .72rem; font-weight: 600; color: var(--muted); }
+.mv-seg {
+  display: flex;
+  border: 1px solid var(--ctl-border, var(--border));
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.mv-seg-b {
+  flex: 1;
+  min-width: 0;
+  padding: .28rem .2rem;
+  border: 0;
+  border-left: 1px solid var(--ctl-border, var(--border));
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: .76rem;
+  cursor: pointer;
+}
+.mv-seg-b:first-child { border-left: 0; }
+.mv-seg-b:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.mv-seg-b[aria-pressed="true"] { background: var(--accent); color: var(--panel); font-weight: 600; }
+.mv-seg-b:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* The More fold's two parts. */
+.mv-part + .mv-part { margin-top: var(--sp-3); padding-top: var(--sp-2); border-top: 1px solid var(--border); }
+.mv-part-h { font-weight: 600; margin: .25rem 0; }
+.mv-part.is-off > :not(.mv-part-h):not(.mv-off-note) { opacity: .5; }
+[data-theme="sunlight"] .mv-role,
+[data-theme="sunlight"] .mv-seg { border-width: 2px; border-color: var(--ctl-border); }
 
 /* The canvases Views draws with (map-overlay.js): the areas and halos, the
    trunks and other paths, the flowing dashes, the tails and the spotlight.

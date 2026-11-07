@@ -132,7 +132,7 @@ const MapViews = (function () {
   // no Balance. Nobody's map changes until somebody picks something.
   const DEFAULTS = {
     paths: 'every',
-    draw: 'lines',
+    draw: 'flow',      // see defaultDraw(): Flow, but plain lines under Classic
     flow: { mode: 'all', speed: 1, under: 0.35, playing: null },
     tails: { len: 24, spot: 90, follow: true, backboneFull: true },
     auto: false,
@@ -179,9 +179,10 @@ const MapViews = (function () {
 
   const GROUPS = [
     ['everyone', 'Everyone'],
-    ['tech', 'Instrument technicians'],
-    ['flood', 'Flood forecasters'],
-    ['property', 'Property services'],
+    // One word each (owner, 7 Nov 2026): who the views are for at a glance.
+    ['tech', 'Technicians'],
+    ['flood', 'Flood'],
+    ['property', 'Property'],
   ];
 
   // The overlay layers a view switches, each on its own module's setter.
@@ -225,7 +226,7 @@ const MapViews = (function () {
       knobs: {
         base: null, links: true, roles: ALL_ROLES, backbone: true, arrows: false, colour: 'freq', health: false,
         outlines: false, ...only('riverLines', 'cameras', 'photos', 'siteFeatures'),
-        drawing: { paths: 'lod', draw: 'lines', auto: true, balance: 50 },
+        drawing: { paths: 'lod', draw: 'flow', flow: { mode: 'all' }, auto: true, balance: 50 },
       },
     },
     {
@@ -269,7 +270,7 @@ const MapViews = (function () {
       knobs: {
         base: null, links: true, roles: { field: false, repeater: true, base: true }, backbone: true, arrows: true,
         colour: 'freq', health: true, outlines: false, ...only('hubs', 'riverLines', 'photos', 'siteFeatures', 'twinOffer'),
-        drawing: { paths: 'every', draw: 'lines', auto: true, balance: 60 },
+        drawing: { paths: 'every', draw: 'flow', flow: { mode: 'all' }, auto: true, balance: 60 },
       },
     },
     {
@@ -398,8 +399,19 @@ const MapViews = (function () {
 
   // Anything in range kept, anything else back to its default: storage can
   // hold a value from an older version, or one typed into the console.
+  // How the paths are drawn until somebody chooses: Flow (the owner's call,
+  // 7 Nov 2026), except under the Classic look, which is the map the way it
+  // was — and which every browser check opens on, so they keep their lines.
+  function defaultDraw() {
+    try { if (typeof lookStored === 'function' && lookStored() === 'classic') return 'lines'; } catch (_) {}
+    return 'flow';
+  }
+  // The stored settings' version. Before 2 the default was plain lines, and
+  // a stored 'lines' was most often only that default written down when
+  // something else was changed, so it is read as the new default once.
+  const DRAWING_V = 2;
   function clean(c) {
-    const d = DEFAULTS;
+    const d = Object.assign({}, DEFAULTS, { draw: defaultDraw() });
     const o = c && typeof c === 'object' ? c : {};
     const f = o.flow && typeof o.flow === 'object' ? o.flow : {};
     const t = o.tails && typeof o.tails === 'object' ? o.tails : {};
@@ -427,6 +439,7 @@ const MapViews = (function () {
       let raw = null;
       try { raw = JSON.parse(readLS(LS_DRAWING) || 'null'); } catch (_) { raw = null; }
       S.cfg = clean(raw);
+      if (raw && typeof raw === 'object' && raw.v !== DRAWING_V && raw.draw === 'lines') S.cfg.draw = defaultDraw();
     }
     return S.cfg;
   }
@@ -475,7 +488,7 @@ const MapViews = (function () {
       return settings();
     }
     const wrote = ch.size > 0 || S.unsaved;
-    if (wrote) { writeLS(LS_DRAWING, JSON.stringify(next)); S.unsaved = false; }
+    if (wrote) { writeLS(LS_DRAWING, JSON.stringify(Object.assign({ v: DRAWING_V }, next))); S.unsaved = false; }
     if (opts.quiet) paintReadouts();
     else rerender();
     if (wrote && typeof rerenderMapLegend === 'function') rerenderMapLegend();
@@ -533,6 +546,9 @@ const MapViews = (function () {
   // backbone — is drawn strong whatever the strength figure is: the point
   // of the mode is that those stand out.
   const LIT_MIN = 0.85;
+  // The map's own backbone lines under Flow's amber ones: faint, but over the
+  // 0.02 a line needs to stay hoverable.
+  const FLOW_BB_UNDER = 0.12;
 
   // What every line in one pass shares, worked out once for the pass.
   function context() {
@@ -571,7 +587,11 @@ const MapViews = (function () {
     const field = FIELD_ROLES.has(role), backbone = BACKBONE_ROLES.has(role);
     if (x.flow) {
       if (field) return x.cfg.flow.under;
-      if (backbone) return Math.max(0.5, x.cfg.flow.under);
+      // Everything flows and Repeaters take turns draw the backbone
+      // themselves, in amber (map-flow.js), so the map's own black-dashed one
+      // steps right back — kept just strong enough to hover and click.
+      // Live readings draws nothing of its own: the backbone stays as it was.
+      if (backbone) return x.cfg.flow.mode === 'live' ? Math.max(0.5, x.cfg.flow.under) : (role === 'backbone-dash' ? 0 : FLOW_BB_UNDER);
       return 1;
     }
     if (x.tails) {
@@ -1275,50 +1295,180 @@ const MapViews = (function () {
   }
   const savedSay = v => `Your own view, kept on this device: ${describe(v.knobs) || 'the map as you set it'}.`;
 
-  function chipHtml(v, act) {
-    const title = v.say + (v.caution ? ` ${v.caution}` : '');
-    return `<button type="button" class="mv-chip" id="${chipId(v.id)}" data-view="${esc(v.id)}"
-        aria-pressed="${act === v.id}" title="${esc(title)}"
-        onclick="MapViews.apply('${escAttr(v.id)}')">${esc(v.label)}</button>`;
+  // ── The section: a card per job, a row per view (look picked 7 Nov 2026:
+  // the role cards, with the compact list's quick settings opened under the
+  // view in force) ──────────────────────────────────────────────────────────
+
+  // One short line per view, under its name; the full sentence (`say`) is the
+  // row's hover title.
+  const LINES = {
+    overview: 'The whole network, tidy', site: 'Photo, property lines, survey marks',
+    radio: 'Tails that light up round the pointer', weak: 'Coloured by the signal to spare',
+    backbone: 'Repeaters, bases and the paths between', traffic: 'Readings pulse in as they arrive',
+    rivers: 'Rivers, basins, ground height', rain: 'Rain gauges as a heat map',
+    property: 'Boundaries, easements, road owners', land: 'Parks, forests, State land, leases',
+  };
+  // A pictogram per job, drawn in the card's own colour (styles.css).
+  const ROLE_ICON = {
+    everyone: '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="7" cy="6.5" r="2.6"/><circle cx="13.5" cy="7.2" r="2.2"/><path d="M2.5 16c.4-3 2.2-4.8 4.5-4.8S11.1 13 11.5 16zM11 16c.2-2.4 1.3-3.9 2.8-3.9s2.9 1.5 3.2 3.9z"/></svg>',
+    tech: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M10 9v8M7 17h6"/><circle cx="10" cy="7.5" r="1.4" fill="currentColor"/><path d="M6.6 4.4a5 5 0 0 0 0 6.2M13.4 4.4a5 5 0 0 1 0 6.2M4.4 2.4a8 8 0 0 0 0 10.2M15.6 2.4a8 8 0 0 1 0 10.2"/></svg>',
+    flood: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M2 8c2-1.6 4-1.6 6 0s4 1.6 6 0 3-1.2 4-.8M2 12c2-1.6 4-1.6 6 0s4 1.6 6 0 3-1.2 4-.8M2 16c2-1.6 4-1.6 6 0s4 1.6 6 0 3-1.2 4-.8"/></svg>',
+    property: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 10 3.5l7 6V17H3z"/><path d="M8 17v-4.5h4V17"/></svg>',
+    saved: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h10v14l-5-3.6L5 17z"/></svg>',
+  };
+  // A small picture of what each view shows: a ground (satellite, topographic,
+  // light or dark), then what is drawn on it. A sketch, not a screenshot.
+  function thumbHtml(id) {
+    const G = {
+      sat: '<rect width="72" height="48" fill="#3c3a2c"/><path d="M0 30 Q18 22 36 28 T72 24 V48 H0z" fill="#2f3a26"/><path d="M44 0 Q50 18 72 20 V0z" fill="#26301f"/>',
+      topo: '<rect width="72" height="48" fill="#e9e4d3"/><path d="M8 40 Q20 28 34 34 T66 26M4 30 Q18 18 32 24 T70 14" fill="none" stroke="#c9bf9f" stroke-width=".8"/>',
+      light: '<rect width="72" height="48" fill="#eef1f4"/>',
+      dark: '<rect width="72" height="48" fill="#1d2630"/>',
+    };
+    const river = c => `<path d="M-2 34 C14 30 18 40 30 36 S48 22 74 26" fill="none" stroke="${c || '#3d8fe0'}" stroke-width="2"/>`;
+    const pin = (x, y) => `<circle cx="${x}" cy="${y}" r="2.1" fill="#107c10" stroke="#fff" stroke-width=".9"/>`;
+    const rpt = (x, y) => `<circle cx="${x}" cy="${y}" r="3" fill="#0b5cab" stroke="#fff" stroke-width="1.1"/>`;
+    const ln = (a, b, c, w, o, d) => `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${c}" stroke-width="${w || 1}" opacity="${o || 1}"${d ? ` stroke-dasharray="${d}"` : ''}/>`;
+    const R1 = [20, 14], R2 = [54, 30];
+    const P = [[8, 30], [14, 40], [30, 22], [36, 40], [44, 12], [62, 10], [66, 40], [28, 6]];
+    const near = p => (Math.hypot(p[0] - R1[0], p[1] - R1[1]) < Math.hypot(p[0] - R2[0], p[1] - R2[1]) ? R1 : R2);
+    const BB = '#ffb703';
+    let b;
+    switch (id) {
+      case 'overview': b = G.light + river() + P.map(p => ln(p, near(p), '#2979ff', 1, 0.7)).join('') + ln(R1, R2, BB, 2.2) + P.map(p => pin(...p)).join('') + rpt(...R1) + rpt(...R2); break;
+      case 'site': b = G.sat + '<path d="M10 4V44M28 4V44M46 4V44M4 16H68M4 32H68" stroke="#fff" stroke-width=".6" opacity=".8"/><path d="M4 24H68" stroke="#fff" stroke-width=".7" stroke-dasharray="2 2"/>' + ln([36, 24], [44, 18], '#6aa6ff', 1.6) + ln([36, 24], [30, 30], '#6aa6ff', 1.6) + pin(36, 24) + '<rect x="50" y="36" width="4" height="4" fill="#f0bf3c"/>'; break;
+      case 'radio': b = G.sat + river() + [[0, 6], [10, 44], [40, 46], [62, 2], [72, 22], [2, 26]].map(e => ln(R2, [R2[0] + (e[0] - R2[0]) * 0.22, R2[1] + (e[1] - R2[1]) * 0.22], '#6aa6ff', 1.6)).join('') + '<circle cx="28" cy="22" r="11" fill="#fff" fill-opacity=".08" stroke="#fff" stroke-width=".8"/>' + ln([26, 20], R2, '#6aa6ff', 1.6) + ln([30, 26], R2, '#c58cff', 1.6) + pin(26, 20) + pin(30, 26) + rpt(...R2); break;
+      case 'weak': b = G.dark + ln([6, 8], R2, '#00e676', 1.2, 0.35) + ln([10, 40], R2, '#00e676', 1.2, 0.35) + ln([28, 4], R2, '#ffab00', 1.4, 0.8) + ln([4, 24], R2, '#e53935', 2.2) + ln([40, 46], R2, '#00e676', 1.2, 0.35) + rpt(...R2) + pin(4, 24) + pin(28, 4); break;
+      case 'backbone': b = G.light + ln([10, 10], [36, 20], BB, 2.6) + ln([36, 20], [62, 12], BB, 2.6) + ln([36, 20], [52, 40], BB, 2.6) + ln([10, 10], [36, 20], '#fff6d0', 1.4, 1, '4 6') + rpt(10, 10) + rpt(36, 20) + rpt(52, 40) + '<rect x="58" y="8" width="7" height="7" fill="#c7401a" stroke="#fff"/>'; break;
+      case 'traffic': b = G.dark + P.slice(0, 5).map(p => ln(p, R2, '#2979ff', 1, 0.3)).join('') + ln([8, 30], R2, '#ffe27a', 1.8, 0.8) + '<circle cx="36" cy="30" r="2.6" fill="#fff"/><circle cx="31" cy="30" r="1.8" fill="#ffe27a" opacity=".7"/>' + rpt(...R2) + pin(8, 30); break;
+      case 'rivers': b = G.topo + '<path d="M6 6 C24 2 40 8 52 4 L66 18 C60 34 50 44 30 44 C14 42 6 30 6 6z" fill="#4fa3d9" fill-opacity=".18" stroke="#0b4f8a" stroke-width=".8"/>' + river('#1f6fd1') + '<path d="M30 36 L36 14" stroke="#1f6fd1" stroke-width="1.3"/>' + pin(20, 33) + pin(44, 27) + '<circle cx="44" cy="27" r="4" fill="none" stroke="#e05aa8" stroke-width="1"/>'; break;
+      case 'rain': b = G.light + '<circle cx="22" cy="20" r="14" fill="#7c4dff" fill-opacity=".22"/><circle cx="26" cy="22" r="7" fill="#3a2ea8" fill-opacity=".35"/><circle cx="54" cy="32" r="10" fill="#2979ff" fill-opacity=".2"/>' + river('#1f6fd1') + pin(24, 21) + pin(54, 32) + pin(10, 38); break;
+      case 'property': b = G.sat + '<path d="M4 10H68M4 26H68M4 40H68M14 4V44M34 4V44M54 4V44" stroke="#fff" stroke-width=".7"/><path d="M24 4V44" stroke="#fff" stroke-width=".8" stroke-dasharray="2 2"/><path d="M0 34 L72 20" stroke="#f9a825" stroke-width="1.6"/>' + pin(44, 16); break;
+      case 'land': b = G.topo + '<rect x="4" y="4" width="30" height="20" fill="#2e8b3e" opacity=".45"/><rect x="38" y="26" width="30" height="18" fill="#1b7f79" opacity=".4"/><rect x="40" y="4" width="16" height="16" fill="#d6539b" opacity=".35"/><path d="M4 24H68M34 4V44M56 4V44" stroke="#555" stroke-width=".6"/>' + river('#1f6fd1'); break;
+      default: b = G.light + P.slice(0, 4).map(p => ln(p, R2, '#2979ff', 1, 0.6)).join('') + rpt(...R2);
+    }
+    return `<span class="mv-thumb" aria-hidden="true"><svg viewBox="0 0 72 48" preserveAspectRatio="xMidYMid slice" focusable="false">${b}</svg></span>`;
   }
-  function savedChipHtml(v, i, act) {
+
+  // What a view turns on, as a few short tags.
+  const BASE_WORDS = { Satellite: 'Satellite photo', 'OSM-Topo': 'Topographic map', Light: 'Light map', Dark: 'Dark map', OpenStreetMap: 'Street map' };
+  const LAYER_WORDS = {
+    riverLines: 'Rivers', riverCatchment: 'Catchment of a picked river', rain: 'Rain heat map', elev: 'Ground height',
+    catchments: 'River basins', lots: 'Property lines', easements: 'Easements', tenure: 'Land tenure', roads: 'Road parcels',
+    roadOwners: 'Road owners', councils: 'Council areas', survey: 'Survey marks', hubs: 'Maintenance hubs',
+    wind: 'Wind regions', photos: 'Field photos', siteFeatures: 'Site features',
+  };
+  function tagsOf(v) {
+    const k = (v && v.knobs) || {};
+    const out = [];
+    if (k.base && BASE_WORDS[k.base]) out.push(BASE_WORDS[k.base]);
+    if (k.links) {
+      const d = k.drawing || {};
+      out.push(FOLD_PATHS[d.paths] || 'Every path');
+      if (d.draw === 'flow') out.push(d.flow && d.flow.mode === 'live' ? 'Live readings' : 'Flow');
+      else if (d.draw) out.push(FOLD_DRAW[d.draw] || '');
+    } else if (k.roles && k.roles.field === false) out.push('Repeaters & bases only');
+    else out.push('No radio paths');
+    if (k.backbone) out.push('Backbone');
+    if (k.colour === 'fade' && k.links) out.push('Fade margin colours');
+    if (k.health) out.push('Health pins');
+    if (k.arrows) out.push('Arrows');
+    if (k.outlines) out.push('Forecast locations');
+    for (const [key, word] of Object.entries(LAYER_WORDS)) if (k[key] === true) out.push(word);
+    return out.filter(Boolean);
+  }
+  const tagsHtml = list => `<span class="mv-tags">${list.map(t => `<span class="mv-tag">${esc(t)}</span>`).join('')}</span>`;
+
+  function rowHtml(v, act, open) {
+    const title = v.say + (v.caution ? ` ${v.caution}` : '');
+    return `<button type="button" class="mv-chip mv-row" id="${chipId(v.id)}" data-view="${esc(v.id)}"
+        aria-pressed="${act === v.id}" aria-expanded="${open}" title="${esc(title)}"
+        onclick="MapViews.apply('${escAttr(v.id)}')">${thumbHtml(v.id)}<span class="mv-row-text"><b>${esc(v.label)}</b>
+        <span class="mv-row-line">${esc(LINES[v.id] || '')}</span></span><span class="mv-tick" aria-hidden="true"></span></button>`;
+  }
+  function savedRowHtml(v, i, act, open) {
     return `<span class="mv-saved">
-        <button type="button" class="mv-chip mv-chip--saved" id="${chipId(v.id)}" data-view="${esc(v.id)}"
-          aria-pressed="${act === v.id}" title="${esc(savedSay(v))}"
-          onclick="MapViews.apply('${escAttr(v.id)}')">${esc(v.name)}</button>
+        <button type="button" class="mv-chip mv-chip--saved mv-row" id="${chipId(v.id)}" data-view="${esc(v.id)}"
+          aria-pressed="${act === v.id}" aria-expanded="${open}" title="${esc(savedSay(v))}"
+          onclick="MapViews.apply('${escAttr(v.id)}')">${thumbHtml('saved')}<span class="mv-row-text"><b>${esc(v.name)}</b>
+          <span class="mv-row-line">Your own view</span></span><span class="mv-tick" aria-hidden="true"></span></button>
         <button type="button" class="mv-chip-x" aria-label="${esc(`Remove your view ${v.name}`)}"
           title="Remove this view" onclick="MapViews.remove(${i})">✕</button>
       </span>`;
   }
 
+  // The quick settings, under the view in force (or the one last picked,
+  // marked as changed): its tags, then which paths, how they are drawn and
+  // the Balance, each a row of buttons. The full set is in More drawing
+  // settings, at the foot of the section.
+  function segHtml(label, items, cur, key) {
+    const id = `mv-q-${key}`;
+    return `<div class="mv-q" role="group" aria-labelledby="${id}-h">
+        <span class="mv-q-h" id="${id}-h">${label}</span>
+        <span class="mv-seg">${items.map(([val, text, patch, title]) => `<button type="button" class="mv-seg-b" id="${id}-${val}"
+            aria-pressed="${cur === val}"${title ? ` title="${esc(title)}"` : ''} onclick="MapViews.set(${patch})">${esc(text)}</button>`).join('')}</span>
+      </div>`;
+  }
+  function quickHtml(c, v, act) {
+    const links = typeof state === 'undefined' || state.mapShowLinks !== false;
+    const changed = v && act !== v.id;
+    const name = v ? (v.label || v.name) : null;
+    const balNow = c.balance < 45 ? 'photo' : c.balance > 55 ? 'network' : 'even';
+    const pathsNow = c.paths === 'lod' ? 'best' : c.paths;
+    return `
+    <div class="mv-open" id="mv-open">
+      <p class="mv-now" id="mv-now">${v && !changed ? `<strong>${esc(name)}</strong>`
+        : v ? `<strong>Your own mix</strong>, started from ${esc(name)}`
+        : '<strong>Your own mix</strong> — no view matches the map as it is now'}</p>
+      ${v && v.knobs ? tagsHtml(tagsOf(v)) : ''}
+      ${links ? `
+      ${segHtml('Which paths', [
+        ['every', 'Every', "{paths:'every'}", 'Every radio path'],
+        ['best', c.paths === 'lod' ? 'Best*' : 'Best', "{paths:'best'}", c.paths === 'lod' ? 'Best path until you zoom in (More drawing settings)' : WORDS['Best path']],
+        ['bundle', 'Bundled', "{paths:'bundle'}", WORDS['Bundled into trunks']],
+        ['areas', 'Areas', "{paths:'areas'}", WORDS.Areas]], pathsNow, 'paths')}
+      ${segHtml('Draw them as', [
+        ['lines', 'Lines', "{draw:'lines'}", 'Plain lines'],
+        ['flow', 'Flow', "{draw:'flow'}", WORDS.Flow],
+        ['tails', 'Tails', "{draw:'tails'}", WORDS.Tails]], c.draw, 'draw')}` : `
+      <p class="filter-note mv-off-note">No radio paths in this view. Show radio paths, under Stations &amp; links, brings them back.</p>`}
+      ${segHtml(termHtml('Balance', WORDS.Balance), [
+        ['photo', 'Photo', '{balance:25}', 'The photo stronger, the lines fainter'],
+        ['even', 'Even', '{balance:50}', 'The photo and the lines as they are'],
+        ['network', 'Network', '{balance:75}', 'The photo greyed, the lines stronger']], balNow, 'balance')}
+    </div>`;
+  }
+
   function chipsHtml(act) {
-    const groups = GROUPS.map(([g, label]) => `
-    <div class="mv-group" role="group" aria-labelledby="mv-g-${g}">
-      <span class="mv-group-h" id="mv-g-${g}">${esc(label)}</span>
-      <div class="mv-chips">${VIEWS.filter(v => v.group === g).map(v => chipHtml(v, act)).join('')}</div>
-    </div>`).join('');
+    const shown = act || pickNow();
+    const open = id => id === shown;
+    const c = C();
+    const shownView = findView(shown);
+    const groups = GROUPS.map(([g, label]) => {
+      const rows = VIEWS.filter(v => v.group === g).map(v => rowHtml(v, act, open(v.id))
+        + (open(v.id) ? quickHtml(c, v, act) : '')).join('');
+      return `
+    <div class="mv-group mv-role mv-role--${g}" role="group" aria-labelledby="mv-g-${g}">
+      <span class="mv-group-h mv-role-h" id="mv-g-${g}"><span class="mv-role-ic">${ROLE_ICON[g] || ''}</span>${esc(label)}</span>
+      <div class="mv-chips mv-rows">${rows}</div>
+    </div>`;
+    }).join('');
     const mine = savedList();
     return `
-    <p class="mv-ask" id="mv-ask">What are you here for? Pick a ${termHtml('view', WORDS.View)}.</p>
+    ${shownView ? '' : quickHtml(c, null, act)}
     <div class="mv-groups">${groups}
-    <div class="mv-group mv-group--saved" role="group" aria-labelledby="mv-g-saved">
-      <span class="mv-group-h" id="mv-g-saved">Your views</span>
-      <div class="mv-chips">${mine.length ? mine.map((v, i) => savedChipHtml(v, i, act)).join('')
+    <div class="mv-group mv-role mv-role--saved mv-group--saved" role="group" aria-labelledby="mv-g-saved">
+      <span class="mv-group-h mv-role-h" id="mv-g-saved"><span class="mv-role-ic">${ROLE_ICON.saved}</span>Your views</span>
+      <div class="mv-chips mv-rows">${mine.length ? mine.map((v, i) => savedRowHtml(v, i, act, open(v.id))
+          + (open(v.id) ? quickHtml(c, v, act) : '')).join('')
         : '<span class="filter-note mv-none">None yet: set the map the way you like it, then keep it below.</span>'}</div>
     </div>
     </div>`;
   }
 
-  function nowHtml(act) {
-    const v = findView(act);
-    const line = !v
-      ? '<strong>Your own mix</strong>: the map as you have set it — no view matches it as it is now.'
-      : v.say ? `<strong>${esc(v.label)}</strong>: ${esc(v.say)}`
-        : `<strong>${esc(v.name)}</strong>: ${esc(savedSay(v))}`;
-    return `
-    <p class="filter-note mv-now" id="mv-now">${line}</p>
-    ${S.undo ? `<button type="button" class="link-btn mv-undo" id="mv-undo" onclick="MapViews.undo()"
-        title="Every switch the last view changed, back as it was before you picked it.">Put the map back</button>` : ''}`;
+  function nowHtml() {
+    return S.undo ? `<button type="button" class="link-btn mv-undo" id="mv-undo" onclick="MapViews.undo()"
+        title="Every switch the last view changed, back as it was before you picked it.">↶ Put the map back</button>` : '';
   }
 
   function radio(name, value, cur, labelHtml, handler) {
@@ -1413,10 +1563,8 @@ const MapViews = (function () {
     const hd = 'MapViews.set({draw:this.value})';
     const note = pathsNoteText();
     return `
-    <details class="mv-card mv-fold${links ? '' : ' is-off'}" id="mv-card-paths"${foldOpen('paths') ? ' open' : ''}
-      ontoggle="MapViews.fold('paths', this.open)">
-      <summary class="mv-card-h">How the radio paths are drawn
-        <span class="mv-fold-now">${esc(FOLD_PATHS[c.paths] || '')} · ${esc(FOLD_DRAW[c.draw] || '')}</span></summary>
+    <div class="mv-part${links ? '' : ' is-off'}" id="mv-card-paths">
+      <div class="mv-part-h">How the radio paths are drawn</div>
       ${links ? '' : `<p class="filter-note mv-off-note">The radio paths are switched off (Show radio paths, under
         Stations &amp; links), so these wait until they are on.</p>`}
       <div class="mv-radios" role="radiogroup" aria-labelledby="mv-paths-h">
@@ -1436,7 +1584,7 @@ const MapViews = (function () {
       </div>
       ${c.draw === 'flow' ? flowHtml(c) : ''}
       ${c.draw === 'tails' ? tailsHtml(c) : ''}
-    </details>`;
+    </div>`;
   }
 
   function autoReadHtml() {
@@ -1452,10 +1600,8 @@ const MapViews = (function () {
   function strengthCardHtml(c) {
     const bw = balanceWords(c.balance);
     return `
-    <details class="mv-card mv-fold" id="mv-card-strength"${foldOpen('strength') ? ' open' : ''}
-      ontoggle="MapViews.fold('strength', this.open)">
-      <summary class="mv-card-h">Line strength
-        <span class="mv-fold-now">${c.auto ? 'Auto-contrast' : 'Your Link opacity'} · Balance ${esc(bw.short.toLowerCase())}</span></summary>
+    <div class="mv-part" id="mv-card-strength">
+      <div class="mv-part-h">Line strength</div>
       <label class="filter-check mv-check" for="mv-auto">
         <input type="checkbox" id="mv-auto" ${c.auto ? 'checked' : ''} onchange="MapViews.set({auto:this.checked})">
         ${termHtml('Auto-contrast', WORDS['Auto-contrast'])}
@@ -1465,6 +1611,21 @@ const MapViews = (function () {
         id: 'mv-balance', label: termHtml('Balance', WORDS.Balance), value: c.balance, min: 0, max: 100, step: 1,
         key: 'balance', read: bw.short, aria: 'Balance between the base map and the network', valuetext: bw.long })}
       <div class="mv-ends" aria-hidden="true"><span>Photo</span><span>Network</span></div>
+    </div>`;
+  }
+
+  // Everything the quick settings leave out, in one fold that starts shut:
+  // best path until zoomed in, what moves in Flow and how fast, the tails
+  // and the spotlight, auto-contrast and the Balance slider.
+  function moreHtml(c) {
+    const bits = [FOLD_PATHS[c.paths], FOLD_DRAW[c.draw], c.auto ? 'Auto-contrast' : 'Your Link opacity'].filter(Boolean);
+    return `
+    <details class="mv-card mv-fold" id="mv-card-more"${foldOpen('more') ? ' open' : ''}
+      ontoggle="MapViews.fold('more', this.open)">
+      <summary class="mv-card-h">More drawing settings
+        <span class="mv-fold-now">${esc(bits.join(' · '))}</span></summary>
+      ${pathsCardHtml(c)}
+      ${strengthCardHtml(c)}
     </details>`;
   }
 
@@ -1510,9 +1671,8 @@ const MapViews = (function () {
     return `
     <div class="map-display-h">Views</div>
     ${chipsHtml(act)}
-    ${nowHtml(act)}
-    ${pathsCardHtml(c)}
-    ${strengthCardHtml(c)}
+    ${nowHtml()}
+    ${moreHtml(c)}
     ${saveHtml()}
     ${wordsHtml()}`;
   }

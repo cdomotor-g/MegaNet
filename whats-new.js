@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 236, date: '2026-11-07', items: [
+      '🗺️ <strong>Views, laid out as a card for each group.</strong> In 🗺️ Layers, the views now sit under '
+        + '<em>Everyone</em>, <em>Technicians</em>, <em>Flood</em> and <em>Property</em>, each with a small picture of '
+        + 'what it shows. The view you pick opens to show what it turns on and three quick choices: which paths, how '
+        + 'they are drawn, and the Balance. The rest is under <em>More drawing settings</em>.',
+      '〰️ <strong>Flow is how the radio paths are drawn now.</strong> Dashes run along each path into its repeater, and '
+        + 'the <strong>backbone</strong> glows amber with pulses running on to the base, so the paths every reading '
+        + 'crosses stand out. Pick <em>Lines</em> in the quick choices for the plain lines; the Classic look keeps them. '
+        + 'If your device asks for less motion, the dashes stand still until you press Play.',
+    ] },
     { n: 235, date: '2026-11-07', items: [
       '⭕ <strong>The busy wheel in the top-right corner stays round on small phones.</strong> On a narrow touch screen '
         + 'such as an iPhone mini it was being stretched into an oval; it is a circle there now, as everywhere else.',

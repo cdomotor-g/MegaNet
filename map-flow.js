@@ -129,11 +129,21 @@ const MapFlow = (function () {
   const CASE_ALPHA = 0.4;                // …at this alpha
   const FIELD_ALPHA = 0.95;
   const DIM_ALPHA = 0.25;                // a line the focus has dimmed
-  const BB_SPEED = 0.7;                  // backbone dashes move at this share of the field's
-  const BB_ON = 12, BB_PERIOD = 66;      // repeater → base, one way: 12 on, 54 gap
-  const BB2_ON = 6, BB2_PERIOD = 70;     // repeater ↔ repeater, both ways: 6 on, 64 gap
-  const BB_W = 2.6;
-  const BB_ALPHA = 0.9;
+  const BB_SPEED = 0.7;                  // backbone pulses move at this share of the field's
+  const BB_ON = 16, BB_PERIOD = 72;      // repeater → base, one way: 16 on, 56 gap
+  const BB2_ON = 9, BB2_PERIOD = 76;     // repeater ↔ repeater, both ways: 9 on, 67 gap
+  // The backbone in Flow is its own colour, not the map's black dashes (owner,
+  // 7 Nov 2026: black dashes did not say "important backbone"): an amber line
+  // (--map-backbone-flow) over a dark edge, glowing, with warm white pulses.
+  // How strong: the backbone lines' own strength (MapViews works it out from
+  // how much of the screen the backbone covers — a hundred paths round a city
+  // come out softer than ten in the bush), lifted, and never below a floor;
+  // the pulses brighter still, so the movement always reads.
+  const BB_EDGE = '#0c0e12', BB_EDGE_W = 5.2, BB_EDGE_ALPHA = 0.5;
+  const BB_LINE_W = 2.4, BB_GLOW = 5;
+  const BB_PULSE = '#fff4cc', BB_PULSE_W = 2.6;
+  const BB_LIFT = 1.5, BB_MIN = 0.3, BB_PULSE_LIFT = 2.4, BB_PULSE_MIN = 0.6;
+  const TURN_BB_OTHERS = 0.5;            // the other backbone paths while a repeater has its turn
 
   // ── Repeaters take turns ──
   const TURN_S = 2.6;                    // seconds a turn at Speed 1
@@ -141,7 +151,6 @@ const MapFlow = (function () {
   const FADE_S = 0.3;                    // in and out
   const TURN_W = 1.8, TURN_ALPHA = 0.85, TURN_CASE_ALPHA = 0.55;
   const SPARK_W = 2.0;                   // the bright dashes along its paths
-  const TURN_BB_W = 2.6, TURN_BB_ALPHA = 0.7, TURN_BB_CASE = 4.0, TURN_BB_CASE_ALPHA = 0.5;
   const RING_GAP = 5, RING_W = 2, RING_CASE_W = 4.5;
   const LABEL_PX = 12;
 
@@ -254,7 +263,8 @@ const MapFlow = (function () {
   function colours() {
     if (!S.colours) {
       const cv = (n, f) => (typeof cssVar === 'function' ? cssVar(n, f) : f);
-      S.colours = { line: cv('--map-line', '#ff6f00'), backbone: cv('--map-backbone', '#000000') };
+      S.colours = { line: cv('--map-line', '#ff6f00'), backbone: cv('--map-backbone', '#000000'),
+        flowBackbone: cv('--map-backbone-flow', '#ffb703') };
     }
     return S.colours;
   }
@@ -452,6 +462,57 @@ const MapFlow = (function () {
     S.buckets.clear();
   }
 
+  // The backbone paths in `list`: the amber line, its edge and its glow, then
+  // the pulses running the way the readings go. Returns the pulses drawn.
+  function drawBackbone(ctx, list, V, d, alpha) {
+    if (!list.length || !(alpha > 0)) return 0;
+    const sc = strokeScale(), col = colours();
+    const f0 = list[0].l.mnFullOpacity;
+    const full = Number.isFinite(f0) ? f0 : 0.6;
+    const lineA = clamp(full * BB_LIFT, BB_MIN, 1) * alpha;
+    const pulseA = clamp(full * BB_PULSE_LIFT, BB_PULSE_MIN, 1) * alpha;
+    const line = new Path2D(), dim = new Path2D();
+    let nLine = 0, nDim = 0;
+    for (const e of list) { if (e.l.mnFocusDimmed) { solid(dim, e, V); nDim++; } else { solid(line, e, V); nLine++; } }
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const [p, n, a] of [[dim, nDim, lineA * DIM_ALPHA], [line, nLine, lineA]]) {
+      if (!n) continue;
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = a * BB_EDGE_ALPHA;
+      ctx.strokeStyle = BB_EDGE;
+      ctx.lineWidth = BB_EDGE_W * sc;
+      ctx.stroke(p);
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = col.flowBackbone;
+      ctx.lineWidth = BB_LINE_W * sc;
+      ctx.shadowColor = col.flowBackbone;
+      ctx.shadowBlur = BB_GLOW;
+      ctx.stroke(p);
+    }
+    const db = d * BB_SPEED;
+    const pulses = new Path2D();
+    let k = 0;
+    for (const e of list) {
+      if (e.l.mnFocusDimmed) continue;
+      k += e.two
+        ? dashes(pulses, e, V, fwdBase(e, db, BB2_PERIOD), BB2_ON, BB2_PERIOD)
+          + dashes(pulses, e, V, backBase(e, db, BB2_ON, BB2_PERIOD), BB2_ON, BB2_PERIOD)
+        : dashes(pulses, e, V, fwdBase(e, db, BB_PERIOD), BB_ON, BB_PERIOD);
+    }
+    if (k) {
+      ctx.globalAlpha = pulseA;
+      ctx.strokeStyle = BB_PULSE;
+      ctx.lineWidth = BB_PULSE_W * sc;
+      ctx.shadowColor = col.flowBackbone;
+      ctx.shadowBlur = BB_GLOW * 1.5;
+      ctx.stroke(pulses);
+    }
+    ctx.restore();
+    return k;
+  }
+
   // ── Everything flows ───────────────────────────────────────────────────────
 
   function drawAll(ctx, G, V) {
@@ -469,22 +530,10 @@ const MapFlow = (function () {
     }
     strokeBuckets(ctx, FIELD_W * sc, (FIELD_W + CASE_EXTRA) * sc, FIELD_ALPHA, CASE_ALPHA);
 
-    // The backbone over the field, as on the map: its own black, slower.
-    const db = d * BB_SPEED;
-    for (const e of G.back) {
-      if (e.hid || offView(e, V)) continue;
-      const b = bucket(col.backbone, !!e.l.mnFocusDimmed);
-      let k;
-      if (e.two) {
-        k = dashes(b.path, e, V, fwdBase(e, db, BB2_PERIOD), BB2_ON, BB2_PERIOD)
-          + dashes(b.path, e, V, backBase(e, db, BB2_ON, BB2_PERIOD), BB2_ON, BB2_PERIOD);
-      } else {
-        k = dashes(b.path, e, V, fwdBase(e, db, BB_PERIOD), BB_ON, BB_PERIOD);
-      }
-      if (k) { b.n += k; nBack++; nDash += k; }
-      if (nDash > MAX_DASHES) break;
-    }
-    strokeBuckets(ctx, BB_W * sc, (BB_W + CASE_EXTRA) * sc, BB_ALPHA, CASE_ALPHA);
+    // The backbone over the field paths, in its own amber, slower.
+    const back = G.back.filter(e => !e.hid && !offView(e, V));
+    nBack = back.length;
+    nDash += drawBackbone(ctx, back, V, d, 1);
     S.last.field = nField; S.last.backbone = nBack; S.last.dashes = nDash;
   }
 
@@ -588,6 +637,11 @@ const MapFlow = (function () {
     const d = S.travel;
     let nDash = 0;
 
+    // Every backbone path on screen, quieter, so the network keeps its spine
+    // while one repeater has its turn; its own are drawn full below.
+    const others = G.back.filter(e => !e.hid && !offView(e, V) && !P.back.includes(e));
+    drawBackbone(ctx, others, V, d, TURN_BB_OTHERS);
+
     // Its field paths in full, in their own colours…
     S.buckets.clear();
     const shown = [];
@@ -606,25 +660,9 @@ const MapFlow = (function () {
     }
     strokeBuckets(ctx, SPARK_W * sc, 0, a, 0);
 
-    // Its backbone paths stronger, their dashes the way they run.
-    const bshown = [];
-    for (const e of P.back) {
-      if (offView(e, V)) continue;
-      const b = bucket(col.backbone, !!e.l.mnFocusDimmed);
-      solid(b.path, e, V); b.n++;
-      bshown.push(e);
-    }
-    strokeBuckets(ctx, TURN_BB_W * sc, TURN_BB_CASE * sc, TURN_BB_ALPHA * a, TURN_BB_CASE_ALPHA * a);
-    const db = d * BB_SPEED;
-    for (const e of bshown) {
-      const b = bucket('#ffffff', !!e.l.mnFocusDimmed);
-      const k = e.two
-        ? dashes(b.path, e, V, fwdBase(e, db, BB2_PERIOD), BB2_ON, BB2_PERIOD)
-          + dashes(b.path, e, V, backBase(e, db, BB2_ON, BB2_PERIOD), BB2_ON, BB2_PERIOD)
-        : dashes(b.path, e, V, fwdBase(e, db, BB_PERIOD), BB_ON, BB_PERIOD);
-      b.n += k; nDash += k;
-    }
-    strokeBuckets(ctx, SPARK_W * sc, 0, a, 0);
+    // Its backbone paths full, their pulses the way they run.
+    const bshown = P.back.filter(e => !offView(e, V));
+    nDash += drawBackbone(ctx, bshown, V, d, Math.max(TURN_BB_OTHERS, a));
     S.last.field = shown.length; S.last.backbone = bshown.length; S.last.dashes = nDash;
 
     // A ring round it and its name beside it.
@@ -859,6 +897,10 @@ const MapFlow = (function () {
     } else {
       rows.push(item('<span class="legend-line legend-line-flow"></span>',
         `${term('Flow', 'Moving dashes')} run the way the traffic does — into each repeater, and on to the base`));
+    }
+    if (typeof state === 'undefined' || state.mapShowBackbone) {
+      rows.push(item('<span class="legend-line legend-line-flow-backbone"></span>',
+        'Backbone — amber, glowing, with pulses running on to the base: the paths every reading crosses'));
     }
     if (!playing(c)) {
       rows.push(`<span class="legend-item"><span class="small txt-muted">Standing still${c.playing == null && calm()

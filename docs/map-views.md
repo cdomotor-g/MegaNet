@@ -22,8 +22,17 @@ strength), with three modules that draw: `map-paths.js` (which paths),
 shared overlay canvas in `map-overlay.js`. Easements and land tenure, which the
 Property services views use, are on the cadastre layer in `map-lots.js`.
 
-Nothing changes until somebody picks something: the defaults are the map as it
-always was — every path, plain lines, the person's own Link opacity, no Balance.
+Until somebody picks something, the map draws every path, with the person's own
+Link opacity and no Balance, as **Flow** (since 7 Nov 2026) — except under the
+Classic look, which keeps plain lines (and which the browser checks open on).
+Under Flow the backbone is drawn amber and glowing, with pulses running along
+it, and the map's own black-dashed backbone steps back.
+
+The section is a card per group — **Everyone**, **Technicians**, **Flood**,
+**Property**, then Your views — with a row per view (a small picture, its name,
+one line). The view in force opens under its row with its tags and the quick
+settings: which paths, how they are drawn, and the Balance. Everything else is
+in the **More drawing settings** fold.
 
 ---
 
@@ -33,14 +42,14 @@ always was — every path, plain lines, the person's own Link opacity, no Balanc
 |---|---|---|
 | Everyone | **Overview** | The base map left alone; every station; each field station's best path until you zoom in (zoom 11), as lines; auto-contrast on; backbone on; links coloured by channel; rivers, flood cameras, field photos and site features on, everything else off. |
 | Everyone | **Site visit** | Satellite; every path as tails, the spotlight following the pointer; auto-contrast; Balance a little toward the photo (35); pins coloured by health; property boundaries, easements, road parcels, survey marks, photos, site features, cameras, the digital twin and rivers. |
-| Instrument technicians | **Radio paths** | Satellite; every path as tails; Balance toward the network (62); arrows; health; maintenance hubs; rivers, photos, site features and the twin. No property layers. |
-| Instrument technicians | **Weak links** | The base map left alone; every path as lines, coloured by fade margin; Balance well toward the network (85) so the weak ones stand out. Working out a margin that is not saved fetches the ground heights along that path. |
-| Instrument technicians | **Backbone** | Only repeaters and bases (the field pins and their paths off); the backbone, arrows, health and the maintenance hubs. |
-| Instrument technicians | **Live traffic** | Each field station's best path, faded, with ⏱️ Latency's live pulses running along it as readings arrive (the network is asked every 15 seconds); health on. |
-| Flood forecasters | **Rivers & catchments** | OSM-Topo; no radio paths; field stations only, with the forecast and information locations outlined; rivers, a river's catchment, the river basins, ground height and flood cameras. |
-| Flood forecasters | **Rainfall** | Light; no radio paths; field stations only, outlined; the rainfall heat map over the river basins and rivers (re-read every 5 minutes). |
-| Property services | **Property & easements** | Satellite; no radio paths; property boundaries, easements, road parcels and road owners, council areas, survey marks and rivers. |
-| Property services | **Land & tenure** | OSM-Topo; no radio paths; land tenure, property boundaries, easements, rivers, river basins, council areas and road parcels. |
+| Technicians | **Radio paths** | Satellite; every path as tails; Balance toward the network (62); arrows; health; maintenance hubs; rivers, photos, site features and the twin. No property layers. |
+| Technicians | **Weak links** | The base map left alone; every path as lines, coloured by fade margin; Balance well toward the network (85) so the weak ones stand out. Working out a margin that is not saved fetches the ground heights along that path. |
+| Technicians | **Backbone** | Only repeaters and bases (the field pins and their paths off); the backbone, drawn as Flow, with arrows, health and the maintenance hubs. |
+| Technicians | **Live traffic** | Each field station's best path, faded, with ⏱️ Latency's live pulses running along it as readings arrive (the network is asked every 15 seconds); health on. |
+| Flood | **Rivers & catchments** | OSM-Topo; no radio paths; field stations only, with the forecast and information locations outlined; rivers, a river's catchment, the river basins, ground height and flood cameras. |
+| Flood | **Rainfall** | Light; no radio paths; field stations only, outlined; the rainfall heat map over the river basins and rivers (re-read every 5 minutes). |
+| Property | **Property & easements** | Satellite; no radio paths; property boundaries, easements, road parcels and road owners, council areas, survey marks and rivers. |
+| Property | **Land & tenure** | OSM-Topo; no radio paths; land tenure, property boundaries, easements, rivers, river basins, council areas and road parcels. |
 
 Each chip's tooltip says what it does and, where it applies, what turning it on
 fetches. The line under the chips says what the view in force does, or **Your own
