@@ -651,6 +651,27 @@
        Leaflet, and is scheduled from app.js, map-los.js and map-fade.js as each
        of them repaints a line. Inert at load like the rest (#154). -->
   <script src="map-arrows.js?v=20261106h"></script>
+  <!-- One screen-pixel canvas under the Stations map's pins, shared by the
+       four modules below that draw on top of the radio paths. Needs Leaflet
+       at call time and nothing else; inert at load. -->
+  <script src="map-overlay.js?v=20261106h"></script>
+  <!-- Which field paths are drawn — every one, the best, bundled, or areas
+       instead of lines — and the areas, trunks and other paths that go with
+       them. Reads MapViews, MapFade and MapFreq at call time; inert at load. -->
+  <script src="map-paths.js?v=20261106h"></script>
+  <!-- Flow: dashes running along the paths into each repeater, repeaters
+       taking turns, or ⏱️ Latency's live pulses. On MapOverlay; reads
+       MapViews and MapLatency at call time; inert at load. -->
+  <script src="map-flow.js?v=20261106h"></script>
+  <!-- Tails & spotlight: a short tail out of each end of a path, drawn whole
+       round the pointer. On MapOverlay; reads MapViews at call time; inert at
+       load. -->
+  <script src="map-tails.js?v=20261106h"></script>
+  <!-- Views, at the top of Layers: ready-made mixes of the map's switches for
+       each audience, kept views, auto-contrast and Balance, and the one
+       function that decides a radio path's opacity. Reaches every module it
+       sets at call time; inert at load. -->
+  <script src="map-views.js?v=20261106h"></script>
   <!-- What is here: one point on the map, and everything the app already knows
        about the ground under it. It asks terrain.js, land-cover.js, map-wind.js,
        map-catchments.js, map-hubs.js and map-survey.js — every one of them at

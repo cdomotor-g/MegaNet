@@ -2967,9 +2967,17 @@ void main() {
         const ids = [l.mnLinkStationId, l.mnLinkRepeaterId, l.mnLinkRepeaterId2].filter(x => x != null);
         if (!ids.includes(station.id)) continue;
         const farId = ids.find(x => x !== station.id);
+        // The line's full strength where it carries one (`mnFullOpacity`, set
+        // by Views, map-views.js), not what a 2-D drawing mode left of it — a
+        // field line outside the Tails spotlight is near invisible on the flat
+        // map on purpose, and a ray here is not a 2-D drawing. The focus dim
+        // is kept, as `options.opacity` had it; map-3d.js mirrors the same way.
+        const dimMix = typeof MAP_FOCUS_DIM_LINE_MIX === 'number' ? MAP_FOCUS_DIM_LINE_MIX : 0.2;
+        const opacity = l.mnFullOpacity != null && isFinite(l.mnFullOpacity)
+          ? l.mnFullOpacity * (l.mnFocusDimmed ? dimMix : 1)
+          : (l.options && l.options.opacity != null ? l.options.opacity : 1);
         add(stationById(farId), (l.options && l.options.color) || '#ff6f00',
-            l.options && l.options.opacity != null ? l.options.opacity : 1,
-            role === 'backbone' ? 'backbone' : 'field');
+            opacity, role === 'backbone' ? 'backbone' : 'field');
       }
       return { paths: [...out.values()], source: 'map' };
     }

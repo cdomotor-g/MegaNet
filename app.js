@@ -4910,7 +4910,12 @@ function stationsMapPanels(map) {
     // The ACMA block is the panel's last section, and has a heading of its own
     // like the rest: with only a rule above it, its one switch read as one more
     // row of Labels & export.
+    // Views first (map-views.js): the ready-made mixes for each audience, how
+    // the radio paths are drawn and how strong they are. A sibling of the
+    // block below rather than a part of it, so the find box, the headings and
+    // the tests that walk that block's rows are the block they always were.
     html: () => `
+      <div id="map-views-block" class="mapd-views">${MapViews.html()}</div>
       <div id="map-display-block">${mapDisplayControlsHtml()}</div>
       <div class="filter-block"><div class="map-display-h">ACMA licences</div>${acmaFilterBlockHtml()}</div>`,
     // The panel is rebuilt with the map on every render of the tab; the find
@@ -4918,6 +4923,7 @@ function stationsMapPanels(map) {
     // that were just built.
     onMount: body => {
       if (map.mnBases) map.mnBases.bind(body);
+      MapViews.bind(body);
       applyMapDisplayFind();
     },
   });
@@ -5299,6 +5305,7 @@ function setMapBackbone(on) {
 
 function mapDisplayControlsHtml() {
   const on = state.mapKillSpaghetti;
+  const autoOp = MapViews.settings().auto;
   return `
     <!-- Find a control (#186). This panel is a dozen switches, three sliders,
          four selects, a radio group and the whole ACMA block, under four
@@ -5380,14 +5387,18 @@ function mapDisplayControlsHtml() {
              onchange="state.mapShowLinks=this.checked;rerenderMapDisplayControls();refreshMapLayers()">
       Show radio paths / signal links
     </label>
-    <label class="filter-range${state.mapShowLinks ? '' : ' is-off'}">
+    <!-- Off while Views' auto-contrast is setting the lines' strength itself
+         (map-views.js): the note under it says so, and what it has them at.
+         The person's own figure is kept for when it is turned off. -->
+    <label class="filter-range${state.mapShowLinks && !autoOp ? '' : ' is-off'}">
       <span>Link opacity <strong id="link-opacity-val" aria-hidden="true">${Math.round(state.mapLinkOpacity * 100)}%</strong></span>
       <input type="range" min="0.1" max="1" step="0.05" value="${state.mapLinkOpacity}"
              aria-label="Link opacity" aria-valuetext="${Math.round(state.mapLinkOpacity * 100)} per cent"
-             ${state.mapShowLinks ? '' : 'disabled'}
+             ${state.mapShowLinks && !autoOp ? '' : 'disabled'}
              oninput="document.getElementById('link-opacity-val').textContent=Math.round(this.value*100)+'%';this.setAttribute('aria-valuetext',Math.round(this.value*100)+' per cent')"
              onchange="setMapLinkOpacity(+this.value)">
     </label>
+    ${MapViews.opacityNoteHtml()}
     <label class="filter-check mapd-join">
       <input type="checkbox" ${on ? 'checked' : ''}
              onchange="state.mapKillSpaghetti=this.checked;rerenderMapDisplayControls();refreshMapLayers()">
@@ -5656,6 +5667,7 @@ function mapDisplayControlsHtml() {
       Property boundaries (Qld)
     </label>
     <p class="filter-note" id="map-lots-note">${MapLots.noteHtml()}</p>
+    ${MapLots.subRowsHtml()}
     <!-- Wind and LOS repaint the legend from here (#175): rivers, survey
          marks and contours each repaint it from inside their own module, and
          these two never did, so the legend's entry for either — and its line
@@ -5739,6 +5751,11 @@ function mapDisplayControlsHtml() {
 }
 
 function rerenderMapDisplayControls() {
+  // A view being applied (map-views.js) redraws the panel once, at the end.
+  if (state.mapRefreshHold) return;
+  // Views sits above this block and reads the same switches: which chip is
+  // pressed, and whether the radio paths are on to be drawn.
+  MapViews.rerender();
   const el = document.getElementById('map-display-block');
   if (!el) return;
   el.innerHTML = mapDisplayControlsHtml();
@@ -5957,8 +5974,15 @@ function applyMapDisplayFind() {
   if (none) {
     none.hidden = !terms.length || shown > 0;
     if (!none.hidden) {
-      none.textContent = `Nothing in this panel matches “${mapDisplayFind.trim()}”. `
-        + 'Clear the box to see all of it — nothing has been switched off.';
+      // Views, above the box, is never filtered (map-views.js): when the
+      // word is there, say so rather than that nothing matches.
+      const views = document.getElementById('map-views-block');
+      const inViews = !!views && terms.every(t => mapDisplayRowText([views]).includes(t));
+      none.textContent = inViews
+        ? `Nothing below matches “${mapDisplayFind.trim()}”: it is in Views, above this box. `
+          + 'Clear the box to see all of the rest.'
+        : `Nothing in this panel matches “${mapDisplayFind.trim()}”. `
+          + 'Clear the box to see all of it — nothing has been switched off.';
     }
   }
 }
@@ -5980,6 +6004,13 @@ function mapLinkNoteHtml() {
     ? ` · <strong>${hidden}</strong> hidden with the stations they run to`
     : '';
   if (!state.mapShowLinks) return `Signal links are hidden${bb}.`;
+  // Views' Which paths (map-paths.js): how many it is leaving out, and how to
+  // see them, said before the rest — the count below is of the paths drawn.
+  const thin = state.mapLinkCount.thinned ? MapPaths.noteText().replace(/\.$/, '') : '';
+  if (thin) {
+    const over = state.mapKillSpaghetti && culled ? ` · <strong>${culled}</strong> over ${state.mapMaxLinkKm} km hidden` : '';
+    return `${esc(thin)}${over}${off}${bb}.`;
+  }
   const links = n => `${n} link${n === 1 ? '' : 's'}`;
   if (!state.mapKillSpaghetti) {
     return `${links(drawn)} drawn — every pass-range path, however long${off}${bb}.`;
@@ -6240,6 +6271,9 @@ function mapLegendHtml() {
       <span class="legend-line legend-line-los"></span>
       <span class="small">Line of sight: an obstructed link draws red</span>
     </span>`) : '',
+    // How Views is drawing them (map-views.js): best path, trunks or areas,
+    // flowing dashes or tails, auto-contrast and Balance — each while on.
+    mapLegendCard(MapViews.legendHtml()),
   ];
   const overlays = [
     MapRiverLines.active() ? MapRiverLines.legendHtml() : '',
@@ -6292,11 +6326,11 @@ function mapLegendHtml() {
         MapPeaks.peaks().length === 1 ? '' : 's'}, ranked. Ground height off ~30 m terrain,
         nothing standing on it</span>
     </span>` : '',
-    MapLots.active() ? `
+    (MapLots.active() ? `
     <span class="legend-item">
       <span class="legend-line legend-line-lot"></span>
       <span class="small">Property boundary — lot/plan when zoomed in (Qld cadastre)</span>
-    </span>` : '',
+    </span>` : '') + MapLots.legendHtml(),
     MapPhotos.active() ? `
     <span class="legend-item">
       <span class="legend-photo" aria-hidden="true">📷</span>
@@ -6331,6 +6365,7 @@ function mapLegendHtml() {
 }
 
 function rerenderMapLegend() {
+  if (state.mapRefreshHold) return;       // a view being applied repaints it once, at the end
   const el = document.getElementById('map-legend');
   if (el) el.innerHTML = mapLegendHtml();
 }
@@ -6475,6 +6510,10 @@ function stopStationsMap() {
   MapDrive.detach();
   DriveMode.detach();
   MapArrows.detach();
+  MapViews.detach();
+  MapTails.detach();
+  MapFlow.detach();
+  MapPaths.detach();
   MapElevation.detach();
   MapHere.detach();
   MapMagnify.detach();
@@ -6674,6 +6713,15 @@ function initMap() {
   // the arrow canvas, and a schedule with no canvas to draw on is a no-op that
   // never comes back.
   MapArrows.attach(state.map);
+  // Views (map-views.js) and the three it draws with, after the arrows and
+  // before the first refresh, which asks them which paths to draw, how strong,
+  // and to draw over them: which paths (map-paths.js), flowing dashes
+  // (map-flow.js), tails and the spotlight (map-tails.js) — then MapViews,
+  // which tells the three what is set.
+  MapPaths.attach(state.map);
+  MapFlow.attach(state.map);
+  MapTails.attach(state.map);
+  MapViews.attach(state.map);
   MapElevation.attach(state.map);
   // 3-D does not survive a rebuild of the map — the container it drew into went
   // with the old one — so attach() closes whatever was open and takes the new
@@ -7058,6 +7106,9 @@ function mapLinkTipHtml(layer) { return MapBackbone.hoverHtml(layer.mnTip); }
 function refreshMapLayers({ skipFit = false, animate } = {}) {
   const map = state.map;
   if (!map || !state.data) return;
+  // A view being applied (map-views.js) sets a dozen switches, several of
+  // which rebuild the map: the rebuild is owed and made once, at the end.
+  if (state.mapRefreshHold) { state.mapRefreshOwed = true; return; }
   MapSpider.reset();                       // pins go home before any are replaced
   clearStationPinHover();                  // a removed pin fires no mouseout
   state.mapMarkers.forEach(m => m.remove());
@@ -7127,8 +7178,15 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     ? passRangeLinks(active ? matched.concat(related) : located).filter(kindsDrawn) : [];
   const maxKm = state.mapKillSpaghetti ? state.mapMaxLinkKm : Infinity;
   const inRange = allLinks.filter(l => l.km <= maxKm);
-  const links = shownIds
+  const cut = shownIds
     ? inRange.filter(l => shownIds.has(l.s.id) && shownIds.has(l.r.id)) : inRange;
+  // Which of them are drawn, as Views' "Which paths" says (map-paths.js):
+  // every one, each field station's best, or none with areas instead — and,
+  // bundled, the curve each is drawn along. Asked with links off too, so the
+  // last build's dropped paths do not linger in its overlays.
+  const thinned = MapPaths.thin(cut);
+  const links = thinned.kept;
+  MapPaths.prepare(links);
   // Backbone pairs take the slider as a match condition, kill-spaghetti or not
   // — a backbone path either exists at this distance or it doesn't, so there
   // is no culled remainder to count. Hide mode cuts them the same way as the
@@ -7142,16 +7200,19 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   // same way — the same stations, length limit and cut — and handed over for
   // the pulses to run along unseen; nothing is drawn for them (map-latency.js).
   const unseen = MapLatency.wantsHiddenLinks();
+  // The paths Views is not drawing (best path only, areas) are hidden links
+  // too, and the pulses run along them the same way.
   const hiddenField = unseen && !state.mapShowLinks
     ? passRangeLinks(active ? matched.concat(related) : located)
         .filter(l => l.km <= maxKm && kindsDrawn(l) && (!shownIds || (shownIds.has(l.s.id) && shownIds.has(l.r.id))))
-    : [];
+    : unseen ? thinned.dropped : [];
   const hiddenBackbone = unseen && !state.mapShowBackbone
     ? backboneLinks(state.mapMaxLinkKm).filter(p => kindsDrawn(p) && (!shownIds || (shownIds.has(p.a.id) && shownIds.has(p.b.id))))
     : [];
   MapLatency.hiddenLinks(hiddenField, hiddenBackbone);
   state.mapLinkCount = { drawn: links.length, culled: allLinks.length - inRange.length,
-                         hidden: inRange.length - links.length,
+                         hidden: inRange.length - cut.length,
+                         thinned: thinned.dropped.length,
                          backbone: backbone.length,
                          backboneHidden: allBackbone.length - backbone.length };
   updateMapLinkNote();
@@ -7159,6 +7220,8 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     MapCluster.rebuild();                 // no pins, so no bubbles; and the fan-out and stack let go
     state.mapMatchLabels = new Set();
     MapLeader.sync();                     // its pin went with the rest
+    MapArrows.schedule();                 // …and the arrows drawn off the lines that went
+    MapViews.afterBuild();
     return;
   }
 
@@ -7173,25 +7236,36 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
 
   const lineColor = getComputedStyle(document.documentElement)
     .getPropertyValue('--map-line').trim() || '#ff6f00';
-  const coreOp   = state.mapLinkOpacity;
-  const casingOp = coreOp * MAP_LINK_CASING_MIX;
+  // How strong each line is drawn is MapViews' one answer (map-views.js): the
+  // Link opacity, or auto-contrast's figure, times Balance, a casing at
+  // MAP_LINK_CASING_MIX of its core, and the drawing's own factor — faint
+  // under flowing dashes, nothing for a path whose tails are all that show.
+  // Worked out before the line is added, so it is never painted at another.
+  const strength = line => {
+    const op = MapViews.lineOpacity(line);
+    line.mnFullOpacity = MapViews.fullOpacity(line);
+    line.mnBaseOpacity = op;
+    line.options.opacity = op;
+    line.options.interactive = op > 0.02;
+    return line;
+  };
 
   // Every casing first, then every core: pairing them per link would let one
   // link's white casing paint over another link's coloured line where they cross.
+  // A bundled path is a curve, drawn station end first like a straight one.
   const fieldTips = links.map(l => ({ kind: 'field', a: l.s, b: l.r, fadeMargin: null }));
+  const fieldGeo  = links.map(l => MapPaths.curve(l.s, l.r) || [[l.s.lat, l.s.lon], [l.r.lat, l.r.lon]]);
   for (const pass of ['casing', 'core']) {
     const casing = pass === 'casing';
     for (const [i, l] of links.entries()) {
-      const lineOp = casing ? casingOp : coreOp;
-      const line = L.polyline([[l.s.lat, l.s.lon], [l.r.lat, l.r.lon]], {
+      const line = L.polyline(fieldGeo[i], {
         color:   casing ? '#ffffff' : lineColor,
         weight:  (casing ? MAP_LINK_CASING_W : MAP_LINK_CORE_W) * mapStrokeScale(),
-        opacity: lineOp,
-      }).addTo(map);
+      });
       line.mnLinkRole       = pass;         // lets the opacity slider restyle in place
       line.mnLinkStationId  = l.s.id;       // and lets repeater focus restyle in place
       line.mnLinkRepeaterId = l.r.id;
-      line.mnBaseOpacity    = lineOp;
+      strength(line).addTo(map);
       // What a restyle should put back when it lets go — MapLos may repaint
       // this to the obstructed colour, and MapBlast restores to it.
       line.mnBaseColor      = casing ? '#ffffff' : lineColor;
@@ -7238,17 +7312,15 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     const casing = pass === 'casing';
     const dash   = pass === 'dash';
     for (const [i, p] of backbone.entries()) {
-      const lineOp = casing ? casingOp : coreOp;
       const line = L.polyline([[p.a.lat, p.a.lon], [p.b.lat, p.b.lon]], {
         color:   casing ? '#ffffff' : backboneColor,
         weight:  (casing ? MAP_BACKBONE_CASING_W : MAP_BACKBONE_CORE_W) * mapStrokeScale(),
-        opacity: lineOp,
         dashArray: dash ? MAP_BACKBONE_DASH : null,
-      }).addTo(map);
+      });
       line.mnLinkRole        = casing ? 'backbone-casing' : dash ? 'backbone-dash' : 'backbone';
       line.mnLinkRepeaterId  = p.a.id;
       line.mnLinkRepeaterId2 = p.b.id;
-      line.mnBaseOpacity     = lineOp;
+      strength(line).addTo(map);
       line.mnBaseColor       = casing ? '#ffffff' : backboneColor;
       // Repeater to base runs one way — that is the direction traffic leaves
       // the network. Repeater to repeater genuinely runs both, and is drawn as
@@ -7444,6 +7516,10 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   // Every marker was just replaced, the card's among them: the leader lets go
   // of the old one and finds the new (map-leader.js).
   MapLeader.sync();
+  // Views' last word on the lines just drawn (map-views.js): auto-contrast
+  // worked out for what is on screen, the spotlight's index of the new lines,
+  // and the flow, tails and paths overlays redrawn over them.
+  MapViews.afterBuild();
 }
 
 // Parts 1 and 2 of the graphic pattern: the picture's name says what it is
@@ -7929,6 +8005,9 @@ function applyMapFocusStyles() {
   // A focus that came or went changes which pins keep their own (a rebuild of
   // the pins asks itself, after this).
   MapCluster.soon();
+  // …and which paths Tails lights, Flow's turn holds on and Best path only
+  // draws dashed (map-views.js).
+  MapViews.cardChanged();
 }
 
 // The selection as a file — the same columns the table shows when it has the
@@ -8050,9 +8129,13 @@ let _pinHover = null;          // { marker, tip, el } while a hover name is show
 
 function onStationPinOver(e) {
   const m = e.target, s = m.mnStation;
-  if (!s || !state.map || m.getTooltip()) return;   // already named on the map
+  if (!s || !state.map) return;
   if (L.Browser.mobile || !window.matchMedia('(hover: hover)').matches) return;
   clearStationPinHover();
+  // The pin under the pointer lights its paths under Tails and brings back
+  // the ones Best path only leaves out (map-views.js) — named on the map or not.
+  MapViews.hover(s.id);
+  if (m.getTooltip()) return;              // already named on the map
   const tip = L.tooltip({
     className: 'mn-pin-label', direction: 'top',
     offset: [0, -((m.mnRadius || 6) + 2)], interactive: false,
@@ -8072,6 +8155,7 @@ function followStationPinHover() {
 }
 
 function clearStationPinHover() {
+  MapViews.hover(null);
   if (!_pinHover) return;
   _pinHover.marker.off('move', followStationPinHover);
   _pinHover.el.classList.remove('mn-pin-hovering');
@@ -8107,21 +8191,14 @@ function setMapLinkOpacity(v) {
   try { localStorage.setItem('mn-map-link-opacity', String(v)); } catch (_) {}
   const label = document.getElementById('link-opacity-val');
   if (label) label.textContent = `${Math.round(v * 100)}%`;
-  for (const l of state.mapLines) {
-    const op = l.mnLinkRole === 'casing' || l.mnLinkRole === 'backbone-casing'
-      ? v * MAP_LINK_CASING_MIX
-      : l.mnLinkRole === 'core' || l.mnLinkRole === 'backbone' ||
-        l.mnLinkRole === 'backbone-dash' ? v : null;
-    if (op == null) continue;
-    // mnBaseOpacity as well as the style, or the next focus dim — which restores
-    // to mnBaseOpacity when it lets a line go — would put back the opacity this
-    // slider was moved off.
-    l.mnBaseOpacity = op;
-    l.setStyle({ opacity: op });
-  }
-  MapArrows.schedule();
-  // The 3-D view draws these lines too, from their styles (map-3d.js).
-  Map3D.sync();
+  // Every line through MapViews' one answer (map-views.js), which keeps
+  // mnBaseOpacity — what the next focus dim restores to — and honours a dim
+  // already on, schedules the arrows, and has the 3-D view follow when its
+  // strength moved. The figure is the slider times Balance and the drawing's
+  // factor, and nothing at all while auto-contrast is setting it instead.
+  MapViews.restyle();
+  // Line strength in the Views section says what the lines are drawn at.
+  MapViews.rerender();
 }
 
 // The `n` stations closest to the centre of their own bounding box — used to
@@ -8853,6 +8930,7 @@ function repaintStnCard() {
     StationTrail.sync();
     MapLatency.follow(null);
     MapDirect.follow(null);
+    MapViews.cardChanged();
     if (typeof Route !== 'undefined') Route.sync();
     return;
   }
@@ -8942,6 +9020,9 @@ function repaintStnCard() {
   // …and the lines to the base stations that hear it direct are its own
   // (map-direct.js).
   MapDirect.follow(s.id);
+  // …and its paths, lit under Tails and drawn dashed where Best path only
+  // leaves them out (map-views.js).
+  MapViews.cardChanged();
 }
 
 // Escape closes the card from anywhere inside it. On the card rather than on
@@ -8980,6 +9061,7 @@ function closeStnCard(refocus = true) {
   StationTrail.sync();                      // whose pill now brings it back
   MapLatency.follow(null);                  // ⏱️ Latency's pane goes back to the stations in view
   MapDirect.follow(null);                   // and its lines to the bases that hear it direct go
+  MapViews.cardChanged();                   // and its paths go back to how Views draws the rest
   // The address drops the station, in place: closing is not a step to go
   // back through (route.js).
   if (typeof Route !== 'undefined') Route.sync();

@@ -1444,6 +1444,20 @@ jobs:
         working-directory: test
         run: npm run maplinks
 
+      # Views on the Stations map (map-views.js and the three drawing modules,
+      # map-paths.js, map-flow.js, map-tails.js; easements and tenure in
+      # map-lots.js): every built-in view pressed and each switch it sets read
+      # off its own module's state, Put the map back, a kept view through a
+      # reload, which paths are drawn, tails lit by a real pointer, the flow's
+      # frames and reduced motion, auto-contrast, Balance, the 3-D mirror at
+      # full strength under Tails, and the cadastre export unchanged with
+      # easements and tenure off. Every other map check opens on today's map,
+      # so none of them sees any of it.
+      - name: Map views — the views, which paths, flow, tails and line strength
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run mapviews
+
       # The side panel (#help-panel, the dock): the help, the Stations cards and
       # any map panel pinned into it, in one resizable, tabbed column. Every
       # check above sees one piece of it — `shell` the landmark and the ❔

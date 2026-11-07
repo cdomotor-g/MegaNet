@@ -513,9 +513,41 @@ const Map3D = (function () {
   const LINK_3D_OP     = 0.85;
   const LINK_3D_WIDTH  = 1.6;
   const LINK_3D_CASING = 2.5;   // px the white casing shows past the line, both sides together
+  //
+  // ── A line's full strength, not what the 2-D drawing mode left of it ──────
+  // Views (map-views.js) can draw the 2-D lines fainter than their strength on
+  // purpose: under the Flow dashes, or near nothing outside the spotlight in
+  // Tails. That is a way of drawing the flat map, and this view draws plain
+  // lines, so it mirrors `mnFullOpacity` — the strength Line strength (the
+  // slider, or auto-contrast, and Balance) gives the line before any drawing
+  // mode — where the line carries one, and `options.opacity` where it does
+  // not. The focus dim is a statement about the network, not a drawing mode,
+  // and is kept: a dimmed line is drawn at MAP_FOCUS_DIM_LINE_MIX of its
+  // strength here too, as `options.opacity` already had it.
+  function lineStrength(l) {
+    if (l.mnFullOpacity != null && isFinite(l.mnFullOpacity)) {
+      const dimMix = typeof MAP_FOCUS_DIM_LINE_MIX === 'number' ? MAP_FOCUS_DIM_LINE_MIX : 0.2;
+      return l.mnFullOpacity * (l.mnFocusDimmed ? dimMix : 1);
+    }
+    return l.options.opacity == null ? 1 : l.options.opacity;
+  }
+  // The strength the floor lifts to LINK_3D_OP: a plain field line's in 2-D.
+  // That was the Link opacity slider until Views; with auto-contrast or
+  // Balance it is what they make of it (MapViews.fullOpacity for a field
+  // core), or every view that turns auto-contrast down would turn the 3-D
+  // links down with it, which is the problem the floor is here to solve.
+  function liftBase() {
+    if (typeof MapViews !== 'undefined' && typeof MapViews.fullOpacity === 'function') {
+      try {
+        const r = Number(MapViews.fullOpacity({ mnLinkRole: 'core', options: {} }));
+        if (r > 0 && isFinite(r)) return r;
+      } catch (_) { /* the slider's value, below */ }
+    }
+    return Number(state.mapLinkOpacity);
+  }
   function linkFeatures() {
     const out = [];
-    const v = Number(state.mapLinkOpacity);
+    const v = liftBase();
     const lift = v > 0 && isFinite(v) ? Math.max(v, LINK_3D_OP) / v : 1;
     const casingMix = typeof MAP_LINK_CASING_MIX === 'number' ? MAP_LINK_CASING_MIX : 0.75;
     for (const l of (state.mapLines || [])) {
@@ -523,7 +555,7 @@ const Map3D = (function () {
       if (role === 'casing' || role === 'backbone-casing') continue;
       const pts = typeof l.getLatLngs === 'function' ? l.getLatLngs() : null;
       if (!pts || pts.length < 2) continue;
-      const op = Math.min(1, (l.options.opacity == null ? 1 : l.options.opacity) * lift);
+      const op = Math.min(1, lineStrength(l) * lift);
       const props = {
         colour: l.options.color || '#ff6f00',
         width:  (l.options.weight || 2) * LINK_3D_WIDTH + (role === 'backbone' ? 1 : 0),
@@ -2655,8 +2687,13 @@ const Map3D = (function () {
   // Their own zoom floors, as tile minzooms: past them nothing is asked, and a
   // far slope that would need a coarser tile is left bare — at that distance a
   // property line is a smear, and a smear of lot lines reads as texture.
+  //
+  // MapLots' one export carries the easements and the land tenure tint too
+  // (map-lots.js, its header), so its layer is on while any of its three
+  // switches is, and its template says which of them it holds.
   const CAD = [
-    { id: 'mn-lots',  name: 'property boundary', on: () => !!state.mapLots,
+    { id: 'mn-lots',  name: 'property boundary',
+      on: () => !!(state.mapLots || state.mapEasements || state.mapTenure),
       mod: () => (typeof MapLots !== 'undefined' ? MapLots : null) },
     { id: 'mn-roads', name: 'road parcel', on: () => !!state.mapRoads,
       mod: () => (typeof MapRoads !== 'undefined' ? MapRoads : null) },
@@ -4658,6 +4695,16 @@ const Map3D = (function () {
   // ── open / close ─────────────────────────────────────────────────────────
   // Declared below the return because nothing here runs at load (#142) and the
   // pair reads better next to each other than split around the public face.
+  // Views (map-views.js) draws the 2-D paths with a factor of their own —
+  // faint under Flow, nothing outside Tails' spotlight — and none while this
+  // view is up; nothing about the flat map moves when it opens or closes, so
+  // it is told: the lines restyled, auto-contrast held or worked out again,
+  // and its overlays drawn or cleared.
+  function viewsFlatChanged() {
+    if (!state.map || typeof MapViews === 'undefined' || typeof MapViews.afterBuild !== 'function') return;
+    try { MapViews.afterBuild(); } catch (e) { console.error('Map3D: Views', e); }
+  }
+
   function open() {
     if (state.map3d || !leaflet) return Promise.resolve(false);
     host = makeHost();
@@ -4679,6 +4726,7 @@ const Map3D = (function () {
       // The site features' floor is lower while this view is up ("Tilted",
       // site-features.js): asked to look again now, not at the next pan.
       if (typeof SiteFeatures !== 'undefined' && SiteFeatures.refresh) SiteFeatures.refresh();
+      viewsFlatChanged();
       announce(`3-D view on. ${viewMoveWords(coarse())} ${viewKeyWords()}`);
       return true;
     }).catch(() => {
@@ -4776,6 +4824,7 @@ const Map3D = (function () {
       // Leaflet's handlers are back as they were when 3-D opened; Draw &
       // measure sets its double click again for whichever tool is armed now.
       if (typeof MapDraw !== 'undefined' && MapDraw.flatAgain) MapDraw.flatAgain();
+      viewsFlatChanged();
     }
     // The leader was drawn over the canvas and went with it; it is put back
     // on the 2-D map's own pane.

@@ -537,9 +537,102 @@ function addBaseLayers(map, opts = {}) {
     });
   }
 
+  // ── Setting the mix from code (Views, map-views.js) ────────────────────────
+  // A view says "Satellite" and means the ground should be Satellite, so it
+  // needs to set the whole mix at once — which until Views only a person at
+  // the rows could do. `mix` is { name: op } with op 0–1 (a number above 0 is
+  // that base on at that strength, 0 or below is that base off), or the
+  // { name: { on, op } } shape mix() hands out, so a mix read back is a mix
+  // that can be put back; a name it leaves out is turned off, keeping its
+  // slider where it was. `nextOrder` (or the `_order` the stored shape
+  // carries) restacks, by mix order()'s rule: the names it knows, then the
+  // rest where they were. A mix naming no base this map has changes nothing
+  // — an empty map is never what anybody asked for.
+  //
+  // It goes the way a person's change does — sync, restack, publish, save —
+  // and the rows on screen are put right in place: checkbox, slider, readout,
+  // the off look and the order, so an open panel says what the map now shows
+  // without waiting for its next render. True when anything changed.
+  function set(mix, nextOrder) {
+    if (!mix || typeof mix !== 'object') return false;
+    const known = names.filter(n => Object.prototype.hasOwnProperty.call(mix, n));
+    if (!known.length) return false;
+    const clamp01 = v => Math.max(0, Math.min(1, v));
+    let changed = false;
+    for (const n of names) {
+      const v = mix[n];
+      let on = false, op = pick[n].op;
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        on = v > 0;
+        if (on) op = clamp01(v);
+      } else if (v && typeof v === 'object') {
+        on = !!v.on;
+        const o = Number(v.op);
+        if (Number.isFinite(o)) op = clamp01(o);
+      }
+      if (pick[n].on !== on || pick[n].op !== op) {
+        pick[n] = { on, op };
+        changed = true;
+      }
+    }
+    const want = Array.isArray(nextOrder) ? nextOrder : (Array.isArray(mix._order) ? mix._order : null);
+    let restacked = false;
+    if (want) {
+      const head = [...new Set(want.filter(n => pick[n]))];
+      const next = [...head, ...order.filter(n => !head.includes(n))];
+      if (next.some((n, i) => n !== order[i])) { order = next; restacked = true; }
+    }
+    if (!changed && !restacked) return false;
+    for (const n of names) sync(n);
+    if (restacked) restack();
+    publish();
+    save();
+    showRows();
+    return true;
+  }
+
+  // The rows of this map's controls wherever they are mounted (Map display on
+  // the Stations map, the 🗺️ panel on the others), brought to the mix.
+  function showRows() {
+    if (typeof document === 'undefined') return;
+    const boxes = new Set();
+    for (const row of document.querySelectorAll('.mn-base-row')) {
+      const box = row.querySelector(`input[type="checkbox"][data-base-map="${uid}"]`);
+      const n = box && box.dataset.base;
+      if (!n || !pick[n]) continue;
+      box.checked = pick[n].on;
+      row.classList.toggle('is-off', !pick[n].on);
+      const r = row.querySelector('input[type="range"]');
+      if (r) {
+        r.value = String(pct(n));
+        r.disabled = !pick[n].on;
+        r.setAttribute('aria-valuetext', `${pct(n)} per cent`);
+      }
+      const out = row.querySelector('.mn-base-val');
+      if (out) out.textContent = `${pct(n)}%`;
+      if (row.parentNode) boxes.add(row.parentNode);
+    }
+    // The order: the rows are one contiguous run among the host's children,
+    // so each is put back, in order, before whatever followed the run.
+    for (const box of boxes) {
+      const rows = [...box.querySelectorAll(':scope > .mn-base-row')]
+        .filter(r => r.querySelector(`[data-base-map="${uid}"]`));
+      if (rows.length < 2) continue;
+      const now = rows.map(r => r.dataset.baseRow);
+      if (now.length === order.length && now.every((n, i) => n === order[i])) continue;
+      const after = rows[rows.length - 1].nextSibling;
+      for (const n of order) {
+        const r = rows.find(x => x.dataset.baseRow === n);
+        if (r) box.insertBefore(r, after);
+      }
+      if (box.id === 'map-display-block' && typeof markMapDisplayCards === 'function') markMapDisplayCards(box);
+    }
+  }
+
   // What a host panel needs, and what a check can read back without scraping
-  // the tile panes: a copy of the mix, never the live object.
-  map.mnBases = { html, bind, mix: () => JSON.parse(JSON.stringify(pick)), order: () => order.slice() };
+  // the tile panes: a copy of the mix, never the live object. `set` is the one
+  // way in from code (above).
+  map.mnBases = { html, bind, mix: () => JSON.parse(JSON.stringify(pick)), order: () => order.slice(), set };
 
   // First in the corner, and first in the group about what the map shows:
   // every other icon in that group is a way of drawing something *over* this.

@@ -6,8 +6,8 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for `state`; reached from app.js (initMap,
 // stopStationsMap, refreshMapLayers, applyMapFocusStyles, setMapLinkOpacity)
-// and from map-los.js and map-fade.js, which schedule a redraw when they
-// repaint a line. All of it from inside its own functions, so this file's
+// and from map-los.js, map-fade.js and map-views.js, which schedule a redraw
+// when they repaint a line. All of it from inside its own functions, so this file's
 // position among the modules is free.
 //
 // ── Why a canvas of its own, and not more polylines ──────────────────────────
@@ -185,6 +185,62 @@ const MapArrows = (function () {
     ctx.lineTo(bx - nx, by - ny);
   }
 
+  // ── A line of more than two points ─────────────────────────────────────────
+  // A link was always one straight segment, and the marks were laid along it.
+  // Bundled into trunks (map-paths.js, Views) a field path is a curve of some
+  // sixteen points, so the marks are laid along the whole path instead: the
+  // same count for the same on-screen length, the same half-spacing in from
+  // each end, each mark pointing along the piece of the curve it sits on.
+  //
+  // `path` holds the line's points on screen, each segment's start distance
+  // and length, and the total. A two-point line is one segment, and `along`
+  // takes its fraction straight, so its marks land where they always did (the
+  // one-way marks by the very same arithmetic).
+  function screenPath(ll) {
+    const pts = ll.map(p => map.latLngToContainerPoint(p));
+    const segs = [];
+    let len = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy);
+      segs.push({ a, dx, dy, at: len, len: l });
+      len += l;
+    }
+    return { pts, segs, len };
+  }
+
+  // The point at fraction f of the path's length, and the unit vector of the
+  // segment it lies on (a zero-length segment is stepped over).
+  function along(path, f) {
+    const segs = path.segs;
+    if (segs.length === 1) {
+      const s = segs[0];
+      return { x: s.a.x + s.dx * f, y: s.a.y + s.dy * f, ux: s.dx / s.len, uy: s.dy / s.len };
+    }
+    const want = f * path.len;
+    let k = 0;
+    while (k < segs.length - 1 && (segs[k].len === 0 || segs[k].at + segs[k].len < want)) k++;
+    while (k > 0 && segs[k].len === 0) k--;
+    const s = segs[k];
+    const t = s.len > 0 ? Math.max(0, Math.min(1, (want - s.at) / s.len)) : 0;
+    return { x: s.a.x + s.dx * t, y: s.a.y + s.dy * t,
+             ux: s.len > 0 ? s.dx / s.len : 1, uy: s.len > 0 ? s.dy / s.len : 0 };
+  }
+
+  // Wholly off one edge of the screen (with `pad`)? Every point is tested, so
+  // a curve that bows into view between two off-screen ends is still drawn.
+  function offScreen(pts, size, pad) {
+    let left = true, right = true, up = true, down = true;
+    for (const p of pts) {
+      if (p.x >= -pad) left = false;
+      if (p.x <= size.x + pad) right = false;
+      if (p.y >= -pad) up = false;
+      if (p.y <= size.y + pad) down = false;
+      if (!left && !right && !up && !down) return false;
+    }
+    return left || right || up || down;
+  }
+
   function stroke(colour, opacity, r) {
     ctx.globalAlpha = Math.min(1, opacity * 0.85);
     ctx.strokeStyle = '#ffffff';
@@ -228,16 +284,14 @@ const MapArrows = (function () {
       if (!(opacity > 0.06)) continue;       // dimmed past the point of being read
       const ll = l.getLatLngs && l.getLatLngs();
       if (!ll || ll.length < 2) continue;
-      const p = map.latLngToContainerPoint(ll[0]);
-      const q = map.latLngToContainerPoint(ll[1]);
-      // Reject what is wholly off one edge before any arithmetic is spent on
-      // it. Zoomed into one site, this is nearly every line on the map.
-      if ((p.x < -pad && q.x < -pad) || (p.x > size.x + pad && q.x > size.x + pad) ||
-          (p.y < -pad && q.y < -pad) || (p.y > size.y + pad && q.y > size.y + pad)) continue;
-      const dx = q.x - p.x, dy = q.y - p.y;
-      const len = Math.hypot(dx, dy);
+      // Every point, not just the ends: a bundled path is a curve (see
+      // screenPath). Reject what is wholly off one edge before any more
+      // arithmetic is spent on it. Zoomed into one site, this is nearly every
+      // line on the map.
+      const path = screenPath(ll);
+      if (offScreen(path.pts, size, pad)) continue;
+      const len = path.len;
       if (len < minPx) continue;
-      const ux = dx / len, uy = dy / len;
       const backbone = l.mnLinkRole === 'backbone';
       const colour = backbone ? backboneColour
                               : ((l.options && l.options.color) || '#000000');
@@ -245,16 +299,17 @@ const MapArrows = (function () {
       if (dir === 'both') {
         // Two-way: one head near each end, pointing outward, and nothing along
         // the middle. See the note at the top of this file.
-        chevron(p.x + ux * len * 0.14, p.y + uy * len * 0.14, -ux, -uy, r.head);
+        const s = along(path, 0.14), e = along(path, 0.86);
+        chevron(s.x, s.y, -s.ux, -s.uy, r.head);
         stroke(colour, opacity, r);
-        chevron(p.x + ux * len * 0.86, p.y + uy * len * 0.86, ux, uy, r.head);
+        chevron(e.x, e.y, e.ux, e.uy, r.head);
         stroke(colour, opacity, r);
         marks += 2;
       } else {
         const n = Math.max(1, Math.min(MAX_PER_LINE, Math.floor(len / r.spacing)));
         for (let i = 0; i < n; i++) {
-          const t = (i + 0.5) / n;            // half a spacing in from either end
-          chevron(p.x + dx * t, p.y + dy * t, ux, uy, r.head);
+          const m = along(path, (i + 0.5) / n);   // half a spacing in from either end
+          chevron(m.x, m.y, m.ux, m.uy, r.head);
           stroke(colour, opacity, r);
         }
         marks += n;

@@ -4444,6 +4444,12 @@ const state = {
   // "back to the default"; read under this default, it would keep the lines
   // hidden from exactly the people who had tried them once.
   mapLots:        mapLayerStored('mn-property-boundaries'),
+  // Easements as a dashed line, and land tenure as a tint, on the same
+  // cadastre export (see MapLots). Off by default and remembered, on the road
+  // owners' terms: each is a way of reading the lots somebody chooses — the
+  // Property services views turn them on — not one every session opens in.
+  mapEasements:   localStorage.getItem('mn-easements') === 'on',
+  mapTenure:      localStorage.getItem('mn-land-tenure') === 'on',
   // Who manages each road and bridge (see MapRoadOwners). Off by default and
   // remembered, on the catchments' terms rather than the road parcels': it
   // recolours every road on the map, which is a way of reading the map
@@ -4580,9 +4586,14 @@ const state = {
                              .split(',').map(s => s.trim()).filter(Boolean)),
   mapMatchLabels: new Set(),  // ids the current filter earned a label (see mapLabelIds)
   // Last refresh, for the map-display note: drawn, culled by the distance
-  // slider, hidden with the stations they run to (#176), and the backbone
-  // pair counts beside them.
-  mapLinkCount:   { drawn: 0, culled: 0, hidden: 0, backbone: 0, backboneHidden: 0 },
+  // slider, hidden with the stations they run to (#176), left out by Views'
+  // Which paths (thinned, map-paths.js), and the backbone pair counts beside them.
+  mapLinkCount:   { drawn: 0, culled: 0, hidden: 0, thinned: 0, backbone: 0, backboneHidden: 0 },
+  // While a view is applied (map-views.js) the map's rebuild, the Layers panel
+  // and the legend wait, and the rebuild one of its switches asked for is
+  // owed: made once at the end rather than once a switch.
+  mapRefreshHold: false,
+  mapRefreshOwed: false,
   mapFitKey:      null,    // extent the map was last auto-fitted to (re-fit only on change)
   mapSearchTimer: null,    // debounce for the search box → marker rebuild
   passRelIdx:     null,    // both directions of the pass-range relation, per loaded file

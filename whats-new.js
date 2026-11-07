@@ -25,6 +25,26 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 234, date: '2026-11-07', items: [
+      '🗺️ <strong>Views: the Stations map set up for what you came to do, in one press.</strong> Open 🗺️ Layers and '
+        + 'pick a view at the top: <em>Overview</em> or <em>Site visit</em> for everyone; <em>Radio paths</em>, '
+        + '<em>Weak links</em>, <em>Backbone</em> or <em>Live traffic</em> for instrument technicians; <em>Rivers &amp; '
+        + 'catchments</em> or <em>Rainfall</em> for flood forecasters; <em>Property &amp; easements</em> or <em>Land &amp; '
+        + 'tenure</em> for property services. Each sets the stations, the radio paths and the layers for that job, and the '
+        + 'base map where it matters. <em>Put the map back</em> undoes it, and <em>Keep this mix</em> saves your own map as a view of '
+        + 'your own on this device.',
+      '〰️ <strong>Fewer lines, and easier to read.</strong> Under <em>How the radio paths are drawn</em>: show only each '
+        + 'field station\'s <em>best path</em> (point at a station for its others, dashed), bundle the long ones into '
+        + 'trunks, or show each repeater\'s area as a colour instead of lines. Draw them as <em>Flow</em> — dashes '
+        + 'running into each repeater, the repeaters taking turns, or the real readings as they arrive — or as '
+        + '<em>Tails &amp; spotlight</em>, a short tail out of each end and the whole path round your pointer.',
+      '🔆 <strong>Lines that stay readable on any map.</strong> <em>Auto-contrast</em> sets how strong the lines are '
+        + 'from how many are on screen, and <em>Balance</em> greys the base map toward the network, or fades the lines '
+        + 'toward the photo.',
+      '🏡 <strong>Easements and land tenure.</strong> Under Property boundaries in Layers, two new switches: '
+        + '<em>Easements, dashed</em> and <em>Land tenure (Qld)</em> — national parks, State forests, reserves, '
+        + 'leases and State land, each a pale colour of its own.',
+    ] },
     { n: 233, date: '2026-11-06', items: [
       '✎ <strong>Type your own figures straight into the radio link.</strong> In 〽️ Radio link, press any figure '
         + 'under TX or RX — TX power, line loss, antenna gain, antenna height, Rx sensitivity — or the frequency: a box '

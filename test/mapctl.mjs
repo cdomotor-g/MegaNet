@@ -150,6 +150,10 @@ try {
     const at = await page.evaluate(([q, s]) => {
       const el = document.querySelector(`.mn-mapctl[data-panel="${q}"] .mn-mapctl-body ${s}`);
       if (!el) return null;
+      // Layers scrolls, and Views (map-views.js) stands above its rows: the
+      // control is brought into the panel's view first, as a person would
+      // scroll to it, so the pointer lands on it and not past the panel's foot.
+      el.scrollIntoView({ block: 'center' });
       const r = el.getBoundingClientRect();
       return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
     }, [panel, selector]);

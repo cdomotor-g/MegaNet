@@ -130,6 +130,25 @@
      itself, so a backbone path still reads as a backbone path while its colour
      goes on saying whatever the link colouring says. */
   --map-backbone: #000000;
+  /* Views' Areas, no lines (map-paths.js): one colour per repeater's area, and
+     the ring its field stations' pins wear. Eight, so repeaters less than
+     60 km apart never share one. Opaque: the area is filled at 0.32 in code. */
+  --map-area-1: #ff8a3d;
+  --map-area-2: #1fb5ad;
+  --map-area-3: #f2c200;
+  --map-area-4: #9b6bff;
+  --map-area-5: #5fb32e;
+  --map-area-6: #ff5fa2;
+  --map-area-7: #2f8fff;
+  --map-area-8: #8a96a3;
+  /* Land tenure on the cadastre export (map-lots.js), filled at about 35 % in
+     code, and the easements' dashed line. Freehold is left clear. */
+  --map-tenure-park:    #2e8b3e;
+  --map-tenure-forest:  #1b7f79;
+  --map-tenure-reserve: #a3c93a;
+  --map-tenure-lease:   #e8892b;
+  --map-tenure-state:   #d6539b;
+  --map-easement:       #ffffff;
   /* The link-by-frequency ramp (MapFreq, #186). Eight hues assigned in
      ascending frequency order — this network uses four (151.5, 151.525, 151.95,
      152.4) and the rest are headroom, so a file with more channels colours all
@@ -681,6 +700,21 @@
   --map-hop-assumed: #5aa8ff;
   --map-hop-missed:  #ff5f52;
   --map-backbone: #000000;
+  /* Brighter on the dark theme, which opens on the Dark base map. */
+  --map-area-1: #ff9d57;
+  --map-area-2: #3fd0c9;
+  --map-area-3: #ffd23f;
+  --map-area-4: #b48cff;
+  --map-area-5: #82d64e;
+  --map-area-6: #ff6fb1;
+  --map-area-7: #4aa8ff;
+  --map-area-8: #d5dce3;
+  --map-tenure-park:    #4cc760;
+  --map-tenure-forest:  #36b8ae;
+  --map-tenure-reserve: #c2e35a;
+  --map-tenure-lease:   #ffa04d;
+  --map-tenure-state:   #ff6fb8;
+  --map-easement:       #ffffff;
   --map-blast: #ff6659;
   --map-blast-ring: #ff8a80;
   --map-river: #4fc3f7;
@@ -4528,6 +4562,12 @@ tr.hops-picked td { background: color-mix(in srgb, var(--accent) 12%, transparen
 .legend-line-contour { border-top-color: rgb(214, 104, 26); }
 /* The lot line is white over a dark casing, as MapLots draws it. */
 .legend-line-lot { border-top-color: #fff; box-shadow: 0 0 0 1px rgba(20, 20, 20, .6); }
+/* Easements and land tenure on the cadastre (map-lots.js): the dashed white
+   line over a dark edge, and a pale square per kind of tenure — Freehold
+   clear. The square's colour arrives as --dot, a --map-tenure-* token. */
+.legend-line-easement { border-top: 2px dashed var(--map-easement, #fff); box-shadow: 0 0 0 1px rgba(20, 20, 20, .6); }
+.legend-sq-tenure { opacity: .75; }
+.legend-sq-tenure.is-clear { background: transparent; box-shadow: inset 0 0 0 1px var(--border); }
 /* A council boundary (map-councils.js): MapCouncils.LINE through --line, two
    pixels as on the map; the tints beside it, when shaded, as a row of chips. */
 .legend-line-council { border-top: 2px solid var(--line, var(--map-line)); }
@@ -4558,6 +4598,34 @@ tr.hops-picked td { background: color-mix(in srgb, var(--accent) 12%, transparen
 .legend-line-fade-good { border-top-color: var(--map-fade-good); border-top-width: 3px; }
 .legend-line-fade-ok   { border-top-color: var(--map-fade-ok); }
 .legend-line-fade-bad  { border-top-color: var(--map-fade-bad); }
+/* How Views draws the radio paths (map-paths.js, map-flow.js, map-tails.js):
+   a trunk, a left-out path drawn dashed, an area's colour (a .legend-dot with
+   its --dot), flowing dashes and live pulses, a tail out of each end, and the
+   spotlight's ring. */
+.legend-line-trunk { border-top-width: 5px; box-shadow: 0 0 0 1px #fff; }
+.legend-line-other { border-top-width: 2px; border-top-style: dashed; }
+.legend-area { box-shadow: 0 0 0 2px color-mix(in srgb, var(--dot) 35%, transparent); }
+.legend-line-flow { border-top: 2px dashed var(--map-line); }
+.legend-line-flow-live { border-top: 2px dotted var(--map-line); }
+.legend-line-tails {
+  height: 3px;
+  border-top: 0;
+  background: linear-gradient(90deg, var(--map-line), transparent 40%, transparent 60%, var(--map-line));
+}
+.legend-line-tails-backbone {
+  background: linear-gradient(90deg, var(--map-backbone), transparent 40%, transparent 60%, var(--map-backbone));
+}
+.legend-spot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+  box-shadow: 0 0 0 1.5px rgba(11, 22, 32, .35);
+  background: rgba(255, 255, 255, .08);
+}
 /* 🪜 Hops to base in the legend: the heard green, at the weight it is drawn. */
 .legend-line-hop-heard { border-top-color: var(--map-hop-heard); border-top-width: 4px; }
 /* A field station's line to a base station that hears it direct (map-direct.js):
@@ -11598,6 +11666,278 @@ body.mn-cardw-dragging {
 #map-display-block + .filter-block > #acma-filter-block > .filter-check {
   margin-top: 0;
   font-weight: 600;
+}
+
+/* ── Views, at the top of Layers (map-views.js) ──────────────────────────────
+   A sibling of #map-display-block, drawn before it: the audience chips, the
+   line under them saying what the view in force does, two cards (how the
+   radio paths are drawn, and how strong), Keep this mix and the words fold.
+   The cards wear the Layers cards' dress (.mapd-card above), as real boxes
+   here: the section is not the flat list of rows the block below is. */
+.mapd-views {
+  --mv-card-bg: var(--mapd-card-bg, color-mix(in srgb, var(--text) 5%, var(--panel)));
+  font-size: .87rem;
+}
+
+/* Clear of the find row and the first heading below it. */
+#map-views-block + #map-display-block {
+  margin-top: var(--sp-5);
+}
+
+.mv-ask {
+  margin: 0 0 var(--sp-2);
+  font-weight: 600;
+}
+
+.mv-groups {
+  grid-template-columns: minmax(0, 1fr);
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.mv-group-h {
+  display: block;
+  margin-bottom: .2rem;
+  font-size: .76rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.mv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+}
+
+.mv-chip {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: .25rem .6rem;
+  border: 1px solid var(--ctl-border, var(--border));
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: .82rem;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.mv-chip:hover { border-color: var(--accent); }
+
+.mv-chip:focus-visible,
+.mv-chip-x:focus-visible,
+.mv-play:focus-visible,
+.mv-save-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The view in force: filled with the accent, so it reads from across the panel. */
+.mv-chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--panel);
+  font-weight: 600;
+}
+
+/* A kept view: dashed, as something the person made rather than one of ours. */
+.mv-chip--saved { border-style: dashed; }
+.mv-chip--saved[aria-pressed="true"] { border-style: solid; }
+
+/* A kept chip and its ✕, one pill. */
+.mv-saved {
+  max-width: 100%;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.mv-saved > .mv-chip { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+
+.mv-chip-x {
+  align-self: stretch;
+  padding: 0 .45rem;
+  border: 1px dashed var(--ctl-border, var(--border));
+  border-left: 0;
+  border-radius: 0 999px 999px 0;
+  background: var(--panel);
+  color: var(--muted);
+  font: inherit;
+  font-size: .72rem;
+  cursor: pointer;
+}
+
+.mv-chip-x:hover { color: var(--text); border-color: var(--accent); }
+
+.mv-none { margin: 0; }
+
+.mv-now { margin-top: var(--sp-2); }
+
+.mv-undo {
+  margin-top: .3rem;
+  font-size: .82rem;
+  font-weight: 600;
+}
+
+/* The two cards. */
+.mv-card {
+  margin-top: var(--sp-3);
+  padding: .45rem .65rem .55rem;
+  background: var(--mv-card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: 0 3px 3px var(--mapd-shade, rgba(8, 15, 24, .16)), inset 0 1px 0 var(--mapd-hi, rgba(255, 255, 255, .8));
+}
+
+.mv-card-h {
+  margin-bottom: .25rem;
+  font-weight: 600;
+}
+/* The two cards fold: the summary names what is chosen, so a shut card
+   still says how the paths are drawn. */
+summary.mv-card-h { cursor: pointer; margin-bottom: 0; }
+details.mv-fold[open] > summary.mv-card-h { margin-bottom: .25rem; }
+.mv-fold-now { display: block; font-weight: 400; color: var(--muted); font-size: .85em; }
+.mv-card.is-off > :not(.mv-card-h):not(.mv-off-note):not(summary) { opacity: .5; }
+
+/* Radio paths switched off: the choices wait, dimmed, under the note saying why. */
+.mv-card.is-off > :not(.mv-card-h):not(.mv-off-note) { opacity: .5; }
+.mv-off-note { margin-top: 0; }
+
+.mv-radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .15rem .9rem;
+  margin: .45rem 0 0;
+}
+
+.mv-radios-h {
+  flex-basis: 100%;
+  font-size: .76rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.mv-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  cursor: pointer;
+}
+
+.mv-opt input { margin: 0; flex-shrink: 0; }
+
+.mv-paths-note { margin-top: .3rem; }
+
+/* What a drawing has to set: indented under the radios it belongs to. */
+.mv-sub {
+  margin-top: .45rem;
+  padding-left: .65rem;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.mv-sub > .mv-radios:first-child { margin-top: 0; }
+
+.mv-range { margin-bottom: 0; }
+
+/* A slider's two ends, named under it. */
+.mv-ends {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -.1rem;
+  font-size: .72rem;
+  color: var(--muted);
+}
+
+.mv-play {
+  margin-top: .45rem;
+  padding: .25rem .65rem;
+  border: 1px solid var(--ctl-border, var(--border));
+  border-radius: var(--r-md);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: .82rem;
+  cursor: pointer;
+}
+
+.mv-play:hover { border-color: var(--accent); }
+
+.mv-check { margin: .2rem 0; }
+.mv-auto-read { margin-top: 0; }
+
+/* Keep this mix. */
+.mv-save {
+  margin-top: var(--sp-3);
+}
+
+.mv-save-label {
+  display: block;
+  margin-bottom: .2rem;
+  font-weight: 600;
+}
+
+.mv-save-row {
+  display: flex;
+  gap: .35rem;
+}
+
+.mv-save-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: .3rem .5rem;
+  border: 1px solid var(--ctl-border, var(--border));
+  border-radius: var(--r-sm);
+  background: var(--panel-sub);
+  color: var(--text);
+  font: inherit;
+  font-size: .82rem;
+}
+
+.mv-save-name::placeholder { color: var(--muted); }
+
+.mv-save-btn {
+  flex: 0 0 auto;
+  padding: .3rem .75rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--panel);
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mv-words { margin-top: var(--sp-3); }
+
+/* Under Sunlight every edge is the strong control border and the type a step
+   heavier, the way the rest of the panel goes. */
+[data-theme="sunlight"] .mv-chip,
+[data-theme="sunlight"] .mv-chip-x,
+[data-theme="sunlight"] .mv-play,
+[data-theme="sunlight"] .mv-card {
+  border-width: 2px;
+  border-color: var(--ctl-border);
+}
+
+[data-theme="sunlight"] .mv-chip[aria-pressed="true"] { border-color: var(--accent); }
+
+/* The canvases Views draws with (map-overlay.js): the areas and halos, the
+   trunks and other paths, the flowing dashes, the tails and the spotlight.
+   Placed like the arrow canvas — absolutely, moved with setPosition — and
+   never a click target: the line under them is. */
+.mn-overlay-canvas,
+.mn-areas-canvas,
+.mn-paths-canvas,
+.mn-flow-canvas,
+.mn-tails-canvas,
+.mn-spot-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
 }
 
 /* The legend (app.js, mapLegendHtml) in the same dress: a band per section

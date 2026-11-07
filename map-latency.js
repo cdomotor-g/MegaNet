@@ -2797,7 +2797,10 @@ const MapLatency = (() => {
       const ll = l.getLatLngs();
       if (!ll || ll.length < 2) continue;
       if (l.mnLinkRole === 'core') {
-        add(field, l.mnLinkStationId, { line: l, fromId: l.mnLinkStationId, toId: l.mnLinkRepeaterId, from: ll[0], to: ll[1] });
+        // The repeater is the last point: a path bundled into a trunk (Views,
+        // map-paths.js) is a curve of many points, and its second point is a
+        // few pixels out of the station.
+        add(field, l.mnLinkStationId, { line: l, fromId: l.mnLinkStationId, toId: l.mnLinkRepeaterId, from: ll[0], to: ll[ll.length - 1] });
       } else if (l.mnLinkRole === 'backbone') {
         const a = l.mnLinkRepeaterId, b = l.mnLinkRepeaterId2;
         add(bb, a, { line: l, fromId: a, toId: b, from: ll[0], to: ll[1] });
@@ -2898,6 +2901,13 @@ const MapLatency = (() => {
     // straight pin to pin; timed `like` another hop when given. Answers where
     // it ends, or null when it cannot be drawn. A hop already in the pulse is
     // not drawn twice: it keeps its time and the better of the two kinds.
+    // How visible a leg's line is, for the "dimmed past reading" test: the
+    // line's full strength under the focus dim where Views keeps one
+    // (mnFullOpacity) — Flow draws the paths faint and Tails hides them on
+    // purpose, so the pulses can read — else the opacity it is drawn at.
+    const legSeen = line => line.mnFullOpacity != null
+      ? line.mnFullOpacity * (line.mnFocusDimmed ? (typeof MAP_FOCUS_DIM_LINE_MIX === 'number' ? MAP_FOCUS_DIM_LINE_MIX : 0.2) : 1)
+      : line.options.opacity;
     const hop = (a, b, kind, start, e, like) => {
       if (!a || !b || a === b) return null;
       const key = a + '>' + b;
@@ -2906,7 +2916,7 @@ const MapLatency = (() => {
         if (HOPS[kind].rank > HOPS[had.kind].rank) had.kind = kind;
         return had.start + had.dur;
       }
-      if (legs.length >= LEGS_MAX || (e && e.line && !(e.line.options.opacity > 0.06))) return null;
+      if (legs.length >= LEGS_MAX || (e && e.line && !(legSeen(e.line) > 0.06))) return null;
       const from = e ? e.from : pinAt(a), to = e ? e.to : pinAt(b);
       if (!from || !to) return null;
       const px = map.latLngToLayerPoint(from).distanceTo(map.latLngToLayerPoint(to));
