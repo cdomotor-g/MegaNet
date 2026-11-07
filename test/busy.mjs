@@ -20,8 +20,11 @@
 //   7. **Pressing it** opens the card: what is happening, live, and the key;
 //      Escape closes it and gives focus back.
 //   8. **Reduced motion**: the rings stand still and the light fades instead.
-//   9. **A phone, and Classic**: in the row at 390 px with no sideways scroll,
-//      and the Classic banner's own colours.
+//   9. **A phone, and Classic**: in the row on an iPhone 12 mini's screen
+//      (375 px, a touch screen) with no sideways scroll, and round there —
+//      the touch-target floor makes every button 2 rem tall, and a wheel drawn
+//      to the button went oval; it is drawn in a square of its own now — and
+//      the Classic banner's own colours.
 //
 // Run:  npm run busy
 //       npm run busy -- -v    also print what passed
@@ -309,7 +312,9 @@ async function main() {
 
     // ── 9. A phone, and Classic ────────────────────────────────────────────
     log('\n9. A phone, and Classic\n');
-    const phone = await open(browser, server, { look: 'calm', viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true }, errors);
+    // An iPhone 12 mini's screen, as Playwright describes it.
+    const phone = await open(browser, server, { look: 'calm', viewport: { width: 375, height: 629 }, screen: { width: 375, height: 812 },
+      deviceScaleFactor: 3, isMobile: true, hasTouch: true }, errors);
     await phone.page.evaluate(() => { fetch('/busy-test/1500/phone'); });
     await until(phone.page, () => document.getElementById('busy').dataset.state === 'spin');
     // Measured on the slot: the wheel itself may still be popping up.
@@ -328,6 +333,18 @@ async function main() {
     check('on a phone it is in the banner, at its right-hand end (next to ⋮, which keeps the corner)',
       P.right <= end + 1 && P.right > end - 30 && (!P.side || P.side.right > P.w - 20) && P.top >= P.hTop && P.bottom <= P.hBottom, J(P));
     check('…with no sideways scroll', P.scroll <= P.client, J(P));
+    // Once it has popped up: the wheel and every ring in it round, however
+    // tall the button is made for a finger.
+    await phone.page.waitForTimeout(300);
+    const R = await phone.page.evaluate(() => {
+      const q = sel => { const e = document.querySelector(sel); const r = e ? e.getBoundingClientRect() : { width: 0, height: 0 };
+        return { w: +r.width.toFixed(2), h: +r.height.toFixed(2) }; };
+      return { coarse: matchMedia('(pointer: coarse)').matches, button: q('#busy'), face: q('#busy .busy-face'),
+        out: q('#busy .busy-out'), tick: q('#busy .busy-tick') };
+    });
+    const round = b => b.w > 20 && Math.abs(b.w - b.h) < 0.5;
+    check('on a touch screen the button is tall enough to press, and the wheel in it is round — not stretched to the button',
+      R.coarse && R.button.h >= 32 && round(R.face) && round(R.out) && round(R.tick), J(R));
     await phone.context.close();
 
     const classic = await open(browser, server, { look: 'classic' }, errors);

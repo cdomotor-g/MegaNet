@@ -25,6 +25,10 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 235, date: '2026-11-07', items: [
+      '⭕ <strong>The busy wheel in the top-right corner stays round on small phones.</strong> On a narrow touch screen '
+        + 'such as an iPhone mini it was being stretched into an oval; it is a circle there now, as everywhere else.',
+    ] },
     { n: 234, date: '2026-11-07', items: [
       '🗺️ <strong>Views: the Stations map set up for what you came to do, in one press.</strong> Open 🗺️ Layers and '
         + 'pick a view at the top: <em>Overview</em> or <em>Site visit</em> for everyone; <em>Radio paths</em>, '

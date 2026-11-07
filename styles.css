@@ -1193,7 +1193,13 @@ header p {
    boxes moved by transform alone, which the browser does off the page's own
    thread — so the wheel keeps turning while a long sum has that thread tied
    up. The outer ring wears the first kind going (saving, working, loading)
-   and the inner one the next, so two at once show as two colours. */
+   and the inner one the next, so two at once show as two colours.
+
+   The button is the slot's whole size, for pressing; the wheel is drawn in
+   .busy-face, a square of its own centred in it, so nothing that sizes the
+   button can bend the circle — on a touch screen every button is made at
+   least 2 rem tall (the touch-target floor), and a wheel drawn to the
+   button was 24 px wide by 32 px tall there: an oval. */
 .busy-slot {
   flex: 0 0 auto;
   display: inline-flex;
@@ -1211,15 +1217,18 @@ header p {
   --busy-a: var(--busy-load);
   --busy-b: var(--busy-a);
   position: relative;
-  flex: 0 0 auto;
-  width: 1.5rem;
-  height: 1.5rem;
+  flex: none;
+  width: 1.6rem;
+  height: 2rem;
+  min-width: 0;
+  min-height: 0;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: 6px;
   background: none;
   color: inherit;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   visibility: hidden;
   opacity: 0;
   transform: scale(.3);
@@ -1233,7 +1242,21 @@ header p {
   transform: none;
   transition: opacity .08s ease-out, transform .2s cubic-bezier(.3, 1.8, .55, 1), visibility 0s;
 }
-.busy:focus-visible { outline: 2px solid var(--busy-a); outline-offset: 2px; }
+.busy:focus-visible { outline: none; }
+.busy:focus-visible .busy-face { outline: 2px solid var(--busy-a); outline-offset: 2px; }
+
+/* The wheel's own square: 24 px, centred, a fixed width and height that
+   no rule for buttons reaches. */
+.busy-face {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: -.75rem 0 0 -.75rem;
+  border-radius: 50%;
+  pointer-events: none;
+}
 
 /* The classic banner is the app's blue: the same three, lightened to read on it. */
 :root[data-shell="classic"] .busy {
@@ -1346,16 +1369,17 @@ header p {
 .busy:not([data-state="spin"]) .busy-n { opacity: 0; }
 .busy[data-state="tick"] .busy-tick { animation: busy-tick .2s ease-out forwards; }
 .busy[data-state="out"] .busy-tick { stroke-dashoffset: 0; opacity: 1; }
-.busy::after {
+.busy-face::after {
   content: '';
   position: absolute;
   inset: 0;
+  box-sizing: border-box;
   border: 2px solid var(--busy-save);
   border-radius: 50%;
   opacity: 0;
   pointer-events: none;
 }
-.busy[data-state="tick"]::after { animation: busy-splash .4s ease-out forwards; }
+.busy[data-state="tick"] .busy-face::after { animation: busy-splash .4s ease-out forwards; }
 
 @keyframes busy-turn { to { transform: rotate(360deg); } }
 @keyframes busy-fall {

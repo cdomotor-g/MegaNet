@@ -1308,7 +1308,10 @@ finger or a keyboard. The meanings live once, in `Busy.KEY`.
 It comes up only once something has taken 100 ms, and then stays at least
 450 ms, so a cached read does not flicker it. The rings are HTML boxes turned
 by `transform`, which the browser runs off the page's own thread: the wheel
-keeps turning while a long sum has the page frozen. Under reduced motion it
+keeps turning while a long sum has the page frozen. They are drawn in
+`.busy-face`, a 24 px square of their own centred in the button, never to the
+button's own box: the touch-target floor makes every button 2 rem tall on a
+touch screen, and a wheel drawn to the button was an oval on a phone. Under reduced motion it
 does not turn; its ring fades slowly up and down instead (*Reduced motion*,
 below).
 
