@@ -693,12 +693,26 @@ try {
   ok('who may log in over SSH, by fingerprint and whose — never a key',
     /SHA256:VeBIQNSQYe0Ge\+JIo/.test(detail) && /jo@laptop/.test(detail) && /team keys/.test(detail) && /private networks/.test(detail)
       && /ssh alert@192\.168\.1\.40/.test(detail) && /passwords accepted/.test(detail), detail.slice(detail.indexOf('SSH access'), detail.indexOf('SSH access') + 900));
+  ok('the panel opens on its Overview, the log and the requests on tabs of their own, the settings folded shut',
+    await page.evaluate(() => document.querySelector('#bs-detail [data-sub="overview"]').getAttribute('aria-pressed') === 'true'
+      && !document.getElementById('bs-log') && !document.getElementById('bs-requests')
+      && document.querySelectorAll('#bs-settings details.bs-fold').length === 5 && ![...document.querySelectorAll('#bs-settings details.bs-fold')].some(d => d.open)));
+  const sums = await page.evaluate(() => [...document.querySelectorAll('#bs-settings .bs-fold-s')].map(e => e.textContent));
+  ok('…each fold saying on one line what it is set to', sums[0] === 'Mt Stuart base · sending readings and every frame' && /^151\.500 MHz · automatic window · gain 29\.7 dB$/.test(sums[1])
+    && /^receiving · 2 channels in 960 kHz · all as above$/.test(sums[2]) && /its own name, channels/.test(sums[3]) && /^chirps automatic · volume 80/.test(sums[4]), JSON.stringify(sums));
+  await page.click('#bs-detail [data-sub="log"]');
+  await until(() => page.evaluate(() => !!document.querySelector('#bs-log pre.bs-log')), 'the Log tab shows the log it sent');
   ok('the log it sent back', /agent 0\.6\.0 started/.test(await text('#bs-log pre.bs-log')));
+  await page.click('#bs-detail [data-sub="requests"]');
+  await until(() => page.evaluate(() => !!document.getElementById('bs-requests')), 'the Requests tab shows what was asked');
+  ok('…its tab counting what is still on its way', /^Requests \(\d+ waiting\)$/.test(await page.evaluate(() => document.querySelector('#bs-detail [data-sub="requests"]').textContent)));
   const reqs = (await text('#bs-requests')).replace(/\s+/g, ' ');
   ok('what was asked of it, and what became of each',
     /change settings \(audio\.volume\)/.test(reqs) && /changed audio\.volume/.test(reqs) && /no published release found/.test(reqs) && /waiting for it/.test(reqs), reqs.slice(0, 400));
 
   // ── Asking ───────────────────────────────────────────────────────────────────
+  await page.click('#bs-detail [data-sub="overview"]');
+  await until(() => page.evaluate(() => !!document.getElementById('bs-settings')), 'back on its Overview');
   const commands = () => sent('admin_base_station_command');
   // The app's own questions (#223): what is asked is read off the dialog, and
   // the button pressed is the one a person would press.
@@ -724,14 +738,18 @@ try {
   await until(() => commands().length === 3, 'an unplugged receiver can be removed, after asking');
   ok('…by its key', commands()[2].p_verb === 'device.forget' && commands()[2].p_args.key === 'ert:usb-FTDI_A10K' && /Remove ERT-A2\?/.test(dialog), JSON.stringify(commands()[2]));
   ok('…a button drawn as dangerous asking as one, its answer "Remove" without the …', q.danger && q.yes === 'Remove', JSON.stringify(q));
+  await page.click('#bs-detail [data-sub="log"]');
   await page.click('#bs-detail button:has-text("Show its last 200 lines")');
   await until(() => commands().length === 4, 'Show its log asks for it');
   ok('…for 200 lines', commands()[3].p_verb === 'log' && commands()[3].p_args.lines === 200, JSON.stringify(commands()[3]));
+  await page.click('#bs-detail [data-sub="overview"]');
   await page.click('#bs-detail button:has-text("Install new releases by itself")');
   await until(() => commands().length === 5, 'automatic updates can be turned on');
   ok('…as update.auto on', commands()[4].p_verb === 'update.auto' && commands()[4].p_args.on === true, JSON.stringify(commands()[4]));
 
   // ── Settings ─────────────────────────────────────────────────────────────────
+  await page.click('#bs-settings details[data-fold="every"] > summary');
+  await page.click('#bs-settings details[data-fold="station"] > summary');
   await page.fill('#bs-f-freq', '2000');
   await page.click('#bs-settings button:has-text("Send the changes")');
   await page.waitForTimeout(200);
@@ -743,9 +761,10 @@ try {
   await page.focus('#bs-f-name');
   await page.evaluate(() => BaseStations.load());
   await page.waitForTimeout(300);
-  ok('typing survives a poll of the list and the panel', await page.evaluate(() =>
+  ok('typing survives a poll of the list and the panel, its folds open as they were', await page.evaluate(() =>
     document.getElementById('bs-f-name').value === 'Mt Stuart' && document.getElementById('bs-f-freq').value === '151.6250'
-      && document.activeElement && document.activeElement.id === 'bs-f-name'));
+      && document.activeElement && document.activeElement.id === 'bs-f-name'
+      && document.querySelector('#bs-settings details[data-fold="every"]').open && !document.querySelector('#bs-settings details[data-fold="sound"]').open));
   await page.click('#bs-settings button:has-text("Send the changes")');
   await until(() => commands().length === 6, 'Send the changes sends them as one request');
   const patch = commands()[5].p_args.patch || {};
@@ -766,12 +785,14 @@ try {
     document.activeElement && document.activeElement.textContent.trim() === 'Check for updates'));
 
   // ── Cancelling, and a station that only reports ──────────────────────────────
+  await page.click('#bs-detail [data-sub="requests"]');
   await page.click('#bs-requests button[aria-label="Cancel reboot"]');
   await until(() => sent('admin_base_station_cancel').length === 1, 'a queued request can be cancelled');
   ok('…by its id', sent('admin_base_station_cancel')[0].p_command_id === 103);
 
   await page.click('#bs-list button[aria-label="Open Hut reporter"]');
   await until(() => page.evaluate(() => /Hut reporter/.test((document.getElementById('bs-detail-h') || {}).textContent || '')), 'opening another station swaps the panel');
+  ok('…on its Overview again', await page.evaluate(() => document.querySelector('#bs-detail [data-sub="overview"]').getAttribute('aria-pressed') === 'true'));
   const hut = (await text('#bs-detail')).replace(/\s+/g, ' ');
   ok('a station that only reports offers nothing to ask, and says why',
     /set it to report only/.test(hut) && await page.evaluate(() => !document.querySelector('#bs-detail [data-verb]')), hut.slice(0, 300));

@@ -81,6 +81,15 @@ the station sent it, and carries a 0.4 entry's into the stick's own when the
 stick is changed; a patch written by hand is where this bites — give `ppm` in
 the entry of every stick with a correction of its own.
 
+**An open station's panel** is laid out as RPi ALERT's own page is (0.21): its **Overview**
+— health, uplink, software, receivers, SSH access, and the settings folded into sections
+(*This station*, *RTL-SDR — every stick*, one for each stick, *Sound, screen and clock*), each
+saying on one line what it is set to — and what reads like a log on tabs of its own: **Requests**
+(what was asked from here, and what became of each; the tab counts those still on their way) and
+**Log** (the last lines of the station's log, when asked for). The tab and the open folds outlive a
+poll; another station opens on its Overview, folds shut. The changes typed in any fold go as one
+request with *Send the changes*.
+
 **Each stick's channels and window.** The settings form lists the channels
 every stick decodes (its own channel first, then its more channels: `151.500,
 151.525, 152.400 EIF`, a format named only where it is not the stick's) and each

@@ -53,6 +53,12 @@ const BaseStations = (function () {
   let formNote = null;
   // The log a station sent back, shown until the panel closes: { id, lines }.
   let logShown = null;
+  // The open station's panel, as RPi ALERT's own page has it (0.21): its
+  // Overview — what it is doing, with its settings folded into sections — and
+  // what reads like a log on tabs of its own. Which tab, and which folds are
+  // open, outlive a poll's repaint; another station starts on its Overview.
+  let subTab = 'overview';
+  const openFolds = new Set();
   const timers = { list: null, detail: null, watch: null, wf: null, ch: null, sig: null };
   let lastAsk = 0;
   // The newest RPi ALERT release, as GitHub says: what a station's "Install the
@@ -402,7 +408,7 @@ const BaseStations = (function () {
         <tbody>${rx.map(r => `<tr>
           <th scope="row">${esc(r.name)} <span class="small qs-dim">${esc(r.kind)}</span></th>
           <td class="small"><span class="${r.state === 'running' ? 'txt-ok' : r.state === 'unplugged' || r.state === 'error' ? 'txt-bad' : 'txt-warn'}">${esc(r.state === 'running' ? 'receiving' : r.state)}</span>${r.error ? `<div class="txt-warn">${esc(r.error)}</div>` : ''}</td>
-          <td class="small">${esc(rxDetail(r)) || '—'}</td>
+          <td class="small">${esc(rxDetail(r)) || '—'}${r.kind === 'sdr' ? stickNowHtml(r) : ''}</td>
           <td class="small">${r.decoded != null ? esc(r.decoded) + ' decoded' : ''}${r.kind === 'sdr' ? checksHtml(r) : ''}${r.dataAgoS != null ? `<div class="qs-dim">data ${esc(span(r.dataAgoS).replace(/^0 min$/, 'just now'))}</div>` : ''}${deafFor(s, r.key) ? `<div class="${deafFor(s, r.key).severity === 'critical' ? 'txt-bad' : 'txt-warn'}">nothing new for ${esc(span((now() - Date.parse((deafFor(s, r.key).evidence || {}).changed_at)) / 1000))}</div>` : ''}</td>
           <td class="adm-row-acts">${!ask ? '' : r.state === 'unplugged'
             ? askBtn('device.forget', { key: r.key }, 'Remove ' + r.name + '? The station forgets it — its name, its own settings and its Flood-Net receiver id.', 'Remove…', 'exp-btn-sm adm-danger', 'Remove ' + r.name)
@@ -659,15 +665,22 @@ const BaseStations = (function () {
     const sel = (k, label, opts) => `<label>${label} <select id="bs-f-${k}" onchange="BaseStations.field('${k}', this.value)">${opts.map(([v, t]) => `<option value="${esc(v)}"${String(f[k]) === String(v) ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
     const chk = (k, label) => `<label class="ser-check"><input type="checkbox" id="bs-f-${k}"${f[k] ? ' checked' : ''} onchange="BaseStations.field('${k}', this.checked)"> ${label}</label>`;
     const sticks = rx.filter(x => x.kind === 'sdr');
+    // A fold: its name, what it is set to, and its fields. Open or shut as it
+    // was before the poll.
+    const fold = (key, title, sum, body) => `<details class="bs-fold" data-fold="${esc(key)}"${openFolds.has(key) ? ' open' : ''} ontoggle="BaseStations.fold(this)">
+        <summary><span class="bs-fold-t">${title}</span><span class="bs-fold-s">${esc(sum)}</span></summary><div class="bs-fold-body">${body}</div></details>`;
+    const winSum = (rate, lo, hi) => (rate && rate !== '0' ? (WIDTH[rate] || rate) + ' window, as set' : 'automatic window'
+      + (lo && lo !== '0' ? ', no narrower than ' + WIDTH[lo] : '') + (hi && hi !== '0' ? ', no wider than ' + WIDTH[hi] : ''));
+    const SOUND = { auto: 'automatic', live: 'real audio only', synth: 're-made bursts', beep: 'beeps', off: 'off' };
+    const SCREEN = { auto: 'dashboard on a monitor', on: 'dashboard always', off: 'text console' };
     return `<h3>Settings</h3>
       <p class="small">Sent to the station as one request, and changed there through the checks its own page uses. Never from here: its ingest token, where readings go, its web page's password, its SSH keys, or what it lets Flood-Net do.</p>
-      <div class="bs-form">
+      ${fold('station', 'This station', (f.name || 'no name') + ' · ' + (f.enabled ? 'sending readings' + (f.receptions ? ' and every frame' : '') : 'not sending'), `<div class="bs-form">
         ${inp('name', 'Name of the base station', ' maxlength="80"')}
         ${chk('enabled', 'Send readings to Flood-Net')}
         ${chk('receptions', 'Send every frame heard (Reception Map)')}
-      </div>
-      <h4>RTL-SDR — every stick</h4>
-      <div class="bs-form">
+      </div>`)}
+      ${fold('every', 'RTL-SDR — every stick', [f.sdrOn ? (f.freq || '—') + ' MHz' : 'RTL-SDR sticks off', winSum(f.rate, f.rmin, f.rmax), 'gain ' + f.gain + (f.gain === 'auto' ? '' : ' dB')].join(' · '), `<div class="bs-form">
         ${chk('sdrOn', 'Use RTL-SDR sticks')}
         ${inp('freq', termHtml('Channels, MHz', WINDOW_WORDS.chans[1]), ' inputmode="decimal" placeholder="151.500, 151.525"')}
         ${sel('format', 'Frame format', Object.entries(FORMATS))}
@@ -681,12 +694,16 @@ const BaseStations = (function () {
       </div>
       ${f.decoder ? `<p class="small qs-dim"><strong>Decoder:</strong> ${esc(DECODER_MEANING)}</p>` : ''}
       ${f.watch ? `<p class="small qs-dim"><strong>Between bursts:</strong> ${esc(WATCH_MEANING)}</p>` : ''}
-      ${Object.values(WINDOW_WORDS).filter(([w]) => f.rmin != null || (w !== WINDOW_WORDS.min[0] && w !== WINDOW_WORDS.max[0])).map(([w, m]) => `<p class="small qs-dim"><strong>${esc(w)}:</strong> ${esc(m)}</p>`).join('')}
-      ${sticks.length ? `<h4>Each stick <span class="small qs-dim">(blank: as above)</span></h4>${sticks.map(r => {
+      ${Object.values(WINDOW_WORDS).filter(([w]) => f.rmin != null || (w !== WINDOW_WORDS.min[0] && w !== WINDOW_WORDS.max[0])).map(([w, m]) => `<p class="small qs-dim"><strong>${esc(w)}:</strong> ${esc(m)}</p>`).join('')}`)}
+      ${sticks.map(r => {
         const v = f['s:' + r.key] || {};
         const k = escAttr(r.key);
-        return `<fieldset class="bs-stick"><legend>${esc(r.name)} <span class="small qs-dim">${esc(r.usb_port ? 'USB port ' + r.usb_port : r.key)}</span></legend>
-          ${stickNowHtml(r)}<div class="bs-form">
+        const own = [v.name && 'name', v.freq && 'channels', v.format && 'format', v.gain && 'gain', v.rate && 'window', (v.rmin || v.rmax) && 'window limits', v.on === false && 'off'].filter(Boolean);
+        const n = Array.isArray(r.channels) && r.channels.length ? r.channels.length : 1;
+        const sum = [v.on === false ? 'not used' : r.state === 'running' ? 'receiving' : r.state || '', n + ' channel' + (n === 1 ? '' : 's') + (r.sample_rate ? ' in ' + (WIDTH[String(r.sample_rate)] || r.sample_rate) : ''),
+          own.length ? 'its own ' + own.join(', ') : 'all as above'].filter(Boolean).join(' · ');
+        return fold('s:' + r.key, esc(r.name) + ` <span class="small qs-dim">${esc(r.usb_port ? 'USB port ' + r.usb_port : r.key)}</span>`, sum, `
+          <p class="small qs-dim">Blank: as for every stick, above.</p>${stickNowHtml(r)}<div class="bs-form">
           <label>Name <input type="text" maxlength="60" value="${esc(v.name)}" placeholder="${esc(r.name)}" oninput="BaseStations.stick('${k}', 'name', this.value)"></label>
           <label>${termHtml('Channels, MHz', WINDOW_WORDS.chans[1])} <input type="text" inputmode="decimal" value="${esc(v.freq)}" placeholder="${esc(f.freq)}" oninput="BaseStations.stick('${k}', 'freq', this.value)"></label>
           <label>Format <select onchange="BaseStations.stick('${k}', 'format', this.value)"><option value="">As above</option>${Object.entries(FORMATS).map(([fv, t]) => `<option value="${fv}"${v.format === fv ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
@@ -694,15 +711,14 @@ const BaseStations = (function () {
           <label>${termHtml('Window', WINDOW_WORDS.window[1])} <select onchange="BaseStations.stick('${k}', 'rate', this.value)"><option value="">As above</option>${[['0', 'Automatic']].concat(WINDOWS).map(([wv, t]) => `<option value="${wv}"${v.rate === wv ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
           ${f.rmin != null ? ['rmin', 'rmax'].map(lk => `<label>${termHtml(WINDOW_WORDS[lk === 'rmin' ? 'min' : 'max'][0], WINDOW_WORDS[lk === 'rmin' ? 'min' : 'max'][1])} <select onchange="BaseStations.stick('${k}', '${lk}', this.value)"><option value="">As above</option>${LIMITS.map(([wv, t]) => `<option value="${wv}"${v[lk] === wv ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`).join('') : ''}
           <label class="ser-check"><input type="checkbox"${v.on !== false ? ' checked' : ''} onchange="BaseStations.stick('${k}', 'on', this.checked)"> Use this stick</label>
-        </div></fieldset>`;
-      }).join('')}` : ''}
-      <h4>Sound, screen and clock</h4>
-      <div class="bs-form">
+        </div>`);
+      }).join('')}
+      ${fold('sound', 'Sound, screen and clock', ['chirps ' + (SOUND[f.audio] || f.audio), 'volume ' + f.volume, SCREEN[f.kiosk] || f.kiosk, f.tz || 'time zone not set'].join(' · '), `<div class="bs-form">
         ${sel('audio', 'Chirps', [['auto', 'Automatic'], ['live', 'Only an SDR\'s real audio'], ['synth', 'A re-made burst per reading'], ['beep', 'A beep per reading'], ['off', 'Off']])}
         ${inp('volume', 'Volume, 0–100', ' inputmode="numeric"')}
         ${sel('kiosk', 'Screen', [['auto', 'Dashboard on a connected monitor'], ['on', 'Always, when a monitor is connected'], ['off', 'Text console only']])}
         ${inp('tz', 'Time zone', ' placeholder="Australia/Brisbane"')}
-      </div>
+      </div>`)}
       <div class="button-group adm-actions">
         <button class="primary" onclick="BaseStations.saveSettings()">Send the changes</button>
         <button class="exp-btn-sm" onclick="BaseStations.resetForm()">Undo my changes</button>
@@ -763,20 +779,37 @@ const BaseStations = (function () {
       ${lines ? `<pre class="bs-log" tabindex="0" aria-label="The base station's log">${esc(lines.map(l => new Date(l.t).toLocaleTimeString() + ' ' + String(l.level).toUpperCase().padEnd(5) + ' [' + l.tag + '] ' + l.msg).join('\n'))}</pre>` : ''}`;
   }
 
+  const SUB_WORDS = {
+    overview: ['Overview', 'What the station is doing now — its health, receivers and software — and its settings, folded into sections.'],
+    requests: ['Requests', 'What was asked of this station from here, by whom, and what became of each.'],
+    log: ['Log', 'The last lines of the station\'s own log, when asked for.'],
+  };
+
+  function subTabsHtml(s) {
+    const waiting = ((detail && detail.commands) || []).filter(c => c.status === 'queued' || c.status === 'sent').length;
+    const label = { overview: 'Overview', requests: 'Requests' + (waiting ? ' (' + waiting + ' waiting)' : ''), log: 'Log' + (logShown && logShown.id === s.id ? '' : '') };
+    return `<div class="pill-row bs-subtabs" role="group" aria-label="What to show of ${esc(s.label)}">${Object.keys(SUB_WORDS).map(k =>
+      `<button type="button" class="pill${subTab === k ? ' is-on' : ''}" aria-pressed="${subTab === k}" data-sub="${k}" title="${esc(SUB_WORDS[k][1])}"
+        onclick="BaseStations.sub('${k}')">${esc(label[k])}</button>`).join('')}</div>`;
+  }
+
   function detailHtml() {
     const s = stationOf();
     if (!s) return '';
+    const sub = s.managed ? subTab : 'overview';
+    const body = sub === 'requests' ? `<div id="bs-requests">${requestsHtml()}</div>`
+      : sub === 'log' ? `<div id="bs-log">${logHtml(s) || '<p class="small">This station cannot be asked for its log.</p>'}</div>`
+      : `${s.managed ? `<div class="bs-cols"><div>${healthHtml(s)}</div><div>${uplinkHtml(s)}${softwareHtml(s)}</div></div>` : ''}
+      ${receiversHtml(s)}
+      ${s.managed ? accessHtml(s) : ''}
+      <div id="bs-settings">${settingsHtml(s)}</div>`;
     return `<section class="panel bs-detail" aria-labelledby="bs-detail-h">
       ${headHtml(s)}
       ${detailErr ? `<p class="small txt-bad">${esc(detailErr)}</p>` : ''}
       ${askErr ? `<p class="small txt-bad">${esc(askErr)}</p>` : ''}
       ${actionsHtml(s)}
-      ${s.managed ? `<div class="bs-cols"><div>${healthHtml(s)}</div><div>${uplinkHtml(s)}${softwareHtml(s)}</div></div>` : ''}
-      ${receiversHtml(s)}
-      ${s.managed ? accessHtml(s) : ''}
-      <div id="bs-settings">${settingsHtml(s)}</div>
-      <div id="bs-log">${logHtml(s)}</div>
-      <div id="bs-requests">${s.managed ? requestsHtml() : ''}</div>
+      ${s.managed ? subTabsHtml(s) : ''}
+      ${body}
     </section>`;
   }
 
@@ -1814,6 +1847,7 @@ const BaseStations = (function () {
   function open(id) {
     if (openId === id) { close(); return; }
     openId = id; detail = null; detailErr = null; askErr = null; form = null; formNote = null; logShown = null;
+    subTab = 'overview'; openFolds.clear();
     clearInterval(timers.watch);
     repaint();
     document.getElementById('bs-detail-h')?.scrollIntoView({ block: 'start' });
@@ -1884,6 +1918,8 @@ const BaseStations = (function () {
   }
 
   function field(k, v) { if (!form) return; form.f[k] = v; form.dirty = true; }
+  function sub(k) { if (!SUB_WORDS[k] || subTab === k) return; subTab = k; repaintLive(); }
+  function fold(el) { const k = el.dataset.fold; if (el.open) openFolds.add(k); else openFolds.delete(k); }
   function stick(key, k, v) { if (!form) return; const e = form.f['s:' + key] = form.f['s:' + key] || {}; e[k] = v; form.dirty = true; }
   function resetForm() { form = null; formNote = null; repaint(); }
 
@@ -1954,7 +1990,7 @@ const BaseStations = (function () {
   }
 
   return { render, init, load, open, close, ask, askFrom, cancel, field, stick, resetForm, saveSettings,
-           keyField, addKey, removeKey, authChanged, wfWindow, chWindow,
+           keyField, addKey, removeKey, authChanged, wfWindow, chWindow, sub, fold,
            // Pure, for test/basestations.mjs.
            _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _stickNowHtml: stickNowHtml, _parseChans: parseChans, _checksHtml: checksHtml, _decodersFor: decodersFor, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf,
            _chRows: chRows, _chVerdict: chVerdict };

@@ -22395,14 +22395,29 @@ a.adm-kpi--go:hover::after, a.adm-kpi--go:focus-visible::after { color: var(--ac
   color: var(--muted);
 }
 .bs-form .ser-check { display: inline-flex; }
-.bs-stick {
-  min-width: 0;
-  margin: var(--sp-2) 0;
-  padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
+/* The open station's panel (RPi ALERT 0.21's own page, mirrored): its
+   Overview, Requests and Log as pills under the actions, and its settings
+   folded into sections, each saying on one line what it is set to — the
+   twisty the folding cards use (.as-alloc), a rule between sections. */
+.bs-subtabs { margin: var(--sp-3) 0 var(--sp-2); padding-bottom: var(--sp-2); border-bottom: 1px solid var(--border); }
+.bs-fold { border-top: 1px solid var(--border); }
+.bs-fold:last-of-type { border-bottom: 1px solid var(--border); }
+.bs-fold > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-1) var(--sp-3);
+  padding: var(--sp-2) var(--sp-1);
+  cursor: pointer;
+  list-style: none;
 }
-.bs-stick legend { padding: 0 var(--sp-1); font-size: var(--fs-sm); font-weight: 600; }
+.bs-fold > summary::-webkit-details-marker { display: none; }
+.bs-fold > summary:hover { background: var(--subtle); }
+.bs-fold-t { font-weight: 600; }
+.bs-fold-t::before { content: '▸'; display: inline-block; width: 1em; color: var(--muted); transition: transform .12s ease; }
+.bs-fold[open] > summary .bs-fold-t::before { transform: rotate(90deg); }
+.bs-fold-s { min-width: 0; color: var(--muted); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.bs-fold-body { padding: 0 var(--sp-1) var(--sp-3) calc(1em + var(--sp-1)); }
 .bs-log {
   max-height: 24rem;
   overflow: auto;
