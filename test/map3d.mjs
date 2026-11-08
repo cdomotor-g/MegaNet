@@ -65,6 +65,7 @@ import zlib from 'node:zlib';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
+import { mvtTile as mvtTileOf, square, pmtilesFile } from './lib/vector-tiles.mjs';
 
 const VERBOSE = process.argv.includes('-v') || process.argv.includes('--verbose');
 // The version map-3d.js pins, read from it, and the one the harness serves:
@@ -177,83 +178,13 @@ function baseTilePng() {
   return flatTile;
 }
 
-// A vector tile and a PMTiles file, written out by hand for 9d — just enough
-// of each. The tile is a Mapbox Vector Tile (the protobuf the State's tiles and
-// Overture's are both in): one layer of square buildings, each with its
-// properties (numbers as doubles, the rest as strings). The file is PMTiles
-// version 3, laid out as Overture's is — header, root directory, metadata,
-// tiles — but with nothing compressed, which the reader allows. `at` maps the
-// byte where each tile starts to its z/x/y, so a range request names the tile.
-function pbVarint(n, out) {
-  while (n > 127) { out.push((n % 128) + 128); n = Math.floor(n / 128); }
-  out.push(n);
-  return out;
-}
-const pbKey = (field, wire, out) => pbVarint(field * 8 + wire, out);
-function pbBytes(field, bytes, out) {
-  pbKey(field, 2, out); pbVarint(bytes.length, out);
-  for (const b of bytes) out.push(b);
-  return out;
-}
-const pbPacked = (field, nums, out) => pbBytes(field, nums.reduce((o, n) => pbVarint(n, o), []), out);
-const zigzag = n => (n << 1) ^ (n >> 31);
-function mvtTile(layer, squares) {
-  const keys = [], values = [];
-  const index = (list, v) => { let i = list.indexOf(v); if (i < 0) { list.push(v); i = list.length - 1; } return i; };
-  const L = [];
-  pbKey(15, 0, L); pbVarint(2, L);                     // version
-  pbBytes(1, Buffer.from(layer), L);                   // name
-  for (const { x0, y0, size, props } of squares) {
-    const tags = [];
-    for (const [k, v] of Object.entries(props)) tags.push(index(keys, k), index(values, v));
-    const pts = [[x0, y0], [x0 + size, y0], [x0 + size, y0 + size], [x0, y0 + size]];
-    const geom = [1 + 8, zigzag(pts[0][0]), zigzag(pts[0][1]), 2 + 3 * 8];   // MoveTo 1, LineTo 3
-    for (let i = 1; i < 4; i++) geom.push(zigzag(pts[i][0] - pts[i - 1][0]), zigzag(pts[i][1] - pts[i - 1][1]));
-    geom.push(7 + 8);                                  // ClosePath
-    const f = [];
-    pbPacked(2, tags, f);
-    pbKey(3, 0, f); pbVarint(3, f);                    // a polygon
-    pbPacked(4, geom, f);
-    pbBytes(2, f, L);
-  }
-  for (const k of keys) pbBytes(3, Buffer.from(k), L);
-  for (const v of values) {
-    const m = [];
-    if (typeof v === 'number') { pbKey(3, 1, m); const d = Buffer.alloc(8); d.writeDoubleLE(v); m.push(...d); }
-    else pbBytes(1, Buffer.from(String(v)), m);
-    pbBytes(4, m, L);
-  }
-  pbKey(5, 0, L); pbVarint(4096, L);                   // extent
-  return Buffer.from(pbBytes(3, L, []));
-}
-function pmtilesFile(tiles, zxyToTileId) {
-  const ents = tiles.map(t => ({ id: zxyToTileId(t.z, t.x, t.y), t })).sort((a, b) => a.id - b.id);
-  let off = 0;
-  for (const e of ents) { e.off = off; off += e.t.data.length; }
-  const dir = [];
-  pbVarint(ents.length, dir);
-  let last = 0;
-  for (const e of ents) { pbVarint(e.id - last, dir); last = e.id; }
-  for (const e of ents) pbVarint(1, dir);              // run lengths
-  for (const e of ents) pbVarint(e.t.data.length, dir);
-  for (const e of ents) pbVarint(e.off + 1, dir);
-  const dirB = Buffer.from(dir);
-  const meta = Buffer.from(JSON.stringify({ vector_layers: [{ id: 'building', minzoom: 14, maxzoom: 14, fields: {} }] }));
-  const H = 127, metaOff = H + dirB.length, dataOff = metaOff + meta.length;
-  const head = Buffer.alloc(H);
-  head.write('PMTiles', 0, 'latin1');
-  head[7] = 3;
-  [[8, H], [16, dirB.length], [24, metaOff], [32, meta.length], [40, dataOff], [48, 0], [56, dataOff], [64, off],
-   [72, ents.length], [80, ents.length], [88, ents.length]].forEach(([at, v]) => head.writeBigUInt64LE(BigInt(v), at));
-  head[96] = 1;                                        // clustered
-  head[97] = 1; head[98] = 1;                          // directories and tiles uncompressed
-  head[99] = 1;                                        // vector tiles
-  head[100] = 14; head[101] = 14;                      // zooms
-  [[102, -1800000000], [106, -850000000], [110, 1800000000], [114, 850000000]].forEach(([at, v]) => head.writeInt32LE(v, at));
-  head[118] = 14;
-  return { file: Buffer.concat([head, dirB, meta, ...ents.map(e => e.t.data)]),
-           at: new Map(ents.map(e => [dataOff + e.off, `${e.t.z}/${e.t.x}/${e.t.y}`])) };
-}
+// A vector tile and a PMTiles file, written out by hand for 9d
+// (test/lib/vector-tiles.mjs, which the twin's check and groundcover write
+// theirs with too): one layer of square buildings, each with its properties
+// (numbers as doubles, the rest as strings), and a file laid out as
+// Overture's is, nothing compressed. `at` maps the byte where each tile
+// starts to its z/x/y, so a range request names the tile.
+const mvtTile = (layer, squares) => mvtTileOf(layer, squares.map(({ x0, y0, size, props }) => square(x0, y0, size, props)));
 
 const server  = await startServer();
 const browser = await launchBrowser();
@@ -3077,7 +3008,10 @@ await page.evaluate(() => { Map3D.stop(); });
 // (Map3D._groundForget): the State's tiles not built yet; built; and built
 // with Overture out of reach.
 console.log('\nTrees and buildings stand on the ground, close in (#278)');
-const PMTILES_VER = (M3D_SRC.match(/const PMTILES_VER\s*=\s*'([^']+)'/) || [])[1];
+// The reader is pinned in ground-cover.js, which opens Overture's file for
+// the 3-D view and the digital twin both (#280).
+const GC_SRC = fs.readFileSync(new URL('../ground-cover.js', import.meta.url), 'utf8');
+const PMTILES_VER = (GC_SRC.match(/const PMTILES_VER\s*=\s*'([^']+)'/) || [])[1];
 const PMTILES_DEV = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8')).devDependencies.pmtiles;
 const { zxyToTileId } = await import('pmtiles');
 const OVT_RELEASE = '2026-10-21.0';
@@ -3184,8 +3118,8 @@ const brief = r => JSON.stringify({ centre: centreKey, settled: r.settled, from:
   stateAsked: r.stateAsked, ovtAsked: r.ovtAsked, state: r.look.stateFeats, ovt: [...tilesOf(r.look.ovtFeats)] }).slice(0, 1500);
 const tilesOf = feats => new Set(feats.map(p => p.t));
 
-ok('the buildings reader is the version map-3d.js pins', !!PMTILES_VER && PMTILES_VER === PMTILES_DEV,
-   `map-3d.js ${PMTILES_VER}; devDependency ${PMTILES_DEV}`);
+ok('the buildings reader is the version ground-cover.js pins', !!PMTILES_VER && PMTILES_VER === PMTILES_DEV,
+   `ground-cover.js ${PMTILES_VER}; devDependency ${PMTILES_DEV}`);
 
 // 1. The State's tiles not built yet: Overture everywhere, and the State not asked.
 const g1 = await groundLook();

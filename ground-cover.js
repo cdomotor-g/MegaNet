@@ -4,13 +4,19 @@
 //                 WRI's Canopy Height Maps v2 (CHMv2), and the trees stood on
 //                 it — a trunk and a crown for every tree top, as GeoJSON a
 //                 MapLibre fill-extrusion layer draws as it is (the ⛰️ 3-D
-//                 view, #278).
+//                 view, #278). And the buildings round it, as plain outlines
+//                 with a height each, for a view with no MapLibre to read the
+//                 tiles (the digital twin, #280): the State's LiDAR outlines
+//                 where Queensland has surveyed, Overture Maps' everywhere else.
 //
 // Load order: none. The IIFE body only declares — no request, no timer, no
 // DOM — and everything it reaches for (fetch, DecompressionStream, Blob,
-// Response) is a browser global looked up at call time, so its position among
-// the modules is free (`npm run toplevel`). Node 22 has every one of them,
-// which is how the files were checked (see "Checked against the real files").
+// Response, TextDecoder) is a browser global looked up at call time, so its
+// position among the modules is free (`npm run toplevel`). Node 22 has every
+// one of them, which is how the files were checked (see "Checked against the
+// real files"). The one module it brings in, `pmtiles` for Overture's file, is
+// a dynamic `import()` from inside a function, as map-3d.js brings in MapLibre
+// — not a change to what kind of page this is.
 //
 // ── The files ────────────────────────────────────────────────────────────────
 //
@@ -72,6 +78,24 @@
 // on the edge is weighed against the neighbours past it, and two boxes side by
 // side stand the same trees along their shared edge.
 //
+// ── Buildings ────────────────────────────────────────────────────────────────
+//
+// buildings(box) reads the zoom-14 tiles the box touches (one to four for the
+// twin's widest patch), each from one place only — the 3-D view's rule
+// (map-3d.js, "Trees and buildings"; docs/ground-cover-sources.md, "In the
+// digital twin"): the State's tile (/api/ground/qld-buildings, worker/
+// ground.js) where meta.json says the tiles are built and its bounds touch the
+// tile, and the State has one there; else Overture's (buildings.pmtiles, read
+// with the `pmtiles` library, the file opened once a page and shared with the
+// 3-D view). Each tile is a Mapbox Vector Tile, read here by a small decoder —
+// protobuf varints, zigzag, MoveTo / LineTo / ClosePath — rather than by a
+// library: the outlines are all that is wanted of it. A tile's buildings run
+// a buffer past its edge, and the next tile holds the rest, so each outline is
+// cut to its own tile's square. Heights: the State's `h` (its measured roof,
+// floored at 2 m in the tiles); Overture's `height`, else 3.2 m a floor
+// (`num_floors`), else one storey (3.5 m), never under 3 m, those it marks
+// `is_underground` left out — the 3-D view's OVT_HEIGHT, the same numbers.
+//
 // ── API ──────────────────────────────────────────────────────────────────────
 //
 //   canopy(box, metresPerPx)  → Promise<{ w, h, data: Uint8Array (metres, row
@@ -86,9 +110,27 @@
 //       (3 km, 10 % grace) is refused: ask canopy() at 9.6 m or coarser.
 //   setSource(fn)             where a quadkey's file is: fn(qk) → URL; null
 //       for /api/canopy/<qk>.tif again. Drops everything kept.
+//   buildings(box, opts)      → Promise<{ buildings: [{ ring: [[lng, lat], …]
+//       (the outline, not closed), holes: [ring, …], h (metres above the
+//       ground), src: 'state'|'overture' }], found, capped, tiles ({ 'z/x/y':
+//       'state'|'overture'|'none' }), tally ({ state, overture, none, failed,
+//       stateFailed, decodeFailed } tiles), state ('built'|'not built'|
+//       'unreachable'), overture ('ready'|'failed'|'unasked'), release,
+//       credit }>. opts.within (a box, the box itself by default): only the
+//       buildings whose middle is in it. Never rejects for a source that
+//       cannot be reached — the tally and the states say so; a box over
+//       TREES_MAX_M is refused.
+//   overture()                → Promise<{ file (a PMTiles), release } | null>:
+//       Overture's buildings file, opened once a page and shared with the 3-D
+//       view; null when it cannot be had (asked afresh next time).
+//   overtureState(), forgetOverture(), setOvertureOpener(fn) (the checks'
+//       stand-in for the opener; null for the real one).
 //   quadkeysFor(box), treesFromGrid(grid, opts), parseTiffHeader(buffer),
-//   crownRadius(h)            the pure parts, for the checks.
-//   stats(), clearCache(), WORDS, ATTRIBUTION, MAX_TREES, TREES_MAX_M.
+//   crownRadius(h), decodeTile(bytes, layers), buildingsFromTile(bytes, z, x,
+//   y, src), buildingHeight(props, src), latestRelease(catalogue)
+//                             the pure parts, for the checks.
+//   stats(), clearCache(), WORDS, ATTRIBUTION, OVERTURE_CREDIT, MAX_TREES,
+//   TREES_MAX_M, PMTILES_VER.
 //
 // A box is { west, south, east, north } in degrees (or [w, s, e, n], or a
 // MapLibre LngLatBounds). Requests that fail reject; a square with no file
@@ -136,6 +178,15 @@ const GroundCover = (function () {
       + 'its crown as wide as the patch of canopy round that point.',
     'Canopy': 'The tops of the trees taken together — the leafy roof a stand of trees makes. A canopy '
       + 'height of 0 m is open ground, water, a road or a roof: the map does not tell those apart.',
+    'Building height': 'How tall a building is drawn, from the ground to its roof. In Queensland’s surveyed towns '
+      + 'it is the roof the State measured by laser survey (none under 2 m); everywhere else it is Overture '
+      + 'Maps’ height where it gives one — mostly estimates from photos, which run low — or 3.2 m a floor, or '
+      + 'one storey (3.5 m) where it gives neither, and never under 3 m.',
+    'LiDAR': 'Laser survey from the air: an aircraft sweeps a laser over the ground and times the echoes, which '
+      + 'measures the ground and what stands on it to within centimetres. Queensland has flown its towns this way.',
+    'Overture Maps': 'A free map of the world’s buildings: OpenStreetMap’s outlines, drawn by volunteers, and '
+      + 'Microsoft’s, traced by a computer from aerial photos where OpenStreetMap has none. Used wherever the '
+      + 'State has not surveyed — the rest of Queensland, and New South Wales.',
   };
 
   // ── TIFF ───────────────────────────────────────────────────────────────────
@@ -963,8 +1014,449 @@ const GroundCover = (function () {
     return fc;
   }
 
+  // ── Buildings ──────────────────────────────────────────────────────────────
+  // The outlines as plain polygons, for a view that has no MapLibre to decode
+  // its tiles (the digital twin, #280). Each zoom-14 tile from one place only,
+  // the same rule as the 3-D view's (map-3d.js, "Trees and buildings"): the
+  // State's tile if it has one, else Overture's — never both, so a house is
+  // never stood twice.
+  const BLD_Z = 14;
+  const BLD_MAX_TILES = 16;                 // a 3 km box at the equator is 4 × 4
+  const MAX_BUILDINGS = 15000;
+  const STATE_BASE = '/api/ground/qld-buildings';
+  const STATE_MIN_M = 2;                    // the State's tiles floor at this already
+  const FLOOR_M = 3.2;                      // an Overture building with floors and no height
+  const ONE_STOREY_M = 3.5;                 // …with neither
+  const OVT_MIN_M = 3;                      // …and never lower: most of its heights are estimates that run low
+  const TILES_KEPT = 24;
+  const OVERTURE_CREDIT = '© OpenStreetMap contributors, Overture Maps Foundation (ODbL)';
+
+  // ── A vector tile, read ──
+  // A Mapbox Vector Tile is protobuf: a tile is layers (3), a layer its name
+  // (1), features (2), keys (3), values (4) and extent (5), a feature its tags
+  // (2, packed key/value index pairs), type (3; 3 is a polygon) and geometry
+  // (4, packed commands). Just that much of protobuf is read here.
+  function pbVarint(r) {
+    let v = 0, mul = 1, byte, n = 0;
+    do {
+      if (r.p >= r.end || n++ > 9) throw new Error('vector tile: a number runs off the end');
+      byte = r.b[r.p++];
+      v += (byte & 0x7f) * mul;
+      mul *= 128;
+    } while (byte & 0x80);
+    return v;
+  }
+  function pbSkip(r, wire) {
+    if (wire === 0) pbVarint(r);
+    else if (wire === 1) r.p += 8;
+    else if (wire === 2) { const n = pbVarint(r); r.p += n; }
+    else if (wire === 5) r.p += 4;
+    else throw new Error(`vector tile: wire type ${wire} is not one this reads`);
+    if (r.p > r.end) throw new Error('vector tile: a field runs off the end');
+  }
+  // The message at the reader, as a reader of its own.
+  function pbSub(r) {
+    const n = pbVarint(r);
+    if (r.p + n > r.end) throw new Error('vector tile: a message runs off the end');
+    const sub = { b: r.b, p: r.p, end: r.p + n };
+    r.p += n;
+    return sub;
+  }
+  function pbPacked(r) {
+    const s = pbSub(r), out = [];
+    while (s.p < s.end) out.push(pbVarint(s));
+    return out;
+  }
+  const unzig = n => (n % 2 ? -(n + 1) / 2 : n / 2);
+  // A signed 64-bit varint (an MVT int_value): a negative one is ten bytes of
+  // two's complement, which a double cannot add up exactly — so as a BigInt.
+  function pbInt64(r) {
+    let v = 0n, shift = 0n, byte, n = 0;
+    do {
+      if (r.p >= r.end || n++ > 9) throw new Error('vector tile: a number runs off the end');
+      byte = r.b[r.p++];
+      v |= BigInt(byte & 0x7f) << shift;
+      shift += 7n;
+    } while (byte & 0x80);
+    return Number(BigInt.asIntN(64, v));
+  }
+
+  function pbValue(r) {
+    const s = pbSub(r);
+    const dv = new DataView(s.b.buffer, s.b.byteOffset, s.b.byteLength);
+    let v = null;
+    while (s.p < s.end) {
+      const key = pbVarint(s), field = Math.floor(key / 8), wire = key % 8;
+      if (field === 1 && wire === 2) { const t = pbSub(s); v = new TextDecoder().decode(s.b.subarray(t.p, t.end)); }
+      else if (field === 2 && wire === 5) { v = dv.getFloat32(s.p, true); s.p += 4; }
+      else if (field === 3 && wire === 1) { v = dv.getFloat64(s.p, true); s.p += 8; }
+      else if (field === 4 && wire === 0) v = pbInt64(s);
+      else if (field === 5 && wire === 0) v = pbVarint(s);
+      else if (field === 6 && wire === 0) v = unzig(pbVarint(s));
+      else if (field === 7 && wire === 0) v = pbVarint(s) !== 0;
+      else pbSkip(s, wire);
+    }
+    return v;
+  }
+
+  // The commands of one feature → its rings in tile units (MoveTo starts a
+  // ring, LineTo adds to it, ClosePath ends it; each point relative to the
+  // last, zigzag-coded).
+  function geometryRings(cmds) {
+    const rings = [];
+    let x = 0, y = 0, ring = null, i = 0;
+    while (i < cmds.length) {
+      const c = cmds[i++], id = c & 7, count = c >> 3;
+      if (id === 1 || id === 2) {
+        for (let k = 0; k < count && i + 1 < cmds.length; k++) {
+          x += unzig(cmds[i++]); y += unzig(cmds[i++]);
+          if (id === 1) { ring = [[x, y]]; rings.push(ring); } else if (ring) ring.push([x, y]);
+        }
+      } else if (id === 7) ring = null;
+      else break;                                   // not a command: the rest is not geometry
+    }
+    return rings;
+  }
+
+  // A tile's bytes → { layerName: { extent, features: [{ type, props, rings }] } },
+  // for the layers named (all of them when `names` is not given).
+  function decodeTile(bytes, names) {
+    const want = names ? new Set(names) : null;
+    const top = { b: bytes, p: 0, end: bytes.length };
+    const out = {};
+    while (top.p < top.end) {
+      const key = pbVarint(top), field = Math.floor(key / 8), wire = key % 8;
+      if (field !== 3 || wire !== 2) { pbSkip(top, wire); continue; }
+      const L = pbSub(top);
+      let name = '', extent = 4096;
+      const keys = [], values = [], feats = [];
+      while (L.p < L.end) {
+        const k = pbVarint(L), f = Math.floor(k / 8), w = k % 8;
+        if (f === 1 && w === 2) { const t = pbSub(L); name = new TextDecoder().decode(L.b.subarray(t.p, t.end)); }
+        else if (f === 2 && w === 2) feats.push(pbSub(L));         // read once the keys and values are known
+        else if (f === 3 && w === 2) { const t = pbSub(L); keys.push(new TextDecoder().decode(L.b.subarray(t.p, t.end))); }
+        else if (f === 4 && w === 2) values.push(pbValue(L));
+        else if (f === 5 && w === 0) extent = pbVarint(L) || 4096;
+        else pbSkip(L, w);
+      }
+      if (want && !want.has(name)) continue;
+      const features = [];
+      for (const F of feats) {
+        let type = 0, tags = [], geom = [];
+        while (F.p < F.end) {
+          const k = pbVarint(F), f = Math.floor(k / 8), w = k % 8;
+          if (f === 2 && w === 2) tags = pbPacked(F);
+          else if (f === 3 && w === 0) type = pbVarint(F);
+          else if (f === 4 && w === 2) geom = pbPacked(F);
+          else pbSkip(F, w);
+        }
+        const props = {};
+        for (let t = 0; t + 1 < tags.length; t += 2) if (tags[t] < keys.length && tags[t + 1] < values.length) props[keys[tags[t]]] = values[tags[t + 1]];
+        features.push({ type, props, rings: geometryRings(geom) });
+      }
+      out[name] = { extent, features };
+    }
+    return out;
+  }
+
+  // Twice a ring's area by the surveyor's formula, in tile units (y down): an
+  // outer ring is positive, a hole negative (the spec's winding).
+  function ringArea2(r) {
+    let a = 0;
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += r[j][0] * r[i][1] - r[i][0] * r[j][1];
+    return a;
+  }
+  // A ring cut to [0, extent] square (Sutherland–Hodgman): a tile's buildings
+  // run a buffer past its edge, and the next tile holds the rest of them.
+  function clipRing(ring, extent) {
+    let pts = ring;
+    const edges = [[0, 0, 1], [0, extent, -1], [1, 0, 1], [1, extent, -1]];   // axis, at, keep side
+    for (const [ax, at, side] of edges) {
+      if (!pts.length) break;
+      const inside = p => (p[ax] - at) * side >= 0;
+      const cut = (a, b) => {
+        const t = (at - a[ax]) / (b[ax] - a[ax]);
+        return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      };
+      const next = [];
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[(i + pts.length - 1) % pts.length], b = pts[i];
+        if (inside(b)) { if (!inside(a)) next.push(cut(a, b)); next.push(b); }
+        else if (inside(a)) next.push(cut(a, b));
+      }
+      pts = next;
+    }
+    return pts;
+  }
+  // A polygon feature's rings → [{ outer, holes }]: each outer ring and the
+  // holes after it. The first ring's winding is taken as the outer one's, so a
+  // tile wound the other way round is still read.
+  function polygonsOf(rings) {
+    const out = [];
+    let sign = 0;
+    for (const r of rings) {
+      if (r.length < 3) continue;
+      const a = ringArea2(r);
+      if (!a) continue;
+      if (!sign) sign = Math.sign(a);
+      if (Math.sign(a) === sign || !out.length) out.push({ outer: r, holes: [] });
+      else out[out.length - 1].holes.push(r);
+    }
+    return out;
+  }
+
+  // How tall a building is drawn: the State's measured roof (`h`), or
+  // Overture's `height`, else 3.2 m a floor, else one storey — and never lower
+  // than 3 m. The 3-D view's OVT_HEIGHT says the same to MapLibre.
+  function buildingHeight(props, src) {
+    const num = v => (v === null || v === undefined || v === '' || typeof v === 'boolean' ? NaN : Number(v));
+    if (src === 'state') {
+      const h = num(props.h);
+      return Number.isFinite(h) ? Math.max(STATE_MIN_M, h) : ONE_STOREY_M;
+    }
+    let h;
+    if (props.height !== undefined && props.height !== null) h = num(props.height);
+    else if (props.num_floors !== undefined && props.num_floors !== null) h = num(props.num_floors) * FLOOR_M;
+    else h = ONE_STOREY_M;
+    if (!Number.isFinite(h)) h = ONE_STOREY_M;
+    return Math.max(OVT_MIN_M, h);
+  }
+
+  // One tile's buildings, as polygons in degrees: [{ ring, holes, h, src }],
+  // `ring` the outline (not closed: the last point is not the first again),
+  // cut to the tile's own square. `src` is 'state' (layer `buildings`) or
+  // 'overture' (layer `building`, those it marks under the ground left out).
+  function buildingsFromTile(bytes, z, x, y, src) {
+    const layer = src === 'state' ? 'buildings' : 'building';
+    const L = decodeTile(bytes, [layer])[layer];
+    if (!L) return [];
+    const n = 2 ** z, ext = L.extent;
+    const lng = px => r7((x + px / ext) / n * 360 - 180);
+    const lat = py => r7(Math.atan(Math.sinh(Math.PI * (1 - 2 * (y + py / ext) / n))) / rad);
+    const deg = r => r.map(p => [lng(p[0]), lat(p[1])]);
+    const out = [];
+    for (const f of L.features) {
+      if (f.type !== 3) continue;
+      if (src !== 'state' && f.props.is_underground === true) continue;
+      const h = r2(buildingHeight(f.props, src));
+      for (const poly of polygonsOf(f.rings)) {
+        const outer = clipRing(poly.outer, ext);
+        if (outer.length < 3 || Math.abs(ringArea2(outer)) < 1e-6) continue;
+        const holes = poly.holes.map(r => clipRing(r, ext)).filter(r => r.length >= 3);
+        out.push({ ring: deg(outer), holes: holes.map(deg), h, src });
+      }
+    }
+    return out;
+  }
+
+  // The zoom-14 tiles a box touches.
+  function tilesFor(b, z) {
+    const n = 2 ** z;
+    const tx = lon => Math.min(n - 1, Math.max(0, Math.floor((lon + 180) / 360 * n)));
+    const ty = lat => {
+      const s = Math.sin(Math.max(-MAX_LAT, Math.min(MAX_LAT, lat)) * rad);
+      return Math.min(n - 1, Math.max(0, Math.floor((0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n)));
+    };
+    const out = [];
+    for (let y = ty(b.north); y <= ty(b.south); y++) for (let x = tx(b.west); x <= tx(b.east); x++) out.push({ z, x, y });
+    return out;
+  }
+  function tileBounds(t) {
+    const n = 2 ** t.z;
+    const lat = v => Math.atan(Math.sinh(Math.PI * (1 - 2 * v / n))) / rad;
+    return { west: t.x / n * 360 - 180, east: (t.x + 1) / n * 360 - 180, north: lat(t.y), south: lat(t.y + 1) };
+  }
+
+  // ── The State's tiles ──
+  // meta.json once a page: { status: 'built', meta } with its bounds and
+  // credit, 'not built' (404), or 'unreachable' — which is not kept, so the
+  // next box asks again.
+  let stateMetaP = null;
+  function stateMeta() {
+    if (stateMetaP) return stateMetaP;
+    const p = stateMetaP = fetch(`${STATE_BASE}/meta.json`).then(async res => {
+      if (res.status === 404) return { status: 'not built', meta: null };
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const m = await res.json();
+      if (!m || typeof m !== 'object' || Array.isArray(m)) throw new Error('meta.json is not an object');
+      return { status: 'built', meta: m };
+    }).catch(() => {
+      if (stateMetaP === p) stateMetaP = null;
+      return { status: 'unreachable', meta: null };
+    });
+    return p;
+  }
+  function stateMayHave(meta, t) {
+    const b = meta && meta.bounds;
+    if (!Array.isArray(b) || b.length !== 4 || !b.every(Number.isFinite)) return true;
+    const k = tileBounds(t);
+    return k.west <= b[2] && k.east >= b[0] && k.south <= b[3] && k.north >= b[1];
+  }
+  // A State tile's bytes, or null where it has none (204, 404). The Worker
+  // serves a gzipped tile with Content-Encoding, which the browser undoes;
+  // one that arrives still gzipped is undone here.
+  async function stateTile(t) {
+    const res = await fetch(`${STATE_BASE}/${t.z}/${t.x}/${t.y}.pbf`);
+    if (res.status === 204 || res.status === 404) { drop(res); return null; }
+    if (!res.ok) { drop(res); throw new Error(`HTTP ${res.status}`); }
+    let bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b) bytes = await inflateWith('gzip', bytes);
+    return bytes.length ? bytes : null;
+  }
+
+  // ── Overture's buildings ──
+  // One PMTiles file for the whole world, read a tile at a time by the
+  // `pmtiles` library with range requests. The library is imported from unpkg
+  // the first time a tile needs it, pinned; `?module` is unpkg rewriting its
+  // one bare import (fflate, its fallback where a browser has no
+  // DecompressionStream) into an address a browser can follow. A failed
+  // import stays failed in the module map, so a retry is a fresh specifier.
+  // Overture deletes each release a couple of months on, so the file's name is
+  // looked up in their catalogue — the child marked latest — once a page.
+  // All three hosts allow cross-site reads, and the file is read with plain
+  // single-range GETs, which need no preflight (Overture's server refuses
+  // one). Opened once a page and shared by the 3-D view and the twin; a
+  // failure is not kept, so the next asker tries again.
+  const PMTILES_VER = '4.5.0';
+  const PMTILES_JS = `https://unpkg.com/pmtiles@${PMTILES_VER}/dist/esm/index.js?module`;
+  const OVT_CATALOG = 'https://stac.overturemaps.org/catalog.json';
+  const OVT_FILE = release => `https://tiles.overturemaps.org/${release}/buildings.pmtiles`;
+  let pmLib = null;       // the library's module namespace, once imported
+  let pmTry = 0;          // failed imports so far
+  let ovt = null;         // { p, file, release, failed, error }
+  let ovtOpener = null;   // the checks' stand-in for openOverture
+  // The release the catalogue marks latest, in Overture's own form
+  // (2026-10-21.0), or null. Nothing else is put into the file's address.
+  function latestRelease(cat) {
+    const ok = r => (typeof r === 'string' && /^\d{4}-\d{2}-\d{2}\.\d+$/.test(r) ? r : null);
+    const links = cat && Array.isArray(cat.links) ? cat.links : [];
+    const child = links.find(l => l && l.rel === 'child' && l.latest === true && typeof l.href === 'string');
+    const m = child && /\/([^/]+)\/catalog\.json$/.exec(child.href);
+    return ok(m && m[1]) || ok(cat && cat.latest);
+  }
+  async function openOverture() {
+    if (!pmLib) {
+      const url = pmTry ? `${PMTILES_JS}&r=${pmTry}` : PMTILES_JS;
+      const lib = await import(url).catch(() => { pmTry++; return null; });
+      if (!lib || typeof lib.PMTiles !== 'function') throw new Error('the buildings reader could not be fetched');
+      pmLib = lib;
+    }
+    const res = await fetch(OVT_CATALOG);
+    const release = latestRelease(res.ok ? await res.json() : null);
+    if (!release) throw new Error('Overture’s catalogue names no current release');
+    const file = new pmLib.PMTiles(OVT_FILE(release));
+    const head = await file.getHeader();
+    // 1 is vector tiles; a file that stops short of zoom 14 has no tile to give.
+    if (!head || head.tileType !== 1 || head.maxZoom < BLD_Z) throw new Error('not Overture’s buildings tiles');
+    return { file, release };
+  }
+  // → Promise<{ file (getZxy), release } | null>, never rejecting.
+  function overture() {
+    if (ovt && !ovt.failed) return ovt.p;
+    const o = ovt = { p: null, file: null, release: null, failed: false, error: null };
+    o.p = Promise.resolve().then(() => (ovtOpener ? ovtOpener() : openOverture())).then(r => {
+      if (!r || !r.file || typeof r.file.getZxy !== 'function') throw new Error('no buildings file');
+      o.file = r.file; o.release = r.release || null;
+      return { file: o.file, release: o.release };
+    }).catch(err => { o.failed = true; o.error = String((err && err.message) || err); return null; });
+    return o.p;
+  }
+  function overtureState() {
+    return { state: !ovt ? 'unasked' : ovt.failed ? 'failed' : ovt.file ? 'ready' : 'opening',
+             release: ovt ? ovt.release : null, error: ovt ? ovt.error : null };
+  }
+
+  // ── buildings() ──
+  // One tile, from one place: the State's where it may have one and does,
+  // else Overture's. → { from: 'state'|'overture'|'none', bytes, stateFailed,
+  // failed }. A tile read whole is kept (the last TILES_KEPT), so a rebuild of
+  // the same place asks nothing again.
+  const bldTiles = new Map();
+  async function buildingTile(t, meta, ovtP) {
+    const key = `${t.z}/${t.x}/${t.y}|${meta.status}`;
+    if (bldTiles.has(key)) { const v = bldTiles.get(key); bldTiles.delete(key); bldTiles.set(key, v); return v; }
+    let stateFailed = false;
+    if (meta.meta && stateMayHave(meta.meta, t)) {
+      try {
+        const bytes = await stateTile(t);
+        if (bytes) return keep(key, { from: 'state', bytes, stateFailed, failed: false });
+      } catch (_) { stateFailed = true; }
+    }
+    const o = await ovtP();
+    if (!o) return { from: 'none', bytes: null, stateFailed, failed: false, ovtMissing: true };
+    let got;
+    try { got = await o.file.getZxy(t.z, t.x, t.y); } catch (_) { return { from: 'none', bytes: null, stateFailed, failed: true }; }
+    const v = got && got.data && got.data.byteLength
+      ? { from: 'overture', bytes: new Uint8Array(got.data), stateFailed, failed: false }
+      : { from: 'none', bytes: null, stateFailed, failed: false };
+    return stateFailed ? v : keep(key, v);
+  }
+  function keep(key, v) {
+    bldTiles.set(key, v);
+    while (bldTiles.size > TILES_KEPT) bldTiles.delete(bldTiles.keys().next().value);
+    return v;
+  }
+
+  async function buildings(box, opts) {
+    const b = normBox(box);
+    const o = Object.assign({ within: b, max: MAX_BUILDINGS }, opts || {});
+    const m = boxMetres(b);
+    const across = Math.max(m.w, m.h);
+    if (across > TREES_MAX_M * 1.1) {
+      throw new RangeError(`buildings: the box is ${(across / 1000).toFixed(1)} km across; at most ${TREES_MAX_M / 1000} km`);
+    }
+    const tiles = tilesFor(b, BLD_Z);
+    if (tiles.length > BLD_MAX_TILES) throw new RangeError(`buildings: the box spans ${tiles.length} tiles (at most ${BLD_MAX_TILES})`);
+    const within = normBox(o.within);
+    const meta = await stateMeta();
+    let ovtP = null;
+    const askOverture = () => (ovtP || (ovtP = overture()));
+    const tally = { state: 0, overture: 0, none: 0, failed: 0, stateFailed: 0, decodeFailed: 0 };
+    const from = {};
+    const found = [];
+    await Promise.all(tiles.map(async t => {
+      const r = await buildingTile(t, meta, askOverture);
+      const key = `${t.z}/${t.x}/${t.y}`;
+      from[key] = r.from;
+      tally[r.from]++;
+      if (r.failed) tally.failed++;
+      if (r.stateFailed) tally.stateFailed++;
+      if (!r.bytes) return;
+      let list;
+      try { list = buildingsFromTile(r.bytes, t.z, t.x, t.y, r.from); } catch (_) { tally.decodeFailed++; return; }
+      for (const bd of list) {
+        let sx = 0, sy = 0;
+        for (const p of bd.ring) { sx += p[0]; sy += p[1]; }
+        const cx = sx / bd.ring.length, cy = sy / bd.ring.length;
+        if (cx >= within.west && cx <= within.east && cy >= within.south && cy <= within.north) found.push(bd);
+      }
+    }));
+    const ov = overtureState();
+    const used = { state: tally.state > 0, overture: tally.overture > 0 };
+    const credit = [used.state && meta.meta && meta.meta.attribution ? String(meta.meta.attribution) : used.state ? 'Buildings: © State of Queensland (CC BY 4.0)' : '',
+                    used.overture ? OVERTURE_CREDIT : ''].filter(Boolean).join('; ');
+    return {
+      buildings: found.slice(0, o.max),
+      found: found.length,
+      capped: found.length > o.max,
+      tiles: from,
+      tally,
+      state: meta.status,                         // 'built' | 'not built' | 'unreachable'
+      overture: ovtP ? ov.state : 'unasked',      // 'ready' | 'failed' | 'unasked'
+      release: ovtP ? ov.release : null,
+      credit,
+    };
+  }
+
   return {
-    canopy, trees,
+    canopy, trees, buildings,
+    overture, overtureState,
+    forgetOverture() { ovt = null; stateMetaP = null; bldTiles.clear(); },
+    setOvertureOpener(fn) {
+      if (fn !== null && fn !== undefined && typeof fn !== 'function') throw new TypeError('setOvertureOpener: a function, or null');
+      ovtOpener = fn || null; ovt = null; bldTiles.clear();
+    },
+    decodeTile, buildingsFromTile, buildingHeight, latestRelease,
     setSource(fn) {
       if (fn !== null && fn !== undefined && typeof fn !== 'function') throw new TypeError('setSource: a function of the quadkey, or null');
       sourceFn = fn || null;
@@ -972,9 +1464,9 @@ const GroundCover = (function () {
     },
     quadkeysFor, treesFromGrid, parseTiffHeader,
     crownRadius,
-    stats: () => ({ ...counters, cachedBlocks: blocks.size, cachedBytes: blockBytes, files: files.size }),
-    clearCache() { files.clear(); blocks.clear(); pending.clear(); blockBytes = 0; },
-    WORDS, ATTRIBUTION, MAX_TREES, TREES_MAX_M,
+    stats: () => ({ ...counters, cachedBlocks: blocks.size, cachedBytes: blockBytes, files: files.size, buildingTiles: bldTiles.size }),
+    clearCache() { files.clear(); blocks.clear(); pending.clear(); blockBytes = 0; bldTiles.clear(); stateMetaP = null; },
+    WORDS, ATTRIBUTION, OVERTURE_CREDIT, MAX_TREES, TREES_MAX_M, PMTILES_VER,
   };
 })();
 if (typeof window !== 'undefined') window.GroundCover = GroundCover;

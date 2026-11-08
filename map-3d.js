@@ -2945,54 +2945,25 @@ const Map3D = (function () {
   // ── Overture's buildings ──
   // One PMTiles file for the whole world, read a tile at a time by the
   // `pmtiles` library with range requests, so a view costs a few hundred KB
-  // of it. The library is imported from unpkg on the first tile that needs
-  // it, the way the renderer is (loadLib), and pinned the same way; `?module`
-  // is unpkg rewriting its one bare import (fflate, its fallback where a
-  // browser has no DecompressionStream) into an address a browser can follow.
-  // Overture deletes each release a couple of months on, so the file's name is
-  // looked up in their catalogue — the child marked latest — once a page and
-  // never kept. All three hosts allow cross-site reads, and the file is read
-  // with plain single-range GETs, which need no preflight (Overture's server
-  // refuses one). Any of it failing leaves the State's tiles drawing and the
-  // panel saying so; the next build of the source tries again.
-  const PMTILES_VER = '4.5.0';
-  const PMTILES_JS = `https://unpkg.com/pmtiles@${PMTILES_VER}/dist/esm/index.js?module`;
-  const OVT_CATALOG = 'https://stac.overturemaps.org/catalog.json';
-  const OVT_FILE = release => `https://tiles.overturemaps.org/${release}/buildings.pmtiles`;
+  // of it. ground-cover.js opens it (GroundCover.overture: the library from
+  // unpkg, pinned, on the first tile that needs it; the release looked up in
+  // Overture's catalogue, the child marked latest, once a page) and shares it
+  // with the digital twin, which reads the same tiles (#280). Any of it
+  // failing leaves the State's tiles drawing and the panel saying so; the next
+  // build of the source tries again.
   const OVT_CREDIT = '© OpenStreetMap contributors, Overture Maps Foundation (ODbL)';
-  let pmLib = null;   // the library's module namespace, once imported
-  let pmTry = 0;      // failed imports so far: each retry is a fresh specifier (loadLib says why)
-  let ovt = null;     // { p, file, release, failed }: the file, opened once a page
-  // The release the catalogue marks latest, in Overture's own form
-  // (2026-10-21.0), or null. Nothing else is put into the file's address.
-  function latestRelease(cat) {
-    const ok = r => (typeof r === 'string' && /^\d{4}-\d{2}-\d{2}\.\d+$/.test(r) ? r : null);
-    const links = cat && Array.isArray(cat.links) ? cat.links : [];
-    const child = links.find(l => l && l.rel === 'child' && l.latest === true && typeof l.href === 'string');
-    const m = child && /\/([^/]+)\/catalog\.json$/.exec(child.href);
-    return ok(m && m[1]) || ok(cat && cat.latest);
-  }
+  let ovt = null;     // { p, file, release, failed }: this build of the source's hold on the file
   function overture() {
     if (ovt) return ovt.p;
     const o = ovt = { p: null, file: null, release: null, failed: false };
-    o.p = (async () => {
-      if (!pmLib) {
-        const url = pmTry ? `${PMTILES_JS}&r=${pmTry}` : PMTILES_JS;
-        const lib = await import(url).catch(() => { pmTry++; return null; });
-        if (!lib || typeof lib.PMTiles !== 'function') throw new Error('the buildings reader could not be fetched');
-        pmLib = lib;
-      }
-      const res = await fetch(OVT_CATALOG);
-      const release = latestRelease(res.ok ? await res.json() : null);
-      if (!release) throw new Error('Overture’s catalogue names no current release');
-      const file = new pmLib.PMTiles(OVT_FILE(release));
-      const head = await file.getHeader();
-      // 1 is vector tiles; a file that stops short of zoom 14 has no tile to give.
-      if (!head || head.tileType !== 1 || head.maxZoom < GROUND_BLD_Z) throw new Error('not Overture’s buildings tiles');
-      o.file = file;
-      o.release = release;
+    const open = typeof GroundCover !== 'undefined' && typeof GroundCover.overture === 'function'
+      ? GroundCover.overture() : Promise.resolve(null);
+    o.p = open.then(r => {
+      if (!r || !r.file) { o.failed = true; return null; }
+      o.file = r.file;
+      o.release = r.release;
       return o;
-    })().catch(() => { o.failed = true; return null; })
+    }, () => { o.failed = true; return null; })
       .then(r => { if (ovt === o && map) setNote(); return r; });
     return o.p;
   }
@@ -4782,7 +4753,7 @@ const Map3D = (function () {
     },
     // …and its seam: forget the State's meta.json and Overture's file, as a
     // new page would, so the next build of the source asks both again.
-    _groundForget() { groundMeta = undefined; ovt = null; },
+    _groundForget() { groundMeta = undefined; ovt = null; if (typeof GroundCover !== 'undefined' && GroundCover.forgetOverture) GroundCover.forgetOverture(); },
 
     // The rising water (see "The rising water"). On by default and remembered
     // when turned off: an animation somebody has said they do not want is not

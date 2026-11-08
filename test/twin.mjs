@@ -734,6 +734,281 @@ try {
       && near(x.pole.height_m, 2, 1e-9) && near(x.pole.diameter_m, 0.3, 1e-9) && near(x.figure.height_m, 1.75, 1e-9)
       && x.ground.source === 'qld', JSON.stringify(x).slice(0, 300));
 
+  // ── 3b. Trees and buildings (#280) ────────────────────────────────────────
+  // What stands round the station, on the twin's own ground: the trees
+  // ground-cover.js finds in the canopy, and the buildings — the State's
+  // outlines where its tiles are built and it has one, Overture's for every
+  // other tile, never both. The canopy is the Worker's and this server has
+  // none, so the trees are handed in (as map3d's 9d does); the State's
+  // meta.json and tiles are answered by routes, and Overture's file is a real
+  // PMTiles file read by the real `pmtiles` library (network.mjs serves it),
+  // found through a catalogue as Overture's is. Every building is placed in
+  // metres from the station, so where it stands and how tall is arithmetic.
+  console.log('\nTrees and buildings\n');
+  {
+    const { zxyToTileId } = await import('pmtiles');
+    const { mvtTile, square, pmtilesFile } = await import('./lib/vector-tiles.mjs');
+    const o0 = (await dbg()).origin;
+    const Z = 14, EXT = 4096, n = 2 ** Z;
+    const mLatT = await page.evaluate(() => KM_PER_DEG_LAT * 1000);
+    const mLonT = await page.evaluate(lat => kmPerDegLon(lat) * 1000, o0.lat);
+    const fxOf = lon => (lon + 180) / 360 * n;
+    const fyOf = lat => (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n;
+    // A square SIZE px across with its middle dx m east and dz m south of the
+    // station, nudged off a tile's edge so no tile cuts it in two.
+    const SIZE = 20;
+    const place = (dx, dz) => {
+      for (let k = 0; k < 8; k++) {
+        const lat = o0.lat - dz / mLatT, lon = o0.lon + dx / mLonT;
+        const fx = fxOf(lon), fy = fyOf(lat), tx = Math.floor(fx), ty = Math.floor(fy);
+        const px = (fx - tx) * EXT, py = (fy - ty) * EXT;
+        if (px > 40 && px < EXT - 40 && py > 40 && py < EXT - 40) {
+          return { dx, dz, tx, ty, x0: Math.round(px - SIZE / 2), y0: Math.round(py - SIZE / 2), key: `${Z}/${tx}/${ty}` };
+        }
+        dx += 25; dz += 25;
+      }
+      throw new Error('no spot off a tile edge');
+    };
+    const centre = { tx: Math.floor(fxOf(o0.lon)), ty: Math.floor(fyOf(o0.lat)) };
+    const centreKey = `${Z}/${centre.tx}/${centre.ty}`;
+    // The State's: two buildings in the tile the station is in. Overture's:
+    // five, one of each kind of height, in whichever tile each falls — and in
+    // the station's own tile, a 33 m tower where the State's first one is, which
+    // must never be stood up while the State has that tile.
+    const stateB = [{ ...place(50, 0), h: 9 }, { ...place(-60, 40), h: 12 }].filter(b => b.key === centreKey);
+    const ovtB = [
+      { ...place(70, -60), props: { height: 7.5 }, want: 7.5 },
+      { ...place(-60, -80), props: { num_floors: 2 }, want: 6.4 },
+      { ...place(0, -120), props: {}, want: 3.5 },
+      { ...place(110, 90), props: { height: 1 }, want: 3 },
+      { ...place(-110, 110), props: { height: 20, is_underground: true }, want: null },
+    ];
+    const ovtByTile = new Map();
+    const addOvt = (key, sq) => { if (!ovtByTile.has(key)) ovtByTile.set(key, []); ovtByTile.get(key).push(sq); };
+    for (const b of ovtB) addOvt(b.key, square(b.x0, b.y0, SIZE, b.props));
+    for (const b of stateB) addOvt(b.key, square(b.x0, b.y0, SIZE, { height: 33 }));
+    const ovtTiles = [];
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+      const key = `${Z}/${centre.tx + dx}/${centre.ty + dy}`;
+      ovtTiles.push({ z: Z, x: centre.tx + dx, y: centre.ty + dy, data: mvtTile('building', ovtByTile.get(key) || []) });
+    }
+    const ovtFile = pmtilesFile(ovtTiles, zxyToTileId);
+    const stateBody = mvtTile('buildings', stateB.map(b => square(b.x0, b.y0, SIZE, { h: b.h })));
+    const gw = { metaBuilt: true, ovtDown: false, stateAsked: [], ovtAsked: [], metaAsked: 0, catalogHits: 0 };
+    await page.route(/\/api\/ground\/qld-buildings\/meta\.json/, route => {
+      gw.metaAsked++;
+      return gw.metaBuilt
+        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ layer: 'qld-buildings',
+            attribution: '© The State of Queensland — generated building outlines (CC BY 4.0)',
+            bounds: [o0.lon - 0.5, o0.lat - 0.5, o0.lon + 0.5, o0.lat + 0.5] }) })
+        : route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"qld-buildings has not been built yet"}' });
+    });
+    await page.route(/\/api\/ground\/qld-buildings\/\d+\/\d+\/\d+\.pbf/, route => {
+      const m = /qld-buildings\/(\d+)\/(\d+)\/(\d+)\.pbf/.exec(route.request().url());
+      const key = `${m[1]}/${m[2]}/${m[3]}`;
+      gw.stateAsked.push(key);
+      return key === centreKey && stateB.length
+        ? route.fulfill({ status: 200, contentType: 'application/x-protobuf', body: stateBody })
+        : route.fulfill({ status: 204, body: '' });
+    });
+    await page.route(/stac\.overturemaps\.org\/catalog\.json/, route => {
+      gw.catalogHits++;
+      if (gw.ovtDown) return route.abort('connectionrefused');
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({ type: 'Catalog', latest: '2026-10-21.0', links: [
+          { rel: 'child', href: 'https://stac.overturemaps.org/2026-10-21.0/catalog.json', latest: true }] }) });
+    });
+    await page.route(/tiles\.overturemaps\.org\/([^/]+)\/buildings\.pmtiles/, route => {
+      const m = /^bytes=(\d+)-(\d+)$/.exec(route.request().headers().range || '');
+      if (!m) return route.fulfill({ status: 400, body: 'one range, please' });
+      const a = +m[1], b = Math.min(+m[2], ovtFile.file.length - 1);
+      if (ovtFile.at.has(a)) gw.ovtAsked.push(ovtFile.at.get(a));
+      return route.fulfill({ status: 206, body: ovtFile.file.subarray(a, b + 1), headers: {
+        'Content-Type': 'application/octet-stream', 'Content-Range': `bytes ${a}-${b}/${ovtFile.file.length}`,
+        'Access-Control-Allow-Origin': '*', 'Access-Control-Expose-Headers': 'Content-Length, Content-Range' } });
+    });
+    // The trees, handed in: two in the patch (12 m and 20 m) and one outside it.
+    const treeAt = [{ dx: 60, dz: 0, h: 12, r: 3 }, { dx: -40, dz: 70, h: 20, r: 6 }, { dx: 400, dz: 0, h: 15, r: 4 }];
+    await page.evaluate(([trees, mLat, mLon, o]) => {
+      window.__realTrees = window.__realTrees || GroundCover.trees;
+      window.__treesAsked = 0;
+      window.__treesFail = false;
+      GroundCover.trees = () => {
+        window.__treesAsked++;
+        if (window.__treesFail) return Promise.reject(new Error('canopy: HTTP 503 from /api/canopy'));
+        const feats = [];
+        for (const t of trees) {
+          const lat = o.lat - t.dz / mLat, lon = o.lon + t.dx / mLon;
+          const ring = r => [[0, 1, 2, 3, 4, 5, 6, 7, 0].map(i => [lon + r / mLon * Math.cos((i * 45 + 22.5) * Math.PI / 180), lat + r / mLat * Math.sin((i * 45 + 22.5) * Math.PI / 180)])];
+          feats.push({ type: 'Feature', properties: { kind: 'trunk', base: 0, top: 0.35 * t.h, h: t.h, r: t.r }, geometry: { type: 'Polygon', coordinates: ring(0.4) } });
+          feats.push({ type: 'Feature', properties: { kind: 'crown', base: 0.3 * t.h, top: t.h, h: t.h, r: t.r }, geometry: { type: 'Polygon', coordinates: ring(t.r) } });
+        }
+        return Promise.resolve({ type: 'FeatureCollection', features: feats, meta: { trees: trees.length, capped: false } });
+      };
+    }, [treeAt, mLatT, mLonT, o0]);
+
+    // A clean slate for the buildings' sources, and a build of the patch.
+    const coverBuild = async () => {
+      gw.stateAsked.length = 0; gw.ovtAsked.length = 0; gw.metaAsked = 0; gw.catalogHits = 0;
+      await page.evaluate(() => { GroundCover.forgetOverture(); window.__treesAsked = 0; DigitalTwin.rebuild(); });
+      await settled();
+      await page.waitForFunction(() => { const c = DigitalTwin.debug().cover; return c.status === 'ok' || c.status === 'off'; }, null, { timeout: BUILD_TIMEOUT })
+        .catch(() => {});
+      return dbg();
+    };
+    // Where each building should stand: its middle in metres, its foot on the
+    // ground at its lowest corner (1×), its roof that much above.
+    const expectB = async (b, h) => page.evaluate(([b, h, SIZE, EXT, n]) => {
+      const lonOf = px => (b.tx + px / EXT) / n * 360 - 180;
+      const latOf = py => Math.atan(Math.sinh(Math.PI * (1 - 2 * (b.ty + py / EXT) / n))) * 180 / Math.PI;
+      const corners = [[b.x0, b.y0], [b.x0 + SIZE, b.y0], [b.x0 + SIZE, b.y0 + SIZE], [b.x0, b.y0 + SIZE]].map(([px, py]) => DigitalTwin._xzOf(latOf(py), lonOf(px)));
+      const d = DigitalTwin.debug();
+      const base = Math.min(...corners.map(c => (DigitalTwin._heightAt(c.x, c.z) - d.h0) * d.exag));
+      return { x: corners.reduce((s, c) => s + c.x, 0) / 4, z: corners.reduce((s, c) => s + c.z, 0) / 4, base, top: base + h };
+    }, [b, h, SIZE, EXT, n]);
+    const findB = (list, e) => list.find(p => near(p.x, e.x, 0.3) && near(p.z, e.z, 0.3));
+
+    // 1. Built, and Overture there: the State's buildings in its tile, Overture's elsewhere.
+    let c = (await coverBuild()).cover;
+    const onePlace = c.result && c.result.tiles[centreKey] === 'state';
+    ok('on by default: the trees and buildings are asked for once the patch stands, and drawn', c.on && c.status === 'ok' && c.inScene
+      && c.drawn && c.drawn.trees === 2 && c.drawn.buildings > 0, JSON.stringify({ status: c.status, drawn: c.drawn, errs: [c.treesError, c.buildingsError] }));
+    ok('the State\'s tile where it has one: the tile the station is in is the State\'s, and Overture is not asked for it',
+      stateB.length === 0 || (onePlace && gw.stateAsked.includes(centreKey) && !gw.ovtAsked.includes(centreKey)),
+      JSON.stringify({ tiles: c.result && c.result.tiles, stateAsked: gw.stateAsked, ovtAsked: gw.ovtAsked }));
+    const sGot = [];
+    for (const b of stateB) { const e = await expectB(b, b.h); sGot.push({ e, p: findB(c.buildings, e) }); }
+    ok('each State building stands where its outline is, on the ground at its lowest corner, as tall as the State measured it',
+      stateB.length > 0 && sGot.every(({ e, p }) => p && p.src === 'state' && near(p.base, e.base, 0.02) && near(p.top, e.top, 0.02)),
+      JSON.stringify(sGot).slice(0, 600));
+    ok('…and Overture\'s 33 m tower over the same spot is not stood beside it — a house is never drawn twice',
+      !c.buildings.some(p => p.h === 33), JSON.stringify(c.buildings.map(p => [p.src, p.h])));
+    const ovtOut = ovtB.filter(b => !(onePlace && b.key === centreKey));
+    const oGot = [];
+    for (const b of ovtOut) { const e = await expectB(b, b.want || 0); oGot.push({ b: b.want, e, p: findB(c.buildings, e) }); }
+    ok('Overture\'s buildings in the tiles the State has none for, each as tall as its height says',
+      oGot.every(({ b, p, e }) => (b == null ? !p : p && p.src === 'overture' && near(p.top, e.top, 0.02))), JSON.stringify(oGot).slice(0, 600));
+    // The trees, where they were found and as tall.
+    const tGot = await page.evaluate(([trees, mLat, mLon, o]) => {
+      const d = DigitalTwin.debug();
+      return trees.map(t => {
+        const want = DigitalTwin._xzOf(o.lat - t.dz / mLat, o.lon + t.dx / mLon);
+        const p = d.cover.trees.find(q => Math.abs(q.x - want.x) < 0.2 && Math.abs(q.z - want.z) < 0.2);
+        return { want, p, ground: (DigitalTwin._heightAt(want.x, want.z) - d.h0) * d.exag, h: t.h, r: t.r };
+      });
+    }, [treeAt, mLatT, mLonT, o0]);
+    ok('each tree in the patch stands where it was found, on the ground under it, as tall as it is and as wide as its crown',
+      tGot.slice(0, 2).every(t => t.p && near(t.p.base, t.ground, 0.01) && near(t.p.top - t.p.base, t.h, 1e-6) && near(t.p.r, t.r, 1e-6)),
+      JSON.stringify(tGot.slice(0, 2)));
+    ok('…and the one outside the patch is not drawn', !tGot[2].p, JSON.stringify(tGot[2]));
+    const meshes = Object.fromEntries(c.meshes.map(m => [m.name, m]));
+    ok('a few draw calls in all: the buildings one mesh, the trees two instanced meshes, in the 3-D view\'s colours',
+      c.meshes.length === 3 && meshes.buildings && !meshes.buildings.instanced && meshes.buildings.colour === '#d9d1c3'
+        && meshes['tree crowns'] && meshes['tree crowns'].instanced && meshes['tree crowns'].count === 2 && meshes['tree crowns'].colour === '#3f8f45'
+        && meshes['tree trunks'] && meshes['tree trunks'].instanced && meshes['tree trunks'].count === 2 && meshes['tree trunks'].colour === '#6b4a2e',
+      JSON.stringify(c.meshes));
+    ok('the note says how many, and where they come from, with its words explained on hover',
+      /In this patch: 2 trees and \d+ buildings?/.test(c.note || '') && /2010–2020/.test(c.note || '') && /none is under 3 m/.test(c.note || '')
+        && await page.evaluate(() => [...document.querySelectorAll('#twin-cover-note .term')].length >= 4
+          && [...document.querySelectorAll('#twin-cover-note .term')].every(t => (t.getAttribute('title') || '').length > 40)),
+      c.note);
+    ok('…and the same words, read without hovering, in a fold beside it',
+      await page.evaluate(() => { const dts = [...document.querySelectorAll('#twin-panel-scene .lat-words dt')].map(d => d.textContent);
+        return ['Tree height', 'Building height', 'LiDAR', 'Overture Maps'].every(w => dts.includes(w)); }));
+    const credits = await page.evaluate(() => document.getElementById('twin-attrib').textContent);
+    ok('the sources are credited under the stage: Meta and WRI\'s canopy, the State\'s outlines, and Overture\'s where it stood any',
+      /CHMv2/.test(credits) && /State of Queensland — generated building outlines/.test(credits)
+        && /Overture Maps Foundation/.test(credits) === !!(c.result && c.result.tally.overture), credits);
+    ok('…and nothing about them added to the notes', (await dbg()).notes.length === 0, (await dbg()).notes.join(' | '));
+
+    // 2. The exaggeration lifts the ground under them, not them.
+    await page.evaluate(() => DigitalTwin.setExag(2));
+    const c2 = (await dbg()).cover;
+    const s2 = stateB.length ? await expectB(stateB[0], stateB[0].h) : null;
+    const p2 = s2 ? findB(c2.buildings, s2) : null;
+    const t2 = c2.trees[0];
+    const t2Ground = await page.evaluate(t => (DigitalTwin._heightAt(t.x, t.z) - DigitalTwin.debug().h0) * 2, t2);
+    ok('at 2× the buildings and trees stand on the stretched ground, as tall as before',
+      (!s2 || (p2 && near(p2.base, s2.base, 0.02) && near(p2.top - p2.base, stateB[0].h, 1e-6))) && near(t2.base, t2Ground, 0.01) && near(t2.top - t2.base, t2.h, 1e-6),
+      JSON.stringify({ p2, s2, t2, t2Ground }));
+    await page.evaluate(() => DigitalTwin.setExag(1));
+
+    // 3. The .glb carries them.
+    const g2 = await page.evaluate(async () => {
+      const buf = await DigitalTwin.buildGlb();
+      const dv = new DataView(buf);
+      const jsonLen = dv.getUint32(12, true);
+      const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jsonLen)));
+      const mesh = name => { const m = json.meshes.find(x => x.name === name); return m ? json.accessors[m.primitives[0].attributes.POSITION] : null; };
+      return { names: json.meshes.map(m => m.name), crowns: mesh('tree crowns'), trunks: mesh('tree trunks'), buildings: mesh('buildings'),
+               extras: json.asset.extras.trees_and_buildings };
+    });
+    ok('the .glb has the buildings and every tree, each baked where it stands',
+      !!g2.buildings && !!g2.crowns && !!g2.trunks && g2.extras && g2.extras.trees === 2 && g2.extras.buildings > 0
+        && g2.crowns.count > 0 && g2.crowns.count % 2 === 0 && g2.crowns.max[1] > g2.crowns.min[1] + 10, JSON.stringify(g2).slice(0, 500));
+
+    // 4. Not built: Overture everywhere, and every kind of height it gives.
+    gw.metaBuilt = false;
+    c = (await coverBuild()).cover;
+    const all = [];
+    for (const b of ovtB) { const e = await expectB(b, b.want || 0); all.push({ want: b.want, e, p: findB(c.buildings, e) }); }
+    ok('the State\'s tiles not built: the State is not asked for a tile, and Overture\'s buildings stand everywhere',
+      gw.stateAsked.length === 0 && c.result.state === 'not built' && Object.values(c.result.tiles).every(f => f === 'overture'),
+      JSON.stringify({ stateAsked: gw.stateAsked, tiles: c.result.tiles }));
+    ok('…as tall as Overture says, 3.2 m a floor, one storey (3.5 m) with neither, never under 3 m, and none it marks under the ground',
+      all.every(({ want, p, e }) => (want == null ? !p : p && near(p.top - p.base, want, 1e-6) && near(p.base, e.base, 0.02))),
+      JSON.stringify(all.map(a => ({ want: a.want, got: a.p && a.p.top - a.p.base }))));
+    ok('…Overture\'s file is the release its catalogue marks latest, looked up once a page',
+      c.result.release === '2026-10-21.0' && gw.catalogHits === 1, JSON.stringify({ release: c.result.release, hits: gw.catalogHits }));
+
+    // 5. Overture out of reach, the State not built: no buildings, the trees
+    // still stand, the twin is as it was, and the note says what could not be had.
+    gw.ovtDown = true;
+    const errsBefore = errors.length;
+    const d5 = await coverBuild();
+    c = d5.cover;
+    ok('Overture out of reach: no buildings, the trees still stand, and the twin is built as ever',
+      d5.built && d5.frames > 0 && c.status === 'ok' && c.drawn.buildings === 0 && c.drawn.trees === 2 && c.result.overture === 'failed',
+      JSON.stringify({ built: d5.built, status: c.status, drawn: c.drawn, result: c.result }));
+    ok('…and the note says Overture\'s buildings could not be reached, with nothing thrown',
+      /Overture Maps’ buildings could not be reached just now/.test(c.note || '') && errors.length === errsBefore,
+      JSON.stringify({ note: c.note, errors: errors.slice(errsBefore) }));
+    gw.ovtDown = false;
+
+    // 6. The canopy out of reach: the buildings still stand, and the note says so.
+    gw.metaBuilt = true;
+    await page.evaluate(() => { window.__treesFail = true; });
+    c = (await coverBuild()).cover;
+    ok('the tree heights out of reach: the buildings still stand, no trees, and the note says the tree heights could not be reached',
+      c.status === 'ok' && c.drawn.trees === 0 && c.drawn.buildings > 0 && /tree heights could not be reached/i.test(c.note || ''),
+      JSON.stringify({ drawn: c.drawn, note: c.note }));
+    await page.evaluate(() => { window.__treesFail = false; });
+
+    // 7. The switch: off takes them away, is kept, and asks nothing; on asks again.
+    await page.evaluate(() => { const cb = document.getElementById('twin-cover'); cb.checked = false; cb.dispatchEvent(new Event('change')); });
+    const off = await dbg();
+    const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('mn-twin')).cover);
+    ok('the switch takes them away and is remembered off', !off.cover.on && off.cover.status === 'off' && off.cover.meshes.length === 0
+      && !off.cover.inScene && kept === false, JSON.stringify({ cover: off.cover, kept }));
+    const offBuild = await coverBuild();
+    const askedOff = await page.evaluate(() => window.__treesAsked);
+    ok('…and a build with it off asks for nothing: no trees, no State tile, no meta.json, no Overture',
+      offBuild.built && offBuild.cover.status === 'off' && askedOff === 0 && gw.stateAsked.length === 0 && gw.metaAsked === 0
+        && gw.catalogHits === 0 && gw.ovtAsked.length === 0, JSON.stringify({ askedOff, gw: { ...gw, stateAsked: gw.stateAsked.length } }));
+    await page.evaluate(() => DigitalTwin.setCover(true));
+    await page.waitForFunction(() => DigitalTwin.debug().cover.status === 'ok', null, { timeout: BUILD_TIMEOUT });
+    c = (await dbg()).cover;
+    ok('…and on again, they are asked for and stand', c.on && c.drawn.trees === 2 && c.drawn.buildings > 0, JSON.stringify(c.drawn));
+
+    await page.evaluate(() => { GroundCover.trees = window.__realTrees; GroundCover.forgetOverture(); });
+    await page.unroute(/\/api\/ground\/qld-buildings\/meta\.json/);
+    await page.unroute(/\/api\/ground\/qld-buildings\/\d+\/\d+\/\d+\.pbf/);
+    await page.unroute(/stac\.overturemaps\.org\/catalog\.json/);
+    await page.unroute(/tiles\.overturemaps\.org\/([^/]+)\/buildings\.pmtiles/);
+    await page.evaluate(() => DigitalTwin.rebuild());
+    await settled();
+  }
+
   // ── 4. The fallbacks, one host at a time ──────────────────────────────────
   console.log('\nThe fallbacks\n');
   world.dem = 'empty';

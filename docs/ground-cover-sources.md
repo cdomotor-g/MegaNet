@@ -614,7 +614,9 @@ buildings** switch (on until turned off; `state.map3dGround`, `mn-3d-ground`):
     release is looked up once a page in `https://stac.overturemaps.org/catalog.json`
     (the child marked `"latest": true`). Each tile is fetched once and shared,
     because MapLibre asks for a zoom-14 tile once for every piece of it on
-    screen.
+    screen. Since #280 the file is opened by `ground-cover.js`
+    (`GroundCover.overture()`), once a page for the 3-D view and the digital
+    twin both; `map-3d.js` holds it for each build of its source, as before.
   - Checked from Chromium on 8 Nov 2026 (release `2026-10-21.0`): plain
     single-range GETs, no preflight, cross-site reads allowed. Mount Isa's
     zoom-14 tile (14/14540/9156) holds 2,937 buildings, 2,279 with a height and
@@ -638,3 +640,52 @@ buildings** switch (on until turned off; `state.map3dGround`, `mn-3d-ground`):
   of reach) and `npm run groundcover` (the routes, and the tree finder on a
   made-up grid).
 
+## In the digital twin (#280, 8 Nov 2026)
+
+`digital-twin.js` stands the same trees and buildings on the twin's own ground
+— the 200 m to 1.6 km patch round one station — behind the Scene panel's
+**Trees and buildings** switch (on until turned off, kept with the twin's other
+settings in `mn-twin`). The twin has no MapLibre, so the reading is in
+`ground-cover.js`, where both views can use it:
+
+- **Buildings**: `GroundCover.buildings(box)` reads the zoom-14 tiles the patch
+  touches (one to four) by the 3-D view's rule — the State's tile where
+  `meta.json` says the tiles are built, its bounds touch the tile and it has
+  one there, else Overture's, never both — and decodes each itself: a small
+  Mapbox Vector Tile reader (protobuf varints, zigzag, MoveTo / LineTo /
+  ClosePath, the layer's extent, tile units to degrees), no library. A tile's
+  outlines run a buffer past its edge (64 units in the State's), so each is
+  cut to its own tile's square, and the next tile holds the rest. A State tile
+  that arrives still gzipped is unpacked with `DecompressionStream('gzip')`
+  (the Worker serves them with `Content-Encoding`, which the browser undoes).
+  Heights are the 3-D view's numbers: the State's `h`; Overture's `height`,
+  else 3.2 m a floor, else one storey (3.5 m), never under 3 m, those marked
+  `is_underground` left out. It answers outlines in degrees with a height and
+  a source each, which tiles came from where, and which source could not be
+  reached — it never rejects for that.
+- **Trees**: `GroundCover.trees(box)`, as the 3-D view asks it, for the patch.
+- **Drawn** as simple shapes, only those in the patch: each building its
+  outline pushed straight up to its height from the ground at its lowest
+  corner, all of them one mesh (walls and a flat roof, `#d9d1c3`, flat-lit);
+  each tree a trunk to 35 % of its height and a low-poly crown from 30 % to the
+  top, as wide as the canopy it was found in — two instanced meshes for every
+  tree (`#6b4a2e`, `#3f8f45`, each crown a shade lighter or darker). Heights
+  are true metres at every exaggeration; the exaggeration lifts the ground
+  under them. Three draw calls, nothing drawn per frame, not in any ray cast.
+- **Loaded** once a build, after the patch stands, never waited on. A source
+  that cannot be reached leaves the twin as it was; the Scene panel's note and
+  the line under the stage say what is there and what could not be had, and
+  the twin's notes are left alone. Off, nothing is asked. The credits go under
+  the stage while anything of theirs stands.
+- **In the `.glb`**: the buildings as they are, and every tree baked where it
+  stands (one mesh for the trunks, one for the crowns — no glTF extension
+  needed); the file's header counts them.
+- Checked in `npm run groundcover` (the decoder and `buildings()` on tiles
+  written by `test/lib/vector-tiles.mjs`, the State's store and Overture's file
+  stood in for) and `npm run twin` (a State tile, a real PMTiles file read by
+  the real library, the trees handed in: where each stands and how tall, the
+  State preferred, the 3 m floor, the exaggeration, the `.glb`, a source out
+  of reach, and the switch asking for nothing). Looked at from Chromium on 8
+  Nov 2026 against the live routes: Gatton's 400 m patch is 142 trees and 43
+  of the State's buildings, each roof over its own in the 10 cm imagery;
+  Lismore's 800 m (New South Wales) is 737 trees and 235 of Overture's.

@@ -11,15 +11,16 @@
 //
 // After core.js and terrain.js, before init.js — index.html holds the order and
 // the reasons. Reaches back to core.js for state, esc, escAttr, announce,
-// cssVar, registerTabTeardown, KM_PER_DEG_LAT, kmPerDegLon, and the 3-D
-// map's words for moving a view (viewMoveWords, viewKeyWords); across to
+// cssVar, termHtml, registerTabTeardown, KM_PER_DEG_LAT, kmPerDegLon, and the
+// 3-D map's words for moving a view (viewMoveWords, viewKeyWords); across to
 // terrain.js for the ~30 m fallback ground, to elvis.js for the AHD height at
 // the pin, to field-photos.js for the field photos taken in the patch (and the
 // viewer they open in), to twin-cadastre.js for the property boundaries, lot
-// numbers and road reserve drawn on the ground, to map-twin.js for the map it
-// is drawn in, to map-3d.js for the side panel's camera buttons it drives
-// (Map3D.cameraChanged), and to app.js for switchTab and primaryRole (from inline
-// handlers). Every one of those is a runtime call from inside this file's own
+// numbers and road reserve drawn on the ground, to ground-cover.js for the
+// trees and buildings stood on it, to map-twin.js for the map it is drawn in,
+// to map-3d.js for the side panel's camera buttons it drives
+// (Map3D.cameraChanged), and to app.js for switchTab and primaryRole (from
+// inline handlers). Every one of those is a runtime call from inside this file's own
 // functions, so its position among the modules is free. Nothing executes at
 // load (`npm run toplevel`).
 //
@@ -251,6 +252,7 @@ const DigitalTwin = (function () {
     bridges: null,         // the bridges in the patch: { status, source, list, crossing, failed }
     bridgesFound: null,    // what the sources said, kept to rebuild the decks at another exaggeration
     tier: null,            // the State's finest imagery over the station (imageryAt), or null
+    cover: null,           // the trees and buildings: { status, trees, buildings, placedTrees, placedBuildings, drawn, … } — see "the trees and buildings"
   };
 
   // Ground under a far station that has no recorded height, read off the
@@ -274,6 +276,7 @@ const DigitalTwin = (function () {
     sharp: null,      // the sharp drape round the station or the pin: { mesh, x, z, mpp }
     flood: null,      // the flood water and its staff: { water, staff, tex, data, mat, palette, speed }
     flowLine: null,   // the flow line's ribbons and arrowheads
+    cover: null,      // the trees and buildings: one group, the buildings' mesh and the trees' two instanced meshes
     off: [],          // listener removers
   };
 
@@ -300,8 +303,10 @@ const DigitalTwin = (function () {
   // or a fraction of the way from 0 m to the top. `waterColour` is what the
   // water's colour says — the level it has passed, or its speed — and
   // `flowLine` whether the flow line is drawn (see "the flood velocity").
+  // `cover` whether the trees and buildings stand on the ground.
   const DEFAULTS = { size: 400, exag: 1, imagery: true, figure: true, label: true, wire: false, horizon: true,
-                     flood: true, floodAnim: null, floodHold: null, fitBridges: true, waterColour: 'level', flowLine: false };
+                     flood: true, floodAnim: null, floodHold: null, fitBridges: true, waterColour: 'level', flowLine: false,
+                     cover: true };
 
   function loadSettings() {
     let s = {};
@@ -310,7 +315,7 @@ const DigitalTwin = (function () {
     if (SIZES.includes(Number(s.size))) out.size = Number(s.size);
     const ex = Number(s.exag);
     if (isFinite(ex) && ex >= 1 && ex <= 3) out.exag = ex;
-    for (const k of ['imagery', 'figure', 'label', 'wire', 'horizon', 'flood', 'fitBridges', 'flowLine']) if (typeof s[k] === 'boolean') out[k] = s[k];
+    for (const k of ['imagery', 'figure', 'label', 'wire', 'horizon', 'flood', 'fitBridges', 'flowLine', 'cover']) if (typeof s[k] === 'boolean') out[k] = s[k];
     if (s.waterColour === 'speed' || s.waterColour === 'level') out.waterColour = s.waterColour;
     if (typeof s.floodAnim === 'boolean') out.floodAnim = s.floodAnim;
     if ((typeof s.floodHold === 'number' && s.floodHold >= 0 && s.floodHold <= 1) || (typeof s.floodHold === 'string' && s.floodHold)) out.floodHold = s.floodHold;
@@ -1038,6 +1043,7 @@ const DigitalTwin = (function () {
     removeMovePin();
     removeNeighbours();
     removeBridges();
+    removeCover();
     removeSharp();
     if (typeof TwinCadastre !== 'undefined') TwinCadastre.remove();
     tw.photoNear = -1;
@@ -4058,6 +4064,290 @@ void main() {
     });
   }
 
+  // ── the trees and buildings ────────────────────────────────────────────────
+  // What stands round the station (#280; the ⛰️ 3-D view's #278, brought
+  // here): the trees ground-cover.js finds in Meta and WRI's canopy heights,
+  // and the buildings — the State's LiDAR outlines where Queensland has
+  // surveyed, Overture Maps' everywhere else, each map tile from one of the
+  // two and never both (GroundCover.buildings) — stood on this ground as
+  // simple shapes, and only those in the patch:
+  //
+  // * a building is its outline pushed straight up to its height, from the
+  //   ground at its lowest corner, so no wall stands off the ground on a slope
+  //   (the uphill side is in the ground instead). Every building in the patch
+  //   is one mesh — walls and a flat roof in the 3-D view's colour, each face
+  //   flat-lit — so a town is one draw call;
+  // * a tree is a trunk and a crown, as the 3-D view draws them — a trunk from
+  //   the ground to 35 % of its height, a crown from 30 % to the top, as wide
+  //   as ground-cover.js found its canopy — two instanced meshes for every
+  //   tree in the patch, the crowns low-poly balls, each a shade lighter or
+  //   darker so a stand of trees is not one green.
+  //
+  // Heights are true metres at every exaggeration, as the station's are: the
+  // exaggeration lifts the ground they stand on, not them.
+  //
+  // Asked once a build, once the patch is standing, and never waited on — the
+  // first frame is drawn without them. A source that cannot be reached leaves
+  // the twin as it was, and the Scene panel's note (and the line under the
+  // stage) says which. Switched off, nothing is asked. In the .glb, each tree
+  // baked in; not in any ray cast, so a click on a roof is a click on the
+  // ground under it, and nothing here is drawn per frame.
+  const COVER_COLOURS = { building: '#d9d1c3', crown: '#3f8f45', trunk: '#6b4a2e' };   // the 3-D view's
+  const TRUNK_SINK = 0.3;     // metres a trunk runs into the ground, so a slope does not show its foot
+  // The words the Scene panel's note marks, from ground-cover.js's one list.
+  const COVER_WORDS = ['Tree height', 'Building height', 'LiDAR', 'Overture Maps'];
+
+  function removeCover() {
+    if (sc.cover) {
+      if (sc.scene) sc.scene.remove(sc.cover);
+      // An instanced mesh's own buffers (where each tree stands, its shade)
+      // are let go by its dispose(), not its geometry's.
+      sc.cover.traverse(o => { if (o.isInstancedMesh) o.dispose(); });
+      disposeObject(sc.cover);
+    }
+    sc.cover = null;
+  }
+
+  // Each tree's middle, height and crown, from ground-cover.js's GeoJSON: the
+  // crown is an octagon about the tree, so its corners' mean is the tree.
+  function treePoints(fc) {
+    const out = [];
+    for (const f of (fc && fc.features) || []) {
+      if (!f || !f.properties || f.properties.kind !== 'crown') continue;
+      const ring = f.geometry && f.geometry.coordinates && f.geometry.coordinates[0];
+      if (!Array.isArray(ring) || ring.length < 4) continue;
+      const n = ring.length - 1;
+      let lon = 0, lat = 0;
+      for (let i = 0; i < n; i++) { lon += ring[i][0]; lat += ring[i][1]; }
+      const h = Number(f.properties.h) || Number(f.properties.top) || 0;
+      if (h > 0) out.push({ lon: lon / n, lat: lat / n, h, r: Number(f.properties.r) || 0 });
+    }
+    return out;
+  }
+
+  // Asked for the patch standing now; each half drawn as it lands.
+  function loadCover(seq) {
+    removeCover();
+    if (!S().cover) { tw.cover = { status: 'off' }; refreshCover(); return; }
+    if (typeof GroundCover === 'undefined' || typeof GroundCover.trees !== 'function' || !sc.scene || !tw.ground || !tw.origin) {
+      tw.cover = null; refreshCover(); return;
+    }
+    const o = tw.origin;
+    const box = patchBox(o.lat, o.lon, tw.ground.size);
+    const C = tw.cover = { status: 'loading', pending: 2, trees: null, buildings: null, treesError: null, buildingsError: null,
+                           placedTrees: [], placedBuildings: [], drawn: { trees: 0, buildings: 0 } };
+    refreshCover();
+    const live = () => seq === tw.seq && tw.cover === C && !!sc.scene && S().cover;
+    const done = () => {
+      if (!live()) return;
+      if (--C.pending <= 0) C.status = 'ok';
+      buildCover();
+      refreshCover();
+    };
+    GroundCover.trees(box).then(fc => { if (live()) C.trees = { list: treePoints(fc), meta: fc.meta || {} }; },
+      err => { if (live()) C.treesError = (err && err.message) || String(err); }).then(done);
+    (typeof GroundCover.buildings === 'function' ? GroundCover.buildings(box) : Promise.reject(new Error('no buildings reader')))
+      .then(r => { if (live()) C.buildings = r; },
+        err => { if (live()) C.buildingsError = (err && err.message) || String(err); }).then(done);
+  }
+
+  // A deterministic shade for a tree, from where it stands.
+  function shadeAt(x, z) {
+    const v = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
+    return v - Math.floor(v);
+  }
+
+  // Every building in the patch, one mesh: walls wound outward and a flat
+  // roof wound up, as plain triangles, so each face is lit flat.
+  function buildingsMesh(list, placed) {
+    const o = tw.origin, half = tw.ground.half;
+    const pos = [];
+    const area2 = r => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += r[j].x * r[i].z - r[i].x * r[j].z; return a; };
+    const tri = (a, b, c) => { pos.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]); };
+    // Metres from the station, with no point the same as the one before it
+    // (the last included, against the first): the roof's triangulation drops
+    // a closing point of its own, and its indices would then run off by one.
+    const toXZ = r => {
+      const out = [];
+      for (const p of r) {
+        const q = localXZ(p[1], p[0], o.lat, o.lon);
+        const prev = out[out.length - 1];
+        if (!prev || Math.abs(prev.x - q.x) > 1e-4 || Math.abs(prev.z - q.z) > 1e-4) out.push(q);
+      }
+      while (out.length > 1 && Math.abs(out[0].x - out[out.length - 1].x) <= 1e-4 && Math.abs(out[0].z - out[out.length - 1].z) <= 1e-4) out.pop();
+      return out;
+    };
+    for (const b of list) {
+      const outer = toXZ(b.ring);
+      if (outer.length < 3) continue;
+      let cx = 0, cz = 0;
+      for (const p of outer) { cx += p.x; cz += p.z; }
+      cx /= outer.length; cz /= outer.length;
+      if (Math.abs(cx) > half || Math.abs(cz) > half) continue;
+      const holes = (b.holes || []).map(toXZ).filter(r => r.length >= 3);
+      let base = Infinity;
+      for (const p of outer) base = Math.min(base, yAt(p.x, p.z));
+      if (!isFinite(base)) continue;
+      const top = base + b.h;
+      // Walls: an edge from p to q faces (−dz, dx), which is outward on a ring
+      // wound with a negative area here and into a hole on one with a positive.
+      const walls = (ring, wantPositive) => {
+        const r = (area2(ring) > 0) === wantPositive ? ring : ring.slice().reverse();
+        for (let i = 0; i < r.length; i++) {
+          const p = r[i], q = r[(i + 1) % r.length];
+          tri([p.x, base, p.z], [q.x, base, q.z], [q.x, top, q.z]);
+          tri([p.x, base, p.z], [q.x, top, q.z], [p.x, top, p.z]);
+        }
+      };
+      walls(outer, false);
+      for (const h of holes) walls(h, true);
+      // The roof, its triangles turned to face up.
+      const pts = [...outer, ...holes.flat()];
+      let faces;
+      try {
+        faces = THREE.ShapeUtils.triangulateShape(outer.map(p => new THREE.Vector2(p.x, p.z)), holes.map(r => r.map(p => new THREE.Vector2(p.x, p.z))));
+      } catch (_) { faces = []; }
+      for (const [ia, ib, ic] of faces) {
+        const a = pts[ia], bb = pts[ib], c = pts[ic];
+        if (!a || !bb || !c) continue;
+        const up = (bb.z - a.z) * (c.x - a.x) - (bb.x - a.x) * (c.z - a.z) > 0;
+        if (up) tri([a.x, top, a.z], [bb.x, top, bb.z], [c.x, top, c.z]);
+        else tri([a.x, top, a.z], [c.x, top, c.z], [bb.x, top, bb.z]);
+      }
+      placed.push({ x: cx, z: cz, base, top, h: b.h, src: b.src, corners: outer.length });
+    }
+    if (!pos.length) return null;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.computeVertexNormals();
+    geo.computeBoundingSphere();
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: COVER_COLOURS.building, roughness: 0.9, metalness: 0, name: 'building' }));
+    mesh.name = 'buildings';
+    return mesh;
+  }
+
+  // Every tree in the patch: two instanced meshes, the trunks and the crowns.
+  function treeMeshes(list, placed) {
+    const o = tw.origin, half = tw.ground.half;
+    const crownR = h => (typeof GroundCover.crownRadius === 'function' ? GroundCover.crownRadius(h) : Math.max(1.5, Math.min(8, 0.18 * h + 1)));
+    for (const t of list) {
+      const p = localXZ(t.lat, t.lon, o.lat, o.lon);
+      if (Math.abs(p.x) > half || Math.abs(p.z) > half) continue;
+      const base = yAt(p.x, p.z);
+      if (!isFinite(base)) continue;
+      placed.push({ x: p.x, z: p.z, base, top: base + t.h, h: t.h, r: t.r > 0 ? t.r : crownR(t.h) });
+    }
+    if (!placed.length) return [];
+    const trunkGeo = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true);
+    trunkGeo.translate(0, 0.5, 0);
+    const crownGeo = new THREE.SphereGeometry(1, 8, 5);
+    const trunks = new THREE.InstancedMesh(trunkGeo,
+      new THREE.MeshStandardMaterial({ color: COVER_COLOURS.trunk, roughness: 0.95, metalness: 0, flatShading: true, name: 'trunk' }), placed.length);
+    const crowns = new THREE.InstancedMesh(crownGeo,
+      new THREE.MeshStandardMaterial({ color: COVER_COLOURS.crown, roughness: 0.9, metalness: 0, flatShading: true, name: 'crown' }), placed.length);
+    trunks.name = 'tree trunks';
+    crowns.name = 'tree crowns';
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), v = new THREE.Vector3();
+    const e = new THREE.Euler(), c = new THREE.Color();
+    placed.forEach((t, i) => {
+      const w = 0.15 * crownR(t.h);
+      m.compose(v.set(t.x, t.base - TRUNK_SINK, t.z), q.identity(), s.set(w, 0.35 * t.h + TRUNK_SINK, w));
+      trunks.setMatrixAt(i, m);
+      const k = shadeAt(t.x, t.z);
+      q.setFromEuler(e.set(0, k * Math.PI, 0));
+      m.compose(v.set(t.x, t.base + 0.65 * t.h, t.z), q, s.set(t.r, 0.35 * t.h, t.r));
+      crowns.setMatrixAt(i, m);
+      crowns.setColorAt(i, c.setScalar(0.8 + 0.35 * k));
+    });
+    for (const mesh of [trunks, crowns]) {
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      mesh.computeBoundingSphere();
+    }
+    return [trunks, crowns];
+  }
+
+  // What has landed, stood on the ground as it is now — again after the
+  // exaggeration moves.
+  function buildCover() {
+    removeCover();
+    const C = tw.cover;
+    if (!C || !sc.scene || !tw.ground || !tw.origin || !THREE) return;
+    C.placedTrees = []; C.placedBuildings = [];
+    C.drawn = { trees: 0, buildings: 0 };
+    const grp = new THREE.Group();
+    grp.name = 'trees and buildings';
+    if (C.buildings && C.buildings.buildings && C.buildings.buildings.length) {
+      const mesh = buildingsMesh(C.buildings.buildings, C.placedBuildings);
+      if (mesh) grp.add(mesh);
+      C.drawn.buildings = C.placedBuildings.length;
+    }
+    if (C.trees && C.trees.list.length) {
+      for (const mesh of treeMeshes(C.trees.list, C.placedTrees)) grp.add(mesh);
+      C.drawn.trees = C.placedTrees.length;
+    }
+    sc.cover = grp;
+    sc.scene.add(grp);
+    requestFrame();
+  }
+
+  // ── the words ──
+  function coverWord(text, key) {
+    const W = typeof GroundCover !== 'undefined' && GroundCover.WORDS;
+    return W && W[key] ? termHtml(text, W[key]) : esc(text);
+  }
+  function plural(n, one) { return `${n.toLocaleString()} ${one}${n === 1 ? '' : 's'}`; }
+  // What stands in the patch, or what could not be had: a phrase for the line
+  // under the stage (`short`: it has its own lead) and the Scene panel's note.
+  // '' where there is nothing to say.
+  function coverStatusHtml(short = false) {
+    const C = tw.cover;
+    if (!C) return '';
+    if (C.status === 'off') return 'Off — nothing is asked for.';
+    if (C.status === 'loading' && !C.trees && !C.buildings && !C.treesError && !C.buildingsError) return 'Reading the trees and buildings for this patch…';
+    const away = 'could not be reached just now';
+    const parts = [];
+    const warn = [];
+    if (C.trees) parts.push(`${plural(C.drawn.trees, 'tree')}${C.trees.meta && C.trees.meta.capped ? ' (the tallest, where there are more)' : ''}`);
+    else if (C.treesError) warn.push(`the tree heights ${away}`);
+    const R = C.buildings;
+    if (R) {
+      const from = [R.tally.state ? 'the State’s' : '', R.tally.overture ? 'Overture Maps’' : ''].filter(Boolean).join(' and ');
+      parts.push(`${plural(C.drawn.buildings, 'building')}${C.drawn.buildings && from ? ` (${from})` : ''}`);
+      if (R.overture === 'failed') warn.push(`Overture Maps’ buildings ${away}${R.tally.state ? ', so only the State’s are drawn' : ''}`);
+      else if (R.tally.failed) warn.push(`${plural(R.tally.failed, 'map tile')} of Overture Maps’ buildings could not be read, so some are missing`);
+      if (R.state === 'unreachable' || R.tally.stateFailed) warn.push(`the State’s laser-surveyed building outlines ${away}`);
+      if (R.tally.decodeFailed) warn.push(`${plural(R.tally.decodeFailed, 'map tile')} of buildings could not be read`);
+    } else if (C.buildingsError) warn.push(`the buildings ${away}`);
+    const still = C.status === 'loading' ? ' Reading the rest…' : '';
+    const said = parts.length ? `${short ? '' : 'In this patch: '}${parts.join(' and ')}.` : '';
+    const bad = warn.length ? ` <span class="txt-warn">${warn.map((w, i) => (i ? w : w[0].toUpperCase() + w.slice(1))).join('; ')}.</span>` : '';
+    return `${said}${bad}${still}`.trim();
+  }
+  function coverNoteHtml() {
+    if (typeof GroundCover === 'undefined') return 'Not part of this copy of the app.';
+    const now = coverStatusHtml();
+    return `${now ? `${now} ` : ''}Trees from Meta and WRI’s canopy map — ${coverWord('tree heights', 'Tree height')} from satellite
+      photos of 2010–2020. Buildings from the State’s outlines measured by ${coverWord('LiDAR', 'LiDAR')} where Queensland has
+      surveyed, and from ${coverWord('Overture Maps', 'Overture Maps')} everywhere else, where
+      ${coverWord('building heights', 'Building height')} are mostly estimates and none is under 3 m.`;
+  }
+  function coverWordsHtml() {
+    const W = typeof GroundCover !== 'undefined' && GroundCover.WORDS;
+    if (!W) return '';
+    return `<details class="lat-words small">
+          <summary>What the words about trees and buildings mean</summary>
+          <dl>${COVER_WORDS.filter(k => W[k]).map(k => `<dt>${esc(k)}</dt><dd>${esc(W[k])}</dd>`).join('')}</dl>
+        </details>`;
+  }
+  function refreshCover() {
+    const el = document.getElementById('twin-cover-note');
+    if (el) el.innerHTML = coverNoteHtml();
+    refreshSiteLine();
+    refreshAttrib();
+    syncCanvasName();
+  }
+
   // ── what else is in the patch, as words ──────────────────────────────────
   // The neighbours by name — each a button that goes to that station's own
   // twin — and the bridges with the level their decks stand at and why.
@@ -4089,6 +4379,10 @@ void main() {
       });
       parts.push(`<span class="twin-site-lead"><span aria-hidden="true">🌉</span> Bridges (${B.list.length}):</span> ${words.join(' · ')}`);
     }
+    // The trees and buildings, while they are being read and once they are —
+    // not when they are off, which the Scene panel says.
+    const cv = tw.cover && tw.cover.status !== 'off' ? coverStatusHtml(true) : '';
+    if (cv) parts.push(`<span class="twin-site-lead"><span aria-hidden="true">🌳</span> Trees and buildings:</span> ${cv}`);
     return parts.join(' <span aria-hidden="true">·</span> ');
   }
   function refreshSiteLine() {
@@ -6997,7 +7291,7 @@ void main() {
       tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false; tw.statusBase = ''; tw.model = null;
       tw.photos = null;
       tw.flood = null; tw.vel = null;
-      tw.neighbours = null; tw.bridges = null; tw.bridgesFound = null; tw.tier = null;
+      tw.neighbours = null; tw.bridges = null; tw.bridgesFound = null; tw.tier = null; tw.cover = null;
       if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
       clearScene();
       requestFrame();
@@ -7063,6 +7357,7 @@ void main() {
     tw.elvis = null;
     tw.vel = null;
     tw.horizon = null; tw.horizonImages = null; tw.horizonPending = false; tw.statusBase = ''; tw.model = null;
+    tw.cover = null;
 
     if (!ground) {
       // The last station's scene must not stand in for this one's: cleared,
@@ -7070,6 +7365,7 @@ void main() {
       if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
       tw.photos = null;
       tw.flood = null;
+      tw.cover = null;
       clearScene();
       requestFrame();
       refreshPhotosLine(); syncPhotoPrompt(); refreshFloodLine(); refreshVelPanel();
@@ -7121,6 +7417,7 @@ void main() {
       loadPhotos(st, seq);
       loadBridges(st, seq, notes, askP);
       loadCadastre(seq);
+      loadCover(seq);
       notes.push(...buildFlood(st));
       refreshVelocity(true);
       // A pin being moved, armed before this build — on the map before the
@@ -7206,6 +7503,8 @@ void main() {
     if (st && g) {
       name = `Three-dimensional view of ${st.name}: ${g.size} m of ground at ${g.sample_m.toFixed(1)} m, `
            + `${(g.max - g.min).toFixed(1)} m of relief, ${modelWords(tw.model)} at the station and a 1.75 m figure beside it`
+           + (tw.cover && tw.cover.drawn && (tw.cover.drawn.trees || tw.cover.drawn.buildings)
+             ? `, ${plural(tw.cover.drawn.trees, 'tree')} and ${plural(tw.cover.drawn.buildings, 'building')} standing round it` : '')
            + (sc.horizon ? `, the country round it to ${HORIZON_M / 1000} km under a sky` : '')
            + (tw.flood && !tw.flood.none && sc.flood && S().flood ? `, and water at its flood levels, up to ${FloodStages.ahdText(tw.flood.top)}. ` : '. ')
            + (rig.mode === 'walk' ? 'POV: W A S D move, drag looks, Escape leaves.'
@@ -7408,6 +7707,11 @@ void main() {
         </label>
         <label class="check-label"><input type="checkbox" ${s.imagery ? 'checked' : ''} onchange="DigitalTwin.setImagery(this.checked)"><span>Drape the aerial imagery</span></label>
         ${typeof TwinCadastre !== 'undefined' ? TwinCadastre.panelHtml() : ''}
+        <div class="twin-cover-field">
+          <label class="check-label"><input type="checkbox" id="twin-cover" ${s.cover ? 'checked' : ''} onchange="DigitalTwin.setCover(this.checked)"><span>Trees and buildings</span></label>
+          <p class="small twin-cover-note" id="twin-cover-note">${coverNoteHtml()}</p>
+          ${coverWordsHtml()}
+        </div>
         <label class="check-label"><input type="checkbox" ${s.fitBridges ? 'checked' : ''} onchange="DigitalTwin.setFitBridges(this.checked)"><span>Widen the patch to hold a bridge at its edge</span></label>
         <label class="check-label"><input type="checkbox" ${s.horizon ? 'checked' : ''} onchange="DigitalTwin.setHorizon(this.checked)"><span>The horizon: far ground to ${HORIZON_M / 1000} km, a sky and haze (a few more requests)</span></label>
         ${floodPanelHtml()}
@@ -7607,6 +7911,10 @@ void main() {
     if (typeof Elvis !== 'undefined') parts.push(Elvis.attribution);
     if (tw.ground && tw.ground.geoid && typeof Geoid !== 'undefined') parts.push(Geoid.attribution);
     if (typeof TwinCadastre !== 'undefined') parts.push(TwinCadastre.attribution());
+    // The trees' and the buildings' sources, while any of them stands.
+    const C = tw.cover;
+    if (C && C.drawn && C.drawn.trees && typeof GroundCover !== 'undefined') parts.push(GroundCover.ATTRIBUTION);
+    if (C && C.drawn && C.drawn.buildings && C.buildings && C.buildings.credit) parts.push(...String(C.buildings.credit).split('; '));
     return [...new Set(parts.filter(Boolean))].map(esc).join(' · ');
   }
 
@@ -7642,6 +7950,7 @@ void main() {
     tw.photos = null; tw.photoNear = -1;
     tw.flood = null; tw.vel = null;
     tw.neighbours = null; tw.bridges = null; tw.bridgesFound = null;
+    tw.cover = null;
     rig.pointLatch = false; rig.pointing = false;
     // The next build is an opening: the lines open again, and fold again.
     clearInfoTimer();
@@ -7697,6 +8006,35 @@ void main() {
   // Blender's importer turns into z-up on the way in.
   function pad4(n) { return (4 - (n % 4)) % 4; }
 
+  // Every instance of an instanced mesh as one plain geometry, in the world.
+  function bakeInstances(mesh) {
+    const src = mesh.geometry, P = src.attributes.position, Nn = src.attributes.normal, I = src.index;
+    const nv = P.count, ni = I ? I.count : 0, n = mesh.count;
+    const pos = new Float32Array(nv * n * 3), nor = Nn ? new Float32Array(nv * n * 3) : null;
+    const idx = I ? new Uint32Array(ni * n) : null;
+    const m = new THREE.Matrix4(), nm = new THREE.Matrix3(), v = new THREE.Vector3();
+    for (let i = 0; i < n; i++) {
+      mesh.getMatrixAt(i, m);
+      m.premultiply(mesh.matrixWorld);
+      nm.getNormalMatrix(m);
+      for (let k = 0; k < nv; k++) {
+        const o = (i * nv + k) * 3;
+        v.fromBufferAttribute(P, k).applyMatrix4(m);
+        pos[o] = v.x; pos[o + 1] = v.y; pos[o + 2] = v.z;
+        if (nor) {
+          v.fromBufferAttribute(Nn, k).applyMatrix3(nm).normalize();
+          nor[o] = v.x; nor[o + 1] = v.y; nor[o + 2] = v.z;
+        }
+      }
+      if (idx) for (let k = 0; k < ni; k++) idx[i * ni + k] = I.getX(k) + i * nv;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    if (nor) geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    if (idx) geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    return geo;
+  }
+
   async function buildGlb() {
     if (!sc.scene || !tw.ground || !THREE) return null;
     const st = currentStation();
@@ -7718,6 +8056,11 @@ void main() {
             ? { height_m: tw.model.poleTop, diameter_m: POLE_R * 2 } : null,
           station: tw.model ? { structure: tw.model.structure, telemetry: tw.model.telemetry, telemetry_known: tw.model.telemetryKnown } : null,
           figure: { height_m: FIGURE_H },
+          trees_and_buildings: tw.cover && tw.cover.drawn && (tw.cover.drawn.trees || tw.cover.drawn.buildings) && S().cover
+            ? { trees: tw.cover.drawn.trees, buildings: tw.cover.drawn.buildings, heights: 'true metres above the ground, not exaggerated',
+                attribution: [tw.cover.drawn.trees && typeof GroundCover !== 'undefined' ? GroundCover.ATTRIBUTION : '',
+                              tw.cover.drawn.buildings && tw.cover.buildings ? tw.cover.buildings.credit : ''].filter(Boolean).join('; ') }
+            : null,
           generated: new Date().toISOString(),
         },
       },
@@ -7775,8 +8118,9 @@ void main() {
     // the frame is not in the file.
     sc.scene.traverseVisible(o => { if (o.isMesh && o.userData.export !== false && o.geometry && o.geometry.attributes.position) meshes.push(o); });
     for (const mesh of meshes) {
-      let geo = mesh.geometry.index ? mesh.geometry : mesh.geometry;   // both fine; index optional
-      geo = geo.clone().applyMatrix4(mesh.matrixWorld);
+      // An instanced mesh — the trees — goes in as one mesh of every instance,
+      // each baked where it stands, so the file needs no glTF extension.
+      const geo = mesh.isInstancedMesh ? bakeInstances(mesh) : mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
       if (!geo.attributes.normal) geo.computeVertexNormals();
       const pos = geo.attributes.position.array;
       const n = geo.attributes.position.count;
@@ -7920,6 +8264,7 @@ void main() {
         placeSharp();
         placeNeighbours();
         if (tw.bridgesFound) buildBridges(currentStation(), tw.bridgesFound);
+        if (tw.cover && (tw.cover.trees || tw.cover.buildings)) buildCover();
         if (typeof TwinCadastre !== 'undefined') TwinCadastre.relift();
         placePhotoMarkers();
         placeFlood();
@@ -7938,6 +8283,14 @@ void main() {
       }
     },
     setFitBridges(on) { S().fitBridges = !!on; saveSettings(); init(); },
+    // The trees and buildings: off takes them away and asks nothing; on asks
+    // for the patch standing now.
+    setCover(on) {
+      S().cover = !!on; saveSettings();
+      if (!on) { removeCover(); tw.cover = { status: 'off' }; requestFrame(); refreshCover(); return; }
+      if (sc.scene && tw.ground && tw.origin) loadCover(tw.seq);
+      else { tw.cover = null; refreshCover(); }
+    },
     setHorizon(on) {
       S().horizon = !!on; saveSettings();
       const st = currentStation();
@@ -8237,6 +8590,23 @@ void main() {
             y: n.group.position.y, groundY: yAt(n.x, n.z), signY: n.sign.position.y, signVisible: n.sign.visible,
             parts: (() => { const out = []; n.group.traverse(o => { if (o.isMesh) out.push(o.name); }); return out; })() })),
         } : null,
+        cover: (() => {
+          const C = tw.cover;
+          const meshes = [];
+          if (sc.cover) sc.cover.traverse(o => { if (o.isMesh) meshes.push({ name: o.name, instanced: !!o.isInstancedMesh, count: o.isInstancedMesh ? o.count : null,
+            vertices: o.geometry.attributes.position.count, colour: `#${o.material.color.getHexString()}`, visible: o.visible }); });
+          const R = C && C.buildings;
+          return {
+            on: !!S().cover, status: C ? C.status : null, drawn: C && C.drawn ? { ...C.drawn } : null,
+            treesError: C ? C.treesError || null : null, buildingsError: C ? C.buildingsError || null : null,
+            trees: C && C.placedTrees ? C.placedTrees.slice(0, 400).map(t => ({ ...t })) : [],
+            buildings: C && C.placedBuildings ? C.placedBuildings.slice(0, 400).map(b => ({ ...b })) : [],
+            result: R ? { state: R.state, overture: R.overture, release: R.release, tally: { ...R.tally }, tiles: { ...R.tiles },
+                          found: R.found, credit: R.credit } : null,
+            meshes, inScene: !!(sc.cover && sc.cover.parent === sc.scene),
+            note: (document.getElementById('twin-cover-note') || {}).textContent || null,
+          };
+        })(),
         bridges: tw.bridges ? {
           status: tw.bridges.status, source: tw.bridges.source, failed: tw.bridges.failed,
           crossing: tw.bridges.crossing ? { ...tw.bridges.crossing } : null,

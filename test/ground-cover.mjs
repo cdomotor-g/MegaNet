@@ -1,7 +1,9 @@
-// The trees and buildings in the 3-D view (#278): worker/canopy.js's
-// /api/canopy/<quadkey>.tif and worker/ground.js's /api/ground/* — offline,
-// Meta's bucket a stand-in on fetch, R2 a Map, the project's answers a
-// stand-in.
+// The trees and buildings in the 3-D view (#278) and the digital twin (#280):
+// worker/canopy.js's /api/canopy/<quadkey>.tif and worker/ground.js's
+// /api/ground/* — offline, Meta's bucket a stand-in on fetch, R2 a Map, the
+// project's answers a stand-in — and ground-cover.js's own readers: the tree
+// finder, and the buildings' vector tiles read into outlines, each tile the
+// State's or Overture's and never both.
 //
 // What matters, because each fails open and in silence if wrong: the canopy
 // route fetches exactly one fixed folder, with nothing of the caller's but a
@@ -16,6 +18,7 @@
 import worker from '../worker/index.js';
 import { handleCanopy, isCanopyPath, canopyQuadkey, canopyRange, UPSTREAM, USER_AGENT, CACHE } from '../worker/canopy.js';
 import { handleGround, isGroundPath, groundTarget, MAX_TILE_BYTES, MAX_META_BYTES, TILE_CACHE } from '../worker/ground.js';
+import { mvtTile, square } from './lib/vector-tiles.mjs';
 
 const results = [];
 const check = (what, ok, detail = '') => results.push({ ok: !!ok, what, detail });
@@ -400,8 +403,173 @@ check('the secret key is in no log line', !logged.some(l => l.includes(SECRET)),
       && J(f.geometry.coordinates[0][0]) === J(f.geometry.coordinates[0][f.geometry.coordinates[0].length - 1])), '');
 }
 
+// ── ground-cover.js: the buildings, without a browser (#280) ────────────────
+// The digital twin has no MapLibre to read the buildings' tiles, so
+// ground-cover.js reads them itself: a Mapbox Vector Tile decoder and the
+// one-place-a-tile rule. Held here on tiles written by hand (the protobuf
+// below, the same encoding the State's tiles and Overture's are in), with
+// the State's store and Overture's file stood in for — so every number the
+// twin stands a building on is arithmetic.
+{
+  const fs = await import('node:fs');
+  const vm = await import('node:vm');
+  const zlib = await import('node:zlib');
+  const ctx = vm.createContext({ console, Math, Uint8Array, Float32Array, Int32Array, Uint16Array, Uint32Array, Float64Array,
+    DataView, ArrayBuffer, Map, Set, Promise, JSON, Number, Object, Array, Error, RangeError, TypeError, String, BigInt,
+    TextDecoder, Blob, Response, DecompressionStream, AbortSignal, Date, window: undefined, fetch: null });
+  ctx.window = ctx;
+  vm.runInContext(fs.readFileSync(new URL('../ground-cover.js', import.meta.url), 'utf8') + '\n;globalThis.__GC = GroundCover;', ctx);
+  const GC = ctx.__GC;
+
+  // The tiles are written by test/lib/vector-tiles.mjs, which map3d and twin
+  // write theirs with too.
+  const mvt = (layer, features, extent) => new Uint8Array(mvtTile(layer, features, extent));
+
+  // A zoom-14 tile in south-east Queensland, and where a point in it is in degrees.
+  const Z = 14, TX = 15107, TY = 9530, EXT = 4096;
+  const lngAt = px => (TX + px / EXT) / 2 ** Z * 360 - 180;
+  const latAt = py => Math.atan(Math.sinh(Math.PI * (1 - 2 * (TY + py / EXT) / 2 ** Z))) * 180 / Math.PI;
+  const near = (a, b, tol) => Math.abs(a - b) <= tol;
+
+  // 1. The decoder: a layer, its extent, a polygon, its properties of every kind.
+  const kinds = mvt('building', [square(100, 200, 50, { s: 'shed', d: 7.5, b: true, n: { sint: -3 }, i: { int64: -5 }, u: { uint: 300 } })]);
+  const dec = GC.decodeTile(kinds);
+  const f0 = dec.building && dec.building.features[0];
+  check('the vector tile reader: a layer, its extent, a polygon and its four corners where they were written',
+    !!f0 && dec.building.extent === 4096 && f0.type === 3 && f0.rings.length === 1
+      && J(f0.rings[0]) === J([[100, 200], [150, 200], [150, 250], [100, 250]]), J(dec));
+  check('…and its properties of every kind a tile holds: a string, a double, a bool, a zigzag, a negative 64-bit and an unsigned integer',
+    !!f0 && f0.props.s === 'shed' && f0.props.d === 7.5 && f0.props.b === true && f0.props.n === -3 && f0.props.i === -5 && f0.props.u === 300,
+    J(f0 && f0.props));
+  check('…and only the layers asked for', J(Object.keys(GC.decodeTile(kinds, ['buildings']))) === '[]');
+
+  // 2. The State's tile: its buildings where the tile says, as tall as `h`.
+  const stateBytes = mvt('buildings', [square(1024, 1024, 128, { h: 9 }), square(3000, 3000, 64, { h: 1.2 })]);
+  const st = GC.buildingsFromTile(stateBytes, Z, TX, TY, 'state');
+  const sq = st[0] && st[0].ring;
+  check('a State tile: each outline in degrees where its corners are on the tile, as tall as its `h`, from the State',
+    st.length === 2 && st[0].src === 'state' && st[0].h === 9 && sq.length === 4
+      && near(sq[0][0], lngAt(1024), 1e-7) && near(sq[0][1], latAt(1024), 1e-7)
+      && near(sq[2][0], lngAt(1152), 1e-7) && near(sq[2][1], latAt(1152), 1e-7), J(st));
+  check('…and none under 2 m, the floor the State\'s tiles are cut at', st[1] && st[1].h === 2, J(st[1]));
+
+  // 3. Overture's: height, else floors, else one storey, never under 3 m, and
+  // none of those it marks under the ground.
+  const ovtProps = [{ height: 7.5 }, { num_floors: { sint: 2 } }, {}, { height: 1 }, { height: -1 }, { num_floors: { sint: 0 } },
+                    { height: 12, is_underground: true }, { height: 'tall' }];
+  const ovtBytes = mvt('building', ovtProps.map((p, i) => square(200 + i * 300, 400, 100, p)));
+  const ov = GC.buildingsFromTile(ovtBytes, Z, TX, TY, 'overture');
+  check('an Overture tile: as tall as `height`, 3.2 m a floor, one storey (3.5 m) with neither, never under 3 m, and none it marks under the ground',
+    J(ov.map(b => b.h)) === J([7.5, 6.4, 3.5, 3, 3, 3, 3.5]) && ov.every(b => b.src === 'overture'), J(ov.map(b => b.h)));
+  check('…the same numbers as the 3-D view\'s', GC.buildingHeight({ height: 7.5 }, 'overture') === 7.5
+    && Math.abs(GC.buildingHeight({ num_floors: 2 }, 'overture') - 6.4) < 1e-9 && GC.buildingHeight({}, 'overture') === 3.5
+    && GC.buildingHeight({ height: 1 }, 'overture') === 3);
+  check('…and a State layer is not read as Overture\'s, nor Overture\'s as the State\'s',
+    GC.buildingsFromTile(ovtBytes, Z, TX, TY, 'state').length === 0 && GC.buildingsFromTile(stateBytes, Z, TX, TY, 'overture').length === 0);
+
+  // 4. A building over the tile's edge is cut there: the next tile holds the rest.
+  const edge = GC.buildingsFromTile(mvt('buildings', [square(4000, 100, 200, { h: 6 })]), Z, TX, TY, 'state')[0];
+  const east = edge ? Math.max(...edge.ring.map(p => p[0])) : null;
+  check('a building that runs past the tile\'s edge (its buffer) is cut at the edge, not drawn twice',
+    !!edge && near(east, lngAt(4096), 1e-7) && near(Math.min(...edge.ring.map(p => p[0])), lngAt(4000), 1e-7), J(edge));
+
+  // 5. A courtyard: the hole after its outer ring, wound the other way.
+  const yard = mvt('buildings', [{ rings: [[[500, 500], [900, 500], [900, 900], [500, 900]], [[600, 600], [600, 800], [800, 800], [800, 600]]], props: { h: 8 } }]);
+  const yb = GC.buildingsFromTile(yard, Z, TX, TY, 'state');
+  check('a building round a courtyard: one outline with its hole', yb.length === 1 && yb[0].holes.length === 1 && yb[0].holes[0].length === 4, J(yb));
+
+  // 6. buildings(box): the State's tile where it has one, Overture's for every
+  // other, never both; the State's store and Overture's file stood in for.
+  const box = { west: lngAt(900), east: lngAt(4096 + 600), north: latAt(300), south: latAt(1500) };   // this tile and the next east
+  const world = { meta: 'built', stateDown: false, ovtDown: false, gz: false, asked: [], ovtAsked: [] };
+  const metaBody = { layer: 'qld-buildings', attribution: '© State of Queensland (Department of Resources) 2026, CC BY 4.0', bounds: [150.0, -29.0, 154.0, -26.0] };
+  ctx.fetch = async url => {
+    world.asked.push(String(url));
+    if (/meta\.json$/.test(url)) {
+      if (world.meta === 'down') throw new TypeError('fetch failed');
+      return world.meta === 'built' ? new Response(JSON.stringify(metaBody), { status: 200 }) : new Response('{}', { status: 404 });
+    }
+    const m = /qld-buildings\/(\d+)\/(\d+)\/(\d+)\.pbf$/.exec(url);
+    if (m) {
+      if (world.stateDown) throw new TypeError('fetch failed');
+      if (+m[2] !== TX || +m[3] !== TY) return new Response(null, { status: 204 });
+      return new Response(world.gz ? zlib.gzipSync(stateBytes) : stateBytes, { status: 200 });
+    }
+    return new Response('', { status: 404 });
+  };
+  GC.setOvertureOpener(async () => {
+    if (world.ovtDown) throw new Error('no catalogue');
+    return { release: '2026-10-21.0', file: { getZxy: async (z, x, y) => { world.ovtAsked.push(`${z}/${x}/${y}`); return { data: ovtBytes.buffer.slice(0) }; } } };
+  });
+  const fresh = () => { GC.forgetOverture(); world.asked.length = 0; world.ovtAsked.length = 0; };
+
+  fresh();
+  const b1 = await GC.buildings(box);
+  const here = `${Z}/${TX}/${TY}`, next = `${Z}/${TX + 1}/${TY}`;
+  check('buildings(): the State\'s tile where it has one, Overture\'s for the tile it has none in',
+    b1.tiles[here] === 'state' && b1.tiles[next] === 'overture' && b1.tally.state === 1 && b1.tally.overture === 1 && b1.state === 'built'
+      && b1.overture === 'ready' && b1.release === '2026-10-21.0', J({ tiles: b1.tiles, tally: b1.tally }));
+  check('…and Overture is never asked for the tile the State has — a house is never stood twice',
+    !world.ovtAsked.includes(here) && world.ovtAsked.includes(next), J(world.ovtAsked));
+  check('…only the buildings whose middle is in the box: the State\'s 9 m one, and Overture\'s in the next tile',
+    b1.buildings.some(b => b.src === 'state' && b.h === 9) && !b1.buildings.some(b => b.src === 'state' && b.h === 2)
+      && b1.buildings.filter(b => b.src === 'overture').length > 0 && b1.buildings.every(b => {
+        const cx = b.ring.reduce((s, p) => s + p[0], 0) / b.ring.length, cy = b.ring.reduce((s, p) => s + p[1], 0) / b.ring.length;
+        return cx >= box.west && cx <= box.east && cy >= box.south && cy <= box.north; }), J(b1.buildings.map(b => [b.src, b.h])));
+  check('…credited to the State, in its own words, and to OpenStreetMap and Overture',
+    b1.credit.includes(metaBody.attribution) && b1.credit.includes('© OpenStreetMap contributors, Overture Maps Foundation (ODbL)'), b1.credit);
+
+  fresh();
+  world.gz = true;
+  GC.clearCache();
+  const b2 = await GC.buildings(box);
+  check('a State tile that arrives still gzipped is unpacked', b2.tiles[here] === 'state' && b2.buildings.some(b => b.src === 'state' && b.h === 9), J(b2.tally));
+  world.gz = false;
+
+  fresh(); GC.clearCache();
+  world.meta = 'missing';
+  const b3 = await GC.buildings(box);
+  check('the State\'s tiles not built yet (meta.json 404): the State is not asked for a tile, Overture is asked for both',
+    b3.state === 'not built' && !world.asked.some(u => /\.pbf$/.test(u)) && b3.tiles[here] === 'overture' && b3.tiles[next] === 'overture'
+      && !b3.credit.includes('State of Queensland'), J({ asked: world.asked, tiles: b3.tiles, credit: b3.credit }));
+
+  fresh(); GC.clearCache();
+  world.meta = 'built'; world.ovtDown = true;
+  let threw = null, b4 = null;
+  try { b4 = await GC.buildings(box); } catch (err) { threw = err; }
+  check('Overture out of reach: nothing thrown, the State\'s tile still read, the other tile empty, and it says Overture failed',
+    !threw && b4.overture === 'failed' && b4.tiles[here] === 'state' && b4.tiles[next] === 'none' && b4.buildings.every(b => b.src === 'state'),
+    J({ threw: threw && threw.message, b4: b4 && { tiles: b4.tiles, overture: b4.overture } }));
+  world.ovtDown = false;
+
+  fresh(); GC.clearCache();
+  world.meta = 'down';
+  const b5 = await GC.buildings(box);
+  check('the State\'s store out of reach: said so, and Overture\'s buildings everywhere instead',
+    b5.state === 'unreachable' && b5.tiles[here] === 'overture' && b5.tiles[next] === 'overture', J({ state: b5.state, tiles: b5.tiles }));
+  world.meta = 'built';
+
+  fresh(); GC.clearCache();
+  world.stateDown = true;
+  const b6 = await GC.buildings(box);
+  check('a State tile that cannot be fetched: counted, and the tile is Overture\'s',
+    b6.tally.stateFailed >= 1 && b6.tiles[here] === 'overture', J(b6.tally));
+  world.stateDown = false;
+
+  let refused = null;
+  try { await GC.buildings({ west: 150, east: 150.1, south: -27.1, north: -27 }); } catch (err) { refused = err; }
+  check('a box wider than 3 km is refused', refused instanceof ctx.RangeError || (refused && refused.name === 'RangeError'), String(refused));
+
+  check('Overture\'s release is the catalogue\'s child marked latest, in its own form, and nothing else',
+    GC.latestRelease({ latest: '2026-09-23.0', links: [{ rel: 'child', href: 'https://stac.overturemaps.org/2026-10-21.0/catalog.json', latest: true }] }) === '2026-10-21.0'
+      && GC.latestRelease({ latest: '../evil' }) === null && GC.latestRelease({ links: [{ rel: 'child', href: 'https://x/../../catalog.json', latest: true }] }) === null);
+  const devPm = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8')).devDependencies.pmtiles;
+  check('the buildings reader asked of unpkg is the version the checks run against', GC.PMTILES_VER === devPm, `${GC.PMTILES_VER} vs ${devPm}`);
+  GC.setOvertureOpener(null);
+}
+
 // ── Report ────────────────────────────────────────────────────────────────────
 const failed = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '  ✓' : '  ✗'} ${r.what}${r.ok || !r.detail ? '' : ` — ${String(r.detail).slice(0, 300)}`}`);
-console.log(failed.length ? `\nFAIL — ${failed.length} of ${results.length}.` : `\nPASS — ${results.length} checks: the canopy route asks one fixed folder with nothing of the caller's but a byte range, and the ground tiles are read by anybody (an empty one a 204) and written with the secret key only.`);
+console.log(failed.length ? `\nFAIL — ${failed.length} of ${results.length}.` : `\nPASS — ${results.length} checks: the canopy route asks one fixed folder with nothing of the caller's but a byte range, and the ground tiles are read by anybody (an empty one a 204) and written with the secret key only; the buildings' tiles are read as written, a tile from one place only.`);
 process.exitCode = failed.length ? 1 : 0;
