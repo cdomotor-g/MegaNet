@@ -263,7 +263,7 @@ const Admin = (function () {
                     <div class="small txt-muted adm-also">+ ${esc(a.email)} · ${termHtml('second address', WORDS.second)}${
                       a.mail_here ? ' · their emails go here' : ''}
                       <button type="button" class="link-btn" onclick="Admin.freeAddress('${escAttr(a.email)}')"
-                        aria-label="Free ${escAttr(a.email)} from ${escAttr(u.email)}">Free…</button></div>`).join('');
+                        aria-label="Free ${esc(a.email)} from ${esc(u.email)}">Free…</button></div>`).join('');
   }
 
   // The word for an account's standing, in the users table.
@@ -362,14 +362,14 @@ const Admin = (function () {
               ${list.map(u => `
                 <tr data-user="${escAttr(u.id)}">
                   <td>${esc(u.email)}${u.is_you ? ' <span class="badge">you</span>' : ''}${secondHtml(u)}</td>
-                  <td><input type="text" data-f="name" value="${escAttr(u.display_name || '')}"
-                             aria-label="Display name for ${escAttr(u.email)}"></td>
-                  <td><select data-f="role" aria-label="Role for ${escAttr(u.email)}">
+                  <td><input type="text" data-f="name" value="${esc(u.display_name || '')}"
+                             aria-label="Display name for ${esc(u.email)}"></td>
+                  <td><select data-f="role" aria-label="Role for ${esc(u.email)}">
                     ${ROLES.map(r => `<option value="${r}"${u.role === r ? ' selected' : ''}>${r}</option>`).join('')}
                   </select>${roleHint(u)}</td>
                   <td>${standingCell(u)}</td>
                   <td>${mayEditCell(u)}</td>
-                  <td class="small col-optional" title="${escAttr(lastSeenTitle(u))}">${u.active_sessions
+                  <td class="small col-optional" title="${esc(lastSeenTitle(u))}">${u.active_sessions
                     ? '<span class="adm-online">● online</span>'
                     : esc(typeof AdminDash !== 'undefined' ? AdminDash.ago(u.last_seen_at || u.last_sign_in_at) : '')}
                     ${u.visits_30d ? `<br><span class="txt-muted">${Math.min(30, u.visits_30d)} day${u.visits_30d === 1 ? '' : 's'} in 30</span>` : ''}</td>
@@ -394,7 +394,7 @@ const Admin = (function () {
     const st = STANDING[u.status];
     if (!st) return '—';
     const by = u.status === 'approved' && u.decided_by ? ` by ${u.decided_by}` : '';
-    return `<span class="${st[1]}" title="${escAttr(st[2] + by)}">${esc(st[0])}</span>`;
+    return `<span class="${st[1]}" title="${esc(st[2] + by)}">${esc(st[0])}</span>`;
   }
 
   // Does the allowlist let this account edit right now? admin_users' may_edit
@@ -466,7 +466,7 @@ const Admin = (function () {
         <form class="adm-form" onsubmit="Admin.saveEntry();return false">
           <label>Address or @domain
             <input type="text" id="adm-entry" inputmode="email" autocomplete="off" required
-                   value="${escAttr(form.entry)}" oninput="Admin.formField('entry',this.value)"
+                   value="${esc(form.entry)}" oninput="Admin.formField('entry',this.value)"
                    placeholder="someone@example.org or @example.org"></label>
           <label>Initial role
             <select id="adm-entry-role" onchange="Admin.formField('role',this.value)">
@@ -474,7 +474,7 @@ const Admin = (function () {
               ${ROLES.map(r => `<option value="${r}"${form.role === r ? ' selected' : ''}>${r}</option>`).join('')}
             </select></label>
           <label>Note
-            <input type="text" id="adm-entry-note" value="${escAttr(form.note)}"
+            <input type="text" id="adm-entry-note" value="${esc(form.note)}"
                    oninput="Admin.formField('note',this.value)" placeholder="Who they are, why they are here"></label>
           <button type="submit" class="primary">Add / update</button>
         </form>
@@ -524,7 +524,7 @@ const Admin = (function () {
     const who = users ? matchedUsers(a).map(u => u.email) : [];
     if (!who.length) return esc(n);
     return n === 1 && !isDomain(a) ? '1'
-      : `<span title="${escAttr(who.join(', '))}">${esc(n)}</span>`;
+      : `<span title="${esc(who.join(', '))}">${esc(n)}</span>`;
   }
 
   // Why the people and the rules are two lists, and what each word means — the

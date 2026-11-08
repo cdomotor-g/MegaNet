@@ -1041,7 +1041,7 @@ const Auth = (function () {
     return `
           <label>Email address
             <input type="email" id="au-email" name="email" autocomplete="${autocomplete}" inputmode="email" required
-                   value="${escAttr(ui.email)}" ${busy ? 'disabled' : ''} spellcheck="false" autocapitalize="off"
+                   value="${esc(ui.email)}" ${busy ? 'disabled' : ''} spellcheck="false" autocapitalize="off"
                    ${ui.step === 'signup' ? 'oninput="Auth.checkAddress(this.value)"' : ''}>
           </label>`;
   }
@@ -1144,7 +1144,7 @@ const Auth = (function () {
     if (!list.length) return '';
     const to = String((who && who.mail_to) || own || '').toLowerCase();
     const opt = (value, label) => `
-              <label class="check-inline"><input type="radio" name="au-mail-to" value="${escAttr(value)}"
+              <label class="check-inline"><input type="radio" name="au-mail-to" value="${esc(value)}"
                 ${to === String(value || own || '').toLowerCase() ? 'checked' : ''} ${busy ? 'disabled' : ''}
                 onchange="Auth.mailTo(this.value)"> ${esc(label)}</label>`;
     return `
@@ -1263,7 +1263,7 @@ const Auth = (function () {
             easy to remember — and a password manager can make and keep one for you.</p>
           <label>Your name <span class="txt-muted">(optional — what administrators see)</span>
             <input type="text" id="au-name" name="name" autocomplete="name" maxlength="60"
-                   value="${escAttr(ui.name)}" ${busy ? 'disabled' : ''}>
+                   value="${esc(ui.name)}" ${busy ? 'disabled' : ''}>
           </label>
           ${msg}
           <div class="modal-foot">
@@ -1285,7 +1285,7 @@ const Auth = (function () {
           ${emailHtml(busy)}
           <label>Six-digit code from the email
             <input type="text" id="au-code" inputmode="numeric" autocomplete="one-time-code"
-                   placeholder="123456" value="${escAttr(ui.code)}" ${busy ? 'disabled' : ''}>
+                   placeholder="123456" value="${esc(ui.code)}" ${busy ? 'disabled' : ''}>
           </label>
           ${linkHtml('The email\'s link does the same job, in whichever tab it opens.')}
           <div class="modal-foot">
@@ -1316,7 +1316,7 @@ const Auth = (function () {
           ${msg}
           <label>Six-digit code from the email
             <input type="text" id="au-code" inputmode="numeric" autocomplete="one-time-code"
-                   placeholder="123456" value="${escAttr(ui.code)}" ${busy ? 'disabled' : ''}>
+                   placeholder="123456" value="${esc(ui.code)}" ${busy ? 'disabled' : ''}>
           </label>
           ${linkHtml()}
           ${notArrivedHtml()}
@@ -1365,7 +1365,7 @@ const Auth = (function () {
         <form class="modal-form" onsubmit="Auth.verifyCode(event)" novalidate>
           <label>Six-digit code from the email
             <input type="text" id="au-code" inputmode="numeric" autocomplete="one-time-code"
-                   placeholder="123456" value="${escAttr(ui.code)}" ${busy ? 'disabled' : ''}>
+                   placeholder="123456" value="${esc(ui.code)}" ${busy ? 'disabled' : ''}>
           </label>
           ${linkHtml('The email also contains a link. Clicking it signs you in in whichever tab it opens, and you can ignore this box.')}
           ${msg}

@@ -48,7 +48,7 @@ const AdminTeams = (function () {
   }
   const suggestHtml = t => addable(t).map(u => {
     const name = String(u.display_name || '').trim();
-    return `<option value="${escAttr(u.email)}"${name && name.toLowerCase() !== String(u.email).toLowerCase() ? ` label="${escAttr(name)}"` : ''}></option>`;
+    return `<option value="${esc(u.email)}"${name && name.toLowerCase() !== String(u.email).toLowerCase() ? ` label="${esc(name)}"` : ''}></option>`;
   }).join('');
 
   // The words, from the Tasks tab's one list.
@@ -91,7 +91,7 @@ const AdminTeams = (function () {
     return `<option value=""${cur ? '' : ' selected'}>No hub</option>` + hubs().map(h => {
       const by = taken.get(h.id);
       const other = by && (!edit || by.id !== edit.id) && by.id !== openId;
-      return `<option value="${escAttr(h.id)}"${h.id === cur ? ' selected' : ''}>${esc(h.name)}${other ? ` — ${esc(by.name)}'s` : ''}</option>`;
+      return `<option value="${esc(h.id)}"${h.id === cur ? ' selected' : ''}>${esc(h.name)}${other ? ` — ${esc(by.name)}'s` : ''}</option>`;
     }).join('');
   }
 
@@ -130,7 +130,7 @@ const AdminTeams = (function () {
       <form class="adm-tok-form adm-team-add" onsubmit="event.preventDefault(); AdminTeams.addPerson('${escAttr(t.id)}')">
         <label>Add somebody, by the address of their Flood-Net account
           <input type="email" id="adm-team-add-${escAttr(t.id)}" maxlength="254" autocomplete="off" spellcheck="false"
-                 list="adm-team-people" value="${escAttr(a.email)}" oninput="AdminTeams.addField('${escAttr(t.id)}', 'email', this.value)"></label>
+                 list="adm-team-people" value="${esc(a.email)}" oninput="AdminTeams.addField('${escAttr(t.id)}', 'email', this.value)"></label>
         <datalist id="adm-team-people">${suggestHtml(t)}</datalist>
         <label class="check-label"><input type="checkbox" id="adm-team-add-own-${escAttr(t.id)}"${a.owner ? ' checked' : ''}
           onchange="AdminTeams.addField('${escAttr(t.id)}', 'owner', this.checked)"><span>As an owner</span></label>
@@ -146,7 +146,7 @@ const AdminTeams = (function () {
     return `<section class="adm-team-open" aria-labelledby="adm-team-h">
         <h3 id="adm-team-h" tabindex="-1">${esc(t.name)}</h3>
         <form class="adm-tok-form" onsubmit="event.preventDefault(); AdminTeams.saveEdit()">
-          <label>Name <input type="text" id="adm-team-name" maxlength="80" value="${escAttr(e.name)}"
+          <label>Name <input type="text" id="adm-team-name" maxlength="80" value="${esc(e.name)}"
             oninput="AdminTeams.editField('name', this.value)"></label>
           <label>${termHtml('Hub', word('hub'))} <select id="adm-team-hub" onchange="AdminTeams.editField('hub', this.value)">${hubOptions(e.hub)}</select></label>
           <label class="check-label"><input type="checkbox" id="adm-team-hands"${e.hands ? ' checked' : ''}
@@ -193,7 +193,7 @@ const AdminTeams = (function () {
         <div id="adm-team-open">${openHtml()}</div>
         <h3 class="adm-req-h">Make a team</h3>
         <form class="adm-tok-form" onsubmit="event.preventDefault(); AdminTeams.make()">
-          <label>Name <input type="text" id="adm-team-new-name" maxlength="80" value="${escAttr(make.name)}"
+          <label>Name <input type="text" id="adm-team-new-name" maxlength="80" value="${esc(make.name)}"
             oninput="AdminTeams.makeField('name', this.value)" placeholder="e.g. Townsville electrical"></label>
           <label>${termHtml('Hub', word('hub'))} <select id="adm-team-new-hub" onchange="AdminTeams.makeField('hub', this.value)">${hubOptions(make.hub)}</select></label>
           <label class="check-label"><input type="checkbox" id="adm-team-new-hands"${make.hands ? ' checked' : ''}

@@ -157,7 +157,7 @@ const AdminDash = (function () {
   function meter(used, limit, label) {
     const p = Math.min(100, pct(used, limit));
     const tone = p >= 90 ? 'bad' : p >= 70 ? 'warn' : 'ok';
-    return `<div class="adm-meter" role="img" aria-label="${escAttr(`${label}: ${p}% of ${bytes(limit)}`)}">
+    return `<div class="adm-meter" role="img" aria-label="${esc(`${label}: ${p}% of ${bytes(limit)}`)}">
       <span class="adm-meter-fill adm-meter--${tone}" style="width:${p}%"></span></div>`;
   }
 
@@ -169,7 +169,7 @@ const AdminDash = (function () {
     const max = Math.max(...rows.map(r => r.v), 1);
     return `<ul class="adm-bars"${id ? ` aria-labelledby="${id}"` : ''}>
       ${rows.map(r => `
-        <li title="${escAttr(`${r.k}: ${fmt(r.v)}${r.note ? ` — ${r.note}` : ''}`)}">
+        <li title="${esc(`${r.k}: ${fmt(r.v)}${r.note ? ` — ${r.note}` : ''}`)}">
           <span class="adm-bar-k">${esc(r.k)}</span>
           <span class="adm-bar-track"><span class="adm-bar" style="width:${Math.max(0.5, (r.v / max) * 100)}%"></span></span>
           <span class="adm-bar-v">${esc(fmt(r.v))}</span>
@@ -185,7 +185,7 @@ const AdminDash = (function () {
     const cols = days.map(d => {
       const tot = d.signed_in + d.anonymous;
       const lbl = `${d.day}: ${d.signed_in} signed in, ${d.anonymous} anonymous, ${d.hits} opens`;
-      return `<div class="adm-col" title="${escAttr(lbl)}">
+      return `<div class="adm-col" title="${esc(lbl)}">
         <span class="adm-col-seg adm-col--in" style="height:${(d.signed_in / max) * 100}%"></span>
         <span class="adm-col-seg adm-col--anon" style="height:${(d.anonymous / max) * 100}%"></span>
         ${tot ? '' : '<span class="adm-col-zero"></span>'}
@@ -402,8 +402,8 @@ const AdminDash = (function () {
             <td>${bytes(t.bytes)}</td>
             <td class="small">${bytes(t.index_bytes)}</td>
             <td class="small${t.dead >= 20 && (t.dead_rows || 0) > 1000 ? ' txt-warn' : ''}">${t.dead}%</td>
-            <td class="small" title="${escAttr(`${num(t.inserts)} inserted · ${num(t.updates)} updated · ${num(t.deletes)} deleted · ${num(t.seq_scans)} sequential and ${num(t.idx_scans)} index scans`)}">${num(t.writes)}</td>
-            <td class="small" title="${escAttr(t.last_analyze ? `analysed ${new Date(t.last_analyze).toLocaleString()}` : '')}">${ago(t.last_vacuum)}</td>
+            <td class="small" title="${esc(`${num(t.inserts)} inserted · ${num(t.updates)} updated · ${num(t.deletes)} deleted · ${num(t.seq_scans)} sequential and ${num(t.idx_scans)} index scans`)}">${num(t.writes)}</td>
+            <td class="small" title="${esc(t.last_analyze ? `analysed ${new Date(t.last_analyze).toLocaleString()}` : '')}">${ago(t.last_vacuum)}</td>
           </tr>`).join('')}</tbody>
         </table>
       </div>
@@ -416,7 +416,7 @@ const AdminDash = (function () {
       <div class="panel adm-span">
         <div class="panel-header">
           <h3 id="adm-tbl-h">Tables</h3>
-          <input type="search" class="adm-filter" placeholder="Filter by name or area" value="${escAttr(filter)}"
+          <input type="search" class="adm-filter" placeholder="Filter by name or area" value="${esc(filter)}"
                  aria-label="Filter tables" oninput="AdminDash.filterTables(this.value)">
         </div>
         <div id="adm-tables">${tablesInner(d)}</div>
