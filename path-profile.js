@@ -510,6 +510,11 @@ function pathAnalyse(prof, opt) {
   const groundB = endOn(o.elevB, tileB);
   const liftA = o.elevA != null && tileA != null && tileA > o.elevA ? tileA - o.elevA : 0;
   const liftB = o.elevB != null && tileB != null && tileB > o.elevB ? tileB - o.elevB : 0;
+  // Where each end's height came from, which is its datum: a survey or the
+  // 5 m LiDAR is AHD, the ~30 m tiles are on the EGM96 geoid (groundOfEnd).
+  const srcOf = (survey, tile, i) => (survey != null && (tile == null || survey >= tile) ? 'survey'
+    : prof.lidar && prof.lidar[i] ? 'lidar' : 'tile');
+  const srcA = srcOf(o.elevA, tileA, 0), srcB = srcOf(o.elevB, tileB, last);
   if (groundA != null) g[0] = groundA;
   if (groundB != null) g[last] = groundB;
   if (groundA == null || groundB == null) {
@@ -671,7 +676,7 @@ function pathAnalyse(prof, opt) {
     k, N_s, hSys, prop,
     model: field ? 'field' : 'cover', allowance_db: allowance,
     verdictBare, diffractionBare_db: diffractionBareDb,
-    liftA_m: liftA, liftB_m: liftB,
+    liftA_m: liftA, liftB_m: liftB, srcA, srcB,
     intrusion_m: Math.max(0, maxIntrusion),
     diffraction_db: diffractionDb,
     v: isFinite(maxV) ? maxV : null,
@@ -2611,14 +2616,15 @@ const PathProfile = (function () {
     const lifted = [[an.liftA_m, a], [an.liftB_m, b]].filter(([m]) => m > 0.5)
       .map(([m, e]) => `${esc(e.name)} ${m.toFixed(1)} m`);
     const datumText = (a.elev != null || b.elev != null) ? `
-      <p class="filter-hint">Ends use the station's surveyed <code>elevation_ahd</code> (AHD);
-        the ground between comes from tiles referenced to the EGM96 geoid. The two agree to
-        about a metre over Australia — inside the ~${prof.resolution_m} m sampling error, but not the
-        same datum. Treat every height here as indicative.${lifted.length ? ` Where a survey is below
+      <p class="filter-hint">Ends use the station's surveyed <code>elevation_ahd</code> (AHD), or the
+        5 m LiDAR (also AHD) where it is on; the ground between comes from tiles referenced to the EGM96
+        geoid. They are not the same datum: across Australia a height on AHD reads 2.1 m less to 0.6 m
+        more than the same point's on EGM96 — inside the tiles' own error, but there. The radio link
+        names each end's datum. Treat every height here as indicative.${lifted.length ? ` Where a survey is below
         the tile under it, the end is stood on the tile instead (${lifted.join(', ')} higher) — the
         tiles round it are a surface, and an antenna below it would start the path in a pit.` : ''}</p>` : `
-      <p class="filter-hint">All heights are sampled from tiles (EGM96 geoid, not AHD) — neither
-        end is snapped to a station with a surveyed elevation.</p>`;
+      <p class="filter-hint">All heights are sampled from tiles (EGM96 geoid, not AHD), or the 5 m
+        LiDAR (AHD) where it is on — neither end is snapped to a station with a surveyed elevation.</p>`;
     const datum = pathMoreHtml('path-heights', 'About the heights — survey and terrain datums', datumText);
 
     shown = { an, prof, a, b, flat: false, sig: signalIn(an, a, b), warn, datum };
@@ -2972,6 +2978,7 @@ const PathProfile = (function () {
   }
 
   function rlWindowHtml(rep) {
+    askGeoid(rep.an);
     const S = compactOf(rep);
     const words = new Map(rlWords());
     const mean = k => words.get(k) || '';
@@ -2992,14 +2999,14 @@ const PathProfile = (function () {
       S.grid.map(r => `<div class="rl-row">${r.map(cell).join('')}</div>`).join('')}</div>`;
     // A row that opens the box (editEnd) is a button in its figure's place,
     // and the whole row takes the press: a label is as likely to be aimed at.
-    const row = (W, E) => ([k, v1, v2]) => {
+    const row = (W, E) => ([k, v1, v2, v2Means]) => {
       const f = rlEditable(E, RL_EDIT[k]) ? RL_EDIT[k] : null;
       const id = `rl-edit-${W}-${k.toLowerCase().replace(/[^a-z]+/g, '-')}`;
       const tip = RL_WHY[k] || `Type your own ${f ? RL_FIELD[f].label : k} for ${E.name} — for this card, the link budget and every path with it`;
       const val = f ? `<button type="button" class="rl-edit" id="${id}" title="${escAttr(tip)}">${esc(v1)}</button>` : esc(v1);
       return `
           <div${f ? ` class="is-edit" onclick="PathProfile.editEnd('${W}', '${f}')"` : ''}><dt>${termHtml(k, mean(k))}</dt><dd>${val}</dd>${
-            v2 ? `<dd class="rl-v2">${esc(v2)}</dd>` : ''}</div>`;
+            v2 ? `<dd class="rl-v2">${termHtml(v2, v2Means)}</dd>` : ''}</div>`;
     };
     const end = (which, tag, P) => `
       <section class="rl-end" aria-label="${tag === 'TX' ? 'Transmitter' : 'Receiver'} — end ${which.toUpperCase()}">
@@ -3028,6 +3035,10 @@ const PathProfile = (function () {
         <p class="rl-settings">${S.settings.map(([k, v]) =>
           `<span>${termHtml(k, mean(k))} <b>${esc(v)}</b></span>`).join(' · ')}</p>
         <p class="rl-rm">${rmLine} ${S.marks.map(m => esc(m.replace(/[.\s]*$/, '.'))).join(' ')} ✦ Flood-Net only. Indicative only.</p>
+        <p class="rl-heights">${S.heights.map(r => {
+          const t = r.term ? termHtml(r.t, DATUM_MEANS[r.term]) : esc(r.t);
+          return r.b ? `<b>${t}</b>` : t;
+        }).join('')}</p>
       </div>`;
     const chart = chartHere(true);
     // What goes under the window, in the card's "More about this path": the
@@ -3302,10 +3313,14 @@ const PathProfile = (function () {
     const deg3 = v => `${String(Math.floor(v)).padStart(3, '0')}${(v % 1).toFixed(1).slice(1)}°`;
 
     const edited = (e, k) => (radioIsOver(e.key, k) ? ' — edited on the card' : '');
-    const groundOf = (e, ground, lift) => `${ground.toFixed(1)} m — ${e.elev == null
-      ? 'terrain tile (EGM96 geoid)'
-      : lift > 0.5 ? `terrain tile: the survey (${e.elev.toFixed(1)} m AHD) is ${lift.toFixed(1)} m under it, so the end stands on the tile`
-      : 'surveyed elevation (AHD)'}`;
+    const groundOf = (e, end) => {
+      const E = groundOfEnd(an, prof, end);
+      if (E.src === 'survey') return `${E.ground.toFixed(1)} m AHD — surveyed elevation`;
+      const what = E.src === 'lidar' ? '5 m LiDAR'
+        : `terrain tile (EGM96 geoid${E.ahd != null ? `; ${E.ahd.toFixed(1)} m AHD` : ''})`;
+      return `${E.ground.toFixed(1)} m ${E.datum} — ${what}${E.lift > 0.5 && e.elev != null
+        ? `: the survey (${e.elev.toFixed(1)} m AHD) is ${E.lift.toFixed(1)} m under it, so the end stands on it` : ''}`;
+    };
     const aglOf = (e, agl) => `${agl.toFixed(1)} m AGL — ${radioIsOver(e.key, 'agl_m') ? 'edited on the card'
       : e.station && stationAntenna(e.station, e.sys).mast ? `the repeater/base mast minimum (its radio system says ${stationAntenna(e.station, e.sys).sysAgl} m)`
       : e.sys ? 'its radio system' : 'default'}`;
@@ -3314,12 +3329,12 @@ const PathProfile = (function () {
       const c = LandCover.CLASSES[cls];
       return `${c.label}${R > 0 ? `, ${Math.round(R)} m` : ''}${db > 0 ? ` — the ${agl} m antenna is under it: ${db.toFixed(1)} dB terminal clutter (ITU-R P.2108)` : ''}`;
     };
-    const endCol = (e, r, p, ground, lift, agl, z, az, elev) => [
+    const endCol = (e, end, r, p, agl, z, az, elev) => [
       `${e.name}${e.station && e.station.station_number ? ` (station ${e.station.station_number})` : ''}`,
       e.station ? (e.station.roles || []).join(', ') || 'station' : 'a point on the ground — no station',
       `${p.lat.toFixed(6)}°, ${p.lon.toFixed(6)}°${p.stood > 1 ? ` (stood ${p.stood.toFixed(0)} m from its registered position, on the highest LiDAR ground within its rounding)` : ''}`,
       `${dmsOf(p.lat, 'N', 'S')}, ${dmsOf(p.lon, 'E', 'W')}`,
-      groundOf(e, ground, lift),
+      groundOf(e, end),
       aglOf(e, agl),
       `${z.toFixed(1)} m`,
       e.sys ? `${e.sys.name}${e.sys.antenna_type ? ` (${e.sys.antenna_type})` : ''}` : (e.isStation ? 'none on file' : '—'),
@@ -3333,8 +3348,8 @@ const PathProfile = (function () {
     const endLabels = ['Station', 'Role', 'Position (WGS84, decimal)', 'Position (WGS84, DMS)', 'Ground elevation',
       'Antenna height', 'Antenna height above datum', 'Radio system', 'TX power', 'Antenna gain', 'Line loss',
       'RX threshold', 'Azimuth to the other end', 'Elevation angle to the other end'];
-    const colA = endCol(a, ra, pa, an.groundA, an.liftA_m, an.aglA, an.txZ, azAB, an.elevA_deg);
-    const colB = endCol(b, rb, pb, an.groundB, an.liftB_m, an.aglB, an.rxZ, azBA, an.elevB_deg);
+    const colA = endCol(a, 0, ra, pa, an.aglA, an.txZ, azAB, an.elevA_deg);
+    const colB = endCol(b, 1, rb, pb, an.aglB, an.rxZ, azBA, an.elevB_deg);
     const ends = endLabels.map((l, i) => [l, colA[i], colB[i]]);
     if (an.coverUsed) {
       ends.push(['Land cover at the antenna', coverAt(an.coverA, an.R_A, an.aglA, an.clutterA_db), coverAt(an.coverB, an.R_B, an.aglB, an.clutterB_db)]);
@@ -3460,7 +3475,7 @@ const PathProfile = (function () {
         : `Radio Mobile runs the same Longley–Rice: set up with the figures above, its “Rx relative” for this path should read about ${signed(pm.m, 1)} dB, give or take what its own terrain data differs by.`);
     }
     notes.push(`Bands: ${LB_MARGIN.map(m => (isFinite(m.min) ? `${m.label} ${m.min} dB or more` : `${m.label} below that`)).join(', ')} — at the reliability asked for.`);
-    notes.push('Indicative only. The ends are surveyed heights (AHD) where the register has them and the ground between is terrain tiles on the EGM96 geoid — the two agree to about a metre over Australia. Antenna patterns are not modelled.');
+    notes.push('Indicative only. The ends are surveyed heights or 5 m LiDAR (both AHD) where there are any, and the ground between is terrain tiles on the EGM96 geoid — not the same datum: across Australia a height on AHD reads 2.1 m less to 0.6 m more than the same point’s on EGM96. Antenna patterns are not modelled.');
 
     const stamp = new Date().toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' });
     const title = rp ? rp.title : 'Elevation profile';
@@ -3507,9 +3522,12 @@ const PathProfile = (function () {
       const max = Math.max(4, Math.floor(px / (size * 0.56)));
       return t.length > max ? `${t.slice(0, max - 1)}…` : t;
     };
-    const endText = (e, ground, agl, role, x, anchor) => `
+    const endText = (e, end, agl, role, x, anchor) => {
+      const G = groundOfEnd(an, rep.prof, end);
+      return `
       <text x="${x}" y="${head - 24}" font-size="13" font-weight="700" text-anchor="${anchor}" fill="${ink}">${esc(fit(`${role} · ${e.name}`, W / 2 - 70, 13))}</text>
-      <text x="${x}" y="${head - 7}" font-size="12" text-anchor="${anchor}" fill="${muted}">${esc(`ground ${ground.toFixed(1)} m · antenna ${agl.toFixed(1)} m AGL`)}</text>`;
+      <text x="${x}" y="${head - 7}" font-size="12" text-anchor="${anchor}" fill="${muted}">${esc(`ground ${G.ground.toFixed(1)} m ${G.datum} · antenna ${agl.toFixed(1)} m AGL`)}</text>`;
+    };
     // The key, wrapped to the width: a swatch drawn as the chart draws the thing.
     const items = [
       ['los', 'Line of sight, A → B'], ['fres', '60% Fresnel zone'], ['gnd', `Ground (earth curvature included, k = ${an.k.toFixed(2)})`],
@@ -3557,8 +3575,8 @@ const PathProfile = (function () {
       <rect x="0" y="0" width="${W}" height="${total}" fill="#ffffff"/>
       ${bare ? '' : `<text x="16" y="28" font-size="19" font-weight="700" fill="${ink}">${esc(fit(rep.heading, W - 32, 19))}</text>
       <text x="16" y="50" font-size="13" fill="${muted}">${esc(fit(rep.sub, W - 32, 13))}</text>`}
-      ${named ? endText(a, an.groundA, an.aglA, 'A, transmitter', 52, 'start') : ''}
-      ${named ? endText(b, an.groundB, an.aglB, 'B, receiver', W - 14, 'end') : ''}
+      ${named ? endText(a, 0, an.aglA, 'A, transmitter', 52, 'start') : ''}
+      ${named ? endText(b, 1, an.aglB, 'B, receiver', W - 14, 'end') : ''}
       ${inner}
       ${key}
       <text x="16" y="${total - 10}" font-size="11" fill="${muted}">${esc(fit(foot, W - 32, 11))}</text>
@@ -3730,6 +3748,8 @@ const PathProfile = (function () {
     ['EIRP / ERP', 'The power the antenna sends out, counted against an antenna that radiates equally every way (EIRP) or against a dipole (ERP, 2.15 dB less).'],
     ['S9, S9+10', 'The signal meter on a radio: S9 is −93 dBm (5 µV) at VHF, each S-unit below it 6 dB, and above it +10, +20 dB over S9.'],
     ['✦', 'Flood-Net’s own: Radio Mobile has no such term. Its Urban and Forest stand in these two places.'],
+    // The chart names each end's ground with its datum (groundOfEnd).
+    ...Object.entries(DATUM_MEANS),
   ];
 
   // The summary's figures, in the window's places. Strings to show, and the
@@ -4101,6 +4121,73 @@ const PathProfile = (function () {
   // should read for this path, without Flood-Net's own (✦) terms.
   const COMPACT_CHART = { bare: true, ends: false, W: 900, H: 210 };
 
+  // ── what a ground height is measured from ──
+  // A height is a number above something, and the card's ends are above two
+  // different things. A station's survey and the 5 m LiDAR are AHD — the
+  // Australian Height Datum, the one every gauge zero and flood level in the
+  // app is in. The ~30 m tiles are on the EGM96 geoid, a worldwide model of
+  // mean sea level, which AHD is not: across Australia a height on AHD reads
+  // 2.1 m less to 0.6 m more than the same point's on EGM96 (geoid.js,
+  // measured at the stations). So each end's ground says which it is, and a
+  // tile height is put into AHD as well where the geoid grid is in. GDA2020
+  // is named because it is the name people reach for: it fixes positions,
+  // not heights.
+  const DATUM_MEANS = {
+    AHD: 'The Australian Height Datum: Australia’s official “mean sea level” for heights — the one gauge zeros, flood levels and survey marks are in. A station’s survey and the 5 m LiDAR are in it.',
+    EGM96: 'A worldwide model of mean sea level (the EGM96 geoid), which the ~30 m terrain tiles are measured from. It is not AHD: across Australia a height on AHD reads 2.1 m less to 0.6 m more than the same point’s on EGM96.',
+    GDA2020: 'The Geocentric Datum of Australia 2020: the datum for positions — latitude and longitude. It says where a point is, not how high it is.',
+  };
+
+  // An end's ground and what it is measured from: { src, datum, ground, lift,
+  // ahd } — src 'survey', 'lidar' or 'tile' (pathAnalyse's srcA / srcB), and
+  // for a tile the same height in AHD, or null while the geoid grid is not in.
+  function groundOfEnd(an, prof, end) {
+    const src = (end === 0 ? an.srcA : an.srcB) || 'tile';
+    const ground = end === 0 ? an.groundA : an.groundB;
+    const lift = (end === 0 ? an.liftA_m : an.liftB_m) || 0;
+    const datum = src === 'tile' ? 'EGM96' : 'AHD';
+    let ahd = null;
+    if (datum === 'EGM96' && typeof Geoid !== 'undefined' && prof && prof.lat && prof.lon) {
+      const i = end === 0 ? 0 : prof.lat.length - 1;
+      const m = Geoid.ahdLessEgm96(prof.lat[i], prof.lon[i]);
+      if (m != null) ahd = ground + m;
+    }
+    return { src, datum, ground, lift, ahd };
+  }
+
+  // The geoid grid (geoid.js, ~200 kB), asked for once a session the first
+  // time an end's ground is a tile height, and the card drawn again when it
+  // is in, so the * line gives that end in AHD as well. A promise that
+  // settles when there is nothing more to wait for.
+  let geoidAsked = null;
+  function askGeoid(an) {
+    if (typeof Geoid === 'undefined' || Geoid.loaded() || (an.srcA !== 'tile' && an.srcB !== 'tile')) return Promise.resolve();
+    if (!geoidAsked) {
+      geoidAsked = Geoid.ensure().then(() => { if (shown && shown.rep) rerender(); }, () => {});
+    }
+    return geoidAsked;
+  }
+
+  // The * under the window: what the two ends' grounds are above, in plain
+  // words. Runs of { t, b, term } — b bold, term the word whose meaning a
+  // hover gives (DATUM_MEANS) — for the card (as HTML) and the picture alike.
+  function heightNote(rep) {
+    const ends = [rep.a, rep.b].map((e, i) => ({ e, ...groundOfEnd(rep.an, rep.prof, i) }));
+    const res = rep.prof.resolution_m || 30;
+    const R = (t, b, term) => ({ t, b: !!b, term: term || null });
+    const out = [R('* '), R('AHD', 1, 'AHD'), R(': Australia’s official sea level, the one gauges and flood levels use. ')];
+    if (ends.some(x => x.datum === 'EGM96')) out.push(R('EGM96', 1, 'EGM96'), R(': the world sea-level model the terrain tiles use. '));
+    ends.forEach((x, i) => {
+      out.push(R(`${'AB'[i]}: `, 1));
+      if (x.src === 'survey') { out.push(R('surveyed. ')); return; }
+      out.push(R(x.src === 'lidar' ? '5 m LiDAR' : `~${res} m tiles`));
+      if (x.src === 'tile') out.push(...(x.ahd != null ? [R(', '), R(`${x.ahd.toFixed(1)} m AHD`, 1)] : [R(', within about 2 m of AHD')]));
+      out.push(R(x.lift > 0.5 && x.e.elev != null ? `; its survey (${x.e.elev.toFixed(1)} m AHD) is under them. ` : '. '));
+    });
+    out.push(R('GDA2020', 0, 'GDA2020'), R(' is for positions, not heights.'));
+    return out;
+  }
+
   // What the compact summary lays out: the summary's own figures, re-cut.
   function compactOf(rep) {
     const S = summaryOf(rep);
@@ -4108,9 +4195,13 @@ const PathProfile = (function () {
     const short = { 'Ground cover': 'Cover', 'Field allowance': 'Allowance' };
     const grid = S.grid.map(r => r.map(c => ({ ...c, k: short[c.k] || c.k })));
     // The ground under each end rides with its antenna height: the chart has
-    // no room over it to say so.
-    const panel = (P, ground) => ({ ...P, rows: P.rows.filter(([k]) => k !== 'Role')
-      .map(r => (r[0] === 'Antenna height' ? [r[0], r[1], `ground ${ground.toFixed(1)} m`] : r)) });
+    // no room over it to say so. With its datum, and a * to the foot's line
+    // on what that is (heightNote); the fourth item is its meaning on hover.
+    const panel = (P, end) => {
+      const E = groundOfEnd(an, rep.prof, end);
+      return { ...P, rows: P.rows.filter(([k]) => k !== 'Role')
+        .map(r => (r[0] === 'Antenna height' ? [r[0], r[1], `ground ${E.ground.toFixed(1)} m ${E.datum}*`, DATUM_MEANS[E.datum]] : r)) };
+    };
     // Radio Mobile prices Longley–Rice alone: what it should read here is the
     // margin with Flood-Net's own terms given back (the full report's note).
     const own = n.cover + n.allowance + (n.floor > 0.05 ? n.floor : 0);
@@ -4133,7 +4224,7 @@ const PathProfile = (function () {
       an.itm && an.itm.warnings.length ? `⚠ ${an.itm.warnings.join('; ')}` : '',
       S.notes.some(x => x.startsWith('✎')) ? '✎ typed over on the card' : '',
     ].filter(Boolean);
-    return { ...S, grid, tx: panel(S.tx, an.groundA), rx: panel(S.rx, an.groundB), settings, rm, own, marks };
+    return { ...S, grid, tx: panel(S.tx, 0), rx: panel(S.rx, 1), settings, rm, own, marks, heights: heightNote(rep) };
   }
 
   // The compact summary as one picture. A document pasted into Teams, a chat
@@ -4161,7 +4252,7 @@ const PathProfile = (function () {
       img.src = chart.url;
     }) : Promise.resolve(null);
     const fail = () => new Error('This browser cannot draw the compact summary as a picture.');
-    return loaded.then(img => new Promise((resolve, reject) => {
+    return Promise.all([loaded, askGeoid(rep.an)]).then(([img]) => new Promise((resolve, reject) => {
       let p;
       try { p = drawCompact(rep, img ? { img, w: chart.w, h: chart.h } : null); } catch (e) { reject(e); return; }
       if (!p) { reject(fail()); return; }
@@ -4232,6 +4323,8 @@ const PathProfile = (function () {
         ...S.marks.map(m => ({ t: `${m.replace(/[.\s]*$/, '.')} `, ...muted })),
         { t: '✦ Flood-Net only. Indicative only.', ...muted },
       ],
+      // The datum's line: a figure and its datum kept on one line.
+      S.heights.map(r => ({ t: r.b ? nb(r.t) : r.t, ...(r.b ? strong : muted) })),
     ];
     const footW = W - 2 * pad - 2;
     const wrap = runs => {

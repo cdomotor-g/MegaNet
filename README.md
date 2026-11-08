@@ -3946,13 +3946,17 @@ which is the one wrong answer that costs someone a site visit. A single missing
 tile leaves a **gap** in the profile rather than being bridged through.
 
 **Datum, declared rather than hidden.** Terrarium heights are above the EGM96
-geoid; a station's `elevation_ahd` is Australian Height Datum. Over Australia the
-two agree to about a metre — well inside the ~30 m sampling error — but they are
-not the same datum and neither is ellipsoidal height. So a snapped station's own
-`elevation_ahd` wins for that **endpoint** and tiles supply everything else —
-the ground between the ends, and an end that has no surveyed height of its own.
-Which of the two an end is using is named on the card, and the panel says so
-under every profile it draws.
+geoid; a station's `elevation_ahd` and the 5 m LiDAR are Australian Height Datum.
+Across Australia a height on AHD reads 2.1 m less to 0.6 m more than the same
+point's on EGM96 (`geoid.js`, measured at the stations) — inside the ~30 m tiles'
+own error, but not the same datum, and neither is ellipsoidal height. So a
+snapped station's own `elevation_ahd` wins for that **endpoint** (unless it is
+under the tile there) and tiles supply everything else — the ground between the
+ends, and an end that has no surveyed height of its own. The radio link names
+each end's datum beside its ground (`ground 860.0 m AHD*`), with a `*` line under
+it saying what AHD and EGM96 are, giving a tile end in AHD as well, and that
+GDA2020 is for positions, not heights; the panel says so under every profile it
+draws.
 
 **The elevation profile** appears under the map once a line exists in *Draw &
 measure*, and plots ground (with the earth-curvature bulge folded in so the line

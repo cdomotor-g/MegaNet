@@ -1241,6 +1241,17 @@ const report = await page.evaluate(async ids => {
         rm: c.rm != null && Math.abs(c.rm - (p.margin + c.own)) < 1e-9 && t.includes(`should read about ${c.rm > 0 ? '+' : ''}${c.rm.toFixed(1)} dB`),
         lean: !/what the words mean/i.test(t) && /WHAT THE WORDS MEAN/.test(r.brief.html) && t.length < r.brief.text.length / 2,
         size: pic ? [pic.w, pic.h, pic.chart] : null,
+        // Each end's ground with what it is measured from — AHD for a survey
+        // or the LiDAR, EGM96 for the tiles — and the * line saying so.
+        datum: [c.tx, c.rx].map((P, i) => {
+          const row = P.rows.find(x => x[0] === 'Antenna height') || [];
+          const src = i ? r.rows.an.srcB : r.rows.an.srcA;
+          const m = /^ground -?\d+\.\d m (AHD|EGM96)\*$/.exec(row[2] || '');
+          return m && m[1] === (src === 'tile' ? 'EGM96' : 'AHD') && !!row[3] && drawn.includes(row[2]) ? m[1] : `✗ ${row[2]} (${src})`;
+        }),
+        note: /^\* AHD: .*A: .*B: .*GDA2020 is for positions, not heights\.$/.test(drawn[drawn.length - 1] || ''),
+        card: !!document.querySelector('#path-profile-panel .rl-heights .term[title*="Australian Height Datum"]')
+          && [...document.querySelectorAll('#path-profile-panel .rl-end-rows dd.rl-v2 .term')].filter(x => /^ground .* (AHD|EGM96)\*$/.test(x.textContent)).length === 2,
       };
     })(),
   };
@@ -1270,6 +1281,9 @@ if (report) {
      report.compact.whole && !!report.compact.size && report.compact.size[0] === 900 && report.compact.size[2], JSON.stringify(report.compact));
   ok('…says what Radio Mobile\'s Rx relative should read, and leaves out the key and the notes',
      report.compact.rm && report.compact.lean, JSON.stringify(report.compact));
+  ok('…each end\'s ground names its datum (AHD or EGM96, as its source is), with a * line under it on what that is — on the picture and the card',
+     report.compact.datum.every(d => d === 'AHD' || d === 'EGM96') && report.compact.note && report.compact.card,
+     JSON.stringify({ datum: report.compact.datum, note: report.compact.note, card: report.compact.card }));
 }
 await page.evaluate(() => PathProfile.hoverOff());
 // 📄 Copy for a report: the Radio Link window with every figure behind the
