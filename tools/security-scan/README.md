@@ -69,10 +69,43 @@ of these:
   `agent/package.json`'s version on RPi_ALERT, then run Actions → build-image
   → Run workflow with the matching `v…` tag (RPi_ALERT's README, *Developing*).
 
+Every issue it leaves for you is labelled `needs-owner` and says, on a
+`Needs from the owner:` line, what to decide or do. For a decision, a reply on
+the issue is enough: the next run reads it and acts on it.
+
 To keep the run's hands off an issue, label it `hold`, or put `[Human]` in its
 title. Any issue can still be fixed by hand: start a session on the repository
 the issue is about and say "fix flood-net-private#N".
 
-The run's log is `security/scan-log.md` in the private repository. It records
-which commit of each repository a run reviewed, which areas it went deep on,
-and what it filed, fixed and left open.
+## How deep it reads
+
+The code is far bigger than one session can read in a morning: about 375,000
+lines here and 16,000 in RPi ALERT. Until November 2026 each run named an area
+and "read" it in a few minutes, which in practice meant skimming. Now each run
+also reads about 40,000 lines line by line, split between up to six reader
+subagents working side by side, and records which file versions it has read
+(`security/coverage.mjs` and `scope.json` in the private repository). The
+front door (the Worker, sign-in and admin pages, ingest, workflows, the Pi's
+web server, updater and root helpers) is read again every four weeks, the rest
+every three to six months, and anything changed since its last reading is due
+straight away. On top of that each run takes one theme that cuts across files,
+in turn: the link from Flood-Net to a Pi, the link from a Pi to Flood-Net, the
+read-only API and the database's grants, private data, and workflows and the
+release path. This costs several times what the skimming did (that was about
+US$0.70 a run).
+
+## What you hear, and where it is kept
+
+- **A weekly report on your phone**, from the scheduled task "Flood-Net
+  security report", about two hours after the review: whether the review ran
+  and how much it read, what it found and patched that week, what is waiting
+  on you, and the running totals. It prints `security/report.mjs` from the
+  private repository, so it is the same every week and costs almost nothing.
+  If the review stops running, the report says so.
+- **The findings register**, `security/findings.md` in the private repository:
+  every finding ever filed, in plain words, with its fix. A workflow there
+  (`security-register.yml`) rebuilds it whenever a `security-scan` issue
+  changes.
+- **The run's log**, `security/scan-log.md` in the private repository: which
+  commit of each repository a run reviewed, its theme and depth, and what it
+  filed, fixed and left open.
