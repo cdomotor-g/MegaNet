@@ -176,6 +176,7 @@
     "libheif-js": "1.23.2",
     "maplibre-gl": "6.13.0",
     "playwright-core": "1.56.1",
+    "pmtiles": "4.5.0",
     "tesseract.js": "7.0.0",
     "three": "0.185.1"
   }

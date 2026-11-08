@@ -177,6 +177,84 @@ function baseTilePng() {
   return flatTile;
 }
 
+// A vector tile and a PMTiles file, written out by hand for 9d — just enough
+// of each. The tile is a Mapbox Vector Tile (the protobuf the State's tiles and
+// Overture's are both in): one layer of square buildings, each with its
+// properties (numbers as doubles, the rest as strings). The file is PMTiles
+// version 3, laid out as Overture's is — header, root directory, metadata,
+// tiles — but with nothing compressed, which the reader allows. `at` maps the
+// byte where each tile starts to its z/x/y, so a range request names the tile.
+function pbVarint(n, out) {
+  while (n > 127) { out.push((n % 128) + 128); n = Math.floor(n / 128); }
+  out.push(n);
+  return out;
+}
+const pbKey = (field, wire, out) => pbVarint(field * 8 + wire, out);
+function pbBytes(field, bytes, out) {
+  pbKey(field, 2, out); pbVarint(bytes.length, out);
+  for (const b of bytes) out.push(b);
+  return out;
+}
+const pbPacked = (field, nums, out) => pbBytes(field, nums.reduce((o, n) => pbVarint(n, o), []), out);
+const zigzag = n => (n << 1) ^ (n >> 31);
+function mvtTile(layer, squares) {
+  const keys = [], values = [];
+  const index = (list, v) => { let i = list.indexOf(v); if (i < 0) { list.push(v); i = list.length - 1; } return i; };
+  const L = [];
+  pbKey(15, 0, L); pbVarint(2, L);                     // version
+  pbBytes(1, Buffer.from(layer), L);                   // name
+  for (const { x0, y0, size, props } of squares) {
+    const tags = [];
+    for (const [k, v] of Object.entries(props)) tags.push(index(keys, k), index(values, v));
+    const pts = [[x0, y0], [x0 + size, y0], [x0 + size, y0 + size], [x0, y0 + size]];
+    const geom = [1 + 8, zigzag(pts[0][0]), zigzag(pts[0][1]), 2 + 3 * 8];   // MoveTo 1, LineTo 3
+    for (let i = 1; i < 4; i++) geom.push(zigzag(pts[i][0] - pts[i - 1][0]), zigzag(pts[i][1] - pts[i - 1][1]));
+    geom.push(7 + 8);                                  // ClosePath
+    const f = [];
+    pbPacked(2, tags, f);
+    pbKey(3, 0, f); pbVarint(3, f);                    // a polygon
+    pbPacked(4, geom, f);
+    pbBytes(2, f, L);
+  }
+  for (const k of keys) pbBytes(3, Buffer.from(k), L);
+  for (const v of values) {
+    const m = [];
+    if (typeof v === 'number') { pbKey(3, 1, m); const d = Buffer.alloc(8); d.writeDoubleLE(v); m.push(...d); }
+    else pbBytes(1, Buffer.from(String(v)), m);
+    pbBytes(4, m, L);
+  }
+  pbKey(5, 0, L); pbVarint(4096, L);                   // extent
+  return Buffer.from(pbBytes(3, L, []));
+}
+function pmtilesFile(tiles, zxyToTileId) {
+  const ents = tiles.map(t => ({ id: zxyToTileId(t.z, t.x, t.y), t })).sort((a, b) => a.id - b.id);
+  let off = 0;
+  for (const e of ents) { e.off = off; off += e.t.data.length; }
+  const dir = [];
+  pbVarint(ents.length, dir);
+  let last = 0;
+  for (const e of ents) { pbVarint(e.id - last, dir); last = e.id; }
+  for (const e of ents) pbVarint(1, dir);              // run lengths
+  for (const e of ents) pbVarint(e.t.data.length, dir);
+  for (const e of ents) pbVarint(e.off + 1, dir);
+  const dirB = Buffer.from(dir);
+  const meta = Buffer.from(JSON.stringify({ vector_layers: [{ id: 'building', minzoom: 14, maxzoom: 14, fields: {} }] }));
+  const H = 127, metaOff = H + dirB.length, dataOff = metaOff + meta.length;
+  const head = Buffer.alloc(H);
+  head.write('PMTiles', 0, 'latin1');
+  head[7] = 3;
+  [[8, H], [16, dirB.length], [24, metaOff], [32, meta.length], [40, dataOff], [48, 0], [56, dataOff], [64, off],
+   [72, ents.length], [80, ents.length], [88, ents.length]].forEach(([at, v]) => head.writeBigUInt64LE(BigInt(v), at));
+  head[96] = 1;                                        // clustered
+  head[97] = 1; head[98] = 1;                          // directories and tiles uncompressed
+  head[99] = 1;                                        // vector tiles
+  head[100] = 14; head[101] = 14;                      // zooms
+  [[102, -1800000000], [106, -850000000], [110, 1800000000], [114, 850000000]].forEach(([at, v]) => head.writeInt32LE(v, at));
+  head[118] = 14;
+  return { file: Buffer.concat([head, dirB, meta, ...ents.map(e => e.t.data)]),
+           at: new Map(ents.map(e => [dataOff + e.off, `${e.t.z}/${e.t.x}/${e.t.y}`])) };
+}
+
 const server  = await startServer();
 const browser = await launchBrowser();
 const errors  = [];
@@ -2982,12 +3060,29 @@ await page.evaluate(() => { Map3D.stop(); });
 
 // ── 9d. trees and buildings (#278) ─────────────────────────────────────────
 // Close in, the trees ground-cover.js finds in the canopy heights are drawn up
-// as a crown on a trunk, and the State's buildings from their tiles in R2 up
-// to their roofs; a wide view asks for neither; the switch takes both off and
-// is remembered. The canopy and the tiles are the Worker's (/api/canopy,
-// /api/ground) and this server has neither, so the trees are handed in here
-// and the buildings' meta.json answered by a route.
+// as a crown on a trunk, and the buildings up to their roofs; a wide view asks
+// for neither; the switch takes both off and is remembered. The canopy and
+// the State's tiles are the Worker's (/api/canopy, /api/ground) and this
+// server has neither, so the trees are handed in here and the State's
+// meta.json and tiles answered by routes — one tile, the one the camera is
+// over, with a building in it, and 204 for the rest.
+//
+// The buildings are one source fed by the file's own protocol, a tile at a
+// time from the State's tiles or else Overture's file, never both. Overture's
+// side is the real `pmtiles` library (served from node_modules, network.mjs),
+// reading a real PMTiles file written here — every tile round the camera's,
+// the State's one included, so a tile asked of Overture that should not have
+// been is a request this route sees — found through a catalogue that names the
+// release, as Overture's does. Three worlds, each from a clean slate
+// (Map3D._groundForget): the State's tiles not built yet; built; and built
+// with Overture out of reach.
 console.log('\nTrees and buildings stand on the ground, close in (#278)');
+const PMTILES_VER = (M3D_SRC.match(/const PMTILES_VER\s*=\s*'([^']+)'/) || [])[1];
+const PMTILES_DEV = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8')).devDependencies.pmtiles;
+const { zxyToTileId } = await import('pmtiles');
+const OVT_RELEASE = '2026-10-21.0';
+const OVT_HEIGHT_EXPECT = JSON.stringify(['max', 3, ['to-number', ['coalesce', ['get', 'height'],
+  ['case', ['has', 'num_floors'], ['*', ['to-number', ['get', 'num_floors']], 3.2], 3.5]], 3.5]]);
 if (!(await page.evaluate(() => state.map3d))) { await page.evaluate(() => Map3D.toggle()); await tilted3d(); }
 await page.evaluate(() => {
   const ring = (lng, lat, r) => [[0, 1, 2, 3, 4, 5, 6, 7, 0].map(i => [lng + r * Math.cos(i * Math.PI / 4), lat + r * Math.sin(i * Math.PI / 4)])];
@@ -3002,36 +3097,180 @@ await page.evaluate(() => {
     return Promise.resolve({ type: 'FeatureCollection', features: feats, meta: { trees: 2, capped: false } });
   };
 });
-await page.route(/\/api\/ground\/qld-buildings\/meta\.json/, route => route.fulfill({ status: 200, contentType: 'application/json',
-  body: JSON.stringify({ layer: 'qld-buildings', count: 1, attribution: '© The State of Queensland — generated building outlines (CC BY 4.0)', bounds: [138, -29.2, 153.6, -9.1] }) }));
-await page.route(/\/api\/ground\/qld-buildings\/\d+\/\d+\/\d+\.pbf/, route => route.fulfill({ status: 204, body: '' }));
-await page.evaluate(() => { Map3D.setGround(false); Map3D.setGround(true); });
 await page.evaluate(() => Map3D._map().jumpTo({ zoom: 11 }));
-await page.waitForTimeout(900);
-const groundWide = await page.evaluate(() => Map3D._ground());
-await page.evaluate(() => Map3D._map().jumpTo({ zoom: 15.6 }));
-await page.waitForFunction(() => { const g = Map3D._ground(); return g.trees && g.trees.trees === 2 && g.buildingsLayer; }, null, { timeout: GL_TIMEOUT }).catch(() => {});
-const groundClose = await page.evaluate(() => {
-  const m = Map3D._map(), g = Map3D._ground();
-  const lt = m.getLayer('mn-trees'), lb = m.getLayer('mn-buildings');
-  return { g, treesType: lt && lt.type, bldType: lb && lb.type, bldSource: lb && lb.source,
-           height: JSON.stringify(m.getPaintProperty('mn-trees', 'fill-extrusion-height')),
-           bldHeight: JSON.stringify(m.getPaintProperty('mn-buildings', 'fill-extrusion-height')),
-           tiles: (m.getSource('mn-bld-qld') || {}).tiles };
+const gc = await page.evaluate(() => { const c = Map3D._map().getCenter(); return { lng: c.lng, lat: c.lat }; });
+const gx = Math.floor((gc.lng + 180) / 360 * 2 ** 14);
+const gy = Math.floor((1 - Math.log(Math.tan(gc.lat * Math.PI / 180) + 1 / Math.cos(gc.lat * Math.PI / 180)) / Math.PI) / 2 * 2 ** 14);
+const centreKey = `14/${gx}/${gy}`;
+// The State's one tile: an 8 × 8 grid of buildings 9 m tall. Overture's, in
+// every tile round it: the same grid, a third with a height, a third with
+// floors only and a third with neither — each marked with the tile it is in.
+// A grid, not one building, because past zoom 14 MapLibre cuts each tile into
+// the pieces on screen, and a lone building in the middle of a tile is in no
+// piece the camera happens to see.
+const buildingGrid = props => Array.from({ length: 64 }, (_, i) =>
+  ({ x0: (i % 8) * 512 + 156, y0: Math.floor(i / 8) * 512 + 156, size: 200, props: props(i) }));
+const stateTileBody = mvtTile('buildings', buildingGrid(() => ({ h: 9, t: `${gx}/${gy}` })));
+const ovtTiles = [];
+for (let dx = -3; dx <= 3; dx++) for (let dy = -3; dy <= 3; dy++) {
+  const t = `${gx + dx}/${gy + dy}`;
+  ovtTiles.push({ z: 14, x: gx + dx, y: gy + dy, data: mvtTile('building',
+    buildingGrid(i => [{ t, height: 7.5 }, { t, num_floors: 2 }, { t }][i % 3])) });
+}
+const ovtFile = pmtilesFile(ovtTiles, zxyToTileId);
+const ground = { metaBuilt: false, ovtDown: false, stateAsked: [], ovtAsked: [], ovtFiles: new Set(), catalogHits: 0 };
+await page.route(/\/api\/ground\/qld-buildings\/meta\.json/, route => (ground.metaBuilt
+  ? route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ layer: 'qld-buildings', count: 1, attribution: '© The State of Queensland — generated building outlines (CC BY 4.0)',
+                             bounds: [gc.lng - 0.5, gc.lat - 0.5, gc.lng + 0.5, gc.lat + 0.5] }) })
+  : route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"qld-buildings has not been built yet"}' })));
+await page.route(/\/api\/ground\/qld-buildings\/\d+\/\d+\/\d+\.pbf/, route => {
+  const m = /qld-buildings\/(\d+)\/(\d+)\/(\d+)\.pbf/.exec(route.request().url());
+  const key = `${m[1]}/${m[2]}/${m[3]}`;
+  ground.stateAsked.push(key);
+  return key === centreKey
+    ? route.fulfill({ status: 200, contentType: 'application/x-protobuf', body: stateTileBody })
+    : route.fulfill({ status: 204, body: '' });
 });
-ok('a wide view asks for no trees', groundWide.on && (!groundWide.trees || groundWide.trees.trees == null), JSON.stringify(groundWide));
+await page.route(/stac\.overturemaps\.org\/catalog\.json/, route => {
+  ground.catalogHits++;
+  if (ground.ovtDown) return route.abort('connectionrefused');
+  return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' },
+    body: JSON.stringify({ type: 'Catalog', id: 'Overture Releases', latest: OVT_RELEASE, links: [
+      { rel: 'child', href: 'https://stac.overturemaps.org/2026-09-23.0/catalog.json' },
+      { rel: 'child', href: `https://stac.overturemaps.org/${OVT_RELEASE}/catalog.json`, latest: true }] }) });
+});
+// Single ranges, answered 206 as Overture's server answers them.
+await page.route(/tiles\.overturemaps\.org\/([^/]+)\/buildings\.pmtiles/, route => {
+  const req = route.request();
+  ground.ovtFiles.add(/overturemaps\.org\/([^/]+)\//.exec(req.url())[1]);
+  const m = /^bytes=(\d+)-(\d+)$/.exec(req.headers().range || '');
+  if (!m) return route.fulfill({ status: 400, body: 'one range, please' });
+  const a = +m[1], b = Math.min(+m[2], ovtFile.file.length - 1);
+  if (ovtFile.at.has(a)) ground.ovtAsked.push(ovtFile.at.get(a));
+  return route.fulfill({ status: 206, body: ovtFile.file.subarray(a, b + 1), headers: {
+    'Content-Type': 'application/octet-stream', 'Content-Range': `bytes ${a}-${b}/${ovtFile.file.length}`, ETag: '"9d"',
+    'Access-Control-Allow-Origin': '*', 'Access-Control-Expose-Headers': 'ETag, Content-Length, Content-Range, Accept-Ranges' } });
+});
+// A clean slate, a wide view, and in close; then whatever came of it.
+async function groundLook() {
+  await page.evaluate(() => Map3D._map().jumpTo({ zoom: 11 }));
+  await page.evaluate(() => { Map3D.setGround(false); Map3D._groundForget(); Map3D.setGround(true); });
+  await page.waitForTimeout(700);
+  const wide = await page.evaluate(() => Map3D._ground());
+  ground.stateAsked.length = 0; ground.ovtAsked.length = 0; ground.ovtFiles.clear(); ground.catalogHits = 0;
+  await page.evaluate(() => Map3D._map().jumpTo({ zoom: 15.6 }));
+  const settled = () => page.waitForFunction(() => {
+    const m = Map3D._map(), g = Map3D._ground();
+    return !!m.getSource('mn-bld') && m.isSourceLoaded('mn-bld') && Object.keys(g.from).length > 0
+      && g.overture !== 'opening' && !!g.trees && g.trees.trees === 2;
+  }, null, { timeout: GL_TIMEOUT }).then(() => true, () => false);
+  let ok_ = await settled();
+  if (ok_) { await page.waitForTimeout(400); ok_ = await settled(); }
+  const look = await page.evaluate(() => {
+    const m = Map3D._map(), g = Map3D._ground(), src = (m.getStyle().sources || {})['mn-bld'] || {};
+    const lay = id => { const l = m.getLayer(id); return l && { type: l.type, source: l.source, sourceLayer: l.sourceLayer, minzoom: l.minzoom,
+      colour: m.getPaintProperty(id, 'fill-extrusion-color'), height: JSON.stringify(m.getPaintProperty(id, 'fill-extrusion-height')) }; };
+    const feats = sl => m.querySourceFeatures('mn-bld', { sourceLayer: sl }).map(f => ({ ...f.properties }));
+    return { g, src: { type: src.type, tiles: src.tiles, minzoom: src.minzoom, maxzoom: src.maxzoom, attribution: src.attribution },
+             oldSource: !!m.getSource('mn-bld-qld'), bld: lay('mn-buildings'), ovt: lay('mn-buildings-ovt'),
+             trees: lay('mn-trees'), stateFeats: feats('buildings'), ovtFeats: feats('building'),
+             note: (document.getElementById('map-3d-note') || {}).textContent || '' };
+  });
+  return { wide, settled: ok_, look, stateAsked: [...ground.stateAsked], ovtAsked: [...ground.ovtAsked],
+           ovtFiles: [...ground.ovtFiles], catalogHits: ground.catalogHits };
+}
+const brief = r => JSON.stringify({ centre: centreKey, settled: r.settled, from: r.look.g.from, tally: r.look.g.tally,
+  stateAsked: r.stateAsked, ovtAsked: r.ovtAsked, state: r.look.stateFeats, ovt: [...tilesOf(r.look.ovtFeats)] }).slice(0, 1500);
+const tilesOf = feats => new Set(feats.map(p => p.t));
+
+ok('the buildings reader is the version map-3d.js pins', !!PMTILES_VER && PMTILES_VER === PMTILES_DEV,
+   `map-3d.js ${PMTILES_VER}; devDependency ${PMTILES_DEV}`);
+
+// 1. The State's tiles not built yet: Overture everywhere, and the State not asked.
+const g1 = await groundLook();
+ok('a wide view asks for no trees and no buildings',
+   g1.wide.on && (!g1.wide.trees || g1.wide.trees.trees == null) && Object.keys(g1.wide.from).length === 0, JSON.stringify(g1.wide));
 ok('close in: the trees drawn up from the ground, a crown on a trunk, as tall as found',
-   groundClose.g.trees && groundClose.g.trees.trees === 2 && groundClose.treesType === 'fill-extrusion' && groundClose.height === '["get","top"]', JSON.stringify(groundClose));
-ok('…and the buildings from their tiles in R2, up to their roofs',
-   groundClose.bldType === 'fill-extrusion' && groundClose.bldSource === 'mn-bld-qld' && groundClose.bldHeight === '["get","h"]'
-     && Array.isArray(groundClose.tiles) && /\/api\/ground\/qld-buildings\/\{z\}\/\{x\}\/\{y\}\.pbf$/.test(groundClose.tiles[0]), JSON.stringify(groundClose));
+   g1.look.g.trees && g1.look.g.trees.trees === 2 && g1.look.trees && g1.look.trees.type === 'fill-extrusion'
+     && g1.look.trees.height === '["get","top"]', JSON.stringify(g1.look.trees));
+ok('the buildings are one source, its tiles through the 3-D view’s own protocol, zoom 14 over-zoomed',
+   g1.look.src.type === 'vector' && Array.isArray(g1.look.src.tiles) && g1.look.src.tiles.length === 1
+     && /^mn-ground:\/\/\{z\}\/\{x\}\/\{y\}\?b=\d+$/.test(g1.look.src.tiles[0]) && g1.look.src.minzoom === 14 && g1.look.src.maxzoom === 14
+     && !g1.look.oldSource, JSON.stringify(g1.look.src));
+ok('…two layers on it: the State’s up to `h`, Overture’s up to its height, 3.2 m a floor, or one storey — in one colour, from zoom 14',
+   g1.look.bld && g1.look.ovt && g1.look.bld.type === 'fill-extrusion' && g1.look.ovt.type === 'fill-extrusion'
+     && g1.look.bld.source === 'mn-bld' && g1.look.ovt.source === 'mn-bld'
+     && g1.look.bld.sourceLayer === 'buildings' && g1.look.ovt.sourceLayer === 'building'
+     && g1.look.bld.height === '["get","h"]' && g1.look.ovt.height === OVT_HEIGHT_EXPECT
+     && g1.look.bld.colour === g1.look.ovt.colour && g1.look.bld.minzoom === 14 && g1.look.ovt.minzoom === 14,
+   JSON.stringify({ bld: g1.look.bld, ovt: g1.look.ovt }));
+// The expression as MapLibre evaluates it, through the style spec it ships with.
+{
+  const { createRequire } = await import('node:module');
+  const spec = createRequire(import.meta.url)('@maplibre/maplibre-gl-style-spec');
+  const e = spec.createPropertyExpression(JSON.parse(OVT_HEIGHT_EXPECT), 'fill-extrusion-height',
+    spec.latest['paint_fill-extrusion']['fill-extrusion-height']);
+  const at = props => { try { return e.value.evaluateWithoutErrorHandling({ zoom: 15 }, { type: 'Polygon', properties: props }); } catch (err) { return String(err.message); } };
+  const got = [at({ height: 7.5 }), at({ num_floors: 2 }), at({}), at({ height: 1 }), at({ height: -1 }), at({ num_floors: 0 })];
+  ok('…an Overture building is drawn as tall as it says, 3.2 m a floor where it gives floors, and one storey (3.5 m) where it gives neither',
+     e.result === 'success' && got[0] === 7.5 && Math.abs(got[1] - 6.4) < 1e-9 && got[2] === 3.5, JSON.stringify(got));
+  ok('…and never lower than 3 m: a 1 m estimate, a -1 and no floors are all drawn 3 m tall',
+     got[3] === 3 && got[4] === 3 && got[5] === 3, JSON.stringify(got));
+}
+ok('not built yet: the State is not asked for a tile, and Overture is asked for every one in view, the one the camera is over included',
+   g1.settled && g1.stateAsked.length === 0 && g1.ovtAsked.includes(centreKey) && g1.look.g.overture === 'ready'
+     && g1.look.stateFeats.length === 0 && tilesOf(g1.look.ovtFeats).has(`${gx}/${gy}`), brief(g1));
+ok('…Overture’s file is the release its catalogue marks latest, looked up once',
+   g1.look.g.release === OVT_RELEASE && g1.ovtFiles.length === 1 && g1.ovtFiles[0] === OVT_RELEASE && g1.catalogHits === 1,
+   JSON.stringify({ release: g1.look.g.release, files: g1.ovtFiles, catalogHits: g1.catalogHits }));
+ok('…credited to OpenStreetMap and Overture alone, and the panel says where they come from and that a building with no height is one storey',
+   /OpenStreetMap contributors, Overture Maps Foundation \(ODbL\)/.test(g1.look.src.attribution || '')
+     && !/State of Queensland/.test(g1.look.src.attribution || '')
+     && /Overture Maps/.test(g1.look.note) && /one storey/.test(g1.look.note) && /not ready yet/.test(g1.look.note),
+   JSON.stringify({ attribution: g1.look.src.attribution, note: g1.look.note.slice(0, 400) }));
+
+// 2. Built: the State's tile where it has one, Overture's everywhere else.
+ground.metaBuilt = true;
+const g2 = await groundLook();
+const ovtTiles2 = tilesOf(g2.look.ovtFeats);
+ok('built: the tile the State has is the State’s buildings, up to their roofs',
+   g2.settled && g2.look.g.from[centreKey] === 'state' && g2.stateAsked.includes(centreKey)
+     && g2.look.stateFeats.length > 0 && g2.look.stateFeats.every(p => p.h === 9 && p.t === `${gx}/${gy}`), brief(g2));
+ok('…and Overture is not asked for that tile, nor its buildings drawn in it — the same house is never drawn twice',
+   !g2.ovtAsked.includes(centreKey) && !ovtTiles2.has(`${gx}/${gy}`), JSON.stringify({ ovtAsked: g2.ovtAsked, ovtTiles: [...ovtTiles2] }));
+ok('…every other tile in view the State has none for is asked of Overture, once, and drawn from it',
+   g2.ovtAsked.length > 0 && new Set(g2.ovtAsked).size === g2.ovtAsked.length && g2.ovtAsked.every(k => g2.stateAsked.includes(k))
+     && Object.entries(g2.look.g.from).every(([k, f]) => (k === centreKey ? f === 'state' : f === 'overture'))
+     && ovtTiles2.size > 0, brief(g2));
+ok('…credited to the State and to OpenStreetMap and Overture, and the panel names both',
+   /State of Queensland/.test(g2.look.src.attribution || '') && /Overture Maps Foundation \(ODbL\)/.test(g2.look.src.attribution || '')
+     && /laser survey/.test(g2.look.note) && /Overture Maps/.test(g2.look.note) && /one storey/.test(g2.look.note),
+   JSON.stringify({ attribution: g2.look.src.attribution, note: g2.look.note.slice(0, 400) }));
+
+// 3. Built, and Overture out of reach: the State's tile still drawn, the rest
+// empty, the panel saying so, and nothing thrown.
+ground.ovtDown = true;
+const errBefore = errors.length;
+const g3 = await groundLook();
+ok('Overture out of reach: the State’s buildings are still drawn where it has them',
+   g3.settled && g3.look.g.overture === 'failed' && g3.look.g.from[centreKey] === 'state'
+     && g3.look.stateFeats.length > 0 && g3.look.ovtFeats.length === 0 && g3.ovtAsked.length === 0, brief(g3));
+ok('…the panel says Overture’s could not be reached, and nothing threw',
+   /could not be reached/.test(g3.look.note) && errors.length === errBefore, JSON.stringify({ note: g3.look.note.slice(0, 400), errors: errors.slice(errBefore) }));
+ground.ovtDown = false;
+
 await page.evaluate(() => Map3D.setGround(false));
 const groundOff = await page.evaluate(() => ({ g: Map3D._ground(), stored: localStorage.getItem('mn-3d-ground'),
-  note: (document.getElementById('map-3d-note') || {}).textContent || '' }));
-ok('the switch takes both off, and is remembered off', !groundOff.g.treesLayer && !groundOff.g.buildingsLayer && groundOff.stored === 'off', JSON.stringify(groundOff));
+  src: !!Map3D._map().getSource('mn-bld') }));
+ok('the switch takes both off, and is remembered off',
+   !groundOff.g.treesLayer && !groundOff.g.buildingsLayer && !groundOff.g.overtureLayer && !groundOff.src && groundOff.stored === 'off',
+   JSON.stringify(groundOff));
 await page.evaluate(() => { GroundCover.trees = window.__realTrees; Map3D.setGround(true); });
 await page.unroute(/\/api\/ground\/qld-buildings\/meta\.json/);
 await page.unroute(/\/api\/ground\/qld-buildings\/\d+\/\d+\/\d+\.pbf/);
+await page.unroute(/stac\.overturemaps\.org\/catalog\.json/);
+await page.unroute(/tiles\.overturemaps\.org\/([^/]+)\/buildings\.pmtiles/);
 
 // ── 10. from a page opened as a file (#190) ─────────────────────────────────
 // file:// is a supported way to run this app (README.md in this folder says

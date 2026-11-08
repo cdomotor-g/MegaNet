@@ -221,7 +221,8 @@ the one exception every page needs, fulfilled from the pinned `leaflet`
 devDependency rather than from unpkg. The libraries the app fetches only when
 something asks for one are served from their devDependencies the same way —
 MapLibre (the 3-D view), three.js (the Digital Twin), Tesseract.js (the field
-photos' OCR) and libheif-js (their HEIC decoder). The last three are answered
+photos' OCR), libheif-js (their HEIC decoder) and pmtiles (the 3-D view's
+reader for Overture's buildings, `?module` and all). The last four are answered
 only at the version pinned there and aborted at any other, so a pin that
 drifts fails its check instead of being answered with something else;
 MapLibre's is held by `npm run map3d` asserting the version that loaded, and

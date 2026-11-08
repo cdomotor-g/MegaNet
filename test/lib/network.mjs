@@ -21,10 +21,11 @@
 // Served from the `maplibre-gl` devDependency, pinned to the same 6.13.0
 // map-3d.js asks for. Real MapLibre, real WebGL, no network.
 //
-// three.js (the Digital Twin), Tesseract.js (the field photos' OCR) and
-// libheif-js (their HEIC decoder) are served the same way, each fetched by the
-// app only when it is needed and each from the version the harness vendors —
-// see beside each below.
+// three.js (the Digital Twin), Tesseract.js (the field photos' OCR),
+// libheif-js (their HEIC decoder) and pmtiles (the 3-D view's reader of
+// Overture's buildings) are served the same way, each fetched by the app only
+// when it is needed and each from the version the harness vendors — see
+// beside each below.
 //
 // Everything else off-origin is aborted: the Supabase datastore, GitHub raw,
 // Overpass, the basemap tile servers. Three consequences worth stating, because
@@ -104,6 +105,21 @@ function tesseractDirs() {
 // `libheif-wasm/`, the build the app asks for, and only at the version pinned.
 function heifDir() {
   return path.dirname(require.resolve('libheif-js/package.json'));
+}
+// And for the 3-D view's reader of Overture's buildings file, `pmtiles`, on
+// the same terms: imported by map-3d.js on the first buildings tile the State
+// has none for, and absent from every check that does not zoom in that far.
+// The app asks for `dist/esm/index.js?module`, and unpkg's `?module` turns the
+// build's one bare import (`fflate`) into an unpkg address for the range the
+// package itself declares — so this does the same rewrite, and answers that
+// address from the `fflate` npm installed beside it. Only at the version
+// pinned; a URL without `?module` is answered as unpkg answers it, bare import
+// and all, which a browser cannot load — as it could not in the field.
+function pmtilesDir() {
+  return path.dirname(require.resolve('pmtiles/package.json'));
+}
+function fflateDir() {
+  return path.dirname(createRequire(require.resolve('pmtiles/package.json')).resolve('fflate/package.json'));
 }
 function testPkgVersion(name) {
   const pkg = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'));
@@ -224,6 +240,46 @@ export async function applyNetworkPolicy(page, origin) {
         return route.fulfill({
           status: 200,
           contentType: CONTENT_TYPE[path.extname(file)] || 'application/octet-stream',
+          headers: { 'Access-Control-Allow-Origin': '*' },
+          body: fs.readFileSync(file),
+        });
+      }
+    }
+
+    // The buildings file's reader: `dist/esm/index.js` of `pmtiles`…
+    const pm = url.match(/unpkg\.com\/pmtiles@([\d.]+)\/(dist\/[^?#]+)(\?[^#]*)?/);
+    if (pm) {
+      let root = null;
+      try { root = pmtilesDir(); } catch (_) { root = null; }
+      const [, ver, rest, query] = pm;
+      const file = root && path.join(root, path.normalize(rest));
+      if (ver === testPkgVersion('pmtiles') && file && file.startsWith(root + path.sep) && fs.existsSync(file)) {
+        let body = fs.readFileSync(file);
+        if (/[?&]module(=|&|$)/.test(query || '') && /\.m?js$/.test(file)) {
+          const range = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).dependencies.fflate;
+          body = body.toString('utf8').replace(/from\s*(["'])fflate\1/g, `from"https://unpkg.com/fflate@${range}?module"`);
+        }
+        return route.fulfill({
+          status: 200,
+          contentType: CONTENT_TYPE[path.extname(file)] || 'application/octet-stream',
+          headers: { 'Access-Control-Allow-Origin': '*' },
+          body,
+        });
+      }
+    }
+    // …and the `fflate` its `?module` import names (a range, as unpkg writes it).
+    const ff = url.match(/unpkg\.com\/fflate@((?:\^|%5E)?[\d.]+)\?module/i);
+    if (ff) {
+      let root = null, range = null;
+      try {
+        root = fflateDir();
+        range = JSON.parse(fs.readFileSync(path.join(pmtilesDir(), 'package.json'), 'utf8')).dependencies.fflate;
+      } catch (_) { root = null; }
+      const file = root && path.join(root, 'esm', 'browser.js');
+      if (root && decodeURIComponent(ff[1]) === range && fs.existsSync(file)) {
+        return route.fulfill({
+          status: 200,
+          contentType: CONTENT_TYPE['.js'],
           headers: { 'Access-Control-Allow-Origin': '*' },
           body: fs.readFileSync(file),
         });

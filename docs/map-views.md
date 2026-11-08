@@ -157,6 +157,19 @@ many paths are drawn and how to see the rest. The paths left out are handed to
   It starts paused when the device asks for less motion; **Play the dashes**
   overrides that either way. About 30 frames a second, and nothing at all while
   the 3-D view or the twin is up.
+
+  **In the ⛰️ 3-D view** (since 8 Nov 2026) Flow has its own dashes, drawn by
+  MapLibre (`map-3d.js`, "Flow in 3-D"): two line layers over the links, white
+  dashes on the field paths and warm-white pulses on the backbone, at the 2-D
+  sizes, gaps and speeds (6 px on, 44 off, 42 px a second; the backbone 16 on,
+  56 off, 0.7 as fast). A MapLibre dash cannot slide, so the dash pattern is
+  stepped a unit at a time, up to 30 times a second. Under Flow the field
+  paths are drawn at Lines underneath (at least 0.3) and the backbone in Flow's
+  amber at 0.85 or more, with no black dash; under Tails the field paths are
+  drawn at 0.3 of their strength, since a tail is a flat-map drawing.
+  Repeaters take turns runs every path at once there; Live readings draws no
+  dashes there (its pulses are ⏱️ Latency's). They stand still while Presenting or paused, and go while a drive has the
+  camera. `npm run mapviews` §9 checks it.
 - **Tails & spotlight** (`map-tails.js`) — each path is a short tail out of each
   end (Tail length, 24 px to begin with from the field station, 0.7 of that from
   the repeater), pointing along it. A path is drawn whole when its station is in
@@ -176,7 +189,8 @@ base   the person's Link opacity — or, with auto-contrast on, its figure
 × role a casing at 0.75 of its core
 = full what the 3-D view and the twin copy   (line.mnFullOpacity)
 × mode Flow: Lines underneath (backbone at least 0.5); Tails: 1 lit, 0 not;
-       Lines: 1 — and 1 while the 3-D view or the twin is up
+       Lines: 1 — and 1 while the 3-D view or the twin is up (the 3-D
+       view makes its own of full: Flow and Tails above)
 ```
 
 `MapViews.restyle()` writes it to every line (`mnBaseOpacity`, what the

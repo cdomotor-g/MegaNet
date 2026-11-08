@@ -551,8 +551,29 @@ const Map3D = (function () {
     }
     return Number(state.mapLinkOpacity);
   }
+  // How Views draws the paths (map-views.js), read once per mirror: the 3-D
+  // view follows Flow and Tails as far as a 3-D line can (owner, 8 Nov 2026:
+  // "i see no flow in 3d mode"). Flow: the field paths faint under moving
+  // dashes (the mn-links-flow layer, below) and the backbone in Flow's amber;
+  // Tails: the field paths faint, since a tail is a flat-map drawing. Lines,
+  // or Views not loaded: as the 2-D map has them.
+  const VIEWS_3D_TAILS = 0.3;     // a field path's share of its strength in 3-D under Tails
+  const VIEWS_3D_FLOW_MIN = 0.3;  // …and the least it keeps under Flow's Lines underneath
+  const VIEWS_3D_BB_MIN = 0.85;   // the backbone under Flow, never fainter than this
+  function viewsDrawing() {
+    try {
+      if (typeof MapViews === 'undefined' || typeof MapViews.settings !== 'function') return null;
+      return MapViews.settings();
+    } catch (_) { return null; }
+  }
   function linkFeatures() {
     const out = [];
+    const vd = viewsDrawing();
+    const drawMode = vd ? vd.draw : 'lines';
+    const flowing = drawMode === 'flow' && vd.flow && vd.flow.mode !== 'live';
+    const fieldMul = drawMode === 'tails' ? VIEWS_3D_TAILS
+      : drawMode === 'flow' ? Math.max(VIEWS_3D_FLOW_MIN, Number(vd.flow && vd.flow.under) || 0) : 1;
+    const amber = typeof cssVar === 'function' ? cssVar('--map-backbone-flow', '#ffb703') : '#ffb703';
     const v = liftBase();
     const lift = v > 0 && isFinite(v) ? Math.max(v, LINK_3D_OP) / v : 1;
     const casingMix = typeof MAP_LINK_CASING_MIX === 'number' ? MAP_LINK_CASING_MIX : 0.75;
@@ -561,9 +582,13 @@ const Map3D = (function () {
       if (role === 'casing' || role === 'backbone-casing') continue;
       const pts = typeof l.getLatLngs === 'function' ? l.getLatLngs() : null;
       if (!pts || pts.length < 2) continue;
-      const op = Math.min(1, lineStrength(l) * lift);
+      let op = Math.min(1, lineStrength(l) * lift);
+      let colour = l.options.color || '#ff6f00';
+      if (role === 'core') op *= fieldMul;
+      else if (flowing && role === 'backbone') { op = Math.max(op, VIEWS_3D_BB_MIN); colour = amber; }
+      else if (flowing && role === 'backbone-dash') op = 0;   // the moving pulses say "backbone" now
       const props = {
-        colour: l.options.color || '#ff6f00',
+        colour,
         width:  (l.options.weight || 2) * LINK_3D_WIDTH + (role === 'backbone' ? 1 : 0),
         op,
         // The casing's, as 2-D mixes it from the core's. A dash has none: it
@@ -591,6 +616,7 @@ const Map3D = (function () {
       if (l.mnLinkStationId   != null) props.sid  = l.mnLinkStationId;
       if (l.mnLinkRepeaterId  != null) props.rid  = l.mnLinkRepeaterId;
       if (l.mnLinkRepeaterId2 != null) props.rid2 = l.mnLinkRepeaterId2;
+      props.dim = l.mnFocusDimmed ? 1 : 0;   // for Flow's dashes (below)
       out.push({
         type: 'Feature',
         properties: props,
@@ -1202,6 +1228,7 @@ const Map3D = (function () {
     if (!map || !ready || !drive) return;
     for (const id of DRIVE_LINKS) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none');
     dropWater();
+    syncFlow3d();   // Flow's dashes go with the links they run on
     hideTip();
     if (typeof MapMini !== 'undefined' && MapMini.camera) MapMini.camera(null);
     syncRoute();
@@ -1301,6 +1328,7 @@ const Map3D = (function () {
     if (!map || !ready) return;
     for (const id of DRIVE_LINKS) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
     syncWater();
+    syncFlow3d();
     syncRoute();
     if (typeof MapMini !== 'undefined' && MapMini.camera) MapMini.camera(map);
     map.jumpTo({ padding: { top: 0, bottom: 0, left: 0, right: 0 }, pitch: PITCH_HOME,
@@ -2838,53 +2866,263 @@ const Map3D = (function () {
 
   // ── Trees and buildings (EPIC #276, #278) ──────────────────────────────
   // What stands round a station, stood on the relief when the view is close:
-  // - **buildings** from the State's LiDAR-drawn outlines (Queensland, where
-  //   surveyed), kept for us as zoom-14 vector tiles in R2 and served by
-  //   /api/ground (worker/ground.js; built by tools/ground/qld-buildings.mjs),
-  //   drawn up to each outline's measured roof height above the ground;
+  // - **buildings**, a zoom-14 tile at a time, each tile from one of two places
+  //   and never from both (docs/ground-cover-sources.md, "Buildings"):
+  //   · the State's LiDAR-drawn outlines (Queensland, where surveyed), kept
+  //     for us as zoom-14 vector tiles in R2 and served by /api/ground
+  //     (worker/ground.js; built by tools/ground/qld-buildings.mjs), drawn up
+  //     to each outline's measured roof height above the ground;
+  //   · Overture Maps' buildings — OpenStreetMap's outlines, and Microsoft's
+  //     machine-drawn ones where OpenStreetMap has none — for every tile the
+  //     State has nothing in: the rest of Queensland, and New South Wales.
+  //     Read straight from Overture's one file (see "Overture's buildings"),
+  //     drawn up to their `height`, or 3.2 m a floor where they give floors
+  //     instead, or one storey where they give neither;
   // - **trees** from Meta and WRI's canopy heights, read through /api/canopy
   //   (worker/canopy.js) by ground-cover.js, which finds each tree top and
   //   hands back a trunk and a crown to draw up from the ground.
-  // Both are MapLibre fill-extrusions, so they stand on the terrain and hide
+  // All are MapLibre fill-extrusions, so they stand on the terrain and hide
   // behind hills. Only close in: buildings from MapLibre zoom 14 (their tiles'
   // own), trees from 14.5, within 1.5 km of the centre, so a wide view asks
   // for nothing. Under the pins and What is here, over the draped ground.
-  // docs/ground-cover-sources.md says where each comes from and how old it is.
+  //
+  // The buildings are one source fed by a protocol of this file's own
+  // (`mn-ground://z/x/y`, registered once a page, as the drape's is). For each
+  // tile it asks the State's tile first and hands that back if there is one;
+  // only a tile the State has none for (204, 404, or a store that cannot be
+  // reached just now) is asked of Overture. So a tile holds the State's
+  // buildings or Overture's, and the same house is never drawn twice — at the
+  // price that a tile the edge of a survey runs through shows the State's
+  // buildings and none past the edge. Until meta.json says the State's tiles
+  // are built, and outside the bounds it gives, the State is not asked at all.
+  // The two sources' layers keep their own names ('buildings', 'building'),
+  // so each has its own fill-extrusion, in the same colour.
+  //
+  // Each build of the source has its own tile URLs (`?b=`): MapLibre's worker
+  // keeps what it made of a tile it over-zooms, by URL, for as long as the
+  // map lasts — a source taken off and put back included — so a tile that was
+  // empty while Overture was out of reach would stay empty after it came back.
   const GROUND_BLD_Z = 14;
   const GROUND_TREES_Z = 14.5;
   const GROUND_BOX_M = 1500;
   const GROUND_COLOURS = { building: '#d9d1c3', crown: '#3f8f45', trunk: '#6b4a2e' };
+  const GROUND_PROTO = 'mn-ground';
+  const GROUND_SRC = 'mn-bld';
+  const FLOOR_M = 3.2;        // a floor, for an Overture building that gives floors and no height
+  const ONE_STOREY_M = 3.5;   // …and one that gives neither
+  const OVT_MIN_M = 3;        // …and never lower than this: most of Overture's heights in
+                              // Queensland are Microsoft's estimates from photos, and run low
+                              // (a median of 1 m at Tenterfield), so a house would be a slab
+  // `num_floors` is asked for with `has` first: a `*` on a missing one is an
+  // error, not a null, and an error in a coalesce is not passed over — MapLibre
+  // draws the whole building at 0 m instead.
+  const OVT_HEIGHT = ['max', OVT_MIN_M, ['to-number', ['coalesce', ['get', 'height'],
+    ['case', ['has', 'num_floors'], ['*', ['to-number', ['get', 'num_floors']], FLOOR_M], ONE_STOREY_M]], ONE_STOREY_M]];
   const EMPTY_FC = { type: 'FeatureCollection', features: [] };
   const groundOn = () => !!state.map3dGround && !drive;
   const groundBefore = () => (map.getLayer('mn-sites-targets') ? 'mn-sites-targets' : undefined);
+  let groundReg = false;   // the protocol, registered once per page
+  let groundBuild = 0;     // the source's builds so far; its tile URLs carry the number
+  let groundCache = new Map();   // z/x/y → a tile being fetched or lately fetched (sharedTile)
+  // Where each tile in view came from ('state', 'overture' or 'none'), the last
+  // few hundred of them, and the counts — for the panel and the check.
+  let groundFrom = new Map();
+  let groundTally = { state: 0, overture: 0, none: 0, failed: 0 };
   function dropGround() {
     if (!map) return;
-    for (const id of ['mn-trees', 'mn-buildings']) if (map.getLayer(id)) map.removeLayer(id);
-    for (const id of ['mn-trees', 'mn-bld-qld']) if (map.getSource(id)) map.removeSource(id);
+    for (const id of ['mn-trees', 'mn-buildings', 'mn-buildings-ovt']) if (map.getLayer(id)) map.removeLayer(id);
+    for (const id of ['mn-trees', GROUND_SRC]) if (map.getSource(id)) map.removeSource(id);
     groundTrees = null;
   }
-  // Whether the buildings' tiles have been built yet, asked once a session.
+  // Whether the State's buildings tiles have been built yet, asked once a session.
   function buildingsMeta() {
     if (groundMeta !== undefined) return Promise.resolve(groundMeta);
     return fetch('/api/ground/qld-buildings/meta.json')
       .then(r => (r.ok ? r.json() : null)).catch(() => null)
       .then(m => (groundMeta = m && typeof m === 'object' ? m : null));
   }
+
+  // ── Overture's buildings ──
+  // One PMTiles file for the whole world, read a tile at a time by the
+  // `pmtiles` library with range requests, so a view costs a few hundred KB
+  // of it. The library is imported from unpkg on the first tile that needs
+  // it, the way the renderer is (loadLib), and pinned the same way; `?module`
+  // is unpkg rewriting its one bare import (fflate, its fallback where a
+  // browser has no DecompressionStream) into an address a browser can follow.
+  // Overture deletes each release a couple of months on, so the file's name is
+  // looked up in their catalogue — the child marked latest — once a page and
+  // never kept. All three hosts allow cross-site reads, and the file is read
+  // with plain single-range GETs, which need no preflight (Overture's server
+  // refuses one). Any of it failing leaves the State's tiles drawing and the
+  // panel saying so; the next build of the source tries again.
+  const PMTILES_VER = '4.5.0';
+  const PMTILES_JS = `https://unpkg.com/pmtiles@${PMTILES_VER}/dist/esm/index.js?module`;
+  const OVT_CATALOG = 'https://stac.overturemaps.org/catalog.json';
+  const OVT_FILE = release => `https://tiles.overturemaps.org/${release}/buildings.pmtiles`;
+  const OVT_CREDIT = '© OpenStreetMap contributors, Overture Maps Foundation (ODbL)';
+  let pmLib = null;   // the library's module namespace, once imported
+  let pmTry = 0;      // failed imports so far: each retry is a fresh specifier (loadLib says why)
+  let ovt = null;     // { p, file, release, failed }: the file, opened once a page
+  // The release the catalogue marks latest, in Overture's own form
+  // (2026-10-21.0), or null. Nothing else is put into the file's address.
+  function latestRelease(cat) {
+    const ok = r => (typeof r === 'string' && /^\d{4}-\d{2}-\d{2}\.\d+$/.test(r) ? r : null);
+    const links = cat && Array.isArray(cat.links) ? cat.links : [];
+    const child = links.find(l => l && l.rel === 'child' && l.latest === true && typeof l.href === 'string');
+    const m = child && /\/([^/]+)\/catalog\.json$/.exec(child.href);
+    return ok(m && m[1]) || ok(cat && cat.latest);
+  }
+  function overture() {
+    if (ovt) return ovt.p;
+    const o = ovt = { p: null, file: null, release: null, failed: false };
+    o.p = (async () => {
+      if (!pmLib) {
+        const url = pmTry ? `${PMTILES_JS}&r=${pmTry}` : PMTILES_JS;
+        const lib = await import(url).catch(() => { pmTry++; return null; });
+        if (!lib || typeof lib.PMTiles !== 'function') throw new Error('the buildings reader could not be fetched');
+        pmLib = lib;
+      }
+      const res = await fetch(OVT_CATALOG);
+      const release = latestRelease(res.ok ? await res.json() : null);
+      if (!release) throw new Error('Overture’s catalogue names no current release');
+      const file = new pmLib.PMTiles(OVT_FILE(release));
+      const head = await file.getHeader();
+      // 1 is vector tiles; a file that stops short of zoom 14 has no tile to give.
+      if (!head || head.tileType !== 1 || head.maxZoom < GROUND_BLD_Z) throw new Error('not Overture’s buildings tiles');
+      o.file = file;
+      o.release = release;
+      return o;
+    })().catch(() => { o.failed = true; return null; })
+      .then(r => { if (ovt === o && map) setNote(); return r; });
+    return o.p;
+  }
+
+  // A tile's corners, west, south, east, north, in degrees.
+  function tileBox(z, x, y) {
+    const n = 2 ** z, lon = v => v / n * 360 - 180;
+    const lat = v => Math.atan(Math.sinh(Math.PI * (1 - 2 * v / n))) * 180 / Math.PI;
+    return [lon(x), lat(y + 1), lon(x + 1), lat(y)];
+  }
+  // Whether the State may have drawn buildings in this tile: its tiles are
+  // built, and the tile touches their bounds.
+  function stateMayHave(z, x, y) {
+    if (!groundMeta) return false;
+    const b = groundMeta.bounds;
+    if (!Array.isArray(b) || b.length !== 4 || !b.every(Number.isFinite)) return true;
+    const t = tileBox(z, x, y);
+    return t[0] <= b[2] && t[2] >= b[0] && t[1] <= b[3] && t[3] >= b[1];
+  }
+  function tileFrom(key, from) {
+    groundTally[from]++;
+    groundFrom.delete(key);
+    groundFrom.set(key, from);
+    if (groundFrom.size > 400) groundFrom.delete(groundFrom.keys().next().value);
+  }
+  // One tile's bytes: the State's, or else Overture's, or else none (an
+  // empty tile, which MapLibre draws as nothing without calling it an error).
+  async function groundTile(z, x, y, signal) {
+    const key = `${z}/${x}/${y}`;
+    if (stateMayHave(z, x, y)) {
+      let res = null;
+      try { res = await fetch(`${location.origin}/api/ground/qld-buildings/${key}.pbf`, { signal }); } catch (err) {
+        if (signal && signal.aborted) throw err;
+      }
+      if (res && res.status === 200) {
+        const buf = await res.arrayBuffer();
+        if (buf.byteLength) { tileFrom(key, 'state'); return buf; }
+      }
+    }
+    const o = await overture();
+    if (signal && signal.aborted) throw new DOMException('The tile is no longer wanted', 'AbortError');
+    let got = null;
+    if (o) {
+      try { got = await o.file.getZxy(z, x, y, signal); } catch (err) {
+        if (signal && signal.aborted) throw err;
+        groundTally.failed++;
+        setNote();
+        throw err;
+      }
+    }
+    if (got && got.data && got.data.byteLength) { tileFrom(key, 'overture'); return got.data; }
+    tileFrom(key, 'none');
+    return new ArrayBuffer(0);
+  }
+  // Past zoom 14 MapLibre asks for a zoom-14 tile once for every piece of it
+  // on screen — up to sixteen at zoom 16 — and one of Overture's is a few
+  // hundred KB. So each tile is fetched once and shared while it is wanted: a
+  // copy to each asker (MapLibre hands the bytes it is given to its worker,
+  // which leaves nothing behind), the fetch called off only when every asker
+  // has gone, and the last few dozen kept for the next pan.
+  const GROUND_KEEP = 32;
+  function sharedTile(z, x, y, signal) {
+    const key = `${z}/${x}/${y}`;
+    let e = groundCache.get(key);
+    if (e) groundCache.delete(key);
+    else {
+      const ctl = new AbortController();
+      e = { ctl, users: 0, done: false };
+      e.p = groundTile(z, x, y, ctl.signal);
+      e.p.then(() => { e.done = true; }, () => { if (groundCache.get(key) === e) groundCache.delete(key); });
+    }
+    groundCache.set(key, e);
+    while (groundCache.size > GROUND_KEEP) groundCache.delete(groundCache.keys().next().value);
+    e.users++;
+    return new Promise((resolve, reject) => {
+      let left = false;
+      const leave = () => {
+        if (left) return false;
+        left = true;
+        e.users--;
+        if (signal) signal.removeEventListener('abort', gone);
+        return true;
+      };
+      function gone() {
+        if (!leave()) return;
+        if (!e.done && e.users <= 0) { e.ctl.abort(); if (groundCache.get(key) === e) groundCache.delete(key); }
+        reject(new DOMException('The tile is no longer wanted', 'AbortError'));
+      }
+      if (signal) {
+        if (signal.aborted) { gone(); return; }
+        signal.addEventListener('abort', gone, { once: true });
+      }
+      e.p.then(d => { if (leave()) resolve(d.slice(0)); }, err => { if (leave()) reject(err); });
+    });
+  }
+  function registerGroundProtocol() {
+    if (groundReg || !ml || typeof ml.addProtocol !== 'function') return;
+    groundReg = true;
+    ml.addProtocol(GROUND_PROTO, async (params, abort) => {
+      const m = /:\/\/(\d+)\/(\d+)\/(\d+)/.exec(params.url || '');
+      if (!m) throw new Error('bad buildings tile url');
+      return { data: await sharedTile(+m[1], +m[2], +m[3], abort && abort.signal) };
+    });
+  }
+
   function syncGround() {
     if (!map || !ready) return;
     if (!groundOn()) { groundGen++; dropGround(); setNote(); return; }
     const gen = ++groundGen;
     buildingsMeta().then(meta => {
-      if (gen !== groundGen || !map || !ready || !groundOn() || !meta || map.getSource('mn-bld-qld')) return;
-      map.addSource('mn-bld-qld', {
-        type: 'vector', tiles: [`${location.origin}/api/ground/qld-buildings/{z}/{x}/{y}.pbf`],
-        minzoom: 14, maxzoom: 14, attribution: String(meta.attribution || ''),
-        ...(Array.isArray(meta.bounds) && meta.bounds.length === 4 ? { bounds: meta.bounds } : {}),
+      if (gen !== groundGen || !map || !ready || !groundOn() || map.getSource(GROUND_SRC)) return;
+      registerGroundProtocol();
+      // A new source asks Overture afresh if it could not be had last time.
+      if (ovt && ovt.failed) ovt = null;
+      groundBuild++;
+      groundCache = new Map();
+      groundFrom = new Map();
+      groundTally = { state: 0, overture: 0, none: 0, failed: 0 };
+      map.addSource(GROUND_SRC, {
+        type: 'vector', tiles: [`${GROUND_PROTO}://{z}/{x}/{y}?b=${groundBuild}`],
+        minzoom: GROUND_BLD_Z, maxzoom: GROUND_BLD_Z,
+        attribution: [meta && meta.attribution ? String(meta.attribution) : '', OVT_CREDIT].filter(Boolean).join('; '),
       });
-      map.addLayer({ id: 'mn-buildings', type: 'fill-extrusion', source: 'mn-bld-qld', 'source-layer': 'buildings',
-        minzoom: GROUND_BLD_Z,
-        paint: { 'fill-extrusion-color': GROUND_COLOURS.building, 'fill-extrusion-height': ['get', 'h'],
-                 'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.92 } }, groundBefore());
+      const paint = h => ({ 'fill-extrusion-color': GROUND_COLOURS.building, 'fill-extrusion-height': h,
+                            'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.92 });
+      map.addLayer({ id: 'mn-buildings', type: 'fill-extrusion', source: GROUND_SRC, 'source-layer': 'buildings',
+        minzoom: GROUND_BLD_Z, paint: paint(['get', 'h']) }, groundBefore());
+      // Overture marks a few buildings as under the ground; those are left out.
+      map.addLayer({ id: 'mn-buildings-ovt', type: 'fill-extrusion', source: GROUND_SRC, 'source-layer': 'building',
+        minzoom: GROUND_BLD_Z, filter: ['!=', ['get', 'is_underground'], true], paint: paint(OVT_HEIGHT) }, groundBefore());
       setNote();
     });
     if (!map.getSource('mn-trees')) {
@@ -2918,16 +3156,126 @@ const Map3D = (function () {
     if (groundTimer) clearTimeout(groundTimer);
     groundTimer = setTimeout(() => { groundTimer = null; syncGround(); }, 350);
   }
+  // What the panel says about them. Overture's part is said as it stands —
+  // not asked yet, read, or not to be had — and the State's as its tiles do.
   function groundNoteHtml() {
     if (!groundOn()) return '';
     const n = groundTrees && !groundTrees.error ? Number(groundTrees.trees) || 0 : null;
     const trees = groundTrees && groundTrees.error ? 'the tree heights could not be read just now'
       : n == null ? 'trees once you zoom in close'
       : `${n.toLocaleString()} tree${n === 1 ? '' : 's'} within 1.5 km${groundTrees.capped ? ' (the tallest, where there are more)' : ''}`;
-    const bld = groundMeta ? 'buildings from the State’s LiDAR outlines where Queensland has surveyed'
-      : groundMeta === null ? 'buildings once their tiles are built' : 'buildings close in';
-    return `Trees and buildings: ${trees}; ${bld}. Tree heights are Meta and WRI’s, from satellite photos of
-      2010–2020; building heights are the State’s measured roofs.<br>`;
+    const known = groundMeta !== undefined, stateOn = !!groundMeta, ovtOn = known && !(ovt && ovt.failed);
+    const stateWord = 'the State’s outlines measured by laser survey from the air (LiDAR) where Queensland has surveyed';
+    const ovtWord = 'Overture Maps’ (OpenStreetMap’s and Microsoft’s outlines)';
+    const away = 'could not be reached just now';
+    const bld = !known ? 'buildings close in'
+      : stateOn && ovtOn ? `buildings from ${stateWord}, and from ${ovtWord} everywhere else`
+      : stateOn ? `buildings from ${stateWord} only — <span class="txt-warn">Overture Maps’ buildings, for
+          everywhere else, ${away}</span>`
+      : ovtOn ? `buildings from ${ovtWord} (the State’s laser-measured ones are not ready yet)`
+      : `<span class="txt-warn">no buildings: Overture Maps’ ${away}, and the State’s are not ready yet</span>`;
+    const failed = groundTally.failed ? ` <span class="txt-warn">${groundTally.failed} of Overture’s
+      tile${groundTally.failed === 1 ? '' : 's'} could not be read, so some buildings are missing.</span>` : '';
+    const heights = [stateOn ? 'building heights are the State’s measured roofs' : '',
+      ovtOn ? `${stateOn ? 'or' : 'building heights are'} Overture’s where it gives one — a building with no
+        height given is drawn one storey (${ONE_STOREY_M} m) tall, and none lower than ${OVT_MIN_M} m` : ''].filter(Boolean).join(', ');
+    return `Trees and buildings: ${trees}; ${bld}.${failed} Tree heights are Meta and WRI’s, from satellite photos of
+      2010–2020${heights ? `; ${heights}` : ''}.<br>`;
+  }
+
+  // ── Flow in 3-D (map-flow.js's dashes, as MapLibre can draw them) ──────
+  // Two line layers on the links' own source, over them: the field paths'
+  // dashes and the backbone's pulses on its amber, white and warm white —
+  // the 2-D Flow's sizes, gaps and speeds, with the backbone's a little
+  // slower. White rather than each path's colour: 2-D gives its coloured
+  // dashes a white edge, which is what reads on the satellite photo, and a
+  // path's own colour alone (the slate blue of one colour) is lost on it. A MapLibre dash pattern cannot be slid along a line, so
+  // the pattern itself is stepped: each step starts the line a unit later in
+  // the pattern, and the dashes run start to end — station to repeater,
+  // repeater on to the base — the way the 2-D Flow runs. Only while Views
+  // draws Flow (not Live readings, which is ⏱️ Latency's) and nobody is
+  // driving; they stand still unless Flow is playing (Play, the device's
+  // reduced-motion setting, Presenting).
+  //
+  // Lengths in a dash pattern are line widths. 2-D's field dashes are 6 px
+  // on and 44 off at 42 px a second; the backbone's 16 on and 56 off at 0.7
+  // of that.
+  const FLOW_3D = [
+    { id: 'mn-links-flow', bb: false, w: 2, on: 3, gap: 22, pxs: 42 },
+    { id: 'mn-links-flow-bb', bb: true, w: 3, on: 5, gap: 19, pxs: 42 * 0.7 },
+  ];
+  const FLOW_3D_FRAME_MS = 1000 / 30;   // no more often than this
+  const flow3d = { raf: null, last: 0, shift: {}, ms: 0 };
+  // The pattern `shift` units along: a dash `on` long and a gap, the line
+  // starting `shift` units into the gap before it.
+  function flowDash(on, gap, shift) {
+    return shift <= gap ? [0, shift, on, gap - shift] : [shift - gap, gap, on - (shift - gap), 0];
+  }
+  function flow3dOn() {
+    const vd = viewsDrawing();
+    return !!(vd && vd.draw === 'flow' && vd.flow && vd.flow.mode !== 'live' && map && ready && !drive);
+  }
+  function flow3dMoving() {
+    const vd = viewsDrawing();
+    // A page out of view gets no frames, so the loop waits there by itself.
+    if (!vd || state.presenting) return false;
+    return vd.flow.playing != null ? !!vd.flow.playing : !reducedMotion();
+  }
+  function stopFlow3d() {
+    if (flow3d.raf) cancelAnimationFrame(flow3d.raf);
+    flow3d.raf = null;
+    flow3d.last = 0;
+  }
+  function frameFlow3d(t) {
+    flow3d.raf = null;
+    if (!map || !map.getLayer(FLOW_3D[0].id) || !flow3dOn() || !flow3dMoving()) return;
+    if (!flow3d.last) flow3d.last = t;
+    if (t - flow3d.last >= FLOW_3D_FRAME_MS) {
+      const vd = viewsDrawing();
+      const speed = Math.max(0.25, Number(vd && vd.flow && vd.flow.speed) || 1);
+      // The dashes' own clock: it stands while they do, and a late frame
+      // moves them no further than a tenth of a second would.
+      flow3d.ms += Math.min(t - flow3d.last, 100) * speed;
+      flow3d.last = t;
+      for (const L of FLOW_3D) {
+        const period = L.on + L.gap;
+        const k = Math.floor((flow3d.ms / 1000) * L.pxs / L.w) % period;
+        if (k === flow3d.shift[L.id] || !map.getLayer(L.id)) continue;
+        flow3d.shift[L.id] = k;
+        map.setPaintProperty(L.id, 'line-dasharray', ['literal', flowDash(L.on, L.gap, k)]);
+      }
+    }
+    flow3d.raf = requestAnimationFrame(frameFlow3d);
+  }
+  function syncFlow3d() {
+    if (!map || !ready) return;
+    if (!flow3dOn()) {
+      stopFlow3d();
+      for (const L of FLOW_3D) if (map.getLayer(L.id)) map.removeLayer(L.id);
+      return;
+    }
+    if (map.getLayer('mn-links')) {
+      for (const L of FLOW_3D) {
+        if (map.getLayer(L.id)) continue;
+        const ids = map.getStyle().layers.map(x => x.id);
+        // Over the links and the field dashes, under whatever was over them.
+        const after = ids[Math.max(ids.indexOf('mn-links'), ids.indexOf(FLOW_3D[0].id)) + 1];
+        map.addLayer({
+          id: L.id, type: 'line', source: 'mn-links',
+          filter: ['all', ['==', ['get', 'dash'], 0], ['>', ['get', 'op'], 0.02],
+                   L.bb ? ['has', 'rid2'] : ['!', ['has', 'rid2']]],
+          layout: { 'line-cap': 'butt', 'line-join': 'round' },
+          paint: {
+            'line-color': L.bb ? '#fff4cc' : '#ffffff',
+            'line-width': L.w,
+            // A path the focus has dimmed keeps its dashes, faint, as 2-D's do.
+            'line-opacity': ['case', ['==', ['get', 'dim'], 1], 0.25, 0.95],
+            'line-dasharray': ['literal', flowDash(L.on, L.gap, flow3d.shift[L.id] || 0)],
+          },
+        }, after);
+      }
+    }
+    if (flow3dMoving()) { if (!flow3d.raf) flow3d.raf = requestAnimationFrame(frameFlow3d); } else stopFlow3d();
   }
 
   // ── The rising water ───────────────────────────────────────────────────
@@ -3623,6 +3971,8 @@ const Map3D = (function () {
       syncAreas(true);
       // …and the trees and buildings, close in (#278).
       syncGround();
+      // …and Flow's moving dashes, when Views draws Flow.
+      syncFlow3d();
       // The finder may have drawn before 3-D was opened, and its pins are DOM
       // markers that the style cannot declare — so they are added here, and
       // the slider's factor is read once the layers it applies to exist.
@@ -4421,11 +4771,18 @@ const Map3D = (function () {
       setNote();
       announce(on ? 'Trees and buildings on — drawn when you zoom in close' : 'Trees and buildings off');
     },
-    // For the check: what the trees and buildings are showing.
+    // For the check: what the trees and buildings are showing — and, for the
+    // buildings, where each tile in view came from.
     _ground() {
       return { on: !!state.map3dGround, trees: groundTrees, meta: groundMeta === undefined ? 'unknown' : !!groundMeta,
-               treesLayer: !!(map && map.getLayer('mn-trees')), buildingsLayer: !!(map && map.getLayer('mn-buildings')) };
+               treesLayer: !!(map && map.getLayer('mn-trees')), buildingsLayer: !!(map && map.getLayer('mn-buildings')),
+               overtureLayer: !!(map && map.getLayer('mn-buildings-ovt')),
+               overture: !ovt ? 'unasked' : ovt.failed ? 'failed' : ovt.file ? 'ready' : 'opening',
+               release: ovt && ovt.release, tally: { ...groundTally }, from: Object.fromEntries(groundFrom) };
     },
+    // …and its seam: forget the State's meta.json and Overture's file, as a
+    // new page would, so the next build of the source asks both again.
+    _groundForget() { groundMeta = undefined; ovt = null; },
 
     // The rising water (see "The rising water"). On by default and remembered
     // when turned off: an animation somebody has said they do not want is not
@@ -4510,6 +4867,20 @@ const Map3D = (function () {
       if (!map) return;
       try { if (typeof map.setPixelRatio === 'function') map.setPixelRatio(state.presenting ? 1 : (window.devicePixelRatio || 1)); } catch (_) { /* the next open takes it */ }
       if (state.presenting) stopWater(); else playWater();
+      syncFlow3d();
+    },
+    // From MapViews: how the paths are drawn changed (Lines, Flow, Tails, what
+    // moves, Play): the mirror's strengths and colours, and the moving dashes.
+    viewsChanged() {
+      if (!state.map3d || !map || !ready) return;
+      const ls = map.getSource('mn-links');
+      if (ls) ls.setData(linkFeatures());
+      syncFlow3d();
+    },
+    // For the check: whether Flow's dashes are on the 3-D view, and moving.
+    _flow3d() {
+      return { layer: !!(map && map.getLayer('mn-links-flow')), bbLayer: !!(map && map.getLayer('mn-links-flow-bb')),
+               moving: !!flow3d.raf, step: JSON.stringify(flow3d.shift) };
     },
     // From MapPaths: a build, perhaps with new areas (or none): redrawn only
     // when the areas themselves changed (their gen), or are gone.
@@ -4758,7 +5129,7 @@ const Map3D = (function () {
             Rising water
           </label>
           <label class="filter-check"
-                 title="Trees from Meta and WRI's canopy heights and buildings from the State's LiDAR-drawn outlines, stood on the ground as tall as they are measured — drawn only when you zoom in close, within 1.5 km of the centre. On until turned off, and remembered.">
+                 title="Trees from Meta and WRI's canopy heights, and buildings from the State's laser-survey (LiDAR) outlines where Queensland has surveyed and from Overture Maps (OpenStreetMap and Microsoft) everywhere else, stood on the ground as tall as they are measured, or one storey where no height is given — drawn only when you zoom in close, the trees within 1.5 km of the centre. On until turned off, and remembered.">
             <input type="checkbox" id="map-3d-ground" ${state.map3dGround ? 'checked' : ''}
                    ${on ? '' : 'disabled'}
                    onchange="Map3D.setGround(this.checked)">
@@ -5011,6 +5382,7 @@ const Map3D = (function () {
     elevKey = null;   // the drape goes with the map; the next one builds its own
     polarGen = null;  // and the polar plot's
     areasKey = null;  // and the repeater areas'
+    stopFlow3d();     // and Flow's dashes
     groundGen++; groundTrees = null;  // and the trees' (the buildings' meta is kept for the session)
     if (groundTimer) { clearTimeout(groundTimer); groundTimer = null; }
     if (areasTimer) { clearTimeout(areasTimer); areasTimer = null; }

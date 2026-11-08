@@ -25,6 +25,18 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 240, date: '2026-11-08', items: [
+      '✨ <strong>Flow in 3-D.</strong> With <em>Flow</em> chosen in 🗺️ Layers › Views, the ⛰️ 3-D view now moves too: '
+        + 'white dashes run along the radio paths from each station to its repeater, and warm-white pulses run along the '
+        + 'amber backbone towards the base, as on the flat map. They stand still while Presenting or paused. Under '
+        + '<em>Tails</em>, the 3-D view shows the paths faint.',
+      '🏘️ <strong>Buildings everywhere in 3-D.</strong> Outside the towns the State has surveyed, the 3-D view now stands '
+        + 'up the buildings from Overture Maps (OpenStreetMap\'s and Microsoft\'s outlines). Their heights are mostly '
+        + 'estimates from photos, so none is drawn lower than 3 m.',
+      '🕸️ <strong>Fewer backbone lines with Best path.</strong> With <em>Best path</em> chosen, each repeater now keeps '
+        + 'only its one backbone path on the best way to a base, so the map is no longer a web of amber. Point at a '
+        + 'repeater to see its other backbone paths, dashed.',
+    ] },
     { n: 239, date: '2026-11-08', items: [
       '🌳 <strong>Trees and buildings in 3-D.</strong> Zoom in close in the ⛰️ 3-D view and the trees round you stand '
         + 'up from the ground, each as tall as Meta and WRI\'s canopy heights say — and in the Queensland towns the '

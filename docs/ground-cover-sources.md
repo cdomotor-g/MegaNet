@@ -596,15 +596,45 @@ stays, which happens only if the State drops every outline in a 2 km square.
 `map-3d.js` draws both, close in only, behind the 3-D settings' **Trees and
 buildings** switch (on until turned off; `state.map3dGround`, `mn-3d-ground`):
 
-- **Buildings** from MapLibre zoom 14: a vector source on
-  `/api/ground/qld-buildings/{z}/{x}/{y}.pbf` (zoom-14 tiles, over-zoomed),
-  drawn as a fill-extrusion up to each outline's `h`. Added only once
-  `meta.json` says the tiles are built; until then the panel says so.
+- **Buildings** from MapLibre zoom 14: one vector source of zoom-14 tiles
+  (over-zoomed), fed by the view's own `mn-ground://` protocol, which takes
+  each tile from one place only. It asks the State's tile first
+  (`/api/ground/qld-buildings/{z}/{x}/{y}.pbf`); if that is there it is the
+  tile, layer `buildings`, drawn up to each outline's `h`. If the State has
+  none (204 or 404, or its tile cannot be had just now), the same tile comes
+  from **Overture**'s `buildings.pmtiles`, layer `building`, drawn up to
+  `height`, or 3.2 m per floor (`num_floors`), or one storey (3.5 m) where it
+  gives neither, and never lower than 3 m (below); buildings it marks `is_underground` are left out. So the
+  same house is never drawn twice. The cost: a tile (about 2.3 km across) that
+  the edge of a State survey runs through shows only the State's buildings,
+  none past the edge. Until `meta.json` says the State's tiles are built, and
+  outside the bounds it gives, the State is not asked at all.
+  - Overture's file is read with the `pmtiles` library (4.5.0, imported from
+    unpkg, `dist/esm/index.js?module`, on the first tile that needs it). The
+    release is looked up once a page in `https://stac.overturemaps.org/catalog.json`
+    (the child marked `"latest": true`). Each tile is fetched once and shared,
+    because MapLibre asks for a zoom-14 tile once for every piece of it on
+    screen.
+  - Checked from Chromium on 8 Nov 2026 (release `2026-10-21.0`): plain
+    single-range GETs, no preflight, cross-site reads allowed. Mount Isa's
+    zoom-14 tile (14/14540/9156) holds 2,937 buildings, 2,279 with a height and
+    658 with neither. Tenterfield's (14/15110/9574) holds 2,033: 1,648 with a
+    height, 19 with floors only, 366 with neither. Most of those heights are
+    Microsoft's machine estimates and run low: the median is 2.3 m at Mount
+    Isa and 1.0 m at Tenterfield, so none is drawn lower than 3 m, a storey
+    (the State's measured tiles draw anything under 2 m at 2 m).
+  - If the library, the catalogue or the file cannot be had, the State's
+    tiles still draw and the panel says Overture's could not be reached; the
+    next build of the source tries again. Credit on the source: the State's
+    line from `meta.json`, and *© OpenStreetMap contributors, Overture Maps
+    Foundation (ODbL)*.
 - **Trees** from zoom 14.5, within 1.5 km of the centre:
   `GroundCover.trees(box)` (`ground-cover.js`) reads the canopy through
   `/api/canopy`, and its trunks and crowns are drawn as a fill-extrusion from
   each feature's `base` to its `top`. Redrawn when the camera settles.
-- Checked in `npm run map3d` (the switch, both layers, a wide view asking for
-  nothing) and `npm run groundcover` (the routes, and the tree finder on a
+- Checked in `npm run map3d` (the switch, the layers, a wide view asking for
+  nothing; for the buildings, a State tile and a PMTiles file made in the
+  check, with the State's tiles not built, built, and built with Overture out
+  of reach) and `npm run groundcover` (the routes, and the tree finder on a
   made-up grid).
 

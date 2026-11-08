@@ -519,6 +519,12 @@ const MapViews = (function () {
       syncOverlays();
     }
     if (ch.has('draw') || ch.has('flow.mode')) tickTurn();
+    // The 3-D view follows how the paths are drawn (Flow's dashes, faint
+    // field paths under Flow and Tails, the backbone's amber).
+    if (['draw', 'flow.mode', 'flow.under', 'flow.playing', 'flow.speed'].some(k => ch.has(k))
+        && typeof Map3D !== 'undefined' && typeof Map3D.viewsChanged === 'function') {
+      safely(() => Map3D.viewsChanged(), 'Map3D.viewsChanged');
+    }
   }
 
   function syncOverlays() {

@@ -46,8 +46,10 @@
 //      takes it off.
 //   9. **3-D** (when the browser has WebGL2, as `npm run map3d` needs): with
 //      Tails on, the field lines the 2-D map draws at 0 are in the 3-D view's
-//      own source at their full strength (`mnFullOpacity`), and closing 3-D
-//      puts the 2-D lines back to their tails.
+//      own source, faint (a tail is a flat-map drawing), and closing 3-D puts
+//      the 2-D lines back to their tails. With Flow on, the 3-D view has its
+//      own moving dashes on the paths, the field paths faint under them, the
+//      backbone in Flow's amber, and Lines takes the dashes away.
 //  10. **Easements and land tenure**: off by default, and with both off the
 //      cadastre's export is the one it was before Views, byte for byte; each
 //      switch changes the export's layers the way it says; both off again and
@@ -888,7 +890,7 @@ try {
   check('Balance 50 takes the filter off', even === '', J(even));
 
   // ── 9. 3-D ────────────────────────────────────────────────────────────────
-  section('9. Tails in the 3-D view');
+  section('9. Tails and Flow in the 3-D view');
   const gl2 = await page.evaluate(() => {
     try { return !!document.createElement('canvas').getContext('webgl2'); } catch (_) { return false; }
   });
@@ -911,14 +913,57 @@ try {
       return {
         flat: MapViews._state().flat,
         mirrored: fieldF.length, cores: cores.length,
-        faint: fieldF.filter(f => !(f.properties.op >= 0.8)).length,
-        minOp: fieldF.reduce((a, f) => Math.min(a, f.properties.op), 1),
+        unseen: fieldF.filter(f => !(f.properties.op > 0.05)).length,
+        maxOp: fieldF.reduce((a, f) => Math.max(a, f.properties.op), 0),
         twoD: cores.filter(l => Math.abs(l.options.opacity - l.mnFullOpacity) > 0.005).length,
         mirror: Map3D._mirror().links.features.filter(f => f.properties.sid != null && f.properties.rid2 == null && !f.properties.dash && !(f.properties.op > 0)).length,
       };
     });
-    check('3-D open: every field line in the 3-D view\'s own source, drawn at its full strength rather than a tail\'s 0',
-      three.mirrored === three.cores && three.cores > 0 && three.faint === 0 && three.mirror === 0, J(three));
+    check('3-D open: every field line in the 3-D view\'s own source, drawn faint rather than at a tail\'s 0',
+      three.mirrored === three.cores && three.cores > 0 && three.unseen === 0 && three.maxOp <= 0.31 && three.mirror === 0, J(three));
+    const noDashes = await page.evaluate(() => Map3D._flow3d());
+    check('…and no moving dashes under Tails', !noDashes.layer && !noDashes.moving, J(noDashes));
+
+    // Flow in 3-D (owner, 8 Nov 2026: "i see no flow in 3d mode").
+    await page.evaluate(() => MapViews.set({ draw: 'flow' }));
+    await settle(900);
+    const flow3 = await page.evaluate(async () => {
+      const m = Map3D._map();
+      const src = m.getSource('mn-links');
+      const data = src && (typeof src.getData === 'function' ? await src.getData() : src.serialize().data);
+      const feats = (data && data.features) || [];
+      const fieldF = feats.filter(f => f.properties.sid != null && f.properties.rid2 == null && !f.properties.dash);
+      const bb = feats.filter(f => f.properties.rid2 != null && !f.properties.dash);
+      const bbDash = feats.filter(f => f.properties.rid2 != null && f.properties.dash);
+      const layers = m.getStyle().layers.map(l => l.id);
+      const before = Map3D._flow3d();
+      await new Promise(r => setTimeout(r, 400));
+      const after = Map3D._flow3d();
+      return {
+        before, after, over: layers.indexOf('mn-links-flow') > layers.indexOf('mn-links'),
+        field: fieldF.length, fieldMax: fieldF.reduce((a, f) => Math.max(a, f.properties.op), 0),
+        fieldMin: fieldF.reduce((a, f) => Math.min(a, f.properties.op), 1),
+        bb: bb.length, bbAmber: bb.filter(f => /^#ffb703$/i.test(f.properties.colour) && f.properties.op >= 0.85).length,
+        bbDashOn: bbDash.filter(f => f.properties.op > 0).length,
+      };
+    });
+    check('Flow in 3-D: its own dashes over the paths and pulses on the backbone, stepping along', flow3.before.layer && flow3.before.bbLayer && flow3.over
+      && flow3.after.moving && flow3.after.step !== flow3.before.step, J(flow3));
+    check('…the field paths faint under them, never gone', flow3.field > 0 && flow3.fieldMin > 0.05 && flow3.fieldMax <= 0.36, J(flow3));
+    check('…and the backbone in Flow\'s amber, strong, with no black dash', flow3.bb > 0 && flow3.bbAmber === flow3.bb && flow3.bbDashOn === 0, J(flow3));
+    await page.evaluate(() => MapViews.setPresenting(true));
+    await settle(300);
+    const still = await page.evaluate(() => Map3D._flow3d());
+    check('…standing still while Presenting, the dashes still drawn', still.layer && !still.moving, J(still));
+    await page.evaluate(() => MapViews.setPresenting(false));
+    await page.evaluate(() => MapViews.set({ draw: 'lines' }));
+    await settle(600);
+    const linesBack = await page.evaluate(() => ({ f: Map3D._flow3d(),
+      full: Map3D._mirror().links.features.filter(f => f.properties.sid != null && f.properties.rid2 == null && !f.properties.dash && f.properties.op < 0.8).length }));
+    check('Lines in 3-D: the dashes gone, the field paths back at their full strength',
+      !linesBack.f.layer && !linesBack.f.bbLayer && !linesBack.f.moving && linesBack.full === 0, J(linesBack));
+    await page.evaluate(() => MapViews.set({ draw: 'tails' }));
+    await settle(600);
     check('…and the 2-D lines under it at full strength too (no tails while 3-D is up)', !three.flat && three.twoD === 0, J(three));
     await page.evaluate(() => Map3D.toggle());
     await page.waitForFunction(() => !state.map3d, null, { timeout: GL_TIMEOUT });
