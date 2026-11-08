@@ -201,6 +201,16 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
   through the Supabase connector, which cancels any statement containing drop
   or delete text, and do not route around that check. Then bump `core.js`
   `DB_SCHEMA_VERSION`.
+- **Querying the live database by hand:** it is on one of Supabase's smallest
+  sizes, with a small daily disk budget that hand-run queries have used up
+  before (29 GB read between 19 Oct and 8 Nov 2026, more than everything else
+  together). Ask the rollups first (`reception_hourly`/`_daily`,
+  `reading_hourly`/`_daily`, `carrier_daily`, `flip_event`); on `reception` or
+  `reading` always bound the time on an indexed column (`heard_at`;
+  `reading_ts` or `received_at`) a day or two at a time; never `count(*)` a big
+  table (read `pg_class.reltuples`); `explain` first if unsure — a `Seq Scan` on
+  `reception`, `reading` or `reading_raw` means rethink; for weeks of raw rows,
+  restore the archived days (`docs/data-archive.md`) and work on the copy.
 - **Leftover human work:** if human tasks remain or fall out of scope at the end,
   ask whether to open a `[Human]` issue with explicit, click-by-click steps.
 - **Closing issues:** when your work closes an issue, close it with a comment
