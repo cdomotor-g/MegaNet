@@ -1,0 +1,10 @@
+{
+  "about": "The owner's switch for the bulletins' voices (tools/voice/speak.mjs reads it on every Bulletin voices run). While bulletins.paused is true no bulletin is voiced on its own — not a new one, not one rewritten, not one a lexicon change would say again — so no ElevenLabs credits go on them, and they play silent on each scene's own seconds, words on screen. A bulletin named by its file in the workflow's force input (Actions → Bulletin voices → Run workflow) is still voiced: that is someone asking for it. Force \"all\" is not. The 🎬 Videos are not affected: a video is voiced only once the owner marks it final.",
+  "bulletins": {
+    "paused": true,
+    "since": "2026-11-08",
+    "why": "The owner is saving ElevenLabs credits for a while, reviewing how each subscription is used across their repositories.",
+    "voice_from": null
+  },
+  "to_lift": "Set bulletins.paused to false and voice_from to the day it lifts (YYYY-MM-DD). Without voice_from, the next run voices every bulletin still listed that has no voice — up to 14 daily and 8 weekly, about 800–1,250 credits each. A bulletin dated before voice_from is never voiced on its own."
+}

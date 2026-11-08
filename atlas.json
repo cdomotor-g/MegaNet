@@ -68,38 +68,30 @@
     ],
     "blocked": [
       {
-        "id": "elevenlabs-credits",
-        "what": "#274 ElevenLabs credits run short before they renew on 25 Nov: #265 is now voiced; hold #266's and #267's voicing until after, or Creator for a month",
+        "id": "bulletin-voices-paused",
+        "what": "Bulletin voices paused by the owner on 8 Nov 2026 to save ElevenLabs credits (tools/voice/pause.json): new bulletins play silent, their words on screen; #274 closed by it",
         "on": "human",
-        "kind": "money",
-        "since": "2026-11-04",
-        "issue": "#274",
+        "kind": "decision",
+        "since": "2026-11-08",
         "holds": [
-          "the last daily bulletins before 25 Nov voiced",
-          "#266 and #267 voiced this month"
+          "the bulletins voiced",
+          "#266 and #267 voiced"
         ],
         "options": [
           {
-            "what": "Hold #266's and #267's voicing until after 25 Nov (a comment on #274)",
+            "what": "Lift the pause when ready: tell a session, which sets paused to false and voice_from to that day",
             "by": "human",
-            "effort": "2 min",
-            "pros": "costs nothing",
-            "cons": "about one daily bulletin around 24–25 Nov plays silent",
+            "effort": "1 min",
+            "pros": "voices back from that day, with no catch-up spend on the silent ones",
+            "cons": "about 19,000 credits a month on bulletins again (Starter gives 40,000)",
             "recommended": true
           },
           {
-            "what": "Upgrade the ElevenLabs account to Creator for a month (US$22, 121,000 credits)",
-            "by": "human",
-            "effort": "5 min",
-            "pros": "nothing silent; #266 and #267 can be voiced now",
-            "cons": "US$16 more than Starter for the month"
-          },
-          {
-            "what": "Do nothing: the voices come back when the credits renew",
+            "what": "Keep it paused",
             "by": "human",
             "effort": "0",
-            "pros": "no spend, no step",
-            "cons": "two or three bulletins before 25 Nov play silent"
+            "pros": "no ElevenLabs credits go on bulletins",
+            "cons": "the bulletins play silent"
           }
         ]
       },
@@ -481,7 +473,7 @@
     {
       "id": "bulletins",
       "name": "Network bulletins and voices",
-      "what": "A scheduled Claude session writes a two-minute animated bulletin each weekday morning (and weekly on Mondays), drawn on Station Health and voiced by the Droggies through ElevenLabs.",
+      "what": "A scheduled Claude session writes a two-minute animated bulletin each weekday morning (and weekly on Mondays), drawn on Station Health and voiced by the Droggies through ElevenLabs (the voices paused by the owner since 8 Nov 2026, tools/voice/pause.json).",
       "paths": [
         "health-bulletin.js",
         "tools/bulletin/",

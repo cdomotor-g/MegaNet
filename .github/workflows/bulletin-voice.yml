@@ -10,6 +10,11 @@
 # a Droggie there changes the next bulletin here (and, run by hand with force
 # "all", re-voices the ones still listed).
 #
+# The owner can pause the bulletins' voices to save credits:
+# tools/voice/pause.json. While paused (since 8 Nov 2026) a run voices no
+# bulletin, force "all" included — only one named by its file in force — and
+# the bulletins play silent, their words on screen. The videos are not paused.
+#
 # It does the same for the 🎬 Videos (data/explainers/<id>.json, EPIC #262) —
 # but only a video marked "voice": "final", its words approved; a draft is
 # never voiced. A video is voiced a scene at a time and each scene kept
@@ -38,7 +43,7 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: 'Re-voice even if up to date: "all", or bulletin or video files, comma-separated (a video forced is said again whole)'
+        description: 'Re-voice even if up to date: "all", or bulletin or video files, comma-separated (a video forced is said again whole; while tools/voice/pause.json pauses the bulletins, only a bulletin named here is voiced)'
         required: false
         default: ''
       sample:

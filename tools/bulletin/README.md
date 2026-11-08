@@ -462,6 +462,16 @@ each scene and word starts. The page plays it and follows it; a bulletin not
 voiced yet plays silent on its own `secs`. A bulletin rewritten the same day is
 voiced again; one let go takes its voice with it.
 
+**Paused since 8 November 2026.** The owner paused the bulletins' voices to
+save ElevenLabs credits for a while: `tools/voice/pause.json`. While
+`bulletins.paused` is `true` the workflow voices no bulletin — new, rewritten or
+forced with `all` — and they play silent, words on screen. Write and publish the
+bulletin as usual; still write every `say` to be said, for when the voices come
+back. Only a bulletin named by its file in the workflow's force input is voiced.
+To lift it, set `paused` to `false` and `voice_from` to that day, so the
+bulletins published while it was on stay silent instead of all being voiced at
+once (the file's `to_lift` says so too). The 🎬 Videos are not paused.
+
 A station name the voices get wrong goes in `tools/voice/lexicon.json`, one
 entry a name — `{ "word": "<the name as on file>", "say": "<respelt as it is
 said>", "notes": "<who says so>" }` — taken from people who know the place,

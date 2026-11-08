@@ -15,8 +15,10 @@
 // a bulletin; nothing here runs in the browser.
 //
 //   node tools/voice/speak.mjs --pending          voice every bulletin whose voice is missing or out of
-//                                                 date, and let go of voices whose bulletin has gone;
-//                                                 then the same for every video marked final
+//                                                 date (none while tools/voice/pause.json pauses them,
+//                                                 bar those named in --force), and let go of voices
+//                                                 whose bulletin has gone; then the same for every
+//                                                 video marked final
 //   node tools/voice/speak.mjs FILE.json          voice one bulletin or video (--force: even if up to date)
 //   node tools/voice/speak.mjs --sample LINES.json --out DIR
 //                                                 say casting test lines: [{ name, voice_id, model, text, settings }]
@@ -273,10 +275,24 @@ export async function voiceBulletin(file, cast, { key, castSrc, repo = REPO, dry
   return { file, voice: vRel, audio: aRel, cost };
 }
 
-// Which bulletins need voicing, and which voices have lost their bulletin
-// (publish.mjs lets the oldest bulletins go; their voices go with them).
-export function pending(cast, { repo = REPO, force = [] } = {}) {
-  const todo = [], orphans = [];
+// The owner's switch for the bulletins' voices, tools/voice/pause.json (its
+// "about" says what it does). No file is no pause; a file that does not read
+// stops the run rather than spend credits the owner may have paused.
+export function readPause(repo = REPO) {
+  const f = path.join(repo, 'tools', 'voice', 'pause.json');
+  if (!fs.existsSync(f)) return {};
+  const p = JSON.parse(fs.readFileSync(f, 'utf8'));
+  const b = p.bulletins || {};
+  if (b.voice_from != null && !/^\d{4}-\d{2}-\d{2}$/.test(b.voice_from)) throw new Error(`tools/voice/pause.json: voice_from "${b.voice_from}" is not a date (YYYY-MM-DD)`);
+  return p;
+}
+
+// Which bulletins need voicing, which are left silent by the pause (held), and
+// which voices have lost their bulletin (publish.mjs lets the oldest bulletins
+// go; their voices go with them, paused or not — that costs nothing).
+export function pending(cast, { repo = REPO, force = [], pause = readPause(repo) } = {}) {
+  const todo = [], held = [], orphans = [];
+  const hold = (pause && pause.bulletins) || {};
   for (const kind of ['daily', 'weekly']) {
     const dir = path.join(repo, 'data', 'bulletins', kind);
     const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => /^\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort() : [];
@@ -288,7 +304,9 @@ export function pending(cast, { repo = REPO, force = [] } = {}) {
         try { const v = JSON.parse(fs.readFileSync(vp, 'utf8')); stale = v.hash !== hashFor(JSON.parse(fs.readFileSync(path.join(repo, rel), 'utf8')), cast); }
         catch (_) { stale = true; }
       }
-      if (stale) todo.push(rel);
+      // Paused, or dated before the day the pause lifted: silent, unless named.
+      const silent = !force.includes(rel) && (hold.paused === true || (hold.voice_from && f.slice(0, 10) < hold.voice_from));
+      if (stale) (silent ? held : todo).push(rel);
     }
     const vdir = path.join(repo, 'data', 'bulletins', 'voice', kind);
     for (const f of fs.existsSync(vdir) ? fs.readdirSync(vdir) : []) {
@@ -296,7 +314,7 @@ export function pending(cast, { repo = REPO, force = [] } = {}) {
       if (!files.includes(`${date}.json`)) orphans.push(`data/bulletins/voice/${kind}/${f}`);
     }
   }
-  return { todo, orphans };
+  return { todo, held, orphans };
 }
 
 // ── one video ───────────────────────────────────────────────────────────────
@@ -456,12 +474,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const isVideo = f => /^data\/explainers\/[a-z0-9][a-z0-9-]*\.json$/.test(f) && !/\/index\.json$/.test(f);
     if (argv.includes('--pending')) {
       const force = (arg('--force') || '').split(',').map(s => s.trim()).filter(Boolean);
-      const { todo, orphans } = pending(cast, { force });
+      const { todo, held, orphans } = pending(cast, { force });
       const xp = pendingExplainers(cast, { force });
       for (const o of [...orphans, ...xp.orphans]) { if (!dry) fs.unlinkSync(path.join(REPO, o)); console.log(`  ${dry ? 'would let go of' : 'let go of'} ${o}`); }
       files = todo;
       videos = xp.todo;
-      if (!files.length) console.log('Every bulletin is voiced and up to date.');
+      if (held.length) {
+        const why = readPause().bulletins || {};
+        console.log(`Bulletin voices are ${why.paused ? `paused${why.since ? ` since ${why.since}` : ''}` : `voiced only from ${why.voice_from}`} (tools/voice/pause.json): `
+          + `${held.length} bulletin${held.length === 1 ? '' : 's'} left silent — ${held.join(', ')}.`);
+      }
+      if (!files.length && !held.length) console.log('Every bulletin is voiced and up to date.');
       if (!videos.length) console.log('Every video marked final is voiced and up to date.');
     } else {
       const named = argv.filter(a => a.endsWith('.json') && a !== arg('--cast') && a !== arg('--lexicon')).map(f => path.relative(REPO, path.resolve(f)));

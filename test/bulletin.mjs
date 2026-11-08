@@ -73,7 +73,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { validate, validateIndex, validateVoice, voicePathFor, PRESENTERS, SCENES, VOICE_FORMAT, STATUS_WORD, BENCHED, weatherTalk } from '../tools/bulletin/validate.mjs';
-import { scriptFor, hashFor, wordTimes, pending, tempoOf, frequencyWords, withLexicon } from '../tools/voice/speak.mjs';
+import { scriptFor, hashFor, wordTimes, pending, readPause, tempoOf, frequencyWords, withLexicon } from '../tools/voice/speak.mjs';
 import { buildFacts, presenterFor, CREW, keptHours, hoursKept } from '../tools/bulletin/gather.mjs';
 import { draft } from '../tools/bulletin/draft.mjs';
 import { publish } from '../tools/bulletin/publish.mjs';
@@ -464,6 +464,21 @@ console.log('The voices');
     JSON.stringify(p.todo) === '["data/bulletins/daily/2026-10-25.json"]'
       && JSON.stringify(p.orphans.sort()) === '["data/bulletins/voice/daily/2026-10-10.json","data/bulletins/voice/daily/2026-10-10.mp3"]', JSON.stringify(p));
   ok('…and with force "all", every bulletin', pending(cast, { repo: tmp, force: ['all'] }).todo.length === 2);
+  // The owner's pause (tools/voice/pause.json): nothing voiced on its own,
+  // force "all" included; a bulletin named in force still is. Lifted with
+  // voice_from, a bulletin dated before it stays silent.
+  const paused = { bulletins: { paused: true, since: '2026-11-08' } }, d25 = 'data/bulletins/daily/2026-10-25.json';
+  const q = pending(cast, { repo: tmp, pause: paused });
+  ok('paused: no bulletin voiced, the unvoiced one held, force "all" no different — one named in force voiced',
+    !q.todo.length && JSON.stringify(q.held) === `["${d25}"]` && q.orphans.length === 2
+      && !pending(cast, { repo: tmp, pause: paused, force: ['all'] }).todo.length
+      && JSON.stringify(pending(cast, { repo: tmp, pause: paused, force: [d25] }).todo) === `["${d25}"]`, JSON.stringify(q));
+  const lifted = pending(cast, { repo: tmp, pause: { bulletins: { paused: false, voice_from: '2026-10-25' } }, force: ['all'] });
+  ok('…lifted with voice_from: only bulletins from that day on are voiced',
+    JSON.stringify(lifted.todo) === `["${d25}"]` && JSON.stringify(lifted.held) === '["data/bulletins/daily/2026-10-24.json"]', JSON.stringify(lifted));
+  let pauseErr = '';
+  try { readPause(REPO); } catch (err) { pauseErr = err.message; }
+  ok("the repository's own pause file reads", !pauseErr, pauseErr);
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 
