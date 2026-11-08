@@ -37,6 +37,9 @@
   // …and the side panel's rail, names or icons, likewise taken from an address
   // that names it (app.js, dockNamesFromAddress).
   dockNamesFromAddress();
+  // …and how the Stations map draws its paths until somebody chooses, from an
+  // address that says (`?draw=lines`; map-views.js, fromAddress).
+  MapViews.fromAddress();
   // ✨ What's new: shown if this device has something it has not seen, and a
   // device that has never been here has seen it all (whats-new.js, #222).
   WhatsNew.start();

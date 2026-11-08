@@ -54,6 +54,10 @@
 //      cadastre's export is the one it was before Views, byte for byte; each
 //      switch changes the export's layers the way it says; both off again and
 //      the URL is the first one exactly.
+//  11. **Flow for everybody**: a Classic page that has never chosen draws
+//      Flow; Lines kept at version 2 under Classic is read as the old default,
+//      under any other look as a choice; `?draw=lines` draws lines for that
+//      page without storing anything, and leaves the address.
 //
 // Everything off-origin is refused (lib/network.mjs) except the cadastre's
 // export, the base-map tiles and — for section 9 only — the terrain tiles,
@@ -1094,6 +1098,38 @@ try {
     && J(backSt.want) === J({ lots: true, easements: false, tenure: false }), J(backSt));
 
   await context.close();
+
+  // ── 11. Flow for everybody, Classic too ─────────────────────────────────
+  // Every other context here opens with `?draw=lines` (lib/browser.mjs pins
+  // it under Classic); this one asks for the app's own default.
+  section('11. Flow for everybody who has not chosen, Classic too');
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, draw: null });
+    const pg = await ctx.newPage();
+    await applyNetworkPolicy(pg, server.origin);
+    pg.on('pageerror', e => errors.push(`§11: ${e.message}`));
+    const open = async (path = '/index.html') => {
+      await pg.goto(server.url(path), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+      await pg.waitForFunction(() => typeof state !== 'undefined' && !!state.data, null, { timeout: LOAD_TIMEOUT });
+      return pg.evaluate(() => ({ draw: MapViews.settings().draw, look: lookStored(), address: location.search }));
+    };
+    const fresh = await open();
+    check('Classic, never chosen: the paths drawn as Flow', fresh.look === 'classic' && fresh.draw === 'flow', J(fresh));
+    const v2 = J({ v: 2, paths: 'every', draw: 'lines' });
+    await pg.evaluate(v => localStorage.setItem('mn-map-drawing', v), v2);
+    const classicOld = await open();
+    check('…and Lines kept under Classic before today (version 2) read as that old default: Flow',
+      classicOld.look === 'classic' && classicOld.draw === 'flow', J(classicOld));
+    const calmOld = await open('/index.html?look=calm');
+    check('…but Lines kept under any other look at version 2 was chosen, and stays',
+      calmOld.look === 'calm' && calmOld.draw === 'lines', J(calmOld));
+    await pg.evaluate(() => localStorage.removeItem('mn-map-drawing'));
+    const door = await open('/index.html?look=classic&draw=lines');
+    const stored = await pg.evaluate(() => localStorage.getItem('mn-map-drawing'));
+    check('?draw=lines: the plain lines for that page, nothing stored, and the address tidied',
+      door.draw === 'lines' && stored === null && !/draw=/.test(door.address), J({ door, stored }));
+    await ctx.close();
+  }
 } finally {
   await browser.close();
   await server.close();
@@ -1106,4 +1142,5 @@ if (bad.length) {
   process.exit(1);
 }
 console.log(`\nPASS — ${results.length} checks: Views above Find a control, every built-in view set and pressed and put back,\n`
-  + '       a kept view through a reload, which paths, tails, flow, auto-contrast, Balance, 3-D, easements and tenure.');
+  + '       a kept view through a reload, which paths, tails, flow, auto-contrast, Balance, 3-D, easements and tenure,\n'
+  + '       and Flow for everybody who has not chosen, Classic too.');

@@ -71,6 +71,12 @@ export async function launchBrowser(opts = {}) {
 // or for none at all, `{ look: null }` — the app's own default, which is what
 // `npm run calm` checks.
 //
+// A context in Classic also opens the Stations map's paths drawn as plain
+// lines, `?draw=lines` (map-views.js, fromAddress): those checks were written
+// against the lines, and Views draws Flow for anybody who has not chosen (the
+// owner's call, for Classic too since 8 Nov 2026). `{ draw: null }` asks for
+// the app's own default; `npm run mapviews` §11 checks it.
+//
 // Pinned through the address, `?look=classic`, rather than through storage:
 // the address is a door the app keeps for exactly this (somebody sent a link
 // back to Classic), it takes the parameter out again before anything reads the
@@ -87,20 +93,21 @@ export async function launchBrowser(opts = {}) {
 function pinLook(browser) {
   const newContext = browser.newContext.bind(browser);
   browser.newContext = async (opts = {}) => {
-    const { look = 'classic', rail = 'icons', ...rest } = opts || {};
+    const { look = 'classic', rail = 'icons', draw = look === 'classic' ? 'lines' : null, ...rest } = opts || {};
     const context = await newContext(rest);
-    if (look || rail) {
-      await context.addInitScript(([wantLook, wantRail]) => {
+    if (look || rail || draw) {
+      await context.addInitScript(([wantLook, wantRail, wantDraw]) => {
         try {
           if (window.top !== window || !/^https?:$/.test(location.protocol)) return;
           const q = new URLSearchParams(location.search);
           let changed = false;
           if (wantLook && !q.has('look')) { q.set('look', wantLook); changed = true; }
           if (wantRail && !q.has('rail')) { q.set('rail', wantRail); changed = true; }
+          if (wantDraw && !q.has('draw')) { q.set('draw', wantDraw); changed = true; }
           if (!changed) return;
           history.replaceState(history.state, '', location.pathname + '?' + q.toString() + location.hash);
         } catch (_) {}
-      }, [look, rail]);
+      }, [look, rail, draw]);
     }
     return context;
   };

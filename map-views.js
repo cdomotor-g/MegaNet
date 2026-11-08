@@ -132,7 +132,7 @@ const MapViews = (function () {
   // no Balance. Nobody's map changes until somebody picks something.
   const DEFAULTS = {
     paths: 'every',
-    draw: 'flow',      // see defaultDraw(): Flow, but plain lines under Classic
+    draw: 'flow',      // see defaultDraw(): Flow, unless the address says otherwise
     flow: { mode: 'all', speed: 1, under: 0.35, playing: null },
     tails: { len: 24, spot: 90, follow: true, backboneFull: true },
     auto: false,
@@ -339,6 +339,7 @@ const MapViews = (function () {
 
   const S = {
     cfg: null,            // the drawing settings, read from storage on first ask
+    addressDraw: null,    // how the address said to draw the paths (fromAddress)
     map: null,
     root: null,           // the Layers panel's body, from bind()
     autoOp: null,         // auto-contrast's last figure, or null
@@ -404,17 +405,39 @@ const MapViews = (function () {
 
   // Anything in range kept, anything else back to its default: storage can
   // hold a value from an older version, or one typed into the console.
-  // How the paths are drawn until somebody chooses: Flow (the owner's call,
-  // 7 Nov 2026), except under the Classic look, which is the map the way it
-  // was — and which every browser check opens on, so they keep their lines.
+  // How the paths are drawn until somebody chooses: Flow, under every look
+  // (the owner's call, 7 Nov 2026, and for Classic too on 8 Nov) — unless the
+  // address said otherwise (fromAddress, below).
   function defaultDraw() {
-    try { if (typeof lookStored === 'function' && lookStored() === 'classic') return 'lines'; } catch (_) {}
-    return 'flow';
+    return S.addressDraw || 'flow';
+  }
+  // `?draw=lines` (or flow, tails): how this page draws the paths until
+  // somebody chooses, for this page only. A link that shows the plain lines,
+  // and the door the browser checks open on them by (test/lib/browser.mjs pins
+  // it under Classic, as it pins the look). Never stored, and taken out of the
+  // address, as `?rail=` is (app.js, dockNamesFromAddress). Called from
+  // init.js, after Route has seen the address.
+  function fromAddress() {
+    let q = null;
+    try { q = new URLSearchParams(location.search); } catch (_) { return; }
+    if (!q.has('draw')) return;
+    const v = q.get('draw');
+    if (DRAWS.includes(v)) { S.addressDraw = v; S.cfg = null; }
+    q.delete('draw');
+    const rest = q.toString();
+    try { history.replaceState(history.state, '', location.pathname + (rest ? '?' + rest : '') + location.hash); } catch (_) {}
   }
   // The stored settings' version. Before 2 the default was plain lines, and
   // a stored 'lines' was most often only that default written down when
-  // something else was changed, so it is read as the new default once.
-  const DRAWING_V = 2;
+  // something else was changed, so it is read as the new default once. At 2
+  // Classic still started on lines, so a 2 that says lines under Classic is
+  // read the same way once more; anywhere else a 2 that says lines was chosen.
+  const DRAWING_V = 3;
+  function oldDefaultLines(raw) {
+    if (!raw || typeof raw !== 'object' || raw.draw !== 'lines' || raw.v === DRAWING_V) return false;
+    if (raw.v !== 2) return true;
+    try { return typeof lookStored === 'function' && lookStored() === 'classic'; } catch (_) { return false; }
+  }
   function clean(c) {
     const d = Object.assign({}, DEFAULTS, { draw: defaultDraw() });
     const o = c && typeof c === 'object' ? c : {};
@@ -444,7 +467,7 @@ const MapViews = (function () {
       let raw = null;
       try { raw = JSON.parse(readLS(LS_DRAWING) || 'null'); } catch (_) { raw = null; }
       S.cfg = clean(raw);
-      if (raw && typeof raw === 'object' && raw.v !== DRAWING_V && raw.draw === 'lines') S.cfg.draw = defaultDraw();
+      if (oldDefaultLines(raw)) S.cfg.draw = defaultDraw();
     }
     return S.cfg;
   }
@@ -1874,7 +1897,7 @@ const MapViews = (function () {
   return {
     attach, detach, html, bind, rerender, settings, set, lineOpacity, fullOpacity, restyle, afterBuild, autoValue,
     hover, hovered, cardChanged, apply, undo, save, remove, active, snapshot, saved, legendHtml, opacityNoteHtml,
-    togglePlay, fold, setPresenting, presenting,
+    togglePlay, fold, setPresenting, presenting, fromAddress,
     VIEWS, WORDS, GROUPS,
     // What is in force, for the checks.
     _state: () => {

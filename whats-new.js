@@ -33,6 +33,8 @@ const WhatsNew = (() => {
       '🏘️ <strong>Buildings everywhere in 3-D.</strong> Outside the towns the State has surveyed, the 3-D view now stands '
         + 'up the buildings from Overture Maps (OpenStreetMap\'s and Microsoft\'s outlines). Their heights are mostly '
         + 'estimates from photos, so none is drawn lower than 3 m.',
+      '🎨 <strong>Flow for everybody.</strong> The Classic look now starts the Stations map\'s paths as Flow too, unless '
+        + 'you have chosen otherwise in 🗺️ Layers › Views.',
       '🕸️ <strong>Fewer backbone lines with Best path.</strong> With <em>Best path</em> chosen, each repeater now keeps '
         + 'only its one backbone path on the best way to a base, so the map is no longer a web of amber. Point at a '
         + 'repeater to see its other backbone paths, dashed.',
