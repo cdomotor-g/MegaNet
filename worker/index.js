@@ -399,7 +399,7 @@ export function dbProxyTarget(pathname, search = '') {
   for (const seg of rest.split('/')) {
     let decoded;
     try { decoded = decodeURIComponent(seg); } catch (_) { return null; }
-    if (decoded === '..' || decoded === '.') return null;
+    if (decoded === '..' || decoded === '.' || decoded.includes('/') || decoded.includes('\\')) return null;
   }
 
   const known = DB_PROXY_SERVICES.some(s => rest === s || rest.startsWith(`${s}/`));

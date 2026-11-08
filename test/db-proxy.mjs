@@ -35,6 +35,10 @@ function header(what, ok, detail) {
   results.push({ ok, what, detail });
 }
 
+// An encoded slash or backslash inside a segment is not a path separator we can vouch for.
+refuses('an encoded slash inside a segment', '/api/db/rest/v1/..%2f..%2fauth%2fv1%2fadmin');
+refuses('an encoded backslash inside a segment', '/api/db/rest/v1/x%5cy');
+
 // ── The three services it exists to carry ────────────────────────────────────
 carries('a PostgREST table read', '/api/db/rest/v1/app_meta', '?select=value',
         `${UPSTREAM}/rest/v1/app_meta?select=value`);
