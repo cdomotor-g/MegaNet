@@ -1609,14 +1609,14 @@ const MapViews = (function () {
     const title = v.say + (v.caution ? ` ${v.caution}` : '');
     return `<button type="button" class="mv-chip mv-row" id="${chipId(v.id)}" data-view="${esc(v.id)}"
         data-find="${esc(tagsOf(v).join(' '))}"
-        aria-pressed="${act === v.id}" aria-expanded="${open}" title="${esc(title)}"
+        aria-pressed="${act === v.id}" aria-controls="mv-open" title="${esc(title)}"
         onclick="MapViews.apply('${escAttr(v.id)}')">${thumbHtml(v.id)}<span class="mv-row-text"><b>${esc(v.label)}</b>
         <span class="mv-row-line">${esc(LINES[v.id] || '')}</span></span><span class="mv-tick" aria-hidden="true"></span></button>`;
   }
   function savedRowHtml(v, i, act, open) {
     return `<span class="mv-saved">
         <button type="button" class="mv-chip mv-chip--saved mv-row" id="${chipId(v.id)}" data-view="${esc(v.id)}"
-          aria-pressed="${act === v.id}" aria-expanded="${open}" title="${esc(savedSay(v))}"
+          aria-pressed="${act === v.id}" aria-controls="mv-open" title="${esc(savedSay(v))}"
           onclick="MapViews.apply('${escAttr(v.id)}')">${thumbHtml('saved')}<span class="mv-row-text"><b>${esc(v.name)}</b>
           <span class="mv-row-line">Your own view</span></span><span class="mv-tick" aria-hidden="true"></span></button>
         <button type="button" class="mv-chip-x" aria-label="${esc(`Remove your view ${v.name}`)}"
@@ -1624,9 +1624,9 @@ const MapViews = (function () {
       </span>`;
   }
 
-  // The quick settings, under the view in force (or the one last picked,
-  // marked as changed): its tags, then which paths, how they are drawn and
-  // the Balance, each a row of buttons. The full set is in More drawing
+  // The quick settings, under all the views, for the view in force (or the
+  // one last picked, marked as changed): its tags, then which paths, how they
+  // are drawn and the Balance, each a row of buttons. The full set is in More drawing
   // settings, at the foot of the section.
   function segHtml(label, items, cur, key) {
     const id = `mv-q-${key}`;
@@ -1642,9 +1642,11 @@ const MapViews = (function () {
     const name = v ? (v.label || v.name) : null;
     const balNow = c.balance < 45 ? 'photo' : c.balance > 55 ? 'network' : 'even';
     const pathsNow = c.paths === 'lod' ? 'best' : c.paths;
+    // In the colour of the view's group, so it is plain which row it is for.
+    const role = v ? (VIEWS.includes(v) ? v.group : 'saved') : '';
     return `
-    <div class="mv-open" id="mv-open">
-      <p class="mv-now" id="mv-now">${v && !changed ? `<strong>${esc(name)}</strong>`
+    <div class="mv-open${role ? ` mv-role--${role}` : ''}" id="mv-open" role="group" aria-labelledby="mv-now">
+      <p class="mv-now" id="mv-now">${v && !changed ? `Settings for <strong>${esc(name)}</strong>`
         : v ? `<strong>Your own mix</strong>, started from ${esc(name)}`
         : '<strong>Your own mix</strong> — no view matches the map as it is now'}</p>
       ${v && v.knobs ? tagsHtml(tagsOf(v)) : ''}
@@ -1671,9 +1673,11 @@ const MapViews = (function () {
     const open = id => id === shown;
     const c = C();
     const shownView = findView(shown);
+    // The quick settings stand under all the views, not under the one in
+    // force: opened inside the list they moved every row below it, and it was
+    // hard to keep your place in it (the owner, 8 Nov 2026).
     const groups = GROUPS.map(([g, label]) => {
-      const rows = VIEWS.filter(v => v.group === g).map(v => rowHtml(v, act, open(v.id))
-        + (open(v.id) ? quickHtml(c, v, act) : '')).join('');
+      const rows = VIEWS.filter(v => v.group === g).map(v => rowHtml(v, act, open(v.id))).join('');
       return `
     <div class="mv-group mv-role mv-role--${g}" role="group" aria-labelledby="mv-g-${g}">
       <span class="mv-group-h mv-role-h" id="mv-g-${g}"><span class="mv-role-ic">${ROLE_ICON[g] || ''}</span>${esc(label)}</span>
@@ -1682,15 +1686,14 @@ const MapViews = (function () {
     }).join('');
     const mine = savedList();
     return `
-    ${shownView ? '' : quickHtml(c, null, act)}
     <div class="mv-groups">${groups}
     <div class="mv-group mv-role mv-role--saved mv-group--saved" role="group" aria-labelledby="mv-g-saved">
       <span class="mv-group-h mv-role-h" id="mv-g-saved"><span class="mv-role-ic">${ROLE_ICON.saved}</span>Your views</span>
-      <div class="mv-chips mv-rows">${mine.length ? mine.map((v, i) => savedRowHtml(v, i, act, open(v.id))
-          + (open(v.id) ? quickHtml(c, v, act) : '')).join('')
+      <div class="mv-chips mv-rows">${mine.length ? mine.map((v, i) => savedRowHtml(v, i, act, open(v.id))).join('')
         : '<span class="filter-note mv-none">None yet: set the map the way you like it, then keep it below.</span>'}</div>
     </div>
-    </div>`;
+    </div>
+    ${quickHtml(c, shownView, act)}`;
   }
 
   function nowHtml() {

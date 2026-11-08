@@ -35,9 +35,18 @@ it, and the map's own black-dashed backbone steps back.
 
 The section is a card per group — **Everyone**, **Technicians**, **Flood**,
 **Property**, then Your views — with a row per view (a small picture, its name,
-one line). The view in force opens under its row with its tags and the quick
-settings: which paths, how they are drawn, and the Balance. Everything else is
-in the **More drawing settings** fold.
+one line). Under all of them (since 8 Nov 2026 — opened under the view's own
+row they moved every row below it), **Settings for** the view in force: its
+tags and the quick settings — which paths, how they are drawn, and the
+Balance — in its group's colour. Everything else is in the **More drawing
+settings** fold.
+
+Views and the map's own layers and controls under it are two cards of their
+kind, in the Stations cards' dress (`.card-kind`): a ground a breath off the
+pane and a band along the top, Views in indigo (`--panel-views`,
+`--edge-views`) and **Map layers & controls** in slate (`--panel-mapctl`,
+`--edge-mapctl`), each card's heading bands in its colour. The find box at the
+top hides the controls card whole when nothing in it matches.
 
 **Find a view or a control**, the box at the very top of Layers (since 8 Nov
 2026; it was under Views and searched only the switches), filters Views as it

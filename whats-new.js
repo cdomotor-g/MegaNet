@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 242, date: '2026-11-08', items: [
+      '🗂️ <strong>Views and the map controls, told apart.</strong> In 🗺️ Layers, Views is now a card of its own in '
+        + 'indigo, and the layers and switches under it are another, <em>Map layers &amp; controls</em>, in slate. A view\'s '
+        + 'quick settings now sit under the whole list of views rather than inside it, so the list keeps its shape when '
+        + 'you pick one.',
+    ] },
     { n: 241, date: '2026-11-08', items: [
       '🌳 <strong>Trees and buildings in the digital twin.</strong> The twin\'s ground now has the trees and buildings round '
         + 'the station standing on it, as the ⛰️ 3-D view has: tree heights from Meta and WRI\'s satellite canopy map, the '

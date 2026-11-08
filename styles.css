@@ -75,6 +75,13 @@
   --edge-station:   #0f766e;
   --edge-unsaved:   #f59f0a;
   --ctl-unsaved:    #a85d00;
+  /* Layers' two halves, in the same dress: Views (how the map is drawn, in
+     ready-made mixes) in indigo, and the map's own layers and controls under
+     it in slate (#map-views-block, .mapd-controls). */
+  --panel-views:    #f4f3fe;
+  --edge-views:     #4f46e5;
+  --panel-mapctl:   #f3f6f9;
+  --edge-mapctl:    #5b6b7d;
   --rx-bg: #eef4fb;
   --tx-bg: #eef8f1;
   /* The station card's seven groups (station-card-view.js): each a colour for
@@ -670,6 +677,10 @@
   --edge-links:     #a78bfa;
   --edge-station:   #2dd4bf;
   --edge-unsaved:   #f5a524;
+  --panel-views:    #23243f;
+  --edge-views:     #a5b4fc;
+  --panel-mapctl:   #1d2731;
+  --edge-mapctl:    #94a3b8;
   --ctl-unsaved:    #f5b041;
   --rx-bg: #1d3242;
   --tx-bg: #19362a;
@@ -11724,13 +11735,40 @@ body.mn-cardw-dragging {
   font-size: .87rem;
 }
 
-/* Clear of the first heading below it — and none to keep clear of when the
-   find box at the top of Layers has hidden Views whole. */
-#map-views-block + #map-display-block {
-  margin-top: var(--sp-5);
+/* ── Layers in two halves ─────────────────────────────────────────────────────
+   Views and the map's own layers and controls are two different things — a
+   ready-made way of drawing the map, and every switch it is made of — and in
+   one column they read as one long list. So each is a card of its kind, in
+   the Stations cards' dress (.card-kind): a ground a breath off the pane and
+   a band in its colour along the top edge, Views in indigo and the controls
+   in slate, with the heading bands taking the card's colour. The card
+   restates --panel, so the buttons and fields inside sit on its ground. */
+#map-views-block.mapd-views,
+.mapd-controls {
+  --panel: var(--kind-panel);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-top-color: var(--kind-edge);
+  box-shadow: inset 0 3px 0 var(--kind-edge), var(--shadow);
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-3) var(--sp-2);
 }
-#map-views-block[hidden] + #map-display-block {
-  margin-top: 0;
+#map-views-block.mapd-views { --kind-panel: var(--panel-views); --kind-edge: var(--edge-views); }
+.mapd-controls { --kind-panel: var(--panel-mapctl); --kind-edge: var(--edge-mapctl); margin-top: var(--sp-4); }
+#map-views-block[hidden] + .mapd-controls { margin-top: 0; }
+:is(#map-views-block, .mapd-controls) .map-display-h {
+  background: color-mix(in srgb, var(--kind-edge) 16%, transparent);
+  border-left-color: var(--kind-edge);
+}
+/* The controls card's name, over its first section: what Views' heading is
+   to Views. */
+.mapd-controls-h {
+  margin: 0 0 var(--sp-3);
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--kind-edge);
 }
 
 .mv-ask {
@@ -12082,7 +12120,8 @@ details.mv-fold[open] > summary.mv-card-h { margin-bottom: .25rem; }
 .mv-role .mv-chip-x { border: 0; border-left: 1px solid var(--border); border-radius: 0; padding: 0 .6rem; }
 .mv-role .mv-none { padding: .4rem .55rem .5rem; border-top: 1px solid var(--border); }
 
-/* What opens under the view in force. */
+/* The quick settings for the view in force, under all the views, in its
+   group's colour. */
 .mv-open {
   display: grid;
   gap: .4rem;
@@ -12095,7 +12134,7 @@ details.mv-fold[open] > summary.mv-card-h { margin-bottom: .25rem; }
 #map-views-block > .mv-open {
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  margin-bottom: var(--sp-2);
+  margin: var(--sp-2) 0;
 }
 .mv-open .mv-now { margin: 0; font-size: .8rem; }
 .mv-tags { display: flex; flex-wrap: wrap; gap: .25rem; }

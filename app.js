@@ -4916,11 +4916,17 @@ function stationsMapPanels(map) {
     // block below rather than a part of it, so the headings and the tests
     // that walk that block's rows are the block they always were; Views
     // filters its own rows for the box (MapViews.find).
+    // The map's own layers and controls under Views are a card of their own
+    // (.mapd-controls, styles.css "Layers in two halves"): two different
+    // things, told apart by colour as the Stations cards are.
     html: () => `
       ${mapDisplayFindHtml()}
       <div id="map-views-block" class="mapd-views">${MapViews.html()}</div>
-      <div id="map-display-block">${mapDisplayControlsHtml()}</div>
-      <div class="filter-block"><div class="map-display-h">ACMA licences</div>${acmaFilterBlockHtml()}</div>`,
+      <div class="mapd-controls" id="map-controls-group" role="group" aria-labelledby="map-controls-h">
+        <div class="mapd-controls-h" id="map-controls-h">Map layers &amp; controls</div>
+        <div id="map-display-block">${mapDisplayControlsHtml()}</div>
+        <div class="filter-block"><div class="map-display-h">ACMA licences</div>${acmaFilterBlockHtml()}</div>
+      </div>`,
     // The panel is rebuilt with the map on every render of the tab; the find
     // term is not, so a term that was in the box comes back filtering the rows
     // that were just built.
@@ -5980,6 +5986,9 @@ function applyMapDisplayFind() {
     const head = acma.querySelector('.map-display-h');
     if (head) head.classList.toggle('mapd-h--first', first && hit);
   }
+  // The controls card goes whole when nothing in it matches, its name with it.
+  const group = document.getElementById('map-controls-group');
+  if (group) group.hidden = terms.length > 0 && shown === 0;
   // Views, at the top, filters its own rows the same way (map-views.js,
   // find): a view by its name and what it does, a setting by its words.
   if (typeof MapViews !== 'undefined' && typeof MapViews.find === 'function') shown += MapViews.find(terms);

@@ -501,7 +501,7 @@ try {
   // The detailed drawing controls sit in one fold that starts shut, so the
   // older Layers rows are not pushed a screen down; its summary still says
   // what is chosen, and opening it is kept. The quick settings (which paths,
-  // how drawn, Balance) open under the view in force instead.
+  // how drawn, Balance) stand under all the views, for the one in force.
   const folds = await page.evaluate(() => [...document.querySelectorAll('#map-views-block details.mv-fold')]
     .map(d => ({ id: d.id, open: d.open, says: d.querySelector('summary').textContent.replace(/\s+/g, ' ').trim() })));
   check('the More drawing settings fold starts shut, its summary naming the choice',
@@ -511,6 +511,14 @@ try {
     return { open: !!o, groups: o ? [...o.querySelectorAll('.mv-q-h')].map(e => e.textContent.trim()) : [],
       pressed: o ? [...o.querySelectorAll('.mv-seg-b[aria-pressed="true"]')].map(b => b.id) : [] };
   });
+  const placed = await page.evaluate(() => {
+    const o = document.getElementById('mv-open'), g = document.querySelector('#map-views-block .mv-groups');
+    return { child: !!o && o.parentElement.id === 'map-views-block', after: !!(o && g && (g.compareDocumentPosition(o) & Node.DOCUMENT_POSITION_FOLLOWING)),
+             inList: !!(o && o.closest('.mv-groups')), cards: [...document.querySelectorAll('#map-views-block.mapd-views, #map-controls-group.mapd-controls')].length,
+             bands: [...document.querySelectorAll('#map-views-block, #map-controls-group')].map(e => getComputedStyle(e).boxShadow.includes('inset')) };
+  });
+  check('the quick settings stand below every view, never inside the list, and Views and the controls are each a card with a band',
+    placed.child && placed.after && !placed.inList && placed.cards === 2 && placed.bands.every(Boolean), J(placed));
   check('…and the quick settings show for your own mix: which paths, how drawn, Balance, with what is on pressed',
     quick.open && J(quick.groups) === J(['Which paths', 'Draw them as', 'Balance'])
       && J(quick.pressed) === J(['mv-q-paths-every', 'mv-q-draw-lines', 'mv-q-balance-even']), J(quick));
