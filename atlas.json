@@ -30,7 +30,7 @@
   "status": {
     "phase": "live",
     "updated": "2026-11-08",
-    "summary": "Live and in daily use (database schema 95): this week added teams and the tasks handed to them, with the SoRT scope builder's hand-off, a driving mode that follows a station's route in 3-D, the agent API's changelog and email list, ACMA licences and radio paths in the API, the Repeaters tab and cuts to database I/O, while account email, compute size and the ACMA download link wait on the owner.",
+    "summary": "Live and in daily use (database schema 106): this week added teams and the tasks handed to them, with the SoRT scope builder's hand-off, a driving mode that follows a station's route in 3-D, the agent API's changelog and email list, ACMA licences and radio paths in the API, the Repeaters tab and cuts to database I/O, while account email, compute size and the ACMA download link wait on the owner.",
     "now": [
       "Views on the Stations map (map-views.js): one press sets the map for a job — Overview and Site visit for everyone; Radio paths, Weak links, Backbone and Live traffic for instrument technicians; Rivers & catchments and Rainfall for flood forecasters; Property & easements and Land & tenure for property services — with the radio paths drawn as every path, best path only, bundled into trunks or repeater areas, as lines, flowing dashes or tails with a spotlight, auto-contrast and a Balance slider, saved views of your own, and easements and land tenure on the property boundaries",
       "The station card in groups (station-card-view.js): Overview, then a tab each for Flood, Radio, Site and Kit (Tabs, the first), or a summary with each group a page of its own (List, chosen beside the box and kept per device), Field data, Zoom, Directions and All actions along the foot, and a search box that shows only the groups and rows holding a word, marked",
@@ -166,37 +166,29 @@
       },
       {
         "id": "compute-size",
-        "what": "#255 move the database to the Small compute size (2 GB) for the Disk IO budget",
+        "what": "#255 move the database off Nano (0.5 GB) — to Small (2 GB), or at least Micro — for the Disk IO budget",
         "on": "human",
         "kind": "money",
         "since": "2026-10-28",
         "issue": "#255",
         "holds": [
-          "headroom on Supabase's Disk IO budget (warned 2026-10-28)"
+          "headroom on Supabase's Disk IO budget (warned 2026-10-28 and again 2026-11-08; base stations' posts time out when it runs out)"
         ],
         "options": [
           {
-            "what": "#255 Part 1: read the compute size and the Database report's Disk IOPS and Memory charts (last 7 days); then Part 2 if it is Nano, disk activity stayed high after 0087, or memory sits at the top: choose Small on Compute and Disk in a quiet dry-weather hour (under 2 min offline), and check the Message Log resumes",
+            "what": "#255 Part 2 now: choose Small on Compute and Disk in a quiet dry-weather hour (under 2 min offline), and check the Message Log resumes",
             "by": "human",
-            "effort": "15 min",
-            "pros": "the whole 902 MB database fits in memory",
+            "effort": "10 min",
+            "pros": "today's 1.46 GB database fits in memory",
             "cons": "about US$5 a month more than Micro",
             "recommended": true
           },
           {
-            "what": "Read the cache hit ratio and disk reads since 0087–0094 through the Supabase connector (read-only) and post them on #255, so Part 1 becomes a yes or no",
-            "by": "agent",
-            "effort": "Low",
-            "model": "Sonnet5/Low",
-            "pros": "the owner decides from numbers",
-            "cons": "the compute size itself is still a dashboard change"
-          },
-          {
-            "what": "Stay on Micro for now: answer #256 with 30 days so receptions level off near 0.7 GB, and wait for the next Disk IO warning",
+            "what": "#255 Part 2 with Micro instead: listed as a free upgrade from Nano on the Pro plan",
             "by": "human",
-            "effort": "5 min",
-            "pros": "costs nothing",
-            "cons": "the database is already four times the 224 MB of shared buffers"
+            "effort": "10 min",
+            "pros": "costs nothing; twice the memory and a faster disk baseline",
+            "cons": "1 GB is still smaller than the database"
           },
           {
             "what": "If #256 keeps 90 days, go straight to Medium (4 GB, about US$60 a month) instead of Small",
@@ -223,7 +215,7 @@
             "what": "Reply (b) 30 days on #256; an agent then sets retain_reception_days by a migration, updates EPIC #240's regime line and the roadmap",
             "by": "human",
             "effort": "2 min",
-            "pros": "the table levels off near 0.7 GB and Small stays enough",
+            "pros": "the table levels off near 1 GB at November's ~80,000 receptions a day, and Small stays enough",
             "cons": "days older than 30 come back only from the R2 archive (#243, its restore test still to run) or the rollups",
             "recommended": true
           },
@@ -232,7 +224,7 @@
             "by": "human",
             "effort": "2 min",
             "pros": "raw receptions stay queryable for a quarter",
-            "cons": "the table nears 2 GB"
+            "cons": "the table nears 3 GB at November's rate"
           },
           {
             "what": "Reply (c) with a number between, such as 45 or 60 days",
