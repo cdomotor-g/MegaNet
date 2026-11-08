@@ -600,6 +600,17 @@ try {
     `${every.core} → ${best.core}, thinned ${best.thinned}; stations ${every.stations} → ${best.stations}`);
   const bestNote = await page.evaluate(() => { const n = document.getElementById('mv-paths-note'); return n && !n.hidden ? n.textContent : ''; });
   check('…and the section says how many are drawn', /\d/.test(bestNote), bestNote);
+  // The backbone cut the same way (owner, 8 Nov: 539 backbone paths are their
+  // own spaghetti): one path per repeater, on its best way to a base — a tree.
+  const tree = await page.evaluate(() => {
+    const bb = state.mapLines.filter(l => l.mnLinkRole === 'backbone');
+    const per = new Map();
+    for (const l of bb) for (const id of [l.mnLinkRepeaterId, l.mnLinkRepeaterId2]) per.set(id, (per.get(id) || 0) + 1);
+    const reps = state.data.stations.filter(s => (s.roles || []).includes('repeater')).length;
+    return { drawn: bb.length, thinned: state.mapLinkCount.backboneThinned, reps };
+  });
+  check('…and the backbone cut to a tree into the bases: no more paths than repeaters, the rest counted',
+    tree.drawn > 0 && tree.drawn <= tree.reps && tree.thinned > tree.drawn, J(tree));
 
   await view(-27.55, 152.3, 9);
   await press('#mv-paths-lod', 900);

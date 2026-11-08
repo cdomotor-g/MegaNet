@@ -973,7 +973,7 @@ const MapLatency = (() => {
   function refreshForHidden() {
     // Hidden by a switch, or by Views (Best path only, Areas: map-paths.js),
     // which leaves the paths out of the build and hands them over only then.
-    const thinned = !!(state.mapLinkCount && state.mapLinkCount.thinned > 0);
+    const thinned = !!(state.mapLinkCount && (state.mapLinkCount.thinned > 0 || state.mapLinkCount.backboneThinned > 0));
     if ((!state.mapShowLinks || !state.mapShowBackbone || thinned) && state.map && typeof refreshMapLayers === 'function') {
       refreshMapLayers({ skipFit: true });
     }

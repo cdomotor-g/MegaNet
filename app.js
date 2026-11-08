@@ -7193,8 +7193,12 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   // field links: a repeater-to-repeater path with one repeater hidden is a line
   // to nowhere, which is the whole complaint.
   const allBackbone = state.mapShowBackbone ? backboneLinks(state.mapMaxLinkKm).filter(kindsDrawn) : [];
-  const backbone = shownIds
+  const backboneCut = shownIds
     ? allBackbone.filter(p => shownIds.has(p.a.id) && shownIds.has(p.b.id)) : allBackbone;
+  // Best path only and Areas cut the backbone too: each repeater's one path
+  // on its best way to a base (map-paths.js, thinBackbone).
+  const bbThin = MapPaths.thinBackbone(backboneCut);
+  const backbone = bbThin.kept;
   // ⏱️ Latency's pulses run along the lines drawn here. With Animate along
   // hidden links ticked, the links a switch above is hiding are worked out the
   // same way — the same stations, length limit and cut — and handed over for
@@ -7208,13 +7212,14 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     : unseen ? thinned.dropped : [];
   const hiddenBackbone = unseen && !state.mapShowBackbone
     ? backboneLinks(state.mapMaxLinkKm).filter(p => kindsDrawn(p) && (!shownIds || (shownIds.has(p.a.id) && shownIds.has(p.b.id))))
-    : [];
+    : unseen ? bbThin.dropped : [];
   MapLatency.hiddenLinks(hiddenField, hiddenBackbone);
   state.mapLinkCount = { drawn: links.length, culled: allLinks.length - inRange.length,
                          hidden: inRange.length - cut.length,
                          thinned: thinned.dropped.length,
                          backbone: backbone.length,
-                         backboneHidden: allBackbone.length - backbone.length };
+                         backboneHidden: allBackbone.length - backboneCut.length,
+                         backboneThinned: bbThin.dropped.length };
   updateMapLinkNote();
   if (!stations.length) {
     MapCluster.rebuild();                 // no pins, so no bubbles; and the fan-out and stack let go

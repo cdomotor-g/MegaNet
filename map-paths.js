@@ -139,7 +139,8 @@ const MapPaths = (function () {
   const WORDS = {
     'Best path': 'Each field station is drawn with one path only: the one to the repeater most likely to hear it — the '
       + 'biggest fade margin (spare signal, in dB) saved for it, or the shortest path when none of its paths has a figure. '
-      + 'Point at a station, open its card or focus a repeater to see the other paths too, dashed.',
+      + 'Point at a station, open its card or focus a repeater to see the other paths too, dashed. The backbone is cut '
+      + 'the same way: each repeater keeps the one path on its best way to a base.',
     'Best path until you zoom in': `Best path only while the map is zoomed out (below zoom ${LOD_ZOOM}, about a district `
       + 'across a laptop screen); zoomed in past that, every path is drawn again.',
     'Bundled into trunks': `Paths of ${BUNDLE_MIN_KM} km or more that come into one repeater from the same direction `
@@ -726,7 +727,92 @@ const MapPaths = (function () {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     if (S.built === 'bundle' && S.trunks.length) drawTrunks(ctx, h);
-    if (S.built === 'best' || S.built === 'areas') drawOthers(ctx, h);
+    if (S.built === 'best' || S.built === 'areas') { drawOthers(ctx, h); drawOtherBackbone(ctx, h); }
+  }
+
+  // ── The backbone, tidied with the field paths (Best path only, Areas) ────
+  // The backbone is every pair of repeaters that *could* relay each other's
+  // readings (backboneIndex: a shared ALERT address), and round a city that
+  // is a hundred paths across one screen — 539 over the network, where the
+  // owner's mock-up had thirty (8 Nov 2026: "my view still does not look like
+  // the mock up"). With Best path only (or Areas) the backbone is cut the same
+  // way the field paths are: each repeater keeps the one path on its best way
+  // to a base — the fewest hops, then the shortest distance — so what is
+  // drawn is a tree into the bases, one line per repeater. A repeater with no
+  // way to a base keeps its shortest path. The rest come back dashed when a
+  // repeater is pointed at, focused or on the card, as the field paths do.
+  // list: backboneLinks items { kind: 'repeater'|'base', a, b, km } (a base
+  // path is a = repeater, b = base).
+  function thinBackbone(list) {
+    const all = Array.isArray(list) ? list : [];
+    S.bbDropByRep = new Map();
+    S.bbKept = all.length;
+    S.bbDropped = 0;
+    const m = mode();
+    if (!(m === 'best' || m === 'areas') || all.length < 2) return { kept: all, dropped: [] };
+    const adj = new Map(), bases = new Set();
+    const link = (id, p) => { if (!adj.has(id)) adj.set(id, []); adj.get(id).push(p); };
+    for (const p of all) {
+      if (!p || !p.a || !p.b) continue;
+      link(p.a.id, p); link(p.b.id, p);
+      if (p.kind === 'base') bases.add(p.b.id);
+    }
+    // Dijkstra from every base at once; a hop costs 1000, then its km.
+    const dist = new Map(), via = new Map(), done = new Set();
+    for (const id of bases) dist.set(id, 0);
+    for (;;) {
+      let u = null, du = Infinity;
+      for (const [id, d] of dist) if (!done.has(id) && d < du) { u = id; du = d; }
+      if (u == null) break;
+      done.add(u);
+      for (const p of adj.get(u) || []) {
+        const v = p.a.id === u ? p.b.id : p.a.id;
+        if (bases.has(v)) continue;
+        const c = du + 1000 + (Number(p.km) || 0);
+        if (!dist.has(v) || c < dist.get(v)) { dist.set(v, c); via.set(v, p); }
+      }
+    }
+    const keep = new Set(via.values());
+    for (const [id, ps] of adj) {
+      if (bases.has(id) || via.has(id)) continue;
+      keep.add(ps.reduce((x, y) => ((Number(x.km) || 0) <= (Number(y.km) || 0) ? x : y)));
+    }
+    const kept = [], dropped = [];
+    for (const p of all) (keep.has(p) ? kept : dropped).push(p);
+    for (const p of dropped) {
+      for (const id of [p.a.id, p.b.id]) {
+        if (!S.bbDropByRep.has(id)) S.bbDropByRep.set(id, []);
+        S.bbDropByRep.get(id).push(p);
+      }
+    }
+    S.bbKept = kept.length;
+    S.bbDropped = dropped.length;
+    return { kept, dropped };
+  }
+  // A repeater's (or base's) backbone paths left out, for the one asked about:
+  // dashed in the backbone's colour over a white casing.
+  function drawOtherBackbone(ctx, h) {
+    if (!S.bbDropByRep || !S.bbDropByRep.size) return;
+    const seen = new Set(), list = [];
+    for (const id of askedIds()) for (const p of S.bbDropByRep.get(id) || []) if (!seen.has(p)) { seen.add(p); list.push(p); }
+    if (!list.length) return;
+    const size = h.size(), sc = strokeScale();
+    const colour = typeof cssVar === 'function' ? cssVar('--map-backbone', '#000000') : '#000000';
+    const drawn = [];
+    for (const p of list) {
+      const a = h.at(p.a.lat, p.a.lon), b = h.at(p.b.lat, p.b.lon);
+      if (!Number.isFinite(a[0]) || offScreen(a, b, size, 8)) continue;
+      drawn.push([a, b]);
+    }
+    ctx.setLineDash([8, 5]);
+    for (const pass of ['casing', 'core']) {
+      ctx.globalAlpha = pass === 'casing' ? 0.6 : 0.9;
+      ctx.strokeStyle = pass === 'casing' ? '#ffffff' : colour;
+      ctx.lineWidth = (pass === 'casing' ? 4.2 : 2.2) * sc;
+      for (const [a, b] of drawn) { ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+    }
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
   }
 
   // Both overlays, once, on the next frame. MapViews calls this after a
@@ -830,8 +916,9 @@ const MapPaths = (function () {
     if (!all || !S.built || S.built === 'every') return '';
     if (S.built === 'best') {
       const lod = rawMode() === 'lod';
-      return `${lod ? 'Best path until you zoom in' : 'Best path only'}: ${fmt(S.kept)} of ${plural(all, 'path', 'paths')} drawn — `
-        + `${lod ? 'zoom in for every path, or ' : ''}point at a station for the rest.`;
+      return `${lod ? 'Best path until you zoom in' : 'Best path only'}: ${fmt(S.kept)} of ${plural(all, 'path', 'paths')} drawn`
+        + `${S.bbDropped ? `, and ${fmt(S.bbKept)} of ${fmt(S.bbKept + S.bbDropped)} backbone paths — each repeater's best way to a base` : ''} — `
+        + `${lod ? 'zoom in for every path, or ' : ''}point at a station or a repeater for the rest.`;
     }
     if (S.built === 'areas') {
       return `Areas, no lines: ${plural(all, 'path', 'paths')} shown as the areas of ${plural(S.areas.size, 'repeater', 'repeaters')} — `
@@ -923,7 +1010,7 @@ const MapPaths = (function () {
   return {
     attach, detach, mode, thin, prepare, curve, schedule, counts,
     areaColour, legendHtml, noteText, WORDS, lodZoom: LOD_ZOOM, _state,
-    drawn3d, areas3d, droppedFor,
+    drawn3d, areas3d, droppedFor, thinBackbone,
   };
 })();
 if (typeof window !== 'undefined') window.MapPaths = MapPaths;

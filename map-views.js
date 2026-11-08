@@ -150,7 +150,9 @@ const MapViews = (function () {
       + 'you picked.',
     'Best path': 'For each field station, only the one path to the repeater it is most likely to use: the one with the most '
       + 'fade margin (the signal it has to spare, in dB) where that has been worked out, otherwise the nearest repeater. Point '
-      + 'at a station, open its card or focus a repeater to see its other paths, dashed.',
+      + 'at a station, open its card or focus a repeater to see its other paths, dashed. The backbone is cut the same way: '
+      + 'each repeater keeps the one path on its best way to a base (the fewest hops, then the shortest), so the backbone '
+      + 'is a tree into the bases rather than every pair of repeaters that could relay.',
     'Bundled into trunks': 'Paths of 16 km or more that come into one repeater from the same direction (within a 36° slice) '
       + 'curve together into one trunk on the way in, wider the more paths it carries. Shorter paths, and a path on its own, '
       + 'stay straight.',
