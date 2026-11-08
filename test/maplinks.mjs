@@ -695,8 +695,10 @@ try {
   await page.fill('#map-display-find', 'qqzz');
   await page.waitForTimeout(300);
   const nothing = await panel();
+  // The line saying so sits with the box, at the top of Layers, outside the
+  // block (since 8 Nov 2026, when the box moved up over Views).
   check('a term that matches nothing says so rather than showing an empty panel',
-    nothing.rows === 1 && nothing.none === true, JSON.stringify(nothing));
+    nothing.rows === 0 && nothing.none === true, JSON.stringify(nothing));
 
   // The term has to survive the panel redrawing itself, which it does whenever
   // one of its own switches moves.

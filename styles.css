@@ -11483,11 +11483,12 @@ body.mn-cardw-dragging {
   background: #fff;
 }
 
-/* Find a control, at the top of the 👁️ Map display flyout (#186). The panel is
-   a dozen switches, three sliders, four selects, a radio group and the ACMA
-   block under four headings, and it scrolls — so it is sticky rather than
-   scrolling away with the rows it is filtering, which is the one thing a search
-   box in a scroller must not do. */
+/* Find a view or a control, at the very top of 🗺️ Layers (#186), over Views
+   and the switches under it. The panel is Views' cards, a dozen switches, three
+   sliders, four selects, a radio group and the ACMA block under several
+   headings, and it scrolls — so it is sticky rather than scrolling away with
+   the rows it is filtering, which is the one thing a search box in a scroller
+   must not do. */
 .mapd-find {
   position: sticky;
   top: 0;
@@ -11709,9 +11710,13 @@ body.mn-cardw-dragging {
   font-size: .87rem;
 }
 
-/* Clear of the find row and the first heading below it. */
+/* Clear of the first heading below it — and none to keep clear of when the
+   find box at the top of Layers has hidden Views whole. */
 #map-views-block + #map-display-block {
   margin-top: var(--sp-5);
+}
+#map-views-block[hidden] + #map-display-block {
+  margin-top: 0;
 }
 
 .mv-ask {

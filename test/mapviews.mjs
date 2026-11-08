@@ -11,9 +11,11 @@
 // leaves the lines clickable at nothing, or a 3-D view that copies a tail's
 // zero across all pass every one of them. So:
 //
-//   1. **Where it sits, and today's map.** The Views block is above Find a
-//      control and outside the block it filters (a term that hides rows hides
-//      no chip). A device that has never picked anything draws today's map:
+//   1. **Where it sits, and today's map.** The find box is the first thing in
+//      Layers, Views under it and outside the block of switches; the box
+//      filters Views too — a view by its group, name or what it does, a
+//      setting by its words, a fold with a match opened and shut again
+//      without being remembered. A device that has never picked anything draws today's map:
 //      nothing written, every path straight, every line at the Link opacity,
 //      no filter on the tiles, no chip pressed, "Your own mix".
 //   2. **Put the map back** after a view is every switch as it was before —
@@ -371,10 +373,12 @@ try {
     const v = document.getElementById('map-views-block');
     const f = document.getElementById('map-display-find');
     const d = document.getElementById('map-display-block');
+    const row = document.getElementById('map-display-find-row');
     return {
       views: !!v, find: !!f,
-      before: !!(v && f && (v.compareDocumentPosition(f) & Node.DOCUMENT_POSITION_FOLLOWING)),
-      above: !!(v && f && v.getBoundingClientRect().bottom <= f.getBoundingClientRect().top + 1),
+      after: !!(v && f && (f.compareDocumentPosition(v) & Node.DOCUMENT_POSITION_FOLLOWING)),
+      below: !!(v && f && f.getBoundingClientRect().bottom <= v.getBoundingClientRect().top + 1),
+      findFirst: !!(row && row.parentNode && row.parentNode.firstElementChild === row && !d.contains(row) && !v.contains(row)),
       outside: !!(v && d && !d.contains(v) && !v.contains(d)),
       filterBlock: !!(v && v.classList.contains('filter-block')),
       heading: v ? (v.querySelector('.map-display-h') || {}).textContent : null,
@@ -390,24 +394,59 @@ try {
     J(place.groups) === J(['Everyone', 'Technicians', 'Flood', 'Property', 'Your views']),
     J(place.groups));
   check('…every chip saying on hover what the view does', place.titled);
-  check('…above the Find a control box, in the page and on screen', place.before && place.above, J(place));
-  check('…and outside the block the find box filters, with no filter-block class', place.outside && !place.filterBlock, J(place));
+  check('…under the find box, which is the first thing in Layers, in the page and on screen',
+    place.after && place.below && place.findFirst, J(place));
+  check('…and outside the block of switches, with no filter-block class', place.outside && !place.filterBlock, J(place));
 
-  await page.fill('#map-display-find', 'wind');
-  await settle(300);
-  const found = await page.evaluate(() => {
-    const v = document.getElementById('map-views-block');
-    const chips = [...v.querySelectorAll('button.mv-chip')];
-    const rows = [...document.getElementById('map-display-block').children]
-      .filter(e => e.id !== 'map-display-find-row' && e.id !== 'map-display-find-none');
-    return { chipsShown: chips.filter(c => c.getClientRects().length > 0).length, chips: chips.length,
-             blockShown: v.getClientRects().length > 0,
-             rowsHidden: rows.filter(r => r.getClientRects().length === 0).length, rows: rows.length };
-  });
-  check('a term in Find a control filters the panel\'s rows but hides no chip of Views',
-    found.blockShown && found.chipsShown === found.chips && found.rowsHidden > 0, J(found));
-  await page.fill('#map-display-find', '');
-  await settle(300);
+  // The find box over Views as well (the owner, 8 Nov 2026): a view by its
+  // group's name, its own name or what it does; a setting by its words.
+  const fvViews = async term => {
+    await page.fill('#map-display-find', term);
+    await settle(300);
+    return page.evaluate(() => {
+      const vis = e => !!e && e.getClientRects().length > 0;
+      const v = document.getElementById('map-views-block');
+      const more = document.getElementById('mv-card-more');
+      const rows = [...document.getElementById('map-display-block').children];
+      return {
+        block: vis(v),
+        chips: [...v.querySelectorAll('button.mv-chip')].filter(vis).map(b => b.id.replace(/^mv-chip-/, '')),
+        groups: [...v.querySelectorAll('.mv-group')].filter(vis).map(g => g.querySelector('.mv-group-h').textContent.trim()),
+        quick: vis(v.querySelector('.mv-open')), present: vis(document.getElementById('mv-present')),
+        moreOpen: !!more && more.open, moreShown: vis(more),
+        parts: [...v.querySelectorAll('.mv-part')].filter(vis).map(p => p.id),
+        words: [...v.querySelectorAll('.mv-words dt')].filter(vis).map(d => d.textContent.trim()),
+        rowsShown: rows.filter(vis).length, rows: rows.length,
+        none: vis(document.getElementById('map-display-find-none')),
+        stored: localStorage.getItem('mn-map-views-open'),
+      };
+    });
+  };
+  const fvAll = await fvViews('');
+  const fvWeak = await fvViews('technicians weak');
+  check('a group\'s name and a view\'s word together find that one view, and the switches below are filtered too',
+    J(fvWeak.chips) === J(['weak']) && J(fvWeak.groups) === J(['Technicians']) && fvWeak.rowsShown < fvWeak.rows, J(fvWeak));
+  const fvFlood = await fvViews('flood');
+  check('…a group\'s name brings in every view in it',
+    fvFlood.groups.includes('Flood') && fvFlood.chips.includes('rivers') && fvFlood.chips.includes('rain'), J(fvFlood));
+  const fvPresent = await fvViews('presenting');
+  check('…the Presenting switch found by its own name, the views that do not say it hidden',
+    fvPresent.present && fvPresent.chips.length < fvAll.chips.length, J(fvPresent));
+  const fvBal = await fvViews('balance');
+  check('…a setting\'s word opens More drawing settings on the part that has it, without remembering it open',
+    fvBal.moreShown && fvBal.moreOpen && fvBal.parts.includes('mv-card-strength') && !fvBal.parts.includes('mv-card-paths')
+      && fvBal.stored === fvAll.stored, J(fvBal));
+  check('…and lists the meaning of the word, not all the others', fvBal.words.includes('Balance') && fvBal.words.length < fvAll.words.length, J(fvBal.words));
+  await page.evaluate(() => MapViews.rerender());
+  await settle(200);
+  const fvKept = await fvViews('balance');
+  check('…and stays filtered when Views redraws itself', J(fvKept.parts) === J(fvBal.parts) && fvKept.moreOpen, J(fvKept));
+  const fvNone = await fvViews('qqzz');
+  check('a word in nothing hides Views whole, and the panel says nothing matches', !fvNone.block && fvNone.none, J(fvNone));
+  const fvBack = await fvViews('');
+  check('clearing the box gives every view back, and shuts the fold it opened',
+    J(fvBack.chips) === J(fvAll.chips) && fvBack.moreOpen === fvAll.moreOpen && fvBack.present && !fvBack.none && fvBack.stored === fvAll.stored,
+    J({ fvBack, fvAll }));
 
   const fresh = await page.evaluate(() => {
     const cores = state.mapLines.filter(l => l.mnLinkRole === 'core');
@@ -1141,6 +1180,6 @@ if (bad.length) {
   console.log(`\nFAIL — ${bad.length} of ${results.length} check(s).`);
   process.exit(1);
 }
-console.log(`\nPASS — ${results.length} checks: Views above Find a control, every built-in view set and pressed and put back,\n`
+console.log(`\nPASS — ${results.length} checks: Views under the find box and found by it, every built-in view set and pressed and put back,\n`
   + '       a kept view through a reload, which paths, tails, flow, auto-contrast, Balance, 3-D, easements and tenure,\n'
   + '       and Flow for everybody who has not chosen, Classic too.');

@@ -340,6 +340,7 @@ const MapViews = (function () {
   const S = {
     cfg: null,            // the drawing settings, read from storage on first ask
     addressDraw: null,    // how the address said to draw the paths (fromAddress)
+    find: [],             // the words in Layers' find box, lower-cased (find)
     map: null,
     root: null,           // the Layers panel's body, from bind()
     autoOp: null,         // auto-contrast's last figure, or null
@@ -798,6 +799,17 @@ const MapViews = (function () {
     try { const v = JSON.parse(localStorage.getItem(LS_OPEN) || '{}'); return !!(v && v[key]); } catch (_) { return false; }
   }
   function fold(key, open) {
+    // Opened or shut by the find box (find, below) is not somebody's choice:
+    // while it has words in it, and the shutting after (the toggle event
+    // comes once the words have gone).
+    if (S.find && S.find.length) return;
+    const d = typeof document !== 'undefined' ? document.getElementById('mv-card-' + key) : null;
+    if (d && d.hasAttribute('data-find-closing')) {
+      d.removeAttribute('data-find-closing');
+      // A browser can fold that close into the open before it and send no
+      // event at all, so the mark can outlive it: only a close is the box's.
+      if (!open) return;
+    }
     try {
       const v = JSON.parse(localStorage.getItem(LS_OPEN) || '{}') || {};
       v[key] = !!open;
@@ -1469,6 +1481,7 @@ const MapViews = (function () {
   function rowHtml(v, act, open) {
     const title = v.say + (v.caution ? ` ${v.caution}` : '');
     return `<button type="button" class="mv-chip mv-row" id="${chipId(v.id)}" data-view="${esc(v.id)}"
+        data-find="${esc(tagsOf(v).join(' '))}"
         aria-pressed="${act === v.id}" aria-expanded="${open}" title="${esc(title)}"
         onclick="MapViews.apply('${escAttr(v.id)}')">${thumbHtml(v.id)}<span class="mv-row-text"><b>${esc(v.label)}</b>
         <span class="mv-row-line">${esc(LINES[v.id] || '')}</span></span><span class="mv-tick" aria-hidden="true"></span></button>`;
@@ -1769,6 +1782,119 @@ const MapViews = (function () {
     </details>`;
   }
 
+  // ── Find a control, over Views too ───────────────────────────────────────
+  // Layers' find box (app.js, applyMapDisplayFind) sits above Views and
+  // filters it as it filters the switches below: every word typed has to be
+  // somewhere in what an item says — its words, its hover words — or in the
+  // names of what it is under (Views, the group, the fold), so "flood" is
+  // the Flood views and "technicians weak" is Weak links. A view's row keeps
+  // its quick settings with it, both ways round: "balance" is the view in
+  // force with its settings. A fold with a match inside is opened while the
+  // words are there, and shut again after, without being remembered; the
+  // words fold shows only the meanings that match. Kept here because
+  // rerender() rebuilds the block and puts the filter back. Returns how many
+  // items are showing.
+  function find(terms) {
+    S.find = (Array.isArray(terms) ? terms : []).map(t => String(t).toLowerCase()).filter(Boolean);
+    return applyFind();
+  }
+  function saysAll(els) {
+    let out = '';
+    for (const el of els) {
+      if (!el) continue;
+      out += ' ' + (el.textContent || '');
+      if (el.title) out += ' ' + el.title;
+      for (const n of el.querySelectorAll('[title]')) out += ' ' + n.title;
+      for (const n of el.querySelectorAll('[aria-label]')) out += ' ' + n.getAttribute('aria-label');
+      if (el.getAttribute && el.getAttribute('data-find')) out += ' ' + el.getAttribute('data-find');
+    }
+    return out.toLowerCase();
+  }
+  function findOpen(d, want) {
+    if (!d) return;
+    if (want && !d.open) { d.setAttribute('data-find-opened', ''); d.open = true; }
+    else if (!want && d.hasAttribute('data-find-opened')) {
+      d.removeAttribute('data-find-opened');
+      d.setAttribute('data-find-closing', '');
+      d.open = false;
+    }
+  }
+  function applyFind() {
+    const el = blockEl();
+    if (!el || typeof el.querySelectorAll !== 'function') return 0;
+    const T = S.find || [];
+    const matches = text => !T.length || T.every(t => text.includes(t));
+    const head = el.querySelector(':scope > .map-display-h');
+    const top = 'views \n ';
+    let shown = 0;
+    const show = (els, on) => { for (const e of els) if (e) e.hidden = !on; if (on) shown++; return on; };
+    // The switch and the notes at the top level: Presenting, Put the map
+    // back, the quick settings when no view is in force, Keep this mix.
+    for (const e of el.querySelectorAll(':scope > .mv-present, :scope > .mv-open, :scope > .mv-undo, :scope > .mv-save')) {
+      show([e], matches(top + saysAll([e])));
+    }
+    // The groups: each row with the quick settings opened under it.
+    const groups = [...el.querySelectorAll('.mv-groups > .mv-group')];
+    for (const g of groups) {
+      const name = saysAll([g.querySelector('.mv-group-h')]);
+      const list = g.querySelector('.mv-rows');
+      let any = false;
+      if (list) {
+        const kids = [...list.children];
+        for (let i = 0; i < kids.length; i++) {
+          const unit = [kids[i]];
+          if (kids[i + 1] && kids[i + 1].classList.contains('mv-open')) unit.push(kids[++i]);
+          if (show(unit, matches(top + name + ' \n ' + saysAll(unit)))) any = true;
+        }
+      }
+      g.hidden = !any;
+    }
+    const box = el.querySelector('.mv-groups');
+    if (box) box.hidden = groups.length > 0 && groups.every(g => g.hidden);
+    // More drawing settings: the whole fold when its name matches, else the
+    // parts in it that do, opened.
+    const more = el.querySelector('#mv-card-more');
+    if (more) {
+      const sum = top + saysAll([more.querySelector('summary')]);
+      const parts = [...more.querySelectorAll('.mv-part')];
+      if (!T.length || matches(sum)) {
+        for (const pt of parts) pt.hidden = false;
+        more.hidden = false;
+        findOpen(more, false);
+        if (T.length) shown++;
+      } else {
+        let any = false;
+        for (const pt of parts) if (show([pt], matches(sum + ' \n ' + saysAll([pt])))) any = true;
+        more.hidden = !any;
+        findOpen(more, any);
+      }
+    }
+    // The words: the meanings that match, opened; all of them under the
+    // fold's own name.
+    const words = el.querySelector('details.mv-words');
+    if (words) {
+      const sum = top + saysAll([words.querySelector('summary')]);
+      const dts = [...words.querySelectorAll('dt')];
+      if (!T.length || matches(sum)) {
+        for (const dt of dts) { dt.hidden = false; if (dt.nextElementSibling) dt.nextElementSibling.hidden = false; }
+        words.hidden = false;
+        findOpen(words, false);
+        if (T.length) shown++;
+      } else {
+        let any = false;
+        for (const dt of dts) {
+          const dd = dt.nextElementSibling && dt.nextElementSibling.tagName === 'DD' ? dt.nextElementSibling : null;
+          if (show([dt, dd], matches(top + saysAll([dt, dd])))) any = true;
+        }
+        words.hidden = !any;
+        findOpen(words, any);
+      }
+    }
+    if (head) head.hidden = T.length > 0 && shown === 0;
+    el.hidden = T.length > 0 && shown === 0;
+    return T.length ? shown : 0;
+  }
+
   // What goes inside #map-views-block (app.js draws the block itself).
   function html() {
     const c = C();
@@ -1802,8 +1928,9 @@ const MapViews = (function () {
     const box = el.querySelector('#mv-save-name');
     const draft = opts.draft === false ? '' : (box ? box.value : '');
     const words = el.querySelector('details.mv-words');
-    const open = !!(words && words.open);
+    const open = !!(words && words.open && !words.hasAttribute('data-find-opened'));
     el.innerHTML = html();
+    applyFind();
     if (draft) { const b = el.querySelector('#mv-save-name'); if (b) b.value = draft; }
     if (open) { const d = el.querySelector('details.mv-words'); if (d) d.open = true; }
     if (inside) {
@@ -1897,7 +2024,7 @@ const MapViews = (function () {
   return {
     attach, detach, html, bind, rerender, settings, set, lineOpacity, fullOpacity, restyle, afterBuild, autoValue,
     hover, hovered, cardChanged, apply, undo, save, remove, active, snapshot, saved, legendHtml, opacityNoteHtml,
-    togglePlay, fold, setPresenting, presenting, fromAddress,
+    togglePlay, fold, setPresenting, presenting, fromAddress, find,
     VIEWS, WORDS, GROUPS,
     // What is in force, for the checks.
     _state: () => {

@@ -39,6 +39,19 @@ one line). The view in force opens under its row with its tags and the quick
 settings: which paths, how they are drawn, and the Balance. Everything else is
 in the **More drawing settings** fold.
 
+**Find a view or a control**, the box at the very top of Layers (since 8 Nov
+2026; it was under Views and searched only the switches), filters Views as it
+filters the switches below (`MapViews.find`, called from `applyMapDisplayFind`
+in `app.js`). Every word typed has to be somewhere in what an item says — its
+words and hover words — or in the names it is under: *Views*, its group, the
+fold. So "flood" is the Flood views, "technicians weak" is Weak links, and
+"presenting" is the Presenting switch. A view's row keeps its quick settings
+with it both ways round. A match inside **More drawing settings** opens it on
+the part that matched, and the words fold shows only the meanings that match;
+both shut again when the box is cleared, and neither is remembered as opened.
+Nothing matching anywhere hides Views whole, and the panel says nothing
+matches. The filter survives Views redrawing itself. `npm run mapviews` §1.
+
 ---
 
 ## The views, by who they are for

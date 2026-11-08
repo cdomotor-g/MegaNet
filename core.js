@@ -1176,8 +1176,9 @@ const HELP = {
       + '<strong>Full screen</strong> in its key, to draw it again the size of the window with its figures '
       + 'over it; Escape puts it back. The dashes are what says <em>backbone</em>; the colour between them says '
       + 'whatever the link colouring says.',
-      'The <strong>Layers</strong> panel has a <strong>Find a control</strong> box at the '
-      + 'top of it. Type into it and the panel filters down to the rows that match — against the '
+      'The <strong>Layers</strong> panel has a <strong>Find a view or a control</strong> box at the very '
+      + 'top of it, above Views. Type into it and the panel filters down to the views and rows that match — '
+      + '"flood" shows the Flood views, "balance" opens the drawing settings on the Balance — against the '
       + 'label, its note and its tooltip, so "wind", "dB", "contour" and "licence" all land '
       + 'somewhere. A word that names a group brings in the whole group, even the rows that never '
       + 'say it: "links" shows everything under <strong>Stations &amp; links</strong>, and "radio paths" '

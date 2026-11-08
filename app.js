@@ -4910,11 +4910,14 @@ function stationsMapPanels(map) {
     // The ACMA block is the panel's last section, and has a heading of its own
     // like the rest: with only a rule above it, its one switch read as one more
     // row of Labels & export.
-    // Views first (map-views.js): the ready-made mixes for each audience, how
+    // The find box first, over everything under it (mapDisplayFindHtml).
+    // Then Views (map-views.js): the ready-made mixes for each audience, how
     // the radio paths are drawn and how strong they are. A sibling of the
-    // block below rather than a part of it, so the find box, the headings and
-    // the tests that walk that block's rows are the block they always were.
+    // block below rather than a part of it, so the headings and the tests
+    // that walk that block's rows are the block they always were; Views
+    // filters its own rows for the box (MapViews.find).
     html: () => `
+      ${mapDisplayFindHtml()}
       <div id="map-views-block" class="mapd-views">${MapViews.html()}</div>
       <div id="map-display-block">${mapDisplayControlsHtml()}</div>
       <div class="filter-block"><div class="map-display-h">ACMA licences</div>${acmaFilterBlockHtml()}</div>`,
@@ -5303,34 +5306,41 @@ function setMapBackbone(on) {
   refreshMapLayers();
 }
 
+// Find a control (#186), at the very top of Layers, over Views as well as the
+// switches under it (the owner, 8 Nov 2026: "put the search bar … right up the
+// top above the views … it should work over the views thing as well"). The
+// panel is a dozen switches, three sliders, four selects, a radio group, the
+// whole ACMA block and Views' cards, under several headings and behind one
+// icon, and it scrolls — so the honest description of it is that a person who
+// knows exactly which switch they want still has to go looking for it. The box
+// filters the panel to the rows that match, headings and all, and matches
+// against what each row *says* — its label, its note and its tooltip — so
+// "wind", "dB", "contour" and "licence" all land somewhere — and against the
+// names of the groups it is in, so a word that names a heading or a card brings
+// in everything under it ("links": the whole of Stations & links;
+// applyMapDisplayFind; Views' own rows, MapViews.find). It filters what is
+// drawn and changes nothing about what is on: a hidden switch is still doing
+// whatever it was doing, and the "nothing matches" line says so. A type="search"
+// field, so the browsers that draw a ✕ in one give the whole panel back in a
+// click. Outside both blocks, so redrawing either leaves the box, its caret and
+// its focus alone.
+function mapDisplayFindHtml() {
+  return `
+    <div class="mapd-find" id="map-display-find-row">
+      <input type="search" id="map-display-find" class="mapd-find-box"
+             placeholder="Find a view or a control…" spellcheck="false"
+             aria-label="Find a view or a control in Layers"
+             aria-controls="map-views-block map-display-block"
+             value="${escAttr(mapDisplayFind)}"
+             oninput="setMapDisplayFind(this.value)">
+    </div>
+    <p class="filter-note" id="map-display-find-none" hidden></p>`;
+}
+
 function mapDisplayControlsHtml() {
   const on = state.mapKillSpaghetti;
   const autoOp = MapViews.settings().auto;
   return `
-    <!-- Find a control (#186). This panel is a dozen switches, three sliders,
-         four selects, a radio group and the whole ACMA block, under four
-         headings and behind one icon, and it scrolls — so the honest
-         description of it is that a person who knows exactly which switch they
-         want still has to go looking for it. The box filters the panel to the
-         rows that match, headings and all, and matches against what each row
-         *says* — its label, its note and its tooltip — so "wind", "dB",
-         "contour" and "licence" all land somewhere — and against the names of
-         the groups it is in, so a word that names a heading or a card brings
-         in everything under it ("links": the whole of Stations & links;
-         applyMapDisplayFind). It filters what is drawn
-         and changes nothing about what is on: a hidden switch is still doing
-         whatever it was doing, and the "nothing matches" line says so. A
-         type="search" field, so the browsers that draw a ✕ in one give the
-         whole panel back in a click. -->
-    <div class="mapd-find" id="map-display-find-row">
-      <input type="search" id="map-display-find" class="mapd-find-box"
-             placeholder="Find a control…" spellcheck="false"
-             aria-label="Find a control in this panel"
-             aria-controls="map-display-block"
-             value="${escAttr(mapDisplayFind)}"
-             oninput="setMapDisplayFind(this.value)">
-    </div>
-    <p class="filter-note" id="map-display-find-none" hidden></p>
     ${typeof Looks !== 'undefined' ? Looks.layersNoteHtml() : ''}
     ${state.map && state.map.mnBases ? state.map.mnBases.html() : ''}
     <!-- What a pin's shape, fill and outline say (map-symbols.js): a triangle
@@ -5970,19 +5980,15 @@ function applyMapDisplayFind() {
     const head = acma.querySelector('.map-display-h');
     if (head) head.classList.toggle('mapd-h--first', first && hit);
   }
+  // Views, at the top, filters its own rows the same way (map-views.js,
+  // find): a view by its name and what it does, a setting by its words.
+  if (typeof MapViews !== 'undefined' && typeof MapViews.find === 'function') shown += MapViews.find(terms);
   const none = document.getElementById('map-display-find-none');
   if (none) {
     none.hidden = !terms.length || shown > 0;
     if (!none.hidden) {
-      // Views, above the box, is never filtered (map-views.js): when the
-      // word is there, say so rather than that nothing matches.
-      const views = document.getElementById('map-views-block');
-      const inViews = !!views && terms.every(t => mapDisplayRowText([views]).includes(t));
-      none.textContent = inViews
-        ? `Nothing below matches “${mapDisplayFind.trim()}”: it is in Views, above this box. `
-          + 'Clear the box to see all of the rest.'
-        : `Nothing in this panel matches “${mapDisplayFind.trim()}”. `
-          + 'Clear the box to see all of it — nothing has been switched off.';
+      none.textContent = `Nothing in this panel matches “${mapDisplayFind.trim()}”. `
+        + 'Clear the box to see all of it — nothing has been switched off.';
     }
   }
 }
