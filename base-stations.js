@@ -87,7 +87,7 @@ const BaseStations = (function () {
   const LIMITS = [['0', 'No limit']].concat(WINDOWS.map(([v, t]) => [v, t.replace(' — the lightest', '')]));
   const WIDTH = Object.fromEntries(LIMITS.slice(1));
   const WINDOW_WORDS = {
-    window: ['Window', 'The slice of the band a stick hears at once. Every channel\'s decoder works through all of it, so a wider window costs the Pi more and hears no channel better. Automatic takes the narrowest that holds the stick\'s channels.'],
+    window: ['Window', 'The slice of the band a stick hears at once. Every channel\'s decoder works through all of it, so a wider window costs the Pi more — and hears weak bursts a little better: a stick\'s 8-bit samples spread their noise across the window, so less of it is left in each channel (at 18 Bateson, 960 kHz\'s noise floor was 5–6 dB under 288 kHz\'s). Automatic takes the narrowest that holds the stick\'s channels.'],
     min: ['No narrower than', 'With the window on Automatic: the narrowest it may take. Wider shows more of the band on the waterfall, and costs the Pi more.'],
     max: ['No wider than', 'With the window on Automatic: the widest it may take. Keeps a stick\'s work down whatever channels it has; a channel the window cannot hold is not decoded, and the stick says so below.'],
     chans: ['Channels', 'The frequencies a stick decodes at once, its own first. A stick with none of its own decodes the channels set for every stick — listening to one far from the others is what makes a window wide.'],
