@@ -78,7 +78,10 @@ const BaseStations = (function () {
   // web/sdr-plan.js RATES): the slice of the band it hears, and its cost, since
   // each channel's decoder works through the whole of it. Set here, exactly
   // that one; automatic, the narrowest that holds the stick's channels.
-  const WINDOWS = [['240000', '240 kHz — the lightest'], ['960000', '960 kHz'], ['1200000', '1.2 MHz'], ['1440000', '1.44 MHz'], ['1920000', '1.92 MHz'], ['2400000', '2.4 MHz']];
+  const WINDOWS = [['240000', '240 kHz — the lightest'], ['288000', '288 kHz'], ['960000', '960 kHz'], ['1200000', '1.2 MHz'], ['1440000', '1.44 MHz'], ['1920000', '1.92 MHz'], ['2400000', '2.4 MHz']];
+  // 288 kHz is RPi ALERT 0.22's (its decoder resamples it by a fraction): not
+  // offered to a station older than that, which would refuse it.
+  const NEW_288 = '0.22.0';
   // RPi ALERT 0.20: the narrowest and the widest window Automatic may take
   // (receivers.sdr.sampleRateMin / sampleRateMax, and a stick's own; 0 no limit).
   const LIMITS = [['0', 'No limit']].concat(WINDOWS.map(([v, t]) => [v, t.replace(' — the lightest', '')]));
@@ -665,6 +668,8 @@ const BaseStations = (function () {
     const sel = (k, label, opts) => `<label>${label} <select id="bs-f-${k}" onchange="BaseStations.field('${k}', this.value)">${opts.map(([v, t]) => `<option value="${esc(v)}"${String(f[k]) === String(v) ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
     const chk = (k, label) => `<label class="ser-check"><input type="checkbox" id="bs-f-${k}"${f[k] ? ' checked' : ''} onchange="BaseStations.field('${k}', this.checked)"> ${label}</label>`;
     const sticks = rx.filter(x => x.kind === 'sdr');
+    const has288 = cmpVersion(s.version || '0', NEW_288) >= 0;
+    const wins = has288 ? WINDOWS : WINDOWS.filter(w => w[0] !== '288000'), lims = has288 ? LIMITS : LIMITS.filter(w => w[0] !== '288000');
     // A fold: its name, what it is set to, and its fields. Open or shut as it
     // was before the poll.
     const fold = (key, title, sum, body) => `<details class="bs-fold" data-fold="${esc(key)}"${openFolds.has(key) ? ' open' : ''} ontoggle="BaseStations.fold(this)">
@@ -687,8 +692,8 @@ const BaseStations = (function () {
         ${inp('gain', 'Gain, dB (or auto)')}
         ${inp('ppm', 'Correction, ppm', ' inputmode="numeric"')}
         ${inp('squelch', 'Squelch, dB', ' inputmode="numeric"')}
-        ${sel('rate', termHtml('Window', WINDOW_WORDS.window[1]), [['0', 'Automatic — the narrowest that holds the channels']].concat(WINDOWS))}
-        ${f.rmin != null ? sel('rmin', termHtml(WINDOW_WORDS.min[0], WINDOW_WORDS.min[1]), LIMITS) + sel('rmax', termHtml(WINDOW_WORDS.max[0], WINDOW_WORDS.max[1]), LIMITS) : ''}
+        ${sel('rate', termHtml('Window', WINDOW_WORDS.window[1]), [['0', 'Automatic — the narrowest that holds the channels']].concat(wins))}
+        ${f.rmin != null ? sel('rmin', termHtml(WINDOW_WORDS.min[0], WINDOW_WORDS.min[1]), lims) + sel('rmax', termHtml(WINDOW_WORDS.max[0], WINDOW_WORDS.max[1]), lims) : ''}
         ${f.decoder ? sel('decoder', termHtml('Decoder', DECODER_MEANING), decodersFor(s)) : ''}
         ${f.watch ? sel('watch', termHtml('Between bursts', WATCH_MEANING), WATCHES) : ''}
       </div>
@@ -708,8 +713,8 @@ const BaseStations = (function () {
           <label>${termHtml('Channels, MHz', WINDOW_WORDS.chans[1])} <input type="text" inputmode="decimal" value="${esc(v.freq)}" placeholder="${esc(f.freq)}" oninput="BaseStations.stick('${k}', 'freq', this.value)"></label>
           <label>Format <select onchange="BaseStations.stick('${k}', 'format', this.value)"><option value="">As above</option>${Object.entries(FORMATS).map(([fv, t]) => `<option value="${fv}"${v.format === fv ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
           <label>Gain, dB <input type="text" value="${esc(v.gain)}" placeholder="${esc(f.gain)}" oninput="BaseStations.stick('${k}', 'gain', this.value)"></label>
-          <label>${termHtml('Window', WINDOW_WORDS.window[1])} <select onchange="BaseStations.stick('${k}', 'rate', this.value)"><option value="">As above</option>${[['0', 'Automatic']].concat(WINDOWS).map(([wv, t]) => `<option value="${wv}"${v.rate === wv ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
-          ${f.rmin != null ? ['rmin', 'rmax'].map(lk => `<label>${termHtml(WINDOW_WORDS[lk === 'rmin' ? 'min' : 'max'][0], WINDOW_WORDS[lk === 'rmin' ? 'min' : 'max'][1])} <select onchange="BaseStations.stick('${k}', '${lk}', this.value)"><option value="">As above</option>${LIMITS.map(([wv, t]) => `<option value="${wv}"${v[lk] === wv ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`).join('') : ''}
+          <label>${termHtml('Window', WINDOW_WORDS.window[1])} <select onchange="BaseStations.stick('${k}', 'rate', this.value)"><option value="">As above</option>${[['0', 'Automatic']].concat(wins).map(([wv, t]) => `<option value="${wv}"${v.rate === wv ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+          ${f.rmin != null ? ['rmin', 'rmax'].map(lk => `<label>${termHtml(WINDOW_WORDS[lk === 'rmin' ? 'min' : 'max'][0], WINDOW_WORDS[lk === 'rmin' ? 'min' : 'max'][1])} <select onchange="BaseStations.stick('${k}', '${lk}', this.value)"><option value="">As above</option>${lims.map(([wv, t]) => `<option value="${wv}"${v[lk] === wv ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`).join('') : ''}
           <label class="ser-check"><input type="checkbox"${v.on !== false ? ' checked' : ''} onchange="BaseStations.stick('${k}', 'on', this.checked)"> Use this stick</label>
         </div>`);
       }).join('')}

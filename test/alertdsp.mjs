@@ -358,6 +358,17 @@ for (const c of [
     return b;
   };
   same('240k', streamOf(240000, 0), { deviceRate: 240000, channelOffsetHz: 0 });
+  // 288k and 300k (RPi ALERT 0.22's windows between 240k and 960k): not whole
+  // multiples of 240k, so resampled by a fraction (Resampler) — the same
+  // bursts read as in 240k, with the channel far off centre, watched or not.
+  const at240 = run(streamOf(240000, 0), { deviceRate: 240000, channelOffsetHz: 0 }).readings;
+  for (const [rate, off] of [[288000, 95000], [300000, -70000]]) {
+    const r = run(streamOf(rate, off), { deviceRate: rate, channelOffsetHz: off }).readings;
+    check(`${rate / 1000}k, the channel ${off / 1000} kHz off centre: the same readings as 240k`, keyOf(r) === keyOf(at240), `${keyOf(r)} | 240k ${keyOf(at240)}`);
+    // The watch filters every sample there: the same readings, awake throughout.
+    const w = same(`${rate / 1000}k, the channel ${off / 1000} kHz off centre`, streamOf(rate, off), { deviceRate: rate, channelOffsetHz: off });
+    check('…and awake throughout, the watch standing aside', w.stats.awake === w.stats.samples, JSON.stringify(w.stats));
+  }
   // 960k, the channel off centre, a neighbour 12.5 kHz away loud enough to clip
   // the stick's bytes (the floor drops under it, once, in both), and another
   // channel's burst at the far side of the window.

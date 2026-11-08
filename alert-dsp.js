@@ -859,6 +859,79 @@ const AlertDsp = (function alertDspModule() {
     }
   }
 
+  // Mix by −offset and resample by L/M (up L, down M) with a polyphase FIR,
+  // keeping its history across chunks: a device rate that is not a whole
+  // multiple of 240k still reaches the decoder's 240k exactly — 288k is
+  // 240k × 6/5, 300k 240k × 5/4 (RPi ALERT 0.22's windows between 240 kHz and
+  // 960 kHz, the RTL2832U's top band but one). The same interface as
+  // Decimator's. The filter keeps ±cutoffHz of the mixed signal: an image of
+  // the upsampling folds onto the channel only from beyond the input's own
+  // band, so a cutoff well under it — 90 kHz, stopping by 180 kHz — leaves the
+  // channel exactly as the integer path would.
+  class Resampler {
+    constructor(inRate, L, M, cutoffHz, taps) {
+      this.inRate = inRate; this.L = L; this.M = M;
+      const K = Math.max(2, Math.ceil(taps / L));           // taps per phase
+      const proto = firwin((K * L) | 1, Math.min(0.95, cutoffHz / (inRate * L / 2)));
+      // Phase p's taps h[p + kL], scaled by L (upsampling divides the gain by L).
+      this.K = K;
+      this.ph = [];
+      for (let ph = 0; ph < L; ph++) {
+        const c = new Float32Array(K);
+        for (let k = 0; k < K; k++) { const t = ph + k * L; c[k] = t < proto.length ? proto[t] * L : 0; }
+        this.ph.push(c);
+      }
+      this.hr = new Float32Array(K - 1);
+      this.hi = new Float32Array(K - 1);
+      this.pos = 0;                 // the next output, in upsampled samples from the next chunk's first
+      this.pr = 1; this.pi = 0; this.count = 0;
+      this.setOffset(0);
+      this.er = new Float32Array(0); this.ei = new Float32Array(0);
+    }
+    setOffset(hz) {
+      this.offset = hz || 0;
+      const w = -2 * Math.PI * this.offset / this.inRate;
+      this.dr = Math.cos(w); this.di = Math.sin(w);
+    }
+    process(ir, ii) {
+      const n = ir.length, K = this.K, H = K - 1, L = this.L, M = this.M;
+      if (this.er.length < H + n) { this.er = new Float32Array(H + n); this.ei = new Float32Array(H + n); }
+      const er = this.er, ei = this.ei;
+      er.set(this.hr); ei.set(this.hi);
+      let pr = this.pr, pi = this.pi;
+      const dr = this.dr, di = this.di, mix = this.offset !== 0;
+      for (let i = 0; i < n; i++) {
+        const xr = ir[i], xi = ii[i];
+        if (mix) {
+          er[H + i] = xr * pr - xi * pi;
+          ei[H + i] = xr * pi + xi * pr;
+          const nr = pr * dr - pi * di;
+          pi = pr * di + pi * dr;
+          pr = nr;
+          if ((++this.count & 0x3ff) === 0) {
+            const m = Math.sqrt(pr * pr + pi * pi);
+            if (m > 1e-9) { pr /= m; pi /= m; }
+          }
+        } else { er[H + i] = xr; ei[H + i] = xi; }
+      }
+      this.pr = pr; this.pi = pi;
+      let pos = this.pos;
+      const count = pos < n * L ? Math.floor((n * L - 1 - pos) / M) + 1 : 0;
+      const outR = new Float32Array(count), outI = new Float32Array(count);
+      for (let o = 0; o < count; o++, pos += M) {
+        const base = Math.floor(pos / L), c = this.ph[pos - base * L];
+        let ar = 0, ai = 0;
+        for (let k = 0, x = H + base; k < K; k++, x--) { const h = c[k]; ar += er[x] * h; ai += ei[x] * h; }
+        outR[o] = ar; outI[o] = ai;
+      }
+      this.pos = pos - n * L;
+      if (H) { this.hr.set(er.subarray(n, n + H)); this.hi.set(ei.subarray(n, n + H)); }
+      return { r: outR, i: outI };
+    }
+  }
+
+  function gcd(a, b) { while (b) { [a, b] = [b, a % b]; } return a; }
+
   // Write `src` into the ring `ring` as if sample by sample from position `at`
   // (any non-negative count; it wraps): at most two block copies.
   function ringPut(ring, at, src) {
@@ -918,9 +991,15 @@ const AlertDsp = (function alertDspModule() {
     reset() {
       const c = this.cfg;
       const factor = Math.max(1, Math.round(c.deviceRate / FS_IN));
-      // Device rate → 240k: keep ±60 kHz flat, stop by ±120 kHz.
-      const taps = factor > 1 ? Math.min(255, 2 * Math.floor(1.65 * c.deviceRate / 60000) + 1) : 1;
-      this.dec1 = new Decimator(c.deviceRate, factor, 60000, taps);
+      if (c.deviceRate % FS_IN) {
+        // Not a whole multiple of 240k (288k, 300k): resampled by a fraction.
+        const g = gcd(FS_IN, c.deviceRate);
+        this.dec1 = new Resampler(c.deviceRate, FS_IN / g, c.deviceRate / g, 90000, 121);
+      } else {
+        // Device rate → 240k: keep ±60 kHz flat, stop by ±120 kHz.
+        const taps = factor > 1 ? Math.min(255, 2 * Math.floor(1.65 * c.deviceRate / 60000) + 1) : 1;
+        this.dec1 = new Decimator(c.deviceRate, factor, 60000, taps);
+      }
       this.dec1.setOffset(c.channelOffsetHz);
       // 240k → 12k channel, the decoder's own lowpass, for the gate, the audio
       // and the scope.
@@ -1367,7 +1446,7 @@ const AlertDsp = (function alertDspModule() {
       }
       this.norm = 1 / (N * w2 * 2 * 127.5 * 127.5);
       this.bins = [];
-      for (let k = 0; k < N; k++) if (Math.abs((k < N / 2 ? k : k - N) * FS_IN / N) <= WATCH_BW_HZ) this.bins.push(k);
+      for (let k = 0; k < N; k++) if (Math.abs((k < N / 2 ? k : k - N) * (this.rate / this.D) / N) <= WATCH_BW_HZ) this.bins.push(k);
       const w = -2 * Math.PI * this.offset / this.rate;
       this.dr = Math.cos(w); this.di = Math.sin(w);
     }
@@ -1377,6 +1456,10 @@ const AlertDsp = (function alertDspModule() {
       if (c.deviceRate !== this.rate || (c.channelOffsetHz || 0) !== this.offset) this.reset();
       const n = u8.length >> 1;
       if (!n) return;
+      // A device rate not a whole multiple of 240k (288k, 300k) is resampled
+      // by a fraction, and sleeping between bursts moves the pipeline in whole
+      // 240k samples: there, every sample is filtered, as with no watch.
+      if (c.deviceRate % FS_IN) { this.stats.samples += n; this.stats.awake += n; p.feed(u8); return; }
       const cap = this.ring.length >> 1;
       ringPut(this.ring, 2 * this.at, u8.subarray(0, 2 * n));
       this.at += n;
@@ -1519,7 +1602,7 @@ const AlertDsp = (function alertDspModule() {
   }
 
   return {
-    FS_IN, FS_BB, DECIM, BAUD, SPB, AFSK_F1, AFSK_F2, FORMATS, DEVICE_RATES,
+    FS_IN, FS_BB, DECIM, BAUD, SPB, AFSK_F1, AFSK_F2, FORMATS, DEVICE_RATES, Resampler,
     BINARY, ASCII, ENHANCED_IFLOWS,
     firwin, fft, crc6Enhanced, parseBytes, parseFrame, encodeFrame, frameBytes,
     carrierSearch, mixDecimate, nudge, afskSoft, gardner, decodeWindow, decodeU8, u8ToFloat,
