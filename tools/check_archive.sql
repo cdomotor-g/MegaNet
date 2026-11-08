@@ -125,7 +125,7 @@ select meganet.roll_up_receptions(100000) is not null as rolled \gset
 insert into meganet.reception (ingest_token_id, point_id, receiver, heard_at, received_at, protocol, alert_id, ok, detail)
 select (select id from meganet.ingest_token where label = '_check_ar pi'), 'ar-sdr', 'rtl-sdr', pg_temp.at(rx_unrolled, 2), now(), 'alert', 7100, true, '{}'::jsonb
   from _d;
-update meganet.app_meta set value = '90' where key = 'retain_reception_days';
+update meganet.app_meta set value = '30' where key = 'retain_reception_days';  -- back to 0108's horizon
 
 -- A reading day, rolled up the same way.
 update meganet.app_meta set value = '1000' where key = 'retain_reading_days';

@@ -166,9 +166,9 @@
       },
       {
         "id": "compute-size",
-        "what": "#255 move the database off Nano (0.5 GB) — to Small (2 GB), or at least Micro — for the Disk IO budget",
-        "on": "human",
-        "kind": "money",
+        "what": "#255 move the database off Nano (0.5 GB) to Small (2 GB) — the owner chose Small on 2026-11-08; the change itself is on Supabase's dashboard",
+        "on": "computer",
+        "kind": "access",
         "since": "2026-10-28",
         "issue": "#255",
         "holds": [
@@ -176,60 +176,17 @@
         ],
         "options": [
           {
-            "what": "#255 Part 2 now: choose Small on Compute and Disk in a quiet dry-weather hour (under 2 min offline), and check the Message Log resumes",
-            "by": "human",
+            "what": "#255 Part 2: on Compute and Disk choose Small in a quiet dry-weather hour (under 2 min offline), then check the Message Log shows new readings; an agent then does Part 3",
+            "by": "computer",
             "effort": "10 min",
-            "pros": "today's 1.46 GB database fits in memory",
-            "cons": "about US$5 a month more than Micro",
+            "pros": "today's 1.46 GB database fits in memory; with receptions kept 30 days (0108) it stays that way",
+            "cons": "about US$5 a month more than Micro, already agreed",
             "recommended": true
           },
           {
-            "what": "#255 Part 2 with Micro instead: listed as a free upgrade from Nano on the Pro plan",
+            "what": "The owner does Part 2 themselves in the dashboard",
             "by": "human",
-            "effort": "10 min",
-            "pros": "costs nothing; twice the memory and a faster disk baseline",
-            "cons": "1 GB is still smaller than the database"
-          },
-          {
-            "what": "If #256 keeps 90 days, go straight to Medium (4 GB, about US$60 a month) instead of Small",
-            "by": "human",
-            "effort": "10 min",
-            "pros": "one change instead of two within months",
-            "cons": "four times Small's price"
-          }
-        ]
-      },
-      {
-        "id": "reception-days",
-        "what": "#256 choose how long receptions stay in the database: 90 days or 30",
-        "on": "human",
-        "kind": "decision",
-        "since": "2026-10-28",
-        "issue": "#256",
-        "holds": [
-          "#255 (which compute size stays enough)",
-          "#240"
-        ],
-        "options": [
-          {
-            "what": "Reply (b) 30 days on #256; an agent then sets retain_reception_days by a migration, updates EPIC #240's regime line and the roadmap",
-            "by": "human",
-            "effort": "2 min",
-            "pros": "the table levels off near 1 GB at November's ~80,000 receptions a day, and Small stays enough",
-            "cons": "days older than 30 come back only from the R2 archive (#243, its restore test still to run) or the rollups",
-            "recommended": true
-          },
-          {
-            "what": "Reply (a) keep 90 days: nothing changes, and plan on Medium compute within about three months",
-            "by": "human",
-            "effort": "2 min",
-            "pros": "raw receptions stay queryable for a quarter",
-            "cons": "the table nears 3 GB at November's rate"
-          },
-          {
-            "what": "Reply (c) with a number between, such as 45 or 60 days",
-            "by": "human",
-            "effort": "2 min"
+            "effort": "10 min"
           }
         ]
       },

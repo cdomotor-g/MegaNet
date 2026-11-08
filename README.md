@@ -811,7 +811,7 @@ select meganet.retain();   -- rolls up, then deletes. In that order, always.
 | `meganet.reading` | 730 days (two years, since `0070`) | `app_meta.retain_reading_days` |
 | `meganet.reading_raw` (submissions as received) | 30 days | `app_meta.retain_reading_raw_days` |
 | `meganet.reading_hourly`, `meganet.reading_daily` | forever | — |
-| `meganet.reception` (every copy heard) | 90 days (`0073`) | `app_meta.retain_reception_days` |
+| `meganet.reception` (every copy heard) | 30 days (`0108`; 90 from `0073` until 8 Nov 2026) | `app_meta.retain_reception_days` |
 | Every raw row of the three above, a gzipped day at a time (`0073`) | **forever, in R2** (`meganet-archive`) | — |
 | `meganet.reception_hourly`, `meganet.reception_daily` (`0071`) | forever | — |
 

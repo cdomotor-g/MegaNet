@@ -40,8 +40,10 @@ on conflict (id) do nothing;
 
 select meganet.create_ingest_token('_check_rr pi') is not null as minted \gset
 
+-- Ten days back: inside retain_reception_days (30 since 0108; it was 90, and
+-- this hour 30 days back, which is now on the horizon and skipped).
 create temporary table _h on commit drop as
-  select pg_catalog.date_trunc('hour', now() - interval '30 days') as h,
+  select pg_catalog.date_trunc('hour', now() - interval '10 days') as h,
          (select id from meganet.ingest_token where label = '_check_rr pi') as tok;
 
 -- Receptions, received ten minutes ago so the watermark takes them (0071,
@@ -201,8 +203,8 @@ begin
                        where ingest_token_id = (select tok from _h)
                          and bucket = pg_catalog.date_trunc('hour', now() - interval '100 days')),
     v::text);
-  perform pg_temp.check_that('the horizon is 90 days unless app_meta says otherwise',
-    (select value from meganet.app_meta where key = 'retain_reception_days') = '90');
+  perform pg_temp.check_that('the horizon is 30 days (0108, #256) unless app_meta says otherwise',
+    (select value from meganet.app_meta where key = 'retain_reception_days') = '30');
 end
 $$;
 
