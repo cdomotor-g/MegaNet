@@ -515,11 +515,11 @@ const BaseStations = (function () {
     // pair: which two (RPi ALERT 0.19: 'full-lean' or 'lean-light'); before, full against lean.
     const [hv, lt] = l && l.pair === 'lean-light' ? ['Lean', 'Light'] : ['Full', 'Lean'];
     if (l && l.compared) out.push(`${termHtml(lt + ' check', 'The station decodes every burst both ways (Decoder: Compare' + (lt === 'Light' ? ' light' : '') + ') and counts bursts the two read differently.')}: `
-      + `${n(l.differ)} of ${n(l.compared)} bursts differ (${(100 * l.differ / l.compared).toFixed(2)}%)${l.time_pct != null ? ' · ' + lt.toLowerCase() + ' ' + l.time_pct + '% of ' + hv.toLowerCase() + '\'s time' : ''}`);
+      + `${n(l.differ)} of ${n(l.compared)} bursts differ (${(100 * l.differ / l.compared).toFixed(2)}%)${l.time_pct != null ? ' · ' + lt.toLowerCase() + ' ' + esc(Number(l.time_pct)) + '% of ' + hv.toLowerCase() + '\'s time' : ''}`);
     const w = r.watch_check;
     if (w && (w.both || w.only_always || w.only_watch)) out.push(`${termHtml('Around-bursts check', 'Between bursts: Check. Readings both ways, and readings only one of the two decoders got.')}: `
       + `${n(w.both)} read both ways, ${n(w.only_always)} only filtering always, ${n(w.only_watch)} only around bursts`
-      + (w.awake_pct != null ? ` · awake ${w.awake_pct}%` : '') + (w.time_pct != null ? ` · ${w.time_pct}% of the work` : ''));
+      + (w.awake_pct != null ? ` · awake ${esc(Number(w.awake_pct))}%` : '') + (w.time_pct != null ? ` · ${esc(Number(w.time_pct))}% of the work` : ''));
     return out.map(x => `<div class="qs-dim">${x}</div>`).join('');
   }
 
