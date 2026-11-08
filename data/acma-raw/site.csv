@@ -495,12 +495,12 @@ SITE_ID,LATITUDE,LONGITUDE,NAME,STATE,LICENSING_AREA_ID,POSTCODE,SITE_PRECISION,
 14176,-26.989048,152.405177,SEQ Water S & F Repeater GREGORS CREEK,QLD,4,4515,Within 100 metres,115,NT5N,pohlmans_range_al,Pohlmans Range AL,2.621
 14178,-26.992131,152.431338,Telstra Radio Terminal Pohlmans Range Road GREGORS CREEK,QLD,4,4313,Within 100 metres,445,NT5N,pohlmans_range_al,Pohlmans Range AL,0.011
 141807,-24.866942,152.348891,11A Barolin Street BUNDABERG,QLD,4,4670,Within 10 metres,,NS8N,mt_watalgan_al,Mt Watalgan AL,43.12
-14187,-27.502263,152.591633,Broadcast Site THE KNOBBY,QLD,2,4311,Within 10 metres,348,NT8K,willowbank,Willowbank,23.402
+14187,-27.502263,152.591633,Broadcast Site THE KNOBBY,QLD,2,4311,Within 10 metres,348,NT8K,mt_marrow_al,Mt Marrow AL,11.514
 141870,-23.832464,151.259335,End of Auckland Point 3 Cnr Macfarlane Rd and McLintock St GLADSTONE,QLD,4,4680,Within 10 metres,,NS4N,gladstone_radar_al,Gladstone Radar AL,2.536
 141871,-23.838832,151.260369,Origin Depot Mark Fenton Drive GLADSTONE,QLD,4,4680,Within 10 metres,,NS4N,gladstone_radar_al,Gladstone Radar AL,1.82
 141997,-27.341976,153.0709,Brisbane Entertainment Centre  BRISBANE,QLD,2,4034,Within 10 metres,,NT9E,eildon_hill_al,EILDON HILL AL,11.102
 142047,-18.520395,146.386057,Lucinda Bulk Sugar Terminal 2 Dungeness Rd LUCINDA,QLD,4,,Within 10 metres,,LQ8J,poverty_hill_al,Poverty Hill AL,38.535
-14205,-27.594195,152.60183,Mt Marrow HAIGSLEA,QLD,2,4340,Within 100 metres,,NT8K,willowbank,Willowbank,13.989
+14205,-27.594195,152.60183,Mt Marrow HAIGSLEA,QLD,2,4340,Within 100 metres,,NT8K,mt_marrow_al,Mt Marrow AL,1.428
 142089,-27.431242,153.115455,QLD Transport Marine Operations Centre Macarthur Ave East PINKENBA,QLD,2,4008,Within 10 metres,,NT9E,eildon_hill_al,EILDON HILL AL,9.008
 142215,-22.559567,148.282475,Seven Queensland Site Tayglen  DYSART,QLD,4,4745,Within 10 metres,,MS1J,mt_lowe_al,Mt Lowe AL,40.753
 14242,-27.829367,152.820313,Telstra Customer 2.5 km E of MT WELCOME,QLD,2,4285,Within 100 metres,232,NT8P,loamside_al,Loamside AL,18.548
@@ -509,7 +509,7 @@ SITE_ID,LATITUDE,LONGITUDE,NAME,STATE,LICENSING_AREA_ID,POSTCODE,SITE_PRECISION,
 14265,-28.051611,152.741604,Energex/Police Site Green Hill BOONAH,QLD,4,4310,Within 10 metres,469,NU2C,kooralbyn_al,Kooralbyn AL,11.068
 142716,-38.184403,142.434648,Fire Station 1 Nicholson St WOOLSTHORPE,VIC,4,3276,Within 10 metres,,KX4B,mt_warrnambool_repea,Mt Warrnambool Repea,29.863
 14316,-27.650566,152.425248,QR Site YARONGMULU  LAIDLEY,QLD,4,4341,Within 10 metres,259,NT8J,schultz_lookout_aler,Schultz Lookout AL,7.994
-14367,-27.606435,152.54007,Meteorology Site The Bluff off Embreys Rd The Bluff,QLD,4,4340,Within 10 metres,,NT8K,willowbank,Willowbank,17.477
+14367,-27.606435,152.54007,Meteorology Site The Bluff off Embreys Rd The Bluff,QLD,4,4340,Within 10 metres,,NT8K,mt_marrow_al,Mt Marrow AL,6.949
 14404,-27.543468,151.970876,Telstra Radio Terminal Video Av Mount Lofty TOOWOOMBA,QLD,4,4350,Within 10 metres,688,NT7L,toowoomba_al,Toowoomba AL,4.088
 14507,-27.611959,151.955624,QR/Ergon/Telstra/Commex Site adj Reservoir Nelson St Middle Ridge TOOWOOMBA,QLD,4,4352,Within 10 metres,721,NT7L,toowoomba_al,Toowoomba AL,11.38
 14527,-27.413366,152.161336,Energex Site MT PERSEVERANCE,QLD,4,4352,Within 10 metres,803,NT8E,ravensbourne_al,Ravensbourne AL,5.639
@@ -1285,7 +1285,7 @@ SITE_ID,LATITUDE,LONGITUDE,NAME,STATE,LICENSING_AREA_ID,POSTCODE,SITE_PRECISION,
 39608,-16.536608,145.385812,Ergon Site LYONS LOOKOUT,QLD,4,4871,Unknown,485,LQ1J,saddle_mountain_aler,Saddle Mtn AL,43.03
 39610,-16.916357,145.252204,Ergon Site HANN TABLELAND,QLD,4,4871,Unknown,942,LQ1N,davies_ck_tm,Davies Ck Tm,30.913
 39611,-28.229045,152.416042,Forestry Site Gambubal BALD MOUNTAIN,QLD,4,4370,Unknown,1194,NU2B,wilsons_peak,Wilsons Peak,7.04
-39646,-27.514331,152.58207,Qld Communications Site MT STRADBROKE,QLD,2,4311,Within 10 metres,315,NT8K,willowbank,Willowbank,22.591
+39646,-27.514331,152.58207,Qld Communications Site MT STRADBROKE,QLD,2,4311,Within 10 metres,315,NT8K,mt_marrow_al,Mt Marrow AL,10.406
 39656,-27.640565,152.43643,Range Crescent 4km ESE of LAIDLEY,QLD,4,4341,Unknown,260,NT8J,schultz_lookout_aler,Schultz Lookout AL,9.341
 39667,-21.290337,148.283227,Ergon Energy (MK) Powerlink Site MT HILLALONG,QLD,4,4742,Unknown,425,MR7F,clarke_range_al,Clarke Range AL Repeater,35.809
 39682,-28.236665,153.267816,Motorola Site Repeater Station Rd SPRINGBROOK,QLD,2,4213,Within 10 metres,927,NU3B,lower_springbrook_al,Lower Springbrook AL,3.195
@@ -1433,7 +1433,7 @@ SITE_ID,LATITUDE,LONGITUDE,NAME,STATE,LICENSING_AREA_ID,POSTCODE,SITE_PRECISION,
 404600,-27.946331,152.625716,53 George St KALBAR,QLD,4,4309,Within 10 metres,,NT8O,kooralbyn_al,Kooralbyn AL,26.002
 404601,-26.941328,152.567262,17 McCauley St KILCOY,QLD,4,4515,Within 10 metres,,NT5O,pohlmans_range_al,Pohlmans Range AL,14.607
 404602,-27.869974,151.271183,Attleigh St MILLMERRAN,QLD,4,4357,Within 10 metres,,NT7N,warahgai_al,Warahgai AL,45.088
-404604,-27.631715,152.589653,John St ROSEWOOD,QLD,4,4340,Within 10 metres,,NT8K,willowbank,Willowbank,11.866
+404604,-27.631715,152.589653,John St ROSEWOOD,QLD,4,4340,Within 10 metres,,NT8K,mt_marrow_al,Mt Marrow AL,3.666
 404620,-27.130317,150.484238,Ergon Energy Site Chinchilla Tara Rd 16 km N of TARA,QLD,5,4421,Within 100 metres,377,MT9B,bottle_tree_al,Bottle Tree AL,37.09
 404636,-27.903691,153.199123,7 Paradise Dr EAGLE HEIGHTS,QLD,2,4271,Within 100 metres,,NT9M,mt_tamborine_al,Mt Tamborine AL,7.419
 404648,-27.423131,153.148155,Cnr Lytton Rd & Pritchard St LYTTON,QLD,2,4178,Within 10 metres,,NT9E,eildon_hill_al,EILDON HILL AL,12.281
@@ -1566,7 +1566,6 @@ SITE_ID,LATITUDE,LONGITUDE,NAME,STATE,LICENSING_AREA_ID,POSTCODE,SITE_PRECISION,
 460879,-25.310746,152.83497,Council Site GHOST HILL,QLD,4,4655,Unknown,59,NT2H,ghost_hill_al,Ghost Hill AL,0.068
 460931,-24.813501,152.458901,QFS/QAS Station 29 Tanner St BARGARA,QLD,4,4670,Within 10 metres,,NS8N,mt_watalgan_al,Mt Watalgan AL,51.644
 460974,-21.600646,148.967883,RCS Site Blue Mountain NEBO,QLD,4,4741,Unknown,1022,MR7L,hospital_br_aler,Hospital Br Aler,54.284
-460978,-24.929814,152.198877,Bundaberg Sugar Bingera Water Tower BINGERA,QLD,4,4670,Within 10 metres,52,NS8M,walla_al_b,Walla AL-B,31.489
 460986,-24.178111,150.915257,Telstra BOCOOLIMA,QLD,4,4680,Unknown,111,MS9D,kroombit_repeater_al,Kroombit Repeater AL,20.005
 460995,-23.737713,151.059517,New Jones Communications Site 23 km NW of Gladstone SCRUBBY MTN,QLD,4,4680,Within 100 metres,330,NS4I,gladstone_radar_al,Gladstone Radar AL,24.435
 461039,-24.891801,151.976722,Telstra Customer Tobin H/S Kolan Flats Rd GIN GIN,QLD,4,4671,Unknown,21,NS7P,mt_watalgan_al,Mt Watalgan AL,21.191
