@@ -266,6 +266,8 @@ const Map3D = (function () {
   let elevReg  = false;  // the elevation protocol, registered once per page
   let elevKey  = null;   // the tile template the drape is currently built on
   let polarGen = null;   // which of MapPolar's paints is draped (#188), or null
+  let areasKey = null;   // which picture of Views' repeater areas is draped, or null
+  let areasTimer = null; // a redraw of it, waiting for the camera to settle
   let cadKeys  = {};     // cadastre layer id → the tile template it is built on (syncCadastre)
   let cadGen   = 0;      // bumped per syncCadastre, so a template resolved late is dropped
   let cadFails = {};     // cadastre layer id → tiles the service would not give
@@ -2701,7 +2703,7 @@ const Map3D = (function () {
   // The ground's raster stack, bottom up: a layer added later goes under the
   // first of the ones above it that exists, so the order never depends on
   // which was added first.
-  const GROUND = ['mn-base', 'mn-elev', 'mn-water', 'mn-polar', 'mn-lots', 'mn-roads',
+  const GROUND = ['mn-base', 'mn-elev', 'mn-water', 'mn-areas', 'mn-polar', 'mn-lots', 'mn-roads',
                   'mn-drive-casing', 'mn-drive-gap-casing', 'mn-drive-line', 'mn-drive-gap',
                   'mn-links-casing', 'mn-links'];
 
@@ -2777,6 +2779,57 @@ const Map3D = (function () {
     }
     polarGen = d.gen;
     setNote();
+  }
+
+  // ── Views' repeater areas (map-paths.js; Run 2's N3, option B) ──────────
+  // With Which paths set to Areas, the flat map shades each repeater's
+  // stations instead of drawing their paths — and this view, which only
+  // mirrors lines, showed the backbone and nothing else. MapPaths hands over
+  // the same shading for the camera's box (drawn3d), and it is draped here as
+  // the polar plot is: an image source over the box's four corners, carried
+  // by the terrain. A box is the camera's, padded, so a small turn needs no
+  // new picture; one is drawn again when the camera settles somewhere the
+  // picture does not cover, or the areas change. Over the elevation ramp and
+  // the water, under the polar plot and the cadastre.
+  const AREAS_PAD = 0.25;
+  function dropAreas() {
+    if (map && map.getLayer('mn-areas')) map.removeLayer('mn-areas');
+    if (map && map.getSource('mn-areas')) map.removeSource('mn-areas');
+    if (areasKey !== null) { areasKey = null; setNote(); }
+  }
+  function syncAreas(force) {
+    if (!map || !ready) return;
+    const P = typeof MapPaths !== 'undefined' && MapPaths.areas3d ? MapPaths : null;
+    const on = P ? P.areas3d() : null;
+    if (!on) { dropAreas(); return; }
+    const b = map.getBounds();
+    const view = { west: b.getWest(), east: b.getEast(), north: Math.min(85, b.getNorth()), south: Math.max(-85, b.getSouth()) };
+    const had = areasKey && areasKey.box;
+    const inside = had && areasKey.gen === on.gen && view.west >= had.west && view.east <= had.east
+      && view.north <= had.north && view.south >= had.south;
+    if (inside && !force && map.getLayer('mn-areas')) return;
+    const dx = (view.east - view.west) * AREAS_PAD, dy = (view.north - view.south) * AREAS_PAD;
+    const box = { west: view.west - dx, east: view.east + dx, north: Math.min(85, view.north + dy), south: Math.max(-85, view.south - dy) };
+    const d = P.drawn3d(box);
+    if (!d) { dropAreas(); return; }
+    const coordinates = [[box.west, box.north], [box.east, box.north], [box.east, box.south], [box.west, box.south]];
+    const src = map.getSource('mn-areas');
+    if (src && src.updateImage && map.getLayer('mn-areas')) {
+      src.updateImage({ url: d.url, coordinates });
+    } else {
+      if (map.getLayer('mn-areas')) map.removeLayer('mn-areas');
+      if (src) map.removeSource('mn-areas');
+      map.addSource('mn-areas', { type: 'image', url: d.url, coordinates });
+      map.addLayer({ id: 'mn-areas', type: 'raster', source: 'mn-areas',
+                     paint: { 'raster-opacity': 1, 'raster-fade-duration': 0 } }, under('mn-areas'));
+    }
+    const first = areasKey === null;
+    areasKey = { gen: on.gen, box };
+    if (first) setNote();
+  }
+  function queueAreas() {
+    if (areasTimer) clearTimeout(areasTimer);
+    areasTimer = setTimeout(() => { areasTimer = null; syncAreas(false); }, 200);
   }
 
   // ── The rising water ───────────────────────────────────────────────────
@@ -3461,6 +3514,8 @@ const Map3D = (function () {
       syncCadastre();
       // A polar plot drawn before 3-D was opened is draped now (#188).
       syncPolar();
+      // …and Views' repeater areas, when Which paths is Areas.
+      syncAreas(true);
       // The finder may have drawn before 3-D was opened, and its pins are DOM
       // markers that the style cannot declare — so they are added here, and
       // the slider's factor is read once the layers it applies to exist.
@@ -3507,6 +3562,7 @@ const Map3D = (function () {
     // The 2-D map under the canvas goes where the camera stopped (see "One
     // view" above).
     map.on('moveend', onCameraEnd);
+    map.on('moveend', queueAreas);
     // ── Clicking a pin (#193) ──────────────────────────────────────────────
     // A pin in 3-D does what a pin in 2-D does, less the one thing this mode
     // has no way to draw. onStationClick() in app.js opens a Leaflet callout
@@ -4141,6 +4197,8 @@ const Map3D = (function () {
     // looks more like an answer than it did as a flat wash, and is exactly as
     // optimistic as it was.
     const P_ = typeof pathPropOf === 'function' ? pathPropOf({}) : { model: 'cover' };
+    const areasNote = areasKey === null ? '' : `Each repeater’s area (Views › Which paths › Areas) is draped on the
+      ground in its colour; the field stations’ paths are left out, as on the flat map.<br>`;
     const polar = polarGen === null ? '' : `Polar radio coverage is draped on the ground:
       bare terrain${P_.model === 'cover' ? '' : ` less the ${P_.allowance} dB field allowance`},
       no antenna patterns, no trees and no terminal clutter — ${P_.model === 'cover'
@@ -4161,7 +4219,7 @@ const Map3D = (function () {
       Path profile tool’s own geometry — k-factor earth, filed antenna heights,
       no trees. Green clears the 60% Fresnel zone, amber is inside it, red is
       blocked. Indicative, like the profile.`;
-    return `${bits.length ? bits.join(' · ') + '<br>' : ''}${flood}${polar}${caveat}`;
+    return `${bits.length ? bits.join(' · ') + '<br>' : ''}${flood}${areasNote}${polar}${caveat}`;
   }
 
   return {
@@ -4321,6 +4379,14 @@ const Map3D = (function () {
     cadastreChanged() { syncCadastre(); },
     // From MapPolar: the 2-D plot was painted or cleared (#188).
     polarChanged() { syncPolar(); },
+    // From MapPaths: a build, perhaps with new areas (or none): redrawn only
+    // when the areas themselves changed (their gen), or are gone.
+    areasChanged() {
+      if (!map || !ready) return;
+      const on = typeof MapPaths !== 'undefined' && MapPaths.areas3d ? MapPaths.areas3d() : null;
+      if (!on) { dropAreas(); return; }
+      if (!areasKey || areasKey.gen !== on.gen) syncAreas(true);
+    },
 
     // What is here picked a point, or closed. Same shape, and for the same
     // reason: the pick is that tool's and this view is only showing it.
@@ -4805,6 +4871,8 @@ const Map3D = (function () {
     buf = null;
     elevKey = null;   // the drape goes with the map; the next one builds its own
     polarGen = null;  // and the polar plot's
+    areasKey = null;  // and the repeater areas'
+    if (areasTimer) { clearTimeout(areasTimer); areasTimer = null; }
     cadKeys = {};     // and so do the cadastre's
     cadFails = {};
     cadGen++;

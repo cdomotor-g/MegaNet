@@ -122,6 +122,15 @@ way, it is forgotten.
   the field stations whose best path is to it (4.5 km round each, at least 8 px),
   and those pins wear the same colour as a ring. Repeaters less than 60 km apart
   never share a colour (eight colours, `--map-area-1` … `--map-area-8`).
+  **In the ⛰️ 3-D view** the same areas are draped on the ground (since 8 Nov
+  2026): `MapPaths.drawn3d(box)` draws them for the camera's box, padded by a
+  quarter, into a Web Mercator picture that `map-3d.js` lays over the relief
+  as an image source (`mn-areas`, over the elevation and water, under the polar
+  plot and the cadastre) — Epic #186's rule, as the polar plot does it. A new
+  picture is drawn when the camera settles outside the padded box or the areas
+  change (`Map3D.areasChanged()`). The **digital twin** still draws all of a
+  station's paths as rays: `MapPaths.droppedFor(id)` hands over the ones Best
+  path only or Areas left out of the build.
 
 The note under the choices, and the link note under Show radio paths, say how
 many paths are drawn and how to see the rest. The paths left out are handed to

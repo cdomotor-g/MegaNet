@@ -2979,6 +2979,14 @@ void main() {
         add(stationById(farId), (l.options && l.options.color) || '#ff6f00',
             opacity, role === 'backbone' ? 'backbone' : 'field');
       }
+      // And the station's paths Views left out of the map's build (Best path
+      // only, Areas: map-paths.js): a station's rays are all of its paths
+      // whatever the flat map is drawing, in the colour its overlay gives them.
+      if (typeof MapPaths !== 'undefined' && typeof MapPaths.droppedFor === 'function') {
+        for (const p of MapPaths.droppedFor(station.id)) {
+          add(p.s.id === station.id ? p.r : p.s, p.colour || '#ff6f00', 0.85, 'field');
+        }
+      }
       return { paths: [...out.values()], source: 'map' };
     }
     const lineC = cssVar('--map-line', '#ff6f00'), bbC = cssVar('--map-backbone', '#000000');

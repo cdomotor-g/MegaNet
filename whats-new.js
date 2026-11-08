@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 237, date: '2026-11-08', items: [
+      '⛰️ <strong>Repeater areas in 3-D.</strong> With <em>Areas</em> chosen under Which paths, the ⛰️ 3-D view now '
+        + 'shows each repeater\'s area in its colour, lying on the hills and valleys, as the flat map does. The digital '
+        + 'twin still shows all of a station\'s radio paths whichever way the map is drawing them.',
+      '🔧 <strong>Smaller fixes to Views.</strong> Flow stops working the screen when there is nothing on it to move; '
+        + '<em>Show what a failure strands</em> paints the hidden paths red too; zooming out with land tenure on no longer '
+        + 'leaves the old property lines behind; and a few words now explain themselves when you point at them.',
+    ] },
     { n: 236, date: '2026-11-07', items: [
       '🗺️ <strong>Views, laid out as a card for each group.</strong> In 🗺️ Layers, the views now sit under '
         + '<em>Everyone</em>, <em>Technicians</em>, <em>Flood</em> and <em>Property</em>, each with a small picture of '

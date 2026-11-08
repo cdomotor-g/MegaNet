@@ -292,6 +292,7 @@ const MapPaths = (function () {
   // repeater id → the field stations whose best path goes to it, then their
   // colours.
   function buildAreas() {
+    S.areasGen = (S.areasGen || 0) + 1;   // the 3-D view's picture of them is out of date
     for (const l of S.best.values()) {
       let a = S.areas.get(l.r.id);
       if (!a) S.areas.set(l.r.id, a = { r: l.r, stations: [] });
@@ -733,6 +734,81 @@ const MapPaths = (function () {
   function schedule() {
     if (S.areasH) S.areasH.schedule();
     if (S.xH) S.xH.schedule();
+    // The 3-D view drapes the areas too (drawn3d, below): told after every
+    // build, it redraws its picture only when the areas themselves changed.
+    if (typeof Map3D !== 'undefined' && typeof Map3D.areasChanged === 'function') {
+      try { Map3D.areasChanged(); } catch (_) { /* the flat map does not depend on it */ }
+    }
+  }
+
+  // ── The areas in 3-D (Epic #186's rule: the 2-D module hands over its own
+  // picture, and map-3d.js drapes it on the relief) ──────────────────────────
+  // What the flat map shades, drawn for the 3-D camera's box into a canvas in
+  // Web Mercator — the same unions, one fill per repeater, the same colours —
+  // which map-3d.js stretches over the box's four corners as an image source,
+  // so the patches lie on the ground, up the hills and down the valleys. The
+  // halos round the pins stay 2-D: the 3-D pins are MapLibre's own.
+  // box: { west, east, north, south } in degrees. Returns null when there is
+  // nothing to drape, else { url, box, key } — key changes when the picture does.
+  const AREAS_3D_PX = 2048;          // the picture's long side
+  const AREAS_3D_ALPHA = 0.4;        // a little stronger than 2-D: the relief's shading darkens it
+  const merc = {
+    x: lon => (lon + 180) / 360,
+    y: lat => { const r = Math.sin(Math.max(-85, Math.min(85, lat)) * Math.PI / 180); return 0.5 - Math.log((1 + r) / (1 - r)) / (4 * Math.PI); },
+  };
+  const areasOn = () => S.built === 'areas' && !!S.areas && S.areas.size > 0;
+  function drawn3d(box) {
+    if (!areasOn() || !box || typeof document === 'undefined') return null;
+    const x0 = merc.x(box.west), x1 = merc.x(box.east), y0 = merc.y(box.north), y1 = merc.y(box.south);
+    if (!(x1 > x0) || !(y1 > y0)) return null;
+    const aspect = (y1 - y0) / (x1 - x0);
+    const W = aspect > 1 ? Math.max(64, Math.round(AREAS_3D_PX / aspect)) : AREAS_3D_PX;
+    const H = aspect > 1 ? AREAS_3D_PX : Math.max(64, Math.round(AREAS_3D_PX * aspect));
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+    if (!ctx) return null;
+    const pal = palette();
+    const TAU = Math.PI * 2;
+    const px = lon => (merc.x(lon) - x0) / (x1 - x0) * W;
+    const py = lat => (merc.y(lat) - y0) / (y1 - y0) * H;
+    let any = false;
+    for (const [rid, a] of S.areas) {
+      ctx.beginPath();
+      let mine = false;
+      for (const st of [a.r].concat(a.stations)) {
+        if (!st || st.lat == null || st.lon == null) continue;
+        // AREA_KM on the ground at this latitude, in the picture's pixels.
+        const rad = Math.max(2, AREA_KM / (40075.016686 * Math.cos(st.lat * Math.PI / 180)) / (x1 - x0) * W);
+        const x = px(st.lon), y = py(st.lat);
+        if (x < -rad || y < -rad || x > W + rad || y > H + rad) continue;
+        ctx.moveTo(x + rad, y);
+        ctx.arc(x, y, rad, 0, TAU);
+        mine = true;
+      }
+      if (!mine) continue;
+      any = true;
+      ctx.globalAlpha = AREAS_3D_ALPHA;
+      ctx.fillStyle = pal[S.colourIdx.get(rid) || 0];
+      ctx.fill('nonzero');
+    }
+    if (!any) return null;
+    return { url: c.toDataURL('image/png'), box: Object.assign({}, box), key: `${S.areasGen}|${box.west},${box.east},${box.north},${box.south}` };
+  }
+  // Whether there is anything for the 3-D view to drape, and which build of
+  // the areas it is: map-3d.js asks this before it spends a picture.
+  const areas3d = () => (areasOn() ? { gen: S.areasGen } : null);
+
+  // A station's paths Views left out of this build (Best path only, Areas):
+  // the digital twin draws a station's paths as rays and reads them off the
+  // map's lines, which no longer hold these. Each with the colour the "other
+  // paths" overlay gives it.
+  function droppedFor(id) {
+    if (id == null || !S.dropBySta) return [];
+    const list = (S.dropBySta.get(id) || []).concat(S.dropByRep.get(id) || []);
+    if (!list.length) return [];
+    const colourOf = pathColourer();
+    return list.map(l => ({ s: l.s, r: l.r, colour: colourOf(l.s, l.r) }));
   }
 
   // "Best path until you zoom in" is decided by the zoom; when a zoom crosses
@@ -847,6 +923,7 @@ const MapPaths = (function () {
   return {
     attach, detach, mode, thin, prepare, curve, schedule, counts,
     areaColour, legendHtml, noteText, WORDS, lodZoom: LOD_ZOOM, _state,
+    drawn3d, areas3d, droppedFor,
   };
 })();
 if (typeof window !== 'undefined') window.MapPaths = MapPaths;

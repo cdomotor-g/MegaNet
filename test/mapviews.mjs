@@ -901,8 +901,36 @@ try {
     check('3-D closed: the field lines back to their tails, at 0 and not interactive',
       flatAgain.zero === flatAgain.n && flatAgain.dead === flatAgain.n && await page.evaluate(() => MapViews._state().flat),
       J(flatAgain));
-    demOn = false;
     await press('#mv-draw-lines', 700);
+
+    // Areas in 3-D (Run 2's N3, option B): the repeaters' areas draped on the
+    // ground as an image under the polar plot and the cadastre, and the field
+    // stations' left-out paths still there for the digital twin's rays.
+    await press('#mv-paths-areas', 1200);
+    const twinPaths = await page.evaluate(() => {
+      const st = state.data.stations.find(s => (s.roles || []).includes('field') && MapPaths.droppedFor(s.id).length > 0);
+      return st ? MapPaths.droppedFor(st.id).length : 0;
+    });
+    await page.evaluate(() => Map3D.toggle());
+    await page.waitForFunction(() => !!Map3D._map() && Map3D._map().isStyleLoaded() && !!Map3D._map().getTerrain(),
+      null, { timeout: GL_TIMEOUT });
+    await settle(1200);
+    const areas3d = await page.evaluate(() => {
+      const m = Map3D._map();
+      const src = m.getSource('mn-areas');
+      const layers = m.getStyle().layers.map(l => l.id);
+      return { layer: !!m.getLayer('mn-areas'), type: src && src.type, under: layers.indexOf('mn-areas') < layers.indexOf('mn-links'),
+               fieldMirrored: Map3D._mirror().links.features.filter(f => f.properties.sid != null && f.properties.rid2 == null).length };
+    });
+    check('Areas in 3-D: the repeaters\' areas draped on the ground, under the paths, with no field paths drawn',
+      areas3d.layer && areas3d.type === 'image' && areas3d.under && areas3d.fieldMirrored === 0, J(areas3d));
+    check('…and a field station\'s left-out paths handed to the digital twin for its rays', twinPaths > 0, J({ twinPaths }));
+    await page.evaluate(() => Map3D.toggle());
+    await page.waitForFunction(() => !state.map3d, null, { timeout: GL_TIMEOUT });
+    await settle(600);
+    await openLayers();
+    await press('#mv-paths-every', 1200);
+    demOn = false;
   }
 
   // ── 10. Easements and land tenure ─────────────────────────────────────────
