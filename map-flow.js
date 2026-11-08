@@ -157,7 +157,8 @@ const MapFlow = (function () {
   // ── Pace ──
   const FRAME_MS = 1000 / 30;            // ~30 frames a second while moving
   const MAX_STEP_S = 0.1;                // a late frame moves the dashes no further than this
-  const STILL_MS = 1000;                 // the still frame redrawn, and 3-D / the twin watched
+  const STILL_MS = 1000;                 // 3-D / the twin watched this often while still…
+  const STILL_REDRAW = 5;                // …and the still frame redrawn every this many watches
   const BUBBLE_MS = 500;                 // who is under a cluster bubble, looked at again
   const PAD = 8;                         // px past the screen's edge a dash is still drawn
   const MAX_DASHES = 30000;              // a ceiling on one frame (MapArrows' reasoning)
@@ -706,6 +707,14 @@ const MapFlow = (function () {
     if (cfg().mode === 'turns') drawTurns(ctx, G, V, playing());
     else drawAll(ctx, G, V);
     S.last.ms = Math.round((performance.now() - t0) * 100) / 100;
+    // Nothing on this frame — every path off screen or under a bubble, or no
+    // repeater to take a turn — so the loop stops asking for frames until
+    // the view moves or the settings change (each of which draws again here);
+    // and the frame that finds something starts it again.
+    const drew = S.last.dashes > 0 || (cfg().mode === 'turns' && !!S.turn);
+    const was = S.empty;
+    S.empty = !drew;
+    if (was && drew) drive();
   }
 
   // ── Pace: moving, still, or nothing ────────────────────────────────────────
@@ -719,6 +728,7 @@ const MapFlow = (function () {
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return 'still';
     const lines = typeof state !== 'undefined' ? state.mapLines : null;
     if (!lines || !lines.length) return 'still';
+    if (S.empty) return 'still';
     return playing(c) ? 'run' : 'still';
   }
 
@@ -784,7 +794,10 @@ const MapFlow = (function () {
   function watchTick() {
     S.watch = null;
     const b = noticeBlocked();
-    if (!b && S.h) S.h.schedule();
+    // The still frame is kept current (a line's colour can change under it),
+    // but not every second, and not at all while it has nothing in it.
+    S.watchN = (S.watchN || 0) + 1;
+    if (!b && S.h && !S.empty && S.watchN % STILL_REDRAW === 0) S.h.schedule();
     drive();
   }
 
@@ -976,8 +989,16 @@ const MapFlow = (function () {
     };
   }
 
+  // The person moved ⏱️ Latency's own animation switch (map-latency.js calls
+  // this for a switch set by hand, not for Flow's quiet ones): it is theirs
+  // now, so leaving Live readings leaves it as they set it.
+  function disown() {
+    S.ownLat = false;
+    keep(LS_OWN, null);
+  }
+
   return {
-    attach, detach, sync, schedule, turn, legendHtml, WORDS, _state,
+    attach, detach, sync, schedule, turn, legendHtml, WORDS, _state, disown,
     playing: () => playing(), active,
   };
 })();

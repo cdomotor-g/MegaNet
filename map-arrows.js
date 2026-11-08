@@ -277,6 +277,10 @@ const MapArrows = (function () {
     // all: one chevron on a 20 px stub is a smudge, not an arrow.
     const minPx = Math.max(20, r.spacing * 0.55);
     let marks = 0;
+    // The view a little padded, in degrees: a curve's own bounds (Leaflet
+    // keeps them with the line) tested against it before any point of it is
+    // projected, so the far-off bundled paths cost one comparison each.
+    const viewLL = map.getBounds().pad(0.1);
     for (const l of state.mapLines) {
       const dir = l.mnArrowDir;
       if (!dir) continue;                    // casings, and the backbone's dash overlay
@@ -284,6 +288,7 @@ const MapArrows = (function () {
       if (!(opacity > 0.06)) continue;       // dimmed past the point of being read
       const ll = l.getLatLngs && l.getLatLngs();
       if (!ll || ll.length < 2) continue;
+      if (ll.length > 2 && typeof l.getBounds === 'function' && !viewLL.intersects(l.getBounds())) continue;
       // Every point, not just the ends: a bundled path is a curve (see
       // screenPath). Reject what is wholly off one edge before any more
       // arithmetic is spent on it. Zoomed into one site, this is nearly every

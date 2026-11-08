@@ -687,7 +687,15 @@ const MapPaths = (function () {
     if (list.length > OTHER_MAX) list.length = OTHER_MAX;
     const size = h.size();
     const sc = strokeScale();
-    const colourOf = pathColourer();
+    const plain = pathColourer();
+    // The same colour rules as a drawn line, in the same order of who wins:
+    // red for a path into a repeater whose failure is being shown (MapBlast's
+    // armedId: state.mapBlast with that repeater focused — the paths that die
+    // with it), else the colouring's own (channel, fade band, or plain).
+    const armed = typeof state !== 'undefined' && state.mapBlast && state.mapFocusRepeaterId != null
+      ? state.mapFocusRepeaterId : null;
+    const blastRed = armed != null && typeof cssVar === 'function' ? cssVar('--map-blast', '#c62828') : '#c62828';
+    const colourOf = (sta, rep) => (armed != null && rep.id === armed ? blastRed : plain(sta, rep));
     const drawn = [];
     for (const l of list) {
       const p = h.at(l.s.lat, l.s.lon), q = h.at(l.r.lat, l.r.lon);

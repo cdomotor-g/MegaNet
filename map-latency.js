@@ -947,6 +947,9 @@ const MapLatency = (() => {
   // pins and Colour pins by health as they are.
   function setAnim(on, opts = {}) {
     U.anim = !!on;
+    // Set by hand (Flow's Live readings sets it quietly): the person's own
+    // choice from now on, which Flow must not undo when it is left.
+    if (!opts.quiet && typeof MapFlow !== 'undefined' && typeof MapFlow.disown === 'function') MapFlow.disown();
     keep('mn-latency-anim', U.anim ? 'on' : 'off');
     liveSync();
     if (U.hidden || U.solo) refreshForHidden();
@@ -968,7 +971,10 @@ const MapLatency = (() => {
     paint();
   }
   function refreshForHidden() {
-    if ((!state.mapShowLinks || !state.mapShowBackbone) && state.map && typeof refreshMapLayers === 'function') {
+    // Hidden by a switch, or by Views (Best path only, Areas: map-paths.js),
+    // which leaves the paths out of the build and hands them over only then.
+    const thinned = !!(state.mapLinkCount && state.mapLinkCount.thinned > 0);
+    if ((!state.mapShowLinks || !state.mapShowBackbone || thinned) && state.map && typeof refreshMapLayers === 'function') {
       refreshMapLayers({ skipFit: true });
     }
   }

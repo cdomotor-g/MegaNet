@@ -773,6 +773,25 @@ try {
   check('…but an animation the person had on is left on', await page.evaluate(() => MapLatency.anim() === true));
   await page.evaluate(() => MapLatency.setAnim(false, { quiet: true }));
   await press('#mv-draw-lines', 700);
+  // …and one the person sets by hand while in Live readings is theirs too.
+  await press('#mv-draw-flow', 500);
+  await press('#mv-flowmode-live', 700);
+  await page.evaluate(() => { MapLatency.setAnim(false); MapLatency.setAnim(true); });
+  await press('#mv-flowmode-all', 700);
+  check('…and one switched on by hand while in Live readings stays on after it',
+    await page.evaluate(() => MapLatency.anim() === true && MapFlow._state().ownStored === false));
+  await page.evaluate(() => MapLatency.setAnim(false, { quiet: true }));
+
+  // Over empty ground (open sea east of the coast) Flow has nothing to draw,
+  // so it stops asking for frames; back over the network it starts again.
+  const flowFirst = await page.evaluate(() => MapFlow._state().pace);
+  await view(-21, 160, 9, 1200);
+  const sea = await page.evaluate(() => ({ pace: MapFlow._state().pace, dashes: MapFlow._state().last.dashes }));
+  await view(-27.5, 152.9, 10, 1200);
+  const land = await page.evaluate(() => ({ pace: MapFlow._state().pace, dashes: MapFlow._state().last.dashes }));
+  check('Flow stops its frames where there is nothing to draw, and starts them again where there is',
+    flowFirst === 'run' && sea.dashes === 0 && sea.pace !== 'run' && land.dashes > 0 && land.pace === 'run', J({ flowFirst, sea, land }));
+  await press('#mv-draw-lines', 700);
 
   // ── 8. Auto-contrast and Balance ──────────────────────────────────────────
   section('8. Line strength: auto-contrast and Balance');

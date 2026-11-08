@@ -1497,6 +1497,13 @@ const MapViews = (function () {
       + `${held ? ' — held there while it is focused' : ''}.`;
   }
 
+  // A word Flow's controls use, with Flow's own meaning on hover.
+  function flowTerm(w) {
+    const F = modFlow();
+    const m = F && F.WORDS && F.WORDS[w];
+    return m ? termHtml(w, m) : esc(w);
+  }
+
   function flowHtml(c) {
     const playing = playingNow(c);
     const mode = c.flow.mode;
@@ -1505,17 +1512,17 @@ const MapViews = (function () {
     <div class="mv-sub" id="mv-flow-opts">
       <div class="mv-radios" role="radiogroup" aria-labelledby="mv-flowmode-h">
         <span class="mv-radios-h" id="mv-flowmode-h">What moves</span>
-        ${radio('flowmode', 'all', mode, 'Everything flows', h)}
+        ${radio('flowmode', 'all', mode, flowTerm('Everything flows'), h)}
         ${radio('flowmode', 'turns', mode, `Repeaters ${termHtml('take turns', WORDS['Take turns'])}`, h)}
         ${radio('flowmode', 'live', mode, termHtml('Live readings', WORDS['Live readings']), h)}
       </div>
       ${mode !== 'live' ? `${rangeHtml({
-        id: 'mv-speed', label: 'Speed', value: c.flow.speed, min: 0.3, max: 2.5, step: 0.1, key: 'flow.speed',
+        id: 'mv-speed', label: flowTerm('Speed'), value: c.flow.speed, min: 0.3, max: 2.5, step: 0.1, key: 'flow.speed',
         read: `${c.flow.speed.toFixed(1)}×`, aria: 'How fast the dashes run',
         valuetext: `${c.flow.speed.toFixed(1)} times the usual speed` })}
       <div class="mv-ends" aria-hidden="true"><span>Calm</span><span>Busy</span></div>` : ''}
       ${rangeHtml({
-        id: 'mv-under', label: 'Lines underneath', value: c.flow.under, min: 0, max: 1, step: 0.05, key: 'flow.under',
+        id: 'mv-under', label: flowTerm('Lines underneath'), value: c.flow.under, min: 0, max: 1, step: 0.05, key: 'flow.under',
         read: pct(c.flow.under), aria: 'How strong the lines under the dashes are',
         valuetext: `${Math.round(c.flow.under * 100)} per cent` })}
       ${mode !== 'live' ? `<button type="button" class="mv-play" id="mv-play"
@@ -1589,7 +1596,17 @@ const MapViews = (function () {
 
   function autoReadHtml() {
     const c = C();
-    if (!c.auto) return `Off: the lines are drawn at your Link opacity, ${pct(manualOp())}.`;
+    if (!c.auto) {
+      // The figure the field lines are really drawn at: the Link opacity, times
+      // the Balance, times Flow's Lines underneath — said only when it differs.
+      const x = context();
+      const why = [];
+      if (c.balance !== 50) why.push('the Balance');
+      if (x.flow) why.push('Flow\u2019s Lines underneath');
+      const drawn = fullWith({ mnLinkRole: 'core' }, x) * (x.flow ? c.flow.under : 1);
+      const lit = x.tails ? '; Tails draws them whole only where the spotlight or the pointer lights them' : '';
+      return `Off: your Link opacity, ${pct(manualOp())}${why.length ? `, drawn at ${pct(drawn)} with ${why.join(' and ')}` : ''}${lit}.`;
+    }
     const anyLines = typeof state !== 'undefined' && (state.mapShowLinks || state.mapShowBackbone);
     if (!anyLines) return 'Nothing to set: no radio paths are on the map.';
     if (S.autoOp == null) return 'Worked out once the map has paths on it.';

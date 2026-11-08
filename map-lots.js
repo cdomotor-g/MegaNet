@@ -412,6 +412,15 @@ const MapLots = (function () {
 
     if (Date.now() - failedAt < FAIL_TTL) { clearOverlay(); setNote('fail'); return; }
 
+    // The picture on the map holds a layer this scale no longer draws — zoomed
+    // out past the lot lines with land tenure still on: off it comes now,
+    // rather than shrinking on the map with its lot lines and lot numbers for
+    // the seconds the tenure-only picture takes.
+    if (overlay && drawnBox && drawnBox.want) {
+      const was = drawnBox.want;
+      if ((was.lots && !want.lots) || (was.easements && !want.easements) || (was.tenure && !want.tenure)) clearOverlay();
+    }
+
     const mine = ++seq;
     setNote('loading');
     resolveLayer().then(id => {
