@@ -18409,8 +18409,8 @@
       "id": "carrs_lookout_al",
       "name": "Carrs Lkt AL",
       "station_number": "541064",
-      "lat": -28.2944,
-      "lon": 152.4156,
+      "lat": -28.293047,
+      "lon": 152.41568,
       "elevation_ahd": 1093.7,
       "roles": [
         "repeater"
@@ -18421,7 +18421,10 @@
       "catchment_ids": [
         "balonne_condamine"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 6878,
+        "battery": 6879
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -41728,8 +41731,8 @@
       "name": "Homebush Station Tm",
       "station_number": "543011",
       "station_type": "auto_water_level",
-      "lat": -26.393,
-      "lon": 147.9415,
+      "lat": -26.39159,
+      "lon": 147.939856,
       "elevation_ahd": 349.18,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
@@ -55278,8 +55281,8 @@
       "name": "Maleny AL",
       "station_number": "540336",
       "station_type": "auto_rain_gauge",
-      "lat": -26.7631,
-      "lon": 152.8475,
+      "lat": -26.762919,
+      "lon": 152.847475,
       "elevation_ahd": 421.3,
       "roles": [
         "field"
@@ -55289,7 +55292,8 @@
         "mary"
       ],
       "alert_ids": {
-        "rainfall": 6427
+        "rainfall": 6427,
+        "battery": 6428
       },
       "satcom": {
         "enabled": false,
@@ -55372,8 +55376,8 @@
       "name": "Mapleton AL",
       "station_number": "540085",
       "station_type": "auto_rain_gauge",
-      "lat": -26.6247,
-      "lon": 152.8664,
+      "lat": -26.624869,
+      "lon": 152.866368,
       "elevation_ahd": 392.7,
       "roles": [
         "field"
@@ -55383,7 +55387,8 @@
         "mary"
       ],
       "alert_ids": {
-        "rainfall": 6447
+        "rainfall": 6447,
+        "battery": 6448
       },
       "satcom": {
         "enabled": false,
@@ -95698,8 +95703,8 @@
       "id": "upper_rosenthal_aler",
       "name": "Upper Rosenthal AL",
       "station_number": "541163",
-      "lat": -28.4025,
-      "lon": 152.0386,
+      "lat": -28.402598,
+      "lon": 152.038644,
       "elevation_ahd": 855,
       "roles": [
         "repeater"
@@ -95710,7 +95715,10 @@
       "catchment_ids": [
         "balonne_condamine"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 5767,
+        "battery": 5768
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -358883,8 +358891,8 @@
       "id": "dalby_base_station",
       "name": "Dalby Base Station",
       "station_number": "41555",
-      "lat": -27.187778,
-      "lon": 151.269722,
+      "lat": -27.188648,
+      "lon": 151.269261,
       "elevation_ahd": 342.33,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
