@@ -779,6 +779,13 @@ const SiteLand = (function () {
     html,
     ask,
     retry,
+    // For the property tip on the Stations map (map-property-tip.js): the
+    // same services, fields and words, so a lot reads the same under the
+    // pointer as on a card.
+    parts: {
+      HOST, LPPF, PARCEL_FIELDS, QLD_BOX, LOTPLAN_RE, USE: LAYERS.use, ADDR: LAYERS.addr,
+      parcelOf, tenureOf, councilOf, parcelWords, areaWords, useWords,
+    },
     clear() {
       for (const job of queue.splice(0)) job.reject(SUPERSEDED);
       answers.clear();

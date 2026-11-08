@@ -6822,6 +6822,8 @@ function initMap() {
   MapRoads.attach(state.map);
   MapRoadOwners.attach(state.map);
   MapLots.attach(state.map);
+  // …and what land is under the pointer while they are drawn (map-property-tip.js).
+  MapPropTip.attach(state.map);
   MapPhotos.attach(state.map);
   MapCameras.attach(state.map);
   MapRain.attach(state.map);

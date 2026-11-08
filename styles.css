@@ -5230,6 +5230,20 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 }
 .leaflet-tooltip.mn-road-label::before { display: none; }
 
+/* What land is under the pointer, with the property layers on
+   (map-property-tip.js): the road label's dress, a few lines deep — its
+   heading the lot or the tenure, and the facts under it a little lighter. */
+.leaflet-tooltip.mn-road-label.mn-prop-tip {
+  white-space: normal;
+  width: max-content;
+  max-width: 300px;
+  line-height: 1.35;
+  padding: 3px 7px;
+  border-color: rgba(121, 85, 72, .55);
+}
+.mn-prop-tip-h { font-weight: 700; }
+.mn-prop-tip-l { font-weight: 500; font-size: .68rem; color: #5d4037; }
+
 /* A bridge's name and whose it is, on hover (map-road-owners.js). The road
    label's deal — its own near-white ground and fixed dark ink, because it sits
    over imagery as often as over a street map — with the border in the

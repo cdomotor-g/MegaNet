@@ -61,6 +61,11 @@
 //      focused repeater and the station's card are there too; that address,
 //      opened in a fresh browser, sets the same drawing, switches, focus and
 //      card, with a note and Put the map back; a garbled code is let go.
+//  13. **What land is under the pointer**: with Property & easements, the
+//      lot on plan, area, tenure, easement (or none) and address on made-up
+//      State answers, nothing more asked inside the same lot; with Land &
+//      tenure the tenure first, who holds it and the land use; zoomed out,
+//      no tip.
 //  11. **Flow for everybody**: a Classic page that has never chosen draws
 //      Flow; Lines kept at version 2 under Classic is read as the old default,
 //      under any other look as a choice; `?draw=lines` draws lines for that
@@ -1248,6 +1253,81 @@ try {
     const junk = await b.evaluate(() => new URLSearchParams(location.search).get('view'));
     check('a code that does not read is let go: the address says the map as it is', junk && junk !== 'm1.zz9', J({ junk }));
     await ctxB.close();
+  }
+
+  // ── 13. What land is under the pointer ───────────────────────────────────
+  // The property tip (map-property-tip.js), on made-up answers from the
+  // State's cadastre: a reserve lot with an easement down its east side, an
+  // address and a land use.
+  section('13. What land is under the pointer, in the property views');
+  {
+    const C = { lat: -27.5598, lng: 151.9507 }, D = 0.002;
+    const sq = (w, s, e, n) => [[[w, s], [e, s], [e, n], [w, n], [w, s]]];
+    const LOT = { attributes: { lot: '3', plan: 'RP12345', lotplan: '3RP12345', tenure: 'Reserve', lot_area: 52000,
+      feat_name: null, alias_name: null, acc_code: '', cover_typ: 'Base', parcel_typ: 'Lot Type Parcel',
+      locality: 'Gatton', shire_name: 'Lockyer Valley Regional' }, geometry: { rings: sq(C.lng - D, C.lat - D, C.lng + D, C.lat + D) } };
+    const EASE = { attributes: { lot: 'A', plan: 'SP99999', lotplan: 'ASP99999', cover_typ: 'Easement', parcel_typ: 'Easement' },
+      geometry: { rings: sq(C.lng + 0.0005, C.lat - D, C.lng + D, C.lat + D) } };
+    const USE = { attributes: { year: 2019, alum_code: '1.3.0', primary_: 'Conservation and natural environments',
+      secondary: 'Nature conservation', tertiary: 'Other conserved area' }, geometry: { rings: sq(C.lng - D, C.lat - D, C.lng + D, C.lat + D) } };
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const pg = await ctx.newPage();
+    await applyNetworkPolicy(pg, server.origin);
+    pg.on('pageerror', e => errors.push(`§13: ${e.message}`));
+    const asked = [];
+    const json = (route, body) => route.fulfill({ status: 200, contentType: 'application/json', body: J(body), headers: CORS });
+    await pg.route(/LandParcelPropertyFramework\/MapServer\/4\/query\?/, route => {
+      const q = new URL(route.request().url()).searchParams;
+      if (q.get('geometryType') === 'esriGeometryPoint') { asked.push('lot'); return json(route, { features: [LOT] }); }
+      if (/Easement/.test(q.get('where') || '')) { asked.push('ease'); return json(route, { features: [EASE] }); }
+      return json(route, { features: [] });
+    });
+    await pg.route(/LandParcelPropertyFramework\/MapServer\/0\/query\?/, route => {
+      asked.push('addr');
+      return json(route, { features: [{ attributes: { address: '12 Example Road, Gatton' } }] });
+    });
+    await pg.route(/LandUse\/MapServer\/0\/query\?/, route => { asked.push('use'); return json(route, { features: [USE] }); });
+    await pg.goto(server.url('/index.html?tab=stations'), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+    await pg.waitForFunction(() => typeof state !== 'undefined' && !!state.data && !!state.map
+      && state.mapMarkers.length > 1000, null, { timeout: LOAD_TIMEOUT });
+    await pg.evaluate(() => MapViews.apply('property'));
+    await pg.evaluate(c => { state.map.setView([c.lat, c.lng], 15, { animate: false }); }, C);
+    await pg.waitForTimeout(1200);
+    // A pin or a path under the pointer would put its own name up instead:
+    // the points asked about are the lot's, kept clear of both.
+    const at = (dx, dy) => pg.evaluate(([c, x, y]) => {
+      const p = state.map.latLngToContainerPoint([c.lat + y, c.lng + x]);
+      const r = state.map.getContainer().getBoundingClientRect();
+      return { x: r.left + p.x, y: r.top + p.y };
+    }, [C, dx, dy]);
+    const hover = async (dx, dy, ms = 1500) => {
+      const p = await at(dx, dy);
+      await pg.mouse.move(p.x - 3, p.y - 3);
+      await pg.mouse.move(p.x, p.y, { steps: 3 });
+      await pg.waitForTimeout(ms);
+      return pg.evaluate(() => MapPropTip._state());
+    };
+    const west = await hover(-0.0012, 0.0004);
+    check('Property & easements: the lot on plan, its area and tenure, no easement under the pointer, the address and where',
+      /Lot 3 on RP12345/.test(west.text) && /5\.20 ha · Reserve/.test(west.text) && /No easement here/.test(west.text)
+        && /Address: 12 Example Road, Gatton/.test(west.text) && /Gatton · Lockyer Valley Regional Council/.test(west.text)
+        && west.shown, J({ west, asked }));
+    const before = asked.length;
+    const east = await hover(0.0012, -0.0004, 600);
+    check('…over the easement, it is named — and moving about inside the lot asks the State nothing more',
+      /Easement A on SP99999 — under the pointer/.test(east.text) && asked.length === before, J({ east, asked }));
+    await pg.evaluate(() => MapViews.apply('land'));
+    await pg.waitForTimeout(1200);
+    await hover(-0.0011, 0.0003, 200);
+    const land = await hover(-0.0012, 0.0004, 1500);
+    check('Land & tenure: the tenure first, who holds that kind of land, the lot, and what the land is used for',
+      /^Reserve/.test(land.text) && /Held by: The State, through a trustee/.test(land.text) && /Lot 3 on RP12345 · 5\.20 ha/.test(land.text)
+        && /Used for: Nature conservation › Other conserved area \(mapped 2019\)/.test(land.text), J({ land, asked }));
+    await pg.evaluate(c => { state.map.setView([c.lat, c.lng], 8, { animate: false }); }, C);
+    await pg.waitForTimeout(800);
+    const far = await hover(0.03, 0.03, 900);
+    check('zoomed out past where the property lines are drawn, no tip', !far.shown && far.text === '', J(far));
+    await ctx.close();
   }
 } finally {
   await browser.close();

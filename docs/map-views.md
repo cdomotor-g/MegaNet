@@ -293,6 +293,28 @@ export (`map-lots.js`):
 
 The legend's Overlay layers section keys both while they are drawn.
 
+**What land is under the pointer** (since 8 Nov 2026, `map-property-tip.js`).
+While the lot lines, easements or tenure are drawn, resting the mouse on the
+land for a moment puts up a hover name, stacked with the road reserve's and the
+survey mark's (`map-tip-stack.js`), asked of the same cadastre as What is here
+through `SiteLand.parts`:
+
+- **Tenure on** (Land & tenure): the tenure first, who holds that kind of land,
+  the lot on plan and its area, what the land is used for (the State's land use
+  map, with its year), the locality and council.
+- **Otherwise** (Property & easements, or the lot lines in any view): the lot on
+  plan, its area and tenure, the easement under the pointer by its own lot on
+  plan — or "No easement here" and how many are nearby, while Easements is on —
+  the street address, the locality and council.
+
+A road reserve is left to the road layer's own name when that is on. Never who
+owns a lot (the State does not publish it). The lot comes back with its
+outline, so moving about inside it asks nothing more; its easements come in one
+question a lot, its address in one, and the land use in one an area. Mouse and
+pen only — a finger has What is here — and nothing while the map moves, a tool
+owns the pointer, the 3-D view is up, or outside Queensland. `npm run mapviews`
+§13 checks it on made-up State answers.
+
 ---
 
 ## How a module plugs in

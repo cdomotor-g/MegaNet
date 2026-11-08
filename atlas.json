@@ -52,7 +52,7 @@
       "#259 a lighter off-air decoder: lean decoding is the live pipeline's default (0.12% of 11,628 live bursts read differently, a third of the time); part 2, BurstWatch, filters a channel only around its bursts (the same readings in every test, a sixth to a twentieth of the work between them), and light decoding (lean: 2) halves a burst's decode again; both in RPi ALERT 0.18–0.19 behind settings, waiting on their checks at the first base station"
     ],
     "next": [
-      "EPIC #276 3-D ground cover: trees, the State's LiDAR buildings and Overture's buildings now stand in the 3-D view close in (#278 closed 8 Nov 2026), and Presenting shipped; next the same in the digital twin (part 2) and Detail modes (#279)",
+      "EPIC #276 3-D ground cover: trees, the State's LiDAR buildings and Overture's buildings stand in the 3-D view (#278) and the digital twin (#280), both closed 8 Nov 2026, and Presenting shipped; next Detail modes (#279) and, later, tree and building heights in line of sight",
       "#271 and #272: put Hillcrest's carrier on 151.500 down to Hillcrest, and count a transmitter's corrupted copies over its whole carrier without bursts read two ways (investigation 03)",
       "EPIC #262 explainers: the first how-to, find a station and read its card, is voiced and on Videos with ▶ Show me on the app; next the phone install (#266) and map layers (#267), both pickable",
       "#252–#254 road routes: avoid closures, inspection runs, routes kept offline (EPIC #250)",

@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 241, date: '2026-11-08', items: [
+      '🌳 <strong>Trees and buildings in the digital twin.</strong> The twin\'s ground now has the trees and buildings round '
+        + 'the station standing on it, as the ⛰️ 3-D view has: tree heights from Meta and WRI\'s satellite canopy map, the '
+        + 'State\'s laser-measured buildings where Queensland has surveyed, and Overture Maps\' everywhere else. A switch in '
+        + 'the twin\'s Scene settings hides them, and the 3-D model you can download carries them too.',
+      '🏡 <strong>What land is under the mouse.</strong> In <em>Property &amp; easements</em> and <em>Land &amp; tenure</em>, '
+        + 'rest the mouse on the land: a label gives the lot on plan, its area and tenure, the easement under it and the '
+        + 'street address — or, with the tenure colours on, who holds that kind of land and what it is used for.',
+    ] },
     { n: 240, date: '2026-11-08', items: [
       '✨ <strong>Flow in 3-D.</strong> With <em>Flow</em> chosen in 🗺️ Layers › Views, the ⛰️ 3-D view now moves too: '
         + 'white dashes run along the radio paths from each station to its repeater, and warm-white pulses run along the '

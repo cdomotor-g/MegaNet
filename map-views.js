@@ -318,7 +318,8 @@ const MapViews = (function () {
     {
       id: 'property', group: 'property', label: 'Property & easements',
       say: 'The satellite photo with property boundaries, easements, road parcels and who looks after each road, council '
-        + 'areas and survey marks. No radio paths.',
+        + 'areas and survey marks. Rest the mouse on the land for its lot on plan, area, tenure, easements and address. '
+        + 'No radio paths.',
       caution: 'Fetches the council areas (about 1 MB) and draws road owners from a regional view; property lines, easements '
         + 'and survey marks once you zoom in.',
       knobs: {
@@ -331,7 +332,8 @@ const MapViews = (function () {
     {
       id: 'land', group: 'property', label: 'Land & tenure',
       say: 'How the land is held — freehold, leases, State land, parks and forests — with property boundaries, easements, '
-        + 'roads, council areas and river basins on a topographic map. No radio paths.',
+        + 'roads, council areas and river basins on a topographic map. Rest the mouse on the land for its tenure, who '
+        + 'holds that kind of land and what it is used for. No radio paths.',
       caution: 'Fetches the river basins (about 760 KB) and council areas (about 1 MB) the first time; land tenure and '
         + 'property lines once you zoom in.',
       knobs: {

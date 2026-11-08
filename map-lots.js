@@ -564,6 +564,10 @@ const MapLots = (function () {
 
     sync,
 
+    // What the picture draws at this scale — the lots, the easements, the
+    // tint — for the property tip under the pointer (map-property-tip.js).
+    drawnNow() { return map ? wanted(viewScale()) : null; },
+
     // Does the legend claim a property-boundary key right now? The lot lines
     // only: an image holding just the tint or the easements is not one.
     active() { return !!overlay && !!drawnBox && !!drawnBox.want.lots; },
