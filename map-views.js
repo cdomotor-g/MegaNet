@@ -223,6 +223,11 @@ const MapViews = (function () {
   // view with no radio paths leaves the link colouring alone: neither is
   // what it is about. `caution` is said in the chip's title — what turning
   // it on fetches.
+  // Every view says whether the backbone is on, and only Overview and
+  // Backbone have it: drawn over Site visit's tails, Radio paths' spotlight,
+  // Weak links' margins or Live traffic's pulses it was most of what the eye
+  // saw (the owner, 8 Nov 2026: "it makes a few of the view modes look
+  // shit … need to have them switch it off automatically").
   const VIEWS = [
     {
       id: 'overview', group: 'everyone', label: 'Overview',
@@ -240,7 +245,7 @@ const MapViews = (function () {
         + 'photos and site features. Radio paths are short tails until you point at a station.',
       caution: 'Property lines, roads and survey marks are fetched once you zoom in close.',
       knobs: {
-        base: 'Satellite', links: true, roles: ALL_ROLES, backbone: true, arrows: false, colour: 'freq', health: true,
+        base: 'Satellite', links: true, roles: ALL_ROLES, backbone: false, arrows: false, colour: 'freq', health: true,
         outlines: false,
         ...only('lots', 'easements', 'roads', 'survey', 'photos', 'siteFeatures', 'cameras', 'twinOffer', 'riverLines'),
         drawing: { paths: 'every', draw: 'tails', tails: { follow: true }, auto: true, balance: 35 },
@@ -252,7 +257,7 @@ const MapViews = (function () {
         + 'the way the readings travel, pins coloured by health, and the maintenance hubs.',
       caution: 'Fetches the maintenance hub areas (about 550 KB) the first time.',
       knobs: {
-        base: 'Satellite', links: true, roles: ALL_ROLES, backbone: true, arrows: true, colour: 'freq', health: true,
+        base: 'Satellite', links: true, roles: ALL_ROLES, backbone: false, arrows: true, colour: 'freq', health: true,
         outlines: false, ...only('hubs', 'riverLines', 'photos', 'siteFeatures', 'twinOffer'),
         drawing: { paths: 'every', draw: 'tails', tails: { follow: true }, auto: true, balance: 62 },
       },
@@ -262,7 +267,7 @@ const MapViews = (function () {
       say: 'Every path coloured by its fade margin — the signal it has to spare — on a greyed map, so the weak ones stand out.',
       caution: 'Works out the margin for each path that has none saved yet, which fetches the ground heights along it.',
       knobs: {
-        base: null, links: true, roles: ALL_ROLES, backbone: true, arrows: false, colour: 'fade', health: false,
+        base: null, links: true, roles: ALL_ROLES, backbone: false, arrows: false, colour: 'fade', health: false,
         outlines: false, ...only('riverLines', 'photos', 'siteFeatures', 'twinOffer'),
         drawing: { paths: 'every', draw: 'lines', auto: true, balance: 85 },
       },
@@ -283,7 +288,7 @@ const MapViews = (function () {
       say: 'Each field station\'s best path, faded, with a pulse running along it whenever one of its readings comes in.',
       caution: 'Asks the network for new readings every 15 seconds while it is on.',
       knobs: {
-        base: null, links: true, roles: ALL_ROLES, backbone: true, arrows: false, colour: 'freq', health: true,
+        base: null, links: true, roles: ALL_ROLES, backbone: false, arrows: false, colour: 'freq', health: true,
         outlines: false, ...only('riverLines', 'photos', 'siteFeatures', 'twinOffer'),
         drawing: { paths: 'best', draw: 'flow', flow: { mode: 'live' }, auto: true, balance: 65 },
       },

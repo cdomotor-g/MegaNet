@@ -56,14 +56,18 @@ matches. The filter survives Views redrawing itself. `npm run mapviews` §1.
 
 ## The views, by who they are for
 
+Every view says whether the backbone paths are on; only Overview and Backbone
+have them (since 8 Nov 2026 — over tails, a spotlight, fade-margin colours or
+live pulses the backbone was most of what the eye saw).
+
 | Group | View | What it sets |
 |---|---|---|
 | Everyone | **Overview** | The base map left alone; every station; each field station's best path until you zoom in (zoom 11), as lines; auto-contrast on; backbone on; links coloured by channel; rivers, flood cameras, field photos and site features on, everything else off. |
-| Everyone | **Site visit** | Satellite; every path as tails, the spotlight following the pointer; auto-contrast; Balance a little toward the photo (35); pins coloured by health; property boundaries, easements, road parcels, survey marks, photos, site features, cameras, the digital twin and rivers. |
-| Technicians | **Radio paths** | Satellite; every path as tails; Balance toward the network (62); arrows; health; maintenance hubs; rivers, photos, site features and the twin. No property layers. |
-| Technicians | **Weak links** | The base map left alone; every path as lines, coloured by fade margin; Balance well toward the network (85) so the weak ones stand out. Working out a margin that is not saved fetches the ground heights along that path. |
+| Everyone | **Site visit** | Satellite; every path as tails, the spotlight following the pointer; auto-contrast; Balance a little toward the photo (35); pins coloured by health; backbone off; property boundaries, easements, road parcels, survey marks, photos, site features, cameras, the digital twin and rivers. |
+| Technicians | **Radio paths** | Satellite; every path as tails; Balance toward the network (62); arrows; health; backbone off; maintenance hubs; rivers, photos, site features and the twin. No property layers. |
+| Technicians | **Weak links** | The base map left alone; every path as lines, coloured by fade margin; Balance well toward the network (85) so the weak ones stand out; backbone off. Working out a margin that is not saved fetches the ground heights along that path. |
 | Technicians | **Backbone** | Only repeaters and bases (the field pins and their paths off); the backbone, drawn as Flow, with arrows, health and the maintenance hubs. |
-| Technicians | **Live traffic** | Each field station's best path, faded, with ⏱️ Latency's live pulses running along it as readings arrive (the network is asked every 15 seconds); health on. |
+| Technicians | **Live traffic** | Each field station's best path, faded, with ⏱️ Latency's live pulses running along it as readings arrive (the network is asked every 15 seconds); health on; backbone off. |
 | Flood | **Rivers & catchments** | OSM-Topo; no radio paths; field stations only, with the forecast and information locations outlined; rivers, a river's catchment, the river basins, ground height and flood cameras. |
 | Flood | **Rainfall** | Light; no radio paths; field stations only, outlined; the rainfall heat map over the river basins and rivers (re-read every 5 minutes). |
 | Property | **Property & easements** | Satellite; no radio paths; property boundaries, easements, road parcels and road owners, council areas, survey marks and rivers. |

@@ -33,6 +33,9 @@ const WhatsNew = (() => {
       '🏘️ <strong>Buildings everywhere in 3-D.</strong> Outside the towns the State has surveyed, the 3-D view now stands '
         + 'up the buildings from Overture Maps (OpenStreetMap\'s and Microsoft\'s outlines). Their heights are mostly '
         + 'estimates from photos, so none is drawn lower than 3 m.',
+      '🕸️ <strong>Views switch the backbone off.</strong> Only <em>Overview</em> and <em>Backbone</em> show the backbone '
+        + 'paths now. Site visit, Radio paths, Weak links and Live traffic switch them off, so their own drawing is what '
+        + 'you see.',
       '🔎 <strong>Find a view or a control.</strong> The search box in 🗺️ Layers is now at the very top, above '
         + 'Views, and finds views too: type <em>flood</em> for the Flood views, or <em>balance</em> to go straight to '
         + 'that setting.',
