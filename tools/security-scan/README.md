@@ -100,8 +100,9 @@ US$0.70 a run).
   about two hours after the review: whether the review ran and how much it
   read, what it found and patched that week, what is waiting on you, and the
   running totals. It posts in one standing chat on claude.ai/code ("🔒
-  Flood-Net security reports", which has the private repository attached) and
-  sends a one-line phone alert. It prints `security/report.mjs` from the
+  Flood-Net security reports", which has the private repository attached),
+  emails you the same text, and sends a one-line phone alert. It ends with what
+  that week's review cost. It prints `security/report.mjs` from the
   private repository, so it is the same every week and costs almost nothing.
   If the review stops running, the report says so. (A task that starts a fresh
   session each week cannot open the private repository unless it is attached
