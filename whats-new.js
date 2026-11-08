@@ -33,6 +33,9 @@ const WhatsNew = (() => {
       '🏘️ <strong>Buildings everywhere in 3-D.</strong> Outside the towns the State has surveyed, the 3-D view now stands '
         + 'up the buildings from Overture Maps (OpenStreetMap\'s and Microsoft\'s outlines). Their heights are mostly '
         + 'estimates from photos, so none is drawn lower than 3 m.',
+      '🔗 <strong>Share sends the view too.</strong> A link from 🔗 Share — or copied from the address bar — now opens '
+        + 'the Stations map drawn the way you see it: the view or your own mix of switches, the open station\'s card and the '
+        + 'repeater you have picked out. Whoever opens it gets a note, and ↶ Put the map back to undo it.',
       '🕸️ <strong>Views switch the backbone off.</strong> Only <em>Overview</em> and <em>Backbone</em> show the backbone '
         + 'paths now. Site visit, Radio paths, Weak links and Live traffic switch them off, so their own drawing is what '
         + 'you see.',

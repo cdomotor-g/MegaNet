@@ -7,6 +7,10 @@
 //
 //   ?tab=stations&station=gatton_al&map=-27.55352,152.27911,13
 //
+// — and, on the Stations map, how it is drawn and what is picked out:
+//
+//   …&view=radio&focus=toowoomba_rpt
+//
 // so a view can be bookmarked, sent to somebody and reloaded, and the
 // browser's back and forward buttons move between tabs and stations instead
 // of leaving the app. Until this, the address never changed: every link
@@ -63,6 +67,19 @@
 // asked for is held (`pending`) and kept in the address meanwhile — a reload
 // or a copy during the load still carries it — and applied once by
 // afterLoad(), which renderAfterLoad() calls when the list has been drawn.
+//
+// ── The view and the focus ──────────────────────────────────────────────────
+// `view` is how the Stations map is drawn: a built-in view's name while one is
+// in force (`view=radio`), else Views' short code for the whole mix — the
+// switches, the pins, the base maps and the drawing (map-views.js,
+// shareCode). `focus` is the repeater picked out on the map. Neither is a
+// step: they follow the map in place, as the view does. A link that carries
+// them applies them once, when the stations have arrived (afterLoad) — the
+// view first, as pressing it would, with Put the map back to undo it; back
+// and forward leave both as they are, since a step is a tab or a station.
+// A reload keeps the device's own view (start, below).
+// (The owner, 8 Nov 2026: "make a user's current view sharable, including
+// the station or whatever is selected".)
 //
 // ── Sending it to somebody ──────────────────────────────────────────────────
 // 🔗 Share in the banner hands the address for where you are to the device's
@@ -127,10 +144,12 @@ const Route = (() => {
       tab: validTab(tab) ? tab : null,
       station: q.get('station') || null,
       map: parseMap(q.get('map')),
+      view: q.get('view') || null,
+      focus: q.get('focus') || null,
       // Whether the address names anything of ours at all, sound or not: a
       // link that does — even to a tab that has since gone — is a link, and
       // not a first visit.
-      named: q.has('tab') || q.has('station') || q.has('map'),
+      named: q.has('tab') || q.has('station') || q.has('map') || q.has('view') || q.has('focus'),
     };
   }
 
@@ -148,6 +167,14 @@ const Route = (() => {
     } catch (_) { return null; }       // a map that has no view yet
   }
 
+  // How the Stations map is drawn, as Views says it (map-views.js), and the
+  // repeater it has picked out.
+  function viewCode() {
+    if (typeof MapViews === 'undefined' || typeof MapViews.shareCode !== 'function' || !state.map) return null;
+    try { return MapViews.shareCode() || null; } catch (_) { return null; }
+  }
+  const focusNow = () => (state.mapFocusRepeaterId != null ? String(state.mapFocusRepeaterId) : null);
+
   // The address for where the app is now — or for `over`, where it names
   // something else (a link to a station from its card). Parameters this file
   // does not own keep their place and their spelling.
@@ -162,13 +189,18 @@ const Route = (() => {
         : (mapView() || (pending && pending.map) || null);
       if (station) mine.push('station=' + enc(station));
       if (map) mine.push('map=' + enc(fmtMap(map)));
+      // What a link asked for is kept until it has been applied.
+      const view = over.view !== undefined ? over.view : ((pending && pending.view) || viewCode());
+      const focus = over.focus !== undefined ? over.focus : ((pending && pending.focus) || focusNow());
+      if (view) mine.push('view=' + enc(view));
+      if (focus) mine.push('focus=' + enc(focus));
     }
     if (tab === 'health') {
       const station = over.station !== undefined ? over.station : healthStation();
       if (station) mine.push('station=' + enc(station));
     }
     const theirs = (location.search || '').replace(/^\?/, '').split('&')
-      .filter(p => p && !/^(tab|station|map)(=|$)/.test(p));
+      .filter(p => p && !/^(tab|station|map|view|focus)(=|$)/.test(p));
     const query = mine.concat(theirs).join('&');
     // A Workbench case in the fragment takes the app to the Workbench on a
     // reload (Workbench.restoreFromUrl), over whatever tab the query names —
@@ -278,8 +310,15 @@ const Route = (() => {
   function applyStations(want) {
     if (state.activeTab !== 'stations' || !state.map || !state.data) return;
     const s = want.station ? state.data.stations.find(x => x.id === want.station) : null;
+    const rep = want.focus ? state.data.stations.find(x => x.id === want.focus) : null;
     applying++;
     try {
+      // The view first: it may rebuild the map's lines and pins, which the
+      // card, the focus and the view of the map then sit on.
+      if (want.view && typeof MapViews !== 'undefined' && typeof MapViews.applyShared === 'function') {
+        try { MapViews.applyShared(want.view); } catch (_) { /* a view that will not apply leaves the map as it is */ }
+      }
+      if (rep && typeof setMapFocusRepeater === 'function') setMapFocusRepeater(rep.id);
       if (s) {
         if (state.stnCard.id !== s.id) showStationCard(s.id, { opener: null, select: false });
       } else if (state.stnCard.id) {
@@ -315,7 +354,9 @@ const Route = (() => {
       try { switchTab(tab); } finally { applying--; }
     }
     if (tab === 'stations') {
-      if (state.data && state.map) applyStations(want);
+      // The step's station and view of the map; the drawing and the focus
+      // are not steps, and stay as they are.
+      if (state.data && state.map) applyStations({ station: want.station, map: want.map });
       else pending = (want.station || want.map) ? { station: want.station, map: want.map } : null;
     }
     sync();
@@ -328,7 +369,7 @@ const Route = (() => {
     started = true;
     const want = read();
     let tab = want.tab;
-    if (!tab && (want.station || want.map)) tab = 'stations';
+    if (!tab && (want.station || want.map || want.view || want.focus)) tab = 'stations';
     // A Workbench case shared without a tab (every link made before this file)
     // is a link to the Workbench.
     if (!tab && /^#wb/.test(location.hash || '')) tab = 'workbench';
@@ -347,8 +388,18 @@ const Route = (() => {
     if (!tab && newDevice && !want.named && !location.hash) { tab = 'sitemap'; firstVisit = true; }
     if (tab) state.activeTab = tab;
     rememberedTab = validTab(state.activeTab) ? state.activeTab : null;
-    if (state.activeTab === 'stations' && (want.station || want.map)) {
-      pending = { station: want.station, map: want.map };
+    // A reload — or back or forward into the app from another site — is this
+    // device carrying on where it was: its own switches are the truth, and an
+    // address written a moment before the last change could put an older view
+    // back over it. Only a link opened (followed, typed, pasted) sets the view.
+    let how = 'navigate';
+    try {
+      const nav = performance.getEntriesByType('navigation')[0];
+      if (nav && nav.type) how = nav.type;
+    } catch (_) { /* no timing to ask: a link */ }
+    const view = how === 'navigate' ? want.view : null;
+    if (state.activeTab === 'stations' && (want.station || want.map || view || want.focus)) {
+      pending = { station: want.station, map: want.map, view, focus: want.focus };
     }
     // Station Health holds a named station itself, until its week is in.
     if (state.activeTab === 'health' && want.station) healthWant(want.station);

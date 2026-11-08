@@ -910,8 +910,10 @@ const HELP = {
            + 'line for a larger chart over 24 hours to 12 months, and <strong>Open in Field Data</strong> '
            + 'from there to filter, inspect and export the same readings.',
     watch: [
-      '<strong>The address bar says where you are</strong> — this tab, the station whose card is up '
-      + 'and the map\'s view — so a bookmark, a reload or a link sent to somebody opens exactly this. '
+      '<strong>The address bar says where you are</strong> — this tab, the station whose card is up, '
+      + 'where the map is looking, how it is drawn (the view, or your own mix of switches) and the repeater '
+      + 'picked out on it — so a bookmark or a link sent to somebody with 🔗 <strong>Share</strong> opens exactly '
+      + 'this. A link that changes how their map is drawn says so, and ↶ Put the map back undoes it. '
       + '<strong>🔗 Copy link</strong> on a station\'s card copies one. Back and forward move between '
       + 'the tabs and the stations you opened; moving the map is not a step, so back never replays '
       + 'your pans. A link opens the station\'s card without selecting it — the card\'s own pills do that.',
@@ -3074,7 +3076,7 @@ const TWIN_HELP = {
          + '~30 m SRTM elsewhere), the aerial imagery draped over it, <strong>the station as built</strong> '
          + 'where it stands — the Type 3 rainfall pole, the river-gauge tower with its platform and '
          + 'extension ladder, its staff gauge and its flood levels marked on it, a manual collector or staff gauge, or a red post where the record cannot say — with '
-         + 'the other stations and the bridges in the patch, and a 1.75 m figure beside it for scale. Orbit it, '
+         + 'the other stations, the bridges and the trees and buildings in the patch, and a 1.75 m figure beside it for scale. Orbit it, '
          + 'look straight down on it, or take the POV and walk about in it at eye height (and up the '
          + 'ladder); click the ground for its height; move the station\'s pin to where it stands on '
          + '10 cm imagery; and '

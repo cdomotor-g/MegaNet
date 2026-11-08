@@ -56,6 +56,11 @@
 //      cadastre's export is the one it was before Views, byte for byte; each
 //      switch changes the export's layers the way it says; both off again and
 //      the URL is the first one exactly.
+//  12. **The view in a link**: a built-in view in force is `view=<id>` in
+//      the address, a mix of your own its code, read back the same; the
+//      focused repeater and the station's card are there too; that address,
+//      opened in a fresh browser, sets the same drawing, switches, focus and
+//      card, with a note and Put the map back; a garbled code is let go.
 //  11. **Flow for everybody**: a Classic page that has never chosen draws
 //      Flow; Lines kept at version 2 under Classic is read as the old default,
 //      under any other look as a choice; `?draw=lines` draws lines for that
@@ -1168,6 +1173,81 @@ try {
     check('?draw=lines: the plain lines for that page, nothing stored, and the address tidied',
       door.draw === 'lines' && stored === null && !/draw=/.test(door.address), J({ door, stored }));
     await ctx.close();
+  }
+
+  // ── 12. The view in a link ───────────────────────────────────────────────
+  // Share carries the view, the station and the focused repeater (the owner,
+  // 8 Nov 2026); a link opened on another device puts all three back.
+  section('12. The view, the station and the focus, in a link');
+  {
+    const ctxA = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const a = await ctxA.newPage();
+    await applyNetworkPolicy(a, server.origin);
+    a.on('pageerror', e => errors.push(`§12 A: ${e.message}`));
+    const load = async (pg, url) => {
+      await pg.goto(url, { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+      await pg.waitForFunction(() => typeof state !== 'undefined' && !!state.data && !!state.map
+        && state.mapMarkers.length > 1000, null, { timeout: LOAD_TIMEOUT });
+      await pg.waitForTimeout(1500);
+    };
+    const q = pg => pg.evaluate(() => Object.fromEntries(new URLSearchParams(location.search)));
+    await load(a, server.url('/index.html?tab=stations'));
+    await a.evaluate(() => MapViews.apply('radio'));
+    await a.waitForTimeout(800);
+    const named = await q(a);
+    check('a built-in view in force is in the address by its name', named.view === 'radio', J(named));
+    await a.evaluate(() => MapViews.set({ balance: 20 }));
+    await a.waitForTimeout(500);
+    const mixed = await q(a);
+    const back = await a.evaluate(v => MapViews.parseShare(v), mixed.view);
+    check('…a mix of your own as its code, which reads back to the same settings',
+      /^m1\./.test(mixed.view || '') && back && back.knobs && back.knobs.drawing.balance === 20
+        && back.knobs.drawing.draw === 'tails' && back.knobs.backbone === false && back.knobs.arrows === true,
+      J({ view: mixed.view, back }));
+    const picked = await a.evaluate(() => {
+      const rep = state.data.stations.find(s => (s.roles || []).includes('repeater'));
+      const fld = state.data.stations.find(s => (s.roles || []).includes('field') && s.lat != null);
+      setMapFocusRepeater(rep.id);
+      showStationCard(fld.id);
+      return { rep: rep.id, fld: fld.id };
+    });
+    await a.waitForTimeout(800);
+    const full = await q(a);
+    const url = await a.evaluate(() => Route.here());
+    const here = await a.evaluate(() => location.href);
+    check('…the focused repeater and the station\'s card in it too, and Share hands out that address',
+      full.focus === picked.rep && full.station === picked.fld && full.view === mixed.view && url === here,
+      J({ full, url, here }));
+    await a.evaluate(() => { const t = document.getElementById('toasts'); if (t) t.innerHTML = ''; });
+    await a.reload({ waitUntil: 'load' });
+    await a.waitForFunction(() => typeof state !== 'undefined' && !!state.data && !!state.map
+      && state.mapMarkers.length > 1000, null, { timeout: LOAD_TIMEOUT });
+    await a.waitForTimeout(1500);
+    const again = await a.evaluate(() => ({ writes: MapViews._state().lastWrites, undo: MapViews._state().canUndo,
+      toast: (document.getElementById('toasts') || {}).textContent || '', view: new URLSearchParams(location.search).get('view') }));
+    check('…and reloading your own address changes nothing and says nothing',
+      again.writes.length === 0 && !again.undo && !/This link set the map/.test(again.toast) && again.view === mixed.view, J(again));
+    await ctxA.close();
+
+    const ctxB = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const b = await ctxB.newPage();
+    await applyNetworkPolicy(b, server.origin);
+    b.on('pageerror', e => errors.push(`§12 B: ${e.message}`));
+    await load(b, url);
+    const got = await b.evaluate(() => ({
+      s: MapViews.settings(), backbone: state.mapShowBackbone, arrows: !!state.mapArrows,
+      focus: state.mapFocusRepeaterId, card: state.stnCard.id, undo: MapViews._state().canUndo,
+      toast: (document.getElementById('toasts') || {}).textContent || '', view: new URLSearchParams(location.search).get('view'),
+    }));
+    check('opened on another device: the same drawing, switches, focus and card',
+      got.s.draw === 'tails' && got.s.balance === 20 && got.backbone === false && got.arrows === true
+        && got.focus === picked.rep && got.card === picked.fld, J(got));
+    check('…with a note saying the link set the map, Put the map back ready, and the code still in the address',
+      /This link set the map/.test(got.toast) && got.undo && got.view === mixed.view, J(got));
+    await load(b, server.url('/index.html?tab=stations&view=m1.zz9'));
+    const junk = await b.evaluate(() => new URLSearchParams(location.search).get('view'));
+    check('a code that does not read is let go: the address says the map as it is', junk && junk !== 'm1.zz9', J({ junk }));
+    await ctxB.close();
   }
 } finally {
   await browser.close();

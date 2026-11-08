@@ -7965,6 +7965,8 @@ function setMapFocusRepeater(id) {
   // (#186) — they are the control that undoes this, so they have to notice it
   // arriving and leaving.
   updateFilterChrome();
+  // And the address, which names the focused repeater (route.js, `focus`).
+  if (typeof Route !== 'undefined') Route.sync();
 }
 
 function clearMapFocusRepeater() {

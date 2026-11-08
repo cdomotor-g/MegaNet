@@ -54,6 +54,30 @@ matches. The filter survives Views redrawing itself. `npm run mapviews` §1.
 
 ---
 
+**The view in a link** (since 8 Nov 2026). The address — and so 🔗 Share,
+a station card's Copy link and Ctrl+K's copy — carries how the Stations map is
+drawn, as `view=`: a built-in view's name while one is in force
+(`view=radio`), else the whole mix as one short code (`MapViews.shareCode`):
+
+```
+view=m1.<switches>.<pins>.<colour>.<bases>.<drawing>
+     m1.11000100000000000001110.111.freq.OSM-Topo*100!Satellite*0.lod~flow~all~100~35~24~90~1~1~1~70
+```
+
+a 1 or 0 for each switch in `SHARE_SWITCHES`' order (append only), the three
+pin roles, the link colouring, each base map top first with its opacity (0
+off), and the drawing: which paths, drawn as, Flow's motion, speed %, Lines
+underneath %, tail and spotlight px, spotlight follows, backbone in full,
+auto-contrast, Balance. With it, `focus=` names the repeater picked out, beside
+`station=` and `map=` (route.js). A link opened — followed, typed, pasted —
+applies them once the stations have arrived, the view as pressing one does:
+a note says the link set the map, and ↶ Put the map back undoes it
+(`MapViews.applyShared`). A reload, or back and forward, keeps the device's
+own view: an address written a moment before the last change could otherwise
+put an older view back. A part of the code that does not read is left out
+rather than spoiling the rest; a code that does not read at all is let go.
+`npm run mapviews` §12.
+
 ## The views, by who they are for
 
 Every view says whether the backbone paths are on; only Overview and Backbone

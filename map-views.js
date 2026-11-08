@@ -1021,6 +1021,7 @@ const MapViews = (function () {
     const cadOrder = cad.filter(w => !w.want).concat(cad.filter(w => w.want));
     let ci = 0;
     const run = writes.map(w => (CADASTRE.includes(w.name) ? cadOrder[ci++] : w));
+    S.lastWrites = run.map(w => w.name);   // for the checks
 
     const outer = holding();
     if (typeof state !== 'undefined') state.mapRefreshHold = true;
@@ -1130,6 +1131,121 @@ const MapViews = (function () {
     rerender();
     if (typeof announce === 'function') announce('The map is back as it was before the view.');
     return true;
+  }
+
+  // ── The view in the address (route.js) ──────────────────────────────────
+  // 🔗 Share and the address bar carry the view on screen, so a link opens
+  // the map the way the sender sees it (the owner, 8 Nov 2026: "make a
+  // user's current view sharable"). A built-in view in force is its name,
+  // `view=radio`; anything else is the whole mix in one short code:
+  //
+  //   view=m1.<switches>.<pins>.<colour>.<bases>.<drawing>
+  //
+  //   switches  a 1 or 0 for each of SHARE_SWITCHES, in its order (- for one
+  //             this device cannot say). Append only: a link made before a
+  //             switch was added says nothing about it, and leaves it alone.
+  //   pins      the field, repeater and base pins, a 1 or 0 each
+  //   colour    the link colouring (freq, fade or plain)
+  //   bases     each base map, top first, as name*opacity % (0 is off), ! between
+  //   drawing   which paths ~ drawn as ~ Flow's motion ~ speed % ~ Lines
+  //             underneath % ~ tail px ~ spotlight px ~ spotlight follows ~
+  //             backbone in full ~ auto-contrast ~ Balance
+  //
+  // Opening one applies it the way pressing a view does: what it changed is
+  // kept for Put the map back, and a note says so (applyShared).
+  const SHARE_V = 'm1';
+  const SHARE_SWITCHES = ['links', 'backbone', 'arrows', 'health', 'outlines', 'riverLines', 'riverCatchment', 'rain',
+    'elev', 'catchments', 'lots', 'easements', 'tenure', 'roads', 'roadOwners', 'councils', 'survey', 'hubs', 'wind',
+    'cameras', 'photos', 'siteFeatures', 'twinOffer'];
+  // A base map's name, with the code's own separators kept out of it.
+  const shareName = n => encodeURIComponent(n).replace(/[.*!~]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+  function shareCode() {
+    const id = active();
+    if (id && VIEWS.some(v => v.id === id)) return id;
+    const s = snapshot();
+    const bit = v => (v === undefined ? '-' : v ? '1' : '0');
+    const sw = SHARE_SWITCHES.map(n => bit(s[n])).join('');
+    const pins = s.roles ? ROLES.map(r => (s.roles[r] === false ? '0' : '1')).join('') : '-';
+    const colour = /^[a-z]{1,12}$/.test(String(s.colour || '')) ? s.colour : '-';
+    let bases = '-';
+    const mix = s.base && s.base.mix;
+    if (mix && typeof mix === 'object') {
+      const names = (Array.isArray(s.base.order) ? s.base.order : []).filter(n => mix[n]);
+      for (const n of Object.keys(mix)) if (!names.includes(n)) names.push(n);
+      const parts = names.map(n => `${shareName(n)}*${mix[n] && mix[n].on ? Math.round(num(mix[n].op, 0, 1, 1) * 100) : 0}`);
+      if (parts.length) bases = parts.join('!');
+    }
+    const d = s.drawing;
+    const draw = d ? [d.paths, d.draw, d.flow.mode, Math.round(d.flow.speed * 100), Math.round(d.flow.under * 100),
+      d.tails.len, d.tails.spot, d.tails.follow ? 1 : 0, d.tails.backboneFull ? 1 : 0, d.auto ? 1 : 0, d.balance].join('~') : '-';
+    return [SHARE_V, sw, pins, colour, bases, draw].join('.');
+  }
+  // A code read back: { id } for a built-in view, { knobs } for a mix, or
+  // null for anything that is neither. Each part is read on its own, and one
+  // that does not read is left out rather than spoiling the rest.
+  function parseShare(code) {
+    const c = String(code || '');
+    if (VIEWS.some(v => v.id === c)) return { id: c };
+    const p = c.split('.');
+    if (p.length !== 6 || p[0] !== SHARE_V) return null;
+    const knobs = {};
+    [...p[1]].forEach((ch, i) => {
+      const n = SHARE_SWITCHES[i];
+      if (n && (ch === '1' || ch === '0')) knobs[n] = ch === '1';
+    });
+    if (/^[01]{3}$/.test(p[2]) && p[2] !== '000') {
+      knobs.roles = {};
+      ROLES.forEach((r, i) => { knobs.roles[r] = p[2][i] === '1'; });
+    }
+    if (/^[a-z]{1,12}$/.test(p[3])) knobs.colour = p[3];
+    if (p[4] !== '-') {
+      const mix = {}, order = [];
+      for (const e of p[4].split('!')) {
+        const m = /^([^*]{1,60})\*(\d{1,3})$/.exec(e);
+        if (!m) continue;
+        let name;
+        try { name = decodeURIComponent(m[1]); } catch (_) { continue; }
+        // In the base maps' own form: on with its opacity, or off with the
+        // opacity this device last gave it left alone.
+        const pct = Math.min(100, Number(m[2]));
+        mix[name] = pct > 0 ? { on: true, op: pct / 100 } : { on: false };
+        order.push(name);
+      }
+      if (order.some(n => mix[n].on)) knobs.base = { mix, order };
+    }
+    const d = p[5].split('~');
+    if (d.length === 11 && PATHS.includes(d[0]) && DRAWS.includes(d[1])) {
+      knobs.drawing = {
+        paths: d[0], draw: d[1],
+        flow: { mode: d[2], speed: Number(d[3]) / 100, under: Number(d[4]) / 100 },
+        tails: { len: Number(d[5]), spot: Number(d[6]), follow: d[7] === '1', backboneFull: d[8] === '1' },
+        auto: d[9] === '1', balance: Number(d[10]),
+      };
+      // clean() keeps each one in range, and puts back the default for one
+      // that is not a number or not a choice.
+      knobs.drawing = (({ paths, draw, flow, tails, auto, balance }) => ({ paths, draw, flow: { mode: flow.mode, speed: flow.speed,
+        under: flow.under }, tails, auto, balance }))(clean(knobs.drawing));
+    }
+    return Object.keys(knobs).length ? { knobs } : null;
+  }
+  // A view from a link (Route.afterLoad), applied as pressing one is, with
+  // what it changed kept for Put the map back and a note to say so.
+  // Returns whether it changed anything.
+  function applyShared(code) {
+    const want = parseShare(code);
+    if (!want) return false;
+    const v = want.id ? findView(want.id) : null;
+    const snap = snapshot();
+    const before = pickNow();
+    const n = applyKnobs(v ? v.knobs : want.knobs);
+    if (n) S.undo = { snap, pick: before };
+    setPick(v ? v.id : active());
+    rerender();
+    if (n && typeof Toast !== 'undefined' && Toast.note) {
+      Toast.note(`This link set the map to ${v ? `the view ${viewName(v)}` : 'the view it was sent from'}. `
+        + '↶ Put the map back, at the top of 🗺️ Layers, undoes it.');
+    }
+    return n > 0;
   }
 
   function newId() {
@@ -1263,6 +1379,10 @@ const MapViews = (function () {
 
   // At the end of every refreshMapLayers, the early return included.
   function afterBuild() {
+    // The address carries the view (route.js): a switch moved from anywhere
+    // — the panel, Ctrl+K, a card — ends in a rebuild, and the address
+    // follows it, so a link copied from the address bar is the map on screen.
+    if (typeof Route !== 'undefined' && typeof Route.sync === 'function') safely(() => Route.sync(), 'Route.sync');
     if (C().auto) safely(() => recomputeAuto({ restyle: false }), 'auto-contrast');
     const T = modTails(), F = modFlow(), P = modPaths();
     if (has(T, 'rebuildIndex')) safely(() => T.rebuildIndex(), 'MapTails.rebuildIndex');
@@ -1936,6 +2056,9 @@ const MapViews = (function () {
     const open = !!(words && words.open && !words.hasAttribute('data-find-opened'));
     el.innerHTML = html();
     applyFind();
+    // The address carries the view (route.js): it follows every change,
+    // which all end here.
+    if (typeof Route !== 'undefined' && typeof Route.sync === 'function') safely(() => Route.sync(), 'Route.sync');
     if (draft) { const b = el.querySelector('#mv-save-name'); if (b) b.value = draft; }
     if (open) { const d = el.querySelector('details.mv-words'); if (d) d.open = true; }
     if (inside) {
@@ -2029,13 +2152,13 @@ const MapViews = (function () {
   return {
     attach, detach, html, bind, rerender, settings, set, lineOpacity, fullOpacity, restyle, afterBuild, autoValue,
     hover, hovered, cardChanged, apply, undo, save, remove, active, snapshot, saved, legendHtml, opacityNoteHtml,
-    togglePlay, fold, setPresenting, presenting, fromAddress, find,
+    togglePlay, fold, setPresenting, presenting, fromAddress, find, shareCode, parseShare, applyShared,
     VIEWS, WORDS, GROUPS,
     // What is in force, for the checks.
     _state: () => {
       const pane = tilePane();
       return {
-        settings: settings(), autoOp: S.autoOp, autoN: S.autoN, pick: pickNow(), active: active(),
+        settings: settings(), autoOp: S.autoOp, autoN: S.autoN, pick: pickNow(), active: active(), lastWrites: S.lastWrites || [],
         canUndo: !!S.undo, saved: savedList().map(v => ({ id: v.id, name: v.name })), hovered: S.hovered,
         attached: !!S.map, filter: pane ? pane.style.filter : null, flat: isFlat(),
       };
