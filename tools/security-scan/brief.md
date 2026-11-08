@@ -352,7 +352,7 @@ Finish with a short summary for the owner:
   --tags origin 'v*'`, fetch it, and compare it with `main`. If `main` is
   ahead with fixes, say the base stations need a new release.
 
-The owner also gets a weekly report on their phone, about two hours after this
-run, from a separate scheduled task ("Flood-Net security report", which prints
-`flood-net-private/security/report.mjs`). It is built from the log, the issues
+The owner also gets a weekly report, about two hours after this run, from a
+separate scheduled task ("Flood-Net security report", which prints
+`flood-net-private/security/report.mjs` in a standing chat). It is built from the log, the issues
 and `coverage.json`, so getting those right matters more than this summary.
