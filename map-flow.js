@@ -246,7 +246,11 @@ const MapFlow = (function () {
     try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return false; }
   }
   // Moving or still: the person's choice, else the device's.
-  function playing(c = cfg()) { return c.playing == null ? !calm() : !!c.playing; }
+  // Presenting (#279) holds the dashes still whatever else is set.
+  function playing(c = cfg()) {
+    if (typeof state !== 'undefined' && state.presenting) return false;
+    return c.playing == null ? !calm() : !!c.playing;
+  }
 
   // The 3-D view and the twin draw the network themselves and cover this one.
   function blocked() {
@@ -916,7 +920,9 @@ const MapFlow = (function () {
         'Backbone — amber, glowing, with pulses running on to the base: the paths every reading crosses'));
     }
     if (!playing(c)) {
-      rows.push(`<span class="legend-item"><span class="small txt-muted">Standing still${c.playing == null && calm()
+      rows.push(typeof state !== 'undefined' && state.presenting
+        ? '<span class="legend-item"><span class="small txt-muted">Standing still while Presenting is on — switch it off in Views, or on the map, to set them moving.</span></span>'
+        : `<span class="legend-item"><span class="small txt-muted">Standing still${c.playing == null && calm()
         ? ', because this device asks for less motion' : ''} — ${term('Play and pause', 'Play')} in Views sets them moving.</span></span>`);
     }
     return rows.join('');

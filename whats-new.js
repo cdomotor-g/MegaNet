@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 238, date: '2026-11-08', items: [
+      '📽️ <strong>Presenting, for a screen shared on a call.</strong> Sharing the Stations map on Teams? Tick '
+        + '<em>Presenting</em> at the top of 🗺️ Layers › Views. The moving dashes stand still, the 3-D view\'s rising '
+        + 'water stops and the 3-D view does less work, so the call has less to send. A chip on the map says it is on '
+        + 'and turns it off.',
+    ] },
     { n: 237, date: '2026-11-08', items: [
       '⛰️ <strong>Repeater areas in 3-D.</strong> With <em>Areas</em> chosen under Which paths, the ⛰️ 3-D view now '
         + 'shows each repeater\'s area in its colour, lying on the hills and valleys, as the flat map does. The digital '

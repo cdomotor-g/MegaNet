@@ -2885,7 +2885,11 @@ const Map3D = (function () {
   function reducedMotion() {
     try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) { return false; }
   }
-  function waterAnimating() { return water.anim == null ? !reducedMotion() : water.anim; }
+  // Presenting (#279): the water stands still on a shared screen.
+  function waterAnimating() {
+    if (typeof state !== 'undefined' && state.presenting) return false;
+    return water.anim == null ? !reducedMotion() : water.anim;
+  }
 
   // The twin's cycle: the rise, the hold at the top and the drain, in seconds.
   function waterClockOpts() {
@@ -3464,6 +3468,9 @@ const Map3D = (function () {
       // A map nobody is looking at must not keep a GPU busy. MapLibre only
       // repaints on demand anyway; this stops the one case where it would not.
       refreshExpiredTiles: false,
+      // Presenting (#279): one pixel per screen pixel — a quarter of the work
+      // on a high-density screen, and nothing a shared screen loses.
+      ...(typeof state !== 'undefined' && state.presenting ? { pixelRatio: 1 } : {}),
       // ~50 tiles of base plus the DEM behind them. The default is unbounded in
       // practice, and this map is opened over a network that spans a state.
       maxTileCacheSize: 120,
@@ -4379,6 +4386,12 @@ const Map3D = (function () {
     cadastreChanged() { syncCadastre(); },
     // From MapPolar: the 2-D plot was painted or cleared (#188).
     polarChanged() { syncPolar(); },
+    // From MapViews: Presenting went on or off (#279).
+    presentingChanged() {
+      if (!map) return;
+      try { if (typeof map.setPixelRatio === 'function') map.setPixelRatio(state.presenting ? 1 : (window.devicePixelRatio || 1)); } catch (_) { /* the next open takes it */ }
+      if (state.presenting) stopWater(); else playWater();
+    },
     // From MapPaths: a build, perhaps with new areas (or none): redrawn only
     // when the areas themselves changed (their gen), or are gone.
     areasChanged() {

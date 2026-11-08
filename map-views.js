@@ -170,6 +170,9 @@ const MapViews = (function () {
     'Auto-contrast': 'Sets how strong the lines are from how much of the screen they cover: many lines on screen and each is '
       + 'drawn fainter, a few and they are drawn stronger — between 12 % and 90 %. Worked out again whenever the map stops '
       + 'moving. Your own Link opacity is kept for when you turn it off.',
+    Presenting: 'For a screen shared on a call (Teams and the like), where everything that moves on the screen costs the '
+      + 'call: Flow\u2019s dashes stand still, the 3-D view\u2019s rising water stops, and the 3-D view is drawn at one pixel per '
+      + 'screen pixel. Remembered on this device until you switch it off.',
     Balance: 'Which comes forward, the map underneath or the network on it. Toward Network the base map turns grey and darker '
       + '(up to 85 % grey) and the lines get up to half as strong again; toward Photo the map keeps its colours and the lines '
       + 'fade, to under half at the end.',
@@ -1168,6 +1171,8 @@ const MapViews = (function () {
     if (!S.map) return;
     C();
     applyTileFilter();
+    presentChip();
+    if (typeof document !== 'undefined') document.documentElement.toggleAttribute('data-presenting', presenting());
     if (typeof S.map.on === 'function') S.map.on('moveend zoomend resize', onMove);
     try {
       if (!S.mq && window.matchMedia) {
@@ -1253,6 +1258,57 @@ const MapViews = (function () {
   // Play/Pause: the opposite of what the dashes are doing when it is pressed,
   // not of what they were doing when the button was drawn — the device's
   // reduced-motion setting can change in between.
+  // ── Presenting (#279) ─────────────────────────────────────────────────────
+  // A switch pressed by hand, for a screen shared on a call: what moves on
+  // the map is held still and the 3-D view does less, until it is switched
+  // off. Kept in state.presenting (core.js) and under mn-presenting; the
+  // modules that move things read it (map-flow.js, map-3d.js), and this file
+  // tells them when it changes, marks the page and puts a chip on the map.
+  const presenting = () => !!(typeof state !== 'undefined' && state.presenting);
+  function presentHtml() {
+    return `<label class="filter-check mv-check mv-present" for="mv-present"
+        title="${esc(WORDS.Presenting)}">
+        <input type="checkbox" id="mv-present" ${presenting() ? 'checked' : ''}
+          onchange="MapViews.setPresenting(this.checked)">
+        <span>📽️ ${termHtml('Presenting', WORDS.Presenting)} — sharing this screen on a call</span>
+      </label>`;
+  }
+  function presentChip() {
+    const map = S.map;
+    const box = map && typeof map.getContainer === 'function' ? map.getContainer() : null;
+    if (!box) return;
+    let chip = box.querySelector('.mv-present-chip');
+    if (!presenting()) { if (chip) chip.remove(); return; }
+    if (!chip) {
+      chip = document.createElement('div');
+      chip.className = 'mv-present-chip';
+      chip.setAttribute('role', 'status');
+      chip.innerHTML = `<span>📽️ Presenting: the map holds still</span>
+        <button type="button" class="mv-present-off" onclick="MapViews.setPresenting(false)"
+          title="Switch Presenting off: the dashes and the 3-D water move again">Turn off</button>`;
+      // Clicks on the chip are its own, not the map's.
+      if (typeof L !== 'undefined' && L.DomEvent) { L.DomEvent.disableClickPropagation(chip); L.DomEvent.disableScrollPropagation(chip); }
+      box.appendChild(chip);
+    }
+  }
+  function setPresenting(on) {
+    const v = !!on;
+    if (typeof state === 'undefined') return;
+    state.presenting = v;
+    try { localStorage.setItem('mn-presenting', v ? 'on' : 'off'); } catch (_) {}
+    if (typeof document !== 'undefined') document.documentElement.toggleAttribute('data-presenting', v);
+    const F = modFlow();
+    if (has(F, 'sync')) safely(() => F.sync(), 'MapFlow.sync');
+    if (typeof Map3D !== 'undefined' && typeof Map3D.presentingChanged === 'function') safely(() => Map3D.presentingChanged(), 'Map3D.presentingChanged');
+    presentChip();
+    rerender();
+    if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
+    if (typeof announce === 'function') {
+      announce(v ? 'Presenting is on: the dashes and the 3-D water hold still, and the 3-D view does less.'
+        : 'Presenting is off: the map moves as it did.');
+    }
+  }
+
   function togglePlay() {
     return set({ flow: { playing: !playingNow(C()) } });
   }
@@ -1525,8 +1581,9 @@ const MapViews = (function () {
         id: 'mv-under', label: flowTerm('Lines underneath'), value: c.flow.under, min: 0, max: 1, step: 0.05, key: 'flow.under',
         read: pct(c.flow.under), aria: 'How strong the lines under the dashes are',
         valuetext: `${Math.round(c.flow.under * 100)} per cent` })}
-      ${mode !== 'live' ? `<button type="button" class="mv-play" id="mv-play"
-          onclick="MapViews.togglePlay()">${playing ? 'Pause the dashes' : 'Play the dashes'}</button>` : ''}
+      ${mode !== 'live' ? (presenting() ? `<p class="filter-note mv-play-held" id="mv-play">Held still while
+          ${termHtml('Presenting', WORDS.Presenting)} is on.</p>` : `<button type="button" class="mv-play" id="mv-play"
+          onclick="MapViews.togglePlay()">${playing ? 'Pause the dashes' : 'Play the dashes'}</button>`) : ''}
       ${mode === 'turns' ? `<p class="filter-note mv-turn" id="mv-turn">${turnHtml()}</p>` : ''}
       ${mode === 'live' ? '<p class="filter-note">A pulse runs as each reading comes in, so the first may take a minute or two to show.</p>' : ''}
     </div>`;
@@ -1687,6 +1744,7 @@ const MapViews = (function () {
     const act = active();
     return `
     <div class="map-display-h">Views</div>
+    ${presentHtml()}
     ${chipsHtml(act)}
     ${nowHtml()}
     ${moreHtml(c)}
@@ -1808,7 +1866,7 @@ const MapViews = (function () {
   return {
     attach, detach, html, bind, rerender, settings, set, lineOpacity, fullOpacity, restyle, afterBuild, autoValue,
     hover, hovered, cardChanged, apply, undo, save, remove, active, snapshot, saved, legendHtml, opacityNoteHtml,
-    togglePlay, fold,
+    togglePlay, fold, setPresenting, presenting,
     VIEWS, WORDS, GROUPS,
     // What is in force, for the checks.
     _state: () => {

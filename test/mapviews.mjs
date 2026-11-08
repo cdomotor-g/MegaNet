@@ -791,6 +791,22 @@ try {
   const land = await page.evaluate(() => ({ pace: MapFlow._state().pace, dashes: MapFlow._state().last.dashes }));
   check('Flow stops its frames where there is nothing to draw, and starts them again where there is',
     flowFirst === 'run' && sea.dashes === 0 && sea.pace !== 'run' && land.dashes > 0 && land.pace === 'run', J({ flowFirst, sea, land }));
+
+  // Presenting (#279): the switch at the top of Views holds the dashes still,
+  // marks the page, puts a chip on the map and is remembered; the chip's own
+  // button turns it off and the dashes move again.
+  await press('#mv-present', 700);
+  const pres = await page.evaluate(() => ({ on: state.presenting, stored: localStorage.getItem('mn-presenting'),
+    attr: document.documentElement.hasAttribute('data-presenting'), chip: !!document.querySelector('#leaflet-map .mv-present-chip'),
+    playing: MapFlow._state().playing, pace: MapFlow._state().pace, held: !!document.querySelector('#mv-play.mv-play-held') || !document.getElementById('mv-play') }));
+  check('Presenting on: the dashes held still, the page marked, a chip on the map, remembered on the device',
+    pres.on && pres.stored === 'on' && pres.attr && pres.chip && !pres.playing && pres.pace !== 'run', J(pres));
+  await page.click('#leaflet-map .mv-present-off');
+  await settle(700);
+  const presOff = await page.evaluate(() => ({ on: state.presenting, stored: localStorage.getItem('mn-presenting'),
+    chip: !!document.querySelector('#leaflet-map .mv-present-chip'), playing: MapFlow._state().playing, pace: MapFlow._state().pace }));
+  check('…and the chip\'s Turn off puts it all back: the dashes moving, no chip',
+    !presOff.on && presOff.stored === 'off' && !presOff.chip && presOff.playing && presOff.pace === 'run', J(presOff));
   await press('#mv-draw-lines', 700);
 
   // ── 8. Auto-contrast and Balance ──────────────────────────────────────────

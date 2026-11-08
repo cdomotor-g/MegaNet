@@ -4340,6 +4340,12 @@ const state = {
   mapLinkOpacity: Math.max(0.1, Math.min(1,
                     Number(localStorage.getItem('mn-map-link-opacity')) || 0.25)),
   mapLabelMode:   'auto',  // station name labels: 'auto' (fit the viewport) | 'on' | 'off'
+  // Presenting (#279): a screen shared on a call, where everything that moves
+  // costs the call — Flow's dashes held still, the 3-D water still and the 3-D
+  // view drawn at one pixel per screen pixel. A switch pressed by hand (the
+  // owner's choice: a page cannot see that it is being shared), remembered on
+  // the device; MapViews.setPresenting() sets it.
+  presenting: (() => { try { return localStorage.getItem('mn-presenting') === 'on'; } catch (_) { return false; } })(),
   mapRelated:     true,    // pull pass-range-related repeaters in with the matches
   // Light up watercourses whose name matches the filter box (see MapRivers).
   // The one map display switch that is remembered between visits: it is the only
