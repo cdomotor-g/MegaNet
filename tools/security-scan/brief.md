@@ -282,8 +282,11 @@ and, in its body just under `Plain words:`, a line `Needs from the owner:
 <what to decide or do, in plain words, and exactly what to say or click>` —
 for a migration, `say "fix flood-net-private#N" in a Claude Code session on
 MegaNet`; for a decision, the choice, and that a reply on the issue is enough.
-The weekly report reads that line to the owner, so an issue without it sits
-unseen. Give an older open issue that lacks `Plain words:`, `Needs from the
+The weekly report reads that line to the owner on a phone, without the issue
+open, so an issue without it sits unseen. Write it to stand alone: start with
+a capital, use the issue's real number (edit the body once the issue exists),
+name the choice itself rather than "the plan below", and leave out code,
+flags and file names. Give an older open issue that lacks `Plain words:`, `Needs from the
 owner:` or the label the same treatment.
 
 How to make the fix:
