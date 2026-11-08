@@ -171,7 +171,7 @@ const Methodology = (function () {
           report every frame they hear, good or bad, as a <em>reception</em>: the receiver and stick, the moment it was heard, the
           address and count, the protocol (legacy ALERT or ALERT2), the channel, how strong it was (its level against the stick's
           own full scale, and its ${term('snr', 'SNR')} over the stick's noise floor) and — since RPi ALERT 0.14 for legacy bursts,
-          and 19 October 2026 for ALERT2 — its ${term('carrier', 'carrier offset')}. Receptions are kept 90 days. Other ways in
+          and 19 October 2026 for ALERT2 — its ${term('carrier', 'carrier offset')}. Receptions are kept 30 days, and every one is archived for good. Other ways in
           (the MQTT bridge, a logger at a base reading an ERT-A2, the browser's Serial Monitor, the HTTP ingest) record less:
           usually just the address, count and time.</p>
         <p>Those hearings are also stored as ${term('reading', 'readings')}: one row per address, moment and value. A legacy frame
