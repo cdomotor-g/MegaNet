@@ -2980,6 +2980,59 @@ ok('the renderer was fetched once, not once per press',
 
 await page.evaluate(() => { Map3D.stop(); });
 
+// ── 9d. trees and buildings (#278) ─────────────────────────────────────────
+// Close in, the trees ground-cover.js finds in the canopy heights are drawn up
+// as a crown on a trunk, and the State's buildings from their tiles in R2 up
+// to their roofs; a wide view asks for neither; the switch takes both off and
+// is remembered. The canopy and the tiles are the Worker's (/api/canopy,
+// /api/ground) and this server has neither, so the trees are handed in here
+// and the buildings' meta.json answered by a route.
+console.log('\nTrees and buildings stand on the ground, close in (#278)');
+if (!(await page.evaluate(() => state.map3d))) { await page.evaluate(() => Map3D.toggle()); await tilted3d(); }
+await page.evaluate(() => {
+  const ring = (lng, lat, r) => [[0, 1, 2, 3, 4, 5, 6, 7, 0].map(i => [lng + r * Math.cos(i * Math.PI / 4), lat + r * Math.sin(i * Math.PI / 4)])];
+  window.__realTrees = GroundCover.trees;
+  GroundCover.trees = box => {
+    const c = [(box.west + box.east) / 2, (box.south + box.north) / 2];
+    const feats = [];
+    for (const [dx, h] of [[-0.0004, 12], [0.0004, 20]]) {
+      feats.push({ type: 'Feature', properties: { kind: 'trunk', base: 0, top: 0.35 * h, h }, geometry: { type: 'Polygon', coordinates: ring(c[0] + dx, c[1], 0.00001) } });
+      feats.push({ type: 'Feature', properties: { kind: 'crown', base: 0.3 * h, top: h, h }, geometry: { type: 'Polygon', coordinates: ring(c[0] + dx, c[1], 0.00004) } });
+    }
+    return Promise.resolve({ type: 'FeatureCollection', features: feats, meta: { trees: 2, capped: false } });
+  };
+});
+await page.route(/\/api\/ground\/qld-buildings\/meta\.json/, route => route.fulfill({ status: 200, contentType: 'application/json',
+  body: JSON.stringify({ layer: 'qld-buildings', count: 1, attribution: '© The State of Queensland — generated building outlines (CC BY 4.0)', bounds: [138, -29.2, 153.6, -9.1] }) }));
+await page.route(/\/api\/ground\/qld-buildings\/\d+\/\d+\/\d+\.pbf/, route => route.fulfill({ status: 204, body: '' }));
+await page.evaluate(() => { Map3D.setGround(false); Map3D.setGround(true); });
+await page.evaluate(() => Map3D._map().jumpTo({ zoom: 11 }));
+await page.waitForTimeout(900);
+const groundWide = await page.evaluate(() => Map3D._ground());
+await page.evaluate(() => Map3D._map().jumpTo({ zoom: 15.6 }));
+await page.waitForFunction(() => { const g = Map3D._ground(); return g.trees && g.trees.trees === 2 && g.buildingsLayer; }, null, { timeout: GL_TIMEOUT }).catch(() => {});
+const groundClose = await page.evaluate(() => {
+  const m = Map3D._map(), g = Map3D._ground();
+  const lt = m.getLayer('mn-trees'), lb = m.getLayer('mn-buildings');
+  return { g, treesType: lt && lt.type, bldType: lb && lb.type, bldSource: lb && lb.source,
+           height: JSON.stringify(m.getPaintProperty('mn-trees', 'fill-extrusion-height')),
+           bldHeight: JSON.stringify(m.getPaintProperty('mn-buildings', 'fill-extrusion-height')),
+           tiles: (m.getSource('mn-bld-qld') || {}).tiles };
+});
+ok('a wide view asks for no trees', groundWide.on && (!groundWide.trees || groundWide.trees.trees == null), JSON.stringify(groundWide));
+ok('close in: the trees drawn up from the ground, a crown on a trunk, as tall as found',
+   groundClose.g.trees && groundClose.g.trees.trees === 2 && groundClose.treesType === 'fill-extrusion' && groundClose.height === '["get","top"]', JSON.stringify(groundClose));
+ok('…and the buildings from their tiles in R2, up to their roofs',
+   groundClose.bldType === 'fill-extrusion' && groundClose.bldSource === 'mn-bld-qld' && groundClose.bldHeight === '["get","h"]'
+     && Array.isArray(groundClose.tiles) && /\/api\/ground\/qld-buildings\/\{z\}\/\{x\}\/\{y\}\.pbf$/.test(groundClose.tiles[0]), JSON.stringify(groundClose));
+await page.evaluate(() => Map3D.setGround(false));
+const groundOff = await page.evaluate(() => ({ g: Map3D._ground(), stored: localStorage.getItem('mn-3d-ground'),
+  note: (document.getElementById('map-3d-note') || {}).textContent || '' }));
+ok('the switch takes both off, and is remembered off', !groundOff.g.treesLayer && !groundOff.g.buildingsLayer && groundOff.stored === 'off', JSON.stringify(groundOff));
+await page.evaluate(() => { GroundCover.trees = window.__realTrees; Map3D.setGround(true); });
+await page.unroute(/\/api\/ground\/qld-buildings\/meta\.json/);
+await page.unroute(/\/api\/ground\/qld-buildings\/\d+\/\d+\/\d+\.pbf/);
+
 // ── 10. from a page opened as a file (#190) ─────────────────────────────────
 // file:// is a supported way to run this app (README.md in this folder says
 // why it is not the way to *test* it), and it is the one place MapLibre 6 does

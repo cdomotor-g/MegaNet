@@ -267,6 +267,10 @@ const Map3D = (function () {
   let elevKey  = null;   // the tile template the drape is currently built on
   let polarGen = null;   // which of MapPolar's paints is draped (#188), or null
   let areasKey = null;   // which picture of Views' repeater areas is draped, or null
+  let groundGen = 0;     // the trees asked for last; an older answer is dropped
+  let groundTimer = null;
+  let groundMeta;        // the buildings tiles' meta.json: undefined unknown, null not built
+  let groundTrees = null; // what the last trees answer said ({ trees, capped, … }) for the note
   let areasTimer = null; // a redraw of it, waiting for the camera to settle
   let cadKeys  = {};     // cadastre layer id → the tile template it is built on (syncCadastre)
   let cadGen   = 0;      // bumped per syncCadastre, so a template resolved late is dropped
@@ -2832,6 +2836,100 @@ const Map3D = (function () {
     areasTimer = setTimeout(() => { areasTimer = null; syncAreas(false); }, 200);
   }
 
+  // ── Trees and buildings (EPIC #276, #278) ──────────────────────────────
+  // What stands round a station, stood on the relief when the view is close:
+  // - **buildings** from the State's LiDAR-drawn outlines (Queensland, where
+  //   surveyed), kept for us as zoom-14 vector tiles in R2 and served by
+  //   /api/ground (worker/ground.js; built by tools/ground/qld-buildings.mjs),
+  //   drawn up to each outline's measured roof height above the ground;
+  // - **trees** from Meta and WRI's canopy heights, read through /api/canopy
+  //   (worker/canopy.js) by ground-cover.js, which finds each tree top and
+  //   hands back a trunk and a crown to draw up from the ground.
+  // Both are MapLibre fill-extrusions, so they stand on the terrain and hide
+  // behind hills. Only close in: buildings from MapLibre zoom 14 (their tiles'
+  // own), trees from 14.5, within 1.5 km of the centre, so a wide view asks
+  // for nothing. Under the pins and What is here, over the draped ground.
+  // docs/ground-cover-sources.md says where each comes from and how old it is.
+  const GROUND_BLD_Z = 14;
+  const GROUND_TREES_Z = 14.5;
+  const GROUND_BOX_M = 1500;
+  const GROUND_COLOURS = { building: '#d9d1c3', crown: '#3f8f45', trunk: '#6b4a2e' };
+  const EMPTY_FC = { type: 'FeatureCollection', features: [] };
+  const groundOn = () => !!state.map3dGround && !drive;
+  const groundBefore = () => (map.getLayer('mn-sites-targets') ? 'mn-sites-targets' : undefined);
+  function dropGround() {
+    if (!map) return;
+    for (const id of ['mn-trees', 'mn-buildings']) if (map.getLayer(id)) map.removeLayer(id);
+    for (const id of ['mn-trees', 'mn-bld-qld']) if (map.getSource(id)) map.removeSource(id);
+    groundTrees = null;
+  }
+  // Whether the buildings' tiles have been built yet, asked once a session.
+  function buildingsMeta() {
+    if (groundMeta !== undefined) return Promise.resolve(groundMeta);
+    return fetch('/api/ground/qld-buildings/meta.json')
+      .then(r => (r.ok ? r.json() : null)).catch(() => null)
+      .then(m => (groundMeta = m && typeof m === 'object' ? m : null));
+  }
+  function syncGround() {
+    if (!map || !ready) return;
+    if (!groundOn()) { groundGen++; dropGround(); setNote(); return; }
+    const gen = ++groundGen;
+    buildingsMeta().then(meta => {
+      if (gen !== groundGen || !map || !ready || !groundOn() || !meta || map.getSource('mn-bld-qld')) return;
+      map.addSource('mn-bld-qld', {
+        type: 'vector', tiles: [`${location.origin}/api/ground/qld-buildings/{z}/{x}/{y}.pbf`],
+        minzoom: 14, maxzoom: 14, attribution: String(meta.attribution || ''),
+        ...(Array.isArray(meta.bounds) && meta.bounds.length === 4 ? { bounds: meta.bounds } : {}),
+      });
+      map.addLayer({ id: 'mn-buildings', type: 'fill-extrusion', source: 'mn-bld-qld', 'source-layer': 'buildings',
+        minzoom: GROUND_BLD_Z,
+        paint: { 'fill-extrusion-color': GROUND_COLOURS.building, 'fill-extrusion-height': ['get', 'h'],
+                 'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.92 } }, groundBefore());
+      setNote();
+    });
+    if (!map.getSource('mn-trees')) {
+      map.addSource('mn-trees', { type: 'geojson', data: EMPTY_FC,
+        attribution: typeof GroundCover !== 'undefined' ? GroundCover.ATTRIBUTION : '' });
+      map.addLayer({ id: 'mn-trees', type: 'fill-extrusion', source: 'mn-trees', minzoom: GROUND_TREES_Z,
+        paint: { 'fill-extrusion-color': ['match', ['get', 'kind'], 'trunk', GROUND_COLOURS.trunk, GROUND_COLOURS.crown],
+                 'fill-extrusion-height': ['get', 'top'], 'fill-extrusion-base': ['get', 'base'],
+                 'fill-extrusion-opacity': 0.95 } }, groundBefore());
+    }
+    const src = map.getSource('mn-trees');
+    if (map.getZoom() < GROUND_TREES_Z || typeof GroundCover === 'undefined' || typeof GroundCover.trees !== 'function') {
+      src.setData(EMPTY_FC);
+      groundTrees = null;
+      setNote();
+      return;
+    }
+    // Round the centre, and never past what is on screen.
+    const c = map.getCenter(), b = map.getBounds();
+    const dLat = GROUND_BOX_M / 111320, dLon = GROUND_BOX_M / (111320 * Math.cos(c.lat * Math.PI / 180));
+    const box = { west: Math.max(b.getWest(), c.lng - dLon), east: Math.min(b.getEast(), c.lng + dLon),
+                  south: Math.max(b.getSouth(), c.lat - dLat), north: Math.min(b.getNorth(), c.lat + dLat) };
+    GroundCover.trees(box).then(fc => {
+      if (gen !== groundGen || !map || !map.getSource('mn-trees')) return;
+      map.getSource('mn-trees').setData(fc);
+      groundTrees = Object.assign({ trees: Math.round((fc.features || []).length / 2) }, fc.meta || {});
+      setNote();
+    }).catch(() => { if (gen === groundGen) { groundTrees = { error: true }; setNote(); } });
+  }
+  function queueGround() {
+    if (groundTimer) clearTimeout(groundTimer);
+    groundTimer = setTimeout(() => { groundTimer = null; syncGround(); }, 350);
+  }
+  function groundNoteHtml() {
+    if (!groundOn()) return '';
+    const n = groundTrees && !groundTrees.error ? Number(groundTrees.trees) || 0 : null;
+    const trees = groundTrees && groundTrees.error ? 'the tree heights could not be read just now'
+      : n == null ? 'trees once you zoom in close'
+      : `${n.toLocaleString()} tree${n === 1 ? '' : 's'} within 1.5 km${groundTrees.capped ? ' (the tallest, where there are more)' : ''}`;
+    const bld = groundMeta ? 'buildings from the State’s LiDAR outlines where Queensland has surveyed'
+      : groundMeta === null ? 'buildings once their tiles are built' : 'buildings close in';
+    return `Trees and buildings: ${trees}; ${bld}. Tree heights are Meta and WRI’s, from satellite photos of
+      2010–2020; building heights are the State’s measured roofs.<br>`;
+  }
+
   // ── The rising water ───────────────────────────────────────────────────
   // Water rising through the heights of the ground in view — from a metre
   // under the lowest, or sea level where the view reaches the sea, to a
@@ -3523,6 +3621,8 @@ const Map3D = (function () {
       syncPolar();
       // …and Views' repeater areas, when Which paths is Areas.
       syncAreas(true);
+      // …and the trees and buildings, close in (#278).
+      syncGround();
       // The finder may have drawn before 3-D was opened, and its pins are DOM
       // markers that the style cannot declare — so they are added here, and
       // the slider's factor is read once the layers it applies to exist.
@@ -3570,6 +3670,7 @@ const Map3D = (function () {
     // view" above).
     map.on('moveend', onCameraEnd);
     map.on('moveend', queueAreas);
+    map.on('moveend', queueGround);
     // ── Clicking a pin (#193) ──────────────────────────────────────────────
     // A pin in 3-D does what a pin in 2-D does, less the one thing this mode
     // has no way to draw. onStationClick() in app.js opens a Leaflet callout
@@ -4204,6 +4305,7 @@ const Map3D = (function () {
     // looks more like an answer than it did as a flat wash, and is exactly as
     // optimistic as it was.
     const P_ = typeof pathPropOf === 'function' ? pathPropOf({}) : { model: 'cover' };
+    const groundNote = groundNoteHtml();
     const areasNote = areasKey === null ? '' : `Each repeater’s area (Views › Which paths › Areas) is draped on the
       ground in its colour; the field stations’ paths are left out, as on the flat map.<br>`;
     const polar = polarGen === null ? '' : `Polar radio coverage is draped on the ground:
@@ -4226,7 +4328,7 @@ const Map3D = (function () {
       Path profile tool’s own geometry — k-factor earth, filed antenna heights,
       no trees. Green clears the 60% Fresnel zone, amber is inside it, red is
       blocked. Indicative, like the profile.`;
-    return `${bits.length ? bits.join(' · ') + '<br>' : ''}${flood}${areasNote}${polar}${caveat}`;
+    return `${bits.length ? bits.join(' · ') + '<br>' : ''}${flood}${groundNote}${areasNote}${polar}${caveat}`;
   }
 
   return {
@@ -4306,6 +4408,23 @@ const Map3D = (function () {
       queueSheets();
       setNote();
       announce(on ? 'Line-of-sight sheets on' : 'Line-of-sight sheets off');
+    },
+
+    // Trees and buildings (#278). On by default and remembered when turned
+    // off, as the water is.
+    setGround(on) {
+      state.map3dGround = !!on;
+      // Switched on again: ask afresh whether the buildings are built.
+      if (on && groundMeta === null) groundMeta = undefined;
+      try { localStorage.setItem('mn-3d-ground', on ? 'on' : 'off'); } catch (_) {}
+      syncGround();
+      setNote();
+      announce(on ? 'Trees and buildings on — drawn when you zoom in close' : 'Trees and buildings off');
+    },
+    // For the check: what the trees and buildings are showing.
+    _ground() {
+      return { on: !!state.map3dGround, trees: groundTrees, meta: groundMeta === undefined ? 'unknown' : !!groundMeta,
+               treesLayer: !!(map && map.getLayer('mn-trees')), buildingsLayer: !!(map && map.getLayer('mn-buildings')) };
     },
 
     // The rising water (see "The rising water"). On by default and remembered
@@ -4638,6 +4757,13 @@ const Map3D = (function () {
                    onchange="Map3D.setWater(this.checked)">
             Rising water
           </label>
+          <label class="filter-check"
+                 title="Trees from Meta and WRI's canopy heights and buildings from the State's LiDAR-drawn outlines, stood on the ground as tall as they are measured — drawn only when you zoom in close, within 1.5 km of the centre. On until turned off, and remembered.">
+            <input type="checkbox" id="map-3d-ground" ${state.map3dGround ? 'checked' : ''}
+                   ${on ? '' : 'disabled'}
+                   onchange="Map3D.setGround(this.checked)">
+            Trees and buildings
+          </label>
           <label class="filter-range${on ? '' : ' is-off'}">
             <span>Vertical exaggeration
               <strong id="map-3d-exag-out" aria-hidden="true">${ex.toFixed(1)}×</strong></span>
@@ -4885,6 +5011,8 @@ const Map3D = (function () {
     elevKey = null;   // the drape goes with the map; the next one builds its own
     polarGen = null;  // and the polar plot's
     areasKey = null;  // and the repeater areas'
+    groundGen++; groundTrees = null;  // and the trees' (the buildings' meta is kept for the session)
+    if (groundTimer) { clearTimeout(groundTimer); groundTimer = null; }
     if (areasTimer) { clearTimeout(areasTimer); areasTimer = null; }
     cadKeys = {};     // and so do the cadastre's
     cadFails = {};

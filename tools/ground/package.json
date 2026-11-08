@@ -1,0 +1,18 @@
+{
+  "name": "floodnet-ground",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Builds Flood-Net's ground-cover tiles for the 3-D view: the State of Queensland's generated building outlines as zoom-14 vector tiles. See docs/ground-cover-sources.md.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "buildings": "node qld-buildings.mjs"
+  },
+  "dependencies": {
+    "geojson-vt": "4.0.2",
+    "vt-pbf": "3.1.3"
+  }
+}

@@ -4507,6 +4507,10 @@ const state = {
   // off, and remembered when it is, for the exaggeration's reason — whether
   // somebody wants it is how they like to read the map, not a thing of now.
   map3dWater:     localStorage.getItem('mn-3d-water') !== 'off',
+  // Trees and buildings in the 3-D view (#278): on until turned off, and
+  // remembered off — drawn only when zoomed in close, so a wide view costs
+  // nothing.
+  map3dGround:    localStorage.getItem('mn-3d-ground') !== 'off',
   // What the link colours mean (#186): 'freq' — the channel the hop runs on
   // (MapFreq, and the default); 'fade' — the fade margin in three bands
   // (MapFade); 'plain' — the one link colour the map drew for its whole life

@@ -760,6 +760,12 @@
        a module only, so it arrives by a dynamic import() from inside
        map-3d.js (#190); the page itself stays classic scripts. -->
   <script src="map-3d.js?v=20261108e"></script>
+  <!-- The trees round a place (#278): Meta and WRI's canopy heights, read a
+       few blocks at a time through /api/canopy/<quadkey>.tif, and a trunk and
+       a crown stood on each tree top for the 3-D views. Beside map-3d.js, which
+       draws them; it only declares and fetches nothing until asked, so its
+       position is free (#154). -->
+  <script src="ground-cover.js?v=20261108e"></script>
   <!-- The digital twin: one station's patch of ground in three dimensions,
        at a scale the 3-D map above does not go to — the State's 1 m LiDAR, the
        aerial imagery, a 2 m pole and a figure for scale, and a camera that can

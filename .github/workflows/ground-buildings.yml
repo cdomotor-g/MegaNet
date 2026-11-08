@@ -1,0 +1,81 @@
+# The State of Queensland's generated building outlines (#278) as zoom-14
+# vector tiles in R2, for the 3-D view. tools/ground/qld-buildings.mjs reads
+# the State's map service, cuts the outlines into tiles and PUTs each one
+# through the Worker's /api/ground/qld-buildings route with the project's
+# secret key; meta.json goes last, so a run that stops part-way never looks
+# finished. docs/ground-cover-sources.md ("Building the Queensland buildings
+# tiles") has the details.
+#
+# By hand only (Actions → Queensland buildings tiles → Run workflow), after the
+# Worker route is deployed and again whenever the State adds survey areas — a
+# few times a year. All of Queensland is about 3.07 million outlines and takes
+# roughly 15–30 minutes. Give a bbox to rebuild one area (meta.json is then
+# left alone); a dry run builds every tile and uploads nothing. Needs the
+# SUPABASE_SECRET_KEY repository secret the archive and photo syncs use.
+
+name: Queensland buildings tiles
+
+on:
+  workflow_dispatch:
+    inputs:
+      bbox:
+        description: 'Only this area: west,south,east,north in degrees, e.g. 151.93,-27.58,151.98,-27.53 (blank for all of Queensland)'
+        type: string
+        required: false
+        default: ''
+      dry_run:
+        description: 'Build the tiles but upload nothing'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ground-buildings
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      BBOX: ${{ inputs.bbox }}
+      DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+    steps:
+      - name: Is the secret key there?
+        id: ready
+        run: |
+          if [ -z "$SUPABASE_SECRET_KEY" ]; then
+            echo "::notice::SUPABASE_SECRET_KEY is not set — no building tiles built or uploaded."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.ready.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.ready.outputs.ready == 'true'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/ground/package-lock.json
+
+      - name: Install
+        if: steps.ready.outputs.ready == 'true'
+        working-directory: tools/ground
+        run: npm ci --omit=dev --ignore-scripts
+
+      # The inputs reach the tool through env, never pasted into the script;
+      # the tool checks the bbox itself.
+      - name: Build and upload the tiles
+        if: steps.ready.outputs.ready == 'true'
+        working-directory: tools/ground
+        run: |
+          args=(--upload)
+          if [ -n "$BBOX" ]; then args+=(--bbox "$BBOX"); fi
+          if [ -n "$DRY_RUN" ]; then args+=(--dry-run); fi
+          node --max-old-space-size=6144 qld-buildings.mjs "${args[@]}"

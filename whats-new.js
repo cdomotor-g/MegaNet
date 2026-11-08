@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 239, date: '2026-11-08', items: [
+      '🌳 <strong>Trees and buildings in 3-D.</strong> Zoom in close in the ⛰️ 3-D view and the trees round you stand '
+        + 'up from the ground, each as tall as Meta and WRI\'s canopy heights say — and in the Queensland towns the '
+        + 'State has surveyed, every building stands to its measured roof height. A switch in the 3-D settings hides '
+        + 'them. The tree heights come from satellite photos of 2010–2020, so newer clearing or growth is not in them.',
+    ] },
     { n: 238, date: '2026-11-08', items: [
       '📽️ <strong>Presenting, for a screen shared on a call.</strong> Sharing the Stations map on Teams? Tick '
         + '<em>Presenting</em> at the top of 🗺️ Layers › Views. The moving dashes stand still, the 3-D view\'s rising '

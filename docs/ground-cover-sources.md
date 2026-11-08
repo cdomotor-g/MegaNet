@@ -472,6 +472,78 @@ server on every move.
 
 `npm run groundcover` (in `test/`) checks both routes.
 
+## Building the Queensland buildings tiles
+
+`tools/ground/qld-buildings.mjs` makes the `qld-buildings` tiles. It is used
+in place of the single PMTiles file suggested above, with the same outlines
+cut into separate tiles, which the route serves.
+
+**What it makes.** One tile for each square of the web map's zoom-14 grid
+(about 2.2 km across in Queensland) that has a building in it. Each tile is a
+vector tile with one layer, `buildings`. Every building in it is the State's
+outline (courtyards stay as holes), numbered with the State's OBJECTID, and
+carries three numbers:
+
+- `h`: how high the roof's highest point stands above the ground at the
+  building's centre (`bsm_max − dtm_centre`), in metres to 0.1 m. Anything
+  under 2 m is drawn as 2 m (about 30,000 outlines). The 762 outlines whose
+  roof came out below the ground are left out. Nothing is cut short: the 35
+  outlines over 150 m are real towers in Brisbane and on the Gold Coast (Q1 is
+  317 m).
+- `e`: the eave height above the same ground (`bsm_edge − dtm_centre`), never
+  more than `h`.
+- `y`: the year the survey was flown.
+
+The map stretches the zoom-14 tiles to draw the closer zooms, and the 3-D view
+draws them from zoom 15 up. A corner lands within about half a metre of the
+State's, because a tile has 4,096 steps across. Last comes `meta.json`: how
+many outlines and tiles, the area they cover, what `h`, `e` and `y` mean, the
+survey years and the credit line. A build that stops part-way leaves the old
+`meta.json` alone.
+
+**How to run it.** From GitHub: Actions → *Queensland buildings tiles* → Run
+workflow. Leave *bbox* empty for all of Queensland. Give
+`west,south,east,north` to rebuild one area, or tick *dry run* to build the
+tiles without uploading any. The run needs the `SUPABASE_SECRET_KEY` secret
+and the route above deployed; it checks the route first and stops if the
+route is not there. Run it again when the State adds survey areas. By hand,
+with Node 22:
+
+```
+cd tools/ground && npm ci
+node qld-buildings.mjs --bbox 151.925,-27.585,151.975,-27.535 --out /tmp/tiles
+SUPABASE_SECRET_KEY=… node qld-buildings.mjs --upload
+```
+
+The tool widens a `--bbox` area to whole tiles, so every tile it uploads is
+complete. It does not upload `meta.json` for a part of the State.
+
+It goes easy on the State's server: no more than three requests at once,
+4,000 outlines to a request, and it waits and tries again when the server is
+busy. It works through Queensland in squares of no more than 100,000 outlines,
+so memory stays under about 1 GB. Tiles on disk are written unpacked. Uploads
+are gzipped, which the route keeps and serves as is, 40% smaller.
+
+**How long and how big.** Measured on 8 November 2026:
+
+| Sample | Outlines | Tiles | Size (gzipped) | Time |
+|---|---|---|---|---|
+| Central Toowoomba, 0.07° square | 35,134 | 9 | 1.3 MB (0.8 MB) | 8 s |
+| Inner Brisbane, 0.18° square | 245,019 | 72 | 9.8 MB (5.9 MB) | 38 s |
+| Five country squares, Tully to the central west | 127,097 | 1,082 | 5.2 MB | 34 s |
+
+Planning all of Queensland takes 27 s: 99 squares and at least 822 requests.
+From these samples, the whole State should take about **15–30 minutes**, or
+longer when the State's server is slow (the workflow allows 5 hours). It
+should make about **125 MB of tiles, about 75 MB gzipped**, roughly 40 bytes
+for each outline. The tile count is the least certain figure: roughly
+**10,000–15,000 tiles**. A city tile holds about 3,500 outlines, a
+country-town tile only 45 to 550, so most of the tiles are in the country. The
+biggest tile is about 230 KB, well under the route's 4 MB limit.
+
+The route cannot delete. If a later build finds a tile empty, the old tile
+stays, which happens only if the State drops every outline in a 2 km square.
+
 ## What needs the owner's say
 
 1. **ODbL's share-alike terms (Overture and OpenStreetMap).** Reading
@@ -518,3 +590,21 @@ server on every move.
   behaviour (Overture's file without a preflight; the deflate blocks in
   Meta's files) — both are standard, but were checked here with command-line
   requests, not in a browser.
+
+## In the 3-D view (#278, 8 Nov 2026)
+
+`map-3d.js` draws both, close in only, behind the 3-D settings' **Trees and
+buildings** switch (on until turned off; `state.map3dGround`, `mn-3d-ground`):
+
+- **Buildings** from MapLibre zoom 14: a vector source on
+  `/api/ground/qld-buildings/{z}/{x}/{y}.pbf` (zoom-14 tiles, over-zoomed),
+  drawn as a fill-extrusion up to each outline's `h`. Added only once
+  `meta.json` says the tiles are built; until then the panel says so.
+- **Trees** from zoom 14.5, within 1.5 km of the centre:
+  `GroundCover.trees(box)` (`ground-cover.js`) reads the canopy through
+  `/api/canopy`, and its trunks and crowns are drawn as a fill-extrusion from
+  each feature's `base` to its `top`. Redrawn when the camera settles.
+- Checked in `npm run map3d` (the switch, both layers, a wide view asking for
+  nothing) and `npm run groundcover` (the routes, and the tree finder on a
+  made-up grid).
+

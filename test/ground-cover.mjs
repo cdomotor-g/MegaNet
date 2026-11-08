@@ -370,6 +370,36 @@ check('ground: nothing else is', BAD_GROUND.every(p => groundTarget(p) === null)
 
 check('the secret key is in no log line', !logged.some(l => l.includes(SECRET)), J(logged.filter(l => l.includes(SECRET))));
 
+// ── ground-cover.js: the tree finder, without a browser (#278) ──────────────
+// The page module, loaded the way a browser would (a script, its global), and
+// its pure parts asked: the zoom-10 squares a box needs, and the trees a small
+// grid of canopy heights holds — one top per crown, as tall as the grid says.
+{
+  const fs = await import('node:fs');
+  const vm = await import('node:vm');
+  const ctx = vm.createContext({ console, Math, Uint8Array, Float32Array, Int32Array, Uint16Array, Uint32Array, Float64Array,
+    DataView, ArrayBuffer, Map, Set, Promise, JSON, Number, Object, Array, Error, RangeError, window: undefined });
+  ctx.window = ctx;
+  vm.runInContext(fs.readFileSync(new URL('../ground-cover.js', import.meta.url), 'utf8') + '\n;globalThis.__GC = GroundCover;', ctx);
+  const GC = ctx.__GC;
+  const qk = GC.quadkeysFor({ west: 153.02, south: -27.48, east: 153.03, north: -27.47 });
+  check('ground-cover.js: a small box over Brisbane needs one zoom-10 square, Meta\'s 3112130013',
+    Array.isArray(qk) && qk.length === 1 && qk[0] === '3112130013', J(qk));
+  // 60 × 60 cells of 1.2 m: two crowns, 12 m and 20 m tall, apart.
+  const w = 60, h = 60, data = new Uint8Array(w * h);
+  const bump = (cx, cy, top, r) => { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const d = Math.hypot(x - cx, y - cy); if (d < r) data[y * w + x] = Math.max(data[y * w + x], Math.round(top * (1 - (d / r) ** 2) + 0.4)); } };
+  bump(15, 20, 12, 5); bump(42, 38, 20, 7);
+  const fc = GC.treesFromGrid({ w, h, data, mpp: 1.2, box: { west: 152.0, south: -27.0006, east: 152.00073, north: -27.0 } });
+  const crowns = (fc.features || []).filter(f => f.properties.kind === 'crown').map(f => f.properties.h).sort((x, y) => x - y);
+  const trunks = (fc.features || []).filter(f => f.properties.kind === 'trunk').length;
+  check('…and two crowns in a grid of canopy heights are two trees, each with its trunk, 12 m and 20 m tall',
+    crowns.length === 2 && trunks === 2 && crowns[0] === 12 && crowns[1] === 20, J({ crowns, trunks, meta: fc.meta }));
+  check('…every tree a crown above its trunk, both closed rings',
+    (fc.features || []).every(f => f.properties.top > f.properties.base && f.geometry.type === 'Polygon'
+      && J(f.geometry.coordinates[0][0]) === J(f.geometry.coordinates[0][f.geometry.coordinates[0].length - 1])), '');
+}
+
 // ── Report ────────────────────────────────────────────────────────────────────
 const failed = results.filter(r => !r.ok);
 for (const r of results) console.log(`${r.ok ? '  ✓' : '  ✗'} ${r.what}${r.ok || !r.detail ? '' : ` — ${String(r.detail).slice(0, 300)}`}`);
