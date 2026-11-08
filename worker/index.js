@@ -87,6 +87,17 @@
 // passphrase, the files in the PHOTOS bucket under _meganet/sort/. Not part of
 // the agent API. worker/sort.js, docs/sort-store.md.
 //
+// A thirteenth: /api/canopy/<quadkey>.tif, how tall the trees are for the 3-D
+// view and the twin (#278) — Meta and WRI's canopy height files passed through
+// from their S3 bucket, which refuses cross-site reads: public, read-only, one
+// fixed folder, a 10-digit quadkey and a single byte range the only caller
+// input. worker/canopy.js, docs/ground-cover-sources.md.
+//
+// A fourteenth: /api/ground/*, map tiles of what stands on the ground (the
+// State's LiDAR building outlines first), kept in the PHOTOS bucket under
+// _ground/ — read by anybody, written by the build tool with the project's
+// secret key only. worker/ground.js, docs/ground-cover-sources.md.
+//
 // And one that is not a door at all: scheduled() below, every minute
 // (wrangler.toml's [triggers]), sends the administrators' notifications —
 // worker/push.js, db/migrations/0066_push_notifications.sql — and every
@@ -103,6 +114,8 @@ import { isDrivePath, handleDrive } from './drive.js';
 import { isNotifyPath, handleNotify, notifyDue, runNotify } from './notify.js';
 import { isRainAheadPath, handleRainAhead } from './rain-ahead.js';
 import { isSortPath, handleSort } from './sort.js';
+import { isCanopyPath, handleCanopy } from './canopy.js';
+import { isGroundPath, handleGround } from './ground.js';
 import { runPush } from './push.js';
 
 export { BriefingLedger } from './briefing.js';
@@ -602,6 +615,14 @@ export default {
     // SoRT's forum sessions (worker/sort.js): whoever has the forum passphrase,
     // a few files of JSON, each save conditional on the version last read.
     if (isSortPath(url.pathname)) return handleSort(request, env, ctx);
+
+    // The canopy heights (worker/canopy.js): anybody, GET and HEAD only, Meta's
+    // one folder, nothing of the caller's passed on but a single byte range.
+    if (isCanopyPath(url.pathname)) return handleCanopy(request, env, ctx);
+
+    // Ground-cover map tiles in R2 (worker/ground.js): read by anybody, an
+    // empty tile a 204; written with the project's secret key only.
+    if (isGroundPath(url.pathname)) return handleGround(request, env);
 
     // Everything else is a static asset, and assets are served before this runs.
     // A request that gets here for any other path is a path that does not exist.

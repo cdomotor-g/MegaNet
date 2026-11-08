@@ -429,6 +429,49 @@ guessed, the way the app already says when ground is guessed.
 - *Buildings (elsewhere): © OpenStreetMap contributors, Overture Maps
   Foundation (ODbL).*
 
+## How the app reaches them
+
+Two routes on Flood-Net's own Worker, both on `floodwarning.net`, so a Bureau
+machine needs no new hostname allowed.
+
+**Tree heights — `/api/canopy/<quadkey>.tif`** (`worker/canopy.js`). A
+pass-through to Meta's files: the route asks Meta's bucket for the same file,
+`…/forests/v2/global/dinov3_global_chm_v2_ml3/chm/<quadkey>.tif`, and hands the
+answer back with the cross-site header Meta's bucket leaves off.
+
+- The *quadkey* is the file's name: the zoom-10 map square it covers, written
+  as exactly 10 digits, each 0 to 3. Anything else is refused (400) before
+  Meta is asked.
+- A reader asks for just the bytes it needs with a **Range** header — one
+  range, written `bytes=<first>-<last>`. That header is the only thing of the
+  caller's passed on; any other kind of range is refused (400).
+- It reads and never writes: GET and HEAD only, one fixed folder on one host,
+  nothing stored. What Meta says comes back as it said it — the bytes (200,
+  or 206 for a range), *no file there* (404: open sea), or *past the end of
+  the file* (416). Anything else from Meta is a 502 that says what Meta said.
+- The files never change, so a browser may keep what it was given for a week.
+
+**Building outlines — `/api/ground/<layer>/<z>/<x>/<y>.pbf`** (`worker/ground.js`).
+Map tiles cut once from the State's outlines and kept in the R2 bucket the
+field photos use (`meganet-photos`, under `_ground/`), so the 3-D view reads
+them the way it reads its other map layers instead of querying the State's
+server on every move.
+
+- The *layer* is one of a short list — for now only `qld-buildings`; *z*, *x*
+  and *y* are the tile's zoom and place on the map, as every web map numbers
+  them (zoom 0 to 18).
+- Anybody may read a tile. A tile that holds nothing (most of the State has
+  no buildings in it) answers **204 No Content**, which the map draws as an
+  empty tile without counting it an error.
+- `/api/ground/<layer>/meta.json` says what the build tool made — when, from
+  which survey, at which zooms. It answers 404 until the layer has been built.
+- Only the build tool writes, with the project's secret key — the same check
+  the data archive uses for its writes; an editor's sign-in is not enough. A
+  write replaces what was there, because the layer is rebuilt whole when the
+  State adds survey areas. A tile may be at most 4 MB and `meta.json` 1 MB.
+
+`npm run groundcover` (in `test/`) checks both routes.
+
 ## What needs the owner's say
 
 1. **ODbL's share-alike terms (Overture and OpenStreetMap).** Reading

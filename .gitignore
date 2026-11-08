@@ -37,3 +37,4 @@ __pycache__/
 /archive/QLD All Site Inspections.xlsx
 /data/inspections/
 /tools/ingest/inspection_extract_sample.json
+tools/ground/node_modules/

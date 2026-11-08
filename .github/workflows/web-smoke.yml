@@ -1965,6 +1965,17 @@ jobs:
         working-directory: test
         run: npm run archivestore
 
+      # And the two doors for the trees and buildings in the 3-D view (#278):
+      # /api/canopy (worker/canopy.js), Meta's canopy heights passed through —
+      # one fixed folder, nothing of the caller's but a single byte range — and
+      # /api/ground (worker/ground.js), building tiles in R2, an empty tile a
+      # 204, written with the secret key only. Offline: Meta's bucket, R2 and
+      # the project are stand-ins.
+      - name: Canopy pass-through asks one folder; ground tiles written with the secret key only
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run groundcover
+
       # And /api/briefing (worker/briefing.js): Station Health's Ask Claude on
       # Flood-Net's own Anthropic key, the one server-side door that spends
       # money. Who may (Access and the database's word that this is an editor
