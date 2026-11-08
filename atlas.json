@@ -30,7 +30,7 @@
   "status": {
     "phase": "live",
     "updated": "2026-11-08",
-    "summary": "Live and in daily use (database schema 106): this week added teams and the tasks handed to them, with the SoRT scope builder's hand-off, a driving mode that follows a station's route in 3-D, the agent API's changelog and email list, ACMA licences and radio paths in the API, the Repeaters tab and cuts to database I/O, while account email, compute size and the ACMA download link wait on the owner.",
+    "summary": "Live and in daily use (database schema 106): this week added teams and the tasks handed to them, with the SoRT scope builder's hand-off, a driving mode that follows a station's route in 3-D, the agent API's changelog and email list, ACMA licences and radio paths in the API, the Repeaters tab and cuts to database I/O, while account email and the ACMA download link wait on the owner.",
     "now": [
       "Views on the Stations map (map-views.js): one press sets the map for a job — Overview and Site visit for everyone; Radio paths, Weak links, Backbone and Live traffic for instrument technicians; Rivers & catchments and Rainfall for flood forecasters; Property & easements and Land & tenure for property services — with the radio paths drawn as every path, best path only, bundled into trunks or repeater areas, as lines, flowing dashes or tails with a spotlight, auto-contrast and a Balance slider, saved views of your own, and easements and land tenure on the property boundaries",
       "The station card in groups (station-card-view.js): Overview, then a tab each for Flood, Radio, Site and Kit (Tabs, the first), or a summary with each group a page of its own (List, chosen beside the box and kept per device), Field data, Zoom, Directions and All actions along the foot, and a search box that shows only the groups and rows holding a word, marked",
@@ -161,32 +161,6 @@
             "model": "Sonnet5/Low",
             "pros": "the owner's sitting covers only what is left",
             "cons": "clears nothing by itself"
-          }
-        ]
-      },
-      {
-        "id": "compute-size",
-        "what": "#255 move the database off Nano (0.5 GB) to Small (2 GB) — the owner chose Small on 2026-11-08; the change itself is on Supabase's dashboard",
-        "on": "computer",
-        "kind": "access",
-        "since": "2026-10-28",
-        "issue": "#255",
-        "holds": [
-          "headroom on Supabase's Disk IO budget (warned 2026-10-28 and again 2026-11-08; base stations' posts time out when it runs out)"
-        ],
-        "options": [
-          {
-            "what": "#255 Part 2: on Compute and Disk choose Small in a quiet dry-weather hour (under 2 min offline), then check the Message Log shows new readings; an agent then does Part 3",
-            "by": "computer",
-            "effort": "10 min",
-            "pros": "today's 1.46 GB database fits in memory; with receptions kept 30 days (0108) it stays that way",
-            "cons": "about US$5 a month more than Micro, already agreed",
-            "recommended": true
-          },
-          {
-            "what": "The owner does Part 2 themselves in the dashboard",
-            "by": "human",
-            "effort": "10 min"
           }
         ]
       },
