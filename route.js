@@ -9,7 +9,7 @@
 //
 // — and, on the Stations map, how it is drawn and what is picked out:
 //
-//   …&view=radio&focus=toowoomba_rpt
+//   …&view=radio&focus=toowoomba_rpt&3d=62,135
 //
 // so a view can be bookmarked, sent to somebody and reloaded, and the
 // browser's back and forward buttons move between tabs and stations instead
@@ -72,7 +72,8 @@
 // `view` is how the Stations map is drawn: a built-in view's name while one is
 // in force (`view=radio`), else Views' short code for the whole mix — the
 // switches, the pins, the base maps and the drawing (map-views.js,
-// shareCode). `focus` is the repeater picked out on the map. Neither is a
+// shareCode). `focus` is the repeater picked out on the map, and `3d` the
+// ⛰️ 3-D view's tilt and turn while it is up (Map3D.camera). None is a
 // step: they follow the map in place, as the view does. A link that carries
 // them applies them once, when the stations have arrived (afterLoad) — the
 // view first, as pressing it would, with Put the map back to undo it; back
@@ -128,6 +129,14 @@ const Route = (() => {
     if (Math.abs(lat) > 90 || Math.abs(lng) > 180 || z < 0 || z > 24) return null;
     return { lat, lng, z };
   }
+  // "62,135" → { pitch, bearing }: the ⛰️ 3-D view's tilt and turn, whole
+  // degrees, or null for anything else.
+  function parse3d(v) {
+    const m = /^(\d{1,2}),(\d{1,3})$/.exec(String(v || ''));
+    if (!m) return null;
+    const pitch = Number(m[1]), bearing = Number(m[2]);
+    return pitch <= 85 && bearing < 360 ? { pitch, bearing } : null;
+  }
   // Five decimals is about a metre, which is all a view needs.
   const fmtMap = m => `${m.lat.toFixed(5)},${m.lng.toFixed(5)},${+m.z.toFixed(2)}`;
   // Commas left as commas: `map=-27.5,152.3,13` reads as a place, and the
@@ -146,10 +155,11 @@ const Route = (() => {
       map: parseMap(q.get('map')),
       view: q.get('view') || null,
       focus: q.get('focus') || null,
+      d3: parse3d(q.get('3d')),
       // Whether the address names anything of ours at all, sound or not: a
       // link that does — even to a tab that has since gone — is a link, and
       // not a first visit.
-      named: q.has('tab') || q.has('station') || q.has('map') || q.has('view') || q.has('focus'),
+      named: q.has('tab') || q.has('station') || q.has('map') || q.has('view') || q.has('focus') || q.has('3d'),
     };
   }
 
@@ -174,6 +184,11 @@ const Route = (() => {
     try { return MapViews.shareCode() || null; } catch (_) { return null; }
   }
   const focusNow = () => (state.mapFocusRepeaterId != null ? String(state.mapFocusRepeaterId) : null);
+  // The ⛰️ 3-D view's camera, while it is up.
+  function cam3d() {
+    if (typeof Map3D === 'undefined' || typeof Map3D.camera !== 'function') return null;
+    try { return Map3D.camera(); } catch (_) { return null; }
+  }
 
   // The address for where the app is now — or for `over`, where it names
   // something else (a link to a station from its card). Parameters this file
@@ -194,13 +209,15 @@ const Route = (() => {
       const focus = over.focus !== undefined ? over.focus : ((pending && pending.focus) || focusNow());
       if (view) mine.push('view=' + enc(view));
       if (focus) mine.push('focus=' + enc(focus));
+      const d3 = over.d3 !== undefined ? over.d3 : ((pending && pending.d3) || cam3d());
+      if (d3) mine.push(`3d=${d3.pitch},${d3.bearing}`);
     }
     if (tab === 'health') {
       const station = over.station !== undefined ? over.station : healthStation();
       if (station) mine.push('station=' + enc(station));
     }
     const theirs = (location.search || '').replace(/^\?/, '').split('&')
-      .filter(p => p && !/^(tab|station|map|view|focus)(=|$)/.test(p));
+      .filter(p => p && !/^(tab|station|map|view|focus|3d)(=|$)/.test(p));
     const query = mine.concat(theirs).join('&');
     // A Workbench case in the fragment takes the app to the Workbench on a
     // reload (Workbench.restoreFromUrl), over whatever tab the query names —
@@ -336,6 +353,11 @@ const Route = (() => {
     } finally {
       applying--;
     }
+    // …and the ⛰️ 3-D view, tilted and turned as the sender had it — last,
+    // over the 2-D view just set, which it opens on.
+    if (want.d3 && typeof Map3D !== 'undefined' && typeof Map3D.openAt === 'function') {
+      Map3D.openAt(want.d3).catch(() => {});
+    }
     // A link to a station the list does not carry (deleted, renamed, a typo)
     // opens the map without it, and says so.
     if (want.station && !s) announce(`The station in this link (${want.station}) is not in the station list`);
@@ -369,7 +391,7 @@ const Route = (() => {
     started = true;
     const want = read();
     let tab = want.tab;
-    if (!tab && (want.station || want.map || want.view || want.focus)) tab = 'stations';
+    if (!tab && (want.station || want.map || want.view || want.focus || want.d3)) tab = 'stations';
     // A Workbench case shared without a tab (every link made before this file)
     // is a link to the Workbench.
     if (!tab && /^#wb/.test(location.hash || '')) tab = 'workbench';
@@ -398,8 +420,9 @@ const Route = (() => {
       if (nav && nav.type) how = nav.type;
     } catch (_) { /* no timing to ask: a link */ }
     const view = how === 'navigate' ? want.view : null;
-    if (state.activeTab === 'stations' && (want.station || want.map || view || want.focus)) {
-      pending = { station: want.station, map: want.map, view, focus: want.focus };
+    const d3 = how === 'navigate' ? want.d3 : null;
+    if (state.activeTab === 'stations' && (want.station || want.map || view || want.focus || d3)) {
+      pending = { station: want.station, map: want.map, view, focus: want.focus, d3 };
     }
     // Station Health holds a named station itself, until its week is in.
     if (state.activeTab === 'health' && want.station) healthWant(want.station);

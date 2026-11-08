@@ -30,6 +30,10 @@ const WhatsNew = (() => {
         + 'the station standing on it, as the ⛰️ 3-D view has: tree heights from Meta and WRI\'s satellite canopy map, the '
         + 'State\'s laser-measured buildings where Queensland has surveyed, and Overture Maps\' everywhere else. A switch in '
         + 'the twin\'s Scene settings hides them, and the 3-D model you can download carries them too.',
+      '⛰️ <strong>Links open the 3-D view too.</strong> A link from 🔗 Share made while the 3-D view is up opens it the '
+        + 'same way for whoever you send it to, tilted and turned as you had it.',
+      '👆 <strong>Tap the land.</strong> On a phone or tablet, tap the land in the property views for the same label a '
+        + 'resting mouse gets.',
       '🏡 <strong>What land is under the mouse.</strong> In <em>Property &amp; easements</em> and <em>Land &amp; tenure</em>, '
         + 'rest the mouse on the land: a label gives the lot on plan, its area and tenure, the easement under it and the '
         + 'street address — or, with the tenure colours on, who holds that kind of land and what it is used for.',

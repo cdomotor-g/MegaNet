@@ -305,6 +305,7 @@ const Map3D = (function () {
   let lfQuiet  = false;  // this file is moving one map to match the other
   let lfZoom   = null;   // the 2-D map's zoom as this file last left it
   let drive    = null;   // { gesture } while a drive has the camera (see "Driving")
+  let routeTimer = null; // the address told of a camera that has stopped (routeSyncSoon)
   let puck     = null;   // the car, an arrow lying on the ground (ml.Marker), while driving
   let tags     = new Map(); // station id → the ml.Marker naming it, while driving
   let driveEase = false; // the drive's first frame eases in from wherever the camera was
@@ -3990,6 +3991,8 @@ const Map3D = (function () {
     // The 2-D map under the canvas goes where the camera stopped (see "One
     // view" above).
     map.on('moveend', onCameraEnd);
+    // A tilt or a turn moves no 2-D view, so the address is told itself.
+    map.on('moveend', routeSyncSoon);
     map.on('moveend', queueAreas);
     map.on('moveend', queueGround);
     // ── Clicking a pin (#193) ──────────────────────────────────────────────
@@ -4709,6 +4712,21 @@ const Map3D = (function () {
 
     // The ⛰️ corner button, and the panel's own switch.
     toggle() { return state.map3d ? (close(), Promise.resolve(false)) : open(); },
+    // The camera's tilt and turn while this view is up, whole degrees, for the
+    // address (route.js) — and a link's way back to it: open, then tilt and
+    // turn as the sender had it.
+    camera() {
+      if (!state.map3d || !map) return null;
+      return { pitch: Math.round(map.getPitch()), bearing: Math.round(((map.getBearing() % 360) + 360) % 360) % 360 };
+    },
+    openAt(cam) {
+      const go = () => {
+        if (!map || !cam) return;
+        try { map.jumpTo({ pitch: Math.max(0, Math.min(85, Number(cam.pitch) || 0)), bearing: Number(cam.bearing) || 0 }); } catch (_) {}
+      };
+      if (state.map3d) { go(); return Promise.resolve(true); }
+      return open().then(ok => { if (ok) go(); return ok; });
+    },
 
     // refreshMapLayers has rebuilt every line and pin, so the mirror is stale.
     // Cheap when 3-D is shut, which is almost always: two early returns.
@@ -5252,6 +5270,18 @@ const Map3D = (function () {
     try { MapViews.afterBuild(); } catch (e) { console.error('Map3D: Views', e); }
   }
 
+  // The address carries the camera's tilt and turn while this view is up
+  // (route.js, `3d`), so a link opens it the same way (the owner, 8 Nov 2026).
+  function routeSync() {
+    if (typeof Route !== 'undefined' && typeof Route.sync === 'function') { try { Route.sync(); } catch (_) {} }
+  }
+  // …once the camera has stopped, and not while a drive moves it every frame:
+  // a browser stops taking address changes made many times a second.
+  function routeSyncSoon() {
+    clearTimeout(routeTimer);
+    routeTimer = setTimeout(() => { routeTimer = null; if (!drive) routeSync(); }, 400);
+  }
+
   function open() {
     if (state.map3d || !leaflet) return Promise.resolve(false);
     host = makeHost();
@@ -5275,6 +5305,7 @@ const Map3D = (function () {
       if (typeof SiteFeatures !== 'undefined' && SiteFeatures.refresh) SiteFeatures.refresh();
       viewsFlatChanged();
       announce(`3-D view on. ${viewMoveWords(coarse())} ${viewKeyWords()}`);
+      routeSync();
       return true;
     }).catch(() => {
       host.classList.remove('is-loading');
@@ -5371,6 +5402,7 @@ const Map3D = (function () {
       state.map3d = false;
       repaintPanel();
       announce('3-D view off');
+      routeSync();
       // …and the site features back to the flat map's floor.
       if (typeof SiteFeatures !== 'undefined' && SiteFeatures.refresh) SiteFeatures.refresh();
       // Leaflet's handlers are back as they were when 3-D opened; Draw &

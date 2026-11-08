@@ -49,9 +49,10 @@
 //
 // ── Pointer conventions ──────────────────────────────────────────────────────
 // Delegated from the map's own mousemove, as the road reserve's name is
-// (map-roads.js): the picture takes no pointer. Mouse and pen only — a finger
-// has What is here. Nothing while a draw tool, a link pick or What is here owns
-// the pointer, while the map moves, or outside Queensland.
+// (map-roads.js): the picture takes no pointer. A mouse or a pen rests on the
+// land; a finger taps it (onTap), and the tip stays until the next tap or the
+// map moves. Nothing while a draw tool, a link pick or What is here owns the
+// pointer, while the map moves, or outside Queensland.
 const MapPropTip = (function () {
   const PAUSE_MS = 280;       // the pointer rests this long before the State is asked
   const TIMEOUT_MS = 12000;
@@ -347,10 +348,17 @@ const MapPropTip = (function () {
     show(ll, content(lot, ll, w));
   }
 
+  // A finger, lately: the last press on the map and when. The browser follows
+  // a tap with made-up mouse moves, which are not somebody resting a mouse.
+  let press = { type: '', at: 0 };
+  const onPress = ev => { press = { type: ev.pointerType || '', at: Date.now() }; };
+  const fingerLately = () => press.type === 'touch' && Date.now() - press.at < 1200;
+
   function onMove(e) {
     if (!map || moveRaf) return;
     const ev = e && e.originalEvent;
     if (ev && ev.pointerType && ev.pointerType === 'touch') return;
+    if (fingerLately()) return;
     const ll = e.latlng;
     moveRaf = requestAnimationFrame(() => {
       moveRaf = null;
@@ -365,6 +373,23 @@ const MapPropTip = (function () {
       timer = setTimeout(() => { timer = null; if (lastLL === ll) askHere(ll); }, PAUSE_MS);
     });
   }
+  // A tap on the land, with a finger (the owner, 8 Nov 2026: yes to "a tap on
+  // empty land shows it"). A tap on a station pin never reaches the map; one
+  // on a survey mark or a bridge opens that one's own callout, and the tip
+  // stands aside for it. The tip stays until the next tap or the map moves.
+  function onTap(e) {
+    if (!map || !fingerLately()) return;
+    const ll = e.latlng;
+    setTimeout(() => {
+      if (!map || (map._popup && map.hasLayer(map._popup))) return;
+      const w = drawn();
+      if (!w || busy() || !inQld(ll)) { hide(); return; }
+      clearTimeout(timer); timer = null;
+      lastLL = ll;
+      if (lotAt(ll)) refresh(); else askHere(ll);
+    }, 0);
+  }
+
   function onOut() {
     lastLL = null;
     clearTimeout(timer); timer = null;
@@ -378,12 +403,16 @@ const MapPropTip = (function () {
       if (map) this.detach();
       map = m;
       m.on('mousemove', onMove);
+      m.on('click', onTap);
       m.on('mouseout movestart zoomstart', onOut);
+      m.getContainer().addEventListener('pointerdown', onPress, true);
     },
     detach() {
       if (!map) return;
       map.off('mousemove', onMove);
+      map.off('click', onTap);
       map.off('mouseout movestart zoomstart', onOut);
+      map.getContainer().removeEventListener('pointerdown', onPress, true);
       onOut();
       map = null;
     },

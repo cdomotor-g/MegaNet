@@ -69,7 +69,9 @@ pin roles, the link colouring, each base map top first with its opacity (0
 off), and the drawing: which paths, drawn as, Flow's motion, speed %, Lines
 underneath %, tail and spotlight px, spotlight follows, backbone in full,
 auto-contrast, Balance. With it, `focus=` names the repeater picked out, beside
-`station=` and `map=` (route.js). A link opened — followed, typed, pasted —
+`station=` and `map=`, and `3d=62,135` the ⛰️ 3-D view's tilt and turn while it
+is up (route.js, `Map3D.camera`); a link opened with it opens the 3-D view so
+(`Map3D.openAt`). A link opened — followed, typed, pasted —
 applies them once the stations have arrived, the view as pressing one does:
 a note says the link set the map, and ↶ Put the map back undoes it
 (`MapViews.applyShared`). A reload, or back and forward, keeps the device's
@@ -295,7 +297,7 @@ The legend's Overlay layers section keys both while they are drawn.
 
 **What land is under the pointer** (since 8 Nov 2026, `map-property-tip.js`).
 While the lot lines, easements or tenure are drawn, resting the mouse on the
-land for a moment puts up a hover name, stacked with the road reserve's and the
+land for a moment — or tapping it with a finger — puts up a hover name, stacked with the road reserve's and the
 survey mark's (`map-tip-stack.js`), asked of the same cadastre as What is here
 through `SiteLand.parts`:
 
@@ -310,10 +312,11 @@ through `SiteLand.parts`:
 A road reserve is left to the road layer's own name when that is on. Never who
 owns a lot (the State does not publish it). The lot comes back with its
 outline, so moving about inside it asks nothing more; its easements come in one
-question a lot, its address in one, and the land use in one an area. Mouse and
-pen only — a finger has What is here — and nothing while the map moves, a tool
+question a lot, its address in one, and the land use in one an area. A tap
+keeps its label until the next tap or the map moves, and stands aside for a
+survey mark's or a bridge's own callout. Nothing while the map moves, a tool
 owns the pointer, the 3-D view is up, or outside Queensland. `npm run mapviews`
-§13 checks it on made-up State answers.
+§13 checks it on made-up State answers, by mouse and by tap.
 
 ---
 

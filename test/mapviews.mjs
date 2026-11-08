@@ -66,6 +66,9 @@
 //      State answers, nothing more asked inside the same lot; with Land &
 //      tenure the tenure first, who holds it and the land use; zoomed out,
 //      no tip.
+//  14. **The 3-D view in a link** (WebGL2 only): its tilt and turn in the
+//      address while it is up, gone when it is put away, and a link opened
+//      elsewhere opens it at the same tilt and turn.
 //  11. **Flow for everybody**: a Classic page that has never chosen draws
 //      Flow; Lines kept at version 2 under Classic is read as the old default,
 //      under any other look as a choice; `?draw=lines` draws lines for that
@@ -1328,6 +1331,79 @@ try {
     const far = await hover(0.03, 0.03, 900);
     check('zoomed out past where the property lines are drawn, no tip', !far.shown && far.text === '', J(far));
     await ctx.close();
+
+    // A finger: a tap on the land puts the same label up, and it stays.
+    const tctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, hasTouch: true });
+    const tp = await tctx.newPage();
+    await applyNetworkPolicy(tp, server.origin);
+    tp.on('pageerror', e => errors.push(`§13 touch: ${e.message}`));
+    await tp.route(/LandParcelPropertyFramework\/MapServer\/4\/query\?/, route => {
+      const q = new URL(route.request().url()).searchParams;
+      if (q.get('geometryType') === 'esriGeometryPoint') return json(route, { features: [LOT] });
+      if (/Easement/.test(q.get('where') || '')) return json(route, { features: [EASE] });
+      return json(route, { features: [] });
+    });
+    await tp.route(/LandParcelPropertyFramework\/MapServer\/0\/query\?/, route => json(route, { features: [{ attributes: { address: '12 Example Road, Gatton' } }] }));
+    await tp.goto(server.url('/index.html?tab=stations'), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+    await tp.waitForFunction(() => typeof state !== 'undefined' && !!state.data && !!state.map
+      && state.mapMarkers.length > 1000, null, { timeout: LOAD_TIMEOUT });
+    await tp.evaluate(() => MapViews.apply('property'));
+    await tp.evaluate(c => { state.map.setView([c.lat, c.lng], 15, { animate: false }); }, C);
+    await tp.waitForTimeout(1200);
+    const tapAt = await tp.evaluate(c => {
+      const p = state.map.latLngToContainerPoint([c.lat + 0.0004, c.lng - 0.0012]);
+      const r = state.map.getContainer().getBoundingClientRect();
+      return { x: r.left + p.x, y: r.top + p.y };
+    }, C);
+    await tp.touchscreen.tap(tapAt.x, tapAt.y);
+    await tp.waitForTimeout(1500);
+    const tapped = await tp.evaluate(() => MapPropTip._state());
+    check('a tap on the land puts the same label up, and it stays there',
+      tapped.shown && /Lot 3 on RP12345/.test(tapped.text) && /Address: 12 Example Road, Gatton/.test(tapped.text), J(tapped));
+    await tctx.close();
+  }
+
+  // ── 14. The 3-D view in a link ───────────────────────────────────────────
+  section('14. The 3-D view, tilted and turned, in a link');
+  const gl2b = await (async () => {
+    const c = await browser.newContext(); const p = await c.newPage();
+    const ok = await p.evaluate(() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch (_) { return false; } });
+    await c.close(); return ok;
+  })();
+  if (!gl2b) {
+    console.log('  SKIP — this browser has no WebGL2, so the 3-D view cannot be opened here.');
+  } else {
+    const ctxA = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const a = await ctxA.newPage();
+    await applyNetworkPolicy(a, server.origin);
+    a.on('pageerror', e => errors.push(`§14 A: ${e.message}`));
+    const ready = async pg => pg.waitForFunction(() => typeof state !== 'undefined' && !!state.data && !!state.map
+      && state.mapMarkers.length > 1000, null, { timeout: LOAD_TIMEOUT });
+    await a.goto(server.url('/index.html?tab=stations'), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+    await ready(a);
+    await a.evaluate(() => { Map3D.setWater(false); return Map3D.toggle(); });
+    await a.waitForFunction(() => !!Map3D._map(), null, { timeout: GL_TIMEOUT });
+    await a.evaluate(() => { Map3D._map().jumpTo({ pitch: 45, bearing: 120 }); });
+    await a.waitForTimeout(1200);
+    const sent = await a.evaluate(() => ({ d3: new URLSearchParams(location.search).get('3d'), url: Route.here() }));
+    check('with the 3-D view up, the address carries its tilt and turn', sent.d3 === '45,120', J(sent));
+    await a.evaluate(() => Map3D.toggle());
+    await a.waitForTimeout(600);
+    const flat = await a.evaluate(() => new URLSearchParams(location.search).get('3d'));
+    check('…and drops them when it is put away', flat === null, J({ flat }));
+    await ctxA.close();
+    const ctxB = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const b = await ctxB.newPage();
+    await applyNetworkPolicy(b, server.origin);
+    b.on('pageerror', e => errors.push(`§14 B: ${e.message}`));
+    await b.goto(sent.url, { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+    await ready(b);
+    await b.waitForFunction(() => state.map3d && !!Map3D.camera() && Map3D.camera().bearing === 120, null, { timeout: GL_TIMEOUT })
+      .catch(() => {});
+    const got = await b.evaluate(() => ({ on: !!state.map3d, cam: Map3D.camera() }));
+    check('opened on another device, the link opens the 3-D view at the same tilt and turn',
+      got.on && got.cam && got.cam.pitch === 45 && got.cam.bearing === 120, J(got));
+    await ctxB.close();
   }
 } finally {
   await browser.close();
