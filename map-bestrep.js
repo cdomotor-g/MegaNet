@@ -70,8 +70,11 @@
 //
 // ── What it is not ───────────────────────────────────────────────────────────
 // ~30 m terrain and omnidirectional antennas, the model the fade margin layer
-// runs and nothing measured on the day. Frequencies are not matched, as the
-// map does not match them: each row says what its repeater listens on. And a
+// runs and nothing measured on the day. A hop on along the backbone is taken
+// only where the next station listens on a channel the one before it sends on
+// (channelTo, map-backbone.js), as the map's backbone is; the station's own
+// first hop is not checked — a field station's channel is never on record —
+// and each row says what its repeater listens on. And a
 // repeater a station is moved to still has to be given the address — the row
 // says how much room its windows have, and hands over to the ALERT IDs tab's
 // Allocate card.
@@ -368,6 +371,15 @@ const MapBestRepeater = (function () {
   // Every route from one repeater to a base, as station ids, the repeater
   // first and the base last: a level at a time, at most MAX_REPEATERS
   // repeaters, and one past the fewest that reach a base.
+  // A hop no channel joins: the receiver is on record as listening on none of
+  // the channels the sender is on record as transmitting on (map-backbone.js
+  // channelTo, the rule the map's backbone runs on). Nothing passes that way,
+  // whatever the pass ranges say; where either has no channel on record it
+  // is not ruled out.
+  function offAir(from, to) {
+    return typeof channelTo === 'function' && !!from && !!to && channelTo(from.s, to.s) === 'off';
+  }
+
   function routesFrom(T, start, carried) {
     if (start.isBase) return { routes: [[start.id]], capped: false };
     const out = [];
@@ -375,6 +387,7 @@ const MapBestRepeater = (function () {
     const toBases = q => {
       const last = T.nodes.get(q.path[q.path.length - 1]);
       for (const { node: b } of nearOf(T, last).bases) {
+        if (offAir(last, b)) continue;
         if (out.length >= ROUTE_CAP) { capped = true; return false; }
         out.push(q.path.concat(b.id));
         if (fewest == null) fewest = q.path.length;
@@ -389,8 +402,9 @@ const MapBestRepeater = (function () {
       const next = [];
       for (const q of level) {
         if (!deeper(q)) continue;
-        for (const { node: r } of nearOf(T, T.nodes.get(q.path[q.path.length - 1])).reps) {
-          if (q.path.includes(r.id)) continue;
+        const from = T.nodes.get(q.path[q.path.length - 1]);
+        for (const { node: r } of nearOf(T, from).reps) {
+          if (q.path.includes(r.id) || offAir(from, r)) continue;
           const c2 = takenBy(q.carried, r);
           if (!c2.length) continue;
           const c = { path: q.path.concat(r.id), carried: c2 };
@@ -947,7 +961,8 @@ const MapBestRepeater = (function () {
   }
 
   const CAVEAT = 'Indicative. ~30 m terrain and omnidirectional antennas, the fade margin layer\'s model, and nothing '
-    + 'measured on the day. Frequencies are not matched — each repeater says what it listens on. Open a path in the '
+    + 'measured on the day. A hop on toward a base is taken only where the next station listens on the channel the one before '
+    + 'sends on; each repeater says what it listens on. Open a path in the '
     + 'elevation profile card, and look at the site, before a station is moved to a repeater.';
 
   function render() {

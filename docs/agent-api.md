@@ -933,8 +933,13 @@ longer holds, and why. It takes no parameters.
   same station twice, and from each first repeater the routes through the fewest
   repeaters that reach a base and through one more. On the network of November
   2026, 975 stations reach a base through one repeater, 44 through two, 11
-  through three and 3 through four. Frequencies are not matched, as the map
-  does not match them; each hop says the one its figure was worked out at.
+  through three and 3 through four.
+- **On the channel:** a hop on is taken only where the next repeater or base
+  station listens on a channel the station before it transmits on — its
+  repeater pair or any of its recorded frequencies — as the map's backbone is.
+  Where either end has no channel on record, the hop is not ruled out. A field
+  station's own first hop is not checked: its channel is never recorded. Each
+  hop says the frequency its figure was worked out at.
 
 What it answers:
 
@@ -1583,6 +1588,18 @@ at [`GET /api/v1/changelog`](#get-apiv1changelog), newest first — both from
 in the same push. A change with nothing to notice (a fix inside, a faster
 answer) is not listed.
 
+- **9 November 2026 — Radio paths now take a hop on only where the next
+  station listens on the channel.** `/radio-path` (the `get_radio_path` tool,
+  and the dossier's `radio_path`) takes a hop on toward a base station only
+  where the next repeater or base station listens on a channel the station
+  before it transmits on — its repeater pair or any of its recorded
+  frequencies. Until now the channels were not checked, so a route could pass
+  through two repeaters that cannot hear each other. A hop is still taken where
+  either end has no channel on record, and a field station's own first hop is
+  not checked. Some routes, `routes_found` counts and `bases_reachable` lists
+  are shorter, and a repeater whose only ways on were off-channel now says no
+  base is within reach. No field, route or tool changed; the first of its `notes`
+  says the new rule.
 - **5 November 2026 — Repeaters and base stations are now modelled with a 4 m
   antenna, not a 10 m mast.** Every fade margin into or out of a repeater or
   base station is worked out with its antenna 4 m above the ground, the height

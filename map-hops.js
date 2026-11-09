@@ -83,8 +83,9 @@
 // A record of one reading's way. The relay week says a repeater carried the
 // station's readings, not which ones or to whom; the copies say which base
 // station heard which last transmitter, not the hops before it; and an assumed
-// hop is the register's opinion. Frequencies are not matched, as the map does
-// not match them.
+// hop is the register's opinion. A hop on along the backbone is taken only
+// where the next station listens on a channel the one before it sends on
+// (map-backbone.js channelTo), as the map's backbone is.
 
 const MapHops = (function () {
   // Over the network's links (400), their arrowheads (405) and 🎯's lines
@@ -260,12 +261,23 @@ const MapHops = (function () {
   // Every route from one first hop to a base, as station ids, the first hop
   // first and the base last: a level at a time, at most MAX_REPEATERS
   // repeaters, and none longer than the fewest that reach a base.
+  // A hop no channel joins: the receiver is on record as listening on none of
+  // the channels the sender is on record as transmitting on (map-backbone.js
+  // channelTo, the rule the map's backbone runs on). Nothing passes that way,
+  // whatever the pass ranges say; where either has no channel on record it
+  // is not ruled out.
+  function offAir(from, to) {
+    return typeof channelTo === 'function' && !!from && !!to && channelTo(from.s, to.s) === 'off';
+  }
+
   function routesFrom(T, start, carried) {
     if (start.isBase) return [[start.id]];
     const out = [];
     let fewest = null;
     const toBases = q => {
-      for (const { node: b } of nearOf(T, T.nodes.get(q.path[q.path.length - 1])).bases) {
+      const last = T.nodes.get(q.path[q.path.length - 1]);
+      for (const { node: b } of nearOf(T, last).bases) {
+        if (offAir(last, b)) continue;
         if (out.length >= ROUTE_CAP) return false;
         out.push(q.path.concat(b.id));
         if (fewest == null) fewest = q.path.length;
@@ -280,8 +292,9 @@ const MapHops = (function () {
       const next = [];
       for (const q of level) {
         if (!deeper(q)) continue;
-        for (const { node: r } of nearOf(T, T.nodes.get(q.path[q.path.length - 1])).reps) {
-          if (q.path.includes(r.id)) continue;
+        const from = T.nodes.get(q.path[q.path.length - 1]);
+        for (const { node: r } of nearOf(T, from).reps) {
+          if (q.path.includes(r.id) || offAir(from, r)) continue;
           const c2 = takenBy(q.carried, r);
           if (!c2.length) continue;
           const c = { path: q.path.concat(r.id), carried: c2 };

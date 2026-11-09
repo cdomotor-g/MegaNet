@@ -33,8 +33,16 @@
 // the first included — delay-plan.js's maxHops, the delay plan's own idea of
 // how far a reading is passed on — and from each first repeater the walk goes
 // one repeater past the fewest that reach a base (walkRoutes says why).
-// Frequencies are not matched, because the map does not match them; each hop
-// says the one its figure was worked out at.
+//
+// And a hop on is taken only on a channel: the next repeater or base station
+// listens on one the station before it transmits on — its repeater pair or a
+// row of its frequencies (channelTo; map-backbone.js's rule, which the map's
+// backbone runs on). Where either has none on record, nothing rules the hop
+// out. The first hop from a field station is not checked: a field station's
+// own channel is never on record. Each hop says the frequency its figure was
+// worked out at. (The owner, 9 Nov 2026: "If two stations are not on the same
+// frequency, then they can't be passing each other whether or not they're in
+// the pass ranges.")
 //
 // ── The figures: what map-fade.js saved, and whether it still holds ─────────
 // meganet.link_fade_margin (0025) keeps one row per pair of stations, worked
@@ -114,6 +122,21 @@ export function openWindows(ranges) {
   return spans;
 }
 
+// Channels within this of each other are one channel: frequencies.js's
+// figure, and map-backbone.js's — channels here are 12.5 kHz apart.
+export const SAME_MHZ = 0.002;
+
+// Can `to` hear what `from` sends? 'on' where it listens on a channel `from`
+// transmits on, 'off' where both are on record and none matches — no hop
+// that way — and 'unknown' where either has none on record. map-backbone.js
+// channelTo, the same rule over the same channels; test/agent-api.mjs holds
+// the two together.
+export function channelTo(from, to) {
+  const t = (from && from.tx) || [], r = (to && to.rx) || [];
+  if (!t.length || !r.length) return 'unknown';
+  return t.some(f => r.some(g => Math.abs(f - g) < SAME_MHZ)) ? 'on' : 'off';
+}
+
 export const covers = (node, a) => !!node && node.windows.some(([lo, hi]) => lo <= a && a <= hi);
 export const windowsOverlap = (a, b) => a.windows.some(([alo, ahi]) => b.windows.some(([blo, bhi]) => Math.max(alo, blo) <= Math.min(ahi, bhi)));
 
@@ -146,6 +169,17 @@ export function stationNode(r, repeaterRec) {
       ...(Array.isArray(rep.exclusions) ? rep.exclusions : []).map(p => ({ kind: 'exclusion', lo: num(p.low), hi: num(p.high) })),
     ];
   }
+  // Every channel on record, the repeater pair first: a topology row's
+  // station_frequency embed, or a station document's frequencies.
+  const rows = Array.isArray(r.station_frequency) ? r.station_frequency : Array.isArray(r.frequencies) ? r.frequencies : [];
+  const chans = key => {
+    const out = [];
+    for (const v of [rep ? rep[key] : null, ...rows.map(f => (f ? f[key] : null))]) {
+      const f = num(v);
+      if (f != null && f > 0 && !out.some(x => Math.abs(x - f) < SAME_MHZ)) out.push(f);
+    }
+    return out;
+  };
   return {
     id: r.id,
     name: r.name || r.id,
@@ -157,6 +191,8 @@ export function stationNode(r, repeaterRec) {
     rm_system_id: r.rm_system_id ?? null,
     rx_mhz: rep ? num(rep.rx_mhz) : null,
     tx_mhz: rep ? num(rep.tx_mhz) : null,
+    rx: chans('rx_mhz'),
+    tx: chans('tx_mhz'),
     // The app's repeaterList: the role and a repeater record both.
     isRepeater: roles.includes('repeater') && !!rep,
     isBase: roles.includes('base'),
@@ -248,8 +284,9 @@ export function walkRoutes(topo, starts, { linkKm = BACKBONE_KM, maxRepeaters = 
   // The routes on from a partial route to every base in reach. A base is
   // never on a partial route (it ends one), so cannot be on this one already.
   // false once the cap is reached.
-  const toBases = (q, nb) => {
+  const toBases = (q, nb, from) => {
     for (const { node: b } of nb.bases) {
+      if (channelTo(from, b) === 'off') continue;
       if (routes.length >= cap) return false;
       const path = q.path.concat(b.id);
       if (!take(path)) { truncated = true; continue; }
@@ -266,19 +303,20 @@ export function walkRoutes(topo, starts, { linkKm = BACKBONE_KM, maxRepeaters = 
     // A first repeater that is a base station too is where the route ends.
     if (s.node.isBase) { routes.push({ start: s.node.id, path: [s.node.id] }); continue; }
     const q = { start: s.node.id, path: [s.node.id], carried: s.carried || s.node.windows };
-    if (!toBases(q, nearOf(topo, s.node, linkKm))) return { routes, nodes, truncated: true };
+    if (!toBases(q, nearOf(topo, s.node, linkKm), s.node)) return { routes, nodes, truncated: true };
     level.push(q);
   }
   while (level.length) {
     const next = [];
     for (const q of level) {
       if (!deeper(q)) continue;
-      for (const { node: r } of nearOf(topo, topo.nodes.get(q.path[q.path.length - 1]), linkKm).repeaters) {
-        if (q.path.includes(r.id)) continue;
+      const from = topo.nodes.get(q.path[q.path.length - 1]);
+      for (const { node: r } of nearOf(topo, from, linkKm).repeaters) {
+        if (q.path.includes(r.id) || channelTo(from, r) === 'off') continue;
         const carried = takenBy(q.carried, r);
         if (!carried.length) continue;
         const c = { start: q.start, path: q.path.concat(r.id), carried };
-        if (!toBases(c, nearOf(topo, r, linkKm))) return { routes, nodes, truncated: true };
+        if (!toBases(c, nearOf(topo, r, linkKm), r)) return { routes, nodes, truncated: true };
         if (deeper(c)) {
           if (next.length >= levelCap) { truncated = true; continue; }
           next.push(c);

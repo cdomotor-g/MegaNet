@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 250, date: '2026-11-09', items: [
+      '📻 <strong>Routes to a base check the channel too.</strong> 🎯 Best repeater and 🪜 Hops to base now go on from a '
+        + 'repeater only to a repeater or base station that listens on a channel it sends on, as the map\'s backbone links do. '
+        + 'Where a channel is not on record, the hop is still taken. The same rule now holds for scripts and AI agents using '
+        + 'Flood-Net\'s data service.',
+    ] },
     { n: 249, date: '2026-11-09', items: [
       '📈 <strong>Fade margins for proposed sites.</strong> Open a path to a place 🗼 Repeater sites, 🚚 Relocate station or '
         + '🎯 Best repeater has proposed (a picture under its table, a ↗, or <em>Profile the worst path</em>) and the elevation '

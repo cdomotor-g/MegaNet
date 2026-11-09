@@ -1293,6 +1293,46 @@ check('the radio path fixtures exist in stations.json', RP_FIELD && RP_FIRST && 
   check('…while a repeater\'s own walk takes any repeater whose windows overlap what it relays',
     JSON.stringify(own) === JSON.stringify(['s>base1', 's>r1>base1', 's>r2>base1', 's>r4>base1']), JSON.stringify(own));
   check('…and stops at its cap, saying so', rp.walkRoutes(net, [{ node: net.nodes.get('s'), carried: null }], { cap: 1 }).truncated === true);
+  // On the channel (the owner, 9 Nov 2026): a hop on only where the next
+  // station listens on one the station before it sends on; none on record
+  // rules nothing out. s sends on 151.500; r2 listens on 152.400 and so is
+  // not taken; r1 listens on 151.500; the base has no channel on record.
+  const chNet = rp.buildTopology([]);
+  for (const [id, x] of net.nodes) chNet.nodes.set(id, { ...x });
+  Object.assign(chNet.nodes.get('s'), { tx: [151.5], rx: [151.5] });
+  Object.assign(chNet.nodes.get('r1'), { tx: [151.5], rx: [151.5] });
+  Object.assign(chNet.nodes.get('r2'), { tx: [152.4], rx: [152.4] });
+  chNet.repeaters = [...chNet.nodes.values()].filter(x => x.isRepeater && !x.isBase);
+  chNet.bases = [...chNet.nodes.values()].filter(x => x.isBase);
+  const chPaths = rp.walkRoutes(chNet, [{ node: chNet.nodes.get('s'), carried: [[1500, 1500]] }], { beyond: 1 }).routes.map(x => x.path.join('>')).sort();
+  check('the walk takes a hop on only where the next station listens on a channel the one before sends on',
+    JSON.stringify(chPaths) === JSON.stringify(['s>base1', 's>r1>base1']), JSON.stringify(chPaths));
+  Object.assign(chNet.nodes.get('base1'), { rx: [152.4] });
+  chNet.near = new Map();
+  const offBase = rp.walkRoutes(chNet, [{ node: chNet.nodes.get('s'), carried: [[1500, 1500]] }], { beyond: 1 }).routes.length;
+  check('…and to a base only on a channel the base is on record as listening on', offBase === 0, String(offBase));
+  // The same rule as the app's: map-backbone.js channelTo, run here over every
+  // repeater and base pair in the document, on the same channels.
+  let chApp = null;
+  try {
+    const bb = appSource('map-backbone.js');
+    chApp = vm.createContext({});
+    vm.runInContext([`const BB_SAME_MHZ = ${scalarOf(bb, 'BB_SAME_MHZ', 'map-backbone.js')};`,
+      sourceOf(bb, 'stationChannels', 'map-backbone.js'), sourceOf(bb, 'channelTo', 'map-backbone.js')].join('\n'), chApp);
+  } catch (err) { chApp = { error: err.message }; }
+  const hubs = (DOC.stations || []).filter(x => Array.isArray(x.roles) && (x.roles.includes('repeater') || x.roles.includes('base')));
+  let pairsN = 0, differ = [];
+  if (chApp && typeof chApp.channelTo === 'function') {
+    for (const x of hubs) for (const y of hubs) {
+      if (x === y) continue;
+      pairsN++;
+      const w = rp.channelTo(rp.stationNode(x, x.repeater), rp.stationNode(y, y.repeater)), app = chApp.channelTo(x, y);
+      if (w !== app) differ.push(`${x.id}>${y.id}: ${w} vs ${app}`);
+    }
+  }
+  check('the Worker\'s channel rule is the app\'s (map-backbone.js channelTo), on every repeater and base pair',
+    chApp && typeof chApp.channelTo === 'function' && pairsN > 0 && !differ.length && rp.SAME_MHZ === Number(scalarOf(appSource('map-backbone.js'), 'BB_SAME_MHZ', 'map-backbone.js')),
+    JSON.stringify({ error: chApp && chApp.error, pairsN, differ: differ.slice(0, 5) }));
   T.link_fade_margin.length = 1;   // leave RICH's row only, as the rest of the checks expect
 }
 

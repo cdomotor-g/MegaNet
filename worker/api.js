@@ -1850,8 +1850,10 @@ async function acmaSection(rc, st, relayP) {
 // the stations the routes touch (one read), the radio systems (a vocabulary)
 // and the station's attenuator tests (two reads).
 
+// station_frequency: every channel each one is on record on, beside its
+// repeater pair — what a hop on is checked against (radio-path.js channelTo).
 const RADIO_TOPOLOGY_SELECT = 'id,name,station_number,lat,lon,elevation_ahd,roles,rm_system_id,'
-  + 'repeater(rx_mhz,tx_mhz,pass_range(kind,lo,hi))';
+  + 'repeater(rx_mhz,tx_mhz,pass_range(kind,lo,hi)),station_frequency(rx_mhz,tx_mhz)';
 const LINK_FADE_SELECT = 'station_a_id,station_b_id,kind,margin_db,margin_ab_db,margin_ba_db,distance_km,freq_mhz,verdict,'
   + 'signature,model,good_db,ok_db,band,computed_at';
 
@@ -1932,7 +1934,8 @@ const RADIO_RULES_NOTE = 'Routes follow the Stations map\'s own rules. A field s
   + `path — or any base station within ${BACKBONE_KM} km, where the route ends. A repeater's own routes start at itself and go on to `
   + 'repeaters whose pass-range windows take some of what it relays; every repeater after the first must take some of what the one '
   + `before passed on. From each first repeater, routes through the fewest repeaters that reach a base and through ${LIMITS.radioBeyondShortest} `
-  + `more, at most ${MAX_REPEATERS} repeaters a route and never the same station twice; frequencies are not matched, as the map does not match them.`;
+  + `more, at most ${MAX_REPEATERS} repeaters a route and never the same station twice; a hop on is taken only where the next station `
+  + 'listens on a channel the one before it transmits on (or either has none on record), as the map\'s backbone is.';
 const RADIO_FIGURE_NOTE = 'A hop\'s figure is the fade margin the Stations map worked out for that pair of stations (Longley–Rice over '
   + 'sampled terrain) and an editor saved: margin_db the way the traffic runs (from → to), margin_back_db the other way, band '
   + 'margin_db against the thresholds saved with it (good at thresholds_db.good or more, ok at thresholds_db.ok or more, else bad), '

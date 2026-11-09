@@ -2,6 +2,16 @@
   "about": "Every change to Flood-Net's agent API (https://floodwarning.net/api/v1 and https://floodwarning.net/api/mcp) that someone using it would notice — a route, a field, a limit, a tool — newest first. Each entry is emailed once to everyone on the API notify list (sign up at https://floodwarning.net/api#notify). Served as JSON at https://floodwarning.net/api/v1/changelog and written up in docs/agent-api.md, under Changes. Add an entry in the same push as the change: it is what tells people.",
   "entries": [
     {
+      "id": "2026-11-09-radio-path-channels",
+      "date": "2026-11-09",
+      "title": "Radio paths now take a hop on only where the next station listens on the channel",
+      "summary": "GET /api/v1/stations/{id}/radio-path (the get_radio_path tool, and the dossier's radio_path) now takes a hop on toward a base station only where the next repeater or base station listens on a channel the station before it transmits on — its repeater pair or any of its recorded frequencies. Until now the channels were not checked, so a route could pass through two repeaters that cannot hear each other. A hop is still taken where either end has no channel on record. A field station's own first hop is not checked, since its channel is never recorded. Some routes, routes_found counts and bases_reachable lists are therefore shorter, and a repeater whose only ways on were off-channel now says no base is within reach. No field, route or tool was added or removed; the first of the answer's notes says the new rule.",
+      "breaking": false,
+      "links": [
+        { "text": "The radio path rules", "url": "https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md#get-apiv1stationsidradio-path" }
+      ]
+    },
+    {
       "id": "2026-11-05-mast-4m",
       "date": "2026-11-05",
       "title": "Repeaters and base stations are now modelled with a 4 m antenna, not a 10 m mast",

@@ -4628,8 +4628,9 @@ each with every figure, the picked one's hops on to a base, how it was worked
 out and what the words mean.
 
 **What it is not**: ~30 m terrain and omnidirectional antennas, the fade margin
-layer's model and nothing measured on the day. Frequencies are not matched, as
-the map does not match them; each row says what its repeater listens on. Not
+layer's model and nothing measured on the day. A hop on toward a base is taken
+only where the next station listens on a channel the one before it sends on, as
+the map's backbone is; each row says what its repeater listens on. Not
 drawn in the ⛰️ 3-D view.
 
 `npm run bestrep` holds it to this on the hilly world.
