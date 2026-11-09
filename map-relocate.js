@@ -316,27 +316,28 @@ const MapRelocate = (function () {
   // ── A repeater that has to move ─────────────────────────────────────────────
   // Asked for on 9 Nov 2026: "a way to relocate repeaters more easily … bring
   // in all the station details of a repeater including its pass ranges". A
-  // repeater has paths both ways, and the network says which way each runs —
-  // the one-way rule the station card's Links list runs on (map-direct.js):
+  // repeater has paths both ways, and its pass ranges say which way each runs
+  // — the rule the map's arrows run on (map-backbone.js, "Which way" and
+  // repeaterPathsOf):
   //
-  //   up to it    every station whose readings come to it (MapDirect.downOf):
-  //   ('in')      the field stations whose AlertIDs its pass ranges carry, and
-  //               the repeaters whose own AlertIDs they carry or that it relays
-  //               on. Priced the other way round: that station transmits, on its
-  //               own radio and antenna, and the repeater at the new place
-  //               listens on its own frequency (marginOf).
-  //   on from it  where its readings go (MapDirect.upOf): the repeaters whose
-  //   ('out')     pass ranges carry its own AlertIDs, the ones that relay it on,
-  //               and the base stations in range on its channel.
+  //   up to it    every station whose readings come to it: the field stations
+  //   ('in')      whose AlertIDs its pass ranges carry, and the repeaters on a
+  //               pair that runs to it. Priced the other way round: that
+  //               station transmits, on its own radio and antenna, and the
+  //               repeater at the new place listens on its own frequency
+  //               (marginOf).
+  //   on from it  where its readings go: the repeaters on a pair that runs
+  //   ('out')     from it, and the base stations in range on its channel
+  //               (MapDirect.upOf — a base has no pass ranges).
   //
-  // Two repeaters that each carry the other's AlertIDs are both: each path is
-  // listed and priced on its own, keyed by direction ('in:' + id for the way
-  // up to it, the bare id the way on), since the two ways run on different
-  // radios and channels. The owner, 9 Nov 2026: "if one repeater's IDs are
-  // within the pass ranges of another repeater, then we know the direction of
-  // data … two repeaters might have IDs in each other's pass ranges, which
-  // just creates … redundancy." All within the map's Max TX distance, as the
-  // map and the card draw them.
+  // A pair of repeaters whose pass ranges share any address, or that each
+  // carry the other's AlertIDs, runs both ways, and is listed and priced both
+  // ways — keyed by direction ('in:' + id up to it, the bare id on from it),
+  // since the two ways run on different radios and channels. One whose own
+  // AlertIDs alone are in the other's pass ranges runs one way. The owner, 9
+  // Nov 2026: "bi-directional if they are in each other's pass ranges, or if
+  // they share stations in their pass ranges … it should just go by the pass
+  // ranges." All within the map's Max TX distance, as the map draws them.
   function isRepeater(st) { return !!st && Array.isArray(st.roles) && st.roles.includes('repeater') && !!st.repeater; }
   function linkKm() { return state.mapMaxLinkKm > 0 ? state.mapMaxLinkKm : 100; }
   function listenMhz(s) { return s && s.repeater && s.repeater.rx_mhz > 0 ? s.repeater.rx_mhz : PATH_DEFAULT_MHZ; }
@@ -370,9 +371,8 @@ const MapRelocate = (function () {
     return { ...e, key: h.key, ...(h.kind === 'base' && tx ? { f: tx } : {}) };
   }
 
-  // The network's one-way rule, both ways round, when map-direct.js is here.
-  const direct = () => typeof MapDirect !== 'undefined' && typeof MapDirect.upOf === 'function'
-    && typeof MapDirect.downOf === 'function';
+  // The pass ranges' rule both ways, when map-backbone.js is here.
+  const direct = () => typeof repeaterPathsOf === 'function';
 
   // A repeater's pass ranges in words, exclusions after them.
   function rangesText(st) {
@@ -425,23 +425,23 @@ const MapRelocate = (function () {
       .concat(near.map(x => out(x, 'near')));
   }
 
-  // A repeater's paths, from map-direct.js's one-way rule (see "A repeater
-  // that has to move"): up to it first, then on from it, then the nearest few
-  // other repeaters and bases on neither list, offered unticked.
+  // A repeater's paths, by the pass ranges (map-backbone.js, repeaterPathsOf
+  // and "Which way"): up to it first, then on from it, then the nearest few
+  // other repeaters and bases on neither list, offered unticked. The base
+  // stations it reaches are the card's (MapDirect.upOf): a base has no pass
+  // ranges, so which hear it goes by its channel.
   function repeaterChoices(st) {
     const kmTo = s => acmaHaversineKm(st.lat, st.lon, s.lat, s.lon);
-    let down = [], up = null;
-    try { down = MapDirect.downOf(st.id) || []; } catch (_) { down = []; }
-    try { up = MapDirect.upOf(st.id); } catch (_) { up = null; }
-    up = up || { carriers: [], relays: [], bases: [] };
-    const list = down.filter(d => d.s && d.s.id !== st.id && d.s.lat != null && d.s.lon != null).map(d => ({
+    let P = { upTo: [], onFrom: [] }, up = null;
+    try { P = repeaterPathsOf(st, linkKm()); } catch (_) { /* nothing on record, then */ }
+    try { up = typeof MapDirect !== 'undefined' && MapDirect.upOf ? MapDirect.upOf(st.id) : null; } catch (_) { up = null; }
+    const list = P.upTo.filter(d => d.s.lat != null && d.s.lon != null).map(d => ({
       s: d.s, key: 'in:' + d.s.id, dir: 'in', group: 'in', kind: isRepeater(d.s) ? 'feeds' : 'carried',
-      why: d.why, listening: false, km: d.km,
+      why: d.how, listening: false, km: d.km,
     }));
     const upList = [
-      ...up.carriers.map(c => ({ s: c.s, kind: 'listening', why: 'carries', km: c.km })),
-      ...up.relays.map(r => ({ s: r.s, kind: 'relay', why: 'relays', km: r.km })),
-      ...up.bases.map(b => ({ s: b.s, kind: 'base', why: b.check === 'match' ? 'base' : 'base-unchecked', km: b.km })),
+      ...P.onFrom.map(x => ({ s: x.s, kind: 'listening', why: x.how, km: x.km })),
+      ...((up && up.bases) || []).map(b => ({ s: b.s, kind: 'base', why: b.check === 'match' ? 'base' : 'base-unchecked', km: b.km })),
     ].filter(x => x.s && x.s.id !== st.id && x.s.lat != null && x.s.lon != null)
      .sort((a, b) => a.km - b.km);
     const seenUp = new Set();
@@ -1447,15 +1447,15 @@ const MapRelocate = (function () {
     if (!isRepeater(st) || h.group === 'near') return '';
     const both = list.some(x => x !== h && x.s.id === h.s.id && x.dir !== h.dir);
     let w = '';
-    if (h.dir === 'in') {
-      const ids = carriedIds(h.s, st);
-      w = h.why === 'relays' ? 'repeater · it relays this one on'
-        : `${h.kind === 'feeds' ? 'repeater · ' : ''}${ids ? `its ${ids} in the pass ranges` : 'in the pass ranges'}`;
+    if (h.why === 'shares') {
+      w = 'repeater · shares pass-range addresses';
+    } else if (h.why === 'each') {
+      w = 'repeater · each carries the other\'s';
     } else if (h.why === 'carries') {
-      const ids = carriedIds(st, h.s);
-      w = `carries its own ${ids || 'readings'}`;
-    } else if (h.why === 'relays') {
-      w = 'relays it on';
+      const ids = h.dir === 'in' ? carriedIds(h.s, st) : carriedIds(st, h.s);
+      w = h.dir === 'in'
+        ? `${h.kind === 'feeds' ? 'repeater · ' : ''}its ${ids || 'readings'} in the pass ranges`
+        : `repeater · its own ${ids || 'readings'} in their pass ranges`;
     } else if (h.why === 'base') {
       w = 'base station, on its channel';
     } else if (h.why === 'base-unchecked') {
@@ -1723,14 +1723,15 @@ const MapRelocate = (function () {
       + 'among the paths up to it below.',
     'Listens on': 'The frequency the repeater receives on, from its record — the frequency the paths up to it are priced at.',
     'Up to it': 'The stations whose readings come to this repeater, which the new place has to go on hearing: every field '
-      + 'station whose ALERT addresses its pass ranges carry, every repeater whose own addresses they carry, and every '
-      + 'repeater it relays on (it listens on that one\'s channel, their pass ranges share addresses, and the channels run '
-      + 'one way). Each is priced from that station up to the new place, on the frequency this repeater listens on.',
-    'On from it': 'Where its readings go, as its card\'s Links list says: the repeaters whose pass ranges carry its own '
-      + 'ALERT addresses, the repeaters that relay it on, and the base stations in range that listen on its channel. Each '
-      + 'is priced from the new place up to them. A base whose channel is not on record is listed but not ticked.',
-    'both ways': 'Each of the two carries the other\'s readings, so the path runs both ways — a spare route the network is '
-      + 'set up with. Both directions are listed and priced, each on its own radios and channel.',
+      + 'station whose ALERT addresses its pass ranges carry, and every repeater whose pass ranges share an address with '
+      + 'its own, or whose own addresses its pass ranges carry. Each is priced from that station up to the new place, on '
+      + 'the frequency this repeater listens on.',
+    'On from it': 'Where its readings go: every repeater whose pass ranges share an address with its own, or carry its own '
+      + 'addresses, and the base stations in range that listen on its channel. Each is priced from the new place up to '
+      + 'them. A base whose channel is not on record is listed but not ticked.',
+    'both ways': 'The two repeaters\' pass ranges share an address (or each carries the other\'s own), so each takes what '
+      + 'the other sends on and the path runs both ways. Both directions are listed and priced, each on its own radios '
+      + 'and channel.',
   };
 
   const CAVEAT = 'Indicative. ~30 m terrain, omnidirectional antennas, a canopy map of 2020 (±5 m) '
@@ -1768,7 +1769,7 @@ const MapRelocate = (function () {
     const choices = hubChoices(st);
     // Every path up to it, and every way on from it on record — a base only
     // where it listens on its channel.
-    ticks = new Set(choices.filter(h => (h.group === 'in' || h.kind === 'listening' || h.kind === 'relay'
+    ticks = new Set(choices.filter(h => (h.group === 'in' || h.kind === 'listening'
                                          || (h.kind === 'base' && h.why === 'base')) && endOf(h, st)).map(h => h.key));
     // A repeater with no way on on record: the nearest base offered stands in
     // for where its readings go, ticked to be argued with.

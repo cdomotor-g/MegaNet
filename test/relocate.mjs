@@ -45,13 +45,12 @@
 //   A source down   Overpass refusing is said in words, and the State's
 //                   buildings still rule their places out.
 //   A repeater      "Use the selected station" takes it off its card, with its
-//                   pass ranges; every station that sends up to it (the field
-//                   stations they carry, the repeaters whose AlertIDs they
-//                   carry or it relays on) is a path to keep, ticked, priced
-//                   from that station up on its own frequency; the repeaters
-//                   carrying its own AlertIDs are where it goes on to; a pair
-//                   carrying each other is listed both ways; and the paths up
-//                   hand over to Repeater sites.
+//                   pass ranges; by the pass ranges alone, every station that
+//                   sends up to it is a path to keep, ticked, priced from that
+//                   station up on its own frequency, and every repeater it
+//                   sends to is where it goes on to; a pair sharing a pass-range
+//                   address, or carrying each other, is listed both ways; and
+//                   the paths up hand over to Repeater sites.
 //   Reset           takes all of it off the map.
 //
 //   npm run relocate          (or: node relocate.mjs)
@@ -529,31 +528,31 @@ const REP = await page.evaluate(() => {
   const K = state.mapMaxLinkKm > 0 ? state.mapMaxLinkKm : 100;
   const isRep = s => s.roles.includes('repeater') && !!s.repeater;
   const km = (a, b) => acmaHaversineKm(a.lat, a.lon, b.lat, b.lon);
-  // What sends up to a repeater, worked out here from the register: the field
-  // stations its pass ranges carry, the repeaters whose own AlertIDs they
-  // carry (findRepeaterMatches, the pass-range relation itself), and the
-  // repeaters the card says it relays on (MapDirect._links, the card's own).
+  // What sends up to a repeater and where it sends, worked out here from the
+  // register by the pass ranges alone (the owner, 9 Nov 2026): the field
+  // stations its pass ranges carry; and the repeaters whose pass ranges share
+  // an address with its own — both ways — or whose own AlertIDs its pass
+  // ranges carry (up to it) or that carry its own (on from it).
+  const own = (x, y) => stationAlertIds(x).some(id => passRangeCoversId(y.repeater, id));
+  const share = (x, y) => windowOverlapCount(repeaterOpenWindows(x.repeater), repeaterOpenWindows(y.repeater)) > 0;
+  const others = r => state.data.stations.filter(x => x.id !== r.id && isRep(x) && x.lat != null && !x.proposed && km(r, x) <= K);
   const upTo = r => {
     const out = new Set();
     for (const s of findStationMatches(r)) {
       if (s.lat != null && s.id !== r.id && !isRep(s) && !s.roles.includes('base') && !s.proposed && km(r, s) <= K) out.add(s.id);
     }
-    for (const x of state.data.stations) {
-      if (x.id === r.id || !isRep(x) || x.roles.includes('base') || x.lat == null || x.proposed || km(r, x) > K) continue;
-      const L = MapDirect._links(x.id);
-      if (findRepeaterMatches(x).some(c => c.id === r.id) || (L && L.relays.some(y => y.id === r.id))) out.add(x.id);
-    }
+    for (const x of others(r)) if (share(r, x) || own(x, r)) out.add(x.id);
     return [...out];
   };
+  const onFrom = r => others(r).filter(x => share(r, x) || own(r, x)).map(x => x.id);
   let best = null;
   for (const r of state.data.stations) {
     if (!isRep(r) || r.roles.includes('base') || r.lat == null || !done(rmSystemOf(r))) continue;
     if (!(r.lon > 139 && r.lon < 153 && r.lat < -11 && r.lat > -28.5)) continue;
     const ids = upTo(r);
     const reps = ids.filter(id => isRep(state.data.stations.find(s => s.id === id)));
-    if (ids.length < 3 || ids.length > 14) continue;
-    const c = { id: r.id, name: r.name, lat: r.lat, lon: r.lon, up: ids, reps,
-                carriers: findRepeaterMatches(r).filter(x => x.lat != null && km(r, x) <= K).map(x => x.id),
+    if (ids.length < 3 || ids.length > 16) continue;
+    const c = { id: r.id, name: r.name, lat: r.lat, lon: r.lon, up: ids, reps, on: onFrom(r),
                 low: r.repeater.pass_ranges[0].low, high: r.repeater.pass_ranges[0].high };
     if (!best || (reps.length && !best.reps.length)) best = c;
     if (best.reps.length) break;
@@ -589,15 +588,19 @@ if (REP) {
   ok('"Use the selected station" takes the repeater whose card is up', rp.st && rp.st.id === REP.id, JSON.stringify(rp.st));
   ok('…and shows its pass ranges, the frequency it listens on and its radio',
      rp.picked.includes(`${REP.low}–${REP.high}`) || rp.picked.includes(`${REP.low}`), rp.picked.slice(0, 200));
-  ok('every station that sends up to it — the field stations its pass ranges carry, the repeaters whose own AlertIDs they carry or it relays on — is a path up to it, ticked, nearest first',
+  ok('every station that sends up to it — the field stations its pass ranges carry, the repeaters sharing a pass-range address or whose own AlertIDs they carry — is a path up to it, ticked, nearest first',
      upTo.length === REP.up.length && REP.up.every(id => upTo.some(c => c.id === id && c.ticked && c.dir === 'in' && c.key === `in:${id}`))
        && upTo.every((c, i) => i === 0 || upTo[i - 1].km <= c.km) && rp.legend.includes('Paths it has to keep'),
      JSON.stringify({ want: REP.up, got: upTo.map(c => c.id), legend: rp.legend }));
   ok('…a repeater sending up to it among them, when the network has one', !REP.reps.length || REP.reps.every(id => upTo.some(c => c.id === id && c.kind === 'feeds')),
      JSON.stringify(REP.reps));
-  ok('the repeaters whose pass ranges carry its own AlertIDs are where its readings go on to, ticked',
-     REP.carriers.every(id => onFrom.some(c => c.id === id && c.dir === 'out' && c.ticked && c.why === 'carries')),
-     JSON.stringify({ want: REP.carriers, got: onFrom.map(c => `${c.id}:${c.why}:${c.ticked}`) }));
+  ok('the repeaters sharing a pass-range address with it, or carrying its own AlertIDs, are where its readings go on to, ticked',
+     REP.on.every(id => onFrom.some(c => c.id === id && c.dir === 'out' && c.ticked))
+       && onFrom.filter(c => c.kind === 'listening').length === REP.on.length,
+     JSON.stringify({ want: REP.on, got: onFrom.map(c => `${c.id}:${c.why}:${c.ticked}`) }));
+  ok('…a pair sharing a pass-range address listed both ways',
+     onFrom.filter(c => c.why === 'shares').every(c => upTo.some(u => u.id === c.id && u.why === 'shares')),
+     JSON.stringify(onFrom.filter(c => c.why === 'shares').map(c => c.id)));
   ok('…and a move further afield is one press from 🗼 Repeater sites', rp.toSites);
 
   await page.evaluate(() => { MapRelocate.set('radiusM', 100); });

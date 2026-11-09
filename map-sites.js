@@ -16,7 +16,9 @@
 // constants, link-budget.js for lbFmtDbd, map-roads.js for MapRoads.near, map-draw.js for MapDraw,
 // places.js for Places.parse, map-controls.js for MapChrome.panel, and app.js
 // for parseSearchTerms, parseIdRange, prepareSearch, stationMatchesSearch,
-// stationAlertIds, rerenderMapLegend and mapNote. Its two Google Earth
+// stationAlertIds, rerenderMapLegend and mapNote; map-backbone.js for
+// repeaterPathsOf (what a repeater hears, for Add what the selected repeater
+// carries). Its two Google Earth
 // buttons call export.js's downloadSitesKmz and downloadSitesKml, which read
 // the answer back through exportSites(); and it tells map-3d.js's Map3D when
 // what it drew has changed (sitesChanged), asked for with a `typeof` because
@@ -1165,14 +1167,14 @@ const MapSites = (function () {
   }
 
   // Everything that sends its readings up to it — the field stations its pass
-  // ranges carry and the repeaters that send to it — by map-direct.js's
-  // one-way rule (MapDirect.downOf), the list 🚚 Relocate station keeps; the
-  // field stations alone where that file is not here.
+  // ranges carry and the repeaters on a pair that runs to it — by the pass
+  // ranges (map-backbone.js, repeaterPathsOf), the list 🚚 Relocate station
+  // keeps; the field stations alone where that file is not here.
   function carriedBy(rep) {
-    if (typeof MapDirect !== 'undefined' && typeof MapDirect.downOf === 'function') {
-      try { return (MapDirect.downOf(rep.id) || []).map(d => d.s); } catch (_) { /* the field stations below */ }
-    }
     const K = state.mapMaxLinkKm > 0 ? state.mapMaxLinkKm : 100;
+    if (typeof repeaterPathsOf === 'function') {
+      try { return repeaterPathsOf(rep, K).upTo.map(d => d.s); } catch (_) { /* the field stations below */ }
+    }
     let list = [];
     try { list = findStationMatches(rep) || []; } catch (_) { list = []; }
     return list.filter(s => s && s.id !== rep.id && s.lat != null && s.lon != null)

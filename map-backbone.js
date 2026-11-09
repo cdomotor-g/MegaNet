@@ -7,11 +7,15 @@
 //   repeaters from re-transmitting on top of each other.
 //
 //   backboneIndex()            every repeater pair whose open pass-range
-//                              windows share at least one ALERT address, plus
-//                              every repeater–base pair, with the distance
+//                              windows share at least one ALERT address, every
+//                              one whose own AlertIDs the other's windows take
+//                              (one-way, sender first), plus every
+//                              repeater–base pair, with the distance
 //                              between them — cached on state.backboneIdx
 //                              until the file changes.
 //   backboneLinks(maxKm)       the pairs within a distance — the drawable list.
+//   repeaterPathsOf(rep, km)   one repeater's paths both ways, by the pass
+//                              ranges — what sends to it and what it sends to.
 //   suggestedRepeaterDelays()  repeater id → suggested delay in ms, from
 //                              ⏳ Repeater Delays' plan (delay-plan.js).
 //   suggestedRepeaterDelayMs(station)
@@ -24,7 +28,7 @@
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, pillText, fmtKm, acmaHaversineKm;
 // across to app.js for repeaterList, passRelationIndex, passRangeCoversId,
-// stationAlertIdTypes, focusStation, zoomToStation, switchTab and
+// stationAlertIds, stationAlertIdTypes, focusStation, zoomToStation, switchTab and
 // dockReveal; and
 // sideways to map-draw.js (MapDraw), link-budget.js (LinkBudget,
 // lbMarginClass) and path-profile.js (PathProfile, fsplDb, wattsToDbm, and
@@ -39,6 +43,21 @@
 // other would accept and pass on. That is a statement about the *windows*, not
 // about which stations happen to use an address today, so the test is interval
 // arithmetic rather than a walk over the sensor list.
+//
+// Which way a repeater pair runs goes by the pass ranges too (the owner, 9
+// Nov 2026: "bi-directional if they are in each other's pass ranges, or if
+// they share stations in their pass ranges … it should just go by the pass
+// ranges"):
+//
+//   two-way   their open windows share any address — each accepts what the
+//             other re-transmits — or each one's own AlertIDs are in the
+//             other's windows.
+//   one-way   one repeater's own AlertIDs are in the other's windows and their
+//             windows share nothing: its own readings go up to the other, and
+//             nothing comes back. The pair is drawn sender (a) to receiver (b),
+//             `oneWay` set. Without this they were drawn only where the sender
+//             was a field station too (as a field link), and not at all where
+//             it was a repeater only.
 //
 // A repeater–base path is the other half of the backbone: where the traffic a
 // repeater relays is finally going. A base is not a repeater — it opens no
@@ -86,14 +105,17 @@ function windowOverlapCount(a, b) {
 // invalidated exactly where state.passRelIdx is: applyStationDoc and
 // refreshFilterOptions.
 //
-//   pairs: [{ kind, a, b, km, overlap, shared }]
+//   pairs: [{ kind, a, b, km, overlap, shared, oneWay, carries }]
 //          kind = 'repeater' for a repeater–repeater path, 'base' for a
 //          repeater–base one (a is always the repeater on a 'base' pair);
-//          overlap = addresses open in both windows — always > 0 on a
-//          'repeater' pair, and 0 on a 'base' pair whose base end holds no
-//          pass ranges; shared = the network's real ALERT addresses covered by
-//          both (may be empty — an overlap can sit on addresses nothing
-//          transmits on yet).
+//          overlap = addresses open in both windows — > 0 on a 'repeater' pair
+//          unless it is matched on its own AlertIDs instead (carries), and 0
+//          on a 'base' pair whose base end holds no pass ranges; shared = the
+//          network's real ALERT addresses covered by both (may be empty — an
+//          overlap can sit on addresses nothing transmits on yet);
+//          oneWay = a sends to b and not back (see "Which way" above);
+//          carries = on a pair matched by AlertIDs alone, { ab, ba }: a's own
+//          AlertIDs in b's windows, and b's in a's.
 //   cover: station id → Set of network ALERT addresses its windows carry.
 function backboneIndex() {
   if (state.backboneIdx) return state.backboneIdx;
@@ -137,6 +159,26 @@ function backboneIndex() {
                    overlap, shared: sharedAddrs(a.id, b.id) });
     }
   }
+  // Repeater → repeater by a repeater's own AlertIDs alone, where the windows
+  // share nothing (see "Which way" above): one-way, sender first, unless each
+  // carries the other's.
+  const own = new Map(reps.map(r => [r.id, stationAlertIds(r)]));
+  for (let i = 0; i < reps.length; i++) {
+    const a = reps[i];
+    if (a.lat == null || a.lon == null) continue;
+    for (let j = i + 1; j < reps.length; j++) {
+      const b = reps[j];
+      if (b.lat == null || b.lon == null || seen.has(pairKey(a.id, b.id))) continue;
+      const ab = own.get(a.id).filter(id => passRangeCoversId(b.repeater, id));
+      const ba = own.get(b.id).filter(id => passRangeCoversId(a.repeater, id));
+      if (!ab.length && !ba.length) continue;
+      seen.add(pairKey(a.id, b.id));
+      const [from, to] = ab.length ? [a, b] : [b, a];
+      pairs.push({ kind: 'repeater', a: from, b: to, km: acmaHaversineKm(a.lat, a.lon, b.lat, b.lon),
+                   overlap: 0, shared: [], oneWay: !(ab.length && ba.length),
+                   carries: ab.length ? { ab, ba } : { ab: ba, ba: ab } });
+    }
+  }
   // Repeater → base. A station that is both keeps its repeater pairs and takes
   // base pairs only for the repeaters it did not already share a window with,
   // so no hop is drawn — or counted — twice.
@@ -154,6 +196,44 @@ function backboneIndex() {
   }
   state.backboneIdx = { pairs, cover };
   return state.backboneIdx;
+}
+
+// A repeater's paths both ways by the pass ranges, within `maxKm`, for 🚚
+// Relocate station moving it (map-relocate.js) and 🗼 Repeater sites taking
+// over what it hears (map-sites.js):
+//   upTo    what sends its readings to it: the field stations whose AlertIDs
+//           its pass ranges carry, and the repeaters on a pair that runs to it
+//           — both ways, or one way from them;
+//   onFrom  the repeaters it sends to — both ways, or one way to them.
+// Each { s, km, how }: 'carries' (AlertIDs in the other's pass ranges, one
+// way), 'shares' (their windows share an address), 'each' (each carries the
+// other's AlertIDs). Nearest first. Base stations are not here: a base has no
+// pass ranges, and which bases hear it is map-direct.js's (MapDirect.upOf).
+function repeaterPathsOf(rep, maxKm) {
+  const out = { upTo: [], onFrom: [] };
+  if (!rep || rep.lat == null || rep.lon == null) return out;
+  const K = maxKm > 0 ? maxKm : 0;
+  const isRep = s => Array.isArray(s.roles) && s.roles.includes('repeater');
+  const isBase = s => Array.isArray(s.roles) && s.roles.includes('base');
+  if (rep.repeater) {
+    for (const f of passRelationIndex().byRepeater.get(rep.id) || []) {
+      if (!f || f.id === rep.id || isRep(f) || isBase(f) || f.proposed || f.lat == null || f.lon == null) continue;
+      const km = acmaHaversineKm(rep.lat, rep.lon, f.lat, f.lon);
+      if (km <= K) out.upTo.push({ s: f, km, how: 'carries' });
+    }
+  }
+  for (const p of backboneIndex().pairs) {
+    if (p.kind !== 'repeater' || p.km > K || (p.a.id !== rep.id && p.b.id !== rep.id)) continue;
+    const other = p.a.id === rep.id ? p.b : p.a;
+    if (other.proposed) continue;
+    const how = p.overlap > 0 ? 'shares' : p.oneWay ? 'carries' : 'each';
+    if (!p.oneWay || p.b.id === rep.id) out.upTo.push({ s: other, km: p.km, how });
+    if (!p.oneWay || p.a.id === rep.id) out.onFrom.push({ s: other, km: p.km, how });
+  }
+  const near = (x, y) => x.km - y.km || String(x.s.name).localeCompare(String(y.s.name));
+  out.upTo.sort(near);
+  out.onFrom.sort(near);
+  return out;
 }
 
 // The drawable backbone list: pairs within `maxKm` — repeater–repeater and
@@ -345,6 +425,12 @@ const MapBackbone = (function () {
     const p = backbonePairFor(a.id, b.id);
     const toBase = isBaseHop(a, b);
     const sharedText = !p ? '—'
+      : p.carries && !p.overlap
+        ? `${p.carries.ab.length ? `${esc(a.name)}'s own ${p.carries.ab.join(', ')} in ${esc(b.name)}'s pass ranges` : ''}${
+            p.carries.ab.length && p.carries.ba.length ? '<br>' : ''}${
+            p.carries.ba.length ? `${esc(b.name)}'s own ${p.carries.ba.join(', ')} in ${esc(a.name)}'s pass ranges` : ''}
+           <br><span class="small">${p.oneWay ? 'their windows share no address, so it runs one way, '
+             + `${esc(p.a.name)} up to ${esc(p.b.name)}` : 'each carries the other\'s, so it runs both ways'}</span>`
       : p.overlap
         ? `${p.shared.length} in use in the network` +
           (p.shared.length ? `<br><span class="small">${p.shared.slice(0, 12).join(', ')}${
@@ -354,7 +440,8 @@ const MapBackbone = (function () {
              distance alone</span>`;
     const da = a.repeater ? a.repeater.delay_ms : null;
     const db = b.repeater ? b.repeater.delay_ms : null;
-    const clash = !toBase && da != null && da === db
+    // Only where their windows overlap does a message reach both to be re-sent.
+    const clash = !toBase && p && p.overlap > 0 && da != null && da === db
       ? `<div class="small txt-bad mn-pop-warn">⚠️ Both repeaters hold the same
            delay — a message both accept is re-transmitted at the same moment and collides at every
            receiver that hears both.</div>` : '';

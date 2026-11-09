@@ -39,7 +39,9 @@
 // canvas's lineDashOffset = −((d + L) mod period), done by hand; see "Batched
 // by colour" for why.) A backbone path to a base runs one way, longer and
 // slower dashes in the backbone's own black; a repeater-to-repeater path runs
-// both ways at once — the two-way notation MapArrows uses, moving.
+// both ways at once — the two-way notation MapArrows uses, moving — unless the
+// pass ranges say it runs one way (map-backbone.js, "Which way"), when it runs
+// from the sender, as a path to a base does.
 //
 // ── Repeaters take turns ─────────────────────────────────────────────────────
 // The repeaters on the screen that have a field path drawn, west to east, each
@@ -173,7 +175,8 @@ const MapFlow = (function () {
       + `station into its repeater, and from a repeater on to the base. A dash every ${DASH_PERIOD} pixels, moving about `
       + `${FIELD_PX_S} pixels a second at normal speed; every path into one repeater delivers a dash to it at the same moment.`,
     'Everything flows': `Every path on the screen carries moving dashes at once. Backbone paths to a base carry longer, `
-      + 'slower dashes in black; a path between two repeaters carries them both ways, because it works both ways.',
+      + 'slower dashes in black; a path between two repeaters carries them both ways when they share any pass-range '
+      + 'address, and one way when only one repeater\'s own addresses are in the other\'s pass ranges.',
     'Take turns': `The repeaters on the screen light up one at a time, west to east, for ${TURN_S} seconds each at normal `
       + 'speed (shorter when Speed is up): its paths drawn in full with dashes running in, its backbone paths stronger, a '
       + 'ring round it and its name beside it. While a repeater is in focus the turn stays on it.',

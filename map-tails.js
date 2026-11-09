@@ -156,7 +156,8 @@ const MapTails = (function () {
       + 'repeater you point at or whose card is open.',
     'Backbone tails': 'With Backbone always in full unticked, the backbone paths between repeaters and bases are drawn as '
       + `tails too, in the backbone's black: the full Tail length out of the sending end and ${Math.round(REPEATER_SHARE * 100)} % `
-      + 'of it into the base — the full length at both ends of a path between two repeaters, which runs both ways.',
+      + 'of it into the base — the full length at both ends of a path between two repeaters that runs both ways (they '
+      + 'share a pass-range address), and as a path to a base where it runs one way.',
   };
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));

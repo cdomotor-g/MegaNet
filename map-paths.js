@@ -772,6 +772,8 @@ const MapPaths = (function () {
       for (const p of adj.get(u) || []) {
         const v = p.a.id === u ? p.b.id : p.a.id;
         if (bases.has(v)) continue;
+        // A one-way pair carries v's readings up only when v is its sender.
+        if (p.oneWay && p.a.id !== v) continue;
         const c = du + 1000 + (Number(p.km) || 0);
         if (!dist.has(v) || c < dist.get(v)) { dist.set(v, c); via.set(v, p); }
       }

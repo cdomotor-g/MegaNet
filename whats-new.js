@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 245, date: '2026-11-09', items: [
+      '➤ <strong>Repeater-to-repeater arrows go by the pass ranges.</strong> Two repeaters whose pass ranges share any '
+        + 'address still show arrows both ways. Where only one repeater\'s own addresses are in the other\'s pass ranges, the '
+        + 'link now runs one way, up to the other — in the arrows, in Flow and in Tails — and the few such links that were '
+        + 'missing from the map (Bellthorpe Gap Rd\'s, for one) are drawn. 🚚 Relocate station lists a repeater\'s paths by '
+        + 'the same rule.',
+    ] },
     { n: 244, date: '2026-11-09', items: [
       '🛣️ <strong>Roads in 3-D.</strong> With the Satellite base map, the ⛰️ 3-D view now has the roads and place names on '
         + 'it that the flat map lays over the photo — and the Dark and Light base maps keep their names in 3-D too.',

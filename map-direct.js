@@ -9,12 +9,12 @@
 //               repeaters that carry it and, for a repeater, the ones that
 //               relay it on — with each one's fade margin, the best first
 //               (the Links line, under Assumed). A base station has none: it
-//               is where the readings come in. upOf and downOf hand the same
-//               one-way rule, both ways round, to 🚚 Relocate station.
+//               is where the readings come in. upOf hands the base
+//               stations that hear a repeater to 🚚 Relocate station.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, fmtKm, cssVar,
-// acmaHaversineKm and termHtml; to app.js for stationAlertIds, findStationMatches, MapSymbols and
+// acmaHaversineKm and termHtml; to app.js for stationAlertIds, MapSymbols and
 // mapStrokeScale; to frequencies.js for Frequencies.carriersOf (which carriers
 // hear it first-hand, and so what it is assumed to transmit on) and
 // Frequencies.repaint; to map-fade.js for MapFade.known and MapFade.work (each
@@ -233,40 +233,6 @@ const MapDirect = (function () {
     bases.sort((x, y) => x.km - y.km);
     off.sort((x, y) => x.km - y.km);
     return { carriers, relays, bases, off, tx, far, maxKm: K, rep, ingest: false };
-  }
-
-  // ── Who sends up to it ──────────────────────────────────────────────────────
-  // linksOf the other way round, for 🚚 Relocate station moving a repeater:
-  // every station whose links up include this one, within the Max TX
-  // distance, nearest first — the field stations whose AlertIDs its pass
-  // ranges carry, and the repeaters that send to it by either of linksOf's
-  // rules: its pass ranges carry their own AlertIDs ('carries'), or it relays
-  // them on ('relays'). The same one-way rule the card's Links list runs on,
-  // so a repeater's readings go up to the one that carries its IDs and never
-  // back down. Two repeaters can each carry the other's AlertIDs; then each is
-  // up from the other, and each is in the other's list both ways — the
-  // redundancy that pairing is set up for. A base station sends nothing up.
-  function downOf(st) {
-    if (!st || !isRep(st) || !placed(st)) return [];
-    const K = maxKm();
-    const out = [], seen = new Set();
-    let fields = [];
-    try { fields = typeof findStationMatches === 'function' ? findStationMatches(st) || [] : []; } catch (_) { fields = []; }
-    for (const f of fields) {
-      if (!f || f.id === st.id || isRep(f) || isBase(f) || !placed(f) || f.proposed) continue;
-      const km = kmOf(st, f);
-      if (km <= K) { out.push({ s: f, km, why: 'carries' }); seen.add(f.id); }
-    }
-    for (const r of stations()) {
-      if (r.id === st.id || seen.has(r.id) || !isRep(r) || isBase(r) || !placed(r) || r.proposed) continue;
-      const km = kmOf(st, r);
-      if (!(km <= K)) continue;
-      const L = linksOf(r);
-      if (!L) continue;
-      if (L.carriers.some(c => c.s.id === st.id)) out.push({ s: r, km, why: 'carries' });
-      else if (L.relays.some(x => x.s.id === st.id)) out.push({ s: r, km, why: 'relays' });
-    }
-    return out.sort((x, y) => x.km - y.km || String(x.s.name).localeCompare(String(y.s.name)));
   }
 
   // ── The fade margins ────────────────────────────────────────────────────────
@@ -652,8 +618,8 @@ const MapDirect = (function () {
       </span>`;
     },
 
-    // Its links up the network (linksOf) and who sends up to it (downOf), as
-    // station objects — what 🚚 Relocate station keeps when a repeater moves.
+    // Its links up the network (linksOf), as station objects — the base
+    // stations of which 🚚 Relocate station keeps when a repeater moves.
     upOf(id) {
       const st = byId(id);
       const L = st ? linksOf(st) : null;
@@ -664,7 +630,6 @@ const MapDirect = (function () {
         ingest: L.ingest,
       };
     },
-    downOf(id) { return downOf(byId(id)); },
 
     // For the check: who it links to, the lines drawn, and a figure set by hand.
     _links(id) {

@@ -37,9 +37,11 @@
 // that repeater carries. A repeater-to-base backbone path points at the base,
 // for the same reason — that is the direction the traffic leaves the network.
 //
-// A repeater-to-repeater path is the one hop that genuinely runs both ways, and
-// it is drawn as such: one arrowhead near each end, pointing outward, and none
-// along the middle. That is the ordinary notation for a two-way link, and it is
+// A repeater-to-repeater path whose pass ranges share an address runs both
+// ways, and it is drawn as such: one arrowhead near each end, pointing
+// outward, and none along the middle. One that is on the map only because one
+// repeater's own AlertIDs are in the other's pass ranges runs one way, and has
+// a field link's row of arrows (map-backbone.js, "Which way"). That is the ordinary notation for a two-way link, and it is
 // deliberately not a row of one-way arrows — a picture that says traffic flows
 // one way down a path that carries it both ways is worse than a picture that
 // says nothing.

@@ -306,6 +306,36 @@ try {
     arrows.dirs['core:fwd'] > 0 && arrows.pointsAtRepeater, JSON.stringify(arrows.dirs));
   check('a repeater-to-repeater backbone path is drawn two-way',
     arrows.dirs['backbone:both'] > 0, JSON.stringify(arrows.dirs));
+  // Which way a repeater pair runs goes by the pass ranges (the owner, 9 Nov
+  // 2026): both ways where their windows share an address or each carries the
+  // other's AlertIDs; one way, sender to receiver, where only one's own
+  // AlertIDs are in the other's windows. Worked out here from the register.
+  const way = await page.evaluate(() => {
+    const own = (x, y) => stationAlertIds(x).some(id => passRangeCoversId(y.repeater, id));
+    const share = (x, y) => windowOverlapCount(repeaterOpenWindows(x.repeater), repeaterOpenWindows(y.repeater)) > 0;
+    const pairs = backboneLinks(state.mapMaxLinkKm).filter(p => p.kind === 'repeater');
+    const one = pairs.filter(p => p.oneWay), two = pairs.filter(p => !p.oneWay);
+    const badOne = one.filter(p => !(own(p.a, p.b) && !own(p.b, p.a) && !share(p.a, p.b))).map(p => `${p.a.id}>${p.b.id}`);
+    const badTwo = two.filter(p => !(share(p.a, p.b) || (own(p.a, p.b) && own(p.b, p.a)))).map(p => `${p.a.id}|${p.b.id}`);
+    const lines = state.mapLines.filter(l => l.mnLinkRole === 'backbone');
+    const drawn = lines.filter(l => one.some(p => p.a.id === l.mnLinkRepeaterId && p.b.id === l.mnLinkRepeaterId2));
+    const twoDrawn = lines.filter(l => two.some(p => (p.a.id === l.mnLinkRepeaterId && p.b.id === l.mnLinkRepeaterId2)));
+    // Every pair the register says runs one way, found independently.
+    const reps = state.data.stations.filter(x => x.roles.includes('repeater') && x.repeater && x.lat != null);
+    let missed = 0;
+    for (let i = 0; i < reps.length; i++) for (let j = i + 1; j < reps.length; j++) {
+      const x = reps[i], y = reps[j];
+      if (acmaHaversineKm(x.lat, x.lon, y.lat, y.lon) > state.mapMaxLinkKm || share(x, y)) continue;
+      const xy = own(x, y), yx = own(y, x);
+      if (xy !== yx && !one.some(p => p.a.id === (xy ? x.id : y.id) && p.b.id === (xy ? y.id : x.id))) missed++;
+    }
+    return { one: one.length, two: two.length, badOne, badTwo, missed, drawn: drawn.length,
+             fwd: drawn.every(l => l.mnArrowDir === 'fwd'), twoBoth: twoDrawn.every(l => l.mnArrowDir === 'both') };
+  });
+  check('a repeater pair runs both ways only where their pass ranges share an address or each carries the other\'s',
+    way.two > 0 && !way.badTwo.length && way.twoBoth, JSON.stringify(way));
+  check('…and one way, sender first, where only one\'s own AlertIDs are in the other\'s pass ranges — every such pair, drawn with one-way arrows',
+    way.one > 0 && !way.badOne.length && way.missed === 0 && way.drawn > 0 && way.fwd, JSON.stringify(way));
 
   await page.evaluate(() => MapArrows.setEnabled(false));
   await page.waitForTimeout(300);
