@@ -521,8 +521,9 @@ const AdminDash = (function () {
       jobsFailedToday: jobs.filter(j => j.failed_24h > 0),
       jobsOff:  jobs.filter(j => j.active === false),
       jobsFailed7d: jobs.reduce((n, j) => n + (Number(j.failed_7d) || 0), 0),
-      waiting:  (Number(w.token_requests) || 0) + (Number(w.findings_critical) || 0) + (Number(w.findings_warn) || 0)
-                + (Number(w.push_failing) || 0),
+      // Only what needs a decision or a fix now: "to watch" findings run to the
+      // hundreds across the network and would bury the rest. They are listed.
+      waiting:  (Number(w.token_requests) || 0) + (Number(w.findings_critical) || 0) + (Number(w.push_failing) || 0),
       daysLeft: g.measured && perDay > 0 ? Math.floor((DB_LIMIT - Number(g.db_bytes || 0)) / perDay) : null,
       perDay,
     };
@@ -553,7 +554,7 @@ const AdminDash = (function () {
     const failedPct = rx ? Math.round(((rx - (Number(f.ok_24h) || 0)) / rx) * 1000) / 10 : 0;
     const waitBits = [
       w.token_requests ? `${num(w.token_requests)} token request${w.token_requests === 1 ? '' : 's'}` : '',
-      (w.findings_critical || 0) + (w.findings_warn || 0) ? `${num((w.findings_critical || 0) + (w.findings_warn || 0))} findings to look at` : '',
+      w.findings_critical ? `${num(w.findings_critical)} critical finding${w.findings_critical === 1 ? '' : 's'}` : '',
       w.push_failing ? `${num(w.push_failing)} device${w.push_failing === 1 ? '' : 's'} failing` : '',
     ].filter(Boolean);
     const jobs = o.jobs || [];

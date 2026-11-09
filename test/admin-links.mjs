@@ -347,7 +347,7 @@ async function main() {
       check('Behind the scenes: the last packet heard, an offline base station named in red here and on the Health tile, 30 days of receptions, each job\'s timing in words, growth a day, what waits',
         ops.heard === '4 min ago' && ops.bsBad && /1 of 2/.test(ops.bs) && /offline: Shed Pi/.test(ops.bs)
           && ops.healthBad && /base station Shed Pi offline/.test(ops.health) && ops.rxCols === 30
-          && ops.jobs[0] === 'every 5 min' && ops.jobs[1] === 'daily at 01:17 Brisbane' && ops.grow === '+13.6 MB a day' && ops.wait === '4', J(ops));
+          && ops.jobs[0] === 'every 5 min' && ops.jobs[1] === 'daily at 01:17 Brisbane' && ops.grow === '+13.6 MB a day' && ops.wait === '3', J(ops));
       check('…every marked word says what it means on hover and in its fold, and what the database cannot see is listed with where to look',
         ops.marked >= 8 && ops.bare === 0 && ops.fold && ops.notyet, J(ops));
       await page.evaluate(() => window.scrollTo(0, 0));
