@@ -1001,6 +1001,229 @@ ok('…and the tool disarms itself', circ.tool === '' && /Draw a circle/.test(ci
 const shapeRow = await page.evaluate(() => document.querySelector('.sites-shape')?.textContent || '');
 ok('the drawn circle is offered again as a source of stations', /Add the \d+ inside ◯/.test(shapeRow), shapeRow.trim());
 
+// ── 5b. must reach ───────────────────────────────────────────────────────────
+// The other half of a repeater's job: what it hears has to get on to where it
+// is going. Filled in from the network for a repeater that is in it — by the
+// pass ranges (repeaterPathsOf) and the bases on its channel (MapDirect.upOf),
+// within the Max TX distance, so a far repeater whose pass ranges are left
+// wide open is not asked for — every row
+// with its distance; priced the other way round from a site; and ranked
+// ahead of the weights.
+console.log('\nMust reach');
+
+const REP = await page.evaluate(() => {
+  const K = Math.max(0, Number(state.mapMaxLinkKm) || 0);
+  const km = (a, b) => acmaHaversineKm(a.lat, a.lon, b.lat, b.lon);
+  let best = null;
+  for (const s of state.data.stations) {
+    if (!s.roles.includes('repeater') || !s.repeater || s.roles.includes('base') || s.lat == null || s.proposed) continue;
+    const P = repeaterPathsOf(s, K);
+    const n = P.onFrom.length;
+    const down = P.upTo.length;
+    if (n && down >= 3 && (!best || n > best.n)) best = { id: s.id, name: s.name, n, lat: s.lat, lon: s.lon };
+  }
+  if (!best) return null;
+  // A repeater beyond the Max TX distance, its pass ranges opened wide so
+  // they take this one's AlertIDs: on record as carrying it, and too far off
+  // to be anywhere its readings go.
+  const far = state.data.stations.find(s => s.roles.includes('repeater') && s.repeater && !s.roles.includes('base')
+    && s.lat != null && km(s, best) > K * 1.5);
+  return far ? { ...best, K, far: { id: far.id, name: far.name, ranges: JSON.stringify(far.repeater.pass_ranges || []),
+                                    ex: JSON.stringify(far.repeater.exclusions || []) } } : { ...best, K, far: null };
+});
+ok('the network has a repeater with somewhere its readings go on to', !!REP, '');
+if (REP) {
+  if (REP.far) {
+    await page.evaluate(f => {
+      const s = state.data.stations.find(x => x.id === f.id);
+      s.repeater.pass_ranges = [{ low: 0, high: 99999 }];
+      s.repeater.exclusions = [];
+      state.passRelIdx = null; state.backboneIdx = null;
+    }, REP.far);
+  }
+  await page.evaluate(id => { MapSites.clear(); showStationCard(id); }, REP.id);
+  await page.waitForTimeout(300);
+  await page.evaluate(() => setDockTab('map-sites'));
+  await page.waitForTimeout(300);
+  await page.locator('.sites-panel button', { hasText: 'Add what the selected repeater carries' }).click();
+  await page.waitForTimeout(200);
+  const filled = await page.evaluate(r => {
+    const K = r.K;
+    const rep0 = state.data.stations.find(s => s.id === r.id);
+    const want = [...repeaterPathsOf(rep0, K).onFrom, ...MapDirect.upOf(r.id).bases.filter(b => b.check === 'match')]
+      .filter(x => x.km <= K).sort((a, b) => a.km - b.km);
+    const seen = new Set(), ids = [];
+    for (const x of want) if (!seen.has(x.s.id)) { seen.add(x.s.id); ids.push(x.s.id); }
+    const rep = state.data.stations.find(s => s.id === r.id);
+    const hubs = MapSites.hubs();
+    const row = sel => [...document.querySelectorAll(sel)].map(li => li.querySelector('.sites-t-km')?.textContent || '');
+    return {
+      origin: MapSites.origin(), want: ids.slice(0, 8), got: hubs.map(h => h.sid),
+      kms: hubs.map(h => acmaHaversineKm(rep.lat, rep.lon, h.lat, h.lon)),
+      carriesFar: r.far ? findRepeaterMatches(rep).some(x => x.id === r.far.id)
+        && !!backbonePairFor(rep.id, r.far.id) : null,
+      hubRows: row('.sites-hubs li'), siteRows: row('.sites-targets:not(.sites-hubs) li'),
+      targets: MapSites.targets().length,
+      ref: document.querySelector('.sites-km-ref')?.textContent.replace(/\s+/g, ' ') || '',
+      self: hubs.some(h => h.sid === r.id) || MapSites.targets().some(t => t.sid === r.id),
+      legend: [...document.querySelectorAll('.sites-panel legend')].map(l => l.textContent.replace(/\s+/g, ' ').trim()),
+    };
+  }, REP);
+  ok('"Add what the selected repeater carries" fills Must reach with where its readings go on to — by the pass ranges, and the bases on its channel, nearest first',
+     filled.origin === REP.id && filled.got.length > 0 && JSON.stringify(filled.got) === JSON.stringify(filled.want),
+     JSON.stringify({ want: filled.want, got: filled.got }));
+  ok('…every one within the map\'s Max TX distance, and never the repeater itself',
+     filled.kms.every(k => k <= REP.K + 1e-9) && !filled.self, JSON.stringify(filled.kms.map(k => k.toFixed(1))));
+  if (REP.far) {
+    ok('a far-off repeater with its pass ranges wide open carries it on record — a pair in the backbone — and is not on the list',
+       filled.carriesFar === true && !filled.got.includes(REP.far.id), JSON.stringify({ far: REP.far.name, carries: filled.carriesFar }));
+  } else {
+    ok('(no repeater in the register beyond the Max TX distance to open wide — nothing to leave out)', true);
+  }
+  ok('every row in both lists says how far it is, from the repeater as it stands',
+     filled.hubRows.length === filled.got.length && filled.hubRows.every(t => /^\d+(\.\d)? km$/.test(t))
+       && filled.siteRows.length === filled.targets && filled.siteRows.every(t => /^\d+(\.\d)? km$/.test(t))
+       && filled.ref.includes(`from ${REP.name} as it stands`),
+     JSON.stringify({ hubs: filled.hubRows.slice(0, 4), sites: filled.siteRows.slice(0, 4), ref: filled.ref }));
+  const kmMatch = await page.evaluate(r => {
+    const rep = state.data.stations.find(s => s.id === r.id);
+    const li = [...document.querySelectorAll('.sites-hubs li')];
+    return MapSites.hubs().every((h, i) => {
+      const k = acmaHaversineKm(rep.lat, rep.lon, h.lat, h.lon);
+      const shown = parseFloat(li[i]?.querySelector('.sites-t-km')?.textContent || 'NaN');
+      return Math.abs(shown - (k < 10 ? Number(k.toFixed(1)) : Math.round(k))) < 1e-9;
+    });
+  }, REP);
+  ok('…the figure shown is the straight-line distance', kmMatch);
+  ok('Must reach has a box of its own, its word explained on hover', filled.legend.some(l => /^Must reach \(\d+\)$/.test(l))
+     && await page.evaluate(() => (document.querySelector('.sites-panel legend .term')?.getAttribute('title') || '').length > 40),
+     JSON.stringify(filled.legend));
+  if (REP.far) {
+    await page.evaluate(f => {
+      const s = state.data.stations.find(x => x.id === f.id);
+      s.repeater.pass_ranges = JSON.parse(f.ranges);
+      s.repeater.exclusions = JSON.parse(f.ex);
+      state.passRelIdx = null; state.backboneIdx = null;
+    }, REP.far);
+  }
+  // Another repeater starts both lists afresh; ✕ takes one off.
+  const removed = await page.evaluate(() => {
+    const before = MapSites.hubs();
+    MapSites.removeHub(before[0].key);
+    return { before: before.length, after: MapSites.hubs().length };
+  });
+  ok('✕ takes one off the list', removed.after === removed.before - 1, JSON.stringify(removed));
+  await page.evaluate(() => { MapSites.clear(); closeStnCard(false); });
+}
+
+// The ranking, on the cluster: its sites, and one mast not built yet 25 km
+// off as the one it must reach — a proposed mast, so its radio is the
+// network's commonest on a mast, and its channel the run's own.
+await page.locator('#sites-paste').fill(pasted);
+await page.locator('.sites-panel button', { hasText: 'Add the list' }).click();
+const hubAt = dest(run1.area.lat, run1.area.lon, 120, 25);
+await page.locator('#sites-hub-paste').fill(`${hubAt[0].toFixed(5)}, ${hubAt[1].toFixed(5)}`);
+await page.locator('.sites-panel button', { hasText: /^Add$/ }).click();
+const oneHub = await page.evaluate(() => ({ hubs: MapSites.hubs(), note: document.getElementById('sites-hub-note')?.textContent || '' }));
+ok('a lat, lon typed into Must reach is a mast not built yet', oneHub.hubs.length === 1 && oneHub.hubs[0].kind === 'point'
+   && /1 added/.test(oneHub.note), JSON.stringify(oneHub));
+await page.evaluate(() => {
+  MapSites.set('wLos', 0); MapSites.set('wFade', 0); MapSites.set('wRoad', 0); MapSites.set('wElev', 5);
+  MapSites.set('count', 5);
+});
+await settle();
+const okWas = await page.evaluate(() => state.mapFadeOkDb);
+await page.evaluate(() => { state.mapFadeOkDb = -999; });
+const runH = await runSites();
+ok('the run finishes with something to reach', runH.status.kind === 'done' && runH.results.length === 5
+   && runH.results.every(r => r.hubs === 1 && r.hubFigs.length === 1), JSON.stringify(runH.status));
+
+// The figure, done again from its parts: the card's profile and cover, the
+// run's repeater radio transmitting, the network's commonest radio on a mast
+// listening, on the run's frequency.
+const crossH = await page.evaluate(async () => {
+  const d = MapSites.exportSites();
+  const r = MapSites.results().find(x => x.src === 'ground');
+  const h = MapSites.hubs()[0];
+  const full = x => x && x.tx_power_w != null && x.antenna_gain_dbi != null && x.line_loss_db != null && x.rx_threshold_dbm != null;
+  const sys = state.data.rm_systems.filter(full);
+  const rep = sys.find(x => x.name === d.rep.sysName);
+  const n = new Map();
+  for (const s of state.data.stations) { const x = rmSystemOf(s); if (full(x)) n.set(x.id, (n.get(x.id) || 0) + 1); }
+  const common = sys.reduce((b, x) => ((n.get(x.id) || 0) > (n.get(b.id) || 0) ? x : b), sys[0]);
+  const own = common.antenna_height_m != null ? Number(common.antenna_height_m) : PATH_DEFAULT_AGL;
+  const agl = Math.max(own, pathPropOf().mastAgl);
+  const f = d.f;
+  const prof = await Terrain.profile([[r.lat, r.lon], [h.lat, h.lon]], 256);
+  const cov = await LandCover.sample(prof.lat, prof.lon);
+  const an = pathAnalyse(prof, { elevA: null, elevB: null, aglA: d.rep.agl, aglB: agl, freqMhz: f,
+    cover: cov.ok ? cov.cls : null, canopy: cov.ok && cov.canopyOk ? cov.canopy : null });
+  const want = wattsToDbm(rep.tx_power_w) + rep.antenna_gain_dbi - rep.line_loss_db - an.pathLoss_db
+             + common.antenna_gain_dbi - common.line_loss_db - common.rx_threshold_dbm;
+  const fig = r.hubFigs[0];
+  return { got: fig.margin, want, src: fig.src, f: MapSites.hubPricing()[0].f, runF: f,
+           agl: MapSites.hubPricing()[0].radio.agl, wantAgl: agl };
+});
+ok('a must-reach figure is the new mast\'s radio on to the far end\'s, the link budget card\'s way',
+   crossH.src === 'cover' && Math.abs(crossH.got - crossH.want) < 1e-9 && crossH.f === crossH.runF && crossH.agl === crossH.wantAgl,
+   JSON.stringify(crossH));
+
+// The rule: more of the list reached ranks first, whatever the weights. With
+// every path counted as reached, height alone orders the five; then the bar
+// is set between the margins they have, so some reach and some do not.
+const HA = runH.results;
+const ms = HA.map(r => r.hubMin).filter(v => v != null).sort((a, b) => a - b);
+const HT = ms.length >= 2 && ms[ms.length - 1] - ms[0] > 0.2 ? (ms[0] + ms[ms.length - 1]) / 2 : null;
+if (HT != null) {
+  await page.evaluate(t => { state.mapFadeOkDb = t; MapSites.set('count', 5); }, HT);
+  await settle();
+  const HB = await page.evaluate(() => MapSites.results());
+  const inv = HA.some((a, i) => HA.some((b, j) => i < j && a.hubMin < HT && b.hubMin >= HT));
+  ok('a place that reaches it ranks above one that does not, whatever the weights',
+     HB.every((r, i) => i === 0 || r.reach <= HB[i - 1].reach) && HB[0].reach === 1,
+     HB.map(r => `${r.reach}/${Math.round(r.ground)} m/${r.hubMin != null ? r.hubMin.toFixed(1) : '—'}`).join(' → '));
+  ok('…which put a lower hill first that height alone would have put second or later',
+     !inv || HB[0].lat !== HA[0].lat || HA[0].hubMin >= HT,
+     `bar ${HT.toFixed(1)} dB; height alone: ${HA.map(r => `${Math.round(r.ground)} m/${r.hubMin != null ? r.hubMin.toFixed(1) : "—"}`).join(' → ')}`);
+  // The finalists are picked on it too: the pool's best reach is among them.
+  const picked = await page.evaluate(() => {
+    const scr = MapSites.screened();
+    const max = Math.max(...scr.map(c => c.s.reach));
+    const res = MapSites.results();
+    const top = res.map(r => scr.find(c => c.lat === r.lat && c.lon === r.lon)).filter(Boolean);
+    return { max, best: Math.max(...top.map(c => c.s.reach)) };
+  });
+  ok('…and the finalists are picked on it, not on the sites alone', picked.best === picked.max, JSON.stringify(picked));
+} else {
+  ok('(the five reach it within a fifth of a decibel of each other — no bar to set between them)', true);
+}
+
+const shown = await page.evaluate(() => {
+  MapSites.select(1);
+  const res = document.querySelector('.sites-result.is-on')?.textContent.replace(/\s+/g, ' ') || '';
+  const rows = [...document.querySelectorAll('.sites-result.is-on .sites-table-hub')].length;
+  const sub = document.querySelector('.sites-result.is-on .sites-table-sub')?.textContent || '';
+  let heavy = 0;
+  MapSites.drawn().lines.eachLayer(l => { if (l.mn3d === 'link' && l.options.weight === 5) heavy++; });
+  const csv = MapSites.csvText().trim().split('\n').filter(l => !l.startsWith('#'));
+  const kml = sitesKml(MapSites.exportSites(), { icons: 'web' });
+  return { res, rows, sub, heavy, onward: csv.filter(l => /repeater on to it/.test(l)).length, results: MapSites.results().length,
+           cols: csv[0].split(','), kmlHubs: /<name>Must reach \(1\)<\/name>/.test(kml), kmlFrom: /<name>Must reach from #1 \(1\)<\/name>/.test(kml),
+           legend: /it must reach/.test(document.getElementById('map-legend')?.textContent || '') };
+});
+ok('each result says how many it must reach it reaches, and its table lists them under their own heading',
+   /Must reach \d of 1 at/.test(shown.res) && shown.rows === 1 && /Must reach/.test(shown.sub), shown.res.slice(0, 300));
+ok('the chosen one\'s path on is drawn, heavier than the sites\'', shown.heavy === 1, `${shown.heavy}`);
+ok('the CSV carries a row on to it for every result, and says which way each row runs',
+   shown.onward === shown.results && shown.cols.includes('direction') && shown.cols.includes('must_reach'), JSON.stringify(shown.cols));
+ok('Google Earth gets a Must reach folder, and each candidate its paths on', shown.kmlHubs && shown.kmlFrom);
+ok('the map\'s key says what the dashed ring is', shown.legend);
+await page.evaluate(w => { state.mapFadeOkDb = w; MapSites.set('wElev', 2); MapSites.set('wLos', 3); MapSites.set('wFade', 4); MapSites.set('wRoad', 1); }, okWas);
+await settle();
+await page.evaluate(() => MapSites.clearHubs());
+ok('Clear must reach empties it and takes the answer with it',
+   await page.evaluate(() => MapSites.hubs().length === 0 && MapSites.results().length === 0));
+
 // ── 6. reset ─────────────────────────────────────────────────────────────────
 console.log('\nReset');
 

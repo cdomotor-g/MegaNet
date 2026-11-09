@@ -1359,7 +1359,7 @@ here.
 - Export the whole drawing to Google Earth as a KML — the shapes in their own colours, and the stations they enclose or run between
 - Snap drawing to stations, so a path between two sites starts and ends on the sites and is named after them
 - Select stations off the map — by rectangle, by circle, or by shift-clicking pins — into the table below, and export the set as CSV
-- **Repeater sites** — say which sites a new repeater has to serve (the map selection, a circle drawn round them, or a pasted list of station numbers, names and ALERT addresses) and get the three to five best places nearby to put the mast, ranked on elevation, line of sight, fade margin and road reserve; fade everything else on the map to see them, see them on the terrain in 3-D, and take them to Google Earth as a KMZ with each candidate's paths in a folder of its own — see *Repeater site finder* under §17
+- **Repeater sites** — say which sites a new repeater has to serve (the map selection, a circle drawn round them, or a pasted list of station numbers, names and ALERT addresses) and get the three to five best places nearby to put the mast, ranked on elevation, line of sight, fade margin and road reserve; fade everything else on the map to see them, see them on the terrain in 3-D, and take them to Google Earth as a KMZ with each candidate's paths in a folder of its own. A **Must reach** list holds where the new mast has to pass its readings on to — filled in from the network's pass ranges and channels for a repeater that is moving — and a place that reaches more of it ranks first; every station in both lists shows how far away it is — see *Repeater site finder* under §17
 - **Relocate station** — pick a station or a repeater that has to move (*Use the selected station*, or find it) and how far it may go, and the ground round it is coloured by how good a new home each spot would be: fade margin to the repeaters that hear it now first — and, for a repeater, from every station its pass ranges carry within the Max TX distance — then open sky for the rain gauge (its WMO siting class from the trees and roofs round it), clear ground and closeness; the three to five best are pinned, kept off every building the State and OpenStreetMap have mapped and out of the water — see *Station relocation finder* under §17
 - Leaflet.js, with the map's own controls in the side panel's rail beside it (§20), each named beside
   its icon (or icons alone, by the rail's **Collapse »**, as the left bar folds), in sections whose
@@ -4328,8 +4328,35 @@ tools you point at the map, answers it.
   pasted column of station numbers does not quietly enrol every station sharing a
   digit run; a term that matches nothing is named, a word that matches many is
   handed back ("“creek” matches 457 — give the station number or the full name"),
-  and both stay in the box to be corrected. Add the base or the next repeater too,
-  if the new one has to reach it.
+  and both stay in the box to be corrected.
+- **Add what the selected repeater carries** — for a repeater that has to move:
+  every station that sends its readings up to it (the field stations its pass
+  ranges carry and the repeaters that send to it, within the map's Max TX
+  distance) as the sites to serve, and where its readings go on to as **Must
+  reach** (below).
+
+Every station in the list shows **how far away it is** — from the repeater
+being moved, where the list came from one, otherwise from the middle of the
+sites — so a far-off one stands out.
+
+**Must reach** is the other half of a repeater's job: the repeaters and base
+stations the new mast has to pass its readings on to (up to eight). For a
+repeater already in the network it fills itself by the pass ranges, the rule
+the map's arrows run on — the repeaters whose pass ranges carry its own ALERT
+addresses or share an address with its own — and the base stations in range
+that listen on its channel, **all within the map's Max TX distance**, so a repeater far away whose pass
+ranges happen to be left wide open is not something the new mast is asked to
+hit. Where nothing is on record, the nearest base within that distance stands
+in, said to be the nearest. Each row says why it is there and how far it is
+(amber beyond the Max TX distance), any of them can be taken off with ✕, and
+more can be added by number, name, ALERT address or a `lat, lon` for a mast not
+built yet. A must-reach path is priced **the other way round from a site**: the
+new mast transmits, on the run's repeater radio and mast, and the station
+listens on its own radio and mast (raised to the propagation settings' mast
+height, as the profile card does) at the frequency it listens on — a repeater's
+RX, and for a base the moved repeater's TX. It is screened for every candidate
+off the tiles (it can run far outside the search area's grid), so the finalists
+are picked on it as well as on the sites, and refined the card's way with them.
 
 **Find sites** then works in two passes. It fetches one terrain grid over a
 circle round the sites (the *Beyond the furthest site* margin, 5 km by default),
@@ -4351,17 +4378,24 @@ to 0 at 250 m, asked of the cadastre for the finalists only and only while its
 slider is above nought. A mast on road reserve is the rare happy case — no
 landholder, no lease, a road to it — so it is a bonus, never a filter, and a
 cadastre that cannot be reached is said to have failed rather than read as "no
-road here". Moving a slider re-ranks at once without re-running anything; changing
-the sites, the radio or the search area takes the answer away, because a list of
-results still on screen under a question it does not answer is the one way this
-can mislead.
+road here". **A place that reaches more of the Must reach list at the map's *ok*
+or better always ranks above one that reaches fewer, whatever the weights** — a
+hill that hears every gauge and cannot pass what it hears on is not a repeater
+site; the four figures are about the sites alone and rank among places that
+reach the same number. Moving a slider re-ranks at once without re-running
+anything; changing the sites, the must-reach list, the radio or the search area
+takes the answer away, because a list of results still on screen under a
+question it does not answer is the one way this can mislead.
 
 Pick a result and its paths are drawn coloured by fade margin (dashed where the
-ground cuts the line) with every site listed against it; **Profile the worst
-path** opens that one in the elevation profile. **Also score existing station
+ground cuts the line, heavier for the paths on to what it must reach, whose
+stations wear a dashed ring and a square dot) with every site listed against it
+and the must-reach stations under a heading of their own; **Profile the worst
+path** opens that one in the elevation profile, and each row's ↗ its own path. **Also score existing station
 sites** weighs the masts already standing in the area against the bare hills —
 a site with power, a track and a willing landholder is worth metres. **Save CSV**
-writes every result against every site. It is indicative in exactly the ways the
+writes every result against every site and every must-reach, its `direction`
+column saying which way each row was priced. It is indicative in exactly the ways the
 rest of this section is — ~30 m terrain, omnidirectional antennas, representative
 cover heights, no buildings — a short list to take to a map and a landholder, not
 a site survey.
@@ -4385,12 +4419,15 @@ Pro's *File → Open*. The file is laid out to be compared one candidate at a ti
 
 - **Sites to serve** — every site, a station with its number, roles, ALERT ids
   and position, and each saying which candidate serves it best.
+- **Must reach**, when there is one — each station with why it is on the list,
+  the candidate that reaches it best, and the channel it was priced on.
 - **One folder per candidate** (`#1 — 612 m · score 83 · 7 of 7 at ≥6 dB`,
   only #1's open) holding its numbered pin — whose balloon is the panel's summary,
   the road reserve and a table of every site's distance, line of sight and margin —
   and **Links from #n**: one path per site, draped on the ground and coloured by
   its fade margin band exactly as on the map, a path the ground cuts thinner and
-  fainter since KML has no dashes; each carries the CSV's own column names as data.
+  fainter since KML has no dashes; each carries the CSV's own column names as data
+  — and **Must reach from #n**, its paths on, the same way.
   **#1's paths are on and every other candidate's are off** — on the folder and on
   each path, because Earth on the web converts an import into project features —
   so ticking a folder puts one candidate and its paths on the terrain at a time.
@@ -4452,7 +4489,8 @@ other's own, are listed both ways, each direction priced on its own radios and
 channel, and marked *both ways*. With many paths the lattice coarsens (never under 12
 across) so places × paths stays near 16,000 profiles. For a move further than
 2 km, *Find a new hilltop for what it carries* opens **🗼 Repeater sites** with
-the stations up to it as the sites to serve.
+the stations up to it as the sites to serve and the ways on ticked here as the
+ones the new mast must reach.
 
 **Find new sites** works the site finder's two passes over a circle round the
 station (**Within**, 500 m by default, 50 m–2 km):

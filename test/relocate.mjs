@@ -638,10 +638,18 @@ if (REP) {
   await page.waitForTimeout(400);
   const handed = await page.evaluate(() => ({
     showing: dockShowing(),
-    n: document.querySelectorAll('.sites-targets li').length,
+    n: document.querySelectorAll('.sites-targets:not(.sites-hubs) li').length,
+    hubs: MapSites.hubs().map(h => h.sid),
+    origin: MapSites.origin(),
+    kms: [...document.querySelectorAll('.sites-hubs li .sites-t-km')].map(e => e.textContent),
   }));
   ok('"Find a new hilltop for what it carries" opens 🗼 Repeater sites with them as the sites to serve',
      handed.showing === 'map-sites' && handed.n === Math.min(40, REP.up.length), JSON.stringify(handed));
+  const tickedOn = rp.choices.filter(c => c.dir === 'out' && c.ticked).map(c => c.id).slice(0, 8);
+  ok('…and the ways on ticked here as the ones the new mast must reach, each with its distance',
+     handed.origin === REP.id && JSON.stringify(handed.hubs) === JSON.stringify(tickedOn)
+       && handed.kms.length === tickedOn.length && handed.kms.every(t => / km$/.test(t)),
+     JSON.stringify({ want: tickedOn, got: handed.hubs, kms: handed.kms }));
   await page.evaluate(() => { MapSites.clear(); closeStnCard(false); setDockTab('map-relocate'); MapRelocate.set('radiusM', ''); });
 
   // Two repeaters that each carry the other's AlertIDs: the path is listed

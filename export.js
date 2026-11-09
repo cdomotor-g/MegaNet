@@ -1165,6 +1165,41 @@ function sitesKmlTargets(data) {
   return sitesKmlFolder(`Sites to serve (${data.targets.length})`, {}, pms.join('\n'));
 }
 
+// Must reach: the repeaters and bases the new mast has to pass its readings
+// on to, each saying why it is there and which candidate reaches it best.
+function sitesKmlHubs(data) {
+  const hubs = data.hubs || [];
+  if (!hubs.length) return '';
+  const pms = hubs.map((h, j) => {
+    let best = null;
+    for (const r of data.results) {
+      const l = r.hubLinks[j];
+      if (!l || l.failed) continue;
+      if (l.colo) { best = { text: `#${r.rank} — the candidate stands on it` }; break; }
+      if (l.margin != null && (!best || best.l && l.margin > best.l.margin)) best = { r, l };
+    }
+    const bestText = !best ? 'no candidate has a margin to it'
+      : best.text || `#${best.r.rank} at ${sitesKmlDb(best.l.margin)} (${best.l.verdict})`;
+    const rows = [
+      ['Must reach', h.why || 'added by hand'],
+      ['Reached best by', bestText],
+      ['Listens on', `${Number(h.f).toFixed(3)} MHz (${h.fFrom})`],
+      ['Antenna', `${h.agl} m AGL`],
+    ];
+    if (h.station) return kmlPlacemark({ ...h.station, name: `⇧ ${h.name}`, lat: h.lat, lon: h.lon }, 'mnTarget', rows);
+    return sitesKmlPlacemark({
+      name: `⇧ ${h.name}`, style: 'mnTargetPt',
+      description: [
+        '<b>A mast not built yet</b> — no station on file',
+        `<b>Position:</b> ${kmlEsc(stationLatLonText(h))}`,
+        ...rows.map(([k, v]) => `<b>${kmlEsc(k)}:</b> ${kmlEsc(v)}`),
+      ].join('<br>'),
+      geometry: `      <Point><coordinates>${h.lon},${h.lat},0</coordinates></Point>`,
+    });
+  });
+  return sitesKmlFolder(`Must reach (${hubs.length})`, {}, pms.join('\n'));
+}
+
 // One candidate: its pin, its paths, and its chords.
 function sitesKmlCandidate(data, r) {
   const n = data.targets.length;
@@ -1180,6 +1215,11 @@ function sitesKmlCandidate(data, r) {
     const los = l.failed ? '—' : l.colo ? 'on it' : kmlEsc(l.verdict || '—');
     const m = l.failed ? 'could not be computed' : l.colo ? 'on it' : kmlEsc(sitesKmlDb(l.margin));
     return `<tr><td>${kmlEsc(t.name)}</td><td>${sitesKmlF(l.dKm, 1)}</td><td>${los}</td><td>${m}</td></tr>`;
+  }).join('') + (r.hubLinks || []).map(l => {
+    const h = data.hubs[l.k];
+    const los = l.failed ? '—' : l.colo ? 'on it' : kmlEsc(l.verdict || '—');
+    const m = l.failed ? 'could not be computed' : l.colo ? 'on it' : kmlEsc(sitesKmlDb(l.margin));
+    return `<tr><td>⇧ ${kmlEsc(h.name)} (must reach)</td><td>${sitesKmlF(l.dKm, 1)}</td><td>${los}</td><td>${m}</td></tr>`;
   }).join('');
   const bits = [];
   if (c.cover) bits.push(`${c.cover} with the land cover on`);
@@ -1194,12 +1234,14 @@ function sitesKmlCandidate(data, r) {
       c.obstructed ? `, ${c.obstructed} obstructed` : ''} of ${n}`,
     `<b>Fade margin:</b> worst ${kmlEsc(sitesKmlDb(c.min))}, median ${kmlEsc(sitesKmlDb(c.median))} · ${
       c.served} of ${n} at ${data.okDb} dB or better`,
+    ...(c.hubs ? [`<b>Must reach:</b> ${c.reach} of ${c.hubs} at ${data.okDb} dB or better${
+      c.hubMin != null ? `, weakest ${kmlEsc(sitesKmlDb(c.hubMin))}` : ''}${c.hubFailed ? ` · ${c.hubFailed} could not be computed` : ''}`] : []),
     `<b>Road reserve:</b> ${kmlEsc(r.roadText)}`,
     `<b>Score parts:</b> elevation ${pct(r.parts.E)} · line of sight ${pct(r.parts.L)} · fade margin ${
       pct(r.parts.F)} · road ${pct(r.parts.R)} — out of 100 each, before the weights`,
     '<table border="1" cellpadding="3" cellspacing="0"><tr><th>Site</th><th>km</th><th>Line of sight</th>'
       + `<th>Margin</th></tr>${rows}</table>`,
-    `<i>Figures: ${kmlEsc(bits.join(' · '))}. The margin is one way, site to repeater — the way the readings go.</i>`,
+    `<i>Figures: ${kmlEsc(bits.join(' · '))}. The margin is one way, the way the readings go: site to repeater, and the repeater on to what it must reach.</i>`,
   ].join('<br>');
   const pin = sitesKmlPlacemark({
     name: `#${r.rank} repeater site — ${Math.round(r.ground)} m`,
@@ -1246,6 +1288,35 @@ function sitesKmlCandidate(data, r) {
       </LineString>`,
     });
   });
+  // The paths on to what it must reach, the same way round as the panel
+  // prices them: this mast transmitting.
+  const onward = (r.hubLinks || []).filter(l => !l.colo && !l.failed).map(l => {
+    const h = data.hubs[l.k];
+    const obs = l.verdict === 'obstructed';
+    return sitesKmlPlacemark({
+      name: `#${r.rank} ⇧ ${h.name} — ${sitesKmlF(l.dKm, 1)} km · ${sitesKmlDb(l.margin)}`,
+      hidden: !first,
+      description: [
+        `<b>#${r.rank} on to ${kmlEsc(h.name)}</b>, ${sitesKmlF(l.dKm, 1)} km — must reach`,
+        `<b>Line of sight:</b> ${kmlEsc(l.verdict || '—')}${obs ? ' — the ground cuts this path' : ''}`,
+        `<b>Fade margin:</b> ${kmlEsc(sitesKmlDb(l.margin))}, the new mast to ${kmlEsc(h.name)} at ${Number(h.f).toFixed(3)} MHz`,
+        `<b>Figure:</b> ${kmlEsc(sitesKmlSource(l.src, data.samples))}`,
+        `<i>Coloured by fade margin: ${kmlEsc(legend)}. Drawn on the ground, not as a line of sight.</i>`,
+      ].join('<br>'),
+      style: `mnLink${obs ? 'Obs' : ''}-${l.band}`,
+      data: [
+        ['rank', r.rank], ['target', h.name], ['target_number', h.number || ''],
+        ['target_lat', sitesKmlF(h.lat, 6)], ['target_lon', sitesKmlF(h.lon, 6)],
+        ['distance_km', sitesKmlF(l.dKm, 2)], ['los', l.verdict || ''],
+        ['margin_db', sitesKmlF(l.margin, 1)], ['figure', l.src], ['direction', 'repeater on to it'],
+      ],
+      geometry: `      <LineString>
+        <tessellate>1</tessellate>
+        <altitudeMode>clampToGround</altitudeMode>
+        <coordinates>${kmlCoords([[r.lat, r.lon], [h.lat, h.lon]])}</coordinates>
+      </LineString>`,
+    });
+  });
   const chords = drawn.map(l => {
     const t = data.targets[l.k];
     return sitesKmlPlacemark({
@@ -1268,10 +1339,12 @@ function sitesKmlCandidate(data, r) {
   const body = [
     pin,
     paths.length ? sitesKmlFolder(`Links from #${r.rank} (${paths.length})`, { hidden: !first }, paths.join('\n')) : '',
+    onward.length ? sitesKmlFolder(`Must reach from #${r.rank} (${onward.length})`, { hidden: !first }, onward.join('\n')) : '',
     chords.length ? sitesKmlFolder('Sight lines at antenna height (3-D)', { hidden: true }, chords.join('\n')) : '',
   ].filter(Boolean).join('\n');
   return sitesKmlFolder(
-    `#${r.rank} — ${Math.round(r.ground)} m · score ${Math.round(r.score)} · ${c.served} of ${n} at ≥${data.okDb} dB`,
+    `#${r.rank} — ${Math.round(r.ground)} m · score ${Math.round(r.score)} · ${c.served} of ${n} at ≥${data.okDb} dB${
+      c.hubs ? ` · must reach ${c.reach} of ${c.hubs}` : ''}`,
     { open: first }, body);
 }
 
@@ -1313,6 +1386,8 @@ function sitesKml(data, { icons } = {}) {
       kmlEsc(data.marginKm)} km beyond the furthest.`,
     `<b>Repeater radio:</b> ${kmlEsc(data.rep.sysName)} at ${kmlEsc(data.rep.agl)} m AGL, ${Number(data.f).toFixed(3)} MHz.${
       data.assumedRadio ? ` Sites with no complete radio on file are taken to carry ${kmlEsc(data.assumedRadio)}.` : ''}`,
+    ...((data.hubs || []).length ? [`<b>Must reach:</b> ${data.hubs.map(h => kmlEsc(h.name)).join(', ')} — priced from the new mast to each, `
+      + `and a candidate reaching more of them at ${data.okDb} dB or better ranks above one reaching fewer, whatever the weights.`] : []),
     `<b>What matters:</b> elevation ${w.e} · line of sight ${w.l} · fade margin ${w.f} · road reserve ${w.r} (weights 0 to 5).`,
     `<b>Terrain:</b> screened over a ~${kmlEsc(data.res)} m grid; the finalists checked at ${data.samples} samples with the land cover on them, kept at least ${
       Number(data.spacingKm).toFixed(1)} km apart.`,
@@ -1333,6 +1408,7 @@ function sitesKml(data, { icons } = {}) {
   <description><![CDATA[${desc}]]></description>
 ${sitesKmlLookAt(data.area.lat, data.area.lon, data.area.rKm * 1000 * 2.8, 40, '  ')}${sitesKmlStyles(data, ic)}
 ${sitesKmlTargets(data)}
+${sitesKmlHubs(data)}
 ${data.results.map(r => sitesKmlCandidate(data, r)).join('\n')}
 ${sitesKmlArea(data)}
 </Document>

@@ -12,13 +12,15 @@
 // bearingDeg, acmaHaversineKm, cssVar, slug, dlText, stationLatLonText,
 // copyLatLonPillHtml and mapViewPills; across to terrain.js for Terrain.grid
 // and Terrain.profile, land-cover.js for LandCover.sample, path-profile.js for
-// pathAnalyse, pathPropOf, rmSystemOf, wattsToDbm and the PATH_DEFAULT_*
+// pathAnalyse, pathPropOf, rmSystemOf, stationAntenna, wattsToDbm and the PATH_DEFAULT_*
 // constants, link-budget.js for lbFmtDbd, map-roads.js for MapRoads.near, map-draw.js for MapDraw,
-// places.js for Places.parse, map-controls.js for MapChrome.panel, and app.js
-// for parseSearchTerms, parseIdRange, prepareSearch, stationMatchesSearch,
-// stationAlertIds, rerenderMapLegend and mapNote; map-backbone.js for
-// repeaterPathsOf (what a repeater hears, for Add what the selected repeater
-// carries). Its two Google Earth
+// places.js for Places.parse, map-controls.js for MapChrome.panel,
+// map-backbone.js for repeaterPathsOf (a repeater's paths both ways by its pass
+// ranges: what it hears, for Add what the selected repeater carries, and where
+// its readings go on to, for Must reach), map-direct.js for MapDirect.upOf (the
+// base stations on its channel), and app.js for parseSearchTerms, parseIdRange,
+// prepareSearch, stationMatchesSearch, stationAlertIds, findRepeaterMatches,
+// rerenderMapLegend and mapNote; core.js for termHtml as well. Its two Google Earth
 // buttons call export.js's downloadSitesKmz and downloadSitesKml, which read
 // the answer back through exportSites(); and it tells map-3d.js's Map3D when
 // what it drew has changed (sitesChanged), asked for with a `typeof` because
@@ -82,6 +84,30 @@
 //                  answer to be had. A mast in the road reserve is the rare
 //                  happy case (no landholder, no lease, a road to it), which is
 //                  why it is a bonus and not a filter.
+//
+// ── Must reach ───────────────────────────────────────────────────────────────
+// Hearing the gauges is half a repeater's job; the other half is getting what
+// it hears on to where it is going. Asked for on 9 Nov 2026: "make sure that
+// any suggested new locations can also get the message out to where it needs
+// to go, as well as listen to all the stations it needs to repeat." So a
+// second list beside the sites to serve: the repeaters and base stations the
+// new mast has to reach. It is priced the other way round from a site — the
+// new mast transmits, on the run's repeater radio, and each one listens on
+// its own radio and mast (stationAntenna) at the frequency it listens on: a
+// repeater's RX, and for a base the moved repeater's TX where there is one
+// (the channel its card's Links list matched). It is kept out of the four
+// figures above, which are about the sites, and ranks ahead of them instead:
+// a place that reaches more of the list at the map's "ok" or better always
+// ranks above one that reaches fewer, whatever the weights — the rule 🚚
+// Relocate station ranks its paths by.
+//
+// For a repeater already in the network the list fills itself, by the pass
+// ranges — the rule the map's arrows run on (repeaterPathsOf): the repeaters
+// whose pass ranges carry its own AlertIDs or share an address with its own,
+// and the bases in range on its channel (MapDirect.upOf) — all within the
+// map's Max TX distance, so a repeater far away whose pass ranges are left wide open is
+// not something the new mast is asked to hit. Every entry says how far it is
+// and why it is there, and any of them can be taken off.
 //
 // Changing a weight re-ranks and costs nothing: every figure is kept, and a
 // weight is a multiplication — MapFade's separation between a margin and the
@@ -160,6 +186,10 @@ const MapSites = (function () {
   const MIN_AREA_KM    = 2;     // the smallest search radius there is
   const COLO_KM        = 0.05;  // a candidate this close to a site is on it
   const MIN_COUNT = 3, MAX_COUNT = 5;
+  const MAX_HUBS       = 8;     // repeaters and bases the new mast must reach
+  const HUB_STEP_M     = 150;   // screening a must-reach path: a sample this far
+                                // apart, off the tiles — it can run well outside
+                                // the search area's grid
   const STORE          = 'mn-sites-v1';
 
   // The dim's reach. Every pane from the overlay budget up — map-survey.js's
@@ -188,8 +218,12 @@ const MapSites = (function () {
   let map = null, body = null;
   let layer = null, lineLayer = null;
   let targets = [];        // [{ key, kind, sid, name, number, lat, lon, elev }]
+  let hubs = [];           // must reach: the same shape, and `why` it is there
+  let origin = null;       // the id of the repeater being moved, when the lists came from one
   let pasteText = '';
   let pasteNote = null;    // what the last paste did, for the line under the box
+  let hubText = '';
+  let hubNote = '';        // the same, for the must-reach box
   let awaitCircle = null;  // Set of shape ids that existed when Draw was pressed
   let job = null;          // { cancelled } while a pass is in flight
   let found = null;        // the screened pool and everything refined since
@@ -292,9 +326,10 @@ const MapSites = (function () {
 
   // One way, the site to the repeater — the way a gauge's readings go, and
   // MapFade's reading of a link. Nothing transmits back down to a site, so
-  // there is no other way to price.
-  function marginOf(an, rep, fld) {
-    return oneWay(an.pathLoss_db, fld, rep);
+  // there is no other way to price. A must-reach path runs the other way
+  // (`out`): the new mast transmits and the repeater or base on it listens.
+  function marginOf(an, rep, far, out) {
+    return out ? oneWay(an.pathLoss_db, rep, far) : oneWay(an.pathLoss_db, far, rep);
   }
 
   // ── The sites to serve ──────────────────────────────────────────────────────
@@ -344,6 +379,145 @@ const MapSites = (function () {
     }
     if (out.added) invalidate();
     return out;
+  }
+
+  // ── Must reach ──────────────────────────────────────────────────────────────
+
+  const isRole = (s, role) => !!s && Array.isArray(s.roles) && s.roles.includes(role);
+  function linkKm() { return state.mapMaxLinkKm > 0 ? state.mapMaxLinkKm : 100; }
+
+  // Why one is on the list, in the words its row and its hover give.
+  const WHY = {
+    carries: 'carries its IDs',
+    shares: 'shares pass ranges',
+    each: 'each carries the other\'s',
+    base: 'base on its channel',
+    'base-unchecked': 'base, channel not on record',
+    nearest: 'nearest base',
+    added: 'added',
+  };
+
+  function hubOfStation(s, why) {
+    return { key: 'hub:' + s.id, kind: 'station', sid: s.id, name: s.name,
+             number: s.station_number || '', lat: s.lat, lon: s.lon,
+             elev: s.elevation_ahd != null ? s.elevation_ahd : null,
+             base: isRole(s, 'base'), why: why || 'added' };
+  }
+
+  function hubOfPoint(p) {
+    return { key: `hpt:${p.lat.toFixed(5)},${p.lon.toFixed(5)}`, kind: 'point', sid: null,
+             name: `Proposed mast ${p.text}`, number: '', lat: p.lat, lon: p.lon, elev: null,
+             base: false, why: 'added' };
+  }
+
+  function addHubs(list) {
+    const have = new Set(hubs.map(h => h.key));
+    const out = { added: 0, dup: 0, noPos: 0, capped: 0 };
+    for (const h of list) {
+      if (h.lat == null || h.lon == null || !isFinite(h.lat) || !isFinite(h.lon)) { out.noPos++; continue; }
+      if (h.sid != null && h.sid === origin) { out.dup++; continue; }   // the one being moved
+      if (have.has(h.key)) { out.dup++; continue; }
+      if (hubs.length >= MAX_HUBS) { out.capped++; continue; }
+      hubs.push(h);
+      have.add(h.key);
+      out.added++;
+    }
+    if (out.added) invalidate();
+    return out;
+  }
+
+  // Where its readings go on to, for a repeater already in the network, by
+  // the pass ranges — the rule the map's arrows run on (map-backbone.js,
+  // repeaterPathsOf): the repeaters on a pair that runs from it, whose pass
+  // ranges carry its own AlertIDs or share an address with its own; and the
+  // base stations in range that listen on its channel (MapDirect.upOf — a
+  // base has no pass ranges). All within the map's Max TX distance, nearest
+  // first; 🚚 Relocate station ticks the same ones. A base whose channel is
+  // not on record is left off, as Relocate leaves it unticked; and where none
+  // of these is on record, the nearest base within the distance stands in for
+  // where its readings go, said to be the nearest so it can be argued with.
+  function mustReachOf(rep) {
+    const K = linkKm();
+    const kmTo = s => acmaHaversineKm(rep.lat, rep.lon, s.lat, s.lon);
+    const placed = s => s && s.id !== rep.id && s.lat != null && s.lon != null;
+    let list = [];
+    if (typeof repeaterPathsOf === 'function') {
+      try { list = repeaterPathsOf(rep, K).onFrom.map(x => ({ s: x.s, km: x.km, why: x.how })); } catch (_) { list = []; }
+    } else {
+      // Without map-backbone.js: the repeaters whose pass ranges carry its
+      // own AlertIDs, which is the part of the rule app.js can answer alone.
+      let mine = [];
+      try { mine = findRepeaterMatches(rep) || []; } catch (_) { mine = []; }
+      list = mine.filter(placed).map(s => ({ s, km: kmTo(s), why: 'carries' }));
+    }
+    if (typeof MapDirect !== 'undefined' && typeof MapDirect.upOf === 'function') {
+      let up = null;
+      try { up = MapDirect.upOf(rep.id); } catch (_) { up = null; }
+      if (up) list = list.concat(up.bases.filter(b => b.check === 'match').map(b => ({ s: b.s, km: b.km, why: 'base' })));
+    }
+    list = list.filter(x => placed(x.s) && x.km <= K);
+    if (!list.length) {
+      const base = ((state.data && state.data.stations) || [])
+        .filter(s => placed(s) && isRole(s, 'base'))
+        .map(s => ({ s, km: kmTo(s), why: 'nearest' }))
+        .filter(x => x.km <= K)
+        .sort((a, b) => a.km - b.km)[0];
+      if (base) list = [base];
+    }
+    const seen = new Set();
+    return list.sort((a, b) => a.km - b.km)
+      .filter(x => !seen.has(x.s.id) && seen.add(x.s.id))
+      .map(x => hubOfStation(x.s, x.why));
+  }
+
+  // The radio at the far end of a must-reach path: its own, on its own mast
+  // (stationAntenna raises a repeater's or a base's to the propagation
+  // settings' mast height, as the profile card does), or — with no complete
+  // one on file, or a proposed mast with no station yet — the network's
+  // commonest, on a mast, said to be assumed.
+  function hubRadio(h) {
+    const s = h.sid != null ? stationById(h.sid) : null;
+    const own = s ? rmSystemOf(s) : null;
+    const sys = complete(own) ? own : fieldDefault();
+    if (!sys) return null;
+    const ant = stationAntenna(s || { roles: ['repeater'] }, sys);
+    return { ...radioOf(sys, ant.agl), assumed: !complete(own) };
+  }
+
+  // What it listens on: a repeater's RX on record. A base hears the moved
+  // repeater on the channel that repeater transmits on — its TX on record,
+  // the match its card made — and otherwise on the first channel the base is
+  // on record as receiving; failing all of those, the run's own frequency.
+  function hubFreq(h) {
+    const s = h.sid != null ? stationById(h.sid) : null;
+    const pos = v => (v != null && +v > 0 ? +v : null);
+    const rx = s && s.repeater ? pos(s.repeater.rx_mhz) : null;
+    if (rx && !isRole(s, 'base')) return { f: rx, from: 'its RX' };
+    const o = origin != null ? stationById(origin) : null;
+    const tx = o && o.repeater ? pos(o.repeater.tx_mhz) : null;
+    if (tx) return { f: tx, from: `${o.name}'s TX` };
+    if (rx) return { f: rx, from: 'its RX' };
+    const fr = s && Array.isArray(s.frequencies) ? s.frequencies.map(x => pos(x && x.rx_mhz)).find(Boolean) : null;
+    if (fr) return { f: fr, from: 'its RX' };
+    return { f: freqMhz(), from: 'the run\'s frequency' };
+  }
+
+  // What the distances in both lists are measured from: the repeater being
+  // moved, where the lists came from one, else the middle of the sites.
+  function kmRef() {
+    const o = origin != null ? stationById(origin) : null;
+    if (o && o.lat != null && o.lon != null) return { lat: o.lat, lon: o.lon, what: `from ${o.name} as it stands` };
+    const a = areaOf(targets);
+    return a ? { lat: a.lat, lon: a.lon, what: 'from the middle of the sites' } : null;
+  }
+
+  function kmHtml(ref, t, flagFar) {
+    if (!ref) return '';
+    const km = acmaHaversineKm(ref.lat, ref.lon, t.lat, t.lon);
+    const far = flagFar && km > linkKm();
+    return `<span class="sites-t-km${far ? ' txt-warn' : ''}" title="${escAttr(`${km.toFixed(1)} km ${ref.what}${
+      far ? ` — further than the map's Max TX distance of ${linkKm()} km: is this one really where its readings go?` : ''}`)}">${
+      km < 10 ? km.toFixed(1) : Math.round(km)} km</span>`;
   }
 
   function addedText(r, what) {
@@ -483,7 +657,7 @@ const MapSites = (function () {
     for (const p of block.values()) if (far(p)) picked.push(p);
     const pool = picked.map((p, n) => ({
       id: 'g' + n, src: 'ground', sid: null, name: null,
-      lat: p.lat, lon: p.lon, ground: p.ground, grid: [], fine: [], road: undefined,
+      lat: p.lat, lon: p.lon, ground: p.ground, grid: [], fine: [], hgrid: [], hfine: [], road: undefined,
     }));
 
     // Somewhere that already has a mast, a power supply, a track and a
@@ -500,7 +674,7 @@ const MapSites = (function () {
         .slice(0, EXISTING_CAP);
       here.forEach((x, n) => pool.push({
         id: 's' + n, src: 'station', sid: x.s.id, name: x.s.name, elevAhd: x.s.elevation_ahd,
-        lat: x.s.lat, lon: x.s.lon, ground: x.ground, grid: [], fine: [], road: undefined,
+        lat: x.s.lat, lon: x.s.lon, ground: x.ground, grid: [], fine: [], hgrid: [], hfine: [], road: undefined,
       }));
     }
     return pool;
@@ -541,7 +715,8 @@ const MapSites = (function () {
   // leaves a bare-ground figure, *said to be one*: a kinder number than the
   // card will give, and the result's line in the panel counts how many of
   // those it is standing on.
-  async function finePair(c, t, rep, fld, f) {
+  // `out` for a must-reach path: the same profile, priced the other way round.
+  async function finePair(c, t, rep, fld, f, out) {
     const dKm = acmaHaversineKm(c.lat, c.lon, t.lat, t.lon);
     if (dKm < COLO_KM) return { dKm, colo: true, verdict: 'clear', margin: null, src: 'cover' };
     const prof = await Terrain.profile([[c.lat, c.lon], [t.lat, t.lon]], FINE_SAMPLES);
@@ -555,14 +730,41 @@ const MapSites = (function () {
     });
     if (!an.ok) return null;
     return { dKm, verdict: an.verdict, ratio: an.worst.ratio,
-             margin: marginOf(an, rep, fld),
+             margin: marginOf(an, rep, fld, out),
              src: cover ? 'cover' : 'bare' };
+  }
+
+  // A must-reach path, screened. It can run far outside the search area, so
+  // not out of the grid: off the tiles, bare ground, a sample every
+  // HUB_STEP_M (never fewer than the grid's screen takes, never more than the
+  // card's) — fine enough that a ridge between the hill and the base is not
+  // stepped over. Holes over a quarter of it leave it unanswered, the grid
+  // screen's rule.
+  async function screenHub(c, h, rep, hr, f) {
+    const dKm = acmaHaversineKm(c.lat, c.lon, h.lat, h.lon);
+    if (dKm < COLO_KM) return { dKm, colo: true, verdict: 'clear', margin: null, src: 'grid' };
+    const n = Math.max(SCREEN_SAMPLES, Math.min(FINE_SAMPLES, Math.ceil(dKm * 1000 / HUB_STEP_M) + 1));
+    const prof = await Terrain.profile([[c.lat, c.lon], [h.lat, h.lon]], n);
+    if (!prof || !prof.ok || prof.missing > n / 4) return { dKm, failed: true, src: 'grid' };
+    const an = pathAnalyse(prof, {
+      elevA: c.src === 'station' && c.elevAhd != null ? c.elevAhd : null,
+      elevB: h.elev, aglA: rep.agl, aglB: hr.agl, freqMhz: f,
+    });
+    if (!an.ok) return { dKm, failed: true, src: 'grid' };
+    return { dKm, verdict: an.verdict, ratio: an.worst.ratio, partial: !!prof.partial,
+             margin: marginOf(an, rep, hr, true), src: 'grid' };
   }
 
   // The best figure in hand for one candidate and one site.
   function figOf(c, k, fine) {
     if (fine && c.fine[k]) return c.fine[k];
     return c.grid[k] || null;
+  }
+
+  // …and for one candidate and one must-reach.
+  function hubFigOf(c, j, fine) {
+    if (fine && c.hfine && c.hfine[j]) return c.hfine[j];
+    return (c.hgrid && c.hgrid[j]) || null;
   }
 
   // ── The score ───────────────────────────────────────────────────────────────
@@ -614,6 +816,20 @@ const MapSites = (function () {
     const sorted = s.margins.slice().sort((a, b) => a - b);
     s.min = sorted.length ? sorted[0] : null;
     s.median = sorted.length ? sorted[Math.floor((sorted.length - 1) / 2)] : null;
+    // Must reach: kept out of the four figures, which are about the sites,
+    // and counted on its own — how many it reaches at "ok" or better, and the
+    // weakest of them. A path with no figure is not reached.
+    const H = (found.hubs || []).length;
+    s.hubs = H; s.reach = 0; s.hubMin = null; s.hubFailed = 0;
+    for (let j = 0; j < H; j++) {
+      const fig = hubFigOf(c, j, fine);
+      if (!fig || fig.failed) { s.hubFailed++; continue; }
+      if (fig.colo) { s.reach++; continue; }
+      if (fig.margin == null) continue;
+      if (fig.margin >= O) s.reach++;
+      if (s.hubMin == null || fig.margin < s.hubMin) s.hubMin = fig.margin;
+    }
+    s.allReach = s.reach === H;
     return s;
   }
 
@@ -622,7 +838,10 @@ const MapSites = (function () {
     return Math.max(0.5, found.area.rKm * 2 * 0.06, 3 * found.res / 1000);
   }
 
-  const byScore = (a, b) => b.s.score - a.s.score || b.c.ground - a.c.ground;
+  // More of the must-reach list reached comes first, whatever the weights —
+  // a hill that hears every gauge and cannot pass what it hears on is not a
+  // repeater site. With nothing to reach, every place reaches all of it.
+  const byScore = (a, b) => (b.s.reach - a.s.reach) || b.s.score - a.s.score || b.c.ground - a.c.ground;
 
   // The finalists come off the screened figures alone — apples to apples, the
   // whole pool on one footing — and are spaced as they are picked, so the few
@@ -672,6 +891,9 @@ const MapSites = (function () {
     const ts = targets.slice();
     const rep = r.rep, f = freqMhz();
     const flds = ts.map(targetRadio);
+    const hs = hubs.slice();
+    const hrs = hs.map(hubRadio);
+    const hfs = hs.map(hubFreq);
     draw();
     render();
     rerenderMapLegend();
@@ -703,11 +925,11 @@ const MapSites = (function () {
             setTimeout(step, 0);
             return;
           }
-          const hs = pool.map(c => c.ground);
-          found = { area, box, pool, targets: ts, rep, flds, f,
+          const gh = pool.map(c => c.ground);
+          found = { area, box, pool, targets: ts, rep, flds, f, hubs: hs, hrs, hfs,
                     res: g.resolution_m, tiles: g.tiles, missing: g.missing,
-                    hMin: Math.min(...hs), hMax: Math.max(...hs), finals: [] };
-          resolve(refine(mine));
+                    hMin: Math.min(...gh), hMax: Math.max(...gh), finals: [] };
+          resolve(screenHubs(mine).then(ok => (ok ? refine(mine) : false)));
         };
         setTimeout(step, 0);
       });
@@ -719,24 +941,53 @@ const MapSites = (function () {
     });
   }
 
+  // Every candidate in the pool to every must-reach, off the tiles. The
+  // finalists are picked on these as well as the sites' figures — picked on
+  // the sites alone, five hills that cannot reach the base would be refined
+  // and ranked, and the one that can would never be looked at.
+  async function screenHubs(mine) {
+    const { pool, hubs: hs, rep, hrs, hfs } = found;
+    if (!hs.length) return true;
+    const todo = [];
+    for (const c of pool) for (let j = 0; j < hs.length; j++) if (hrs[j]) todo.push([c, j]);
+    let done = 0;
+    const tell = () => setStatus('running', `Screening ${pool.length} candidates on to the ${hs.length} it must reach — ${
+      todo.length ? Math.round(done / todo.length * 100) : 100}%`);
+    tell();
+    await lanes(todo, CONCURRENCY, async ([c, j]) => {
+      let fig;
+      try { fig = await screenHub(c, hs[j], rep, hrs[j], hfs[j].f); }
+      catch (_) { fig = { dKm: acmaHaversineKm(c.lat, c.lon, hs[j].lat, hs[j].lon), failed: true, src: 'grid' }; }
+      if (mine.cancelled) return;
+      c.hgrid[j] = fig;
+      done++;
+      if (done % 8 === 0 || done === todo.length) tell();
+    }, mine);
+    return !mine.cancelled;
+  }
+
   // Pick the finalists, refine whatever of them has not been refined already,
   // ask the cadastre about the ones it has not been asked about, and rank.
   // Re-entered by a weight change with the pool still in hand, so a re-rank
   // costs the new finalists' paths and nothing else.
   async function refine(mine) {
     const finals = finalists();
-    const { targets: ts, rep, flds, f } = found;
+    const { targets: ts, rep, flds, f, hubs: hs, hrs, hfs } = found;
     const todo = [];
-    for (const c of finals) for (let k = 0; k < ts.length; k++) if (c.fine[k] === undefined) todo.push([c, k]);
+    for (const c of finals) for (let k = 0; k < ts.length; k++) if (c.fine[k] === undefined) todo.push([c, k, false]);
+    for (const c of finals) for (let j = 0; j < hs.length; j++) if (hrs[j] && c.hfine[j] === undefined) todo.push([c, j, true]);
     let done = 0;
     const tell = () => setStatus('running', `Checking the ${finals.length} finalists the link budget card's
       way — 256 samples, the land cover on them — ${done} of ${todo.length} paths`);
     tell();
-    await lanes(todo, CONCURRENCY, async ([c, k]) => {
+    await lanes(todo, CONCURRENCY, async ([c, k, out]) => {
       let fig = null;
-      try { fig = await finePair(c, ts[k], rep, flds[k], f); } catch (_) { fig = null; }
+      try {
+        fig = out ? await finePair(c, hs[k], rep, hrs[k], hfs[k].f, true)
+                  : await finePair(c, ts[k], rep, flds[k], f);
+      } catch (_) { fig = null; }
       if (mine.cancelled) return;
-      c.fine[k] = fig;                    // null: tried, and the screened figure stands
+      if (out) c.hfine[k] = fig; else c.fine[k] = fig;   // null: tried, and the screened figure stands
       done++;
       tell();
     }, mine);
@@ -828,11 +1079,13 @@ const MapSites = (function () {
   // dim for the same reason: at full strength the network's own labels are
   // there, and two of them on one site is clutter. In the lines' pane, under
   // the canvas (see LINE_Z), so at full strength the station's pin covers it.
-  function targetMark(t, named) {
+  // A must-reach is the same mark, square, inside a dashed ring — where the
+  // readings go on to, not where they come from.
+  function targetMark(t, named, hub) {
     return L.divIcon({
       className: 'mn-site-icon',
-      html: `<span class="mn-site-t"><i class="mn-site-tdot" aria-hidden="true"></i>${
-        named ? `<b class="mn-site-tname">${esc(t.name)}</b>` : ''}</span>`,
+      html: `<span class="mn-site-t${hub ? ' is-hub' : ''}"><i class="mn-site-tdot" aria-hidden="true"></i>${
+        named ? `<b class="mn-site-tname">${hub ? '⇧ ' : ''}${esc(t.name)}</b>` : ''}</span>`,
       iconSize: [0, 0], iconAnchor: [0, 0],
     });
   }
@@ -854,7 +1107,7 @@ const MapSites = (function () {
     clearLayers();
     // Nothing to serve and nothing found is nothing on the map — not two empty
     // layer groups in panes of their own.
-    if (!map || (!targets.length && !results.length)) return;
+    if (!map || (!targets.length && !hubs.length && !results.length)) return;
     lineLayer = L.layerGroup([], { pane: LINE_PANE }).addTo(map);
     layer = L.layerGroup([], { pane: PANE }).addTo(map);
     const accent = cssVar('--accent', '#0b5cab');
@@ -881,18 +1134,34 @@ const MapSites = (function () {
       mark.mn3d = 'tmark';
       mark.addTo(lineLayer);
     }
+    for (const h of hubs) {
+      const ring = L.circleMarker([h.lat, h.lon], {
+        pane: LINE_PANE, radius: 12, color: accent, weight: 2.5, opacity: 0.95,
+        dashArray: '4 4', fill: false, interactive: false,
+      });
+      ring.mn3d = 'target';
+      ring.addTo(lineLayer);
+      const mark = L.marker([h.lat, h.lon], {
+        icon: targetMark(h, named, true), pane: LINE_PANE, interactive: false, keyboard: false,
+      });
+      mark.mn3d = 'tmark';
+      mark.addTo(lineLayer);
+    }
     const sel = results.find(r => selected && r.c.id === selected.id);
     if (sel) {
-      found.targets.forEach((t, k) => {
-        const fig = figOf(sel.c, k, true);
+      // The sites' paths, and — heavier, since they are the way out — the
+      // paths on to what it must reach.
+      const path = (to, fig, weight) => {
         if (!fig || fig.failed || fig.colo) return;
-        const line = L.polyline([[sel.c.lat, sel.c.lon], [t.lat, t.lon]], {
-          pane: LINE_PANE, color: bandColour(bandOf(fig)), weight: 3, opacity: 0.9,
+        const line = L.polyline([[sel.c.lat, sel.c.lon], [to.lat, to.lon]], {
+          pane: LINE_PANE, color: bandColour(bandOf(fig)), weight, opacity: 0.9,
           dashArray: fig.verdict === 'obstructed' ? '7 6' : null, interactive: false,
         });
         line.mn3d = 'link';
         line.addTo(lineLayer);
-      });
+      };
+      found.targets.forEach((t, k) => path(t, figOf(sel.c, k, true), 3));
+      (found.hubs || []).forEach((h, j) => path(h, hubFigOf(sel.c, j, true), 5));
     }
     for (const r of results) {
       const pin = L.marker([r.c.lat, r.c.lon], {
@@ -931,7 +1200,7 @@ const MapSites = (function () {
   }
 
   function dimFactor() {
-    return targets.length || results.length ? dimPct() / 100 : 1;
+    return targets.length || hubs.length || results.length ? dimPct() / 100 : 1;
   }
 
   // CSS opacity on Leaflet's *panes*, never setStyle on anybody's layers. Three
@@ -1038,7 +1307,22 @@ const MapSites = (function () {
       <span>Line of sight <strong>${s.clear}</strong> clear${s.marginal ? `, ${s.marginal} partly clear` : ''}${
         s.obstructed ? `, <span class="txt-bad">${s.obstructed} obstructed</span>` : ''} of ${n}</span>
       <span>Fade margin worst <strong>${dbText(s.min)}</strong>, median ${dbText(s.median)} ·
-        ${s.served} of ${n} at ${okDb()} dB or better</span>`;
+        ${s.served} of ${n} at ${okDb()} dB or better</span>${reachHtml(s)}`;
+  }
+
+  // The must-reach half of a result, in one line: how many it reaches, and
+  // the weakest. Nothing at all when there is nothing to reach.
+  function reachHtml(s) {
+    if (!s.hubs) return '';
+    return `
+      <span class="${s.allReach ? '' : 'txt-bad'}">${termHtml('Must reach', WORDS['Must reach'])}
+        <strong>${s.reach} of ${s.hubs}</strong> at ${okDb()} dB or better${
+        s.hubMin != null ? `, weakest ${dbText(s.hubMin)}` : ''}${
+        s.hubFailed ? ` · <span class="txt-warn">${s.hubFailed} could not be computed</span>` : ''}</span>`;
+  }
+
+  function reachText(s) {
+    return s.hubs ? `must reach ${s.reach} of ${s.hubs} at ${okDb()} dB or better` : '';
   }
 
   function popupHtml(r) {
@@ -1063,7 +1347,8 @@ const MapSites = (function () {
         <span class="legend-site" aria-hidden="true">1</span>
         <span class="small">Repeater site candidates — ${results.length} ranked, best first, for
           ${found.targets.length} site${found.targets.length === 1 ? '' : 's'} (ringed) inside the dashed
-          search area. The chosen one's paths are coloured by fade margin: green ${goodDb()} dB or better,
+          search area${found.hubs.length ? `, and ${found.hubs.length} it must reach (a dashed ring, a square
+          dot; its paths drawn heavier)` : ''}. The chosen one's paths are coloured by fade margin: green ${goodDb()} dB or better,
           yellow ${okDb()}, red below, dashed where the ground cuts the line.</span>
       </span>`;
   }
@@ -1096,7 +1381,11 @@ const MapSites = (function () {
           ${fmtKm(spacingKm())} apart. Repeater radio ${esc(found.rep.sysName)} at ${found.rep.agl} m AGL,
           ${found.f.toFixed(3)} MHz.${found.flds.some(x => x && x.assumed)
             ? ` <span class="txt-muted">Sites with no complete radio on file are taken to carry ${
-                esc(found.flds.find(x => x && x.assumed).sysName)}.</span>` : ''}`;
+                esc(found.flds.find(x => x && x.assumed).sysName)}.</span>` : ''}${found.hubs.length
+            ? ` Every candidate also priced on to the ${found.hubs.length} it must reach, the new mast transmitting —
+                a place reaching more of them at ${okDb()} dB or better ranks above one reaching fewer.${
+                found.hrs.some(x => x && x.assumed) ? ` <span class="txt-muted">One with no complete radio on file is taken to carry ${
+                  esc(found.hrs.find(x => x && x.assumed).sysName)}.</span>` : ''}` : ''}`;
       }
       default: {
         const r = readiness();
@@ -1162,7 +1451,7 @@ const MapSites = (function () {
   // so a press with no repeater selected says what to do instead.
   function repeaterButtonHtml() {
     return `<button type="button" onclick="MapSites.serveRepeater()"
-                title="Add every station that sends its readings up to the selected repeater — the field stations its pass ranges carry and the repeaters that send to it — within the map's Max TX distance, nearest first: for a repeater that has to move"
+                title="For a repeater that has to move: every station that sends its readings up to the selected repeater (the field stations its pass ranges carry and the repeaters that send to it) as the sites to serve, and where its readings go on to (the repeaters whose pass ranges carry its IDs or share an address with its own, and the bases on its channel) as Must reach — all within the map's Max TX distance, nearest first"
                 >Add what the selected repeater carries</button>`;
   }
 
@@ -1196,18 +1485,72 @@ const MapSites = (function () {
     return bits.join(' · ');
   }
 
+  // Every site with how far it is (kmRef: from the repeater being moved, or
+  // the middle of the sites) — the owner, 9 Nov 2026: "in all the lists … put
+  // a little kilometres distance to them all", so a far one stands out.
   function targetsHtml() {
     if (!targets.length) return '<p class="small txt-muted">No sites yet.</p>';
+    const ref = kmRef();
     return `
+      ${ref ? `<p class="small txt-muted sites-km-ref">${termHtml('km', WORDS.km)} ${esc(ref.what)}</p>` : ''}
       <ul class="sites-targets" aria-label="Sites the repeater has to serve">
         ${targets.map(t => `
           <li>
             <span class="sites-t-name">${esc(t.name)}</span>
             <span class="small txt-muted">${esc(t.number || (t.kind === 'point' ? 'no station yet' : ''))}</span>
+            ${kmHtml(ref, t, origin != null)}
             <button type="button" class="sites-t-x" aria-label="Remove ${escAttr(t.name)}"
                     title="Remove ${escAttr(t.name)}" onclick="MapSites.removeTarget('${escAttr(t.key)}')">✕</button>
           </li>`).join('')}
       </ul>`;
+  }
+
+  // The must-reach list: each with its distance and why it is on it.
+  function hubsHtml() {
+    if (!hubs.length) {
+      return '<p class="small txt-muted">Nothing yet — the new mast is ranked on the sites alone.</p>';
+    }
+    const ref = kmRef();
+    return `
+      ${ref ? `<p class="small txt-muted sites-km-ref">${termHtml('km', WORDS.km)} ${esc(ref.what)}</p>` : ''}
+      <ul class="sites-targets sites-hubs" aria-label="Repeaters and bases the new mast must reach">
+        ${hubs.map(h => {
+          const why = WHY[h.why] || '';
+          return `
+          <li>
+            <span class="sites-t-name">⇧ ${esc(h.name)}</span>
+            <span class="small txt-muted">${esc(h.number || (h.kind === 'point' ? 'no station yet' : ''))}${
+              h.why === 'added' ? ' · added by hand' : why ? ` · ${termHtml(why, WORDS[why] || '')}` : ''}</span>
+            ${kmHtml(ref, h, true)}
+            <button type="button" class="sites-t-x" aria-label="Remove ${escAttr(h.name)} from must reach"
+                    title="Remove ${escAttr(h.name)}" onclick="MapSites.removeHub('${escAttr(h.key)}')">✕</button>
+          </li>`;
+        }).join('')}
+      </ul>`;
+  }
+
+  function hubsFieldHtml() {
+    return `
+        <fieldset class="sites-fs">
+          <legend>${termHtml('Must reach', WORDS['Must reach'])} (${hubs.length})</legend>
+          <p class="small txt-muted">The repeaters and bases the new mast has to pass its readings on to.
+            <em>Add what the selected repeater carries</em> fills this in from the network's pass ranges and
+            channels, within the map's ${linkKm()} km Max TX distance.</p>
+          <label class="sites-paste">
+            <span class="small">Add one — a station number, name or ALERT address, or a <code>lat, lon</code>
+              for a mast not built yet.</span>
+            <input type="text" id="sites-hub-paste" spellcheck="false" autocomplete="off"
+                   value="${escAttr(hubText)}" placeholder="Wilsons Peak"
+                   oninput="MapSites.setHubPaste(this.value)"
+                   onkeydown="if (event.key === 'Enter') { event.preventDefault(); MapSites.addHubPaste(); }">
+          </label>
+          <div class="sites-row">
+            <button type="button" onclick="MapSites.addHubPaste()">Add</button>
+            <button type="button" onclick="MapSites.clearHubs()" ${hubs.length ? '' : 'disabled'}>Clear must reach</button>
+          </div>
+          <p class="small" id="sites-hub-note" aria-live="polite">${esc(hubNote)}</p>
+          ${hubsHtml()}
+        </fieldset>`;
   }
 
   function resultsHtml() {
@@ -1271,6 +1614,23 @@ const MapSites = (function () {
                         aria-label="Profile the path to ${escAttr(t.name)}">↗</button>` : ''}</td>
                 </tr>`;
               }).join('')}
+              ${found.hubs.length ? `<tr class="sites-table-sub"><th scope="rowgroup" colspan="5">${
+                termHtml('Must reach', WORDS['Must reach'])} — this mast transmitting to them</th></tr>` : ''}
+              ${found.hubs.map((h, j) => {
+                const fig = hubFigOf(r.c, j, true);
+                const band = fig && !fig.failed ? bandOf(fig) : 'none';
+                return `<tr class="sites-table-hub">
+                  <td>⇧ ${esc(h.name)}</td>
+                  <td>${fig ? fig.dKm.toFixed(1) : '—'}</td>
+                  <td class="${fig && fig.verdict === 'obstructed' ? 'txt-bad' : fig && fig.verdict === 'marginal' ? 'txt-warn' : ''}">${
+                    !fig || fig.failed ? '—' : fig.colo ? 'on it' : VERDICT[fig.verdict]}</td>
+                  <td><span class="sites-band sites-band-${band}">${
+                    !fig || fig.failed ? '—' : fig.colo ? 'on it' : dbText(fig.margin)}</span>${
+                    fig && fig.src !== 'cover' && !fig.colo && !fig.failed ? '<span class="txt-muted" title="Not the land-cover figure">*</span>' : ''}</td>
+                  <td>${fig && !fig.colo ? `<button type="button" class="btn-link" onclick="MapSites.profile(${r.rank}, ${j}, true)"
+                        aria-label="Profile the path on to ${escAttr(h.name)}">↗</button>` : ''}</td>
+                </tr>`;
+              }).join('')}
             </tbody>
           </table>
         </div>
@@ -1303,7 +1663,7 @@ const MapSites = (function () {
           <label class="sites-paste">
             <span class="small">Or paste a list — station numbers, names, ALERT addresses or
               <code>4021-4025</code> windows, and a <code>lat, lon</code> on its own line for a site with no
-              station yet. Put the base or the next repeater in too, if the new one has to reach it.</span>
+              station yet. Where the new mast has to pass its readings on to goes under Must reach.</span>
             <textarea id="sites-paste" rows="3" spellcheck="false" autocomplete="off"
                       placeholder="541155&#10;Amiens Knob AL&#10;6128, 6129&#10;-27.51, 152.47"
                       oninput="MapSites.setPaste(this.value)">${esc(pasteText)}</textarea>
@@ -1315,6 +1675,7 @@ const MapSites = (function () {
           <p class="small" id="sites-paste-note" aria-live="polite">${pasteNoteHtml()}</p>
           ${targetsHtml()}
         </fieldset>
+${hubsFieldHtml()}
 
         <fieldset class="sites-fs">
           <legend>Search</legend>
@@ -1382,7 +1743,7 @@ const MapSites = (function () {
           <button type="button" id="sites-run" class="primary" onclick="MapSites.run()"
                   ${readiness().ok && status.kind !== 'running' ? '' : 'disabled'}>Find sites</button>
           <button type="button" id="sites-cancel" onclick="MapSites.cancel()" ${status.kind === 'running' ? '' : 'hidden'}>Cancel</button>
-          <button type="button" onclick="MapSites.clear()" ${results.length || targets.length ? '' : 'disabled'}>Clear</button>
+          <button type="button" onclick="MapSites.clear()" ${results.length || targets.length || hubs.length ? '' : 'disabled'}>Clear</button>
           <button type="button" onclick="MapSites.save()" ${results.length ? '' : 'disabled'}
                   title="Every result against every site, as rows">Save CSV</button>
         </div>
@@ -1399,8 +1760,41 @@ const MapSites = (function () {
         </div>
         <p class="filter-note" id="sites-status">${statusHtml()}</p>
         ${resultsHtml()}
+        ${wordsHtml()}
         <p class="filter-note">${esc(CAVEAT)}</p>
       </div>`;
+  }
+
+  // The words on this panel that mean something particular here — on hover
+  // where they are used, and listed in the fold under the panel for a finger
+  // or a keyboard (CLAUDE.md, "Plain words").
+  const WORDS = {
+    'Must reach': 'The repeaters and base stations the new mast has to pass its readings on to. Each path is priced '
+      + 'the other way round from a site: the new mast transmits, on the repeater radio below, and the station listens '
+      + 'on its own radio and mast at the frequency it listens on. A place that reaches more of them at the map\'s '
+      + '"ok" fade margin or better always ranks above one that reaches fewer, whatever the weights.',
+    km: 'Straight-line distance, so a far-off station stands out. Measured from the repeater being moved, where the '
+      + 'lists came from one, otherwise from the middle of the sites. Amber when it is further than the map\'s Max TX '
+      + 'distance — the furthest the map draws a radio link.',
+    'carries its IDs': 'Its pass ranges include the moved repeater\'s own ALERT addresses, so it takes the repeater\'s '
+      + 'readings on — one way, up to it. The network was set up for this path.',
+    'shares pass ranges': 'Its pass ranges and the moved repeater\'s share at least one address, so each passes on what '
+      + 'the other sends — the path runs both ways, and this way is one of the ways on.',
+    'each carries the other\'s': 'Each repeater\'s pass ranges include the other\'s own ALERT addresses, so the path '
+      + 'runs both ways, and this way is one of the ways on.',
+    'base on its channel': 'A base station within the map\'s Max TX distance that is on record as receiving on the '
+      + 'channel the moved repeater transmits on — a place its readings come into Flood-Net.',
+    'base, channel not on record': 'A base station in range whose receiving channel is not on record, so nobody can '
+      + 'say whether it listens to this repeater. Ticked by hand in 🚚 Relocate station.',
+    'nearest base': 'Nothing on record says where this repeater\'s readings go on to, so the nearest base station '
+      + 'within the map\'s Max TX distance stands in for it. Take it off, or add the right one, if you know better.',
+  };
+
+  function wordsHtml() {
+    return `
+        <details class="bestrep-words"><summary>What the words here mean</summary>
+          <dl>${Object.entries(WORDS).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+        </details>`;
   }
 
   const CAVEAT = 'Indicative. ~30 m terrain and its heights above the geoid, omnidirectional '
@@ -1470,19 +1864,20 @@ const MapSites = (function () {
       `# repeater,${q(found.rep.sysName)},${found.rep.agl} m AGL,${found.f.toFixed(3)} MHz`,
       `# weights,elevation ${w.e},line of sight ${w.l},fade margin ${w.f},road reserve ${w.r}`,
       `# terrain,~${found.res} m grid screening; finalists at ${FINE_SAMPLES} samples with land cover`,
-      'rank,site_lat,site_lon,ground_m,score,where,road_reserve,target,target_number,target_lat,target_lon,distance_km,los,margin_db,figure',
+      ...(found.hubs.length ? [`# must reach,${found.hubs.map(h => q(h.name)).join(',')},priced from the new mast to each,a place reaching more at ${okDb()} dB or better ranks first`] : []),
+      'rank,site_lat,site_lon,ground_m,score,where,road_reserve,target,target_number,target_lat,target_lon,distance_km,los,margin_db,figure,direction,must_reach',
     ];
+    const line = (r, road, t, fig, dir) => rows.push([
+      r.rank, r.c.lat.toFixed(6), r.c.lon.toFixed(6), Math.round(r.c.ground), r.s.score.toFixed(1),
+      q(whereText(r.c)), q(road), q(t.name), q(t.number), t.lat.toFixed(6), t.lon.toFixed(6),
+      fig.dKm != null ? fig.dKm.toFixed(2) : '', fig.failed ? '' : fig.colo ? 'co-located' : fig.verdict ? VERDICT[fig.verdict] || fig.verdict : '',
+      f1(fig.margin), fig.failed ? 'failed' : fig.src || '', dir,
+      r.s.hubs ? `${r.s.reach} of ${r.s.hubs}` : '',
+    ].join(','));
     for (const r of results) {
       const road = roadCsv(r.c);
-      found.targets.forEach((t, k) => {
-        const fig = figOf(r.c, k, true) || {};
-        rows.push([
-          r.rank, r.c.lat.toFixed(6), r.c.lon.toFixed(6), Math.round(r.c.ground), r.s.score.toFixed(1),
-          q(whereText(r.c)), q(road), q(t.name), q(t.number), t.lat.toFixed(6), t.lon.toFixed(6),
-          fig.dKm != null ? fig.dKm.toFixed(2) : '', fig.failed ? '' : fig.colo ? 'co-located' : fig.verdict ? VERDICT[fig.verdict] || fig.verdict : '',
-          f1(fig.margin), fig.failed ? 'failed' : fig.src || '',
-        ].join(','));
-      });
+      found.targets.forEach((t, k) => line(r, road, t, figOf(r.c, k, true) || {}, 'site to repeater'));
+      found.hubs.forEach((h, j) => line(r, road, h, hubFigOf(r.c, j, true) || {}, 'repeater on to it'));
     }
     return rows.join('\n') + '\n';
   }
@@ -1559,7 +1954,10 @@ const MapSites = (function () {
     clear() {
       invalidate();
       targets = [];
+      hubs = [];
+      origin = null;
       pasteNote = null;
+      hubNote = '';
       awaitCircle = null;
       draw();
       render();
@@ -1569,6 +1967,7 @@ const MapSites = (function () {
     clearTargets() {
       invalidate();
       targets = [];
+      if (!hubs.length) origin = null;
       pasteNote = null;
       draw();
       render();
@@ -1584,22 +1983,85 @@ const MapSites = (function () {
       rerenderMapLegend();
     },
 
-    // The stations a repeater carries as the sites to serve (selectedRepeater):
-    // the selected one, or the one 🚚 Relocate station hands over by id —
-    // `open` then brings this panel up too.
+    // A repeater that has to move, both of its lists (selectedRepeater): the
+    // stations that send up to it as the sites to serve, and where its
+    // readings go on to as Must reach — the selected one, or the one 🚚
+    // Relocate station hands over by id, with the ways on it had ticked
+    // (`hubs`: [{ id, why }]). `open` brings this panel up too. A different
+    // repeater from the one the lists came from starts them afresh: two
+    // repeaters' lists mixed is a question nobody asked.
     serveRepeater(id, opts = {}) {
       const rep = id != null ? stationById(id) : selectedRepeater();
       if (!rep || !rep.repeater) {
         if (map) mapNote('Select a repeater first — open its card, pick its row, or click its pin — then press this.', 5000);
         return;
       }
+      if (origin != null && origin !== rep.id) { invalidate(); targets = []; hubs = []; }
+      origin = rep.id;
+      // Never itself, in either list.
+      const was = targets.length + hubs.length;
+      targets = targets.filter(t => t.sid !== rep.id);
+      hubs = hubs.filter(h => h.sid !== rep.id);
+      if (targets.length + hubs.length !== was) invalidate();
       const r = addTargets(carriedBy(rep).map(targetOfStation));
-      pasteNote = { text: `${addedText(r, `station${r.added === 1 ? '' : 's'} sending up to ${rep.name}`)} — the hop on from the new mast `
-        + 'is not in this ranking: give its place to 🎯 Best repeater as a new site', missing: [], ambiguous: [] };
+      const handed = Array.isArray(opts.hubs)
+        ? opts.hubs.map(x => { const s = stationById(x.id); return s ? hubOfStation(s, WHY[x.why] ? x.why : 'added') : null; }).filter(Boolean)
+        : mustReachOf(rep);
+      const h = addHubs(handed);
+      pasteNote = { text: addedText(r, `station${r.added === 1 ? '' : 's'} sending up to ${rep.name}`),
+                    missing: [], ambiguous: [] };
+      hubNote = hubs.length
+        ? `${hubs.length} it must reach on from the new mast${h.capped ? ` · ${h.capped} over the ${MAX_HUBS} limit left out` : ''}`
+          + (hubs.some(x => x.why === 'nearest') ? ' — nothing on record says where its readings go, so the nearest base stands in' : '')
+        : `Nothing within the map's ${linkKm()} km Max TX distance is on record as taking ${rep.name}'s readings on — add where they go.`;
       draw();
       render();
       rerenderMapLegend();
       if (opts.open) openPanel();
+    },
+
+    removeHub(key) {
+      const n = hubs.length;
+      hubs = hubs.filter(h => h.key !== key);
+      if (hubs.length !== n) invalidate();
+      if (!hubs.length && !targets.length) origin = null;
+      draw();
+      render();
+      rerenderMapLegend();
+    },
+
+    clearHubs() {
+      invalidate();
+      hubs = [];
+      hubNote = '';
+      if (!targets.length) origin = null;
+      draw();
+      render();
+      rerenderMapLegend();
+    },
+
+    setHubPaste(v) { hubText = String(v || ''); },
+
+    // The paste box's own rules (resolvePaste): exact before loose, a word
+    // that matches many asked back, a coordinate a mast not built yet.
+    addHubPaste() {
+      const el = document.getElementById('sites-hub-paste');
+      if (el) hubText = el.value;
+      if (!hubText.trim()) return;
+      const got = resolvePaste(hubText);
+      const list = got.hits.map(s => hubOfStation(s, 'added')).concat(got.points.map(hubOfPoint));
+      const r = addHubs(list);
+      const bits = [`${r.added} added — ${hubs.length} to reach`];
+      if (r.dup) bits.push(`${r.dup} already in, or the repeater being moved`);
+      if (r.noPos) bits.push(`${r.noPos} with no position on file`);
+      if (r.capped) bits.push(`${r.capped} over the ${MAX_HUBS} limit left out`);
+      if (got.missing.length) bits.push(`not found: ${got.missing.join(', ')}`);
+      if (got.ambiguous.length) bits.push(`${got.ambiguous.map(a => `“${a.term}” matches ${a.n}`).join(', ')} — give the station number or the full name`);
+      hubNote = bits.join(' · ');
+      hubText = got.missing.concat(got.ambiguous.map(a => a.term)).join(' ');
+      draw();
+      render();
+      rerenderMapLegend();
     },
 
     useSelection() {
@@ -1683,13 +2145,14 @@ const MapSites = (function () {
     // One path into the elevation profile and the link budget, the way the
     // backbone card and the budget card hand theirs over: a two-point line in
     // Draw & measure, reused if it is already there.
-    profile(rank, k) {
+    profile(rank, k, hub) {
       const r = results.find(x => x.rank === +rank);
-      const t = found && found.targets[+k];
+      const t = found && (hub ? found.hubs[+k] : found.targets[+k]);
       if (!r || !t) return;
-      // The site first: it is the transmitter, as in the margin the finder
-      // priced (marginOf), so the profile and the budget price the same way.
-      const pa = [t.lat, t.lon], pb = [r.c.lat, r.c.lon];
+      // The transmitter first, as in the margin the finder priced (marginOf),
+      // so the profile and the budget price the same way: the site up to the
+      // mast, or the mast on to what it must reach.
+      const pa = hub ? [r.c.lat, r.c.lon] : [t.lat, t.lon], pb = hub ? [t.lat, t.lon] : [r.c.lat, r.c.lon];
       // The card lives with the Stations cards — in the side panel beside the
       // map, or under it — never on the map, so full screen is left first,
       // the way the station card's Edit leaves it: a profile drawn behind the
@@ -1701,7 +2164,7 @@ const MapSites = (function () {
       state.path.open = true;
       const existing = MapDraw.findLine(pa, pb);
       if (existing) MapDraw.focus(existing.id);
-      else MapDraw.addLine([pa, pb], [t.sid || null, r.c.sid || null]);
+      else MapDraw.addLine([pa, pb], hub ? [r.c.sid || null, t.sid || null] : [t.sid || null, r.c.sid || null]);
       // …and brought on screen. With this panel pinned into the side panel the
       // card is in another pane of it (〽️, the path tools), which a scroll alone
       // cannot reach — a hidden element does not scroll into view — so that
@@ -1713,7 +2176,8 @@ const MapSites = (function () {
         el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
       const where = typeof stationsCardsWhere === 'function' ? stationsCardsWhere() : 'with the station cards';
-      mapNote(`Profiling site #${r.rank} → ${t.name} — the card is ${where}.`, 5000);
+      mapNote(hub ? `Profiling site #${r.rank} on to ${t.name} — the card is ${where}.`
+                  : `Profiling site #${r.rank} → ${t.name} — the card is ${where}.`, 5000);
     },
 
     save() {
@@ -1736,6 +2200,18 @@ const MapSites = (function () {
       const w = weights();
       const assumed = found.flds.find(x => x && x.assumed);
       const band = fig => (fig && !fig.failed ? bandOf(fig) : 'none');
+      const linkOut = (r, t, k, fig) => {
+        const b = band(fig);
+        return {
+          k, dKm: fig && fig.dKm != null ? fig.dKm : acmaHaversineKm(r.c.lat, r.c.lon, t.lat, t.lon),
+          verdict: fig && !fig.failed ? fig.verdict || null : null,
+          ratio: fig && fig.ratio != null ? fig.ratio : null,
+          margin: fig && fig.margin != null ? fig.margin : null,
+          src: !fig || fig.failed ? 'failed' : fig.src,
+          colo: !!(fig && fig.colo), failed: !fig || !!fig.failed,
+          band: b, colour: BAND[b][1],
+        };
+      };
       return {
         area: { ...found.area },
         marginKm: Math.max(0, +cfg.marginKm || 0),
@@ -1757,6 +2233,16 @@ const MapSites = (function () {
             station: st ? { ...st } : null,
           };
         }),
+        hubs: found.hubs.map((h, j) => {
+          const st = h.sid ? stationById(h.sid) : null;
+          return {
+            key: h.key, kind: h.kind, sid: h.sid, name: h.name, number: h.number,
+            lat: h.lat, lon: h.lon, elev: h.elev, why: WHY[h.why] || '',
+            agl: found.hrs[j] ? found.hrs[j].agl : PATH_DEFAULT_AGL,
+            f: found.hfs[j].f, fFrom: found.hfs[j].from,
+            station: st ? { ...st } : null,
+          };
+        }),
         results: results.map(r => ({
           rank: r.rank, lat: r.c.lat, lon: r.c.lon, ground: r.c.ground, score: r.s.score,
           src: r.c.src, name: r.c.name,
@@ -1767,20 +2253,10 @@ const MapSites = (function () {
             failed: r.s.failed, served: r.s.served, colo: r.s.colo,
             cover: r.s.cover, bare: r.s.bare, grid: r.s.grid,
             min: r.s.min, median: r.s.median,
+            hubs: r.s.hubs, reach: r.s.reach, hubMin: r.s.hubMin, hubFailed: r.s.hubFailed,
           },
-          links: found.targets.map((t, k) => {
-            const fig = figOf(r.c, k, true);
-            const b = band(fig);
-            return {
-              k, dKm: fig && fig.dKm != null ? fig.dKm : acmaHaversineKm(r.c.lat, r.c.lon, t.lat, t.lon),
-              verdict: fig && !fig.failed ? fig.verdict || null : null,
-              ratio: fig && fig.ratio != null ? fig.ratio : null,
-              margin: fig && fig.margin != null ? fig.margin : null,
-              src: !fig || fig.failed ? 'failed' : fig.src,
-              colo: !!(fig && fig.colo), failed: !fig || !!fig.failed,
-              band: b, colour: BAND[b][1],
-            };
-          }),
+          links: found.targets.map((t, k) => linkOut(r, t, k, figOf(r.c, k, true))),
+          hubLinks: found.hubs.map((h, j) => linkOut(r, h, j, hubFigOf(r.c, j, true))),
         })),
       };
     },
@@ -1856,7 +2332,21 @@ const MapSites = (function () {
         cover: r.s.cover, bare: r.s.bare, grid: r.s.grid,
         road: r.c.road === undefined ? undefined : r.c.road && { ...r.c.road },
         figs: found.targets.map((t, k) => ({ ...(figOf(r.c, k, true) || {}) })),
+        hubs: r.s.hubs, reach: r.s.reach, hubMin: r.s.hubMin, hubFailed: r.s.hubFailed,
+        hubFigs: found.hubs.map((h, j) => ({ ...(hubFigOf(r.c, j, true) || {}) })),
       }));
+    },
+    hubs() { return hubs.map(h => ({ ...h })); },
+    origin() { return origin; },
+    // The radio and frequency each must-reach was priced with, for the check.
+    hubPricing() {
+      return found ? found.hubs.map((h, j) => ({ key: h.key, radio: found.hrs[j] && { ...found.hrs[j] }, ...found.hfs[j] })) : [];
+    },
+    // Every candidate's screened figures, for the check: the finalists have
+    // to be picked on the must-reach paths as well as the sites'.
+    screened() {
+      return found ? found.pool.map(c => ({ id: c.id, lat: c.lat, lon: c.lon, ground: c.ground,
+                                            s: scoreOf(c, false), hgrid: (c.hgrid || []).map(f => f && { ...f }) })) : [];
     },
     pool() { return found ? found.pool.map(c => ({ id: c.id, lat: c.lat, lon: c.lon, ground: c.ground, src: c.src })) : []; },
     area() { const a = found ? found.area : areaOf(targets); return a ? { ...a } : null; },

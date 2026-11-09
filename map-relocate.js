@@ -1710,7 +1710,7 @@ const MapRelocate = (function () {
           ${upTo && typeof MapSites !== 'undefined' && MapSites.serveRepeater ? `
           <p class="small txt-muted">Further than ${MAX_R / 1000} km?
             <button type="button" class="btn-link" onclick="MapRelocate.toSites()"
-                    title="Open 🗼 Repeater sites with the stations this repeater carries as the sites to serve">Find a new hilltop for what it carries</button></p>` : ''}
+                    title="Open 🗼 Repeater sites with the stations this repeater carries as the sites to serve, and the ways on ticked here as the ones the new mast must reach">Find a new hilltop for what it carries</button></p>` : ''}
           <details class="bestrep-words"><summary>What the words here mean</summary>
             <dl>${Object.entries(REP_WORDS).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
           </details>`;
@@ -1922,11 +1922,15 @@ const MapRelocate = (function () {
     },
 
     // Further than this finder looks: the repeater site finder, with the
-    // stations this repeater carries as the sites the new mast has to serve.
+    // stations this repeater carries as the sites the new mast has to serve,
+    // and the ways on ticked here as the ones it must reach — so a hilltop
+    // found there is held to the same paths on as a place found here.
     toSites() {
       const st = station();
       if (!st || typeof MapSites === 'undefined' || !MapSites.serveRepeater) return;
-      MapSites.serveRepeater(st.id, { open: true });
+      const hubs = hubChoices(st).filter(h => h.dir === 'out' && ticks.has(h.key))
+        .map(h => ({ id: h.s.id, why: h.why || 'added' }));
+      MapSites.serveRepeater(st.id, { open: true, hubs });
     },
 
     setSearch(v) {

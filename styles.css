@@ -6702,6 +6702,26 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 .sites-t-x:hover,
 .sites-t-x:focus-visible { color: var(--text); }
 
+/* How far each one is — from the repeater being moved, or the middle of the
+   sites — at the end of its row, so a far-off one stands out down the list. */
+.sites-t-km {
+  flex: none;
+  font-size: .75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.sites-t-km.txt-warn { color: var(--warn); }
+
+.sites-km-ref { margin: var(--sp-1) 0 0; }
+
+/* The must-reach rows under the sites in a result's table. */
+.sites-table-sub th {
+  padding-top: var(--sp-2);
+  text-align: left;
+  font-weight: 600;
+}
+
 .sites-run { color: var(--accent); }
 
 /* The ranked answer. Each result is one button — pick it and its paths go on
@@ -6907,6 +6927,9 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   box-shadow: 0 0 0 1px rgba(0, 0, 0, .35);
   transform: translate(-50%, -50%);
 }
+
+/* A must-reach: the same dot, square — where the readings go on to. */
+.mn-site-t.is-hub .mn-site-tdot { border-radius: 2px; }
 
 .mn-site-tname {
   position: absolute;

@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 246, date: '2026-11-09', items: [
+      '🗼 <strong>A new hilltop that can pass the readings on.</strong> 🗼 Repeater sites has a <em>Must reach</em> list: the '
+        + 'repeaters and base stations the new mast has to get its readings on to. For a repeater that is moving it fills '
+        + 'itself from the network\'s pass ranges and channels — only those within the map\'s Max TX distance, so a far-off '
+        + 'repeater with its pass ranges left wide open is not on it — and 🚚 Relocate station\'s <em>Find a new hilltop</em> '
+        + 'brings the ways on you had ticked there. A hill that reaches more of the list always ranks above one that reaches '
+        + 'fewer, and each result lists the paths on under their own heading, in the CSV and the Google Earth file too.',
+      '📏 <strong>Distances in the lists.</strong> Every station in 🗼 Repeater sites\' two lists shows how far away it is — '
+        + 'from the repeater being moved, or the middle of the sites — so one a long way off stands out.',
+    ] },
     { n: 245, date: '2026-11-09', items: [
       '➤ <strong>Repeater-to-repeater arrows go by the pass ranges.</strong> Two repeaters whose pass ranges share any '
         + 'address still show arrows both ways. Where only one repeater\'s own addresses are in the other\'s pass ranges, the '
