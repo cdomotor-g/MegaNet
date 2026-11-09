@@ -4425,18 +4425,28 @@ offered unticked, for a station that might be better heard by a hub that does
 not carry it yet. A hub with no complete radio on file cannot be ticked.
 
 **A repeater** brings its details with it: its **pass ranges** (less any
-exclusions), how many stations they carry, the frequency it listens on and its
-radio and mast. Every station its pass ranges carry within the map's **Max TX
-distance** — the links the map draws — comes ticked under *Paths it has to
-keep*, with the addresses that put it there, and each is priced the other way
-round: from the station, on its own radio and antenna, up to the new place,
-received on the repeater's own frequency. The repeaters that pass the
-repeater's own readings on come ticked too, or, where none does, the nearest
-base offered. *all* and *none* tick the carried stations as a group. With many
-paths the lattice coarsens (never under 12 across) so places × paths stays near
-16,000 profiles. For a move further than 2 km, *Find a new hilltop for what it
-carries* opens **🗼 Repeater sites** with the same stations as the sites to
-serve.
+exclusions), how many field stations they carry, the frequency it listens on
+and its radio and mast. Its paths are listed by the way the readings run, by the
+one-way rule the station card's *Links* list uses (map-direct.js), within the
+map's **Max TX distance**, all ticked:
+
+- **Up to it** — every station whose readings come to it: the field stations
+  whose ALERT addresses its pass ranges carry, the repeaters whose own addresses
+  they carry, and the repeaters it relays on (it listens on their channel, their
+  windows share addresses, and the channels run one way). Each is priced from
+  that station, on its own radio and antenna, up to the new place, received on
+  the repeater's own frequency. *all* and *none* tick them as a group.
+- **On from it** — where its readings go: the repeaters whose pass ranges carry
+  its own addresses, the repeaters that relay it on, and the base stations in
+  range on its channel (one whose channel is not on record is listed unticked).
+  Where none is on record, the nearest base offered stands in, ticked.
+
+Two repeaters that each carry the other's addresses — a spare route — are
+listed both ways, each direction priced on its own radios and channel, and
+marked *both ways*. With many paths the lattice coarsens (never under 12
+across) so places × paths stays near 16,000 profiles. For a move further than
+2 km, *Find a new hilltop for what it carries* opens **🗼 Repeater sites** with
+the stations up to it as the sites to serve.
 
 **Find new sites** works the site finder's two passes over a circle round the
 station (**Within**, 500 m by default, 50 m–2 km):

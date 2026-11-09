@@ -316,14 +316,27 @@ const MapRelocate = (function () {
   // ── A repeater that has to move ─────────────────────────────────────────────
   // Asked for on 9 Nov 2026: "a way to relocate repeaters more easily … bring
   // in all the station details of a repeater including its pass ranges". A
-  // repeater is a station like any other here — its own radio, its own mast,
-  // the repeaters that pass its own addresses on — and one thing more: the
-  // stations its pass ranges carry, whose readings it has to go on hearing
-  // from wherever it goes. Those are the pass-range relation the map draws
-  // its links from (findStationMatches), within the map's Max TX distance as
-  // the map draws them, and they are priced the other way round: the station
-  // transmits, on its own radio and antenna, and the repeater at the new place
-  // listens on its own frequency (marginOf).
+  // repeater has paths both ways, and the network says which way each runs —
+  // the one-way rule the station card's Links list runs on (map-direct.js):
+  //
+  //   up to it    every station whose readings come to it (MapDirect.downOf):
+  //   ('in')      the field stations whose AlertIDs its pass ranges carry, and
+  //               the repeaters whose own AlertIDs they carry or that it relays
+  //               on. Priced the other way round: that station transmits, on its
+  //               own radio and antenna, and the repeater at the new place
+  //               listens on its own frequency (marginOf).
+  //   on from it  where its readings go (MapDirect.upOf): the repeaters whose
+  //   ('out')     pass ranges carry its own AlertIDs, the ones that relay it on,
+  //               and the base stations in range on its channel.
+  //
+  // Two repeaters that each carry the other's AlertIDs are both: each path is
+  // listed and priced on its own, keyed by direction ('in:' + id for the way
+  // up to it, the bare id the way on), since the two ways run on different
+  // radios and channels. The owner, 9 Nov 2026: "if one repeater's IDs are
+  // within the pass ranges of another repeater, then we know the direction of
+  // data … two repeaters might have IDs in each other's pass ranges, which
+  // just creates … redundancy." All within the map's Max TX distance, as the
+  // map and the card draw them.
   function isRepeater(st) { return !!st && Array.isArray(st.roles) && st.roles.includes('repeater') && !!st.repeater; }
   function linkKm() { return state.mapMaxLinkKm > 0 ? state.mapMaxLinkKm : 100; }
   function listenMhz(s) { return s && s.repeater && s.repeater.rx_mhz > 0 ? s.repeater.rx_mhz : PATH_DEFAULT_MHZ; }
@@ -346,8 +359,20 @@ const MapRelocate = (function () {
   }
 
   // One entry of hubChoices as the far end of a path, or null where there is
-  // no radio to price it with.
-  function endOf(h, st) { return h.kind === 'carried' ? carriedOf(h.s, st) : hubOf(h.s); }
+  // no radio to price it with. It carries the entry's key, which is what is
+  // ticked: a station can be at the far end both ways.
+  function endOf(h, st) {
+    const e = h.dir === 'in' ? carriedOf(h.s, st) : hubOf(h.s);
+    if (!e) return null;
+    // A base hears a repeater on the channel the repeater transmits on — the
+    // match its card's Links list made — not on a repeater window it has none of.
+    const tx = st && st.repeater && st.repeater.tx_mhz > 0 ? st.repeater.tx_mhz : null;
+    return { ...e, key: h.key, ...(h.kind === 'base' && tx ? { f: tx } : {}) };
+  }
+
+  // The network's one-way rule, both ways round, when map-direct.js is here.
+  const direct = () => typeof MapDirect !== 'undefined' && typeof MapDirect.upOf === 'function'
+    && typeof MapDirect.downOf === 'function';
 
   // A repeater's pass ranges in words, exclusions after them.
   function rangesText(st) {
@@ -370,10 +395,12 @@ const MapRelocate = (function () {
   // and bases, offered unticked: a station that moves may be better heard by
   // a hub that does not carry it yet.
   //
-  // A repeater adds, ahead of them, the stations its pass ranges carry
-  // within the Max TX distance, nearest first (kind 'carried').
+  // A repeater's are its paths both ways (repeaterChoices). Every entry:
+  //   { s, key, dir: 'in' | 'out', group, kind, why, km, listening }
+  // group is the heading it is listed under; key is what is ticked.
   function hubChoices(st) {
     if (!st) return [];
+    if (isRepeater(st) && direct()) return repeaterChoices(st);
     const kmTo = s => acmaHaversineKm(st.lat, st.lon, s.lat, s.lon);
     const K = linkKm();
     const carried = carriedAll(st).map(s => ({ s, kind: 'carried', listening: false, km: kmTo(s) }))
@@ -391,9 +418,48 @@ const MapRelocate = (function () {
       .filter(x => x.km <= NEAR_HUB_KM)
       .sort((a, b) => a.km - b.km)
       .slice(0, NEAR_HUB_N);
-    return carried
-      .concat(listen.map(s => ({ s, kind: 'listening', listening: true, km: kmTo(s) })))
-      .concat(near.map(x => ({ s: x.s, kind: 'near', listening: false, km: x.km })));
+    const out = (x, kind) => ({ s: x.s, key: x.s.id, dir: 'out', group: kind, kind, why: kind === 'listening' ? 'carries' : '',
+                                listening: kind === 'listening', km: x.km });
+    return carried.map(x => ({ ...x, key: 'in:' + x.s.id, dir: 'in', group: 'in', why: 'carries' }))
+      .concat(listen.map(s => out({ s, km: kmTo(s) }, 'listening')))
+      .concat(near.map(x => out(x, 'near')));
+  }
+
+  // A repeater's paths, from map-direct.js's one-way rule (see "A repeater
+  // that has to move"): up to it first, then on from it, then the nearest few
+  // other repeaters and bases on neither list, offered unticked.
+  function repeaterChoices(st) {
+    const kmTo = s => acmaHaversineKm(st.lat, st.lon, s.lat, s.lon);
+    let down = [], up = null;
+    try { down = MapDirect.downOf(st.id) || []; } catch (_) { down = []; }
+    try { up = MapDirect.upOf(st.id); } catch (_) { up = null; }
+    up = up || { carriers: [], relays: [], bases: [] };
+    const list = down.filter(d => d.s && d.s.id !== st.id && d.s.lat != null && d.s.lon != null).map(d => ({
+      s: d.s, key: 'in:' + d.s.id, dir: 'in', group: 'in', kind: isRepeater(d.s) ? 'feeds' : 'carried',
+      why: d.why, listening: false, km: d.km,
+    }));
+    const upList = [
+      ...up.carriers.map(c => ({ s: c.s, kind: 'listening', why: 'carries', km: c.km })),
+      ...up.relays.map(r => ({ s: r.s, kind: 'relay', why: 'relays', km: r.km })),
+      ...up.bases.map(b => ({ s: b.s, kind: 'base', why: b.check === 'match' ? 'base' : 'base-unchecked', km: b.km })),
+    ].filter(x => x.s && x.s.id !== st.id && x.s.lat != null && x.s.lon != null)
+     .sort((a, b) => a.km - b.km);
+    const seenUp = new Set();
+    for (const x of upList) {
+      if (seenUp.has(x.s.id)) continue;
+      seenUp.add(x.s.id);
+      list.push({ ...x, key: x.s.id, dir: 'out', group: 'up', listening: x.kind === 'listening' });
+    }
+    const seen = new Set(list.map(x => x.s.id));
+    stations()
+      .filter(s => s.id !== st.id && !seen.has(s.id) && s.lat != null && s.lon != null
+                && Array.isArray(s.roles) && (s.roles.includes('repeater') || s.roles.includes('base')))
+      .map(s => ({ s, km: kmTo(s) }))
+      .filter(x => x.km <= NEAR_HUB_KM)
+      .sort((a, b) => a.km - b.km)
+      .slice(0, NEAR_HUB_N)
+      .forEach(x => list.push({ s: x.s, key: x.s.id, dir: 'out', group: 'near', kind: 'near', why: '', listening: false, km: x.km }));
+    return list;
   }
 
   function freqText(h) { return `${h.f.toFixed(3)} MHz`; }
@@ -846,11 +912,11 @@ const MapRelocate = (function () {
   function readiness() {
     if (!state.data) return { ok: false, why: 'No stations are loaded.' };
     const st = station();
-    if (!st) return { ok: false, why: 'Pick the station that has to move — find it by name or number, or use the one on the station card.' };
+    if (!st) return { ok: false, why: 'Pick the station or repeater that has to move — find it by name or number, or press Use the selected station.' };
     if (st.lat == null || st.lon == null) return { ok: false, why: `${st.name} has no position on file to move from.` };
     const here = hereRadio(st);
     if (!here) return { ok: false, why: 'No radio system on file carries all four of transmit power, antenna gain, line loss and receiver threshold — there is no margin to compute.' };
-    const hubs = hubChoices(st).filter(h => ticks.has(h.s.id)).map(h => endOf(h, st)).filter(Boolean);
+    const hubs = hubChoices(st).filter(h => ticks.has(h.key)).map(h => endOf(h, st)).filter(Boolean);
     if (!hubs.length) {
       if (isRepeater(st)) return { ok: false, why: 'Tick at least one station it carries, or a repeater or base it passes its readings on to.' };
       return { ok: false, why: hubChoices(st).some(h => h.listening)
@@ -1294,8 +1360,8 @@ const MapRelocate = (function () {
   function pathsDoneText() {
     const n = found.hubs.length, nIn = found.hubs.filter(h => h.dir === 'in').length, nOut = n - nIn;
     if (!nIn) return `to ${n} repeater${n === 1 ? '' : 's'}`;
-    return `on ${n} path${n === 1 ? '' : 's'} — from ${nIn} station${nIn === 1 ? '' : 's'} it carries${
-      nOut ? ` and on to ${nOut} repeater${nOut === 1 ? '' : 's'} or base${nOut === 1 ? '' : 's'}` : ''}`;
+    return `on ${n} path${n === 1 ? '' : 's'} — up to it from ${nIn} station${nIn === 1 ? '' : 's'}${
+      nOut ? ` and on from it to ${nOut} repeater${nOut === 1 ? '' : 's'} or base${nOut === 1 ? '' : 's'}` : ''}`;
   }
 
   function statusHtml() {
@@ -1359,40 +1425,65 @@ const MapRelocate = (function () {
       </button>`).join('') || '<p class="small txt-muted">No station by that name.</p>';
   }
 
+  // The heading over a group of paths. A repeater's are by direction; a
+  // station's are the repeaters carrying it and the rest nearby.
   function hubsHead(h, st, list) {
-    if (h.kind === 'carried') {
-      const n = list.filter(x => x.kind === 'carried').length;
-      const on = list.filter(x => x.kind === 'carried' && ticks.has(x.s.id)).length;
-      return `Stations it carries — ${n} in its pass ranges within ${linkKm()} km
+    if (h.group === 'in') {
+      const n = list.filter(x => x.group === 'in').length;
+      const on = list.filter(x => x.group === 'in' && ticks.has(x.key)).length;
+      return `${termHtml('Up to it', REP_WORDS['Up to it'])} — ${n} station${n === 1 ? '' : 's'} whose readings it takes, within ${linkKm()} km
         <span class="reloc-hubs-all">
-          <button type="button" class="btn-link" onclick="MapRelocate.tickKind('carried', true)" ${on === n ? 'disabled' : ''}>all</button> ·
-          <button type="button" class="btn-link" onclick="MapRelocate.tickKind('carried', false)" ${on ? '' : 'disabled'}>none</button>
+          <button type="button" class="btn-link" onclick="MapRelocate.tickKind('in', true)" ${on === n ? 'disabled' : ''}>all</button> ·
+          <button type="button" class="btn-link" onclick="MapRelocate.tickKind('in', false)" ${on ? '' : 'disabled'}>none</button>
         </span>`;
     }
-    if (h.kind === 'listening') return isRepeater(st) ? 'Passing its own readings on now' : 'Carrying it now';
-    return isRepeater(st) ? 'Nearby repeaters and bases' : 'Nearby, not carrying it';
+    if (h.group === 'up') return `${termHtml('On from it', REP_WORDS['On from it'])} — where its readings go`;
+    if (h.group === 'listening') return 'Carrying it now';
+    return isRepeater(st) ? 'Nearby repeaters and bases, on neither list' : 'Nearby, not carrying it';
+  }
+
+  // Why a path is on a repeater's list, in a few words.
+  function whyText(h, st, list) {
+    if (!isRepeater(st) || h.group === 'near') return '';
+    const both = list.some(x => x !== h && x.s.id === h.s.id && x.dir !== h.dir);
+    let w = '';
+    if (h.dir === 'in') {
+      const ids = carriedIds(h.s, st);
+      w = h.why === 'relays' ? 'repeater · it relays this one on'
+        : `${h.kind === 'feeds' ? 'repeater · ' : ''}${ids ? `its ${ids} in the pass ranges` : 'in the pass ranges'}`;
+    } else if (h.why === 'carries') {
+      const ids = carriedIds(st, h.s);
+      w = `carries its own ${ids || 'readings'}`;
+    } else if (h.why === 'relays') {
+      w = 'relays it on';
+    } else if (h.why === 'base') {
+      w = 'base station, on its channel';
+    } else if (h.why === 'base-unchecked') {
+      w = 'base station, channel not on record';
+    }
+    return both ? `${w} · ${termHtml('both ways', REP_WORDS['both ways'])}` : w;
   }
 
   function hubsHtml(st) {
     const list = hubChoices(st);
     if (!list.length) {
       return isRepeater(st)
-        ? `<p class="small txt-muted">No station in its pass ranges is within ${linkKm()} km, no repeater passes it on, and none is within 60 km.</p>`
+        ? `<p class="small txt-muted">Nothing sends up to it within ${linkKm()} km, nothing takes its readings on, and no repeater or base is within 60 km.</p>`
         : '<p class="small txt-muted">No repeater carries it, and none is within 60 km.</p>';
     }
     return `<ul class="reloc-hubs${isRepeater(st) ? ' reloc-hubs-tall' : ''}" aria-label="${isRepeater(st)
       ? 'Paths the new site has to keep' : 'Repeaters the new site has to reach'}">${list.map((h, n) => {
       const ok = !!endOf(h, st);
-      const k = found ? found.hubs.findIndex(x => x.id === h.s.id) : -1;
+      const k = found ? found.hubs.findIndex(x => x.key === h.key) : -1;
       const now = k >= 0 ? figOf(found.now, k, true) : null;
-      const first = n === 0 || list[n - 1].kind !== h.kind;
-      const ids = h.kind === 'carried' && isRepeater(st) ? carriedIds(h.s, st) : '';
+      const first = n === 0 || list[n - 1].group !== h.group;
+      const why = whyText(h, st, list);
       return `${first ? `<li class="reloc-hubs-head small txt-muted">${hubsHead(h, st, list)}</li>` : ''}
         <li>
           <label class="filter-check">
-            <input type="checkbox" ${ticks.has(h.s.id) ? 'checked' : ''} ${ok ? '' : 'disabled'}
-                   onchange="MapRelocate.toggleHub('${escAttr(h.s.id)}', this.checked)">
-            <span>${esc(h.s.name)} <span class="small txt-muted">${h.km.toFixed(1)} km${ids ? ` · ${esc(ids)}` : ''}${
+            <input type="checkbox" ${ticks.has(h.key) ? 'checked' : ''} ${ok ? '' : 'disabled'}
+                   onchange="MapRelocate.toggleHub('${escAttr(h.key)}', this.checked)">
+            <span>${isRepeater(st) && h.group !== 'near' ? (h.dir === 'in' ? '↑ from ' : '↑ to ') : ''}${esc(h.s.name)} <span class="small txt-muted">${h.km.toFixed(1)} km${why ? ` · ${why}` : ''}${
               ok ? '' : ' · no complete radio on file'}${now ? ` · now <span class="sites-band sites-band-${bandOf(now)}">${dbText(now.margin)}</span>` : ''}</span></span>
           </label>
         </li>`;
@@ -1603,19 +1694,20 @@ const MapRelocate = (function () {
   function repeaterHtml(st, here) {
     const all = carriedAll(st), K = linkKm();
     const inReach = all.filter(s => acmaHaversineKm(st.lat, st.lon, s.lat, s.lon) <= K).length;
+    const upTo = hubChoices(st).filter(h => h.group === 'in').length;
     const ranges = rangesText(st);
     return `
           <dl class="reloc-rep small">
             <dt>${termHtml('Pass ranges', REP_WORDS['Pass ranges'])}</dt>
             <dd>${ranges ? esc(ranges) : '<span class="txt-muted">none on file — it carries no station</span>'}</dd>
             <dt>${termHtml('Carries', REP_WORDS.Carries)}</dt>
-            <dd>${all.length} station${all.length === 1 ? '' : 's'}${all.length > inReach
-              ? ` — ${inReach} within the map's ${K} km Max TX distance, the ones listed below` : ''}</dd>
+            <dd>${all.length} field station${all.length === 1 ? '' : 's'}${all.length > inReach
+              ? ` — ${inReach} within the map's ${K} km Max TX distance` : ''}</dd>
             <dt>${termHtml('Listens on', REP_WORDS['Listens on'])}</dt>
             <dd>${esc(freqText({ f: listenMhz(st) }))}${st.repeater && st.repeater.rx_mhz > 0 ? '' : ' <span class="txt-muted">(none on file — the default)</span>'}</dd>
             ${here ? `<dt>Radio</dt><dd>${esc(here.sysName)}${here.assumed ? ' <span class="txt-muted">(assumed)</span>' : ''}, ${here.agl} m mast</dd>` : ''}
           </dl>
-          ${inReach && typeof MapSites !== 'undefined' && MapSites.serveRepeater ? `
+          ${upTo && typeof MapSites !== 'undefined' && MapSites.serveRepeater ? `
           <p class="small txt-muted">Further than ${MAX_R / 1000} km?
             <button type="button" class="btn-link" onclick="MapRelocate.toSites()"
                     title="Open 🗼 Repeater sites with the stations this repeater carries as the sites to serve">Find a new hilltop for what it carries</button></p>` : ''}
@@ -1627,9 +1719,18 @@ const MapRelocate = (function () {
   // The words a repeater's details use, on hover and in the fold under them.
   const REP_WORDS = {
     'Pass ranges': 'The ALERT addresses this repeater passes on, as its record has them, less any it is set to leave out.',
-    Carries: 'Every station with an address in the pass ranges. The ones within the map\'s Max TX distance are the paths '
-      + 'listed below, ticked: the new place has to go on hearing each of them, and is priced from the station up to it.',
+    Carries: 'Every field station with an address in the pass ranges. The ones within the map\'s Max TX distance are '
+      + 'among the paths up to it below.',
     'Listens on': 'The frequency the repeater receives on, from its record — the frequency the paths up to it are priced at.',
+    'Up to it': 'The stations whose readings come to this repeater, which the new place has to go on hearing: every field '
+      + 'station whose ALERT addresses its pass ranges carry, every repeater whose own addresses they carry, and every '
+      + 'repeater it relays on (it listens on that one\'s channel, their pass ranges share addresses, and the channels run '
+      + 'one way). Each is priced from that station up to the new place, on the frequency this repeater listens on.',
+    'On from it': 'Where its readings go, as its card\'s Links list says: the repeaters whose pass ranges carry its own '
+      + 'ALERT addresses, the repeaters that relay it on, and the base stations in range that listen on its channel. Each '
+      + 'is priced from the new place up to them. A base whose channel is not on record is listed but not ticked.',
+    'both ways': 'Each of the two carries the other\'s readings, so the path runs both ways — a spare route the network is '
+      + 'set up with. Both directions are listed and priced, each on its own radios and channel.',
   };
 
   const CAVEAT = 'Indicative. ~30 m terrain, omnidirectional antennas, a canopy map of 2020 (±5 m) '
@@ -1665,12 +1766,15 @@ const MapRelocate = (function () {
     invalidate();
     stationId = st.id;
     const choices = hubChoices(st);
-    ticks = new Set(choices.filter(h => (h.kind === 'listening' || h.kind === 'carried') && endOf(h, st)).map(h => h.s.id));
-    // A repeater nothing passes on goes straight to a base: the nearest one
-    // offered stands in for where its readings go, ticked to be argued with.
-    if (isRepeater(st) && !choices.some(h => h.kind === 'listening' && ticks.has(h.s.id))) {
-      const base = choices.find(h => h.kind === 'near' && h.s.roles.includes('base') && hubOf(h.s));
-      if (base) ticks.add(base.s.id);
+    // Every path up to it, and every way on from it on record — a base only
+    // where it listens on its channel.
+    ticks = new Set(choices.filter(h => (h.group === 'in' || h.kind === 'listening' || h.kind === 'relay'
+                                         || (h.kind === 'base' && h.why === 'base')) && endOf(h, st)).map(h => h.key));
+    // A repeater with no way on on record: the nearest base offered stands in
+    // for where its readings go, ticked to be argued with.
+    if (isRepeater(st) && !choices.some(h => h.dir === 'out' && ticks.has(h.key))) {
+      const base = choices.find(h => h.dir === 'out' && h.s.roles.includes('base') && hubOf(h.s));
+      if (base) ticks.add(base.key);
     }
     hitQ = '';
     draw();
@@ -1801,14 +1905,14 @@ const MapRelocate = (function () {
     },
     useCard() { return this.useSelected(); },
 
-    // A whole group of the paths ticked or unticked — a repeater's carried
-    // stations can run to dozens.
+    // A whole group of the paths ticked or unticked, by its group ('in') or
+    // its kind — a repeater's paths up to it can run to dozens.
     tickKind(kind, on) {
       const st = station();
       if (!st) return;
       for (const h of hubChoices(st)) {
-        if (h.kind !== kind) continue;
-        if (on && endOf(h, st)) ticks.add(h.s.id); else if (!on) ticks.delete(h.s.id);
+        if (h.group !== kind && h.kind !== kind) continue;
+        if (on && endOf(h, st)) ticks.add(h.key); else if (!on) ticks.delete(h.key);
       }
       invalidate();
       draw();
@@ -1830,8 +1934,9 @@ const MapRelocate = (function () {
       if (el) el.innerHTML = hitsHtml();
     },
 
-    toggleHub(id, on) {
-      if (on) ticks.add(id); else ticks.delete(id);
+    // One path ticked or unticked, by its key (hubChoices).
+    toggleHub(key, on) {
+      if (on) ticks.add(key); else ticks.delete(key);
       invalidate();
       draw();
       render();
@@ -1937,10 +2042,11 @@ const MapRelocate = (function () {
 
     // For the checks, and for anybody at the console.
     station() { const st = station(); return st ? { id: st.id, name: st.name } : null; },
-    hubs() { return found ? found.hubs.map(h => ({ id: h.id, name: h.name, f: h.f, agl: h.rad.agl, dir: h.dir })) : [...ticks]; },
+    hubs() { return found ? found.hubs.map(h => ({ id: h.id, key: h.key, name: h.name, f: h.f, agl: h.rad.agl, dir: h.dir })) : [...ticks]; },
     choices() {
       const st = station();
-      return st ? hubChoices(st).map(h => ({ id: h.s.id, kind: h.kind, km: h.km, ticked: ticks.has(h.s.id) })) : [];
+      return st ? hubChoices(st).map(h => ({ id: h.s.id, key: h.key, dir: h.dir, group: h.group, kind: h.kind, why: h.why,
+                                             km: h.km, ticked: ticks.has(h.key) })) : [];
     },
     status() { return { ...status }; },
     cells() {

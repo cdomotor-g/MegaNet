@@ -1160,11 +1160,18 @@ const MapSites = (function () {
   // so a press with no repeater selected says what to do instead.
   function repeaterButtonHtml() {
     return `<button type="button" onclick="MapSites.serveRepeater()"
-                title="Add every station the selected repeater's pass ranges carry within the map's Max TX distance, nearest first — for a repeater that has to move"
+                title="Add every station that sends its readings up to the selected repeater — the field stations its pass ranges carry and the repeaters that send to it — within the map's Max TX distance, nearest first: for a repeater that has to move"
                 >Add what the selected repeater carries</button>`;
   }
 
+  // Everything that sends its readings up to it — the field stations its pass
+  // ranges carry and the repeaters that send to it — by map-direct.js's
+  // one-way rule (MapDirect.downOf), the list 🚚 Relocate station keeps; the
+  // field stations alone where that file is not here.
   function carriedBy(rep) {
+    if (typeof MapDirect !== 'undefined' && typeof MapDirect.downOf === 'function') {
+      try { return (MapDirect.downOf(rep.id) || []).map(d => d.s); } catch (_) { /* the field stations below */ }
+    }
     const K = state.mapMaxLinkKm > 0 ? state.mapMaxLinkKm : 100;
     let list = [];
     try { list = findStationMatches(rep) || []; } catch (_) { list = []; }
@@ -1585,7 +1592,7 @@ const MapSites = (function () {
         return;
       }
       const r = addTargets(carriedBy(rep).map(targetOfStation));
-      pasteNote = { text: `${addedText(r, `station${r.added === 1 ? '' : 's'} ${rep.name} carries`)} — the hop on from the new mast `
+      pasteNote = { text: `${addedText(r, `station${r.added === 1 ? '' : 's'} sending up to ${rep.name}`)} — the hop on from the new mast `
         + 'is not in this ranking: give its place to 🎯 Best repeater as a new site', missing: [], ambiguous: [] };
       draw();
       render();

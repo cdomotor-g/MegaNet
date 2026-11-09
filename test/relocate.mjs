@@ -45,9 +45,13 @@
 //   A source down   Overpass refusing is said in words, and the State's
 //                   buildings still rule their places out.
 //   A repeater      "Use the selected station" takes it off its card, with its
-//                   pass ranges; the stations they carry are paths to keep,
-//                   ticked, priced from each station up to the repeater on
-//                   its own frequency; and they hand over to Repeater sites.
+//                   pass ranges; every station that sends up to it (the field
+//                   stations they carry, the repeaters whose AlertIDs they
+//                   carry or it relays on) is a path to keep, ticked, priced
+//                   from that station up on its own frequency; the repeaters
+//                   carrying its own AlertIDs are where it goes on to; a pair
+//                   carrying each other is listed both ways; and the paths up
+//                   hand over to Repeater sites.
 //   Reset           takes all of it off the map.
 //
 //   npm run relocate          (or: node relocate.mjs)
@@ -523,17 +527,49 @@ console.log('\nA repeater');
 const REP = await page.evaluate(() => {
   const done = sys => sys && sys.tx_power_w != null && sys.antenna_gain_dbi != null && sys.line_loss_db != null && sys.rx_threshold_dbm != null;
   const K = state.mapMaxLinkKm > 0 ? state.mapMaxLinkKm : 100;
+  const isRep = s => s.roles.includes('repeater') && !!s.repeater;
+  const km = (a, b) => acmaHaversineKm(a.lat, a.lon, b.lat, b.lon);
+  // What sends up to a repeater, worked out here from the register: the field
+  // stations its pass ranges carry, the repeaters whose own AlertIDs they
+  // carry (findRepeaterMatches, the pass-range relation itself), and the
+  // repeaters the card says it relays on (MapDirect._links, the card's own).
+  const upTo = r => {
+    const out = new Set();
+    for (const s of findStationMatches(r)) {
+      if (s.lat != null && s.id !== r.id && !isRep(s) && !s.roles.includes('base') && !s.proposed && km(r, s) <= K) out.add(s.id);
+    }
+    for (const x of state.data.stations) {
+      if (x.id === r.id || !isRep(x) || x.roles.includes('base') || x.lat == null || x.proposed || km(r, x) > K) continue;
+      const L = MapDirect._links(x.id);
+      if (findRepeaterMatches(x).some(c => c.id === r.id) || (L && L.relays.some(y => y.id === r.id))) out.add(x.id);
+    }
+    return [...out];
+  };
+  let best = null;
   for (const r of state.data.stations) {
-    if (!r.roles.includes('repeater') || !r.repeater || r.lat == null || !done(rmSystemOf(r))) continue;
+    if (!isRep(r) || r.roles.includes('base') || r.lat == null || !done(rmSystemOf(r))) continue;
     if (!(r.lon > 139 && r.lon < 153 && r.lat < -11 && r.lat > -28.5)) continue;
-    const near = findStationMatches(r).filter(s => s.lat != null && s.id !== r.id && acmaHaversineKm(r.lat, r.lon, s.lat, s.lon) <= K);
-    if (near.length < 3 || near.length > 12) continue;
-    return { id: r.id, name: r.name, lat: r.lat, lon: r.lon, carried: near.map(s => s.id),
-             low: r.repeater.pass_ranges[0].low, high: r.repeater.pass_ranges[0].high };
+    const ids = upTo(r);
+    const reps = ids.filter(id => isRep(state.data.stations.find(s => s.id === id)));
+    if (ids.length < 3 || ids.length > 14) continue;
+    const c = { id: r.id, name: r.name, lat: r.lat, lon: r.lon, up: ids, reps,
+                carriers: findRepeaterMatches(r).filter(x => x.lat != null && km(r, x) <= K).map(x => x.id),
+                low: r.repeater.pass_ranges[0].low, high: r.repeater.pass_ranges[0].high };
+    if (!best || (reps.length && !best.reps.length)) best = c;
+    if (best.reps.length) break;
   }
-  return null;
+  // Two repeaters each carrying the other's AlertIDs: the path runs both ways.
+  let pair = null;
+  for (const a of state.data.stations) {
+    if (pair || !isRep(a) || a.roles.includes('base') || a.lat == null) continue;
+    for (const b of findRepeaterMatches(a)) {
+      if (b.id === a.id || b.lat == null || b.roles.includes('base') || km(a, b) > K) continue;
+      if (findRepeaterMatches(b).some(x => x.id === a.id)) { pair = { a: a.id, b: b.id }; break; }
+    }
+  }
+  return best && { ...best, pair };
 });
-ok('the network has a repeater carrying a few stations to move', !!REP, '');
+ok('the network has a repeater a few stations send up to', !!REP, '');
 if (REP) {
   // Selected the way a person selects one — its card — and taken with a real click.
   await page.evaluate(id => { showStationCard(id); }, REP.id);
@@ -548,21 +584,27 @@ if (REP) {
     legend: [...document.querySelectorAll('.reloc-panel legend')].map(l => l.textContent),
     toSites: !!document.querySelector('.reloc-panel button[onclick="MapRelocate.toSites()"]'),
   }));
-  const carried = rp.choices.filter(c => c.kind === 'carried');
+  const upTo = rp.choices.filter(c => c.group === 'in');
+  const onFrom = rp.choices.filter(c => c.group === 'up');
   ok('"Use the selected station" takes the repeater whose card is up', rp.st && rp.st.id === REP.id, JSON.stringify(rp.st));
   ok('…and shows its pass ranges, the frequency it listens on and its radio',
      rp.picked.includes(`${REP.low}–${REP.high}`) || rp.picked.includes(`${REP.low}`), rp.picked.slice(0, 200));
-  ok('every station its pass ranges carry within the Max TX distance is a path to keep, ticked, nearest first',
-     carried.length === REP.carried.length && REP.carried.every(id => carried.some(c => c.id === id && c.ticked))
-       && carried.every((c, i) => i === 0 || carried[i - 1].km <= c.km) && rp.legend.includes('Paths it has to keep'),
-     JSON.stringify({ want: REP.carried.length, got: carried.length, legend: rp.legend }));
+  ok('every station that sends up to it — the field stations its pass ranges carry, the repeaters whose own AlertIDs they carry or it relays on — is a path up to it, ticked, nearest first',
+     upTo.length === REP.up.length && REP.up.every(id => upTo.some(c => c.id === id && c.ticked && c.dir === 'in' && c.key === `in:${id}`))
+       && upTo.every((c, i) => i === 0 || upTo[i - 1].km <= c.km) && rp.legend.includes('Paths it has to keep'),
+     JSON.stringify({ want: REP.up, got: upTo.map(c => c.id), legend: rp.legend }));
+  ok('…a repeater sending up to it among them, when the network has one', !REP.reps.length || REP.reps.every(id => upTo.some(c => c.id === id && c.kind === 'feeds')),
+     JSON.stringify(REP.reps));
+  ok('the repeaters whose pass ranges carry its own AlertIDs are where its readings go on to, ticked',
+     REP.carriers.every(id => onFrom.some(c => c.id === id && c.dir === 'out' && c.ticked && c.why === 'carries')),
+     JSON.stringify({ want: REP.carriers, got: onFrom.map(c => `${c.id}:${c.why}:${c.ticked}`) }));
   ok('…and a move further afield is one press from 🗼 Repeater sites', rp.toSites);
 
   await page.evaluate(() => { MapRelocate.set('radiusM', 100); });
   const B = await run();
   ok('the run finishes', B.status.kind === 'done', JSON.stringify(B.status) + ' ' + B.text.slice(0, 300));
-  ok('…screening the carried stations as paths up to the place, and says so',
-     B.hubs.filter(h => h.dir === 'in').length === REP.carried.length && /from \d+ stations? it carries/.test(B.text), B.text.slice(0, 300));
+  ok('…screening every station that sends up to it as a path up to the place, and says so',
+     B.hubs.filter(h => h.dir === 'in').length === REP.up.length && /up to it from \d+ stations?/.test(B.text), B.text.slice(0, 300));
   const crossIn = await page.evaluate(async () => {
     const hubs = MapRelocate.hubs(), k = hubs.findIndex(h => h.dir === 'in');
     const r = MapRelocate.results()[0];
@@ -596,8 +638,25 @@ if (REP) {
     n: document.querySelectorAll('.sites-targets li').length,
   }));
   ok('"Find a new hilltop for what it carries" opens 🗼 Repeater sites with them as the sites to serve',
-     handed.showing === 'map-sites' && handed.n === Math.min(40, REP.carried.length), JSON.stringify(handed));
+     handed.showing === 'map-sites' && handed.n === Math.min(40, REP.up.length), JSON.stringify(handed));
   await page.evaluate(() => { MapSites.clear(); closeStnCard(false); setDockTab('map-relocate'); MapRelocate.set('radiusM', ''); });
+
+  // Two repeaters that each carry the other's AlertIDs: the path is listed
+  // both ways, each ticked and keyed on its own.
+  if (REP.pair) {
+    const both = await page.evaluate(p => {
+      MapRelocate.pickStation(p.a);
+      const c = MapRelocate.choices().filter(x => x.id === p.b);
+      const words = document.querySelector('.reloc-panel .reloc-hubs')?.textContent.replace(/\s+/g, ' ') || '';
+      return { c, words: /both ways/.test(words) };
+    }, REP.pair);
+    ok('two repeaters each carrying the other\'s AlertIDs: the path is listed up to it and on from it, both ticked, and said to run both ways',
+       both.c.length === 2 && both.c.some(x => x.dir === 'in' && x.key === `in:${REP.pair.b}` && x.ticked)
+         && both.c.some(x => x.dir === 'out' && x.key === REP.pair.b && x.ticked) && both.words,
+       JSON.stringify(both));
+  } else {
+    ok('(no two repeaters carry each other\'s AlertIDs in this register — nothing to check both ways)', true);
+  }
 }
 
 // ── 9. reset ─────────────────────────────────────────────────────────────────

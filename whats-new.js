@@ -30,8 +30,9 @@ const WhatsNew = (() => {
         + 'it that the flat map lays over the photo — and the Dark and Light base maps keep their names in 3-D too.',
       '🚚 <strong>Move a repeater.</strong> 🚚 Relocate station now takes a repeater as well. <em>Use the selected station</em> '
         + 'takes whichever station you have picked — its card, its row in the list, or its pin — and a repeater brings its '
-        + 'pass ranges, the frequency it listens on and every station those ranges carry within the map\'s Max TX distance, '
-        + 'each ticked as a path the new spot has to keep hearing. For a move further than 2 km, <em>Find a new hilltop for '
+        + 'pass ranges, the frequency it listens on, and its paths both ways — up to it from every station and repeater whose '
+        + 'readings it takes, and on from it to the repeaters and base stations its own readings go to — each ticked as a path '
+        + 'the new spot has to keep. Two repeaters that carry each other\'s readings are listed both ways. For a move further than 2 km, <em>Find a new hilltop for '
         + 'what it carries</em> hands the same stations to 🗼 Repeater sites, which also has <em>Add what the selected '
         + 'repeater carries</em> of its own. 🎯 Best repeater takes the selected station the same way.',
       '🫧 <strong>Point at a bubble of stations</strong> and their radio paths light up, the way pointing at a single pin does '
