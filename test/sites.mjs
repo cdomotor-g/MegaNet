@@ -893,10 +893,12 @@ console.log('\nThe small profiles');
 // are inside the 60% zone — and nowhere when it says they are not.
 const thumbs = await page.evaluate(() => {
   const on = document.querySelector('.sites-result.is-on');
-  const cells = on ? [...on.querySelectorAll('.sites-thumbs .sites-thumb')] : [];
+  const cells = on ? [...on.querySelectorAll('.sites-table tbody tr .sites-thumb')] : [];
   const r = MapSites.results()[MapSites.selectedRank() - 1];
   return {
     n: cells.length, rows: on ? on.querySelectorAll('.sites-table tbody tr').length : 0,
+    ownRow: new Set(cells.map(b => b.closest('tr'))).size,
+    apart: !!on?.querySelector('.sites-thumbs'),
     drawn: cells.filter(b => b.querySelector('svg.path-thumb line') && b.querySelector('svg.path-thumb path')).length,
     kept: r.figs.filter(f => f.thumb && f.thumb.pts.length > 10).length,
     notClear: r.figs.filter(f => f.verdict && f.verdict !== 'clear').length,
@@ -906,8 +908,9 @@ const thumbs = await page.evaluate(() => {
   };
 });
 ok('every result starts with its number on a band of its own', thumbs.head);
-ok('the picked result draws every path small, one picture per row of its table',
-   thumbs.n === 7 && thumbs.rows === 7 && thumbs.drawn === 7 && thumbs.kept === 7, JSON.stringify(thumbs));
+ok('the picked result draws every path small, one picture in each row of its table',
+   thumbs.n === 7 && thumbs.rows === 7 && thumbs.ownRow === 7 && !thumbs.apart && thumbs.drawn === 7 && thumbs.kept === 7,
+   JSON.stringify(thumbs));
 ok('…red on the pictures of the paths that are not clear, and only those', thumbs.red === thumbs.notClear,
    `${thumbs.red} red, ${thumbs.notClear} not clear`);
 ok('…under a key that says what the strokes are', thumbs.key);
@@ -923,7 +926,7 @@ const big = await page.evaluate(k => {
   return {
     full: PathProfile.isFull(), showing: dockShowing(),
     title: document.getElementById('app-modal-title')?.textContent || '',
-    finder: !!document.querySelector('.sites-panel .sites-result.is-on .sites-thumbs'),
+    finder: !!document.querySelector('.sites-panel .sites-result.is-on .sites-table .sites-thumb'),
     point: r.src !== 'station', mast: p ? p.agl_m : null, rep: MapSites.exportSites().rep.agl, by: p ? p.by : null,
     edited: !!state.radio.ends[radioKey(null, r.lat, r.lon)]?.agl_m,
     quoted: r.figs[k].margin, card: m ? m.margin : null, cardBy: m ? m.placed[1] : null,
@@ -1294,10 +1297,12 @@ const hubPic = await page.evaluate(() => {
   const last = cells[cells.length - 1];
   const fig = MapSites.results()[MapSites.selectedRank() - 1].hubFigs[0];
   const m = last?.querySelector('svg.path-thumb line[stroke="var(--accent)"]');
-  return { n: cells.length, sites: MapSites.targets().length, name: last?.querySelector('.sites-thumb-name')?.textContent || '',
+  const row = last?.closest('tr');
+  return { n: cells.length, sites: MapSites.targets().length,
+           name: row?.classList.contains('sites-table-hub') ? row.querySelector('td')?.textContent.trim() || '' : '',
            kept: !!(fig && fig.thumb), losX1: m ? +m.getAttribute('x1') : null, call: last?.getAttribute('onclick') || '' };
 });
-ok('…and a picture of it, last, mast on the left, opening its own path',
+ok('…and a picture of it, in its own row last, mast on the left, opening its own path',
    hubPic.n === hubPic.sites + 1 && /^⇧ /.test(hubPic.name) && hubPic.kept && hubPic.losX1 != null && hubPic.losX1 < 10
    && /MapSites\.profile\(1, 0, true, true\)/.test(hubPic.call), JSON.stringify(hubPic));
 await page.evaluate(w => { state.mapFadeOkDb = w; MapSites.set('wElev', 2); MapSites.set('wLos', 3); MapSites.set('wFade', 4); MapSites.set('wRoad', 1); }, okWas);

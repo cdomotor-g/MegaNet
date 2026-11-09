@@ -1600,9 +1600,9 @@ const MapSites = (function () {
           ${copyLatLonPillHtml({ lat: r.c.lat, lon: r.c.lon })}
         </div>
         <div class="table-wrap">
-          <table class="sites-table">
+          <table class="sites-table sites-table-pics">
             <caption class="sr-only">Every site against repeater site ${r.rank}</caption>
-            <thead><tr><th scope="col">Site</th><th scope="col">km</th><th scope="col">${termHtml('LOS', PATH_LOS_MEANING)}</th><th scope="col">Margin</th><th scope="col"><span class="sr-only">Profile</span></th></tr></thead>
+            <thead><tr><th scope="col">Site</th><th scope="col">km</th><th scope="col">${termHtml('LOS', PATH_LOS_MEANING)}</th><th scope="col">Margin</th><th scope="col" class="sites-t-pic">${termHtml('Ground profile', WORDS['Ground profile'])}</th><th scope="col"><span class="sr-only">Profile</span></th></tr></thead>
             <tbody>
               ${found.targets.map((t, k) => {
                 const fig = figOf(r.c, k, true);
@@ -1615,11 +1615,12 @@ const MapSites = (function () {
                   <td><span class="sites-band sites-band-${band}">${
                     !fig || fig.failed ? '—' : fig.colo ? 'on it' : dbText(fig.margin)}</span>${
                     fig && fig.src !== 'cover' && !fig.colo && !fig.failed ? '<span class="txt-muted" title="Not the land-cover figure">*</span>' : ''}</td>
+                  <td class="sites-t-pic">${picHtml(r, `${t.name} → site ${r.rank}`, fig, false, k)}</td>
                   <td>${fig && !fig.colo ? `<button type="button" class="btn-link" onclick="MapSites.profile(${r.rank}, ${k})"
                         aria-label="Profile the path to ${escAttr(t.name)}">↗</button>` : ''}</td>
                 </tr>`;
               }).join('')}
-              ${found.hubs.length ? `<tr class="sites-table-sub"><th scope="rowgroup" colspan="5">${
+              ${found.hubs.length ? `<tr class="sites-table-sub"><th scope="rowgroup" colspan="6">${
                 termHtml('Must reach', WORDS['Must reach'])} — this mast transmitting to them</th></tr>` : ''}
               ${found.hubs.map((h, j) => {
                 const fig = hubFigOf(r.c, j, true);
@@ -1632,6 +1633,7 @@ const MapSites = (function () {
                   <td><span class="sites-band sites-band-${band}">${
                     !fig || fig.failed ? '—' : fig.colo ? 'on it' : dbText(fig.margin)}</span>${
                     fig && fig.src !== 'cover' && !fig.colo && !fig.failed ? '<span class="txt-muted" title="Not the land-cover figure">*</span>' : ''}</td>
+                  <td class="sites-t-pic">${picHtml(r, `site ${r.rank} → ${h.name}`, fig, true, j)}</td>
                   <td>${fig && !fig.colo ? `<button type="button" class="btn-link" onclick="MapSites.profile(${r.rank}, ${j}, true)"
                         aria-label="Profile the path on to ${escAttr(h.name)}">↗</button>` : ''}</td>
                 </tr>`;
@@ -1639,51 +1641,42 @@ const MapSites = (function () {
             </tbody>
           </table>
         </div>
-        ${thumbsHtml(r)}
+        ${thumbsKeyHtml(r)}
       </div>`;
   }
 
-  // Every path's ground, drawn small (pathThumbSvg, path-profile.js): the table
-  // says which paths fail, the pictures say why — the ridge in the way, the
-  // trees at one end. The transmitting end on the left, as the card has it
-  // when a picture is clicked, which opens that path's chart full screen over
-  // the map: each site up to the new mast, then the mast on to what it must
-  // reach. A path with only the screened figure has no picture kept, and a
-  // click still opens its full profile.
-  function thumbsHtml(r) {
-    const cell = (name, label, fig, hub, k) => {
-      if (!fig || fig.colo) return '';
-      const ok = !fig.failed;
-      const band = ok ? bandOf(fig) : 'none';
-      const km = fig.dKm != null ? `${fig.dKm.toFixed(1)} km` : '';
-      const reading = ok ? `${dbText(fig.margin)} · ${VERDICT[fig.verdict]}` : 'no figure';
-      // finePair profiles the mast at A and the far end at B: a site sends up
-      // to the mast, so its picture is turned round; the mast sends on to a hub.
-      const pic = fig.thumb
-        ? pathThumbSvg(fig.thumb, { flip: !hub })
-        : `<span class="sites-thumb-none small txt-muted">${ok ? 'Screened only — no picture kept' : 'No figure for this path'}</span>`;
-      return `
-          <li>
-            <button type="button" class="sites-thumb" onclick="MapSites.profile(${r.rank}, ${k}, ${hub}, true)"
+  // Every path's ground, drawn small (pathThumbSvg, path-profile.js), in its
+  // own row of the table: the figures say which paths fail, the picture beside
+  // them says why — the ridge in the way, the trees at one end. The
+  // transmitting end on the left, as the card has it when a picture is
+  // clicked, which opens that path's chart full screen over the map: each site
+  // up to the new mast, then the mast on to what it must reach. A path with
+  // only the screened figure has no picture kept, and a click still opens its
+  // full profile.
+  function picHtml(r, label, fig, hub, k) {
+    if (!fig || fig.colo) return '';
+    const ok = !fig.failed;
+    const km = fig.dKm != null ? `${fig.dKm.toFixed(1)} km` : '';
+    const reading = ok ? `${dbText(fig.margin)} · ${VERDICT[fig.verdict]}` : 'no figure';
+    // finePair profiles the mast at A and the far end at B: a site sends up
+    // to the mast, so its picture is turned round; the mast sends on to a hub.
+    const pic = fig.thumb
+      ? pathThumbSvg(fig.thumb, { flip: !hub })
+      : `<span class="sites-thumb-none small txt-muted">${ok ? 'Screened only — no picture kept' : 'No figure for this path'}</span>`;
+    return `<button type="button" class="sites-thumb" onclick="MapSites.profile(${r.rank}, ${k}, ${hub}, true)"
                     title="Open the elevation profile of ${escAttr(label)} full screen"
-                    aria-label="${escAttr(`${label}: ${km}, ${reading}. Open its elevation profile full screen`)}">
-              <span class="sites-thumb-name">${hub ? '⇧ ' : ''}${esc(name)}</span>
-              ${pic}
-              <span class="sites-thumb-fig small"><span class="sites-band sites-band-${band}">${
-                ok ? dbText(fig.margin) : '—'}</span> · ${esc(km)}${ok ? ` · <span class="${
-                fig.verdict === 'obstructed' ? 'txt-bad' : fig.verdict === 'marginal' ? 'txt-warn' : ''}">${esc(VERDICT[fig.verdict])}</span>` : ''}</span>
-            </button>
-          </li>`;
-    };
-    const cells = found.targets.map((t, k) => cell(t.name, `${t.name} → site ${r.rank}`, figOf(r.c, k, true), false, k)).join('')
-      + (found.hubs || []).map((h, j) => cell(h.name, `site ${r.rank} → ${h.name}`, hubFigOf(r.c, j, true), true, j)).join('');
-    if (!cells.trim()) return '';
+                    aria-label="${escAttr(`${label}: ${km}, ${reading}. Open its elevation profile full screen`)}">${pic}</button>`;
+  }
+
+  // The pictures' key and what way round they are, under the table.
+  function thumbsKeyHtml(r) {
+    const any = found.targets.some((t, k) => { const f = figOf(r.c, k, true); return f && !f.colo; })
+      || (found.hubs || []).some((h, j) => { const f = hubFigOf(r.c, j, true); return f && !f.colo; });
+    if (!any) return '';
     return `
-        <h5 class="sites-thumbs-h">Ground profiles — the sending end on the left</h5>
         ${pathThumbKeyHtml()}
-        <ul class="sites-thumbs" aria-label="The ground under every path from or to site ${r.rank}">${cells}
-        </ul>
-        <p class="small txt-muted sites-thumbs-hint">Each site sends up to site ${r.rank}${(found.hubs || []).length
+        <p class="small txt-muted sites-thumbs-hint">Each ${termHtml('ground profile', WORDS['Ground profile'])} has its
+          sending end on the left: each site sends up to site ${r.rank}${(found.hubs || []).length
           ? `, and site ${r.rank} sends on to each ⇧ must-reach` : ''}. Click one to open it full screen, with the fade margin
           and the figures beside it.</p>`;
   }
@@ -1820,6 +1813,9 @@ ${hubsFieldHtml()}
   // where they are used, and listed in the fold under the panel for a finger
   // or a keyboard (CLAUDE.md, "Plain words").
   const WORDS = {
+    'Ground profile': 'The ground under the path, and what grows on it, drawn small beside its figures, with the sending '
+      + 'end on the left. Red is ground or trees inside 60% of the Fresnel zone, where they cost signal. Click one to open '
+      + 'that path\'s elevation profile full screen.',
     'Must reach': 'The repeaters and base stations the new mast has to pass its readings on to. Each path is priced '
       + 'the other way round from a site: the new mast transmits, on the repeater radio below, and the station listens '
       + 'on its own radio and mast at the frequency it listens on. A place that reaches more of them at the map\'s '

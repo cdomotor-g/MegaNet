@@ -6818,8 +6818,9 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 
 .sites-detail { padding: 0 var(--sp-2) var(--sp-2); }
 
-/* Every path's ground, drawn small under the table (pathThumbSvg,
-   path-profile.js), in the site finder and 🚚 Relocate station. Small enough
+/* Every path's ground, drawn small (pathThumbSvg, path-profile.js): in a
+   column of the site finder's table (.sites-table-pics, below), and under the
+   table in 🚚 Relocate station. Small enough
    that a dozen paths are a glance — one to a row in the on-map flyout, three
    or so in the side panel — and each a button: a click opens that path's
    chart full screen. */
@@ -6934,6 +6935,57 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 .sites-table td:first-child {
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+/* The site finder's table carries each path's ground beside its figures
+   (picHtml, map-sites.js). The picture grows with the panel — a side panel
+   pulled wide has the room — and, where the table is too narrow for a column
+   of them (the on-map flyout), each drops onto a line of its own under its
+   row's figures, as wide as the table. Subgrid keeps the figures' columns
+   lined up from row to row. */
+.sites-detail { container: sites-detail / inline-size; }
+
+/* Columns sized to what is in them, not the global fixed sixths — a fixed
+   sixth is narrower than the picture, and a cell's overflow is clipped. */
+.sites-table-pics { table-layout: auto; }
+
+.sites-table-pics td { vertical-align: middle; }
+
+.sites-table-pics .sites-t-pic { padding: 3px 4px; }
+
+.sites-table-pics .sites-thumb {
+  width: clamp(7rem, 38cqi - 2rem, 18rem);
+  padding: 2px;
+}
+
+@container sites-detail (max-width: 30rem) {
+  .sites-table-pics {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+  }
+
+  .sites-table-pics > thead,
+  .sites-table-pics > tbody,
+  .sites-table-pics tr {
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
+    align-items: center;
+  }
+
+  .sites-table-pics tr { border-bottom: 1px solid var(--border); }
+  .sites-table-pics thead tr { background: var(--thead); }
+  .sites-table-pics th,
+  .sites-table-pics td { border-bottom: 0; }
+
+  /* The name across the top, the figures under it, the picture last. */
+  .sites-table-pics tr > :first-child,
+  .sites-table-pics .sites-t-pic,
+  .sites-table-sub th { grid-column: 1 / -1; }
+  .sites-table-pics .sites-t-pic { order: 1; }
+  .sites-table-pics thead .sites-t-pic { display: none; }
+  .sites-table-pics td.sites-t-pic:empty { display: none; }
+  .sites-table-pics .sites-thumb { width: 100%; }
 }
 
 /* A swatch of the band beside the figure, so the table reads in the same
