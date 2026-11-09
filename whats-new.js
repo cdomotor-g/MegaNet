@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 243, date: '2026-11-09', items: [
+      '📶 <strong>Links on every station\'s card</strong>, not just field stations\'. A repeater\'s <strong>Radio</strong> tab now '
+        + 'lists its links up the network too, each with its fade margin: the repeaters that carry its own readings, the ones '
+        + 'that relay it on toward a base station, and the base stations in range that listen on its channel. Only the way up, '
+        + 'never back down to what it hears. A base station\'s card says it has none, since it is where the readings come in.',
+    ] },
     { n: 242, date: '2026-11-08', items: [
       '🗂️ <strong>Views and the map controls, told apart.</strong> In 🗺️ Layers, Views is now a card of its own in '
         + 'indigo, and the layers and switches under it are another, <em>Map layers &amp; controls</em>, in slate. A view\'s '

@@ -21,7 +21,10 @@
 //      leaves open. The Radio tab opens with a summary: its best link, and a
 //      channel nothing explains. While its card is open the map draws a line
 //      to each base that hears it — and only those — and the line goes with
-//      the card.
+//      the card. A repeater's Links run up the network too: the repeaters
+//      carrying its own AlertIDs, the ones that relay it on (one way by
+//      channel), and the bases on its TX on record — never what it carries —
+//      with no line of its own; a base station's say it has none.
 //   5. **The pins under the lines**: real clicks. Once the lines have been
 //      drawn and gone a pin still opens its card, a line still opens its
 //      radio-path card, and a canvas another layer leaves in a pane over the
@@ -191,10 +194,10 @@ async function main() {
         && lines[0].startsWith(`RX ${repeater.repeater.rx_mhz} · TX ${repeater.repeater.tx_mhz} MHz`) && /primary/.test(lines[0])
         && lines[1] === 'RX 150.4125 · TX 155.9125 MHz Voice, licence 123456/1',
       JSON.stringify(lines));
-    check('a station with no pair and no radio has no block',
+    check('a station with no pair and no radio, and not a base station, has no block',
       await page.evaluate(() => {
         const s = state.data.stations.find(x => !x.proposed && !Frequencies.pairs(x).length && !stationAlertIds(x).length
-          && x.alert2_station_id == null && x.lat != null);
+          && x.alert2_station_id == null && x.lat != null && !x.roles.includes('base'));
         showStationCard(s.id);
         return !document.querySelector('#stn-card .stn-card-freqs');
       }));
@@ -421,9 +424,54 @@ async function main() {
     await page.evaluate(() => closeStnCard());
     check('…and the lines go with the card',
       await page.evaluate(() => MapDirect._drawn().length === 0 && !document.querySelector('.legend-line-direct')));
-    check('a repeater\'s card has no Links line, and draws none',
-      await page.evaluate(id => { showStationCard(id); return !document.querySelector('#stn-card .stn-card-links') && MapDirect._drawn().length === 0; },
-        repeater.id));
+    log('\nLinks on a repeater and a base station — upstream only\n');
+    // Upper Rosenthal AL (151.500 in and out): its own AlertIDs (5767, 5768)
+    // are carried by Amiens Knob (31 km) and Wilsons Peak (48 km), not by its
+    // own pass ranges; GATTON LVRC (97 km) is a base with no RX on record.
+    // Wilsons Peak (in on 151.500, out on 152.400) has no AlertIDs: Constitution
+    // Hill AL (96 km, in on 152.400) relays it on, SRRC Base Station listens on
+    // 152.400, and Constitution Hill (the base) on 151.500 — another channel.
+    const UROS = 'upper_rosenthal_aler', WP = 'wilsons_peak';
+    const ul = await page.evaluate(id => MapDirect._links(id), UROS);
+    const wl = await page.evaluate(id => MapDirect._links(id), WP);
+    check('a repeater\'s links: the repeaters carrying its own AlertIDs, and the base stations in range on its TX on record',
+      ul && ['amiens_knob_al', 'wilsons_peak'].every(x => ids(ul.carriers).includes(x))
+        && ids(ul.bases).includes('gatton_lvrc_enviromon_basestation') && ul.tx.join() === '151.5' && !ul.ingest, JSON.stringify(ul));
+    check('…and the repeaters that relay it on: they listen on its TX and do not send back on its RX',
+      wl && ids(wl.relays).join() === 'constitution_hill_al' && wl.tx.join() === '152.4'
+        && wl.bases.find(b => b.id === 'srrc_base')?.check === 'match' && wl.off.includes('constitution_hill'), JSON.stringify(wl));
+    check('…never back down: neither repeater it carries is a link of Wilsons Peak\'s',
+      wl && ![...ids(wl.carriers), ...ids(wl.relays), ...ids(wl.bases)].some(x => x === UROS || x === 'amiens_knob_al'), JSON.stringify(wl));
+    await page.evaluate(([fig]) => {
+      for (const [a, b, m] of fig) MapDirect._set(a, b, m);
+    }, [[[UROS, 'wilsons_peak', 8.5], [UROS, 'amiens_knob_al', 21.3], [UROS, 'gatton_lvrc_enviromon_basestation', -6.1],
+      [WP, 'constitution_hill_al', 14.2], [WP, 'srrc_base', 2.4]]]);
+    await page.evaluate(id => { showStationCard(id); StnCardView.go('radio'); }, UROS);
+    card = await freqCard();
+    const UL = card && card.Links;
+    check('a repeater\'s card lists them under Assumed TX, best first, each saying what it is',
+      UL && JSON.stringify(UL.links.map(flat)) === JSON.stringify(['Amiens Knob AL · +21.3 dB Good', 'Wilsons Peak · +8.5 dB Marginal'])
+        && JSON.stringify(UL.weak.map(flat)) === JSON.stringify(['GATTON LVRC ENVIROMON BASESTATION · −6.1 dB Poor'])
+        && UL.notes[0] === 'repeater · 31.3 km · carries it'
+        && card.summary && card.summary[0] === 'Best link: Amiens Knob AL, a repeater, +21.3 dB Good.', JSON.stringify([UL, card.summary]));
+    check('…and draws no line of its own on the map: its way on is the backbone, drawn already',
+      await page.evaluate(() => MapDirect._drawn().length === 0 && MapDirect._onId() === null));
+    await page.click('#stn-card .stn-link[data-mn-link="amiens_knob_al"] button');
+    check('…a name opens the backbone path the map draws for the pair',
+      await page.evaluate(id => { const c = MapBackbone.current(); return !!c && c.kind === 'backbone' && c.aId === id && c.bId === 'amiens_knob_al'; }, UROS));
+    await page.evaluate(id => { showStationCard(id); StnCardView.go('radio'); }, WP);
+    card = await freqCard();
+    check('a repeater relayed on says so, in a word that says what it means — and with no AlertIDs, still has its best link on top',
+      card && card.Links && card.Links.notes.includes('repeater · 96.0 km · relays it on')
+        && card.summary && card.summary[0] === 'Best link: Constitution Hill AL, a repeater, +14.2 dB Good.'
+        && await page.evaluate(() => /listens on the channel this one transmits on/.test(
+          [...document.querySelectorAll('#stn-card .stn-card-links .freq-why .term')].map(e => e.title).join(' '))),
+      JSON.stringify(card && card.Links));
+    await page.evaluate(() => { showStationCard('gatton_lvrc_enviromon_basestation'); StnCardView.go('radio'); });
+    card = await freqCard();
+    check('a base station\'s card says it has none, being where the readings come in — even with no channel on record',
+      card && card.Links && card.Links.links.length === 0 && /^none — it is a base station Readings come into Flood-Net here/.test(card.Links.text),
+      JSON.stringify(card && card.Links));
 
     // The lines' pane is over the pins and links (400). With the map's
     // preferCanvas it used to get a canvas of its own the size of the map,

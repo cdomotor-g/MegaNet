@@ -7,9 +7,11 @@
 //                 under them, what it is *assumed* to transmit on, what it
 //                 was *heard on* (see "Assumed, and heard on" below), and the
 //                 protocol its readings came in on — legacy ALERT or ALERT2.
-//                 Under Assumed, map-direct.js's Links: every repeater that
-//                 carries it and every base station that hears it direct,
-//                 with each one's fade margin as a bar, the best first. Each
+//                 Under Assumed, map-direct.js's Links: every step up the
+//                 network toward the base stations — the repeaters that carry
+//                 it or relay it on, and every base station that hears it
+//                 direct — with each one's fade margin as a bar, the best
+//                 first; a base station's say it is where readings come in. Each
 //                 part a heading over its content, and at the top of the
 //                 Radio tab a two-line summary: its best link, and whether
 //                 everything it was heard on is explained.
@@ -356,18 +358,22 @@ const Frequencies = (function () {
   const sumId = id => `mn-freqs-sum-${id}`;
 
   // The summary's place: an empty box (hidden while empty) for any station on
-  // the radio, so paint() can fill it when the figures and readings land.
+  // the radio, and any repeater — one with no AlertIDs of its own still has
+  // links up — so paint() can fill it when the figures and readings land.
   function summaryHtml(s) {
-    if (s.proposed || !radio(s)) return '';
+    const rep = Array.isArray(s.roles) && s.roles.includes('repeater');
+    if (s.proposed || (!radio(s) && !rep)) return '';
     return `<div class="freq-sum" id="${escAttr(sumId(s.id))}" data-mn-freqs="${escAttr(String(s.id))}">${summaryInner(s)}</div>`;
   }
 
   const cardId = id => `mn-freqs-card-${id}`;
 
   // The card's block. Empty for a station with no pair that is not on the
-  // radio — a satellite or wired site has no channel to assume or hear.
+  // radio — a satellite or wired site has no channel to assume or hear — and
+  // not a base station, whose Links say it is where the readings come in.
   function cardHtml(s) {
-    if (!pairs(s).length && !radio(s)) return '';
+    const base = !!s && Array.isArray(s.roles) && s.roles.includes('base');
+    if (!pairs(s).length && !radio(s) && !base) return '';
     watch();
     trackFolds();
     return `<div class="stn-card-ids stn-card-freqs" id="${escAttr(cardId(s.id))}"

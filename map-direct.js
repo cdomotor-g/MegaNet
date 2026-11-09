@@ -1,12 +1,15 @@
 // MegaNet — map-direct.js
 //
-//   MapDirect   a field station's links, and the base stations that hear it
+//   MapDirect   a station's links up the network, toward the base stations
+//               that take its readings in, and the base stations that hear it
 //               with no repeater between. While a field station's card is
 //               open, the Stations map draws a line from it to every base
-//               station that can likely hear it directly; and the card's Radio
-//               tab lists every link it has — those, and the repeaters that
-//               carry it — with each one's fade margin, the best first
-//               (the Links line, under Assumed).
+//               station that can likely hear it directly; and every station
+//               card's Radio tab lists every link it has upstream — those, the
+//               repeaters that carry it and, for a repeater, the ones that
+//               relay it on — with each one's fade margin, the best first
+//               (the Links line, under Assumed). A base station has none: it
+//               is where the readings come in.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, fmtKm, cssVar,
@@ -16,7 +19,9 @@
 // Frequencies.repaint; to map-fade.js for MapFade.known and MapFade.work (each
 // link's fade margin — the fade-margin layer's own figure, worked out the same
 // way); to link-budget.js for lbMarginClass (the card's bands); and to
-// map-backbone.js for MapBackbone.open (a link's radio-path card). All of it
+// map-backbone.js for MapBackbone.open (a link's radio-path card),
+// backbonePairFor (which card a repeater's link opens), and
+// repeaterOpenWindows and windowOverlapCount (who relays a repeater on). All of it
 // from inside its own functions — the IIFE body only declares — so this
 // file's position among the modules is free (`npm run toplevel`). initMap()
 // attaches it, stopStationsMap() detaches it, repaintStnCard() tells it which
@@ -52,6 +57,36 @@
 //              what the receiver needs, at the reliability the link budget is
 //              set to (70 % of situations by default). Below that it is listed
 //              as too weak, not drawn.
+//
+// ── Upstream only ────────────────────────────────────────────────────────────
+// The Links list runs one way, as the readings do: from the station on the
+// card toward the base stations (the ingest points), never back down to what
+// it hears. What counts as a step up, by what the station is:
+//
+//   field station  the repeaters whose pass ranges carry its AlertIDs, and the
+//                  base stations in range on its assumed TX (above).
+//   repeater       the same for its own AlertIDs (Upper Rosenthal AL's 5767 and
+//                  5768 are carried by Amiens Knob and Wilsons Peak, not by its
+//                  own pass ranges), with its TX on record as the channel;
+//                  and the repeaters that relay it on: within the Max TX
+//                  distance, their open windows take some of what it passes on,
+//                  and the channels run one way — they listen on its TX and do
+//                  not transmit on its RX. Wilsons Peak (in on 151.500, out on
+//                  152.400) relays Upper Rosenthal (151.500 both ways); Upper
+//                  Rosenthal does not relay Wilsons Peak, which it cannot hear.
+//                  Two repeaters in and out on the same channel hear each other
+//                  both ways, and nothing on record says which way is up — so
+//                  neither is listed as relaying the other, unless one carries
+//                  the other's AlertIDs.
+//   base station   nothing: its receivers put what they hear into Flood-Net,
+//                  and the list says so rather than standing empty.
+//
+// Hop counts to the nearest base on record were tried for "up", and are not
+// used: the register's base stations are a handful, most in the south-east, so
+// Upper Rosenthal, 97 km from an environmental base with no channel on record,
+// came out one hop from home, and Amiens Knob, which carries its AlertIDs, a
+// step down.
+// The pass ranges and the channel plan are what the network was set up by.
 //
 // ── The fade margins ─────────────────────────────────────────────────────────
 // MapFade's, never one invented here: a saved row while its signature holds,
@@ -96,6 +131,7 @@ const MapDirect = (function () {
   const byId = id => stations().find(s => s.id === id) || null;
   const placed = s => !!s && s.lat != null && s.lon != null;
   const isBase = s => !!s && Array.isArray(s.roles) && s.roles.includes('base');
+  const isRep = s => !!s && Array.isArray(s.roles) && s.roles.includes('repeater');
   const fin = v => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
   const same = (a, b) => a != null && b != null && Math.abs(a - b) < SAME_MHZ;
   const chan = f => { const t = Number(f).toFixed(4); return t.endsWith('0') ? t.slice(0, -1) : t; };
@@ -105,15 +141,26 @@ const MapDirect = (function () {
   const db = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)} dB`;
   const drawnOnMap = s => typeof MapSymbols === 'undefined' || !MapSymbols.drawn || MapSymbols.drawn(s);
 
-  // A field station on the radio: what has links to list. Not one that is a
-  // repeater or a base as well — its way on is the backbone, drawn already.
-  function canShow(s) {
-    if (!placed(s) || !Array.isArray(s.roles) || !s.roles.includes('field') || s.proposed) return false;
-    if (s.roles.includes('repeater') || s.roles.includes('base')) return false;
+  const onRadio = s => {
     let ids = [];
     try { ids = stationAlertIds(s) || []; } catch (_) { ids = []; }
     return ids.length > 0 || fin(s.alert2_station_id) != null;
+  };
+
+  // What the card lists links for: a base station (to say it has none, being
+  // where the readings come in), a repeater, and a field station on the radio
+  // — placed, and not proposed.
+  function canList(s) {
+    if (!s || !Array.isArray(s.roles) || s.proposed) return false;
+    if (isBase(s)) return true;
+    if (!placed(s)) return false;
+    if (isRep(s)) return true;
+    return s.roles.includes('field') && onRadio(s);
   }
+
+  // What the map draws lines for: a field station only. A repeater's and a
+  // base's way on is the backbone, drawn already.
+  const canDraw = s => canList(s) && !isBase(s) && !isRep(s);
 
   // Every channel a base is on record as listening on.
   function rxOf(b) {
@@ -124,23 +171,54 @@ const MapDirect = (function () {
     return out.sort((x, y) => x - y);
   }
 
+  // The repeaters that relay a repeater on (see "Upstream only"): within the
+  // Max TX distance, their open windows taking some of what it passes on, and
+  // the channels one way — they listen on its TX and do not transmit on its
+  // RX, all four on record. Not a base (listed as one), nor one listed already.
+  function relaysOf(st, K, skip) {
+    const r0 = st.repeater;
+    const tx = fin(r0 && r0.tx_mhz), rx = fin(r0 && r0.rx_mhz);
+    if (tx == null || rx == null || typeof repeaterOpenWindows !== 'function' || typeof windowOverlapCount !== 'function') return [];
+    const mine = repeaterOpenWindows(r0);
+    if (!mine.length) return [];
+    const out = [];
+    for (const r of stations()) {
+      if (r.id === st.id || !isRep(r) || isBase(r) || !r.repeater || skip.has(r.id) || !placed(r)) continue;
+      const rrx = fin(r.repeater.rx_mhz), rtx = fin(r.repeater.tx_mhz);
+      if (!same(rrx, tx) || rtx == null || same(rtx, rx)) continue;
+      const km = kmOf(st, r);
+      if (!(km <= K) || !windowOverlapCount(mine, repeaterOpenWindows(r.repeater))) continue;
+      out.push({ s: r, km });
+    }
+    return out.sort((x, y) => x.km - y.km);
+  }
+
   // ── Who it links to ─────────────────────────────────────────────────────────
-  //   { carriers: [{ s: repeater, km, direct }], bases: [{ s: base, km, check,
-  //     rx, tx }], off: [{ s, km, rx }], tx: [MHz], far, maxKm }
-  // check: 'match' (listens on its assumed TX), 'unchecked' (no RX on record,
-  // or no assumed TX to check against).
+  //   { carriers: [{ s: repeater, km, direct }], relays: [{ s: repeater, km }],
+  //     bases: [{ s: base, km, check, rx, tx }], off: [{ s, km, rx }],
+  //     tx: [MHz], far, maxKm, rep, ingest }
+  // check: 'match' (listens on its TX — a repeater's on record, a field
+  // station's assumed), 'unchecked' (no RX on record, or no TX to check
+  // against). A base station answers { ingest: true } and empty lists.
   function linksOf(st) {
-    if (!canShow(st)) return null;
+    if (!canList(st)) return null;
     const K = maxKm();
+    if (isBase(st)) return { carriers: [], relays: [], bases: [], off: [], tx: [], far: 0, maxKm: K, rep: false, ingest: true };
+    const rep = isRep(st);
     const C = typeof Frequencies !== 'undefined' && Frequencies.carriersOf ? Frequencies.carriersOf(st) : null;
+    // What it transmits on: a repeater's TX on record; a field station's own
+    // never is, so the RX of the repeaters likely to hear it first-hand.
     const tx = [];
-    for (const c of (C && C.direct) || []) if (c.rx != null && !tx.some(f => same(f, c.rx))) tx.push(c.rx);
+    const own = rep ? fin(st.repeater && st.repeater.tx_mhz) : null;
+    if (own != null) tx.push(own);
+    else for (const c of (C && C.direct) || []) if (c.rx != null && !tx.some(f => same(f, c.rx))) tx.push(c.rx);
     const carrierIds = new Set(((C && C.all) || []).map(c => c.r.id));
     const directIds = new Set(((C && C.direct) || []).map(c => c.r.id));
     const carriers = ((C && C.all) || [])
       .filter(c => c.km != null && c.km <= K && placed(c.r))
       .map(c => ({ s: c.r, km: c.km, direct: directIds.has(c.r.id) }));
     const far = ((C && C.all) || []).filter(c => c.km == null || c.km > K).length;
+    const relays = rep && st.repeater ? relaysOf(st, K, carrierIds) : [];
     const bases = [], off = [];
     for (const b of stations()) {
       if (!isBase(b) || b.id === st.id || carrierIds.has(b.id) || !placed(b) || !drawnOnMap(b)) continue;
@@ -153,7 +231,7 @@ const MapDirect = (function () {
     }
     bases.sort((x, y) => x.km - y.km);
     off.sort((x, y) => x.km - y.km);
-    return { carriers, bases, off, tx, far, maxKm: K };
+    return { carriers, relays, bases, off, tx, far, maxKm: K, rep, ingest: false };
   }
 
   // ── The fade margins ────────────────────────────────────────────────────────
@@ -178,7 +256,7 @@ const MapDirect = (function () {
   // time; the card and the lines repaint as each lands.
   function ask(st, L) {
     if (typeof MapFade === 'undefined' || !MapFade.work) return;
-    const list = L.carriers.map(c => c.s).concat(L.bases.map(b => b.s)).slice(0, MAX_WORK);
+    const list = L.carriers.map(c => c.s).concat(L.relays.map(r => r.s), L.bases.map(b => b.s)).slice(0, MAX_WORK);
     for (const other of list) {
       if (figOf(st, other)) continue;
       figs.set(key(st.id, other.id), { phase: 'asking' });
@@ -232,6 +310,7 @@ const MapDirect = (function () {
   // that could not be, after them, nearest first.
   function rowsOf(st, L) {
     const rows = L.carriers.map(c => ({ kind: 'carrier', s: c.s, km: c.km, direct: c.direct, fig: figOf(st, c.s) }))
+      .concat(L.relays.map(r => ({ kind: 'relay', s: r.s, km: r.km, fig: figOf(st, r.s) })))
       .concat(L.bases.map(b => ({ kind: 'base', s: b.s, km: b.km, check: b.check, rx: b.rx, tx: b.tx, fig: figOf(st, b.s) })));
     const m = r => (r.fig && r.fig.phase === 'ok' ? r.fig.margin : null);
     return rows.sort((x, y) => {
@@ -246,9 +325,16 @@ const MapDirect = (function () {
   // What its words mean: on hover, and in the block's "What the words mean"
   // fold (frequencies.js) — [word, meaning].
   const WORDS = {
-    links: ['Links', 'Every radio path out of this station the map knows: the repeaters whose pass ranges carry it, within '
-      + 'the Max TX distance, and the base stations within it that listen on its channel and so hear it with no repeater '
-      + 'between. Best fade margin first.'],
+    links: ['Links', 'Every radio path from this station up the network, toward the base stations that take its readings '
+      + 'into Flood-Net — never back down to what it hears. The repeaters whose pass ranges carry it; for a repeater, also '
+      + 'the repeaters that relay it on; and the base stations that listen on its channel and so hear it with no repeater '
+      + 'between. All within the Max TX distance, best fade margin first. A base station has none: it is where the '
+      + 'readings come in.'],
+    relay: ['Relays it on', 'A repeater that takes what this repeater relays and passes it on toward a base station: its '
+      + 'pass ranges take some of the same AlertIDs, it listens on the channel this one transmits on, and it does not '
+      + 'transmit on the channel this one listens on — so the traffic between them runs one way, up.'],
+    ingest: ['Base station', 'Where readings come into Flood-Net: its receivers hear field stations and repeaters and put '
+      + 'their readings in the datastore. Every station\'s links point toward one, so a base station has none of its own.'],
     margin: ['Modelled fade margin', 'How many decibels (dB) its signal arrives above what the receiver needs, at the reliability the '
       + 'link budget is set to. Good is 10 dB or more, Marginal 3 or more, Poor below that. Worked out over the terrain — '
       + 'the figure the radio-path card gives — a model, not a measurement: the real link can be several dB better or worse, '
@@ -308,12 +394,22 @@ const MapDirect = (function () {
     if (r.kind === 'carrier') {
       return `${isBase(r.s) ? 'base and repeater' : 'repeater'} · ${where} · carries it${r.direct ? '' : `, likely ${word('second', 'second-hand')}`}`;
     }
+    if (r.kind === 'relay') return `repeater · ${where} · ${word('relay', 'relays it on')}`;
     const ch = r.check === 'match' ? `on ${esc(r.tx.map(chan).join(', '))} MHz` : word('unchecked', 'channel not checked');
     return `base station · ${where} · hears it direct · ${ch}`;
   }
 
+  // Which radio-path card a link opens: from a field station, its field link
+  // to a repeater or its path direct to a base; from a repeater, the backbone
+  // path the map draws for the pair (every repeater–base pair, and every two
+  // repeaters whose windows overlap), else the field link its AlertIDs make.
+  function pathKind(st, r) {
+    if (!isRep(st)) return r.kind === 'base' ? 'direct' : 'field';
+    return typeof backbonePairFor === 'function' && backbonePairFor(st.id, r.s.id) ? 'backbone' : 'field';
+  }
+
   function nameBtn(st, r) {
-    return `<button type="button" class="link-btn" onclick="MapDirect.open('${escAttr(st.id)}','${escAttr(r.s.id)}','${r.kind === 'base' ? 'direct' : 'field'}')"
+    return `<button type="button" class="link-btn" onclick="MapDirect.open('${escAttr(st.id)}','${escAttr(r.s.id)}','${pathKind(st, r)}')"
       title="Open the elevation profile and link budget for this path">${esc(r.s.name || r.s.id)}</button>`;
   }
 
@@ -359,7 +455,17 @@ const MapDirect = (function () {
     }
     const S = (html, right = '') => (typeof Frequencies !== 'undefined' && Frequencies.section
       ? Frequencies.section('links', WORDS.links[0], WORDS.links[1], html, right, scaleStyle()) : '');
-    if (!all.length) return S(`<span class="txt-muted">none within ${esc(String(L.maxKm))} km</span>${notes.join('')}`);
+    if (L.ingest) {
+      return S(`<span class="txt-muted">none — it is a ${word('ingest', 'base station')}</span>`
+        + ' <span class="mn-pop-note freq-why">Readings come into Flood-Net here, so there is no link further up to show.</span>');
+    }
+    if (!all.length) {
+      if (L.rep) {
+        notes.unshift('<span class="mn-pop-note freq-why">Nothing on record takes it on toward a base station: no repeater '
+          + 'carries its AlertIDs or relays it on, and no base station in range listens on its channel.</span>');
+      }
+      return S(`<span class="txt-muted">none within ${esc(String(L.maxKm))} km</span>${notes.join('')}`);
+    }
     ask(st, L);
     const fold = typeof Frequencies !== 'undefined' && Frequencies.foldAttrs ? Frequencies.foldAttrs(st.id, 'weak') : '';
     const weakHtml = weak.length ? `<details class="freq-fold"${fold}><summary>${word('weak')} <b class="freq-count">${weak.length}</b></summary>`
@@ -378,7 +484,7 @@ const MapDirect = (function () {
     if (!rows.length) return '';
     const best = rows[0], m = band(best.fig.margin);
     const what = best.kind === 'base' ? 'direct to base' : isBase(best.s) ? 'a base and repeater' : 'a repeater';
-    const reps = rows.filter(r => r.kind === 'carrier');
+    const reps = rows.filter(r => r.kind !== 'base');
     const poor = typeof LB_MARGIN !== 'undefined' ? LB_MARGIN[1].min : 3;
     const after = best.kind === 'base' && reps.length && reps.every(r => r.fig.margin < poor)
       ? (reps.length === 1 ? ' Its repeater link is Poor.' : ` All ${reps.length} repeater links are Poor.`) : '';
@@ -440,10 +546,11 @@ const MapDirect = (function () {
 
   // A link's radio-path card: the elevation profile and the link budget on the
   // pair, the station transmitting. 'field' to a repeater that carries it,
-  // 'direct' to a base that hears it with no repeater between.
+  // 'direct' to a base that hears it with no repeater between, 'backbone' from
+  // a repeater along a path the map draws (pathKind).
   function open(aId, bId, kind) {
     if (typeof MapBackbone === 'undefined' || !byId(aId) || !byId(bId)) return;
-    MapBackbone.open(kind === 'direct' ? 'direct' : 'field', aId, bId);
+    MapBackbone.open(kind === 'direct' || kind === 'backbone' ? kind : 'field', aId, bId);
   }
 
   // The channel a direct path is on, for the radio-path card's Frequency row.
@@ -479,7 +586,7 @@ const MapDirect = (function () {
     // The card is on this station now (null: closed). Its lines follow it.
     follow(id) {
       const st = id ? byId(id) : null;
-      const next = st && canShow(st) ? st.id : null;
+      const next = st && canDraw(st) ? st.id : null;
       if (next === null && onId === null) return;
       const moved = next !== onId;
       onId = next;
@@ -516,8 +623,9 @@ const MapDirect = (function () {
       const L = st ? linksOf(st) : null;
       return L && {
         carriers: L.carriers.map(c => ({ id: c.s.id, km: c.km, direct: c.direct })),
+        relays: L.relays.map(r => ({ id: r.s.id, km: r.km })),
         bases: L.bases.map(b => ({ id: b.s.id, km: b.km, check: b.check })),
-        off: L.off.map(o => o.s.id), tx: L.tx.slice(), maxKm: L.maxKm,
+        off: L.off.map(o => o.s.id), tx: L.tx.slice(), maxKm: L.maxKm, ingest: L.ingest,
       };
     },
     _drawn() { return layer ? layer.getLayers().filter(l => l.mnDirect).map(l => ({ ...l.mnDirect })) : []; },
