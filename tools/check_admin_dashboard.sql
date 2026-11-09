@@ -157,6 +157,53 @@ begin
 end
 $$;
 
+-- ── 2b. Behind the scenes (0109) ─────────────────────────────────────────────
+
+do $$
+declare v text;
+begin
+  v := pg_temp.as_role('anon', (select claims from _who where k = 'anon'), 'select meganet.admin_ops()::text');
+  perform pg_temp.check_that('anonymous cannot read behind the scenes', v like 'ERROR%', v);
+
+  v := pg_temp.as_role('authenticated', (select claims from _who where k = 'editor'), 'select meganet.admin_ops()::text');
+  perform pg_temp.check_that('an editor cannot read behind the scenes', v = 'ERROR 42501', v);
+
+  v := pg_temp.as_role('authenticated', (select claims from _who where k = 'admin'),
+         $q$select (select string_agg(k, ',' order by k) from jsonb_object_keys(meganet.admin_ops()) k)$q$);
+  perform pg_temp.check_that('an administrator reads flow, days, stations, waiting, jobs and growth',
+    v = 'at,cron,days,flow,growth,jobs,stations,waiting', v);
+
+  v := pg_temp.as_role('authenticated', (select claims from _who where k = 'admin'),
+         $q$select jsonb_array_length(meganet.admin_ops() -> 'days')::text$q$);
+  perform pg_temp.check_that('the receptions chart is thirty days, gaps included', v = '30', v);
+
+  v := pg_temp.as_role('authenticated', (select claims from _who where k = 'admin'),
+         $q$select (meganet.admin_ops() -> 'growth' ->> 'db_bytes')$q$);
+  perform pg_temp.check_that('growth says the database size', v ~ '^[0-9]+$', v);
+
+  v := pg_temp.as_role('authenticated', (select claims from _who where k = 'admin'), 'select count(*)::text from meganet.db_size_day');
+  perform pg_temp.check_that('nobody reads the size snapshots directly', v like 'ERROR%', v);
+end
+$$;
+
+-- A snapshot from three days ago is what growth is measured from.
+insert into meganet.db_size_day (day, db_bytes, tables, taken_at)
+values (current_date - 3, 1048576, '{"meganet.station": 0}', now() - interval '3 days')
+on conflict (day) do update set db_bytes = excluded.db_bytes, tables = excluded.tables, taken_at = excluded.taken_at;
+
+do $$
+declare v text;
+begin
+  v := pg_temp.as_role('authenticated', (select claims from _who where k = 'admin'),
+         $q$select (meganet.admin_ops() -> 'growth' ->> 'measured') || ' ' || (meganet.admin_ops() -> 'growth' ->> 'days')$q$);
+  perform pg_temp.check_that('growth is measured from the oldest snapshot in the week', v = 'true 3.0', v);
+
+  v := pg_temp.as_role('authenticated', (select claims from _who where k = 'admin'),
+         $q$select ((meganet.admin_ops() -> 'growth' ->> 'per_day')::bigint > 0)::text$q$);
+  perform pg_temp.check_that('…and is a size a day', v = 'true', v);
+end
+$$;
+
 -- ── 3. The bounds ────────────────────────────────────────────────────────────
 
 insert into meganet.app_visit (day, visitor) values (current_date - 401, '00000000-0000-4000-8000-0000000da5b0');
