@@ -307,6 +307,20 @@ const MapSites = (function () {
              elev: s.elevation_ahd != null ? s.elevation_ahd : null };
   }
 
+  // The panel opened from somewhere else (🚚 Relocate station's hand-over):
+  // its pane if the side panel holds it, its corner flyout if not.
+  function openPanel() {
+    const wrap = document.querySelector('.mn-mapctl[data-panel="sites"]');
+    if (!wrap) return false;
+    if (wrap.classList.contains('is-docked')) {
+      if (typeof setDockTab === 'function') setDockTab('map-sites');
+    } else if (!wrap.classList.contains('is-open') && !(state.mapPanelsPinned && state.mapPanelsPinned.has('sites'))) {
+      const btn = wrap.querySelector('.mn-mapctl-btn');
+      if (btn) btn.click();
+    }
+    return true;
+  }
+
   function targetOfPoint(p) {
     return { key: `pt:${p.lat.toFixed(5)},${p.lon.toFixed(5)}`, kind: 'point', sid: null,
              name: `Proposed site ${p.text}`, number: '', lat: p.lat, lon: p.lon, elev: null };
@@ -1123,12 +1137,42 @@ const MapSites = (function () {
                 ${state.mapSelection && state.mapSelection.size ? '' : 'disabled'}
                 title="Add the stations picked on the map (shift-click, box-select or Select inside)"
                 >Add the map selection (${state.mapSelection ? state.mapSelection.size : 0})</button>
+        ${repeaterButtonHtml()}
       </div>
       ${shapes.length ? `<div class="sites-shapes">${shapes.map(sh => `
         <button type="button" class="btn-link sites-shape" onclick="MapSites.addShape('${escAttr(sh.id)}')"
                 title="Add the stations inside this drawn shape">
           Add the ${sh.stationIds.length} inside ${sh.kind === 'circle' ? '◯' : '▭'} ${esc(sh.label || sh.measure || '')}
         </button>`).join('')}</div>` : ''}`;
+  }
+
+  // A repeater that has to move further than 🚚 Relocate station looks: the
+  // stations its pass ranges carry, within the map's Max TX distance and
+  // nearest first, are the sites its new mast has to serve. The selected
+  // station, wherever it was selected (selectedStationId, app.js).
+  function selectedRepeater() {
+    const id = typeof selectedStationId === 'function' ? selectedStationId() : null;
+    const s = id != null ? stationById(id) : null;
+    return s && Array.isArray(s.roles) && s.roles.includes('repeater') && s.repeater ? s : null;
+  }
+
+  // Never disabled: the panel is not drawn again when the selection moves,
+  // so a press with no repeater selected says what to do instead.
+  function repeaterButtonHtml() {
+    return `<button type="button" onclick="MapSites.serveRepeater()"
+                title="Add every station the selected repeater's pass ranges carry within the map's Max TX distance, nearest first — for a repeater that has to move"
+                >Add what the selected repeater carries</button>`;
+  }
+
+  function carriedBy(rep) {
+    const K = state.mapMaxLinkKm > 0 ? state.mapMaxLinkKm : 100;
+    let list = [];
+    try { list = findStationMatches(rep) || []; } catch (_) { list = []; }
+    return list.filter(s => s && s.id !== rep.id && s.lat != null && s.lon != null)
+      .map(s => ({ s, km: acmaHaversineKm(rep.lat, rep.lon, s.lat, s.lon) }))
+      .filter(x => rep.lat == null || x.km <= K)
+      .sort((a, b) => a.km - b.km)
+      .map(x => x.s);
   }
 
   function pasteNoteHtml() {
@@ -1529,6 +1573,24 @@ const MapSites = (function () {
       draw();
       render();
       rerenderMapLegend();
+    },
+
+    // The stations a repeater carries as the sites to serve (selectedRepeater):
+    // the selected one, or the one 🚚 Relocate station hands over by id —
+    // `open` then brings this panel up too.
+    serveRepeater(id, opts = {}) {
+      const rep = id != null ? stationById(id) : selectedRepeater();
+      if (!rep || !rep.repeater) {
+        if (map) mapNote('Select a repeater first — open its card, pick its row, or click its pin — then press this.', 5000);
+        return;
+      }
+      const r = addTargets(carriedBy(rep).map(targetOfStation));
+      pasteNote = { text: `${addedText(r, `station${r.added === 1 ? '' : 's'} ${rep.name} carries`)} — the hop on from the new mast `
+        + 'is not in this ranking: give its place to 🎯 Best repeater as a new site', missing: [], ambiguous: [] };
+      draw();
+      render();
+      rerenderMapLegend();
+      if (opts.open) openPanel();
     },
 
     useSelection() {

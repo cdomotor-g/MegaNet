@@ -44,6 +44,10 @@
 //                   click lands on, and picks it.
 //   A source down   Overpass refusing is said in words, and the State's
 //                   buildings still rule their places out.
+//   A repeater      "Use the selected station" takes it off its card, with its
+//                   pass ranges; the stations they carry are paths to keep,
+//                   ticked, priced from each station up to the repeater on
+//                   its own frequency; and they hand over to Repeater sites.
 //   Reset           takes all of it off the map.
 //
 //   npm run relocate          (or: node relocate.mjs)
@@ -509,6 +513,92 @@ ok('…and the State\'s buildings still rule their places out, the barn\'s no lo
    && !D.cells.some(c => c.excluded === 'building' && distSquare(BARN, c.x, c.y) < CLEAR
                          && distSquare(SHED, c.x, c.y) >= CLEAR && Math.hypot(c.x - HOUSE.x, c.y - HOUSE.y) - HOUSE.r >= CLEAR));
 osmMode = 'ok';
+
+// ── 8b. a repeater ───────────────────────────────────────────────────────────
+// Asked for on 9 Nov 2026: a repeater that has to move brings its pass
+// ranges, and the stations they carry are paths the new place has to keep —
+// priced from each station up to it, on the repeater's own frequency.
+console.log('\nA repeater');
+
+const REP = await page.evaluate(() => {
+  const done = sys => sys && sys.tx_power_w != null && sys.antenna_gain_dbi != null && sys.line_loss_db != null && sys.rx_threshold_dbm != null;
+  const K = state.mapMaxLinkKm > 0 ? state.mapMaxLinkKm : 100;
+  for (const r of state.data.stations) {
+    if (!r.roles.includes('repeater') || !r.repeater || r.lat == null || !done(rmSystemOf(r))) continue;
+    if (!(r.lon > 139 && r.lon < 153 && r.lat < -11 && r.lat > -28.5)) continue;
+    const near = findStationMatches(r).filter(s => s.lat != null && s.id !== r.id && acmaHaversineKm(r.lat, r.lon, s.lat, s.lon) <= K);
+    if (near.length < 3 || near.length > 12) continue;
+    return { id: r.id, name: r.name, lat: r.lat, lon: r.lon, carried: near.map(s => s.id),
+             low: r.repeater.pass_ranges[0].low, high: r.repeater.pass_ranges[0].high };
+  }
+  return null;
+});
+ok('the network has a repeater carrying a few stations to move', !!REP, '');
+if (REP) {
+  // Selected the way a person selects one — its card — and taken with a real click.
+  await page.evaluate(id => { showStationCard(id); }, REP.id);
+  await page.waitForTimeout(300);
+  await page.evaluate(() => setDockTab('map-relocate'));
+  await page.waitForTimeout(300);
+  await page.locator('.reloc-panel button', { hasText: 'Use the selected station' }).first().click();
+  await page.waitForTimeout(300);
+  const rp = await page.evaluate(() => ({
+    st: MapRelocate.station(), choices: MapRelocate.choices(),
+    picked: document.querySelector('.reloc-panel .reloc-rep')?.textContent.replace(/\s+/g, ' ') || '',
+    legend: [...document.querySelectorAll('.reloc-panel legend')].map(l => l.textContent),
+    toSites: !!document.querySelector('.reloc-panel button[onclick="MapRelocate.toSites()"]'),
+  }));
+  const carried = rp.choices.filter(c => c.kind === 'carried');
+  ok('"Use the selected station" takes the repeater whose card is up', rp.st && rp.st.id === REP.id, JSON.stringify(rp.st));
+  ok('…and shows its pass ranges, the frequency it listens on and its radio',
+     rp.picked.includes(`${REP.low}–${REP.high}`) || rp.picked.includes(`${REP.low}`), rp.picked.slice(0, 200));
+  ok('every station its pass ranges carry within the Max TX distance is a path to keep, ticked, nearest first',
+     carried.length === REP.carried.length && REP.carried.every(id => carried.some(c => c.id === id && c.ticked))
+       && carried.every((c, i) => i === 0 || carried[i - 1].km <= c.km) && rp.legend.includes('Paths it has to keep'),
+     JSON.stringify({ want: REP.carried.length, got: carried.length, legend: rp.legend }));
+  ok('…and a move further afield is one press from 🗼 Repeater sites', rp.toSites);
+
+  await page.evaluate(() => { MapRelocate.set('radiusM', 100); });
+  const B = await run();
+  ok('the run finishes', B.status.kind === 'done', JSON.stringify(B.status) + ' ' + B.text.slice(0, 300));
+  ok('…screening the carried stations as paths up to the place, and says so',
+     B.hubs.filter(h => h.dir === 'in').length === REP.carried.length && /from \d+ stations? it carries/.test(B.text), B.text.slice(0, 300));
+  const crossIn = await page.evaluate(async () => {
+    const hubs = MapRelocate.hubs(), k = hubs.findIndex(h => h.dir === 'in');
+    const r = MapRelocate.results()[0];
+    const rep = state.data.stations.find(s => s.id === MapRelocate.station().id);
+    const stn = state.data.stations.find(s => s.id === hubs[k].id);
+    const own = rmSystemOf(stn);
+    const full = sys => sys && sys.tx_power_w != null && sys.antenna_gain_dbi != null && sys.line_loss_db != null && sys.rx_threshold_dbm != null;
+    if (!full(own)) return { skip: true };
+    const sysR = rmSystemOf(rep);
+    const aglA = stationAntenna(rep, sysR).agl, aglB = stationAntenna(stn, own).agl;
+    const f = rep.repeater.rx_mhz > 0 ? rep.repeater.rx_mhz : PATH_DEFAULT_MHZ;
+    const dKm = acmaHaversineKm(r.lat, r.lon, stn.lat, stn.lon);
+    const n = Math.max(64, Math.min(1024, Math.ceil(dKm * 1000 / 30) + 1));
+    const prof = await Terrain.profile([[r.lat, r.lon], [stn.lat, stn.lon]], n);
+    const an = pathAnalyse(prof, { elevA: null, elevB: stn.elevation_ahd, aglA, aglB, freqMhz: f });
+    // Up to the repeater: the station transmits, the repeater listens.
+    const want = wattsToDbm(own.tx_power_w) + own.antenna_gain_dbi - own.line_loss_db - an.pathLoss_db
+               + sysR.antenna_gain_dbi - sysR.line_loss_db - sysR.rx_threshold_dbm;
+    return { got: r.grid[k].margin, want, f: hubs[k].f, repF: f };
+  });
+  ok('a carried station\'s figure is its own radio up to the repeater\'s, at the repeater\'s frequency',
+     crossIn.skip || (crossIn.got === crossIn.want && crossIn.f === crossIn.repF), JSON.stringify(crossIn));
+  ok('…the lattice coarsened only as far as the paths need', B.step >= Math.round(2 * 100 / 32) && B.step <= Math.max(15, Math.round(2 * 100 / 12)),
+     `step ${B.step} m over ${B.hubs.length} paths`);
+
+  // Further afield: the same stations, handed to the repeater site finder.
+  await page.evaluate(() => MapRelocate.toSites());
+  await page.waitForTimeout(400);
+  const handed = await page.evaluate(() => ({
+    showing: dockShowing(),
+    n: document.querySelectorAll('.sites-targets li').length,
+  }));
+  ok('"Find a new hilltop for what it carries" opens 🗼 Repeater sites with them as the sites to serve',
+     handed.showing === 'map-sites' && handed.n === Math.min(40, REP.carried.length), JSON.stringify(handed));
+  await page.evaluate(() => { MapSites.clear(); closeStnCard(false); setDockTab('map-relocate'); MapRelocate.set('radiusM', ''); });
+}
 
 // ── 9. reset ─────────────────────────────────────────────────────────────────
 console.log('\nReset');

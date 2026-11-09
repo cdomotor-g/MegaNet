@@ -265,6 +265,7 @@ const Map3D = (function () {
   let demFails = 0;      // DEM tiles the renderer could not fetch
   let elevReg  = false;  // the elevation protocol, registered once per page
   let elevKey  = null;   // the tile template the drape is currently built on
+  let refKey   = null;   // the reference services draped over the base (syncBaseRefs)
   let polarGen = null;   // which of MapPolar's paints is draped (#188), or null
   let areasKey = null;   // which picture of Views' repeater areas is draped, or null
   let groundGen = 0;     // the trees asked for last; an older answer is dropped
@@ -353,6 +354,27 @@ const Map3D = (function () {
       attribution: 'Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS User Community',
     },
   };
+
+  // ── the roads and names over a base that has none ──────────────────────
+  // The 2-D map lays Esri's reference tiles over the three bases that arrive
+  // without names (map-controls.js, makeBaseLabels): Satellite takes the
+  // places and the roads with their names and route shields, Dark and Light
+  // the names drawn for each. Until 9 Nov 2026 the 3-D view drew the base
+  // alone, so tilting a satellite map took every road off it ("Need roads in
+  // 3d", the owner). They are draped here, the same tiles in the same order —
+  // places, then the roads over them — over the base and the elevation ramp
+  // and under everything else, where their pane (250) sits in 2-D: over the
+  // ramp (245), under every overlay. Asked for when the style loads and when
+  // the base changes (syncBaseRefs); a base with names of its own takes none.
+  const BASE_REFS = {
+    'Satellite': ['Reference/World_Boundaries_and_Places', 'Reference/World_Transportation'],
+    'Dark':      ['Canvas/World_Dark_Gray_Reference'],
+    'Light':     ['Canvas/World_Light_Gray_Reference'],
+  };
+  const REF_IDS = ['mn-ref-0', 'mn-ref-1'];
+  // The credit the 2-D Satellite base carries for them ("Labels © …"); the
+  // canvases' own credit already names the same sources.
+  const REF_CREDIT = 'Labels © Esri, HERE, Garmin, © OpenStreetMap contributors';
 
   // Which of them the 2-D map is currently showing. addBaseLayers() records it
   // on the Leaflet map as `mnBaseName` — with several blended, the most opaque
@@ -2681,6 +2703,32 @@ const Map3D = (function () {
     };
   }
 
+  // The base's roads and names (BASE_REFS), added, swapped or dropped to
+  // match the base the 2-D map is showing. Nothing is asked again while the
+  // base keeps the same ones.
+  function syncBaseRefs() {
+    if (!map || !ready) return;
+    const svcs = BASE_REFS[baseName()] || [];
+    const key = svcs.join('|');
+    if (key === refKey && svcs.every((_, i) => map.getLayer(REF_IDS[i]))) return;
+    for (const id of REF_IDS) {
+      if (map.getLayer(id)) map.removeLayer(id);
+      if (map.getSource(id)) map.removeSource(id);
+    }
+    refKey = key;
+    svcs.forEach((svc, i) => {
+      const id = REF_IDS[i];
+      // The canvases' names stop where the canvases do, at 16, and are
+      // stretched past it with them; Satellite's go on natively.
+      map.addSource(id, {
+        type: 'raster', tileSize: 256, maxzoom: svc.startsWith('Canvas/') ? 16 : 19,
+        tiles: [`https://server.arcgisonline.com/ArcGIS/rest/services/${svc}/MapServer/tile/{z}/{y}/{x}`],
+        ...(svc.startsWith('Reference/') ? { attribution: REF_CREDIT } : {}),
+      });
+      map.addLayer({ id, type: 'raster', source: id }, under(id));
+    });
+  }
+
   // Add, drop or restyle the elevation drape to match what Map display says.
   // Called when the style loads, and from MapElevation whenever its switch, its
   // slider or its relief toggle moves.
@@ -2736,7 +2784,7 @@ const Map3D = (function () {
   // The ground's raster stack, bottom up: a layer added later goes under the
   // first of the ones above it that exists, so the order never depends on
   // which was added first.
-  const GROUND = ['mn-base', 'mn-elev', 'mn-water', 'mn-areas', 'mn-polar', 'mn-lots', 'mn-roads',
+  const GROUND = ['mn-base', 'mn-elev', ...REF_IDS, 'mn-water', 'mn-areas', 'mn-polar', 'mn-lots', 'mn-roads',
                   'mn-drive-casing', 'mn-drive-gap-casing', 'mn-drive-line', 'mn-drive-gap',
                   'mn-links-casing', 'mn-links'];
 
@@ -3935,6 +3983,7 @@ const Map3D = (function () {
       // pin, ring and badge stood on it: a hop's sheet starts at the pin it
       // comes from, and drawn over it, the pin was behind a coloured film.
       map.addLayer(sheetLayer, 'mn-sites-targets');
+      syncBaseRefs();
       syncElevation();
       syncCadastre();
       // A polar plot drawn before 3-D was opened is draped now (#188).
@@ -4840,6 +4889,8 @@ const Map3D = (function () {
       // under the links either way — a base re-added over the top of the ramp
       // would put the picker's choice where Map display's overlays belong.
       map.addLayer({ id: 'mn-base', type: 'raster', source: 'mn-base' }, under('mn-base'));
+      // …and the roads and names that ride with it, or none (BASE_REFS).
+      syncBaseRefs();
     },
 
     // Map display's elevation switch, its opacity slider or its relief toggle
@@ -5142,7 +5193,8 @@ const Map3D = (function () {
             camera sees outlined on it in red; click it or drag it to send the camera
             there.</p>
           <p class="filter-note">The base map is the one Layers has on — the most
-            opaque of them, if several are blended — and the
+            opaque of them, if several are blended — with the roads and place names
+            the 2-D map lays over it (Satellite's roads, Dark's and Light's names) — and the
             pins and links are the ones the 2-D map has drawn — the same filters, the same
             colouring, the same hidden and culled sets. So are the field photos’ 📷 — the
             ones around the middle of the view, which is where the 2-D map is: it follows
@@ -5382,6 +5434,7 @@ const Map3D = (function () {
     ready = false;
     buf = null;
     elevKey = null;   // the drape goes with the map; the next one builds its own
+    refKey = null;    // and the base's roads and names
     polarGen = null;  // and the polar plot's
     areasKey = null;  // and the repeater areas'
     stopFlow3d();     // and Flow's dashes

@@ -119,6 +119,8 @@ const MapRelocate = (function () {
 
   const MIN_R = 50, MAX_R = 2000;     // metres the station may move
   const ACROSS        = 32;           // places across the circle's diameter …
+  const MIN_ACROSS    = 12;           // … down to this many when there are many paths
+  const SCREEN_BUDGET = 16000;        // places × paths screened, before the lattice coarsens
   const MIN_STEP      = 15;           // … never closer than this, in metres
   const SCREEN_STEP_M = 30;           // sample spacing on a screened path
   const MIN_SAMPLES   = 64;
@@ -169,7 +171,7 @@ const MapRelocate = (function () {
   ];
 
   const WEIGHTS = [
-    ['wFade',  'Fade margin',  'decibels to spare to the repeaters ticked, the worst of them'],
+    ['wFade',  'Fade margin',  'decibels to spare on the paths ticked — to its repeaters, and from the stations a repeater carries — the worst of them'],
     ['wSky',   'Open sky',     'the rain gauge clear of trees and roofs — its WMO siting class'],
     ['wClear', 'Clear ground', 'no tree or roof within 20 m of the hut and the mast'],
     ['wNear',  'Close by',     'not far from where the station stands now'],
@@ -193,7 +195,7 @@ const MapRelocate = (function () {
   const OUT_FILL = '#52514e', OUT_LINE = '#c3c2b7';
   const PAINTS = {
     score:  'Suitability — everything weighed',
-    margin: 'Fade margin to the worst repeater',
+    margin: 'Fade margin on the worst path',
     change: 'Change in fade margin from where it is now',
   };
 
@@ -242,7 +244,15 @@ const MapRelocate = (function () {
     return Math.max(MIN_R, Math.min(MAX_R, isFinite(r) && r > 0 ? r : 500));
   }
 
-  function stepFor(r) { return Math.max(MIN_STEP, Math.round(2 * r / ACROSS)); }
+  // ~ACROSS places across the circle, and fewer when there are many paths to
+  // screen from each — a repeater carrying sixty stations would be fifty
+  // thousand profiles at the full lattice — so places × paths stays inside
+  // SCREEN_BUDGET. A station with its few repeaters is never coarsened.
+  function acrossFor(n) {
+    const k = Math.floor(Math.sqrt(SCREEN_BUDGET / (Math.PI / 4) / Math.max(1, n || 1)));
+    return Math.max(MIN_ACROSS, Math.min(ACROSS, k));
+  }
+  function stepFor(r, n) { return Math.max(MIN_STEP, Math.round(2 * r / acrossFor(n))); }
 
   function clearM() { const v = +cfg.clearM; return isFinite(v) && v >= 0 ? Math.min(100, v) : 10; }
   function rimM()   { const v = +cfg.rimM;   return isFinite(v) && v >= 0 ? Math.min(20, v) : 1; }
@@ -299,29 +309,91 @@ const MapRelocate = (function () {
       id: s.id, s, name: s.name, lat: s.lat, lon: s.lon,
       elev: s.elevation_ahd != null ? s.elevation_ahd : null,
       rad: radioOf(sys, stationAntenna(s, sys).agl), mast: stationIsMast(s),
-      f: s.repeater && s.repeater.rx_mhz > 0 ? s.repeater.rx_mhz : PATH_DEFAULT_MHZ,
+      f: listenMhz(s), dir: 'out',
     };
+  }
+
+  // ── A repeater that has to move ─────────────────────────────────────────────
+  // Asked for on 9 Nov 2026: "a way to relocate repeaters more easily … bring
+  // in all the station details of a repeater including its pass ranges". A
+  // repeater is a station like any other here — its own radio, its own mast,
+  // the repeaters that pass its own addresses on — and one thing more: the
+  // stations its pass ranges carry, whose readings it has to go on hearing
+  // from wherever it goes. Those are the pass-range relation the map draws
+  // its links from (findStationMatches), within the map's Max TX distance as
+  // the map draws them, and they are priced the other way round: the station
+  // transmits, on its own radio and antenna, and the repeater at the new place
+  // listens on its own frequency (marginOf).
+  function isRepeater(st) { return !!st && Array.isArray(st.roles) && st.roles.includes('repeater') && !!st.repeater; }
+  function linkKm() { return state.mapMaxLinkKm > 0 ? state.mapMaxLinkKm : 100; }
+  function listenMhz(s) { return s && s.repeater && s.repeater.rx_mhz > 0 ? s.repeater.rx_mhz : PATH_DEFAULT_MHZ; }
+
+  function carriedAll(st) {
+    if (!isRepeater(st)) return [];
+    try { return (findStationMatches(st) || []).filter(s => s && s.id !== st.id && s.lat != null && s.lon != null); }
+    catch (_) { return []; }
+  }
+
+  function carriedOf(s, st) {
+    if (!s || s.lat == null || s.lon == null) return null;
+    const rad = hereRadio(s);
+    if (!rad) return null;
+    return {
+      id: s.id, s, name: s.name, lat: s.lat, lon: s.lon,
+      elev: s.elevation_ahd != null ? s.elevation_ahd : null,
+      rad, mast: stationIsMast(s), f: listenMhz(st), dir: 'in',
+    };
+  }
+
+  // One entry of hubChoices as the far end of a path, or null where there is
+  // no radio to price it with.
+  function endOf(h, st) { return h.kind === 'carried' ? carriedOf(h.s, st) : hubOf(h.s); }
+
+  // A repeater's pass ranges in words, exclusions after them.
+  function rangesText(st) {
+    const r = st && st.repeater;
+    if (!r || !Array.isArray(r.pass_ranges) || !r.pass_ranges.length) return '';
+    const span = x => (x.low === x.high ? `${x.low}` : `${x.low}–${x.high}`);
+    const ex = (r.exclusions || []).filter(x => x.high >= x.low);
+    return r.pass_ranges.map(span).join(', ') + (ex.length ? ` (less ${ex.map(span).join(', ')})` : '');
+  }
+
+  // What a path's far end is called in the words on the panel: a station
+  // moves away from its repeaters, a repeater from its paths both ways.
+  function endWord(st, n) {
+    const w = isRepeater(st) ? 'path' : 'repeater';
+    return n === 1 ? w : `${w}s`;
   }
 
   // The repeaters that carry the station today — the pass-range relation the
   // map draws its links from — and after them the nearest few other repeaters
   // and bases, offered unticked: a station that moves may be better heard by
   // a hub that does not carry it yet.
+  //
+  // A repeater adds, ahead of them, the stations its pass ranges carry
+  // within the Max TX distance, nearest first (kind 'carried').
   function hubChoices(st) {
     if (!st) return [];
+    const kmTo = s => acmaHaversineKm(st.lat, st.lon, s.lat, s.lon);
+    const K = linkKm();
+    const carried = carriedAll(st).map(s => ({ s, kind: 'carried', listening: false, km: kmTo(s) }))
+      .filter(x => x.km <= K)
+      .sort((a, b) => a.km - b.km || String(a.s.name).localeCompare(String(b.s.name)));
+    const seen = new Set(carried.map(x => x.s.id));
     let listen = [];
     try { listen = findRepeaterMatches(st) || []; } catch (_) { listen = []; }
-    listen = listen.filter(r => r && r.id !== st.id && r.lat != null && r.lon != null);
-    const seen = new Set(listen.map(r => r.id));
+    listen = listen.filter(r => r && r.id !== st.id && !seen.has(r.id) && r.lat != null && r.lon != null);
+    for (const r of listen) seen.add(r.id);
     const near = stations()
       .filter(s => s.id !== st.id && !seen.has(s.id) && s.lat != null && s.lon != null
                 && Array.isArray(s.roles) && (s.roles.includes('repeater') || s.roles.includes('base')))
-      .map(s => ({ s, km: acmaHaversineKm(st.lat, st.lon, s.lat, s.lon) }))
+      .map(s => ({ s, km: kmTo(s) }))
       .filter(x => x.km <= NEAR_HUB_KM)
       .sort((a, b) => a.km - b.km)
       .slice(0, NEAR_HUB_N);
-    return listen.map(s => ({ s, listening: true, km: acmaHaversineKm(st.lat, st.lon, s.lat, s.lon) }))
-      .concat(near.map(x => ({ s: x.s, listening: false, km: x.km })));
+    return carried
+      .concat(listen.map(s => ({ s, kind: 'listening', listening: true, km: kmTo(s) })))
+      .concat(near.map(x => ({ s: x.s, kind: 'near', listening: false, km: x.km })));
   }
 
   function freqText(h) { return `${h.f.toFixed(3)} MHz`; }
@@ -334,9 +406,11 @@ const MapRelocate = (function () {
 
   // One way, the station to the hub — the way its readings go, and MapFade's
   // reading of a link, so a figure here is the figure the map paints it. Nothing
-  // transmits back down to a station, so there is no other way to price.
+  // transmits back down to a station, so there is no other way to price. A
+  // station a moved repeater carries is the hub the other way round: its
+  // readings come up to the new place (dir 'in').
   function marginOf(an, here, hub) {
-    return oneWay(an.pathLoss_db, here, hub.rad);
+    return hub.dir === 'in' ? oneWay(an.pathLoss_db, hub.rad, here) : oneWay(an.pathLoss_db, here, hub.rad);
   }
 
   // ── The lattice ─────────────────────────────────────────────────────────────
@@ -405,8 +479,8 @@ const MapRelocate = (function () {
         c.grid[k] = fig;
         done++;
         if (performance.now() > until) {
-          setStatus('running', `Screening ${cells.length} places against ${hubs.length} repeater${
-            hubs.length === 1 ? '' : 's'} — ${Math.round(done / total * 100)}%`);
+          setStatus('running', `Screening ${cells.length} places against ${hubs.length} ${
+            hubs.some(h => h.dir === 'in') ? 'path' : 'repeater'}${hubs.length === 1 ? '' : 's'} — ${Math.round(done / total * 100)}%`);
           await new Promise(r => setTimeout(r, 0));
           until = performance.now() + CHUNK_MS;
         }
@@ -776,8 +850,9 @@ const MapRelocate = (function () {
     if (st.lat == null || st.lon == null) return { ok: false, why: `${st.name} has no position on file to move from.` };
     const here = hereRadio(st);
     if (!here) return { ok: false, why: 'No radio system on file carries all four of transmit power, antenna gain, line loss and receiver threshold — there is no margin to compute.' };
-    const hubs = hubChoices(st).filter(h => ticks.has(h.s.id)).map(h => hubOf(h.s)).filter(Boolean);
+    const hubs = hubChoices(st).filter(h => ticks.has(h.s.id)).map(h => endOf(h, st)).filter(Boolean);
     if (!hubs.length) {
+      if (isRepeater(st)) return { ok: false, why: 'Tick at least one station it carries, or a repeater or base it passes its readings on to.' };
       return { ok: false, why: hubChoices(st).some(h => h.listening)
         ? 'Tick at least one repeater with a complete radio on file.'
         : `No repeater on file carries ${st.name}'s addresses — tick one of the repeaters or bases near it.` };
@@ -798,7 +873,7 @@ const MapRelocate = (function () {
     found = null; results = []; selected = null; rerankDue = false;
     const mine = job = { cancelled: false };
     const { st, here, hubs } = r;
-    const rM = radiusM(), step = stepFor(rM);
+    const rM = radiusM(), step = stepFor(rM, hubs.length);
     const cells = cellsFor(st, rM, step);
     const hereNew = cfg.agl > 0 ? { ...here, agl: +cfg.agl } : here;
     draw();
@@ -962,7 +1037,7 @@ const MapRelocate = (function () {
     return `
       <span>Fade margin worst <strong>${dbText(s.worst)}</strong>${s.wk != null ? ` (${esc(found.hubs[s.wk].name)})` : ''}${
         delta != null ? ` · <span class="${delta >= 0 ? 'txt-ok' : 'txt-warn'}">${delta >= 0 ? '+' : ''}${delta.toFixed(1)} dB on now</span>` : ''}</span>
-      <span>${s.allOk ? `Every repeater at ${okDb()} dB or better`
+      <span>${s.allOk ? `Every ${endWord(found.st, 1)} at ${okDb()} dB or better`
         : `<span class="txt-bad">${n - s.ok} of ${n} below ${okDb()} dB${s.failed ? ` or not computed` : ''}</span>`}</span>`;
   }
 
@@ -1214,6 +1289,15 @@ const MapRelocate = (function () {
       Land cover: ${cov && cov.ok ? `Sentinel-2 ${esc(String(cov.year))}` : '<span class="txt-warn">could not be read — water is not ruled out</span>'}.`;
   }
 
+  // The paths screened, as the status line says them: a station's to its
+  // repeaters; a repeater's from the stations it carries and on to the rest.
+  function pathsDoneText() {
+    const n = found.hubs.length, nIn = found.hubs.filter(h => h.dir === 'in').length, nOut = n - nIn;
+    if (!nIn) return `to ${n} repeater${n === 1 ? '' : 's'}`;
+    return `on ${n} path${n === 1 ? '' : 's'} — from ${nIn} station${nIn === 1 ? '' : 's'} it carries${
+      nOut ? ` and on to ${nOut} repeater${nOut === 1 ? '' : 's'} or base${nOut === 1 ? '' : 's'}` : ''}`;
+  }
+
   function statusHtml() {
     switch (status.kind) {
       case 'running': return `<span class="sites-run">${esc(status.text)}</span>`;
@@ -1229,13 +1313,13 @@ const MapRelocate = (function () {
         const bestW = Math.max(-Infinity, ...results.map(r => (r.s.worst == null ? -Infinity : r.s.worst)));
         const worse = nowW != null && isFinite(bestW) && bestW < nowW - 0.05;
         return `Screened ${found.cells.length} places ${found.step} m apart within ${found.rM} m of ${esc(found.st.name)},
-          to ${found.hubs.length} repeater${found.hubs.length === 1 ? '' : 's'}, over terrain sampled every ~${SCREEN_STEP_M} m;
+          ${pathsDoneText()}, over terrain sampled every ~${SCREEN_STEP_M} m;
           where it is now and the best ${found.finals.length} checked the link budget card's way.
           ${out.length ? `${out.length} ruled out — ${[nb ? `${nb} on or beside a building` : '', nw ? `${nw} in water` : ''].filter(Boolean).join(', ')}.` : ''}
           ${worse ? ` <strong>Every place suggested is heard less well than where it stands now</strong> — the best by
             ${(nowW - bestW).toFixed(1)} dB.` : ''}
-          Station radio ${esc(found.here.sysName)}${found.here.assumed ? ' (assumed — none of its own on file)' : ''},
-          ${found.hereNew.agl} m AGL at a new site.<br>${sourcesText()}`;
+          ${isRepeater(found.st) ? 'Repeater' : 'Station'} radio ${esc(found.here.sysName)}${found.here.assumed ? ' (assumed — none of its own on file)' : ''},
+          ${found.hereNew.agl} m AGL at a new site${found.hubs.some(h => h.dir === 'in') ? `, listening on ${esc(freqText({ f: listenMhz(found.st) }))}` : ''}.<br>${sourcesText()}`;
       }
       default: {
         const r = readiness();
@@ -1275,24 +1359,52 @@ const MapRelocate = (function () {
       </button>`).join('') || '<p class="small txt-muted">No station by that name.</p>';
   }
 
+  function hubsHead(h, st, list) {
+    if (h.kind === 'carried') {
+      const n = list.filter(x => x.kind === 'carried').length;
+      const on = list.filter(x => x.kind === 'carried' && ticks.has(x.s.id)).length;
+      return `Stations it carries — ${n} in its pass ranges within ${linkKm()} km
+        <span class="reloc-hubs-all">
+          <button type="button" class="btn-link" onclick="MapRelocate.tickKind('carried', true)" ${on === n ? 'disabled' : ''}>all</button> ·
+          <button type="button" class="btn-link" onclick="MapRelocate.tickKind('carried', false)" ${on ? '' : 'disabled'}>none</button>
+        </span>`;
+    }
+    if (h.kind === 'listening') return isRepeater(st) ? 'Passing its own readings on now' : 'Carrying it now';
+    return isRepeater(st) ? 'Nearby repeaters and bases' : 'Nearby, not carrying it';
+  }
+
   function hubsHtml(st) {
     const list = hubChoices(st);
-    if (!list.length) return '<p class="small txt-muted">No repeater carries it, and none is within 60 km.</p>';
-    return `<ul class="reloc-hubs" aria-label="Repeaters the new site has to reach">${list.map((h, n) => {
-      const ok = !!hubOf(h.s);
+    if (!list.length) {
+      return isRepeater(st)
+        ? `<p class="small txt-muted">No station in its pass ranges is within ${linkKm()} km, no repeater passes it on, and none is within 60 km.</p>`
+        : '<p class="small txt-muted">No repeater carries it, and none is within 60 km.</p>';
+    }
+    return `<ul class="reloc-hubs${isRepeater(st) ? ' reloc-hubs-tall' : ''}" aria-label="${isRepeater(st)
+      ? 'Paths the new site has to keep' : 'Repeaters the new site has to reach'}">${list.map((h, n) => {
+      const ok = !!endOf(h, st);
       const k = found ? found.hubs.findIndex(x => x.id === h.s.id) : -1;
       const now = k >= 0 ? figOf(found.now, k, true) : null;
-      const first = n === 0 || list[n - 1].listening !== h.listening;
-      return `${first ? `<li class="reloc-hubs-head small txt-muted">${h.listening ? 'Carrying it now' : 'Nearby, not carrying it'}</li>` : ''}
+      const first = n === 0 || list[n - 1].kind !== h.kind;
+      const ids = h.kind === 'carried' && isRepeater(st) ? carriedIds(h.s, st) : '';
+      return `${first ? `<li class="reloc-hubs-head small txt-muted">${hubsHead(h, st, list)}</li>` : ''}
         <li>
           <label class="filter-check">
             <input type="checkbox" ${ticks.has(h.s.id) ? 'checked' : ''} ${ok ? '' : 'disabled'}
                    onchange="MapRelocate.toggleHub('${escAttr(h.s.id)}', this.checked)">
-            <span>${esc(h.s.name)} <span class="small txt-muted">${h.km.toFixed(1)} km${
+            <span>${esc(h.s.name)} <span class="small txt-muted">${h.km.toFixed(1)} km${ids ? ` · ${esc(ids)}` : ''}${
               ok ? '' : ' · no complete radio on file'}${now ? ` · now <span class="sites-band sites-band-${bandOf(now)}">${dbText(now.margin)}</span>` : ''}</span></span>
           </label>
         </li>`;
     }).join('')}</ul>`;
+  }
+
+  // The addresses of a carried station that fall in the repeater's ranges.
+  function carriedIds(s, st) {
+    try {
+      const ids = stationAlertIds(s).filter(id => passRangeCoversId(st.repeater, id));
+      return ids.length ? `ALERT ${ids.join(', ')}` : '';
+    } catch (_) { return ''; }
   }
 
   function keyHtml() {
@@ -1321,7 +1433,7 @@ const MapRelocate = (function () {
       <li class="sites-result${on ? ' is-on' : ''}">
         <button type="button" class="sites-result-main" onclick="MapRelocate.select(${r.rank})"
                 aria-pressed="${on ? 'true' : 'false'}"
-                title="Show this place's paths on the map, and its figure for every repeater">
+                title="Show this place's paths on the map, and its figure for every one of them">
           <span class="sites-rank" aria-hidden="true">${r.rank}</span>
           <span class="sites-result-text">
             <strong>${esc(whereFrom(r.c))}</strong> · score ${Math.round(r.s.score)}
@@ -1364,19 +1476,19 @@ const MapRelocate = (function () {
         <div class="sites-actions">
           <button type="button" onclick="MapRelocate.flyTo(${rank})">Go to it</button>
           ${s.wk != null ? `<button type="button" onclick="MapRelocate.profile(${rank}, ${s.wk})"
-                  title="Open the path to the worst-served repeater in the elevation profile and link budget">Profile the worst path</button>` : ''}
+                  title="Open the worst-served path in the elevation profile and link budget">Profile the worst path</button>` : ''}
           ${copyLatLonPillHtml({ lat: c.lat, lon: c.lon })}
         </div>
         <div class="table-wrap">
           <table class="sites-table">
-            <caption class="sr-only">Every repeater from ${rank ? `new site ${rank}` : 'where it is now'}</caption>
-            <thead><tr><th scope="col">Repeater</th><th scope="col">km</th><th scope="col">${termHtml('LOS', PATH_LOS_MEANING)}</th><th scope="col">Margin</th>${
+            <caption class="sr-only">Every ${endWord(found.st, 1)} from ${rank ? `new site ${rank}` : 'where it is now'}</caption>
+            <thead><tr><th scope="col">${isRepeater(found.st) ? 'Path' : 'Repeater'}</th><th scope="col">km</th><th scope="col">${termHtml('LOS', PATH_LOS_MEANING)}</th><th scope="col">Margin</th>${
               rank ? '<th scope="col">Now</th>' : ''}<th scope="col"><span class="sr-only">Profile</span></th></tr></thead>
             <tbody>
               ${found.hubs.map((h, k) => {
                 const fig = figOf(c, k, true), was = figOf(found.now, k, true);
                 return `<tr>
-                  <td>${esc(h.name)}</td>
+                  <td>${isRepeater(found.st) ? (h.dir === 'in' ? 'from ' : 'on to ') : ''}${esc(h.name)}</td>
                   <td>${fig && fig.dKm != null ? fig.dKm.toFixed(1) : '—'}</td>
                   <td class="${fig && fig.verdict === 'obstructed' ? 'txt-bad' : fig && fig.verdict === 'marginal' ? 'txt-warn' : ''}">${
                     !fig || fig.failed ? '—' : esc(fig.verdict ? pathVerdictWord(fig.verdict) : '—')}</td>
@@ -1403,10 +1515,10 @@ const MapRelocate = (function () {
     return `
       <div class="sites-panel reloc-panel">
         <fieldset class="sites-fs">
-          <legend>Station to move</legend>
+          <legend>Station or repeater to move</legend>
           <div class="sites-row">
-            <button type="button" onclick="MapRelocate.useCard()"
-                    title="Use the station whose card is open on the map">Use the station on the card</button>
+            <button type="button" onclick="MapRelocate.useSelected()"
+                    title="Use the station whose card is open on the map, or the one selected in the list or picked on the map — a repeater brings its pass ranges and the stations they carry">Use the selected station</button>
           </div>
           <input type="search" id="reloc-find" class="polar-find" autocomplete="off" spellcheck="false"
                  value="${escAttr(hitQ)}" placeholder="Or find it — name or station #"
@@ -1414,12 +1526,13 @@ const MapRelocate = (function () {
           <div class="polar-hits" id="reloc-hits">${hitsHtml()}</div>
           <p class="small polar-picked" id="reloc-picked">${st
             ? `Moving <strong>${esc(st.name)}</strong>${st.station_number ? ` (${esc(st.station_number)})` : ''}${
-                rain ? '' : ' · <span class="txt-muted">no rain gauge on file — open sky may matter less</span>'}`
+                isRepeater(st) ? '' : rain ? '' : ' · <span class="txt-muted">no rain gauge on file — open sky may matter less</span>'}`
             : 'No station picked yet.'}</p>
+          ${st && isRepeater(st) ? repeaterHtml(st, here) : ''}
         </fieldset>
 
         ${st ? `<fieldset class="sites-fs">
-          <legend>Repeaters it has to reach</legend>
+          <legend>${isRepeater(st) ? 'Paths it has to keep' : 'Repeaters it has to reach'}</legend>
           ${hubsHtml(st)}
         </fieldset>` : ''}
 
@@ -1446,8 +1559,8 @@ const MapRelocate = (function () {
                      aria-label="${escAttr(label)} weight" title="${escAttr(hint)}"
                      onchange="MapRelocate.set('${k}', this.value)">
             </label>`).join('')}
-          <p class="small txt-muted">A place every repeater ticked hears at ${okDb()} dB or better always ranks
-            above one some repeater does not. A weight is a re-rank, not a re-run.</p>
+          <p class="small txt-muted">A place where every ${st ? endWord(st, 1) : 'repeater'} ticked is at ${okDb()} dB or better always ranks
+            above one where some are not. A weight is a re-rank, not a re-run.</p>
         </fieldset>
 
         <fieldset class="sites-fs">
@@ -1483,6 +1596,42 @@ const MapRelocate = (function () {
       </div>`;
   }
 
+  // What a repeater brings with it: its pass ranges, the stations they carry,
+  // the frequency it listens on and its mast — the details the paths are
+  // priced from — and, for a move further than this finder looks, the
+  // repeater site finder over the same stations.
+  function repeaterHtml(st, here) {
+    const all = carriedAll(st), K = linkKm();
+    const inReach = all.filter(s => acmaHaversineKm(st.lat, st.lon, s.lat, s.lon) <= K).length;
+    const ranges = rangesText(st);
+    return `
+          <dl class="reloc-rep small">
+            <dt>${termHtml('Pass ranges', REP_WORDS['Pass ranges'])}</dt>
+            <dd>${ranges ? esc(ranges) : '<span class="txt-muted">none on file — it carries no station</span>'}</dd>
+            <dt>${termHtml('Carries', REP_WORDS.Carries)}</dt>
+            <dd>${all.length} station${all.length === 1 ? '' : 's'}${all.length > inReach
+              ? ` — ${inReach} within the map's ${K} km Max TX distance, the ones listed below` : ''}</dd>
+            <dt>${termHtml('Listens on', REP_WORDS['Listens on'])}</dt>
+            <dd>${esc(freqText({ f: listenMhz(st) }))}${st.repeater && st.repeater.rx_mhz > 0 ? '' : ' <span class="txt-muted">(none on file — the default)</span>'}</dd>
+            ${here ? `<dt>Radio</dt><dd>${esc(here.sysName)}${here.assumed ? ' <span class="txt-muted">(assumed)</span>' : ''}, ${here.agl} m mast</dd>` : ''}
+          </dl>
+          ${inReach && typeof MapSites !== 'undefined' && MapSites.serveRepeater ? `
+          <p class="small txt-muted">Further than ${MAX_R / 1000} km?
+            <button type="button" class="btn-link" onclick="MapRelocate.toSites()"
+                    title="Open 🗼 Repeater sites with the stations this repeater carries as the sites to serve">Find a new hilltop for what it carries</button></p>` : ''}
+          <details class="bestrep-words"><summary>What the words here mean</summary>
+            <dl>${Object.entries(REP_WORDS).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+          </details>`;
+  }
+
+  // The words a repeater's details use, on hover and in the fold under them.
+  const REP_WORDS = {
+    'Pass ranges': 'The ALERT addresses this repeater passes on, as its record has them, less any it is set to leave out.',
+    Carries: 'Every station with an address in the pass ranges. The ones within the map\'s Max TX distance are the paths '
+      + 'listed below, ticked: the new place has to go on hearing each of them, and is priced from the station up to it.',
+    'Listens on': 'The frequency the repeater receives on, from its record — the frequency the paths up to it are priced at.',
+  };
+
   const CAVEAT = 'Indicative. ~30 m terrain, omnidirectional antennas, a canopy map of 2020 (±5 m) '
     + 'and only the buildings the State and OpenStreetMap have mapped — a short list to walk on site, '
     + 'not a survey. Look at the imagery, and open a path in the elevation profile card, before anything is moved.';
@@ -1515,7 +1664,14 @@ const MapRelocate = (function () {
     if (!st) return;
     invalidate();
     stationId = st.id;
-    ticks = new Set(hubChoices(st).filter(h => h.listening && hubOf(h.s)).map(h => h.s.id));
+    const choices = hubChoices(st);
+    ticks = new Set(choices.filter(h => (h.kind === 'listening' || h.kind === 'carried') && endOf(h, st)).map(h => h.s.id));
+    // A repeater nothing passes on goes straight to a base: the nearest one
+    // offered stands in for where its readings go, ticked to be argued with.
+    if (isRepeater(st) && !choices.some(h => h.kind === 'listening' && ticks.has(h.s.id))) {
+      const base = choices.find(h => h.kind === 'near' && h.s.roles.includes('base') && hubOf(h.s));
+      if (base) ticks.add(base.s.id);
+    }
     hitQ = '';
     draw();
     render();
@@ -1551,7 +1707,7 @@ const MapRelocate = (function () {
       `# radio,${q(found.here.sysName)},${found.here.agl} m AGL now,${found.hereNew.agl} m AGL at a new site`,
       `# weights,fade margin ${w.f},open sky ${w.s},clear ground ${w.c},close by ${w.n}`,
       `# rules,clear of buildings by ${clearM()} m,gauge rim ${rimM()} m,ok ${okDb()} dB,good ${goodDb()} dB`,
-      `# repeaters,${found.hubs.map(h => q(`${h.name} (${freqText(h)})`)).join(',')}`,
+      `# ${isRepeater(found.st) ? 'paths' : 'repeaters'},${found.hubs.map(h => q(`${h.dir === 'in' ? 'from ' : ''}${h.name} (${freqText(h)})`)).join(',')}`,
       ['rank', 'lat', 'lon', 'east_m', 'north_m', 'distance_m', 'now', 'ruled_out', 'score', 'all_ok',
        'worst_margin_db', 'worst_repeater', ...found.hubs.map((h, k) => `margin_${k + 1}_db`),
        'figure', 'wmo_class', 'obstacle_deg', 'obstacle', 'cover_pct_20m', 'land_cover', 'nearest_building_m', 'nearest_building'].join(','),
@@ -1585,7 +1741,7 @@ const MapRelocate = (function () {
       // heard by its repeaters.
       MapChrome.panel(m, {
         id: 'relocate', icon: '🚚', dockIcon: Glyphs.rail('relocate'), title: 'Relocate station',
-        btnLabel: 'Relocate station — a new home for a station that has to move',
+        btnLabel: 'Relocate station — a new home for a station or repeater that has to move',
         group: 'tools', order: 26,
         html: () => panelHtml(),
         onMount(el) { body = el; },
@@ -1635,10 +1791,37 @@ const MapRelocate = (function () {
 
     pickStation,
 
-    useCard() {
-      const id = state.stnCard && state.stnCard.id;
-      if (!id) { if (map) mapNote('Open a station\'s card on the map first — then press this.', 5000); return; }
+    // The station that is selected, wherever it was selected: its card on
+    // the map, its row in the list, or the one station picked on the map
+    // (selectedStationId, core.js). A repeater brings its pass ranges.
+    useSelected() {
+      const id = typeof selectedStationId === 'function' ? selectedStationId() : (state.stnCard && state.stnCard.id);
+      if (!id) { if (map) mapNote('Select a station first — open its card, pick its row, or click its pin — then press this.', 5000); return; }
       pickStation(id);
+    },
+    useCard() { return this.useSelected(); },
+
+    // A whole group of the paths ticked or unticked — a repeater's carried
+    // stations can run to dozens.
+    tickKind(kind, on) {
+      const st = station();
+      if (!st) return;
+      for (const h of hubChoices(st)) {
+        if (h.kind !== kind) continue;
+        if (on && endOf(h, st)) ticks.add(h.s.id); else if (!on) ticks.delete(h.s.id);
+      }
+      invalidate();
+      draw();
+      render();
+      rerenderMapLegend();
+    },
+
+    // Further than this finder looks: the repeater site finder, with the
+    // stations this repeater carries as the sites the new mast has to serve.
+    toSites() {
+      const st = station();
+      if (!st || typeof MapSites === 'undefined' || !MapSites.serveRepeater) return;
+      MapSites.serveRepeater(st.id, { open: true });
     },
 
     setSearch(v) {
@@ -1671,19 +1854,23 @@ const MapRelocate = (function () {
     profile(rank, k) {
       const c = placeOf(rank), h = found && found.hubs[+k];
       if (!c || !h) return;
-      const pa = [c.lat, c.lon], pb = [h.lat, h.lon];
+      // The transmitting end first, as the card prices a path: the place to its
+      // repeater, or a carried station up to the place.
+      let pa = [c.lat, c.lon], pb = [h.lat, h.lon], ids = [c.now ? found.st.id : null, h.id];
+      if (h.dir === 'in') { [pa, pb] = [pb, pa]; ids = [ids[1], ids[0]]; }
       if (state.mapFullscreen && typeof toggleMapFullscreen === 'function') toggleMapFullscreen(false);
       state.path.open = true;
       const existing = MapDraw.findLine(pa, pb);
       if (existing) MapDraw.focus(existing.id);
-      else MapDraw.addLine([pa, pb], [c.now ? found.st.id : null, h.id]);
+      else MapDraw.addLine([pa, pb], ids);
       const el = document.getElementById('path-profile-panel');
       if (el) {
         if (typeof dockReveal === 'function') dockReveal(el);
         el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
       const where = typeof stationsCardsWhere === 'function' ? stationsCardsWhere() : 'with the station cards';
-      mapNote(`Profiling ${+rank ? `new site #${rank}` : 'where it is now'} → ${h.name} — the card is ${where}.`, 5000);
+      const here = +rank ? `new site #${rank}` : 'where it is now';
+      mapNote(`Profiling ${h.dir === 'in' ? `${h.name} → ${here}` : `${here} → ${h.name}`} — the card is ${where}.`, 5000);
     },
 
     save() {
@@ -1750,7 +1937,11 @@ const MapRelocate = (function () {
 
     // For the checks, and for anybody at the console.
     station() { const st = station(); return st ? { id: st.id, name: st.name } : null; },
-    hubs() { return found ? found.hubs.map(h => ({ id: h.id, name: h.name, f: h.f, agl: h.rad.agl })) : [...ticks]; },
+    hubs() { return found ? found.hubs.map(h => ({ id: h.id, name: h.name, f: h.f, agl: h.rad.agl, dir: h.dir })) : [...ticks]; },
+    choices() {
+      const st = station();
+      return st ? hubChoices(st).map(h => ({ id: h.s.id, kind: h.kind, km: h.km, ticked: ticks.has(h.s.id) })) : [];
+    },
     status() { return { ...status }; },
     cells() {
       if (!found) return [];
@@ -1778,7 +1969,7 @@ const MapRelocate = (function () {
     buildings() {
       return found ? { sources: found.site.buildings.sources.map(s => ({ ...s })), n: found.site.buildings.list.length } : null;
     },
-    step() { return found ? found.step : stepFor(radiusM()); },
+    step() { return found ? found.step : stepFor(radiusM(), ticks.size); },
     selectedRank() { return !selected || !found ? null : selected === found.now ? 0 : (results.find(r => r.c === selected) || {}).rank || null; },
     drawn() { return { wash: !!wash, lines: lineLayer, pins: layer }; },
   };

@@ -1119,7 +1119,7 @@ no ALERT address, or none a repeater passes, says so in `repeaters.detail`.
 drawn; clicking one opens its card, elevation profile and link budget. Add
 `&map=<lat>,<lon>,<zoom>` to centre the map somewhere else at the same time —
 a site the station might move to, say: the side panel's 🚚 **Relocate station**
-then takes *Use the station on the card* and models the ground around it, and
+then takes *Use the selected station* and models the ground around it, and
 the link budget prices a path from any point on the map. No address opens those
 tools by itself; these two open the map where they work.
 

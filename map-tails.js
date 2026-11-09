@@ -37,7 +37,8 @@
 // field station is in the lit set, or when it runs into a repeater that is:
 //
 //   the spotlight      the field stations whose pins are inside the circle
-//   the pointer        the pin under it (MapViews.hovered())
+//   the pointer        the pin under it, or every station in the bubble
+//                      under it (MapViews.hoveredIds(), map-cluster.js)
 //   the card           the station whose card is open (state.stnCard.id)
 //   the focus          the field stations of the focused repeater's drawn
 //                      paths (state.mapFocusRepeaterId) — each of them whole,
@@ -333,7 +334,11 @@ const MapTails = (function () {
       if (S.byStation.has(k)) L.st.add(k);
       if (S.byRepeater.has(k)) L.rp.add(k);
     };
-    try { if (typeof MapViews !== 'undefined' && has(MapViews, 'hovered')) one(MapViews.hovered()); } catch (_) { /* no hover then */ }
+    // A bubble of grouped pins (map-cluster.js) is all of its stations at once.
+    try {
+      if (typeof MapViews !== 'undefined' && has(MapViews, 'hoveredIds')) (MapViews.hoveredIds() || []).forEach(one);
+      else if (typeof MapViews !== 'undefined' && has(MapViews, 'hovered')) one(MapViews.hovered());
+    } catch (_) { /* no hover then */ }
     if (typeof state !== 'undefined') {
       one(state.stnCard && state.stnCard.id);
       // The focused repeater: the field stations of its drawn paths, whole.

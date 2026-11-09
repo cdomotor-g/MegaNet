@@ -4455,7 +4455,9 @@ hr {
 }
 
 /* What a bubble holds, on hover. */
-.leaflet-tooltip.mn-cluster-tip { max-width: 260px; white-space: normal; line-height: 1.35; }
+/* width: max-content, or the tooltip shrinks to its longest word: Leaflet places it absolutely in a pane
+   with no width, so "normal" wrapping had nothing to wrap against (the owner's screenshot, 9 Nov 2026). */
+.leaflet-tooltip.mn-cluster-tip { width: max-content; max-width: 260px; white-space: normal; line-height: 1.35; }
 
 .legend-line {
   width: 16px;
@@ -6950,6 +6952,20 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 }
 
 .reloc-hubs .filter-check { align-items: baseline; }
+
+/* A repeater's paths run to dozens: a taller list, and the group's all · none. */
+.reloc-hubs.reloc-hubs-tall { max-height: 16rem; }
+.reloc-hubs-all { font-weight: 400; margin-left: var(--sp-1); white-space: nowrap; }
+
+/* What a repeater brings with it: its pass ranges, what they carry, its radio. */
+.reloc-rep {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px var(--sp-2);
+  margin: var(--sp-1) 0 0;
+}
+.reloc-rep dt { font-weight: 600; }
+.reloc-rep dd { margin: 0; overflow-wrap: anywhere; }
 
 /* The key: the wash's bands, best first, as .polar-key draws its ramp. Colour
    arrives as --dot (#138); ruled out also carries the wash's own hatch, so it

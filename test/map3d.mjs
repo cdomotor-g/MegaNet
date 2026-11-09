@@ -2128,6 +2128,37 @@ await page.evaluate(() => { Map3D.baseChanged(); });
 const rebased = await cadLook();
 ok('…and a base map swapped in goes under all of it',
    JSON.stringify(rebased.order) === JSON.stringify(['mn-base', 'mn-elev', 'mn-lots', 'mn-roads', 'mn-links']), JSON.stringify(rebased.order));
+
+// The roads and names the 2-D map lays over a base that has none
+// (makeBaseLabels): Satellite's places and roads, Dark's own names, and none
+// over a base that draws its own — draped over the base and the ramp, under
+// the cadastre. Asked on 9 Nov 2026: "Need roads in 3d".
+const refLook = () => page.evaluate(() => {
+  const m = Map3D._map(), st = m.getStyle();
+  return { order: st.layers.map(l => l.id).filter(id => /^mn-(base|elev|ref-\d|lots|roads|links)$/.test(id)),
+           tiles: ['mn-ref-0', 'mn-ref-1'].map(id => (st.sources[id] && st.sources[id].tiles[0]) || null),
+           credit: (st.sources['mn-ref-1'] || {}).attribution || '' };
+});
+const baseWas = await page.evaluate(() => state.map.mnBaseName || null);
+await page.evaluate(() => { state.map.mnBaseName = 'Satellite'; Map3D.baseChanged(); });
+const sat = await refLook();
+ok('Satellite in 3-D carries the 2-D map\'s place names and roads — the roads over the names, over the ramp, under the cadastre',
+   JSON.stringify(sat.order) === JSON.stringify(['mn-base', 'mn-elev', 'mn-ref-0', 'mn-ref-1', 'mn-lots', 'mn-roads', 'mn-links'])
+     && /Reference\/World_Boundaries_and_Places\/MapServer\/tile\/\{z\}\/\{y\}\/\{x\}$/.test(sat.tiles[0] || '')
+     && /Reference\/World_Transportation\/MapServer\/tile\/\{z\}\/\{y\}\/\{x\}$/.test(sat.tiles[1] || '')
+     && /Labels © Esri/.test(sat.credit),
+   JSON.stringify(sat));
+await page.evaluate(() => { state.map.mnBaseName = 'Dark'; Map3D.baseChanged(); });
+const darkRefs = await refLook();
+ok('…Dark takes its own names instead, and only them',
+   darkRefs.order.includes('mn-ref-0') && !darkRefs.order.includes('mn-ref-1')
+     && /Canvas\/World_Dark_Gray_Reference\//.test(darkRefs.tiles[0] || '') && darkRefs.tiles[1] === null,
+   JSON.stringify(darkRefs));
+await page.evaluate(() => { state.map.mnBaseName = 'OpenStreetMap'; Map3D.baseChanged(); });
+const osmRefs = await refLook();
+ok('…and a base that draws its own roads takes none',
+   !osmRefs.order.some(id => /^mn-ref-/.test(id)) && osmRefs.tiles.every(t => t === null), JSON.stringify(osmRefs));
+await page.evaluate(b => { state.map.mnBaseName = b; Map3D.baseChanged(); }, baseWas);
 await page.evaluate(() => MapElevation.setEnabled(false));
 
 // A tile that will not come is a stretch of ground with no boundary on it,

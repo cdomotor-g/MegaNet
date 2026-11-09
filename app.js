@@ -1582,6 +1582,17 @@ function findStationMatches(repeater) {
   return passRelationIndex().byRepeater.get(repeater.id) || [];
 }
 
+// The one station "the selected station" means to a tool that takes one — the
+// map's finders' Use the selected station: the station whose card is open on
+// the map, else the row selected in the list, else the map selection when it
+// is exactly one station. Null when nothing is.
+function selectedStationId() {
+  if (state.stnCard && state.stnCard.id != null) return state.stnCard.id;
+  if (state.selectedId != null) return state.selectedId;
+  if (state.mapSelection && state.mapSelection.size === 1) return [...state.mapSelection][0];
+  return null;
+}
+
 // ── Related-by-pass-range stations ───────────────────────────────────────────
 // Filtering for a station answers "where is it"; the question behind it is
 // usually "who carries it". So while a filter is running the result set is

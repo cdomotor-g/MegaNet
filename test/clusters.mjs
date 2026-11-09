@@ -6,6 +6,8 @@
 //      view every station is in exactly one bubble or drawn as its own pin,
 //      the counts add up, a pin in a bubble is neither drawn nor hit, and the
 //      map's name says how many are grouped.
+//      Pointing at a bubble lights its stations' paths under Tails, as
+//      pointing at a pin does, and its hover words are a readable width.
 //   2. **Pressing a bubble** zooms in on its stations, and the zoom groups
 //      them again, smaller; from MAX_ZOOM + 1 every station has its own pin.
 //   3. **What keeps its own pin** — the station whose card is up, the map
@@ -137,6 +139,36 @@ try {
     return { contains: m._containsPoint(m._point), drawnHere: !!r, id: m.mnStationId };
   });
   check('a pin in a bubble is not hit where it stands (the bubble over it is what a press reaches)', hit.contains === false, J(hit));
+  // Pointing at a bubble points at every station in it (MapViews.hoverGroup):
+  // under Tails their paths light, as one pin's do when it is pointed at.
+  const hov = await page.evaluate(async () => {
+    const was = MapViews.settings().draw;
+    MapViews.set({ draw: 'tails' });
+    await new Promise(r => setTimeout(r, 300));
+    const fields = new Set(state.data.stations.filter(s => s.roles.includes('field')).map(s => String(s.id)));
+    const layer = Object.values(state.map._layers)
+      .filter(l => l.mnCluster)
+      .sort((a, b) => b.mnCluster.members.length - a.mnCluster.members.length)
+      .find(l => l.mnCluster.members.some(m => fields.has(String(m.mnStationId))));
+    const ids = layer.mnCluster.members.map(m => m.mnStationId);
+    layer.fire('mouseover');
+    await new Promise(r => setTimeout(r, 300));
+    const group = MapViews._state().hoveredGroup || [];
+    const asked = MapViews.hoveredIds();
+    const lit = MapTails._state().lit.stations;
+    const tip = layer.getTooltip() && layer.getTooltip().getElement();
+    const tipW = tip ? tip.getBoundingClientRect().width : 0;
+    layer.fire('mouseout');
+    await new Promise(r => setTimeout(r, 300));
+    const after = { group: MapViews._state().hoveredGroup, lit: MapTails._state().lit.stations.length };
+    MapViews.set({ draw: was });
+    const idSet = new Set(ids.map(String));
+    return { n: ids.length, group: group.length, same: group.length === ids.length && group.every((id, i) => id === ids[i]),
+             asked: asked.length, lit: lit.length, litInside: lit.every(id => idSet.has(String(id))), after, tipW };
+  });
+  check('pointing at a bubble lights its stations\' paths under Tails, as pointing at a pin does, and leaving it puts them out',
+    hov.same && hov.asked === hov.n && hov.lit > 0 && hov.litInside && hov.after.group == null && hov.after.lit === 0, J(hov));
+  check('the bubble\'s hover words are a readable width, not a word a line', hov.tipW >= 120, J({ tipW: hov.tipW }));
 
   // ── 2. Pressing a bubble ──────────────────────────────────────────────
   console.log('\n2. Pressing a bubble\n');

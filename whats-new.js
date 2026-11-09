@@ -25,6 +25,19 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 244, date: '2026-11-09', items: [
+      '🛣️ <strong>Roads in 3-D.</strong> With the Satellite base map, the ⛰️ 3-D view now has the roads and place names on '
+        + 'it that the flat map lays over the photo — and the Dark and Light base maps keep their names in 3-D too.',
+      '🚚 <strong>Move a repeater.</strong> 🚚 Relocate station now takes a repeater as well. <em>Use the selected station</em> '
+        + 'takes whichever station you have picked — its card, its row in the list, or its pin — and a repeater brings its '
+        + 'pass ranges, the frequency it listens on and every station those ranges carry within the map\'s Max TX distance, '
+        + 'each ticked as a path the new spot has to keep hearing. For a move further than 2 km, <em>Find a new hilltop for '
+        + 'what it carries</em> hands the same stations to 🗼 Repeater sites, which also has <em>Add what the selected '
+        + 'repeater carries</em> of its own. 🎯 Best repeater takes the selected station the same way.',
+      '🫧 <strong>Point at a bubble of stations</strong> and their radio paths light up, the way pointing at a single pin does '
+        + '— in <em>Radio paths</em>, <em>Overview</em> and the other views that draw paths faint or one at a time. The note on '
+        + 'a bubble is readable again, too: it had squeezed to a word a line.',
+    ] },
     { n: 243, date: '2026-11-09', items: [
       '📶 <strong>Links on every station\'s card</strong>, not just field stations\'. A repeater\'s <strong>Radio</strong> tab now '
         + 'lists its links up the network too, each with its fade margin: the repeaters that carry its own readings, the ones '

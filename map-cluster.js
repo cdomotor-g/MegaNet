@@ -60,8 +60,10 @@
 //   Mix        a ring split by how many wear each colour
 //
 // With the pins in their role colours a bubble is always a mix: roles are
-// kinds, not a scale. Hovering one says what is in it; pressing it zooms to
-// its stations. A message from a station in a bubble flashes the bubble, and
+// kinds, not a scale. Hovering one says what is in it, and lights its
+// stations' radio paths the way hovering one pin lights that pin's (under
+// Tails, and the paths Best path or bundling leave out — hoverOn); pressing
+// it zooms to its stations. A message from a station in a bubble flashes the bubble, and
 // its pulse does not run along the links inside it (map-latency.js). Its glow
 // stays behind the other bubbles: they are in front of the pulse canvas's
 // glows, flares and pulses (discs, overBubbles), as they are of the pins.
@@ -83,7 +85,7 @@ const MapCluster = (function () {
     'Group nearby pins': `Zoomed out, stations closer together than about ${MERGE_PX} pixels on the screen are drawn as one `
       + `bubble saying how many there are, and bubbles that would overlap become one. Zoom in, or press a bubble, and they come apart; from zoom ${MAX_ZOOM + 1} every `
       + 'station has its own pin. The selected station, the map selection, a filter\'s matches and the stations a focused '
-      + 'repeater serves always keep their own pins.',
+      + 'repeater serves always keep their own pins. Pointing at a bubble lights its stations\' radio paths, as pointing at a pin does.',
     'Bubble colour': 'How a bubble is coloured while the pins are coloured by health or by ⏱️ Latency. With the pins in their '
       + 'role colours every bubble is a mix: a role is a kind, not better or worse.',
     Worst: 'The colour of the worst station in the bubble: under Colour pins by health a fault before a watch before OK; '
@@ -117,6 +119,7 @@ const MapCluster = (function () {
     drawn: null,          // the pins last handed to the fan-out and the stack
     hadBubbles: false,
     soon: false,
+    hoverB: null,         // the bubble under the pointer, its stations' paths lit (hoverOn)
   };
   let Bubble = null;
 
@@ -275,7 +278,30 @@ const MapCluster = (function () {
       && S.map.getZoom() <= MAX_ZOOM);
   }
 
+  // ── Pointing at a bubble ──────────────────────────────────────────────────
+  // Its stations are pointed at all at once (MapViews.hoverGroup): under Tails
+  // their paths light whole, and under Best path, bundling or areas the paths
+  // left out are drawn for them — what a single pin's hover does, for every
+  // pin the bubble holds. Mouse only, as a pin's is: a tap is a press, which
+  // zooms in, and the mouseover a tap emulates would leave the paths lit.
+  function hoverOn(b) {
+    if (!b || !b.mnCluster || typeof MapViews === 'undefined' || typeof MapViews.hoverGroup !== 'function') return;
+    try {
+      if (L.Browser.mobile || !(window.matchMedia && window.matchMedia('(hover: hover)').matches)) return;
+    } catch (_) { return; }
+    S.hoverB = b;
+    MapViews.hoverGroup(b.mnCluster.members.map(m => m.mnStationId).filter(id => id != null));
+  }
+
+  function hoverOff(b) {
+    if (S.hoverB !== b) return;
+    S.hoverB = null;
+    if (typeof MapViews !== 'undefined' && typeof MapViews.hoverGroup === 'function') MapViews.hoverGroup(null);
+  }
+
   function clearBubbles() {
+    // A bubble taken away under the pointer says no mouseout.
+    if (S.hoverB) hoverOff(S.hoverB);
     for (const b of S.bubbles) b.remove();
     S.bubbles = [];
     S.byId = new Map();
@@ -402,6 +428,9 @@ const MapCluster = (function () {
           b.openTooltip();
         };
         b.on('mouseover', wantTip);
+        // And its stations' paths, lit as a pin's are when it is pointed at.
+        b.on('mouseover', () => hoverOn(b));
+        b.on('mouseout', () => hoverOff(b));
         S.bubbles.push(b);
         for (const m of g.members) { now.add(m); S.byId.set(m.mnStationId, b); }
       }

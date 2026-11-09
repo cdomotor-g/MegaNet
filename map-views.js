@@ -95,7 +95,8 @@
 // the next visit, as long as the rest of that view is still in force.
 //
 // Exposes: attach, detach, html, bind, rerender, settings, set, lineOpacity,
-// fullOpacity, restyle, afterBuild, autoValue, hover, hovered, cardChanged,
+// fullOpacity, restyle, afterBuild, autoValue, hover, hovered, hoverGroup,
+// hoveredIds, cardChanged,
 // apply, undo, save, remove, active, snapshot, saved, togglePlay, VIEWS, WORDS,
 // legendHtml, opacityNoteHtml, _state.
 
@@ -354,6 +355,7 @@ const MapViews = (function () {
     autoN: 0,             // …and the lines on screen it was worked out from
     lastFlat: true,       // whether the last restyle saw the flat map (no 3-D, no twin)
     hovered: null,        // the station id under the pointer
+    hoveredGroup: null,   // …or a bubble's stations, while the pointer is on one (hoverGroup)
     pick: undefined,      // the last view applied (mn-map-view-pick), read on first ask
     saved: null,          // the kept views (mn-map-saved-views), read on first ask
     undo: null,           // { snap, pick } — the map as it was before the last view
@@ -1376,6 +1378,7 @@ const MapViews = (function () {
     S.map = null;
     S.root = null;
     S.hovered = null;
+    S.hoveredGroup = null;
     S.autoN = 0;
   }
 
@@ -1409,12 +1412,38 @@ const MapViews = (function () {
     const next = id == null ? null : id;
     if (S.hovered === next) return;
     S.hovered = next;
+    hoverFollow();
+  }
+  const hovered = () => S.hovered;
+
+  // A bubble of grouped pins under the pointer (map-cluster.js), or none: its
+  // stations are pointed at all at once, so what a pin's hover lights — its
+  // paths under Tails, the paths Best path or bundling leave out — lights for
+  // every station in it (the owner, 9 Nov 2026: "pop in the links for station
+  // clusters in the same way we do for individual stations").
+  function hoverGroup(ids) {
+    const next = Array.isArray(ids) && ids.length ? ids.filter(id => id != null) : null;
+    const was = S.hoveredGroup;
+    if (was === next || (was && next && was.length === next.length && was.every((id, i) => id === next[i]))) return;
+    S.hoveredGroup = next && next.length ? next : null;
+    hoverFollow();
+  }
+
+  // Everything pointed at: the pin, then the bubble's stations. What
+  // map-tails.js and map-paths.js light.
+  function hoveredIds() {
+    const out = [];
+    if (S.hovered != null) out.push(S.hovered);
+    if (S.hoveredGroup) for (const id of S.hoveredGroup) if (id !== S.hovered) out.push(id);
+    return out;
+  }
+
+  function hoverFollow() {
     const c = C();
     const T = modTails(), P = modPaths();
     if (c.draw === 'tails' && has(T, 'sync')) safely(() => T.sync(), 'MapTails.sync');
     if (c.paths !== 'every' && has(P, 'schedule')) safely(() => P.schedule(), 'MapPaths.schedule');
   }
-  const hovered = () => S.hovered;
 
   // The station card's station, or the focused repeater, changed.
   function cardChanged() {
@@ -2156,7 +2185,7 @@ const MapViews = (function () {
 
   return {
     attach, detach, html, bind, rerender, settings, set, lineOpacity, fullOpacity, restyle, afterBuild, autoValue,
-    hover, hovered, cardChanged, apply, undo, save, remove, active, snapshot, saved, legendHtml, opacityNoteHtml,
+    hover, hovered, hoverGroup, hoveredIds, cardChanged, apply, undo, save, remove, active, snapshot, saved, legendHtml, opacityNoteHtml,
     togglePlay, fold, setPresenting, presenting, fromAddress, find, shareCode, parseShare, applyShared,
     VIEWS, WORDS, GROUPS,
     // What is in force, for the checks.
@@ -2165,6 +2194,7 @@ const MapViews = (function () {
       return {
         settings: settings(), autoOp: S.autoOp, autoN: S.autoN, pick: pickNow(), active: active(), lastWrites: S.lastWrites || [],
         canUndo: !!S.undo, saved: savedList().map(v => ({ id: v.id, name: v.name })), hovered: S.hovered,
+        hoveredGroup: S.hoveredGroup ? S.hoveredGroup.slice() : null,
         attached: !!S.map, filter: pane ? pane.style.filter : null, flat: isFlat(),
       };
     },

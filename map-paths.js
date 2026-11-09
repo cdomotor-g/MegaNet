@@ -657,15 +657,19 @@ const MapPaths = (function () {
 
   // The ids whose other paths are asked for: the pin pointed at, the card's
   // station and the focused repeater.
+  // A bubble of grouped pins pointed at asks for every station in it
+  // (MapViews.hoveredIds, map-cluster.js).
   function askedIds() {
     const ids = [];
-    let hov = null;
+    let hov = [];
     try {
-      if (typeof MapViews !== 'undefined' && typeof MapViews.hovered === 'function') hov = MapViews.hovered();
-    } catch (_) { hov = null; }
+      if (typeof MapViews !== 'undefined' && typeof MapViews.hoveredIds === 'function') hov = MapViews.hoveredIds() || [];
+      else if (typeof MapViews !== 'undefined' && typeof MapViews.hovered === 'function') hov = [MapViews.hovered()];
+    } catch (_) { hov = []; }
     const card = typeof state !== 'undefined' && state.stnCard ? state.stnCard.id : null;
     const focus = typeof state !== 'undefined' ? state.mapFocusRepeaterId : null;
-    for (const id of [hov, card, focus]) if (id != null && !ids.includes(id)) ids.push(id);
+    const seen = new Set();
+    for (const id of [...hov, card, focus]) if (id != null && !seen.has(id)) { seen.add(id); ids.push(id); }
     return ids;
   }
 

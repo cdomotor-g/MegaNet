@@ -891,7 +891,7 @@ const MapBestRepeater = (function () {
           <legend>The station</legend>
           <div class="sites-row">
             <button type="button" onclick="MapBestRepeater.useCard()"
-                    title="Use the station whose card is open on the map">Use the station on the card</button>
+                    title="Use the station whose card is open on the map, or the one selected in the list or picked on the map">Use the selected station</button>
           </div>
           <input type="search" id="bestrep-find" class="polar-find" autocomplete="off" spellcheck="false"
                  value="${escAttr(hitQ)}" placeholder="Or find it — name or station #"
@@ -1445,11 +1445,14 @@ const MapBestRepeater = (function () {
     pickStation,
     pickPoint,
 
+    // The station selected wherever it was selected (selectedStationId,
+    // app.js): its card, its row, or the one station picked on the map.
     useCard() {
-      const id = state.stnCard && state.stnCard.id;
-      if (!id) { if (map) mapNote('Open a station\'s card on the map first — then press this.', 5000); return; }
+      const id = typeof selectedStationId === 'function' ? selectedStationId() : (state.stnCard && state.stnCard.id);
+      if (!id) { if (map) mapNote('Select a station first — open its card, pick its row, or click its pin — then press this.', 5000); return; }
       pickStation(id);
     },
+    useSelected() { return this.useCard(); },
 
     usePoint(text) {
       const p = parsePoint(text);

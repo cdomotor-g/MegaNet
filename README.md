@@ -1360,7 +1360,7 @@ here.
 - Snap drawing to stations, so a path between two sites starts and ends on the sites and is named after them
 - Select stations off the map — by rectangle, by circle, or by shift-clicking pins — into the table below, and export the set as CSV
 - **Repeater sites** — say which sites a new repeater has to serve (the map selection, a circle drawn round them, or a pasted list of station numbers, names and ALERT addresses) and get the three to five best places nearby to put the mast, ranked on elevation, line of sight, fade margin and road reserve; fade everything else on the map to see them, see them on the terrain in 3-D, and take them to Google Earth as a KMZ with each candidate's paths in a folder of its own — see *Repeater site finder* under §17
-- **Relocate station** — pick a station that has to move and how far it may go, and the ground round it is coloured by how good a new home each spot would be: fade margin to the repeaters that hear it now first, then open sky for the rain gauge (its WMO siting class from the trees and roofs round it), clear ground and closeness; the three to five best are pinned, kept off every building the State and OpenStreetMap have mapped and out of the water — see *Station relocation finder* under §17
+- **Relocate station** — pick a station or a repeater that has to move (*Use the selected station*, or find it) and how far it may go, and the ground round it is coloured by how good a new home each spot would be: fade margin to the repeaters that hear it now first — and, for a repeater, from every station its pass ranges carry within the Max TX distance — then open sky for the rain gauge (its WMO siting class from the trees and roofs round it), clear ground and closeness; the three to five best are pinned, kept off every building the State and OpenStreetMap have mapped and out of the water — see *Station relocation finder* under §17
 - Leaflet.js, with the map's own controls in the side panel's rail beside it (§20), each named beside
   its icon (or icons alone, by the rail's **Collapse »**, as the left bar folds), in sections whose
   headings fold them: **Stations & places** (the cards, Find a place, the path tools, the digital
@@ -4417,17 +4417,33 @@ wants the paddock back, the trees have grown over it — and the repeaters that
 hear it today must go on hearing it. **🚚 Station relocation finder**, in the
 strip straight after 🗼, answers it.
 
-**The station**: *Use the station on the card* takes the one whose card is open
-on the map, or find it by name or number. The repeaters that carry it now (its
-pass ranges) come ticked; the nearest six other repeaters and bases within 60 km
-are offered unticked, for a station that might be better heard by a hub that
-does not carry it yet. A hub with no complete radio on file cannot be ticked.
+**The station**: *Use the selected station* takes the one whose card is open on
+the map — else the row selected in the list, else the one station picked on the
+map — or find it by name or number. The repeaters that carry it now (its pass
+ranges) come ticked; the nearest six other repeaters and bases within 60 km are
+offered unticked, for a station that might be better heard by a hub that does
+not carry it yet. A hub with no complete radio on file cannot be ticked.
+
+**A repeater** brings its details with it: its **pass ranges** (less any
+exclusions), how many stations they carry, the frequency it listens on and its
+radio and mast. Every station its pass ranges carry within the map's **Max TX
+distance** — the links the map draws — comes ticked under *Paths it has to
+keep*, with the addresses that put it there, and each is priced the other way
+round: from the station, on its own radio and antenna, up to the new place,
+received on the repeater's own frequency. The repeaters that pass the
+repeater's own readings on come ticked too, or, where none does, the nearest
+base offered. *all* and *none* tick the carried stations as a group. With many
+paths the lattice coarsens (never under 12 across) so places × paths stays near
+16,000 profiles. For a move further than 2 km, *Find a new hilltop for what it
+carries* opens **🗼 Repeater sites** with the same stations as the sites to
+serve.
 
 **Find new sites** works the site finder's two passes over a circle round the
 station (**Within**, 500 m by default, 50 m–2 km):
 
-- a **lattice** of places about 32 across the circle, never closer than 15 m,
-  where the station stands now among them;
+- a **lattice** of places about 32 across the circle (fewer for a repeater with
+  many paths, as above), never closer than 15 m, where the station stands now
+  among them;
 - a **screen** from every place to every repeater ticked, sampled every 30 m so
   the terrain tiles come at their finest (~30 m) and two places a step apart
   stand on different ground, through `pathAnalyse` — this colours the map;
