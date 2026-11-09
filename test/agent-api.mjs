@@ -776,7 +776,7 @@ const LICENSING = JSON.parse(fs.readFileSync(repo('data/acma-licensing.json'), '
   const licOk = LICENSING.licences.every(([no, status, kind, issued, expiry, ci]) => {
     const l = DEVICES.licences[no], k = LICENSING.kinds[kind] || [];
     return l && l.status === status && l.type === k[0] && l.category === k[1] && l.service === k[2] && l.subservice === k[3]
-      && (l.issued ?? null) === (issued ?? null) && l.expiry === expiry && LICENSING.clients[ci] && l.client_no === LICENSING.clients[ci][0];
+      && (l.issued ?? null) === (issued ?? null) && (l.expiry ?? null) === (expiry ?? null) && LICENSING.clients[ci] && l.client_no === LICENSING.clients[ci][0];
   });
   check('…every licence as the register gives it — status, kind, dates, licensee', licOk
     && LICENSING.licences.length === new Set(DEVICES.devices.map(d => d.lic)).size);
