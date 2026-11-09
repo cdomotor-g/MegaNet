@@ -29,8 +29,8 @@
   },
   "status": {
     "phase": "live",
-    "updated": "2026-11-08",
-    "summary": "Live and in daily use (database schema 106): this week added teams and the tasks handed to them, with the SoRT scope builder's hand-off, a driving mode that follows a station's route in 3-D, the agent API's changelog and email list, ACMA licences and radio paths in the API, the Repeaters tab and cuts to database I/O, while account email and the ACMA download link wait on the owner.",
+    "updated": "2026-11-09",
+    "summary": "Live and in daily use (database schema 109): this week added teams and the tasks handed to them, with the SoRT scope builder's hand-off, a driving mode that follows a station's route in 3-D, the agent API's changelog and email list, ACMA licences and radio paths in the API, the Repeaters tab and cuts to database I/O, while account email and the ACMA download link wait on the owner.",
     "now": [
       "Views on the Stations map (map-views.js): one press sets the map for a job — Overview and Site visit for everyone; Radio paths, Weak links, Backbone and Live traffic for instrument technicians; Rivers & catchments and Rainfall for flood forecasters; Property & easements and Land & tenure for property services — with the radio paths drawn as every path, best path only, bundled into trunks or repeater areas, as lines, flowing dashes or tails with a spotlight, auto-contrast and a Balance slider, saved views of your own, and easements and land tenure on the property boundaries",
       "The station card in groups (station-card-view.js): Overview, then a tab each for Flood, Radio, Site and Kit (Tabs, the first), or a summary with each group a page of its own (List, chosen beside the box and kept per device), Field data, Zoom, Directions and All actions along the foot, and a search box that shows only the groups and rows holding a word, marked",
@@ -343,6 +343,33 @@
             "by": "human",
             "effort": "15 min",
             "recommended": true
+          }
+        ]
+      },
+      {
+        "id": "behind-the-scenes-keys",
+        "what": "#281 make a read-only Cloudflare API token and, if wanted, a Supabase access token, saved as GitHub secrets, so the Admin tab's Behind the scenes can show what the database cannot see",
+        "on": "computer",
+        "kind": "access",
+        "since": "2026-11-09",
+        "issue": "#281",
+        "holds": [
+          "#282",
+          "Supabase's API errors and advice on the Admin tab",
+          "Cloudflare's Workers and R2 buckets on the Admin tab"
+        ],
+        "options": [
+          {
+            "what": "Follow #281's click-by-click: Cloudflare token (Workers Scripts and R2 Storage, Read), optionally a Supabase access token, then GitHub → Settings → Secrets → CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, SUPABASE_ACCESS_TOKEN",
+            "by": "computer",
+            "effort": "15 min",
+            "recommended": true
+          },
+          {
+            "what": "Skip the Supabase token: #282 brings Supabase's advice in with no key (its open-source checks run in the database) and leaves the API errors as a link",
+            "by": "agent",
+            "effort": "3h",
+            "model": "Sonnet5"
           }
         ]
       }
