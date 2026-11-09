@@ -6175,7 +6175,7 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 .mn-base-elev-extra {
   margin-top: var(--sp-2);
   padding-top: var(--sp-2);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border);
 }
 
 /* A vertical strip, highest band at the top, the way a map legend is read.
@@ -6244,9 +6244,9 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   order: -1;
   margin-bottom: 1px;
   padding: 0 4px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 3px;
-  background: var(--card);
+  background: var(--panel);
   color: var(--text);
   font-size: .7rem;
   font-weight: 600;
@@ -6500,7 +6500,7 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 .polar-fs {
   margin: 0 0 var(--sp-2);
   padding: var(--sp-1) var(--sp-2) var(--sp-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: var(--r-sm, 4px);
 }
 
@@ -6596,7 +6596,7 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 .legend-polar-ramp {
   display: flex;
   height: 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
 }
 
 .legend-polar-ramp i {
@@ -6614,7 +6614,7 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 .sites-fs {
   margin: 0 0 var(--sp-2);
   padding: var(--sp-1) var(--sp-2) var(--sp-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: var(--r-sm, 4px);
 }
 
@@ -6732,20 +6732,36 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   list-style: none;
 }
 
+/* Each result is a card of its own, in all three finders (this one, 🚚
+   Relocate station and 🎯 Best repeater): an edge all the way round, a gap
+   before the next, and its number and headline on a shaded band across the
+   top — the station card's section band (--cr-band's mix) — so where #1 ends
+   and #2 begins is seen before a word is read, not only under the pointer.
+   The lines under the band start under the headline, clear of the badge. The
+   one picked has the accent's edge, doubled, and a blue band, as its pin and
+   paths are on the map.
+   The edge is --muted mixed into the panel rather than --border, which in the
+   dark theme is too near the panel to see (1.4:1). It was var(--line) until
+   now, the token #109 found referenced and never defined — so the edge these
+   cards were drawn with had never been drawn at all. */
 .sites-result {
-  margin: 0 0 var(--sp-1);
-  border: 1px solid var(--line);
+  margin: 0 0 var(--sp-2);
+  border: 1px solid color-mix(in srgb, var(--muted) 45%, var(--panel));
   border-radius: var(--r-sm, 4px);
 }
 
-.sites-result.is-on { border-color: var(--accent); }
+.sites-result.is-on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
 
 .sites-result-main {
   display: flex;
-  align-items: flex-start;
-  gap: var(--sp-2);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
   width: 100%;
-  padding: var(--sp-1) var(--sp-2);
+  padding: 0;
   border: 0;
   background: none;
   color: inherit;
@@ -6756,6 +6772,19 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 
 .sites-result-main:hover,
 .sites-result-main:focus-visible { background: var(--subtle); }
+
+.sites-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: .25rem var(--sp-2);
+  border-radius: calc(var(--r-sm, 4px) - 1px) calc(var(--r-sm, 4px) - 1px) 0 0;
+  background: color-mix(in srgb, var(--muted) 13%, var(--panel));
+}
+
+.sites-result.is-on .sites-head { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); }
+
+.sites-body { padding: var(--sp-1) var(--sp-2) var(--sp-1) calc(1.4rem + 2 * var(--sp-2)); }
 
 .sites-rank,
 .legend-site {
@@ -6789,6 +6818,103 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 
 .sites-detail { padding: 0 var(--sp-2) var(--sp-2); }
 
+/* Every path's ground, drawn small under the table (pathThumbSvg,
+   path-profile.js), in the site finder and 🚚 Relocate station. Small enough
+   that a dozen paths are a glance — one to a row in the on-map flyout, three
+   or so in the side panel — and each a button: a click opens that path's
+   chart full screen. */
+.sites-thumbs-h {
+  margin: var(--sp-2) 0 0;
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.sites-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: var(--sp-2);
+  margin: var(--sp-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sites-thumb {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 4px 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm, 4px);
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: zoom-in;
+}
+
+.sites-thumb:hover,
+.sites-thumb:focus-visible { border-color: var(--accent); }
+
+/* The name on one line (the whole of it is in the button's hover), the
+   figures under the picture free to wrap rather than lose the verdict. */
+.sites-thumb-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sites-thumb-name { font-size: .75rem; font-weight: 600; }
+
+.sites-thumb .path-thumb {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sites-thumb-none {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 240 / 92;
+  padding: 4px;
+  border: 1px dashed var(--border);
+  text-align: center;
+}
+
+.sites-thumbs-hint { margin: var(--sp-1) 0 0; }
+
+/* The pictures' key: the strokes they are drawn in, in words. */
+.path-thumb-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--sp-2);
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+
+.path-thumb-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.path-thumb-key i {
+  display: inline-block;
+  width: 16px;
+  height: 0;
+  border-top: 2px solid var(--accent);
+}
+
+.path-thumb-key i.path-thumb-k-fres { border-top: 1px dashed var(--accent); }
+.path-thumb-key i.path-thumb-k-obs { border-top: 3px solid var(--bad); }
+
+.path-thumb-key i.path-thumb-k-mast {
+  width: 0;
+  height: 12px;
+  border-top: 0;
+  border-left: 2px solid var(--map-repeater);
+}
+
 .sites-detail .table-wrap { margin-top: var(--sp-1); }
 
 .sites-table {
@@ -6800,7 +6926,7 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 .sites-table th,
 .sites-table td {
   padding: 2px 4px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border);
   text-align: left;
   white-space: nowrap;
 }
@@ -6878,9 +7004,9 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   order: -1;
   margin-bottom: 1px;
   padding: 0 4px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 3px;
-  background: var(--card);
+  background: var(--panel);
   color: var(--text);
   font-size: .7rem;
   font-weight: 600;
@@ -6936,9 +7062,9 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   left: 13px;                   /* clear of the 9 px ring round the point */
   top: 0;
   padding: 0 4px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 3px;
-  background: var(--card);
+  background: var(--panel);
   color: var(--text);
   font-size: .7rem;
   font-weight: 600;
@@ -7073,38 +7199,16 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 
 .bestrep-chip {
   padding: 0 .45em;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: var(--r-pill);
   white-space: nowrap;
 }
 
 .bestrep-chip.bestrep-now { border-color: var(--accent); }
 
-/* Each hub in the 🎯 Best repeater list (map-bestrep.js) starts with its
-   number and name on a shaded band across the row — the station card's
-   section band (--cr-band's mix) — so where one hub ends and the next begins
-   is seen before a word is read. The band is the badge's height and a little
-   more, so the badge sits inside it; the lines under it start under the name.
-   The one picked is on a blue band, as its pin and path are on the map. */
-.bestrep-results .sites-result-main {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0;
-  padding: 0;
-}
-
-.bestrep-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: .2rem var(--sp-2);
-  border-radius: var(--r-sm, 4px);
-  background: color-mix(in srgb, var(--muted) 13%, var(--panel));
-}
-
-.sites-result.is-on .bestrep-head { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); }
-
-.bestrep-body { padding: var(--sp-1) var(--sp-2) var(--sp-1) calc(1.4rem + 2 * var(--sp-2)); }
+/* Each hub in the 🎯 Best repeater list starts with its number and name on a
+   shaded band — the finders' shared card (.sites-result, .sites-head and
+   .sites-body, under the site finder above), where it began. */
 
 .bestrep-words {
   margin-top: var(--sp-2);
@@ -21899,7 +22003,7 @@ body.has-sort-bridge .signin-nudge { display: none; }
 .mn-rain-lapse { margin: .5rem 0 .2rem; }
 .mn-rain-lapse-btns { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .mn-rain-lapse button { padding: .35rem .7rem; font-size: .85rem; }
-.mn-rain-lapse.is-on { padding: .4rem .5rem; border: 1px solid var(--line); border-radius: var(--r-md); }
+.mn-rain-lapse.is-on { padding: .4rem .5rem; border: 1px solid var(--border); border-radius: var(--r-md); }
 .mn-rain-fig-icon { background: none; border: 0; }
 .mn-rain-fig {
   position: absolute;

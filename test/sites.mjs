@@ -884,6 +884,65 @@ ok('…and the note says where the card is', /side panel/.test(afterProf.note) &
 await page.evaluate(() => setDockTab('map-sites'));
 await page.waitForTimeout(300);
 
+// ── 2e. every path drawn small, and one opened full screen ──────────────────
+console.log('\nThe small profiles');
+
+// The table says which paths fail; a picture of each says why. One per row,
+// each drawn from the refined figure's own analysis (kept with it, so nothing
+// is profiled again), and red wherever the figure says the ground or the trees
+// are inside the 60% zone — and nowhere when it says they are not.
+const thumbs = await page.evaluate(() => {
+  const on = document.querySelector('.sites-result.is-on');
+  const cells = on ? [...on.querySelectorAll('.sites-thumbs .sites-thumb')] : [];
+  const r = MapSites.results()[MapSites.selectedRank() - 1];
+  return {
+    n: cells.length, rows: on ? on.querySelectorAll('.sites-table tbody tr').length : 0,
+    drawn: cells.filter(b => b.querySelector('svg.path-thumb line') && b.querySelector('svg.path-thumb path')).length,
+    kept: r.figs.filter(f => f.thumb && f.thumb.pts.length > 10).length,
+    notClear: r.figs.filter(f => f.verdict && f.verdict !== 'clear').length,
+    red: cells.filter(b => b.querySelector('svg [stroke="var(--bad)"], svg [fill="var(--bad)"]')).length,
+    key: !!on?.querySelector('.path-thumb-key .term[title]'),
+    head: [...document.querySelectorAll('.sites-panel .sites-results > li')].every(li => li.querySelector('.sites-head .sites-rank')),
+  };
+});
+ok('every result starts with its number on a band of its own', thumbs.head);
+ok('the picked result draws every path small, one picture per row of its table',
+   thumbs.n === 7 && thumbs.rows === 7 && thumbs.drawn === 7 && thumbs.kept === 7, JSON.stringify(thumbs));
+ok('…red on the pictures of the paths that are not clear, and only those', thumbs.red === thumbs.notClear,
+   `${thumbs.red} red, ${thumbs.notClear} not clear`);
+ok('…under a key that says what the strokes are', thumbs.key);
+
+const tk = await page.evaluate(() => MapSites.targets().findIndex(t => t.kind === 'station'));
+const tName = await page.evaluate(k => MapSites.targets()[k].name, tk);
+await page.locator('.sites-result.is-on .sites-thumb').nth(tk).click();
+await page.waitForFunction(() => !!document.querySelector('#path-full .path-full-chart svg'), null, { timeout: RUN_TIMEOUT });
+const big = await page.evaluate(() => {
+  const r = MapSites.results()[MapSites.selectedRank() - 1];
+  const o = r.src === 'station' ? null : state.radio.ends[radioKey(null, r.lat, r.lon)];
+  return {
+    full: PathProfile.isFull(), showing: dockShowing(),
+    title: document.getElementById('app-modal-title')?.textContent || '',
+    finder: !!document.querySelector('.sites-panel .sites-result.is-on .sites-thumbs'),
+    point: r.src !== 'station', mast: o ? o.agl_m : null, rep: MapSites.exportSites().rep.agl,
+  };
+});
+ok('a click on one opens that path\'s chart full screen, the site at A',
+   big.full && big.title.startsWith(`Elevation profile — ${tName} → `), JSON.stringify(big));
+ok('…over the finder, which stays the pane on screen behind it', big.showing === 'map-sites' && big.finder,
+   JSON.stringify(big));
+// A candidate that is a point on the ground has no radio of its own, and the
+// card stood it on its default mast — so the picture (priced on the finder's
+// mast) and the chart it opened could disagree about the same path.
+ok('…with a point candidate stood on the finder\'s mast, not the card\'s default',
+   !big.point || big.mast === big.rep, JSON.stringify(big));
+await page.keyboard.press('Escape');
+await page.waitForTimeout(300);
+const shut = await page.evaluate(() => ({ full: PathProfile.isFull(),
+  focus: document.activeElement?.className || '', showing: dockShowing() }));
+ok('…and Escape closes it, back on the finder with focus on the picture',
+   !shut.full && shut.showing === 'map-sites' && /sites-thumb/.test(shut.focus), JSON.stringify(shut));
+ok('…without throwing', errors.length === 0, errors.join('\n'));
+
 // ── 3. the weights ───────────────────────────────────────────────────────────
 console.log('\nThe weights');
 
@@ -1218,6 +1277,19 @@ ok('the CSV carries a row on to it for every result, and says which way each row
    shown.onward === shown.results && shown.cols.includes('direction') && shown.cols.includes('must_reach'), JSON.stringify(shown.cols));
 ok('Google Earth gets a Must reach folder, and each candidate its paths on', shown.kmlHubs && shown.kmlFrom);
 ok('the map\'s key says what the dashed ring is', shown.legend);
+// The path on gets its picture too, after the sites', drawn the way it was
+// priced: the mast at A, sending — so not turned round as the sites' are.
+const hubPic = await page.evaluate(() => {
+  const cells = [...document.querySelectorAll('.sites-result.is-on .sites-thumb')];
+  const last = cells[cells.length - 1];
+  const fig = MapSites.results()[MapSites.selectedRank() - 1].hubFigs[0];
+  const m = last?.querySelector('svg.path-thumb line[stroke="var(--accent)"]');
+  return { n: cells.length, sites: MapSites.targets().length, name: last?.querySelector('.sites-thumb-name')?.textContent || '',
+           kept: !!(fig && fig.thumb), losX1: m ? +m.getAttribute('x1') : null, call: last?.getAttribute('onclick') || '' };
+});
+ok('…and a picture of it, last, mast on the left, opening its own path',
+   hubPic.n === hubPic.sites + 1 && /^⇧ /.test(hubPic.name) && hubPic.kept && hubPic.losX1 != null && hubPic.losX1 < 10
+   && /MapSites\.profile\(1, 0, true, true\)/.test(hubPic.call), JSON.stringify(hubPic));
 await page.evaluate(w => { state.mapFadeOkDb = w; MapSites.set('wElev', 2); MapSites.set('wLos', 3); MapSites.set('wFade', 4); MapSites.set('wRoad', 1); }, okWas);
 await settle();
 await page.evaluate(() => MapSites.clearHubs());

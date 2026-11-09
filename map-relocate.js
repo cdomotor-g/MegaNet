@@ -14,8 +14,9 @@
 // bearingDeg, cssVar, slug, dlText, stationLatLonText, copyLatLonPillHtml and
 // mapViewPills; across to terrain.js for Terrain.profile, land-cover.js for
 // LandCover.sample and LandCover.canopyAt, path-profile.js for pathAnalyse,
-// pathGround, pathPropOf, rmSystemOf, stationAntenna, stationIsMast, wattsToDbm
-// and the PATH_DEFAULT_* constants, link-budget.js for lbFmtDbd, map-draw.js
+// pathGround, pathPropOf, rmSystemOf, stationAntenna, stationIsMast, wattsToDbm,
+// the PATH_DEFAULT_* constants, the small pictures (pathThumbOf, pathThumbSvg,
+// pathThumbKeyHtml), radioKey, radioOver and PathProfile.openFull, link-budget.js for lbFmtDbd, map-draw.js
 // for MapDraw, map-controls.js for MapChrome.panel, and app.js for
 // findRepeaterMatches, rerenderMapLegend and mapNote. All of it from inside its
 // own functions, so this file's position among the modules is free.
@@ -991,7 +992,9 @@ const MapRelocate = (function () {
       cover: res ? res.cls : null, canopy: res && res.canopyOk ? res.canopy : null,
     });
     if (!an.ok) return null;
-    return { dKm, verdict: an.verdict, margin: marginOf(an, here, hub), src: 'card' };
+    // The picture of it (pathThumbOf), kept with the figure: the place at A,
+    // the hub at B.
+    return { dKm, verdict: an.verdict, margin: marginOf(an, here, hub), src: 'card', thumb: pathThumbOf(an) };
   }
 
   async function refine(mine) {
@@ -1525,9 +1528,11 @@ const MapRelocate = (function () {
         <button type="button" class="sites-result-main" onclick="MapRelocate.select(${r.rank})"
                 aria-pressed="${on ? 'true' : 'false'}"
                 title="Show this place's paths on the map, and its figure for every one of them">
-          <span class="sites-rank" aria-hidden="true">${r.rank}</span>
-          <span class="sites-result-text">
-            <strong>${esc(whereFrom(r.c))}</strong> · score ${Math.round(r.s.score)}
+          <span class="sites-head">
+            <span class="sites-rank" aria-hidden="true">${r.rank}</span>
+            <span><strong>${esc(whereFrom(r.c))}</strong> · score ${Math.round(r.s.score)}</span>
+          </span>
+          <span class="sites-result-text sites-body">
             <span class="small txt-muted">${esc(stationLatLonText(r.c))}${r.c.ground != null ? ` · ground ~${Math.round(r.c.ground)} m` : ''}</span>
             <span class="small sites-result-sum">${summaryHtml(r.c, r.s)}</span>
             <span class="small">${skyText(r.c)}</span>
@@ -1548,9 +1553,11 @@ const MapRelocate = (function () {
       <div class="sites-result reloc-now${on ? ' is-on' : ''}">
         <button type="button" class="sites-result-main" onclick="MapRelocate.select(0)" aria-pressed="${on ? 'true' : 'false'}"
                 title="Show the paths from where it is now">
-          <span class="sites-rank reloc-now-mark" aria-hidden="true">◎</span>
-          <span class="sites-result-text">
-            <strong>Where it is now</strong> <span class="small txt-muted">— the figures every place is read against</span>
+          <span class="sites-head">
+            <span class="sites-rank reloc-now-mark" aria-hidden="true">◎</span>
+            <span><strong>Where it is now</strong> <span class="small txt-muted">— the figures every place is read against</span></span>
+          </span>
+          <span class="sites-result-text sites-body">
             <span class="small sites-result-sum">${summaryHtml(c, s)}</span>
             <span class="small">${skyText(c)}</span>
             <span class="small">${esc(groundText(c))}</span>
@@ -1594,7 +1601,47 @@ const MapRelocate = (function () {
             </tbody>
           </table>
         </div>
+        ${thumbsHtml(c, rank)}
       </div>`;
+  }
+
+  // Every path's ground, drawn small (pathThumbSvg, path-profile.js), as the
+  // site finder draws its own: the transmitting end on the left, as the card
+  // has it when a picture is clicked — which opens that path's chart full
+  // screen over the map, the finder left where it is behind it.
+  function thumbsHtml(c, rank) {
+    const here = rank ? `new site ${rank}` : 'where it is now';
+    const cells = found.hubs.map((h, k) => {
+      const fig = figOf(c, k, true);
+      if (!fig) return '';
+      const ok = !fig.failed && fig.margin != null;
+      const band = ok ? bandOf(fig) : 'none';
+      const km = fig.dKm != null ? `${fig.dKm.toFixed(1)} km` : '';
+      const words = fig.verdict ? pathVerdictWord(fig.verdict) : '';
+      const name = h.dir === 'in' ? `${h.name} → ${here}` : `${here} → ${h.name}`;
+      const pic = fig.thumb
+        ? pathThumbSvg(fig.thumb, { flip: h.dir === 'in' })
+        : `<span class="sites-thumb-none small txt-muted">${fig.failed ? 'No figure for this path' : 'Screened only — no picture kept'}</span>`;
+      return `
+          <li>
+            <button type="button" class="sites-thumb" onclick="MapRelocate.profile(${rank}, ${k}, true)"
+                    title="Open the elevation profile of ${escAttr(name)} full screen"
+                    aria-label="${escAttr(`${name}: ${km}, ${ok ? `${dbText(fig.margin)}, ${words}` : 'no figure'}. Open its elevation profile full screen`)}">
+              <span class="sites-thumb-name">${isRepeater(found.st) ? (h.dir === 'in' ? 'from ' : 'on to ') : ''}${esc(h.name)}</span>
+              ${pic}
+              <span class="sites-thumb-fig small"><span class="sites-band sites-band-${band}">${
+                ok ? dbText(fig.margin) : '—'}</span> · ${esc(km)}${words ? ` · <span class="${
+                fig.verdict === 'obstructed' ? 'txt-bad' : fig.verdict === 'marginal' ? 'txt-warn' : ''}">${esc(words)}</span>` : ''}</span>
+            </button>
+          </li>`;
+    }).join('');
+    if (!cells.trim()) return '';
+    return `
+        <h5 class="sites-thumbs-h">Ground profiles — the sending end on the left</h5>
+        ${pathThumbKeyHtml()}
+        <ul class="sites-thumbs" aria-label="The ground under every path from ${escAttr(here)}">${cells}
+        </ul>
+        <p class="small txt-muted sites-thumbs-hint">Click one to open it full screen, with the fade margin and the figures beside it.</p>`;
   }
 
   function panelHtml() {
@@ -1961,13 +2008,27 @@ const MapRelocate = (function () {
     // site finder hands its over: a two-point line in Draw & measure, reused
     // if it is already there — the station's own id at its end when it is the
     // path from where it is now, so the card stands it on its surveyed height.
-    profile(rank, k) {
+    //
+    // `full` is a small picture's click: the same line, its chart opened full
+    // screen over the map (PathProfile.openFull) and the finder left as it is.
+    profile(rank, k, full) {
       const c = placeOf(rank), h = found && found.hubs[+k];
       if (!c || !h) return;
       // The transmitting end first, as the card prices a path: the place to its
       // repeater, or a carried station up to the place.
       let pa = [c.lat, c.lon], pb = [h.lat, h.lon], ids = [c.now ? found.st.id : null, h.id];
       if (h.dir === 'in') { [pa, pb] = [pb, pa]; ids = [ids[1], ids[0]]; }
+      // A new place is a point with no radio of its own: the card is told the
+      // mast it was priced on (radioOver), as the site finder tells it.
+      if (!c.now && found.hereNew) radioOver(radioKey(null, c.lat, c.lon)).agl_m = found.hereNew.agl;
+      if (full) {
+        state.path.open = true;
+        const had = MapDraw.findLine(pa, pb);
+        if (had) MapDraw.focus(had.id);
+        else MapDraw.addLine([pa, pb], ids);
+        PathProfile.openFull();
+        return;
+      }
       if (state.mapFullscreen && typeof toggleMapFullscreen === 'function') toggleMapFullscreen(false);
       state.path.open = true;
       const existing = MapDraw.findLine(pa, pb);

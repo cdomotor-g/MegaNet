@@ -757,6 +757,134 @@ function pathMarginMeaning() {
     + `growth, rain or a season could eat it; under ${floor} is poor.`;
 }
 
+// ── The profile as a small picture ──────────────────────────────────────────
+// The site finder and the relocation finder list a dozen paths for one place,
+// and a table of margins says which ones fail without saying why. A picture of
+// each says why at a glance — the ridge in the way, the mast too short, the
+// trees at one end — so each path gets the card's chart in miniature: the
+// ground with the earth's bulge in it, what stands on it, the line of sight,
+// the 60% Fresnel zone dashed either side of it, and the surface inside that
+// zone in red. No axes and no cursor: a click opens the card's own chart full
+// screen, which has both.
+//
+// pathThumbOf() keeps only what the picture needs from a pathAnalyse() answer,
+// thinned to THUMB_N samples (the highest per stretch, so a crest is never
+// thinned away), so a finder can keep one per path it has priced without
+// keeping every analysis whole. pathThumbSvg() draws it; `flip` turns it end
+// for end, so the transmitting end is on the left as it will be on the card.
+const PATH_THUMB_N = 160;
+
+function pathThumbOf(an) {
+  if (!an || !an.ok || !Array.isArray(an.pts) || an.pts.length < 2) return null;
+  const all = an.pts, last = all.length - 1;
+  let idx;
+  if (all.length <= PATH_THUMB_N) idx = all.map((_, i) => i);
+  else {
+    const top = new Map();
+    all.forEach((p, i) => {
+      if (i === 0 || i === last) return;
+      const k = Math.min(PATH_THUMB_N - 1, Math.floor(p.d1 / (an.D || 1) * PATH_THUMB_N));
+      const h = p.surfBulged != null ? p.surfBulged : p.bulged;
+      const j = top.get(k);
+      const hj = j == null ? null : (all[j].surfBulged != null ? all[j].surfBulged : all[j].bulged);
+      if (j == null || (h != null && (hj == null || h > hj))) top.set(k, i);
+    });
+    idx = [0, ...[...top.values()].sort((a, b) => a - b), last];
+  }
+  const r = v => (v == null ? null : Math.round(v * 10) / 10);
+  return {
+    D: an.D, txZ: an.txZ, rxZ: an.rxZ, groundA: an.groundA, groundB: an.groundB, verdict: an.verdict,
+    pts: idx.map(i => {
+      const p = all[i];
+      return { d: r(p.d1), g: r(p.bulged), s: r(p.surfBulged), los: r(p.los), r1: r(p.r1),
+               cls: p.cover != null && p.cover > 0 ? p.cls : null, c: r(p.clearance) };
+    }),
+  };
+}
+
+// What the small pictures show, said in words under them — a finger and a
+// keyboard read it there, a pointer gets the Fresnel zone's meaning on hover.
+const PATH_FRESNEL_MEANING = 'The room round the straight line between the two antennas that the signal needs to arrive '
+  + 'at full strength. Ground or trees inside 60% of it cost signal; above the straight line itself, the signal has to bend '
+  + 'over them, which costs more.';
+
+function pathThumbKeyHtml() {
+  return `<p class="path-thumb-key small">
+    <span><i class="path-thumb-k-los"></i> Line of sight</span>
+    <span><i class="path-thumb-k-fres"></i> 60% of the ${termHtml('Fresnel zone', PATH_FRESNEL_MEANING)}</span>
+    <span><i class="path-thumb-k-obs"></i> Ground or trees inside it</span>
+    <span><i class="path-thumb-k-mast"></i> Masts</span>
+  </p>`;
+}
+
+// opt: { flip, label } — `label` is the picture's whole reading, for a screen
+// reader, since the picture itself is nothing a screen reader can read.
+function pathThumbSvg(th, opt = {}) {
+  if (!th || !th.pts || th.pts.length < 2) return '';
+  const W = 240, H = 92, P = 3;
+  const iw = W - 2 * P, ih = H - 2 * P, D = th.D || 1;
+  let lo = Infinity, hi = -Infinity;
+  for (const p of th.pts) {
+    if (p.g != null) { lo = Math.min(lo, p.g); hi = Math.max(hi, p.g); }
+    if (p.s != null) hi = Math.max(hi, p.s);
+    if (p.los != null && p.r1 != null) { hi = Math.max(hi, p.los + 0.6 * p.r1); lo = Math.min(lo, p.los - 0.6 * p.r1); }
+  }
+  if (!isFinite(lo) || !isFinite(hi)) return '';
+  const pad = Math.max(10, (hi - lo) * 0.08);
+  lo -= pad; hi += pad;
+  const x = d => (P + (opt.flip ? (D - d) : d) / D * iw).toFixed(1);
+  const y = m => (P + (1 - (m - lo) / (hi - lo)) * ih).toFixed(1);
+  const floor = (P + ih).toFixed(1);
+  const pts = th.pts;
+  const line = (f, attrs) => `<polyline points="${pts.filter(p => f(p) != null).map(p => `${x(p.d)},${y(f(p))}`).join(' ')}" fill="none" ${attrs}/>`;
+  // Ground in runs, gaps left as gaps (the card's rule: a bridged gap is invented ground).
+  const runs = [];
+  let run = [];
+  for (const p of pts) {
+    if (p.g == null) { if (run.length > 1) runs.push(run); run = []; } else run.push(p);
+  }
+  if (run.length > 1) runs.push(run);
+  const ground = runs.map(rn => `<path d="M${x(rn[0].d)},${floor} L${rn.map(p => `${x(p.d)},${y(p.g)}`).join(' L')} L${x(rn[rn.length - 1].d)},${floor} Z"
+      fill="var(--terrain-fill)" stroke="var(--terrain-line)" stroke-width="1"/>`).join('');
+  // What stands on the ground, one band per run of the same land-cover class.
+  const bands = [];
+  let seg = null;
+  const flush = () => {
+    if (seg && seg.length > 1 && typeof LandCover !== 'undefined') {
+      const top = seg.map(p => `${x(p.d)},${y(p.s)}`).join(' L');
+      const bot = seg.slice().reverse().map(p => `${x(p.d)},${y(p.g)}`).join(' L');
+      bands.push(`<path d="M${top} L${bot} Z" fill="${LandCover.colourVar(seg[0].cls)}" opacity=".85" stroke="none"/>`);
+    }
+    seg = null;
+  };
+  for (const p of pts) {
+    const ok = p.cls != null && p.g != null && p.s != null;
+    if (!ok || (seg && seg[0].cls !== p.cls)) flush();
+    if (ok) (seg = seg || []).push(p);
+  }
+  flush();
+  // The surface inside the 60% zone, in red over the top of it.
+  const bad = [];
+  let b = [];
+  for (const p of pts) {
+    if (p.s != null && p.c != null && p.r1 != null && p.c < 0.6 * p.r1) b.push(p);
+    else { if (b.length) bad.push(b); b = []; }
+  }
+  if (b.length) bad.push(b);
+  const red = bad.map(rn => (rn.length === 1
+    ? `<circle cx="${x(rn[0].d)}" cy="${y(rn[0].s)}" r="1.6" fill="var(--bad)"/>`
+    : `<polyline points="${rn.map(p => `${x(p.d)},${y(p.s)}`).join(' ')}" fill="none" stroke="var(--bad)" stroke-width="2.2"/>`)).join('');
+  const zone = `${line(p => (p.los == null || p.r1 == null ? null : p.los + 0.6 * p.r1), 'stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 2" opacity=".75"')}
+    ${line(p => (p.los == null || p.r1 == null ? null : p.los - 0.6 * p.r1), 'stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 2" opacity=".75"')}`;
+  const los = `<line x1="${x(0)}" y1="${y(th.txZ)}" x2="${x(D)}" y2="${y(th.rxZ)}" stroke="var(--accent)" stroke-width="1.6"/>`;
+  const masts = `<line x1="${x(0)}" y1="${y(th.groundA)}" x2="${x(0)}" y2="${y(th.txZ)}" stroke="var(--map-repeater)" stroke-width="2.2"/>
+    <line x1="${x(D)}" y1="${y(th.groundB)}" x2="${x(D)}" y2="${y(th.rxZ)}" stroke="var(--map-repeater)" stroke-width="2.2"/>`;
+  return `<svg class="path-thumb" viewBox="0 0 ${W} ${H}" role="img"${opt.label ? ` aria-label="${escAttr(opt.label)}"` : ' aria-hidden="true"'}>
+    <rect x="${P}" y="${P}" width="${iw}" height="${ih}" fill="var(--profile-sky)" stroke="var(--border)" stroke-width="1"/>
+    ${ground}${bands.join('')}${zone}${los}${red}${masts}
+  </svg>`;
+}
+
 // ── Elevation profile (Stations map) ─────────────────────────────────────────
 // Draw a line on the map and see the ground under it, and what is growing on
 // it. The quickest read there is on whether a path is plausible, and the
@@ -3161,8 +3289,12 @@ const PathProfile = (function () {
     }
   }
 
+  // A path still being sampled opens too: the finders' small pictures put
+  // their path in and open it in one press, before its ground has landed.
+  // fullPaint() says it is sampling meanwhile, and the chart comes in with the
+  // ground (rerender repaints this too).
   function openFull() {
-    if (full || !shown) return;
+    if (full || !target()) return;
     full = { t: 0, onResize: null };
     // Redrawn to the new size once the window has stopped moving.
     full.onResize = () => {

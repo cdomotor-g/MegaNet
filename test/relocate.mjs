@@ -493,6 +493,32 @@ ok('…and a click on it picks it: its callout, its row, its paths to the repeat
    sel.rank === 2 && /^#2 new site/.test(sel.popup) && sel.row === '2' && sel.links === A.hubs.length, JSON.stringify(sel));
 await page.evaluate(() => state.map.closePopup());
 
+// Every path from the picked place, drawn small under its table, and each a
+// press that opens that path's chart full screen over the finder.
+const thumbs = await page.evaluate(() => {
+  const on = document.querySelector('.reloc-panel .sites-result.is-on');
+  const cells = on ? [...on.querySelectorAll('.sites-thumbs .sites-thumb')] : [];
+  return { n: cells.length, rows: on ? on.querySelectorAll('.sites-table tbody tr').length : 0,
+           drawn: cells.filter(b => b.querySelector('svg.path-thumb line')).length,
+           head: [...document.querySelectorAll('.reloc-panel .sites-result')].every(x => x.querySelector('.sites-head .sites-rank')) };
+});
+ok('every place starts with its number on a band of its own', thumbs.head);
+ok('the picked place draws every path small, one picture per row of its table',
+   thumbs.n > 0 && thumbs.n === thumbs.rows && thumbs.drawn === thumbs.n, JSON.stringify(thumbs));
+await page.locator('.reloc-panel .sites-result.is-on .sites-thumb').first().click();
+await page.waitForFunction(() => !!document.querySelector('#path-full .path-full-chart svg'), null, { timeout: 60_000 });
+const big = await page.evaluate(() => {
+  const c = MapRelocate.results()[MapRelocate.selectedRank() - 1];
+  const o = state.radio.ends[radioKey(null, c.lat, c.lon)];
+  return { full: PathProfile.isFull(), title: document.getElementById('app-modal-title')?.textContent || '',
+           finder: !!document.querySelector('.reloc-panel .sites-result.is-on .sites-thumbs'), mast: o ? o.agl_m : null };
+});
+ok('…a press on one opens its chart full screen, the finder still behind it, the place on its own mast',
+   big.full && /^Elevation profile — /.test(big.title) && big.finder && big.mast > 0, JSON.stringify(big));
+await page.keyboard.press('Escape');
+await page.waitForTimeout(300);
+ok('…and Escape puts it away', !(await page.evaluate(() => PathProfile.isFull())));
+
 const legend = await page.evaluate(() => document.getElementById('map-legend')?.textContent.replace(/\s+/g, ' ') || '');
 ok('the legend says what the ground and the pins are', /Station relocation/.test(legend), legend.slice(0, 200));
 

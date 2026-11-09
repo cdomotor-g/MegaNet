@@ -12,8 +12,9 @@
 // bearingDeg, acmaHaversineKm, cssVar, slug, dlText, stationLatLonText,
 // copyLatLonPillHtml and mapViewPills; across to terrain.js for Terrain.grid
 // and Terrain.profile, land-cover.js for LandCover.sample, path-profile.js for
-// pathAnalyse, pathPropOf, rmSystemOf, stationAntenna, wattsToDbm and the PATH_DEFAULT_*
-// constants, link-budget.js for lbFmtDbd, map-roads.js for MapRoads.near, map-draw.js for MapDraw,
+// pathAnalyse, pathPropOf, rmSystemOf, stationAntenna, wattsToDbm, the PATH_DEFAULT_*
+// constants, the small pictures (pathThumbOf, pathThumbSvg, pathThumbKeyHtml),
+// radioKey and radioOver, and PathProfile.openFull, link-budget.js for lbFmtDbd, map-roads.js for MapRoads.near, map-draw.js for MapDraw,
 // places.js for Places.parse, map-controls.js for MapChrome.panel,
 // map-backbone.js for repeaterPathsOf (a repeater's paths both ways by its pass
 // ranges: what it hears, for Add what the selected repeater carries, and where
@@ -729,9 +730,11 @@ const MapSites = (function () {
       cover: cover ? res.cls : null, canopy: cover && res.canopyOk ? res.canopy : null,
     });
     if (!an.ok) return null;
+    // The picture of it (pathThumbOf), kept with the figure so the panel can
+    // draw every path for a candidate without profiling any of them again.
     return { dKm, verdict: an.verdict, ratio: an.worst.ratio,
              margin: marginOf(an, rep, fld, out),
-             src: cover ? 'cover' : 'bare' };
+             src: cover ? 'cover' : 'bare', thumb: pathThumbOf(an) };
   }
 
   // A must-reach path, screened. It can run far outside the search area, so
@@ -1564,9 +1567,11 @@ const MapSites = (function () {
             <button type="button" class="sites-result-main" onclick="MapSites.select(${r.rank})"
                     aria-pressed="${on ? 'true' : 'false'}"
                     title="Show this site's paths on the map, and its figure for every site">
-              <span class="sites-rank" aria-hidden="true">${r.rank}</span>
-              <span class="sites-result-text">
-                <strong>${Math.round(r.c.ground)} m</strong> · score ${Math.round(r.s.score)}
+              <span class="sites-head">
+                <span class="sites-rank" aria-hidden="true">${r.rank}</span>
+                <span><strong>${Math.round(r.c.ground)} m</strong> · score ${Math.round(r.s.score)}</span>
+              </span>
+              <span class="sites-result-text sites-body">
                 <span class="small txt-muted">${esc(stationLatLonText(r.c))} — ${esc(whereText(r.c))}</span>
                 <span class="small sites-result-sum">${summaryHtml(r)}</span>
                 <span class="small">${roadHtml(r.c)}</span>
@@ -1634,7 +1639,53 @@ const MapSites = (function () {
             </tbody>
           </table>
         </div>
+        ${thumbsHtml(r)}
       </div>`;
+  }
+
+  // Every path's ground, drawn small (pathThumbSvg, path-profile.js): the table
+  // says which paths fail, the pictures say why — the ridge in the way, the
+  // trees at one end. The transmitting end on the left, as the card has it
+  // when a picture is clicked, which opens that path's chart full screen over
+  // the map: each site up to the new mast, then the mast on to what it must
+  // reach. A path with only the screened figure has no picture kept, and a
+  // click still opens its full profile.
+  function thumbsHtml(r) {
+    const cell = (name, label, fig, hub, k) => {
+      if (!fig || fig.colo) return '';
+      const ok = !fig.failed;
+      const band = ok ? bandOf(fig) : 'none';
+      const km = fig.dKm != null ? `${fig.dKm.toFixed(1)} km` : '';
+      const reading = ok ? `${dbText(fig.margin)} · ${VERDICT[fig.verdict]}` : 'no figure';
+      // finePair profiles the mast at A and the far end at B: a site sends up
+      // to the mast, so its picture is turned round; the mast sends on to a hub.
+      const pic = fig.thumb
+        ? pathThumbSvg(fig.thumb, { flip: !hub })
+        : `<span class="sites-thumb-none small txt-muted">${ok ? 'Screened only — no picture kept' : 'No figure for this path'}</span>`;
+      return `
+          <li>
+            <button type="button" class="sites-thumb" onclick="MapSites.profile(${r.rank}, ${k}, ${hub}, true)"
+                    title="Open the elevation profile of ${escAttr(label)} full screen"
+                    aria-label="${escAttr(`${label}: ${km}, ${reading}. Open its elevation profile full screen`)}">
+              <span class="sites-thumb-name">${hub ? '⇧ ' : ''}${esc(name)}</span>
+              ${pic}
+              <span class="sites-thumb-fig small"><span class="sites-band sites-band-${band}">${
+                ok ? dbText(fig.margin) : '—'}</span> · ${esc(km)}${ok ? ` · <span class="${
+                fig.verdict === 'obstructed' ? 'txt-bad' : fig.verdict === 'marginal' ? 'txt-warn' : ''}">${esc(VERDICT[fig.verdict])}</span>` : ''}</span>
+            </button>
+          </li>`;
+    };
+    const cells = found.targets.map((t, k) => cell(t.name, `${t.name} → site ${r.rank}`, figOf(r.c, k, true), false, k)).join('')
+      + (found.hubs || []).map((h, j) => cell(h.name, `site ${r.rank} → ${h.name}`, hubFigOf(r.c, j, true), true, j)).join('');
+    if (!cells.trim()) return '';
+    return `
+        <h5 class="sites-thumbs-h">Ground profiles — the sending end on the left</h5>
+        ${pathThumbKeyHtml()}
+        <ul class="sites-thumbs" aria-label="The ground under every path from or to site ${r.rank}">${cells}
+        </ul>
+        <p class="small txt-muted sites-thumbs-hint">Each site sends up to site ${r.rank}${(found.hubs || []).length
+          ? `, and site ${r.rank} sends on to each ⇧ must-reach` : ''}. Click one to open it full screen, with the fade margin
+          and the figures beside it.</p>`;
   }
 
   function worstIndex(c) {
@@ -2145,7 +2196,12 @@ ${hubsFieldHtml()}
     // One path into the elevation profile and the link budget, the way the
     // backbone card and the budget card hand theirs over: a two-point line in
     // Draw & measure, reused if it is already there.
-    profile(rank, k, hub) {
+    //
+    // `full` is a small picture's click: the same line, and its chart opened
+    // full screen over the map (PathProfile.openFull) rather than the card
+    // brought on screen — the finder stays where it is behind it, so the next
+    // picture is one press away when it closes.
+    profile(rank, k, hub, full) {
       const r = results.find(x => x.rank === +rank);
       const t = found && (hub ? found.hubs[+k] : found.targets[+k]);
       if (!r || !t) return;
@@ -2153,6 +2209,21 @@ ${hubsFieldHtml()}
       // so the profile and the budget price the same way: the site up to the
       // mast, or the mast on to what it must reach.
       const pa = hub ? [r.c.lat, r.c.lon] : [t.lat, t.lon], pb = hub ? [t.lat, t.lon] : [r.c.lat, r.c.lon];
+      // A point at either end has no radio of its own, so the card would stand
+      // it on the default mast. The finder priced it on the mast it was asked
+      // about, so the card is told that (the spot's override in state.radio,
+      // radioOver) — or the picture clicked and the chart it opens disagree.
+      const tr = hub ? found.hrs[+k] : found.flds[+k];
+      if (!t.sid && tr) radioOver(radioKey(null, t.lat, t.lon)).agl_m = tr.agl;
+      if (!r.c.sid) radioOver(radioKey(null, r.c.lat, r.c.lon)).agl_m = found.rep.agl;
+      if (full) {
+        state.path.open = true;
+        const had = MapDraw.findLine(pa, pb);
+        if (had) MapDraw.focus(had.id);
+        else MapDraw.addLine([pa, pb], hub ? [r.c.sid || null, t.sid || null] : [t.sid || null, r.c.sid || null]);
+        PathProfile.openFull();
+        return;
+      }
       // The card lives with the Stations cards — in the side panel beside the
       // map, or under it — never on the map, so full screen is left first,
       // the way the station card's Edit leaves it: a profile drawn behind the

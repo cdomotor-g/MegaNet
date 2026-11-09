@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 247, date: '2026-11-09', items: [
+      '🗼 <strong>Every path, drawn small.</strong> Pick a result in 🗼 Repeater sites or 🚚 Relocate station and, under '
+        + 'its table, <em>Ground profiles</em> shows the ground under each of its paths — the line of sight, the Fresnel zone '
+        + 'and, in red, anything in the way, the must-reach paths too. Click one to open that path\'s full elevation profile over the map; close it and '
+        + 'you are back on the list.',
+      '🗂️ <strong>Results told apart.</strong> In those two lists and 🎯 Best repeater, each result is now a card with an '
+        + 'edge round it and its number on a shaded band, so it is plain where #1 ends and #2 begins.',
+    ] },
     { n: 246, date: '2026-11-09', items: [
       '🗼 <strong>A new hilltop that can pass the readings on.</strong> 🗼 Repeater sites has a <em>Must reach</em> list: the '
         + 'repeaters and base stations the new mast has to get its readings on to. For a repeater that is moving it fills '

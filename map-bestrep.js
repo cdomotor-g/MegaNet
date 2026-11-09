@@ -825,11 +825,11 @@ const MapBestRepeater = (function () {
         <button type="button" class="sites-result-main" onclick="MapBestRepeater.select('${escAttr(c.hub.id)}')"
                 aria-pressed="${on ? 'true' : 'false'}"
                 title="Show this one's path and its route on to a base on the map">
-          <span class="bestrep-head">
+          <span class="sites-head bestrep-head">
             <span class="sites-rank" aria-hidden="true">${c.rank}</span>
             <strong>${esc(c.hub.name)}</strong>
           </span>
-          <span class="sites-result-text bestrep-body">
+          <span class="sites-result-text sites-body bestrep-body">
             <span class="small txt-muted">${esc(roleText(c.hub))}${c.hub.number ? ` ${esc(c.hub.number)}` : ''} · ${c.km.toFixed(1)} km ${compass(c.brg)}</span>
             <span class="small">${term('hop')} ${hopLine}</span>
             ${f && !f.failed ? `<span class="small">${term('onward')} ${onwardHtml(c)}</span>` : ''}

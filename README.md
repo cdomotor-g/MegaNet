@@ -4387,11 +4387,20 @@ anything; changing the sites, the must-reach list, the radio or the search area
 takes the answer away, because a list of results still on screen under a
 question it does not answer is the one way this can mislead.
 
-Pick a result and its paths are drawn coloured by fade margin (dashed where the
+Each result is a card of its own — an edge round it and its number, height and
+score on a shaded band — so one ends plainly where the next begins. Pick a result
+and its paths are drawn coloured by fade margin (dashed where the
 ground cuts the line, heavier for the paths on to what it must reach, whose
 stations wear a dashed ring and a square dot) with every site listed against it
 and the must-reach stations under a heading of their own; **Profile the worst
-path** opens that one in the elevation profile, and each row's ↗ its own path. **Also score existing station
+path** opens that one in the elevation profile, and each row's ↗ its own path.
+Under the table, **Ground profiles** draws every one of those paths small — the
+ground, the line of sight, the 60% Fresnel zone dashed round it and, in red,
+ground or trees inside it — the sending end on the left; click a picture to open
+that path's chart full screen over the map, with the finder still behind it when
+it closes. A candidate that is a bare point is stood on the finder's mast height
+in that chart, so the picture and the chart agree. 🚚 Relocate station draws its
+paths the same way. **Also score existing station
 sites** weighs the masts already standing in the area against the bare hills —
 a site with power, a track and a willing landholder is worth metres. **Save CSV**
 writes every result against every site and every must-reach, its `direction`
