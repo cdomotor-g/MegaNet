@@ -306,36 +306,63 @@ try {
     arrows.dirs['core:fwd'] > 0 && arrows.pointsAtRepeater, JSON.stringify(arrows.dirs));
   check('a repeater-to-repeater backbone path is drawn two-way',
     arrows.dirs['backbone:both'] > 0, JSON.stringify(arrows.dirs));
-  // Which way a repeater pair runs goes by the pass ranges (the owner, 9 Nov
-  // 2026): both ways where their windows share an address or each carries the
-  // other's AlertIDs; one way, sender to receiver, where only one's own
-  // AlertIDs are in the other's windows. Worked out here from the register.
+  // Which way a repeater pair runs (the owner, 9 Nov 2026): each way needs the
+  // pass ranges — their windows share an address, or the sender's own
+  // AlertIDs are in the receiver's — and the channel: the receiver listens on
+  // one the sender transmits on (unknown where either has none on record).
+  // Worked out here from the register, every pair, and held to the map.
   const way = await page.evaluate(() => {
     const own = (x, y) => stationAlertIds(x).some(id => passRangeCoversId(y.repeater, id));
     const share = (x, y) => windowOverlapCount(repeaterOpenWindows(x.repeater), repeaterOpenWindows(y.repeater)) > 0;
-    const pairs = backboneLinks(state.mapMaxLinkKm).filter(p => p.kind === 'repeater');
-    const one = pairs.filter(p => p.oneWay), two = pairs.filter(p => !p.oneWay);
-    const badOne = one.filter(p => !(own(p.a, p.b) && !own(p.b, p.a) && !share(p.a, p.b))).map(p => `${p.a.id}>${p.b.id}`);
-    const badTwo = two.filter(p => !(share(p.a, p.b) || (own(p.a, p.b) && own(p.b, p.a)))).map(p => `${p.a.id}|${p.b.id}`);
-    const lines = state.mapLines.filter(l => l.mnLinkRole === 'backbone');
-    const drawn = lines.filter(l => one.some(p => p.a.id === l.mnLinkRepeaterId && p.b.id === l.mnLinkRepeaterId2));
-    const twoDrawn = lines.filter(l => two.some(p => (p.a.id === l.mnLinkRepeaterId && p.b.id === l.mnLinkRepeaterId2)));
-    // Every pair the register says runs one way, found independently.
+    const chans = (s, k) => [s.repeater && s.repeater[k], ...(s.frequencies || []).map(r => r && r[k])]
+      .map(Number).filter(f => f > 0);
+    const hears = (tx, rx) => { const t = chans(tx, 'tx_mhz'), r = chans(rx, 'rx_mhz');
+                                return !t.length || !r.length || t.some(f => r.some(g => Math.abs(f - g) < 0.002)); };
+    const goes = (x, y) => (share(x, y) || own(x, y)) && hears(x, y);
+    const K = state.mapMaxLinkKm;
+    const pairs = backboneLinks(K).filter(p => p.kind === 'repeater');
+    const key = (x, y) => `${x}>${y}`;
+    const got = new Map(pairs.map(p => [key(p.a.id, p.b.id), p]));
     const reps = state.data.stations.filter(x => x.roles.includes('repeater') && x.repeater && x.lat != null);
-    let missed = 0;
+    const wrong = [];
+    let two = 0, one = 0, none = 0, wasTwo = 0;
     for (let i = 0; i < reps.length; i++) for (let j = i + 1; j < reps.length; j++) {
       const x = reps[i], y = reps[j];
-      if (acmaHaversineKm(x.lat, x.lon, y.lat, y.lon) > state.mapMaxLinkKm || share(x, y)) continue;
-      const xy = own(x, y), yx = own(y, x);
-      if (xy !== yx && !one.some(p => p.a.id === (xy ? x.id : y.id) && p.b.id === (xy ? y.id : x.id))) missed++;
+      if (acmaHaversineKm(x.lat, x.lon, y.lat, y.lon) > K) continue;
+      const xy = goes(x, y), yx = goes(y, x);
+      if (share(x, y)) wasTwo++;
+      const p = got.get(key(x.id, y.id)) || got.get(key(y.id, x.id));
+      if (xy && yx) { two++; if (!p || p.oneWay) wrong.push(`${x.id}|${y.id} should be two-way`); }
+      else if (xy || yx) {
+        one++;
+        const [f, t] = xy ? [x, y] : [y, x];
+        if (!p || !p.oneWay || p.a.id !== f.id || p.b.id !== t.id) wrong.push(`${f.id}>${t.id} should be one-way`);
+      } else { if (share(x, y) || own(x, y) || own(y, x)) none++; if (p) wrong.push(`${x.id}|${y.id} should not be a path`); }
     }
-    return { one: one.length, two: two.length, badOne, badTwo, missed, drawn: drawn.length,
-             fwd: drawn.every(l => l.mnArrowDir === 'fwd'), twoBoth: twoDrawn.every(l => l.mnArrowDir === 'both') };
+    const lines = state.mapLines.filter(l => l.mnLinkRole === 'backbone');
+    const bad = lines.filter(l => {
+      const p = got.get(key(l.mnLinkRepeaterId, l.mnLinkRepeaterId2));
+      return p && p.kind === 'repeater' && l.mnArrowDir !== (p.oneWay ? 'fwd' : 'both');
+    }).length;
+    const oneDrawn = lines.filter(l => { const p = got.get(key(l.mnLinkRepeaterId, l.mnLinkRepeaterId2)); return p && p.oneWay; }).length;
+    // The card's own example: Upper Rosenthal (151.500 both ways) is heard by
+    // Wilsons Peak (in on 151.500), which sends on 152.400 — not back.
+    const ur = state.data.stations.find(x => /^Upper Rosenthal/i.test(x.name || ''));
+    const wp = state.data.stations.find(x => /^Wilsons Peak/i.test(x.name || ''));
+    const pair = ur && wp ? (got.get(key(ur.id, wp.id)) || got.get(key(wp.id, ur.id))) : null;
+    return { two, one, none, wasTwo, wrong: wrong.slice(0, 8), nWrong: wrong.length, bad, oneDrawn,
+             example: pair ? { a: pair.a.name, b: pair.b.name, oneWay: pair.oneWay } : null,
+             offAir: backboneIndex().offAir.filter(p => p.kind === 'repeater' && p.km <= K).length };
   });
-  check('a repeater pair runs both ways only where their pass ranges share an address or each carries the other\'s',
-    way.two > 0 && !way.badTwo.length && way.twoBoth, JSON.stringify(way));
-  check('…and one way, sender first, where only one\'s own AlertIDs are in the other\'s pass ranges — every such pair, drawn with one-way arrows',
-    way.one > 0 && !way.badOne.length && way.missed === 0 && way.drawn > 0 && way.fwd, JSON.stringify(way));
+  check('every repeater pair runs each way only where the pass ranges say so and the receiver listens on the sender\'s channel',
+    way.two > 0 && way.one > 0 && way.nWrong === 0, JSON.stringify(way));
+  check('…its arrows two-way or one-way to match, and the one-way ones drawn sender to receiver',
+    way.bad === 0 && way.oneDrawn > 0, JSON.stringify(way));
+  check('…Upper Rosenthal up to Wilsons Peak and not back: Wilsons Peak sends on a channel Upper Rosenthal does not listen on',
+    !way.example || (way.example.oneWay && /^Upper Rosenthal/.test(way.example.a) && /^Wilsons Peak/.test(way.example.b)),
+    JSON.stringify(way.example));
+  check('…and a pair no channel joins either way is not drawn, but kept to say why',
+    way.none > 0 && way.offAir === way.none, JSON.stringify(way));
 
   await page.evaluate(() => MapArrows.setEnabled(false));
   await page.waitForTimeout(300);
@@ -434,8 +461,8 @@ try {
   check('a repeater-to-repeater hop is on the sender\'s TX, both ways listed',
     !!hops.even && hops.even.got === hops.even.want && hops.even.listens == null && hops.even.n === 2,
     JSON.stringify(hops.even));
-  check('…and a receiver listening elsewhere is named with its own RX',
-    !!hops.odd && hops.odd.got === hops.odd.want && hops.odd.listens === hops.odd.rx,
+  check('…and where a receiver\'s main channel differs, the label names it — and that is only ever on a hop another of its channels hears',
+    !hops.odd || (hops.odd.got === hops.odd.want && hops.odd.listens === hops.odd.rx),
     JSON.stringify(hops.odd));
   check('a repeater-to-base hop is one way, on the repeater\'s TX',
     !!hops.base && hops.base.got === hops.base.want && hops.base.n === 1, JSON.stringify(hops.base));

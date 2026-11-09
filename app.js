@@ -5447,7 +5447,7 @@ function mapDisplayControlsHtml() {
     <!-- Arrows joins the links' card: it is one more thing about the lines the
          switches above it draw. -->
     <label class="filter-check mapd-join"
-           title="Arrowheads along every drawn link, showing which way the traffic runs — a field station reports in to its repeater, a repeater hands off to a base. Between two repeaters it goes by their pass ranges: both ways, with a head at each end, when they share any pass-range address or each carries the other's own; one way when only one's own addresses are in the other's pass ranges.">
+           title="Arrowheads along every drawn link, showing which way the traffic runs — a field station reports in to its repeater, a repeater hands off to a base. Between two repeaters each way needs both: the pass ranges (they share an address, or the sender's own addresses are in the receiver's) and the channel (the receiver listens on what the sender transmits on). Both ways gets a head at each end; one way gets arrows pointing up to the receiver.">
       <input type="checkbox" ${state.mapArrows ? 'checked' : ''}
              onchange="MapArrows.setEnabled(this.checked)">
       Arrows along the links
@@ -6287,8 +6287,8 @@ function mapLegendHtml() {
       <span class="legend-arrow" aria-hidden="true">➤</span>
       <span class="small">${MapArrows.drawing()
         ? `Arrows run the way the traffic does — into the repeater, and on to the base. A
-           repeater-to-repeater path goes by the pass ranges: both ways, a head at each end, when
-           they share an address; one way when only one's own addresses are in the other's. A
+           repeater-to-repeater path runs each way the pass ranges allow and the receiver listens on
+           the sender's channel: a head at each end when both ways do, one way when only one does. A
            backbone path's arrows are black, like its dashes`
         : `Arrows along the links are on, and draw from zoom ${MapArrows.minZoom} in — they grow
            as you zoom, and are off out here where direction is not the question being asked`}</span>
@@ -7341,7 +7341,7 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
   // was.
   const backboneColor = getComputedStyle(document.documentElement)
     .getPropertyValue('--map-backbone').trim() || '#000000';
-  const backboneTips = backbone.map(p => ({ kind: p.kind, a: p.a, b: p.b, fadeMargin: null }));
+  const backboneTips = backbone.map(p => ({ kind: p.kind, a: p.a, b: p.b, oneWay: !!p.oneWay, fadeMargin: null }));
   for (const pass of ['casing', 'core', 'dash']) {
     const casing = pass === 'casing';
     const dash   = pass === 'dash';
@@ -7357,11 +7357,11 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
       strength(line).addTo(map);
       line.mnBaseColor       = casing ? '#ffffff' : backboneColor;
       // Repeater to base runs one way — that is the direction traffic leaves
-      // the network. Repeater to repeater goes by the pass ranges
-      // (map-backbone.js, "Which way"): both ways where their windows share an
-      // address or each carries the other's AlertIDs, one way — sender to
-      // receiver, a to b — where only one's own AlertIDs are in the other's
-      // windows. The dash overlay and the casing carry no arrows: one set per path.
+      // the network. Repeater to repeater runs each way where the pass ranges
+      // say so and the receiver listens on the sender's channel
+      // (map-backbone.js, "Which way"): both ways, or one way, sender to
+      // receiver, a to b. The dash overlay and the casing carry no arrows:
+      // one set per path.
       if (pass === 'core') line.mnArrowDir = p.kind === 'base' || p.oneWay ? 'fwd' : 'both';
       line.on('click', MapBackbone.onLineClick);
       line.mnTip = backboneTips[i];

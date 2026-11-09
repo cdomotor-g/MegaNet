@@ -44,20 +44,25 @@
 // about which stations happen to use an address today, so the test is interval
 // arithmetic rather than a walk over the sensor list.
 //
-// Which way a repeater pair runs goes by the pass ranges too (the owner, 9
-// Nov 2026: "bi-directional if they are in each other's pass ranges, or if
-// they share stations in their pass ranges … it should just go by the pass
-// ranges"):
+// Which way a repeater pair runs is worked out each way on its own, and a way
+// runs only where two things hold (the owner, 9 Nov 2026: "bi-directional if
+// they are in each other's pass ranges, or if they share stations in their
+// pass ranges … it should just go by the pass ranges", and then "the frequency
+// … should be taken into account in all situations. If two stations are not
+// on the same frequency, then they can't be passing each other"):
 //
-//   two-way   their open windows share any address — each accepts what the
-//             other re-transmits — or each one's own AlertIDs are in the
-//             other's windows.
-//   one-way   one repeater's own AlertIDs are in the other's windows and their
-//             windows share nothing: its own readings go up to the other, and
-//             nothing comes back. The pair is drawn sender (a) to receiver (b),
-//             `oneWay` set. Without this they were drawn only where the sender
-//             was a field station too (as a field link), and not at all where
-//             it was a repeater only.
+//   the pass ranges   their open windows share any address (each accepts
+//                     what the other re-transmits), or the sender's own
+//                     AlertIDs are in the receiver's windows;
+//   the channel       the receiver listens on a channel the sender transmits
+//                     on (channelTo). Where either end has no channel on
+//                     record it cannot be checked, and is not ruled out.
+//
+// Both ways → a two-way pair. One way → `oneWay`, drawn sender (a) to receiver
+// (b). Neither → not a path at all; the pairs the pass ranges alone would have
+// joined are kept as `offAir`, for the checks and for anybody asking why a
+// line is missing. A repeater–base pair is the same test one way: off the
+// base's channels on record, it is not a path.
 //
 // A repeater–base path is the other half of the backbone: where the traffic a
 // repeater relays is finally going. A base is not a repeater — it opens no
@@ -86,6 +91,28 @@ function repeaterOpenWindows(rep) {
   return spans;
 }
 
+// The channels a station is on record as sending on and listening on: its
+// repeater pair, then every row of its frequencies (a base's rows are what it
+// listens on). Unparseable or blank values are left out.
+const BB_SAME_MHZ = 0.002;   // frequencies.js's: channels here are 12.5 kHz apart
+function stationChannels(s, key) {
+  const out = [];
+  const add = v => { const f = v == null || v === '' ? NaN : Number(v); if (f > 0 && !out.some(x => Math.abs(x - f) < BB_SAME_MHZ)) out.push(f); };
+  if (s && s.repeater) add(s.repeater[key]);
+  for (const r of (s && s.frequencies) || []) add(r && r[key]);
+  return out;
+}
+
+// Can `rx` hear what `tx` sends? 'on' where it listens on a channel `tx`
+// transmits on, 'off' where both are on record and none matches — then
+// nothing passes that way, whatever the pass ranges say — and 'unknown' where
+// either end has no channel on record, which rules nothing out.
+function channelTo(tx, rx) {
+  const t = stationChannels(tx, 'tx_mhz'), r = stationChannels(rx, 'rx_mhz');
+  if (!t.length || !r.length) return 'unknown';
+  return t.some(f => r.some(g => Math.abs(f - g) < BB_SAME_MHZ)) ? 'on' : 'off';
+}
+
 // How many ALERT addresses two open-window lists have in common. Any overlap
 // at all is what makes a backbone pair; the count is what the path card shows.
 function windowOverlapCount(a, b) {
@@ -105,7 +132,7 @@ function windowOverlapCount(a, b) {
 // invalidated exactly where state.passRelIdx is: applyStationDoc and
 // refreshFilterOptions.
 //
-//   pairs: [{ kind, a, b, km, overlap, shared, oneWay, carries }]
+//   pairs: [{ kind, a, b, km, overlap, shared, oneWay, carries, channel }]
 //          kind = 'repeater' for a repeater–repeater path, 'base' for a
 //          repeater–base one (a is always the repeater on a 'base' pair);
 //          overlap = addresses open in both windows — > 0 on a 'repeater' pair
@@ -115,13 +142,16 @@ function windowOverlapCount(a, b) {
 //          overlap can sit on addresses nothing transmits on yet);
 //          oneWay = a sends to b and not back (see "Which way" above);
 //          carries = on a pair matched by AlertIDs alone, { ab, ba }: a's own
-//          AlertIDs in b's windows, and b's in a's.
+//          AlertIDs in b's windows, and b's in a's (null where the windows
+//          overlap); channel = { ab, ba }, 'on' or 'unknown' each way that
+//          runs (ba null on a one-way or base pair).
+//   offAir: the pairs the pass ranges join that no channel does, either way.
 //   cover: station id → Set of network ALERT addresses its windows carry.
 function backboneIndex() {
   if (state.backboneIdx) return state.backboneIdx;
   // Nothing loaded yet: answer empty without caching, so the index is still
   // built from the real file later — passRelationIndex's own convention.
-  if (!state.data) return { pairs: [], cover: new Map() };
+  if (!state.data) return { pairs: [], cover: new Map(), offAir: [] };
   const reps = repeaterList(state.data.stations);
   const bases = state.data.stations.filter(s => s.roles.includes('base'));
   const addresses = passRelationIndex().addresses;
@@ -144,44 +174,48 @@ function backboneIndex() {
   const pairKey = (x, y) => (x < y ? x + '|' + y : y + '|' + x);
   const seen = new Set();
   const pairs = [];
-  for (let i = 0; i < reps.length; i++) {
-    const a = reps[i];
-    if (a.lat == null || a.lon == null) continue;
-    const wa = windows.get(a.id);
-    if (!wa.length) continue;
-    for (let j = i + 1; j < reps.length; j++) {
-      const b = reps[j];
-      if (b.lat == null || b.lon == null) continue;
-      const overlap = windowOverlapCount(wa, windows.get(b.id));
-      if (!overlap) continue;
-      seen.add(pairKey(a.id, b.id));
-      pairs.push({ kind: 'repeater', a, b, km: acmaHaversineKm(a.lat, a.lon, b.lat, b.lon),
-                   overlap, shared: sharedAddrs(a.id, b.id) });
-    }
-  }
-  // Repeater → repeater by a repeater's own AlertIDs alone, where the windows
-  // share nothing (see "Which way" above): one-way, sender first, unless each
-  // carries the other's.
+  const offAir = [];
+  // Every repeater pair, each way checked on its own (see "Which way"): a
+  // way runs where the pass ranges say so — the windows share an address, or
+  // the sender's own AlertIDs are in the receiver's windows — and the
+  // receiver listens on a channel the sender transmits on (channelTo).
   const own = new Map(reps.map(r => [r.id, stationAlertIds(r)]));
   for (let i = 0; i < reps.length; i++) {
     const a = reps[i];
     if (a.lat == null || a.lon == null) continue;
+    const wa = windows.get(a.id);
     for (let j = i + 1; j < reps.length; j++) {
       const b = reps[j];
-      if (b.lat == null || b.lon == null || seen.has(pairKey(a.id, b.id))) continue;
+      if (b.lat == null || b.lon == null) continue;
+      const wb = windows.get(b.id);
+      const overlap = wa.length && wb.length ? windowOverlapCount(wa, wb) : 0;
       const ab = own.get(a.id).filter(id => passRangeCoversId(b.repeater, id));
       const ba = own.get(b.id).filter(id => passRangeCoversId(a.repeater, id));
-      if (!ab.length && !ba.length) continue;
+      const rangesAB = overlap > 0 || ab.length > 0, rangesBA = overlap > 0 || ba.length > 0;
+      if (!rangesAB && !rangesBA) continue;
+      const km = acmaHaversineKm(a.lat, a.lon, b.lat, b.lon);
+      const chAB = rangesAB ? channelTo(a, b) : null, chBA = rangesBA ? channelTo(b, a) : null;
+      const goAB = rangesAB && chAB !== 'off', goBA = rangesBA && chBA !== 'off';
       seen.add(pairKey(a.id, b.id));
-      const [from, to] = ab.length ? [a, b] : [b, a];
-      pairs.push({ kind: 'repeater', a: from, b: to, km: acmaHaversineKm(a.lat, a.lon, b.lat, b.lon),
-                   overlap: 0, shared: [], oneWay: !(ab.length && ba.length),
-                   carries: ab.length ? { ab, ba } : { ab: ba, ba: ab } });
+      if (!goAB && !goBA) { offAir.push({ kind: 'repeater', a, b, km, overlap }); continue; }
+      // Sender first: a one-way pair runs a to b.
+      const fwd = goAB;
+      const [from, to] = fwd ? [a, b] : [b, a];
+      pairs.push({
+        kind: 'repeater', a: from, b: to, km, overlap,
+        shared: overlap ? sharedAddrs(a.id, b.id) : [],
+        oneWay: !(goAB && goBA),
+        // Matched on AlertIDs alone, the windows sharing nothing: whose are whose.
+        carries: overlap ? null : (fwd ? { ab, ba } : { ab: ba, ba: ab }),
+        // 'on' (a channel matches) or 'unknown' (one end has none on record), each way.
+        channel: fwd ? { ab: chAB, ba: goBA ? chBA : null } : { ab: chBA, ba: goAB ? chAB : null },
+      });
     }
   }
   // Repeater → base. A station that is both keeps its repeater pairs and takes
   // base pairs only for the repeaters it did not already share a window with,
-  // so no hop is drawn — or counted — twice.
+  // so no hop is drawn — or counted — twice. Off the base's channels on
+  // record, it is not a path.
   for (const b of bases) {
     if (b.lat == null || b.lon == null) continue;
     for (const a of reps) {
@@ -189,12 +223,15 @@ function backboneIndex() {
       const key = pairKey(a.id, b.id);
       if (seen.has(key)) continue;
       seen.add(key);
-      pairs.push({ kind: 'base', a, b, km: acmaHaversineKm(a.lat, a.lon, b.lat, b.lon),
+      const km = acmaHaversineKm(a.lat, a.lon, b.lat, b.lon);
+      const ch = channelTo(a, b);
+      if (ch === 'off') { offAir.push({ kind: 'base', a, b, km, overlap: 0 }); continue; }
+      pairs.push({ kind: 'base', a, b, km,
                    overlap: windowOverlapCount(windows.get(a.id), windows.get(b.id)),
-                   shared: sharedAddrs(a.id, b.id) });
+                   shared: sharedAddrs(a.id, b.id), channel: { ab: ch, ba: null } });
     }
   }
-  state.backboneIdx = { pairs, cover };
+  state.backboneIdx = { pairs, cover, offAir };
   return state.backboneIdx;
 }
 
@@ -416,6 +453,20 @@ const MapBackbone = (function () {
     return p ? p.kind === 'base' : !b.roles.includes('repeater');
   }
 
+  // Which way a backbone pair runs, and the channel each way (see "Which way"
+  // at the top of this file): the ways that run, and for a one-way pair why
+  // the other does not.
+  function wayWords(p) {
+    const ch = c => (c === 'unknown' ? ' — channel not on record at one end, so not checked' : ' — it listens on that channel');
+    const one = `${esc(p.a.name)} → ${esc(p.b.name)}${ch(p.channel && p.channel.ab)}`;
+    if (p.kind === 'base') return one;
+    if (!p.oneWay) return `both ways<br><span class="small">${one}<br>${esc(p.b.name)} → ${esc(p.a.name)}${ch(p.channel && p.channel.ba)}</span>`;
+    const back = channelTo(p.b, p.a) === 'off'
+      ? `${esc(p.a.name)} does not listen on any channel ${esc(p.b.name)} sends on`
+      : `${esc(p.a.name)}'s pass ranges take nothing ${esc(p.b.name)} sends`;
+    return `one way<br><span class="small">${one}<br>not back: ${back}</span>`;
+  }
+
   // A backbone hop is repeater → repeater or repeater → base. The base end of
   // the second kind opens no pass-range window and re-transmits nothing, so the
   // shared-address figure says what matched instead, and neither the delay row
@@ -429,15 +480,16 @@ const MapBackbone = (function () {
         ? `${p.carries.ab.length ? `${esc(a.name)}'s own ${p.carries.ab.join(', ')} in ${esc(b.name)}'s pass ranges` : ''}${
             p.carries.ab.length && p.carries.ba.length ? '<br>' : ''}${
             p.carries.ba.length ? `${esc(b.name)}'s own ${p.carries.ba.join(', ')} in ${esc(a.name)}'s pass ranges` : ''}
-           <br><span class="small">${p.oneWay ? 'their windows share no address, so it runs one way, '
-             + `${esc(p.a.name)} up to ${esc(p.b.name)}` : 'each carries the other\'s, so it runs both ways'}</span>`
+           <br><span class="small">${p.oneWay ? `their windows share no address, so it runs one way, ${esc(p.a.name)} up to ${esc(p.b.name)}`
+             : 'each carries the other\'s, so it runs both ways'}</span>`
       : p.overlap
         ? `${p.shared.length} in use in the network` +
           (p.shared.length ? `<br><span class="small">${p.shared.slice(0, 12).join(', ')}${
              p.shared.length > 12 ? '…' : ''}</span>` : '') +
           `<br><span class="small">windows overlap on ${p.overlap} address${p.overlap === 1 ? '' : 'es'}</span>`
         : `<span class="small">no pass-range window at the base end — this path is matched on
-             distance alone</span>`;
+             distance and channel</span>`;
+    const wayText = p ? wayWords(p) : '';
     const da = a.repeater ? a.repeater.delay_ms : null;
     const db = b.repeater ? b.repeater.delay_ms : null;
     // Only where their windows overlap does a message reach both to be re-sent.
@@ -450,6 +502,7 @@ const MapBackbone = (function () {
     return row('Repeater', stationLink(a)) +
            row(toBase ? 'Base station' : 'Repeater', stationLink(b)) +
            row('Shared ALERT IDs', sharedText) +
+           (wayText ? row('Which way', wayText) : '') +
            delays +
            clash;
   }
@@ -645,8 +698,8 @@ const MapBackbone = (function () {
       const { kind, a, b } = tip;
       const head = kind === 'field' ? 'Field link — not backbone'
         : kind === 'base' ? 'Backbone — repeater to base station'
-        : 'Backbone — repeater to repeater, both ways';
-      const hops = MapFreq.hops(kind, a, b).map(h => `
+        : `Backbone — repeater to repeater, ${tip.oneWay ? 'one way' : 'both ways'}`;
+      const hops = MapFreq.hops(kind, a, b, tip.oneWay).map(h => `
         <div class="mn-link-tip-hop"><span class="mn-link-tip-k">TX</span> ${esc(h.from.name)}
           → <span class="mn-link-tip-k">RX</span> ${esc(h.to.name)} ·
           ${h.label ? `<strong>${esc(h.label)}</strong>` : 'frequency not recorded'}${h.listens

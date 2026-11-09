@@ -156,7 +156,8 @@ const MapFreq = (function () {
     // recorded; `listens` is the receiving repeater's RX when it is not the
     // channel sent on. Not asked of a base: the radio it listens with is not
     // the repeater row a base that is also a repeater carries.
-    hops(kind, a, b) {
+    // A one-way repeater pair (map-backbone.js, oneWay) is on the air a to b only.
+    hops(kind, a, b, oneWay) {
       if (kind === 'field') {
         const f = endMhz(b);
         return [{ from: a, to: b, label: f != null ? fmt(f) : null, listens: null }];
@@ -167,7 +168,7 @@ const MapFreq = (function () {
         return { from: tx, to: rx, label: f != null ? fmt(f) : null,
                  listens: f != null && heard != null && heard !== f ? fmt(heard) : null };
       };
-      return kind === 'base' ? [way(a, b)] : [way(a, b), way(b, a)];
+      return kind === 'base' || oneWay ? [way(a, b)] : [way(a, b), way(b, a)];
     },
 
     // Which colouring the operator has chosen. Both this and MapFade.active()

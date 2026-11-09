@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 248, date: '2026-11-09', items: [
+      '📻 <strong>Repeater links check the channel too.</strong> A repeater now only passes to another that listens on a '
+        + 'channel it sends on, as well as when the pass ranges say so. About forty links between repeaters that cannot hear '
+        + 'each other have gone from the map, and about sixty that work only one way now show one-way arrows. Links to a base '
+        + 'station on a channel it is not on record as listening on have gone too. Where a channel is not on record, the link '
+        + 'stays. Point at a backbone link, or open it, to see which way it runs and why. 🚚 Relocate station uses the same rule.',
+    ] },
     { n: 247, date: '2026-11-09', items: [
       '🗼 <strong>Every path, drawn small.</strong> Pick a result in 🗼 Repeater sites or 🚚 Relocate station and, under '
         + 'its table, <em>Ground profiles</em> shows the ground under each of its paths — the line of sight, the Fresnel zone '

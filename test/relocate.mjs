@@ -561,16 +561,22 @@ const REP = await page.evaluate(() => {
   // ranges carry (up to it) or that carry its own (on from it).
   const own = (x, y) => stationAlertIds(x).some(id => passRangeCoversId(y.repeater, id));
   const share = (x, y) => windowOverlapCount(repeaterOpenWindows(x.repeater), repeaterOpenWindows(y.repeater)) > 0;
+  // …and the channel: the receiver listens on one the sender sends on, or
+  // one of them has none on record (not ruled out).
+  const chans = (s, k) => [s.repeater && s.repeater[k], ...(s.frequencies || []).map(r => r && r[k])].map(Number).filter(f => f > 0);
+  const hears = (tx, rx) => { const t = chans(tx, 'tx_mhz'), q = chans(rx, 'rx_mhz');
+                              return !t.length || !q.length || t.some(f => q.some(g => Math.abs(f - g) < 0.002)); };
+  const goes = (x, y) => (share(x, y) || own(x, y)) && hears(x, y);
   const others = r => state.data.stations.filter(x => x.id !== r.id && isRep(x) && x.lat != null && !x.proposed && km(r, x) <= K);
   const upTo = r => {
     const out = new Set();
     for (const s of findStationMatches(r)) {
       if (s.lat != null && s.id !== r.id && !isRep(s) && !s.roles.includes('base') && !s.proposed && km(r, s) <= K) out.add(s.id);
     }
-    for (const x of others(r)) if (share(r, x) || own(x, r)) out.add(x.id);
+    for (const x of others(r)) if (goes(x, r)) out.add(x.id);
     return [...out];
   };
-  const onFrom = r => others(r).filter(x => share(r, x) || own(r, x)).map(x => x.id);
+  const onFrom = r => others(r).filter(x => goes(r, x)).map(x => x.id);
   let best = null;
   for (const r of state.data.stations) {
     if (!isRep(r) || r.roles.includes('base') || r.lat == null || !done(rmSystemOf(r))) continue;
@@ -583,13 +589,14 @@ const REP = await page.evaluate(() => {
     if (!best || (reps.length && !best.reps.length)) best = c;
     if (best.reps.length) break;
   }
-  // Two repeaters each carrying the other's AlertIDs: the path runs both ways.
+  // Two repeaters each carrying the other's AlertIDs, on each other's
+  // channels: the path runs both ways.
   let pair = null;
   for (const a of state.data.stations) {
     if (pair || !isRep(a) || a.roles.includes('base') || a.lat == null) continue;
     for (const b of findRepeaterMatches(a)) {
       if (b.id === a.id || b.lat == null || b.roles.includes('base') || km(a, b) > K) continue;
-      if (findRepeaterMatches(b).some(x => x.id === a.id)) { pair = { a: a.id, b: b.id }; break; }
+      if (findRepeaterMatches(b).some(x => x.id === a.id) && goes(a, b) && goes(b, a)) { pair = { a: a.id, b: b.id }; break; }
     }
   }
   return best && { ...best, pair };
@@ -624,9 +631,9 @@ if (REP) {
      REP.on.every(id => onFrom.some(c => c.id === id && c.dir === 'out' && c.ticked))
        && onFrom.filter(c => c.kind === 'listening').length === REP.on.length,
      JSON.stringify({ want: REP.on, got: onFrom.map(c => `${c.id}:${c.why}:${c.ticked}`) }));
-  ok('…a pair sharing a pass-range address listed both ways',
-     onFrom.filter(c => c.why === 'shares').every(c => upTo.some(u => u.id === c.id && u.why === 'shares')),
-     JSON.stringify(onFrom.filter(c => c.why === 'shares').map(c => c.id)));
+  ok('…a pair both ways only where both channels match, one way otherwise',
+     onFrom.filter(c => c.kind === 'listening').every(c => upTo.some(u => u.id === c.id) === REP.up.includes(c.id)),
+     JSON.stringify(onFrom.map(c => c.id)));
   ok('…and a move further afield is one press from 🗼 Repeater sites', rp.toSites);
 
   await page.evaluate(() => { MapRelocate.set('radiusM', 100); });

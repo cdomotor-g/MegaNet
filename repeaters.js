@@ -1520,7 +1520,7 @@ const Repeaters = (() => {
         lift > 0.5 ? ` (the terrain there is ${num(Math.round(lift))} m above the station's surveyed height, so it stands on the terrain)` : ''}.`);
     facts.push(ends.join(' '));
     if (typeof MapFreq !== 'undefined') {
-      const hops = MapFreq.hops(both ? 'repeater' : 'base', a, b);
+      const hops = MapFreq.hops(both ? 'repeater' : 'base', a, b, !!(pp && pp.oneWay));
       facts.push(hops.map(h => `${esc(h.from.name)} sends to ${esc(h.to.name)} on ${h.label ? esc(h.label) : 'a frequency not on file'}${
         h.listens ? ` (${esc(h.to.name)} listens on ${esc(h.listens)})` : ''}`).join('; ') + '.');
     }

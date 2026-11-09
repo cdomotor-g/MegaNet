@@ -1342,7 +1342,7 @@ here.
 - Colour the links by the frequency each hop runs on, by fade margin, or not at all — one radio group, frequency by default
 - **Colour pins by health** — every station OK, watch, fault or no data by when Flood-Net last heard it (and, once its card has been opened, by what its readings say), with its key in the legend; bigger is worse and the ring says it again, so colour is never the only channel; off by default, one request for the whole network a load
 - **Last heard** in the station list — how long since Flood-Net heard each station (*45 min*, *3 h*, *never*), green, ⚠ amber or ⛔ red against its checks, from that same one request
-- Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, and between two repeaters by their pass ranges (both ways where they share an address, one way where only one's own addresses are in the other's), and growing with the zoom rather than burying a whole-state view
+- Arrowheads along every link showing which way the traffic runs — into the repeater, on to the base, and between two repeaters each way the pass ranges allow and the receiver listens on the sender's channel (both ways, or one way), and growing with the zoom rather than burying a whole-state view
 - Map and station cards side by side on any window wider than 1,100 px — the map filling the page and the cards in the side panel beside it, whose width drags — and a six-column list there (name, station number, roles, AlertID, SLS catchment, last heard) instead of the eleven the stacked shape, which a tablet's window gets, has room for; on a phone the map fills the screen and the cards are the side panel's drawers over it, from the rail that ⋮ in the banner brings out
 - **What’s here?** — click any point and read its ground height, land cover, wind region, drainage basin, maintenance hub, the land's tenure and council, the estimated mobile signal for each carrier, and the nearest station, repeater and survey mark
 - **Magnifier** — a round glass that follows the mouse and shows the map under it closer up (2× to 16×, Shift + scroll), with each pin shrunk to a small dot, its name barely there and every line and overlay left out, for what a station's pin and label are sitting on in the imagery; on a phone, drag it and tap it
@@ -2234,15 +2234,18 @@ way the traffic runs: a pass-range link is a field station reporting *in* to
 the repeater whose window covers its address, so a fan of arrows converging on a
 hilltop is a picture of what that repeater carries; a repeater-to-base backbone
 path points at the base, which is the direction traffic leaves the network.
-Between two repeaters it goes by their pass ranges: where their windows share
-any address, or each carries the other's own AlertIDs, the path runs both ways
-and is drawn as such — one head near each end, pointing outward, and none along
-the middle. Where only one repeater's own AlertIDs are in the other's pass
-ranges and their windows share nothing, its readings go one way, up to the
-other, and the path is drawn sender to receiver with one-way arrows (Flow and
-Tails run it one way too). Those one-way pairs are on the backbone for that
-reason alone: before 9 Nov 2026 they were drawn only where the sender was a
-field station as well, as a field link.
+Between two repeaters each way is checked on its own, and runs only where both
+hold: the **pass ranges** (their windows share any address, or the sender's own
+AlertIDs are in the receiver's windows) and the **channel** (the receiver
+listens on a channel the sender transmits on — its repeater pair or any of its
+frequency rows; where either end has none on record it cannot be checked and is
+not ruled out). Both ways: one head near each end, pointing outward, and none
+along the middle. One way: drawn sender to receiver with one-way arrows, and
+Flow and Tails run it one way too — Upper Rosenthal up to Wilsons Peak, which
+sends on 152.400 where Upper Rosenthal listens on 151.500, for one. Neither: not
+a path, and not drawn, however the pass ranges overlap; the same goes for a
+repeater to a base whose channels on record do not include one it sends on.
+Hovering or opening a backbone path says which way it runs and why.
 
 **They are a function of the zoom, and below about zoom 10 they are not drawn at
 all.** Fixed-size marks were wrong at both ends of the range: zoomed out over a
@@ -4479,22 +4482,23 @@ not carry it yet. A hub with no complete radio on file cannot be ticked.
 **A repeater** brings its details with it: its **pass ranges** (less any
 exclusions), how many field stations they carry, the frequency it listens on
 and its radio and mast. Its paths are listed by the way the readings run, by the
-pass ranges — the rule the map's arrows use (map-backbone.js) — within the
-map's **Max TX distance**, all ticked:
+pass ranges and the channels — the rule the map's arrows use (map-backbone.js) —
+within the map's **Max TX distance**, all ticked:
 
 - **Up to it** — every station whose readings come to it: the field stations
-  whose ALERT addresses its pass ranges carry, the repeaters whose pass ranges
-  share an address with its own, and the repeaters whose own addresses its pass
-  ranges carry. Each is priced from that station, on its own radio and antenna,
+  whose ALERT addresses its pass ranges carry, and the repeaters whose pass
+  ranges share an address with its own or whose own addresses its pass ranges
+  carry, where it listens on their channel. Each is priced from that station, on its own radio and antenna,
   up to the new place, received on the repeater's own frequency. *all* and
   *none* tick them as a group.
 - **On from it** — where its readings go: the repeaters whose pass ranges share
-  an address with its own or carry its own addresses, and the base stations in
+  an address with its own or carry its own addresses, and that listen on its
+  channel, and the base stations in
   range on its channel (one whose channel is not on record is listed unticked).
   Where none is on record, the nearest base offered stands in, ticked.
 
-Two repeaters whose pass ranges share an address, or that each carry the
-other's own, are listed both ways, each direction priced on its own radios and
+Two repeaters joined both ways — by the pass ranges and on each other's
+channels — are listed both ways, each direction priced on its own radios and
 channel, and marked *both ways*. With many paths the lattice coarsens (never under 12
 across) so places × paths stays near 16,000 profiles. For a move further than
 2 km, *Find a new hilltop for what it carries* opens **🗼 Repeater sites** with
