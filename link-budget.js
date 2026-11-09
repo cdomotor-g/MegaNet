@@ -142,13 +142,17 @@ const LinkBudget = (function () {
 
   function pointEndpoint(lat, lon) {
     const key = radioKey(null, lat, lon);
+    // A site a finder proposed a mast at starts from the radio it was priced
+    // with (radioPlace, path-profile.js), and says so.
+    const placed = radioPlaced(key);
+    const where = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
     return {
-      kind: 'point', sid: null, key,
-      name: `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
-      lat, lon, ground: null, groundSrc: null, sysName: null, freq: null,
+      kind: 'point', sid: null, key, placed,
+      name: placed ? `${placed.name} · ${where}` : where,
+      lat, lon, ground: null, groundSrc: null, sysName: placed ? placed.sysName : null, freq: null,
       // A hypothetical site has to start from something; the 1 W field station
       // is what most of this network actually is, down to its line loss.
-      def: radioDefaults(null),
+      def: radioDefaults(null, key),
       over: radioOver(key),
     };
   }
@@ -707,6 +711,7 @@ const LinkBudget = (function () {
         </div>
         <p class="small lb-src">${e.kind === 'station'
           ? `Station${e.sysName ? ` · ${esc(e.sysName)}` : ''}${e.freq ? ` · repeater ${e.freq} MHz` : ''}`
+          : e.placed ? `Proposed${e.placed.by ? ` by ${esc(e.placed.by)}` : ''}${e.sysName ? ` · ${esc(e.sysName)}` : ''} — nothing is written back to the station data`
           : 'Hypothetical point — nothing is written back to the station data'}</p>
         <p class="small lb-src">Ground ${e.ground != null
           ? `${e.ground.toFixed(1)} m <span class="txt-muted">${esc(e.groundSrc || '')}</span>`

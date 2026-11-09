@@ -4791,6 +4791,11 @@ const state = {
   radio: {
     freqMhz: null,   // null = the repeater on either end, else PATH_DEFAULT_MHZ
     ends:    {},     // radioKey → { tx_w, gain_dbi, loss_db, agl_m, rx_dbm }, overrides only
+    // A point on the ground a finder proposed a mast at, and the radio it
+    // priced it with (radioPlace, path-profile.js): radioKey → { name, by,
+    // sysId, sysName, tx_w, gain_dbi, loss_db, agl_m, rx_dbm, f }. The point's
+    // own figures from then on — what anybody types still goes in `ends`.
+    placed:  {},
   },
   // Elevation profile under the map. The terrain itself is cached in Terrain,
   // the radio at each end is state.radio's, and the profile is recomputed from

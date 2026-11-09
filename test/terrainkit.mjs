@@ -1462,7 +1462,7 @@ const noRadio = await page.evaluate(async () => {
   return null;
 });
 ok('two points on the ground get a stated reason, not a number',
-   /both ends have to be stations/.test((noRadio || {}).row || ''), JSON.stringify(noRadio));
+   /both ends need a radio — a point on the ground has none/.test((noRadio || {}).row || ''), JSON.stringify(noRadio));
 ok('…and no signal along the line, with the key saying why',
    !!noRadio && !noRadio.layer && /No signal drawn/.test(noRadio.sig), JSON.stringify(noRadio));
 ok('…and with no margin to lead with, the box leads with the line of sight',

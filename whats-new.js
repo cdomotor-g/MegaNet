@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 249, date: '2026-11-09', items: [
+      '📈 <strong>Fade margins for proposed sites.</strong> Open a path to a place 🗼 Repeater sites, 🚚 Relocate station or '
+        + '🎯 Best repeater has proposed (a picture under its table, a ↗, or <em>Profile the worst path</em>) and the elevation '
+        + 'profile and the link budget now work out its fade margin with the radio that finder assumed there, the same figure '
+        + 'the finder showed. It used to say <em>not computed</em>, because the place is not a station yet. The radio is named on '
+        + 'the card, and you can type your own figures over it.',
+    ] },
     { n: 248, date: '2026-11-09', items: [
       '📻 <strong>Repeater links check the channel too.</strong> A repeater now only passes to another that listens on a '
         + 'channel it sends on, as well as when the pass ranges say so. About forty links between repeaters that cannot hear '

@@ -14,7 +14,7 @@
 // and Terrain.profile, land-cover.js for LandCover.sample, path-profile.js for
 // pathAnalyse, pathPropOf, rmSystemOf, stationAntenna, wattsToDbm, the PATH_DEFAULT_*
 // constants, the small pictures (pathThumbOf, pathThumbSvg, pathThumbKeyHtml),
-// radioKey and radioOver, and PathProfile.openFull, link-budget.js for lbFmtDbd, map-roads.js for MapRoads.near, map-draw.js for MapDraw,
+// radioPlace, and PathProfile.openFull, link-budget.js for lbFmtDbd, map-roads.js for MapRoads.near, map-draw.js for MapDraw,
 // places.js for Places.parse, map-controls.js for MapChrome.panel,
 // map-backbone.js for repeaterPathsOf (a repeater's paths both ways by its pass
 // ranges: what it hears, for Add what the selected repeater carries, and where
@@ -300,7 +300,7 @@ const MapSites = (function () {
 
   function radioOf(sys, agl) {
     return {
-      sysName: sys.name, txW: sys.tx_power_w, gain: sys.antenna_gain_dbi,
+      sysId: sys.id, sysName: sys.name, txW: sys.tx_power_w, gain: sys.antenna_gain_dbi,
       loss: sys.line_loss_db, thr: sys.rx_threshold_dbm,
       agl: agl != null ? agl : (sys.antenna_height_m != null ? sys.antenna_height_m : PATH_DEFAULT_AGL),
     };
@@ -2209,13 +2209,16 @@ ${hubsFieldHtml()}
       // so the profile and the budget price the same way: the site up to the
       // mast, or the mast on to what it must reach.
       const pa = hub ? [r.c.lat, r.c.lon] : [t.lat, t.lon], pb = hub ? [t.lat, t.lon] : [r.c.lat, r.c.lon];
-      // A point at either end has no radio of its own, so the card would stand
-      // it on the default mast. The finder priced it on the mast it was asked
-      // about, so the card is told that (the spot's override in state.radio,
-      // radioOver) — or the picture clicked and the chart it opens disagree.
+      // A point at either end has no radio of its own, and the card would
+      // neither stand it on the finder's mast nor work out a margin to it. So
+      // the radio the finder priced it with goes with it (radioPlace,
+      // path-profile.js): the card prices the path the way the finder did,
+      // says the radio is the finder's, and the picture clicked and the chart
+      // it opens agree.
       const tr = hub ? found.hrs[+k] : found.flds[+k];
-      if (!t.sid && tr) radioOver(radioKey(null, t.lat, t.lon)).agl_m = tr.agl;
-      if (!r.c.sid) radioOver(radioKey(null, r.c.lat, r.c.lon)).agl_m = found.rep.agl;
+      const f = hub && found.hfs[+k] ? found.hfs[+k].f : found.f;
+      if (!t.sid && tr) radioPlace(t.lat, t.lon, tr, { name: hub ? 'Proposed mast' : 'Proposed site', by: 'Repeater sites', f });
+      if (!r.c.sid) radioPlace(r.c.lat, r.c.lon, found.rep, { name: 'Proposed repeater site', by: 'Repeater sites', f });
       if (full) {
         state.path.open = true;
         const had = MapDraw.findLine(pa, pb);

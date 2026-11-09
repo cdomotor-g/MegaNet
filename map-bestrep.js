@@ -13,7 +13,7 @@
 // bearingDeg, cssVar, slug, dlText, announce, termHtml, stationLatLonText,
 // copyLatLonPillHtml and mapViewPills; across to path-profile.js for
 // pathGround, pathAnalyse, pathPropOf, rmSystemOf, stationAntenna,
-// stationIsMast, wattsToDbm and the PATH_DEFAULT_* constants, land-cover.js
+// stationIsMast, wattsToDbm, radioPlace and the PATH_DEFAULT_* constants, land-cover.js
 // for LandCover.sample, map-fade.js for MapFade.known, work and ready,
 // map-backbone.js for repeaterOpenWindows, map-draw.js for MapDraw,
 // map-controls.js for MapChrome.panel, address-space.js for
@@ -1516,6 +1516,12 @@ const MapBestRepeater = (function () {
       const c = results.find(x => x.hub.id === id);
       if (!c || !found) return;
       const pa = [found.site.lat, found.site.lon], pb = [c.hub.lat, c.hub.lon];
+      // A new site is a point with no radio of its own: the one it was priced
+      // with goes with it (radioPlace, path-profile.js), so the card works out
+      // the same margin rather than none.
+      if (!found.site.st && found.here) {
+        radioPlace(found.site.lat, found.site.lon, found.here, { name: 'New station', by: 'Best repeater', f: c.hub.f });
+      }
       if (state.mapFullscreen && typeof toggleMapFullscreen === 'function') toggleMapFullscreen(false);
       state.path.open = true;
       const existing = MapDraw.findLine(pa, pb);

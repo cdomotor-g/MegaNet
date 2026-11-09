@@ -509,12 +509,15 @@ await page.locator('.reloc-panel .sites-result.is-on .sites-thumb').first().clic
 await page.waitForFunction(() => !!document.querySelector('#path-full .path-full-chart svg'), null, { timeout: 60_000 });
 const big = await page.evaluate(() => {
   const c = MapRelocate.results()[MapRelocate.selectedRank() - 1];
-  const o = state.radio.ends[radioKey(null, c.lat, c.lon)];
+  const o = radioPlaced(radioKey(null, c.lat, c.lon));
+  const m = PathProfile.shownMargin();
   return { full: PathProfile.isFull(), title: document.getElementById('app-modal-title')?.textContent || '',
-           finder: !!document.querySelector('.reloc-panel .sites-result.is-on .sites-thumbs'), mast: o ? o.agl_m : null };
+           finder: !!document.querySelector('.reloc-panel .sites-result.is-on .sites-thumbs'), mast: o ? o.agl_m : null,
+           by: o ? o.by : null, card: m ? m.margin : null };
 });
-ok('…a press on one opens its chart full screen, the finder still behind it, the place on its own mast',
-   big.full && /^Elevation profile — /.test(big.title) && big.finder && big.mast > 0, JSON.stringify(big));
+ok('…a press on one opens its chart full screen, the finder still behind it, the place carrying the station\'s radio',
+   big.full && /^Elevation profile — /.test(big.title) && big.finder && big.mast > 0 && big.by === 'Relocate station', JSON.stringify(big));
+ok('…and the chart works out a margin for the new place, not "not computed"', big.card != null, JSON.stringify(big));
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 ok('…and Escape puts it away', !(await page.evaluate(() => PathProfile.isFull())));

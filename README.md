@@ -4401,8 +4401,9 @@ Under the table, **Ground profiles** draws every one of those paths small — th
 ground, the line of sight, the 60% Fresnel zone dashed round it and, in red,
 ground or trees inside it — the sending end on the left; click a picture to open
 that path's chart full screen over the map, with the finder still behind it when
-it closes. A candidate that is a bare point is stood on the finder's mast height
-in that chart, so the picture and the chart agree. 🚚 Relocate station draws its
+it closes. A candidate that is a bare point carries the radio the finder priced
+it with into that chart and the link budget, so the chart shows the fade margin
+the finder quoted rather than "not computed". 🚚 Relocate station draws its
 paths the same way. **Also score existing station
 sites** weighs the masts already standing in the area against the bare hills —
 a site with power, a track and a willing landholder is worth metres. **Save CSV**
@@ -5307,7 +5308,12 @@ power or the required E field worked out as you type. What is typed is the
 site's own override for the session (`state.radio`), the same one the boxes
 under *More about this path* and the link budget write, so every card prices
 from it; *Back to its own figures* takes it off. A point on the ground has no
-radio, so only its antenna height is offered. A bar over the cards keeps 🗒️ *Copy like RM* (the window as a
+radio, so only its antenna height is offered — unless 🗼 Repeater sites, 🚚
+Relocate station or 🎯 Best repeater proposed a mast there: then it carries the
+radio that finder priced it with (`radioPlace`, kept in `state.radio.placed` for
+the session), named *Proposed repeater site*, *New site for …* or *New station*,
+and the card works out its fade margin as it does a station's — the same figure
+the finder quoted — with every box offered, as a station's are. A bar over the cards keeps 🗒️ *Copy like RM* (the window as a
 picture) and 📄 *Copy for a report* (the window as a document, with every
 figure behind the margin under it) at the top of the pane as it scrolls. Under the map it goes back into the column
 between the list and *Repeaters listening*, where the render emitted it. `#stations-main.is-split` then
@@ -5394,7 +5400,8 @@ between the cells (`summaryOf` / `summaryHtml` / `summaryText`). It is built of
 tables with every inset given both as `cellpadding` and as `padding`, and the
 meters as small pictures, because that is what Word, LibreOffice and the mail
 programs keep of a pasted page. A point on the ground has no radio, so the
-figures that need one there read —. **🗒️ Copy compact**, before it, is the same
+figures that need one there read — (a finder's proposed site has the radio it
+was priced with, and they read as a station's do). **🗒️ Copy compact**, before it, is the same
 window in brief, at under half the height, drawn as **one picture** and put on
 the clipboard alone (`compactOf` / `compactPicture`): a document pasted into
 Teams, a chat or a web mail comes apart there, and given text or a document

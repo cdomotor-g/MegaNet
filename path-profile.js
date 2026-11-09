@@ -258,12 +258,15 @@ function radioOver(key) {
 
 // What a site starts from before anything is typed: its radio system's
 // figures, the antenna at the mast height at a repeater or base
-// (stationAntenna) — or, at a point on the ground, the 1 W field station most
-// of this network is, down to its line loss and receiver threshold
-// (LB_DEFAULT_LOSS_DB and LB_DEFAULT_RX_DBM, link-budget.js, read when this runs
-// rather than when the file loads).
-function radioDefaults(st) {
+// (stationAntenna) — or, at a point on the ground, the radio a finder placed
+// there (radioPlace) if one did, else the 1 W field station most of this
+// network is, down to its line loss and receiver threshold (LB_DEFAULT_LOSS_DB
+// and LB_DEFAULT_RX_DBM, link-budget.js, read when this runs rather than when
+// the file loads). `key` is the point's radioKey.
+function radioDefaults(st, key) {
   if (!st) {
+    const p = key ? radioPlaced(key) : null;
+    if (p) return { tx_w: p.tx_w, loss_db: p.loss_db, gain_dbi: p.gain_dbi, agl_m: p.agl_m, rx_dbm: p.rx_dbm };
     return { tx_w: 1, loss_db: LB_DEFAULT_LOSS_DB, gain_dbi: 5.15, agl_m: PATH_DEFAULT_AGL, rx_dbm: LB_DEFAULT_RX_DBM };
   }
   const sys = rmSystemOf(st);
@@ -274,6 +277,32 @@ function radioDefaults(st) {
     agl_m:    stationAntenna(st, sys).agl,
     rx_dbm:   sys && sys.rx_threshold_dbm != null ? sys.rx_threshold_dbm : null,
   };
+}
+
+// A mast a finder proposed on a point on the ground (🗼 Repeater sites, 🚚
+// Relocate station), with the radio it priced the place with. A point on its
+// own has no radio, and the elevation profile will not invent one for it
+// (profileMargin) — but a proposed site is not a point on its own: the finder
+// that proposed it said what would stand there, and the card prices the path
+// with that, says whose it is, and takes whatever is typed over it like any
+// station's. For the session only, like every other what-if here.
+//   radio: { sysId, sysName, txW, gain, loss, thr, agl } (a finder's radioOf)
+//   opt:   { name, by, f } — what to call the place, which finder, its MHz
+function radioPlace(lat, lon, radio, opt = {}) {
+  if (!radio || lat == null || lon == null) return null;
+  const key = radioKey(null, lat, lon);
+  state.radio.placed = state.radio.placed || {};
+  state.radio.placed[key] = {
+    name: opt.name || 'Proposed site', by: opt.by || '', f: opt.f > 0 ? opt.f : null,
+    sysId: radio.sysId != null ? radio.sysId : null, sysName: radio.sysName || null,
+    tx_w: radio.txW, gain_dbi: radio.gain, loss_db: radio.loss, rx_dbm: radio.thr, agl_m: radio.agl,
+  };
+  return key;
+}
+
+function radioPlaced(key) {
+  const p = state.radio.placed;
+  return (p && key && p[key]) || null;
 }
 
 // One figure at a site: the override if there is one, else the default given.
@@ -289,14 +318,15 @@ function radioIsOver(key, k) {
 }
 
 // The frequency every card prices at: the one typed in either card's box,
-// else the repeater on either end of the path, else the network's band.
-function radioFreq(stA, stB) {
+// else the repeater on either end of the path, else the one a finder priced a
+// proposed site at (`hint`, radioPlace), else the network's band.
+function radioFreq(stA, stB, hint) {
   if (state.radio.freqMhz > 0) return state.radio.freqMhz;
   for (const st of [stA, stB]) {
     const r = st && st.repeater;
     if (r && r.rx_mhz > 0) return r.rx_mhz;
   }
-  return PATH_DEFAULT_MHZ;
+  return hint > 0 ? hint : PATH_DEFAULT_MHZ;
 }
 
 // A figure in state.radio moved: every card that prices from it is drawn
@@ -994,13 +1024,20 @@ const PathProfile = (function () {
   function endpoint(sh, end) {
     const i = end === 0 ? 0 : sh.pts.length - 1;
     const st = stationOf(sh, end);
-    const sys = st ? rmSystemOf(st) : null;
     const key = radioKey(st, sh.pts[i][0], sh.pts[i][1]);
-    const def = radioDefaults(st);
+    // A point a finder proposed a mast at carries the radio it was priced
+    // with (radioPlace), and is priced with it; any other point has none.
+    const placed = st ? null : radioPlaced(key);
+    const sys = st ? rmSystemOf(st)
+      : placed && placed.sysId != null ? ((state.data && state.data.rm_systems) || []).find(r => r.id === placed.sysId) || null
+      : null;
+    const def = radioDefaults(st, key);
+    const where = `${sh.pts[i][0].toFixed(4)}, ${sh.pts[i][1].toFixed(4)}`;
     return {
-      station: st, sys, key, def,
-      name: st ? st.name : `${sh.pts[i][0].toFixed(4)}, ${sh.pts[i][1].toFixed(4)}`,
+      station: st, sys, key, def, placed,
+      name: st ? st.name : placed ? `${placed.name} · ${where}` : where,
       isStation: !!st,
+      hasRadio: !!st || !!placed,
       elev: st && st.elevation_ahd != null ? st.elevation_ahd : null,
       // A repeater's or base's mast, where its system says less (stationAntenna),
       // or whatever has been typed for this site in either card.
@@ -1012,7 +1049,7 @@ const PathProfile = (function () {
   // else whatever repeater is on either end of this path, else the band the
   // network lives in.
   function freqFor(a, b) {
-    return radioFreq(a.station, b.station);
+    return radioFreq(a.station, b.station, (a.placed && a.placed.f) || (b.placed && b.placed.f));
   }
 
   // Everything that quotes this profile follows it: the budget's terrain and
@@ -1927,9 +1964,11 @@ const PathProfile = (function () {
   // round (MapBackbone.open). ⇄ Flip direction is the other way, for a hop
   // that has one.
   //
-  // Stations only. A line dropped on bare ground has no radio at its end, and
-  // a margin computed around an assumed one would be this card inventing a
-  // network — the link budget is where hypothetical ends live.
+  // Stations only — and the sites a finder proposed a mast at, with the radio
+  // it said would stand there (radioPlace). A line dropped on bare ground has
+  // no radio at its end, and a margin computed around an assumed one would be
+  // this card inventing a network — the link budget is where hypothetical
+  // ends live.
   function endRadio(e) {
     return {
       txW:  radioVal(e.key, e.def, 'tx_w'),
@@ -1955,11 +1994,11 @@ const PathProfile = (function () {
   }
 
   // { m } — the margin A → B — when it computes, else why not: one of
-  // 'ends' (a point on the ground rather than a station), 'system' (a station
+  // 'ends' (a point on the ground with no radio placed on it), 'system' (a station
   // with no rm_system on file, and nothing typed in its place), 'loss' (the
   // model did not run) or a list of named terms nobody has supplied.
   function profileMargin(an, a, b) {
-    if (!a.isStation || !b.isStation) return { m: null, why: 'ends' };
+    if (!a.hasRadio || !b.hasRadio) return { m: null, why: 'ends' };
     const ra = endRadio(a), rb = endRadio(b);
     const missing = missingTerms(a, ra, b, rb);
     if (missing.length) return { m: null, why: !a.sys || !b.sys ? 'system' : 'missing', missing };
@@ -1975,7 +2014,7 @@ const PathProfile = (function () {
     const r = profileMargin(an, a, b);
     if (r.m == null) {
       const why = r.why === 'ends'
-        ? 'both ends have to be stations — a point on the ground has no radio on it'
+        ? 'both ends need a radio — a point on the ground has none, unless a finder proposed a mast there'
         : r.why === 'system'
           ? 'no radio system on file at one end'
           : r.why === 'loss'
@@ -2627,7 +2666,7 @@ const PathProfile = (function () {
     // typed (in either card) doesn't pretend to have.
     const src = (e, k) => `<b class="path-src">${
       radioIsOver(e.key, k) ? 'edited'
-        : e.isStation && e.sys ? `default · ${esc(e.sys.name)}`
+        : e.hasRadio && e.sys ? `default · ${esc(e.sys.name)}`
         : 'default'}</b>`;
     const box = (tag, e, k, label, step, value) => `
         <label class="draw-field">
@@ -2641,7 +2680,7 @@ const PathProfile = (function () {
     // A's and A's alone: B gets no box to change nothing with, and neither
     // does a point on the ground, which has no radio at all. ⇄ Flip direction
     // makes B the transmitter, and the box follows it.
-    const tx = (tag, e) => (e.isStation
+    const tx = (tag, e) => (e.hasRadio
       ? box(tag, e, 'tx_w', 'TX power (W)', '0.1', radioVal(e.key, e.def, 'tx_w')) : '');
     return `
       <div class="path-form">
@@ -2922,7 +2961,7 @@ const PathProfile = (function () {
     'Rx system name': 'Start from another radio system\'s figures, or type your own',
   };
 
-  function rlEditable(e, k) { return !!k && (k === 'agl_m' || e.isStation); }
+  function rlEditable(e, k) { return !!k && (k === 'agl_m' || e.hasRadio); }
 
   // A figure as a box shows it: no float dust (0.1 + 0.2), nothing for none.
   const rlNum = v => (v == null || !isFinite(v) ? '' : String(+Number(v).toFixed(4)));
@@ -2948,10 +2987,11 @@ const PathProfile = (function () {
   function editEnd(which, focusK) {
     const e = rlEndOf(which);
     if (!e) return;
-    const fields = e.isStation ? RL_FIELDS[which] : ['agl_m'];
+    const fields = e.hasRadio ? RL_FIELDS[which] : ['agl_m'];
     const fMhz = shown && shown.rep ? shown.rep.an.fMhz : radioFreq(e.station, null);
     const own = k => (e.def[k] == null ? 'none on file' : `${rlNum(e.def[k])} ${RL_FIELD[k].unit}`);
-    const from = e.isStation ? (e.sys ? `its own, ${e.sys.name}` : 'none on file') : 'the default';
+    const from = e.placed ? `the radio ${e.placed.by || 'a finder'} proposed${e.placed.sysName ? `, ${e.placed.sysName}` : ''}`
+      : e.isStation ? (e.sys ? `its own, ${e.sys.name}` : 'none on file') : 'the default';
     const box = k => {
       const F = RL_FIELD[k];
       return `
@@ -2960,10 +3000,10 @@ const PathProfile = (function () {
           <input type="number" id="rl-e-${k}" data-k="${k}" step="${F.step}"${F.min ? ` min="${F.min}"` : ''}${F.max ? ` max="${F.max}"` : ''}
                  value="${rlNum(radioVal(e.key, e.def, k))}" placeholder="${escAttr(rlNum(e.def[k]) || 'not set')}">
           <b class="rl-e-unit">${esc(F.unit)}</b>
-          <span class="rl-e-own">${radioIsOver(e.key, k) ? '✎ yours · ' : ''}${esc(e.isStation && e.sys ? 'its own' : 'default')}: ${esc(own(k))}</span>
+          <span class="rl-e-own">${radioIsOver(e.key, k) ? '✎ yours · ' : ''}${esc(e.placed ? 'proposed' : e.isStation && e.sys ? 'its own' : 'default')}: ${esc(own(k))}</span>
         </label>`;
     };
-    const systems = e.isStation ? ((state.data && state.data.rm_systems) || []) : [];
+    const systems = e.hasRadio ? ((state.data && state.data.rm_systems) || []) : [];
     const pick = systems.length ? `
         <label class="rl-e-field rl-e-sys">
           <span>Start from</span>
@@ -2977,7 +3017,7 @@ const PathProfile = (function () {
       role: 'dialog',
       describedBy: 'rl-e-desc',
       html: `
-        <p id="rl-e-desc" class="ask-text">${e.isStation
+        <p id="rl-e-desc" class="ask-text">${e.hasRadio
           ? `Type your own figures over ${esc(e.name)}'s (${esc(from)}). Leave a box blank for its own figure.`
           : 'A point on the ground has no radio, so its antenna height is the one figure to set. Leave it blank for the default.'}</p>
         <form class="ask-form rl-e-form" novalidate>
@@ -3002,7 +3042,7 @@ const PathProfile = (function () {
         }));
         const preview = () => {
           const p = card.querySelector('#rl-e-preview');
-          if (p) p.textContent = e.isStation ? rlPreview(which, read(), fMhz) : '';
+          if (p) p.textContent = e.hasRadio ? rlPreview(which, read(), fMhz) : '';
         };
         preview();
         card.querySelectorAll('input[data-k]').forEach(i => i.addEventListener('input', preview));
@@ -3469,7 +3509,7 @@ const PathProfile = (function () {
       groundOf(e, end),
       aglOf(e, agl),
       `${z.toFixed(1)} m`,
-      e.sys ? `${e.sys.name}${e.sys.antenna_type ? ` (${e.sys.antenna_type})` : ''}` : (e.isStation ? 'none on file' : '—'),
+      e.sys ? `${e.sys.name}${e.sys.antenna_type ? ` (${e.sys.antenna_type})` : ''}` : (e.hasRadio ? 'none on file' : '—'),
       r.txW != null ? `${r.txW} W (${wattsToDbm(r.txW).toFixed(2)} dBm)${edited(e, 'tx_w')}` : 'not on file',
       r.gain != null ? `${+r.gain.toFixed(2)} dBi (${lbDbd(r.gain)} dBd)${edited(e, 'gain_dbi')}` : 'not on file',
       r.loss != null ? `${+r.loss.toFixed(2)} dB${edited(e, 'loss_db')}` : 'not on file',
@@ -3582,7 +3622,7 @@ const PathProfile = (function () {
       ['RX threshold', rb.thr, 'dBm', `receiver sensitivity at ${b.name}`],
     );
     const band = pm.m == null ? null : lbMarginClass(pm.m);
-    const why = pm.m != null ? '' : pm.why === 'ends' ? 'both ends have to be stations — a point on the ground has no radio on it'
+    const why = pm.m != null ? '' : pm.why === 'ends' ? 'both ends need a radio — a point on the ground has none, unless a finder proposed a mast there'
       : pm.why === 'system' ? 'no radio system on file at one end'
       : pm.why === 'loss' ? `no path loss to take it off — the model did not run${an.itmError ? `: ${an.itmError}` : ''}`
       : `no figure on file for ${fmtTermList(pm.missing)}`;
@@ -3888,11 +3928,12 @@ const PathProfile = (function () {
   // numbers behind the ones a check wants to add up.
   function summaryOf(rep) {
     const { an, a, b, prof } = rep;
-    // A radio only where there is a station: a point on the ground has none,
-    // and the card does not invent one for it (profileMargin).
+    // A radio only where there is a station, or a finder's proposed site: a
+    // point on the ground has none, and the card does not invent one for it
+    // (profileMargin).
     const none = { txW: null, gain: null, loss: null, thr: null };
-    const ra = a.isStation ? rep.ra : none, rb = b.isStation ? rep.rb : none;
-    const noRadio = !a.isStation ? 'A' : !b.isStation ? 'B' : null;
+    const ra = a.hasRadio ? rep.ra : none, rb = b.hasRadio ? rep.rb : none;
+    const noRadio = !a.hasRadio ? 'A' : !b.hasRadio ? 'B' : null;
     const itm = an.itm, P_ = an.prop, w = an.worst, f = an.fMhz;
     const has = (...xs) => xs.every(x => x != null && isFinite(x));
     const L = an.pathLoss_db;
@@ -3933,9 +3974,9 @@ const PathProfile = (function () {
     ];
     const roleOf = e => (e.station
       ? (e.station.roles || []).map(r => ({ field: 'Field station', repeater: 'Repeater', base: 'Base station' }[r] || r)).join(', ') || 'Station'
-      : 'A point on the ground');
+      : e.placed ? `Proposed${e.placed.by ? ` by ${e.placed.by}` : ''}` : 'A point on the ground');
     const subOf = e => (e.station && e.station.station_number ? `Station ${e.station.station_number}` : '');
-    const sysOf = e => (e.sys ? e.sys.name : e.isStation ? 'none on file' : '—');
+    const sysOf = e => (e.sys ? e.sys.name : e.placed && e.placed.sysName ? e.placed.sysName : e.isStation ? 'none on file' : '—');
     const gainRow = (e, r) => ['Antenna gain', r.gain == null ? '—' : `${+r.gain.toFixed(2)} dBi${ed(e, 'gain_dbi')}`,
       r.gain == null ? '' : `${lbDbd(r.gain)} dBd`];
     const lossRow = (e, r) => ['Line loss', r.loss == null ? '—' : `${+r.loss.toFixed(2)} dB${ed(e, 'loss_db')}`, ''];
@@ -4912,7 +4953,9 @@ const PathProfile = (function () {
       const r = profileMargin(s.an, s.a, s.b);
       return r.m == null ? null : {
         margin: r.m, verdict: s.an.verdict,
-        ends: [s.a.station.id, s.b.station.id],
+        // A finder's proposed site has no station behind it (radioPlace).
+        ends: [s.a.station ? s.a.station.id : null, s.b.station ? s.b.station.id : null],
+        placed: [s.a.placed ? s.a.placed.by : null, s.b.placed ? s.b.placed.by : null],
       };
     },
 

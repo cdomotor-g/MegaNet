@@ -916,25 +916,35 @@ const tk = await page.evaluate(() => MapSites.targets().findIndex(t => t.kind ==
 const tName = await page.evaluate(k => MapSites.targets()[k].name, tk);
 await page.locator('.sites-result.is-on .sites-thumb').nth(tk).click();
 await page.waitForFunction(() => !!document.querySelector('#path-full .path-full-chart svg'), null, { timeout: RUN_TIMEOUT });
-const big = await page.evaluate(() => {
+const big = await page.evaluate(k => {
   const r = MapSites.results()[MapSites.selectedRank() - 1];
-  const o = r.src === 'station' ? null : state.radio.ends[radioKey(null, r.lat, r.lon)];
+  const p = r.src === 'station' ? null : radioPlaced(radioKey(null, r.lat, r.lon));
+  const m = PathProfile.shownMargin();
   return {
     full: PathProfile.isFull(), showing: dockShowing(),
     title: document.getElementById('app-modal-title')?.textContent || '',
     finder: !!document.querySelector('.sites-panel .sites-result.is-on .sites-thumbs'),
-    point: r.src !== 'station', mast: o ? o.agl_m : null, rep: MapSites.exportSites().rep.agl,
+    point: r.src !== 'station', mast: p ? p.agl_m : null, rep: MapSites.exportSites().rep.agl, by: p ? p.by : null,
+    edited: !!state.radio.ends[radioKey(null, r.lat, r.lon)]?.agl_m,
+    quoted: r.figs[k].margin, card: m ? m.margin : null, cardBy: m ? m.placed[1] : null,
+    readout: document.querySelector('#path-full')?.textContent.replace(/\s+/g, ' ') || '',
   };
-});
+}, tk);
 ok('a click on one opens that path\'s chart full screen, the site at A',
    big.full && big.title.startsWith(`Elevation profile — ${tName} → `), JSON.stringify(big));
 ok('…over the finder, which stays the pane on screen behind it', big.showing === 'map-sites' && big.finder,
    JSON.stringify(big));
-// A candidate that is a point on the ground has no radio of its own, and the
-// card stood it on its default mast — so the picture (priced on the finder's
-// mast) and the chart it opened could disagree about the same path.
-ok('…with a point candidate stood on the finder\'s mast, not the card\'s default',
-   !big.point || big.mast === big.rep, JSON.stringify(big));
+// A candidate that is a point on the ground has no radio of its own, so the
+// card stood it on its default mast and would not work out a margin to it —
+// the picture and the chart it opened disagreed about the same path. The
+// finder's radio goes with it now (radioPlace), as the place's own figures
+// rather than as anything typed, and the card works out the finder's margin.
+const bigShort = JSON.stringify({ ...big, readout: big.readout.slice(0, 200) });
+ok('…with a point candidate carrying the finder\'s radio, on the finder\'s mast — its own figures, not typed ones',
+   !big.point || (big.mast === big.rep && big.by === 'Repeater sites' && !big.edited), bigShort);
+ok('…and the chart works out the margin the finder quoted, saying the radio is the finder\'s',
+   !big.point || (big.card != null && Math.abs(big.card - big.quoted) < 0.5 && big.cardBy === 'Repeater sites'
+                  && /Proposed repeater site/.test(big.readout) && !/not computed/.test(big.readout)), bigShort);
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 const shut = await page.evaluate(() => ({ full: PathProfile.isFull(),

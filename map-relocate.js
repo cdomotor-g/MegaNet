@@ -16,7 +16,7 @@
 // LandCover.sample and LandCover.canopyAt, path-profile.js for pathAnalyse,
 // pathGround, pathPropOf, rmSystemOf, stationAntenna, stationIsMast, wattsToDbm,
 // the PATH_DEFAULT_* constants, the small pictures (pathThumbOf, pathThumbSvg,
-// pathThumbKeyHtml), radioKey, radioOver and PathProfile.openFull, link-budget.js for lbFmtDbd, map-draw.js
+// pathThumbKeyHtml), radioPlace and PathProfile.openFull, link-budget.js for lbFmtDbd, map-draw.js
 // for MapDraw, map-controls.js for MapChrome.panel, and app.js for
 // findRepeaterMatches, rerenderMapLegend and mapNote. All of it from inside its
 // own functions, so this file's position among the modules is free.
@@ -288,7 +288,7 @@ const MapRelocate = (function () {
   }
 
   function radioOf(sys, agl) {
-    return { sysName: sys.name, txW: sys.tx_power_w, gain: sys.antenna_gain_dbi,
+    return { sysId: sys.id, sysName: sys.name, txW: sys.tx_power_w, gain: sys.antenna_gain_dbi,
              loss: sys.line_loss_db, thr: sys.rx_threshold_dbm, agl };
   }
 
@@ -2018,9 +2018,12 @@ const MapRelocate = (function () {
       // repeater, or a carried station up to the place.
       let pa = [c.lat, c.lon], pb = [h.lat, h.lon], ids = [c.now ? found.st.id : null, h.id];
       if (h.dir === 'in') { [pa, pb] = [pb, pa]; ids = [ids[1], ids[0]]; }
-      // A new place is a point with no radio of its own: the card is told the
-      // mast it was priced on (radioOver), as the site finder tells it.
-      if (!c.now && found.hereNew) radioOver(radioKey(null, c.lat, c.lon)).agl_m = found.hereNew.agl;
+      // A new place is a point with no radio of its own: the station's radio,
+      // on the mast it was priced on, goes with it (radioPlace), as the site
+      // finder's does — so the card works out the same margin.
+      if (!c.now && found.hereNew) {
+        radioPlace(c.lat, c.lon, found.hereNew, { name: `New site for ${found.st.name}`, by: 'Relocate station', f: h.f });
+      }
       if (full) {
         state.path.open = true;
         const had = MapDraw.findLine(pa, pb);
