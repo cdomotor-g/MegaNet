@@ -14,9 +14,10 @@
 // app.js's switchTab() and init.js call AdminDash.beacon(). Nothing here runs
 // at load.
 //
-// Everything on it comes from one call, meganet.admin_dashboard() (0043),
-// which refuses anybody meganet.is_admin() says no to — but for the Waiting
-// for approval tile, which counts the users admin.js already holds. It is a reading of the
+// Everything on it comes from two calls made together: meganet.admin_dashboard()
+// (0043) and, for Behind the scenes, meganet.admin_ops() (0109). Both refuse
+// anybody meganet.is_admin() says no to. The Waiting for approval tile counts
+// the users admin.js already holds instead. It is a reading of the
 // database's own statistics — pg_stat_database, pg_stat_activity, the
 // relation sizes, pg_stat_statements — not a copy of Supabase's or
 // Cloudflare's dashboards, and it says where its numbers come from.
@@ -43,6 +44,10 @@ const AdminDash = (function () {
   let data    = null;
   let loading = false;
   let error   = null;
+  // Behind the scenes (0109): meganet.admin_ops(), asked beside the dashboard.
+  // Its own error, so a database without 0109 still draws everything else.
+  let ops      = null;
+  let opsError = null;
   let loadedAt = null;
   let timer   = null;
   let sort    = { key: 'bytes', dir: -1 };
@@ -250,7 +255,10 @@ const AdminDash = (function () {
     const up = db.started_at ? (Date.now() - new Date(db.started_at).getTime()) / 1000 : 0;
     const hit = db.cache_hit != null ? Math.round(db.cache_hit * 1000) / 10 : null;
     const connPct = pct(c.total || 0, db.max_connections || 0);
-    const problems = [];
+    // Behind the scenes' own problems first: data stopping or a base station
+    // gone is what an administrator opens the tab to find out.
+    const opsP = ops ? opsProblems(ops) : [];
+    const problems = opsP.map(p => p.text);
     if (connPct >= 80) problems.push('connections near the limit');
     if (hit != null && hit < 99) problems.push('cache hit below 99%');
     if ((c.idle_in_tx || 0) > 0 && (c.longest_tx_s || 0) > 300) problems.push('a transaction open over 5 min');
@@ -265,7 +273,7 @@ const AdminDash = (function () {
     return `<div class="adm-kpis">
       ${tile('Health', problems.length ? '⚠ Check' : '✓ Healthy',
              problems.length ? esc(problems.join('; ')) : `Postgres ${esc(String(db.version || '').split(' ')[0])} · up ${span(up)}`,
-             problems.length ? 'warn' : 'ok', null, 'adm-src-h')}
+             opsP.some(p => p.bad) ? 'bad' : problems.length ? 'warn' : 'ok', null, opsP.length ? 'adm-ops-h' : 'adm-src-h')}
       ${costsTile()}
       ${tile('Database size', bytes(db.size_bytes),
              `${meter(db.size_bytes, DB_LIMIT, 'Database size')}${pct(db.size_bytes, DB_LIMIT)}% of the 8 GB disk included on Pro`,
@@ -423,6 +431,355 @@ const AdminDash = (function () {
       </div>`;
   }
 
+  // ── behind the scenes (0109) ──
+  //
+  // What the owner's separate health page showed that this tab did not: data
+  // flowing in, the base stations and their receivers, what is waiting on an
+  // administrator, the database's scheduled jobs and how fast it is filling.
+  // All of it from meganet.admin_ops(), which reads rollups and indexes only —
+  // that page read the whole reception table on every open.
+
+  // What the words mean (CLAUDE.md "Plain words"): the hover, and the fold at
+  // the foot of the section for a finger or a keyboard. One list.
+  const OPS_WORDS = {
+    heard:      'When a base station\'s radio last heard a packet from any transmitter, by the base station\'s own clock. '
+              + 'Over 15 minutes is unusual; over an hour, with the network up, means data has stopped coming in.',
+    receptions: 'Every packet a base station\'s radio picked up and sent in — decoded or not, duplicates included. '
+              + 'Counted from the hourly summaries, so the newest hour appears about ten minutes after it ends.',
+    failed:     'Receptions whose bits did not check out (a bad checksum, a broken frame or noise), so they carry no reading. '
+              + 'A few percent is normal; a jump points at interference or a weak link.',
+    readings:   'Values from a station — a river level, rain, a battery — stored in the database. One packet can carry one reading.',
+    basestation:'A computer with a radio receiver (a Raspberry Pi with an SDR stick, say) that listens to the network and sends what it hears here.',
+    online:     'Online: checked in within three of its own check-in intervals (never less than three minutes). '
+              + 'Quiet: last check-in within the hour. Offline: nothing for over an hour. Off: the station turned check-ins off itself. '
+              + 'The same rule as the Base Stations tab.',
+    receiver:   'One radio on a base station. "Running" is what it said at its last check-in; the decoded count is packets it has decoded since it started.',
+    findings:   'Problems Station Health has found and not yet seen clear: critical (data stopped), to watch (getting worse) and notes. '
+              + 'They clear themselves when the problem goes away.',
+    tokens:     'A base station asking for its key so it can send data. It waits until an administrator approves it in Ingest tokens below.',
+    push:       'Phones or computers signed up for administrator notifications whose last messages could not be delivered. '
+              + 'Usually a device that was reset or uninstalled the app — remove it under Notifications.',
+    jobs:       'Work the database does on a timer by itself (pg_cron): summing readings into hourly and daily totals, archiving old rows, '
+              + 'checking base stations and transmitters, sending account emails. A failed run is retried at the next time.',
+    growth:     'How much bigger the database got a day, measured from a snapshot taken once a day (01:41 Brisbane) — up to a week back. '
+              + 'Supabase Pro includes 8 GB of disk; past that it costs more.',
+  };
+  const OPS_GLOSSARY = [
+    ['heard', 'Last packet heard'], ['receptions', 'Receptions'], ['failed', 'Failed to decode'], ['readings', 'Readings'],
+    ['basestation', 'Base station'], ['online', 'Online, quiet, offline, off'], ['receiver', 'Receiver'],
+    ['findings', 'Health findings'], ['tokens', 'Token requests'], ['push', 'Notification devices failing'],
+    ['jobs', 'Scheduled jobs'], ['growth', 'Database growth'],
+  ];
+
+  // What each of the database's own jobs is for, by its pg_cron name less the
+  // schema's prefix (the name the table shows).
+  const JOB_ABOUT = {
+    'account-mail':                'Emails administrators about accounts waiting, and people when they are approved.',
+    'base-station-health':         'Opens and clears findings for base stations that stop checking in and receivers that stop decoding.',
+    'flip-sources':                'Works out which repeater a corrupted (bit-flipped) packet came through.',
+    'retain':                      'Archives readings and receptions past their keep-time to R2, then deletes them here.',
+    'roll-up':                     'Sums readings into the hourly and daily totals the charts read.',
+    'roll-up-carriers':            'Sums each transmitter\'s signal by the day, for the drift and signal-strength checks.',
+    'roll-up-receptions':          'Sums receptions into the hourly and daily totals (the chart above reads them).',
+    'transmitter-health':          'Checks every transmitter for drift, off-channel signal and corruption, and opens findings.',
+    'size-snapshot':               'Records the database\'s size once a day, for the growth figure.',
+  };
+
+  // A pg_cron schedule as words, for the five shapes this database uses; any
+  // other is shown as written.
+  function cronWords(s) {
+    const p = String(s || '').trim().split(/\s+/);
+    if (p.length !== 5 || p.slice(2).some(x => x !== '*')) return String(s || '');
+    const [m, h] = p;
+    let r;
+    if ((r = /^\*\/(\d+)$/.exec(m)) && h === '*') return `every ${r[1]} min`;
+    if (/^\d+$/.test(m) && h === '*') return `hourly at :${m.padStart(2, '0')}`;
+    if (/^\d+$/.test(m) && /^\d+$/.test(h)) {
+      const bris = (Number(h) + 10) % 24;   // Brisbane keeps no daylight saving
+      return `daily at ${String(bris).padStart(2, '0')}:${m.padStart(2, '0')} Brisbane`;
+    }
+    return String(s);
+  }
+
+  function minsAgo(ts) { return ts ? (Date.now() - new Date(ts).getTime()) / 60000 : Infinity; }
+  const hhmm = ts => (ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
+
+  function opsCounts(o) {
+    const st = o.stations || [];
+    const jobs = o.jobs || [];
+    const w = o.waiting || {};
+    const g = o.growth || {};
+    const perDay = Number(g.per_day) || 0;
+    return {
+      online:   st.filter(s => s.state === 'online').length,
+      quiet:    st.filter(s => s.state === 'quiet'),
+      offline:  st.filter(s => s.state === 'offline'),
+      stations: st.filter(s => s.state !== 'off').length,
+      receivers: st.reduce((n, s) => n + (s.receivers || []).length, 0),
+      rxDown:   st.flatMap(s => (s.receivers || []).filter(r => r.state && r.state !== 'running')
+                  .map(r => `${s.label} ${r.name}`)),
+      jobsFailedToday: jobs.filter(j => j.failed_24h > 0),
+      jobsOff:  jobs.filter(j => j.active === false),
+      jobsFailed7d: jobs.reduce((n, j) => n + (Number(j.failed_7d) || 0), 0),
+      waiting:  (Number(w.token_requests) || 0) + (Number(w.findings_critical) || 0) + (Number(w.findings_warn) || 0)
+                + (Number(w.push_failing) || 0),
+      daysLeft: g.measured && perDay > 0 ? Math.floor((DB_LIMIT - Number(g.db_bytes || 0)) / perDay) : null,
+      perDay,
+    };
+  }
+
+  // What the Health tile says when something behind the scenes is wrong, worst
+  // first; `bad` turns the tile red rather than amber.
+  function opsProblems(o) {
+    const f = o.flow || {}, w = o.waiting || {}, n = opsCounts(o);
+    const out = [];
+    const m = minsAgo(f.last_heard_at);
+    if (m > 60) out.push({ bad: true, text: f.last_heard_at ? `no packet heard for ${ago(f.last_heard_at).replace(' ago', '')}` : 'no packet ever heard' });
+    else if (m > 15) out.push({ text: 'packets have gone quiet' });
+    for (const s of n.offline) out.push({ bad: true, text: `base station ${s.label} offline` });
+    if (n.rxDown.length) out.push({ bad: true, text: `receiver not running: ${n.rxDown.join(', ')}` });
+    if (n.jobsFailedToday.length) out.push({ bad: true, text: `scheduled job failed today: ${n.jobsFailedToday.map(j => j.name.replace(/^meganet-/, '')).join(', ')}` });
+    if (n.daysLeft != null && n.daysLeft < 30) out.push({ bad: true, text: `database full in about ${n.daysLeft} days` });
+    if (Number(w.findings_critical) > 0) out.push({ text: `${w.findings_critical} critical health finding${w.findings_critical === 1 ? '' : 's'}` });
+    for (const s of n.quiet) out.push({ text: `base station ${s.label} quiet` });
+    if (n.jobsOff.length) out.push({ text: `scheduled job turned off: ${n.jobsOff.map(j => j.name).join(', ')}` });
+    return out;
+  }
+
+  function opsTiles(o) {
+    const f = o.flow || {}, w = o.waiting || {}, g = o.growth || {}, n = opsCounts(o);
+    const heardM = minsAgo(f.last_heard_at);
+    const rx = Number(f.receptions_24h) || 0;
+    const failedPct = rx ? Math.round(((rx - (Number(f.ok_24h) || 0)) / rx) * 1000) / 10 : 0;
+    const waitBits = [
+      w.token_requests ? `${num(w.token_requests)} token request${w.token_requests === 1 ? '' : 's'}` : '',
+      (w.findings_critical || 0) + (w.findings_warn || 0) ? `${num((w.findings_critical || 0) + (w.findings_warn || 0))} findings to look at` : '',
+      w.push_failing ? `${num(w.push_failing)} device${w.push_failing === 1 ? '' : 's'} failing` : '',
+    ].filter(Boolean);
+    const jobs = o.jobs || [];
+    const jobsOk = jobs.filter(j => j.active !== false && !(j.failed_24h > 0)).length;
+    return `<div class="adm-kpis">
+      ${tile(termHtml('Last packet heard', OPS_WORDS.heard), esc(f.last_heard_at ? ago(f.last_heard_at) : 'never'),
+             `last reading stored ${esc(ago(f.last_reading_at))} · ${num(f.readings_24h)} ${termHtml('readings', OPS_WORDS.readings)} in 24 h`,
+             heardM > 60 ? 'bad' : heardM > 15 ? 'warn' : 'ok', 'adm-kpi-heard', 'adm-rx-h')}
+      ${tile(termHtml('Receptions · 24 h', OPS_WORDS.receptions), num(rx),
+             `${failedPct}% ${termHtml('failed to decode', OPS_WORDS.failed)} · to ${esc(hhmm(f.rolled_to))}`,
+             null, 'adm-kpi-rx', 'adm-rx-h')}
+      ${tile(termHtml('Base stations online', OPS_WORDS.online), `${num(n.online)} <small>of ${num(n.stations)}</small>`,
+             `${num(n.receivers)} receiver${n.receivers === 1 ? '' : 's'}`
+               + (n.offline.length ? ` · offline: ${esc(n.offline.map(s => s.label).join(', '))}` : '')
+               + (n.quiet.length ? ` · quiet: ${esc(n.quiet.map(s => s.label).join(', '))}` : ''),
+             n.offline.length || n.rxDown.length ? 'bad' : n.quiet.length ? 'warn' : n.stations ? 'ok' : null, 'adm-kpi-bs', 'adm-bs-h')}
+      ${tile('Waiting on you', num(n.waiting), waitBits.length ? esc(waitBits.join(' · ')) : 'Nothing behind the scenes',
+             n.waiting ? 'warn' : null, 'adm-kpi-opsq', 'adm-opsq-h')}
+      ${tile(termHtml('Scheduled jobs', OPS_WORDS.jobs),
+             o.cron ? `${num(jobsOk)} <small>of ${num(jobs.length)} clean</small>` : '—',
+             o.cron ? `${num(n.jobsFailed7d)} failed run${n.jobsFailed7d === 1 ? '' : 's'} in 7 days`
+                      + (n.jobsFailedToday.length ? ` · failed today: ${esc(n.jobsFailedToday.map(j => j.name.replace(/^meganet-/, '')).join(', '))}` : '')
+                    : 'This database has no pg_cron',
+             n.jobsFailedToday.length ? 'bad' : n.jobsOff.length ? 'warn' : o.cron ? 'ok' : null, 'adm-kpi-jobs', 'adm-jobs-h')}
+      ${tile(termHtml('Database growth', OPS_WORDS.growth),
+             !g.measured ? 'Measuring' : n.perDay > 0 ? `+${bytes(n.perDay)} <small>a day</small>` : 'Not growing',
+             !g.measured ? 'the first figure comes a day after the first snapshot'
+               : n.daysLeft != null ? `about ${num(n.daysLeft)} days to the 8 GB disk · over ${esc(String(g.days))} days`
+               : `over the last ${esc(String(g.days))} days`,
+             n.daysLeft != null && n.daysLeft < 30 ? 'bad' : n.daysLeft != null && n.daysLeft < 120 ? 'warn' : null, 'adm-kpi-grow', 'adm-grow-h')}
+    </div>`;
+  }
+
+  // Receptions a UTC day: decoded on the baseline, failed on top — the visits
+  // chart's columns, each a hover target, a legend, and the numbers in a table.
+  function receptionsChart(days) {
+    const max = Math.max(1, ...days.map(d => Number(d.n) || 0));
+    const h = v => `${Math.round((v / max) * 1000) / 10}%`;
+    const cols = days.map(d => {
+      const ok = Number(d.ok) || 0, bad = Math.max(0, (Number(d.n) || 0) - ok);
+      const lbl = `${d.day}: ${num(d.n)} receptions, ${num(ok)} decoded, ${num(bad)} failed`;
+      return `<div class="adm-col" title="${esc(lbl)}">
+        ${ok ? `<span class="adm-col-seg adm-col--rxok" style="--h:${h(ok)}"></span>` : ''}
+        ${bad ? `<span class="adm-col-seg adm-col--rxbad" style="--h:${h(bad)}"></span>` : ''}
+        ${d.n ? '' : '<span class="adm-col-zero"></span>'}
+      </div>`;
+    }).join('');
+    const first = days[0]?.day || '', last = days[days.length - 1]?.day || '';
+    return `
+      <div class="adm-legend small">
+        <span><i class="adm-sw adm-col--rxok"></i>Decoded</span>
+        <span><i class="adm-sw adm-col--rxbad"></i>${termHtml('Failed to decode', OPS_WORDS.failed)}</span>
+      </div>
+      <div class="adm-chart" role="img" aria-label="Receptions a day for the last 30 days; the table below has the numbers">
+        <div class="adm-chart-y small"><span>${num(max)}</span><span>0</span></div>
+        <div class="adm-cols adm-cols--rx">${cols}</div>
+      </div>
+      <div class="adm-chart-x small"><span>${esc(first)}</span><span>${esc(last)} (UTC, today so far)</span></div>
+      <details><summary class="small">Table</summary>
+        <div class="table-wrap medium" role="region" tabindex="0" aria-label="Receptions a day">
+          <table class="adm-table"><caption class="sr-only">Receptions a day, last 30 days</caption>
+            <thead><tr><th scope="col">Day</th><th scope="col">Receptions</th><th scope="col">Decoded</th><th scope="col">Failed</th></tr></thead>
+            <tbody>${days.slice().reverse().map(d => `<tr><td>${esc(d.day)}</td><td>${num(d.n)}</td><td>${num(d.ok)}</td>
+              <td>${num(Math.max(0, (Number(d.n) || 0) - (Number(d.ok) || 0)))}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>
+      </details>`;
+  }
+
+  const STATE_TONE = { online: 'ok', quiet: 'warn', offline: 'bad', off: '' };
+
+  function stationsHtml(o) {
+    const st = o.stations || [];
+    const rows = st.map(s => {
+      const rx = s.receivers || [];
+      const rxHtml = rx.length ? rx.map(r => `<div><b>${esc(r.name)}</b>${r.kind ? ` <span class="small">${esc(r.kind)}</span>` : ''}
+          · <span class="${r.state === 'running' ? 'txt-ok' : 'txt-bad'}">${esc(r.state || 'unknown')}</span>
+          · <span class="small" title="${esc(`Decode count last moved ${full(r.changed_at)}`)}">${num(r.decoded)} decoded, last ${esc(ago(r.changed_at))}</span></div>`).join('')
+        : '<span class="small">No receiver reported</span>';
+      return `<tr>
+        <td>${esc(s.label)}</td>
+        <td><span class="term-chip adm-state adm-state--${STATE_TONE[s.state] ?? ''}" title="${esc(OPS_WORDS.online)}">${esc(s.state)}</span></td>
+        <td class="small" title="${esc(full(s.last_seen_at))}">${esc(ago(s.last_seen_at))}</td>
+        <td>${rxHtml}</td>
+      </tr>`;
+    }).join('');
+    return `
+      <div class="panel">
+        <div class="panel-header"><h3 id="adm-bs-h">${termHtml('Base stations', OPS_WORDS.basestation)} and their ${termHtml('receivers', OPS_WORDS.receiver)}</h3></div>
+        ${st.length ? `<div class="table-wrap">
+          <table class="adm-table"><caption class="sr-only">Each base station, its state, last check-in and receivers</caption>
+            <thead><tr><th scope="col">Base station</th><th scope="col">State</th><th scope="col">Checked in</th><th scope="col">Receivers</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table></div>` : '<p class="small table-empty">No base station has checked in.</p>'}
+        <p class="small">More on each — its radios, uplink, settings and what it hears — on
+          <button class="link-btn" onclick="switchTab('basestations')">Base Stations</button>.</p>
+      </div>`;
+  }
+
+  function waitingOpsHtml(o) {
+    const w = o.waiting || {};
+    const waitingAccounts = typeof Admin !== 'undefined' && Admin.waitingCount ? Admin.waitingCount() : null;
+    const row = (label, n, action) => `<li><span>${label}</span><b class="${n ? 'txt-warn' : ''}">${num(n)}</b>${action ? `<span class="small">${action}</span>` : '<span></span>'}</li>`;
+    const goBtn = (target, text) => `<button class="link-btn" onclick="return AdminDash.go(event, '${escAttr(target)}')">${text}</button>`;
+    return `
+      <div class="panel">
+        <div class="panel-header"><h3 id="adm-opsq-h">Waiting on you</h3></div>
+        <ul class="adm-queue">
+          ${waitingAccounts != null ? row('Accounts waiting for approval', waitingAccounts, goBtn('adm-waiting|adm-people', 'See them')) : ''}
+          ${row(termHtml('Base stations asking for a key', OPS_WORDS.tokens), w.token_requests, goBtn('adm-req-h|adm-tok-h', 'Ingest tokens'))}
+          ${row(`${termHtml('Health findings', OPS_WORDS.findings)} — critical`, w.findings_critical, '<button class="link-btn" onclick="switchTab(\'health\')">Station Health</button>')}
+          ${row('Health findings — to watch', w.findings_warn, '')}
+          ${row('Health findings — notes', w.findings_info, '')}
+          ${row(termHtml('Notification devices failing', OPS_WORDS.push), w.push_failing, goBtn('adm-push-h', 'Notifications'))}
+        </ul>
+      </div>`;
+  }
+
+  function jobsHtml(o) {
+    if (!o.cron) {
+      return `<div class="panel"><div class="panel-header"><h3 id="adm-jobs-h">Scheduled jobs</h3></div>
+        <p class="small">This database has no pg_cron, so nothing runs on a timer.</p></div>`;
+    }
+    const rows = (o.jobs || []).map(j => {
+      const tone = j.failed_24h > 0 ? 'txt-bad' : j.failed_7d > 0 ? 'txt-warn' : '';
+      return `<tr>
+        <td><span class="term" title="${esc(JOB_ABOUT[j.name.replace(/^meganet-/, '')] || 'One of the database\'s own jobs.')}">${esc(j.name.replace(/^meganet-/, ''))}</span>
+          ${j.active === false ? ' <span class="badge">turned off</span>' : ''}
+          ${j.last_error_at ? `<div class="small ${tone || 'txt-muted'}">last failed <span title="${esc(full(j.last_error_at))}">${esc(ago(j.last_error_at))}</span>: ${esc(j.last_error || '')}</div>` : ''}</td>
+        <td class="small" title="${esc(j.schedule)}">${esc(cronWords(j.schedule))}</td>
+        <td>${num(j.ok_7d)}</td>
+        <td class="${tone}">${num(j.failed_7d)}</td>
+        <td class="small" title="${esc(full(j.last_at))}">${esc(j.last_at ? ago(j.last_at) : 'not in 7 days')}${j.last_status && j.last_status !== 'succeeded' ? ` · ${esc(j.last_status)}` : ''}</td>
+      </tr>`;
+    }).join('');
+    return `
+      <div class="panel">
+        <div class="panel-header"><h3 id="adm-jobs-h">${termHtml('Scheduled jobs', OPS_WORDS.jobs)} · last 7 days</h3></div>
+        <div class="table-wrap">
+          <table class="adm-table adm-jobs"><caption class="sr-only">The database's scheduled jobs, their runs in the last 7 days, and each one's last failure under its name</caption>
+            <thead><tr><th scope="col">Job</th><th scope="col">Runs</th><th scope="col">OK</th><th scope="col">Failed</th>
+              <th scope="col">Last run</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <p class="small">Hover a job for what it does. A failed run is tried again at its next time; a failure today turns the Health tile red.</p>
+      </div>`;
+  }
+
+  function growthHtml(o) {
+    const g = o.growth || {}, n = opsCounts(o);
+    let body;
+    if (!g.measured) {
+      body = `<p class="small">Measuring. The database is ${bytes(g.db_bytes)} now. A snapshot of its size is taken once a day at 01:41 Brisbane
+        ${g.first_day ? `(the first on ${esc(g.first_day)})` : ''}; the growth figure appears once one is a day old.</p>`;
+    } else {
+      const tables = g.tables || [];
+      body = `<p class="small">${bytes(g.then_bytes)} → ${bytes(g.db_bytes)} over ${esc(String(g.days))} days:
+        ${n.perDay > 0 ? `<b>${bytes(n.perDay)} a day</b>, about ${num(n.daysLeft)} days until the 8 GB disk Supabase Pro includes.` : 'not growing.'}
+        Receptions are kept 30 days, so their table reuses the space of the day it deletes rather than growing.</p>
+        ${tables.length ? `<h4 class="adm-sub-h" id="adm-grow-t-h">The tables growing most <span class="small">(with their indexes)</span></h4>
+          ${bars(tables.map(t => ({ k: String(t.name).replace(/^meganet\./, ''), v: Number(t.per_day) || 0, note: `${bytes(t.bytes)} now` })),
+                 { fmt: v => `${bytes(v)}/day`, id: 'adm-grow-t-h' })}` : ''}`;
+    }
+    return `
+      <div class="panel">
+        <div class="panel-header"><h3 id="adm-grow-h">${termHtml('Database growth', OPS_WORDS.growth)}</h3></div>
+        ${body}
+      </div>`;
+  }
+
+  // What the other page showed that the database cannot see, and where to
+  // look for it meanwhile. Each needs an account token kept on a server.
+  function notHereHtml() {
+    const ref = (/\/\/([a-z0-9]+)\.supabase\.co/.exec(typeof DB_ORIGIN !== 'undefined' ? DB_ORIGIN : '') || [])[1];
+    const sb = p => (ref ? `<a href="https://supabase.com/dashboard/project/${escAttr(ref)}/${p}" target="_blank" rel="noopener">` : '<a>');
+    return `
+      <div class="panel">
+        <div class="panel-header"><h3 id="adm-notyet-h">Not on this page yet</h3></div>
+        <p class="small">These need a key to Supabase's or Cloudflare's own accounts, which Flood-Net does not hold. Until then, look there:</p>
+        <ul class="small adm-notyet">
+          <li><b>Errors at the database's front door</b> — requests the app made that failed. ${sb('logs/edge-logs')}Supabase logs</a></li>
+          <li><b>Supabase's security and speed advice</b> — its own checks of the database. ${sb('advisors/security')}Security</a> · ${sb('advisors/performance')}Performance</a></li>
+          <li><b>Backups</b> — Supabase Pro takes one a day. ${sb('database/backups/scheduled')}Backups</a></li>
+          <li><b>Cloudflare Workers and R2 storage</b> — what runs floodwarning.net and holds the photos and archive.
+            <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">Cloudflare</a></li>
+          <li><b>Whether floodwarning.net is up</b> — needs a check from outside it, which can message you when it stops answering.</li>
+        </ul>
+      </div>`;
+  }
+
+  function opsGlossaryHtml() {
+    return `<div class="panel adm-span"><details class="rd-fold adm-words"><summary><h3 class="bk-inline-h" id="adm-ops-words-h">What the words in Behind the scenes mean</h3></summary>
+      <dl class="rd-words">${OPS_GLOSSARY.map(([k, label]) => `<dt>${esc(label)}</dt><dd>${esc(OPS_WORDS[k])}</dd>`).join('')}</dl>
+    </details></div>`;
+  }
+
+  function opsHtml() {
+    const head = `<div class="panel-header"><h3 id="adm-ops-h">Behind the scenes</h3></div>`;
+    if (opsError) return `<div class="panel adm-dash">${head}<p class="small txt-bad">${esc(opsError)}</p></div>`;
+    if (!ops) return `<div class="panel adm-dash">${head}<p class="small">Loading…</p></div>`;
+    return `
+      <div class="panel adm-dash">${head}
+        <p class="small">The data coming in, the base stations hearing it, what is waiting on you, the jobs the database runs on a timer,
+          and how fast it is filling up.</p>
+        ${opsTiles(ops)}
+      </div>
+      <div class="adm-dash-grid">
+        <div class="stack">
+          <div class="panel">
+            <div class="panel-header"><h3 id="adm-rx-h">${termHtml('Receptions', OPS_WORDS.receptions)} a day</h3></div>
+            <p class="small">Packets the base stations heard, last 30 days. A big jump means more data, and the database filling faster.</p>
+            ${receptionsChart(ops.days || [])}
+          </div>
+          ${waitingOpsHtml(ops)}
+          ${growthHtml(ops)}
+        </div>
+        <div class="stack">
+          ${stationsHtml(ops)}
+          ${jobsHtml(ops)}
+          ${notHereHtml()}
+        </div>
+        ${opsGlossaryHtml()}
+      </div>`;
+  }
+
   // ── the section ──
 
   function isAdmin() {
@@ -447,6 +804,7 @@ const AdminDash = (function () {
     if (!data) return `<div class="panel">${head}<p class="small">Loading…</p></div>`;
     return `
       <div class="panel adm-dash">${head}${healthTiles(data)}</div>
+      ${opsHtml()}
       <div class="adm-dash-grid">
         <div class="stack">${accessHtml(data)}</div>
         <div class="stack">${volumeHtml(data)}</div>
@@ -464,14 +822,27 @@ const AdminDash = (function () {
   async function load({ withUsers = true } = {}) {
     if (!isAdmin()) { repaint(); return; }
     loading = true; repaint();
-    try {
-      data = await dbRpc('admin_dashboard', {});
+    // Both at once; either may fail without taking the other with it.
+    const [dash, behind] = await Promise.allSettled([dbRpc('admin_dashboard', {}), dbRpc('admin_ops', {})]);
+    if (dash.status === 'fulfilled') {
+      data = dash.value;
       error = null;
       loadedAt = new Date();
-    } catch (err) {
+    } else {
+      const err = dash.reason || {};
       error = err.status === 404
         ? 'The database does not have the dashboard yet — apply db/migrations/0043_admin_dashboard.sql.'
         : `Could not load the dashboard: ${err.message}`;
+    }
+    if (behind.status === 'fulfilled') {
+      ops = behind.value;
+      opsError = null;
+    } else {
+      const err = behind.reason || {};
+      ops = null;
+      opsError = err.status === 404
+        ? 'The database does not have this section yet — apply db/migrations/0109_admin_behind_the_scenes.sql.'
+        : `Could not load Behind the scenes: ${err.message}`;
     }
     loading = false;
     repaint();
@@ -504,7 +875,7 @@ const AdminDash = (function () {
   }
 
   function authChanged() {
-    data = null; error = null; loadedAt = null;
+    data = null; error = null; loadedAt = null; ops = null; opsError = null;
     stop();
     if (state.activeTab === 'admin') { repaint(); start(); }
   }

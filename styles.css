@@ -22424,6 +22424,29 @@ a.adm-kpi--go:hover::after, a.adm-kpi--go:focus-visible::after { color: var(--ac
 }
 .adm-col--in   { background: var(--adm-in); }
 .adm-col--anon { background: var(--adm-anon); }
+
+/* ── Behind the scenes (admin-dashboard.js, 0109) ────────────────────────────
+   A tile in trouble is red, as amber is "worth a look"; the word in the tile
+   says which, never the colour alone. The receptions chart takes the visits
+   chart's columns and pair of colours (decoded on the baseline, failed on
+   top), its heights a token so no inline style decides anything. */
+.adm-kpi--bad  { border-left: 4px solid var(--bad); }
+.adm-kpi--bad .adm-kpi-value { color: var(--bad); }
+.adm-cols--rx .adm-col-seg { height: var(--h, 0); }
+.adm-col--rxok  { background: var(--adm-in); }
+.adm-col--rxbad { background: var(--adm-anon); }
+.adm-state { display: inline-block; padding: 0 .5em; border: 1px solid var(--border); border-radius: var(--r-pill);
+  white-space: nowrap; font-size: var(--fs-sm); }
+.adm-state--ok   { border-color: var(--ok); }
+.adm-state--warn { border-color: var(--warn); }
+.adm-state--bad  { border-color: var(--bad); color: var(--bad); font-weight: 600; }
+.adm-queue { list-style: none; margin: .3rem 0 0; padding: 0; display: grid; gap: .35rem; }
+.adm-queue li { display: grid; grid-template-columns: minmax(0, 1fr) 3rem minmax(0, 8rem); gap: .5rem; align-items: baseline; }
+.adm-queue b { text-align: right; font-variant-numeric: tabular-nums; }
+.adm-notyet { margin: .3rem 0 0; padding-left: 1.1rem; }
+.adm-notyet li { margin-bottom: .35rem; }
+.adm-page .table-wrap table.adm-jobs { min-width: 28rem; }
+.adm-words { margin-top: 0; }
 .adm-chart-x {
   display: flex; justify-content: space-between;
   color: var(--muted); margin: .2rem 0 .4rem calc(1.5rem + .4rem);

@@ -113,7 +113,26 @@ async function main() {
       // The dashboard, as little of it as draws its tiles and the panels they open.
       const DASH = { db: { size_bytes: 9e8, schema_version: null, max_connections: 60 }, connections: { total: 8, active: 2 },
                      users: { active_now: 1, total: 2 }, visits: { days: [] }, storage: [], api: [], tables: [] };
-      const map = { whoami: WHO[who], admin_users: USERS, admin_allowlist: ALLOW, admin_ingest_tokens: TOKENS, admin_dashboard: DASH,
+      // Behind the scenes (0109): one base station online, one offline, two jobs,
+      // a week's growth — enough to colour every tile and fill every panel.
+      const now = Date.now(), iso = ms => new Date(now - ms).toISOString();
+      const OPS = { at: iso(0), cron: true,
+        flow: { last_heard_at: iso(4 * 60e3), last_reading_at: iso(6 * 60e3), readings_24h: 5120, receptions_24h: 81234, ok_24h: 78000, rolled_to: iso(30 * 60e3) },
+        days: Array.from({ length: 30 }, (_, i) => ({ day: new Date(now - (29 - i) * 864e5).toISOString().slice(0, 10),
+                                                       n: i === 3 ? 0 : 70000 + i * 100, ok: i === 3 ? 0 : 68000 + i * 100 })),
+        stations: [
+          { id: 1, label: 'Hilltop Pi', state: 'online', last_seen_at: iso(60e3),
+            receivers: [{ name: 'rtl0', kind: 'sdr', state: 'running', decoded: 1234, changed_at: iso(60e3), seen_at: iso(60e3) }] },
+          { id: 2, label: 'Shed Pi', state: 'offline', last_seen_at: iso(15 * 3600e3), receivers: [] }],
+        waiting: { token_requests: 1, findings_critical: 2, findings_warn: 1, findings_info: 3, push_failing: 0 },
+        jobs: [
+          { name: 'meganet-account-mail', schedule: '*/5 * * * *', active: true, ok_7d: 2014, failed_7d: 2, failed_24h: 0, last_at: iso(60e3),
+            last_status: 'succeeded', last_error: 'job startup timeout', last_error_at: iso(3 * 864e5) },
+          { name: 'meganet-retain', schedule: '17 15 * * *', active: true, ok_7d: 7, failed_7d: 0, failed_24h: 0, last_at: iso(9 * 3600e3),
+            last_status: 'succeeded', last_error: null, last_error_at: null }],
+        growth: { measured: true, since: iso(7 * 864e5), days: 7.0, db_bytes: 2.1e9, then_bytes: 2.0e9, per_day: Math.round(1e8 / 7),
+                  tables: [{ name: 'meganet.reception', bytes: 4e8, per_day: 9e6 }] } };
+      const map = { whoami: WHO[who], admin_users: USERS, admin_allowlist: ALLOW, admin_ingest_tokens: TOKENS, admin_dashboard: DASH, admin_ops: OPS,
                     admin_ingest_token_requests: [], push_mine: { devices: [], waiting: 0 }, my_prefs: { nav_views: null } };
       if (name in map) return reply(200, map[name]);
       return reply(404, { message: 'not stood in for' });
@@ -305,6 +324,35 @@ async function main() {
       await page.evaluate(() => window.scrollTo(0, 0));
       const toVisits = await landed('#adm-dash a.adm-kpi--go[data-go="adm-vis-h"]', 'adm-vis-h');
       check('…and Visitors today opens Visitors, last 30 days', toVisits.focus === 'adm-vis-h' && toVisits.top >= 0 && toVisits.top < 160, J(toVisits));
+
+      // Behind the scenes (0109): the owner's separate health page, here.
+      const ops = await page.evaluate(() => {
+        const txt = el => el?.textContent.replace(/\s+/g, ' ').trim() || '';
+        const health = [...document.querySelectorAll('#adm-dash .adm-kpi')].find(t => txt(t.querySelector('.adm-kpi-label')) === 'Health');
+        const marked = [...document.querySelectorAll('#adm-dash .term')].map(t => t.getAttribute('title') || '');
+        const fold = txt(document.getElementById('adm-ops-words-h')?.closest('details'));
+        return {
+          heard: txt(document.querySelector('#adm-kpi-heard .adm-kpi-value')),
+          bs: txt(document.getElementById('adm-kpi-bs')), bsBad: !!document.getElementById('adm-kpi-bs')?.classList.contains('adm-kpi--bad'),
+          health: txt(health), healthBad: !!health?.classList.contains('adm-kpi--bad'),
+          rxCols: document.querySelectorAll('.adm-cols--rx .adm-col').length,
+          jobs: [...document.querySelectorAll('.adm-jobs tbody tr')].map(r => txt(r.cells[1])),
+          grow: txt(document.querySelector('#adm-kpi-grow .adm-kpi-value')),
+          wait: txt(document.querySelector('#adm-kpi-opsq .adm-kpi-value')),
+          bare: marked.filter(t => t.length < 20).length, marked: marked.length,
+          fold: ['Last packet heard', 'Receptions', 'Failed to decode', 'Scheduled jobs', 'Database growth'].every(w => fold.includes(w)),
+          notyet: !!document.getElementById('adm-notyet-h'),
+        };
+      });
+      check('Behind the scenes: the last packet heard, an offline base station named in red here and on the Health tile, 30 days of receptions, each job\'s timing in words, growth a day, what waits',
+        ops.heard === '4 min ago' && ops.bsBad && /1 of 2/.test(ops.bs) && /offline: Shed Pi/.test(ops.bs)
+          && ops.healthBad && /base station Shed Pi offline/.test(ops.health) && ops.rxCols === 30
+          && ops.jobs[0] === 'every 5 min' && ops.jobs[1] === 'daily at 01:17 Brisbane' && ops.grow === '+13.6 MB a day' && ops.wait === '4', J(ops));
+      check('…every marked word says what it means on hover and in its fold, and what the database cannot see is listed with where to look',
+        ops.marked >= 8 && ops.bare === 0 && ops.fold && ops.notyet, J(ops));
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const toBs = await landed('#adm-kpi-bs', 'adm-bs-h');
+      check('…and Base stations online opens the list of base stations and their receivers', toBs.focus === 'adm-bs-h' && toBs.top >= 0 && toBs.top < 160, J(toBs));
       await context.close();
     }
     {
