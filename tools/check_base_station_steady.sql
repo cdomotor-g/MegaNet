@@ -1,4 +1,4 @@
--- check_base_station_steady.sql — Prove 0111 and 0112: a base station's spectrum folded
+-- check_base_station_steady.sql — Prove 0111, 0112 and 0114: a base station's spectrum folded
 -- by the hour — per stick and tuning, each bin's lowest tenth and its median,
 -- closed hours only, from a watermark, once — and what comes in through each
 -- base station from the reception rollups: messages and stations by protocol,
@@ -272,6 +272,15 @@ begin
     and (select pg_catalog.sum((e ->> 5)::int) from jsonb_array_elements(s -> 'days') e) = 20
     and (select pg_catalog.max((e ->> 6)::int) from jsonb_array_elements(s -> 'days') e) = 3
     and (select pg_catalog.max((e ->> 7)::int) from jsonb_array_elements(s -> 'days') e) = 1, s -> 'days' #>> '{}');
+  -- 0114: the ones the register does not hold, and where the base station is
+  perform pg_temp.check_that('a station the register does not hold is laid out: decoded and heard, its frequency, its receiver, when',
+    jsonb_array_length(s -> 'strangers') = 1
+    and (s -> 'strangers' -> 0) @> '{"protocol": "alert", "id": 8273, "ok": 6, "n": 6, "days": 1, "only_here": true, "fmin": 151.5, "fmax": 151.5}'::jsonb
+    and (s -> 'strangers' -> 0 -> 'points') = '[["rpi-s-sdr1", 6, 151.5, 151.5, null]]'::jsonb
+    and (s -> 'strangers' -> 0 ->> 'first')::timestamptz < (s -> 'strangers' -> 0 ->> 'last')::timestamptz
+    and (s -> 'strangers' -> 0 -> 'paths') = 'null'::jsonb, s -> 'strangers' #>> '{}');
+  perform pg_temp.check_that('…and the base station says where it is: its host station, having reported no position',
+    (s -> 'site' ->> 'lat')::numeric = -31.60 and (s -> 'site' ->> 'lon')::numeric = 161.10 and (s2 -> 'site') = 'null'::jsonb, (s -> 'site')::text || (s2 -> 'site')::text);
   select e into n from jsonb_array_elements(r -> 'network') e where e ->> 'protocol' = 'alert';
   perform pg_temp.check_that('the network''s own count takes a station heard by two base stations once',
     (n ->> 'ids')::int < (select pg_catalog.sum((p ->> 'ids')::int) from jsonb_array_elements(r -> 'stations') e, jsonb_array_elements(e -> 'protocols') p
