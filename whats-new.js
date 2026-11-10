@@ -25,6 +25,20 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 252, date: '2026-11-10', items: [
+      '📜 <strong>ACMA licences.</strong> A new tool on the Stations map shows the radio licences our own transmitters run '
+        + 'under — the Bureau\'s, councils\' and Seqwater\'s — each drawn with the area it covers: a shaded circle round a '
+        + 'point-to-multipoint base, a shaded line for a point-to-point link. Search a station or a licence number, ring '
+        + 'every transmitting station by whether a licence was found for it, and save the list. It has a plain-words guide '
+        + 'to licence types and power limits, with links to ACMA.',
+      '📻 <strong>ACMA licences near here</strong>, under Radio on every station card: whether a licence was found for the '
+        + 'station, the nearest licences with their distance and direction, and a link to each one\'s licence document.',
+      '📐 <strong>Benchmarks on the Flood tab.</strong> A station\'s benchmarks are now under Flood history on its card and '
+        + 'in the station editor, with hover meanings for the survey words. Signed-in editors can add a benchmark of their '
+        + 'own (level, datum, description, date surveyed), and change or remove it; the Bureau\'s entries are kept apart.',
+      '🧹 <strong>Clear the selection leaves nothing on.</strong> It now also leaves 3-D and the digital twin and switches '
+        + 'off Latency &amp; signal\'s colouring.',
+    ] },
     { n: 251, date: '2026-11-10', items: [
       '⚖️ <strong>Repeater comparison</strong>, a new tool on the Stations map: pick two or more repeaters and it lists the '
         + 'sites they both carry in a grid — the fade margin, line of sight and ground profile of each site\'s path up to '

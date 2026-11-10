@@ -217,6 +217,11 @@ MegaNet/
 ├── map-repcompare.js       ← MapRepCompare — ⚖️ repeater comparison: two or more
 │                             repeaters, the sites they both carry, and each
 │                             site's path up to each of them side by side
+├── map-acma.js             ← MapAcma — 📜 ACMA licences: the licences the stations'
+│                             own transmitters run under, drawn with the area each
+│                             covers; a search; every transmitting station ringed by
+│                             its licensing state; the station card's "ACMA licences
+│                             near here" (docs/acma-licences.md)
 ├── modal.js                ← Modal     — the shared dialog shell, and confirmDialog /
 │                             promptDialog: the app's own questions, in place of the
 │                             browser's confirm() and prompt() (#223)
@@ -487,6 +492,7 @@ MegaNet/
 │   ├── acma_fetch.py        (classify + score interference candidates → data/acma-*.json)
 │   ├── acma_diff.py         (archive monthly snapshots + diff them → data/acma-changes.json)
 │   ├── mobile_sectors.py    (every mobile base station sector in the ACMA extract → data/mobile/)
+│   ├── acma_station_licences.py (the licences the stations' own transmitters run under → data/acma-station-licences.json)
 │   └── coverage_tiles.py    (the carriers' 4G coverage maps, ACCC, yearly → data/coverage/ tiles)
 │
 └── archive/                ← redundant / superseded / unreferenced (see archive/README.md)
@@ -6744,6 +6750,11 @@ ACMA daily bulk extract (spectra_rrl.zip, ~68 MB zipped / ~580 MB CSV)
        └─ tools/acma_diff.py   → data/acma-raw/<YYYY-MM>/    (archived snapshot)
                                  data/acma-snapshots.json    (archive index)
                                  data/acma-changes.json      (diffs + new IMD products)
+  └─ tools/acma_station_licences.py → data/acma-station-licences.json
+                                 (the licences the stations' OWN transmitters run under:
+                                  the Bureau's, councils' and water authorities' fixed
+                                  licences, both ends of each link — 📜 ACMA licences on the
+                                  Stations map and on every station card; docs/acma-licences.md)
 ```
 
 The app only ever reads the generated JSON — no live ACMA calls (the RRL API

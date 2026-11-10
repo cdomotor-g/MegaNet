@@ -3347,8 +3347,8 @@ function dockClearEl() {
   b.type = 'button';
   b.className = 'mn-mapctl-btn mn-map-clear';
   b.title = 'Clear the selection — deselects the station and any link, takes off everything drawn on the map and '
-          + 'every tool\'s answer, and disarms whatever was waiting for a click. '
-          + 'The view (3-D included) and the filters stay as they are';
+          + 'every tool\'s answer, disarms whatever was waiting for a click, and leaves 3-D, the digital twin '
+          + 'and Latency & signal\'s colouring. Where the map is looking and the filters stay as they are';
   b.setAttribute('aria-label', 'Clear the selection');
   b.setAttribute('onclick', 'clearStationsMapSelection()');
   b.innerHTML = `<span class="mn-mapctl-ico" aria-hidden="true">${Glyphs.rail('clear')}</span>`
@@ -5077,7 +5077,8 @@ function stationsMapPanels(map) {
   // 🗼 Repeater site finder tools/25, from MapSites.attach() after it,
   // 🚚 Station relocation finder tools/26, from MapRelocate.attach() after that,
   // 🎯 Best repeater tools/27, from MapBestRepeater.attach() after that, and
-  // ⚖️ Repeater comparison tools/28, from MapRepCompare.attach() after that.
+  // ⚖️ Repeater comparison tools/28, from MapRepCompare.attach() after that,
+  // and 📜 ACMA licences tools/29, from MapAcma.attach() last.
   //
   // What is here (#186) — arm it, click the map, and the card in the opposite
   // corner says what the app knows about that point. A plain corner button
@@ -5404,6 +5405,14 @@ async function clearStationsMapSelection() {
       confirm: 'Clear the selection', danger: true }))) return;
 
   clearStationsMapMarks();
+  // The three views that are switched on rather than drawn — Latency & signal's
+  // colouring, the digital twin and 3-D — go too: 🧹 leaves nothing on, so no
+  // ring is left in the strip. (↺ shares clearStationsMapMarks and has its own
+  // say on the view, so these are here, not there.)
+  mapTry(() => { if (MapLatency.on()) MapLatency.setOn(false); });
+  mapTry(() => { if (MapTwin.active()) MapTwin.leave(); });
+  mapTry(() => { if (Map3D.active()) Map3D.toggle(); });
+  mapTry(() => syncDockLive());
   const held = state.selectedId ? editorHoldReason() : '';
   if (state.selectedId && !held) {
     state.selectedId  = null;
@@ -6465,6 +6474,7 @@ function mapLegendHtml() {
     MapRelocate.active() ? MapRelocate.legendHtml() : '',
     MapBestRepeater.active() ? MapBestRepeater.legendHtml() : '',
     MapRepCompare.active() ? MapRepCompare.legendHtml() : '',
+    typeof MapAcma !== 'undefined' && MapAcma.active() ? MapAcma.legendHtml() : '',
     MapHops.active() ? MapHops.legendHtml() : '',
     MapDirect.active() ? MapDirect.legendHtml() : '',
     MapPeaks.active() ? `
@@ -6683,6 +6693,7 @@ function stopStationsMap() {
   MapRelocate.detach();
   MapBestRepeater.detach();
   MapRepCompare.detach();
+  if (typeof MapAcma !== 'undefined') MapAcma.detach();
   MapHops.detach();
   MapDirect.detach();
   MapLatency.detach();
@@ -6948,6 +6959,9 @@ function initMap() {
   // ⚖️ Repeater comparison: two or more masts already standing go in, and the
   // sites they both carry come out, each path up to each of them side by side.
   MapRepCompare.attach(state.map);
+  // 📜 ACMA licences: the licences these stations' own transmitters run
+  // under, drawn with the area each covers, and which stations have one.
+  if (typeof MapAcma !== 'undefined') MapAcma.attach(state.map);
   // 🪜 Hops to base: a pane for its lines, and the hops of a station lit
   // before the map was built again drawn on the new one.
   MapHops.attach(state.map);
@@ -9145,6 +9159,8 @@ function repaintStnCard() {
   SiteRoads.ask(`mn-roads-card-${s.id}`, s);
   // …and the mobile signal there, on the same terms (site-mobile.js).
   SiteMobile.ask(`mn-mobile-card-${s.id}`, s);
+  // …and the ACMA licences near it, out of a register copy read once (map-acma.js).
+  if (typeof MapAcma !== 'undefined') MapAcma.cardAsk(`mn-lic-card-${s.id}`, s);
   // …and the councils' cameras near it, out of a list read once (map-cameras.js).
   MapCameras.ask(`mn-cams-card-${s.id}`, s);
   // …and the catchment above its gauge, from a 75 KB index read once.
@@ -9158,7 +9174,8 @@ function repaintStnCard() {
   // …and its site features (site-features.js), kept per station for two
   // minutes, so a repaint asks nothing new.
   if (typeof SiteFeatures !== 'undefined') SiteFeatures.cardAsk(s);
-  // …and the Bureau's benchmarks there (station-benchmarks.js), on the same terms.
+  // …and its benchmarks, in Flood (station-benchmarks.js): the Bureau's and any
+  // an editor entered for an editor, the Bureau's numbers for anybody else.
   if (typeof StationBenchmarks !== 'undefined') StationBenchmarks.cardAsk(s);
   // And the station's history (station-history.js).
   if (typeof StationHistory !== 'undefined') StationHistory.cardAsk(s);
@@ -9505,6 +9522,11 @@ function stnCardHtml(s) {
   const flood = `
     ${RiverDetails.cardHtml(s)}
     ${RiverDetails.historyCardHtml(s)}
+    ${/* The benchmarks its gauge is levelled from (station-benchmarks.js): the
+         Bureau's (0101) and any an editor entered (0110), under the flood
+         history; an editor is offered Add at a station with a river gauge. */
+      typeof StationBenchmarks !== 'undefined'
+        ? StationBenchmarks.cardHtml(s, { offerAdd: RiverDetails.has(s) || RiverDetails.hasHistory(s) }) : ''}
     ${located ? `<div class="acma-sect stn-card-cams-sect" id="${escAttr(camsId)}"
          data-mn-cams="${escAttr(MapCameras.key(s))}">${MapCameras.html(s)}</div>` : ''}
     ${RiverCatchments.cardHtml(s)}
@@ -9541,8 +9563,8 @@ function stnCardHtml(s) {
   // on (site-land.js), the road and bridge and who manages them
   // (site-roads.js), the mobile signal (site-mobile.js), what the water and
   // the ground are likely to do to what is built there (site-exposure.js),
-  // and, for signed-in editors, its ancillary features (0061) and the
-  // Bureau's benchmarks (0101).
+  // and, for signed-in editors, its ancillary features (0061). (Its benchmarks
+  // are in Flood, under the flood history.)
   const where = [
     acmaCardRow('Position', located ? esc(stationLatLonText(s)) : null),
     acmaCardRow('Elevation', s.elevation_ahd == null ? null
@@ -9573,8 +9595,7 @@ function stnCardHtml(s) {
          data-mn-mobile="${escAttr(SiteMobile.key(s))}">${SiteMobile.html(s)}</div>` : ''}
     ${located ? `<div class="acma-sect" id="${escAttr(expId)}"
          data-mn-exposure="${escAttr(SiteExposure.key(s))}">${SiteExposure.html(s)}</div>` : ''}
-    ${typeof SiteFeatures !== 'undefined' ? SiteFeatures.cardHtml(s) : ''}
-    ${typeof StationBenchmarks !== 'undefined' ? StationBenchmarks.cardHtml(s) : ''}`;
+    ${typeof SiteFeatures !== 'undefined' ? SiteFeatures.cardHtml(s) : ''}`;
 
   // What is fitted and who changed it, each for the accounts it is for and
   // nothing for anybody else: the logger (0090, station-lpu.js), the
@@ -9644,7 +9665,9 @@ function stnCardHtml(s) {
     // A proposed station says so before anything else on its card (0039):
     // nothing in it is about a station on the ground yet. On every tab.
     proposal: stnCardProposalHtml(s),
-    groups: { about, health, data: stnCardDataHtml(s), flood, radio, site, kit, act },
+    // 📻 Radio ends with the ACMA licences near the station (map-acma.js).
+    groups: { about, health, data: stnCardDataHtml(s), flood,
+      radio: `${radio}${typeof MapAcma !== 'undefined' ? MapAcma.cardHtml(s) : ''}`, site, kit, act },
     lines, dock, note,
   });
 }

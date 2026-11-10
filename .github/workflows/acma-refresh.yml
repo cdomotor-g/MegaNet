@@ -175,6 +175,14 @@ jobs:
         run: python3 tools/mobile_sectors.py --zip /tmp/spectra_rrl.zip
              --mocn data/mobile/accc-mocn-sites.csv --out data/mobile
 
+      # The licences the stations' own transmitters run under, off the same
+      # extract: the Bureau's, councils' and water authorities' fixed licences,
+      # with both ends of every link, for the Stations map's ACMA licences tool
+      # and the station cards (map-acma.js, docs/acma-licences.md). Committed
+      # with the rest by the data/acma-*.json line below.
+      - name: The stations' own licences
+        run: python3 tools/acma_station_licences.py --zip /tmp/spectra_rrl.zip
+
       - name: Summarise what changed
         run: |
           python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"

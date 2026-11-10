@@ -212,6 +212,21 @@ async function main() {
     });
     check('a station the lists name has the section on its card', !!card, full.id);
 
+    // The station's benchmarks (station-benchmarks.js) have their place in
+    // the same Flood group, after the Bureau's details and the flood history
+    // and before the cameras — `npm run benchmarks` holds what goes in it.
+    const bmPlace = await page.evaluate(() => {
+      const rhs = document.querySelector('#stn-card .stn-card-rhs');
+      const bm = rhs && rhs.parentElement.querySelector(':scope > .stn-card-benchmarks');
+      if (!bm) return null;
+      const fh = rhs.parentElement.querySelector(':scope > .stn-card-fh');
+      const after = (a, b) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+      const cams = rhs.parentElement.querySelector(':scope > .stn-card-cams-sect');
+      return { afterRhs: after(rhs, bm), afterHistory: !fh || fh.nextElementSibling === bm, beforeCams: !cams || after(bm, cams) };
+    });
+    check('the Benchmarks section has its place in the Flood group, under the details and the flood history',
+      bmPlace && bmPlace.afterRhs && bmPlace.afterHistory && bmPlace.beforeCams, JSON.stringify(bmPlace));
+
     check('"Hdb snapshot 26/9/26" is the line under the section\'s heading',
       card && card.afterHead === 'Hdb snapshot 26/9/26', card && card.afterHead);
 

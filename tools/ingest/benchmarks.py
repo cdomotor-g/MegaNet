@@ -62,6 +62,21 @@ HOW IT READS IT
         a dash at Cairns Airport ("Origin of Level – Deep Driven Mark"), and is
         read as one. Any other byte above 0x7F raises.
 
+    One thing is left out on purpose. Flood-Net keeps no private person's name
+    with a site (CLAUDE.md, "Private data"), and one comment gives the name of
+    the person who re-installed a mark for a council, in brackets after
+    "contractor". REDACT drops a name written that way and keeps the rest of
+    the comment; the meta counts what it dropped and where (`redacted`), never
+    the words. db/migrations/0110 took the same name out of the table. A
+    council, a company or a street is not a person and stays.
+
+    Checked against the report again on 10 November 2026 with a second,
+    independent reading (rows found by their number, level and datum rather
+    than by column position): the same 777 benchmarks at 519 stations, every
+    character of every row accounted for, and the database holding exactly
+    what this writes. test/benchmarks-ingest.mjs holds the layout's hard cases
+    on an invented page (`npm run benchmarksingest`).
+
 USAGE
     python3 tools/ingest/benchmarks.py            # rewrite the JSON (private repo)
     python3 tools/ingest/benchmarks.py --check    # fail if it would change
@@ -120,6 +135,22 @@ NUMBER_RE = re.compile(r'^\d{6}$')
 
 # The one byte above 0x7F the export wrote, and what it stands for.
 STRAY = {0xBF: '–'}
+
+# A private person's name, as the report writes one: in brackets after
+# "contractor". The name goes, the rest stays. db/migrations/0110 applies the
+# same pattern to the table, so keep the two the same.
+REDACT = (
+    (re.compile(r'(contractor)\s*\([A-Z][a-z]+ [A-Z][a-z]+\)'), r'\1'),
+)
+
+
+def redact(text):
+    """The text with any private person's name dropped, and how many were."""
+    n = 0
+    for pattern, keep in REDACT:
+        text, k = pattern.subn(keep, text)
+        n += k
+    return text, n
 
 
 class ParseError(Exception):
@@ -253,8 +284,13 @@ def build(path=None):
     private.require(path)
     rows, pages, printed, strays = read(path)
 
-    stations, by_number = [], {}
+    stations, by_number, redacted = [], {}, []
     for r in rows:
+        for column in ('description', 'comment'):
+            text, n = redact(' '.join(r[column]))
+            if n:
+                r[column] = [text]
+                redacted.append({'bureau_number': r['number'], 'column': column})
         name = ' '.join(r['name'])
         key = r['number'].lstrip('0')
         s = by_number.get(key)
@@ -295,6 +331,7 @@ def build(path=None):
         'by_datum': dict(collections.Counter(b[1] for b in marks).most_common()),
         'stations_by_basin': dict(collections.Counter(s['basin'] for s in stations)),
         'stray_bytes': strays,
+        'redacted': redacted,
     }
     return {'meta': meta, 'stations': stations}
 
@@ -340,6 +377,8 @@ def report(doc, stations_path):
     print('  benchmarks a station has: ' + ', '.join(f'{n}: {many[n]} stations' for n in sorted(many)))
     for s in meta['stray_bytes']:
         print(f'  line {s["line"]}: byte {s["byte"]} read as {s["read_as"]!r}')
+    for r in meta['redacted']:
+        print(f'  station {r["bureau_number"]}: a person\'s name left out of the {r["column"]}')
     if os.path.exists(stations_path):
         with open(stations_path, encoding='utf-8') as fh:
             keyed = {(s.get('station_number') or '').strip().lstrip('0')

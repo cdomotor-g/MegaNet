@@ -329,6 +329,110 @@ begin
 end
 $$;
 
+-- ── 6. Benchmarks an editor enters (0110) ────────────────────────────────────
+
+do $$
+declare
+  v text; v_id text; v_anon text; v_stranger text; v_direct text;
+begin
+  if pg_catalog.to_regclass('meganet.station_benchmark_entry') is null then
+    return;
+  end if;
+  if not exists (select 1 from pg_catalog.pg_roles where rolname = 'authenticator') then
+    return;
+  end if;
+
+  v := pg_temp.as_who('editor', $q$select meganet.station_benchmark_entry_save(
+         '{"station_id": "_check_bm_ahd", "level_m": "102.345", "datum": "ahd",
+           "description": "  Made-up   pin in the made-up slab ", "surveyed_on": "2026-11-01"}')::text$q$);
+  perform pg_temp.check_that('an editor adds a benchmark — tidied, on the gauge through the zero in force, and it is not kept by a rolled-back try',
+    v like '%"on_gauge_m": 1.845%' and v like '%"description": "Made-up pin in the made-up slab"%'
+    and v like '%"source": "Entered in Flood-Net"%'
+    and not exists (select 1 from meganet.station_benchmark_entry where station_id like '\_check\_bm\_%'), v);
+
+  -- as_who rolls back, so the rows the rest of this reads are put in as the
+  -- owner would: through the function, with the editor's claims set.
+  perform pg_catalog.set_config('request.jwt.claims',
+    '{"role":"authenticated","email":"bm-editor@example.test","sub":"00000000-0000-4000-8000-0000000b7101"}', true);
+  v_id := meganet.station_benchmark_entry_save(
+            '{"station_id": "_check_bm_ahd", "level_m": 102.345, "datum": "AHD", "description": "Made-up pin"}') -> 'benchmark' ->> 'id';
+  perform meganet.station_benchmark_entry_save(
+            '{"station_id": "_check_bm_ahd", "level_m": 2.5, "datum": "GH", "description": "Made-up mark on the gauge post"}');
+  perform meganet.station_benchmark_entry_save(
+            '{"station_id": "_check_bm_ahd", "level_m": 10, "datum": "OTHER", "datum_other": "Made-up mine datum", "description": "Made-up peg"}');
+  perform pg_temp.check_that('the entered benchmarks are on the station: AHD less the zero, a gauge height as itself, another datum nowhere',
+    (select on_gauge_m from meganet.station_benchmark_entered where id = v_id::uuid) = 1.845
+    and (select on_gauge_m from meganet.station_benchmark_entered where station_id = '_check_bm_ahd' and datum = 'GH') = 2.5
+    and (select on_gauge_m is null and datum_other = 'Made-up mine datum' from meganet.station_benchmark_entered
+          where station_id = '_check_bm_ahd' and datum = 'OTHER'));
+  perform pg_temp.check_that('…and who entered each is on it',
+    (select bool_and(created_by = 'bm-editor@example.test') from meganet.station_benchmark_entry where station_id = '_check_bm_ahd'));
+
+  perform meganet.station_benchmark_entry_save(pg_catalog.jsonb_build_object(
+            'id', v_id, 'level_m', 102.35, 'datum', 'AHD', 'description', 'Made-up pin, re-levelled', 'comment', 'Made-up comment'));
+  perform pg_temp.check_that('an editor changes one by its id, and it stays on its station',
+    (select level_m = 102.35 and description = 'Made-up pin, re-levelled' and comment = 'Made-up comment' and station_id = '_check_bm_ahd'
+       from meganet.station_benchmark_entry where id = v_id::uuid));
+
+  -- Re-loading the Bureau's report replaces the Bureau's rows and none of these.
+  perform pg_temp.load(pg_temp.doc());
+  perform pg_temp.check_that('loading the Bureau''s report again leaves every entered benchmark where it was',
+    (select count(*) from meganet.station_benchmark_entered where station_id = '_check_bm_ahd') = 3);
+
+  v := pg_temp.as_who('editor', $q$select meganet.station_benchmark_entry_save('{"station_id": "_check_bm_ahd", "level_m": "high", "datum": "AHD", "description": "x"}')::text$q$);
+  perform pg_temp.check_that('a level that is not a number is refused', v = 'error 22023', v);
+  v := pg_temp.as_who('editor', $q$select meganet.station_benchmark_entry_save('{"station_id": "_check_bm_ahd", "level_m": 1, "datum": "GDA", "description": "x"}')::text$q$);
+  perform pg_temp.check_that('…and a datum that is not on the list', v = 'error 22023', v);
+  v := pg_temp.as_who('editor', $q$select meganet.station_benchmark_entry_save('{"station_id": "_check_bm_ahd", "level_m": 1, "datum": "OTHER", "description": "x"}')::text$q$);
+  perform pg_temp.check_that('…and another datum with no name', v = 'error 22023', v);
+  v := pg_temp.as_who('editor', $q$select meganet.station_benchmark_entry_save('{"station_id": "_check_bm_ahd", "level_m": 1, "datum": "AHD", "description": "  "}')::text$q$);
+  perform pg_temp.check_that('…and one with no description', v = 'error 22023', v);
+  v := pg_temp.as_who('editor', $q$select meganet.station_benchmark_entry_save('{"station_id": "_check_bm_ahd", "level_m": 1, "datum": "AHD", "description": "x", "surveyed_on": "2999-01-01"}')::text$q$);
+  perform pg_temp.check_that('…and a day surveyed that has not happened', v = 'error 22023', v);
+  v := pg_temp.as_who('editor', $q$select meganet.station_benchmark_entry_save('{"station_id": "_check_bm_gone", "level_m": 1, "datum": "AHD", "description": "x"}')::text$q$);
+  perform pg_temp.check_that('…and a station that is deleted', v = 'error P0002', v);
+
+  v_anon     := pg_temp.as_who('anon',     $q$select meganet.station_benchmark_entry_save('{"station_id": "_check_bm_ahd", "level_m": 1, "datum": "AHD", "description": "x"}')::text$q$);
+  v_stranger := pg_temp.as_who('stranger', $q$select meganet.station_benchmark_entry_save('{"station_id": "_check_bm_ahd", "level_m": 1, "datum": "AHD", "description": "x"}')::text$q$);
+  v_direct   := pg_temp.as_who('editor',   $q$insert into meganet.station_benchmark_entry (station_id, level_m, datum, description, created_by) values ('_check_bm_ahd', 1, 'AHD', 'x', 'x') returning id::text$q$);
+  perform pg_temp.check_that('nobody signed out adds one, nor somebody who is not an editor — and not even an editor writes the table directly',
+    v_anon = 'error 42501' and v_stranger = 'error 42501' and v_direct = 'error 42501',
+    v_anon || ' / ' || v_stranger || ' / ' || v_direct);
+  v_anon     := pg_temp.as_who('anon',     'select count(*)::text from meganet.station_benchmark_entered');
+  v_stranger := pg_temp.as_who('stranger', 'select count(*)::text from meganet.station_benchmark_entered');
+  v          := pg_temp.as_who('editor',   $q$select count(*)::text from meganet.station_benchmark_entered where station_id = '_check_bm_ahd'$q$);
+  perform pg_temp.check_that('nobody signed out reads one, somebody who is not an editor reads none, an editor reads them',
+    v_anon = 'error 42501' and v_stranger = '0' and v = '3', v_anon || ' / ' || v_stranger || ' / ' || v);
+  v_stranger := pg_temp.as_who('stranger', pg_catalog.format('select meganet.station_benchmark_entry_remove(%L)::text', v_id));
+  perform pg_temp.check_that('…and only an editor removes one', v_stranger = 'error 42501', v_stranger);
+
+  perform meganet.station_benchmark_entry_remove(v_id::uuid);
+  perform pg_temp.check_that('a removed benchmark leaves the station and is kept, stamped with who and when',
+    not exists (select 1 from meganet.station_benchmark_entered where id = v_id::uuid)
+    and (select removed_at is not null and removed_by = 'bm-editor@example.test'
+           from meganet.station_benchmark_entry where id = v_id::uuid));
+  v := pg_temp.as_who('editor', pg_catalog.format('select meganet.station_benchmark_entry_remove(%L)::text', v_id));
+  perform pg_temp.check_that('…and cannot be removed twice, or changed after', v = 'error P0002'
+    and pg_temp.as_who('editor', pg_catalog.format($q$select meganet.station_benchmark_entry_save('{"id": %s, "level_m": 1, "datum": "AHD", "description": "x"}')::text$q$,
+                                                    pg_catalog.to_jsonb(v_id)::text)) = 'error P0002', v);
+  perform pg_catalog.set_config('request.jwt.claims', '', true);
+end
+$$;
+
+-- A person's name in brackets after "contractor" is not kept in a comment
+-- (0110's update, tools/ingest/benchmarks.py's REDACT): the rule, on a made-up
+-- comment.
+do $$
+begin
+  perform pg_temp.check_that('the rule that takes a contractor''s name out of a comment leaves the rest',
+    pg_catalog.regexp_replace('Re-Install by council contractor (Made Up) - 16/02/2023',
+                              '(contractor)\s*\([A-Z][a-z]+ [A-Z][a-z]+\)', '\1')
+      = 'Re-Install by council contractor - 16/02/2023'
+    and pg_catalog.regexp_replace('Hilti in concrete (Gold Coast council)', '(contractor)\s*\([A-Z][a-z]+ [A-Z][a-z]+\)', '\1')
+      = 'Hilti in concrete (Gold Coast council)');
+end
+$$;
+
 -- ── The verdict ──────────────────────────────────────────────────────────────
 
 select lpad(ord::text, 2) as "#",

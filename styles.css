@@ -29653,3 +29653,126 @@ select.kl-in { width: auto; font-family: inherit; }
 }
 
 .repcmp-only p { margin: var(--sp-1) 0; }
+
+/* ── A station's benchmarks: the Bureau's and the entered ones, and the form
+   that adds one (station-benchmarks.js, 0110) ───────────────────────────────
+   On the station card's Flood tab and in the station editor. The two lists
+   each under a line saying whose they are; an entered mark's Change / Remove
+   under it; the form a short column of boxes, two abreast where there is room. */
+.sb-from { margin: var(--sp-2) 0 0; }
+.sb-from + .sb-list { margin-top: var(--sp-1); }
+.sb-list .sb-tools .link-btn { margin-left: 0; margin-right: var(--sp-2); }
+.sb-ask { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); }
+.sb-add { margin: var(--sp-1) 0 var(--sp-2); }
+.sb-form {
+  margin: var(--sp-2) 0; padding: var(--sp-2);
+  border: 1px solid var(--border); border-radius: var(--r-md, 6px);
+  background: color-mix(in srgb, var(--muted) 6%, var(--panel));
+}
+.sb-form-h { display: block; margin-bottom: var(--sp-1); }
+.sb-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: var(--sp-2); }
+.sb-form .sb-f { display: flex; flex-direction: column; gap: .15rem; min-width: 0; font-size: var(--fs-sm, .875rem); }
+.sb-form .sb-f[hidden] { display: none; }
+.sb-form .sb-f :is(input, select) { width: 100%; min-width: 0; box-sizing: border-box; }
+.sb-form :is(.sb-f-desc, .sb-f-comment, .sb-f-source) { grid-column: 1 / -1; }
+.sb-form-btns { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
+.sb-private, .sb-error { margin: var(--sp-1) 0 0; }
+.ef-bm-body .sb-list { margin-top: var(--sp-1); }
+
+/* ── 📜 ACMA licences (map-acma.js) ─────────────────────────────────────────
+   The map tool's pane and the station card's "ACMA licences near here". The
+   finders' shared panel (.sites-panel, .sites-fs, .sites-table, .polar-hits,
+   .bestrep-words) does the frame; what is here is the licence rows, the
+   chips that say a state, the guide's folds and the colours a holder and a
+   licensing state are drawn in — on the map (read through cssVar) and in the
+   panel alike. */
+:root {
+  --lic-bureau: #1565c0; --lic-council: #e65100; --lic-other: #6a1b9a;
+  --lic-site: #2e7d32; --lic-area: #0277bd; --lic-none: #c62828; --lic-warn: #f9a825;
+}
+[data-theme="dark"] {
+  --lic-bureau: #64b5f6; --lic-council: #ffb74d; --lic-other: #ce93d8;
+  --lic-site: #81c784; --lic-area: #4fc3f7; --lic-none: #ef9a9a; --lic-warn: #ffd54f;
+}
+.lic-dot {
+  display: inline-block; width: .7em; height: .7em; margin-right: .35em;
+  border-radius: 50%; background: var(--dot, var(--muted)); vertical-align: baseline;
+}
+.lic-muted { color: var(--muted); font-weight: 400; }
+.lic-chip {
+  display: inline-block; padding: 0 .4em; border: 1px solid var(--border);
+  border-radius: 999px; font-size: var(--fs-sm, .8125rem); line-height: 1.5; white-space: nowrap;
+}
+.lic-chip.lic-in { border-color: var(--lic-site); }
+.lic-chip.lic-out { border-style: dashed; }
+.lic-chip.lic-warn { border-color: var(--lic-warn); background: color-mix(in srgb, var(--lic-warn) 18%, transparent); }
+.lic-chip.lic-bad { border-color: var(--lic-none); color: var(--lic-none); }
+.lic-state { font-weight: 600; border-width: 2px; }
+.lic-state-site { border-color: var(--lic-site); }
+.lic-state-area { border-color: var(--lic-area); }
+.lic-state-none { border-color: var(--lic-none); }
+.lic-state-na { border-color: var(--muted); font-weight: 400; }
+
+.lic-verdict { margin: var(--sp-1) 0; line-height: 1.45; }
+.lic-rec { margin: var(--sp-1) 0; font-size: var(--fs-sm, .875rem); color: var(--muted); }
+.lic-near-list { list-style: none; margin: var(--sp-1) 0; padding: 0; }
+.lic-near {
+  display: flex; flex-direction: column; gap: .1rem;
+  padding: var(--sp-1) 0; border-top: 1px solid var(--border);
+  font-size: var(--fs-sm, .875rem);
+}
+.lic-near-h { display: flex; align-items: baseline; gap: .25rem; }
+.lic-near-h .lic-no { font-weight: 600; margin: 0; }
+.lic-near-h .lic-km { margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lic-near-b { display: block; min-width: 0; overflow-wrap: anywhere; }
+.lic-links a, .lic-foot a { white-space: nowrap; }
+.lic-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin: var(--sp-1) 0; }
+.lic-more { margin: var(--sp-1) 0; }
+.lic-more > summary { cursor: pointer; font-size: var(--fs-sm, .875rem); }
+.stn-card-lic:focus { outline: none; }
+.stn-card-lic .bestrep-words { margin-top: var(--sp-1); }
+
+.lic-panel .sites-fs { margin-bottom: var(--sp-2); }
+.lic-check { display: flex; align-items: baseline; gap: .35rem; font-size: var(--fs-sm, .875rem); }
+.lic-check input { margin: 0; flex: none; position: relative; top: .1em; }
+.lic-check.lic-master { font-weight: 600; margin-bottom: var(--sp-1); }
+.lic-check-sub { padding-left: var(--sp-2); }
+.lic-checks { display: flex; flex-wrap: wrap; gap: .15rem var(--sp-3); margin: var(--sp-1) 0; }
+.lic-selects { align-items: center; }
+.lic-selects label { display: inline-flex; align-items: center; gap: .3rem; font-size: var(--fs-sm, .875rem); }
+.lic-selects input[type="number"] { width: 4.5rem; }
+.lic-hit-h { margin: var(--sp-1) 0 0; font-size: var(--fs-sm, .8125rem); font-weight: 600; color: var(--muted); }
+.polar-hit.lic-hit { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-2); text-align: left; }
+.lic-picked {
+  margin-top: var(--sp-2); padding: var(--sp-1) var(--sp-2) var(--sp-2);
+  border-left: 3px solid var(--map-leader, var(--accent));
+  background: color-mix(in srgb, var(--muted) 6%, transparent);
+}
+.lic-picked-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem; margin: var(--sp-1) 0; }
+.lic-picked-h .link-btn { margin-left: auto; }
+.lic-scroll { max-width: 100%; overflow-x: auto; }
+.lic-table { font-size: var(--fs-sm, .8125rem); }
+.lic-table td.num, .lic-table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lic-conds, .lic-exp, .lic-sources { margin: var(--sp-1) 0; padding-left: 1.1rem; font-size: var(--fs-sm, .875rem); }
+.lic-counts { list-style: none; margin: var(--sp-1) 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .2rem var(--sp-2); }
+.lic-counts li { font-size: var(--fs-sm, .875rem); }
+.lic-counts strong { font-size: 1.15em; font-variant-numeric: tabular-nums; }
+
+.lic-guide { margin: var(--sp-2) 0; border: 1px solid var(--border); border-radius: var(--r-md, 6px); padding: var(--sp-1) var(--sp-2); }
+.lic-guide > summary { cursor: pointer; font-weight: 600; }
+.lic-guide-sec { margin: var(--sp-1) 0; border-top: 1px solid var(--border); padding-top: var(--sp-1); }
+.lic-guide-sec > summary { cursor: pointer; font-weight: 600; font-size: var(--fs-sm, .9rem); }
+.lic-guide-sec :is(p, li, dd, dt) { font-size: var(--fs-sm, .875rem); line-height: 1.5; }
+.lic-guide-sec ul { padding-left: 1.1rem; margin: var(--sp-1) 0; }
+.lic-guide-sec li { margin-bottom: .35rem; }
+.lic-dl dt { font-weight: 600; margin-top: var(--sp-1); }
+.lic-dl dd { margin: 0; }
+.lic-src { white-space: nowrap; font-size: .92em; }
+.lic-disclaimer { border-left: 3px solid var(--lic-warn); padding-left: var(--sp-2); }
+.lic-tip { max-width: 18rem; white-space: normal; font-size: var(--fs-sm, .8125rem); }
+.lic-tip hr { margin: .25rem 0; border: 0; border-top: 1px solid var(--border); }
+/* 📜 ACMA licences: its tables read whole — wrapped, and scrolled sideways when too wide. */
+.lic-table { table-layout: auto; width: 100%; }
+.lic-table th, .lic-table td { white-space: normal; overflow: visible; text-overflow: clip; vertical-align: top; }
+.lic-devs { list-style: none; margin: var(--sp-1) 0; padding: 0; font-size: var(--fs-sm, .875rem); }
+.lic-devs li { padding: var(--sp-1) 0; border-top: 1px solid var(--border); line-height: 1.45; }

@@ -385,6 +385,61 @@ meganet.load_flood_peaks_from_url();`. Then refresh `stations.json`
 (`snapshot_stations_json.py`), whose stations now carry `flood_peaks`.
 `check_flood_peaks.sql` is the database's half.
 
+## HDB's benchmark details (0101, 0110)
+
+`ingest/benchmarks.py` reads the Bureau's report *Queensland Flood Warning
+River Height Stations — Benchmark Details* (printed from HDB on 15/10/2026, 40
+pages) into one JSON document: 777 benchmarks at 519 stations, each with its
+level, datum (AHD, ASSUM, STATE or UNKNOWN), description and comments, under
+the station's bureau number, name and basin.
+
+**The report is not in this repository.** What a benchmark is and where — a
+bolt in a tree beside a house — is editors' in the database (`0101`), so the
+report and the JSON live in the private repository
+`cdomotor-g/flood-net-private` (`benchmarks/`); `ingest/private.py` finds it
+beside this checkout, or wherever `FLOODNET_PRIVATE` points. `--source` reads a
+copy anywhere else.
+
+```sh
+python3 tools/ingest/benchmarks.py            # rewrite the JSON (private repo)
+python3 tools/ingest/benchmarks.py --report   # what came out, in prose
+python3 tools/ingest/benchmarks.py --check    # fail if the JSON would change
+python3 tools/ingest/benchmarks.py --source /path/to/report.txt --report
+python3 tools/ingest/benchmarks.py --sql \
+  | psql "$MEGANET_DB_URL" -v ON_ERROR_STOP=1 --single-transaction
+```
+
+How it reads the fixed-width page:
+
+- **By column position**, taken from each page's rule of dashes; every page's
+  rule must be the first page's. Text in the gap between two columns raises.
+- **A basin is carried down** the rows under it; the page head repeats on every
+  page and is skipped.
+- **A line with no station number carries on the row above** — the station
+  name, description and comment wrap, sometimes over a page break — and is
+  joined to it with one space. Anything in the number, level or datum column of
+  such a line raises.
+- **Station numbers keep their leading zeros**; the database matches them to a
+  station through `meganet.bureau_key()`.
+- **Levels are kept as printed** (104.20 stays 104.20, a negative stays
+  negative).
+- **A station's rows are together**, under one name and basin; anything else
+  raises, as does a datum that is not one of the four, a page out of order, or
+  pages dated on different days.
+- **A private person's name is left out** (`REDACT`): a name in brackets after
+  "contractor" goes, the rest of the comment stays, and `meta.redacted` counts
+  which station and column — never the words. Flood-Net keeps no private
+  person's name with a site.
+
+`--sql` prints one call to `meganet.load_benchmarks_doc()`, which makes
+`meganet.bureau_benchmark` match the document. It does not touch the benchmarks
+editors enter in the app (`meganet.station_benchmark_entry`, `0110`).
+
+`cd test && npm run benchmarksingest` runs the reader over two invented pages
+in the report's layout — the wraps, the page break, the leading zero, the
+negative level, the stray byte, the name left out, and each thing it refuses —
+because the real report cannot be here for CI to read.
+
 ## The 2024 FldWarn KMZ and the repeater document
 
 `ingest/fldwarn_kmz_2024.py --extract` reads the Bureau's 2024 *FldWarn Stations
@@ -487,6 +542,26 @@ Both are idempotent, stream the big CSVs rather than loading them, and
 document every flag under `--help`. `acma_fetch.py --dry-run` prints the
 per-mechanism candidate counts without writing anything — it doubles as the
 sanity check that frequency units parsed correctly.
+
+## `acma_station_licences.py` — the licences the stations' own transmitters run under
+
+Off the same ACMA extract, the opposite cut to the interference pipeline: not
+who else transmits near the receivers, but which licences the network's own
+transmitters run under. It keeps the fixed-service licences (point to
+multipoint, point to point) of the Bureau of Meteorology, of anybody else with
+a licence on a channel the stations use, and of councils with a
+point-to-multipoint licence in 148–174 MHz — with both ends of every link and
+each licence's special conditions — as `data/acma-station-licences.json` for
+the Stations map's **📜 ACMA licences** tool and the station card
+(`map-acma.js`). The weekly ACMA refresh runs it; `docs/acma-licences.md` has
+the rules it is read by.
+
+```bash
+python3 tools/acma_station_licences.py --zip spectra_rrl.zip
+```
+
+Standard library only. About 20 seconds over the zip. It writes nothing if it
+keeps no licences, so a change in the register's layout cannot empty the file.
 
 ## `mobile_sectors.py` — every mobile base station sector, for the coverage estimate
 

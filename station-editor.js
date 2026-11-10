@@ -758,6 +758,11 @@ function editorForm(s) {
          Bureau question, so it is among the Bureau's fields. -->
     ${RiverDetails.editorHtml(s, { more: `<label>Flood history from<input type="text" id="ef-fpfrom" value="${esc(s.flood_peaks_from || '')}"
              placeholder="a station's id, e.g. gatton" title="The Bureau's floods at that station's gauge are shown for this one while it has no gauge of its own"></label>` })}
+    <!-- The benchmarks its gauge is levelled from (station-benchmarks.js): the
+         Bureau's (0101), and the ones an editor adds, changes or removes here
+         (0110) — each saved on its own, not with the station (data-ef-ignore).
+         A station not saved yet has no id to put one on. -->
+    ${typeof StationBenchmarks !== 'undefined' ? StationBenchmarks.editorHtml(state.editorId ? { id: state.editorId } : null) : ''}
     ${editorArroSection(s, sensors)}
     ${StationInspections.sectionHtml(s)}
     <!-- Edits not saved yet: how many, which, and a Save — stuck to the foot of

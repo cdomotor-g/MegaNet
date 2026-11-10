@@ -125,6 +125,11 @@ on:
       - 'data/acma-devices.json'
       - 'data/acma-sites.json'
       - 'tools/acma_fetch.py'
+      # The licences the stations' own transmitters run under, which the
+      # Stations map's ACMA licences tool reads (`npm run acmamap`), and the
+      # tool that builds the file.
+      - 'data/acma-station-licences.json'
+      - 'tools/acma_station_licences.py'
       - '.github/workflows/web-smoke.yml'
   pull_request:
     paths:
@@ -231,6 +236,11 @@ on:
       - 'data/acma-devices.json'
       - 'data/acma-sites.json'
       - 'tools/acma_fetch.py'
+      # The licences the stations' own transmitters run under, which the
+      # Stations map's ACMA licences tool reads (`npm run acmamap`), and the
+      # tool that builds the file.
+      - 'data/acma-station-licences.json'
+      - 'tools/acma_station_licences.py'
       - '.github/workflows/web-smoke.yml'
   workflow_dispatch:
 
@@ -1544,6 +1554,18 @@ jobs:
         working-directory: test
         run: npm run repcompare
 
+      # 📜 ACMA licences (map-acma.js), on the committed register copy
+      # (data/acma-station-licences.json): a circle round every
+      # point-to-multipoint base and a line on every point-to-point link,
+      # every transmitting station's licensing state worked out again from
+      # the file apart from the module, the search by station, licence and
+      # frequency, the coverage rings, counts and CSVs, the station card's
+      # section, the guide's sources, and Clear the selection.
+      - name: ACMA licences — what each covers, and which stations have one
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run acmamap
+
       # The Message Log's Base station filter (message-log.js): bases by name
       # from the receivers' own list, the Path column saying the name, the
       # question asked of the datastore, and nothing of it without the list.
@@ -1882,6 +1904,27 @@ jobs:
         if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
         run: npm run sortbenchmarks
+
+      # Node, with python3. The reader of HDB's benchmark details
+      # (tools/ingest/benchmarks.py) over two invented pages in the report's
+      # fixed-width layout — the real report is in the private repository:
+      # the basin carried down, leading zeros, wrapped names, descriptions and
+      # comments, a row over a page break, a negative level, the stray byte, a
+      # person's name left out, and each thing it refuses rather than reads.
+      - name: Benchmark details reader — the report's layout on an invented page
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run benchmarksingest
+
+      # Chromium. A station's benchmarks on the card's Flood tab and in the
+      # station editor (station-benchmarks.js, 0101 + 0110): the numbers for
+      # anybody, the words for an editor, the meanings on hover and in the
+      # fold, and an editor adding, changing and removing one — what the form
+      # refuses, what it sends, and that it is not a station edit.
+      - name: Station benchmarks — the Flood tab, the editor, adding, changing and removing one
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run benchmarks
 
       # Node, then Chromium. The TDMA Planner tab (tdma-planner.js): the AirLink
       # air-time formula and the two worked frames against the sources' figures, then the tab, its card and its CSVs.

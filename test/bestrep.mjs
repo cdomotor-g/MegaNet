@@ -111,7 +111,7 @@ const panel = await page.evaluate(() => {
     title: wrap && wrap.querySelector('.mn-mapctl-title')?.textContent,
     group: strip.find(b => b.dataset.dock === 'map-bestrep')?.closest('.dock-group')?.dataset.group,
     afterRelocate: at('[data-dock="map-bestrep"]') === at('[data-dock="map-relocate"]') + 1,
-    beforeHere: at('.mn-map-here') === at('[data-dock="map-bestrep"]') + 2
+    beforeHere: at('.mn-map-here') === at('[data-dock="map-bestrep"]') + 3
       && at('[data-dock="map-repcompare"]') === at('[data-dock="map-bestrep"]') + 1,
     runDisabled: document.getElementById('bestrep-run')?.disabled,
     status: document.getElementById('bestrep-status')?.textContent || '',

@@ -321,6 +321,19 @@ async function main() {
     });
     check('a panel\'s own live() rings its button and its clear() is called by 🧹', hook.ringed && hook.cleared === 1 && !hook.after, J(hook));
 
+    // 🧹 leaves nothing on: Latency & signal's colouring is a view that is
+    // switched on rather than drawn, and it goes too (as 3-D and the twin do).
+    const views = await page.evaluate(async () => {
+      MapLatency.setOn(true);
+      syncDockLive();
+      const was = MapLatency.on();
+      await clearStationsMapSelection();
+      return { was, latency: MapLatency.on(), twin: MapTwin.active(), in3d: Map3D.active(),
+               rings: [...document.querySelectorAll('#help-panel .dock-strip .is-live')].length };
+    });
+    check('🧹 also switches off Latency colouring, the twin and 3-D — no ring left',
+      views.was && !views.latency && !views.twin && !views.in3d && views.rings === 0, J(views));
+
     await context.close();
 
     const phone = await openStations(browser, server, errors, { viewport: { width: 375, height: 800 } });

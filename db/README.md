@@ -332,6 +332,7 @@ its cache at all (`PGRST002`).
 | `meganet.station_feature` | Where a station's ancillary features are (`0061`): station, kind, name, note, `geom` — GeoJSON, longitude first, WGS84, seven places, nothing but `type` and `coordinates` (a check over `station_feature_geom_problem()`) — `placed` (`map`, `gps`, `typed`, `mixed`) and the GPS's `accuracy_m`, who added and last changed it, and a soft delete. The kind and the shape are tied by a foreign key over a generated `geom_type`, so a benchmark cannot be a line however it is written; two live features of one kind at a station do not share a name. **Editors only** (RLS hides tombstones); nothing for `anon`. See **Site features**, below. |
 | `meganet.benchmark_extract`, `meganet.bureau_benchmark`, `meganet.station_benchmark` | The Bureau's benchmarks (`0101`): HDB's *Benchmark Details* report for its Queensland river height stations as printed — which report (one row, with the reader's meta), and every benchmark, keyed on the bureau number like the flood peaks: the station's name and basin as HDB has them, the mark's level and datum, what it is and where, and the comments. The view puts each on its live station with the gauge zero in force and `on_gauge_m`, the level less that zero where both are AHD or both State. **Editors only** — a benchmark's description is not for the open internet — and the report lives in the private repository. Written only by `load_benchmarks_doc()`. See **The Bureau's benchmarks**, below. |
 | `meganet.station_benchmark_public`, `meganet.benchmark_mark(text)` | The same benchmarks **in numbers, for anybody** (`0102`): each live station's marks in the order printed — the mark's number where its description gives one (`benchmark_mark()`: PSM, SSM, PM, SD, CGC or a numbered BM), its level and datum, the gauge zero in force and `on_gauge_m` where the datums agree, and the day the report was printed. No description, no comment, not HDB's spelling of the station's name. **Public** — deliberately not `security_invoker`, as `0023`'s chart views are not, its twelve columns fixed and checked when `0102` applies; read by the agent API's `GET /api/v1/stations/{id}/benchmarks`. |
+| `meganet.station_benchmark_entry`, `meganet.station_benchmark_entered`, `meganet.station_benchmark_entry_save(jsonb)`, `meganet.station_benchmark_entry_remove(uuid)` | Benchmarks **an editor enters** for a station (`0110`), beside the Bureau's: level, datum (the report's four, `GH` for a level on the gauge itself, or `OTHER` named in `datum_other`), what the mark is and where, comments, the day surveyed, where the figure came from, and who entered and last changed it. A table of its own, keyed on the station's id, so `load_benchmarks_doc()` cannot touch a row of it. The view is the ones still standing on live stations, with the gauge zero in force and `on_gauge_m` by `0101`'s rule (a `GH` entry is its own level on the gauge). **Editors only**, read and write; writes go through the two functions, and removing one stamps `removed_at` rather than deleting it. Not published, not in the agent API. See **The Bureau's benchmarks**, below. |
 | `meganet.a2plan_site` | What a repeater site needs before it carries ALERT2, for the ALERT2 Transition Plan (`0065`): `fit` (a fit-out only), `retrofit` (power, antenna, enclosure, earthing, access) or `rebuild` (the structure), one row a station, who set it and when; no row is "not assessed". **The plan's list only** (`0076`; `0065` gave it to administrators), everybody on it seeing the same answer; nothing for `anon`, or for an administrator or member who is not on the list. |
 | `meganet.a2plan_scenario` | A saved ALERT2 Transition Plan scenario (`0065`): the card's settings (a JSON object of at most 64 KB the app checks again on load), a name, notes, `shared`. **Private to its author until shared, then everybody's on the plan's list to see** (`0076`; the select policy and `a2plan_read()` say the same); only its author changes or removes it. One author leaving the list leaves their shared scenarios shared and their private ones unseen. |
 | `meganet.a2plan_member` | Who sees the ALERT2 Transition Plan (`0076`): one row a person, `nominates` (may change the list), who added them and when. The owner nominates, starting with themselves (`select meganet.a2plan_member_save('their address', true)` from the SQL editor, a direct connection); being an administrator gives nothing here. **RLS on, no policy and no grant**: read through `a2plan_read()` and `whoami()` (`a2plan`, `a2plan_nominates`), written through the two functions below. |
@@ -2253,8 +2254,9 @@ Details* prints them: 777 benchmarks at 519 stations, printed from HDB on
 `tools/ingest/benchmarks.py` reads the report out of the private repository
 `cdomotor-g/flood-net-private` (`benchmarks/`), where it lives because the
 descriptions say where a mark is to the tree and the gate post. The station
-card lists them for an editor, and the 📏 Level Survey's Datum step offers each
-as the primary benchmark (`station-benchmarks.js`). And an editor can send a
+card's 🌊 Flood tab and the station editor list them for an editor — and the
+numbers (`0102`) for anybody else — and the 📏 Level Survey's Datum step offers
+each as the primary benchmark (`station-benchmarks.js`). And an editor can send a
 station's benchmarks to the SoRT scope builder tab that asked for them — SoRT
 opens `#benchmarks-for-sort=…`, the editor reviews the marks and presses Send,
 and they go by `postMessage` to `https://cdomotor-g.github.io` alone
@@ -2293,10 +2295,38 @@ python3 tools/ingest/benchmarks.py --sql \
   `benchmark_mark()`'s, the rule `station-benchmarks.js`'s `markName()` follows
   — the two agree on all 777.
 
+- **An editor's own benchmarks are a second table (`0110`).** The Bureau's
+  table is the report and nothing else, so a mark a crew set last week, or one
+  the report has never listed, goes in `meganet.station_benchmark_entry` —
+  added, changed and removed from the station card's Flood tab or the station
+  editor through `station_benchmark_entry_save()` and `_remove()`, which ask
+  `is_editor()` themselves. Loading a newer report replaces the Bureau's rows
+  and leaves every entered one where it was. The page shows the two lists
+  apart, each saying whose it is. A removed one is stamped, not deleted: undo
+  it by hand (`update meganet.station_benchmark_entry set removed_at = null,
+  removed_by = null where id = …`).
+- **No private person's name.** One comment in the report names the person who
+  re-installed a mark for a council. The reader drops a name written that way
+  (in brackets after "contractor" — `REDACT` in `tools/ingest/benchmarks.py`,
+  counted in the document's `meta.redacted`), and `0110` took it out of the
+  table with the same pattern. A council, a company or a street stays. After
+  the reader changes, regenerate `benchmarks.json` in the private repository
+  (`python3 tools/ingest/benchmarks.py`) so its `--check` agrees again.
+- **Audited against the report, 10 November 2026.** The report was read a
+  second time by an independent method (rows found by number, level and datum,
+  not by column position) and compared with the reader and with the live
+  table: the same file (SHA-256 as `benchmark_extract.sha256`), 777 benchmarks
+  at 519 stations, every character of every row accounted for, nothing
+  missing, extra or different, and every bureau number on exactly one live
+  station. `npm run benchmarksingest` (`test/benchmarks-ingest.mjs`) holds the
+  reader to the layout's hard cases on an invented page, since the report
+  itself cannot be in this repository.
+
 `tools/check_station_benchmarks.sql` proves it against a real Postgres: the
 load and its refusals, the view's join and its arithmetic, nobody but an
-editor (and the service key) reading a description, and anybody reading the
-numbers.
+editor (and the service key) reading a description, anybody reading the
+numbers, and an editor's own benchmarks — added, changed, removed, refused
+where they should be, and untouched by a re-load of the report.
 
 ## Checking it from outside
 
