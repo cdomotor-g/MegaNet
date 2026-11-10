@@ -147,6 +147,8 @@ const pg = await page.evaluate(() => ({
   figs: [...document.querySelectorAll('#rlc-page svg[role="img"]')].map(s => (s.getAttribute('aria-label') || (s.querySelector('title') || {}).textContent || '').length),
   answer: (document.querySelector('.rlc-answer')?.textContent || '').replace(/\s+/g, ' '),
   links: [...document.querySelectorAll('#rlc-ask a')].map(a => a.href),
+  tldr: (document.querySelector('#rlc-km30 .rlc-tldr')?.textContent || '').replace(/\s+/g, ' '),
+  tldrFirst: !!document.querySelector('#rlc-km30 .rlc-tldr + .rlc-answer'),
 }));
 ok('it has its thirteen sections, in order, and the glossary', J(pg.sects) === J(pg.want) && pg.sects.length === 13 && pg.words >= 60, J(pg.sects));
 ok('it says first that it is a guide, not legal advice, and to ask ACMA', /A guide, not legal advice/.test(pg.disclaimer) && /ask ACMA/.test(pg.disclaimer), pg.disclaimer);
@@ -159,6 +161,10 @@ ok('the short answer on 30 km: legal but unprotected, the law beside the policy,
    /still licensed\. It is legal, but unprotected/.test(pg.answer) && /Both are true, because they are two different kinds of rule/.test(pg.answer)
    && /It sets no distance at all/.test(pg.answer) && /the price of being protected, not of being legal/.test(pg.answer)
    && /A repeater is different/.test(pg.answer) && /ACMA has not yet confirmed it in writing/.test(pg.answer), pg.answer);
+ok('the 30 km section opens with the TL;DR: no licence of its own, what protection is, what to do, a repeater is different, not yet confirmed',
+   pg.tldrFirst && /does not need a licence of its own/.test(pg.tldr) && /ACMA’s undertaking not to license a later transmitter/.test(pg.tldr)
+   && /no second line at 45 km/.test(pg.tldr) && /Know which gauges are beyond 30 km/.test(pg.tldr) && /A repeater is different/.test(pg.tldr)
+   && /ACMA has not yet confirmed this reading in writing/.test(pg.tldr), pg.tldr);
 ok('the page says a hub is not a Bureau office, and sends no radar data to an office by radio',
    /not a Bureau hub, the office its technicians work from/.test(whole0) && !/radar site to an office/.test(whole0) && /goes over the internet, not by radio/.test(whole0), '');
 const whole = await page.evaluate(() => document.getElementById('rlc-page').textContent.replace(/\s+/g, ' '));

@@ -280,6 +280,25 @@ const KbLicensing = (function () {
     const m = MODELS[S.model];
     const pdf = typeof MapAcma !== 'undefined' && MapAcma.pdfUrl ? MapAcma.pdfUrl('1463975/1') : '';
     return sect('km30', `${head('km30', '⭕', 'The 30 km question', 'Must a station more than 30 km from a licensed repeater have a licence of its own?')}
+      <div class="rlc-tldr" data-rlc="tldr">
+        <p class="rlc-answer-h">TL;DR — for a team deciding what to license</p>
+        <p>A gauge more than 30 km from the licensed repeater it reports to does <strong>not need a licence of its own</strong>. It is still covered by that
+          repeater’s licence, so it is legal, provided it keeps a gauge’s limits (1 W, bursts of 2 seconds at most, at least 10 seconds apart) and interferes
+          with nobody. The 30 km is not in the law or on the licences: it is the circle ACMA plans round each licensed repeater. There is no second line at
+          45 km; that is only the example this page works through.</p>
+        <p>What a gauge loses beyond 30 km is ${t('protection', 'protection')}: ACMA’s undertaking not to license a later transmitter that its planning shows
+          would interfere. It is not a promise that nobody ever interferes. Outside the circle a gauge has no claim if another user’s signal drowns it out,
+          and it must be fixed or switched off if it ever interferes with somebody else.</p>
+        <ul>
+          <li><strong>Know which gauges are beyond 30 km</strong> of their licensed repeater.</li>
+          <li><strong>Move one to a nearer licensed repeater</strong> where that is easy.</li>
+          <li><strong>Pay for a separate licence only</strong> where a gauge’s readings matter enough that it must be protected.</li>
+          <li><strong>A repeater is different.</strong> A transmitter that relays signals on past the licensed repeater’s reach cannot run on that
+            repeater’s licence and needs its own. That one is the law.</li>
+        </ul>
+        <p class="small txt-muted">A working position, not legal advice: ACMA has not yet confirmed this reading in writing. The reasoning, and the documents
+          it rests on, follow.</p>
+      </div>
       <div class="rlc-answer" data-rlc="plain">
         <p class="rlc-answer-h">The short answer</p>
         <p class="rlc-answer-big"><strong>A gauge more than 30 km from its licensed repeater is still licensed. It is legal, but unprotected.</strong></p>
