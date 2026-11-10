@@ -33,8 +33,10 @@
 // ── What a licence covers, and what is drawn ─────────────────────────────────
 // Point to point: the two sites the licence names. A line between them.
 //
-// Point to multipoint: the licence names its base station only. The remote
-// stations that talk to that base are authorised by it but are written on
+// Point to multipoint: the licence names one transmitting station only — its
+// "base station", which in this network is always a repeater: Flood-Net's own
+// base stations only receive and need no licence. The remote stations that
+// talk to that transmitter are authorised by the licence but are written on
 // neither the licence nor the register, and neither the law nor the licence
 // states a distance (Radiocommunications Licence Conditions (Fixed Licence)
 // Determination 2025, ss 5, 13, 15 and 23; its explanatory statement says such
@@ -50,9 +52,10 @@
 // says so. The Knowledge base's 🪪 Radio Licensing tab (kb-licensing.js) sets
 // the whole argument out; licence-docs.js holds the documents' words.
 //
-// A repeater is not a remote station. It relays, so it is a base station
-// needing a licence at its own site; inside another base's circle it is
-// covered only as a fill-in for gaps in that base's coverage, never to carry
+// A repeater is not a remote station. It relays, so in a licence's terms it
+// is the base station, needing a licence at its own site; inside another
+// licence's circle it is covered only as a fill-in for gaps in that
+// transmitter's coverage, never to carry
 // the signal further (determination s 14(3)–(4); FX16 s 4.3). The verdict of a
 // repeater with no licence at its site says so.
 //
@@ -61,13 +64,13 @@
 //   site   a current licence has a transmitter within SITE_KM of it;
 //   area   it is inside the circle of a current point-to-multipoint licence;
 //   beyond it is outside every circle, but a repeater that carries it stands
-//          at a licensed point-to-multipoint base on its channel: covered in
+//          at a licensed point-to-multipoint transmitter on its channel: covered in
 //          law by that licence, outside what ACMA planned it for (a gauge
 //          only — a repeater out there needs its own licence);
 //   none   none of those — never "unlicensed": the extract can lag, the
 //          holder may not be in the list, a class licence may apply.
 // A licence on a channel the station is known not to use counts for neither.
-// Everything else — no address, a base that only listens — is "not a
+// Everything else — no address, a base station (they only receive) — is "not a
 // transmitter": receiving needs no licence.
 
 const MapAcma = (() => {
@@ -148,10 +151,11 @@ const MapAcma = (() => {
       holder: 'The organisation the licence is issued to (the licensee). Only the holders ticked in this panel are '
         + 'searched: the Bureau of Meteorology, anybody else with a licence on a channel this network uses, and councils '
         + 'with their own telemetry licences in the same band.',
-      pmp: 'Point to multipoint: one base station at a named site, and the remote stations that talk to it. The licence '
-        + 'and the register name the base only — the remote stations are covered by it without being listed.',
+      pmp: 'Point to multipoint: one transmitting station at a named site — the licence calls it the base station; in this '
+        + 'network it is a repeater — and the remote stations that talk to it. The licence and the register name that '
+        + 'station only: the remote stations are covered by it without being listed.',
       ptp: 'Point to point: a radio link between two named sites. Both ends are on the licence; it covers nothing else.',
-      area: `The circle round a point-to-multipoint base: ${R} km here. It is the service area ACMA plans such a licence `
+      area: `The circle round a point-to-multipoint transmitter: ${R} km here. It is the service area ACMA plans such a licence `
         + 'on — 30 km for a high-power system, 2 km for a low-power one — and its policy says every station of the system '
         + 'must be inside it (RALI FX16). It is not in the law and not on the licence: the law sets no distance for a '
         + 'remote station. So inside the circle is what the licence was planned for. Outside it a station is unprotected '
@@ -160,13 +164,13 @@ const MapAcma = (() => {
       site: `A current licence has a transmitter within ${Math.round(SITE_KM * 1000)} m of the station, on a channel the `
         + 'station uses (or its channel is not on record).',
       inarea: 'No licence names the station’s own site, but it stands inside the circle of a current point-to-multipoint '
-        + 'licence on its channel — the kind of licence that covers remote stations talking to its base.',
+        + 'licence on its channel — the kind of licence that covers remote stations talking to its transmitter.',
       beyond: 'No licence names the station’s site and it is outside every circle on its channel — but a repeater that '
-        + 'carries it, within the map’s Max TX distance, stands at a licensed point-to-multipoint base on that channel. The law sets no distance for a remote '
+        + 'carries it, within the map’s Max TX distance, stands at a licensed point-to-multipoint transmitter on that channel. The law sets no distance for a remote '
         + 'station, so that licence still covers it. It is outside the service area ACMA planned the licence on, so it is '
         + 'unprotected and must stop if it causes interference. Something to decide about, not a finding that it is unlicensed.',
-      relay: 'A repeater passes on other stations’ messages, so it is a base station, not a remote one. Standing inside '
-        + 'another base’s circle covers it only as a fill-in for gaps in that base’s own coverage, on the same channel, and '
+      relay: 'A repeater passes on other stations’ messages, so in a licence’s terms it is the base station, not a remote one. Standing inside '
+        + 'another licence’s circle covers it only as a fill-in for gaps in that transmitter’s own coverage, on the same channel, and '
         + 'never to carry the signal further. A repeater normally needs a licence naming its own site.',
       fan: 'Frequency assignment number: ACMA’s number for this one use of the channel — “Freq. assign. ID” on the licence '
         + 'document. It is the number a transmitter’s label must show.',
@@ -177,18 +181,18 @@ const MapAcma = (() => {
         + 'the weekly copy can lag, the licence may be held by somebody not in the list, or a transmitter of 100 mW EIRP '
         + 'or less may run under the class licence for low-power devices.',
       na: 'The station has no ALERT address and is not a repeater, so it is not recorded as transmitting. Receiving '
-        + 'needs no licence.',
-      nearmiss: `A station with none found whose nearest point-to-multipoint base on its channel is ${NEAR_MISS_KM} km or less `
-        + 'beyond the circle, though no repeater on record carries it to that base. Most likely it talks to that base and is '
+        + 'needs no licence. Every Flood-Net base station is of this kind: they only receive.',
+      nearmiss: `A station with none found whose nearest point-to-multipoint transmitter on its channel is ${NEAR_MISS_KM} km or less `
+        + 'beyond the circle, though no repeater on record carries it to that transmitter. Most likely it talks to it and is '
         + 'a little outside the service area ACMA plans on; widen Service area to see them fall inside.',
       farout: `A station with none found that is more than ${NEAR_MISS_KM} km beyond the nearest circle on its channel. `
-        + 'These are the likelier real gaps: check which base it reports through and whether that base is licensed.',
-      nochan: 'A station with none found and no point-to-multipoint base on its channel among the ticked holders. Either '
+        + 'These are the likelier real gaps: check which repeater it reports through and whether that repeater is licensed.',
+      nochan: 'A station with none found and no point-to-multipoint transmitter on its channel among the ticked holders. Either '
         + 'its channel on record is wrong, its licence is held by somebody not ticked, or there is none.',
-      gap: 'How far the station is outside a point-to-multipoint licence’s circle: its distance from that base, '
+      gap: 'How far the station is outside a point-to-multipoint licence’s circle: its distance from that licence’s transmitter, '
         + 'less the service area’s radius.',
-      carries: 'The base of the covering licence stands where a repeater that carries this station stands — by the '
-        + 'repeater’s pass ranges — so the station really does talk to that licensed base.',
+      carries: 'The covering licence’s transmitter stands where a repeater that carries this station stands — by the '
+        + 'repeater’s pass ranges — so the station really does talk to that licensed transmitter.',
       soon: `The licence expires within ${SOON_DAYS} days. Licences here run a year at a time; an expired licence `
         + 'authorises nothing until it is renewed.',
       lapsed: 'The register shows the licence as expired, surrendered or otherwise not in force.',
@@ -210,7 +214,7 @@ const MapAcma = (() => {
     ['register', 'Register'], ['holder', 'Holder'], ['pmp', 'Point to multipoint (PMP)'], ['ptp', 'Point to point (PTP)'],
     ['area', 'Service area'], ['site', 'Licence at the site'], ['inarea', 'Inside a licence’s area'], ['beyond', 'Beyond a licence’s area'],
     ['relay', 'A repeater inside a circle'], ['none', 'None found'],
-    ['na', 'Not a transmitter'], ['gap', 'Gap'], ['nearmiss', 'Just past a circle'], ['farout', 'Well outside'], ['nochan', 'No base on its channel'], ['carries', 'Carries it'], ['soon', 'Expires soon'], ['lapsed', 'Not in force'],
+    ['na', 'Not a transmitter'], ['gap', 'Gap'], ['nearmiss', 'Just past a circle'], ['farout', 'Well outside'], ['nochan', 'No licence on its channel'], ['carries', 'Carries it'], ['soon', 'Expires soon'], ['lapsed', 'Not in force'],
     ['txpower', 'TX power'], ['eirp', 'EIRP'], ['emission', 'Emission'], ['fan', 'Frequency assignment number'], ['label', 'Transmitter label'],
     ['cond', 'Special condition'],
     ['under', 'Stations under it'], ['recorded', 'On the station’s record'],
@@ -455,7 +459,7 @@ const MapAcma = (() => {
     if (a.transmits) a.state = a.site.length ? 'site' : a.area.length ? 'area' : 'none';
     const reps = C ? C.all.map(c => c.r).filter(located) : [];
     a.carried = reps.length > 0;
-    // Which covering base a repeater that carries it stands at.
+    // Which covering licence's transmitter a repeater that carries it stands at.
     if (a.state === 'area' && !light) {
       for (const m of a.area) {
         const r = reps.find(x => kmTo(x, m.txSite) <= SITE_KM);
@@ -464,9 +468,9 @@ const MapAcma = (() => {
       a.area.sort((x, y) => (y.via ? 1 : 0) - (x.via ? 1 : 0) || x.txKm - y.txKm);
     }
     // Outside every circle, but a repeater that carries it stands at a licensed
-    // point-to-multipoint base on its channel: a remote station of that
+    // point-to-multipoint transmitter on its channel: a remote station of that
     // licence in law, beyond the service area ACMA planned it on. A gauge
-    // only — a repeater out there is a base that needs its own licence.
+    // only — a repeater out there needs its own licence.
     // The carrier must be within the map's Max TX distance: a pass range
     // matches an ALERT address anywhere in the country, and a repeater two
     // states away that happens to pass the same number carries nothing of it.
@@ -483,7 +487,7 @@ const MapAcma = (() => {
             via: c.r, direct: direct.has(c.r), gap: km - R, radius: R });
         }
       }
-      // A base that likely hears it directly first, then the nearest.
+      // A licensed repeater that likely hears it directly first, then the nearest.
       a.beyond.sort((x, y) => (y.direct ? 1 : 0) - (x.direct ? 1 : 0) || x.txKm - y.txKm);
       if (a.beyond.length) a.state = 'beyond';
     }
@@ -499,8 +503,9 @@ const MapAcma = (() => {
     const s = a.st, date = dateText(asAt());
     if (!a.located) return 'It has no position on record, so no licence can be matched to it.';
     if (!a.transmits) {
-      return 'Not recorded as a transmitter — it has no ALERT address and is not a repeater — so there is nothing here to '
-        + 'license. Receiving needs no licence.';
+      const isBase = Array.isArray(s.roles) && s.roles.includes('base');
+      return `${isBase ? 'A base station: Flood-Net’s base stations only receive, and this one has' : 'Not recorded as a transmitter — it has'} `
+        + 'no ALERT address and is not a repeater — so there is nothing here to license. Receiving needs no licence.';
     }
     const offNote = a.off.length ? ` A licence here on another channel was left out: ${a.off[0].lic.no} (${freqText(a.off[0].lic)}).` : '';
     const lapsedNote = a.lapsed.length ? ` Not in force here: ${a.lapsed.slice(0, 2).map(m => `${m.lic.no} (${m.lic.status.toLowerCase()}${m.lic.expiry ? `, expiry ${dateText(m.lic.expiry)}` : ''})`).join(', ')}.` : '';
@@ -515,30 +520,30 @@ const MapAcma = (() => {
     if (a.state === 'area') {
       const m = a.area[0], l = m.lic;
       if (a.relay) {
-        return `No licence names this site, and it is a repeater. It is ${fmtKm(m.txKm)} from the base of point-to-multipoint licence ${l.no} `
+        return `No licence names this site, and it is a repeater. It is ${fmtKm(m.txKm)} from the transmitter of point-to-multipoint licence ${l.no} `
           + `(${holderName(l)}, ${freqText(l)}) — inside ${areaWords(l)}. That covers a gauge. It covers a repeater only as a fill-in `
-          + `for gaps in that base’s own coverage, on its channel, and never to carry the signal further; a repeater normally `
+          + `for gaps in that transmitter’s own coverage, on its channel, and never to carry the signal further; a repeater normally `
           + `needs a licence naming its own site.${offNote}${lapsedNote}`;
       }
-      const via = m.via ? ` That base is at ${m.via.name}, a repeater that carries this station.`
-        : a.carried ? ' None of the repeaters that carry this station stands at that base, so check it is the base it talks to.' : '';
-      return `No licence names this site. It is ${fmtKm(m.txKm)} from the base of point-to-multipoint licence ${l.no} `
+      const via = m.via ? ` That transmitter is at ${m.via.name}, a repeater that carries this station.`
+        : a.carried ? ' None of the repeaters that carry this station stands at that transmitter, so check it is the one it talks to.' : '';
+      return `No licence names this site. It is ${fmtKm(m.txKm)} from the transmitter of point-to-multipoint licence ${l.no} `
         + `(${holderName(l)}, ${freqText(l)}) — inside ${areaWords(l)}. A licence of that kind covers the remote stations that talk `
-        + `to its base without listing them.${via}${offNote}${lapsedNote}`;
+        + `to it without listing them.${via}${offNote}${lapsedNote}`;
     }
     if (a.state === 'beyond') {
       const m = a.beyond[0], l = m.lic;
       const how = m.direct ? `It reports through ${m.via.name}, which stands`
         : `Its readings are carried by ${m.via.name} — most likely by way of a nearer repeater, which relays and so needs a licence of its own — and ${m.via.name} stands`;
       return `No licence names this site, and it is outside every licence’s area on its channel. ${how} `
-        + `at the base of point-to-multipoint licence ${l.no} (${holderName(l)}, ${freqText(l)}) — ${fmtKm(m.txKm)} away, `
+        + `at the transmitter of point-to-multipoint licence ${l.no} (${holderName(l)}, ${freqText(l)}) — ${fmtKm(m.txKm)} away, `
         + `${fmtKm(Math.max(0, m.gap))} beyond ${areaWords(l)}. The law sets no distance for a remote station, so that licence still `
         + `covers it; but it is outside what the licence was planned for — unprotected, and it must stop if it causes `
         + `interference.${offNote}${lapsedNote}`;
     }
     const n = a.nearestPmp;
-    const nearest = n ? ` The nearest point-to-multipoint base on its channel is ${n.lic.no} (${holderName(n.lic)}), ${fmtKm(n.txKm)} away — `
-      + `${fmtKm(Math.max(0, n.gap))} beyond its ${n.radius} km service area${a.carried && !a.relay ? ', and no repeater within range that carries this station stands at a licensed base on its channel' : ''}.` : '';
+    const nearest = n ? ` The nearest point-to-multipoint transmitter on its channel is ${n.lic.no} (${holderName(n.lic)}), ${fmtKm(n.txKm)} away — `
+      + `${fmtKm(Math.max(0, n.gap))} beyond its ${n.radius} km service area${a.carried && !a.relay ? ', and no repeater within range that carries this station stands at a licensed transmitter on its channel' : ''}.` : '';
     const relay = a.relay ? ' A repeater relays other stations’ messages, so it needs a licence naming its own site.' : '';
     return `No licence found for this site in the register copy of ${date}, among the holders ticked.${nearest}${relay} That is not the `
       + `same as unlicensed: the copy can lag, the licence may be held by somebody not in the list, or a transmitter of 100 mW `
@@ -757,9 +762,9 @@ const MapAcma = (() => {
   }
 
   // The none-found stations by who owns them, split by how likely each is a
-  // real gap: just past a circle (a base is close — probably covered, only
+  // real gap: just past a circle (a licensed transmitter is close — probably covered, only
   // further out than ACMA assumes), well outside every circle, or no
-  // point-to-multipoint base on its channel at all among the ticked holders.
+  // point-to-multipoint transmitter on its channel at all among the ticked holders.
   const NO_OWNER = '(no owner on record)';
   function noneByOwner() {
     const C = coverage();
@@ -782,7 +787,7 @@ const MapAcma = (() => {
       .sort((x, y) => (y.far + y.nochan) - (x.far + x.nochan) || y.n - x.n);
   }
 
-  // The stations that report to a licensed base from beyond its area, furthest out first.
+  // The stations that report to a licensed transmitter from beyond its area, furthest out first.
   function beyondRows() {
     const C = coverage();
     return C ? C.rows.filter(a => a.state === 'beyond').sort((x, y) => y.beyond[0].gap - x.beyond[0].gap) : [];
@@ -816,7 +821,7 @@ const MapAcma = (() => {
       const s = a.st, m = a.site[0] || a.area[0] || a.beyond[0] || null, n = a.nearestPmp;
       const gapKm = a.state === 'beyond' ? Math.max(0, a.beyond[0].gap) : n && a.state === 'none' ? Math.max(0, n.gap) : null;
       const note = [a.relay && a.state === 'area' ? 'a repeater: covered only as a fill-in, else it needs its own licence' : '',
-        a.state === 'beyond' ? 'covered in law by the licence of the base it reports to; outside the planned service area' : '',
+        a.state === 'beyond' ? 'covered in law by the licence of the repeater it reports through; outside the planned service area' : '',
         a.off.length ? `licence on another channel here: ${a.off[0].lic.no}` : '', a.lapsed.length ? `not in force here: ${a.lapsed[0].lic.no}` : '']
         .filter(Boolean).join('; ');
       lines.push([q(s.id), q(s.name), q(s.station_number || ''), s.lat, s.lon, q(ownerText(s)), q((s.roles || []).join(' ')),
@@ -902,8 +907,8 @@ const MapAcma = (() => {
     const u = C ? (C.under.get(l) || { site: 0, area: 0, beyond: 0 }) : null;
     const txs = l.devs.filter(x => x.tr === 'T'), maxEirp = Math.max(0, ...txs.map(x => Number(x.eirpW) || 0));
     const model = l.kind !== 'pmp' || !maxEirp ? ''
-      : maxEirp <= 8.3 ? `At ${watt(maxEirp)} EIRP this base is within ACMA’s low-power model, whose service area is 2 km, not 30. The register does not say which model a licence was assigned on.`
-        : maxEirp > 40 + 1e-6 ? `Its ${watt(maxEirp)} EIRP is more than the 40 W ACMA plans a point-to-multipoint base on; it was most likely assigned as a land-mobile-style system.` : '';
+      : maxEirp <= 8.3 ? `At ${watt(maxEirp)} EIRP this transmitter is within ACMA’s low-power model, whose service area is 2 km, not 30. The register does not say which model a licence was assigned on.`
+        : maxEirp > 40 + 1e-6 ? `Its ${watt(maxEirp)} EIRP is more than the 40 W ACMA plans a point-to-multipoint transmitter on; it was most likely assigned as a land-mobile-style system.` : '';
     const labelled = txs.filter(x => x.fan && Number(x.eirpW) > LABEL_W);
     const devRows = l.devs.slice().sort((a, b) => (a.tr === b.tr ? 0 : a.tr === 'T' ? -1 : 1)).slice(0, 12).map(x => `<li>
         <strong>${x.tr === 'T' ? 'Transmits' : 'Receives'}</strong> at ${esc(x.site.name)} <span class="lic-muted">(ACMA site ${esc(x.site.id)})</span><br>
@@ -1013,7 +1018,8 @@ const MapAcma = (() => {
           <dd>One base station “at a fixed location specified in the licence”, and remote stations whose “locations … are not
             specified in the licence” (${src('fixed', 's 5(2) and its note')}; the definition is in the ${src('interp', 'Interpretation determination')}).
             ${n ? `${n.pmp} of the Bureau’s licences in this register copy are of this type` : 'Most of the Bureau’s ALERT licences are of this type'} — a repeater
-            or base listening for many gauges on one channel. In the register a variant reads <em>Point to Multipoint – Land Mobile
+            taking in many gauges on one channel. In this network the licence’s “base station” is always a repeater: Flood-Net’s own base
+            stations only receive. In the register a variant reads <em>Point to Multipoint – Land Mobile
             Spec</em>: the same kind of licence on channels otherwise set aside for land mobile radio.</dd>
           <dt>Fixed — point to point</dt>
           <dd>A link “principally for communication with one other fixed station” (${src('interp', 'Interpretation determination')}).
@@ -1021,7 +1027,7 @@ const MapAcma = (() => {
             data from a repeater or radar site to an office. Where the licence names no antenna, a link in 148–174 MHz must use
             one at least as directional as a 6-element Yagi — 12 dBi, a beam of 44° or less (${src('fixed', 's 11, Table 1')}).</dd>
           <dt>Land mobile (land mobile system)</dt>
-          <dd>A base and the vehicles or handhelds that talk to it, “operated principally for two-way communications”
+          <dd>A fixed radio and the vehicles or handhelds that talk to it, “operated principally for two-way communications”
             (${src('interp', 'Interpretation determination')}; conditions in the ${src('lm', 'Land Mobile Licence determination')}).
             It is the licence for a voice network, not for a gauge bolted to a pole: a fixed telemetry station is not a mobile.</dd>
           <dt>Scientific</dt>
@@ -1038,15 +1044,15 @@ const MapAcma = (() => {
             An ALERT gauge of a watt or more is ten times over that limit, so the class licence does not cover it.</dd>
         </dl>`)}
       ${fold('reach', 'How far a point-to-multipoint licence reaches — the 30 km question', `
-        <p><strong>The short answer.</strong> A gauge more than 30 km from its licensed base is not unlicensed for that reason alone.
-          It is outside what its licence was planned for. A <em>repeater</em> that carries the signal further than the base reaches is
+        <p><strong>The short answer.</strong> A gauge more than 30 km from the licensed repeater it reports to is not unlicensed for that reason alone.
+          It is outside what its licence was planned for. A <em>repeater</em> that carries the signal further than that one reaches is
           different: it needs a licence of its own.</p>
         <p><strong>The law sets no distance.</strong> Nor does it name the remote stations: they are on neither the licence nor the register
-          (${src('fixed', 's 5(2) note')}; ${cite('lcd-not-listed', 'read it')}). What it requires is that a remote station talks to that base, on
-          the base’s own frequencies, briefly and at low power, without harmful interference (${src('fixed', 'ss 13, 15 and 23')}). ACMA’s own
+          (${src('fixed', 's 5(2) note')}; ${cite('lcd-not-listed', 'read it')}). What it requires is that a remote station talks to the licensed station, on
+          that station’s own frequencies, briefly and at low power, without harmful interference (${src('fixed', 'ss 13, 15 and 23')}). ACMA’s own
           explanation: such transmitters “can be located anywhere, although for most practical purposes, they need to be located in relatively
-          close physical proximity” to the base (${src('fixedEs', 'explanatory statement')}; ${cite('es-anywhere', 'read it')}).</p>
-        <p><strong>The licence states no distance</strong> either, as a rule: a Bureau licence names the base’s site, frequency, power and
+          close physical proximity” to the named one (${src('fixedEs', 'explanatory statement')}; ${cite('es-anywhere', 'read it')}).</p>
+        <p><strong>The licence states no distance</strong> either, as a rule: a Bureau licence names the repeater’s site, frequency, power and
           antenna. <strong>Some licences say more.</strong> A special condition can state a service area (a few in this register copy read “a
           service area of 20 km”) or authorise “remote transmitters … within range of the specified site”, and a licence’s own condition is
           the one that binds (${src('fixed', 's 12(2)')}). Where a figure is given the tool draws that instead.</p>
@@ -1055,49 +1061,49 @@ const MapAcma = (() => {
           (${src('fx16', 'RALI FX16, s 3.1 and 3.2')}; ${cite('fx16-30km', 'read it')}). A RALI is applied when a licence is issued and allows
           exceptions case by case; it is not legislation. So the circle is the right first look — and this tool draws it — but a station
           beyond it is one the plan did not allow for, not one the law forbids.</p>
-        <p><strong>What being beyond it costs.</strong> No protection: only the base is checked against other users, so nobody is kept off the
+        <p><strong>What being beyond it costs.</strong> No protection: only the licence’s own transmitter is checked against other users, so nobody is kept off the
           channel out there (${cite('fx16-coordination', 'FX16 on coordination')}). It must not cause harmful interference, at any distance —
-          that is law (${src('fixed', 's 15(1)')}). And a transmitter that <em>extends</em> the base’s coverage is not covered at all: a
+          that is law (${src('fixed', 's 15(1)')}). And a transmitter that <em>extends</em> the licensed repeater’s coverage is not covered at all: a
           fill-in may not be used to stretch the area (${src('fixed', 's 14(4)')}), and FX16 calls such a transmitter “another master
           station” to be licensed separately (${cite('fx16-another-master', 'read it')}).</p>
-        <p><strong>What the tool does with it.</strong> A gauge outside every circle that reports through a repeater standing at a licensed
-          base is marked ${term('beyond', 'beyond a licence’s area')}, not none found. Change the radius with <em>Service area</em> above.</p>
-        <p>For comparison, a land mobile licence defines its service area as 40 km from the base
+        <p><strong>What the tool does with it.</strong> A gauge outside every circle that reports through a repeater with a licence at its
+          site is marked ${term('beyond', 'beyond a licence’s area')}, not none found. Change the radius with <em>Service area</em> above.</p>
+        <p>For comparison, a land mobile licence defines its service area as 40 km from its fixed station
           (${src('lm', 'Land Mobile Licence determination')}).</p>
         <p><button type="button" class="pill" onclick="MapAcma.learn('km30')"><span aria-hidden="true">🪪</span> The whole argument, with a station to move in and out of the circle</button></p>`)}
       ${fold('power', 'Transmitter power', `
         <ul>
-          <li><strong>The named station</strong> — the base, or either end of a link — may run what its licence lists: a
+          <li><strong>The named station</strong> — the repeater, or either end of a link — may run what its licence lists: a
             ${term('txpower', 'transmitter power')} into the antenna and an ${term('eirp', 'EIRP')} out of it. Pick a licence here to see both.</li>
           <li><strong>A remote station</strong> of a point-to-multipoint licence, sending data or telemetry, may transmit for no more than
             2 seconds at a time, no more often than every 10 seconds, for no more than one-thirtieth of the time, and at no more
             than <strong>1 W</strong> into the antenna — 5 W only in 451.5–452.5 MHz and 805.5–806 MHz (${src('fixed', 's 15(3)–(4), Table 2')}).</li>
-          <li><strong>ACMA’s plan adds EIRP figures</strong>: a base at no more than 40 W EIRP (8.3 W for a low-power system) through an
-            antenna of no more than 8.2 dBi; a gauge at no more than 20 W EIRP, and no more than 5 W in any direction but towards its base —
+          <li><strong>ACMA’s plan adds EIRP figures</strong>: the licensed repeater at no more than 40 W EIRP (8.3 W for a low-power system) through an
+            antenna of no more than 8.2 dBi; a gauge at no more than 20 W EIRP, and no more than 5 W in any direction but towards that repeater —
             so 5 W in all with an antenna that radiates all round (${src('fx16', 'RALI FX16, s 3.1')}; ${cite('fx16-omni', 'read it')}).</li>
           <li><strong>A condition written on the licence wins</strong> where it differs from those (${src('fixed', 's 12(2)')}). A gauge that
-            runs more than 1 W into its antenna as a remote station is worth checking against its base’s licence document.</li>
+            runs more than 1 W into its antenna as a remote station is worth checking against the licence document of the repeater it reports to.</li>
           <li><strong>Channels shared with land mobile</strong> are planned at 83 W EIRP for a high-power system and 8.3 W for a low-power
             one (${src('lm08', 'RALI LM08')}), which is why those two figures recur on licences.</li>
           <li><strong>No licence at all</strong>: 100 mW EIRP on 150.7875–152.49375 MHz (${src('lipd', 'LIPD class licence')}).</li>
         </ul>`)}
       ${fold('site', 'What should be held for a site', `
         <ul>
-          <li><strong>A repeater, or a base that transmits</strong>: a licence naming its site — point to multipoint if it serves many
-            gauges, point to point if it is one end of a link. It is the “base station at a fixed location specified in the licence”.
-            A repeater inside another base’s circle is covered by that licence only as a fill-in for gaps in the base’s own coverage
+          <li><strong>A repeater</strong>: a licence naming its site — point to multipoint if it serves many
+            gauges, point to point if it is one end of a link. It is what the law calls the “base station at a fixed location specified in the licence”.
+            A repeater inside another licence’s circle is covered by that licence only as a fill-in for gaps in that transmitter’s own coverage
             (${src('fixed', 's 14(3)–(4)')}).</li>
           <li><strong>A label on the transmitter</strong>: at a shared site — two or more fixed transmitters within 200 m of each other — a
             licensed transmitter of more than 2 W EIRP must carry a label with its frequency assignment number and the words “Do Not
             Remove” (${src('labelling', 'Labelling determination, ss 7 and 8')}; ${cite('label-what', 'read it')}). Pick a licence here to see
             the number.</li>
-          <li><strong>A field gauge</strong>: one of three. It is a remote station of the point-to-multipoint licence of the repeater or
-            base it transmits to — on that licence’s channel, inside its service area and within the remote-station limits; or it
+          <li><strong>A field gauge</strong>: one of three. It is a remote station of the point-to-multipoint licence of the repeater
+            it transmits to — on that licence’s channel, inside its service area and within the remote-station limits; or it
             has its own licence at its own site; or it radiates 100 mW EIRP or less and runs under the class licence.</li>
           <li><strong>Protection</strong>: a remote station is covered but not individually protected from interference — it is protected
             only by being where the plan expects it (${src('fx16', 'RALI FX16, s 3.1')}). ACMA’s guidance is that protecting one takes its
             own point-to-point licence as well (${src('options', 'ACMA’s guidance')}).</li>
-          <li><strong>A base that only listens</strong>: nothing is required.</li>
+          <li><strong>A base station</strong>: nothing is required. Every Flood-Net base station only receives, and receiving needs no licence.</li>
           <li><strong>Who holds it</strong>: the licence belongs to its holder — the Bureau, a council, a water authority. Anybody else
             operating a transmitter under it needs the holder’s written authorisation (${src('act', 'Act, s 114')}), which the holder may
             not give in some cases (${src('auth', 'Authorisations and Transfers determination')}). A council’s gauge on a Bureau channel,
@@ -1114,7 +1120,7 @@ const MapAcma = (() => {
           <li><strong>Client</strong> — the holder’s number in ACMA’s books. <strong>Site</strong> — ACMA’s number for a place; its
             position is as accurate as the register says (often “within 10 metres”, sometimes “unknown”).</li>
           <li><strong>Transmits / Receives</strong> — each licence lists its transmitters and the receivers it refers to. For a
-            point-to-multipoint licence both are at the base.</li>
+            point-to-multipoint licence both are at the one named site.</li>
           <li><strong>${term('emission', 'Emission')}</strong>, <strong>${term('txpower', 'TX power')}</strong> and <strong>${term('eirp', 'EIRP')}</strong> — what may be sent and how strongly.</li>
           <li><strong>The copy</strong> — Flood-Net reads ACMA’s daily download once a week (${src('data', 'the download')}); the live
             register is at ${src('rrl', 'ACMA’s register')}. A licence changed since the copy shows here as it was.</li>
@@ -1202,11 +1208,11 @@ const MapAcma = (() => {
           inside an area ${c.relays === 1 ? 'is a repeater' : 'are repeaters'} with no licence at ${c.relays === 1 ? 'its' : 'their'} own site — ${term('relay', 'covered only as a fill-in')}.` : ''}</p>
         <details class="lic-more" id="acmalic-beyond">
           <summary>${far.length} station${far.length === 1 ? '' : 's'} ${term('beyond', 'beyond a licence’s area')}</summary>
-          <p class="small txt-muted">Each reports through a repeater that stands at a licensed base on its channel, from further out than the
+          <p class="small txt-muted">Each reports through a repeater that stands at a licensed transmitter on its channel, from further out than the
             service area. Covered in law; outside the plan — unprotected, and to stop if it interferes. Furthest out first.</p>
           <div class="lic-scroll"><table class="sites-table lic-table" id="acmalic-beyond-table">
-            <thead><tr><th scope="col">Station</th><th scope="col">Owner</th><th scope="col" title="The repeater that carries it and stands at a licensed point-to-multipoint base, and that licence.">Reports through</th>
-              <th scope="col" title="Its distance from that base.">From the base</th><th scope="col">${term('gap', 'Beyond by')}</th></tr></thead>
+            <thead><tr><th scope="col">Station</th><th scope="col">Owner</th><th scope="col" title="The repeater that carries it and stands at a licensed point-to-multipoint transmitter, and that licence.">Reports through</th>
+              <th scope="col" title="Its distance from that licence’s transmitter.">Distance</th><th scope="col">${term('gap', 'Beyond by')}</th></tr></thead>
             <tbody>${far.slice(0, NONE_CAP).map(a => `<tr class="sites-row-go" onclick="MapAcma.pickStation('${escAttr(a.st.id)}')">
               <td>${esc(a.st.name)}${a.st.station_number ? ` <span class="lic-muted">#${esc(a.st.station_number)}</span>` : ''}</td>
               <td>${esc(ownerText(a.st)) || '<span class="lic-muted">—</span>'}</td>
@@ -1220,7 +1226,7 @@ const MapAcma = (() => {
             ${[['gap', 'Furthest from any licence first'], ['near', 'Nearest to a licence first'], ['name', 'Name'], ['owner', 'Owner']]
               .map(([v, t]) => `<option value="${v}" ${noneSort === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
           <div class="lic-scroll"><table class="sites-table lic-table" id="acmalic-none-table">
-            <thead><tr><th scope="col">Station</th><th scope="col">Owner</th><th scope="col" title="The nearest point-to-multipoint base on its channel, among the ticked holders — the licence that would cover it if its circle reached.">What would cover it</th>
+            <thead><tr><th scope="col">Station</th><th scope="col">Owner</th><th scope="col" title="The nearest point-to-multipoint transmitter on its channel, among the ticked holders — the licence that would cover it if its circle reached.">What would cover it</th>
               <th scope="col">${term('gap', 'Gap')}</th></tr></thead>
             <tbody>${rows.slice(0, NONE_CAP).map(a => `<tr class="sites-row-go" onclick="MapAcma.pickStation('${escAttr(a.st.id)}')">
               <td>${esc(a.st.name)}${a.st.station_number ? ` <span class="lic-muted">#${esc(a.st.station_number)}</span>` : ''}</td>
@@ -1231,14 +1237,14 @@ const MapAcma = (() => {
         </details>
         <details class="lic-more" id="acmalic-none-owners">
           <summary>None found, by owner — where the real gaps are</summary>
-          <p class="small txt-muted">A station ${NEAR_MISS_KM} km or less past a circle most likely talks to that base and is a little outside the
-            service area ACMA plans on. The ones to look at first are well outside every circle, or have no base on their channel at all. Click an owner to
+          <p class="small txt-muted">A station ${NEAR_MISS_KM} km or less past a circle most likely talks to that transmitter and is a little outside the
+            service area ACMA plans on. The ones to look at first are well outside every circle, or have no licence on their channel at all. Click an owner to
             list its stations above.</p>
           <div class="lic-scroll"><table class="sites-table lic-table" id="acmalic-none-owner-table">
             <thead><tr><th scope="col">Owner</th><th scope="col">${term('none', 'None found')}</th>
               <th scope="col">${term('nearmiss', 'Just past a circle')}</th><th scope="col">${term('farout', 'Well outside')}</th>
-              <th scope="col">${term('nochan', 'No base on its channel')}</th>
-              <th scope="col" title="The holder whose point-to-multipoint base is nearest to most of this owner’s none-found stations.">Nearest holder</th></tr></thead>
+              <th scope="col">${term('nochan', 'No licence on its channel')}</th>
+              <th scope="col" title="The holder whose point-to-multipoint transmitter is nearest to most of this owner’s none-found stations.">Nearest holder</th></tr></thead>
             <tbody>${noneByOwner().map(o => `<tr class="sites-row-go${noneOwner === o.owner ? ' is-lit' : ''}" onclick="MapAcma.set('noneOwner', ${escAttr(JSON.stringify(o.owner))})">
               <td><button type="button" class="link-btn">${esc(o.owner)}</button></td><td class="num">${o.n}</td><td class="num">${o.near || '—'}</td>
               <td class="num">${o.far || '—'}</td><td class="num">${o.nochan || '—'}</td><td>${esc(o.holder) || '<span class="lic-muted">—</span>'}</td></tr>`).join('')}</tbody></table></div>
@@ -1336,7 +1342,7 @@ const MapAcma = (() => {
   function legendHtml() {
     const bits = [];
     if (F.show || (picked && picked.type === 'licence')) {
-      bits.push(`ACMA licences — a circle is a point-to-multipoint licence’s ${F.radius} km service area round its base (ACMA’s plan, not a
+      bits.push(`ACMA licences — a circle is a point-to-multipoint licence’s ${F.radius} km service area round its transmitter (ACMA’s plan, not a
         boundary in the law), a line a point-to-point link between its two ends; ${CLASSES.map(([k, label]) =>
           `<span class="lic-dot" style="--dot:${classColour(k)}" aria-hidden="true"></span>${esc(label)}`).join(' ')};
         dashed where the licence is not in force, amber where it expires within ${SOON_DAYS} days.`);

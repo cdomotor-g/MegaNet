@@ -306,7 +306,7 @@ MegaNet/
 ├── kb-licensing-draw.js    ← LicensingDraw — the 🪪 Radio Licensing tab's drawings: the
 │                             scene, the 30 km explorer, antenna patterns, the power ladder
 ├── kb-licensing.js         ← KbLicensing — the 🪪 Radio Licensing tab: who needs a licence,
-│                             the 30 km question, a gauge's and a base's limits, antennas
+│                             the 30 km question, a gauge's and a repeater's limits, antennas
 ├── owner-logos.js          ← OwnerLogos — each station owner's logo beside its name
 │                             on the station card and in the editor (the marks in assets/owners/)
 ├── health-bulletin.js      ← HealthBulletin — 📺 Network Bulletin at the top of Station
@@ -6514,9 +6514,11 @@ network's radios need by way of an ACMA licence. It is a guide, not legal
 advice, and says so first.
 
 - **Who needs a licence** — anything that sends, nothing that only listens; the
-  three kinds of licence; what the Act allows a court to impose.
-- **One base, many gauges** — how a point-to-multipoint licence names one base
-  station and covers the unlisted gauges round it, role by role, beside a
+  three kinds of licence; what the Act allows a court to impose. Flood-Net's
+  base stations only receive, so none needs one: in a licence, "base station"
+  means the transmitting station it names, which here is always a repeater.
+- **One repeater, many gauges** — how a point-to-multipoint licence names one
+  repeater and covers the unlisted gauges round it, role by role, beside a
   point-to-point link.
 - **The 30 km question** — set out as what the law says (no distance), what the
   licence says (usually none) and what ACMA's planning policy says (30 km,
@@ -6526,7 +6528,7 @@ advice, and says so first.
 - **A gauge's limits** — 1 W into the antenna, bursts of 2 seconds, 10 seconds
   apart, 1 in 30 of the time — with a checker for a radio, a cable and an
   antenna, a picture of the power on its way out and a minute of bursts.
-- **A base's and a repeater's** — ACMA's two service models, a licence document
+- **A repeater's limits** — ACMA's two service models, a licence document
   read line by line, the label a transmitter at a shared site must carry, and
   the emission code taken apart.
 - **Receivers**, **EIRP and decibels** one word at a time, the **antennas** with

@@ -227,6 +227,12 @@ ok('“licence at the site” rests on a transmitter within 500 m; “inside a l
 ok('“none found” names the nearest licence that would cover it, and a gap above nothing',
    st.rows.filter(r => r.state === 'none' && r.nearest).every(r => r.nearest.gap > 0 && r.nearest.kind === 'pmp')
    && st.rows.filter(r => r.state === 'none' && r.nearest).length > 0, '');
+const quietBase = await page.evaluate(() => {
+  const b = state.data.stations.find(s => (s.roles || []).includes('base') && !(s.roles || []).includes('repeater') && !s.repeater && stationAlertIds(s).length === 0 && s.lat != null);
+  return b ? { state: MapAcma.stateOf(b).state, verdict: MapAcma.verdict(b.id) } : null;
+});
+ok('a Flood-Net base station only receives: not a transmitter, and its verdict says so',
+   !!quietBase && quietBase.state === 'na' && /Flood-Net’s base stations only receive/.test(quietBase.verdict) && /nothing here to license/.test(quietBase.verdict), J(quietBase));
 ok('there are stations in each state to look at', tally('site') > 20 && tally('area') > 100 && tally('beyond') > 20 && tally('none') > 10, J(st.counts));
 
 const atSite = st.rows.find(r => r.state === 'site'), inArea = st.rows.find(r => r.state === 'area'), none = st.rows.find(r => r.state === 'none' && r.nearest);
@@ -410,6 +416,7 @@ ok('every claim’s source is a link to the Federal Register of Legislation or t
 ok('…and each is listed once more with its date', guide.dated.length >= 12 && guide.dated.every(t => /(20\d\d)/.test(t)), J(guide.dated.slice(0, 2)));
 ok('it answers the 30 km question: the law sets no distance, the licence states none, 30 km is ACMA’s planning rule',
    /The law sets no distance/.test(guide.text) && /The licence states no distance/.test(guide.text) && /30 km is ACMA’s planning rule/.test(guide.text)
+   && /Every Flood-Net base station only receives/.test(guide.text) && !/base that transmits/i.test(guide.text)
    && /All stations must be contained within the service area/.test(guide.text) && /100 mW EIRP/.test(guide.text), '');
 ok('…with a way to read each rule in the saved document, and the label a transmitter at a shared site must carry',
    guide.cites >= 5 && /frequency assignment number and the words “Do Not\s+Remove”/.test(guide.text), J({ cites: guide.cites }));

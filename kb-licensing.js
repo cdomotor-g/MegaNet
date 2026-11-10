@@ -10,7 +10,7 @@
 //                   km30    the 30 km question — law, licence and ACMA's plan,
 //                           with a station to move in and out of the circle
 //                   gauge   the limits a gauge keeps, and a checker for them
-//                   base    a base's and a repeater's limits, a licence document
+//                   base    a repeater's limits (the licence's "base station"), a licence document
 //                           read line by line, the label a transmitter at a
 //                           shared site must carry, the emission code taken apart
 //                   rx      receivers
@@ -54,8 +54,8 @@ const KbLicensing = (function () {
   let regErr = '';
 
   const SECTIONS = [
-    ['who', '📡', 'Who needs a licence'], ['pmp', '🛰️', 'One base, many gauges'], ['km30', '⭕', 'The 30 km question'],
-    ['gauge', '🌧️', 'A gauge’s limits'], ['base', '🗼', 'A base’s and a repeater’s'], ['rx', '👂', 'Receivers'],
+    ['who', '📡', 'Who needs a licence'], ['pmp', '🛰️', 'One repeater, many gauges'], ['km30', '⭕', 'The 30 km question'],
+    ['gauge', '🌧️', 'A gauge’s limits'], ['base', '🗼', 'A repeater’s limits'], ['rx', '👂', 'Receivers'],
     ['power', '🔆', 'EIRP and decibels'], ['ant', '📶', 'Antennas'], ['need', '🧭', 'Does it need its own?'],
     ['ours', '🧮', 'Ours, counted'], ['ask', '☎️', 'ACMA’s pages'], ['docs', '📚', 'The documents'], ['quiz', '✅', 'Try seven cases'],
   ];
@@ -87,10 +87,10 @@ const KbLicensing = (function () {
         licence covers what, the limits a gauge and a repeater must keep, and where each rule is written — press any
         <span class="rlc-cite-eg"><span aria-hidden="true">📖</span> link like this</span> to read the rule in its own document.</p>
       <ul class="rlc-facts" aria-label="The six things to know">
-        ${fact('Send = licence', 'Transmitting needs a licence. Listening does not.', 'who')}
-        ${fact('1 base, many gauges', 'A licence names one base station. The gauges that report to it ride on it, unlisted.', 'pmp')}
-        ${fact('1 W · 2 s · 10 s', 'A gauge on a base’s licence: 1 W into its antenna, bursts of 2 seconds, 10 seconds apart.', 'gauge')}
-        ${fact('30 km', 'ACMA’s planning circle round a base. Not a distance written in the law.', 'km30')}
+        ${fact('Send = licence', 'Transmitting needs a licence. Listening does not — and Flood-Net’s base stations only listen.', 'who')}
+        ${fact('1 repeater, many gauges', 'A licence names one repeater. The gauges that report to it ride on it, unlisted.', 'pmp')}
+        ${fact('1 W · 2 s · 10 s', 'A gauge on a repeater’s licence: 1 W into its antenna, bursts of 2 seconds, 10 seconds apart.', 'gauge')}
+        ${fact('30 km', 'ACMA’s planning circle round a licensed repeater. Not a distance written in the law.', 'km30')}
         ${fact('Relays', 'A repeater carries other stations’ messages, so it needs a licence naming its own site.', 'base')}
         ${fact('A label', 'A licensed transmitter over 2 W at a shared site must carry its frequency assignment number.', 'label')}
       </ul>
@@ -108,8 +108,12 @@ const KbLicensing = (function () {
 
   function whoHtml() {
     return sect('who', `${head('who', '📡', 'Who needs a licence', 'Anything that transmits. Nothing that only listens.')}
-      ${figure('A gauge, a repeater and a listening base', D().scene(),
-        'The reading leaves the gauge, is heard and sent on by the repeater, and arrives at a base that only listens. Two of the three transmit.')}
+      ${figure('A gauge, a repeater and a base station that only listens', D().scene(),
+        'The reading leaves the gauge, is heard and sent on by the repeater, and arrives at a base station. Two of the three transmit; the base station only listens.')}
+      <p class="rlc-note"><strong>Flood-Net’s base stations never transmit.</strong> Every one is a receiver: it takes the readings in off the air and passes them on by the internet.
+        So none of them needs a licence, and nothing on this page about transmitters applies to them. One word needs care, though: in a licence, and in the law,
+        <em>“base station”</em> means something else — the transmitting hub the licence names. In this network that hub is always a <strong>repeater</strong>,
+        and this page says “repeater” for it wherever it can.</p>
       <p>The rule is one sentence of ${t('act', 'the Act')}: ${c('act-46', 'section 46')} says nobody may operate a radio device
         “otherwise than as authorised by” a licence. There are three kinds:</p>
       <ul class="rlc-cards">
@@ -143,35 +147,35 @@ const KbLicensing = (function () {
 
   const ROLES = {
     base: {
-      n: 1, name: 'Base station', aka: 'RALI FX16 calls it the master station.',
-      ours: 'A repeater, or a base that transmits.',
+      n: 1, name: 'The licence’s “base station”', aka: 'The law’s word for the hub. RALI FX16 calls it the master station.',
+      ours: 'A repeater — always. Flood-Net’s own base stations only receive, so none of them is one of these.',
       listed: 'Yes — its site, frequency, power and antenna are written on the licence and shown in the register.',
       rules: () => [`The one station the licence names: ${c('lcd-base')}.`,
         `It may run the transmitter power and ${t('eirp')} its licence lists, and no more.`,
-        `ACMA plans a base on no more than 40 W EIRP (${c('fx16-eirp-master')}) and an upright antenna of no more than 8.2 ${t('dbi')} (${c('fx16-master-antenna')}).`],
+        `ACMA plans one on no more than 40 W EIRP (${c('fx16-eirp-master')}) and an upright antenna of no more than 8.2 ${t('dbi')} (${c('fx16-master-antenna')}).`],
     },
     remote: {
       n: 2, name: 'Remote station', aka: 'The spokes of the wheel.',
-      ours: 'A rain or river gauge that reports to a licensed repeater or base.',
+      ours: 'A rain or river gauge that reports to a licensed repeater.',
       listed: 'No. Its location is on neither the licence nor the register.',
-      rules: () => [`Covered by the base’s licence without being named: ${c('lcd-not-listed')}.`,
-        `It may talk only to stations on that same licence (${c('lcd-talk-to')}), on the base’s frequencies (${c('lcd-frequency')}).`,
+      rules: () => [`Covered by the repeater’s licence without being named: ${c('lcd-not-listed')}.`,
+        `It may talk only to stations on that same licence (${c('lcd-talk-to')}), on the repeater’s frequencies (${c('lcd-frequency')}).`,
         `Data only, in short bursts: 2 seconds at most, 10 seconds apart at least (${c('lcd-timing')}), at 1 W into the antenna (${c('lcd-power')}).`,
         `It must stop if it causes ${t('harmful', 'harmful interference')} (${c('lcd-no-harm')}).`],
     },
     fillin: {
       n: 3, name: 'Supplementary base station', aka: 'A fill-in transmitter.',
-      ours: 'Rare here. A second transmitter added to reach a pocket the licensed base cannot — behind a ridge. A repeater that carries gauges further afield is not one.',
+      ours: 'Rare here. A second transmitter added to reach a pocket the licensed repeater cannot — behind a ridge. A repeater that carries gauges further afield is not one.',
       listed: 'No. It is “at a location that is not mentioned in the fixed licence”.',
-      rules: () => [`Only to patch a gap inside the base’s own coverage: ${c('lcd-fill-gaps')}.`,
+      rules: () => [`Only to patch a gap inside the repeater’s own coverage: ${c('lcd-fill-gaps')}.`,
         `Never to stretch that coverage: ${c('lcd-no-extend')}.`,
-        `Once it reaches past the base’s 30 km, ACMA’s policy calls it another master station needing its own licence (${c('fx16-another-master')}).`],
+        `Once it reaches past the repeater’s 30 km, ACMA’s policy calls it another master station needing its own licence (${c('fx16-another-master')}).`],
     },
     rcs: {
-      n: 4, name: 'Remote control station', aka: 'Controls the base from somewhere else.',
+      n: 4, name: 'Remote control station', aka: 'Controls the hub from somewhere else.',
       ours: 'Not something flood telemetry uses; shown so the licence’s wording makes sense.',
       listed: 'No.',
-      rules: () => ['At most 1 W into the antenna, through a directional antenna, on the base’s frequencies.'],
+      rules: () => ['At most 1 W into the antenna, through a directional antenna, on the repeater’s frequencies.'],
     },
   };
 
@@ -190,9 +194,10 @@ const KbLicensing = (function () {
       onclick="KbLicensing.role('${k}')"><span class="rlc-num" aria-hidden="true">${r.n}</span> ${esc(r.name)}</button>`).join('');
 
   function pmpHtml() {
-    return sect('pmp', `${head('pmp', '🛰️', 'One base, many gauges', 'How a point-to-multipoint licence works — the kind most of this network runs under.')}
+    return sect('pmp', `${head('pmp', '🛰️', 'One repeater, many gauges', 'How a point-to-multipoint licence works — the kind most of this network runs under.')}
       <p>A ${t('pmp', 'point-to-multipoint')} licence is a wheel: a hub and its spokes. ACMA’s description: ${c('fx16-system')}.
-        The licence names the hub. Everything else that talks to the hub is covered by the same licence without being written on it.</p>
+        The licence names the hub — it calls it the <em>base station</em>, and in this network it is a repeater. Everything else that talks to the hub is covered
+        by the same licence without being written on it. Flood-Net’s own base stations are not part of the wheel at all: they only listen.</p>
       <div class="rlc-sys">
         ${figure('A point-to-multipoint system, numbered by role', `<div id="rlc-system">${D().system(S.role)}</div>`,
           'The shaded area is the ground ACMA plans the licence to serve. Pick a role to light it.')}
@@ -206,9 +211,9 @@ const KbLicensing = (function () {
         <tbody>
           <tr><th scope="row">Shape</th><td>A hub and its spokes</td><td>One link between two places</td></tr>
           <tr><th scope="row">The law’s test</th><td>${c('int-pmp', 'talks to more than one other station')}</td><td>${c('int-ptp', 'talks to one other station')}</td></tr>
-          <tr><th scope="row">Named on the licence</th><td>The base only</td><td>Both ends</td></tr>
-          <tr><th scope="row">In the register</th><td>The base only (${c('es-register', 'why')})</td><td>Both ends</td></tr>
-          <tr><th scope="row">${t('protection', 'Protected')} from later licences</th><td>The base, and its planned service area</td><td>Each end, by name</td></tr>
+          <tr><th scope="row">Named on the licence</th><td>The repeater only</td><td>Both ends</td></tr>
+          <tr><th scope="row">In the register</th><td>The repeater only (${c('es-register', 'why')})</td><td>Both ends</td></tr>
+          <tr><th scope="row">${t('protection', 'Protected')} from later licences</th><td>The repeater, and its planned service area</td><td>Each end, by name</td></tr>
           <tr><th scope="row">Antenna the law asks for</th><td>None stated</td><td>At 148–174 MHz, at least 12 dBi and a beam of 44° or less — a 6-element ${t('yagi')} (${c('lcd-antenna')})</td></tr>
           <tr><th scope="row">Used here for</th><td>A repeater and the gauges round it</td><td>Carrying data from a repeater or a radar site to an office</td></tr>
         </tbody></table></div>`);
@@ -236,29 +241,29 @@ const KbLicensing = (function () {
     else { verdict = 'Beyond the plan — not unlicensed for that alone'; vcls = 'warn'; }
     const law = e.relay
       ? (e.inside
-        ? row('warn', '!', 'The law', `A transmitter that relays may work here on the base’s licence only as a fill-in: to patch a gap in the base’s own coverage, on the base’s frequencies (${c('lcd-fill-gaps', 's 14(3)')}).`)
+        ? row('warn', '!', 'The law', `A transmitter that relays may work here on the repeater’s licence only as a fill-in: to patch a gap in the repeater’s own coverage, on the repeater’s frequencies (${c('lcd-fill-gaps', 's 14(3)')}).`)
         : row('bad', '✕', 'The law', `A fill-in may not be used “to extend the coverage area of a base station” (${c('lcd-no-extend', 's 14(4)')}). Out here that is what a relay does, so this licence does not cover it.`))
-      : row('ok', '✓', 'The law', `Sets no distance for a gauge. It must talk to this base, on the base’s frequencies, inside the power and timing limits, and cause no harmful interference (${c('es-anywhere', 'ACMA: “can be located anywhere”')}).`);
+      : row('ok', '✓', 'The law', `Sets no distance for a gauge. It must talk to this repeater, on the repeater’s frequencies, inside the power and timing limits, and cause no harmful interference (${c('es-anywhere', 'ACMA: “can be located anywhere”')}).`);
     const plan = e.inside
       ? row('ok', '✓', 'ACMA’s plan', `Inside the ${num(m.radius)} km service area the ${m.name.toLowerCase()} model plans on (${c(S.model === 'low' ? 'fx16-2km' : 'fx16-30km', 'RALI FX16')}).`)
       : row('bad', '✕', 'ACMA’s plan', `Outside it. FX16 says every station “must be contained within the service area” (${c(S.model === 'low' ? 'fx16-2km' : 'fx16-30km', 'RALI FX16')}); a new system would not be assigned this way without an agreed exception.`);
     const prot = e.inside
       ? row('ok', '✓', 'Protection', 'The channel is kept clear of other licensed users out to here, because the plan counts on stations being here.')
       : e.other
-        ? row('bad', '✕', 'Protection', `None — and it is now ${num(e.toB)} km from the next base on the channel, inside <em>that</em> licence’s service area. This is where its bursts are most likely to be somebody else’s interference.`)
+        ? row('bad', '✕', 'Protection', `None — and it is now ${num(e.toB)} km from the next licensed repeater on the channel, inside <em>that</em> licence’s service area. This is where its bursts are most likely to be somebody else’s interference.`)
         : row('warn', '!', 'Protection', `None is planned for out here. The station is on a “no interference, no protection” footing (${c('fx19-fortuitous', 'ACMA’s words, in FX19')}).`);
     const todo = e.relay
-      ? (e.inside ? 'Confirm it only fills a gap in the base’s coverage. If it carries gauges the base could not otherwise hear, license it as a base in its own right.'
-        : 'License it as a base station in its own right, coordinated like any other.')
+      ? (e.inside ? 'Confirm it only fills a gap in the repeater’s coverage. If it carries gauges the licensed repeater could not otherwise hear, give it a licence of its own.'
+        : 'Give it a licence naming its own site, coordinated like any other.')
       : (e.inside ? 'Nothing more as far as distance goes. Check its power and timing in the next section.'
-        : 'Do not record it as unlicensed. Pick one: ask ACMA whether it may stay on this licence; license the nearer repeater it really reports to as a base; or accept it as unprotected. If it ever interferes with anyone, it must stop.');
-    return `<p class="rlc-ex-verdict rlc-ex-${vcls}" id="rlc-ex-verdict"><span class="rlc-ex-d">${num(e.km)} km from the base</span> ${esc(verdict)}</p>
+        : 'Do not record it as unlicensed. Pick one: ask ACMA whether it may stay on this licence; get a licence for the nearer repeater it really reports to; or accept it as unprotected. If it ever interferes with anyone, it must stop.');
+    return `<p class="rlc-ex-verdict rlc-ex-${vcls}" id="rlc-ex-verdict"><span class="rlc-ex-d">${num(e.km)} km from the repeater</span> ${esc(verdict)}</p>
       <ul class="rlc-ex-rows">${law}${plan}${prot}</ul>
       <p class="rlc-ex-todo"><strong>What to do:</strong> ${todo}</p>`;
   }
   function explorerName() {
     const e = explorerState();
-    return `A ${e.relay ? 'relay' : 'gauge'} ${num(e.km)} km from a licensed base whose service area is ${num(e.m.radius)} km: ${e.inside ? 'inside it' : e.other ? 'outside it, and inside the next base’s' : 'outside it'}.`;
+    return `A ${e.relay ? 'relay' : 'gauge'} ${num(e.km)} km from a licensed repeater whose service area is ${num(e.m.radius)} km: ${e.inside ? 'inside it' : e.other ? 'outside it, and inside the next licence’s' : 'outside it'}.`;
   }
 
   function licenceCounts() {
@@ -271,13 +276,13 @@ const KbLicensing = (function () {
   function km30Html() {
     const m = MODELS[S.model];
     const pdf = typeof MapAcma !== 'undefined' && MapAcma.pdfUrl ? MapAcma.pdfUrl('1463975/1') : '';
-    return sect('km30', `${head('km30', '⭕', 'The 30 km question', 'Must a station more than 30 km from a licensed base have a licence of its own?')}
+    return sect('km30', `${head('km30', '⭕', 'The 30 km question', 'Must a station more than 30 km from a licensed repeater have a licence of its own?')}
       <div class="rlc-answer">
         <p class="rlc-answer-h">The short answer</p>
         <p><strong>No — not for a gauge, and not for that reason alone.</strong> 30 km is not in the law and not on the Bureau’s licences. It is the
           ${t('servicearea', 'service area')} ACMA plans a licence on — and in that plan it is written as a “must”. So a gauge beyond 30 km is
           <em>outside what its licence was planned for</em>, which has consequences, but it is not unlicensed.</p>
-        <p><strong>A repeater is different.</strong> A transmitter that carries the signal past the base’s reach may not run on the base’s licence at all.
+        <p><strong>A repeater is different.</strong> A transmitter that carries the signal past the repeater’s reach may not run on the repeater’s licence at all.
           It needs its own.</p>
       </div>
 
@@ -286,14 +291,14 @@ const KbLicensing = (function () {
         <li class="rlc-layer rlc-layer-law">
           <p class="rlc-layer-h">${kind('law')} <strong>1 · The law</strong> — the Act and the Fixed Licence determination</p>
           <p><strong>No distance.</strong> The determination lists what a remote station must do — talk only to its own licence’s stations
-            (${c('lcd-talk-to', 's 13')}), on the base’s frequencies (${c('lcd-frequency', 's 15(2)')}, ${c('lcd-vhf', 's 23(2)')}), briefly
+            (${c('lcd-talk-to', 's 13')}), on the repeater’s frequencies (${c('lcd-frequency', 's 15(2)')}, ${c('lcd-vhf', 's 23(2)')}), briefly
             (${c('lcd-timing', 's 15(3)')}), at low power (${c('lcd-power', 's 15(4)')}), without harmful interference (${c('lcd-no-harm', 's 15(1)')}).
             None of it is a distance. ACMA’s own explanation of the determination puts it this way:</p>
           ${L().quote('es-anywhere')}
         </li>
         <li class="rlc-layer rlc-layer-lic">
           <p class="rlc-layer-h"><span class="term-chip ld-kind" title="${escAttr(W().meaning('special'))}">The licence</span> <strong>2 · The licence document itself</strong></p>
-          <p><strong>Usually no distance — but read it.</strong> A Bureau licence names the base’s site, frequency, power and antenna and stops there
+          <p><strong>Usually no distance — but read it.</strong> A Bureau licence names the repeater’s site, frequency, power and antenna and stops there
             ${pdf ? `(${out('licence 1463975/1, Takura Hill', pdf)} is typical)` : ''}. A licence <em>can</em> carry a condition of its own, and where it does, that
             condition is the one that binds: ${c('lcd-own-conditions', 's 12(2)')}.</p>
           <div id="rlc-lic-counts">${licenceCounts()}</div>
@@ -317,21 +322,21 @@ const KbLicensing = (function () {
             <label><input type="radio" name="rlc-kind" value="relay" ${S.kind === 'relay' ? 'checked' : ''} onchange="KbLicensing.set('kind', this.value)"> A repeater or fill-in <span class="txt-muted">(passes others’ on)</span></label>
           </fieldset>
           <fieldset class="rlc-seg"><legend>${t('model', 'Service model')}</legend>
-            <label><input type="radio" name="rlc-model" value="high" ${S.model === 'high' ? 'checked' : ''} onchange="KbLicensing.set('model', this.value)"> High power <span class="txt-muted">(40 W base, 30 km)</span></label>
-            <label><input type="radio" name="rlc-model" value="low" ${S.model === 'low' ? 'checked' : ''} onchange="KbLicensing.set('model', this.value)"> Low power <span class="txt-muted">(8.3 W base, 2 km)</span></label>
+            <label><input type="radio" name="rlc-model" value="high" ${S.model === 'high' ? 'checked' : ''} onchange="KbLicensing.set('model', this.value)"> High power <span class="txt-muted">(40 W hub, 30 km)</span></label>
+            <label><input type="radio" name="rlc-model" value="low" ${S.model === 'low' ? 'checked' : ''} onchange="KbLicensing.set('model', this.value)"> Low power <span class="txt-muted">(8.3 W hub, 2 km)</span></label>
           </fieldset>
-          <label class="rlc-slider">Distance from the licensed base: <output id="rlc-km-out" for="rlc-km">${num(S.km)} km</output>
+          <label class="rlc-slider">Distance from the licensed repeater: <output id="rlc-km-out" for="rlc-km">${num(S.km)} km</output>
             <input type="range" id="rlc-km" min="0" max="${m.reuse}" step="${S.model === 'low' ? 0.1 : 1}" value="${S.km}"
                    oninput="KbLicensing.set('km', this.value)"></label>
         </div>
-        ${figure('The station, the base and its service area, from above', D().explorer(),
-          `The solid circle is the service area. The line under the picture is the ${t('reuse', 're-use distance')}: ACMA puts the next base on the same channel no closer than that, and the dashed circle is that base’s own service area.`)}
+        ${figure('The station, the licensed repeater and its service area, from above', D().explorer(),
+          `The solid circle is the service area. The line under the picture is the ${t('reuse', 're-use distance')}: ACMA puts the next licence on the same channel no closer than that, and the dashed circle is that licence’s own service area.`)}
         <div class="rlc-ex-read" id="rlc-ex-read" aria-live="polite">${explorerReadout()}</div>
       </div>
 
       <h4>What “outside the plan” costs</h4>
       <ul class="rlc-list">
-        <li><strong>No protection.</strong> Only the base is checked against other users; the gauges are protected because the plan assumes where they are:
+        <li><strong>No protection.</strong> Only the repeater is checked against other users; the gauges are protected because the plan assumes where they are:
           ${c('fx16-coordination')}. In another point-to-multipoint instruction ACMA says what that means beyond the planned range:
           ${L().quote('fx19-fortuitous')}
           <span class="small txt-muted">That is RALI FX19, written for wireless broadband at 1900 MHz — a different band, quoted because it states the principle in so many words.</span></li>
@@ -346,9 +351,9 @@ const KbLicensing = (function () {
         <caption>The ways through, least effort first</caption>
         <thead><tr><th scope="col">Option</th><th scope="col">When it fits</th><th scope="col">What it takes</th></tr></thead>
         <tbody>
-          <tr><th scope="row">Check which base it really reports to</th><td>Always first. Many gauges are far from one licensed base and close to another on the same channel.</td>
-            <td>The ACMA licences tool on the Stations map lists the nearest licensed bases for any station.</td></tr>
-          <tr><th scope="row">Leave it, knowingly</th><td>It reports to a licensed base, keeps the power and timing limits, and is nowhere near another user of the channel.</td>
+          <tr><th scope="row">Check which repeater it really reports to</th><td>Always first. Many gauges are far from one licensed repeater and close to another on the same channel.</td>
+            <td>The ACMA licences tool on the Stations map lists the nearest licensed repeaters for any station.</td></tr>
+          <tr><th scope="row">Leave it, knowingly</th><td>It reports to a licensed repeater, keeps the power and timing limits, and is nowhere near another user of the channel.</td>
             <td>Record that it is outside the planned service area and unprotected. It must stop if it ever causes interference.</td></tr>
           <tr><th scope="row">Ask ACMA</th><td>Several stations are in this position, or the answer decides money.</td>
             <td>One email — a draft is in <button type="button" class="link-btn" onclick="KbLicensing.go('ask')">ACMA’s pages</button> below. A written answer settles it.</td></tr>
@@ -391,7 +396,7 @@ const KbLicensing = (function () {
       { k: 'law', name: 'Share of time on the air', got: `1 in ${num(gap / dur, 0)}`, limit: '1 in 30 at most', bad: dur / gap > 1 / 30 + 1e-9, cite: 'lcd-duty', why: 'Burst length divided by start-to-start time.' },
       { k: 'policy', name: 'EIRP', got: D().wattText(eirp), limit: '20 W at most', bad: eirp > 20 + 1e-9, cite: 'fx16-eirp-remote',
         why: `${D().wattText(atAnt)} into an antenna of ${num(a.gain, 2)} dBi.` },
-      { k: 'policy', name: a.dir ? 'Power off the back of the antenna' : 'Power away from the base', got: D().wattText(back), limit: '5 W at most', bad: back > 5 + 1e-9, cite: 'fx16-omni',
+      { k: 'policy', name: a.dir ? 'Power off the back of the antenna' : 'Power away from the repeater', got: D().wattText(back), limit: '5 W at most', bad: back > 5 + 1e-9, cite: 'fx16-omni',
         why: a.dir ? `The EIRP, ${num(a.fb)} dB down behind a ${a.name.toLowerCase()}.` : 'This antenna radiates all round, so it is the whole EIRP.' },
     ];
     return { a, tx, loss, atAnt, eirp, back, dur, gap, lim, rules, fails: rules.filter(r => r.bad) };
@@ -400,7 +405,7 @@ const KbLicensing = (function () {
   function checkOut() {
     const k = checkState();
     const lawFails = k.fails.filter(r => r.k === 'law').length, polFails = k.fails.length - lawFails;
-    const sum = !k.fails.length ? ['ok', 'Keeps all six limits', 'As a remote station of a licensed base, this set-up is inside both the law’s limits and ACMA’s planning figures.']
+    const sum = !k.fails.length ? ['ok', 'Keeps all six limits', 'As a remote station of a licensed repeater, this set-up is inside both the law’s limits and ACMA’s planning figures.']
       : lawFails ? ['bad', `Over ${lawFails} of the law’s limits${polFails ? `, and ${polFails} of ACMA’s planning figures` : ''}`,
         'It cannot run like this as a remote station on somebody’s point-to-multipoint licence. Turn it down, or it needs a licence naming its own site that allows these settings.']
         : ['warn', `Inside the law, over ${polFails} of ACMA’s planning figures`, 'Lawful as a remote station, but more than FX16 plans a gauge on. Expect to be asked to turn it down if anybody is disturbed.'];
@@ -431,16 +436,16 @@ const KbLicensing = (function () {
 
   function gaugeHtml() {
     const ants = Object.entries(D().ANTENNAS).filter(([k]) => k !== 'iso');
-    return sect('gauge', `${head('gauge', '🌧️', 'A gauge’s limits', 'What a rain or river gauge must keep to when it rides on a base’s licence as a remote station.')}
+    return sect('gauge', `${head('gauge', '🌧️', 'A gauge’s limits', 'What a rain or river gauge must keep to when it rides on a repeater’s licence as a remote station.')}
       <ul class="rlc-rules">
         <li><span class="rlc-rule-n">1 W</span><span>into the antenna, at most — measured after the cable, not at the radio (${c('lcd-power', 's 15(4)')}). Only in 451.5–452.5 MHz and 805.5–806 MHz is it 5 W.</span></li>
         <li><span class="rlc-rule-n">2 s</span><span>is the longest a single ${t('burst', 'transmission')} may last (${c('lcd-timing', 's 15(3)')}).</span></li>
         <li><span class="rlc-rule-n">10 s</span><span>is the least from the start of one burst to the start of the next (${c('lcd-interval', 'what “repetition interval” means')}).</span></li>
         <li><span class="rlc-rule-n">1 in 30</span><span>is the most of the time it may be on the air — its ${t('duty', 'duty cycle')} (${c('lcd-duty', 'defined in s 5(3)')}).</span></li>
-        <li><span class="rlc-rule-n">20 W</span><span>${t('eirp')} at most in ACMA’s plan, and no more than 5 W in any direction but towards the base — so 5 W in all if the antenna is not directional (${c('fx16-eirp-remote', 'the 20 W')}; ${c('fx16-omni', 'the 5 W')}).</span></li>
-        <li><span class="rlc-rule-n">Same channel</span><span>as the base listens on, and it talks to nothing but stations on that licence (${c('lcd-frequency', 's 15(2)')}; ${c('lcd-talk-to', 's 13')}).</span></li>
+        <li><span class="rlc-rule-n">20 W</span><span>${t('eirp')} at most in ACMA’s plan, and no more than 5 W in any direction but towards the repeater — so 5 W in all if the antenna is not directional (${c('fx16-eirp-remote', 'the 20 W')}; ${c('fx16-omni', 'the 5 W')}).</span></li>
+        <li><span class="rlc-rule-n">Same channel</span><span>as the repeater listens on, and it talks to nothing but stations on that licence (${c('lcd-frequency', 's 15(2)')}; ${c('lcd-talk-to', 's 13')}).</span></li>
       </ul>
-      <p>The first four and the last are law. The 20 W and 5 W figures are ACMA’s planning policy. A condition written on the base’s own licence overrides any of them
+      <p>The first four and the last are law. The 20 W and 5 W figures are ACMA’s planning policy. A condition written on the repeater’s own licence overrides any of them
         (${c('lcd-own-conditions', 's 12(2)')}).</p>
 
       <h4>Check a gauge</h4>
@@ -465,7 +470,7 @@ const KbLicensing = (function () {
         The checker takes the figures you give it; it does not know a station’s real radio.</p>`);
   }
 
-  // ── A base, a repeater, and the licence that names them ─────────────────────
+  // ── A repeater, and the licence that names it ───────────────────────────────
 
   const EM = {
     '7K50F2D': 'the Bureau’s usual ALERT designator',
@@ -503,7 +508,7 @@ const KbLicensing = (function () {
         : !q.shared ? 'With no other assigned transmitter within 200 metres it is not a shared site, so the rule does not apply. A label does no harm.'
           : 'Fit a label with the transmitter’s frequency assignment number and “Do Not Remove”, in a colour that stands out.';
     return `<fieldset class="rlc-seg rlc-label-fs"><legend>Does this transmitter need one?</legend>
-        ${box('lic', 'It is a fixed transmitter named on a licence — a base or a repeater, not an unlisted gauge')}
+        ${box('lic', 'It is a fixed transmitter named on a licence — a repeater, not an unlisted gauge')}
         ${box('w2', 'Its licence allows more than 2 W EIRP')}
         ${box('shared', 'Another licensed fixed transmitter stands within 200 metres, in the same band')}
       </fieldset>
@@ -514,31 +519,32 @@ const KbLicensing = (function () {
   function baseHtml() {
     const pdf = typeof MapAcma !== 'undefined' && MapAcma.pdfUrl ? MapAcma.pdfUrl('1463975/1') : '';
     const row = (k, v, what) => `<tr><th scope="row">${k}</th><td>${v}</td><td>${what}</td></tr>`;
-    return sect('base', `${head('base', '🗼', 'A base’s limits, and a repeater’s', 'The station the licence names may do what the licence lists — and a repeater is always one of those.')}
-      <p><strong>A repeater is a base station.</strong> It transmits to carry other stations’ messages, so it cannot ride on another licence the way a gauge
+    return sect('base', `${head('base', '🗼', 'A repeater’s limits', 'The station a licence names may do what the licence lists. In this network that station is always a repeater.')}
+      <p><strong>A repeater is what the law calls a base station.</strong> It transmits to carry other stations’ messages, so it cannot ride on another licence the way a gauge
         does. It needs a licence naming its own site; the ACMA licences tool on the Stations map shows which repeaters have one. A repeater with none, sitting inside another
-        base’s circle, is covered only if it is a true ${t('fillin', 'fill-in')}; one that reaches further is “another master station” (${c('fx16-another-master')}).</p>
+        licensed repeater’s circle, is covered only if it is a true ${t('fillin', 'fill-in')}; one that reaches further is “another master station” (${c('fx16-another-master')}).
+        Flood-Net’s base stations are not in this section: they only receive, and a receiver has no limits to keep.</p>
 
       <h4>What ACMA plans each kind of system on</h4>
       <div class="table-wrap"><table class="rlc-table rlc-models">
-        <caption>RALI FX16’s two service models</caption>
+        <caption>RALI FX16’s two service models — its “master station” is our licensed repeater</caption>
         <thead><tr><th scope="col">&nbsp;</th><th scope="col">High power</th><th scope="col">Low power</th></tr></thead>
         <tbody>
-          <tr><th scope="row">Base’s ${t('eirp')}, at most</th><td>40 W (${c('fx16-eirp-master', 's 3.1')})</td><td>8.3 W (${c('fx16-low-eirp', 's 3.2')})</td></tr>
+          <tr><th scope="row">Repeater’s ${t('eirp')}, at most</th><td>40 W (${c('fx16-eirp-master', 's 3.1')})</td><td>8.3 W (${c('fx16-low-eirp', 's 3.2')})</td></tr>
           <tr><th scope="row">A gauge’s EIRP, at most</th><td>20 W (${c('fx16-eirp-remote', 's 3.1')})</td><td>8.3 W</td></tr>
           <tr><th scope="row">${t('servicearea', 'Service area')}</th><td>30 km (${c('fx16-30km', 's 3.1')})</td><td>2 km (${c('fx16-2km', 's 3.2')})</td></tr>
           <tr><th scope="row">${t('reuse', 'Re-use distance')}</th><td>100 km (${c('fx16-reuse', 's 3.1')})</td><td>10 km (${c('fx16-low-reuse', 's 3.2')})</td></tr>
-          <tr><th scope="row">Base antenna</th><td>Upright, 8.2 dBi at most (${c('fx16-master-antenna', 's 3.1')})</td><td>Planned on the same</td></tr>
-          <tr><th scope="row">${t('eah', 'Antenna height')} assumed</th><td>Base 200 m, gauge 5 m (${c('fx16-heights', 's 3.1')})</td><td>Base 10 m, gauge 3 m</td></tr>
+          <tr><th scope="row">Its antenna</th><td>Upright, 8.2 dBi at most (${c('fx16-master-antenna', 's 3.1')})</td><td>Planned on the same</td></tr>
+          <tr><th scope="row">${t('eah', 'Antenna height')} assumed</th><td>Repeater 200 m, gauge 5 m (${c('fx16-heights', 's 3.1')})</td><td>Hub 10 m, gauge 3 m</td></tr>
           <tr><th scope="row">Fill-in transmitters</th><td>Allowed inside the area (${c('fx16-fill-in', 's 3.1')})</td><td>Not provided for</td></tr>
         </tbody></table></div>
       <p>The same service areas apply when a point-to-multipoint licence is assigned on channels otherwise set aside for land mobile radio
         (${c('fx16-land-mobile', 's 5.4')}) — the register files those as <em>Point to Multipoint – Land Mobile Spec</em>.</p>
 
-      <h4>A fill-in gets weaker the further it is from the base</h4>
+      <h4>A fill-in gets weaker the further it is from the licensed repeater</h4>
       <div class="table-wrap"><table class="rlc-table rlc-fill">
-        <caption>What a supplementary base station may run, by its distance from the base (${c('fx16-fill-in-table', 'FX16 Table 2')})</caption>
-        <thead><tr><th scope="col">Distance from the base</th><th scope="col">EIRP, at most</th><th scope="col">${t('eah', 'Effective antenna height')}</th></tr></thead>
+        <caption>What a fill-in (a “supplementary base station”) may run, by its distance from the licensed repeater (${c('fx16-fill-in-table', 'FX16 Table 2')})</caption>
+        <thead><tr><th scope="col">Distance from the licensed repeater</th><th scope="col">EIRP, at most</th><th scope="col">${t('eah', 'Effective antenna height')}</th></tr></thead>
         <tbody><tr><td>Under 10 km</td><td>20 W</td><td>100 m</td></tr><tr><td>Under 20 km</td><td>10 W</td><td>25 m</td></tr><tr><td>Under 30 km</td><td>5 W</td><td>5 m</td></tr></tbody>
       </table></div>
 
@@ -556,11 +562,11 @@ const KbLicensing = (function () {
           ${row('Date of effect and expiry', '28 Sep 2026 to 23 Sep 2027', 'A year. After the expiry date it authorises nothing until renewed.')}
           ${row(t('special', 'Special conditions'), 'None on this one', 'Where a licence has any, they are listed here and they outrank the general rules.')}
           ${row(t('advisory', 'Advisory note'), 'Points to the Transmitter Licence and Fixed Licence determinations', 'Where the standing conditions are. Nothing about distance or a service area.')}
-          ${row('Site', 'ACMA site 16671, Takura Hill, with its latitude and longitude', 'The base station: the one place the licence names.')}
-          ${row(t('frequency', 'Assigned frequency'), '151.5 MHz, to transmit and to receive', `The channel. The gauges send on the frequency the base receives on. ${t('simplex', 'Single frequency')}.`)}
+          ${row('Site', 'ACMA site 16671, Takura Hill, with its latitude and longitude', 'The repeater — the licence’s “base station”: the one place the licence names.')}
+          ${row(t('frequency', 'Assigned frequency'), '151.5 MHz, to transmit and to receive', `The channel. The gauges send on the frequency the repeater receives on. ${t('simplex', 'Single frequency')}.`)}
           ${row(t('bandwidth'), '12.5 kHz', 'The width of the channel.')}
-          ${row(t('txpower', 'Transmitter power'), '5 W', 'The most the base’s radio may put out.')}
-          ${row(t('eirp'), '8.4 W', 'The most the base may radiate in its strongest direction.')}
+          ${row(t('txpower', 'Transmitter power'), '5 W', 'The most the repeater’s radio may put out.')}
+          ${row(t('eirp'), '8.4 W', 'The most the repeater may radiate in its strongest direction.')}
           ${row(t('fan', 'Freq. assign. ID'), '0001167088 to transmit, 0001167091 to receive', 'ACMA’s number for this one use of the channel. The transmit one goes on the transmitter’s label — see below.')}
           ${row(t('emission', 'Emission designator'), '10K1F3E', 'The kind of signal — taken apart below.')}
           ${row(t('polarisation', 'Antenna'), 'Vertical; “Colinear Vertical”', `An upright ${t('collinear')}: all round the compass.`)}
@@ -605,10 +611,10 @@ const KbLicensing = (function () {
   function rxHtml() {
     return sect('rx', `${head('rx', '👂', 'Receivers', 'Listening needs no licence. A licence for a receiver buys protection, not permission.')}
       <ul class="rlc-cards">
-        <li class="rlc-card rlc-card-on"><h4>A base that only listens</h4>
-          <p>Needs nothing. Section 46 applies to a receiver only if it is one of six listed kinds (${c('types-receivers', 'the list')}), and a plain
-            listening base is not one of them unless somebody has had it coordinated and licensed.</p></li>
-        <li class="rlc-card"><h4>The base’s receiver on a point-to-multipoint licence</h4>
+        <li class="rlc-card rlc-card-on"><h4>A Flood-Net base station</h4>
+          <p>Only listens, so it needs nothing — and that is every base station in this network. Section 46 applies to a receiver only if it is one of six listed kinds (${c('types-receivers', 'the list')}), and a plain
+            listening station is not one of them unless somebody has had it coordinated and licensed.</p></li>
+        <li class="rlc-card"><h4>The repeater’s receiver on a point-to-multipoint licence</h4>
           <p>The licence lists a receive frequency beside the transmit one. That is the licence <em>referring</em> to the receiver — it is what the gauges are
             allowed to transmit to — not licensing it: ${c('lcd-receiver')}.</p></li>
         <li class="rlc-card"><h4>A ${t('rxlic', 'fixed receive licence')}</h4>
@@ -665,9 +671,9 @@ const KbLicensing = (function () {
               <tr><td class="num">0.1 W</td><td class="num">20</td><td>The class licence’s limit</td></tr>
               <tr><td class="num">1 W</td><td class="num">30</td><td>A gauge’s limit at the antenna</td></tr>
               <tr><td class="num">5 W</td><td class="num">37</td><td>A common radio; the all-round limit for a gauge</td></tr>
-              <tr><td class="num">8.3 W</td><td class="num">39.2</td><td>A low-power base’s EIRP</td></tr>
+              <tr><td class="num">8.3 W</td><td class="num">39.2</td><td>A low-power hub’s EIRP</td></tr>
               <tr><td class="num">20 W</td><td class="num">43</td><td>A gauge’s EIRP limit</td></tr>
-              <tr><td class="num">40 W</td><td class="num">46</td><td>A high-power base’s EIRP</td></tr>
+              <tr><td class="num">40 W</td><td class="num">46</td><td>A licensed repeater’s EIRP in the high-power model</td></tr>
             </tbody></table></div>
         </div>
       </div>
@@ -715,12 +721,12 @@ const KbLicensing = (function () {
         The shaded wedge is the ${t('beamwidth')}. Drawn from each antenna’s published gain, beamwidth and front-to-back figures by one formula: the right shape, not a maker’s measured plot.</p>
       <h4>Where the rules mention antennas</h4>
       <ul class="rlc-list">
-        <li><strong>A base</strong> is planned on an upright (${t('polarisation', 'vertically polarised')}) antenna of no more than 8.2 dBi — a tall ${t('collinear')} (${c('fx16-master-antenna')}).</li>
+        <li><strong>A licensed repeater</strong> is planned on an upright (${t('polarisation', 'vertically polarised')}) antenna of no more than 8.2 dBi — a tall ${t('collinear')} (${c('fx16-master-antenna')}).</li>
         <li><strong>A gauge</strong> may use anything, but a ${t('directional')} antenna is encouraged. With an ${t('omni', 'omnidirectional')} one its whole EIRP may be no more than 5 W (${c('fx16-omni')}).
           ACMA’s example of a directional antenna at VHF is a 3-element Yagi: ${c('fx16-yagi', '6 dBi, 12 dB front to back, a 75° beam')}.</li>
         <li><strong>A point-to-point link</strong> at 148–174 MHz whose licence names no antenna must use one of at least 12 dBi with a beam of 44° or less and 20 dB front to back —
           a 6-element Yagi (${c('lcd-antenna', 'Table 1')}). If the licence names an antenna, that one must be used.</li>
-        <li><strong>The licence records</strong> the antenna’s type, ${t('polarisation')}, height and — for a directional one — its ${t('azimuth')}. Changing the antenna on a base
+        <li><strong>The licence records</strong> the antenna’s type, ${t('polarisation')}, height and — for a directional one — its ${t('azimuth')}. Changing the antenna on a licensed repeater
           changes its EIRP, so it is a change to the licence.</li>
       </ul>`);
   }
@@ -728,28 +734,28 @@ const KbLicensing = (function () {
   // ── Does it need its own licence? ───────────────────────────────────────────
 
   const WIZ = {
-    start: { q: 'Does it transmit?', help: 'A gauge with a radio and an ALERT address does. So does a repeater. A base that only receives does not.',
+    start: { q: 'Does it transmit?', help: 'A gauge with a radio and an ALERT address does. So does a repeater. A base station does not: Flood-Net’s only receive.',
       a: [['Yes', 'tiny'], ['No — it only listens', 'r-listen']] },
     tiny: { q: 'Is it a very low-power device — 100 mW EIRP or less, on 150.7875–152.49375 MHz?', help: 'A tenth of a watt. Almost no flood gauge is; a short-range sensor link might be.',
       a: [['Yes', 'r-class'], ['No — a watt or more', 'relay']] },
     relay: { q: 'Does it pass on other stations’ messages?', help: 'A repeater does. A gauge sends only its own readings.',
       a: [['Yes — it relays', 'r-relay'], ['No — only its own readings', 'hasbase']] },
-    hasbase: { q: 'Is the repeater or base it transmits to licensed, on the channel the gauge uses?', help: 'On the Stations map, open 📜 ACMA licences and find the station: it lists the licensed bases nearest to it and their channels.',
+    hasbase: { q: 'Is the repeater it transmits to licensed, on the channel the gauge uses?', help: 'On the Stations map, open 📜 ACMA licences and find the station: it lists the licensed repeaters nearest to it and their channels.',
       a: [['Yes', 'limits'], ['No', 'r-nobase'], ['Not sure', 'r-find']] },
     limits: { q: 'Does it keep a remote station’s limits — 1 W into the antenna, bursts of 2 seconds or less, 10 seconds or more apart?', help: 'The checker under “A gauge’s limits” works it out from the radio, the cable and the antenna.',
       a: [['Yes', 'inside'], ['No — more power, or longer or faster bursts', 'r-own']] },
-    inside: { q: 'Is it inside that base’s service area — 30 km, or the distance the licence itself states?', help: 'The ACMA licences tool draws the circle and says how far each station is from the base.',
+    inside: { q: 'Is it inside that repeater’s service area — 30 km, or the distance the licence itself states?', help: 'The ACMA licences tool draws the circle and says how far each station is from the repeater.',
       a: [['Yes', 'r-covered'], ['No — further out', 'r-beyond']] },
   };
   const RESULTS = {
     'r-listen': ['ok', 'No licence needed', () => `Receiving needs none. If the site matters and has no transmitter licence, a ${t('rxlic', 'fixed receive licence')} is an optional way to have it protected.`],
     'r-class': ['ok', 'Covered by the class licence', () => 'It may run with no licence of its own under the low-power class licence, for as long as it stays at 100 mW EIRP or less. It has no protection from interference.'],
-    'r-relay': ['bad', 'Yes — it needs a licence naming its own site', () => `A relay is a base station. Find its site in the register; if it has no licence there, it needs one through an ${t('accredited', 'accredited person')}. The one narrow exception is a true fill-in inside a licensed base’s coverage (${c('lcd-fill-gaps', 's 14(3)')}; ${c('lcd-no-extend', 's 14(4)')}).`],
-    'r-nobase': ['bad', 'Yes — something must be licensed', () => 'With no licensed base on its channel there is nothing for it to ride on. Either the base it reports to is licensed as a point-to-multipoint base, or the gauge has a licence of its own.'],
+    'r-relay': ['bad', 'Yes — it needs a licence naming its own site', () => `A relay is what the law calls a base station. Find its site in the register; if it has no licence there, it needs one through an ${t('accredited', 'accredited person')}. The one narrow exception is a true fill-in inside a licensed repeater’s coverage (${c('lcd-fill-gaps', 's 14(3)')}; ${c('lcd-no-extend', 's 14(4)')}).`],
+    'r-nobase': ['bad', 'Yes — something must be licensed', () => 'With no licensed repeater on its channel there is nothing for it to ride on. Either the repeater it reports to gets a point-to-multipoint licence, or the gauge has a licence of its own.'],
     'r-find': ['warn', 'Find out first', () => 'Everything else depends on this. Look the station up in the ACMA licences tool on the Stations map; “none found” there is a prompt to look further, not a finding.'],
     'r-own': ['bad', 'Yes — or turn it down', () => `Over the remote-station limits it cannot ride on somebody’s point-to-multipoint licence (${c('lcd-power', 's 15(4)')}; ${c('lcd-timing', 's 15(3)')}). Bring it inside the limits, or license its own site for the settings it needs.`],
-    'r-covered': ['ok', 'No — the base’s licence covers it', () => `It is a remote station of that licence: covered without being listed (${c('lcd-not-listed')}), and inside what the licence was planned for. If somebody other than the licence holder owns it, the holder’s written permission is needed (${c('act-114', 'Act, s 114')}).`],
-    'r-beyond': ['warn', 'Not by law — but it is outside the plan', () => `The base’s licence still covers it in law; nothing there sets a distance. It is outside ACMA’s planned service area (${c('fx16-30km')}), so it is unprotected and must not interfere. See <button type="button" class="link-btn" onclick="KbLicensing.go('km30')">the 30 km question</button> for the ways through.`],
+    'r-covered': ['ok', 'No — the repeater’s licence covers it', () => `It is a remote station of that licence: covered without being listed (${c('lcd-not-listed')}), and inside what the licence was planned for. If somebody other than the licence holder owns it, the holder’s written permission is needed (${c('act-114', 'Act, s 114')}).`],
+    'r-beyond': ['warn', 'Not by law — but it is outside the plan', () => `The repeater’s licence still covers it in law; nothing there sets a distance. It is outside ACMA’s planned service area (${c('fx16-30km')}), so it is unprotected and must not interfere. See <button type="button" class="link-btn" onclick="KbLicensing.go('km30')">the 30 km question</button> for the ways through.`],
   };
   function wizHtml() {
     let node = 'start';
@@ -812,19 +818,19 @@ const KbLicensing = (function () {
     const main = reg.top[0] || [151.5, 0];
     return `<ul class="rlc-tiles" aria-label="The Bureau’s licences in force">
         ${tile(reg.mine, 'Bureau licences in force')}
-        ${tile(reg.minePmp, `${t('pmp', 'point to multipoint')} — a base and its gauges`)}
+        ${tile(reg.minePmp, `${t('pmp', 'point to multipoint')} — a repeater and its gauges`)}
         ${tile(reg.minePtp, `${t('ptp', 'point to point')} — a link`)}
         ${tile(reg.soon, 'expire within 90 days')}
       </ul>
       <p>From ${t('register', 'ACMA’s register')} as it stood on ${esc(reg.asAt)} — ${reg.total} licences of ${reg.holders} holders are kept, the Bureau’s and those of councils and
-        water authorities on the same channels. <strong>${main[1]}</strong> of the Bureau’s ${reg.txN} VHF base transmitters are on <strong>${num(main[0], 4)} MHz</strong>.</p>
-      <h4>How strong the Bureau’s VHF bases are licensed to be</h4>
-      ${figure('The Bureau’s VHF point-to-multipoint bases by licensed EIRP', D().bars(reg.bins.map(([l, n, cls]) => [l, n, cls]),
-        `The Bureau’s ${reg.txN} VHF base transmitters by licensed EIRP: ${reg.bins.map(([l, n]) => `${n} at ${l}`).join(', ')}.`),
-        `8.3 W is where ACMA’s low-power model stops and 40 W where its high-power model does. A base just over 8.3 W is a high-power system in the plan; the register does not say which model a licence was assigned on.`)}
+        water authorities on the same channels. <strong>${main[1]}</strong> of the Bureau’s ${reg.txN} licensed VHF transmitters of that kind are on <strong>${num(main[0], 4)} MHz</strong>.</p>
+      <h4>How strong the Bureau’s VHF repeaters are licensed to be</h4>
+      ${figure('The Bureau’s VHF point-to-multipoint transmitters by licensed EIRP', D().bars(reg.bins.map(([l, n, cls]) => [l, n, cls]),
+        `The Bureau’s ${reg.txN} licensed VHF point-to-multipoint transmitters by EIRP: ${reg.bins.map(([l, n]) => `${n} at ${l}`).join(', ')}.`),
+        `8.3 W is where ACMA’s low-power model stops and 40 W where its high-power model does. A transmitter just over 8.3 W is a high-power system in the plan; the register does not say which model a licence was assigned on.`)}
       <details class="rlc-sure"><summary>The same counts as a table</summary>
-        <div class="table-wrap"><table class="rlc-table"><caption>The Bureau’s VHF base transmitters by licensed EIRP</caption>
-          <thead><tr><th scope="col">Licensed EIRP</th><th scope="col">Base transmitters</th></tr></thead>
+        <div class="table-wrap"><table class="rlc-table"><caption>The Bureau’s licensed VHF point-to-multipoint transmitters by EIRP</caption>
+          <thead><tr><th scope="col">Licensed EIRP</th><th scope="col">Transmitters</th></tr></thead>
           <tbody>${reg.bins.map(([l, n]) => `<tr><td>${esc(l)}</td><td class="num">${n}</td></tr>`).join('')}</tbody></table></div>
       </details>`;
   }
@@ -833,7 +839,7 @@ const KbLicensing = (function () {
       <div id="rlc-ours-body">${oursBody()}</div>
       <p><button type="button" class="primary" onclick="KbLicensing.tool()"><span aria-hidden="true">📜</span> Open the ACMA licences tool on the Stations map</button></p>
       <p class="small txt-muted">The tool draws every licence at its site with its service area, and says for each transmitting station whether a licence is at its site, it is
-        inside a licence’s area, it reports to a licensed base from beyond the area, or none was found.</p>`);
+        inside a licence’s area, it reports to a licensed repeater from beyond the area, or none was found.</p>`);
   }
 
   // ── ACMA's pages, and a question to send ────────────────────────────────────
@@ -871,13 +877,13 @@ const KbLicensing = (function () {
   const ASK = `To: freqplan@acma.gov.au (copy info@acma.gov.au)
 Subject: RALI FX16 — remote stations beyond the 30 km service area of an existing point-to-multipoint licence
 
-We operate flood-warning telemetry in the VHF high band. Rain and river gauges report as remote stations to base stations that hold Fixed (Point to Multipoint) licences, most of them on 151.5 MHz, single frequency.
+We operate flood-warning telemetry in the VHF high band. Rain and river gauges report as remote stations to repeaters, each the base station of a Fixed (Point to Multipoint) licence, most of them on 151.5 MHz, single frequency. Our own receiving sites do not transmit.
 
 RALI FX16 (25 March 2025), section 3.1, gives a service area radius of 30 km and says all stations must be contained within it. The Radiocommunications Licence Conditions (Fixed Licence) Determination 2025 sets no distance for a remote station, and its explanatory statement says such transmitters "can be located anywhere".
 
-Some of our gauges are more than 30 km from the licensed base they report to. Could you confirm:
+Some of our gauges are more than 30 km from the licensed base station (repeater) they report to. Could you confirm:
 
-1. Is a remote station that reports to a licensed base from beyond 30 km authorised by that base's licence, provided it meets sections 13, 15 and 23 of the Determination and causes no harmful interference?
+1. Is a remote station that reports to a licensed base station from beyond 30 km authorised by that base station's licence, provided it meets sections 13, 15 and 23 of the Determination and causes no harmful interference?
 2. If it is, is our understanding right that it has no protection beyond the service area and operates on a no-interference basis?
 3. Would ACMA prefer such stations to be brought under a licence for a nearer base station, and is there a preferred way to do that for an existing network?
 4. Do the service models of FX16 apply to these single-frequency licences on 151.5 MHz, or were they assigned under another RALI?
@@ -918,14 +924,14 @@ Thank you.`;
   const QUIZ = [
     ['A new rain gauge, 1 W into a collinear antenna, 12 km from a Bureau repeater that has a point-to-multipoint licence on 151.5 MHz.',
       'Covered, with nothing more to do.', () => `It is a remote station of the repeater’s licence: unlisted, inside the 30 km service area, inside the power limit. It needs the Bureau’s agreement if it is not the Bureau’s gauge (${c('act-114', 'Act, s 114')}).`],
-    ['The same gauge, but 44 km from that repeater, with no nearer licensed base.',
+    ['The same gauge, but 44 km from that repeater, with no nearer licensed repeater.',
       'Still covered in law. Outside the plan.', () => `No distance is set by law (${c('es-anywhere')}), so it is not unlicensed. It is outside FX16’s service area (${c('fx16-30km')}): unprotected, and it must stop if it interferes. Record it and consider asking ACMA.`],
     ['A river gauge with a 5 W radio on half a metre of cable, reporting to a licensed repeater 8 km away.',
       'Over the power limit — close, but not covered as it stands.', () => `About 4.5 W reaches the antenna; the limit for a remote station is 1 W (${c('lcd-power', 's 15(4)')}). Turn it down or fit an attenuator, or license its own site for 5 W.`],
-    ['A solar-powered repeater on a ridge 50 km from the nearest licensed base, relaying six gauges to it.',
-      'Needs its own licence.', () => `It relays, and it carries the signal beyond the base’s reach. The law forbids a fill-in extending coverage (${c('lcd-no-extend', 's 14(4)')}) and FX16 calls it another master station (${c('fx16-another-master')}).`],
-    ['An office base station with a receiver and an antenna, and no transmitter.',
-      'No licence needed.', () => `Listening needs none. A ${t('rxlic', 'fixed receive licence')} is optional, for protection (${c('int-receive')}).`],
+    ['A solar-powered repeater on a ridge 50 km from the nearest licensed repeater, relaying six gauges to it.',
+      'Needs its own licence.', () => `It relays, and it carries the signal beyond the repeater’s reach. The law forbids a fill-in extending coverage (${c('lcd-no-extend', 's 14(4)')}) and FX16 calls it another master station (${c('fx16-another-master')}).`],
+    ['A Flood-Net base station: a receiver and an antenna, and no transmitter.',
+      'No licence needed.', () => `Listening needs none, and every base station in this network only listens. A ${t('rxlic', 'fixed receive licence')} is optional, for protection (${c('int-receive')}).`],
     ['A council wants to put its own gauge on the Bureau’s 151.5 MHz channel near a Bureau repeater.',
       'It needs the Bureau’s written permission, or its own licence.', () => `Only the licensee and those it has authorised in writing may transmit under a licence (${c('act-114', 'Act, s 114')}). The council’s alternative is a licence of its own.`],
     ['A Bureau repeater licensed for 17 W EIRP, in a hilltop hut it shares with a council’s two-way radio base and a mobile phone tower.',

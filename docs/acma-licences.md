@@ -12,6 +12,14 @@ the document at the sentence. The documents are kept in [`docs/acma/`](acma/READ
 It is a different question from the interference layer (🗺️ Layers › ACMA
 licences, 📡 RF Changes), which asks who *else* transmits near the receivers.
 
+**Two meanings of "base station".** Flood-Net's base stations — the
+receivers that take the readings in — **only receive**. None transmits, so
+none needs a licence, and the tool marks each *Not a transmitter*. In a
+licence and in the law, "base station" means something else: the one
+transmitting station a point-to-multipoint licence names. In this network
+that is always a **repeater**. Below, "the licensed repeater" is that
+station, and "base station" appears only inside a quotation.
+
 **A guide, not legal advice.** Written in November 2026 from the instruments
 linked below. Check with ACMA (1300 850 115, info@acma.gov.au) before relying
 on any of it.
@@ -44,38 +52,38 @@ The panel's holder list is the same set, with a tick box each.
 |---|---|---|
 | A transmitter needs a licence | Operating one without is an offence. Apparatus, spectrum and class licences are the three kinds. | [Radiocommunications Act 1992](https://www.legislation.gov.au/C2004A04465/latest/text), s 46 |
 | Outside a condition is outside the licence | Operation "is not authorised by the relevant apparatus licence if it is not in accordance with the conditions of the licence". | Act, s 97(4) |
-| Point to multipoint | One base station "at a fixed location specified in the licence"; remote stations whose "locations … are not specified in the licence". | [Fixed Licence determination 2025](https://www.legislation.gov.au/F2025L00388/latest/text), s 5(2) and note (Compilation No. 2, in force 21 March 2026) |
+| Point to multipoint | One "base station" — here, a repeater — "at a fixed location specified in the licence"; remote stations whose "locations … are not specified in the licence". | [Fixed Licence determination 2025](https://www.legislation.gov.au/F2025L00388/latest/text), s 5(2) and note (Compilation No. 2, in force 21 March 2026) |
 | Point to point | A station "principally for communication with one other fixed station". Both ends are on the licence. | [Interpretation determination 2025](https://www.legislation.gov.au/F2025L00362/latest/text) |
 | Who a station may talk to | Only stations the same licence authorises or refers to. | Fixed Licence determination, s 13 |
-| A remote station's channel | Only the base's licensed transmit and receive frequencies. | Fixed Licence determination, ss 15(2), 23(2) |
+| A remote station's channel | Only the licensed repeater's transmit and receive frequencies. | Fixed Licence determination, ss 15(2), 23(2) |
 | A remote station's power and timing | For data or telemetry: no more than 2 s a transmission, at least 10 s between starts, no more than 1 in 30 of the time; no more than 1 W measured at the antenna input (5 W only in 451.5–452.5 and 805.5–806 MHz). | Fixed Licence determination, s 15(3)–(4), Table 2 |
 | A remote station must not interfere | It may not be operated "if its operation causes harmful interference". At any distance. | Fixed Licence determination, ss 15(1), 23(1) |
 | A licence's own conditions win | Where a condition written on the licence differs from the determination, the licence's applies. | Fixed Licence determination, s 12(2) |
 | A fill-in transmitter | Only to overcome gaps "within the coverage area of a base station"; never "to extend the coverage area of a base station". | Fixed Licence determination, s 14(3)–(4) |
 | A point-to-point antenna | Where the licence names none, 148–174 MHz needs at least 12 dBi, a beam of 44° or less and 20 dB front to back. | Fixed Licence determination, s 11, Table 1 |
-| The service area (ACMA's planning radius) | "A service area radius of 30 km. All stations must be contained within the service area." 2 km for a low-power system. Only the base is coordinated; the remote stations are protected by being inside the model. | [RALI FX16](https://www.acma.gov.au/sites/default/files/2025-11/rali_fx16.pdf), ss 3.1, 3.2 (in effect 25 March 2025) |
-| ACMA's planning figures for power | A base: 40 W EIRP at most (8.3 W low power), antenna gain 8.2 dBi at most. A remote station: 20 W EIRP at most, and 5 W at most in any direction but towards its base. | RALI FX16, s 3.1 |
+| The service area (ACMA's planning radius) | "A service area radius of 30 km. All stations must be contained within the service area." 2 km for a low-power system. Only the licensed repeater is coordinated; the remote stations are protected by being inside the model. | [RALI FX16](https://www.acma.gov.au/sites/default/files/2025-11/rali_fx16.pdf), ss 3.1, 3.2 (in effect 25 March 2025) |
+| ACMA's planning figures for power | The licensed repeater: 40 W EIRP at most (8.3 W low power), antenna gain 8.2 dBi at most. A remote station: 20 W EIRP at most, and 5 W at most in any direction but towards that repeater. | RALI FX16, s 3.1 |
 | A transmitter that extends coverage | "…beyond a 30 km radius of the master station is not a supplementary transmitter; it is another master station and must be separately licensed". | RALI FX16, s 4.3 |
 | A label on the transmitter | A licensed fixed transmitter of more than 2 W EIRP at a communal site carries a label with its frequency assignment number and "Do Not Remove". | [Labelling determination 2023](https://www.legislation.gov.au/F2023L01181/latest/text), ss 5, 7, 8; Act, s 300 |
-| Land mobile | A base and mobiles "operated principally for two-way communications"; its service area is 40 km from the base. Not the licence for a fixed gauge. | [Land Mobile Licence determination 2025](https://www.legislation.gov.au/F2025L01132/asmade/text) |
+| Land mobile | A fixed radio and mobiles "operated principally for two-way communications"; its service area is 40 km from the fixed radio. Not the licence for a fixed gauge. | [Land Mobile Licence determination 2025](https://www.legislation.gov.au/F2025L01132/asmade/text) |
 | No licence at all | Any transmitter on 150.7875–152.49375 MHz at 100 mW EIRP or less. | [LIPD class licence 2025](https://www.legislation.gov.au/F2025L01047/asmade/text), Schedule 1, Table 1, item 17 |
 | Somebody else's transmitter on your licence | Needs the holder's written authorisation, which some holders may not give. | Act, s 114; [Authorisations and Transfers determination 2025](https://www.legislation.gov.au/F2025L00844/asmade/text) |
 
 ### The 30 km question
 
-**Must a station more than 30 km from a licensed base have a licence of its
-own? Not a gauge, and not for that reason alone.**
+**Must a station more than 30 km from the licensed repeater it reports to
+have a licence of its own? Not a gauge, and not for that reason alone.**
 
 There are three places a rule can live, and they say different things:
 
 1. **The law** — the Act and the Fixed Licence determination — **sets no
    distance.** It lists what a remote station must do: talk to its own
-   licence's stations, on the base's frequencies, briefly, at low power,
+   licence's stations, on the licensed repeater's frequencies, briefly, at low power,
    without harmful interference. ACMA's explanatory statement to the
    determination says a licence's unlisted transmitters "can be located
    anywhere, although for most practical purposes, they need to be located in
    relatively close physical proximity" to the one that is named.
-2. **The licence document** names the base's site, frequency, power and
+2. **The licence document** names the repeater's site, frequency, power and
    antenna, and — as a rule — no distance. A few licences write one into a
    special condition ("a service area of 20 km"), and a licence's own condition
    binds; where one is given the tool draws it.
@@ -85,10 +93,10 @@ There are three places a rule can live, and they say different things:
    fits it — and allows exceptions case by case. It is not legislation.
 
 So a gauge beyond the circle is **outside what its licence was planned for**:
-unprotected, since only the base is coordinated; bound not to interfere, which
+unprotected, since only the licensed repeater is coordinated; bound not to interfere, which
 is law at any distance; and on the back foot in a dispute. It is not
 unlicensed. A **repeater** is different: a transmitter that carries the signal
-further than the base reaches may not run on the base's licence at all
+further than a licensed repeater reaches may not run on that repeater's licence at all
 (s 14(4); FX16 s 4.3) and needs a licence naming its own site.
 
 What nobody has written down, as far as could be found, is what ACMA does about
@@ -119,9 +127,9 @@ For a station that transmits — it has an ALERT address, or is a repeater:
 |---|---|
 | **Licence at the site** | A licence in force has a transmitter within 500 m, on a channel the station uses (or its channel is not on record). |
 | **Inside a licence's area** | Otherwise: it is inside the circle of a point-to-multipoint licence in force, on its channel. For a **repeater** the verdict adds that a circle covers it only as a fill-in, and that it normally needs its own licence. |
-| **Beyond a licence's area** | Otherwise, for a gauge: a repeater that carries it (by its pass ranges), within the map's Max TX distance, stands within 500 m of the base of a point-to-multipoint licence in force on its channel. Covered in law by that licence; outside the service area ACMA planned it on. |
+| **Beyond a licence's area** | Otherwise, for a gauge: a repeater that carries it (by its pass ranges), within the map's Max TX distance, stands within 500 m of the transmitter of a point-to-multipoint licence in force on its channel. Covered in law by that licence; outside the service area ACMA planned it on. |
 | **None found** | None of those. Never "unlicensed": the weekly copy can lag, the holder may not be in the list, or a transmitter of 100 mW EIRP or less may run under the class licence. |
-| **Not a transmitter** | No ALERT address and not a repeater. Receiving needs no licence. |
+| **Not a transmitter** | No ALERT address and not a repeater. Receiving needs no licence. Every Flood-Net base station is here: they only receive. |
 
 A station's channel is its own transmit frequency where one is recorded, else
 the listening frequency of each repeater that likely hears it directly

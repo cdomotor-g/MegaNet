@@ -124,7 +124,7 @@ const SiteMap = (function () {
       ],
     },
     licensing: {
-      what: 'What the network\'s transmitters and receivers need by way of an ACMA radio licence, in plain words — who needs one, how one licence covers a base and its gauges, the 30 km question, the limits on power and timing, and antennas and EIRP taken apart — with every rule opened in its own document.',
+      what: 'What the network\'s transmitters and receivers need by way of an ACMA radio licence, in plain words — who needs one, how one licence covers a repeater and its gauges, the 30 km question, the limits on power and timing, and antennas and EIRP taken apart — with every rule opened in its own document.',
       use: [
         'Find out whether a station needs a licence of its own, six questions at most',
         'Settle what 30 km means: the law, the licence and ACMA\'s plan side by side',

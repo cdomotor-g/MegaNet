@@ -819,14 +819,15 @@ const HELP = {
   },
   licensing: {
     summary: 'What this network\'s transmitters and receivers need by way of a radio licence, in plain words. <strong>Who needs one</strong> '
-           + '(anything that sends; nothing that only listens), how a <strong>point-to-multipoint</strong> licence covers one named base and the '
+           + '(anything that sends; nothing that only listens), how a <strong>point-to-multipoint</strong> licence covers one named repeater and the '
            + 'unlisted gauges round it, and the <strong>30 km question</strong> — set out as what the law says, what the licence says and what '
            + 'ACMA\'s planning policy says, with a station you can slide in and out of the circle. A <strong>checker</strong> holds a gauge\'s '
-           + 'radio, cable, antenna and timing to the six limits for a remote station. Further down: a base\'s and a repeater\'s limits, a licence '
+           + 'radio, cable, antenna and timing to the six limits for a remote station. Further down: a repeater\'s limits, a licence '
            + 'document read line by line, the <strong>label</strong> a transmitter at a shared site must carry, receivers, <strong>EIRP</strong> '
            + 'and decibels taken apart word by word, the antennas with their patterns, a six-question helper for one station, the Bureau\'s '
            + 'licences counted, ACMA\'s own pages and a question to send. Every rule has a 📖 link that opens its document at the sentence.',
     watch: [
+      '<strong>Flood-Net\'s base stations only receive</strong>, so none needs a licence. Where a licence or the law says “base station” it means the transmitting station the licence names — in this network, always a repeater.',
       '<strong>A guide, not legal advice.</strong> It was written from copies of the documents saved on one day. Rules change and a licence can carry its own conditions: read the licence document and ask ACMA before acting.',
       '<strong>30 km is ACMA\'s planning circle, not a distance in the law.</strong> A gauge beyond it is outside what its licence was planned for — unprotected, and it must not interfere — but it is not unlicensed for that reason alone. A repeater that carries the signal further is different and needs its own licence.',
       'Each rule is marked <strong>The law</strong> or <strong>ACMA policy</strong>. The law binds; a RALI decides what licence is issued and what is protected.',

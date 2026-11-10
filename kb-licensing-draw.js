@@ -5,17 +5,17 @@
 //                   from the sheet's tokens so both themes get them, and moved
 //                   by CSS so the one reduced-motion policy stills them.
 //
-//     scene()        who needs a licence: a gauge, a repeater and a base that
+//     scene()        who needs a licence: a gauge, a repeater and a base station that
 //                    only listens, with the message travelling between them
 //     system()       a point-to-multipoint system, role by role
-//     explorer()     the 30 km question seen from above: a base, its service
-//                    area, the next base on the channel, and a station to move
+//     explorer()     the 30 km question seen from above: a licensed repeater, its
+//                    service area, the next licence on the channel, and a station to move
 //     shapes()       one power, three shapes: isotropic, dipole, Yagi
 //     pattern()      an antenna's radiation pattern, from above or from the side
 //     antenna()      what the antenna itself looks like
 //     ladder()       transmitter power → at the antenna → EIRP, against the limits
 //     timeline()     a gauge's bursts across a minute, against the timing rules
-//     bars()         how many of a holder's bases run at each EIRP
+//     bars()         how many of a holder's licensed transmitters run at each EIRP
 //
 // Every drawing is `role="img"` with a name that carries its numbers; what it
 // offers to do is on real controls beside it, never on the picture
@@ -46,9 +46,9 @@ const LicensingDraw = (function () {
     dipole: { name: 'Half-wave dipole', gain: 2.15, bw: 360, vbw: 78, fb: 0, dir: false, els: 0,
       what: 'A straight rod about a metre long, fed in the middle. The simplest real antenna and the second yardstick (0 dBd).', use: 'The reference for dBd and ERP; folded versions sit on many masts.' },
     col5: { name: 'Collinear, 5 dBi', gain: 5.15, bw: 360, vbw: 36, fb: 0, dir: false, els: 0,
-      what: 'Two or three dipoles stacked in one upright tube, a couple of metres tall.', use: 'Gauges that must reach more than one repeater; small bases.' },
+      what: 'Two or three dipoles stacked in one upright tube, a couple of metres tall.', use: 'Gauges that must reach more than one repeater; a base station’s receiver.' },
     col8: { name: 'Collinear, 8.2 dBi', gain: 8.2, bw: 360, vbw: 16, fb: 0, dir: false, els: 0,
-      what: 'A tall stack of dipoles, five or six metres of tube. 8.2 dBi is the most RALI FX16 plans a base station on.', use: 'A repeater or base that listens all round.' },
+      what: 'A tall stack of dipoles, five or six metres of tube. 8.2 dBi is the most RALI FX16 plans a licence’s hub on.', use: 'A repeater; a base station that listens all round.' },
     yagi3: { name: 'Yagi, 3 elements', gain: 6, bw: 75, vbw: 75, fb: 12, dir: true, els: 3,
       what: 'Three rods on a short boom. ACMA’s least for a directional antenna at VHF: 6 dBi, a 75° beam, 12 dB front to back.', use: 'A gauge pointed at its one repeater.' },
     yagi6: { name: 'Yagi, 6 elements', gain: 12, bw: 44, vbw: 44, fb: 20, dir: true, els: 6,
@@ -92,7 +92,7 @@ const LicensingDraw = (function () {
 
   function scene() {
     return `<svg class="rlc-svg rlc-scene" viewBox="0 0 760 300" role="img"
-        aria-label="A rain gauge transmits to a repeater on a hill, which transmits on to a base that only listens. The gauge and the repeater need a licence; the listening base does not.">
+        aria-label="A rain gauge transmits to a repeater on a hill, which transmits on to a base station that only listens. The gauge and the repeater need a licence; the base station does not.">
       <path class="rlc-sky" d="M0 0h760v300H0z"/>
       <path class="rlc-hill" d="M0 214 C90 196 150 204 220 196 C290 176 330 118 380 112 C430 118 470 176 540 196 C610 206 680 198 760 208 V300 H0z"/>
       <path class="rlc-water" d="M36 214 q16 -7 32 0 t32 0 t32 0 t32 0 v10 H36z"/>
@@ -122,7 +122,7 @@ const LicensingDraw = (function () {
         <path class="rlc-line rlc-thin" d="M618 164 h14 v14 h-14z M646 164 h14 v14 h-14z M636 202 v-16 h12 v16"/>
         <path class="rlc-line" d="M690 202 V96 M682 108 h16 M684 122 h12"/>
         ${waves(676, 100, -1, 'rlc-wave-in')}
-        <text class="rlc-lbl" x="648" y="240" text-anchor="middle">Base</text>
+        <text class="rlc-lbl" x="648" y="240" text-anchor="middle">Base station</text>
       </g>
       ${tag(648, 250, 160, 'Only listens · none', 'rlc-tag-no')}
 
@@ -144,7 +144,7 @@ const LicensingDraw = (function () {
     const lit = k => (on === k ? ' is-on' : on ? ' is-off' : '');
     const remotes = [[120, 250], [205, 300], [330, 318], [470, 300], [150, 170]];
     return `<svg class="rlc-svg rlc-system" viewBox="0 0 660 360" role="img"
-        aria-label="A point-to-multipoint system: one base station on a hill named on the licence, five remote stations round it that are not named, a fill-in transmitter behind a ridge, and a remote control station.">
+        aria-label="A point-to-multipoint system: one repeater on a hill, named on the licence as its base station; five remote stations round it that are not named; a fill-in transmitter behind a ridge; and a remote control station.">
       <ellipse class="rlc-area-fill" cx="320" cy="222" rx="286" ry="124"/>
       <ellipse class="rlc-area-edge" cx="320" cy="222" rx="286" ry="124"/>
       <path class="rlc-hill" d="M232 178 C276 156 296 96 320 92 C344 96 364 156 408 178z"/>
@@ -179,12 +179,12 @@ const LicensingDraw = (function () {
 
   // ── The 30 km question, from above ──────────────────────────────────────────
   // Drawn once; placeExplorer() moves the parts. Positions are in kilometres
-  // from base A along a line 12° north of east, at `scale` px a km.
+  // from the licensed repeater along a line 12° north of east, at `scale` px a km.
 
   const EX = { ax: 150, ay: 150, bearing: -12 * Math.PI / 180 };
   function explorer() {
     return `<svg class="rlc-svg rlc-explorer" id="rlc-ex-svg" viewBox="0 0 720 300" role="img" aria-labelledby="rlc-ex-name">
-      <title id="rlc-ex-name">A base station, its service area, and a station at a distance you choose</title>
+      <title id="rlc-ex-name">A licensed repeater, its service area, and a station at a distance you choose</title>
       <path class="rlc-reuse" id="rlc-ex-reuse" d="M${EX.ax} 268 H450 M${EX.ax} 260 v16 M450 260 v16"/>
       <circle class="rlc-area-fill rlc-area-b" id="rlc-ex-area-b" cx="450" cy="${EX.ay}" r="90"/>
       <circle class="rlc-area-edge rlc-area-b" id="rlc-ex-edge-b" cx="450" cy="${EX.ay}" r="90"/>
@@ -192,12 +192,12 @@ const LicensingDraw = (function () {
       <circle class="rlc-area-edge" id="rlc-ex-edge-a" cx="${EX.ax}" cy="${EX.ay}" r="90"/>
       <path class="rlc-ruler" id="rlc-ex-ruler" d="M${EX.ax} ${EX.ay} L240 190"/>
       <g id="rlc-ex-b"><circle class="rlc-pin rlc-pin-b" cx="450" cy="${EX.ay}" r="6"/>
-        <text class="rlc-lbl" x="450" y="${EX.ay + 24}" text-anchor="middle">next base on</text>
+        <text class="rlc-lbl" x="450" y="${EX.ay + 24}" text-anchor="middle">next licence on</text>
         <text class="rlc-lbl" x="450" y="${EX.ay + 40}" text-anchor="middle">the channel</text></g>
       <circle class="rlc-pin" cx="${EX.ax}" cy="${EX.ay}" r="7"/>
-      <text class="rlc-lbl rlc-lbl-b" x="${EX.ax}" y="${EX.ay + 26}" text-anchor="middle">licensed base</text>
+      <text class="rlc-lbl rlc-lbl-b" x="${EX.ax}" y="${EX.ay + 26}" text-anchor="middle">licensed repeater</text>
       <text class="rlc-lbl rlc-lbl-area" id="rlc-ex-ring-t" x="${EX.ax}" y="52" text-anchor="middle">service area · 30 km</text>
-      <text class="rlc-lbl rlc-lbl-reuse" id="rlc-ex-reuse-t" x="300" y="290" text-anchor="middle">re-use distance · 100 km — the least between two bases on one channel</text>
+      <text class="rlc-lbl rlc-lbl-reuse" id="rlc-ex-reuse-t" x="300" y="290" text-anchor="middle">re-use distance · 100 km — the least between two licences on one channel</text>
       <g id="rlc-ex-st" transform="translate(240 190)">
         <circle class="rlc-st-pulse" r="16"/>
         <circle class="rlc-st" id="rlc-ex-dot" r="8"/>
@@ -224,7 +224,7 @@ const LicensingDraw = (function () {
     g('rlc-ex-km').textContent = `${num(v.km)} km`;
     g('rlc-ex-ring-t').setAttribute('y', f1(EX.ay - r - 8));
     g('rlc-ex-ring-t').textContent = `service area · ${num(v.radius)} km`;
-    g('rlc-ex-reuse-t').textContent = `re-use distance · ${num(v.reuse)} km — the least between two bases on one channel`;
+    g('rlc-ex-reuse-t').textContent = `re-use distance · ${num(v.reuse)} km — the least between two licences on one channel`;
     g('rlc-ex-name').textContent = v.name;
   }
 
@@ -383,7 +383,7 @@ const LicensingDraw = (function () {
     </svg>`;
   }
 
-  // ── A holder's bases by EIRP ────────────────────────────────────────────────
+  // ── A holder's licensed transmitters by EIRP ────────────────────────────────
 
   // rows: [[label, count, cls]]
   function bars(rows, name) {

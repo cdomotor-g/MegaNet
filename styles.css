@@ -29837,6 +29837,7 @@ select.kl-in { width: auto; font-family: inherit; }
 .rlc-cite-eg { white-space: nowrap; border: 1px solid var(--border); border-radius: var(--r-pill); padding: 0 .5em; background: var(--panel-sub); font-size: var(--fs-sm); }
 .rlc-disclaimer { border-left: 3px solid var(--lic-warn); padding-left: var(--sp-2); }
 .rlc-toc { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
+.rlc-page p.rlc-note { padding: var(--sp-2) var(--sp-3); border-left: 4px solid var(--lic-area); border-radius: var(--r-sm); background: color-mix(in srgb, var(--lic-area) 10%, var(--panel)); }
 
 .rlc-facts { list-style: none; margin: 0 0 var(--sp-3); padding: 0; display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr)); }
 .rlc-fact-b { display: grid; gap: var(--sp-1); width: 100%; height: 100%; text-align: left; align-content: start; padding: var(--sp-3);
