@@ -2484,6 +2484,15 @@ jobs:
       - name: check_health_findings.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_health_findings.sql
+      # The administrators told (0113): one email when a base station has not
+      # checked in for half an hour, one when it is back — with what the
+      # station says brought it back — never twice for one finding, three a
+      # station a day at most, none with the switch off or without a mail key,
+      # and the switch an administrator's alone. Sends nothing: the sender is
+      # stood in for inside the check's own transaction.
+      - name: check_base_station_mail.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_base_station_mail.sql
       - name: check_inspections.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_inspections.sql

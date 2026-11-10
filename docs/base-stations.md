@@ -367,6 +367,53 @@ administrators can read them.
 `tools/check_health_findings.sql` proves each — opening, getting worse, held,
 cleared — against Postgres.
 
+## Told when one goes offline
+
+A finding is something a person has to open a tab to see. On the night of
+10 November 2026 a base station lost its internet link at 22:18 and stayed cut
+off until its operator switched it off and on at 06:27; it was down as *offline*
+the whole night, and nobody was told. Two things came of it.
+
+**The administrators are emailed** (`0113`,
+`meganet.send_base_station_mail()`, `pg_cron` every five minutes):
+
+- **Offline** — one message when a base station has not checked in for **30
+  minutes**, saying when it was last heard, whether it is on Wi-Fi or Ethernet,
+  and what it does by itself to get back. Half an hour, not at once: a router
+  restarting in the small hours is a few minutes of quiet, and the station's
+  own first tries (below) come in that time.
+- **Back** — one message when it checks in again, with how long it was away
+  and, where the station says, what brought it back.
+- Once per finding, however long it stays open, and **at most three "offline"
+  messages a station in 24 hours**, so a link that comes and goes does not fill
+  an inbox. Several stations in one run are one message.
+- To Flood-Net's administrators — the people who can read base station findings
+  — at the address their account mail goes to. Under the list on the Base
+  Stations tab, one switch turns the messages off for all of them, and the wait
+  can be 10 minutes to two hours. Nothing is sent until the mail key is set
+  (`docs/accounts.md`); who else should hear, and about what, is #216.
+
+A message names the base station by its label and nothing else: no address of
+the station, none of a person. `tools/check_base_station_mail.sql` proves it,
+with the sender stood in for.
+
+**A base station gets its own link back** (RPi ALERT 0.23). When no Flood-Net
+door has answered for two minutes it works out what kind of trouble it is, then
+joins its Wi-Fi network again, renews the connection, restarts its networking at
+fifteen minutes and, as the last resort, reboots itself at 45 — each reboot in
+one outage after a longer wait, and never during a survey, with a phone on its
+hotspot, or during an update. It keeps a record of every outage that survives
+the reboot and sends it in its status as `recovery`. On the tab, a station's
+**Uplink** says what it does *if it loses touch* — or that its software is too
+old to do anything — and *Last lost touch*: when, for how long, what kind of
+trouble, each thing it tried and what brought it back, as the station tells it.
+**Settings › This station › When it loses touch with Flood-Net** changes it from
+here: everything, everything but the reboot, or nothing.
+
+A check-in cannot be made while the link is down, so that record always arrives
+afterwards. Something that reads these records and the findings together, and
+acts on them, is EPIC #288.
+
 ## Its connection over time
 
 The Admin tab's **Base station connections** (`admin-links.js`, `0080`) is the
