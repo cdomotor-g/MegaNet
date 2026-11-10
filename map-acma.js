@@ -91,6 +91,8 @@ const MapAcma = (() => {
   let picked = null;            // { type: 'station' | 'licence', id }
   let cover = null;             // the coverage answer, cached: { key, rows, counts, holders }
   let noneSort = 'gap';
+  let noneOwner = '';     // the none-found list narrowed to one owner ('' = all)
+  const NEAR_MISS_KM = 10; // a gap this small is likely a station just past the assumed reach, not a missing licence
 
   function loadPrefs() {
     const base = { show: false, cover: false, cls: { bureau: true, council: true, other: true }, off: [],
@@ -127,9 +129,12 @@ const MapAcma = (() => {
       pmp: 'Point to multipoint: one base station at a named site, and the remote stations that talk to it. The licence '
         + 'and the register name the base only — the remote stations are covered by it without being listed.',
       ptp: 'Point to point: a radio link between two named sites. Both ends are on the licence; it covers nothing else.',
-      area: `The circle round a point-to-multipoint base: ${R} km here. The licence itself states no distance — this is `
-        + 'the service-area radius ACMA plans such a service on (30 km high power, 2 km low power, RALI FX16), unless the '
-        + 'licence’s own special conditions give a figure, which is then drawn instead. A planning figure, not a legal boundary.',
+      area: `The circle round a point-to-multipoint base: ${R} km here. The licence does not say how far away its remote `
+        + 'stations may be. When ACMA hands out a channel it assumes they are all within 30 km of the base (2 km for a '
+        + 'low-power system) and keeps other users of the channel clear of that circle only (RALI FX16). So the circle is '
+        + 'the reach ACMA assumes — a sensible first look, not a legal boundary. A station outside it is not unlicensed '
+        + 'for that reason alone; it is just further out than ACMA allowed for. Where a licence’s own special conditions '
+        + 'give a distance, that is drawn instead.',
       site: `A current licence has a transmitter within ${Math.round(SITE_KM * 1000)} m of the station, on a channel the `
         + 'station uses (or its channel is not on record).',
       inarea: 'No licence names the station’s own site, but it stands inside the circle of a current point-to-multipoint '
@@ -139,6 +144,13 @@ const MapAcma = (() => {
         + 'or less may run under the class licence for low-power devices.',
       na: 'The station has no ALERT address and is not a repeater, so it is not recorded as transmitting. Receiving '
         + 'needs no licence.',
+      nearmiss: `A station with none found whose nearest point-to-multipoint base on its channel is ${NEAR_MISS_KM} km or less `
+        + 'beyond the circle. Most likely it talks to that base and is simply further out than ACMA assumes; widen '
+        + 'Assumed reach to see them fall inside.',
+      farout: `A station with none found that is more than ${NEAR_MISS_KM} km beyond the nearest circle on its channel. `
+        + 'These are the likelier real gaps: check which base it reports through and whether that base is licensed.',
+      nochan: 'A station with none found and no point-to-multipoint base on its channel among the ticked holders. Either '
+        + 'its channel on record is wrong, its licence is held by somebody not ticked, or there is none.',
       gap: 'How far the station is outside the nearest point-to-multipoint licence’s circle: its distance from that base, '
         + 'less the radius.',
       carries: 'The base of the covering licence stands where a repeater that carries this station stands — by the '
@@ -163,7 +175,7 @@ const MapAcma = (() => {
   const GLOSSARY = [
     ['register', 'Register'], ['holder', 'Holder'], ['pmp', 'Point to multipoint (PMP)'], ['ptp', 'Point to point (PTP)'],
     ['area', 'Covered area'], ['site', 'Licence at the site'], ['inarea', 'Inside a licence’s area'], ['none', 'None found'],
-    ['na', 'Not a transmitter'], ['gap', 'Gap'], ['carries', 'Carries it'], ['soon', 'Expires soon'], ['lapsed', 'Not in force'],
+    ['na', 'Not a transmitter'], ['gap', 'Gap'], ['nearmiss', 'Just past a circle'], ['farout', 'Well outside'], ['nochan', 'No base on its channel'], ['carries', 'Carries it'], ['soon', 'Expires soon'], ['lapsed', 'Not in force'],
     ['txpower', 'TX power'], ['eirp', 'EIRP'], ['emission', 'Emission'], ['cond', 'Special condition'],
     ['under', 'Stations under it'], ['recorded', 'On the station’s record'],
   ];
@@ -443,7 +455,7 @@ const MapAcma = (() => {
     }
     if (a.state === 'area') {
       const m = a.area[0], l = m.lic, R = radiusOf(l);
-      const reach = l.statedKm != null ? `the ${R} km service area written on that licence` : `the ${R} km radius ACMA plans such a licence on`;
+      const reach = l.statedKm != null ? `the ${R} km service area written on that licence` : `the ${R} km reach ACMA assumes for such a licence`;
       const via = m.via ? ` That base is at ${m.via.name}, a repeater that carries this station.`
         : a.carried ? ' None of the repeaters that carry this station stands at that base, so check it is the base it talks to.' : '';
       return `No licence names this site. It is ${fmtKm(m.txKm)} from the base of point-to-multipoint licence ${l.no} `
@@ -626,10 +638,36 @@ const MapAcma = (() => {
     catch (_) { return s.owner ? String(s.owner) : ''; }
   }
 
+  // The none-found stations by who owns them, split by how likely each is a
+  // real gap: just past a circle (a base is close — probably covered, only
+  // further out than ACMA assumes), well outside every circle, or no
+  // point-to-multipoint base on its channel at all among the ticked holders.
+  const NO_OWNER = '(no owner on record)';
+  function noneByOwner() {
+    const C = coverage();
+    if (!C) return [];
+    const by = new Map();
+    for (const a of C.rows) {
+      if (a.state !== 'none') continue;
+      const k = ownerText(a.st) || NO_OWNER;
+      let o = by.get(k);
+      if (!o) by.set(k, o = { owner: k, n: 0, near: 0, far: 0, nochan: 0, holders: new Map() });
+      o.n++;
+      if (!a.nearestPmp) o.nochan++;
+      else {
+        if (Math.max(0, a.nearestPmp.gap) <= NEAR_MISS_KM) o.near++; else o.far++;
+        const h = holderName(a.nearestPmp.lic);
+        o.holders.set(h, (o.holders.get(h) || 0) + 1);
+      }
+    }
+    return [...by.values()].map(o => ({ ...o, holder: ([...o.holders].sort((x, y) => y[1] - x[1])[0] || [''])[0] }))
+      .sort((x, y) => (y.far + y.nochan) - (x.far + x.nochan) || y.n - x.n);
+  }
+
   function noneRows() {
     const C = coverage();
     if (!C) return [];
-    const rows = C.rows.filter(a => a.state === 'none');
+    const rows = C.rows.filter(a => a.state === 'none' && (!noneOwner || (ownerText(a.st) || NO_OWNER) === noneOwner));
     const gap = a => (a.nearestPmp ? Math.max(0, a.nearestPmp.gap) : Infinity);
     if (noneSort === 'name') rows.sort((x, y) => String(x.st.name).localeCompare(String(y.st.name)));
     else if (noneSort === 'owner') rows.sort((x, y) => ownerText(x.st).localeCompare(ownerText(y.st)) || String(x.st.name).localeCompare(String(y.st.name)));
@@ -675,7 +713,7 @@ const MapAcma = (() => {
       const u = C.under.get(l) || { site: 0, area: 0 }, t = l.devs.find(d => d.tr === 'T') || {}, s0 = l.txSites[0] || l.sites[0] || {};
       lines.push([q(l.no), q(holderName(l)), l.holder ? l.holder.cls : '', q(l.cat), q(l.status), l.issued, l.expiry, daysLeft(l) ?? '',
         q(l.callsign), q(l.f.map(mhz).join(' ')), t.txW ?? '', t.eirpW ?? '', q(l.sites.map(s => s.id).join(' ')), q(l.sites.map(s => s.name).join(' | ')),
-        s0.lat ?? '', s0.lon ?? '', l.kind === 'pmp' ? radiusOf(l) : '', l.kind === 'pmp' ? (l.statedKm != null ? 'the licence' : 'planning radius') : '',
+        s0.lat ?? '', s0.lon ?? '', l.kind === 'pmp' ? radiusOf(l) : '', l.kind === 'pmp' ? (l.statedKm != null ? 'the licence' : 'assumed reach') : '',
         u.site, u.area, q(l.conds.join(' | ')), q(pdfUrl(l.no))].join(','));
     }
     return lines.join('\n') + '\n';
@@ -737,7 +775,7 @@ const MapAcma = (() => {
         ${esc(mhz(x.f))} MHz${x.bw != null ? `, ${esc(String(x.bw))} kHz wide` : ''}${x.em ? ` · ${term('emission', 'emission')} ${esc(x.em)}` : ''}${x.tr === 'T'
           ? ` · ${term('txpower', 'TX power')} ${esc(watt(x.txW))} · ${term('eirp', 'EIRP')} ${esc(watt(x.eirpW))}` : ''}${x.antM != null ? ` · antenna ${esc(String(x.antM))} m up` : ''}</li>`).join('');
     const reach = l.kind === 'pmp'
-      ? `Its circle is ${radiusOf(l)} km — ${l.statedKm != null ? 'the service area written in its special conditions' : 'ACMA’s planning radius, set above; the licence states no distance'}.`
+      ? `Its circle is ${radiusOf(l)} km — ${l.statedKm != null ? 'the service area written in its special conditions' : 'the reach ACMA assumes when it hands out the channel (set above); the licence states no distance'}.`
       : l.links.length ? `A link between ${l.links.map(([a, b]) => `${a.name} and ${b.name} (${fmtKm(acmaHaversineKm(a.lat, a.lon, b.lat, b.lon))})`).join('; ')}. It covers those ends and nothing between.`
       : 'The register copy holds one end of this link only.';
     return `<div class="lic-picked" id="acmalic-picked" data-lic="${escAttr(l.no)}">
@@ -854,11 +892,12 @@ const MapAcma = (() => {
         <p><strong>The licence states no distance.</strong> It names the base station’s site and nothing else; the remote stations are
           not listed on it or in the register (${src('fixed', 's 5(2) note')}; ${src('options', 'ACMA’s guidance')}). What the rules
           require is that a remote station talks to that base, on the base’s own frequencies (${src('fixed', 'ss 13, 15(2) and 23(2)')}).</p>
-        <p><strong>30 km is ACMA’s planning figure.</strong> When ACMA assigns a channel for a point-to-multipoint service it plans on a
+        <p><strong>30 km is ACMA’s planning figure.</strong> In plain words: it is the distance ACMA assumes, not a limit it sets. When ACMA assigns a channel for a point-to-multipoint service it plans on a
           service area of 30 km radius for a high-power system and 2 km for a low-power one, expects every station of the system to
           be inside it, and protects nothing beyond it (${src('fx16', 'RALI FX16')}). So 30 km is the right circle to draw as a first
-          look — and this tool draws it — but it is a planning radius, not a boundary written into the licence. Change it with
-          <em>Radius</em> above.</p>
+          look — and this tool draws it — but it is an assumed reach, not a boundary written into the licence. A station beyond it is not unlicensed
+          for that reason alone; it is further from its base than ACMA allowed for, so nobody is kept off its channel out there. Change it with
+          <em>Assumed reach</em> above.</p>
         <p><strong>Some licences say more.</strong> A special condition can state a service area (one in this register copy reads “a
           service area of 20 km”) or authorise “remote transmitters … within range of the specified site”. Where a figure is given
           the tool draws that instead. A second transmitter added to fill a gap may not be used to stretch the area
@@ -965,11 +1004,11 @@ const MapAcma = (() => {
           <label>Band <select id="acmalic-band" onchange="MapAcma.set('band', this.value)">
             ${[['all', 'Any'], ['vhf', '148–174 MHz'], ['uhf', '400–520 MHz']]
               .map(([v, t]) => `<option value="${v}" ${F.band === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-          <label title="${escAttr(meaning('area'))}">Radius <input type="number" id="acmalic-radius" min="1" max="150" step="1" value="${escAttr(String(F.radius))}"
+          <label title="${escAttr(meaning('area'))}">Assumed reach <input type="number" id="acmalic-radius" min="1" max="150" step="1" value="${escAttr(String(F.radius))}"
             onchange="MapAcma.set('radius', this.value)"> km</label>
         </div>
         <p class="small txt-muted" id="acmalic-shown">${D ? `${nShown} of ${D.lics.length} licences match${F.show ? ' and are drawn' : ''}. A circle is a point-to-multipoint
-          licence’s planning radius, not a legal boundary — the guide below says why.` : ''}</p>
+          licence’s assumed reach — how far ACMA assumes its stations are from the base — not a legal boundary — the guide below says why.` : ''}</p>
       </fieldset>`;
   }
 
@@ -989,8 +1028,8 @@ const MapAcma = (() => {
         </ul>
         <p class="small txt-muted">Of ${tx} stations that transmit. Read from the register copy of ${esc(dateText(asAt()))} with a ${F.radius} km
           radius; “none found” is a prompt to look, not a finding that a station is unlicensed.</p>
-        <details class="lic-more" id="acmalic-none" ${rows.length && rows.length <= 40 ? 'open' : ''}>
-          <summary>${rows.length} station${rows.length === 1 ? '' : 's'} with ${term('none', 'none found')}</summary>
+        <details class="lic-more" id="acmalic-none" ${rows.length && (rows.length <= 40 || noneOwner) ? 'open' : ''}>
+          <summary>${rows.length} station${rows.length === 1 ? '' : 's'} with ${term('none', 'none found')}${noneOwner ? ` — ${esc(noneOwner)} only` : ''}</summary>
           <div class="sites-row lic-selects"><label>Sort by <select id="acmalic-none-sort" onchange="MapAcma.set('noneSort', this.value)">
             ${[['gap', 'Furthest from any licence first'], ['near', 'Nearest to a licence first'], ['name', 'Name'], ['owner', 'Owner']]
               .map(([v, t]) => `<option value="${v}" ${noneSort === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
@@ -1003,6 +1042,21 @@ const MapAcma = (() => {
               <td>${a.nearestPmp ? `${esc(a.nearestPmp.lic.no)} <span class="lic-muted">${esc(holderName(a.nearestPmp.lic))}, ${esc(fmtKm(a.nearestPmp.txKm))} away</span>` : '<span class="lic-muted">none on its channel</span>'}</td>
               <td class="num">${a.nearestPmp ? esc(fmtKm(Math.max(0, a.nearestPmp.gap))) : '—'}</td></tr>`).join('')}</tbody></table></div>
           ${rows.length > NONE_CAP ? `<p class="small txt-muted">The first ${NONE_CAP} of ${rows.length}; the CSV has them all.</p>` : ''}
+        </details>
+        <details class="lic-more" id="acmalic-none-owners">
+          <summary>None found, by owner — where the real gaps are</summary>
+          <p class="small txt-muted">A station ${NEAR_MISS_KM} km or less past a circle most likely talks to that base and is only further out than ACMA
+            assumes. The ones to look at first are well outside every circle, or have no base on their channel at all. Click an owner to
+            list its stations above.</p>
+          <div class="lic-scroll"><table class="sites-table lic-table" id="acmalic-none-owner-table">
+            <thead><tr><th scope="col">Owner</th><th scope="col">${term('none', 'None found')}</th>
+              <th scope="col">${term('nearmiss', 'Just past a circle')}</th><th scope="col">${term('farout', 'Well outside')}</th>
+              <th scope="col">${term('nochan', 'No base on its channel')}</th>
+              <th scope="col" title="The holder whose point-to-multipoint base is nearest to most of this owner’s none-found stations.">Nearest holder</th></tr></thead>
+            <tbody>${noneByOwner().map(o => `<tr class="sites-row-go${noneOwner === o.owner ? ' is-lit' : ''}" onclick="MapAcma.set('noneOwner', ${escAttr(JSON.stringify(o.owner))})">
+              <td><button type="button" class="link-btn">${esc(o.owner)}</button></td><td class="num">${o.n}</td><td class="num">${o.near || '—'}</td>
+              <td class="num">${o.far || '—'}</td><td class="num">${o.nochan || '—'}</td><td>${esc(o.holder) || '<span class="lic-muted">—</span>'}</td></tr>`).join('')}</tbody></table></div>
+          ${noneOwner ? `<p class="small">Listing only <strong>${esc(noneOwner)}</strong> above. <button type="button" class="link-btn" onclick="MapAcma.set('noneOwner', '')">Show every owner</button></p>` : ''}
         </details>
         <details class="lic-more" id="acmalic-owners"><summary>By holder — licences, expiries and the stations under each</summary>
           <div class="lic-scroll"><table class="sites-table lic-table">
@@ -1073,7 +1127,7 @@ const MapAcma = (() => {
   }
 
   const CAVEAT = 'Indicative. A weekly copy of ACMA’s public register, matched to stations by position and channel; a '
-    + 'point-to-multipoint circle is a planning radius. Read the licence document and check with ACMA before acting on it. '
+    + 'point-to-multipoint circle is the reach ACMA assumes, not a legal boundary. Read the licence document and check with ACMA before acting on it. '
     + 'Contains data from the Australian Communications and Media Authority (CC BY 4.0).';
 
   function render() {
@@ -1095,7 +1149,7 @@ const MapAcma = (() => {
   function legendHtml() {
     const bits = [];
     if (F.show || (picked && picked.type === 'licence')) {
-      bits.push(`ACMA licences — a circle is a point-to-multipoint licence’s ${F.radius} km planning radius round its base (not a legal
+      bits.push(`ACMA licences — a circle is a point-to-multipoint licence’s ${F.radius} km assumed reach round its base (not a legal
         boundary), a line a point-to-point link between its two ends; ${CLASSES.map(([k, label]) =>
           `<span class="lic-dot" style="--dot:${classColour(k)}" aria-hidden="true"></span>${esc(label)}`).join(' ')};
         dashed where the licence is not in force, amber where it expires within ${SOON_DAYS} days.`);
@@ -1297,6 +1351,7 @@ const MapAcma = (() => {
       else if (k === 'status') F.status = ['all', 'current', 'soon', 'lapsed'].includes(value) ? value : 'all';
       else if (k === 'band') F.band = ['all', 'vhf', 'uhf'].includes(value) ? value : 'all';
       else if (k === 'radius') { const n = Math.round(Number(value)); F.radius = n >= 1 && n <= 150 ? n : PLAN_KM; }
+      else if (k === 'noneOwner') { noneOwner = noneOwner === String(value || '') ? '' : String(value || ''); render(); return; }
       else if (k === 'noneSort') { noneSort = ['gap', 'near', 'name', 'owner'].includes(value) ? value : 'gap'; render(); return; }
       else return;
       if (!D) { savePrefs(); render(); whenLoaded(() => { after(); repaintCards(); }); return; }

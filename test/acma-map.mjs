@@ -145,7 +145,7 @@ ok('…a line — and its shaded band — on every point-to-point link, both end
    drawn.links > 0 && drawn.lines === 2 * drawn.links && drawn.ptpNoLink === 0, J(drawn));
 ok('…and a ring to press at every licensed site', drawn.rings === allSites, J({ rings: drawn.rings, allSites }));
 ok('the rail is lit and the legend says what the shapes mean', drawn.live && drawn.legend, J({ live: drawn.live, legend: drawn.legend }));
-ok('the panel says a circle is a planning radius, not a boundary', /planning radius, not a legal boundary/.test(drawn.shown), drawn.shown);
+ok('the panel says a circle is an assumed reach, not a boundary', /assumed reach — how far ACMA assumes its stations are from the base — not a legal boundary/.test(drawn.shown), drawn.shown);
 
 const bureauPmp = FILE.licences.reduce((n, l, i) => n + (FILE.holders[l[5]][4] === 'bureau' && kindOf(l) === 'pmp' ? txSitesOf(i).length : 0), 0);
 await page.locator('#acmalic-classes input[type="checkbox"]').first().click();
@@ -216,7 +216,7 @@ const atSite = st.rows.find(r => r.state === 'site'), inArea = st.rows.find(r =>
 const verdicts = await page.evaluate(ids => ids.map(id => MapAcma.verdict(id)), [atSite.id, inArea.id, none.id]);
 ok('the verdict of a licensed site names the licence', verdicts[0].startsWith('Licensed at this site:') && verdicts[0].includes(atSite.site.no), verdicts[0]);
 ok('…of a station inside a circle says no licence names the site, which licence covers it, and that the circle is a planning radius or the licence’s own',
-   /^No licence names this site/.test(verdicts[1]) && verdicts[1].includes(inArea.area.no) && /(radius ACMA plans|service area written on that licence)/.test(verdicts[1]), verdicts[1]);
+   /^No licence names this site/.test(verdicts[1]) && verdicts[1].includes(inArea.area.no) && /(reach ACMA assumes|service area written on that licence)/.test(verdicts[1]), verdicts[1]);
 ok('…and where none was found it never says unlicensed as a fact',
    /^No licence found for this site in the register copy of/.test(verdicts[2]) && /not the same as unlicensed/.test(verdicts[2])
    && verdicts[2].includes(none.nearest.no) && !/\bis unlicensed\b/i.test(verdicts[2]), verdicts[2]);
@@ -316,6 +316,21 @@ ok('Save stations CSV saves a file named floodnet-…', /^floodnet-acma-licensin
 await page.click('#acmalic-none > summary');
 await page.selectOption('#acmalic-none-sort', 'name');
 await page.waitForTimeout(300);
+// None found, by owner: every none-found station counted once, split by how
+// far outside a circle it is; an owner's row narrows the list to its stations.
+const byOwner = await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('#acmalic-none-owner-table tbody tr')].map(tr => [...tr.children].map(td => td.textContent.trim()));
+  const n = v => (v === '—' ? 0 : Number(v));
+  return { rows, total: rows.reduce((s, r) => s + n(r[1]), 0), split: rows.every(r => n(r[1]) === n(r[2]) + n(r[3]) + n(r[4])) };
+});
+if (process.env.ACMA_PRINT) console.log(JSON.stringify(byOwner.rows));
+ok('none found is also listed by owner: every such station once, split into just past a circle, well outside, and no base on its channel',
+   byOwner.rows.length > 0 && byOwner.total === cov.counts.none && byOwner.split, J({ total: byOwner.total, none: cov.counts.none }));
+await page.evaluate(() => document.querySelector('#acmalic-none-owner-table tbody tr').click());
+const narrowed = await page.evaluate(() => ({ n: document.querySelectorAll('#acmalic-none-table tbody tr').length,
+  owners: [...new Set([...document.querySelectorAll('#acmalic-none-table tbody tr td:nth-child(2)')].map(td => td.textContent.trim()))] }));
+ok('clicking an owner lists only its stations', narrowed.owners.length === 1 && narrowed.n > 0, J(narrowed));
+await page.evaluate(() => MapAcma.set('noneOwner', ''));
 const sorted = await page.evaluate(() => [...document.querySelectorAll('#acmalic-none-table tbody tr td:first-child')].slice(0, 30).map(td => td.firstChild.textContent.trim()));
 ok('the list sorts by name when asked', sorted.every((n, i) => i === 0 || sorted[i - 1].localeCompare(n) <= 0), J(sorted.slice(0, 5)));
 

@@ -48,7 +48,7 @@ The panel's holder list is the same set, with a tick box each.
 | Land mobile | A base and mobiles “operated principally for two-way communications”; its service area is 40 km from the base. Not the licence for a fixed gauge. | [Land Mobile Licence determination 2025](https://www.legislation.gov.au/F2025L01132/asmade/text) (made 18 September 2025) |
 | No licence at all | Any transmitter on 150.7875–152.49375 MHz at 100 mW EIRP or less. | [LIPD class licence 2025](https://www.legislation.gov.au/F2025L01047/asmade/text), Schedule 1, Table 1, item 17 (made 4 September 2025) |
 | Somebody else's transmitter on your licence | Needs the holder's written authorisation, which some holders may not give. | Act, s 114; [Authorisations and Transfers determination 2025](https://www.legislation.gov.au/F2025L00844/asmade/text) (made 10 July 2025) |
-| The planning radius | ACMA plans a point-to-multipoint service on a 30 km service area (high power) or 2 km (low power), with every station inside it and nothing protected beyond it. | [RALI FX16](https://www.acma.gov.au/sites/default/files/2025-11/rali_fx16.pdf) (in effect 25 March 2025) |
+| The assumed reach (ACMA's planning radius) | ACMA plans a point-to-multipoint service on a 30 km service area (high power) or 2 km (low power), with every station inside it and nothing protected beyond it. | [RALI FX16](https://www.acma.gov.au/sites/default/files/2025-11/rali_fx16.pdf) (in effect 25 March 2025) |
 | Power on land-mobile channels | Planned at 83 W EIRP (high power) and 8.3 W (low power). | [RALI LM08](https://www.acma.gov.au/sites/default/files/2025-12/rali_lm08_-_may_2024_update_1.pdf) (in effect 17 May 2024) |
 
 ### The 30 km question
@@ -57,7 +57,7 @@ The panel's holder list is the same set, with a tick box each.
 documents name the base's site, frequency, power and antenna, and nothing
 about how far away a remote station may be. 30 km is the radius ACMA *plans*
 such a service on (RALI FX16). So the tool draws a 30 km circle as a first
-look, calls it a planning radius everywhere it appears, and lets it be
+look, calls it an assumed reach everywhere it appears (the distance ACMA assumes when it hands out a channel, not a limit), and lets it be
 changed. Four licences in the 10 November copy state a service area of their
 own in a special condition (“a service area of 20 km”); for those the stated
 figure is drawn instead.

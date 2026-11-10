@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-09** (revision 249 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-10** (revision 250 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -443,6 +443,9 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 > ~~**⚠️** These were originally listed as "independent — no sequencing dependency." They are logically independent but **mechanically serialised**~~ — **resolved the easy way: one agent did both in sequence**, #121 read #120's pane comment instead of picking a z-index blind, and the `MemMeter` third of the table had already been obsoleted by #144 (layers are counted generically off `liveMaps()`).
 
 ## Standalone issues
+- **#285** `[Standalone]` `[Haiku4.5/Low]` — **OPEN, opened revision 250** — regenerate the private repository's derived benchmarks file now that the reader (`tools/ingest/benchmarks.py`) drops a private person's name from one comment (`0110` already took it out of the live table). Needs a session with `cdomotor-g/flood-net-private` attached; the raw report there is the owner's call. Depends on nothing.
+- **#284** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 250** — a licensing-state column and filter on the Stations list, and the same columns in the station exports, read from `MapAcma.stateOf`. Touches the Stations list and `export.js`; independent of #283.
+- **#283** `[Standalone]` `[Sonnet5/High]` — **OPEN, opened revision 250** — 📜 ACMA licences draws land mobile, scientific and area-wide licences too (today only fixed ones: point to multipoint and point to point). Extends `tools/acma_station_licences.py` and `map-acma.js`; do before or after #284, not at once with another `map-acma.js` change.
 - **#282** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 249** — the Admin tab's *Behind the scenes* (`0109`) gains what the database cannot see: the Supabase API gateway's errors by hour, Supabase's security and speed advice, and Cloudflare's Workers and R2 buckets. An hourly workflow reads them with GETs only and writes one row a source into a new `meganet.ops_external` (service role only); `admin_ops()` returns it; tiles for API server errors and new security warnings feed the Health tile. **Waits on #281.** Each source stands alone, so with only the Cloudflare key it still ships that part; with no Supabase key the advice comes from Supabase's open-source checks run in the database.
 - **#281** `[Standalone]` `[Human]` `[Computer]` — **OPEN, opened revision 249** — the owner makes a read-only Cloudflare API token (Workers Scripts and R2 Storage, Read) and, if they choose, a Supabase access token, and saves them as GitHub secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `SUPABASE_ACCESS_TOKEN`. Click-by-click on the issue, with the choice to skip the Supabase one (it cannot be limited to reading). About 15 minutes, sign-in only. **Unblocks:** #282.
 - ~~**#274**~~ `[Standalone]` `[Human]` — **CLOSED at revision 248, opened at 234** — ElevenLabs credits ran short before their 25 Nov renewal (Starter, 40,000 a month). The owner chose none of the three options: on 8 Nov 2026 they **paused the bulletins' voices** to save credits for a while (`tools/voice/pause.json`). New bulletins play silent, words on screen; the Bulletin voices workflow voices none, `force` "all" included, until the pause is lifted (with `voice_from`, so the silent ones are not all voiced at once). The 🎬 Videos are not paused: #266 and #267 are voiced only on the owner's OK, as always.
@@ -740,8 +743,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### AI agent — Sonnet5
 | Effort | Issues |
 |---|---|
-| High | **#217** (transmitter drift as a finding — *live; a week of legacy offsets to look at*) · **#238** (QLDTraffic on the map — flooded and closed roads, damaged bridges; *its flood cameras shipped at revision 192*) |
-| Med | **#266** (how-to: Flood-Net on your phone — *pickable now*) · **#282** (Supabase's API errors and advice, Cloudflare's Workers and R2 on the Admin tab — *waits on #281*) · **#267** (how-to: map layers and the site's look — *pickable now*) · **#254** (a route kept on the phone for no signal) · **#177** (NSW road parcels) · **#187** (ACMA transmitters in 3-D — its drawings half shipped at revision 147) · **#201** (place a field photo on the map) · **#205** (tides and soils on the card beyond Queensland) · **#220** (maintenance due list) · **#228** (accessibility follow-ups) |
+| High | **#283** (ACMA licences: land mobile and area-wide licences drawn too — *pickable now*) · **#217** (transmitter drift as a finding — *live; a week of legacy offsets to look at*) · **#238** (QLDTraffic on the map — flooded and closed roads, damaged bridges; *its flood cameras shipped at revision 192*) |
+| Med | **#284** (licensing state on the Stations list and in exports — *pickable now*) · **#266** (how-to: Flood-Net on your phone — *pickable now*) · **#282** (Supabase's API errors and advice, Cloudflare's Workers and R2 on the Admin tab — *waits on #281*) · **#267** (how-to: map layers and the site's look — *pickable now*) · **#254** (a route kept on the phone for no signal) · **#177** (NSW road parcels) · **#187** (ACMA transmitters in 3-D — its drawings half shipped at revision 147) · **#201** (place a field photo on the map) · **#205** (tides and soils on the card beyond Queensland) · **#220** (maintenance due list) · **#228** (accessibility follow-ups) |
 | Low | — |
 
 *(The Low row held #99 and is now empty — it closed at `30cf03b`. #138 was in the High row until `532b290`. #150 takes its place there — rated High for its Part A only, and Part A is three problems rather than one: label placement, the pointer/hit-area work, and a keyboard path that constraint 6 makes an obligation rather than a nicety. Its Part B is deliberately not rated, because the issue's stop rule says to file it rather than absorb it. #151 joins the Med row: it is a ~30-line change and would read as Low on size alone, but it lands in #136's region of `app.js` and its only real decision is a text-contrast judgement that constraint 6 makes binding — the same reason #137's sizing was wrong, in miniature.)*
@@ -749,7 +752,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### AI agent — Haiku4.5
 | Effort | Issues |
 |---|---|
-| Low | — |
+| Low | **#285** (regenerate the private repository's benchmarks file — *needs that repository attached*) |
 
 *(The Low row held **#189** and **#225** until revision 136, both closed in one push: the OSM tile host — which turned up a second copy of the old URL in the Map Generator — and Directions on the station card, which landed in the card's *Position* group rather than literally beside Street View, for the reason in its entry.)*
 
@@ -872,6 +875,18 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 250 — 2026-11-10: 📜 ACMA licences for our own transmitters, ⚖️ Repeater comparison, benchmarks on the Flood tab — 0110; #283, #284 and #285 opened
+
+Two long lists from the owner in one sitting. **Opens #283, #284 and #285**; closes nothing.
+
+- **Stations map:** ⚖️ Repeater comparison (`map-repcompare.js`); 🗼 Repeater sites renamed **Move/New Repeater**, with a typed repeater pick and row clicks; 🎯 Best repeater's one entry box and a ground profile on every hop; pins on a drawn line's profile; 💬 hover notes on or off; map views no longer switch the twin offer on; 🧹 Clear the selection disarms everything and leaves 3-D, the twin and Latency colouring; ⛰️ pressed again only hides its pane, **Leave 3-D** edged red; a gold ring on a tool with something on behind another pane (`MapChrome.panel`'s `live` / `clear`).
+- **📜 ACMA licences** (`map-acma.js`, `tools/acma_station_licences.py` → `data/acma-station-licences.json`, refreshed weekly; `docs/acma-licences.md`): the 413 fixed licences of the Bureau, Seqwater and 24 councils, a circle for a point-to-multipoint base at the reach ACMA assumes (30 km, RALI FX16 — not a licence term) or the licence's own stated area, a line for a point-to-point link; search; every transmitting station ringed by state (225 at a licensed site, 1,669 inside an area, 612 none found), the none-found by owner split into just past a circle and well outside; a sourced guide. *ACMA licences near here* on the station card's Radio tab. **The agent API is unchanged.**
+- **Station card, Flood tab:** Flood history and the station's ground; **Benchmarks** moved there, with editors' own entries (`0110`, applied, schema 110: `station_benchmark_entry`, `station_benchmark_entered`, two editor-only functions; a private person's name removed from one Bureau comment). The Bureau's report audited: 777 of 777 benchmarks match.
+- **Digital twin:** Ground and Instruments marks on the flood-level scale. **Message Log:** a Base station filter by name for editors.
+- **Checks added:** `repcompare`, `acmamap`, `benchmarks`, `benchmarksingest`, `msglogbase`.
+- **#283** `[Sonnet5/High]` — land mobile and area-wide licences drawn. **#284** `[Sonnet5/Med]` — licensing state on the Stations list and in exports. **#285** `[Haiku4.5/Low]` — the private repository's benchmarks file regenerated.
+- **Still to confirm by a person:** the 30 km / 2 km and 83 W / 8.3 W figures against RALI FX16 and LM08 themselves — ACMA's site refused this machine, so they came from search extracts; the guide says so.
 
 ### Revision 249 — 2026-11-09: 🩺 the Admin tab's *Behind the scenes* — 0109; #281 and #282 opened
 

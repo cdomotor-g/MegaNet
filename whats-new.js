@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 253, date: '2026-11-10', items: [
+      '📜 <strong>ACMA licences says it plainer.</strong> The circle round a point-to-multipoint base is now called its '
+        + '<em>assumed reach</em>: the distance ACMA assumes the base\'s stations are within when it hands out the channel '
+        + '(30 km), not a limit written on the licence. A new table, <em>None found, by owner</em>, splits each owner\'s '
+        + 'stations into those just past a circle and those well outside one — the likelier real gaps — and a click lists them.',
+    ] },
     { n: 252, date: '2026-11-10', items: [
       '📜 <strong>ACMA licences.</strong> A new tool on the Stations map shows the radio licences our own transmitters run '
         + 'under — the Bureau\'s, councils\' and Seqwater\'s — each drawn with the area it covers: a shaded circle round a '
