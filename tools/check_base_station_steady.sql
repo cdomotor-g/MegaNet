@@ -1,4 +1,4 @@
--- check_base_station_steady.sql — Prove 0111: a base station's spectrum folded
+-- check_base_station_steady.sql — Prove 0111 and 0112: a base station's spectrum folded
 -- by the hour — per stick and tuning, each bin's lowest tenth and its median,
 -- closed hours only, from a watermark, once — and what comes in through each
 -- base station from the reception rollups: messages and stations by protocol,
@@ -208,6 +208,9 @@ begin
   perform pg_temp.hour('id',  2,  'rpi-s-sdr1', 'alert', 8279, 50, 50, 0, 'a-drive');  -- a drive survey: not a base station's ingest
   perform pg_temp.hour('id2', 2,  'rpi-t-sdr1', 'alert', 8271, 4, 4, 0);     -- the other base station
   perform pg_temp.hour('id',  400, 'rpi-s-sdr1', 'alert', 8275, 3, 3, 0);    -- 17 days ago: outside a week
+  -- 0112: the ALERT2 came through a repeater the register knows and one it does not
+  update meganet.reception_hourly set path = '{65511,64999}'
+   where ingest_token_id = pg_temp.ctx('id')::bigint and protocol = 'alert2';
 end
 $$;
 
@@ -253,6 +256,22 @@ begin
   perform pg_temp.check_that('decoded messages a UTC day, legacy and ALERT2 apart',
     (select pg_catalog.sum((e ->> 1)::int) from jsonb_array_elements(s -> 'days') e) = 22
     and (select pg_catalog.sum((e ->> 2)::int) from jsonb_array_elements(s -> 'days') e) = 20, s -> 'days' #>> '{}');
+  -- 0112: station by station, by path, and the day's own numbers
+  perform pg_temp.check_that('each counted station is named: the register''s with its station and sensor type, the stranger with neither',
+    jsonb_array_length(s -> 'ids') = 3
+    and (s -> 'ids') @> '[["alert", 8271, 14, "_check_bs_gauge", "rain", false]]'::jsonb
+    and (s -> 'ids') @> '[["alert", 8273, 6, null, null, true]]'::jsonb
+    and (s -> 'ids') @> '[["alert2", 65511, 20, "_check_bs_gauge", null, true]]'::jsonb
+    and not (s -> 'ids')::text like '%8274%', s -> 'ids' #>> '{}');
+  perform pg_temp.check_that('ALERT2 by the repeaters it came through, named where the register has the address',
+    jsonb_array_length(s -> 'paths') = 1
+    and (s -> 'paths' -> 0 -> 'path') = '[65511, 64999]'::jsonb and (s -> 'paths' -> 0 ->> 'ok')::int = 20 and (s -> 'paths' -> 0 ->> 'ids')::int = 1
+    and (s -> 'paths' -> 0 -> 'names') = '["Check Steady Gauge", null]'::jsonb, s -> 'paths' #>> '{}');
+  perform pg_temp.check_that('a day also says what was heard and how many stations, each protocol apart',
+    (select pg_catalog.sum((e ->> 4)::int) from jsonb_array_elements(s -> 'days') e) = 30
+    and (select pg_catalog.sum((e ->> 5)::int) from jsonb_array_elements(s -> 'days') e) = 20
+    and (select pg_catalog.max((e ->> 6)::int) from jsonb_array_elements(s -> 'days') e) = 3
+    and (select pg_catalog.max((e ->> 7)::int) from jsonb_array_elements(s -> 'days') e) = 1, s -> 'days' #>> '{}');
   select e into n from jsonb_array_elements(r -> 'network') e where e ->> 'protocol' = 'alert';
   perform pg_temp.check_that('the network''s own count takes a station heard by two base stations once',
     (n ->> 'ids')::int < (select pg_catalog.sum((p ->> 'ids')::int) from jsonb_array_elements(r -> 'stations') e, jsonb_array_elements(e -> 'protocols') p
