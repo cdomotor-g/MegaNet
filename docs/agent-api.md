@@ -234,6 +234,7 @@ says what to change; an unknown tool or malformed request is a JSON-RPC error.
 | `get_station_dossier` | Everything a report needs about one station, in one call | `GET /api/v1/stations/{id}/dossier` |
 | `get_readings` | Telemetry ingested into Flood-Net: raw, hourly or daily | `GET /api/v1/stations/{id}/readings` |
 | `get_latest_readings` | What every gauge is saying now: each station's newest reading on every channel, in one call, by network, basin, kind or bounding box; `format: "geojson"` for a map | `GET /api/v1/readings/latest` |
+| `get_receiver_readings` | Everything one receiver (a base station's Pi) took in since a time, in the order it arrived — the readings another receiver posted first included. For polling: follow `next_since` | `GET /api/v1/readings/heard` |
 | `get_silent_stations` | What Flood-Net has stopped hearing: the stations silent (not heard) now, worst first, with when each was last heard, and the groups that went unheard together; by network, basin, kind, bounding box or severity; `format: "geojson"` for a map | `GET /api/v1/health/silent` |
 | `get_station_health` | What Station Health says about one station over 3, 7 or 14 days: its findings with what to do, its check schedule day by day, its battery's night lows and trend | `GET /api/v1/stations/{id}/health` |
 | `get_health_findings` | The same for a page of stations, worst first: by owner, station ids, network, basin, kind or bounding box | `GET /api/v1/health/findings` |
@@ -614,6 +615,71 @@ curl -s 'https://floodwarning.net/api/v1/readings/latest?type=river&bbox=145.5,-
   database the route answers **503** `"not available yet"`, naming the
   relation and the migration (see
   [For the owner](#apply-0057-for-the-latest-readings)).
+
+### `GET /api/v1/readings/heard`
+
+**What one receiver heard** — every reading a receiver (a base station's
+Raspberry Pi) took in since a time, in the order it arrived. It is for an app
+that follows one base station live by polling.
+[`/readings/latest`](#get-apiv1readingslatest) cannot do that job: it keeps one
+reading an address, so a second burst between two polls is gone, and it names
+only the path of the copy that was stored — so a burst another receiver posted
+first looks as if yours never heard it. This route lists those too.
+
+| Parameter | Meaning |
+|---|---|
+| `receiver` | **required** — the receiver, as a reading's `path` names it without the stick and frequency: the path `serial-monitor/rpi-6dfef7f4-sdr1-152.400` is receiver `rpi-6dfef7f4` (or `serial-monitor/rpi-6dfef7f4`, whole) |
+| `since` | readings that **arrived after** this instant, ISO 8601 (no zone means UTC). Default 15 minutes ago; at most 7 days ago. Pass the last answer's `next_since` |
+| `limit` | at most 2,000 readings a call (default 500) |
+
+```sh
+curl -s 'https://floodwarning.net/api/v1/readings/heard?receiver=rpi-6dfef7f4'
+```
+
+```json
+{
+  "receiver": "rpi-6dfef7f4",
+  "since": "2026-11-10T02:00:00.000000Z", "until": "2026-11-10T02:14:50.000000Z",
+  "count": 2, "limit": 500, "more": false,
+  "next_since": "2026-11-10T02:14:50.000000Z",
+  "next": "https://floodwarning.net/api/v1/readings/heard?receiver=rpi-6dfef7f4&since=2026-11-10T02%3A14%3A50.000000Z",
+  "readings": [
+    { "t": "2026-11-10T02:03:11+00:00", "received_at": "2026-11-10T02:03:12.4+00:00",
+      "addr": "a:6128", "alert_id": 6128, "station_id": "loudoun_br_al", "station_name": "Loudoun Br AL",
+      "value_raw": 412, "quality": 0, "heard": "first",
+      "via": ["serial-monitor/rpi-6dfef7f4-sdr1-152.400"],
+      "path": "serial-monitor/rpi-6dfef7f4-sdr1-152.400", "freq_mhz": 152.4, "level_dbfs": -41.2, "snr_db": 17.5 },
+    { "t": "2026-11-10T02:09:40+00:00", "received_at": "2026-11-10T02:09:41.1+00:00",
+      "addr": "a:6039", "alert_id": 6039, "station_id": "abergowrie_br_al", "station_name": "Abergowrie Br AL",
+      "value_raw": 233, "quality": 0, "heard": "copy",
+      "via": ["serial-monitor/rpi-6dfef7f4-sdr1-152.400"],
+      "path": "serial-monitor/rpi-83071968-sdr1-152.400", "dup_count": 1,
+      "copy_paths": ["serial-monitor/rpi-6dfef7f4-sdr1-152.400"], "last_copy_at": "2026-11-10T02:09:43.8+00:00" }
+  ]
+}
+```
+
+- `heard` is **`first`** when this receiver's copy was the one stored, and
+  **`copy`** when another receiver posted the reading first and this one's was
+  counted on it. `via` is this receiver's own paths on the reading; `path` the
+  stored copy's; `copy_paths` the later copies', in the order they landed;
+  `last_copy_at` when the newest landed.
+- The signal — `freq_mhz`, `rssi_dbm`, `level_dbfs`, `snr_db` — is the stored
+  copy's, so it is given only where `heard` is `first`. Flood-Net keeps a
+  later copy's path, not its signal.
+- **To follow a receiver, call again with `since` set to `next_since`** (`next`
+  is that URL). `more` says whether there is further to read now: a call reads
+  at most 6 hours of arrivals and ends on a whole instant of arrival, so a
+  page can hold a few more than `limit`. A call stops 10 seconds short of now,
+  so that a reading still being stored is not stepped over.
+- A reading **comes again** — the same `addr`, `t` and `value_raw` — when this
+  receiver's copy landed after the reading was listed for an earlier call, or
+  before `since` for another receiver: keep one by those three. A copy that
+  lands more than 15 minutes after its reading was first stored is not picked
+  up by a later call.
+- Answers are cached for a minute like every other, so the same `since` asked
+  twice inside a minute gives the same answer; `next_since` always moves on.
+- It reads `meganet.reading` in arrival order (its index, migration `0106`).
 
 ### `GET /api/v1/stations/{id}/flood-levels`
 
@@ -1588,6 +1654,17 @@ at [`GET /api/v1/changelog`](#get-apiv1changelog), newest first — both from
 in the same push. A change with nothing to notice (a fix inside, a faster
 answer) is not listed.
 
+- **10 November 2026 — What one receiver heard: a new route to follow a base
+  station live.** `GET /api/v1/readings/heard?receiver=` (the
+  `get_receiver_readings` tool) lists every reading one receiver — a base
+  station's Pi, named as a reading's `path` names it, e.g. `rpi-6dfef7f4` —
+  took in since a time, in the order it arrived: the ones it posted first
+  (`heard: "first"`) and the ones another receiver posted first, with its copy
+  counted on them (`heard: "copy"`), which `/readings/latest` never showed. An
+  app following one base station polls it with `since` set to the last
+  answer's `next_since` rather than pulling a whole region. Raw rows from
+  `/stations/{id}/readings` also gain `copy_paths`, the paths of a reading's
+  later copies. Nothing was removed or renamed.
 - **9 November 2026 — Radio paths now take a hop on only where the next
   station listens on the channel.** `/radio-path` (the `get_radio_path` tool,
   and the dossier's `radio_path`) takes a hop on toward a base station only

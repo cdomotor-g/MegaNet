@@ -46,6 +46,11 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     (`ok`, `not recorded`, `unavailable`). Start here for reports.
   - `get_readings` — `GET /api/v1/stations/{id}/readings` (raw ≤ 7 days,
     hourly ≤ 31, daily ≤ 731; ≤ 5,000 rows)
+  - `get_receiver_readings` — `GET /api/v1/readings/heard?receiver=&since=`:
+    everything one receiver (a base station's Pi, e.g. `rpi-6dfef7f4`) took in
+    since a time, in arrival order, the readings another receiver posted
+    first included (`heard`: `first` or `copy`). To follow one, call again
+    with `since` = `next_since` (500 readings a call, up to 2,000).
   - `get_latest_readings` — `GET /api/v1/readings/latest?network=&basin=&type=&bbox=west,south,east,north`:
     what every gauge is saying now — each station's newest reading on every
     channel, with its age, in one call (100 stations a page, up to 1,000).

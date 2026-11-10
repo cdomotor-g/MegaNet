@@ -12,9 +12,9 @@
        reference this page summarises; test/agent-docs.mjs holds both to the
        code's URLs, limits, endpoints and tools. -->
   <link rel="canonical" href="https://floodwarning.net/api">
-  <link rel="icon" type="image/svg+xml" href="assets/icon-small.svg?v=20261110h">
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=20261110h">
-  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=20261110h">
+  <link rel="icon" type="image/svg+xml" href="assets/icon-small.svg?v=20261110i">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=20261110i">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=20261110i">
   <meta name="theme-color" content="#0b5cab">
 
   <!-- Self-contained for the same reason as about.html: no stylesheet, font or
@@ -103,7 +103,7 @@
 <body>
 <main>
 
-  <img class="logo" src="assets/logo.webp?v=20261110h" alt="" width="900" height="879">
+  <img class="logo" src="assets/logo.webp?v=20261110i" alt="" width="900" height="879">
   <h1>Flood-Net station API</h1>
   <p class="lede">
     Flood-Net's station register, readable by programs as well as people. Point
@@ -327,6 +327,16 @@
             Every reporting station's newest reading on each channel, by
             <code>network</code>, <code>basin</code>, <code>type</code> or
             <code>bbox</code>. <a href="/api/v1/readings/latest">Example</a>
+          </td>
+        </tr>
+        <tr>
+          <td><code>GET /api/v1/readings/heard</code></td>
+          <td><code>get_receiver_readings</code></td>
+          <td>
+            Everything one <code>receiver</code> (a base station) took in
+            <code>since</code> a time, in the order it arrived &mdash; the
+            readings another receiver posted first included. For polling:
+            follow <code>next_since</code>.
           </td>
         </tr>
         <tr>

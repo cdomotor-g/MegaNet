@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 256, date: '2026-11-10', items: [
+      '📻 <strong>Heard by, on Field Data.</strong> Type a receiver (a base station\'s radio computer, such as '
+        + '<em>rpi-83071968</em>) in the new <em>Heard by</em> box under Resolution and Load readings draws only what that '
+        + 'receiver heard — including readings another receiver posted first — beside the line for every receiver, so '
+        + 'what one base station missed shows as gaps. After a load the box offers the receivers that heard those readings. '
+        + 'Windows of 14 days or less.',
+      '🤖 <strong>The same for apps and AI agents.</strong> The API has a new address, <em>/api/v1/readings/heard</em>, '
+        + 'that lists everything one receiver took in since a time, in the order it arrived, for an app that follows a '
+        + 'base station live. Details on the <a href="/api">API page</a>.',
+    ] },
     { n: 255, date: '2026-11-10', items: [
       '📡 <strong>Steady signals</strong>, on the Base Stations tab under an open station\'s waterfall: the bright bands that '
         + 'never go away, found for you, each with what it probably is (the stick\'s own spike, the computer beside it, solar '

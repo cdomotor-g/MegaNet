@@ -36,6 +36,9 @@ Documentation: [`docs/agent-api.md`](docs/agent-api.md).
   `get_readings`, `get_flood_levels`, `get_benchmarks` (a station's survey
   marks in numbers: level, datum, what each reads on the gauge),
   `get_service_level`, `list_catchments`, `get_catchment`, `list_networks`.
+- What one receiver (a base station) heard since a time, for polling:
+  `get_receiver_readings` (`/api/v1/readings/heard?receiver=`), then follow
+  `next_since`.
 - What every gauge is saying now: `get_latest_readings`
   (`/api/v1/readings/latest`) — each station's newest reading on every
   channel, in one call, by network, basin, kind or `bbox=west,south,east,north`.

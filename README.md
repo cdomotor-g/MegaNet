@@ -929,7 +929,11 @@ select station_key, station_name, online, round(minutes_since_seen) as quiet_for
 What lands through `ingest()` is read back three ways. **Field Data** charts one
 station's sensors over a window — the 357 filter, the rollups, the gaps — and
 the station editor's sensor rows each carry a week of it as a sparkline, which
-opens a chart with a door onto Field Data.
+opens a chart with a door onto Field Data. Its **Heard by** box draws only the
+readings one receiver (a base station's Pi, named as a reading's path names it)
+heard — first, or as a later copy of a reading another receiver posted first —
+beside the load for every receiver, so what one base station missed shows as
+gaps; raw readings only.
 **Message Log** is the same rows read as an arrival log: every message the
 datastore accepted, newest first, with the ingress pathway (protocol,
 transport, which base heard it, how many further copies by which other paths)

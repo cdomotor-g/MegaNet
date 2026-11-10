@@ -2198,6 +2198,7 @@ function toolArgs(name) {
     case 'stations_near': return { lat: RICH.lat, lon: RICH.lon, radius_km: 15, limit: 3 };
     case 'get_readings': return { id: RICH.id, resolution: 'daily', from: day(NOW - 10 * 24 * hour) };
     case 'get_latest_readings': return { type: 'river', limit: 3 };
+    case 'get_receiver_readings': return { receiver: 'rpi-0a0b0c0d', limit: 3 };
     case 'get_silent_stations': return { limit: 3 };
     case 'get_health_findings': return { min_severity: 'warn', limit: 3 };
     case 'list_catchments': case 'list_networks': return {};
@@ -2361,7 +2362,7 @@ section('MCP');
 
   const list = await rpc('tools/list', {}, { headers: { 'MCP-Protocol-Version': '2025-06-18' } });
   const tools = list.json.result.tools;
-  const expected = ['search_stations', 'get_station', 'get_station_dossier', 'stations_near', 'get_readings', 'get_latest_readings', 'get_silent_stations',
+  const expected = ['search_stations', 'get_station', 'get_station_dossier', 'stations_near', 'get_readings', 'get_latest_readings', 'get_receiver_readings', 'get_silent_stations',
     'get_station_health', 'get_health_findings', 'list_catchments', 'get_catchment', 'get_flood_levels', 'get_benchmarks', 'get_service_level',
     'get_acma_licences', 'acma_licences_near', 'get_radio_path', 'list_networks'];
   check('tools/list has every tool', expected.every(n => tools.some(t => t.name === n)) && tools.length === expected.length, tools.map(t => t.name).join(', '));
@@ -2567,6 +2568,78 @@ section('Edge cache');
 
 // ── The routes that were here before ─────────────────────────────────────────
 section('The existing routes');
+
+// ── What a receiver heard (/readings/heard) ──────────────────────────────────
+// One Pi's readings in arrival order: the ones it posted first, the ones
+// another receiver posted first and it was counted on, and a copy that landed
+// after its reading was first stored — and nobody else's.
+{
+  api.resetApiState();
+  const RX = 'serial-monitor/rpi-0a0b0c0d', OTHER = 'serial-monitor/rpi-ffff0000-sdr0';
+  const min = 60000;
+  const heardRow = (name, tAgo, recvAgo, valueRaw, extra) => ({ ...plainReading(ELPRO_ADDR, ELPRO.id, NOW - tAgo, valueRaw),
+    received_at: iso(NOW - recvAgo), last_dup_at: null, ...extra, _name: name });
+  const added = [
+    heardRow('first', 5 * hour, 10 * min, 301, { path: `${RX}-sdr1-152.400`, snr_db: 14.5, level_dbfs: -40 }),
+    heardRow('copy', 5 * hour - min, 8 * min, 302, { path: OTHER, dup_count: 1, dup_paths: [`${RX}-sdr2-151.5375`],
+      last_dup_at: iso(NOW - 8 * min + 3000), snr_db: 9 }),
+    heardRow('others', 5 * hour - 2 * min, 7 * min, 303, { path: OTHER, dup_count: 1, dup_paths: ['DURIKAI'], last_dup_at: iso(NOW - 7 * min + 2000) }),
+    heardRow('late copy', 5 * hour - 3 * min, 20 * min, 304, { path: OTHER, dup_count: 1, dup_paths: [`${RX}-sdr1-152.400`], last_dup_at: iso(NOW - 14 * min) }),
+    heardRow('before', 5 * hour - 4 * min, 21 * min, 305, { path: `${RX}-sdr1-152.400` }),
+    heardRow('unsettled', 5 * hour - 5 * min, 2000, 306, { path: `${RX}-sdr1-152.400` }),
+    heardRow('namesake', 5 * hour - 6 * min, 6 * min, 307, { path: `${RX}9-sdr1-152.400` }),
+  ].map(({ _name, ...r }) => r);
+  T.reading.push(...added);
+  try {
+    const r = await get('/api/v1/readings/heard?receiver=rpi-0a0b0c0d');
+    const vals = (r.json.readings || []).map(x => x.value_raw);
+    check('readings/heard: a receiver\'s readings in arrival order — first, counted as a copy, and a copy that landed late — and nobody else\'s',
+      r.status === 200 && JSON.stringify(vals) === '[304,301,302]', `${r.status} ${JSON.stringify(vals)} ${r.json.detail || ''}`);
+    const [late, first, copy] = r.json.readings || [];
+    check('…each says how it was heard, by which of the receiver\'s paths, and names its station',
+      first && first.heard === 'first' && first.via[0] === `${RX}-sdr1-152.400` && first.station_id === ELPRO.id && first.station_name === ELPRO.name
+      && copy.heard === 'copy' && copy.via[0] === `${RX}-sdr2-151.5375` && copy.path === OTHER && copy.dup_count === 1
+      && late.heard === 'copy' && Date.parse(late.last_copy_at) === NOW - 14 * min,
+      JSON.stringify(r.json.readings));
+    check('…the signal only where this receiver\'s copy was the one stored', first && first.snr_db === 14.5 && copy.snr_db === undefined);
+    check('…and where to go on from: nothing more now, next_since at the call\'s end',
+      r.json.more === false && r.json.next_since === r.json.until && r.json.receiver === 'rpi-0a0b0c0d'
+      && new URL(r.json.next).searchParams.get('since') === r.json.next_since && new URL(r.json.next).searchParams.get('receiver') === 'rpi-0a0b0c0d',
+      JSON.stringify({ more: r.json.more, next: r.json.next, until: r.json.until }));
+    const again = await get(new URL(r.json.next).pathname + new URL(r.json.next).search);
+    check('…and the next call starts after it: nothing twice', again.status === 200 && again.json.count === 0, JSON.stringify(again.json.readings));
+    const whole = await get('/api/v1/readings/heard?receiver=' + encodeURIComponent(RX) + '&since=' + encodeURIComponent(iso(NOW - 30 * min)));
+    check('…a since further back takes the earlier reading too, the receiver named whole',
+      JSON.stringify(whole.json.readings.map(x => x.value_raw)) === '[305,304,301,302]', JSON.stringify(whole.json.readings.map(x => x.value_raw)));
+    const one = await get('/api/v1/readings/heard?receiver=rpi-0a0b0c0d&limit=1');
+    check('…limit=1: the late copy and one new reading, more to come, and next_since past what was given',
+      JSON.stringify(one.json.readings.map(x => x.value_raw)) === '[304,301]' && one.json.more === true
+      && one.json.next_since === iso(NOW - 10 * min).replace('Z', '000Z'), JSON.stringify({ v: one.json.readings.map(x => x.value_raw), n: one.json.next_since }));
+    const two = await get(new URL(one.json.next).pathname + new URL(one.json.next).search);
+    check('…and following it gives the rest, once', JSON.stringify(two.json.readings.map(x => x.value_raw)) === '[302]'
+      && two.json.more === false, JSON.stringify(two.json.readings.map(x => x.value_raw)));
+    const reads = stub.requests.filter(q => /\/reading\?/.test(q.url)).pop();
+    check('…read off the arrival-order index: bounded both ways on received_at, in its order',
+      reads && (decodeURIComponent(reads.url).match(/received_at=(gt|lte)\./g) || []).length === 2
+      && /order=received_at\.asc,addr\.asc,reading_ts\.asc,value_raw\.asc/.test(decodeURIComponent(reads.url)), reads && reads.url);
+    for (const [q, why] of [['', 'no receiver'], ['?receiver=a', 'a one-letter receiver'], ['?receiver=rpi*', 'a wildcard'],
+      ['?receiver=rpi-0a0b0c0d&since=' + iso(NOW - 8 * 24 * hour), 'a since over a week back'],
+      ['?receiver=rpi-0a0b0c0d&since=' + iso(NOW + hour), 'a since in the future'], ['?receiver=rpi-0a0b0c0d&offset=3', 'a parameter it does not take']]) {
+      const b = await get('/api/v1/readings/heard' + q);
+      check(`…400 for ${why}`, b.status === 400, `${b.status}`);
+    }
+    const none = await get('/api/v1/readings/heard?receiver=rpi-nobody');
+    check('…a receiver nothing came by: an empty answer that says how a receiver is named',
+      none.status === 200 && none.json.count === 0 && none.json.notes.some(n => /named/.test(n)));
+    const raw = await get(`/api/v1/stations/${ELPRO.id}/readings?resolution=raw&from=${encodeURIComponent(iso(NOW - 6 * hour))}`);
+    const withCopy = (raw.json.rows || []).find(x => x.value_raw === 302);
+    check('a station\'s raw readings carry their later copies\' paths', withCopy && JSON.stringify(withCopy.copy_paths) === JSON.stringify([`${RX}-sdr2-151.5375`])
+      && (raw.json.rows || []).find(x => x.value_raw === 301).copy_paths === undefined, JSON.stringify(withCopy));
+  } finally {
+    for (const r of added) T.reading.splice(T.reading.indexOf(r), 1);
+    api.resetApiState();
+  }
+}
 
 {
   check('the database proxy still maps its paths', dbProxyTarget('/api/db/rest/v1/app_meta', '?select=value')

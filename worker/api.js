@@ -142,6 +142,14 @@ export const LIMITS = Object.freeze({
   readingsMax: 5000,
   latestDefault: 100,          // stations per page of /readings/latest — an agent's context, not the database, is the limit
   latestMax: 1000,             // …and "every gauge in one call" while no more than this many report
+  heardDefault: 500,           // readings per page of /readings/heard
+  heardMax: 2000,
+  heardWindowHours: 6,         // arrival time one call reads: about 6,000 readings in November 2026, off the arrival-order index
+  heardSinceMaxDays: 7,        // how far back "since" may start — the raw window /stations/{id}/readings allows
+  heardSinceDefaultMin: 15,
+  heardCopyLookbackMin: 15,    // a later copy is looked for on readings that first arrived up to this long before "since"
+  heardSettleSeconds: 10,      // a call stops this short of now, so a reading still being stored is not stepped over
+  heardUpstreamPages: 8,
   latestAddressMax: 15000,     // addresses one whole-network read of reading_latest takes (6,738 in October 2026)
   idsPerRead: 100,             // ids in one `in.(…)` list: a longer URL is one a proxy on the way may refuse
   windowMaxDays: Object.freeze({ raw: 7, hourly: 31, daily: 731 }),
@@ -2665,7 +2673,7 @@ async function dossierEndpoint(rc, rawId) {
 // ── GET /api/v1/stations/{id}/readings ───────────────────────────────────────
 
 const READING_SELECT = {
-  raw: 'addr,alert_id,station_number,channel,reading_ts,received_at,value_raw,value,unit,quality,path,dup_count,'
+  raw: 'addr,alert_id,station_number,channel,reading_ts,received_at,value_raw,value,unit,quality,path,dup_count,dup_paths,'
     + 'freq_mhz,rssi_dbm,level_dbfs,snr_db',
   hourly: 'addr,alert_id,channel,bucket,n,n_dup,unit,raw_min,raw_max,raw_mean,raw_last,val_min,val_max,val_mean,val_last,first_ts,last_ts',
   daily: 'addr,alert_id,channel,bucket,n,n_dup,unit,raw_min,raw_max,raw_mean,raw_last,val_min,val_max,val_mean,val_last,first_ts,last_ts',
@@ -2758,6 +2766,7 @@ async function readingsEndpoint(rc, rawId, params) {
   const shaped = rows.map(r => (resolution === 'raw'
     ? stripNulls({ t: r.reading_ts, addr: r.addr, value_raw: num(r.value_raw), value: num(r.value), unit: r.unit,
         quality: r.quality, received_at: r.received_at, path: r.path, dup_count: r.dup_count || null,
+        copy_paths: copyPaths(r),
         freq_mhz: num(r.freq_mhz), rssi_dbm: num(r.rssi_dbm), level_dbfs: num(r.level_dbfs), snr_db: num(r.snr_db) })
     : stripNulls({ t: r.bucket, addr: r.addr, n: r.n, raw_min: num(r.raw_min), raw_max: num(r.raw_max),
         raw_mean: num(r.raw_mean), raw_last: num(r.raw_last), val_min: num(r.val_min), val_max: num(r.val_max),
@@ -3016,6 +3025,195 @@ async function latestReadingsEndpoint(rc, params) {
     source: 'meganet.reading_latest (each address\'s newest reading in meganet.reading); meganet.station',
     generated_at: new Date().toISOString(),
   }, 'stations');
+}
+
+// ── GET /api/v1/readings/heard ───────────────────────────────────────────────
+// "What did my base station hear?" — every reading one receiver took in, in
+// the order it arrived, for a client that polls: a field app showing one base
+// station live. /readings/latest cannot answer it. It keeps one reading an
+// address, so a second burst between two polls is gone; and it names only the
+// path of the copy that was stored, so a burst another receiver posted first
+// looks as if this one never heard it — its copy is counted on the reading
+// (dup_count) and its path kept beside it (dup_paths), which this route reads.
+//
+// A receiver is the thing in one place: the Pi, not one of its sticks. A path
+// such as "serial-monitor/rpi-6dfef7f4-sdr1-152.400" is that Pi's stick 1 on
+// 152.400 MHz, and its receiver is "serial-monitor/rpi-6dfef7f4" —
+// sensor-values.js hostOf(), the app's own rule. `receiver` may be given
+// whole or by its last part ("rpi-6dfef7f4").
+//
+// The readings come off meganet.reading's arrival-order index (0106), a
+// bounded stretch a call (LIMITS.heardWindowHours): the database is asked only
+// for rows this receiver's path is on, or that have copies — PostgREST cannot
+// look inside dup_paths for part of a name — and the copies' paths are matched
+// here. `since` is exclusive and next_since is where the next call starts.
+// A copy can land after its reading was first stored, so a call also takes
+// the readings first stored up to heardCopyLookbackMin before `since` whose
+// newest copy came after it: a reading can therefore come twice, the second
+// time with this receiver on it — the same addr, t and value_raw.
+
+export const HEARD_PARAMS = ['receiver', 'since', 'limit'];
+
+const HEARD_SELECT = 'addr,alert_id,a2_station,a2_sensor,station_number,channel,station_id,reading_ts,received_at,'
+  + 'value_raw,value,unit,quality,path,dup_count,dup_paths,last_dup_at,freq_mhz,rssi_dbm,level_dbfs,snr_db';
+
+// The receiver a path names: the path without its stick and frequency.
+export function receiverOfPath(path) {
+  const p = String(path || '');
+  const m = /^(.*?)-sdr\d+(?:-[\d.]+)?$/.exec(p);
+  return m ? m[1] : p;
+}
+const receiverMatches = (path, rx) => {
+  const host = receiverOfPath(path);
+  return host === rx || host.endsWith(`/${rx}`);
+};
+// The paths of a reading's later copies, as stored; null when it has none.
+function copyPaths(r) {
+  const list = Array.isArray(r.dup_paths) ? r.dup_paths.filter(Boolean) : [];
+  return list.length ? list : null;
+}
+
+// Postgres keeps a time to the microsecond and a JS date to the millisecond;
+// a cursor a millisecond coarse would hand back, or step over, its neighbours.
+function microsOf(ts) {
+  const s = String(ts).trim().replace(' ', 'T');
+  const m = /\.(\d+)/.exec(s);
+  const whole = Date.parse(s.replace(/\.\d+/, ''));
+  return whole * 1000 + (m ? Number(`${m[1]}000000`.slice(0, 6)) : 0);
+}
+const isoMicros = us => new Date(Math.floor(us / 1000)).toISOString()
+  .replace('Z', `${String(us % 1000).padStart(3, '0')}Z`);
+
+function parseReceiver(v) {
+  if (v === undefined) {
+    throw bad('"receiver" is required: the receiver whose readings to list, as a reading\'s path names it without the '
+      + 'stick and frequency — e.g. receiver=rpi-6dfef7f4 for the path "serial-monitor/rpi-6dfef7f4-sdr1-152.400".');
+  }
+  const s = String(v).trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,119}$/.test(s) || /[/ .-]$/.test(s)) {
+    throw bad('"receiver" must be 2–120 letters, digits, spaces and . _ / - — a receiver as a reading\'s path names it, '
+      + 'e.g. rpi-6dfef7f4 or serial-monitor/rpi-6dfef7f4.');
+  }
+  // A stick's own path is taken for its receiver.
+  return receiverOfPath(s);
+}
+
+async function heardReadingsEndpoint(rc, params) {
+  const notes = [];
+  const rx = parseReceiver(params.receiver);
+  const limit = parseIntParam(params.limit, 'limit', { min: 1, max: LIMITS.heardMax, dflt: LIMITS.heardDefault, clampMax: true }, notes);
+  const nowUs = (rc.now - LIMITS.heardSettleSeconds * 1000) * 1000;
+  let sinceUs;
+  if (params.since !== undefined) {
+    parseInstant(params.since, 'since');
+    sinceUs = microsOf(/^\d{4}-\d{2}-\d{2}$/.test(String(params.since).trim()) ? `${String(params.since).trim()}T00:00:00Z`
+      : /(Z|[+-]\d{2}:?\d{2})$/.test(String(params.since).trim()) ? params.since : `${String(params.since).trim()}Z`);
+    if (sinceUs > rc.now * 1000) throw bad('"since" is in the future.');
+    if (sinceUs < (rc.now - LIMITS.heardSinceMaxDays * 86400000) * 1000) {
+      throw bad(`"since" may be at most ${LIMITS.heardSinceMaxDays} days ago. Older readings are at `
+        + `${API_PREFIX}/stations/{id}/readings, a station at a time.`);
+    }
+  } else {
+    sinceUs = (rc.now - LIMITS.heardSinceDefaultMin * 60000) * 1000;
+  }
+  // Nothing has settled yet between a `since` this recent and now.
+  const untilUs = Math.max(sinceUs, Math.min(nowUs, sinceUs + LIMITS.heardWindowHours * 3600e6));
+  const reachedNow = untilUs >= nowUs || untilUs === sinceUs;
+  const lookUs = sinceUs - LIMITS.heardCopyLookbackMin * 60e6;
+
+  const pairs = [
+    ['select', HEARD_SELECT],
+    ['received_at', `gt.${isoMicros(lookUs)}`],
+    ['received_at', `lte.${isoMicros(untilUs)}`],
+    ['and', `(or(received_at.gt.${pgQuote(isoMicros(sinceUs))},last_dup_at.gt.${pgQuote(isoMicros(sinceUs))}),`
+      + `or(path.like.${pgQuote(`*${rx}*`)},dup_count.gt.0))`],
+    ['order', 'received_at.asc,addr.asc,reading_ts.asc,value_raw.asc'],
+  ];
+  const heard = [];              // this receiver's, in arrival order
+  const early0 = () => heard.filter(h => h.us <= sinceUs).length;
+  let exhausted = untilUs === sinceUs, lastUs = null, prevUs = null, read = 0, pages = 0;
+  while (!exhausted && pages < LIMITS.heardUpstreamPages) {
+    const got = await rc.up.select('reading', [...pairs, ['limit', LIMITS.upstreamPageRows], ['offset', read]]);
+    pages++;
+    read += got.rows.length;
+    for (const r of got.rows) {
+      const us = microsOf(r.received_at);
+      if (us !== lastUs) { prevUs = lastUs; lastUs = us; }
+      const mine = [r.path, ...(Array.isArray(r.dup_paths) ? r.dup_paths : [])].filter(p => p && receiverMatches(p, rx));
+      if (mine.length) heard.push({ r, us, mine: uniq(mine) });
+    }
+    if (got.rows.length < LIMITS.upstreamPageRows) { exhausted = true; break; }
+    // Enough once the page is full and the database has moved on past its last instant.
+    const need = early0() + limit;
+    if (heard.length >= need && heard[need - 1].us < lastUs) break;
+  }
+
+  // A page ends on a whole instant of arrival — one batch from a base station
+  // is one instant — so the next call's `since` cuts between two, never
+  // through one; it may hold a few more than `limit` for that.
+  let list = exhausted ? heard : heard.filter(h => h.us < lastUs);
+  let nextUs = exhausted ? untilUs : prevUs;
+  if (!exhausted && !list.length) { list = heard; nextUs = lastUs; }   // one instant filled every page read
+  const early = list.filter(h => h.us <= sinceUs).length;              // later copies of earlier readings: never cut
+  let k = early + limit;
+  if (k < list.length) {
+    while (k < list.length && list[k].us === list[k - 1].us) k++;
+    if (k < list.length) { list = list.slice(0, k); nextUs = list[k - 1].us; }
+  }
+  const more = !(exhausted && list.length === heard.length && reachedNow);
+  nextUs = Math.max(sinceUs, nextUs == null ? sinceUs : nextUs);
+
+  const ids = uniq(list.map(h => h.r.station_id).filter(Boolean));
+  const stations = byKey(ids.length ? await stationRowsByIds(rc, ids, 'id,name,station_number', []) : []);
+  const rows = list.map(({ r, mine }) => {
+    const first = !!r.path && receiverMatches(r.path, rx);
+    const st = stations.get(r.station_id);
+    return stripNulls({
+      t: r.reading_ts,
+      received_at: r.received_at,
+      addr: r.addr,
+      alert_id: r.alert_id ?? null,
+      a2_station: r.a2_station ?? null,
+      a2_sensor: r.a2_sensor ?? null,
+      channel: r.channel || null,
+      station_id: r.station_id || null,
+      station_name: st ? st.name : null,
+      value_raw: num(r.value_raw),
+      value: num(r.value),
+      unit: r.unit,
+      quality: r.quality,
+      heard: first ? 'first' : 'copy',
+      via: mine,
+      path: r.path,
+      dup_count: r.dup_count || null,
+      copy_paths: copyPaths(r),
+      last_copy_at: r.last_dup_at || null,
+      // The signal is the stored copy's: this receiver's only when it was first.
+      ...(first ? { freq_mhz: num(r.freq_mhz), rssi_dbm: num(r.rssi_dbm), level_dbfs: num(r.level_dbfs), snr_db: num(r.snr_db) } : {}),
+    });
+  });
+
+  notes.push('Telemetry ingested into Flood-Net only, in the order it arrived (received_at). heard says whether this receiver\'s copy was the one stored ("first") or another receiver posted the reading first and this one\'s copy was counted on it ("copy"); via is this receiver\'s own paths on it, path the stored copy\'s, copy_paths the later copies\'. The signal (freq_mhz, rssi_dbm, level_dbfs, snr_db) is the stored copy\'s, so it is given only where heard is "first".');
+  notes.push(`To follow a receiver, call again with since=next_since. A reading comes again, with the same addr, t and value_raw, when this receiver's copy landed after it was first listed for another's — and a copy that lands more than ${LIMITS.heardCopyLookbackMin} minutes after its reading was first stored is not picked up by a later call. A call stops ${LIMITS.heardSettleSeconds} seconds short of now, and reads at most ${LIMITS.heardWindowHours} hours of arrivals: more says whether there is further to read now.`);
+  if (!rows.length) {
+    notes.push(`No reading that arrived in this stretch came by a receiver named "${rx}". A receiver is named as a reading's path names it, without the stick and frequency — "serial-monitor/rpi-6dfef7f4-sdr1-152.400" is receiver rpi-6dfef7f4 — and the paths in use are on the readings of ${API_PREFIX}/readings/latest.`);
+  }
+  const nextParams = { receiver: rx, since: isoMicros(nextUs) };
+  if (params.limit !== undefined) nextParams.limit = String(limit);
+  return {
+    receiver: rx,
+    since: isoMicros(sinceUs),
+    until: isoMicros(untilUs),
+    count: rows.length,
+    limit,
+    more,
+    next_since: isoMicros(nextUs),
+    next: `${rc.origin}${API_PREFIX}/readings/heard?${buildQuery(Object.entries(nextParams))}`,
+    readings: rows,
+    notes,
+    source: 'meganet.reading (path, dup_paths); meganet.station',
+    generated_at: new Date().toISOString(),
+  };
 }
 
 // ── GET /api/v1/health/silent ────────────────────────────────────────────────
@@ -3620,6 +3818,7 @@ export const ENDPOINTS = Object.freeze([
   { path: '/api/v1/acma', op: 'getAcmaLicencesNear', summary: 'The ACMA register\'s licences at sites within radius_m of a point — for a site not built yet, or a move.' },
   { path: '/api/v1/stations/{id}/radio-path', op: 'getStationRadioPath', summary: 'How a station\'s readings reach a base station: its repeaters, the backbone on, and the fade margin Flood-Net saved for each hop, stale or not.' },
   { path: '/api/v1/readings/latest', op: 'getLatestReadings', summary: 'Every station\'s newest reading on each channel, in one call: by network, basin, kind or bounding box.' },
+  { path: '/api/v1/readings/heard', op: 'getReceiverReadings', summary: 'Every reading one receiver (a base station\'s Pi) took in since a time, in arrival order — the ones another receiver posted first included. For polling.' },
   { path: '/api/v1/health/silent', op: 'getSilentStations', summary: 'The stations Flood-Net is not hearing now, and the groups it stopped hearing together, from the server\'s own health run.' },
   { path: '/api/v1/health/findings', op: 'getHealthFindings', summary: 'Station Health for a page of stations, worst first — by owner, by station ids, or by network, basin, kind or bounding box.' },
   { path: '/api/v1/catchments', op: 'listCatchments', summary: 'The 77 Queensland drainage basins.' },
@@ -3789,6 +3988,13 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
           formatParam,
           limitParam(LIMITS.latestMax, LIMITS.latestDefault), offsetParam,
         ], okOrGeo('A page of stations, each with its channels\' newest readings; or a GeoJSON FeatureCollection of them.')),
+      '/api/v1/readings/heard': op('getReceiverReadings', 'Get what a receiver heard',
+        'Every reading one receiver took in since a time, in the order it arrived — whether its copy was the one stored or another receiver posted the reading first and this one\'s copy was counted on it. Made for polling: call again with since=next_since.',
+        [
+          { ...q('receiver', 'The receiver, as a reading\'s path names it without the stick and frequency: "rpi-6dfef7f4" or "serial-monitor/rpi-6dfef7f4" for the path "serial-monitor/rpi-6dfef7f4-sdr1-152.400".', { type: 'string', minLength: 2, maxLength: 120 }), required: true },
+          q('since', `Readings that arrived after this instant, ISO 8601 (default ${LIMITS.heardSinceDefaultMin} minutes ago; at most ${LIMITS.heardSinceMaxDays} days ago). Pass the last answer's next_since.`, { type: 'string' }),
+          limitParam(LIMITS.heardMax, LIMITS.heardDefault),
+        ], ok('The readings the receiver heard, in arrival order, and next_since for the next call.')),
       '/api/v1/health/silent': op('getSilentStations', 'Get the silent stations',
         'Stations not heard now — checks Flood-Net\'s receivers missed while hearing others — worst first, with when each was last heard, and groups gone unheard together. Not what the stations sent: ARRO says if one kept reporting. From the server\'s run every 15 minutes; checked_at says when.',
         [
@@ -3901,6 +4107,9 @@ async function routeRest(rc, sub, params) {
   if (parts[0] === 'acma' && parts.length === 1) return acmaNearEndpoint(rc, allowParams(params, ACMA_NEAR_PARAMS));
   if (parts[0] === 'readings' && parts.length === 2 && parts[1] === 'latest') {
     return latestReadingsEndpoint(rc, allowParams(params, LATEST_PARAMS));
+  }
+  if (parts[0] === 'readings' && parts.length === 2 && parts[1] === 'heard') {
+    return heardReadingsEndpoint(rc, allowParams(params, HEARD_PARAMS));
   }
   if (parts[0] === 'health' && parts.length === 2 && parts[1] === 'silent') {
     return silentStationsEndpoint(rc, allowParams(params, SILENT_PARAMS));
@@ -4206,7 +4415,7 @@ export const MCP_INSTRUCTIONS = [
   'Flood-Net (floodwarning.net) is the engineering register of the Bureau of Meteorology\'s Queensland (and neighbouring) flood-warning telemetry network: rainfall and river-height field stations, the repeaters that relay them, base stations, and the radio paths between. This server is READ-ONLY and serves only public data.',
   'Station ids are lowercase slugs such as "abergowrie_br_al" (a Bureau number also works). Find stations with search_stations or stations_near, then call get_station_dossier for everything about one station in a single call — identity, location, radio, telemetry and health, the Service Level Specification entry, the Bureau\'s flood classes, crossings and gauge zero, AEP levels, inspection numbers and nearby stations, each labelled with its source. Use get_flood_levels or get_service_level when only that is needed.',
   'For what Station Health says about a station — its findings with what to do, its check schedule day by day, its battery\'s night lows — call get_station_health; for a maintenance run\'s worth of stations, get_health_findings by owner or by station ids.',
-  'For what every gauge is saying now, call get_latest_readings once — by radio network, basin, kind or bounding box if you like — rather than get_readings station by station; it covers only telemetry ingested into Flood-Net, which most stations do not send. For what has gone quiet, call get_silent_stations. For a map, search_stations, stations_near, get_latest_readings and get_silent_stations answer GeoJSON with format "geojson".',
+  'For what every gauge is saying now, call get_latest_readings once — by radio network, basin, kind or bounding box if you like — rather than get_readings station by station; it covers only telemetry ingested into Flood-Net, which most stations do not send. For everything one receiver (a base station) heard since a time, the readings another receiver posted first included, call get_receiver_readings and follow its next_since. For what has gone quiet, call get_silent_stations. For a map, search_stations, stations_near, get_latest_readings and get_silent_stations answer GeoJSON with format "geojson".',
   'For how a station\'s readings reach a base station, call get_radio_path: the repeaters that pass its ALERT addresses, the routes on along the backbone, and the fade margin Flood-Net saved for every hop — with whether each is stale (worked out with an older model, or an end has changed since), the best path and its weakest hop, and the path margins measured at site visits. Say which figures are stale when you quote them.',
   'For radio licensing, get_acma_licences gives the ACMA licences Flood-Net records for a station and every licence the ACMA register has near it (licensee, frequencies, power, distance, whether it is on the station\'s frequency); acma_licences_near does the same for a point where a site might go. The register is a weekly extract kept for the network\'s area — say its source_date, and check a licence on the ACMA\'s register before relying on it.',
   'Heights: flood classes, crossings and flood effects are metres on the gauge, not AHD; AEP levels are modelled metres AHD and indicative only. Say which source a figure came from. Sections report status "ok", "not recorded" or "unavailable" — never read "not recorded" as zero.',
@@ -4276,7 +4485,7 @@ export const MCP_TOOLS = Object.freeze([
   {
     name: 'get_readings',
     title: 'Get readings',
-    description: `Telemetry ingested into Flood-Net for one station: raw readings (window up to ${LIMITS.windowMaxDays.raw} days) — each with the path it came by and, where the receiver measured them, its freq_mhz, rssi_dbm, level_dbfs and snr_db — or hourly (${LIMITS.windowMaxDays.hourly} days) or daily rollups (${LIMITS.windowMaxDays.daily} days). Most stations report through the Bureau's own systems, so an empty answer is normal.`,
+    description: `Telemetry ingested into Flood-Net for one station: raw readings (window up to ${LIMITS.windowMaxDays.raw} days) — each with the path it came by, the paths of its later copies (copy_paths) and, where the receiver measured them, its freq_mhz, rssi_dbm, level_dbfs and snr_db — or hourly (${LIMITS.windowMaxDays.hourly} days) or daily rollups (${LIMITS.windowMaxDays.daily} days). Most stations report through the Bureau's own systems, so an empty answer is normal.`,
     inputSchema: { type: 'object', properties: {
       id: idArg,
       from: { type: 'string', maxLength: 40, description: 'Start, ISO 8601 date or date-time.' },
@@ -4297,6 +4506,17 @@ export const MCP_TOOLS = Object.freeze([
       format: formatArg, limit: limitArg(LIMITS.latestMax, LIMITS.latestDefault), offset: offsetArg,
     }, additionalProperties: false },
     route: a => ['/readings/latest', pick(a, ['network', 'basin', 'type', 'bbox', 'format', 'limit', 'offset'])],
+  },
+  {
+    name: 'get_receiver_readings',
+    title: 'Get what a receiver heard',
+    description: `Every reading one receiver (a base station's Pi, named as readings' paths name it — "rpi-6dfef7f4") took in since a time, in the order it arrived: each says whether this receiver's copy was the one stored (heard "first") or another receiver posted the reading first and this one's copy was counted on it ("copy"). To follow a receiver live, call again with since set to the answer's next_since. ${LIMITS.heardDefault} readings a call by default, up to ${LIMITS.heardMax}; since defaults to ${LIMITS.heardSinceDefaultMin} minutes ago and may be at most ${LIMITS.heardSinceMaxDays} days ago.`,
+    inputSchema: { type: 'object', properties: {
+      receiver: { type: 'string', minLength: 2, maxLength: 120, description: 'The receiver, as a reading\'s path names it without the stick and frequency, e.g. "rpi-6dfef7f4".' },
+      since: { type: 'string', maxLength: 40, description: 'Readings that arrived after this instant, ISO 8601. Pass the last answer\'s next_since.' },
+      limit: limitArg(LIMITS.heardMax, LIMITS.heardDefault),
+    }, required: ['receiver'], additionalProperties: false },
+    route: a => ['/readings/heard', pick(a, ['receiver', 'since', 'limit'])],
   },
   {
     name: 'get_silent_stations',

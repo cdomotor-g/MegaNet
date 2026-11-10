@@ -2275,6 +2275,8 @@ const ArroData = (function () {
       win:       '7d',
       from:      '', to: '',   // custom window, yyyy-mm-dd
       res:       'auto',
+      rx:        '',        // only what this receiver heard — see fieldHeardBy()
+      rxSeen:    [],        // the receivers on the last raw load, offered as suggestions
       loading:   false,
       error:     '',
       empty:     '',
@@ -2802,6 +2804,42 @@ const ArroData = (function () {
   // The query. Everything above is pure; this is the only part that talks to the
   // network, and it captures its instance up front so a tab switch mid-flight
   // cannot land somebody else's readings in the field list.
+  // ── Heard by one receiver ────────────────────────────────────────────────────
+  // A raw reading names the path of the copy that was stored and, beside it,
+  // the paths of the copies that landed after (dup_paths). A receiver is the
+  // thing in one place — the Pi, not one of its sticks — so its name is a path
+  // without the stick and frequency (SensorValues.hostOf), and the filter
+  // takes that name whole or by its last part, as the agent API's
+  // /readings/heard does. A reading counts as heard by it whether its copy
+  // was the one stored or a later one.
+  function fieldRxOf(path) { return SensorValues.hostOf(path || '') || ''; }
+  function fieldRxMatch(path, want) {
+    const host = fieldRxOf(path).toLowerCase();
+    return !!host && (host === want || host.endsWith('/' + want));
+  }
+  function fieldRxWant(q) {
+    const typed = String(q.rx || '').trim();
+    return typed ? fieldRxOf(typed).toLowerCase() : '';
+  }
+  // The rows a receiver heard, how many of them it was first with, and every
+  // receiver on the rows it was asked of.
+  function fieldHeardBy(rows, want) {
+    const seen = new Map();
+    const kept = [];
+    let first = 0;
+    for (const r of rows) {
+      const paths = [r.path, ...(Array.isArray(r.dup_paths) ? r.dup_paths : [])].filter(Boolean);
+      for (const p of paths) { const h = fieldRxOf(p); if (h) seen.set(h, (seen.get(h) || 0) + 1); }
+      if (!want) continue;
+      if (paths.some(p => fieldRxMatch(p, want))) {
+        kept.push(r);
+        if (r.path && fieldRxMatch(r.path, want)) first++;
+      }
+    }
+    return { rows: want ? kept : rows, first, seen: [...seen].sort((a, b) => b[1] - a[1]).map(x => x[0]) };
+  }
+  function fieldSetRx(v) { const q = fq(); q.rx = String(v || '').trim(); q.error = ''; q.empty = ''; renderSide(); }
+
   async function fieldRun() {
     const inst = ad;
     const q = fq();
@@ -2816,6 +2854,13 @@ const ArroData = (function () {
     const win = fieldWindow(q);
     if (!win) { q.error = 'That is not a time window — the "from" date has to fall before the "to" date.'; renderSide(); return; }
     const res = fieldRes(q, win);
+    const rx = fieldRxWant(q);
+    if (rx && res !== 'raw') {
+      q.error = `Only raw readings say which receiver heard them, and this window would be drawn from ${AD_RES_LABEL[res]}. `
+              + `Pick a window of ${AD_RAW_MAX_DAYS} days or less, or clear “Heard by”.`;
+      renderSide();
+      return;
+    }
 
     const seq = ++q.seq;
     q.loading = true;
@@ -2839,6 +2884,13 @@ const ArroData = (function () {
 
     q.loading = false;
 
+    // Every reading read, before the receiver filter: what the filter is a
+    // share of, and the receivers the box can offer next time.
+    const all = out.rows;
+    const heard = res === 'raw' ? fieldHeardBy(all, rx) : { rows: all, first: 0, seen: [] };
+    if (res === 'raw') q.rxSeen = heard.seen.slice(0, 12);
+    out.rows = heard.rows;
+
     const byAddr = new Map();
     for (const r of out.rows) {
       if (!byAddr.has(r.addr)) byAddr.set(r.addr, []);
@@ -2849,13 +2901,27 @@ const ArroData = (function () {
     // a second copy of them beside the first — and it drops them whether or not
     // anything came back, so a chart is never left showing last question's
     // answer under this question's window.
+    // A load for one receiver stands beside a load for another, or for all of
+    // them: that comparison is what the filter is for.
     const replacing = new Set(addrs);
+    const sameRx = s => (s.prov.rx || '') === rx;
     // The replaced series are part of the step the new ones arrive in, so one
     // Undo puts the previous answer back.
-    if (inst.series.some(s => s.prov && replacing.has(s.prov.addr)) && checkpoint(inst, 'adopt', 'field load')) {
+    if (inst.series.some(s => s.prov && replacing.has(s.prov.addr) && sameRx(s)) && checkpoint(inst, 'adopt', 'field load')) {
       inst.redo = [];
     }
-    inst.series = inst.series.filter(s => !(s.prov && replacing.has(s.prov.addr)));
+    inst.series = inst.series.filter(s => !(s.prov && replacing.has(s.prov.addr) && sameRx(s)));
+
+    if (!out.rows.length && all.length) {
+      // Readings, and none of them by this receiver: say who did hear them,
+      // so a mistyped name is seen for what it is.
+      q.empty = `None of the ${all.length.toLocaleString()} readings between ${fmtFull(win.t0)} and ${fmtFull(win.t1)} `
+              + `came by a receiver named “${q.rx.trim()}”. `
+              + (heard.seen.length ? `They came by ${heard.seen.slice(0, 6).join(', ')}${heard.seen.length > 6 ? ' and others' : ''}.`
+                                   : 'None of them names the receiver it came by.');
+      if (ad === inst) renderAll();
+      return;
+    }
 
     if (!out.rows.length) {
       // Nothing is drawn. An empty axis over a silent window reads as "the
@@ -2896,15 +2962,23 @@ const ArroData = (function () {
           ? ((state.data?.stations || []).find(x => x.id === ownerId) || { id: ownerId, name: ownerId })
           : named;
         const label = [owner?.name || fieldAddrLabel(addr),
-                       sensor?.type || hit?.label || fieldAddrLabel(addr)].filter(Boolean).join(' · ');
+                       sensor?.type || hit?.label || fieldAddrLabel(addr),
+                       rx ? `heard by ${q.rx.trim()}` : ''].filter(Boolean).join(' · ');
         const warn = [];
         if (out.capped) warn.push(`The row cap (${AD_FIELD_ROW_CAP.toLocaleString()}) was reached — this is the start of the window, not all of it. Narrow the window or pick a coarser resolution.`);
         if (res !== 'raw') warn.push(`Drawn from ${AD_RES_LABEL[res]}: each point is the counter as it read at the end of its bucket. Within-bucket minimum and maximum are in the inspector and the export.`);
         if (built.anyDup) warn.push('Some readings arrived by more than one path — click a point to see which.');
+        if (rx) {
+          const of = all.filter(r => r.addr === addr).length;
+          const mine = rows.filter(r => r.path && fieldRxMatch(r.path, rx)).length;
+          warn.push(`Only the readings ${q.rx.trim()} heard: ${rows.length.toLocaleString()} of the ${of.toLocaleString()} in this window. `
+            + `It was first with ${mine.toLocaleString()}; another receiver posted the other ${(rows.length - mine).toLocaleString()} first and its copy was counted on them. `
+            + 'A gap here is a reading this receiver missed, not one the station did not send.');
+        }
         data.warn = warn;
 
         const s = adoptSeries(data, {
-          fileName: `${addr} · ${AD_RES_LABEL[res]}`,
+          fileName: `${addr} · ${AD_RES_LABEL[res]}${rx ? ` · heard by ${q.rx.trim()}` : ''}`,
           meta:     { sensorId: sensor?.sensor_id || null },
           label,
           station:  owner || null,
@@ -2917,6 +2991,7 @@ const ArroData = (function () {
           prov: {
             source: 'field',
             addr, res,
+            ...(rx ? { rx } : {}),
             t0: win.t0, t1: win.t1,
             at: Date.now(),
             host: dbHostLabel(),
@@ -2934,11 +3009,18 @@ const ArroData = (function () {
     inst.pin = null;
     if (ad === inst) {
       renderAll();
-      note(`${out.rows.length.toLocaleString()} ${AD_RES_LABEL[res]} from ${dbHostLabel()}.`);
+      note(`${out.rows.length.toLocaleString()} ${AD_RES_LABEL[res]} from ${dbHostLabel()}`
+        + `${rx ? `, the ones ${q.rx.trim()} heard of ${all.length.toLocaleString()}` : ''}.`);
     }
   }
 
   // ── the picker ───────────────────────────────────────────────────────────────
+
+  // The one word on the picker that means something particular here.
+  const AD_HEARD_BY_MEANING = 'A receiver is a base station\'s radio computer, named as readings name it — rpi-83071968. '
+    + 'With one typed here, only the readings it heard are drawn: the ones it posted first, and the ones another receiver '
+    + 'posted first that it also heard. Raw readings only (a window of 14 days or less). After a load, the box offers the '
+    + 'receivers that heard those readings.';
 
   const AD_FIND_CAP = 25;   // matches offered before the operator is asked to type more
 
@@ -3064,6 +3146,21 @@ const ArroData = (function () {
                     title="${escAttr(k === 'auto' ? 'Chosen from the width of the window' : 'Always draw ' + AD_RES_LABEL[k])}">${esc(label)}</button>`).join('')}
         </div>
         ${res ? `<p class="small ad-cfg-note">This window will be drawn from <b>${esc(AD_RES_LABEL[res])}</b>.</p>` : ''}
+
+        <label class="ad-cfg-row ad-cfg-row--block ad-cfg-row--spaced"
+               title="${escAttr(AD_HEARD_BY_MEANING)}">
+          <span>${termHtml('Heard by', AD_HEARD_BY_MEANING)}</span>
+          <input type="search" class="ad-field-input" id="ad-field-rx" data-keep list="ad-field-rx-list"
+                 placeholder="Any receiver — or e.g. rpi-83071968"
+                 value="${escAttr(q.rx)}"
+                 onchange="ArroData.fieldSetRx(this.value)">
+          <datalist id="ad-field-rx-list">
+            ${q.rxSeen.map(h => `<option value="${escAttr(h)}"></option>`).join('')}
+          </datalist>
+        </label>
+        <p class="small ad-cfg-note">${q.rx.trim()
+          ? `Only the readings <b>${esc(q.rx.trim())}</b> heard, raw readings only. It stands beside a load for every receiver, so the two compare.`
+          : `Leave empty for every receiver. ${esc(AD_HEARD_BY_MEANING)}`}</p>
 
         <button class="ad-field-run" ${q.loading ? 'disabled' : ''}
                 onclick="ArroData.fieldRun()">${q.loading ? 'Reading…' : 'Load readings'}</button>
@@ -8294,7 +8391,7 @@ const ArroData = (function () {
     preset, unpin, setCfgFor, applyCfgAll, exportCsv, exportImg, explain, compareToggle, tableToggle, dropAll,
     // the Field Data tab (#114)
     fieldSetStation, fieldToggleSensor, fieldAllSensors, fieldSetWindow,
-    fieldSetRes, fieldSetDate, fieldRun, fieldClearError,
+    fieldSetRes, fieldSetRx, fieldSetDate, fieldRun, fieldClearError,
     // what the datastore holds, as opposed to what the registry says it should
     fieldProbe, fieldSetProbeTerm, fieldProbeClear, fieldSelectableAddrs,
     // the Message Log's door in — one address, one moment, charted

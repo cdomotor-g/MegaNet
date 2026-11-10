@@ -2,6 +2,16 @@
   "about": "Every change to Flood-Net's agent API (https://floodwarning.net/api/v1 and https://floodwarning.net/api/mcp) that someone using it would notice — a route, a field, a limit, a tool — newest first. Each entry is emailed once to everyone on the API notify list (sign up at https://floodwarning.net/api#notify). Served as JSON at https://floodwarning.net/api/v1/changelog and written up in docs/agent-api.md, under Changes. Add an entry in the same push as the change: it is what tells people.",
   "entries": [
     {
+      "id": "2026-11-10-receiver-readings",
+      "date": "2026-11-10",
+      "title": "What one receiver heard: a new route to follow a base station live",
+      "summary": "GET /api/v1/readings/heard?receiver= (the get_receiver_readings tool) lists every reading one receiver took in since a time, in the order it arrived. A receiver is a base station's Raspberry Pi, named as a reading's path names it without the stick and frequency: the path serial-monitor/rpi-6dfef7f4-sdr1-152.400 is receiver rpi-6dfef7f4. Each reading says whether this receiver's copy was the one stored (heard \"first\") or another receiver posted it first and this one's copy was counted on it (heard \"copy\") — the readings /readings/latest never showed as yours. To follow a base station, poll with since set to the last answer's next_since instead of pulling a whole region: 500 readings a call by default, up to 2,000; since may start at most 7 days back. A reading can come a second time, with the same addr, t and value_raw, when your copy landed after it was first listed. Raw rows from /stations/{id}/readings also gain copy_paths, the paths of a reading's later copies. Nothing was removed or renamed.",
+      "breaking": false,
+      "links": [
+        { "text": "The route, its fields and how to poll it", "url": "https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md#get-apiv1readingsheard" }
+      ]
+    },
+    {
       "id": "2026-11-09-radio-path-channels",
       "date": "2026-11-09",
       "title": "Radio paths now take a hop on only where the next station listens on the channel",

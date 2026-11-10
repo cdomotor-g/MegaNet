@@ -1381,6 +1381,14 @@ jobs:
         working-directory: test
         run: npm run fieldprobe
 
+      # Field Data's "Heard by" (arro-data.js): only the readings one receiver
+      # heard, whether its copy was stored or counted on another's, drawn
+      # beside everybody's; a rollup window refused with a sentence.
+      - name: Field Data — Heard by one receiver
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run fieldheardby
+
       # The station editor's sparklines (sensor-sparks.js): a week on every
       # sensor row from one load for the station, the rain gauge's wrap undone
       # and a flipped frame not counted as rain, a 163 V battery frame left
