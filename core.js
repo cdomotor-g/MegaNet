@@ -3990,8 +3990,10 @@ const DB_SCHEMA = 'meganet';
 // by db-migrate.yml on 5 November 2026, bumped after; no shape the app reads
 // changes. 105: Field Station 25W, a third radio system in slot 3 (0105),
 // applied by db-migrate.yml on 6 November 2026, bumped after; no shape the app
-// reads changes.
-const DB_SCHEMA_VERSION = 110;
+// reads changes. 111: a base station's spectrum by the hour and its ingest
+// (0111), applied by db-migrate.yml on 10 November 2026, bumped after; the
+// Base Stations tab reads both, and a database without them says which file.
+const DB_SCHEMA_VERSION = 111;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
