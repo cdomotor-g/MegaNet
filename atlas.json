@@ -380,9 +380,11 @@
         "on": "human",
         "kind": "decision",
         "since": "2026-11-10",
+        "issue": "#286",
         "holds": [
           "licensing decisions for the 203 gauges beyond a licence's area",
-          "whether the 37 repeaters need licences of their own"
+          "whether the 37 repeaters need licences of their own",
+          "#287 only in its wording, not its build"
         ],
         "options": [
           {

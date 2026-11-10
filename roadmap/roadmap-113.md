@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-10** (revision 252 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-10** (revision 253 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -443,6 +443,8 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 > ~~**⚠️** These were originally listed as "independent — no sequencing dependency." They are logically independent but **mechanically serialised**~~ — **resolved the easy way: one agent did both in sequence**, #121 read #120's pane comment instead of picking a z-index blind, and the `MemMeter` third of the table had already been obsoleted by #144 (layers are counted generically off `liveMaps()`).
 
 ## Standalone issues
+- **#287** `[Standalone]` `[Sonnet5/High]` — **OPEN, opened revision 253** — the inspection form records whether a licensed transmitter's ACMA label is fitted (its frequency assignment number and "Do Not Remove": Radiocommunications (Labelling) Determination 2023), shows the number it should carry from `MapAcma`, reads back in Inspection History and its CSV, and the ACMA licences tool says what the last inspection found. Migration `0112`. Touches `inspections.js`, `history.js` and `map-acma.js`: not at once with #283, #284 or another inspection-form change. Depends on nothing.
+- **#286** `[Standalone]` `[Human]` — **OPEN, opened revision 253** — the owner sends ACMA's Spectrum Planning Section the question drafted in the 🪪 Radio Licensing lesson: is a gauge that reports to a licensed repeater from beyond the 30 km service area covered by that licence, unprotected and bound not to interfere, as the documents imply? 203 gauges and 37 repeaters turn on the answer. Blocks nothing in the code; an agent updates the lesson, the tool's wording and `docs/acma-licences.md` once the reply is on the issue. On the Atlas as `acma-30km-confirmation`.
 - **#285** `[Standalone]` `[Haiku4.5/Low]` — **OPEN, opened revision 250** — regenerate the private repository's derived benchmarks file now that the reader (`tools/ingest/benchmarks.py`) drops a private person's name from one comment (`0110` already took it out of the live table). Needs a session with `cdomotor-g/flood-net-private` attached; the raw report there is the owner's call. Depends on nothing.
 - **#284** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 250** — a licensing-state column and filter on the Stations list, and the same columns in the station exports, read from `MapAcma.stateOf`. Touches the Stations list and `export.js`; independent of #283. *Since revision 252 there are four states for a transmitter, not three — Beyond a licence's area is new — and `stateOf` also says whether the station is a repeater and which repeater it reports through.*
 - **#283** `[Standalone]` `[Sonnet5/High]` — **OPEN, opened revision 250** — 📜 ACMA licences draws land mobile, scientific and area-wide licences too (today only fixed ones: point to multipoint and point to point). Extends `tools/acma_station_licences.py` and `map-acma.js`; do before or after #284, not at once with another `map-acma.js` change.
@@ -743,7 +745,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### AI agent — Sonnet5
 | Effort | Issues |
 |---|---|
-| High | **#283** (ACMA licences: land mobile and area-wide licences drawn too — *pickable now*) · **#217** (transmitter drift as a finding — *live; a week of legacy offsets to look at*) · **#238** (QLDTraffic on the map — flooded and closed roads, damaged bridges; *its flood cameras shipped at revision 192*) |
+| High | **#287** (inspection form: the transmitter's ACMA label — *pickable now; not alongside #283 or #284*) · **#283** (ACMA licences: land mobile and area-wide licences drawn too — *pickable now*) · **#217** (transmitter drift as a finding — *live; a week of legacy offsets to look at*) · **#238** (QLDTraffic on the map — flooded and closed roads, damaged bridges; *its flood cameras shipped at revision 192*) |
 | Med | **#284** (licensing state on the Stations list and in exports — *pickable now*) · **#266** (how-to: Flood-Net on your phone — *pickable now*) · **#282** (Supabase's API errors and advice, Cloudflare's Workers and R2 on the Admin tab — *waits on #281*) · **#267** (how-to: map layers and the site's look — *pickable now*) · **#254** (a route kept on the phone for no signal) · **#177** (NSW road parcels) · **#187** (ACMA transmitters in 3-D — its drawings half shipped at revision 147) · **#201** (place a field photo on the map) · **#205** (tides and soils on the card beyond Queensland) · **#220** (maintenance due list) · **#228** (accessibility follow-ups) |
 | Low | — |
 
@@ -780,7 +782,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### Human
 | Issues |
 |---|
-| #66, #156, #157, #158, #166, #185, #207, #210, #233, #234, #236, #237, #239, #261, #269, #270, #273, #281 |
+| #66, #156, #157, #158, #166, #185, #207, #210, #233, #234, #236, #237, #239, #261, #269, #270, #273, #281, #286 |
 
 > **The Human column shrank for a reason worth recording.** #145 was `[Human]` because applying a migration and creating a Storage bucket "needs the dashboard and the database password". That is no longer true: #149 applied `0010` and created the bucket from an agent session over the Supabase MCP connection, and verified both with read-only queries afterwards. **Before allocating anything else to a human on the grounds that it touches the live database, check whether that connection is available.** #146 and #148 were both allocated partly on that assumption, were re-noted at revision 15, and at revision 16 were done that way: `0011` applied over the same connection and verified with read-only queries. **Two migrations applied by an agent now, so this is a settled fact rather than one project's luck.** The Human column is #66, #156 and #157 — and each is `[Human]` for the right reason rather than the dashboard one: #156 is a product decision (which suggested features to want), and **#157 is the first one on this board that is `[Human]` because of the *toolchain*, not the credentials.** CRBasic Editor is Windows-only and Campbell's, and every `campbellsci.com` host is unreachable from the agent environment's egress policy, so a datalogger program cannot be compiled — or its instruction reference read — by any session, however it is allocated. That is a new category, and it is worth naming: the test above ("check whether that connection is available") does not dispose of it, because no connection would help.
 >
@@ -876,6 +878,14 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 253 — 2026-11-10: #286 and #287 opened — the question for ACMA, and the label on the inspection form
+
+The owner said yes to both follow-ups from revision 252. **Opens #286 and #287**; closes nothing.
+
+- **#286** `[Human]` — send ACMA the drafted question on gauges beyond the 30 km service area, click by click; the reply goes on the issue. The Atlas blocker `acma-30km-confirmation` now points at it.
+- **#287** `[Sonnet5/High]` — the inspection form records whether a licensed transmitter carries its label, with the number it should show. Serialise with #283 and #284 (all three touch `map-acma.js` or read it).
+- **Sequencing:** #286 waits on nobody and blocks no code. #287 is pickable now. If ACMA's answer to #286 changes the reading, the lesson and the tool's wording change with it; #284 and #287 are unaffected.
+
 ### Revision 252 — 2026-11-10: 🪪 Radio Licensing in the Knowledge base, the licensing documents kept, 📜 ACMA licences' fourth state
 
 The owner supplied RALI FX16, RALI FX19 and the Fixed Licence determination as PDFs and asked what they change, for a plain-words lesson, and for the 30 km question to be settled. Opens and closes nothing.
@@ -886,7 +896,7 @@ The owner supplied RALI FX16, RALI FX19 and the Fixed Licence determination as P
 - **📜 ACMA licences** (`map-acma.js`): a fourth state, **Beyond a licence's area** — 203 gauges that report through a repeater with a licence at its site, out of the 612 that were "none found" (409 remain); a repeater inside another licence's circle told it is covered only as a fill-in (37); *Assumed reach* renamed *Service area*; a remote station's power worked out at the antenna and as EIRP; the label a transmitter over 2 W EIRP at a shared site must carry (Radiocommunications (Labelling) Determination 2023), with each transmitter's frequency assignment number now in the register copy.
 - **Checks added:** `licensing` (53: every quotation on its page, word for word; then the tab). `acmamap` extended to the fourth state, the label and the way to the lesson (68).
 - **Base stations only receive** (the owner, the same day): Flood-Net's base stations never transmit, so none needs a licence. The lesson, the tool, the word list and the docs now say "repeater" or "licensed transmitter" for the station a licence names, keep "base station" for the law's own words and for Flood-Net's receivers, and say which is which.
-- **Waits on the owner:** sending ACMA the drafted question (the lesson, *ACMA's pages*) — recorded on the Atlas as `acma-30km-confirmation`.
+- **Waits on the owner:** sending ACMA the drafted question (the lesson, *ACMA's pages*) — recorded on the Atlas as `acma-30km-confirmation`, and from revision 253 as **#286**.
 
 ### Revision 251 — 2026-11-10: Base Stations — Steady signals and What comes in through each — 0111
 
