@@ -280,6 +280,32 @@ count, or no ID**). The database names each counted station; the grouping is
 done in the browser, which holds the owners. **Save this breakdown as CSV**
 writes every row of the one on screen.
 
+A station owned jointly is counted under each of its owners, so the owner rows
+can add up to more than the total; each share is of the total.
+
+### Not in the register — whose are they?
+
+**Not in the register** (`0114`; also the button on that row of any other
+breakdown) lists every station decoded that the register does not hold.
+Nothing on the air names an owner, so it lays out what narrows it down:
+
+- **Which frequency, and who is licensed on it** — the stations and messages on
+  each frequency, beside every holder the ACMA's register has on that frequency
+  (within 6 kHz) within 300 km of the base station, nearest first. The licence
+  holder of a network is the agency to ask.
+- **Which transmitter the base station heard them from** (ALERT2) — the last
+  address in each message's relay path, which is the repeater the base station
+  itself received, with how many stations come through it and its signal.
+- **Station by station** — messages and messages a day, frequency, where it
+  was heard from, mean SNR, the first day the daily records have it, and
+  clues: an ALERT2 address that also relays others is a repeater; a legacy ID
+  is shown beside the nearest IDs the register does hold, since agencies are
+  given IDs in blocks.
+
+**Save this breakdown as CSV** writes every station with all its licence
+holders and paths. Adding the station to the register, with its ALERT2 address
+or sensor IDs, takes it off the list.
+
 ## Channel by channel
 
 Under the waterfall, **Channel by channel** (`0081`) takes the last day, week or

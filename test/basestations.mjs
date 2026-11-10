@@ -339,13 +339,22 @@ const FNS = {
                       { protocol: 'alert2', n: 10600, ok: 10500, undecoded: 0, dup: 0, bad: 100, ids: 12, known: 12, only_here: 2, last: ago(30) }],
           receivers: [{ point_id: 'rx-1', protocol: 'alert', n: 4000, ok: 3500, ids: 120, last: ago(90), name: 'RTL-SDR 1' },
                       { point_id: 'rx-1', protocol: 'alert2', n: 10600, ok: 10500, ids: 12, last: ago(30), name: 'RTL-SDR 1' }],
-          ids: [['alert2', 65001, 10000, REG.id, null, true], ['alert', 9001, 2000, REG.id, 'Rainfall', false], ['alert', 9002, 1000, REG.id, 'Water Level', true],
-                ['alert', 7777, 400, null, null, true]],
+          ids: [['alert2', 65001, 9700, REG.id, null, true], ['alert', 9001, 2000, REG.id, 'Rainfall', false], ['alert', 9002, 1000, REG.id, 'Water Level', true],
+                ['alert', 7777, 400, null, null, true], ['alert2', 33300, 300, null, null, true]],
+          // 0114: the two nobody has registered — a legacy ID on the council's
+          // frequency, an ALERT2 address on the Bureau's, mostly through a repeater.
+          site: { lat: -19.35, lon: 146.78 },
+          strangers: [
+            { protocol: 'alert', id: 7777, ok: 400, n: 420, only_here: true, first: ago(6 * 86400), last: ago(120), snr: 12, fmin: 151.575, fmax: 151.575, days: 7, since: day(3),
+              points: [['rx-1', 400, 151.575, 151.575, 12]], paths: null },
+            { protocol: 'alert2', id: 33300, ok: 300, n: 300, only_here: true, first: ago(6 * 86400), last: ago(60), snr: 15.2, fmin: 151.5, fmax: 151.5, days: 7, since: day(40),
+              points: [['rx-1', 300, 151.5, 151.5, 15.2]], paths: [[[65001], 200, 18], [[], 100, 9.5]] }],
           paths: [{ protocol: 'alert2', path: [], ok: 6000, ids: 8, names: [] }, { protocol: 'alert2', path: [65001, 64000], ok: 4500, ids: 4, names: ['Mt Stuart', null] }] },
         { id: 12, label: 'Depot roof', revoked: false, host_station: null, days: days(300, 0),
           protocols: [{ protocol: 'alert', n: 2400, ok: 2100, undecoded: 300, dup: 0, bad: 0, ids: 120, known: 120, only_here: 0, last: ago(300) }],
           receivers: [{ point_id: 'rx-9', protocol: 'alert', n: 2400, ok: 2100, ids: 120, last: ago(300), name: null }],
-          ids: [['alert', 9001, 2100, REG.id, 'Rainfall', false]], paths: [] },
+          // …and a station two bodies own, which is under each of them
+          ids: [['alert', 9001, 2000, REG.id, 'Rainfall', false], ['alert', 9100, 100, 'billinudgel_marshal', 'Battery', true]], paths: [], strangers: [], site: null },
         { id: 14, label: 'Never heard', revoked: false, host_station: null, days: [], protocols: [], receivers: [] }] };
   },
   // Its receivers' own SNR shift by day (0083): RTL-SDR 1's ALERT stepped down
@@ -807,17 +816,20 @@ try {
   await until(async () => (await byRows()).some(r => r[0] === 'Southern Downs Regional Council'), 'the breakdown opens by owner, once the owners are on hand');
   let by = await byRows();
   ok('by owner, all base stations: a station two of them decode is one station, its messages counted at each',
-    by.length === 3 && by[0].join('|') === 'Southern Downs Regional Council|3|5,100|10,000|15,100|94%'
-      && by[1].join('|') === 'Not in the register|1|400|—|400|2%' && by[2].join('|') === 'Too few to count, or no ID|—|100|500|600|4%', JSON.stringify(by));
+    by.length === 5 && by[0].join('|') === 'Southern Downs Regional Council|3|5,000|9,700|14,700|91%'
+      && by[1].join('|') === 'Not in the register — who are they?|2|400|300|700|4%' && by[4].join('|') === 'Too few to count, or no ID|—|100|500|600|4%', JSON.stringify(by));
+  ok('…and a station owned jointly is under each of its owners, the page saying the rows then add up to more',
+    by[2].join('|') === 'Byron Shire Council|1|100|—|100|under 1%' && by[3].join('|') === 'NSW DCCEEW|1|100|—|100|under 1%'
+      && /counted under each of its owners/.test(await text('#bs-in-by')), JSON.stringify(by));
   await page.click('#bs-in-by button:has-text("Kind of sensor")');
   by = await byRows();
   ok('by kind of sensor: the legacy sensor\'s type, and for ALERT2 what the station is',
-    by.some(r => r[0] === 'ALERT2 repeater' && r[3] === '10,000') && by.some(r => r[0] === 'Rainfall' && r[2] === '4,100') && by.some(r => r[0] === 'Water Level' && r[2] === '1,000'), JSON.stringify(by));
+    by.some(r => r[0] === 'ALERT2 repeater' && r[3] === '9,700') && by.some(r => r[0] === 'Rainfall' && r[2] === '4,000') && by.some(r => r[0] === 'Water Level' && r[2] === '1,000'), JSON.stringify(by));
   await page.click('#bs-in-by button:has-text("Mt Stuart hut")');
   await page.click('#bs-in-by button:has-text("Station by station")');
   by = await byRows();
   ok('one base station, station by station: its IDs added up under the station, with what only it hears',
-    by[0].join('|') === 'Amiens Knob AL|3 2 only here|3,000|10,000|13,000|93%' && /^Legacy ID 7777 — not in the register$/.test(by[1][0]), JSON.stringify(by));
+    by[0].join('|') === 'Amiens Knob AL|3 2 only here|3,000|9,700|12,700|91%' && /^Legacy ID 7777 — not in the register$/.test(by[1][0]), JSON.stringify(by));
   await page.click('#bs-in-by button:has-text("Relay path")');
   by = await byRows();
   ok('by relay path: straight from the station, or the repeaters it came through, named where the register has them',
@@ -828,6 +840,23 @@ try {
     by.length === 7 && /\(so far\)$/.test(by[0][0]) && by[0].slice(1).join('|') === '500 of 505 (99%)|100|1,500 of 1,500 (100%)|12|2,000 of 2,005 (100%)|75%', JSON.stringify(by[0]));
   ok('the breakdown\'s headings carry their meanings too, listed in the same fold',
     await page.evaluate(() => { const th = [...document.querySelectorAll('#bs-in-by thead .term')]; return th.length >= 3 && th.every(t => t.title.length > 40
+      && [...document.querySelectorAll('#bs-in dl.rd-words dd')].some(d => d.textContent === t.title)); }));
+  // …and the ones nobody has registered (0114): what narrows down whose they are
+  await page.click('#bs-in-by .pill-row button:has-text("Not in the register")');
+  const rowsOf = cls => page.evaluate(c => [...document.querySelectorAll('#bs-in-by table.' + c + ' tbody tr')].map(tr => [...tr.children].map(td => td.innerText.replace(/\s+/g, ' ').trim())), cls);
+  await until(async () => (await rowsOf('bs-in-uf')).some(r => /BUREAU OF METEOROLOGY/.test(r[4])), 'the unregistered stations, frequency by frequency, once the ACMA\'s licences are on hand');
+  const uf = await rowsOf('bs-in-uf'), ut = await rowsOf('bs-in-ut'), us = await rowsOf('bs-in-us');
+  ok('each frequency names who is licensed on it near the base station — the agency to ask',
+    uf.length === 2 && /^151\.575 MHz\|Legacy ALERT\|1\|400 57% of these\|TOWNSVILLE CITY COUNCIL Broadcast Site Kelso, \d+ km$/.test(uf[0].join('|'))
+      && /^151\.50 MHz\|ALERT2\|1\|300 43% of these\|BUREAU OF METEOROLOGY Met Tower Mt Stuart, 0 km$/.test(uf[1].join('|')), JSON.stringify(uf));
+  ok('ALERT2 by the transmitter the base station itself heard — the last in the path, named where the register has it — with its signal',
+    ut.length === 2 && ut[0].join('|') === 'Mt Stuart (65001)|1|200|18.0 dB' && ut[1].join('|') === 'Straight from the station|1|100|9.5 dB', JSON.stringify(ut));
+  ok('a row a station: its messages, frequency, where it was heard from, its signal, since when, and what its number says',
+    us.length === 2 && /^7777 legacy ID\|400 57 a day · 95% of heard\|151\.575\|legacy carries no path\|12\.0 dB\|/.test(us[0].join('|')) && /register/.test(us[0][6])
+      && /^33300 ALERT2 station\|300 43 a day\|151\.50\|Mt Stuart \(65001\) 200 · 18\.0 dB straight from it 100 · 9\.5 dB\|15\.2 dB\|/.test(us[1].join('|'))
+      && /on 7 days/.test(us[1][5]) && /^Heard straight from it/.test(us[1][6]), JSON.stringify(us));
+  ok('its headings carry their meanings, listed in the fold',
+    await page.evaluate(() => { const th = [...document.querySelectorAll('#bs-in-by thead .term')]; return th.length >= 10 && th.every(t => t.title.length > 40
       && [...document.querySelectorAll('#bs-in dl.rd-words dd')].some(d => d.textContent === t.title)); }));
   await page.click('#bs-in button:has-text("30 days")');
   await until(() => sent('admin_base_station_ingest').some(a => a.p_days === 30), 'the 30 days button asks for thirty');

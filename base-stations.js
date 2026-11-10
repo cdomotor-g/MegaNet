@@ -1787,13 +1787,19 @@ const BaseStations = (function () {
     ['in-register', 'Not in the register', 'IDs Flood-Net\'s station register does not hold: another network\'s stations, or ones not entered yet.'],
     ['in-only', 'Only here', 'Stations this base station decoded that no other base station did in the period. If this base station goes down, these go dark.'],
     ['in-share', 'ALERT2 share', 'The part of the decoded messages that came as ALERT2 rather than legacy ALERT.'],
-    ['in-owner', 'Owner', 'Who owns the station sending: from the Bureau\'s Service Level Specification where it lists the station, else the owner recorded on the station. A station owned jointly is counted under the pair, not under each.'],
+    ['in-owner', 'Owner', 'Who owns the station sending: from the Bureau\'s Service Level Specification where it lists the station, else the owner recorded on the station. A station owned jointly is counted under each of its owners, so the rows can add up to more than the total.'],
     ['in-network', 'Radio network', 'The local radio network the register puts the station in: the repeater it reports through and the gauges round it.'],
     ['in-hub', 'Bureau region', 'The Bureau field maintenance region (hub) the station falls in.'],
     ['in-kind', 'Kind of sensor', 'For legacy ALERT, what the sensor behind the ID measures, as the register has it (rainfall, water level, battery…). For ALERT2, whether the station sending is a repeater or a field station.'],
-    ['in-path', 'Relay path', 'The repeaters an ALERT2 message says it came through before the base station heard it. "Straight from the station" means it names none.'],
+    ['in-path', 'Relay path', 'The repeaters an ALERT2 message says it came through, in order: the first is nearest the station sending, the last is the one the base station itself heard. "Straight from the station" means it names none.'],
     ['in-few', 'Too few to count, or no ID', 'Messages decoded from an ID heard fewer than three times in the period, or with no ID read at all. Mostly corrupted copies of other messages, so they are kept apart rather than counted as stations.'],
     ['in-part', 'Share', 'This row\'s part of all the decoded messages in the table.'],
+    ['in-freq', 'Frequency', 'The frequency the receiver measured the messages on, put to the nearest 6.25 kHz channel.'],
+    ['in-lic', 'Licensed on it nearby', 'Who the ACMA\'s register of radio licences has on that frequency (within 6 kHz) within 300 km of the base station, nearest first. A network\'s licence holder is the agency to ask whose stations these are. It lists every licence on the frequency, not only flood networks.'],
+    ['in-from', 'Heard from', 'The transmitter the base station itself heard the message from: the last repeater in its relay path, or the station itself when it came straight. A strong, steady signal from one repeater means the stations behind it belong to that repeater\'s network.'],
+    ['in-snr', 'Signal', 'How far the messages stood above the noise at the receiver, on average, in dB (SNR). Higher is closer or better placed; it is the last transmitter\'s signal, not the far station\'s.'],
+    ['in-since', 'First heard', 'The first day the daily records have this ID decoded at the base station, however long ago. A group of IDs that all began on one day is a network that was switched on, or a channel the base station began listening to, that day.'],
+    ['in-clue', 'Clues', 'What else can be said from here: whether an ALERT2 address also relays others (so it is a repeater), and for a legacy ID the nearest IDs the register does hold — agencies are given IDs in blocks, so a neighbour\'s owner is a fair first guess.'],
   ];
   const inTerm = (k, text) => { const w = IN_WORDS.find(x => x[0] === k); return termHtml(text || w[1], w[2]); };
   // { days, r, err } — r as the database answered.
@@ -1801,10 +1807,13 @@ const BaseStations = (function () {
   // The breakdown under the table (0112): by what, for which base station
   // ('all' or an ingest token's id), and whether a long list is opened out.
   const IN_BY = [['owner', 'Owner'], ['network', 'Radio network'], ['hub', 'Bureau region'], ['catchment', 'Catchment'], ['lga', 'Council area'],
-    ['kind', 'Kind of sensor'], ['path', 'Relay path'], ['station', 'Station by station'], ['day', 'Day by day']];
+    ['kind', 'Kind of sensor'], ['path', 'Relay path'], ['station', 'Station by station'], ['unknown', 'Not in the register'], ['day', 'Day by day']];
+  const IN_ACMA_KM = 300;    // licences this near a base station, for the stations nobody has registered
   const IN_BY_TERM = { owner: 'in-owner', network: 'in-network', hub: 'in-hub', kind: 'in-kind', path: 'in-path' };
   const IN_TOP = 25;
   let inBy = 'owner', inAt = 'all', inMore = false, inSlsAsked = false;
+  // The ACMA's devices, for the unknown stations' frequencies: { loading } | { list: [{ f, client, site, lat, lon }] } | { err }.
+  let inAcma = null;
 
   // A station's row, read: its two protocols and their totals.
   function inRead(x) {
@@ -1906,8 +1915,17 @@ const BaseStations = (function () {
   const inOwnersReady = () => typeof SLS === 'undefined' || SLS.loaded() || inSlsAsked === 'failed';
   const inNamed = (list, id) => { const e = ((state.data && state.data[list]) || []).find(q => q.id === id); return e ? e.name : id; };
 
-  // What a counted station falls under: [key, label]. One not in the register
-  // is its own row whatever the question.
+  // What a counted station falls under: [[key, label]] — one, except a station
+  // owned jointly, which is under each of its owners.
+  function inGroupsOf(row) {
+    if (inBy === 'owner' && row[3] != null && inOwnersReady()) {
+      const st = inStn(row[3]), o = st && typeof stationOwner === 'function' ? stationOwner(st) : null;
+      if (o && o.parties && o.parties.length > 1) return o.parties.map(p => ['o' + p, p]);
+    }
+    return [inGroupOf(row)];
+  }
+  // …one of them: [key, label]. One not in the register is its own row
+  // whatever the question.
   function inGroupOf(row) {
     const [proto, id, , stationId, type] = row;
     if (stationId == null) return inBy === 'station' ? ['?' + proto + id, (proto === 'alert2' ? 'ALERT2 station ' : 'Legacy ID ') + id + ' — not in the register'] : ['?', 'Not in the register'];
@@ -1950,6 +1968,7 @@ const BaseStations = (function () {
     }
     if (xs.some(x => !Array.isArray(x.ids))) return { need: true };
     const by = new Map();
+    let joint = false;
     const at = (key, label, sub) => { let g = by.get(key); if (!g) { g = { label, sub, ids: new Set(), a: 0, a2: 0, only: 0 }; by.set(key, g); } return g; };
     if (inBy === 'path') {
       for (const x of xs) for (const p of x.paths || []) {
@@ -1958,20 +1977,26 @@ const BaseStations = (function () {
       }
     } else {
       for (const x of xs) for (const row of x.ids) {
-        const [key, label] = inGroupOf(row), g = at(key, label);
-        g.ids.add(row[0] + ':' + row[1]);
-        g[row[0] === 'alert2' ? 'a2' : 'a'] += Number(row[2]);
-        if (row[5]) g.only++;
-        if (key[0] === '?') g.warn = true;
+        const gs = inGroupsOf(row);
+        if (gs.length > 1) joint = true;
+        for (const [key, label] of gs) {
+          const g = at(key, label);
+          g.ids.add(row[0] + ':' + row[1]);
+          g[row[0] === 'alert2' ? 'a2' : 'a'] += Number(row[2]);
+          if (row[5]) g.only++;
+          if (key[0] === '?') g.warn = true;
+        }
       }
     }
     const rows = [...by.values()].map(g => Object.assign(g, { n: g.n != null ? g.n : g.ids.size }))
       .sort((p, q) => (q.a + q.a2) - (p.a + p.a2) || String(p.label).localeCompare(String(q.label)));
     // What was decoded but not counted as a station: the rest of each protocol's total.
     const tot = xs.map(inRead).reduce((t, v) => ({ a: t.a + Number(v.a.ok), a2: t.a2 + Number(v.a2.ok) }), { a: 0, a2: 0 });
-    const rest = { a: inBy === 'path' ? 0 : Math.max(0, tot.a - rows.reduce((n, g) => n + g.a, 0)), a2: Math.max(0, tot.a2 - rows.reduce((n, g) => n + g.a2, 0)) };
+    const listed = inBy === 'path' ? { a: 0, a2: rows.reduce((n, g) => n + g.a2, 0) }
+      : xs.reduce((t, x) => { for (const r of x.ids) t[r[0] === 'alert2' ? 'a2' : 'a'] += Number(r[2]); return t; }, { a: 0, a2: 0 });
+    const rest = { a: inBy === 'path' ? 0 : Math.max(0, tot.a - listed.a), a2: Math.max(0, tot.a2 - listed.a2) };
     if (rest.a + rest.a2 > 0) rows.push({ label: 'Too few to count, or no ID', few: true, n: null, a: rest.a, a2: rest.a2, only: 0, dim: true });
-    return { rows, total: rows.reduce((n, g) => n + g.a + g.a2, 0), one: xs.length === 1, several: all.length > 1 };
+    return { rows, total: listed.a + listed.a2 + rest.a + rest.a2, one: xs.length === 1, several: all.length > 1, joint };
   }
 
   function inDaysTableHtml(b) {
@@ -1998,9 +2023,10 @@ const BaseStations = (function () {
     const pill = (on, text, call) => `<button type="button" class="pill${on ? ' is-on' : ''}" aria-pressed="${on}" onclick="${call}">${esc(text)}</button>`;
     const picks = `<div class="pill-row" role="group" aria-label="Break it down by">${IN_BY.map(([k, t]) => pill(k === inBy, t, `BaseStations.inGroup('${k}')`)).join('')}</div>`
       + (heard.length > 1 ? `<div class="pill-row" role="group" aria-label="For which base station">${pill(inAt === 'all', 'All base stations', "BaseStations.inFor('all')")}${heard.map(x => pill(String(x.id) === String(inAt), x.label, `BaseStations.inFor(${Number(x.id)})`)).join('')}</div>` : '');
-    const b = inBreak();
+    const b = inBy === 'unknown' ? {} : inBreak();
     let out;
-    if (b.need) out = '<p class="small txt-warn">The database does not have this yet — apply db/migrations/0112_base_station_ingest_breakdown.sql. Day by day works without it.</p>';
+    if (inBy === 'unknown') out = inUnknownHtml();
+    else if (b.need) out = '<p class="small txt-warn">The database does not have this yet — apply db/migrations/0112_base_station_ingest_breakdown.sql. Day by day works without it.</p>';
     else if (b.days) out = b.days.length ? inDaysTableHtml(b) : '<p class="small qs-dim">Nothing in the period.</p>';
     else if (!b.rows.length) out = `<p class="small qs-dim">${inBy === 'path' ? 'No ALERT2 decoded in the period.' : 'Nothing decoded in the period.'}</p>`;
     else {
@@ -2008,7 +2034,7 @@ const BaseStations = (function () {
       const shown = inMore ? b.rows : b.rows.slice(0, IN_TOP).concat(b.rows.length > IN_TOP ? b.rows.slice(IN_TOP).filter(g => g.few) : []);
       const head = (IN_BY.find(q => q[0] === inBy) || [])[1], term = IN_BY_TERM[inBy];
       const body = shown.map(g => `<tr${g.dim ? ' class="qs-dim"' : ''}>
-          <th scope="row">${g.few ? inTerm('in-few') : `<span${g.warn ? ' class="txt-warn"' : ''}>${esc(g.label)}</span>`}${g.sub ? `<div class="small qs-dim">${esc(g.sub)}</div>` : ''}</th>
+          <th scope="row">${g.few ? inTerm('in-few') : g.warn && inBy !== 'station' ? `<button type="button" class="pill bs-in-go" title="Each of them, with its frequency, the repeater it came through and who is licensed there" onclick="BaseStations.inGroup('unknown')">${esc(g.label)} — who are they?</button>` : `<span${g.warn ? ' class="txt-warn"' : ''}>${esc(g.label)}</span>`}${g.sub ? `<div class="small qs-dim">${esc(g.sub)}</div>` : ''}</th>
           <td class="small">${g.n == null ? '—' : esc(chN(g.n))}${!path && b.one && b.several && g.only ? `<div class="qs-dim">${esc(chN(g.only))} only here</div>` : ''}</td>
           ${path ? '' : `<td class="small">${g.a ? esc(chN(g.a)) : '<span class="qs-dim">—</span>'}</td>`}
           <td class="small">${g.a2 ? esc(chN(g.a2)) : '<span class="qs-dim">—</span>'}</td>
@@ -2024,15 +2050,201 @@ const BaseStations = (function () {
             ${path ? '' : '<th scope="col">Both</th>'}<th scope="col" class="bs-in-p">${inTerm('in-part')}</th></tr></thead>
           <tbody>${body}</tbody></table></div>`
         + (hidden > 0 || (inMore && b.rows.length > IN_TOP) ? `<p class="small"><button type="button" class="pill" onclick="BaseStations.inAll()">${inMore ? 'Show the top ' + IN_TOP + ' only' : 'Show all ' + chN(b.rows.length) + ' rows'}</button></p>` : '')
+        + (b.joint ? '<p class="small qs-dim">A station owned jointly is counted under each of its owners, so these rows add up to more than the total; each share is of the total.</p>' : '')
         + (inAt === 'all' && heard.length > 1 ? '<p class="small qs-dim">All base stations together: a station two of them decode is one station, and its messages are counted at each.</p>' : '');
     }
     return `<div class="bs-in-bhead"><h3 class="bs-in-bh">Whose it is: the decoded messages, broken down</h3>
         <button type="button" class="pill" onclick="BaseStations.inBreakSave()">Save this breakdown as CSV</button></div>${picks}<div id="bs-in-by-t">${out}</div>`;
   }
 
+  // ── …and the ones nobody has registered (0114) ───────────────────────────
+  // Each station decoded that the register does not hold, with what narrows
+  // down whose it is: the frequency (and who the ACMA has licensed on it near
+  // the base station), the transmitter the base station heard it from (the
+  // last address in its path), its signal, since when, and what its number
+  // says. Nothing on the air names an owner; this is the evidence to take to
+  // whoever holds the licence.
+
+  const inSnap = f => Math.round(Number(f) / 0.00625) * 0.00625;
+  const inFreqOf = (fmin, fmax) => (fmin == null || fmax == null ? null : Number(fmax) - Number(fmin) > 0.007 ? null : inSnap((Number(fmin) + Number(fmax)) / 2));
+  const inFreqText = u => (u.f != null ? chMhz(u.f) : u.fmin != null ? chMhz(u.fmin) + '–' + chMhz(u.fmax) : '—');
+  const inDayShort = t => { const d = new Date(t); return isFinite(d) ? d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : ''; };
+
+  // The base stations picked, and their strangers as one list: a station two
+  // of them decode is one row, its messages added up.
+  function inUnknown() {
+    const all = ((ing && ing.r && ing.r.stations) || []).filter(x => inRead(x).n > 0);
+    const xs = inAt === 'all' ? all : all.filter(x => String(x.id) === String(inAt));
+    if (xs.some(x => !Array.isArray(x.strangers))) return { need: true };
+    // An ALERT2 address's name, where a path names it, and what comes through it.
+    const names = new Map(), relays = new Map();
+    for (const x of xs) for (const p of x.paths || []) (p.path || []).forEach((a, i) => { if (p.names && p.names[i]) names.set(a, p.names[i]); });
+    const by = new Map();
+    for (const x of xs) for (const g of x.strangers) {
+      const k = g.protocol + ':' + g.id;
+      let u = by.get(k);
+      if (!u) { u = { protocol: g.protocol, id: g.id, ok: 0, n: 0, days: 0, at: [], sites: [], paths: [], from: new Map(), fmin: null, fmax: null, first: null, last: null, since: null, snr: null, top: -1, only: !!g.only_here }; by.set(k, u); }
+      u.ok += Number(g.ok); u.n += Number(g.n || 0); u.days = Math.max(u.days, Number(g.days || 0));
+      u.at.push(x.label); if (x.site) u.sites.push(x.site);
+      if (g.fmin != null) u.fmin = u.fmin == null ? Number(g.fmin) : Math.min(u.fmin, Number(g.fmin));
+      if (g.fmax != null) u.fmax = u.fmax == null ? Number(g.fmax) : Math.max(u.fmax, Number(g.fmax));
+      if (g.first && (!u.first || g.first < u.first)) u.first = g.first;
+      if (g.last && (!u.last || g.last > u.last)) u.last = g.last;
+      if (g.since && (!u.since || g.since < u.since)) u.since = g.since;
+      if (Number(g.ok) > u.top) { u.top = Number(g.ok); u.snr = g.snr; }
+      for (const [path, ok, snr] of g.paths || []) {
+        u.paths.push({ path, ok: Number(ok), snr, at: x.label });
+        const last = path.length ? path[path.length - 1] : null, key = (last == null ? 'self' : last) + '|' + x.id;
+        const e = u.from.get(key) || { last, ok: 0, snr, at: x.label };
+        e.ok += Number(ok); u.from.set(key, e);
+        path.forEach(a => { if (a !== g.id) { const r = relays.get(a) || new Set(); r.add(g.id); relays.set(a, r); } });
+      }
+    }
+    const list = [...by.values()].map(u => Object.assign(u, { f: inFreqOf(u.fmin, u.fmax), paths: u.paths.sort((p, q) => q.ok - p.ok), from: [...u.from.values()].sort((p, q) => q.ok - p.ok) }))
+      .sort((p, q) => q.ok - p.ok || p.id - q.id);
+    const tot = xs.map(inRead).reduce((n, v) => n + v.ok, 0);
+    return { list, names, relays, total: tot, several: xs.length > 1, days: ing.r.days, sites: xs.map(x => x.site).filter(Boolean) };
+  }
+
+  // Who the ACMA has on a frequency near any of these sites: [{ client, n, km, site }], nearest first.
+  function inLicensees(f, sites) {
+    if (f == null || !inAcma || !inAcma.list || !sites.length) return [];
+    const by = new Map();
+    for (const d of inAcma.list) {
+      if (Math.abs(d.f - f) > CH_NEAR_MHZ) continue;
+      const km = Math.min(...sites.map(q => chKm(q.lat, q.lon, d.lat, d.lon)));
+      if (km > IN_ACMA_KM) continue;
+      const e = by.get(d.client) || { client: d.client, n: 0, km: Infinity, site: '' };
+      e.n++; if (km < e.km) { e.km = km; e.site = d.site; }
+      by.set(d.client, e);
+    }
+    return [...by.values()].sort((a, b) => a.km - b.km || a.client.localeCompare(b.client));
+  }
+  const inLicText = (f, sites) => inLicensees(f, sites).map(l => l.client + ' (' + l.site + ', ' + Math.round(l.km) + ' km' + (l.n > 1 ? ', ' + l.n + ' devices' : '') + ')');
+  function inLicHtml(f, sites) {
+    if (!sites.length) return '<span class="qs-dim">the base station has not said where it is</span>';
+    if (!inAcma || inAcma.loading) return '<span class="qs-dim">loading the licences…</span>';
+    if (inAcma.err) return `<span class="qs-dim">${esc(inAcma.err)}</span>`;
+    const lic = inLicensees(f, sites);
+    if (!lic.length) return '<span class="qs-dim">nobody within ' + IN_ACMA_KM + ' km</span>';
+    return lic.slice(0, 6).map(l => `<div><strong>${esc(l.client)}</strong><div class="qs-dim">${esc(l.site)}, ${esc(chN(Math.round(l.km)))} km${l.n > 1 ? ' · ' + esc(l.n) + ' devices' : ''}</div></div>`).join('')
+      + (lic.length > 6 ? `<div class="qs-dim">+${esc(lic.length - 6)} more — all of them in the CSV</div>` : '');
+  }
+
+  function inAcmaAsk() {
+    if (inBy !== 'unknown' || inAcma) return;
+    if (typeof acmaEnsureCore !== 'function' || typeof acmaEnsureDevices !== 'function') { inAcma = { err: 'the ACMA licences are not on this page' }; return; }
+    inAcma = { loading: true };
+    acmaEnsureCore().then(acmaEnsureDevices).then(() => {
+      const A = state.acma, list = [];
+      for (const d of Object.values(A.deviceById || {})) {
+        const st = A.siteById[d.site_id];
+        if (!st || d.f_mhz == null || st.lat == null || st.lon == null) continue;
+        const lic = (A.licById || {})[d.lic] || {}, cl = (A.clientById || {})[lic.client_no] || {};
+        list.push({ f: Number(d.f_mhz), client: cl.name || 'licensee ' + (lic.client_no || '?'), site: st.name, lat: Number(st.lat), lon: Number(st.lon) });
+      }
+      inAcma = { list, source: A.threats && A.threats.meta && A.threats.meta.source_date };
+    }).catch(e => { inAcma = { err: 'the ACMA licences could not be loaded (' + e.message + ')' }; }).then(paintIn);
+  }
+
+  // The register's legacy IDs in order, for a stranger's neighbours: [[id, station]].
+  let inIdsMemo = { src: null, ids: [] };
+  function inRegIds() {
+    const list = (state.data && state.data.stations) || [];
+    if (inIdsMemo.src !== list) {
+      const m = new Map();
+      for (const st of list) for (const se of st.sensors || []) if (Number.isInteger(se.alert_id) && !m.has(se.alert_id)) m.set(se.alert_id, st);
+      inIdsMemo = { src: list, ids: [...m.entries()].sort((a, b) => a[0] - b[0]) };
+    }
+    return inIdsMemo.ids;
+  }
+  // What can be said of one: [text].
+  function inClues(u, d) {
+    const out = [];
+    if (u.protocol === 'alert2') {
+      const r = d.relays.get(u.id);
+      if (r && r.size) out.push('A repeater: ' + r.size + ' other unregistered station' + (r.size === 1 ? ' comes' : 's come') + ' through it');
+      if (u.from.some(e => e.last == null)) out.push('Heard straight from it at times, so it is within reach of the base station');
+    } else {
+      const ids = inRegIds();
+      let lo = 0, hi = ids.length;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (ids[mid][0] < u.id) lo = mid + 1; else hi = mid; }
+      const say = e => { const o = typeof stationOwner === 'function' && inOwnersReady() ? stationOwner(e[1]) : null; return e[0] + ' ' + e[1].name + (o ? ' (' + o.name + ')' : ''); };
+      const near = [ids[lo - 1], ids[lo]].filter(e => e && Math.abs(e[0] - u.id) <= 50);
+      if (near.length) out.push('Nearest IDs in the register: ' + near.map(say).join(' · '));
+      else out.push('No ID within 50 of it in the register');
+    }
+    if (d.several && u.at.length > 1) out.push('Decoded at ' + u.at.join(' and '));
+    return out;
+  }
+  const inAddr = (a, d) => (d.names.get(a) ? d.names.get(a) + ' (' + a + ')' : 'address ' + a);
+  const inFromText = (e, d) => (e.last == null ? 'straight from it' : inAddr(e.last, d)) + (d.several ? ' at ' + e.at : '');
+
+  function inUnknownHtml() {
+    const d = inUnknown();
+    if (d.need) return '<p class="small txt-warn">The database does not have this yet — apply db/migrations/0114_base_station_ingest_strangers.sql.</p>';
+    if (!d.list.length) return '<p class="small qs-dim">Every station decoded in the period is in the register.</p>';
+    const ok = d.list.reduce((n, u) => n + u.ok, 0), perDay = n => chN(Math.round(n / Math.max(1, d.days)));
+    // Frequency by frequency.
+    const fq = new Map();
+    for (const u of d.list) {
+      const k = (u.f != null ? chMhz(u.f) : '?') + '|' + u.protocol;
+      const e = fq.get(k) || { f: u.f, protocol: u.protocol, n: 0, ok: 0, u };
+      e.n++; e.ok += u.ok; fq.set(k, e);
+    }
+    const fRows = [...fq.values()].sort((a, b) => b.ok - a.ok).map(e => `<tr>
+        <th scope="row">${e.f != null ? esc(chMhz(e.f)) + ' <span class="small qs-dim">MHz</span>' : '<span class="qs-dim">not one frequency</span>'}</th>
+        <td class="small">${e.protocol === 'alert2' ? 'ALERT2' : 'Legacy ALERT'}</td>
+        <td class="small">${esc(chN(e.n))}</td>
+        <td class="small"><strong>${esc(chN(e.ok))}</strong> <span class="qs-dim">${Math.round(e.ok / Math.max(1, ok) * 100)}% of these</span></td>
+        <td class="small">${inLicHtml(e.f, d.sites)}</td></tr>`).join('');
+    // The transmitter the base station heard them from (ALERT2).
+    const hop = new Map();
+    for (const u of d.list) for (const e of u.from) {
+      const k = (e.last == null ? 'self' : e.last) + '|' + e.at;
+      const h = hop.get(k) || { last: e.last, at: e.at, ok: 0, ids: new Set(), snr: e.snr };
+      h.ok += e.ok; h.ids.add(u.id); hop.set(k, h);
+    }
+    const hRows = [...hop.values()].sort((a, b) => b.ok - a.ok).map(h => `<tr>
+        <th scope="row">${h.last == null ? 'Straight from the station' : esc(inAddr(h.last, d))}${d.several ? `<div class="small qs-dim">heard at ${esc(h.at)}</div>` : ''}</th>
+        <td class="small">${esc(chN(h.ids.size))}</td><td class="small"><strong>${esc(chN(h.ok))}</strong></td>
+        <td class="small">${h.snr == null ? '—' : esc(Number(h.snr).toFixed(1)) + ' dB'}</td></tr>`).join('');
+    const shown = inMore ? d.list : d.list.slice(0, IN_TOP);
+    const sRows = shown.map(u => `<tr>
+        <th scope="row">${esc(u.id)}<div class="small qs-dim">${u.protocol === 'alert2' ? 'ALERT2 station' : 'legacy ID'}</div></th>
+        <td class="small"><strong>${esc(chN(u.ok))}</strong><div class="qs-dim">${esc(perDay(u.ok))} a day${u.n > u.ok ? ' · ' + Math.round(u.ok / u.n * 100) + '% of heard' : ''}</div></td>
+        <td class="small">${esc(inFreqText(u))}</td>
+        <td class="small">${u.protocol !== 'alert2' ? '<span class="qs-dim">legacy carries no path</span>'
+          : u.from.slice(0, 3).map(e => `<div>${esc(inFromText(e, d))} <span class="qs-dim">${esc(chN(e.ok))}${e.snr == null ? '' : ' · ' + esc(Number(e.snr).toFixed(1)) + ' dB'}</span></div>`).join('')
+            + (u.paths[0] && u.paths[0].path.length > 1 ? `<div class="qs-dim">busiest path: ${esc(u.paths[0].path.map(a => d.names.get(a) || a).join(' → '))}</div>` : '')}</td>
+        <td class="small">${u.snr == null ? '—' : esc(Number(u.snr).toFixed(1)) + ' dB'}</td>
+        <td class="small">${u.since ? esc(inDayShort(u.since)) : '—'}<div class="qs-dim">${u.last ? 'last ' + esc(ago(u.last)) : ''}${u.days ? ' · on ' + esc(u.days) + ' day' + (u.days === 1 ? '' : 's') : ''}</div></td>
+        <td class="small">${inClues(u, d).map(c => `<div>${esc(c)}</div>`).join('') || '<span class="qs-dim">—</span>'}</td></tr>`).join('');
+    return `<p class="small"><strong>${esc(chN(d.list.length))} station${d.list.length === 1 ? '' : 's'} not in the register</strong> sent ${esc(chN(ok))} of the ${esc(chN(d.total))} decoded messages (${Math.round(ok / Math.max(1, d.total) * 100)}%).
+        Nothing on the air says whose a station is, so this lays out what narrows it down: the frequency and who is licensed on it, the repeater it comes through, and what its number sits beside.</p>
+      <h4 class="bs-in-uh">Which frequency, and who is licensed on it</h4>
+      <div class="table-wrap" role="region" tabindex="0" aria-label="Unregistered stations by frequency"><table class="adm-table bs-in-b bs-in-uf">
+        <caption class="sr-only">The unregistered stations by frequency and protocol: how many, their decoded messages, and who the ACMA has licensed on that frequency near the base station</caption>
+        <thead><tr><th scope="col">${inTerm('in-freq')}</th><th scope="col">Protocol</th><th scope="col">${inTerm('in-stations')}</th><th scope="col">${inTerm('in-messages', 'Decoded')}</th><th scope="col" class="bs-in-l">${inTerm('in-lic')}</th></tr></thead>
+        <tbody>${fRows}</tbody></table></div>
+      ${hRows ? `<h4 class="bs-in-uh">Which transmitter the base station heard them from (ALERT2)</h4>
+      <div class="table-wrap" role="region" tabindex="0" aria-label="Unregistered ALERT2 stations by the transmitter heard"><table class="adm-table bs-in-b bs-in-ut">
+        <caption class="sr-only">The unregistered ALERT2 stations by the last transmitter in their path: how many stations came through it, their decoded messages and its signal</caption>
+        <thead><tr><th scope="col">${inTerm('in-from')}</th><th scope="col">${inTerm('in-stations', 'Stations through it')}</th><th scope="col">${inTerm('in-messages', 'Decoded')}</th><th scope="col">${inTerm('in-snr')}</th></tr></thead>
+        <tbody>${hRows}</tbody></table></div>
+      <p class="small qs-dim">From each station's eight busiest paths. The signal is that transmitter's at the base station, whatever lies behind it — so a repeater's stations all share its figure.</p>` : ''}
+      <h4 class="bs-in-uh">Station by station</h4>
+      <div class="table-wrap" role="region" tabindex="0" aria-label="Unregistered stations, one a row"><table class="adm-table bs-in-b bs-in-us">
+        <caption class="sr-only">Each unregistered station: its decoded messages, frequency, the transmitter it was heard from, its signal, when it was first heard, and what else can be said</caption>
+        <thead><tr><th scope="col">ID</th><th scope="col">${inTerm('in-messages', 'Decoded')}</th><th scope="col">${inTerm('in-freq')}</th><th scope="col" class="bs-in-f">${inTerm('in-from')}</th><th scope="col">${inTerm('in-snr')}</th><th scope="col">${inTerm('in-since')}</th><th scope="col" class="bs-in-c">${inTerm('in-clue')}</th></tr></thead>
+        <tbody>${sRows}</tbody></table></div>`
+      + (d.list.length > IN_TOP ? `<p class="small"><button type="button" class="pill" onclick="BaseStations.inAll()">${inMore ? 'Show the top ' + IN_TOP + ' only' : 'Show all ' + chN(d.list.length) + ' stations'}</button></p>` : '')
+      + `<p class="small qs-dim">Licences from the ACMA's Register of Radiocommunications Licences extract${inAcma && inAcma.source ? ' of ' + esc(inAcma.source) : ''} (CC BY 4.0), within ${IN_ACMA_KM} km of the base station and 6 kHz of the frequency. Once you know whose they are, add the station to the register with its ALERT2 address or sensor IDs and it leaves this list.</p>`;
+  }
+
   // The owners come from the SLS file, which the tab may not have yet.
   function inOwnersAsk() {
-    if (inBy !== 'owner' || inSlsAsked || typeof SLS === 'undefined' || SLS.loaded()) return;
+    if ((inBy !== 'owner' && inBy !== 'unknown') || inSlsAsked || typeof SLS === 'undefined' || SLS.loaded()) return;
     inSlsAsked = true;
     SLS.ensureData().then(paintIn, () => { inSlsAsked = 'failed'; paintIn(); });
   }
@@ -2080,6 +2292,7 @@ const BaseStations = (function () {
     set('bs-in-body', inTableHtml());
     set('bs-in-by', inBreakHtml());
     inOwnersAsk();
+    inAcmaAsk();
   }
 
   async function loadIn() {
@@ -2123,6 +2336,18 @@ const BaseStations = (function () {
   // The breakdown on screen, every row of it, as a file.
   function inBreakSave() {
     if (!ing || !ing.r) { announce('Nothing to save yet.'); return; }
+    if (inBy === 'unknown') {
+      const d = inUnknown();
+      if (d.need || !d.list.length) { announce('Nothing to save yet.'); return; }
+      const rows = [['Protocol', 'ID', 'Decoded', 'Heard', 'Decoded a day', 'Frequency MHz', 'Heard from (decoded, SNR dB)', 'Busiest paths (decoded)', 'Signal SNR dB', 'Decoded at', 'First heard (UTC day)', 'Last heard', 'Days decoded on', 'Clues', 'Licensed on the frequency nearby']]
+        .concat(d.list.map(u => [u.protocol === 'alert2' ? 'ALERT2' : 'Legacy ALERT', u.id, u.ok, u.n, Math.round(u.ok / Math.max(1, d.days)), inFreqText(u),
+          u.from.map(e => inFromText(e, d) + ' (' + e.ok + (e.snr == null ? '' : ', ' + e.snr) + ')').join('; '),
+          u.paths.slice(0, 8).map(p => (p.path.length ? p.path.join('>') : 'direct') + ' (' + p.ok + ')').join('; '),
+          u.snr == null ? '' : u.snr, u.at.join('; '), u.since ? String(u.since).slice(0, 10) : '', u.last || '', u.days, inClues(u, d).join('; '), inLicText(u.f, d.sites).join('; ')]));
+      saveCsv('floodnet-base-station-ingest-not-in-register-' + ing.r.days + 'd.csv', rows);
+      announce('Saved ' + (rows.length - 1) + ' stations.');
+      return;
+    }
     const b = inBreak();
     const at = inAt === 'all' ? 'All base stations' : ((ing.r.stations || []).find(x => String(x.id) === String(inAt)) || {}).label || '';
     let rows;
@@ -2705,7 +2930,7 @@ const BaseStations = (function () {
   // A sign-in or sign-out: everything held was the last session's.
   function authChanged() {
     list = null; error = null; detail = null; openId = null; askErr = null; keys = null; keysErr = null; keyMsg = null; mail = null; mailMsg = null; form = null; formNote = null; logShown = null; note = '';
-    wf = null; wfImg = null; wfHoverAt = null; ch = null; chAcma = null; st = null; ing = null;
+    wf = null; wfImg = null; wfHoverAt = null; ch = null; chAcma = null; st = null; ing = null; inAcma = null;
     stop();
     if (state.activeTab === 'basestations') { repaint(); init(); }
   }

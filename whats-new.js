@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 262, date: '2026-11-11', items: [
+      '🕵️ <strong>Stations nobody has registered: whose are they?</strong> Base Stations tab › What comes in through each › '
+        + '<em>Not in the register</em> lists every unknown station a base station decodes with what narrows down its owner: the frequency '
+        + 'and who the ACMA has licensed on it nearby, the repeater it was heard through and how strong, when it was first heard, and for a '
+        + 'legacy ID the nearest IDs the register does hold. It saves as CSV to send to whoever holds the licence.',
+      '👥 <strong>Joint owners counted under each.</strong> In the same breakdown, a station two bodies own now counts under each of them.',
+    ] },
     { n: 261, date: '2026-11-11', items: [
       '🖥️ <strong>Told when a base station goes offline — and base stations that get themselves back.</strong> Flood-Net now emails its '
         + 'administrators when a base station has not checked in for 30 minutes, and again when it is back, with how long it was away. '
