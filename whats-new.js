@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 255, date: '2026-11-10', items: [
+      '📡 <strong>Steady signals</strong>, on the Base Stations tab under an open station\'s waterfall: the bright bands that '
+        + 'never go away, found for you, each with what it probably is (the stick\'s own spike, the computer beside it, solar '
+        + 'gear, a licensed neighbour, or not identified yet), the reasons, whether it sits on or beside a channel the station '
+        + 'decodes, and what to do — from leaving it, through a setting or a filter, to when it is worth reporting to the ACMA.',
+      '📥 <strong>What comes in through each</strong>, on the same tab: a row a base station with how many stations it '
+        + 'decodes, its messages as legacy ALERT and as ALERT2, what only that base station hears, a bar a day and its '
+        + 'receivers, over a day, a week or a month. Both tables save as CSV.',
+    ] },
     { n: 254, date: '2026-11-10', items: [
       '🔎 <strong>ACMA licences in the search box.</strong> Press Ctrl K (or click the search box) and type a licence '
         + 'number, a holder such as Seqwater or a council, a site, or a frequency such as 151.5: matching licences are '

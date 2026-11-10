@@ -59,7 +59,7 @@ const BaseStations = (function () {
   // open, outlive a poll's repaint; another station starts on its Overview.
   let subTab = 'overview';
   const openFolds = new Set();
-  const timers = { list: null, detail: null, watch: null, wf: null, ch: null, sig: null };
+  const timers = { list: null, detail: null, watch: null, wf: null, ch: null, sig: null, st: null, ing: null };
   let lastAsk = 0;
   // The newest RPi ALERT release, as GitHub says: what a station's "Install the
   // latest release" and its nightly timer fetch (rpi-alert-update asks the same
@@ -1433,6 +1433,9 @@ const BaseStations = (function () {
     const set = (id, html) => { const e = document.getElementById(id); if (e && e.innerHTML !== html) keepFocus(e, () => { e.innerHTML = html; }); };
     set('bs-ch-sum', chSummaryHtml(rows));
     set('bs-ch-body', chTableHtml(rows, others));
+    // What was decoded on a frequency, and the licences, are what Steady
+    // signals judges by: it is read again whenever they arrive.
+    paintSt();
   }
 
   async function loadCh() {
@@ -1468,6 +1471,402 @@ const BaseStations = (function () {
     chDays = days; ch = null;
     paintCh();
     loadCh();
+  }
+
+  // ── what sits there all the time (0111) ──────────────────────────────────
+  // A waterfall shows a band that never goes away and says nothing about it.
+  // The database folds each stick's spectrum rows by the hour into the level
+  // every frequency was at or above in nine minutes of ten
+  // (base_station_spectrum_hourly); BandSmarts (base-station-bands.js) finds
+  // what stands out of that, and says what each probably is from what can be
+  // checked — the middle of the window, the other stick, a retune, the time
+  // of day, a computer clock's multiples, the ACMA's licences, the traffic
+  // decoded there — and whether it matters to a channel the station decodes.
+  // Folded hourly, so half an hour between polls is plenty.
+
+  const ST_DAYS = [2, 7];
+  const ST_MS = 1800000;
+  const ST_SURE = { sure: '', likely: 'Probably', maybe: 'Possibly' };
+  const ACMA_INTERFERENCE_URL = 'https://www.acma.gov.au/radio-reception-and-interference';
+  // { id, days, r, err } — r as the database answered.
+  let st = null, stDays = 2, stBusy = false;
+
+  const stTerm = (k, text) => { const w = BandSmarts.WORDS.find(x => x[0] === k); return termHtml(text || w[1], w[2]); };
+  // A band's frequency: exact where it is known to be a channel or licence,
+  // else as fine as the stick's bins are.
+  const stFreq = b => (b.v.approx ? '≈ ' + (b.v.show_hz / 1e6).toFixed(b.bin_hz >= 5000 ? 2 : 3) : mhz(b.v.show_hz));
+  const stWhen = t => new Date(t * 1000).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+  // What the tab already knows, for BandSmarts: the sticks' names, where the
+  // station is, the channels it decodes, what it heard on each (the Channel
+  // by channel panel's window) and the ACMA's licences near it once loaded.
+  function stCtx(s) {
+    const names = {};
+    for (const k of wfSticks(s)) names[k.key] = k.name;
+    const site = (st && st.r && st.r.site) || (ch && ch.r && ch.r.site) || null;
+    return { names, lon: site ? site.lon : null, listening: chListening(s).filter(l => l.running),
+      heard: ch && ch.id === s.id && ch.r ? (ch.r.channels || []).map(c => ({ f: Number(c.f), n: Number(c.n || 0), ok: Number(c.ok || 0) })) : [],
+      acma: chAcma && !chAcma.loading && !chAcma.err ? chAcma.list : null };
+  }
+
+  function stRead(s) {
+    if (!st || st.id !== s.id || !st.r) return null;
+    return BandSmarts.analyse(st.r.rows || [], stCtx(s));
+  }
+
+  // A stick's window as a line: the level each frequency never dropped below
+  // (solid) and its usual level (faint), its bands numbered and its channels
+  // ticked along the bottom.
+  function stSvg(k, listening) {
+    const W = 600, H = 120, top = 16, bot = 14, n = k.steady.length, max = 50;
+    const x = i => (i + 0.5) / n * W, y = v => top + (1 - Math.min(max, Math.max(0, v)) / max) * (H - top - bot);
+    const path = a => Array.from(a).map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1)).join('');
+    const fx = hz => (hz - (k.center_hz - k.rate / 2)) / k.rate * W;
+    const bands = k.bands.map((b, i) => {
+      const x0 = fx(b.lo_hz), w = Math.max(3, fx(b.hi_hz) - x0);
+      return `<rect class="bs-st-band bs-st-band--${esc(b.v.impact.k)}" x="${x0.toFixed(1)}" y="${top}" width="${w.toFixed(1)}" height="${H - top - bot}"></rect>`
+        + `<text class="bs-st-n" x="${(x0 + w / 2).toFixed(1)}" y="11" text-anchor="middle">${i + 1}</text>`;
+    }).join('');
+    const ticks = listening.filter(l => l.f * 1e6 >= k.center_hz - k.rate / 2 && l.f * 1e6 <= k.center_hz + k.rate / 2)
+      .map(l => `<line class="bs-st-chan" x1="${fx(l.f * 1e6).toFixed(1)}" x2="${fx(l.f * 1e6).toFixed(1)}" y1="${H - bot}" y2="${H - bot + 5}"></line>`).join('');
+    const edge = (1 - WF_USABLE) / 2 * W;
+    return `<svg class="bs-st-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
+        aria-label="${esc(k.name)}: the level each frequency never dropped below, ${esc(mhz(k.center_hz - k.rate / 2))} to ${esc(mhz(k.center_hz + k.rate / 2))} MHz, with ${k.bands.length} band${k.bands.length === 1 ? '' : 's'} marked">
+      <rect class="bs-st-edge" x="0" y="${top}" width="${edge}" height="${H - top - bot}"></rect>
+      <rect class="bs-st-edge" x="${W - edge}" y="${top}" width="${edge}" height="${H - top - bot}"></rect>
+      ${bands}<path class="bs-st-typ" d="${path(k.typ)}"></path><path class="bs-st-line" d="${path(k.steady)}"></path>${ticks}
+      <text class="bs-st-ax" x="2" y="${H - 2}">${esc(mhz(k.center_hz - k.rate / 2))}</text>
+      <text class="bs-st-ax" x="${W / 2}" y="${H - 2}" text-anchor="middle">${esc(mhz(k.center_hz))} MHz</text>
+      <text class="bs-st-ax" x="${W - 2}" y="${H - 2}" text-anchor="end">${esc(mhz(k.center_hz + k.rate / 2))}</text>
+    </svg>`;
+  }
+
+  function stThereHtml(b) {
+    const share = Math.round(b.share * 100) + '% of ' + b.hours + ' h';
+    const since = b.whole ? 'the whole time looked at' : b.since_t ? 'without a break since ' + stWhen(b.since_t) : 'not in the last hour';
+    const when = b.when === 'day' ? 'By day only.' : b.when === 'night' ? 'At night only.' : '';
+    return `${esc(share)}<div class="qs-dim">${esc(since)}</div>${when ? `<div>${esc(when)}</div>` : ''}`;
+  }
+
+  function stStickHtml(k, s) {
+    const listening = chListening(s);
+    const rx = receiversOf(s).find(r => String(r.key).slice(-80) === k.key);
+    const head = `<h3>${esc(k.name)} <span class="small qs-dim">${esc(mhz(k.center_hz - k.rate / 2))}–${esc(mhz(k.center_hz + k.rate / 2))} MHz · ${k.hours} h judged`
+      + `${rx ? ' · ' + (rx.gain_db == null ? 'gain auto' : 'gain ' + esc(rx.gain_db) + ' dB') : ''}${k.retuned ? ' · retuned in this time' : ''}</span></h3>`;
+    const floor = k.floor && k.floor.swing >= 4
+      ? `<p class="small"><strong class="txt-warn">Its ${stTerm('floor', 'noise floor')} moves by ${esc(k.floor.swing)} dB through the day</strong>${k.floor.high === 'day' ? ', highest by day: noise at the site that comes with the sun, which points at solar gear' : k.floor.high === 'night' ? ', highest at night: something that runs then, such as lighting' : ''}. While it is up, every station sounds that much weaker.</p>` : '';
+    if (!k.bands.length) return `<div class="bs-st-stick">${head}${stSvg(k, listening)}<p class="small"><span class="txt-ok">Nothing steady stands out.</span> Whatever shows on its waterfall comes and goes.</p>${floor}</div>`;
+    const rows = k.bands.map((b, i) => `<tr>
+        <th scope="row"><span class="bs-st-no">${i + 1}</span> ${esc(stFreq(b))} <span class="small qs-dim">MHz</span>${b.steady ? '' : `<div class="small"><span class="badge term-chip" title="${esc(BandSmarts.WORDS.find(w => w[0] === 'busy')[2])}">busy, not constant</span></div>`}</th>
+        <td class="small">${esc(BandSmarts.kHz(b.width_hz))}</td>
+        <td class="small">${esc(Math.round(b.over_db))} dB</td>
+        <td class="small">${stThereHtml(b)}</td>
+        <td class="small"><strong>${ST_SURE[b.v.sure] ? esc(ST_SURE[b.v.sure]) + ': ' : ''}${esc(b.v.title)}</strong>${b.v.why.map(w => `<div class="qs-dim">${esc(w)}</div>`).join('')}</td>
+        <td class="small"><span class="${b.v.impact.cls}">${esc(b.v.impact.text)}</span></td>
+        <td class="small">${b.v.todo.map(t => `<div>${esc(t)}</div>`).join('')}</td>
+      </tr>`).join('');
+    return `<div class="bs-st-stick">${head}${stSvg(k, listening)}
+      <div class="table-wrap" role="region" tabindex="0" aria-label="${esc(k.name)}: its steady signals"><table class="adm-table bs-st-t">
+        <caption class="sr-only">${esc(k.name)}: each steady signal, how wide and strong it is, how much of the time it is there, what it probably is, whether it matters and what to do</caption>
+        <thead><tr><th scope="col" class="bs-st-f">Frequency</th><th scope="col">${stTerm('width')}</th><th scope="col">${stTerm('over')}</th><th scope="col">${stTerm('there')}</th>
+          <th scope="col" class="bs-wide">What it probably is</th><th scope="col" class="bs-st-m">Does it matter</th><th scope="col" class="bs-wide">What to do</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>${floor}</div>`;
+  }
+
+  function stSummaryHtml(s, a) {
+    if (!st || st.id !== s.id) return 'Loading…';
+    if (st.err) return `<span class="txt-bad">${esc(st.err)}</span>`;
+    if (!a.sticks.length && !a.waiting.length) return 'No hours folded for this station yet. Each stick\'s spectrum is folded on the hour, so the first appear within an hour or so of its first rows (RPi ALERT 0.13.5 or later), and a stick is judged once it has three.';
+    const c = a.counts, bits = [];
+    if (c.on) bits.push(`<strong class="txt-bad">${c.on} sit${c.on === 1 ? 's' : ''} on a channel it decodes</strong>`);
+    if (c.beside) bits.push(`<strong class="txt-warn">${c.beside} strong beside a channel</strong>`);
+    if (c.strong) bits.push(`<strong class="txt-warn">${c.strong} strong enough to matter anywhere</strong>`);
+    if (c.unknown) bits.push(c.unknown + ' not identified yet');
+    const hours = Math.max(0, ...a.sticks.map(k => k.hours));
+    return (a.sticks.length ? (c.bands ? `Over the ${hours} hours judged: <strong>${c.steady} ${stTerm('steady', c.steady === 1 ? 'steady signal' : 'steady signals')}</strong>`
+        + (c.bands - c.steady ? ` and ${c.bands - c.steady} ${stTerm('busy', 'busy, not constant')}` : '') + (bits.length ? ' — ' + bits.join(', ') : ' — none of them on or beside a channel it decodes') + '.'
+        : `Over the ${hours} hours judged, nothing steady stands out on any stick.`) : '')
+      + a.waiting.map(w => ` ${esc(w.name)} has ${w.hours} hour${w.hours === 1 ? '' : 's'} folded so far and is judged from three.`).join('')
+      + (st.r.to ? ` <span class="qs-dim">Folded to ${esc(new Date(st.r.to).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}.</span>` : '')
+      + (chAcma && chAcma.loading ? ' <span class="qs-dim">The ACMA licences are still loading.</span>' : '');
+  }
+
+  function stFoldsHtml() {
+    return `<details class="rd-fold"><summary><h3 class="bk-inline-h">Tests that tell the causes apart</h3></summary>
+        <dl class="rd-words">${BandSmarts.TESTS.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></details>
+      <details class="rd-fold"><summary><h3 class="bk-inline-h">What can be done, from least effort to most</h3></summary>
+        <ol class="small">
+          <li><strong>Leave it.</strong> A band that is not on or beside a channel the station decodes, and not strong, costs nothing.</li>
+          <li><strong>Change a setting</strong> (Settings, above): a narrower window leaves a strong neighbour out altogether; another channel list moves the stick's own centre spike off a channel; a fixed gain a few steps down stops a strong signal making the stick turn itself down.</li>
+          <li><strong>Tidy the hut:</strong> the stick on a short USB extension lead away from the computer, ferrites on the USB, power and solar leads, the antenna and its feeder away from switch-mode supplies.</li>
+          <li><strong>Fit a filter</strong> on the antenna lead: a band-pass for 148–153 MHz keeps out FM broadcast, pagers and anything far off the band; a notch takes out one strong neighbour; a cavity filter is the cure when the neighbour is on the same hill.</li>
+          <li><strong>Talk to whoever holds the frequency.</strong> The licence found names them; most cases end with a phone call.</li>
+          <li><strong>Report it to the ${stTerm('acma')}.</strong> See below.</li>
+        </ol></details>
+      <details class="rd-fold"><summary><h3 class="bk-inline-h">When to report something to the ACMA</h3></summary>
+        <p class="small">The ACMA looks into interference to licensed radiocommunications services, and transmitters with no licence. It expects your own equipment to be ruled out first, so report a band only when all of these hold:</p>
+        <ul class="small">
+          <li>it is on the air — it goes when the antenna comes off, or a second receiver away from the hut hears it;</li>
+          <li>no licence is found for it, or it is on or beside a frequency your own network is licensed for;</li>
+          <li>it costs you reception — the table says it sits on, or swamps, a channel the station decodes.</li>
+        </ul>
+        <p class="small">Have ready: the frequency, when it is there (the table), a picture of the waterfall, where the base station is, and the licence number of the service it affects (📜 ACMA licences on the Stations map). <a href="${ACMA_INTERFERENCE_URL}" target="_blank" rel="noopener">Radio reception and interference — acma.gov.au</a></p></details>
+      <details class="rd-fold"><summary><h3 class="bk-inline-h">What the words on this page mean</h3></summary>
+        <dl class="rd-words">${BandSmarts.WORDS.map(w => `<dt>${esc(w[1])}</dt><dd>${esc(w[2])}</dd>`).join('')}</dl></details>`;
+  }
+
+  function stShellHtml(s) {
+    return `<section class="panel bs-st" aria-labelledby="bs-st-h">
+      <div class="panel-header"><h2 id="bs-st-h">Steady signals: what is always there, and what it probably is</h2>
+        <div class="pill-row" role="group" aria-label="How far back">${ST_DAYS.map(d => `<button type="button" class="pill${d === stDays ? ' is-on' : ''}" aria-pressed="${d === stDays}" onclick="BaseStations.stWindow(${d})">${d} days</button>`).join('')}
+          <button type="button" class="pill" onclick="BaseStations.stSave()">Save as CSV</button></div></div>
+      <p class="small" id="bs-st-sum" aria-live="polite"></p>
+      <div id="bs-st-body"></div>
+      <p class="small qs-dim">A bright band that never leaves the waterfall is found here from the level each frequency never dropped below in nine minutes of ten, hour by hour, against the frequencies either side of it. Each line is one stick's window: solid, what is always there; faint, its usual level; shaded, the window's edges; numbered, the bands in the table; ticks, the channels it decodes. What each band is put down to comes only from what can be checked from here — the reasons are listed under it — and says "possibly" or "not identified" where that is not enough. What was decoded on a frequency is taken from Channel by channel below.</p>
+      ${stFoldsHtml()}
+    </section>`;
+  }
+
+  function paintSt() {
+    if (state.activeTab !== 'basestations') return;
+    const el = document.getElementById('bs-st');
+    if (!el) return;
+    const s = stationOf();
+    if (!isAdmin() || !s || !s.managed || !wfSticks(s).length) { if (el.innerHTML) { el.innerHTML = ''; el.dataset.sig = ''; } return; }
+    const sig = s.id + ':' + stDays;
+    if (el.dataset.sig !== sig || !el.firstElementChild) { el.innerHTML = stShellHtml(s); el.dataset.sig = sig; }
+    const a = stRead(s) || { sticks: [], waiting: [], counts: {} };
+    const set = (id, html) => { const e = document.getElementById(id); if (e && e.innerHTML !== html) keepFocus(e, () => { e.innerHTML = html; }); };
+    set('bs-st-sum', stSummaryHtml(s, a));
+    set('bs-st-body', a.sticks.map(k => stStickHtml(k, s)).join(''));
+  }
+
+  async function loadSt() {
+    if (!isAdmin() || openId == null || stBusy) return;
+    const id = openId, days = stDays;
+    stBusy = true;
+    try {
+      const r = await dbRpc('admin_base_station_bands', { p_id: id, p_days: days });
+      if (openId !== id || stDays !== days) return;
+      st = { id, days, r, err: null };
+    } catch (err) {
+      if (openId !== id || stDays !== days) return;
+      st = { id, days, r: null, err: err.status === 404 ? 'The database does not have this yet — apply db/migrations/0111_base_station_steady_signals.sql.'
+        : 'Could not load its steady signals: ' + err.message };
+    } finally {
+      stBusy = false;
+    }
+    paintSt();
+  }
+
+  function stStart() {
+    clearInterval(timers.st);
+    timers.st = null;
+    const s = stationOf();
+    if (!s || !s.managed) return;
+    loadSt();
+    timers.st = setInterval(() => { if (!document.hidden && state.activeTab === 'basestations') loadSt(); }, ST_MS);
+  }
+
+  function stWindow(days) {
+    if (!ST_DAYS.includes(days) || days === stDays) return;
+    stDays = days; st = null;
+    paintSt();
+    loadSt();
+  }
+
+  // A table as a file: a BOM first, since these open in Excel.
+  function saveCsv(name, rows) {
+    dlText(name, '\ufeff' + rows.map(r => r.map(csvEscape).join(',')).join('\r\n') + '\r\n', 'text/csv;charset=utf-8');
+  }
+  const fileSlug = t => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'base-station';
+
+  function stRows(s) {
+    const a = stRead(s);
+    const rows = [['Stick', 'Frequency MHz', 'Kind', 'Width kHz', 'Strength, dB over its surroundings', 'Share of hours %', 'Hours judged', 'Since', 'What it probably is', 'How sure', 'Why', 'Does it matter', 'What to do']];
+    for (const k of (a && a.sticks) || []) {
+      for (const b of k.bands) {
+        rows.push([k.name, stFreq(b), b.steady ? 'steady' : 'busy, not constant', (b.width_hz / 1000).toFixed(1), b.over_db, Math.round(b.share * 100), b.hours,
+          b.whole ? 'the whole time' : b.since_t ? new Date(b.since_t * 1000).toISOString() : '', b.v.title, b.v.sure, b.v.why.join(' '), b.v.impact.text, b.v.todo.join(' ')]);
+      }
+    }
+    return rows;
+  }
+
+  function stSave() {
+    const s = stationOf();
+    if (!s) return;
+    const rows = stRows(s);
+    if (rows.length < 2) { announce('No steady signals to save.'); return; }
+    saveCsv('floodnet-steady-signals-' + fileSlug(s.label) + '.csv', rows);
+    announce('Saved ' + (rows.length - 1) + ' steady signals.');
+  }
+
+  // ── what comes in through each (0111) ────────────────────────────────────
+  // A base station a row, from the reception rollups: how many stations it
+  // decodes and how many messages, legacy ALERT and ALERT2 apart, what no
+  // other base station hears, its receivers, and a bar a day. For every
+  // ingest point at once, so it sits under the list, not in a station's panel.
+
+  const IN_DAYS = [1, 7, 30];
+  const IN_MS = 600000;
+  const IN_WORDS = [
+    ['in-stations', 'Stations', 'The different transmitters a base station decoded at least three times in the period: a legacy ALERT sensor ID, or an ALERT2 station address, counts as one. Three, because a single decode can be a corrupted copy of something else.'],
+    ['in-messages', 'Messages decoded', 'Bursts the base station heard and read without error. "Heard" also counts the ones it could not read.'],
+    ['in-legacy', 'Legacy ALERT', 'The original ALERT protocol: a short burst carrying one sensor ID and one value, with no error correction.'],
+    ['in-alert2', 'ALERT2', 'The newer protocol: longer messages from a station address, with error correction and time slots. Usually a repeater or concentrator passing on what it gathered.'],
+    ['in-register', 'Not in the register', 'IDs Flood-Net\'s station register does not hold: another network\'s stations, or ones not entered yet.'],
+    ['in-only', 'Only here', 'Stations this base station decoded that no other base station did in the period. If this base station goes down, these go dark.'],
+    ['in-share', 'ALERT2 share', 'The part of the decoded messages that came as ALERT2 rather than legacy ALERT.'],
+  ];
+  const inTerm = (k, text) => { const w = IN_WORDS.find(x => x[0] === k); return termHtml(text || w[1], w[2]); };
+  // { days, r, err } — r as the database answered.
+  let ing = null, inDays = 7, inBusy = false;
+
+  // A station's row, read: its two protocols and their totals.
+  function inRead(x) {
+    const p = k => (x.protocols || []).find(q => q.protocol === k) || { n: 0, ok: 0, undecoded: 0, ids: 0, known: 0, only_here: 0, last: null };
+    const a = p('alert'), a2 = p('alert2'), ok = Number(a.ok) + Number(a2.ok), n = Number(a.n) + Number(a2.n);
+    const days = (x.days || []).length;
+    return { a, a2, ok, n, share: ok ? Number(a2.ok) / ok : null, perDay: days ? ok / days : 0,
+      last: [a.last, a2.last].filter(Boolean).sort().pop() || null };
+  }
+
+  function inBarsHtml(x) {
+    const d = x.days || [];
+    if (!d.length) return '<span class="qs-dim">—</span>';
+    const W = 120, H = 28, max = Math.max(1, ...d.map(v => Number(v[1]) + Number(v[2]))), w = W / d.length;
+    const bars = d.map((v, i) => {
+      const h1 = Number(v[1]) / max * H, h2 = Number(v[2]) / max * H;
+      return `<rect class="bs-in-a" x="${(i * w).toFixed(1)}" y="${(H - h1).toFixed(1)}" width="${Math.max(1, w - 1).toFixed(1)}" height="${h1.toFixed(1)}"></rect>`
+        + `<rect class="bs-in-a2" x="${(i * w).toFixed(1)}" y="${(H - h1 - h2).toFixed(1)}" width="${Math.max(1, w - 1).toFixed(1)}" height="${h2.toFixed(1)}"></rect>`;
+    }).join('');
+    return `<svg class="bs-in-bars" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Decoded messages a day, ${esc(String(d[0][0]).slice(0, 10))} to ${esc(String(d[d.length - 1][0]).slice(0, 10))}: at most ${esc(chN(max))} in a day">${bars}</svg>`;
+  }
+
+  function inProtoHtml(p) {
+    if (!Number(p.n)) return '<span class="qs-dim">none</span>';
+    const rate = Math.round(Number(p.ok) / Number(p.n) * 100);
+    return `<strong>${esc(chN(p.ok))}</strong> <span class="qs-dim">of ${esc(chN(p.n))} heard (${rate}%)</span>`
+      + `<div>${esc(chN(p.ids))} station${Number(p.ids) === 1 ? '' : 's'}</div>`
+      + (Number(p.ids) - Number(p.known) > 0 ? `<div class="txt-warn">${esc(chN(Number(p.ids) - Number(p.known)))} not in the register</div>` : '')
+      + (Number(p.only_here) ? `<div>${esc(chN(p.only_here))} only here</div>` : '');
+  }
+
+  function inRxHtml(x) {
+    const by = new Map();
+    for (const r of x.receivers || []) { const e = by.get(r.point_id) || { name: r.name || r.point_id, rows: [] }; e.rows.push(r); by.set(r.point_id, e); }
+    if (!by.size) return '<span class="qs-dim">—</span>';
+    return [...by.values()].map(e => `<div>${esc(e.name)}: ${e.rows.map(r => esc(chN(r.ok)) + ' ' + (r.protocol === 'alert2' ? 'ALERT2' : 'legacy') + ' from ' + esc(chN(r.ids))).join(', ')}</div>`).join('');
+  }
+
+  function inTableHtml() {
+    const xs = (ing && ing.r && ing.r.stations) || [];
+    if (!xs.length) return '';
+    const several = xs.filter(x => inRead(x).ok > 0).length > 1;
+    const body = xs.map(x => {
+      const v = inRead(x);
+      return `<tr>
+        <th scope="row">${esc(x.label)}${x.host_station ? `<div class="small qs-dim">at ${esc(x.host_station)}</div>` : ''}${x.revoked ? '<div class="small"><span class="badge">token revoked</span></div>' : ''}</th>
+        <td class="small"><strong>${esc(chN(Number(v.a.ids) + Number(v.a2.ids)))}</strong>${several && Number(v.a.only_here) + Number(v.a2.only_here) ? `<div>${esc(chN(Number(v.a.only_here) + Number(v.a2.only_here)))} only here</div>` : ''}</td>
+        <td class="small">${inProtoHtml(v.a)}</td>
+        <td class="small">${inProtoHtml(v.a2)}</td>
+        <td class="small">${v.share == null ? '<span class="qs-dim">—</span>' : Math.round(v.share * 100) + '%'}</td>
+        <td class="small">${v.ok ? esc(chN(Math.round(v.perDay))) : '<span class="qs-dim">—</span>'}</td>
+        <td>${inBarsHtml(x)}</td>
+        <td class="small">${inRxHtml(x)}</td>
+        <td class="small">${v.last ? esc(ago(v.last)) : '<span class="qs-dim">nothing</span>'}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="table-wrap" role="region" tabindex="0" aria-labelledby="bs-in-h"><table class="adm-table bs-in-t">
+        <caption class="sr-only">Each base station: the stations it decodes, its decoded messages as legacy ALERT and as ALERT2, the ALERT2 share, messages a day, a bar a day, its receivers and when it last heard anything</caption>
+        <thead><tr><th scope="col">Base station</th><th scope="col">${inTerm('in-stations')}</th><th scope="col">${inTerm('in-legacy')}</th><th scope="col">${inTerm('in-alert2')}</th>
+          <th scope="col">${inTerm('in-share')}</th><th scope="col">${inTerm('in-messages', 'Decoded a day')}</th><th scope="col">Day by day</th><th scope="col" class="bs-wide">By receiver</th><th scope="col">Last heard</th></tr></thead>
+        <tbody>${body}</tbody></table></div>
+      <div class="qs-legend"><span><i class="qs-sw bs-sw-in-a" aria-hidden="true"></i>legacy ALERT</span><span><i class="qs-sw bs-sw-in-a2" aria-hidden="true"></i>ALERT2</span>
+        <span class="qs-dim">a bar a day (UTC), decoded messages</span></div>`;
+  }
+
+  function inSummaryHtml() {
+    if (!ing) return 'Loading…';
+    if (ing.err) return `<span class="txt-bad">${esc(ing.err)}</span>`;
+    const xs = ing.r.stations || [], vs = xs.map(inRead);
+    const ok = vs.reduce((n, v) => n + v.ok, 0), a = vs.reduce((n, v) => n + Number(v.a.ok), 0), a2 = vs.reduce((n, v) => n + Number(v.a2.ok), 0);
+    const span = ing.r.days === 1 ? 'day' : ing.r.days + ' days';
+    if (!ok) return 'Nothing decoded by any base station in the last ' + span + '.';
+    const net = k => (ing.r.network || []).find(q => q.protocol === k) || { ids: 0, known: 0 };
+    const active = vs.filter(v => v.ok > 0).length;
+    return `In the last ${span}, ${active} base station${active === 1 ? '' : 's'} brought in <strong>${esc(chN(ok))} decoded messages</strong>: `
+      + `${esc(chN(a))} ${inTerm('in-legacy', 'legacy ALERT')} (${Math.round(a / ok * 100)}%) and ${esc(chN(a2))} ${inTerm('in-alert2')} (${Math.round(a2 / ok * 100)}%), `
+      + `from ${esc(chN(net('alert').ids))} legacy IDs and ${esc(chN(net('alert2').ids))} ALERT2 stations across the network`
+      + (Number(net('alert').ids) - Number(net('alert').known) + Number(net('alert2').ids) - Number(net('alert2').known) > 0
+        ? ` — ${esc(chN(Number(net('alert').ids) - Number(net('alert').known) + Number(net('alert2').ids) - Number(net('alert2').known)))} of them ${inTerm('in-register', 'not in the register')}` : '') + '.'
+      + (ing.r.to ? ` <span class="qs-dim">Rolled up to ${esc(ago(ing.r.to))}.</span>` : '');
+  }
+
+  function inShellHtml() {
+    return `<section class="panel bs-in" aria-labelledby="bs-in-h">
+      <div class="panel-header"><h2 id="bs-in-h">What comes in through each</h2>
+        <div class="pill-row" role="group" aria-label="How far back">${IN_DAYS.map(d => `<button type="button" class="pill${d === inDays ? ' is-on' : ''}" aria-pressed="${d === inDays}" onclick="BaseStations.inWindow(${d})">${d === 1 ? '1 day' : d + ' days'}</button>`).join('')}
+          <button type="button" class="pill" onclick="BaseStations.inSave()">Save as CSV</button></div></div>
+      <p class="small" id="bs-in-sum" aria-live="polite"></p>
+      <div id="bs-in-body"></div>
+      <p class="small qs-dim">From the hourly reception rollups, so the last hour may not be in yet; a month comes by the day. A message heard by two base stations counts for both, and one relayed by two repeaters is two messages. Drive surveys are left out.</p>
+      <details class="rd-fold"><summary><h3 class="bk-inline-h">What these words mean</h3></summary>
+        <dl class="rd-words">${IN_WORDS.map(w => `<dt>${esc(w[1])}</dt><dd>${esc(w[2])}</dd>`).join('')}</dl></details>
+    </section>`;
+  }
+
+  function paintIn() {
+    if (state.activeTab !== 'basestations') return;
+    const el = document.getElementById('bs-in');
+    if (!el) return;
+    if (!isAdmin()) { if (el.innerHTML) { el.innerHTML = ''; el.dataset.sig = ''; } return; }
+    const sig = String(inDays);
+    if (el.dataset.sig !== sig || !el.firstElementChild) { el.innerHTML = inShellHtml(); el.dataset.sig = sig; }
+    const set = (id, html) => { const e = document.getElementById(id); if (e && e.innerHTML !== html) keepFocus(e, () => { e.innerHTML = html; }); };
+    set('bs-in-sum', inSummaryHtml());
+    set('bs-in-body', inTableHtml());
+  }
+
+  async function loadIn() {
+    if (!isAdmin() || inBusy) return;
+    const days = inDays;
+    inBusy = true;
+    try {
+      const r = await dbRpc('admin_base_station_ingest', { p_days: days });
+      if (inDays !== days) return;
+      setNow(r.now);
+      ing = { days, r, err: null };
+    } catch (err) {
+      if (inDays !== days) return;
+      ing = { days, r: null, err: err.status === 404 ? 'The database does not have this yet — apply db/migrations/0111_base_station_steady_signals.sql.'
+        : 'Could not load what comes in: ' + err.message };
+    } finally {
+      inBusy = false;
+    }
+    paintIn();
+  }
+
+  function inWindow(days) {
+    if (!IN_DAYS.includes(days) || days === inDays) return;
+    inDays = days; ing = null;
+    paintIn();
+    loadIn();
+  }
+
+  function inSave() {
+    const xs = (ing && ing.r && ing.r.stations) || [];
+    if (!xs.length) { announce('Nothing to save yet.'); return; }
+    const rows = [['Base station', 'Hosted at', 'Days', 'Stations decoded', 'Legacy ALERT heard', 'Legacy ALERT decoded', 'Legacy IDs', 'Legacy IDs not in the register', 'Legacy IDs only here',
+      'ALERT2 heard', 'ALERT2 decoded', 'ALERT2 stations', 'ALERT2 stations not in the register', 'ALERT2 stations only here', 'ALERT2 share %', 'Decoded a day', 'Last heard']];
+    for (const x of xs) {
+      const v = inRead(x);
+      rows.push([x.label, x.host_station || '', ing.r.days, Number(v.a.ids) + Number(v.a2.ids), v.a.n, v.a.ok, v.a.ids, Number(v.a.ids) - Number(v.a.known), v.a.only_here,
+        v.a2.n, v.a2.ok, v.a2.ids, Number(v.a2.ids) - Number(v.a2.known), v.a2.only_here, v.share == null ? '' : Math.round(v.share * 100), Math.round(v.perDay), v.last || '']);
+    }
+    saveCsv('floodnet-base-station-ingest-' + ing.r.days + 'd.csv', rows);
+    announce('Saved ' + (rows.length - 1) + ' base stations.');
   }
 
   // ── its receivers' own signal (0083) ─────────────────────────────────────
@@ -1672,8 +2071,10 @@ const BaseStations = (function () {
         <div id="bs-msg">${msgHtml()}</div>
         <div id="bs-list">${list ? listHtml() : ''}</div>
       </div>
+      <div id="bs-in"></div>
       <div id="bs-detail">${detailHtml()}</div>
       <div id="bs-wf"></div>
+      <div id="bs-st"></div>
       <div id="bs-ch"></div>
       <div id="bs-sig"></div>
       <div id="bs-keys">${keysHtml()}</div>
@@ -1694,7 +2095,9 @@ const BaseStations = (function () {
     if (!el) return;
     // Typing in either form survives: it is mirrored, and focus is put back.
     keepFocus(el, () => { el.innerHTML = render(); });
+    paintIn();
     paintWf();
+    paintSt();
     paintCh();
     paintSig();
   }
@@ -1725,7 +2128,9 @@ const BaseStations = (function () {
     set('bs-kpis', list ? kpisHtml() : '');
     set('bs-msg', msgHtml());
     set('bs-list', list ? listHtml() : '');
+    paintIn();
     paintWf();
+    paintSt();
     paintCh();
     paintSig();
     const d = document.getElementById('bs-detail');
@@ -1832,8 +2237,8 @@ const BaseStations = (function () {
   }
 
   function stop() {
-    clearInterval(timers.list); clearTimeout(timers.detail); clearInterval(timers.watch); clearInterval(timers.wf); clearInterval(timers.ch); clearInterval(timers.sig);
-    timers.list = timers.detail = timers.watch = timers.wf = timers.ch = timers.sig = null;
+    clearInterval(timers.list); clearTimeout(timers.detail); clearInterval(timers.watch); clearInterval(timers.wf); clearInterval(timers.ch); clearInterval(timers.sig); clearInterval(timers.st); clearInterval(timers.ing);
+    timers.list = timers.detail = timers.watch = timers.wf = timers.ch = timers.sig = timers.st = timers.ing = null;
   }
 
   function init() {
@@ -1842,8 +2247,10 @@ const BaseStations = (function () {
     load();
     loadKeys();
     loadLatest();
+    loadIn();
+    timers.ing = setInterval(() => { if (!document.hidden && state.activeTab === 'basestations') loadIn(); }, IN_MS);
     timers.list = setInterval(() => { if (!document.hidden && state.activeTab === 'basestations') { load(); loadLatest(); } }, LIST_MS);
-    if (openId != null) { loadDetail(); wfStart(); chStart(); sigStart(); timers.watch = setInterval(() => { if (!document.hidden) watch(false); }, WATCH_MS); }
+    if (openId != null) { loadDetail(); wfStart(); stStart(); chStart(); sigStart(); timers.watch = setInterval(() => { if (!document.hidden) watch(false); }, WATCH_MS); }
     if (typeof registerTabTeardown === 'function') registerTabTeardown('base-stations', stop);
   }
 
@@ -1864,6 +2271,8 @@ const BaseStations = (function () {
     loadDetail();
     wf = null; wfImg = null; wfHoverAt = null;
     wfStart();
+    st = null;
+    stStart();
     ch = null;
     chStart();
     sig = null;
@@ -1873,8 +2282,8 @@ const BaseStations = (function () {
 
   function close() {
     openId = null; detail = null; askErr = null; form = null; formNote = null; logShown = null;
-    wf = null; wfImg = null; wfHoverAt = null; ch = null; sig = null;
-    clearInterval(timers.watch); clearTimeout(timers.detail); clearInterval(timers.wf); clearInterval(timers.ch); clearInterval(timers.sig);
+    wf = null; wfImg = null; wfHoverAt = null; ch = null; sig = null; st = null;
+    clearInterval(timers.watch); clearTimeout(timers.detail); clearInterval(timers.wf); clearInterval(timers.ch); clearInterval(timers.sig); clearInterval(timers.st);
     repaint();
   }
 
@@ -1989,16 +2398,16 @@ const BaseStations = (function () {
   // A sign-in or sign-out: everything held was the last session's.
   function authChanged() {
     list = null; error = null; detail = null; openId = null; askErr = null; keys = null; keysErr = null; keyMsg = null; form = null; formNote = null; logShown = null; note = '';
-    wf = null; wfImg = null; wfHoverAt = null; ch = null; chAcma = null;
+    wf = null; wfImg = null; wfHoverAt = null; ch = null; chAcma = null; st = null; ing = null;
     stop();
     if (state.activeTab === 'basestations') { repaint(); init(); }
   }
 
   return { render, init, load, open, close, ask, askFrom, cancel, field, stick, resetForm, saveSettings,
-           keyField, addKey, removeKey, authChanged, wfWindow, chWindow, sub, fold,
+           keyField, addKey, removeKey, authChanged, wfWindow, chWindow, stWindow, stSave, inWindow, inSave, sub, fold,
            // Pure, for test/basestations.mjs.
            _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _stickNowHtml: stickNowHtml, _parseChans: parseChans, _checksHtml: checksHtml, _decodersFor: decodersFor, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf,
-           _chRows: chRows, _chVerdict: chVerdict };
+           _chRows: chRows, _chVerdict: chVerdict, _inRead: inRead };
 })();
 
 if (typeof window !== 'undefined') window.BaseStations = BaseStations;

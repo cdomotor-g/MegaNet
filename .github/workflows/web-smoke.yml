@@ -480,6 +480,17 @@ jobs:
         working-directory: test
         run: npm run basestations
 
+      # Node. What sits on a base station's spectrum all the time, and what it
+      # probably is (base-station-bands.js): spectra built an hour at a time
+      # with a known answer — a carrier, a busy channel, the centre spike,
+      # another stick with and without it, a retune, a clock's multiple, day
+      # and night, a wandering frequency, decoded traffic — and whether each
+      # matters to a channel the station decodes.
+      - name: Base Stations — steady signals, and what each probably is
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run bsbands
+
       # Chromium. The Reception Map against a drive built to blame one real
       # repeater: named first by pass ranges alone and with positions; NMEA
       # parsed; a GPS card placing a receiver's receptions; CSV/GeoJSON round
@@ -2436,6 +2447,13 @@ jobs:
       - name: check_base_station_channels.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_base_station_channels.sql
+      # Steady signals and ingest (0111): an hour of a stick's spectrum folded
+      # to each bin's lowest tenth and median, a row a tuning, closed hours
+      # only and once; each base station's messages and stations by protocol
+      # from the reception rollups; administrators the only callers.
+      - name: check_base_station_steady.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_base_station_steady.sql
       # The network's health kept by the database (0059): a base station that
       # stops checking in and a receiver that runs but decodes nothing each a
       # finding on the next run, held while its station is away, cleared when

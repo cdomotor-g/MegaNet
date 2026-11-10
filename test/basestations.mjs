@@ -32,6 +32,13 @@
 //     a stick's span and channels in its colour, the bursts it heard in words,
 //     a tip under the pointer, the window's buttons, and a poll asking for the
 //     last few minutes rather than the hour
+//   * steady signals (0111): a row a band on the open station's stick — the
+//     busy channel, the centre spike, something on a channel it decodes
+//     nothing on, a carrier nobody is licensed for — each with what it
+//     probably is, whether it matters and what to do; the stick's line with
+//     its bands; the words' meanings; the windows; a database without 0111
+//   * what comes in through each (0111): a row a base station, legacy ALERT
+//     and ALERT2 apart, the network's line, a bar a day, the windows
 //
 // Run:  npm run basestations
 //       npm run basestations -- -v    also print what passed
@@ -292,6 +299,39 @@ const FNS = {
   },
   admin_base_station_channels: a => Object.assign({ now: new Date(dbNow()).toISOString(), from: ago(a.p_days * 86400), to: ago(600) },
     a.p_id === 11 ? CHANNELS : { site: null, channels: [], register: [] }, { days: a.p_days, by: a.p_days <= 14 ? 'hour' : 'day' }),
+  // Its spectrum by the hour (0111): a day of RTL-SDR 1 on the waterfall's
+  // tuning, 64 bins of 15 kHz. Always there: the busy channel on 151.500,
+  // something on 151.625 (which it decodes nothing on), the stick's own spike
+  // at its centre, and a carrier near 151.900 nobody is licensed for.
+  admin_base_station_bands: a => {
+    const top = Math.floor(dbNow() / 3600e3) * 3600, rows = [];
+    for (let h = 24; h >= 1 && a.p_id === 11; h--) {
+      const low = new Uint8Array(64).fill(6);
+      low[18] = 46; low[27] = 36; low[32] = 30; low[45] = 50;
+      const b64 = Buffer.from(low).toString('base64');
+      rows.push({ t: top - h * 3600, key: STICK_1, center_hz: WF_LO + WF_RATE / 2, rate: WF_RATE, n: 60, floor_db: -45.5, low: b64, mid: b64 });
+    }
+    return { now: new Date(dbNow()).toISOString(), days: a.p_days, from: ago(a.p_days * 86400), to: new Date(top * 1000).toISOString(),
+      site: { lat: -19.35, lon: 146.78 }, rows };
+  },
+  // What comes in through each (0111): Mt Stuart mostly ALERT2 with a few
+  // stations only it hears, the report-only station on legacy ALERT alone.
+  admin_base_station_ingest: a => {
+    const day = g => new Date(dbNow() - g * 86400e3).toISOString().slice(0, 10);
+    const days = (x, y) => [...Array(Math.min(a.p_days, 7))].map((_, i) => [day(Math.min(a.p_days, 7) - 1 - i), x, y, x + y + 5]);
+    return { now: new Date(dbNow()).toISOString(), days: a.p_days, from: ago(a.p_days * 86400), to: ago(900), min_decodes: 3,
+      network: [{ protocol: 'alert', ids: 150, known: 141 }, { protocol: 'alert2', ids: 12, known: 12 }],
+      stations: [
+        { id: 11, label: 'Mt Stuart hut', revoked: false, host_station: 'Mt Stuart', days: days(500, 1500),
+          protocols: [{ protocol: 'alert', n: 4000, ok: 3500, undecoded: 400, dup: 0, bad: 100, ids: 120, known: 111, only_here: 30, last: ago(90) },
+                      { protocol: 'alert2', n: 10600, ok: 10500, undecoded: 0, dup: 0, bad: 100, ids: 12, known: 12, only_here: 2, last: ago(30) }],
+          receivers: [{ point_id: 'rx-1', protocol: 'alert', n: 4000, ok: 3500, ids: 120, last: ago(90), name: 'RTL-SDR 1' },
+                      { point_id: 'rx-1', protocol: 'alert2', n: 10600, ok: 10500, ids: 12, last: ago(30), name: 'RTL-SDR 1' }] },
+        { id: 12, label: 'Depot roof', revoked: false, host_station: null, days: days(300, 0),
+          protocols: [{ protocol: 'alert', n: 2400, ok: 2100, undecoded: 300, dup: 0, bad: 0, ids: 120, known: 120, only_here: 0, last: ago(300) }],
+          receivers: [{ point_id: 'rx-9', protocol: 'alert', n: 2400, ok: 2100, ids: 120, last: ago(300), name: null }] },
+        { id: 14, label: 'Never heard', revoked: false, host_station: null, days: [], protocols: [], receivers: [] }] };
+  },
   // Its receivers' own SNR shift by day (0083): RTL-SDR 1's ALERT stepped down
   // 5 dB nine days ago with its noise floor where it was; its ALERT2 steady.
   admin_base_station_signal: a => {
@@ -663,6 +703,63 @@ try {
   await until(async () => /apply db\/migrations\/0081_base_station_channels\.sql/.test(await text('#bs-ch-sum')), 'a database without 0081 is told which file to apply');
   await page.click('#bs-ch button:has-text("7 days")');
   await until(() => page.evaluate(() => document.querySelectorAll('#bs-ch tbody tr').length === 7), '…and the week comes back when it can');
+
+  // ── Steady signals (0111) ────────────────────────────────────────────────────
+  ok('opening it asks for two days of its spectrum by the hour', sent('admin_base_station_bands').some(a => a.p_id === 11 && a.p_days === 2), JSON.stringify(sent('admin_base_station_bands')));
+  await until(() => page.evaluate(() => document.querySelectorAll('#bs-st tbody tr').length === 4), 'a row a band: four on RTL-SDR 1');
+  const stRows = await page.evaluate(() => [...document.querySelectorAll('#bs-st tbody tr')].map(tr => [...tr.children].map(c => c.innerText.replace(/\s+/g, ' ').trim())));
+  const stRow = f => stRows.find(r => r[0].includes(f)) || [];
+  ok('the busy channel is a channel it decodes, and does not matter',
+    /A channel it decodes/.test(stRow('151.50 ')[4]) && /It decoded [\d,]+ of [\d,]+ bursts/.test(stRow('151.50 ')[4]) && /^No/.test(stRow('151.50 ')[5]), JSON.stringify(stRow('151.50 ')));
+  ok('the stick\'s centre is its own spike', /The stick's own centre spike/.test(stRow('151.70 ')[4]) && /^No/.test(stRow('151.70 ')[5]), JSON.stringify(stRow('151.70 ')));
+  ok('something on a channel it decodes nothing on matters, and is not called a transmitter',
+    /^Yes — it sits on 151\.625 MHz, which RTL-SDR 1 decodes/.test(stRow('151.625')[5]) && /Possibly: Not identified yet/.test(stRow('151.625')[4])
+      && /antenna off/.test(stRow('151.625')[6]), JSON.stringify(stRow('151.625')));
+  ok('a carrier nobody is licensed for, on one stick: not identified, no licence found, the antenna test to do',
+    /Not identified yet/.test(stRow('151.90')[4]) && /No licence on this frequency within 100 km/.test(stRow('151.90')[4]) && /Only this stick/.test(stRow('151.90')[4])
+      && /antenna off/.test(stRow('151.90')[6]), JSON.stringify(stRow('151.90')));
+  ok('each band says how wide, how far over its surroundings and how much of the time',
+    stRow('151.90')[1] === '15 kHz' && stRow('151.90')[2] === '22 dB' && /^100% of 24 h the whole time looked at$/.test(stRow('151.90')[3]), JSON.stringify(stRow('151.90').slice(0, 4)));
+  const stSum = (await text('#bs-st-sum')).replace(/\s+/g, ' ');
+  ok('a line says how many, and how many matter', /^Over the 24 hours judged: 4 steady signals — 1 sits on a channel it decodes, 2 not identified yet\./.test(stSum), stSum);
+  ok('the stick\'s window is drawn as a line with its bands numbered',
+    await page.evaluate(() => { const g = document.querySelector('#bs-st svg.bs-st-svg'); return !!g && g.querySelectorAll('rect.bs-st-band').length === 4 && g.querySelectorAll('rect.bs-st-band--on').length === 1 && !!g.querySelector('path.bs-st-line') && /4 bands marked/.test(g.getAttribute('aria-label')); }));
+  ok('its headings carry their meanings on hover, and the same meanings are listed for a finger',
+    await page.evaluate(() => { const th = [...document.querySelectorAll('#bs-st thead .term')]; const dl = document.querySelector('#bs-st details dl.rd-words');
+      return th.length === 3 && th.every(t => t.title.length > 40) && [...document.querySelectorAll('#bs-st details summary')].some(x => /What the words on this page mean/.test(x.textContent))
+        && [...document.querySelectorAll('#bs-st dl.rd-words dd')].some(d => d.textContent === th[0].title) && !!dl; }));
+  ok('…with the tests that tell causes apart, what can be done, and when to report to the ACMA',
+    await page.evaluate(() => { const t = document.getElementById('bs-st').textContent; return /Take the antenna off for five minutes/.test(t) && /Fit a filter/.test(t) && /When to report something to the ACMA/.test(t)
+      && !!document.querySelector('#bs-st a[href="https://www.acma.gov.au/radio-reception-and-interference"]'); }));
+  await page.click('#bs-st button:has-text("7 days")');
+  await until(() => sent('admin_base_station_bands').some(a => a.p_id === 11 && a.p_days === 7), 'the 7 days button asks for seven');
+  fail = { fn: 'admin_base_station_bands', status: 404, body: { code: 'PGRST202', message: 'Could not find the function meganet.admin_base_station_bands' } };
+  await page.click('#bs-st button:has-text("2 days")');
+  await until(async () => /apply db\/migrations\/0111_base_station_steady_signals\.sql/.test(await text('#bs-st-sum')), 'a database without 0111 is told which file to apply');
+  await page.click('#bs-st button:has-text("7 days")');
+  await until(() => page.evaluate(() => document.querySelectorAll('#bs-st tbody tr').length === 4), '…and the bands come back when it can');
+
+  // ── What comes in through each (0111) ────────────────────────────────────────
+  ok('the tab asks what came in through each base station over a week', sent('admin_base_station_ingest').some(a => a.p_days === 7), JSON.stringify(sent('admin_base_station_ingest')));
+  await until(() => page.evaluate(() => document.querySelectorAll('#bs-in tbody tr').length === 3), 'a row a base station');
+  const inRows = await page.evaluate(() => [...document.querySelectorAll('#bs-in tbody tr')].map(tr => [...tr.children].map(c => c.innerText.replace(/\s+/g, ' ').trim())));
+  ok('a station\'s row: its stations, legacy ALERT and ALERT2 apart with what decoded, the ALERT2 share and a day\'s worth',
+    /^Mt Stuart hut at Mt Stuart$/.test(inRows[0][0]) && /^132 32 only here$/.test(inRows[0][1])
+      && /^3,500 of 4,000 heard \(88%\) 120 stations 9 not in the register 30 only here$/.test(inRows[0][2])
+      && /^10,500 of 10,600 heard \(99%\) 12 stations 2 only here$/.test(inRows[0][3]) && inRows[0][4] === '75%' && inRows[0][5] === '2,000', JSON.stringify(inRows[0]));
+  ok('…its receivers, and when it last heard anything', /^RTL-SDR 1: 3,500 legacy from 120, 10,500 ALERT2 from 12$/.test(inRows[0][7]) && /ago|just now/.test(inRows[0][8]), JSON.stringify(inRows[0].slice(7)));
+  ok('a station on legacy ALERT alone says none for ALERT2, and one that heard nothing says so',
+    inRows[1][3] === 'none' && inRows[1][4] === '0%' && inRows[2][8] === 'nothing' && inRows[2][2] === 'none', JSON.stringify([inRows[1], inRows[2]]));
+  ok('a bar a day, legacy and ALERT2 stacked', await page.evaluate(() => { const g = document.querySelector('#bs-in tbody tr svg.bs-in-bars'); return !!g && g.querySelectorAll('rect.bs-in-a').length === 7 && g.querySelectorAll('rect.bs-in-a2').length === 7; }));
+  const inSum = (await text('#bs-in-sum')).replace(/\s+/g, ' ');
+  ok('a line adds it up for the network',
+    /^In the last 7 days, 2 base stations brought in 16,100 decoded messages: 5,600 legacy ALERT \(35%\) and 10,500 ALERT2 \(65%\), from 150 legacy IDs and 12 ALERT2 stations across the network — 9 of them not in the register\./.test(inSum), inSum);
+  ok('its headings carry their meanings, listed under it too',
+    await page.evaluate(() => { const th = [...document.querySelectorAll('#bs-in thead .term')]; return th.length === 5 && th.every(t => t.title.length > 40)
+      && [...document.querySelectorAll('#bs-in dl.rd-words dd')].some(d => d.textContent === th[0].title); }));
+  await page.click('#bs-in button:has-text("30 days")');
+  await until(() => sent('admin_base_station_ingest').some(a => a.p_days === 30), 'the 30 days button asks for thirty');
+  await until(() => page.evaluate(() => /In the last 30 days/.test(document.getElementById('bs-in-sum').textContent)), '…and says so');
 
   // ── Signal across what it hears (0083) ───────────────────────────────────────
   ok('opening it asks for its receivers\' own signal', sent('admin_base_station_signal').some(a => a.p_id === 11), JSON.stringify(sent('admin_base_station_signal')));

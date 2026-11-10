@@ -23001,6 +23001,37 @@ a.adm-kpi--go:hover::after, a.adm-kpi--go:focus-visible::after { color: var(--ac
 .bs-ch-t .bs-wide { width: 28%; }
 .bs-ch-t td > div + div { margin-top: var(--sp-1); }
 
+/* Steady signals (0111): a line a stick — what each frequency never dropped
+   below — with its bands shaded by whether they matter and numbered to the
+   table under it; and What comes in through each, a bar a day. */
+.bs-st .panel-header, .bs-in .panel-header { flex-wrap: wrap; gap: var(--sp-2); }
+.bs-st-stick + .bs-st-stick { margin-top: var(--sp-4); }
+.bs-st-svg { display: block; width: 100%; height: 130px; background: var(--panel-sub); border: 1px solid var(--border); border-radius: 4px; }
+.bs-st-line { fill: none; stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.bs-st-typ { fill: none; stroke: var(--muted); stroke-width: 1; opacity: .55; vector-effect: non-scaling-stroke; }
+.bs-st-edge { fill: var(--muted); opacity: .12; }
+.bs-st-band { fill: var(--muted); opacity: .22; }
+.bs-st-band--on { fill: var(--bad); opacity: .3; }
+.bs-st-band--beside, .bs-st-band--strong { fill: var(--warn); opacity: .3; }
+.bs-st-chan { stroke: var(--ok); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.bs-st-n, .bs-st-ax { fill: var(--text); font-size: 10px; }
+.bs-st-ax { fill: var(--muted); }
+.bs-st-no { display: inline-block; min-width: 1.4em; padding: 0 .3em; border: 1px solid var(--border); border-radius: 999px; text-align: center; font-size: var(--fs-sm); }
+.table-wrap table.bs-st-t { min-width: 68rem; margin-top: var(--sp-2); }
+.bs-st-t td, .bs-st-t th, .bs-in-t td, .bs-in-t th { vertical-align: top; overflow-wrap: break-word; }
+.bs-st-t th[scope="row"] { white-space: nowrap; }
+.bs-st-t .bs-st-f { width: 9.5rem; }
+.bs-st-t .bs-st-m { width: 16%; }
+.bs-st-t th:nth-child(2), .bs-st-t th:nth-child(3) { width: 5.5rem; }
+.bs-st-t th:nth-child(4) { width: 9.5rem; }
+.bs-st-t .bs-wide { width: 25%; }
+.bs-st-t td > div + div { margin-top: var(--sp-1); }
+.table-wrap table.bs-in-t { min-width: 60rem; }
+.bs-in-t .bs-wide { width: 24%; }
+.bs-in-bars { display: block; width: 120px; height: 28px; }
+.bs-in-a, .qs-sw.bs-sw-in-a { fill: var(--accent); background: var(--accent); }
+.bs-in-a2, .qs-sw.bs-sw-in-a2 { fill: var(--c-ident); background: var(--c-ident); }
+
 /* ── A header's "?" (Repeaters listening) ────────────────────────────────────
    How-to text that every visit would otherwise pay for in card height, moved
    behind a disclosure at the header's right end. A <details> for the same

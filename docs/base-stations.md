@@ -178,6 +178,86 @@ also how often its rows come — and a gap in it is a time the station was not
 checking in. Two days of rows are kept. It needs RPi ALERT 0.13.5 or later on
 the station; an older one, or a station with no SDR stick, has no waterfall.
 
+## Steady signals
+
+A waterfall shows a bright band that never goes away and says nothing about it.
+Under the waterfall, **Steady signals** (`0111`) finds those bands and says, for
+each: how wide and how strong it is, how much of the time it is there and since
+when, what it probably is, whether it matters, and what to do.
+
+**How a band is found.** Each spectrum row is the strongest every frequency was
+in its minute. On the hour the database folds a stick's rows into two lines
+(`base_station_spectrum_hourly`, ninety days kept): the level each frequency was
+at or above in nine minutes of ten, and its usual (median) level. What stays in
+the first, hour after hour, was there in nearly every minute — a carrier or a
+noise source, not a station sending a burst and stopping. A band is what stands
+5 dB or more above the frequencies either side of it; one that shows only in
+the usual level is *busy, not constant*. A stick is judged once it has three
+hours, and a band counts if it is there a quarter of the hours — so one that
+comes with the sun is still found.
+
+**How it is told what it is** — only from what can be checked from here, most
+certain first, with the reasons listed under each answer:
+
+| It is put down to | When |
+|---|---|
+| **A channel it decodes** | the station decoded bursts on that frequency (from Channel by channel). If fewer than half decode under something steady, it says a carrier may be sitting under the traffic |
+| **The stick's own centre spike** | it is at the exact middle of the stick's window, where every RTL-SDR draws a line of its own |
+| **Made inside this stick or its lead** | another stick hears that frequency in the middle of its window and has nothing there; or the stick was retuned and the band kept its place in the window instead of its frequency |
+| **A harmonic of a computer clock** | a bare carrier within 5 kHz of a multiple of a clock that runs beside the stick — wired Ethernet's 25 MHz (150.000), the stick's own 28.8 MHz crystal, a Raspberry Pi's 19.2 or 54 MHz, USB's 12, 24 and 48 |
+| **Solar gear** / **something that runs at night** | it is there in 70% of daylight hours and under 20% of night hours, or the reverse (local time from the station's longitude) |
+| **A licensed transmitter** | the ACMA's register has a licence within 6.25 kHz of it within 100 km — named, with its site and distance |
+| **At the window's edge** | it is in the stick's outer tenth, where a signal from just outside folds back in |
+| **Broadband noise** | it is 100 kHz wide or more |
+| **Electrical noise from nearby gear** | its frequency wanders by 1.5 kHz or more from hour to hour, which a licensed transmitter does not do |
+| **On the air, and no licence found** | another stick hears it too, or it kept its frequency through a retune, and the extract has nobody there |
+| **Not identified yet** | none of the above — typically one stick, never retuned — with the test that would settle it |
+
+It never calls something unlicensed while the licence files are still loading,
+and a weak band another stick does not show is said to prove nothing.
+
+**Whether it matters** is decided separately, by where the band is and how
+strong: **yes** when it sits on a channel the station decodes (a burst weaker
+than it will not be read); **possibly** when it is within 25 kHz of one and
+20 dB or more over its surroundings, or 30 dB over anywhere (it uses up the
+stick's range, and a stick on automatic gain turns itself down for it);
+otherwise **no**.
+
+Each stick's window is drawn as a line — solid for what is always there, faint
+for its usual level, its bands numbered to the table and its channels ticked —
+and a stick whose **noise floor** moves by 4 dB or more through the day says
+so, and whether it is highest by day or at night. Folded under the table: the
+tests that tell causes apart (antenna off, the other stick, moving the window,
+10 dB less gain, the clock, switching things off, listening on a handheld),
+what can be done from least effort to most (leave it, a setting, tidying the
+hut, a filter, a call to the licence holder, the ACMA), when a band is worth
+[reporting to the ACMA](https://www.acma.gov.au/radio-reception-and-interference),
+and what the words mean. **Save as CSV** writes the table.
+
+The reasoning is `base-station-bands.js` (`BandSmarts`), run in the browser and
+held to known answers by `npm run bsbands`; the database only folds the hours
+(`roll_up_spectrum()`, hourly at minute 13) and hands them over
+(`admin_base_station_bands()`, two or seven days). It needs RPi ALERT 0.13.5 or
+later, as the waterfall does.
+
+## What comes in through each
+
+Under the list, **What comes in through each** (`0111`,
+`admin_base_station_ingest()`) is a row a base station over the last day, week
+or month, from the reception rollups:
+
+- **Stations** — the different transmitters it decoded three times or more (a
+  legacy ALERT sensor ID or an ALERT2 station address each count as one), and
+  how many of them **only** this base station decoded;
+- **Legacy ALERT** and **ALERT2**, apart — messages decoded of those heard and
+  the rate, the stations on each, how many are **not in the register**;
+- the **ALERT2 share** of what it decoded, what it decodes **a day**, and a bar
+  a day, the two protocols stacked;
+- the same **by receiver**, and when it last heard anything.
+
+A line above adds it up for the network. A message heard by two base stations
+counts for both; drive surveys are left out. **Save as CSV** writes the table.
+
 ## Channel by channel
 
 Under the waterfall, **Channel by channel** (`0081`) takes the last day, week or

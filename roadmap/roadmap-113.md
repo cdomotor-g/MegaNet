@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-10** (revision 250 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-10** (revision 251 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -875,6 +875,15 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 251 — 2026-11-10: Base Stations — Steady signals and What comes in through each — 0111
+
+The owner saw bright bands that never leave both base stations' waterfalls and asked for them to be found and explained, and for ingest figures per base station. Opens and closes nothing.
+
+- **`0111`** (`base_station_spectrum_hourly`, `roll_up_spectrum()`, `admin_base_station_bands(id, days)`, `admin_base_station_ingest(days)`): each stick's spectrum folded by the hour to the level every bin was at or above in nine rows of ten and its median, a row a tuning, ninety days kept, pg_cron at minute 13; and every base station's ingest from the reception rollups. `tools/check_base_station_steady.sql`, 27 checks.
+- **On screen** (`base-stations.js`, new `base-station-bands.js`): **Steady signals** under the waterfall — a line a stick with its bands numbered, and a table saying what each probably is, why, whether it matters to a channel the station decodes and what to do, with the tests, the remedies and when to report to the ACMA folded under it; **What comes in through each** under the list — stations, legacy ALERT and ALERT2 apart, what only that base station hears, a bar a day, by receiver. Both save as CSV. `docs/base-stations.md` has both.
+- **Checks added:** `bsbands` (Node, 43); `basestations` extended to both panels.
+- **Not done, and nobody's yet:** a finding raised with the tab closed when a steady band lands on a channel a station decodes (the hours are kept for it); the bands marked on the waterfall itself.
 
 ### Revision 250 — 2026-11-10: 📜 ACMA licences for our own transmitters, ⚖️ Repeater comparison, benchmarks on the Flood tab — 0110; #283, #284 and #285 opened
 

@@ -101,6 +101,15 @@ const ACCEPTED = {
          + 'is undefined, never runs it. Constrains nothing below it.',
     },
   ],
+  'base-station-bands.js': [
+    {
+      match: "if (typeof module !== 'undefined' && module.exports) module.exports = BandSmarts;",
+      why: 'The Steady signals reasoning\'s CommonJS registration, required by test/bsbands.mjs '
+         + 'so what the Base Stations tab says about a band is what the check holds to spectra '
+         + 'built for it in Node. Guarded so the browser, where `module` is undefined, never '
+         + 'runs it. Constrains nothing below it.',
+    },
+  ],
   'delay-plan.js': [
     {
       match: "if (typeof module !== 'undefined' && module.exports) module.exports = DelayPlan;",

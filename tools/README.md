@@ -93,6 +93,15 @@ step); denied, withdrawn and expired requests cannot be approved and their token
 cannot ask again; a request a day past expiry is swept; and the twenty-first waiting
 device is told to try later (`PT429`). Confirmed red on four deliberate breaks.
 
+`check_base_station_steady.sql` holds `0111`: 27 checks. An hour of a stick's
+spectrum rows folded to one row a tuning — a bin lit in every row kept in the
+lowest tenth, one lit in eleven of twenty only in the median — closed hours
+only, from a watermark, once, ninety days kept; and each base station's ingest
+from the reception rollups, legacy ALERT and ALERT2 apart, a station counted
+after three decodes, the register's and the ones only it hears, drive surveys
+left out, a month from the daily rollup. Administrators the only callers; the
+folding the scheduler's alone.
+
 `check_base_stations.sql` holds `0049`, base stations checking in, and `0068`'s
 waterfall: 60 checks, the
 stations played by anon holding a token in `X-Ingest-Token` and the people made
