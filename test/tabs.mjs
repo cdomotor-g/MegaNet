@@ -1064,6 +1064,18 @@ const SEED_FW_LIVE = `async () => {
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 }`;
 
+// 🪪 Radio Licensing with everything it folds away open: the glossary, the
+// "how sure" notes, the cases, a Yagi's patterns and a gauge over its limits —
+// the widest table on the page is the checker's, and it only fails when asked.
+const SEED_LICENSING = `async () => {
+  KbLicensing.check(1);
+  KbLicensing.pick('yagi6');
+  KbLicensing.role('fillin');
+  KbLicensing.set('kind', 'relay');
+  for (const d of document.querySelectorAll('#rlc-page details')) d.open = true;
+  await new Promise(r => setTimeout(r, 300));
+}`;
+
 const CONVERTED = [
   { id: 'networks',   label: 'Networks',        issue: '#109 (proving ground) / #137' },
   { id: 'passranges', label: 'ALERT IDs',       issue: '#137' },
@@ -1130,6 +1142,8 @@ const CONVERTED = [
   { id: 'swr',        label: 'SWR Meter — as it opens', issue: 'born converted' },
   { id: 'swr',        label: 'SWR Meter — your readings, the needle meter on SWR', issue: 'born converted', seed: SEED_SWR },
   { id: 'pinouts',    label: 'Pinouts — as it opens', issue: 'born converted' },
+  { id: 'licensing',  label: 'Radio Licensing — as it opens', issue: 'born converted' },
+  { id: 'licensing',  label: 'Radio Licensing — every fold open, a Yagi picked, a gauge over its limits', issue: 'born converted', seed: SEED_LICENSING },
   { id: 'pinouts',    label: 'Pinouts — a radio\'s DB9 from the back, a pin picked, a hook-up ticked', issue: 'born converted', seed: SEED_PO },
   { id: 'a2firmware', label: 'ERT-A2 Simulator — as it opens', issue: 'born converted' },
   { id: 'a2firmware', label: 'ERT-A2 Simulator — a unit\'s versions checked, its own walkthrough at the laptop', issue: 'born converted', seed: SEED_FW },

@@ -145,7 +145,7 @@ ok('…a line — and its shaded band — on every point-to-point link, both end
    drawn.links > 0 && drawn.lines === 2 * drawn.links && drawn.ptpNoLink === 0, J(drawn));
 ok('…and a ring to press at every licensed site', drawn.rings === allSites, J({ rings: drawn.rings, allSites }));
 ok('the rail is lit and the legend says what the shapes mean', drawn.live && drawn.legend, J({ live: drawn.live, legend: drawn.legend }));
-ok('the panel says a circle is an assumed reach, not a boundary', /assumed reach — how far ACMA assumes its stations are from the base — not a legal boundary/.test(drawn.shown), drawn.shown);
+ok('the panel says a circle is the service area ACMA plans on, not a boundary in the law', /service area — the ground ACMA plans the licence to serve, not a boundary in the law/.test(drawn.shown), drawn.shown);
 
 const bureauPmp = FILE.licences.reduce((n, l, i) => n + (FILE.holders[l[5]][4] === 'bureau' && kindOf(l) === 'pmp' ? txSitesOf(i).length : 0), 0);
 await page.locator('#acmalic-classes input[type="checkbox"]').first().click();
@@ -168,16 +168,17 @@ const st = await page.evaluate(() => {
   const tx = s => !!s.repeater || (s.roles || []).includes('repeater') || stationAlertIds(s).length > 0;
   const rows = state.data.stations.filter(s => located(s) && tx(s)).map(s => {
     const a = MapAcma.assess(s.id);
-    return { id: s.id, lat: Number(s.lat), lon: Number(s.lon), state: a.state, chans: a.chans, site: a.site[0] || null, area: a.area[0] || null, nearest: a.nearest };
+    return { id: s.id, lat: Number(s.lat), lon: Number(s.lon), state: a.state, chans: a.chans, site: a.site[0] || null, area: a.area[0] || null, nearest: a.nearest,
+      beyond: a.beyond[0] || null, relay: a.relay };
   });
   const quiet = state.data.stations.filter(s => located(s) && !tx(s));
   return { rows, counts: MapAcma.counts(), quiet: quiet.length, quietStates: [...new Set(quiet.slice(0, 300).map(s => MapAcma.stateOf(s).state))],
     nopos: state.data.stations.filter(s => !located(s)).length };
 });
 const tally = s => st.rows.filter(r => r.state === s).length;
-ok('every transmitting station is in exactly one of three states, and the counts are theirs',
-   st.counts.site === tally('site') && st.counts.area === tally('area') && st.counts.none === tally('none')
-   && st.counts.site + st.counts.area + st.counts.none === st.rows.length, J(st.counts));
+ok('every transmitting station is in exactly one of four states, and the counts are theirs',
+   st.counts.site === tally('site') && st.counts.area === tally('area') && st.counts.beyond === tally('beyond') && st.counts.none === tally('none')
+   && st.counts.site + st.counts.area + st.counts.beyond + st.counts.none === st.rows.length, J(st.counts));
 ok('a station with no ALERT address that is not a repeater is “not a transmitter”, never “none found”',
    st.counts.na === st.quiet && st.quietStates.length === 1 && st.quietStates[0] === 'na' && st.counts.nopos === st.nopos, J({ na: st.counts.na, quiet: st.quiet, s: st.quietStates }));
 
@@ -201,22 +202,44 @@ const mine = r => {
   }
   return site ? 'site' : area ? 'area' : 'none';
 };
-const wrong = st.rows.filter(r => mine(r) !== r.state);
+// "Beyond a licence's area" is "none" as far as the file alone can say: what
+// lifts it is a repeater that carries the station, which the file knows
+// nothing of. That half is held just below, against the stations themselves.
+const wrong = st.rows.filter(r => mine(r) !== (r.state === 'beyond' ? 'none' : r.state));
 ok(`all ${st.rows.length} are what the file says, worked out again here apart from the module`, wrong.length === 0,
    J(wrong.slice(0, 5).map(r => [r.id, r.state, mine(r)])));
+const far = await page.evaluate(rows => rows.map(r => {
+  const via = state.data.stations.find(x => String(x.id) === String(r.via));
+  const C = Frequencies.carriersOf(state.data.stations.find(x => String(x.id) === String(r.id)));
+  const c = C && via ? C.all.find(x => x.r === via) : null;
+  const lic = MapAcma.licence(r.no);
+  const site = lic ? lic.sites.find(q => lic.txSites.includes(q.id) && acmaHaversineKm(q.lat, q.lon, Number(via.lat), Number(via.lon)) <= 0.5) : null;
+  return { id: r.id, repeater: !!via && (!!via.repeater || (via.roles || []).includes('repeater')), carries: !!c, inRange: !!c && c.km <= C.maxKm,
+    atBase: !!site, current: !!lic && lic.standing !== 'lapsed', pmp: !!lic && lic.kind === 'pmp' };
+}), st.rows.filter(r => r.state === 'beyond').map(r => ({ id: r.id, via: r.beyond.via, no: r.beyond.no })));
+ok('“beyond a licence’s area” rests on a repeater that carries the station, within the Max TX distance, standing at a point-to-multipoint base in force',
+   far.length > 20 && far.every(f => f.repeater && f.carries && f.inRange && f.atBase && f.current && f.pmp), J(far.filter(f => !(f.repeater && f.carries && f.inRange && f.atBase && f.current && f.pmp)).slice(0, 4)));
+ok('…is further out than that licence’s radius, and is never said of a repeater',
+   st.rows.filter(r => r.state === 'beyond').every(r => r.beyond.gap > 0 && r.beyond.txKm > r.beyond.radius && !r.relay), '');
 ok('“licence at the site” rests on a transmitter within 500 m; “inside a licence’s area” on a point-to-multipoint base within its radius',
    st.rows.filter(r => r.state === 'site').every(r => r.site && r.site.txKm <= 0.5)
    && st.rows.filter(r => r.state === 'area').every(r => r.area && r.area.kind === 'pmp' && r.area.txKm > 0.5 && r.area.txKm <= 30.0001), '');
 ok('“none found” names the nearest licence that would cover it, and a gap above nothing',
    st.rows.filter(r => r.state === 'none' && r.nearest).every(r => r.nearest.gap > 0 && r.nearest.kind === 'pmp')
    && st.rows.filter(r => r.state === 'none' && r.nearest).length > 0, '');
-ok('there are stations in each state to look at', tally('site') > 20 && tally('area') > 100 && tally('none') > 10, J(st.counts));
+ok('there are stations in each state to look at', tally('site') > 20 && tally('area') > 100 && tally('beyond') > 20 && tally('none') > 10, J(st.counts));
 
 const atSite = st.rows.find(r => r.state === 'site'), inArea = st.rows.find(r => r.state === 'area'), none = st.rows.find(r => r.state === 'none' && r.nearest);
-const verdicts = await page.evaluate(ids => ids.map(id => MapAcma.verdict(id)), [atSite.id, inArea.id, none.id]);
+const beyondRow = st.rows.find(r => r.state === 'beyond'), relayRow = st.rows.find(r => r.state === 'area' && r.relay);
+const verdicts = await page.evaluate(ids => ids.map(id => (id == null ? '' : MapAcma.verdict(id))), [atSite.id, inArea.id, none.id, beyondRow.id, relayRow ? relayRow.id : null]);
 ok('the verdict of a licensed site names the licence', verdicts[0].startsWith('Licensed at this site:') && verdicts[0].includes(atSite.site.no), verdicts[0]);
 ok('…of a station inside a circle says no licence names the site, which licence covers it, and that the circle is a planning radius or the licence’s own',
-   /^No licence names this site/.test(verdicts[1]) && verdicts[1].includes(inArea.area.no) && /(reach ACMA assumes|service area written on that licence)/.test(verdicts[1]), verdicts[1]);
+   /^No licence names this site/.test(verdicts[1]) && verdicts[1].includes(inArea.area.no) && /(service area ACMA plans such a licence on|service area written on that licence)/.test(verdicts[1]), verdicts[1]);
+ok('…of a station beyond a circle names the repeater it reports through and that licence, says the law sets no distance, and never that it is unlicensed',
+   /outside every licence’s area on its channel/.test(verdicts[3]) && verdicts[3].includes(beyondRow.beyond.no) && /The law sets no distance for a remote station/.test(verdicts[3])
+   && /unprotected, and it must stop if it causes interference/.test(verdicts[3]) && !/unlicensed/i.test(verdicts[3]), verdicts[3]);
+ok('…and of a repeater inside a circle says a circle covers it only as a fill-in, and that it normally needs its own licence',
+   !relayRow || (/it is a repeater/.test(verdicts[4]) && /only as a fill-in/.test(verdicts[4]) && /needs a licence naming its own site/.test(verdicts[4])), verdicts[4]);
 ok('…and where none was found it never says unlicensed as a fact',
    /^No licence found for this site in the register copy of/.test(verdicts[2]) && /not the same as unlicensed/.test(verdicts[2])
    && verdicts[2].includes(none.nearest.no) && !/\bis unlicensed\b/i.test(verdicts[2]), verdicts[2]);
@@ -291,7 +314,10 @@ const cov = await page.evaluate(() => {
   state.map.eachLayer(l => { if (l.options && l.options.pane === 'mnAcmaLicCover' && l instanceof L.CircleMarker) rings++; });
   const n = k => Number(document.querySelector(`#acmalic-counts li[data-state="${k}"] strong`)?.textContent);
   const csv = MapAcma.stationsCsv().trim().split('\n'), lcsv = MapAcma.licencesCsv().trim().split('\n');
-  return { rings, shown: { site: n('site'), area: n('area'), none: n('none'), na: n('na') }, counts: MapAcma.counts(),
+  return { rings, shown: { site: n('site'), area: n('area'), beyond: n('beyond'), none: n('none'), na: n('na') }, counts: MapAcma.counts(),
+    beyondSummary: (document.querySelector('#acmalic-beyond > summary')?.textContent || '').trim(),
+    beyondRows: document.querySelectorAll('#acmalic-beyond-table tbody tr').length,
+    csvBeyond: csv.filter(l => l.includes(',Beyond a licence’s area,')).length,
     noneSummary: (document.querySelector('#acmalic-none > summary')?.textContent || '').trim(),
     noneRows: document.querySelectorAll('#acmalic-none-table tbody tr').length,
     owners: document.querySelectorAll('#acmalic-owners tbody tr').length,
@@ -301,13 +327,15 @@ const cov = await page.evaluate(() => {
 });
 ok('a ring on every transmitting station, and no other', cov.rings === st.rows.length, J({ rings: cov.rings, tx: st.rows.length }));
 ok('the counts on the panel are the counts', cov.shown.site === cov.counts.site && cov.shown.area === cov.counts.area
-   && cov.shown.none === cov.counts.none && cov.shown.na === cov.counts.na, J(cov.shown));
+   && cov.shown.beyond === cov.counts.beyond && cov.shown.none === cov.counts.none && cov.shown.na === cov.counts.na, J(cov.shown));
+ok('the stations beyond a licence’s area are listed, each with the repeater it reports through',
+   cov.beyondSummary.startsWith(`${cov.counts.beyond} station`) && cov.beyondRows === Math.min(cov.counts.beyond, 150), J({ s: cov.beyondSummary, rows: cov.beyondRows }));
 ok('the stations with none found are listed, with what would cover each',
    cov.noneSummary.startsWith(`${cov.counts.none} station`) && cov.noneRows === Math.min(cov.counts.none, 150), J({ s: cov.noneSummary, rows: cov.noneRows }));
 ok('there is a line for every holder with licences', cov.owners === FILE.holders.length, String(cov.owners));
 ok('the stations CSV has a line for every transmitting station, its state in words, and the caution at its head',
-   cov.csvRows === st.rows.length && cov.csvNone === cov.counts.none && /not the same as unlicensed/.test(cov.csvSays)
-   && /station_number.*state.*licence.*gap_km/.test(cov.csvHead), J({ rows: cov.csvRows, none: cov.csvNone }));
+   cov.csvRows === st.rows.length && cov.csvNone === cov.counts.none && cov.csvBeyond === cov.counts.beyond && /not the same as unlicensed/.test(cov.csvSays)
+   && /station_number.*state.*licence.*gap_km.*reports_through/.test(cov.csvHead), J({ rows: cov.csvRows, none: cov.csvNone, beyond: cov.csvBeyond }));
 ok('the licences CSV has a line for every licence', cov.lcsvRows === cov.n, J({ rows: cov.lcsvRows, n: cov.n }));
 
 const [download] = await Promise.all([page.waitForEvent('download', { timeout: 15_000 }), page.click('#acmalic-save')]);
@@ -371,6 +399,7 @@ const guide = await page.evaluate(() => {
   const g = document.getElementById('acmalic-guide');
   return { first: g.querySelector('.lic-disclaimer')?.textContent.replace(/\s+/g, ' ') || '', secs: [...g.querySelectorAll('.lic-guide-sec')].map(d => d.dataset.guide),
     srcs: [...g.querySelectorAll('a')].map(a => a.href), dated: [...g.querySelectorAll('.lic-sources li')].map(li => li.textContent.replace(/\s+/g, ' ')),
+    cites: g.querySelectorAll('button.ld-cite').length,
     text: g.textContent.replace(/\s+/g, ' ') };
 });
 ok('the guide says first that it is a guide, not legal advice, and to check with ACMA', /guide, not legal advice/.test(guide.first) && /check with ACMA/.test(guide.first), guide.first);
@@ -379,8 +408,28 @@ ok('it covers why, the types, how far a licence reaches, power, what a site shou
 ok('every claim’s source is a link to the Federal Register of Legislation or to ACMA',
    guide.srcs.length >= 25 && guide.srcs.every(h => /^https:\/\/www\.(legislation|acma)\.gov\.au\//.test(h)), J(guide.srcs.filter(h => !/^https:\/\/www\.(legislation|acma)\.gov\.au\//.test(h))));
 ok('…and each is listed once more with its date', guide.dated.length >= 12 && guide.dated.every(t => /(20\d\d)/.test(t)), J(guide.dated.slice(0, 2)));
-ok('it answers the 30 km question: a planning figure, the licence states no distance',
-   /The licence states no distance/.test(guide.text) && /30 km is ACMA’s planning figure/.test(guide.text) && /100 mW EIRP/.test(guide.text), '');
+ok('it answers the 30 km question: the law sets no distance, the licence states none, 30 km is ACMA’s planning rule',
+   /The law sets no distance/.test(guide.text) && /The licence states no distance/.test(guide.text) && /30 km is ACMA’s planning rule/.test(guide.text)
+   && /All stations must be contained within the service area/.test(guide.text) && /100 mW EIRP/.test(guide.text), '');
+ok('…with a way to read each rule in the saved document, and the label a transmitter at a shared site must carry',
+   guide.cites >= 5 && /frequency assignment number and the words “Do Not\s+Remove”/.test(guide.text), J({ cites: guide.cites }));
+
+// ── 7b. the label, and the way to the lesson ─────────────────────────────────
+console.log('\nThe transmitter label, and the Knowledge base');
+
+const label = await page.evaluate(id => {
+  const a = MapAcma.assess(id), lic = MapAcma.licence(a.site[0].no);
+  MapAcma.pickLicence(lic.no, { stay: true });
+  return { note: a.label, fans: lic.fans };
+}, atSite.id);
+await page.waitForTimeout(500);
+label.detail = await page.evaluate(() => (document.getElementById('acmalic-picked')?.textContent || '').replace(/\s+/g, ' '));
+const fanInFile = FILE.devices.filter(d => d[2] === 'T' && d[13]).length, txInFile = FILE.devices.filter(d => d[2] === 'T').length;
+ok('the register copy carries every transmitter’s frequency assignment number', fanInFile === txInFile && txInFile > 400 && /^\d{6,10}$/.test(FILE.devices.find(d => d[2] === 'T')[13]), J({ fanInFile, txInFile }));
+ok('a licensed site over 2 W EIRP is told the label its transmitter must carry at a shared site, with the number',
+   label.fans.length >= 1 && (label.note === '' || (label.note.includes(label.fans[0]) && /Do Not Remove/.test(label.note))), label.note);
+ok('a picked licence lists each transmitter’s frequency assignment number', label.fans.every(f => label.detail.includes(f)), label.detail.slice(0, 200));
+await page.evaluate(() => MapAcma.unpick());
 
 // ── 8. the rail, and clearing ────────────────────────────────────────────────
 console.log('\nThe rail and Clear the selection');
@@ -400,6 +449,12 @@ const gone = await page.evaluate(() => {
 ok('Clear the selection takes the licences, the rings and the picked station off the map',
    !gone.live && !gone.s.show && !gone.s.cover && gone.s.picked === null && gone.shapes === 0, J({ live: gone.live, shapes: gone.shapes }));
 ok('…and leaves the holders and the radius as they were set', gone.s.radius === 30 && gone.s.holders.every(h => h.on), J(gone.s.radius));
+
+await page.evaluate(() => MapAcma.learn('km30'));
+await page.waitForTimeout(500);
+const lesson = await page.evaluate(() => ({ tab: state.tab || (document.querySelector('.tab-btn.active') || {}).dataset?.tab, page: !!document.getElementById('rlc-page'),
+  at: document.activeElement ? document.activeElement.id : '' }));
+ok('What the rules say opens the Knowledge base’s Radio Licensing lesson at the 30 km question', lesson.page && lesson.at === 'rlc-km30-h', J(lesson));
 
 ok('no page errors', errors.length === 0, errors.join(' | '));
 

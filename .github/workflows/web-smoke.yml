@@ -1585,6 +1585,19 @@ jobs:
         working-directory: test
         run: npm run acmamap
 
+      # 🪪 Radio Licensing (kb-licensing.js) and the licensing documents kept
+      # in docs/acma/ (licence-docs.js): every quotation the app shows is on
+      # the page it names in the saved copy, word for word; the glossary's
+      # words and the words each is built from; then the tab — the 30 km
+      # question with a station moved in and out of the circle, the gauge
+      # checker's arithmetic, the transmitter label, the six-question helper,
+      # the reader opening a document at the sentence, and the Bureau's
+      # licences counted from the register copy.
+      - name: Radio Licensing — the rules, quoted from their documents
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run licensing
+
       # The Message Log's Base station filter (message-log.js): bases by name
       # from the receivers' own list, the Path column saying the name, the
       # question asked of the datastore, and nothing of it without the list.

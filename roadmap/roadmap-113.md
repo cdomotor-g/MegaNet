@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-10** (revision 251 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-10** (revision 252 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -444,7 +444,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## Standalone issues
 - **#285** `[Standalone]` `[Haiku4.5/Low]` — **OPEN, opened revision 250** — regenerate the private repository's derived benchmarks file now that the reader (`tools/ingest/benchmarks.py`) drops a private person's name from one comment (`0110` already took it out of the live table). Needs a session with `cdomotor-g/flood-net-private` attached; the raw report there is the owner's call. Depends on nothing.
-- **#284** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 250** — a licensing-state column and filter on the Stations list, and the same columns in the station exports, read from `MapAcma.stateOf`. Touches the Stations list and `export.js`; independent of #283.
+- **#284** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 250** — a licensing-state column and filter on the Stations list, and the same columns in the station exports, read from `MapAcma.stateOf`. Touches the Stations list and `export.js`; independent of #283. *Since revision 252 there are four states for a transmitter, not three — Beyond a licence's area is new — and `stateOf` also says whether the station is a repeater and which repeater it reports through.*
 - **#283** `[Standalone]` `[Sonnet5/High]` — **OPEN, opened revision 250** — 📜 ACMA licences draws land mobile, scientific and area-wide licences too (today only fixed ones: point to multipoint and point to point). Extends `tools/acma_station_licences.py` and `map-acma.js`; do before or after #284, not at once with another `map-acma.js` change.
 - **#282** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 249** — the Admin tab's *Behind the scenes* (`0109`) gains what the database cannot see: the Supabase API gateway's errors by hour, Supabase's security and speed advice, and Cloudflare's Workers and R2 buckets. An hourly workflow reads them with GETs only and writes one row a source into a new `meganet.ops_external` (service role only); `admin_ops()` returns it; tiles for API server errors and new security warnings feed the Health tile. **Waits on #281.** Each source stands alone, so with only the Cloudflare key it still ships that part; with no Supabase key the advice comes from Supabase's open-source checks run in the database.
 - **#281** `[Standalone]` `[Human]` `[Computer]` — **OPEN, opened revision 249** — the owner makes a read-only Cloudflare API token (Workers Scripts and R2 Storage, Read) and, if they choose, a Supabase access token, and saves them as GitHub secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `SUPABASE_ACCESS_TOKEN`. Click-by-click on the issue, with the choice to skip the Supabase one (it cannot be limited to reading). About 15 minutes, sign-in only. **Unblocks:** #282.
@@ -875,6 +875,17 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 252 — 2026-11-10: 🪪 Radio Licensing in the Knowledge base, the licensing documents kept, 📜 ACMA licences' fourth state
+
+The owner supplied RALI FX16, RALI FX19 and the Fixed Licence determination as PDFs and asked what they change, for a plain-words lesson, and for the 30 km question to be settled. Opens and closes nothing.
+
+- **The 30 km question, from the documents read in full.** Not in the Act or the Fixed Licence determination (its explanatory statement: unlisted transmitters "can be located anywhere") and not on the Bureau's licences; it is RALI FX16's service area, put as "All stations must be contained within the service area". A gauge beyond it is outside what its licence was planned for — unprotected, bound not to interfere — not unlicensed. A repeater that carries the signal further needs its own licence (s 14(4); FX16 s 4.3). This settles revision 250's "still to confirm" for FX16; RALI LM08 and MS42 are still unread (ACMA's site refuses automated visits).
+- **🪪 Radio Licensing** (`kb-licensing.js`, `kb-licensing-draw.js`, `licensing-words.js`; tab 61, the Knowledge base's sixth): who needs a licence, one base and many gauges, the 30 km question with a station to slide, a gauge's limits with a checker, a base's and a repeater's, the transmitter label, receivers, EIRP and decibels word by word, antennas with their patterns, a six-question helper, the Bureau's licences counted, ACMA's pages and a draft question to send.
+- **The documents** (`docs/acma/`, `licence-docs.js`, `tools/acma_docs.py`): the three PDFs, the determination as in force (Compilation No. 2 — amended twice since it was made, not in the sections that matter here) and its explanatory statement, as they stood on 10 November 2026; a reader that opens one at the quoted sentence.
+- **📜 ACMA licences** (`map-acma.js`): a fourth state, **Beyond a licence's area** — 203 gauges that report through a repeater standing at a licensed base, out of the 612 that were "none found" (409 remain); a repeater inside another base's circle told it is covered only as a fill-in (37); *Assumed reach* renamed *Service area*; a remote station's power worked out at the antenna and as EIRP; the label a transmitter over 2 W EIRP at a shared site must carry (Radiocommunications (Labelling) Determination 2023), with each transmitter's frequency assignment number now in the register copy.
+- **Checks added:** `licensing` (53: every quotation on its page, word for word; then the tab). `acmamap` extended to the fourth state, the label and the way to the lesson (68).
+- **Waits on the owner:** sending ACMA the drafted question (the lesson, *ACMA's pages*) — recorded on the Atlas as `acma-30km-confirmation`.
 
 ### Revision 251 — 2026-11-10: Base Stations — Steady signals and What comes in through each — 0111
 

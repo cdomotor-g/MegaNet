@@ -25,6 +25,25 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 257, date: '2026-11-10', items: [
+      '🪪 <strong>Radio Licensing, a new lesson in the Knowledge base.</strong> What the network\'s transmitters and receivers need by '
+        + 'way of an ACMA licence, in plain words: who needs one, how one licence covers a base and the gauges round it, the limits on a '
+        + 'gauge\'s power and timing with a checker, EIRP and decibels taken apart word by word, the antennas with their patterns, and a '
+        + 'six-question helper for any one station. Every rule has a 📖 link that opens its document at the sentence.',
+      '⭕ <strong>The 30 km question, answered from the documents.</strong> 30 km is not in the law and not on the Bureau\'s licences. '
+        + 'It is the service area ACMA plans a licence on. A gauge beyond it is unprotected and must not interfere, but is not unlicensed for '
+        + 'that reason alone; a repeater that carries the signal further needs its own licence. The lesson has a station to slide in and '
+        + 'out of the circle, and a question to send ACMA to have it confirmed.',
+      '📜 <strong>ACMA licences, on the Stations map, has a fourth state.</strong> A gauge outside every circle that reports through a '
+        + 'repeater standing at a licensed base is now <em>Beyond a licence\'s area</em>, not <em>None found</em> — about 200 stations. '
+        + 'A repeater inside another base\'s circle with no licence at its own site is told a circle covers it only as a fill-in. '
+        + '<em>Assumed reach</em> is now <em>Service area</em>, and the guide quotes the rules it rests on.',
+      '🏷️ <strong>The label a transmitter must carry.</strong> A licensed transmitter of more than 2 W EIRP at a shared site must carry a '
+        + 'label with its frequency assignment number and “Do Not Remove”. A station\'s card and a picked licence now show that number, '
+        + 'and the lesson says when the rule applies.',
+      '📚 <strong>The documents are kept with Flood-Net.</strong> RALI FX16, RALI FX19 and the Fixed Licence determination — as first '
+        + 'made and as in force now — can be read inside the lesson, opened as saved PDFs, or followed to their current versions.',
+    ] },
     { n: 256, date: '2026-11-10', items: [
       '📻 <strong>Heard by, on Field Data.</strong> Type a receiver (a base station\'s radio computer, such as '
         + '<em>rpi-83071968</em>) in the new <em>Heard by</em> box under Resolution and Load readings draws only what that '

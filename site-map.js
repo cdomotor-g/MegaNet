@@ -123,6 +123,16 @@ const SiteMap = (function () {
         'Check a 4–20 mA loop has the voltage to drive the sensor',
       ],
     },
+    licensing: {
+      what: 'What the network\'s transmitters and receivers need by way of an ACMA radio licence, in plain words — who needs one, how one licence covers a base and its gauges, the 30 km question, the limits on power and timing, and antennas and EIRP taken apart — with every rule opened in its own document.',
+      use: [
+        'Find out whether a station needs a licence of its own, six questions at most',
+        'Settle what 30 km means: the law, the licence and ACMA\'s plan side by side',
+        'Check a gauge\'s radio, cable and antenna against the limits for a remote station',
+        'Learn what EIRP, dBi and isotropic mean, and what each antenna\'s pattern looks like',
+        'See whether a transmitter must carry a label, and what goes on it',
+      ],
+    },
     a2firmware: {
       what: 'An ERT-A2 on the bench, simulated from real units\' logs: demos of its firmware upgrade and of settings changed from its menus, and its console to explore yourself.',
       use: [
@@ -590,6 +600,8 @@ const SiteMap = (function () {
     { text: 'Learn why bits go wrong, and how to tell the causes apart', tab: 'biterrors' },
     { text: 'Make sense of an SWR meter\'s readings',      tab: 'swr' },
     { text: 'Look up which pin is which on a connector',   tab: 'pinouts' },
+    { text: 'Work out whether a station needs its own radio licence', tab: 'licensing' },
+    { text: 'Learn what EIRP and antenna gain mean',       tab: 'licensing' },
     { text: 'Upgrade an ERT-A2\'s firmware',               tab: 'a2firmware' },
     { text: 'Try out an ERT-A2\'s menus',                   tab: 'a2firmware' },
     { text: 'Practise reading a levelling staff',          tab: 'kbstaff' },

@@ -248,6 +248,10 @@ def build(zip_path, stations_path):
                 rnd(num(d.get("HEIGHT")), 1), rnd(num(d.get("AZIMUTH")), 1),
                 (d.get("AUTHORISATION_DATE") or "").strip()[:10],
                 (d.get("EFL_ID") or "").strip(), (d.get("RELATED_EFL_ID") or "").strip(),
+                # The licence document's "Freq. assign. ID": the number the
+                # Radiocommunications (Labelling) Determination 2023 asks for
+                # on the label of a transmitter over 2 W EIRP at a shared site.
+                (d.get("EFL_FREQ_IDENT") or "").strip(),
             ])
         licences.append([
             number, (lic.get("STATUS_TEXT") or "").strip(), (lic.get("LICENCE_CATEGORY_NAME") or "").strip(),
@@ -276,7 +280,7 @@ def build(zip_path, stations_path):
                 "sites": ["id", "name", "lat", "lon", "state", "precision", "elevation_m"],
                 "licences": ["number", "status", "category", "issued", "expiry", "holder", "callsign", "conditions"],
                 "devices": ["licence", "site", "tr", "f_mhz", "bw_khz", "emission", "tx_w", "eirp_w", "antenna_m",
-                            "azimuth", "authorised", "efl_id", "related_efl_id"],
+                            "azimuth", "authorised", "efl_id", "related_efl_id", "freq_assign_id"],
             },
             "counts": {"holders": len(holders), "sites": len(site_rows), "licences": len(licences), "devices": len(devices),
                        "conditions": len(cond_text)},

@@ -4033,7 +4033,7 @@ function renderMain() {
   // 📟 The SWR Meter works on made-up stations and readings typed in, and
   // 💾 A2 Firmware on a made-up unit and versions pasted in. 🎬 Videos are
   // about the app; with no list a video's counts fall back to its own.
-  const noDataTabs = ['sitemap', 'capabilities', 'videos', 'offline', 'views', 'bitbench', 'biterrors', 'swr', 'pinouts', 'a2firmware', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'camera', 'levels', 'twopeg', 'surveyguide', 'kbstaff', 'kblogbook', 'kblifecycle', 'kblevel', 'kbriver', 'admin', 'basestations', 'tdma'];
+  const noDataTabs = ['sitemap', 'capabilities', 'videos', 'offline', 'views', 'bitbench', 'biterrors', 'swr', 'pinouts', 'a2firmware', 'licensing', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'camera', 'levels', 'twopeg', 'surveyguide', 'kbstaff', 'kblogbook', 'kblifecycle', 'kblevel', 'kbriver', 'admin', 'basestations', 'tdma'];
   // The Stations cards may be in the side panel rather than in here, and the
   // innerHTML below does not reach them there. Out first, whatever is about to
   // be drawn: a render of the Stations tab emits a fresh copy of every card,
@@ -4118,6 +4118,7 @@ function renderMain() {
     case 'swr':        el.innerHTML = SwrMeter.render();    SwrMeter.init();    break;
     case 'pinouts':    el.innerHTML = Pinouts.render();     Pinouts.init();     break;
     case 'a2firmware': el.innerHTML = A2Firmware.render();  A2Firmware.init();  break;
+    case 'licensing':  el.innerHTML = KbLicensing.render(); KbLicensing.init(); break;
     default:           el.innerHTML = '<p class="table-empty">Unknown tab</p>';
   }
   updateChromeHeight();     // three tabs size their own scrollers off it

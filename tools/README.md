@@ -571,6 +571,29 @@ python3 tools/acma_station_licences.py --zip spectra_rrl.zip
 
 Standard library only. About 20 seconds over the zip. It writes nothing if it
 keeps no licences, so a change in the register's layout cannot empty the file.
+Each device row ends with its frequency assignment number (`EFL_FREQ_IDENT`,
+"Freq. assign. ID" on the licence document): the number a transmitter's label
+must show at a shared site.
+
+## `acma_docs.py` — the words of the licensing documents, page by page
+
+The PDFs kept in `docs/acma/` — RALI FX16, RALI FX19, the Fixed Licence
+determination as made and as in force, and its explanatory statement — turned
+into `docs/acma/text/<id>.json`, one string a page with the running header and
+footer taken off. It is what the app's document reader shows when a 📖 link is
+pressed in the Knowledge base's **🪪 Radio Licensing** tab or the ACMA licences
+guide (`licence-docs.js`), and what `npm run licensing` holds every quotation
+in the app to. `docs/acma/README.md` says where each document came from and
+how to replace one.
+
+```bash
+python3 tools/acma_docs.py            # rebuild every text file
+python3 tools/acma_docs.py --check    # exit 1 if one is stale
+```
+
+Needs poppler's `pdftotext` and `pdfinfo` (`poppler-utils`); standard library
+otherwise. `docs/acma/text/law.json` — the short extracts of the Act — is
+written by hand and left alone.
 
 ## `mobile_sectors.py` — every mobile base station sector, for the coverage estimate
 

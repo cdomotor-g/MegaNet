@@ -298,6 +298,15 @@ MegaNet/
 ├── a2-firmware.js          ← A2Firmware — the 💾 ERT-A2 Simulator tab: demos of the firmware
 │                             upgrade and of settings, the console to explore, the version
 │                             checker, every step written out
+├── licence-docs.js         ← LicenceDocs — the licensing documents kept in docs/acma/, the
+│                             passages the app quotes from them, and the reader that opens
+│                             one at its sentence
+├── licensing-words.js      ← LicensingWords — the words of radio licensing in plain words,
+│                             each with the words it is built from
+├── kb-licensing-draw.js    ← LicensingDraw — the 🪪 Radio Licensing tab's drawings: the
+│                             scene, the 30 km explorer, antenna patterns, the power ladder
+├── kb-licensing.js         ← KbLicensing — the 🪪 Radio Licensing tab: who needs a licence,
+│                             the 30 km question, a gauge's and a base's limits, antennas
 ├── owner-logos.js          ← OwnerLogos — each station owner's logo beside its name
 │                             on the station card and in the editor (the marks in assets/owners/)
 ├── health-bulletin.js      ← HealthBulletin — 📺 Network Bulletin at the top of Station
@@ -6008,7 +6017,7 @@ tabs on a phone-sized page, a real OCR read included, and
 ### 29. Knowledge base and Field training (Lessons, and Mallee HydroTech's Training Tools)
 
 Two groups hold lessons rather than tools. **📚 Knowledge base** is Flood-Net's
-own: 🎓 Radio Propagation, ⚡ Bit Errors (§34), 📟 the SWR Meter (§35), 🪛 Pinouts and 💾 the ERT-A2 Simulator (§38). **Field training**, straight
+own: 🎓 Radio Propagation, ⚡ Bit Errors (§34), 📟 the SWR Meter (§35), 🪛 Pinouts, 💾 the ERT-A2 Simulator (§38) and 🪪 Radio Licensing (§41). **Field training**, straight
 after Surveying, holds five lessons adapted
 with permission from [Mallee HydroTech](https://malleehydrotech.com.au/)'s open
 training tools (one group until Bit Errors made it seven, past the nav's six;
@@ -6497,6 +6506,42 @@ a scene at a time, each scene kept, so changing one scene's words spends that
 scene's ElevenLabs credits and no more (`tools/voice/speak.mjs`,
 `bulletin-voice.yml`). `npm run explainers` holds the tab, the validator and
 the voicing to all of it.
+
+### 41. Radio Licensing (What the Transmitters and Receivers Need, Rule by Rule)
+
+🪪 **Radio Licensing**, under **📚 Knowledge base**, says in plain words what this
+network's radios need by way of an ACMA licence. It is a guide, not legal
+advice, and says so first.
+
+- **Who needs a licence** — anything that sends, nothing that only listens; the
+  three kinds of licence; what the Act allows a court to impose.
+- **One base, many gauges** — how a point-to-multipoint licence names one base
+  station and covers the unlisted gauges round it, role by role, beside a
+  point-to-point link.
+- **The 30 km question** — set out as what the law says (no distance), what the
+  licence says (usually none) and what ACMA's planning policy says (30 km,
+  "must be contained"), with a station to slide in and out of the circle. A
+  gauge beyond it is outside what its licence was planned for, not unlicensed;
+  a repeater that carries the signal further needs its own licence.
+- **A gauge's limits** — 1 W into the antenna, bursts of 2 seconds, 10 seconds
+  apart, 1 in 30 of the time — with a checker for a radio, a cable and an
+  antenna, a picture of the power on its way out and a minute of bursts.
+- **A base's and a repeater's** — ACMA's two service models, a licence document
+  read line by line, the label a transmitter at a shared site must carry, and
+  the emission code taken apart.
+- **Receivers**, **EIRP and decibels** one word at a time, the **antennas** with
+  their patterns, a six-question helper for one station, the Bureau's licences
+  counted from the register copy, ACMA's own pages and a question to send.
+
+Every rule carries a 📖 link that opens its document at the sentence, marked.
+The documents — RALI FX16, RALI FX19, the Fixed Licence determination as made
+and as in force, and its explanatory statement — are kept in `docs/acma/` as
+they stood on the day the lesson was written, each with a link to its current
+version; `docs/acma/README.md` says where they came from. `npm run licensing`
+fails any quotation that is not on its page, word for word.
+
+The Stations map's **📜 ACMA licences** tool applies the same rules to the
+stations themselves (`docs/acma-licences.md`).
 
 ## Deployment Plan
 

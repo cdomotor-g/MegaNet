@@ -410,6 +410,19 @@ const TABS = [
     // palette.mjs's probes hold for other tabs.
     { id: 'a2firmware', label: 'ERT-A2 Simulator',       icon: '💾',
       find: 'firmware upgrade update upgrading updating flash flashing reflash ert-a2 erta2 a2 host bootloader boot loader radio application function image fi fi6015 fi2044 v23 wrap bin release g rel g 10366 9967 10848 reset button test button d1 d2 d3 d4 progress leds stick thumb drive flash drive fat32 format tera term teraterm putty hyperterminal realterm terminal menu unit diagnostic update device firmware show firmware version version versions repeater tx lockup simulator emulator console menus unit config communication i/o setup station address login engineer technician tx frequency tx power report format unit type accumulators settings configuration interactive demo' },
+    // 🪪 Radio Licensing (licence-docs.js, licensing-words.js,
+    // kb-licensing-draw.js, kb-licensing.js): what the network's transmitters
+    // and receivers need by way of an ACMA licence — who needs one, how a
+    // point-to-multipoint licence works, the 30 km question, a gauge's and a
+    // base's limits, EIRP and antennas taken apart, the label on a
+    // transmitter — every rule quoted from its document and opened there. The
+    // sixth and last tab this group has room for (nav.mjs's ceiling). Its
+    // find words are the rules, the units and the antennas by name — never
+    // "council", "guide", "install", "signal", "network", "pdf", "port",
+    // "the", "what", "does", "each" or "do", which nav.mjs's and
+    // palette.mjs's probes hold for other tabs.
+    { id: 'licensing',  label: 'Radio Licensing',        icon: '🪪',
+      find: 'licence license licensing licences licensed unlicensed acma apparatus class spectrum point to multipoint pmp point to point ptp fixed base master remote supplementary fill-in service area 30 km thirty kilometres radius planning rali fx16 fx19 determination act legislation law legal rule rules condition conditions penalty offence eirp erp isotropic dbi dbd dbm decibel decibels watt watts power limit duty cycle burst antenna antennas yagi collinear dipole whip omni omnidirectional directional gain beamwidth front to back polarisation receiver receive listen label labelling communal frequency assignment emission designator register rrl accredited transmitter transmitters' },
   ] },
   // Last, so it sits at the foot of the nav: nobody's daily work, and the one
   // group whose tab the header's load buttons and the Export tab's Data source
@@ -803,6 +816,29 @@ const HELP = {
       'A device set to reduce motion starts every step still, on its telling moment; ▶ Play runs it.',
     ],
     related: ['pinouts', 'swr', 'inspections', 'serial'],
+  },
+  licensing: {
+    summary: 'What this network\'s transmitters and receivers need by way of a radio licence, in plain words. <strong>Who needs one</strong> '
+           + '(anything that sends; nothing that only listens), how a <strong>point-to-multipoint</strong> licence covers one named base and the '
+           + 'unlisted gauges round it, and the <strong>30 km question</strong> — set out as what the law says, what the licence says and what '
+           + 'ACMA\'s planning policy says, with a station you can slide in and out of the circle. A <strong>checker</strong> holds a gauge\'s '
+           + 'radio, cable, antenna and timing to the six limits for a remote station. Further down: a base\'s and a repeater\'s limits, a licence '
+           + 'document read line by line, the <strong>label</strong> a transmitter at a shared site must carry, receivers, <strong>EIRP</strong> '
+           + 'and decibels taken apart word by word, the antennas with their patterns, a six-question helper for one station, the Bureau\'s '
+           + 'licences counted, ACMA\'s own pages and a question to send. Every rule has a 📖 link that opens its document at the sentence.',
+    watch: [
+      '<strong>A guide, not legal advice.</strong> It was written from copies of the documents saved on one day. Rules change and a licence can carry its own conditions: read the licence document and ask ACMA before acting.',
+      '<strong>30 km is ACMA\'s planning circle, not a distance in the law.</strong> A gauge beyond it is outside what its licence was planned for — unprotected, and it must not interfere — but it is not unlicensed for that reason alone. A repeater that carries the signal further is different and needs its own licence.',
+      'Each rule is marked <strong>The law</strong> or <strong>ACMA policy</strong>. The law binds; a RALI decides what licence is issued and what is protected.',
+      'The 📖 reader shows a saved copy as plain words with the quoted sentence marked. Its two links open the saved PDF at that page and the version in force now.',
+      'The checker takes the figures you type; it does not know a station\'s real radio. The antenna patterns are drawn from published figures, not measured.',
+      'Hover a dotted word for its meaning; <em>What the words on this page mean</em> at the foot lists them all, each with the words it is built from.',
+    ],
+    related: ['stations', 'propagation', 'swr'],
+    links: [
+      { label: 'ACMA licences — what the stations\' own transmitters run under', href: 'docs/acma-licences.md' },
+      { label: 'The licensing documents kept with Flood-Net', href: 'docs/acma/README.md' },
+    ],
   },
   stations: {
     summary: 'The map fills the page, and its cards sit beside it in the <strong>side panel</strong> '

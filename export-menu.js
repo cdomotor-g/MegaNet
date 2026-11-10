@@ -206,6 +206,11 @@ const ExportMenu = (function () {
         call: ['Pinouts.exportCsv', 'one'] },
       { label: 'Every connector — CSV', sub: 'the whole library, a row a pin, to print or keep with the field kit', call: ['Pinouts.exportCsv', 'all'] },
     ],
+    licensing: () => [
+      { label: 'The gauge check, in words — TXT', sub: 'the radio, cable, antenna and timing in the checker, each limit it was held to and where that limit is written',
+        call: ['KbLicensing.exportTxt', 'check'] },
+      { label: 'The question for ACMA — TXT', sub: 'the draft email asking ACMA to confirm what a remote station beyond 30 km may do', call: ['KbLicensing.exportTxt', 'ask'] },
+    ],
     a2firmware: () => [
       { label: 'These steps, as a checklist — TXT', sub: 'the walkthrough picked, a step a line with a box to tick, and the versions pasted into the checker — to print or take to the site',
         call: ['A2Firmware.exportTxt'] },
