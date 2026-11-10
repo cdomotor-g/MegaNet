@@ -240,6 +240,20 @@ async function main() {
     const copied = await page.evaluate(async () => ({ clip: await navigator.clipboard.readText(), here: location.href }));
     check('"Copy a link to where you are" copies the address', copied.clip === copied.here, J(copied));
 
+    // ACMA licences (map-acma.js): found by licence number and by holder, and
+    // picking one opens 📜 ACMA licences on the Stations map at that licence.
+    await openWithChord(page);
+    const licNo = await page.evaluate(async () => { await MapAcma.ready(); return MapAcma.find('bureau', 1)[0].no; });
+    let A = await type(page, licNo.split('/')[0]);
+    check('a licence number finds the licence, under Licences', A.labels.includes(`ACMA licence ${licNo}`), J(A.labels));
+    A = await type(page, 'seqwater');
+    check('…and a holder\'s name finds its licences', A.labels.filter(l => /^ACMA licence /.test(l)).length > 0, J(A.labels));
+    A = await type(page, licNo.split('/')[0]);
+    await page.evaluate(no => { const i = [...document.querySelectorAll('#pal-list .pal-opt')].findIndex(o => o.querySelector('.pal-label').textContent === `ACMA licence ${no}`); Palette.pick(i); }, licNo);
+    await page.waitForFunction(no => MapAcma.summary().picked && MapAcma.summary().picked.id === no, licNo, { timeout: 10_000 }).catch(() => {});
+    const wentLic = await page.evaluate(() => ({ tab: state.activeTab, picked: MapAcma.summary().picked }));
+    check('picking it opens the Stations map\'s ACMA licences tool on that licence', wentLic.tab === "stations" && wentLic.picked && wentLic.picked.id === licNo, J(wentLic));
+
     check('nothing threw for the whole run', errors.length === 0, errors.slice(0, 3).join(' | '));
     await context.close();
   } finally {

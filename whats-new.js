@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 254, date: '2026-11-10', items: [
+      '🔎 <strong>ACMA licences in the search box.</strong> Press Ctrl K (or click the search box) and type a licence '
+        + 'number, a holder such as Seqwater or a council, a site, or a frequency such as 151.5: matching licences are '
+        + 'listed under <em>Licences</em>, and picking one opens 📜 ACMA licences on the Stations map at that licence.',
+    ] },
     { n: 253, date: '2026-11-10', items: [
       '📜 <strong>ACMA licences says it plainer.</strong> The circle round a point-to-multipoint base is now called its '
         + '<em>assumed reach</em>: the distance ACMA assumes the base\'s stations are within when it hands out the channel '

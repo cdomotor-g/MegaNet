@@ -1414,6 +1414,31 @@ const MapAcma = (() => {
 
     unpick() { picked = null; after(); },
 
+    // For the banner's search box (palette.js): the licences a text names — a
+    // licence number, a holder, a site or a frequency such as 151.5 — best
+    // first, or null while the register copy is still on its way (ready()
+    // says when). Digits alone are a licence number or a holder's client
+    // number and nothing else, so a station number does not drag in every
+    // licence whose site id happens to contain it.
+    ready() { return ensure(); },
+    find(text, cap) {
+      if (!D) return null;
+      const q = String(text || '').trim().toLowerCase();
+      if (q.length < 3) return [];
+      const num = /^\d+(\.\d+)?$/.test(q) ? Number(q) : null;
+      const isFreq = num != null && q.includes('.');
+      const digits = /^[\d/]+$/.test(q);
+      const found = D.lics.filter(l => (isFreq ? l.f.some(f => Math.abs(f - num) < 0.0005 || mhz(f).startsWith(q))
+        : digits ? l.no.startsWith(q) || (l.holder && l.holder.no === q)
+        : l.search.includes(q)));
+      found.sort((a, b) => (a.no.startsWith(q) ? 0 : 1) - (b.no.startsWith(q) ? 0 : 1)
+        || (standing(a) === 'lapsed' ? 1 : 0) - (standing(b) === 'lapsed' ? 1 : 0));
+      return found.slice(0, cap || 5).map(l => ({ no: l.no, total: found.length,
+        sub: [holderName(l), l.kind === 'pmp' ? 'point to multipoint' : 'point to point', freqText(l),
+          (l.txSites[0] || l.sites[0] || { name: '' }).name,
+          standing(l) === 'lapsed' ? 'not in force' : standing(l) === 'soon' ? `expires ${dateText(l.expiry)}` : ''].filter(Boolean).join(' · ') }));
+    },
+
     // From a station's card: the tool open on that station, the licences on.
     showFor(id) {
       openPanel();

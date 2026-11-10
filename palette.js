@@ -234,6 +234,31 @@ const Palette = (() => {
     Places.goMark(m);
   }
 
+  // ── ACMA licences ────────────────────────────────────────────────────────────
+  // The radio licences 📜 ACMA licences holds (map-acma.js): by licence
+  // number, holder, site or frequency. Its register copy is fetched the first
+  // time something is typed that could name one, and the list is drawn again
+  // when it lands. Picking one opens the tool on the Stations map at that
+  // licence.
+  let licAsked = false;
+  function licenceItems(raw) {
+    const q = raw.trim();
+    if (q.length < 3 || typeof MapAcma === 'undefined' || !MapAcma.find) return [];
+    const found = MapAcma.find(q, 5);
+    if (found === null) {
+      if (!licAsked) {
+        licAsked = true;
+        MapAcma.ready().then(() => { if (document.getElementById('pal-q')) refresh(); }, () => { /* no copy: no licences offered */ });
+      }
+      return [];
+    }
+    return found.map(l => ({ kind: 'licence', icon: '📜', label: `ACMA licence ${l.no}`, sub: l.sub,
+      run: () => {
+        if (state.activeTab !== 'stations') switchTab('stations');
+        MapAcma.showLicence(l.no);
+      } }));
+  }
+
   // ── Places ────────────────────────────────────────────────────────────────
 
   function placeItems(raw) {
@@ -356,6 +381,7 @@ const Palette = (() => {
     { key: 'station', title: 'Stations' },
     { key: 'tab',     title: 'Tabs' },
     { key: 'action',  title: 'Actions' },
+    { key: 'licence', title: 'Licences' },
     { key: 'suggest', title: 'Did you mean?' },
     { key: 'mark',    title: 'Survey marks' },
     { key: 'place',   title: 'Places' },
@@ -374,6 +400,7 @@ const Palette = (() => {
       ...st.list,
       ...answers.filter(i => i.kind === 'tab'),
       ...answers.filter(i => i.kind === 'action'),
+      ...licenceItems(raw),
       ...(st.near || []),
       ...markItems(raw),
       ...placeItems(raw),
@@ -401,7 +428,7 @@ const Palette = (() => {
     const none = !matches().length && !marks.loading
       ? `<p class="pal-none small">${!query.trim() ? 'Nothing to offer yet.'
         : near ? `Nothing matches <strong>${esc(query.trim())}</strong> as it is spelt — these stations sound like it.`
-        : `Nothing matches <strong>${esc(query.trim())}</strong>. A station's name, number or ALERT address; a survey mark's number with PSM or BM in front; a coordinate; or a tab or an action.`}</p>`
+        : `Nothing matches <strong>${esc(query.trim())}</strong>. A station's name, number or ALERT address; an ACMA licence number, holder or frequency; a survey mark's number with PSM or BM in front; a coordinate; or a tab or an action.`}</p>`
       : '';
     // Where the survey-mark lookup has got to, under the list: not an option,
     // so not counted and never what Enter opens. A failure is only worth a
