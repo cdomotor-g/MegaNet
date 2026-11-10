@@ -148,6 +148,8 @@ const row = (o) => Object.assign({
 const { config: _c, access: _a, ...LIST_STATUS } = STATUS;
 const db = {
   keysHash: 'h1',
+  mail: { on: true, after_min: 30, ready: true, people: 2,
+    recent: [{ id: 12, label: 'Ross River hut', down_told_at: ago(9 * 3600), up_told_at: ago(3600), cleared_at: ago(3700) }] },
   stations: [
     row({ id: 11, label: 'Mt Stuart base', host_station_id: '533000', host_station: 'Mt Stuart', status: LIST_STATUS, beat: BEAT,
       access: { available: true, meganet_keys: true, keys: 2, ssh: true }, state: 'online',
@@ -288,6 +290,13 @@ const FNS = {
     return { id: c.id, status: 'cancelled' };
   },
   admin_base_station_keys: () => ({ hash: db.keysHash, keys: db.keys }),
+  // 0113: whether the administrators are emailed about an offline base station.
+  admin_base_station_mail: () => Object.assign({}, db.mail),
+  admin_base_station_mail_set: a => {
+    if (a.p_on != null) db.mail.on = a.p_on;
+    if (a.p_after_min != null) db.mail.after_min = a.p_after_min;
+    return Object.assign({}, db.mail);
+  },
   admin_base_station_spectrum: a => {
     const bucket = a.p_hours * 10, nowS = dbNow() / 1000;
     let from = nowS - a.p_hours * 3600;
@@ -476,8 +485,21 @@ try {
         channels: [{ freq_hz: 151500000, in_band: true }, { freq_hz: 151537500, in_band: true }, { freq_hz: 151575000, in_band: false, why: 'spike' }] }),
       nowPlain: B._stickNowHtml({ sample_rate: 960000, window: { auto: true, needs: 960000 }, channels: [{ freq_hz: 151500000, in_band: true }, { freq_hz: 151575000, in_band: true }] }),
     };
+    // RPi ALERT 0.23: what the station does by itself when it loses touch — a
+    // setting where it has one, and its own account of the last times.
+    const r23 = JSON.parse(JSON.stringify(cfg));
+    r23.recover = { mode: 'full' };
+    const fr = B._formFrom(r23, rx);
+    const T0 = Date.parse('2026-11-10T12:18:00Z');
+    const recover = { shown: fr.recover, none: B._formFrom(cfg, rx).recover, same: B._patchFrom(r23, fr, rx),
+      net: B._patchFrom(r23, Object.assign({}, fr, { recover: 'network' }), rx), old: B._patchFrom(cfg, Object.assign({}, f, { recover: 'off' }), rx),
+      words: [B._recoverHtml({ status: { recovery: { mode: 'full' } } }), B._recoverHtml({ status: {} }), B._recoverHtml({ status: { recovery: { mode: 'off' } } })],
+      lost: B._lostHtml({ status: { recovery: { mode: 'full', outages: [
+        { began: T0, ended: T0 + 8.15 * 3600e3, kind: 'no-network', how: 'power', steps: [{ what: 'wifi-rejoin', ok: false, n: 48 }, { what: 'net-restart', ok: true }, { what: 'power', ok: true }] },
+        { began: T0 - 86400e3, ended: T0 - 86400e3 + 16 * 60e3, kind: 'dead-link', how: null, steps: [] }] } } }),
+      never: B._lostHtml({ status: { recovery: { mode: 'full', outages: [] } } }) };
     return {
-      decoder, watch, window20,
+      decoder, watch, window20, recover,
       serialShown: f4['s:' + stick1].gain, serialSame, serialRenamed,
       liveness: [
         B._liveness({ managed: true, mode: 'manage', idle_s: 60, last_seen_at: t(20) }).k,
@@ -515,6 +537,19 @@ try {
     pure.deaf.length === 1 && pure.deaf[0][0] === 'txt-bad' && pure.deaf[0][1] === 'Stick A has decoded nothing for 26 h', JSON.stringify(pure.deaf));
   ok('what needs a look: a refused token, power, heat, the clock, the queue, a receiver down — and not the GPS',
     pure.flags.join('|') === 'token refused|under-voltage now|77 °C|clock not set|600 readings waiting|1 receiver not receiving', pure.flags.join('|'));
+  ok('what it does when it loses touch is offered where the station has the setting, and sent only when changed',
+    pure.recover.shown === 'full' && pure.recover.none === '' && Object.keys(pure.recover.same.patch).length === 0
+      && JSON.stringify(pure.recover.net.patch) === '{"recover":{"mode":"network"}}' && Object.keys(pure.recover.old.patch).length === 0,
+    JSON.stringify(pure.recover));
+  ok('…said in words: what it does by itself, that older software does nothing, and off as a warning',
+    /gets back by itself: joins its network again, restarts its networking, and reboots after 45 minutes/.test(pure.recover.words[0])
+      && /does nothing by itself/.test(pure.recover.words[1]) && /RPi ALERT 0\.23 and later/.test(pure.recover.words[1])
+      && /txt-warn/.test(pure.recover.words[2]) && /turned off on it/.test(pure.recover.words[2]), pure.recover.words.join(' | '));
+  ok('…and the station\'s own account of the last time: how long, why, what brought it back, each thing it tried, and the times before folded away',
+    /for 8 h — it was on no network; back after somebody switched it off and on/.test(pure.recover.lost)
+      && /It joined its Wi-Fi again \(did not work, 48 times\), restarted its networking, switched off and on by somebody\./.test(pure.recover.lost)
+      && /<summary>1 more, as the station tells it<\/summary>/.test(pure.recover.lost) && /its network passed nothing; back by itself/.test(pure.recover.lost)
+      && pure.recover.never === '', pure.recover.lost);
   ok('the decoder is offered where the station has one, and sent only when changed',
     pure.decoder.shown === 'compare' && pure.decoder.none === '' && Object.keys(pure.decoder.same.patch).length === 0
       && JSON.stringify(pure.decoder.lean.patch) === '{"receivers":{"sdr":{"decoder":"lean"}}}' && Object.keys(pure.decoder.old.patch).length === 0,
@@ -943,6 +978,27 @@ try {
   fail = { fn: 'admin_base_station_command', status: 429, body: { code: 'PT429', message: '20 requests are already waiting for this base station — let it catch up' } };
   await page.click('#bs-detail [data-verb="status"]');
   await until(async () => /Not asked: 20 requests are already waiting/.test(await text('#bs-detail')), 'a request the database refuses says why');
+
+  // ── The emails about an offline base station (0113) ─────────────────────────
+  await until(async () => /the 2 administrators are emailed when a base station has not checked in for/.test(await text('#bs-mail')), 'the list says who is emailed when a base station goes offline');
+  ok('…after how long, and the last time it told them', await page.evaluate(() => document.getElementById('bs-mail-after').value === '30')
+    && /Last told: Ross River hut offline, 9 h ago — and back, 60 min ago\./.test(await text('#bs-mail')), await text('#bs-mail'));
+  await page.selectOption('#bs-mail-after', '60');
+  await until(() => sent('admin_base_station_mail_set').length === 1, 'another wait is sent');
+  ok('…as the wait alone', sent('admin_base_station_mail_set')[0].p_on === null && sent('admin_base_station_mail_set')[0].p_after_min === 60, JSON.stringify(sent('admin_base_station_mail_set')[0]));
+  await until(async () => /Saved: after 60 minutes\./.test(await text('#bs-mail')), '…and said');
+  await page.click('#bs-mail button:has-text("Turn these emails off")');
+  dialog = (await answer(page, false)).message;
+  await page.waitForTimeout(300);
+  ok('turning them off asks first, and "no" sends nothing', /Nobody will be emailed/.test(dialog) && sent('admin_base_station_mail_set').length === 1, dialog);
+  await page.click('#bs-mail button:has-text("Turn these emails off")');
+  await answer(page, true);
+  await until(() => sent('admin_base_station_mail_set').length === 2, '"yes" turns them off');
+  ok('…as the switch alone', sent('admin_base_station_mail_set')[1].p_on === false && sent('admin_base_station_mail_set')[1].p_after_min === null);
+  await until(async () => /Nobody is emailed when a base station goes offline\./.test(await text('#bs-mail')) && /Turn these emails on/.test(await text('#bs-mail')), '…and the tab says nobody is emailed, and offers to turn them on');
+  db.mail.ready = false; db.mail.on = true;
+  await page.evaluate(() => BaseStations.mailSet(true, null));
+  await until(async () => /No email can be sent yet — the mail key is not set/.test(await text('#bs-mail')), 'with no mail key it says no email can be sent yet');
 
   // ── Team keys ────────────────────────────────────────────────────────────────
   await page.fill('#bs-key-owner', 'Sam Field');

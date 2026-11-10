@@ -40,6 +40,9 @@ const BaseStations = (function () {
   // it refused — kept until the next ask, since the reload after it succeeds.
   let askErr = null;
   let keys = null, keysErr = null;
+  // Whether the administrators are emailed about an offline base station (0113),
+  // and what was last said; null until asked, false where the database has no 0113.
+  let mail = null, mailMsg = null;
   // The last key added or taken off: { text, cls }, for the same reason.
   let keyMsg = null;
   let note = '';
@@ -429,7 +432,69 @@ const BaseStations = (function () {
       ['Route', esc(m.endpoint ? (/floodwarning\.net/.test(m.endpoint) ? 'floodwarning.net' : 'the database directly') : '—')],
     ];
     if (m.error) rows.push(['Last problem', `<span class="txt-warn">${esc(m.error)}</span>`]);
+    rows.push(['If it loses touch', recoverHtml(s)]);
+    const lost = lostHtml(s);
+    if (lost) rows.push(['Last lost touch', lost]);
     return `<h3>Uplink</h3><dl class="adm-dl">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`;
+  }
+
+  // What the station does by itself when it cannot reach Flood-Net (RPi ALERT
+  // 0.23's keeper, its status' `recovery`), and the last times it had to: the
+  // station's own account, told at its first check-in afterwards.
+  const RECOVER = {
+    full: 'it gets back by itself: joins its network again, restarts its networking, and reboots after 45 minutes',
+    network: 'it reconnects and restarts its networking by itself, but is set never to reboot',
+    off: 'it does nothing by itself — that is turned off on it',
+  };
+  const RECOVER_MODES = [['full', 'Reconnect, restart its networking, and reboot as the last resort'],
+    ['network', 'Reconnect and restart its networking — never reboot'], ['off', 'Nothing — only keep what it hears']];
+  const RECOVER_HOW = { 'wifi-rejoin': 'after joining its Wi-Fi network again', 'net-reconnect': 'after renewing its network connection',
+    'net-restart': 'after restarting its networking', 'restart-agent': 'after restarting its own software', reboot: 'after rebooting itself',
+    power: 'after somebody switched it off and on', restart: 'after its software was restarted' };
+  const RECOVER_STEP = { 'wifi-rejoin': 'joined its Wi-Fi again', 'net-reconnect': 'renewed its connection', 'net-restart': 'restarted its networking',
+    'restart-agent': 'restarted its software', reboot: 'rebooted itself', power: 'switched off and on by somebody', restart: 'its software was restarted' };
+  const RECOVER_KIND = { 'no-network': 'it was on no network', 'dead-link': 'its network passed nothing', names: 'it could not look up Flood-Net\'s name',
+    agent: 'only its own software could not reach Flood-Net', 'far-end': 'Flood-Net was not answering' };
+
+  function recoverHtml(s) {
+    const r = (s.status || {}).recovery;
+    if (!r || !r.mode) return `<span class="txt-warn">it does nothing by itself</span> <span class="qs-dim">— RPi ALERT 0.23 and later get their own link back</span>`;
+    return (r.mode === 'off' ? '<span class="txt-warn">' + esc(RECOVER.off) + '</span>' : esc(RECOVER[r.mode] || r.mode));
+  }
+
+  function lostHtml(s) {
+    const o = (((s.status || {}).recovery || {}).outages || []).filter(x => x && isFinite(x.began) && isFinite(x.ended));
+    if (!o.length) return '';
+    const one = (x) => {
+      const steps = (x.steps || []).map(st => (RECOVER_STEP[st.what] || st.what) + (st.ok ? '' : ' (did not work' + (st.n > 1 ? ', ' + st.n + ' times' : '') + ')')).join(', ');
+      return `${esc(when(x.began))} for ${esc(span((x.ended - x.began) / 1000))}${x.kind ? ' — ' + esc(RECOVER_KIND[x.kind] || x.kind) : ''}; back ${esc(x.how ? (RECOVER_HOW[x.how] || x.how) : 'by itself')}`
+        + (steps ? `<div class="small qs-dim">It ${esc(steps)}.</div>` : '');
+    };
+    return one(o[0]) + (o.length > 1 ? `<details class="small"><summary>${o.length - 1} more, as the station tells it</summary>${o.slice(1).map(x => `<div>${one(x)}</div>`).join('')}</details>` : '');
+  }
+
+  // ── telling the administrators (0113) ────────────────────────────────────
+  // One switch for all of them, and how long a base station is unheard before
+  // a message goes. Who else should be told, and about what, is #216.
+  const MAIL_WAITS = [10, 15, 30, 60, 120];
+
+  function mailHtml() {
+    if (mail == null) return '';
+    if (mail === false) return `<p class="small qs-dim">Nobody is emailed when a base station goes offline: the database does not have that yet — apply db/migrations/0113_base_station_mail.sql.</p>`;
+    const last = (mail.recent || [])[0];
+    const waits = MAIL_WAITS.includes(mail.after_min) ? MAIL_WAITS : MAIL_WAITS.concat(mail.after_min).sort((a, b) => a - b);
+    const people = mail.people === 1 ? 'the one administrator is' : 'the ' + mail.people + ' administrators are';
+    return `<div class="bs-mail small" style="margin-top:.75rem">
+      <p>${!mail.on ? '<span class="txt-warn">Nobody is emailed when a base station goes offline.</span>'
+        : !mail.ready ? `<span class="txt-warn">No email can be sent yet</span> — the mail key is not set (<a href="${esc(docUrl('docs/accounts.md'))}" target="_blank" rel="noopener">how</a>). Once it is, ${esc(people)} emailed when a base station has not checked in for ${esc(mail.after_min)} minutes, and again when it is back.`
+        : `<strong>Emails:</strong> ${esc(people)} emailed when a base station has not checked in for
+          <label class="sr-only" for="bs-mail-after">Minutes without a check-in before the email</label>
+          <select id="bs-mail-after" style="width:auto;display:inline-block" onchange="BaseStations.mailSet(null, Number(this.value))">${waits.map(n => `<option value="${n}"${n === mail.after_min ? ' selected' : ''}>${n} minutes</option>`).join('')}</select>,
+          and again when it is back.`}
+        <button class="exp-btn-sm" onclick="BaseStations.mailSet(${mail.on ? 'false' : 'true'}, null)">${mail.on ? 'Turn these emails off' : 'Turn these emails on'}</button></p>
+      ${last ? `<p class="qs-dim">Last told: ${esc(last.label)} offline, ${esc(ago(last.down_told_at))}${last.up_told_at && last.cleared_at ? ' — and back, ' + esc(ago(last.up_told_at)) : last.cleared_at ? ' — back since' : ' — not back yet'}.</p>` : ''}
+      ${mailMsg ? `<p class="${esc(mailMsg.cls)}" role="status">${esc(mailMsg.text)}</p>` : ''}
+    </div>`;
   }
 
   // The station's last update run. One that found nothing to install says only
@@ -537,6 +602,8 @@ const BaseStations = (function () {
       rmin: sd.sampleRateMin === undefined ? null : String(sd.sampleRateMin || 0), rmax: sd.sampleRateMax === undefined ? null : String(sd.sampleRateMax || 0),
       audio: (cfg.audio || {}).enabled === false ? 'off' : ((cfg.audio || {}).mode || 'auto'), volume: String((cfg.audio || {}).volume ?? 80),
       kiosk: (cfg.kiosk || {}).mode || 'auto', tz: (cfg.system || {}).timezone || '',
+      // RPi ALERT 0.23 and later: what it does by itself when it loses touch.
+      recover: (cfg.recover || {}).mode || '',
     };
     const own = (cfg.receivers || {}).sdrDevices || [];
     for (const r of rx.filter(x => x.kind === 'sdr')) {
@@ -576,6 +643,7 @@ const BaseStations = (function () {
       if (f.name.trim() !== (cfg.name || '')) put('name', f.name.trim());
       if (f.enabled !== ((cfg.meganet || {}).enabled !== false)) put('meganet.enabled', f.enabled);
       if (f.receptions !== ((cfg.meganet || {}).receptions !== false)) put('meganet.receptions', f.receptions);
+      if ((cfg.recover || {}).mode && f.recover && f.recover !== cfg.recover.mode) put('recover.mode', f.recover);
       if (f.sdrOn !== (sd.enabled !== false)) put('receivers.sdr.enabled', f.sdrOn);
       // Every stick's channels: the first its own channel, the rest more
       // channels — each sent only if it changed (a first channel changed
@@ -684,6 +752,7 @@ const BaseStations = (function () {
         ${inp('name', 'Name of the base station', ' maxlength="80"')}
         ${chk('enabled', 'Send readings to Flood-Net')}
         ${chk('receptions', 'Send every frame heard (Reception Map)')}
+        ${f.recover ? sel('recover', 'When it loses touch with Flood-Net', RECOVER_MODES) : ''}
       </div>`)}
       ${fold('every', 'RTL-SDR — every stick', [f.sdrOn ? (f.freq || '—') + ' MHz' : 'RTL-SDR sticks off', winSum(f.rate, f.rmin, f.rmax), 'gain ' + f.gain + (f.gain === 'auto' ? '' : ' dB')].join(' · '), `<div class="bs-form">
         ${chk('sdrOn', 'Use RTL-SDR sticks')}
@@ -2284,6 +2353,7 @@ const BaseStations = (function () {
         <div id="bs-kpis">${list ? kpisHtml() : ''}</div>
         <div id="bs-msg">${msgHtml()}</div>
         <div id="bs-list">${list ? listHtml() : ''}</div>
+        <div id="bs-mail">${mailHtml()}</div>
       </div>
       <div id="bs-in"></div>
       <div id="bs-detail">${detailHtml()}</div>
@@ -2342,6 +2412,7 @@ const BaseStations = (function () {
     set('bs-kpis', list ? kpisHtml() : '');
     set('bs-msg', msgHtml());
     set('bs-list', list ? listHtml() : '');
+    set('bs-mail', mailHtml());
     paintIn();
     paintWf();
     paintSt();
@@ -2432,6 +2503,27 @@ const BaseStations = (function () {
     if (el && state.activeTab === 'basestations') keepFocus(el, () => { el.innerHTML = keysHtml(); });
   }
 
+  // The emails' switch (0113). A database without it: said, not an error.
+  async function loadMail() {
+    if (!isAdmin()) return;
+    try { mail = await dbRpc('admin_base_station_mail', {}); }
+    catch (err) { if (err.status === 404) mail = false; }
+    const el = document.getElementById('bs-mail');
+    if (el && state.activeTab === 'basestations') keepFocus(el, () => { el.innerHTML = mailHtml(); });
+  }
+
+  async function mailSet(on, afterMin) {
+    if (on === false && !(await confirmDialog({ title: 'Stop emailing the administrators?',
+      message: 'Nobody will be emailed when a base station goes offline, or when it is back. Every one is still listed here, and each station still tries to get its own link back.',
+      confirm: 'Turn the emails off', danger: true }))) return;
+    try {
+      mail = await dbRpc('admin_base_station_mail_set', { p_on: on, p_after_min: afterMin });
+      mailMsg = { text: on === false ? 'Off: nobody is emailed.' : on === true ? 'On.' : 'Saved: after ' + mail.after_min + ' minutes.', cls: 'txt-ok' };
+    } catch (err) { mailMsg = { text: 'Not changed: ' + err.message, cls: 'txt-bad' }; }
+    const el = document.getElementById('bs-mail');
+    if (el && state.activeTab === 'basestations') keepFocus(el, () => { el.innerHTML = mailHtml(); });
+  }
+
   // GitHub's latest release, when the last answer is old enough (see `latest`).
   async function loadLatest() {
     if (!isAdmin() || Date.now() - latestAt < (latest && latest.version ? LATEST_MS : LATEST_RETRY_MS)) return;
@@ -2460,6 +2552,7 @@ const BaseStations = (function () {
     stop();
     load();
     loadKeys();
+    loadMail();
     loadLatest();
     loadIn();
     timers.ing = setInterval(() => { if (!document.hidden && state.activeTab === 'basestations') loadIn(); }, IN_MS);
@@ -2611,16 +2704,16 @@ const BaseStations = (function () {
 
   // A sign-in or sign-out: everything held was the last session's.
   function authChanged() {
-    list = null; error = null; detail = null; openId = null; askErr = null; keys = null; keysErr = null; keyMsg = null; form = null; formNote = null; logShown = null; note = '';
+    list = null; error = null; detail = null; openId = null; askErr = null; keys = null; keysErr = null; keyMsg = null; mail = null; mailMsg = null; form = null; formNote = null; logShown = null; note = '';
     wf = null; wfImg = null; wfHoverAt = null; ch = null; chAcma = null; st = null; ing = null;
     stop();
     if (state.activeTab === 'basestations') { repaint(); init(); }
   }
 
   return { render, init, load, open, close, ask, askFrom, cancel, field, stick, resetForm, saveSettings,
-           keyField, addKey, removeKey, authChanged, wfWindow, chWindow, stWindow, stSave, inWindow, inSave, inGroup, inFor, inAll, inBreakSave, sub, fold,
+           keyField, addKey, removeKey, mailSet, authChanged, wfWindow, chWindow, stWindow, stSave, inWindow, inSave, inGroup, inFor, inAll, inBreakSave, sub, fold,
            // Pure, for test/basestations.mjs.
-           _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _stickNowHtml: stickNowHtml, _parseChans: parseChans, _checksHtml: checksHtml, _decodersFor: decodersFor, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf,
+           _liveness: liveness, _flags: flags, _recoverHtml: recoverHtml, _lostHtml: lostHtml, _patchFrom: patchFrom, _formFrom: formFrom, _stickNowHtml: stickNowHtml, _parseChans: parseChans, _checksHtml: checksHtml, _decodersFor: decodersFor, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf,
            _chRows: chRows, _chVerdict: chVerdict, _inRead: inRead };
 })();
 

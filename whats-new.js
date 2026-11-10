@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 261, date: '2026-11-11', items: [
+      '🖥️ <strong>Told when a base station goes offline — and base stations that get themselves back.</strong> Flood-Net now emails its '
+        + 'administrators when a base station has not checked in for 30 minutes, and again when it is back, with how long it was away. '
+        + 'The switch, and the wait, are under the list on 🖥️ Base Stations. A station on RPi ALERT 0.23 also works to get its own '
+        + 'link back — it joins its Wi-Fi again, restarts its networking, and reboots as a last resort — and tells Flood-Net '
+        + 'afterwards what happened: open a station and look under <em>Uplink</em> for <em>If it loses touch</em> and '
+        + '<em>Last lost touch</em>. <em>Settings › This station</em> can turn the reboot, or all of it, off.',
+    ] },
     { n: 260, date: '2026-11-10', items: [
       '⭕ <strong>The 30 km question in one box.</strong> Knowledge base › 🪪 Radio Licensing › The 30 km question now starts with a TL;DR for a team '
         + 'deciding what to license: a gauge beyond 30 km needs no licence of its own, what “protection” means, and the four things to do about it.',
