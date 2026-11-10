@@ -2903,21 +2903,60 @@ await page.evaluate(() => Map3D._waterClock(null));
 
 // ── 9c. ⛰️ and its settings ────────────────────────────────────────────────
 // One button: pressed, the side panel opens on the 3-D settings and the map
-// tilts; pressed again, the map is flat and the side panel is back as ⛰️ found
-// it — on the pane that was open, or shut. Both, from a known start: the map
-// flat by Map3D's own toggle, which leaves the side panel alone.
-console.log('\n⛰️ opens its settings, and puts the side panel back');
+// tilts. Pressed again while the map is in 3-D it is a pane's button like
+// every other in the rail — it puts the settings away, or brings them back —
+// and the map stays tilted: gold while its pane is the one open, ringed
+// (.is-live) while 3-D is on behind another pane or none. Leaving is the
+// pane's own Leave 3-D, edged in red, which keeps the pane. From a known
+// start: the map flat by Map3D's own toggle, which leaves the side panel alone.
+console.log('\n⛰️ opens its settings; pressed again it only puts them away; Leave 3-D leaves');
 
 const flat3d = () => page.waitForFunction(() => !state.map3d && !Map3D._map(), null, { timeout: GL_TIMEOUT });
 const tilted3d = () => page.waitForFunction(() => !!Map3D._map() && Map3D._map().isStyleLoaded(), null, { timeout: GL_TIMEOUT });
+const rail3dLook = () => page.evaluate(() => {
+  syncDockLive();
+  const b = document.querySelector('#help-panel .dock-strip .mn-map-3d');
+  const leave = document.getElementById('map-3d-toggle');
+  const cs = leave && leave.getClientRects().length ? getComputedStyle(leave) : null;
+  return { showing: dockShowing(), on3d: !!state.map3d, gold: b.classList.contains('is-on'), ring: b.classList.contains('is-live'),
+           expanded: b.getAttribute('aria-expanded'), pressed: b.getAttribute('aria-pressed'), title: b.title,
+           leave: leave ? leave.textContent.trim() : null, leaveCls: leave ? leave.className : null,
+           leaveEdge: cs ? `${cs.borderTopWidth} ${cs.borderTopStyle}` : null,
+           storedTab: localStorage.getItem('mn-dock-tab'), storedOpen: localStorage.getItem('mn-help') };
+});
 if (await page.evaluate(() => state.map3d)) { await page.evaluate(() => Map3D.toggle()); await flat3d(); }
 await page.evaluate(() => setDockTab('map-legend'));
 await btn3d.click();
 await tilted3d();
-const in1 = await page.evaluate(() => dockShowing());
+const in1 = await rail3dLook();
+ok('⛰️ from the legend: the map tilts and the 3-D settings open, the button gold and not ringed',
+   in1.showing === 'map-3d' && in1.on3d && in1.gold && !in1.ring && in1.expanded === 'true' && in1.storedTab === 'map-legend',
+   JSON.stringify(in1));
+ok('…Leave 3-D is edged in red while the map is in 3-D',
+   in1.leave === 'Leave 3-D' && /map3d-leave/.test(in1.leaveCls) && in1.leaveEdge === '2px solid', JSON.stringify(in1));
 await btn3d.click();
+await page.waitForTimeout(150);
+const away1 = await rail3dLook();
+ok('⛰️ pressed again puts the settings away and leaves the map in 3-D — ringed, not gold, its tooltip saying on now',
+   away1.showing === null && away1.on3d && !away1.gold && away1.ring && away1.expanded === 'false' && away1.pressed === 'true'
+     && /on now$/.test(away1.title) && !!(await page.evaluate(() => !!Map3D._map())), JSON.stringify(away1));
+await btn3d.click();
+await page.waitForTimeout(150);
+const back1 = await rail3dLook();
+ok('…and a third press brings them back, still in 3-D', back1.showing === 'map-3d' && back1.on3d && back1.gold && !back1.ring,
+   JSON.stringify(back1));
+// With another pane open over it, 3-D is still accounted for in the rail.
+await page.evaluate(() => setDockTab('map-legend'));
+const behind = await rail3dLook();
+ok('another pane opened over a tilted map: ⛰️ ringed, the open pane\'s button the gold one',
+   behind.showing === 'map-legend' && behind.ring && !behind.gold
+     && await page.evaluate(() => document.querySelector('.dock-tab[data-dock="map-legend"]').classList.contains('is-on')),
+   JSON.stringify(behind));
+await btn3d.click();
+await page.waitForTimeout(150);
+await page.locator('#map-3d-toggle').click();
 await flat3d();
-const out1 = await page.evaluate(() => ({ showing: dockShowing(), stored: localStorage.getItem('mn-dock-tab') }));
+const out1 = await rail3dLook();
 // The minimap let go of the camera with it: back on the 2-D map, its outline
 // that map's view again.
 const flatMini = await page.evaluate(() => {
@@ -2930,20 +2969,26 @@ const flatMini = await page.evaluate(() => {
 ok('leaving 3-D puts the minimap back on the 2-D map, outlining its view',
    !flatMini.camera && flatMini.corners === 4 && flatMini.outline && flatMini.outline.every((v, i) => near(v, flatMini.bounds[i], 1e-9)),
    JSON.stringify(flatMini));
-ok('⛰️ from the legend: the 3-D settings while tilted, the legend again when flat',
-   in1 === 'map-3d' && out1.showing === 'map-legend' && out1.stored === 'map-legend', JSON.stringify({ in1, out1 }));
+ok('Leave 3-D flattens the map and keeps the pane, which says Enter 3-D with no red edge; the ring is gone',
+   !out1.on3d && out1.showing === 'map-3d' && out1.leave === 'Enter 3-D' && !/map3d-leave/.test(out1.leaveCls) && !out1.ring
+     && out1.pressed === 'false' && out1.storedTab === 'map-legend', JSON.stringify(out1));
 await page.evaluate(() => shutDock());
 await btn3d.click();
 await tilted3d();
-const in2 = await page.evaluate(() => ({ showing: dockShowing(), stored: localStorage.getItem('mn-help') }));
+const in2 = await rail3dLook();
 await btn3d.click();
-await flat3d();
-const out2 = await page.evaluate(() => dockShowing());
-ok('…from a shut side panel: opened on the 3-D settings, and shut again after — remembered as shut while it was open',
-   in2.showing === 'map-3d' && in2.stored === 'collapsed' && out2 === null, JSON.stringify({ in2, out2 }));
-// Back into 3-D for the teardown below, which is about leaving the tab with it on.
+await page.waitForTimeout(150);
+const out2 = await rail3dLook();
+ok('…from a shut side panel: opened on the 3-D settings — remembered as shut while it is — and shut again by ⛰️, still in 3-D',
+   in2.showing === 'map-3d' && in2.storedOpen === 'collapsed' && out2.showing === null && out2.on3d && out2.ring,
+   JSON.stringify({ in2, out2 }));
+// 🧹 Clear the selection leaves the view alone: 3-D is not a selection.
+await page.evaluate(() => clearStationsMapSelection());
+await page.waitForTimeout(150);
+const kept = await rail3dLook();
+ok('🧹 Clear the selection leaves the map in 3-D', kept.on3d && kept.ring, JSON.stringify(kept));
+// Still in 3-D for the teardown below, which is about leaving the tab with it on.
 await page.evaluate(() => setDockTab('stations'));
-await btn3d.click();
 await tilted3d();
 
 // ── 📍 Find a place's pins, and the rings that stood in the sky ────────────

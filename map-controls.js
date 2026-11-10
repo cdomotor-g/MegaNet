@@ -922,6 +922,11 @@ const MapChrome = (function () {
       order: Number(opts.order) || 0,
       // …and whether the host's strip gives it a button at all (see panel()).
       strip: opts.strip !== false,
+      // What the host's rail asks of a tool (app.js, syncDockLive and
+      // clearStationsMapMarks): whether it has something on, and how to take
+      // it all off. Both optional (see panel()).
+      live: typeof opts.live === 'function' ? opts.live : null,
+      clear: typeof opts.clear === 'function' ? opts.clear : null,
     };
   }
 
@@ -1198,6 +1203,13 @@ const MapChrome = (function () {
     //             when it is not given. btnLabel, or title, has to contain it
     //   dockIcon  optional, the glyph its button in the side panel wears when
     //             it is not `icon`
+    //   live      optional, () => boolean: the tool has something on — a
+    //             result or its inputs on the map, a pick armed. The side
+    //             panel rings its button while that is so and its pane is not
+    //             the one showing (app.js, syncDockLive)
+    //   clear     optional, () => void: take all of that off and disarm it,
+    //             without asking and without announcing. 🧹 Clear the
+    //             selection and ↺ call it (app.js, clearStationsMapMarks)
     //   strip     false: in the side panel it is a pane with no button of its
     //             own in the strip, opened by another control instead — the
     //             3-D settings, which ⛰️ opens as it tilts the map (app.js,

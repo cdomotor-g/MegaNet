@@ -498,6 +498,9 @@ const FloodStages = (function () {
     const cls = { major: 0, moderate: 1, minor: 2 }[l.kind];
     if (cls != null) return cls;
     if (l.kind === 'peak') return l.highest ? 3 : 5;
+    // The station's own ground and instruments (the twin's reference marks):
+    // not levels, so the last to keep a name where the track is short.
+    if (l.kind === 'ref') return 6;
     return 4 + (l.aepIndex || 0) / 10;
   }
 

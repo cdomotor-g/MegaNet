@@ -214,6 +214,9 @@ MegaNet/
 │                             station or a new site against every repeater and base
 │                             within reach, ranked by the weaker of its own hop and
 │                             the route on to a base
+├── map-repcompare.js       ← MapRepCompare — ⚖️ repeater comparison: two or more
+│                             repeaters, the sites they both carry, and each
+│                             site's path up to each of them side by side
 ├── modal.js                ← Modal     — the shared dialog shell, and confirmDialog /
 │                             promptDialog: the app's own questions, in place of the
 │                             browser's confirm() and prompt() (#223)
@@ -1359,14 +1362,14 @@ here.
 - Export the whole drawing to Google Earth as a KML — the shapes in their own colours, and the stations they enclose or run between
 - Snap drawing to stations, so a path between two sites starts and ends on the sites and is named after them
 - Select stations off the map — by rectangle, by circle, or by shift-clicking pins — into the table below, and export the set as CSV
-- **Repeater sites** — say which sites a new repeater has to serve (the map selection, a circle drawn round them, or a pasted list of station numbers, names and ALERT addresses) and get the three to five best places nearby to put the mast, ranked on elevation, line of sight, fade margin and road reserve; fade everything else on the map to see them, see them on the terrain in 3-D, and take them to Google Earth as a KMZ with each candidate's paths in a folder of its own. A **Must reach** list holds where the new mast has to pass its readings on to — filled in from the network's pass ranges and channels for a repeater that is moving — and a place that reaches more of it ranks first; every station in both lists shows how far away it is — see *Repeater site finder* under §17
+- **Move/New Repeater** — say which sites a new repeater has to serve (the map selection, a circle drawn round them, or a pasted list of station numbers, names and ALERT addresses) and get the three to five best places nearby to put the mast, ranked on elevation, line of sight, fade margin and road reserve; fade everything else on the map to see them, see them on the terrain in 3-D, and take them to Google Earth as a KMZ with each candidate's paths in a folder of its own. A **Must reach** list holds where the new mast has to pass its readings on to — filled in from the network's pass ranges and channels for a repeater that is moving — and a place that reaches more of it ranks first; every station in both lists shows how far away it is — see *Repeater site finder* under §17
 - **Relocate station** — pick a station or a repeater that has to move (*Use the selected station*, or find it) and how far it may go, and the ground round it is coloured by how good a new home each spot would be: fade margin to the repeaters that hear it now first — and, for a repeater, from every station its pass ranges carry within the Max TX distance — then open sky for the rain gauge (its WMO siting class from the trees and roofs round it), clear ground and closeness; the three to five best are pinned, kept off every building the State and OpenStreetMap have mapped and out of the water — see *Station relocation finder* under §17
 - Leaflet.js, with the map's own controls in the side panel's rail beside it (§20), each named beside
   its icon (or icons alone, by the rail's **Collapse »**, as the left bar folds), in sections whose
   headings fold them: **Stations & places** (the cards, Find a place, the path tools, the digital
   twin), **Map** — what the map shows (**Layers**, with the base map — OSM-Topo by default,
   OpenStreetMap, Satellite or Dark — the **Legend**, **Latency**) — and **Tools**, what you point at it
-  (**Draw & measure**, **Radio coverage**, **Repeater sites**, **Relocate station**, **What's here?**, **Magnifier**);
+  (**Draw & measure**, **Radio coverage**, **Move/New Repeater**, **Relocate station**, **What's here?**, **Magnifier**);
   and a foot that stays put: **Clear the selection**, the **3-D view** with its settings and camera,
   **Full screen** and **Help**. A panel opens as a pane of the side panel from its button in the rail;
   a button does its one thing, and a mode wears a switch. The icons are drawn in each look's own hand
@@ -4336,7 +4339,14 @@ tools you point at the map, answers it.
   every station that sends its readings up to it (the field stations its pass
   ranges carry and the repeaters that send to it, within the map's Max TX
   distance) as the sites to serve, and where its readings go on to as **Must
-  reach** (below).
+  reach** (below). The box under the buttons does the same for a repeater
+  found by typing — its name, station number or ALERT address, repeaters only,
+  with the names that sound like it offered where nothing is spelt that way —
+  so the repeater need not be selected on the map first.
+
+In a picked result's table, **a click on a row** (or its name, from the
+keyboard) moves the map to that station and lights its path to the candidate
+in gold, on the flat map and in 3-D; the picture and the ↗ keep their own jobs.
 
 Every station in the list shows **how far away it is** — from the repeater
 being moved, where the list came from one, otherwise from the middle of the
@@ -4502,7 +4512,7 @@ Two repeaters joined both ways — by the pass ranges and on each other's
 channels — are listed both ways, each direction priced on its own radios and
 channel, and marked *both ways*. With many paths the lattice coarsens (never under 12
 across) so places × paths stays near 16,000 profiles. For a move further than
-2 km, *Find a new hilltop for what it carries* opens **🗼 Repeater sites** with
+2 km, *Find a new hilltop for what it carries* opens **🗼 Move/New Repeater** with
 the stations up to it as the sites to serve and the ways on ticked here as the
 ones the new mast must reach.
 
@@ -5309,7 +5319,7 @@ power or the required E field worked out as you type. What is typed is the
 site's own override for the session (`state.radio`), the same one the boxes
 under *More about this path* and the link budget write, so every card prices
 from it; *Back to its own figures* takes it off. A point on the ground has no
-radio, so only its antenna height is offered — unless 🗼 Repeater sites, 🚚
+radio, so only its antenna height is offered — unless 🗼 Move/New Repeater, 🚚
 Relocate station or 🎯 Best repeater proposed a mast there: then it carries the
 radio that finder priced it with (`radioPlace`, kept in `state.radio.placed` for
 the session), named *Proposed repeater site*, *New site for …* or *New station*,
@@ -5426,7 +5436,7 @@ top-right corner lives in the strip instead, at every width — a phone's rail
 included, where a pane is a drawer — except ↺ reset, which is built to stay
 (`corner: true` on `MapChrome.button`, so the side panel is never offered it)
 and is the one thing in that corner. Each panel — Layers, Legend, Draw & measure, Radio coverage,
-Repeater sites, Relocate station, the 3-D settings — moves
+Move/New Repeater, Relocate station, the 3-D settings — moves
 its whole `.mn-mapctl` wrapper (icon, heading, pin and body) into a pane of its
 own the moment it is built, with a button in the strip — but the 3-D settings,
 whose pane ⛰️ opens (`strip: false` on `MapChrome.panel`); its corner icon and

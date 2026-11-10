@@ -4522,8 +4522,13 @@ const Map3D = (function () {
     if (body && body.parentNode) body.outerHTML = Map3D.panelHtml();
     for (const btn of document.querySelectorAll('.mn-map-3d')) {
       btn.setAttribute('aria-pressed', state.map3d ? 'true' : 'false');
-      btn.classList.toggle('is-on', !!state.map3d);
+      // Lit while 3-D is on — in the map's corner. In the side panel's rail
+      // the button is gold while its pane is the one open and ringed while
+      // 3-D is on behind another, which is the rail's to say (app.js,
+      // syncDockLive, called below).
+      if (typeof syncDockLive !== 'function') btn.classList.toggle('is-on', !!state.map3d);
     }
+    if (typeof syncDockLive === 'function') syncDockLive();
     syncCamera();
   }
 
@@ -5146,8 +5151,10 @@ const Map3D = (function () {
       return `
         <div class="map3d-panel" id="map-3d-panel-body">
           <div class="map3d-actions">
-            <button type="button" id="map-3d-toggle" class="${on ? '' : 'primary'}"
-                    aria-pressed="${on}" onclick="Map3D.toggle()">
+            <button type="button" id="map-3d-toggle" class="${on ? 'map3d-leave' : 'primary'}"
+                    aria-pressed="${on}" onclick="Map3D.toggle()"
+                    title="${on ? 'Leave 3-D — back to the flat map. This is the way out: ⛰️ in the side panel only puts these settings away'
+                                : 'Enter 3-D — tilt the map and see the ground it is drawn on'}">
               ${on ? 'Leave 3-D' : 'Enter 3-D'}
             </button>
             <button type="button" onclick="Map3D.levelCamera()" ${on ? '' : 'disabled'}

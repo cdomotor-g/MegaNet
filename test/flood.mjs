@@ -431,7 +431,10 @@ async function browserHalf(FS) {
                fill: Number(track.style.getPropertyValue('--level')), water: track.style.getPropertyValue('--sw'),
                valuenow: Number(track.getAttribute('aria-valuenow')), valuetext: track.getAttribute('aria-valuetext'),
                track: r(track), head: r(box.querySelector('.twin-scale-head')), labels, marks,
-               leaders: box.querySelectorAll('.twin-scale-leaders polyline').length,
+               leaders: box.querySelectorAll('.twin-scale-leaders polyline:not(.is-ref)').length,
+               // The station's own ground and instruments: marks that are not levels.
+               refs: [...box.querySelectorAll('.twin-scale-ref')].map(b => ({ id: b.dataset.ref, text: b.textContent.trim(), title: b.title, ...r(b) })),
+               refMarks: [...box.querySelectorAll('.twin-scale-refmark')].map(m => ({ id: m.dataset.ref, ...r(m) })),
                inside: !hidden && inside(r(box)) && inside(r(box.querySelector('.twin-scale-head'))) && labels.every(inside), stage: st };
     }, scope);
     // Where a level's mark should be on the track: to scale from the foot.
@@ -579,6 +582,18 @@ async function browserHalf(FS) {
       T.labels.length === 7 && noOverlap(T) && T.leaders === 7 && T.inside
         && J(T.labels.map(l => l.text)) === J(['Minor 7.0 m', 'Moderate 10.0 m', 'Major 15.0 m', '1% AEP 15.1 m', '0.5% AEP 15.6 m', '0.2% AEP 15.9 m', '0.066% AEP 16.2 m']),
       J(T.labels.map(l => [l.text, +l.top.toFixed(1), +l.bottom.toFixed(1)])));
+    // The station itself on the scale: its ground, and the foot of what holds
+    // its instruments, each a dashed mark with a name that says what it is —
+    // and no name of either sitting on a level's.
+    {
+      const all = [...T.labels, ...T.refs].sort((a, b) => a.top - b.top);
+      ok('the station\'s ground and its instruments are marked on the scale too, each saying what it is, clear of every level\'s name',
+        T.refs.some(x => x.id === 'ground' && /Ground/.test(x.text) && /ground at the station/i.test(x.title))
+          && T.refs.every(x => /m AHD/.test(x.title)) && T.refMarks.length === T.refs.length
+          && T.refMarks.every(m => m.top >= T.track.top - 2 && m.bottom <= T.track.bottom + 2)
+          && all.every((l, i) => i === 0 || l.top >= all[i - 1].bottom - 0.5),
+        J(T.refs.map(x => [x.id, x.text, +x.top.toFixed(1)])));
+    }
     ok('…in the order of their marks, top to bottom: no two lines cross',
       J(T.labels.slice().sort((a, b) => a.top - b.top).map(l => l.key)) === J(T.marks.slice().sort((a, b) => a.top - b.top || F.levels.findIndex(x => x.key === b.key) - F.levels.findIndex(x => x.key === a.key)).map(m => m.key)),
       J(T.labels.slice().sort((a, b) => a.top - b.top).map(l => l.key)));

@@ -25,6 +25,36 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 251, date: '2026-11-10', items: [
+      '⚖️ <strong>Repeater comparison</strong>, a new tool on the Stations map: pick two or more repeaters and it lists the '
+        + 'sites they both carry in a grid — the fade margin, line of sight and ground profile of each site\'s path up to '
+        + 'each of them, and which hears it best. Click a row to see it on the map.',
+      '🗼 <strong>Repeater sites is now Move/New Repeater</strong> — the same tool, with a name that says both jobs. You '
+        + 'can type the repeater to move (name, station number or ALERT address) instead of selecting it on the map first, '
+        + 'and clicking a row in a result\'s table takes the map to that station with its path lit in gold.',
+      '🎯 <strong>One box in Best repeater.</strong> Type a station\'s name, number or ALERT address, or a new site\'s '
+        + 'latitude and longitude however you write it; it says what it has understood under the box. Pick a result and '
+        + 'each hop to a base has its ground profile drawn small beside its figures — click one for the full chart.',
+      '📍 <strong>Pins on a drawn line\'s ground profile.</strong> Draw a line with corners and its profile marks the start '
+        + '(A), the end (B) and every change of direction (1, 2, 3…), each with its distance along and ground height; the '
+        + 'same letters and numbers sit on the line\'s corners on the map.',
+      '🌊 <strong>Flood history on the station card.</strong> The Flood tab now lists the largest floods on the Bureau\'s '
+        + 'record for the gauge — date, height, class and AHD level where known — with the station\'s ground height beside '
+        + 'them. In the digital twin, the flood-level scale now marks the station\'s ground and the foot of its instruments.',
+      '💬 <strong>Hover notes on or off.</strong> A small button under ↺ on the Stations map turns off everything that pops '
+        + 'up under the pointer — the property and tenure note, road, river and bridge names, station and path labels — '
+        + 'and remembers your choice.',
+      '🧊 <strong>The digital twin offer stays off when you untick it.</strong> Picking a map view no longer ticks '
+        + '<em>Offer the digital twin at close zoom</em> again; only the box in Layers changes it.',
+      '🧹 <strong>Clear the selection clears everything.</strong> It now also disarms any pick waiting for a click, puts '
+        + 'the Magnifier away, and takes every tool\'s ring off the side panel\'s strip.',
+      '⛰️ <strong>3-D stays on until you leave it.</strong> Pressing 3-D view again only hides or shows its settings; '
+        + '<strong>Leave 3-D</strong>, now edged in red, is the way out. A button in the strip is gold while its pane is '
+        + 'open, and a tool with something still on behind another pane wears a gold ring.',
+      '📡 <strong>Base stations by name in the Message Log.</strong> For signed-in editors, <em>More filters</em> has a '
+        + '<strong>Base station</strong> filter listing each base by its name, and the Path column says the name too '
+        + '(hover for the path as it is kept). In the radio link card, an end with a station picked now reads green.',
+    ] },
     { n: 250, date: '2026-11-09', items: [
       '📻 <strong>Routes to a base check the channel too.</strong> 🎯 Best repeater and 🪜 Hops to base now go on from a '
         + 'repeater only to a repeater or base station that listens on a channel it sends on, as the map\'s backbone links do. '

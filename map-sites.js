@@ -230,6 +230,8 @@ const MapSites = (function () {
   let found = null;        // the screened pool and everything refined since
   let results = [];        // [{ rank, c, s }] — the ranked answer on the map
   let selected = null;     // the candidate whose links are drawn
+  let focus = null;        // { hub, k } — the table row pressed: its path is lit on the map
+  let repQ = '';           // what is typed in the box that finds a repeater by name
   let rerankDue = false;   // a weight moved while a pass was in flight
   let status = { kind: 'idle', text: '' };
   let dimWatch = null;     // MutationObserver on the map pane, while attached
@@ -888,7 +890,7 @@ const MapSites = (function () {
     const r = readiness();
     if (!r.ok) { setStatus('blocked', r.why); return Promise.resolve(false); }
     if (job) job.cancelled = true;
-    found = null; results = []; selected = null;
+    found = null; results = []; selected = null; focus = null;
     const mine = job = { cancelled: false };
     const area = areaOf(targets), box = boxOf(area);
     const ts = targets.slice();
@@ -1034,7 +1036,7 @@ const MapSites = (function () {
   function invalidate() {
     if (job) job.cancelled = true;
     job = null;
-    found = null; results = []; selected = null;
+    found = null; results = []; selected = null; focus = null;
     rerankDue = false;
     status = { kind: 'idle', text: '' };
   }
@@ -1163,6 +1165,25 @@ const MapSites = (function () {
         line.mn3d = 'link';
         line.addTo(lineLayer);
       };
+      // The row pressed in the table (showPath): a gold band under its path
+      // and a gold ring round its far end, so the one path asked about stands
+      // out of the dozen drawn. Tagged as the others are, so 3-D shows it too.
+      const lit = focus && (focus.hub ? (found.hubs || [])[focus.k] : found.targets[focus.k]);
+      if (lit) {
+        const gold = cssVar('--map-leader', '#ffba28');
+        const under = L.polyline([[sel.c.lat, sel.c.lon], [lit.lat, lit.lon]], {
+          pane: LINE_PANE, color: gold, weight: 12, opacity: 0.75, interactive: false,
+        });
+        under.mn3d = 'link';
+        under.mnLit = true;
+        under.addTo(lineLayer);
+        const halo = L.circleMarker([lit.lat, lit.lon], {
+          pane: LINE_PANE, radius: 16, color: gold, weight: 4, opacity: 0.95, fill: false, interactive: false,
+        });
+        halo.mn3d = 'target';
+        halo.mnLit = true;
+        halo.addTo(lineLayer);
+      }
       found.targets.forEach((t, k) => path(t, figOf(sel.c, k, true), 3));
       (found.hubs || []).forEach((h, j) => path(h, hubFigOf(sel.c, j, true), 5));
     }
@@ -1462,6 +1483,71 @@ const MapSites = (function () {
   // ranges carry and the repeaters on a pair that runs to it — by the pass
   // ranges (map-backbone.js, repeaterPathsOf), the list 🚚 Relocate station
   // keeps; the field stations alone where that file is not here.
+  // The same, for a repeater found by typing rather than selected on the map
+  // (the owner, 10 Nov 2026): the box searches the repeaters only, by name,
+  // station number or ALERT address — the Stations filter's own matcher, and
+  // the names that sound like it (station-suggest.js) where nothing is spelt
+  // that way — and a pick does what the button does for the selected one. The
+  // input is never drawn again by typing in it (setRepFind repaints only the
+  // list under it), so the caret survives, as the link budget's box does.
+  const REP_FIND_CAP = 8;
+  function isRepeater(s) { return !!s && Array.isArray(s.roles) && s.roles.includes('repeater') && !!s.repeater; }
+  function repHitsHtml() {
+    const text = repQ.trim();
+    if (!text || !state.data) return '';
+    const prep = { ...prepareSearch(text) };
+    const all = state.data.stations;
+    const hits = [];
+    if (prep.terms.length || prep.ranges.length) {
+      for (const s of all) {
+        if (!isRepeater(s) || !stationMatchesSearch(s, prep)) continue;
+        hits.push(s);
+        if (hits.length > REP_FIND_CAP) break;
+      }
+    }
+    const near = typeof StationSuggest !== 'undefined' && hits.length <= StationSuggest.FEW
+      ? StationSuggest.stations(text, all, { limit: REP_FIND_CAP, matched: hits, filter: isRepeater }) : [];
+    const instead = !hits.length && near.length > 0;
+    const list = instead ? near : hits;
+    const more = list.length > REP_FIND_CAP;
+    const shown = more ? list.slice(0, REP_FIND_CAP) : list;
+    const lead = instead ? StationSuggest.leadHtml(text)
+      : `${!list.length ? 'No repeater matches' : more ? `More than ${REP_FIND_CAP} repeaters match`
+        : `${list.length} repeater${list.length === 1 ? ' matches' : 's match'}`} “${esc(text)}”${
+        more ? ' — keep typing to narrow it' : ''}`;
+    const said = /\?$/.test(lead) ? lead : `${lead}.`;
+    if (!shown.length) return `<p class="small lb-find-none">${said}</p>`;
+    const buttons = l => l.map(st => `
+        <button type="button" class="lb-hit${origin === st.id ? ' is-here' : ''}"
+                onclick="MapSites.pickRepeater('${escAttr(st.id)}')"
+                title="Add what ${escAttr(st.name)} carries as the sites to serve, and where its readings go on to as Must reach">
+          <span class="lb-hit-name">${instead ? esc(st.name) : markHits(st.name, prep.terms, prep.res)}</span>
+          <span class="small lb-hit-num">${instead ? esc(st.station_number || '') : markHits(st.station_number || '', prep.terms)}</span>
+          ${origin === st.id ? '<span class="lb-hit-at">in the lists</span>' : ''}
+        </button>`).join('');
+    const also = !instead && near.length ? `
+      <p class="small lb-find-lead" id="sites-rep-near">${StationSuggest.leadHtml(text, hits.length)}</p>
+      <div class="lb-hits" role="group" aria-labelledby="sites-rep-near">${buttons(near)}</div>` : '';
+    return `
+      <p class="small lb-find-lead" id="sites-rep-lead">${said}</p>
+      <div class="lb-hits" role="group" aria-labelledby="sites-rep-lead">${buttons(shown)}</div>${also}`;
+  }
+  function repFindHtml() {
+    return `
+      <div class="lb-find sites-rep-find" data-tour="sites-rep-find">
+        <label class="small" for="sites-rep-find">Or type the repeater to move — its name, station number or ALERT
+          address — and pick it from the list: the same as selecting it on the map and pressing
+          <em>Add what the selected repeater carries</em>.</label>
+        <div class="lb-find-row">
+          <input type="search" id="sites-rep-find" class="lb-find-input" value="${escAttr(repQ)}"
+                 autocomplete="off" spellcheck="false" placeholder="Repeater name, station # or ALERT address"
+                 oninput="MapSites.setRepFind(this.value)"
+                 onkeydown="if (event.key === 'Enter') { event.preventDefault(); MapSites.pickRepeaterTyped(); }">
+        </div>
+        <div id="sites-rep-hits" aria-live="polite">${repHitsHtml()}</div>
+      </div>`;
+  }
+
   function carriedBy(rep) {
     const K = state.mapMaxLinkKm > 0 ? state.mapMaxLinkKm : 100;
     if (typeof repeaterPathsOf === 'function') {
@@ -1607,8 +1693,8 @@ const MapSites = (function () {
               ${found.targets.map((t, k) => {
                 const fig = figOf(r.c, k, true);
                 const band = fig && !fig.failed ? bandOf(fig) : 'none';
-                return `<tr>
-                  <td>${esc(t.name)}</td>
+                return `<tr${rowAttrs(r, k, false, t)}>
+                  <td>${rowNameHtml(t, false, k)}</td>
                   <td>${fig ? fig.dKm.toFixed(1) : '—'}</td>
                   <td class="${fig && fig.verdict === 'obstructed' ? 'txt-bad' : fig && fig.verdict === 'marginal' ? 'txt-warn' : ''}">${
                     !fig || fig.failed ? '—' : fig.colo ? 'on it' : VERDICT[fig.verdict]}</td>
@@ -1625,8 +1711,8 @@ const MapSites = (function () {
               ${found.hubs.map((h, j) => {
                 const fig = hubFigOf(r.c, j, true);
                 const band = fig && !fig.failed ? bandOf(fig) : 'none';
-                return `<tr class="sites-table-hub">
-                  <td>⇧ ${esc(h.name)}</td>
+                return `<tr${rowAttrs(r, j, true, h, 'sites-table-hub')}>
+                  <td>${rowNameHtml(h, true, j)}</td>
                   <td>${fig ? fig.dKm.toFixed(1) : '—'}</td>
                   <td class="${fig && fig.verdict === 'obstructed' ? 'txt-bad' : fig && fig.verdict === 'marginal' ? 'txt-warn' : ''}">${
                     !fig || fig.failed ? '—' : fig.colo ? 'on it' : VERDICT[fig.verdict]}</td>
@@ -1643,6 +1729,23 @@ const MapSites = (function () {
         </div>
         ${thumbsKeyHtml(r)}
       </div>`;
+  }
+
+  // A row of the table is a way to the map (the owner, 10 Nov 2026: "if a user
+  // clicks a row it should move the map to that station and highlight the
+  // links"): a click anywhere on it that is not one of its own buttons — the
+  // picture, the ↗ — goes to showPath, and the name is a button so the
+  // keyboard has the same way in.
+  function isFocus(hub, k) { return !!focus && focus.hub === !!hub && focus.k === k; }
+  function rowAttrs(r, k, hub, t, cls) {
+    const on = isFocus(hub, k);
+    return ` class="sites-row-go${cls ? ' ' + cls : ''}${on ? ' is-lit' : ''}"${on ? ' aria-current="true"' : ''}
+                    onclick="MapSites.rowClick(event, ${r.rank}, ${k}, ${!!hub})"
+                    title="Move the map to ${escAttr(t.name)} and light up its path to site ${r.rank}"`;
+  }
+  function rowNameHtml(t, hub, k) {
+    return `<button type="button" class="btn-link sites-t-go" aria-pressed="${isFocus(hub, k) ? 'true' : 'false'}"
+                    aria-label="${escAttr(`${t.name}: move the map to it and light up its path`)}">${hub ? '⇧ ' : ''}${esc(t.name)}</button>`;
   }
 
   // Every path's ground, drawn small (pathThumbSvg, path-profile.js), in its
@@ -1678,7 +1781,8 @@ const MapSites = (function () {
         <p class="small txt-muted sites-thumbs-hint">Each ${termHtml('ground profile', WORDS['Ground profile'])} has its
           sending end on the left: each site sends up to site ${r.rank}${(found.hubs || []).length
           ? `, and site ${r.rank} sends on to each ⇧ must-reach` : ''}. Click one to open it full screen, with the fade margin
-          and the figures beside it.</p>`;
+          and the figures beside it. Click anywhere else on a row — or its name — to move the map to that station and
+          light up its path in gold.</p>`;
   }
 
   function worstIndex(c) {
@@ -1700,10 +1804,11 @@ const MapSites = (function () {
     const rep = repeaterSystem();
     const w = weights();
     return `
-      <div class="sites-panel">
+      <div class="sites-panel sites-finder">
         <fieldset class="sites-fs">
           <legend>Sites to serve (${targets.length})</legend>
           <div id="sites-shapes">${shapesHtml()}</div>
+          ${repFindHtml()}
           <label class="sites-paste">
             <span class="small">Or paste a list — station numbers, names, ALERT addresses or
               <code>4021-4025</code> windows, and a <code>lat, lon</code> on its own line for a site with no
@@ -1868,6 +1973,7 @@ ${hubsFieldHtml()}
   function select(rank, opts) {
     const r = results.find(x => x.rank === +rank);
     if (!r) return;
+    if (!selected || selected.id !== r.c.id) focus = null;
     selected = r.c;
     draw();
     render();
@@ -1943,8 +2049,8 @@ ${hubsFieldHtml()}
       // In among the tools you point at the map: the polar plot sweeps from a
       // station, this finds where the station should have been.
       MapChrome.panel(m, {
-        id: 'sites', icon: '🗼', dockIcon: Glyphs.rail('sites'), title: 'Repeater sites',
-        btnLabel: 'Repeater sites — the best places for a new repeater',
+        id: 'sites', icon: '🗼', dockIcon: Glyphs.rail('sites'), title: 'Move/New Repeater',
+        btnLabel: 'Move/New Repeater — the best places to move a repeater to, or to build a new one',
         group: 'tools', order: 25,
         html: () => panelHtml(),
         onMount(el) { body = el; },
@@ -1984,6 +2090,10 @@ ${hubsFieldHtml()}
     },
 
     active() { return results.length > 0; },
+    // Anything of this tool's on: an answer, a search running, sites or masts
+    // listed (they are drawn on the map), or a circle being waited for. The
+    // side panel rings 🗼 while so (app.js, syncDockLive); clear() ends it.
+    live() { return results.length > 0 || !!job || targets.length > 0 || hubs.length > 0 || !!awaitCircle; },
 
     legendHtml,
 
@@ -2065,6 +2175,36 @@ ${hubsFieldHtml()}
       render();
       rerenderMapLegend();
       if (opts.open) openPanel();
+    },
+
+    // The find-a-repeater box. Typing repaints only the list under it.
+    setRepFind(v) {
+      repQ = String(v || '');
+      const el = document.getElementById('sites-rep-hits');
+      if (el) el.innerHTML = repHitsHtml();
+    },
+    // A pick from that list: the repeater's lists, as the button fills them.
+    pickRepeater(id) {
+      const s = stationById(id);
+      if (!isRepeater(s)) return;
+      repQ = '';
+      this.serveRepeater(s.id);
+      if (map && s.lat != null && s.lon != null) map.panTo([s.lat, s.lon]);
+      if (map) mapNote(`${s.name} — what it carries is in Sites to serve, and where its readings go on to is in Must reach.`, 6000);
+    },
+    // Enter in the box: the one repeater it has come down to, or a word back.
+    pickRepeaterTyped() {
+      const text = repQ.trim();
+      if (!text || !state.data) return;
+      const prep = { ...prepareSearch(text) };
+      let hits = prep.terms.length || prep.ranges.length
+        ? state.data.stations.filter(s => isRepeater(s) && stationMatchesSearch(s, prep)) : [];
+      const exact = hits.filter(s => String(s.name || '').toLowerCase() === text.toLowerCase()
+        || String(s.station_number || '').toLowerCase() === text.toLowerCase());
+      if (exact.length === 1) hits = exact;
+      if (hits.length === 1) { this.pickRepeater(hits[0].id); return; }
+      if (map) mapNote(hits.length ? `${hits.length} repeaters match “${text}” — pick one from the list under the box.`
+        : `No repeater matches “${text}”.`, 5000);
     },
 
     removeHub(key) {
@@ -2182,6 +2322,38 @@ ${hubsFieldHtml()}
 
     select,
 
+    // A row of the table pressed: the map goes to that station and its path
+    // to (or from) the candidate is lit. Centred on the station where the
+    // candidate is in view from there at this zoom; otherwise the view is
+    // fitted to the two, so the lit path is all on screen.
+    showPath(rank, k, hub) {
+      const r = results.find(x => x.rank === +rank);
+      const t = found && (hub ? (found.hubs || [])[+k] : found.targets[+k]);
+      if (!r || !t) return;
+      if (!selected || selected.id !== r.c.id) selected = r.c;
+      focus = { hub: !!hub, k: +k };
+      draw();
+      render();
+      const again = body && body.querySelector('tr.is-lit .sites-t-go');
+      if (again) again.focus({ preventScroll: true });
+      if (!map) return;
+      const st = L.latLng(t.lat, t.lon), mast = L.latLng(r.c.lat, r.c.lon);
+      const z = map.getZoom(), half = map.getSize().divideBy(2);
+      const a = map.project(st, z), b = map.project(mast, z);
+      if (Math.abs(a.x - b.x) < half.x * 0.85 && Math.abs(a.y - b.y) < half.y * 0.85) map.panTo(st);
+      else map.fitBounds(L.latLngBounds([st, mast]).pad(0.2));
+      const fig = hub ? hubFigOf(r.c, +k, true) : figOf(r.c, +k, true);
+      mapNote(`${t.name} — its path ${hub ? 'from' : 'to'} site ${r.rank} is lit in gold${
+        fig && !fig.failed && !fig.colo ? `: ${fig.dKm.toFixed(1)} km, ${dbText(fig.margin)}` : ''}.`, 6000);
+    },
+    rowClick(ev, rank, k, hub) {
+      const b = ev && ev.target && ev.target.closest ? ev.target.closest('button, a') : null;
+      if (b && !b.classList.contains('sites-t-go')) return;
+      this.showPath(rank, k, hub);
+    },
+    // For the checks: the row whose path is lit.
+    lit() { return focus ? { ...focus } : null; },
+
     flyTo(rank) {
       const r = results.find(x => x.rank === +rank);
       if (!r || !map) return;
@@ -2213,8 +2385,8 @@ ${hubsFieldHtml()}
       // it opens agree.
       const tr = hub ? found.hrs[+k] : found.flds[+k];
       const f = hub && found.hfs[+k] ? found.hfs[+k].f : found.f;
-      if (!t.sid && tr) radioPlace(t.lat, t.lon, tr, { name: hub ? 'Proposed mast' : 'Proposed site', by: 'Repeater sites', f });
-      if (!r.c.sid) radioPlace(r.c.lat, r.c.lon, found.rep, { name: 'Proposed repeater site', by: 'Repeater sites', f });
+      if (!t.sid && tr) radioPlace(t.lat, t.lon, tr, { name: hub ? 'Proposed mast' : 'Proposed site', by: 'Move/New Repeater', f });
+      if (!r.c.sid) radioPlace(r.c.lat, r.c.lon, found.rep, { name: 'Proposed repeater site', by: 'Move/New Repeater', f });
       if (full) {
         state.path.open = true;
         const had = MapDraw.findLine(pa, pb);

@@ -532,6 +532,88 @@ const RiverDetails = (function () {
       </div>`;
   }
 
+  // ── The flood history and the station's ground (0037) ─────────────────────
+  //
+  // The floods the gauge has seen — HDB's largest peaks, which the station
+  // carries as `flood_peaks` (flood-stages.js has the long account) — and the
+  // station's own ground height beside them, so a height on the gauge can be
+  // read against the ground without leaving the Flood group. The ground is the
+  // card's Site figure again, not a second measurement.
+
+  // What the words in this section mean: the hover on each, and the fold under
+  // the list that a finger can read.
+  const HISTORY_TERMS = [
+    ['Station ground', 'How high the ground at the station is, in metres above the Australian Height Datum (AHD, close to mean sea level). The same figure as Elevation under Site; “modelled” means it was read off an elevation model, not surveyed.'],
+    ['On the gauge', 'The height the river reached as read on this station’s gauge on the day — metres above the gauge’s zero as it then stood.'],
+    ['m AHD', 'The same flood as a level above the Australian Height Datum, worked out through the gauge zero in force on the day. Left off where that zero is not known in AHD.'],
+    ['Class', 'Which of today’s flood classes that height falls in — at or above major, moderate or minor, or below minor. The classes are the newest on record and may not be the ones in force on the day.'],
+  ];
+  const historyMeans = k => (HISTORY_TERMS.find(t => t[0] === k) || [])[1] || '';
+  const term = (text, k) => (typeof termHtml === 'function' ? termHtml(text, historyMeans(k)) : esc(text));
+
+  // The station's ground, as the Site group gives it.
+  function groundRowHtml(s) {
+    if (!s || s.elevation_ahd == null || s.elevation_ahd === '') return '';
+    return `<div class="acma-row"><span>${term('Station ground', 'Station ground')}</span><span>${esc(s.elevation_ahd)} m AHD${
+      s.elevation_source ? ' <span class="mn-pop-note">modelled</span>' : ''}</span></div>`;
+  }
+
+  // Today's class for a height on the gauge, or null where there are no
+  // classes to say.
+  function classOf(h, classes) {
+    if (h == null || !classes) return null;
+    const given = CLASS_LEVELS.filter(c => classes[c.key] != null);
+    if (!given.length) return null;
+    let at = null;
+    for (const c of given) if (Number(h) >= Number(classes[c.key])) at = c;
+    return at || { label: `Below ${given[0].label.toLowerCase()}`, cls: 'mn-pop-note' };
+  }
+
+  function hasHistory(s) {
+    return !!s && Array.isArray(s.flood_peaks) && s.flood_peaks.some(p => p && p.height_m != null);
+  }
+
+  // The section on the station card: the ground, then the floods, highest
+  // first. With no floods on record it is the ground alone; with neither,
+  // nothing.
+  function historyCardHtml(s) {
+    const ground = groundRowHtml(s);
+    if (!hasHistory(s)) {
+      return ground ? `<div class="acma-sect stn-card-fh">${ground}</div>` : '';
+    }
+    const classes = newestFirst(s.flood_classes || [], 'as_at')[0] || null;
+    const peaks = s.flood_peaks.filter(p => p && p.height_m != null)
+      .slice().sort((a, b) => Number(b.height_m) - Number(a.height_m));
+    const rows = peaks.map(p => {
+      const c = classOf(p.height_m, classes);
+      const ahd = p.level_m_ahd != null && Number.isFinite(Number(p.level_m_ahd))
+        ? ` <span class="mn-pop-note">${esc(fig(Math.round(Number(p.level_m_ahd) * 100) / 100, 2))} m AHD</span>` : '';
+      const cls = c ? ` <span class="${c.cls} stn-card-fh-class">${esc(c.label)}</span>` : '';
+      return `<div class="acma-row"><span>${esc(p.date ? date(p.date) : 'Undated')}</span><span>${esc(height(p.height_m, 2))}${cls}${ahd}</span></div>`;
+    });
+    const from = s.flood_peaks_gauge
+      ? (() => {
+          const st = typeof state !== 'undefined' && state.data && s.flood_peaks_from
+            ? (state.data.stations || []).find(x => x.id === s.flood_peaks_from) : null;
+          return `<p class="small mn-pop-note stn-card-fh-from">The Bureau’s record at ${esc(st ? `${st.name} (${s.flood_peaks_gauge})` : `gauge ${s.flood_peaks_gauge}`)}, which this station takes its flood history from.</p>`;
+        })() : '';
+    return `
+      <div class="acma-sect stn-card-fh">
+        <span class="small txt-muted stn-card-rhs-head"
+              title="The largest floods the Bureau’s hydrological database (HDB) records at this gauge — up to five, highest first">Flood history</span>
+        <span class="stn-card-rhs-snap mn-pop-note">${peaks.length === 1 ? 'The largest flood' : `The ${peaks.length} largest floods`} on the Bureau’s record · ${esc(SNAPSHOT)}</span>
+        ${ground}
+        <div class="acma-row stn-card-fh-cols small txt-muted"><span>Date</span><span>${term('On the gauge', 'On the gauge')}${
+          classes ? ` · ${term('class', 'Class')}` : ''}${peaks.some(p => p.level_m_ahd != null) ? ` · ${term('m AHD', 'm AHD')}` : ''}</span></div>
+        ${rows.join('')}
+        ${from}
+        <details class="stn-card-rhs-earlier">
+          <summary class="small">What the words here mean</summary>
+          ${HISTORY_TERMS.map(([k, v]) => `<p class="small"><strong>${esc(k)}</strong> — ${esc(v)}</p>`).join('')}
+        </details>
+      </div>`;
+  }
+
   // ── The AEP flood levels and the flood velocity (0033) ────────────────────
 
   const oneIn = n => `about a 1-in-${n.toLocaleString('en-AU')} chance in any year`;
@@ -964,6 +1046,8 @@ const RiverDetails = (function () {
     hasAep,
     cardHtml,
     aepCardHtml,
+    hasHistory,
+    historyCardHtml,
     velocityRowHtml,
     velocitySummary,
     floodClassesText,

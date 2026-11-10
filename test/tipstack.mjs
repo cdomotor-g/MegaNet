@@ -392,6 +392,47 @@ try {
       !!p[PAIR[0]] && !!p[PAIR[1]] && !meet(p[PAIR[0]], p[PAIR[1]]), J(p));
   }
 
+  // ── 💬 the hover notes' switch ─────────────────────────────────────────────
+  // Small, under ↺ in the top-right corner; off hides every name that follows
+  // the pointer and leaves the pins' own names; remembered across a reload.
+  {
+    const sw = await page.evaluate(() => {
+      const b = document.querySelector('#leaflet-map .leaflet-top.leaflet-right .mn-map-tips');
+      const r = document.querySelector('#leaflet-map .mn-map-reset');
+      if (!b) return null;
+      const bb = b.getBoundingClientRect(), rb = r ? r.getBoundingClientRect() : null;
+      return { pressed: b.getAttribute('aria-pressed'), label: b.getAttribute('aria-label'), title: b.title,
+        w: bb.width, h: bb.height, below: rb ? bb.top >= rb.bottom - 1 : null,
+        inBar: !!b.closest('.mn-mapbar') };
+    });
+    check('💬 is on the map, top right, under ↺ and outside its bar, named and pressed (on)',
+      !!sw && sw.pressed === 'true' && /hover notes/i.test(sw.label) && sw.title.length > 40 && sw.below === true && !sw.inBar, J(sw));
+    check('…and smaller than a corner button', !!sw && sw.w <= 30 && sw.h <= 30, J(sw));
+    const tipState = () => page.evaluate(() => {
+      const hov = L.tooltip({ direction: 'top', className: 'mn-road-label' }).setLatLng(state.map.getCenter()).setContent('A road').addTo(state.map);
+      const perm = L.tooltip({ permanent: true, direction: 'bottom', className: 'mn-pin-label' }).setLatLng(state.map.getCenter()).setContent('A pin').addTo(state.map);
+      const vis = t => t._container.offsetWidth > 0;
+      const out = { hover: vis(hov), pin: vis(perm), off: MapTipStack.off(), stored: localStorage.getItem('mn-map-tips'),
+        pressed: document.querySelector('.mn-map-tips').getAttribute('aria-pressed'),
+        cls: state.map.getContainer().classList.contains('mn-tips-off') };
+      hov.remove(); perm.remove();
+      return out;
+    });
+    let t = await tipState();
+    check('on: a hover name shows', t.hover && t.pin && !t.off, J(t));
+    await page.click('.mn-map-tips');
+    t = await tipState();
+    check('pressed: hover names are hidden, a pin\'s own name stays, and the button says off',
+      !t.hover && t.pin && t.off && t.stored === 'off' && t.pressed === 'false' && t.cls, J(t));
+    await page.reload();
+    await page.waitForFunction(() => typeof state !== 'undefined' && state.map && document.querySelector('.mn-map-tips'), null, { timeout: LOAD_TIMEOUT });
+    t = await tipState();
+    check('…and it is still off after a reload', !t.hover && t.pin && t.off && t.pressed === 'false' && t.cls, J(t));
+    await page.click('.mn-map-tips');
+    t = await tipState();
+    check('pressed again: hover names are back', t.hover && !t.off && t.stored === 'on' && t.pressed === 'true' && !t.cls, J(t));
+  }
+
   check('no pageerror', errors.length === 0, errors.join(' | '));
 } finally {
   await browser.close();

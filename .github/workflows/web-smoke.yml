@@ -1533,6 +1533,25 @@ jobs:
         working-directory: test
         run: npm run bestrep
 
+      # ⚖️ Repeater comparison (map-repcompare.js), on the same hilly world and
+      # the committed register: only repeaters offered and taken, the shared
+      # sites exactly what two or more of them carry by their pass ranges,
+      # every cell the path priced afresh to the last bit with its picture
+      # kept, a row a real click picks moving the map and drawing its paths,
+      # the CSV whole, and Clear the selection taking all of it off.
+      - name: Repeater comparison — the sites two or more repeaters both carry
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run repcompare
+
+      # The Message Log's Base station filter (message-log.js): bases by name
+      # from the receivers' own list, the Path column saying the name, the
+      # question asked of the datastore, and nothing of it without the list.
+      - name: Message Log — base stations by name
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run msglogbase
+
       # 🪜 Hops to base (map-hops.js), on the committed register with the
       # datastore answered by the check: the station card's pill pressed with
       # a real click; every route from the station to a base through

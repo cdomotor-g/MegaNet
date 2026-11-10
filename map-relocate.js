@@ -1757,7 +1757,7 @@ const MapRelocate = (function () {
           ${upTo && typeof MapSites !== 'undefined' && MapSites.serveRepeater ? `
           <p class="small txt-muted">Further than ${MAX_R / 1000} km?
             <button type="button" class="btn-link" onclick="MapRelocate.toSites()"
-                    title="Open 🗼 Repeater sites with the stations this repeater carries as the sites to serve, and the ways on ticked here as the ones the new mast must reach">Find a new hilltop for what it carries</button></p>` : ''}
+                    title="Open 🗼 Move/New Repeater with the stations this repeater carries as the sites to serve, and the ways on ticked here as the ones the new mast must reach">Find a new hilltop for what it carries</button></p>` : ''}
           <details class="bestrep-words"><summary>What the words here mean</summary>
             <dl>${Object.entries(REP_WORDS).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
           </details>`;
@@ -1919,6 +1919,9 @@ const MapRelocate = (function () {
     },
 
     active() { return !!found && results.length > 0; },
+    // Anything of this tool's on: a station chosen, a search running or its
+    // answer. The side panel rings 🚚 while so (app.js, syncDockLive).
+    live() { return !!stationId || !!job || results.length > 0; },
     legendHtml,
     run,
 

@@ -111,7 +111,8 @@ const panel = await page.evaluate(() => {
     title: wrap && wrap.querySelector('.mn-mapctl-title')?.textContent,
     group: strip.find(b => b.dataset.dock === 'map-bestrep')?.closest('.dock-group')?.dataset.group,
     afterRelocate: at('[data-dock="map-bestrep"]') === at('[data-dock="map-relocate"]') + 1,
-    beforeHere: at('.mn-map-here') === at('[data-dock="map-bestrep"]') + 1,
+    beforeHere: at('.mn-map-here') === at('[data-dock="map-bestrep"]') + 2
+      && at('[data-dock="map-repcompare"]') === at('[data-dock="map-bestrep"]') + 1,
     runDisabled: document.getElementById('bestrep-run')?.disabled,
     status: document.getElementById('bestrep-status')?.textContent || '',
     words: document.querySelectorAll('.bestrep-words dt').length,
@@ -120,7 +121,7 @@ const panel = await page.evaluate(() => {
 ok('a 🎯 Best repeater is a pane of the side panel, open from its button in the strip',
    panel.present && panel.docked && panel.shown && panel.showing === 'map-bestrep' && panel.title === 'Best repeater',
    JSON.stringify(panel));
-ok('…in the tools group, straight after the relocation finder and straight before What is here',
+ok('…in the tools group, straight after the relocation finder, with ⚖️ Repeater comparison between it and What is here',
    panel.group === 'tools' && panel.afterRelocate && panel.beforeHere, JSON.stringify(panel));
 ok('Find the best repeater is off with no station, and the panel says what is missing',
    panel.runDisabled === true && /Pick a station/.test(panel.status), panel.status);
@@ -361,6 +362,37 @@ ok('…and a click on it picks it: its callout, its row, a table of every hop',
    sel.selected === r2.id && /^#2 /.test(sel.popup) && sel.row === '2' && sel.table === 1 + r2hops, JSON.stringify(sel));
 await page.evaluate(() => state.map.closePopup());
 
+// Each hop's ground, drawn small in its row: the station's own from the
+// pricing, the hops on drawn when the card opens.
+await page.waitForFunction(() => ![...document.querySelectorAll('.bestrep-panel .sites-result.is-on .sites-t-pic .sites-thumb-none')]
+  .some(x => /Drawing/.test(x.textContent)), null, { timeout: 60000 }).catch(() => {});
+const pics = await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('.bestrep-panel .sites-result.is-on .sites-table tbody tr')];
+  return {
+    head: document.querySelector('.bestrep-panel .sites-result.is-on .sites-table thead .sites-t-pic')?.textContent.trim() || '',
+    means: document.querySelector('.bestrep-panel .sites-result.is-on .sites-table thead .sites-t-pic [title]')?.getAttribute('title') || '',
+    rows: rows.length,
+    drawn: rows.filter(r => r.querySelector('td.sites-t-pic .sites-thumb svg')).length,
+    buttons: rows.filter(r => r.querySelector('td.sites-t-pic button.sites-thumb')).length,
+    open: rows.filter(r => r.querySelector('button.btn-link')).length,
+    key: !!document.querySelector('.bestrep-panel .sites-result.is-on .sites-thumbs-hint'),
+    fold: [...document.querySelectorAll('.bestrep-words dt')].some(d => d.textContent === 'Ground profile'),
+  };
+});
+ok('every hop in the table has its ground profile drawn beside its figures, and a ↗',
+   pics.head === 'Ground profile' && pics.means.length > 40 && pics.rows === 1 + r2hops && pics.drawn === pics.rows
+   && pics.buttons === pics.rows && pics.open === pics.rows && pics.key && pics.fold, JSON.stringify(pics));
+await page.locator('.bestrep-panel .sites-result.is-on tbody tr:first-child .sites-thumb').click();
+await page.waitForTimeout(600);
+const fullOpen = await page.evaluate(() => ({
+  line: !!MapDraw.findLine([MapBestRepeater.site().lat, MapBestRepeater.site().lon],
+    (s => [s.lat, s.lon])(state.data.stations.find(x => x.id === MapBestRepeater.selected()))),
+  full: !!document.querySelector('.pp-full, .path-full, [class*="pp-fs"], dialog[open]'),
+}));
+ok('a click on a picture puts that hop in the elevation profile', fullOpen.line, JSON.stringify(fullOpen));
+await page.keyboard.press('Escape');
+await page.waitForTimeout(300);
+
 const legend = await page.evaluate(() => document.getElementById('map-legend')?.textContent.replace(/\s+/g, ' ') || '');
 ok('the legend says what the paths and the pins are', /Best repeater/.test(legend), legend.slice(0, 200));
 
@@ -445,8 +477,29 @@ console.log('\nA new site');
 
 const k = { lat: 111132.92, lon: 111412.84 * Math.cos(pick.lat * Math.PI / 180) };
 const typed = { lat: +(pick.lat + 3000 / k.lat).toFixed(5), lon: +(pick.lon + 2000 / k.lon).toFixed(5) };
-await page.fill('#bestrep-point', `${typed.lat}, ${typed.lon}`);
-await page.locator('.bestrep-point button', { hasText: 'Use' }).click();
+// One box for both: the same one the station was found in reads a lat, lon,
+// says what it has understood, and Enter takes it.
+const reads = await page.evaluate(() => ({
+  boxes: document.querySelectorAll('.mn-mapctl[data-panel="bestrep"] input[type="search"], .mn-mapctl[data-panel="bestrep"] input[type="text"]').length,
+  hint: (document.getElementById('bestrep-find-hint')?.textContent || '').replace(/\s+/g, ' '),
+  plain: MapBestRepeater.parsePoint('-17.5, 145.9'), hemi: MapBestRepeater.parsePoint('17.5S 145.9E'),
+  pre: MapBestRepeater.parsePoint('S17.5 E145.9'), swap: MapBestRepeater.parsePoint('145.9E 17.5S'),
+  dms: MapBestRepeater.parsePoint('17°30\'00"S 145°54\'00"E'), spaces: MapBestRepeater.parsePoint('-17.5 145.9'),
+  north: MapBestRepeater.parsePoint('17.5N 145.9E'), number: MapBestRepeater.parsePoint('541155'),
+  off: MapBestRepeater.parsePoint('95, 200'),
+}));
+const nearPt = p => p && Math.abs(p.lat + 17.5) < 1e-9 && Math.abs(p.lon - 145.9) < 1e-9;
+ok('the panel has one box for a station or a new site, with a hint under it',
+   reads.boxes === 1 && /latitude, longitude/.test(reads.hint) && /ALERT address/.test(reads.hint), JSON.stringify(reads.boxes) + ' ' + reads.hint.slice(0, 120));
+ok('it reads a lat, lon the common ways: signed, with N S E W before or after, either order, and in degrees minutes seconds',
+   nearPt(reads.plain) && nearPt(reads.hemi) && nearPt(reads.pre) && nearPt(reads.swap) && nearPt(reads.dms) && nearPt(reads.spaces)
+   && reads.north && reads.north.lat === 17.5, JSON.stringify(reads));
+ok('a station number is not a position, and a latitude past 90 is refused', reads.number === null && reads.off === null);
+await page.fill('#bestrep-find', `${typed.lat}, ${typed.lon}`);
+const offer = await page.evaluate(() => (document.getElementById('bestrep-hits')?.textContent || '').replace(/\s+/g, ' '));
+ok('typing a lat, lon says it is a new site, where, and how far from the nearest station',
+   /New site at/.test(offer) && /km from/.test(offer), offer.slice(0, 160));
+await page.press('#bestrep-find', 'Enter');
 await page.waitForTimeout(300);
 const pt = await page.evaluate(() => ({ site: MapBestRepeater.site(), choices: MapBestRepeater.choices(), radio: MapBestRepeater.radio() }));
 ok('a lat, lon typed is a new site of its own, nothing carrying it',
@@ -459,10 +512,16 @@ const N = await page.evaluate(() => ({ status: MapBestRepeater.status(), n: MapB
   text: document.getElementById('bestrep-status')?.textContent.replace(/\s+/g, ' ') || '' }));
 ok('…and it is answered', N.status.kind === 'done' && N.n === pt.choices.length && /is the best of/.test(N.text), N.text.slice(0, 200));
 
-await page.fill('#bestrep-point', 'somewhere');
-await page.locator('.bestrep-point button', { hasText: 'Use' }).click();
+await page.fill('#bestrep-find', '95, 200');
+const badList = await page.evaluate(() => (document.getElementById('bestrep-hits')?.textContent || '').replace(/\s+/g, ' '));
+await page.press('#bestrep-find', 'Enter');
 const bad = await page.evaluate(() => document.getElementById('bestrep-status')?.textContent || '');
-ok('a lat, lon it cannot read is said to be', /latitude, longitude/.test(bad), bad);
+ok('a lat, lon it cannot read is said to be, under the box and on Enter',
+   /cannot be read/.test(badList) && /latitude, longitude/.test(bad), badList.slice(0, 120) + ' | ' + bad);
+await page.fill('#bestrep-find', 'zzz-no-such-station');
+const none = await page.evaluate(() => (document.getElementById('bestrep-hits')?.textContent || '').replace(/\s+/g, ' '));
+ok('a name nothing matches says so and how to give a new site', /No station/.test(none) && /latitude, longitude/.test(none), none.slice(0, 140));
+await page.fill('#bestrep-find', '');
 
 // Picked on the map: a real click on open ground.
 await page.evaluate(p => state.map.setView([p.lat, p.lon], 12, { animate: false }), typed);

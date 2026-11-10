@@ -193,14 +193,20 @@ const MapViews = (function () {
 
   // The overlay layers a view switches, each on its own module's setter.
   const LAYER_KNOBS = ['riverLines', 'riverCatchment', 'rain', 'elev', 'catchments', 'lots', 'easements', 'tenure',
-    'roads', 'roadOwners', 'councils', 'survey', 'hubs', 'wind', 'cameras', 'photos', 'siteFeatures', 'twinOffer'];
+    'roads', 'roadOwners', 'councils', 'survey', 'hubs', 'wind', 'cameras', 'photos', 'siteFeatures'];
+  // Not among them: Offer the digital twin at close zoom (MapTwin.setEnabled).
+  // It was a view's to set until November 2026, and seven of the ten views
+  // set it on — so an operator who unticked it had it ticked again by the
+  // next view they pressed (the owner: "I turn this off and it keeps turning
+  // itself back on"). It is the person's own switch now: no view, kept view
+  // or shared link reads or writes it.
   // What a person calls them, for a kept view's description.
   const LAYER_NAMES = {
     riverLines: 'rivers', riverCatchment: 'a river\'s catchment', rain: 'rainfall', elev: 'ground height',
     catchments: 'river basins', lots: 'property boundaries', easements: 'easements', tenure: 'land tenure',
     roads: 'road parcels', roadOwners: 'road owners', councils: 'council areas', survey: 'survey marks',
     hubs: 'maintenance hubs', wind: 'wind regions', cameras: 'flood cameras', photos: 'field photos',
-    siteFeatures: 'site features', twinOffer: 'the digital twin',
+    siteFeatures: 'site features',
   };
   const PATH_WORDS = {
     every: 'every path', best: 'the best path only', lod: 'the best path until zoomed in',
@@ -248,7 +254,7 @@ const MapViews = (function () {
       knobs: {
         base: 'Satellite', links: true, roles: ALL_ROLES, backbone: false, arrows: false, colour: 'freq', health: true,
         outlines: false,
-        ...only('lots', 'easements', 'roads', 'survey', 'photos', 'siteFeatures', 'cameras', 'twinOffer', 'riverLines'),
+        ...only('lots', 'easements', 'roads', 'survey', 'photos', 'siteFeatures', 'cameras', 'riverLines'),
         drawing: { paths: 'every', draw: 'tails', tails: { follow: true }, auto: true, balance: 35 },
       },
     },
@@ -259,7 +265,7 @@ const MapViews = (function () {
       caution: 'Fetches the maintenance hub areas (about 550 KB) the first time.',
       knobs: {
         base: 'Satellite', links: true, roles: ALL_ROLES, backbone: false, arrows: true, colour: 'freq', health: true,
-        outlines: false, ...only('hubs', 'riverLines', 'photos', 'siteFeatures', 'twinOffer'),
+        outlines: false, ...only('hubs', 'riverLines', 'photos', 'siteFeatures'),
         drawing: { paths: 'every', draw: 'tails', tails: { follow: true }, auto: true, balance: 62 },
       },
     },
@@ -269,7 +275,7 @@ const MapViews = (function () {
       caution: 'Works out the margin for each path that has none saved yet, which fetches the ground heights along it.',
       knobs: {
         base: null, links: true, roles: ALL_ROLES, backbone: false, arrows: false, colour: 'fade', health: false,
-        outlines: false, ...only('riverLines', 'photos', 'siteFeatures', 'twinOffer'),
+        outlines: false, ...only('riverLines', 'photos', 'siteFeatures'),
         drawing: { paths: 'every', draw: 'lines', auto: true, balance: 85 },
       },
     },
@@ -280,7 +286,7 @@ const MapViews = (function () {
       caution: 'Fetches the maintenance hub areas (about 550 KB) the first time.',
       knobs: {
         base: null, links: true, roles: { field: false, repeater: true, base: true }, backbone: true, arrows: true,
-        colour: 'freq', health: true, outlines: false, ...only('hubs', 'riverLines', 'photos', 'siteFeatures', 'twinOffer'),
+        colour: 'freq', health: true, outlines: false, ...only('hubs', 'riverLines', 'photos', 'siteFeatures'),
         drawing: { paths: 'every', draw: 'flow', flow: { mode: 'all' }, auto: true, balance: 60 },
       },
     },
@@ -290,7 +296,7 @@ const MapViews = (function () {
       caution: 'Asks the network for new readings every 15 seconds while it is on.',
       knobs: {
         base: null, links: true, roles: ALL_ROLES, backbone: false, arrows: false, colour: 'freq', health: true,
-        outlines: false, ...only('riverLines', 'photos', 'siteFeatures', 'twinOffer'),
+        outlines: false, ...only('riverLines', 'photos', 'siteFeatures'),
         drawing: { paths: 'best', draw: 'flow', flow: { mode: 'live' }, auto: true, balance: 65 },
       },
     },
@@ -301,7 +307,7 @@ const MapViews = (function () {
       caution: 'Fetches the ground heights for each screenful, and the river basins (about 760 KB) the first time.',
       knobs: {
         base: 'OSM-Topo', links: false, roles: FIELD_ONLY, backbone: false, arrows: false, health: false, outlines: true,
-        ...only('riverLines', 'riverCatchment', 'catchments', 'elev', 'cameras', 'photos', 'siteFeatures', 'twinOffer'),
+        ...only('riverLines', 'riverCatchment', 'catchments', 'elev', 'cameras', 'photos', 'siteFeatures'),
         drawing: { paths: 'every', draw: 'lines', auto: true, balance: 40 },
       },
     },
@@ -325,8 +331,7 @@ const MapViews = (function () {
         + 'and survey marks once you zoom in.',
       knobs: {
         base: 'Satellite', links: false, roles: ALL_ROLES, backbone: false, arrows: false, health: false, outlines: false,
-        ...only('lots', 'easements', 'roads', 'roadOwners', 'councils', 'survey', 'riverLines', 'photos', 'siteFeatures',
-          'twinOffer'),
+        ...only('lots', 'easements', 'roads', 'roadOwners', 'councils', 'survey', 'riverLines', 'photos', 'siteFeatures'),
         drawing: { paths: 'every', draw: 'lines', auto: true, balance: 40 },
       },
     },
@@ -945,7 +950,6 @@ const MapViews = (function () {
     cameras: boolKnob('mapCameras', M('MapCameras'), 'setEnabled'),
     photos: boolKnob('mapPhotos', M('MapPhotos'), 'setEnabled'),
     siteFeatures: boolKnob('mapSiteFeatures', M('SiteFeatures'), 'setEnabled'),
-    twinOffer: boolKnob('mapTwinAuto', M('MapTwin'), 'setEnabled'),
     drawing: {
       avail: () => true,
       read: () => settings(),
@@ -1161,6 +1165,8 @@ const MapViews = (function () {
   const SHARE_SWITCHES = ['links', 'backbone', 'arrows', 'health', 'outlines', 'riverLines', 'riverCatchment', 'rain',
     'elev', 'catchments', 'lots', 'easements', 'tenure', 'roads', 'roadOwners', 'councils', 'survey', 'hubs', 'wind',
     'cameras', 'photos', 'siteFeatures', 'twinOffer'];
+  // (twinOffer keeps its place so older links still line up; it is no longer
+  // a knob, so it is written as "-" and ignored when read.)
   // A base map's name, with the code's own separators kept out of it.
   const shareName = n => encodeURIComponent(n).replace(/[.*!~]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
   function shareCode() {

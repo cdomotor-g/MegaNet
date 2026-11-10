@@ -178,9 +178,9 @@ const panel = await page.evaluate(() => {
     status: document.getElementById('sites-status')?.textContent || '',
   };
 });
-ok('a 🗼 Repeater sites is a pane of the side panel, open from its button in the strip',
+ok('🗼 Move/New Repeater is a pane of the side panel, open from its button in the strip',
    panel.present && panel.docked && panel.shown && panel.showing === 'map-sites'
-     && panel.title === 'Repeater sites' && /^Repeater sites — /.test(panel.label || ''), JSON.stringify(panel));
+     && panel.title === 'Move/New Repeater' && /^Move\/New Repeater — /.test(panel.label || ''), JSON.stringify(panel));
 ok('…in the tools group, straight after the polar plot and straight before the station relocation finder',
    panel.group === 'tools' && panel.afterPolar && panel.beforeRelocate, JSON.stringify(panel));
 ok('Find sites is disabled with nothing to serve, and the panel says what is missing',
@@ -234,7 +234,7 @@ const pasted = [
   'creek',                                 // hundreds of them
 ].join('\n');
 await page.locator('#sites-paste').fill(pasted);
-await page.locator('.sites-panel button', { hasText: 'Add the list' }).click();
+await page.locator('.sites-finder button', { hasText: 'Add the list' }).click();
 const afterPaste = await page.evaluate(() => ({
   targets: MapSites.targets(),
   note: document.getElementById('sites-paste-note')?.textContent || '',
@@ -262,9 +262,9 @@ ok('every site is ringed on the map', afterPaste.rings === 6, `${afterPaste.ring
 await page.evaluate(id => { state.mapSelection.clear(); addToMapSelection([id]); MapSites.clear(); }, S[4].id);
 // clear() took the paste's six away; put them back, then add the selection.
 await page.locator('#sites-paste').fill(pasted);
-await page.locator('.sites-panel button', { hasText: 'Add the list' }).click();
+await page.locator('.sites-finder button', { hasText: 'Add the list' }).click();
 await page.evaluate(() => MapSites.drawingChanged());   // the selection count is drawn with the shapes row
-await page.locator('.sites-panel button', { hasText: 'Add the map selection' }).click();
+await page.locator('.sites-finder button', { hasText: 'Add the map selection' }).click();
 const withSel = await page.evaluate(() => MapSites.targets().map(t => t.sid));
 ok('Add the map selection puts the picked stations in the set', withSel.includes(S[4].id) && withSel.length === 7,
    `${withSel.length} site(s)`);
@@ -412,6 +412,54 @@ ok('…and a click on it picks it, opens its callout and its row',
    picked2.rank === 2 && /^#2 repeater site/.test(picked2.popup) && picked2.row === '2', JSON.stringify(picked2));
 ok('…without throwing', errors.length === 0, errors.join('\n'));
 await page.evaluate(() => { state.map.closePopup(); MapSites.select(1); });
+
+// A row of the table is a way to the map: the station comes on screen and its
+// path to the candidate is lit — and the row's own buttons keep their jobs.
+const rowGo = await page.evaluate(async () => {
+  const rows = [...document.querySelectorAll('.sites-result.is-on .sites-table tbody tr.sites-row-go')];
+  const k = rows.length - 1;
+  const t = MapSites.targets()[k];
+  rows[k].querySelector('td:nth-child(2)').click();
+  await new Promise(r => setTimeout(r, 600));
+  const lit = [];
+  MapSites.drawn().lines.eachLayer(l => { if (l.mnLit) lit.push(l.mn3d); });
+  const on = document.querySelector('.sites-result.is-on .sites-table tbody tr.is-lit');
+  return {
+    n: rows.length, lit: MapSites.lit(), layers: lit.sort().join(','),
+    inView: state.map.getBounds().contains([t.lat, t.lon]),
+    row: on ? on.querySelector('.sites-t-go')?.textContent.trim() : null, name: t.name,
+    pressed: on?.querySelector('.sites-t-go')?.getAttribute('aria-pressed'),
+    focus: document.activeElement?.className || '',
+    rank: MapSites.selectedRank(),
+  };
+});
+ok('a click on a row of the table lights that station\'s path on the map and brings the station into view',
+   rowGo.lit && rowGo.lit.k === rowGo.n - 1 && !rowGo.lit.hub && rowGo.layers === 'link,target' && rowGo.inView,
+   JSON.stringify(rowGo));
+ok('…the row says it is the one lit, its name is a button the keyboard can press, and the candidate stays picked',
+   rowGo.row === rowGo.name && rowGo.pressed === 'true' && /sites-t-go/.test(rowGo.focus) && rowGo.rank === 1,
+   JSON.stringify(rowGo));
+const rowKey = await page.evaluate(async () => {
+  const b = document.querySelector('.sites-result.is-on .sites-table tbody tr.sites-row-go .sites-t-go');
+  b.focus(); b.click();
+  await new Promise(r => setTimeout(r, 300));
+  const lit0 = MapSites.lit();
+  // The ↗ in a row is its own button: it must not light the row it is in.
+  const other = [...document.querySelectorAll('.sites-result.is-on .sites-table tbody tr.sites-row-go')]
+    .findIndex((tr, i) => i > 0 && tr.querySelector('.sites-thumb'));
+  let after = null;
+  if (other > 0) {
+    MapSites.rowClick({ target: document.querySelectorAll('.sites-result.is-on .sites-table tbody tr.sites-row-go')[other].querySelector('.sites-thumb') }, 1, other, false);
+    after = MapSites.lit();
+  }
+  MapSites.select(2);
+  const moved = MapSites.lit();
+  MapSites.select(1);
+  return { lit0, other, after, moved };
+});
+ok('…the name pressed does the same, a row\'s own picture button does not, and another candidate picked puts the light out',
+   rowKey.lit0 && rowKey.lit0.k === 0 && (rowKey.other < 1 || (rowKey.after && rowKey.after.k === 0)) && rowKey.moved === null,
+   JSON.stringify(rowKey));
 
 // ── 2b. the Google Earth file ────────────────────────────────────────────────
 console.log('\nThe Google Earth file');
@@ -838,7 +886,9 @@ if (!gl2) {
      s3c.dim === 1 && JSON.stringify(s3c.paint.links) === '["get","op"]' && JSON.stringify(s3c.paint.st) === '["get","op"]'
      && s3c.paint.here === 1 && s3c.names === 0, JSON.stringify(s3c.paint));
 
-  await page.locator('.mn-map-3d').click();
+  // The pane's own Leave 3-D (Map3D.toggle): ⛰️ in the rail only puts the
+  // 3-D settings away now, it no longer leaves.
+  await page.evaluate(() => { Map3D.toggle(); });
   await page.waitForFunction(() => !Map3D._map(), null, { timeout: RUN_TIMEOUT });
   const gone3 = await page.evaluate(() => ({
     host: !!document.getElementById('map3d'), markers: document.querySelectorAll('.maplibregl-marker').length,
@@ -868,7 +918,7 @@ const beforeProf = await page.evaluate(() => ({ showing: dockShowing(),
   cards: !!document.querySelector('#help-panel .dock-pane-stations #stations-cards') }));
 ok('the cards are in the side panel beside the finder, and the finder is the pane on screen',
    beforeProf.showing === 'map-sites' && beforeProf.cards, JSON.stringify(beforeProf));
-await page.locator('.sites-panel button', { hasText: 'Profile the worst path' }).first().click();
+await page.locator('.sites-finder button', { hasText: 'Profile the worst path' }).first().click();
 await page.waitForTimeout(400);
 const afterProf = await page.evaluate(() => {
   const el = document.getElementById('path-profile-panel');
@@ -944,9 +994,9 @@ ok('…over the finder, which stays the pane on screen behind it', big.showing =
 // rather than as anything typed, and the card works out the finder's margin.
 const bigShort = JSON.stringify({ ...big, readout: big.readout.slice(0, 200) });
 ok('…with a point candidate carrying the finder\'s radio, on the finder\'s mast — its own figures, not typed ones',
-   !big.point || (big.mast === big.rep && big.by === 'Repeater sites' && !big.edited), bigShort);
+   !big.point || (big.mast === big.rep && big.by === 'Move/New Repeater' && !big.edited), bigShort);
 ok('…and the chart works out the margin the finder quoted, saying the radio is the finder\'s',
-   !big.point || (big.card != null && Math.abs(big.card - big.quoted) < 0.5 && big.cardBy === 'Repeater sites'
+   !big.point || (big.card != null && Math.abs(big.card - big.quoted) < 0.5 && big.cardBy === 'Move/New Repeater'
                   && /Proposed repeater site/.test(big.readout) && !/not computed/.test(big.readout)), bigShort);
 await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
@@ -1117,7 +1167,7 @@ if (REP) {
   await page.waitForTimeout(300);
   await page.evaluate(() => setDockTab('map-sites'));
   await page.waitForTimeout(300);
-  await page.locator('.sites-panel button', { hasText: 'Add what the selected repeater carries' }).click();
+  await page.locator('.sites-finder button', { hasText: 'Add what the selected repeater carries' }).click();
   await page.waitForTimeout(200);
   const filled = await page.evaluate(r => {
     const K = r.K;
@@ -1186,16 +1236,48 @@ if (REP) {
   });
   ok('✕ takes one off the list', removed.after === removed.before - 1, JSON.stringify(removed));
   await page.evaluate(() => { MapSites.clear(); closeStnCard(false); });
+
+  // The same repeater, typed: no station selected, its name in the box, and a
+  // pick from the list fills both lists as the button did.
+  await page.waitForTimeout(200);
+  const repName = await page.evaluate(id => state.data.stations.find(s => s.id === id).name, REP.id);
+  await page.locator('#sites-rep-find').fill(repName);
+  await page.waitForTimeout(200);
+  const typed = await page.evaluate(id => {
+    const hits = [...document.querySelectorAll('#sites-rep-hits .lb-hit')];
+    const all = hits.map(b => (b.getAttribute('onclick') || '').match(/'([^']+)'/)?.[1]);
+    const reps = all.every(x => { const s = state.data.stations.find(y => y.id === x); return s && s.roles.includes('repeater'); });
+    const mine = hits[all.indexOf(id)];
+    const boxKept = document.activeElement?.id === 'sites-rep-find';
+    if (mine) mine.click();
+    return { n: hits.length, reps, found: !!mine, boxKept, selected: typeof selectedStationId === 'function' ? selectedStationId() : null,
+             origin: MapSites.origin(), targets: MapSites.targets().length, hubs: MapSites.hubs().map(h => h.sid),
+             box: document.getElementById('sites-rep-find')?.value };
+  }, REP.id);
+  ok('a repeater typed by name is offered — repeaters only — without the box losing its caret',
+     typed.n >= 1 && typed.reps && typed.found && typed.boxKept, JSON.stringify(typed));
+  ok('…and picking it fills Sites to serve and Must reach as the button does for a selected one, and empties the box',
+     typed.origin === REP.id && typed.targets > 0
+       && JSON.stringify(typed.hubs) === JSON.stringify(filled.got) && typed.box === '', JSON.stringify(typed));
+  const typedNone = await page.evaluate(() => {
+    MapSites.setRepFind('zzqqxx');
+    const none = document.querySelector('#sites-rep-hits')?.textContent.trim() || '';
+    MapSites.setRepFind('');
+    return { none, empty: document.querySelector('#sites-rep-hits')?.children.length };
+  });
+  ok('…a name no repeater has says so, and an empty box lists nothing',
+     /No repeater matches/.test(typedNone.none) && typedNone.empty === 0, JSON.stringify(typedNone));
+  await page.evaluate(() => MapSites.clear());
 }
 
 // The ranking, on the cluster: its sites, and one mast not built yet 25 km
 // off as the one it must reach — a proposed mast, so its radio is the
 // network's commonest on a mast, and its channel the run's own.
 await page.locator('#sites-paste').fill(pasted);
-await page.locator('.sites-panel button', { hasText: 'Add the list' }).click();
+await page.locator('.sites-finder button', { hasText: 'Add the list' }).click();
 const hubAt = dest(run1.area.lat, run1.area.lon, 120, 25);
 await page.locator('#sites-hub-paste').fill(`${hubAt[0].toFixed(5)}, ${hubAt[1].toFixed(5)}`);
-await page.locator('.sites-panel button', { hasText: /^Add$/ }).click();
+await page.locator('.sites-finder button', { hasText: /^Add$/ }).click();
 const oneHub = await page.evaluate(() => ({ hubs: MapSites.hubs(), note: document.getElementById('sites-hub-note')?.textContent || '' }));
 ok('a lat, lon typed into Must reach is a mast not built yet', oneHub.hubs.length === 1 && oneHub.hubs[0].kind === 'point'
    && /1 added/.test(oneHub.note), JSON.stringify(oneHub));

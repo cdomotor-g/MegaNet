@@ -5,7 +5,26 @@
 //                 names in one column, the pins' own names in another.
 //
 // After Leaflet, before init.js — index.html holds the order and the reasons.
-// Reads nothing of the app's; nothing runs at load — init.js starts it.
+// The stacking reads nothing of the app's; the switch below reaches core.js's
+// announce and toast.js from inside its own functions. Nothing runs at load —
+// init.js starts it.
+//
+// ── The switch (💬, under ↺ on the Stations map) ────────────────────────────
+//
+// The hover names can be turned off, and stay off. Asked for in these words
+// (10 Nov 2026): "give the user some way to easily turn the tooltip on and off
+// for the property views particularly, probably for all views … a little
+// button on the map window somewhere maybe in the top right corner … small
+// and unintrusive." The property tip (map-property-tip.js) is a paragraph that
+// follows the pointer, and reading the lot lines under it means moving it out
+// of the way; the others are shorter and the same in kind. One switch for all
+// of them, because this file already knows which names come and go with the
+// pointer: each wears mn-hover-tip, and a map whose switch is off wears
+// mn-tips-off, which hides them (styles.css). The names a pin keeps on the
+// map — the permanent ones — are not hover names and stay. The property tip
+// also asks the State nothing while it is off (MapPropTip reads off()).
+// Remembered on this device (mn-map-tips), like the other ways of reading
+// the map.
 //
 // ── Why ──────────────────────────────────────────────────────────────────────
 //
@@ -99,6 +118,66 @@ const MapTipStack = (() => {
                           // map-stack.js's MAX_LIFT for the pins themselves: four names
                           // deep under one pin, where the register has at most three
   let started = false;
+
+  // ── The switch ─────────────────────────────────────────────────────────────
+  const STORE = 'mn-map-tips';
+  let tipsOff = null;           // read once, the first time anything asks
+  const switched = new Set();   // maps wearing the 💬 button
+  function off() {
+    if (tipsOff === null) {
+      try { tipsOff = localStorage.getItem(STORE) === 'off'; } catch (_) { tipsOff = false; }
+    }
+    return tipsOff;
+  }
+  const TITLE_ON = 'Hover notes are on: resting the pointer on the map says what is under it — the lot, tenure and '
+    + 'easements of the land, a road, river, bridge or survey mark, a station or a radio path. Press to turn them off.';
+  const TITLE_OFF = 'Hover notes are off: nothing pops up under the pointer. The names printed on the map stay, and a '
+    + 'click still opens a card. Press to turn them back on.';
+  function paint(map) {
+    const isOff = off();
+    const el = map.getContainer && map.getContainer();
+    if (el) el.classList.toggle('mn-tips-off', isOff);
+    const b = map._mnTipsBtn;
+    if (!b) return;
+    b.setAttribute('aria-pressed', String(!isOff));
+    b.classList.toggle('is-off', isOff);
+    b.title = isOff ? TITLE_OFF : TITLE_ON;
+  }
+  function setEnabled(on) {
+    tipsOff = !on;
+    try { localStorage.setItem(STORE, on ? 'on' : 'off'); } catch (_) { /* still off for this session */ }
+    for (const m of [...switched]) {
+      const el = m.getContainer && m.getContainer();
+      if (!el || !document.contains(el)) { switched.delete(m); continue; }
+      paint(m);
+    }
+    const said = on ? 'Hover notes on — rest the pointer on the map to see what is under it.'
+      : 'Hover notes off — nothing pops up under the pointer. 💬 on the map turns them back on.';
+    if (typeof Toast !== 'undefined' && Toast.show) Toast.show(said);
+    else if (typeof announce === 'function') announce(said);
+  }
+  // The button: a control of its own under the map's top-right corner bar,
+  // not one of MapChrome's — it is a way of reading the map, small, and the
+  // corner bar on the Stations map is ↺'s alone (map-controls.js).
+  function attachSwitch(map) {
+    if (!map || map._mnTipsBtn || typeof L === 'undefined') { if (map) paint(map); return; }
+    const ctl = L.control({ position: 'topright' });
+    ctl.onAdd = () => {
+      const b = L.DomUtil.create('button', 'mn-map-tips');
+      b.type = 'button';
+      b.innerHTML = '<span aria-hidden="true">💬</span>';
+      b.setAttribute('aria-label', 'Hover notes on the map');
+      L.DomEvent.disableClickPropagation(b);
+      L.DomEvent.on(b, 'click', L.DomEvent.stop);
+      L.DomEvent.on(b, 'click', () => setEnabled(off()));
+      L.DomEvent.on(b, 'dblclick', L.DomEvent.stop);
+      map._mnTipsBtn = b;
+      return b;
+    };
+    ctl.addTo(map);
+    switched.add(map);
+    paint(map);
+  }
 
   const PIN_NAME = /(^|\s)mn-pin-label(\s|$)/;
   const isPinName = t => PIN_NAME.test(t.options.className || '');
@@ -205,6 +284,8 @@ const MapTipStack = (() => {
       setPosition.call(this, pos);
       const k = kindOf(this);
       if (!k) return;
+      // What the switch hides: the names that come and go with the pointer.
+      if (k === hover) this._container.classList.add('mn-hover-tip');
       this._mnTipAt = L.DomUtil.getPosition(this._container);
       this._mnTipDy = 0;
       k.add(this);
@@ -216,5 +297,5 @@ const MapTipStack = (() => {
     };
   }
 
-  return { start };
+  return { start, attachSwitch, setEnabled, off, enabled: () => !off() };
 })();

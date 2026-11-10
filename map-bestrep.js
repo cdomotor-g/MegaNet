@@ -113,8 +113,8 @@ const MapBestRepeater = (function () {
   let site = null;          // { kind: 'station', id } | { kind: 'point', lat, lon }
   let sysId = null;         // the radio picked for the station, or null for its own
   let aglSet = null;        // the antenna height typed, or null for its radio's
-  let hitQ = '';
-  let pointQ = '';
+  let hitQ = '';           // what is typed in the one box: a station, or a lat, lon
+  let pics = new Map();     // 'from>to' → { state: 'pending' | 'done', thumb } — a hop on's ground, drawn small
   let armed = false;        // the next click on the map is the new site
   let job = null;           // { cancelled } while a pass is in flight
   let found = null;         // everything worked out, for the site as it was asked
@@ -171,6 +171,11 @@ const MapBestRepeater = (function () {
       carries: 'This repeater\'s pass ranges already take one of the station\'s ALERT addresses, so it relays the station today.',
       free: 'ALERT addresses inside this repeater\'s pass ranges that no station in its hub holds and nobody has set aside — room '
         + 'for a new station\'s readings. Addresses set aside are counted once the ALERT IDs tab has been opened.',
+      profile: 'The ground under the hop, and what grows on it, drawn small beside its figures, with the sending end on the '
+        + 'left: the straight line between the two antennas, the 60% Fresnel zone dashed either side of it, and in red '
+        + 'whatever reaches into that zone. Click one to open that hop\'s elevation profile full screen.',
+      newsite: 'A place with no station yet, given as a latitude and longitude. It is priced on the radio most of the '
+        + 'network runs unless another is picked under Search, and nothing carries it now.',
       unworked: 'A hop on the route on with no fade margin on file: nobody has worked it out under the model in use, or its saved '
         + 'figure is stale because a radio or a position has changed since.',
     };
@@ -181,6 +186,7 @@ const MapBestRepeater = (function () {
     ['good', 'Good'], ['ok', 'Ok'], ['bad', 'Poor'],
     ['clear', 'Clear'], ['marginal', 'Partly clear'], ['obstructed', 'Obstructed'],
     ['carries', 'Carries it now'], ['free', 'Free addresses'], ['unworked', 'Not worked out'],
+    ['profile', 'Ground profile'], ['newsite', 'New site'],
   ];
 
   function term(k, text) { return termHtml(text || (GLOSSARY.find(g => g[0] === k) || [k, k])[1], words()[k]); }
@@ -323,7 +329,11 @@ const MapBestRepeater = (function () {
       cover: res ? res.cls : null, canopy: res && res.canopyOk ? res.canopy : null,
     });
     if (!an.ok) return { dKm, failed: 'the model refused the path' };
-    return { dKm, verdict: an.verdict, margin: oneWay(an.pathLoss_db, here, hub.rad), src: 'card' };
+    // The picture of it (pathThumbOf, path-profile.js), kept with the figure
+    // as the site finder keeps its own, so the table draws it without
+    // profiling the hop again.
+    return { dKm, verdict: an.verdict, margin: oneWay(an.pathLoss_db, here, hub.rad), src: 'card',
+             thumb: typeof pathThumbOf === 'function' ? pathThumbOf(an) : null };
   }
 
   // ── On to a base ────────────────────────────────────────────────────────────
@@ -633,7 +643,91 @@ const MapBestRepeater = (function () {
     if (job) job.cancelled = true;
     job = null;
     found = null; results = []; selectedId = null; showAll = false;
+    pics = new Map();
     status = { kind: 'idle', text: '' };
+  }
+
+  // ── The ground under each hop, drawn small ──────────────────────────────────
+  // The station's own hop keeps its picture from the pricing (firstHop). The
+  // hops on are priced from the fade margin layer's figures, which keep no
+  // ground — so the picked repeater's are profiled here, once each, when its
+  // card opens: pathGround's ground at the card's sample count with the land
+  // cover on it (bare where the cover cannot be had), the far end's listening
+  // frequency. A picture only: the figures beside it stay the layer's.
+
+  async function hopPicture(fromId, toId) {
+    const a = stationById(fromId), b = stationById(toId);
+    if (!a || !b || a.lat == null || b.lat == null) return null;
+    const A = hubOf(a), B = hubOf(b);
+    const aglA = A.rad ? A.rad.agl : PATH_DEFAULT_AGL, aglB = B.rad ? B.rad.agl : PATH_DEFAULT_AGL;
+    const got = await pathGround(
+      { lat: A.lat, lon: A.lon, elev: A.elev, agl: aglA, mast: A.mast },
+      { lat: B.lat, lon: B.lon, elev: B.elev, agl: aglB, mast: B.mast },
+      { samples: SAMPLES, freqMhz: B.f });
+    if (!got || !got.ok) return null;
+    let res = null;
+    try { res = await LandCover.sample(got.prof.lat, got.prof.lon); } catch (_) { res = null; }
+    const cover = !!(res && res.ok);
+    const an = pathAnalyse(got.prof, {
+      elevA: got.ends.a.elev, elevB: got.ends.b.elev, aglA, aglB, freqMhz: B.f,
+      cover: cover ? res.cls : null, canopy: cover && res.canopyOk ? res.canopy : null,
+    });
+    return an.ok ? pathThumbOf(an) : null;
+  }
+
+  function routeHops(c) {
+    return c && c.onward && c.onward.kind === 'route' ? c.onward.best.hops : [];
+  }
+
+  // The picked repeater's hops on with no picture yet, drawn and put in their
+  // cells as each arrives. Asked once a hop; a new answer starts a new map.
+  function ensurePictures() {
+    const c = selectedId != null ? results.find(x => x.hub.id === selectedId) : null;
+    if (!c || !found || typeof pathThumbOf !== 'function') return;
+    const mine = pics;
+    const todo = routeHops(c).filter(h => !mine.has(`${h.from}>${h.to}`));
+    if (!todo.length) return;
+    for (const h of todo) mine.set(`${h.from}>${h.to}`, { state: 'pending', thumb: null });
+    lanes(todo, CONCURRENCY, async h => {
+      let thumb = null;
+      try { thumb = await hopPicture(h.from, h.to); } catch (_) { thumb = null; }
+      if (pics !== mine) return;
+      mine.set(`${h.from}>${h.to}`, { state: 'done', thumb });
+      const now = selectedId != null ? results.find(x => x.hub.id === selectedId) : null;
+      const k = routeHops(now).findIndex(x => x.from === h.from && x.to === h.to);
+      const cell = k >= 0 ? document.getElementById(`bestrep-pic-${k + 1}`) : null;
+      if (cell) cell.innerHTML = picHtml(now, k + 1);
+    }, { cancelled: false });
+  }
+
+  const VERDICT_WORD = { clear: 'clear', marginal: 'partly clear', obstructed: 'obstructed' };
+
+  // One hop's picture as a button: k = 0 the station's own hop, k ≥ 1 the
+  // k-th hop on. A click opens that hop's chart full screen over the map
+  // (profile, below), the finder staying where it is behind it.
+  function picHtml(c, k) {
+    if (!c || !found) return '';
+    let label, km, margin, verdict, thumb, none;
+    if (k === 0) {
+      const f = c.first;
+      if (!f) return '';
+      label = `${found.site.name} → ${c.hub.name}`;
+      km = c.km; margin = f.failed ? null : f.margin; verdict = f.failed ? null : f.verdict; thumb = f.thumb || null;
+      none = f.failed ? 'No figure for this hop' : 'No picture kept';
+    } else {
+      const h = routeHops(c)[k - 1];
+      if (!h) return '';
+      const pic = pics.get(`${h.from}>${h.to}`);
+      label = `${nameOf(h.from)} → ${nameOf(h.to)}`;
+      km = h.km; margin = h.margin; verdict = h.verdict; thumb = pic ? pic.thumb : null;
+      none = !pic || pic.state === 'pending' ? 'Drawing the ground…' : 'The ground could not be read';
+    }
+    const reading = [margin != null ? dbText(margin) : '', verdict && VERDICT_WORD[verdict] ? VERDICT_WORD[verdict] : '']
+      .filter(Boolean).join(' · ') || 'no figure';
+    const body = thumb ? pathThumbSvg(thumb) : `<span class="sites-thumb-none small txt-muted">${esc(none)}</span>`;
+    return `<button type="button" class="sites-thumb" onclick="MapBestRepeater.profile('${escAttr(c.hub.id)}', ${k}, true)"
+                    title="Open the elevation profile of ${escAttr(label)} full screen"
+                    aria-label="${escAttr(`${label}: ${km != null ? `${km.toFixed(1)} km, ` : ''}${reading}. Open its elevation profile full screen`)}">${body}</button>`;
   }
 
   // ── Words for figures ───────────────────────────────────────────────────────
@@ -766,35 +860,130 @@ const MapBestRepeater = (function () {
     }
   }
 
+  // ── The one box ─────────────────────────────────────────────────────────────
+  // A station — by name, station number or ALERT address — or a new site as
+  // a latitude and longitude: one box that works out which was typed, and
+  // says under it what it has understood before anything is picked.
+
+  // The stations a text matches: name or station number containing it, or —
+  // for a whole number — an ALERT address that is exactly it.
   function hits() {
     const q = hitQ.trim().toLowerCase();
     if (!q) return [];
+    const addr = /^\d{1,5}$/.test(q) ? +q : null;
+    const holds = s => {
+      if (addr == null) return false;
+      try { return stationAlertIds(s).some(a => +a === addr); } catch (_) { return false; }
+    };
     return stations().filter(s => s.lat != null && s.lon != null
-        && ((s.name || '').toLowerCase().includes(q) || String(s.station_number || '').toLowerCase().includes(q)))
+        && ((s.name || '').toLowerCase().includes(q) || String(s.station_number || '').toLowerCase().includes(q) || holds(s)))
       .slice(0, HIT_CAP);
   }
 
+  // A latitude and longitude, the common ways of writing one:
+  //   -27.1234, 151.5678      27.1234S 151.5678E      S27.1234 E151.5678
+  //   27°07'24"S 151°34'04"E  27° 7.4' S, 151° 34.07' E
+  // — a comma, a semicolon, spaces or nothing but the hemisphere letter
+  // between. N S E W say which is which, whichever comes first; without
+  // them the latitude is first, and the two the other way round (a longitude
+  // first) are turned back, since no latitude passes 90. `south` says a bare
+  // positive latitude was read as south (southGuess, below).
+  const NUM = String.raw`(-?\d+(?:\.\d+)?)\s*°?\s*(?:(\d+(?:\.\d+)?)\s*['′]\s*(?:(\d+(?:\.\d+)?)\s*(?:["″]|'')\s*)?)?`;
+  const POINT_POST = new RegExp(String.raw`^${NUM}(?:([NSEW])\s*[,;\s]*|[,;\s]\s*)${NUM}([NSEW])?$`);
+  const POINT_PRE  = new RegExp(String.raw`^([NSEW])\s*${NUM}[,;\s]*([NSEW])\s*${NUM}$`);
+
+  function parsePoint(text) {
+    const t = String(text || '').toUpperCase().replace(/[−–—]/g, '-')
+      .replace(/\b(?:LATITUDE|LONGITUDE|LAT|LONG|LON|LNG)\b\.?\s*[:=]?/g, ' ')
+      .replace(/[()\[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!t) return null;
+    let one, two;
+    let m = POINT_PRE.exec(t);
+    if (m) { one = { h: m[1], d: m[2], mi: m[3], se: m[4] }; two = { h: m[5], d: m[6], mi: m[7], se: m[8] }; }
+    else {
+      m = POINT_POST.exec(t);
+      if (!m) return null;
+      one = { d: m[1], mi: m[2], se: m[3], h: m[4] }; two = { d: m[5], mi: m[6], se: m[7], h: m[8] };
+    }
+    const val = p => {
+      const mi = p.mi != null ? +p.mi : 0, se = p.se != null ? +p.se : 0;
+      if (mi >= 60 || se >= 60) return NaN;
+      const neg = /^-/.test(p.d);
+      const v = Math.abs(+p.d) + mi / 60 + se / 3600;
+      if (p.h) return (p.h === 'S' || p.h === 'W') ? -v : v;   // the letter decides, whatever the sign
+      return neg ? -v : v;
+    };
+    const isLat = h => h === 'N' || h === 'S', isLon = h => h === 'E' || h === 'W';
+    let a = val(one), b = val(two);
+    if (!isFinite(a) || !isFinite(b)) return null;
+    if ((isLat(one.h) && isLat(two.h)) || (isLon(one.h) && isLon(two.h))) return null;
+    let bare = !one.h && !/^-/.test(one.d);
+    if (isLon(one.h) || isLat(two.h)) { [a, b] = [b, a]; bare = !two.h && !/^-/.test(two.d); }
+    else if (!one.h && !two.h && Math.abs(a) > 90 && Math.abs(b) <= 90) { [a, b] = [b, a]; bare = !/^-/.test(two.d); }
+    if (!(Math.abs(a) <= 90 && Math.abs(b) <= 180)) return null;
+    let south = false;
+    if (bare && a > 0 && southGuess()) { a = -a; south = true; }
+    return { lat: a, lon: b, south };
+  }
+
+  // Every station in the register is south of the equator, so a latitude
+  // typed with no minus and no letter is read as south — and said to be.
+  function southGuess() {
+    const list = stations().filter(s => s.lat != null);
+    return list.length > 0 && list.every(s => s.lat < 0);
+  }
+
+  // Typed like a coordinate — two numbers, a degree sign, a hemisphere letter
+  // against a figure — but not one parsePoint can read.
+  function looksLikePoint(text) {
+    const t = String(text || '').trim();
+    if (!/\d/.test(t) || !/^[\s\d.,;:°'"′″NSEWnsew+\-−]+$/.test(t)) return false;
+    return (t.match(/\d+(?:\.\d+)?/g) || []).length >= 2 || /°/.test(t) || /\d\s*[NSEWnsew]|[NSEWnsew]\s*\d/.test(t);
+  }
+
+  const POINT_EXAMPLE = '-27.4698, 153.0251 or 27.4698S 153.0251E';
+
+  function nearestTo(p) {
+    let best = null, bk = Infinity;
+    for (const s of stations()) {
+      if (s.lat == null || s.lon == null) continue;
+      const k = acmaHaversineKm(p.lat, p.lon, s.lat, s.lon);
+      if (k < bk) { bk = k; best = s; }
+    }
+    return best ? { s: best, km: bk } : null;
+  }
+
+  // What the box has understood, under it: a new site ready to use, the
+  // stations that match, or why it can do nothing with what is there.
   function hitsHtml() {
     if (!hitQ.trim()) return '';
+    const p = parsePoint(hitQ);
+    if (p) {
+      const near = nearestTo(p);
+      return `
+      <button type="button" class="polar-hit bestrep-newsite" id="bestrep-usepoint" onclick="MapBestRepeater.useTyped()"
+              title="${escAttr(words().newsite)}">
+        <span>📍 New site at <strong>${esc(stationLatLonText(p))}</strong></span>
+        <span class="small txt-muted">${near ? `${near.km < 10 ? near.km.toFixed(1) : Math.round(near.km)} km from ${esc(near.s.name)} · ` : ''}press Enter or click to use it</span>
+      </button>${p.south ? '<p class="small txt-muted">Read as south of the equator, as every station is — type N after the latitude if it is north.</p>' : ''}`;
+    }
     const list = hits();
-    return list.map(s => `
+    const rows = list.map(s => {
+      let addrs = [];
+      try { addrs = stationAlertIds(s); } catch (_) { addrs = []; }
+      return `
       <button type="button" class="polar-hit${site && site.kind === 'station' && s.id === site.id ? ' is-here' : ''}"
               onclick="MapBestRepeater.pickStation('${escAttr(s.id)}')">
         <span>${esc(s.name)}</span>
-        <span class="small txt-muted">${esc(s.station_number || '')}</span>
-      </button>`).join('') || '<p class="small txt-muted">No station by that name.</p>';
-  }
-
-  // "-27.1234, 151.5678" — a comma, spaces or both between; the two the
-  // other way round (a longitude first) are turned back, since no latitude
-  // passes 90.
-  function parsePoint(text) {
-    const m = /^\s*(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)\s*$/.exec(String(text || ''));
-    if (!m) return null;
-    let a = +m[1], b = +m[2];
-    if (Math.abs(a) > 90 && Math.abs(b) <= 90) [a, b] = [b, a];
-    if (!(Math.abs(a) <= 90 && Math.abs(b) <= 180)) return null;
-    return { lat: a, lon: b };
+        <span class="small txt-muted">${esc([s.station_number || '', addrs.length ? `ALERT ${addrs.join(', ')}` : ''].filter(Boolean).join(' · '))}</span>
+      </button>`;
+    }).join('');
+    if (looksLikePoint(hitQ)) {
+      return `<p class="small txt-warn">That looks like a latitude, longitude, but it cannot be read as one — a latitude is
+        between -90 and 90 and a longitude between -180 and 180. For example ${esc(POINT_EXAMPLE)}.</p>${rows}`;
+    }
+    return rows || `<p class="small txt-muted">No station has that in its name, number or ALERT addresses. For a new site,
+      type its latitude, longitude — for example ${esc(POINT_EXAMPLE)}.</p>`;
   }
 
   function pickedHtml(s) {
@@ -872,25 +1061,35 @@ const MapBestRepeater = (function () {
                   title="The ALERT IDs tab's Allocate card, set to this repeater — set an address aside for the station there">Allocate an address here</button>` : ''}
         </div>
         <div class="table-wrap">
-          <table class="sites-table">
+          <table class="sites-table sites-table-pics bestrep-table">
             <caption class="sr-only">Every hop from ${esc(found.site.name)} through ${esc(c.hub.name)} to a base</caption>
-            <thead><tr><th scope="col">Hop</th><th scope="col">km</th><th scope="col">${term('hop', 'Margin')}</th><th scope="col">Figure</th></tr></thead>
+            <thead><tr><th scope="col">Hop</th><th scope="col">km</th><th scope="col">${term('hop', 'Margin')}</th><th scope="col">Figure</th><th scope="col" class="sites-t-pic">${term('profile')}</th><th scope="col"><span class="sr-only">Profile</span></th></tr></thead>
             <tbody>
               <tr>
                 <td>${esc(found.site.name)} → ${esc(c.hub.name)}</td>
                 <td>${c.km.toFixed(1)}</td>
                 <td>${first ? bandHtml(first.margin) : '—'}</td>
                 <td>${first ? 'worked out here' : esc(c.first ? c.first.failed : '')}</td>
+                <td class="sites-t-pic" id="bestrep-pic-0">${picHtml(c, 0)}</td>
+                <td>${first ? `<button type="button" class="btn-link" onclick="MapBestRepeater.profile('${escAttr(c.hub.id)}', 0)"
+                      aria-label="Profile the hop from ${escAttr(found.site.name)} to ${escAttr(c.hub.name)}">↗</button>` : ''}</td>
               </tr>
-              ${hops.map(h => `<tr>
+              ${hops.map((h, i) => `<tr>
                 <td>${esc(nameOf(h.from))} → ${esc(nameOf(h.to))}</td>
                 <td>${h.km != null ? h.km.toFixed(1) : '—'}</td>
                 <td>${h.margin != null ? bandHtml(h.margin) : '—'}</td>
                 <td>${h.margin == null ? termHtml(srcText(h), words().unworked) : esc(srcText(h))}</td>
+                <td class="sites-t-pic" id="bestrep-pic-${i + 1}">${picHtml(c, i + 1)}</td>
+                <td><button type="button" class="btn-link" onclick="MapBestRepeater.profile('${escAttr(c.hub.id)}', ${i + 1})"
+                      aria-label="Profile the hop from ${escAttr(nameOf(h.from))} to ${escAttr(nameOf(h.to))}">↗</button></td>
               </tr>`).join('')}
             </tbody>
           </table>
         </div>
+        ${typeof pathThumbKeyHtml === 'function' ? pathThumbKeyHtml() : ''}
+        <p class="small txt-muted sites-thumbs-hint">Each ${term('profile', 'ground profile')} has its sending end on the
+          left: ${esc(found.site.name)} up to ${esc(c.hub.name)}${hops.length ? ', then each hop on towards a base' : ''}.
+          Click one to open it full screen, with the fade margin and the figures beside it.</p>
         ${r && c.onward.routes > 1 ? `<p class="small txt-muted">The best of ${c.onward.routes} routes on${c.onward.capped ? ` (the first ${ROUTE_CAP} weighed)` : ''}.</p>` : ''}
       </div>`;
   }
@@ -907,19 +1106,21 @@ const MapBestRepeater = (function () {
             <button type="button" onclick="MapBestRepeater.useCard()"
                     title="Use the station whose card is open on the map, or the one selected in the list or picked on the map">Use the selected station</button>
           </div>
-          <input type="search" id="bestrep-find" class="polar-find" autocomplete="off" spellcheck="false"
-                 value="${escAttr(hitQ)}" placeholder="Or find it — name or station #"
-                 aria-label="Find the station" oninput="MapBestRepeater.setSearch(this.value)">
-          <div class="polar-hits" id="bestrep-hits">${hitsHtml()}</div>
           <div class="sites-row bestrep-point">
-            <input type="text" id="bestrep-point" class="polar-find" autocomplete="off" spellcheck="false"
-                   value="${escAttr(pointQ)}" placeholder="Or a new site — lat, lon"
-                   aria-label="A new site, as latitude and longitude"
-                   onkeydown="if (event.key === 'Enter') MapBestRepeater.usePoint(this.value)">
-            <button type="button" onclick="MapBestRepeater.usePoint(document.getElementById('bestrep-point').value)">Use</button>
+            <input type="search" id="bestrep-find" class="polar-find" autocomplete="off" spellcheck="false"
+                   value="${escAttr(hitQ)}" placeholder="Station name, number or ALERT address — or lat, lon"
+                   aria-label="The station, by name, station number or ALERT address — or a new site as latitude, longitude"
+                   aria-describedby="bestrep-find-hint"
+                   oninput="MapBestRepeater.setSearch(this.value)"
+                   onkeydown="if (event.key === 'Enter') { event.preventDefault(); MapBestRepeater.useTyped(); }">
             <button type="button" id="bestrep-arm" aria-pressed="${armed ? 'true' : 'false'}" class="${armed ? 'is-on' : ''}"
                     onclick="MapBestRepeater.arm()" title="Click the map where the new station would stand">📍 ${armed ? 'Click the map…' : 'Pick on the map'}</button>
           </div>
+          <div class="polar-hits" id="bestrep-hits" aria-live="polite">${hitsHtml()}</div>
+          <p class="small txt-muted bestrep-find-hint" id="bestrep-find-hint">One box for both: type a station's name, station
+            number or ALERT address and pick it from the list — or, for a ${term('newsite', 'new site')} with nothing there yet,
+            its latitude, longitude (${esc(POINT_EXAMPLE)}; degrees, minutes and seconds work too). What it has understood
+            shows under the box as you type; Enter takes it.</p>
           <p class="small polar-picked" id="bestrep-picked">${pickedHtml(s)}</p>
         </fieldset>
 
@@ -970,6 +1171,7 @@ const MapBestRepeater = (function () {
     const focusId = document.activeElement && body.contains(document.activeElement) ? document.activeElement.id : null;
     body.innerHTML = panelHtml();
     if (focusId) { const el = document.getElementById(focusId); if (el) el.focus({ preventScroll: true }); }
+    ensurePictures();
   }
 
   function legendHtml() {
@@ -1147,7 +1349,7 @@ const MapBestRepeater = (function () {
     invalidate();
     site = { kind: 'point', lat: +(+lat).toFixed(6), lon: +(+lon).toFixed(6) };
     sysId = null; aglSet = null;
-    pointQ = `${site.lat}, ${site.lon}`;
+    hitQ = '';
     settle(false);
     announce(`New site at ${stationLatLonText(site)}.`);
   }
@@ -1434,6 +1636,10 @@ const MapBestRepeater = (function () {
     },
 
     active() { return !!found && results.length > 0; },
+    // Anything of this tool's on: a site chosen, the map pick armed, a search
+    // running or its answer. The side panel rings 🎯 while so (app.js,
+    // syncDockLive).
+    live() { return !!site || armed || !!job || results.length > 0; },
     legendHtml,
     run,
     workMissing,
@@ -1450,7 +1656,7 @@ const MapBestRepeater = (function () {
     clear() {
       invalidate();
       site = null; sysId = null; aglSet = null;
-      hitQ = ''; pointQ = '';
+      hitQ = '';
       disarm();
       draw();
       render();
@@ -1472,13 +1678,34 @@ const MapBestRepeater = (function () {
     usePoint(text) {
       const p = parsePoint(text);
       if (!p) {
-        pointQ = String(text || '');
-        setStatus('blocked', 'Give the new site as latitude, longitude in decimal degrees — for example -27.4698, 153.0251.');
+        setStatus('blocked', `Give the new site as latitude, longitude — for example ${POINT_EXAMPLE}.`);
         return;
       }
       pickPoint(p.lat, p.lon);
       fitSite();
     },
+
+    // Enter in the one box: the new site it has read, or the station — the
+    // only match, or the one whose name, number or ALERT address is exactly
+    // what was typed. Several matches and none exact leave the list to choose from.
+    useTyped() {
+      const q = hitQ.trim();
+      if (!q) return;
+      const p = parsePoint(q);
+      if (p) { pickPoint(p.lat, p.lon); fitSite(); return; }
+      const list = hits();
+      const lq = q.toLowerCase();
+      const exact = list.filter(s => (s.name || '').toLowerCase() === lq || String(s.station_number || '').toLowerCase() === lq
+        || (/^\d+$/.test(q) && (() => { try { return stationAlertIds(s).some(a => +a === +q); } catch (_) { return false; } })()));
+      const one = list.length === 1 ? list[0] : exact.length === 1 ? exact[0] : null;
+      if (one) { pickStation(one.id); return; }
+      if (looksLikePoint(q)) { this.usePoint(q); return; }
+      setStatus('blocked', list.length
+        ? `${list.length === HIT_CAP ? `${HIT_CAP} or more` : list.length} stations match “${q}” — pick one from the list under the box, or type more of its name.`
+        : `No station matches “${q}”. Type a name, a station number or an ALERT address — or, for a new site, its latitude, longitude, for example ${POINT_EXAMPLE}.`);
+    },
+
+    parsePoint(text) { const p = parsePoint(text); return p ? { ...p } : null; },
 
     arm(on) {
       armed = on == null ? !armed : !!on;
@@ -1527,9 +1754,35 @@ const MapBestRepeater = (function () {
     // measure, reused if it is already there — the station's own id at its
     // end when it is in the register, so the card stands it on its surveyed
     // height.
-    profile(id) {
+    //
+    // `k` picks the hop: 0 (or nothing) the station's own, k ≥ 1 the k-th hop
+    // on along the picked route, both ends stations in the register. `full`
+    // is a small picture's click: the same line, and its chart opened full
+    // screen over the map (PathProfile.openFull), the finder left where it is.
+    profile(id, k, full) {
       const c = results.find(x => x.hub.id === id);
       if (!c || !found) return;
+      k = +k || 0;
+      if (k > 0) {
+        const h = routeHops(c)[k - 1];
+        const a = h && stationById(h.from), b = h && stationById(h.to);
+        if (!a || !b) return;
+        const qa = [a.lat, a.lon], qb = [b.lat, b.lon];
+        if (!full && state.mapFullscreen && typeof toggleMapFullscreen === 'function') toggleMapFullscreen(false);
+        state.path.open = true;
+        const had = MapDraw.findLine(qa, qb);
+        if (had) MapDraw.focus(had.id);
+        else MapDraw.addLine([qa, qb], [a.id, b.id]);
+        if (full) { PathProfile.openFull(); return; }
+        const pel = document.getElementById('path-profile-panel');
+        if (pel) {
+          if (typeof dockReveal === 'function') dockReveal(pel);
+          pel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        const at = typeof stationsCardsWhere === 'function' ? stationsCardsWhere() : 'with the station cards';
+        mapNote(`Profiling ${a.name} → ${b.name} — the card is ${at}.`, 5000);
+        return;
+      }
       const pa = [found.site.lat, found.site.lon], pb = [c.hub.lat, c.hub.lon];
       // A new site is a point with no radio of its own: the one it was priced
       // with goes with it (radioPlace, path-profile.js), so the card works out
@@ -1537,11 +1790,12 @@ const MapBestRepeater = (function () {
       if (!found.site.st && found.here) {
         radioPlace(found.site.lat, found.site.lon, found.here, { name: 'New station', by: 'Best repeater', f: c.hub.f });
       }
-      if (state.mapFullscreen && typeof toggleMapFullscreen === 'function') toggleMapFullscreen(false);
+      if (!full && state.mapFullscreen && typeof toggleMapFullscreen === 'function') toggleMapFullscreen(false);
       state.path.open = true;
       const existing = MapDraw.findLine(pa, pb);
       if (existing) MapDraw.focus(existing.id);
       else MapDraw.addLine([pa, pb], [found.site.id, c.hub.id]);
+      if (full) { PathProfile.openFull(); return; }
       const el = document.getElementById('path-profile-panel');
       if (el) {
         if (typeof dockReveal === 'function') dockReveal(el);

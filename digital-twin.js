@@ -5451,6 +5451,57 @@ void main() {
     return `${FloodStages.levelText(l)}${l.kind !== 'aep' && l.gauge != null ? `${b ? ` ${where}` : ''} (${FloodStages.ahdText(l.ahd)})` : l.gauge != null ? ` (${FloodStages.gaugeText(l.gauge, where)})` : ''}${lent}`;
   }
 
+  // ── the station on the scale ──
+  // Two heights that are not flood levels and colour nothing, marked on the
+  // track so a level can be read against the station itself: the ground at
+  // the pin (the twin's ground model there, the feet of whatever is drawn),
+  // and the foot of what holds the instruments as the twin draws it — the
+  // cabinet on a tower's platform, the enclosure on a pole. A height off
+  // either end of the track is marked at that end with an arrow. Nothing for
+  // a station drawn as a collector, a staff or a post: there is no enclosure
+  // to say.
+  const POLE_ENCL_FOOT = 1.05;   // the pole enclosure's underside over the ground (centre 1.25, 0.40 tall)
+  const REF_COLOURS = { ground: '#a07a3c', instruments: '#b8c2cc' };
+  function floodRefs() {
+    const F = tw.flood, m = tw.model, g = velGround();
+    if (!F || F.none || g == null || !isFinite(g)) return [];
+    const out = [{ key: 'ref ground', id: 'ground', kind: 'ref', label: 'Ground', ahd: g,
+      means: 'The ground at the station — the twin\'s ground model at the pin, where the pole or tower stands. Water above this mark is over the ground the station stands on.' }];
+    if (m && m.structure === 'tower' && m.tower) {
+      out.push({ key: 'ref instruments', id: 'instruments', kind: 'ref', label: 'Instruments', ahd: g + m.tower.deck,
+        means: `The foot of the instrument cabinet on the tower's platform, ${m.tower.h.toFixed(1)} m over the ground${m.tower.recorded ? ' as recorded on the station' : ' — the 3.0 m default, as no platform height is recorded'}. Water above this mark is into the logger and radio.` });
+    } else if (m && (m.structure === 'pole' || m.structure === 'repeater')) {
+      out.push({ key: 'ref instruments', id: 'instruments', kind: 'ref', label: 'Instruments', ahd: g + POLE_ENCL_FOOT,
+        means: `The underside of the enclosure on the pole, ${POLE_ENCL_FOOT.toFixed(2)} m over the ground as the standard pole is drawn — not a measurement of this site. Water above this mark is into the logger and radio.` });
+    }
+    // A height on the gauge, where the levels are said that way: by the same
+    // offset the ladder's own levels carry.
+    const ref = F.lad.levels.find(l => l.gauge != null);
+    const off = ref ? ref.ahd - ref.gauge : null;
+    for (const r of out) {
+      r.gauge = off == null ? null : r.ahd - off;
+      r.where = r.ahd > F.top + 1e-6 ? 'above' : r.ahd < F.start - 1e-6 ? 'below' : 'in';
+    }
+    return out;
+  }
+  function floodRefWords(r, onGauge) {
+    const at = `${FloodStages.ahdText(r.ahd)}${onGauge && r.gauge != null ? `, ${FloodStages.gaugeText(r.gauge, floodGaugeWord(tw.flood))}` : ''}`;
+    const off = r.where === 'above' ? ' It is above the highest level on this scale, so it is marked at the top.'
+      : r.where === 'below' ? ' It is below the foot of this scale, so it is marked at the foot.' : '';
+    return `${r.label}: ${at}. ${r.means}${off}`;
+  }
+  // The same two, where a finger can read them: a line in the Scene panel.
+  function floodRefsLineHtml() {
+    const refs = floodScaleOn() ? floodRefs() : [];
+    if (!refs.length) return '';
+    const onGauge = tw.flood.lad.levels.every(l => l.gauge != null);
+    return `<strong>Also on the scale</strong> (dashed marks): ${refs.map(r => esc(floodRefWords(r, onGauge))).join(' ')}`;
+  }
+  function refreshFloodRefsLine() {
+    const el = document.getElementById('twin-flood-refs');
+    if (el) el.innerHTML = floodRefsLineHtml();
+  }
+
   // The marks, the labels and the lines between them, for the ladder on
   // screen, the stage's height now and the track's measure. Again whenever
   // any of them changes. `from` is where the marks and names were on the
@@ -5468,7 +5519,7 @@ void main() {
       if (on) scaleNamesShow();
     }
     syncSpeedKey();
-    if (!on) return;
+    if (!on) { refreshFloodRefsLine(); return; }
     // Up, and untouched: in a few seconds, logarithmic if the levels warrant it.
     armScaleAuto();
     const F = tw.flood, pal = sc.flood.palette;
@@ -5482,8 +5533,14 @@ void main() {
     if (!body || !track || !marks || !labels || !svg) return;
     const px = Math.max(0, track.clientHeight);
     const onGauge = F.lad.levels.every(l => l.gauge != null);
-    const pos = FloodStages.scale(F.lad.levels, { lo: F.start, hi: F.top, px, gap: SCALE_GAP, k: F.logK });
-    F.scale = { px, onGauge, pos, k: F.logK };
+    // The station's ground and instruments are laid out with the levels, so no
+    // name sits on another, and kept apart from them: they are not levels the
+    // track takes hold of or the water is coloured by.
+    const refs = floodRefs();
+    const all = FloodStages.scale([...F.lad.levels, ...refs], { lo: F.start, hi: F.top, px, gap: SCALE_GAP, k: F.logK });
+    const pos = all.slice(0, F.lad.levels.length);
+    const refPos = all.slice(F.lad.levels.length);
+    F.scale = { px, onGauge, pos, k: F.logK, refs: refs.map((r, i) => ({ ...r, mark: refPos[i].mark, at: refPos[i].at, shown: refPos[i].shown })) };
     const byKey = new Map(F.lad.levels.map(l => [l.key, l]));
     // Where each is drawn first: its old place when it is gliding from one.
     const glide = !!from && !reducedMotion();
@@ -5492,7 +5549,8 @@ void main() {
     marks.innerHTML = pos.map(p => {
       const l = byKey.get(p.key);
       return `<span class="twin-scale-mark${l.kind === 'peak' ? ' is-peak' : ''}" data-level="${escAttr(p.key)}" style="--y:${markAt(p).toFixed(1)}px;--sw:${escAttr(FloodStages.colourOf(l, pal))}"></span>`;
-    }).join('');
+    }).join('') + F.scale.refs.map(r =>
+      `<span class="twin-scale-refmark" data-ref="${escAttr(r.id)}" style="--y:${r.mark.toFixed(1)}px;--sw:${REF_COLOURS[r.id]}"></span>`).join('');
     // The labels are buttons: each holds the water at its level. The one it is
     // held at says so (aria-pressed), and so does its look.
     const had = labels.contains(document.activeElement) ? document.activeElement.dataset.flood : null;
@@ -5502,15 +5560,26 @@ void main() {
       return `<button type="button" class="twin-scale-label${l.kind === 'peak' ? ' is-peak' : ''}" data-flood="${escAttr(p.key)}" aria-pressed="false"
                 style="--y:${nameAt(p).toFixed(1)}px" onclick="DigitalTwin.floodAt('${escAttr(p.key)}')"
                 title="Hold the water at ${escAttr(words)}" aria-label="Hold the water at ${escAttr(words)}"><span class="twin-flood-sw" style="--sw:${escAttr(FloodStages.colourOf(l, pal))}" aria-hidden="true"></span>${esc(FloodStages.scaleText(l, onGauge))}</button>`;
+    }).join('') + F.scale.refs.filter(r => r.shown).map(r => {
+      const words = floodRefWords(r, onGauge);
+      const arrow = r.where === 'above' ? '▲ ' : r.where === 'below' ? '▼ ' : '';
+      const text = `${arrow}${r.label} ${onGauge && r.gauge != null ? `${r.gauge.toFixed(1)} m` : `${r.ahd.toFixed(2)} m`}`;
+      // In range it holds the water there, as a level's name does; off the
+      // end of the track there is nowhere to hold it.
+      const t = px > 0 ? 1 - r.mark / px : 0;
+      const press = r.where === 'in' ? ` onclick="DigitalTwin.setFloodFraction(${t.toFixed(4)})"` : ' aria-disabled="true"';
+      return `<button type="button" class="twin-scale-ref" data-ref="${escAttr(r.id)}" style="--y:${r.at.toFixed(1)}px"${press}
+                title="${escAttr(words)}${r.where === 'in' ? ' Press to hold the water here.' : ''}" aria-label="${escAttr(words)}"><span class="twin-flood-sw" style="--sw:${REF_COLOURS[r.id]}" aria-hidden="true"></span>${esc(text)}</button>`;
     }).join('');
+    refreshFloodRefsLine();
     if (had) { const back = labels.querySelector(`[data-flood="${CSS.escape(had)}"]`); if (back) back.focus(); }
     if (glide) {
       // Drawn where they were; now, with the transition on, where they go.
       box.classList.add('is-rescaling');
       void box.offsetWidth;
       const want = new Map(pos.map(p => [p.key, p]));
-      for (const el of marks.children) el.style.setProperty('--y', `${want.get(el.dataset.level).mark.toFixed(1)}px`);
-      for (const el of labels.children) el.style.setProperty('--y', `${want.get(el.dataset.flood).at.toFixed(1)}px`);
+      for (const el of marks.children) { const w = want.get(el.dataset.level); if (w) el.style.setProperty('--y', `${w.mark.toFixed(1)}px`); }
+      for (const el of labels.children) { const w = want.get(el.dataset.flood); if (w) el.style.setProperty('--y', `${w.at.toFixed(1)}px`); }
       clearTimeout(tw.glideTimer);
       tw.glideTimer = setTimeout(() => { tw.glideTimer = 0; box.classList.remove('is-rescaling'); }, SCALE_GLIDE_MS);
     }
@@ -5522,9 +5591,9 @@ void main() {
     const lx = labels.getBoundingClientRect().right - b.left;
     svg.setAttribute('width', String(Math.round(b.width)));
     svg.setAttribute('height', String(Math.round(b.height)));
-    svg.innerHTML = pos.filter(p => p.shown).map(p => {
+    svg.innerHTML = [...pos, ...F.scale.refs].filter(p => p.shown).map(p => {
       const ya = y0 + p.mark, yb = y0 + p.at, xm = x0 - Math.max(2, (x0 - lx) * 0.45);
-      return `<polyline points="${x0.toFixed(1)},${ya.toFixed(1)} ${xm.toFixed(1)},${ya.toFixed(1)} ${lx.toFixed(1)},${yb.toFixed(1)}"/>`;
+      return `<polyline${p.kind === 'ref' ? ' class="is-ref"' : ''} points="${x0.toFixed(1)},${ya.toFixed(1)} ${xm.toFixed(1)},${ya.toFixed(1)} ${lx.toFixed(1)},${yb.toFixed(1)}"/>`;
     }).join('');
     syncFloodScale();
   }
@@ -5813,6 +5882,7 @@ void main() {
                    oninput="DigitalTwin.setFloodFraction(this.value / 1000)">
           </label>
           <p class="small twin-borrow-line" id="twin-borrow-line">${borrowLineHtml()}</p>
+          <p class="small twin-borrow-line" id="twin-flood-refs">${floodRefsLineHtml()}</p>
         </fieldset>`;
   }
 

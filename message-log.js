@@ -119,7 +119,7 @@ const MessageLog = (() => {
     { key: 'source',   label: 'Source',   narrow: false,
       title: 'How it reached us — the transport: HTTP, the MQTT bridge, typed in, backfilled, read off a serial port.' },
     { key: 'path',     label: 'Path',     narrow: false,
-      title: 'The repeater or base that delivered the copy we kept, when the adapter knew. The duplicate copies\' paths are in the detail drawer.' },
+      title: 'The repeater or base that delivered the copy we kept, when the adapter knew — by the base station\'s name where it has given one, then which of its receivers; hover for the path as it is kept. The duplicate copies\' paths are in the detail drawer.' },
     { key: 'freq',     label: 'Freq',     narrow: false, since: 2, w: 84,
       title: 'The frequency the kept copy was heard on, in MHz — when the base station said. Not the Channel column, which names a sensor behind a station number.' },
     { key: 'signal',   label: 'Signal',   narrow: false, since: 2, w: 108,
@@ -228,6 +228,7 @@ const MessageLog = (() => {
       find:    '',             // station / address box; takes a pasted list
       protocol: '', source: '', quality: '',   // '' = any, else the smallint code
       path:    '', channel: '',
+      base:    '',             // a base station's name — '' = any (see baseList)
       freq:    '',             // MHz, exact — '' = any
       dupsOnly: false,         // only readings heard more than once
       unresolvedOnly: false,   // only rows no station has claimed yet
@@ -424,6 +425,57 @@ const MessageLog = (() => {
     return { ors, unmatched, hadTerms: terms.length > 0 };
   }
 
+  // ── base stations by name ──────────────────────────────────────────────────
+  // A path names the receiver that took the kept copy in —
+  // "serial-monitor/rpi-83071968-sdr1-151.5375" — which nobody says aloud. The
+  // receivers each say whose they are (ingest_point_latest, 0045: the base
+  // station's name is its token's label, and the station it stands at when
+  // that is on file), so the log can be asked for a base by its name and the
+  // Path column can say it. That list is the editors' to read; anybody else
+  // gets none, and the filter and the names simply are not there.
+  const hostOfPoint = id => { const m = String(id || '').match(/^(.*?)-sdr\d+(?:-[\d.]+)?$/); return m ? m[1] : String(id || ''); };
+  async function loadBases() {
+    if (ml.bases || ml.basesAsked) return;
+    ml.basesAsked = true;
+    let rows = [];
+    try { rows = await dbSelect('ingest_point_latest?select=token_label,point_id,host_station_id&order=point_id.asc&limit=1000') || []; }
+    catch (_) { rows = []; }
+    const by = new Map();
+    for (const p of rows) {
+      const name = String(p.token_label || '').trim();
+      if (!name || !p.point_id) continue;
+      let b = by.get(name);
+      if (!b) by.set(name, b = { name, hosts: new Set(), at: '' });
+      b.hosts.add(hostOfPoint(p.point_id));
+      if (!b.at && p.host_station_id) {
+        const st = ((state.data && state.data.stations) || []).find(x => x.id === p.host_station_id);
+        if (st && st.name && st.name !== name) b.at = st.name;
+      }
+    }
+    ml.bases = [...by.values()].sort((a, b) => a.name.localeCompare(b.name));
+    if (ml.bases.length) rerender();
+  }
+  function baseList() { return ml.bases || []; }
+  // The base a path came in at, or null: the longest host that starts it.
+  function baseOfPath(path) {
+    const p = String(path || '').replace(/^serial-monitor\//, '');
+    if (!p) return null;
+    let best = null, len = 0;
+    for (const b of baseList()) for (const h of b.hosts) {
+      if (h.length > len && (p === h || p.startsWith(h + '-'))) { best = b; len = h.length; }
+    }
+    return best ? { base: best, rest: p.slice(len).replace(/^-/, '') } : null;
+  }
+  // The filter for one base: every path that starts with one of its hosts.
+  function baseFilter(name) {
+    const b = name && baseList().find(x => x.name === name);
+    if (!b) return '';
+    const clean = h => encodeURIComponent('serial-monitor/' + h.replace(/[%*_(),"\\]/g, '')) + '*';
+    const hosts = [...b.hosts];
+    return hosts.length === 1 ? `path=like.${clean(hosts[0])}`
+      : `or=(${hosts.map(h => `path.like.${clean(h)}`).join(',')})`;
+  }
+
   function buildQueryPath(q, win, resolved, offset) {
     const parts = [
       `reading_ts=gte.${encodeURIComponent(new Date(win.t0).toISOString())}`,
@@ -435,6 +487,8 @@ const MessageLog = (() => {
     if (q.source   !== '') parts.push(`source=eq.${q.source}`);
     if (q.quality  !== '') parts.push(`quality=eq.${q.quality}`);
     if (q.path.trim())     parts.push(`path=ilike.${encodeURIComponent('*' + q.path.trim().replace(/[%*]/g, '') + '*')}`);
+    const baseOr = baseFilter(q.base);
+    if (baseOr)            parts.push(baseOr);
     if (q.channel.trim())  parts.push(`channel=ilike.${encodeURIComponent('*' + q.channel.trim().replace(/[%*]/g, '') + '*')}`);
     // Exact, because a frequency is a channel name as much as a number: 152.4
     // is 152.400 and is not 152.4125. numeric in the table, so no float fuzz.
@@ -635,6 +689,13 @@ const MessageLog = (() => {
             ${sel('protocol', 'Protocol', 'The wire protocol the reading was decoded from')}
             ${sel('source',   'Source',   'The transport that delivered it — HTTP, MQTT, serial, typed, backfilled')}
             ${sel('quality',  'Quality',  'What the source said about the reading')}
+            ${baseList().length ? `
+            <label class="ml-f" title="The base station that took the kept copy in, by its name — every receiver it has. Only bases that have told Flood-Net their name are listed; the Path box beside it finds the rest.">
+              <span>Base station</span>
+              <select onchange="MessageLog.setText('base', this.value)">
+                <option value="">any</option>${baseList().map(b =>
+                  `<option value="${escAttr(b.name)}" ${q.base === b.name ? 'selected' : ''}>${esc(b.name)}${b.at ? ` — at ${esc(b.at)}` : ''}</option>`).join('')}
+              </select></label>` : ''}
             <label class="ml-f" title="The repeater or base that delivered the kept copy — substring match">
               <span>Path</span>
               <input type="search" value="${escAttr(q.path)}"
@@ -763,7 +824,13 @@ const MessageLog = (() => {
       case 'quality':  return `<td class="small">${esc(vocabKey('quality', r.quality))}</td>`;
       case 'protocol': return `<td class="small">${esc(vocabKey('protocol', r.protocol))}</td>`;
       case 'source':   return `<td class="small">${esc(vocabKey('source', r.source))}</td>`;
-      case 'path':     return `<td class="small mono">${esc(r.path || '—')}</td>`;
+      case 'path': {
+        // The base station's name where its receiver has said whose it is,
+        // then which of its receivers; the path as it is kept, on hover.
+        const at = baseOfPath(r.path);
+        return at ? `<td class="small" title="${escAttr(`${at.base.name}${at.base.at ? `, at ${at.base.at}` : ''} — path ${r.path}`)}"><b>${esc(at.base.name)}</b>${at.rest ? ` <span class="mono">${esc(at.rest)}</span>` : ''}</td>`
+          : `<td class="small mono">${esc(r.path || '—')}</td>`;
+      }
       case 'freq':     return `<td class="small mono">${esc(fmtFreq(r.freq_mhz))}</td>`;
       case 'signal': {
         const s = signalOf(r);
@@ -1753,6 +1820,7 @@ const MessageLog = (() => {
     // Safe to repeat — init() runs on every render of the tab, and the
     // registry replaces rather than stacks (#142).
     registerTabTeardown('MessageLog', stop);
+    loadBases();
     fetchVocab().then(() => {
       // Codes on screen before the vocabulary landed read as bare numbers;
       // one repaint turns them into words. Nothing else moves.

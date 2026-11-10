@@ -273,6 +273,18 @@ const MapMode = (function () {
     },
     sync,
     leave,
+    // Every mode that is armed, left — 🧹 Clear the selection and ↺ (app.js,
+    // clearStationsMapMarks), so a mode added to MODES is disarmed by them
+    // without a line of its own there.
+    leaveAll() {
+      for (const m of MODES) {
+        let on = null;
+        try { on = m.on(); } catch (_) { on = null; }
+        if (!on) continue;
+        try { m.leave(); } catch (_) { /* its own panel still has its own way out */ }
+      }
+      sync();
+    },
     // Read by the check: the modes the banner is showing, by key.
     shown: () => current().map(m => m.key),
   };

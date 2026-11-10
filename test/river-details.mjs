@@ -111,6 +111,32 @@ async function main() {
       types: RiverDetails.CROSSING_TYPES, datums: RiverDetails.DATUMS, keys: RiverDetails.LIST_KEYS,
       indexes: RiverDetails.BUREAU_INDEXES, fields: RiverDetails.FIELD_KEYS,
     }));
+    // The flood history on the card's Flood group (0037): the floods highest
+    // first, each with today's class and its AHD level where there is one,
+    // and the station's ground beside them — the ground alone where no flood
+    // is on record, and nothing where there is neither.
+    const fh = await page.evaluate(() => {
+      const s = {
+        id: 't', name: 'T', elevation_ahd: 47.2, elevation_source: 'model',
+        flood_classes: [{ as_at: '2026-09-25', minor_m: 6, moderate_m: 8, major_m: 10 }],
+        flood_peaks: [{ date: '2017-04-05', height_m: 4.41 }, { date: '2019-02-03', height_m: 10.9, level_m_ahd: 53.105 },
+                      { date: '2018-12-17', height_m: 6.5 }],
+      };
+      const el = document.createElement('div');
+      el.innerHTML = RiverDetails.historyCardHtml(s);
+      const rows = [...el.querySelectorAll('.acma-row')].map(r => r.textContent.replace(/\s+/g, ' ').trim());
+      const only = document.createElement('div');
+      only.innerHTML = RiverDetails.historyCardHtml({ elevation_ahd: 12 });
+      return { rows, head: (el.querySelector('.stn-card-rhs-head') || {}).textContent || '',
+               terms: el.querySelectorAll('[title]').length, key: !!el.querySelector('details'),
+               only: only.textContent.replace(/\s+/g, ' ').trim(), none: RiverDetails.historyCardHtml({}) };
+    });
+    check('the Flood group lists the recorded floods, highest first, each with its class and AHD level, and the station\'s ground',
+      fh.head === 'Flood history' && /^Station ground ?47\.2 m AHD modelled$/.test(fh.rows[0])
+        && /^03\/02\/2019 ?10\.90 m Major 53\.11 m AHD$/.test(fh.rows[2]) && /^17\/12\/2018 ?6\.50 m Minor$/.test(fh.rows[3])
+        && /^05\/04\/2017 ?4\.41 m Below minor$/.test(fh.rows[4]) && fh.terms >= 4 && fh.key
+        && /^Station ground ?12 m AHD$/.test(fh.only) && fh.none === '',
+      JSON.stringify(fh));
     const sqlTypes = insertedRows(sql, 'crossing_type');
     check('the crossing types are 0031\'s, code and label, in its order',
       sqlTypes && JSON.stringify(sqlTypes.map(r => [r[0], r[1]]))

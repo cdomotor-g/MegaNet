@@ -1499,7 +1499,8 @@ async function tiltedHalf(page, R, db, viewer, text) {
   await back3();
   ok('…signed back in, they come back', true);
 
-  await page.locator('.mn-map-3d').click();
+  // Out by the pane's own Leave 3-D: ⛰️ pressed again only puts its pane away.
+  await page.evaluate(() => Map3D.toggle());
   await page.waitForFunction(() => !Map3D._map(), null, { timeout: BUILD_TIMEOUT });
   const gone = await page.evaluate(() => ({ markers: document.querySelectorAll('.maplibregl-marker').length,
                                            pins: Map3D._photos().pins.length, flat: document.querySelectorAll('.mn-photo-icon').length }));

@@ -97,7 +97,7 @@ try {
   await page.evaluate(() => switchTab('stations'));
   await page.waitForFunction(() => !!state.map && state.mapMarkers.length > 1000, null, { timeout: 30_000 });
   check('with its side panel declining them, the Stations map\'s controls stand in its corner',
-    await page.evaluate(() => document.querySelectorAll('#leaflet-map .leaflet-top.leaflet-right .mn-mapctl').length === 9
+    await page.evaluate(() => document.querySelectorAll('#leaflet-map .leaflet-top.leaflet-right .mn-mapctl').length === 10
       && !document.querySelector('#help-panel .mn-mapctl')));
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -358,7 +358,10 @@ try {
     const shown = el => !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
     const bar = document.querySelector('.leaflet-top.leaflet-right .mn-mapbar');
     return {
-      controls: document.querySelectorAll('.leaflet-top.leaflet-right > .leaflet-control').length,
+      // 💬, the hover-notes switch (map-tip-stack.js), is a small control of its
+      // own under the bar, by design — it is counted apart.
+      controls: document.querySelectorAll('.leaflet-top.leaflet-right > .leaflet-control:not(.mn-map-tips)').length,
+      tips: document.querySelectorAll('.leaflet-top.leaflet-right > .mn-map-tips').length,
       known: Object.keys(MapChrome.groups()),
       loose: bar ? [...bar.children].filter(c => !c.classList.contains('mn-mapbar-group')).length : -1,
       groups: bar ? [...bar.querySelectorAll('.mn-mapbar-group')].map(g => ({
@@ -379,6 +382,7 @@ try {
 
   check('the corner is one control, not one per icon', corner.controls === 1,
     `${corner.controls} controls in the top-right corner`);
+  check('…with the hover-notes switch its one small neighbour', corner.tips === 1, `${corner.tips} hover-notes switches`);
   check('and nothing is loose in it — every icon is in a group', corner.loose === 0,
     `${corner.loose} children of the bar are not groups`);
 
@@ -476,7 +480,7 @@ try {
   });
   const alone = k => JSON.stringify(k.items) === '["mn-map-reset"]' && k.hairlines === 0 && !!k.at
     && k.at.dx >= 0 && k.at.dx <= 12 && k.at.dy >= 0 && k.at.dy <= 12
-    && k.panels === 9 && k.panelsInSide && k.buttonsInSide;
+    && k.panels === 10 && k.panelsInSide && k.buttonsInSide;
   const narrow = await cornerNow();
   check('at a phone\'s width the Stations map\'s corner holds ↺ alone, at its top right, every other control in the side panel\'s rail',
     alone(narrow), JSON.stringify(narrow));

@@ -50,7 +50,7 @@
 //                   station up on its own frequency, and every repeater it
 //                   sends to is where it goes on to; a pair sharing a pass-range
 //                   address, or carrying each other, is listed both ways; and
-//                   the paths up hand over to Repeater sites.
+//                   the paths up hand over to Move/New Repeater.
 //   Reset           takes all of it off the map.
 //
 //   npm run relocate          (or: node relocate.mjs)
@@ -637,7 +637,7 @@ if (REP) {
   ok('…a pair both ways only where both channels match, one way otherwise',
      onFrom.filter(c => c.kind === 'listening').every(c => upTo.some(u => u.id === c.id) === REP.up.includes(c.id)),
      JSON.stringify(onFrom.map(c => c.id)));
-  ok('…and a move further afield is one press from 🗼 Repeater sites', rp.toSites);
+  ok('…and a move further afield is one press from 🗼 Move/New Repeater', rp.toSites);
 
   await page.evaluate(() => { MapRelocate.set('radiusM', 100); });
   const B = await run();
@@ -679,7 +679,7 @@ if (REP) {
     origin: MapSites.origin(),
     kms: [...document.querySelectorAll('.sites-hubs li .sites-t-km')].map(e => e.textContent),
   }));
-  ok('"Find a new hilltop for what it carries" opens 🗼 Repeater sites with them as the sites to serve',
+  ok('"Find a new hilltop for what it carries" opens 🗼 Move/New Repeater with them as the sites to serve',
      handed.showing === 'map-sites' && handed.n === Math.min(40, REP.up.length), JSON.stringify(handed));
   const tickedOn = rp.choices.filter(c => c.dir === 'out' && c.ticked).map(c => c.id).slice(0, 8);
   ok('…and the ways on ticked here as the ones the new mast must reach, each with its distance',

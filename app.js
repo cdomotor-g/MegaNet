@@ -3154,8 +3154,109 @@ function syncDockStrip(showing) {
     });
   });
   syncDockNamesEl();
+  syncDockLive();
   dockWatchFoot(strip.querySelector(':scope > .dock-group[data-group="foot"]'));
   if (had && had !== document.activeElement && strip.contains(had)) had.focus({ preventScroll: true });
+}
+
+// ── Which tools have something on ────────────────────────────────────────────
+// A rail button says two different things, and until November 2026 it could
+// only say one. **Its pane is open** — the gold tile (.is-on), as ever. **The
+// tool has something on** — a result on the map, ends picked, a mode armed, the
+// map in 3-D — while its pane is *not* the one showing: a gold ring round its
+// ordinary tile (.is-live), so that a finder's answer left on the map, or the
+// 3-D view, is still accounted for in the rail once another pane is opened
+// over it. Both at once is the gold tile alone: the pane is in front of you.
+//
+// What "on" means for each pane is said here, by the pane's key, in the
+// modules' own words. A tool built later says it for itself where it makes its
+// panel — MapChrome.panel(map, { …, live: () => boolean, clear: () => void })
+// — and both this and 🧹 (clearStationsMapMarks) find it there, with no line
+// to add here.
+const DOCK_LIVE = {
+  places:         () => Places.live(),
+  paths:          () => !!(state.link && (state.link.a || state.link.b || state.link.picking)),
+  twin:           () => MapTwin.active(),
+  'map-draw':     () => !!(state.draw && (state.draw.tool || state.draw.shapes.length)),
+  'map-latency':  () => MapLatency.on(),
+  'map-polar':    () => MapPolar.active(),
+  'map-sites':    () => MapSites.live(),
+  'map-relocate': () => MapRelocate.live(),
+  'map-bestrep':  () => MapBestRepeater.live(),
+};
+
+function dockToolLive(key) {
+  try {
+    if (DOCK_LIVE[key]) return !!DOCK_LIVE[key]();
+    const e = dockMapItems.get(key);
+    return !!(e && typeof e.live === 'function' && e.live());
+  } catch (_) { return false; }   // a module not on the page has nothing on
+}
+
+// The rings, and ⛰️'s dress, brought into step. Cheap enough to be asked
+// often — a dozen getters and as many class toggles that mostly change nothing
+// — because a tool's state changes in its own module, in a dozen places each,
+// and none of them should have to know there is a rail: it is asked whenever
+// the strip is painted, after every press and key on the page, and a few times
+// a second while the Stations rail is up, for the finder that takes ten
+// seconds to answer.
+const DOCK_LIVE_SAYS = ' — on now';
+
+function syncDockLive() {
+  const strip = document.querySelector('#help-panel .dock-strip');
+  if (!strip) return;
+  dockLiveWatch();
+  const tools = dockHoldsMapTools();
+  const showing = dockShowing();
+  for (const b of strip.querySelectorAll('.dock-tab[data-dock]')) {
+    const live = tools && b.dataset.dock !== showing && dockToolLive(b.dataset.dock);
+    if (b.classList.contains('is-live') !== live) b.classList.toggle('is-live', live);
+    dockLiveTitle(b, live);
+  }
+  // ⛰️: gold while its pane is the one showing, ringed while the map is in 3-D
+  // behind another pane or none. In the map's corner it is the corner's split
+  // button, lit while 3-D is on.
+  const on3d = typeof Map3D !== 'undefined' && Map3D.active();
+  for (const b of document.querySelectorAll('.mn-map-3d')) {
+    const inStrip = strip.contains(b);
+    const open = inStrip && showing === 'map-3d';
+    const lit = inStrip ? open : on3d;
+    const live = inStrip && on3d && !open;
+    if (b.classList.contains('is-on') !== lit) b.classList.toggle('is-on', lit);
+    if (b.classList.contains('is-live') !== live) b.classList.toggle('is-live', live);
+    if (inStrip) b.setAttribute('aria-expanded', String(open));
+    else b.removeAttribute('aria-expanded');
+    dockLiveTitle(b, live);
+  }
+}
+
+// "— on now" on the end of a ringed button's tooltip, so the ring is not the
+// only thing saying it, and off again with the ring.
+function dockLiveTitle(b, live) {
+  const t = b.title || '';
+  const has = t.endsWith(DOCK_LIVE_SAYS);
+  if (live && !has) b.title = t + DOCK_LIVE_SAYS;
+  else if (!live && has) b.title = t.slice(0, -DOCK_LIVE_SAYS.length);
+}
+
+let dockLiveTimer = 0;
+let dockLiveQueued = false;
+
+function dockLiveSoon() {
+  if (dockLiveQueued) return;
+  dockLiveQueued = true;
+  requestAnimationFrame(() => { dockLiveQueued = false; syncDockLive(); });
+}
+
+// Wired the first time the strip is painted (syncDockLive), not as this file
+// loads: nothing here runs at load (test/toplevel.mjs).
+function dockLiveWatch() {
+  if (dockLiveTimer) return;
+  document.addEventListener('click', dockLiveSoon, true);
+  document.addEventListener('keyup', dockLiveSoon, true);
+  dockLiveTimer = window.setInterval(() => {
+    if (!document.hidden && state.activeTab === 'stations') syncDockLive();
+  }, 500);
 }
 
 // The foot stays at the bottom of the rail while the sections scroll under it
@@ -3245,8 +3346,9 @@ function dockClearEl() {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'mn-mapctl-btn mn-map-clear';
-  b.title = 'Clear the selection — deselects the station and any link, and takes off everything drawn on the map. '
-          + 'The view and the filters stay as they are';
+  b.title = 'Clear the selection — deselects the station and any link, takes off everything drawn on the map and '
+          + 'every tool\'s answer, and disarms whatever was waiting for a click. '
+          + 'The view (3-D included) and the filters stay as they are';
   b.setAttribute('aria-label', 'Clear the selection');
   b.setAttribute('onclick', 'clearStationsMapSelection()');
   b.innerHTML = `<span class="mn-mapctl-ico" aria-hidden="true">${Glyphs.rail('clear')}</span>`
@@ -3617,7 +3719,8 @@ function dockAdopt(el, info) {
   // is taken out rather than left for getElementById to find first.
   if (e.el && e.el !== el) e.el.remove();
   Object.assign(e, { el, state: 'held', icon: info.icon, label: info.label, name: info.name, group: info.group,
-                     groupLabel: info.groupLabel, rank: info.rank, order: info.order, strip: info.strip !== false });
+                     groupLabel: info.groupLabel, rank: info.rank, order: info.order, strip: info.strip !== false,
+                     live: info.live, clear: info.clear });
   if (e.kind === 'panel') {
     if (!e.pane) {
       e.pane = document.createElement('div');
@@ -4973,7 +5076,8 @@ function stationsMapPanels(map) {
   // 📡 Polar radio coverage is tools/20 — MapPolar.attach(), which runs later —
   // 🗼 Repeater site finder tools/25, from MapSites.attach() after it,
   // 🚚 Station relocation finder tools/26, from MapRelocate.attach() after that,
-  // and 🎯 Best repeater tools/27, from MapBestRepeater.attach() after that.
+  // 🎯 Best repeater tools/27, from MapBestRepeater.attach() after that, and
+  // ⚖️ Repeater comparison tools/28, from MapRepCompare.attach() after that.
   //
   // What is here (#186) — arm it, click the map, and the card in the opposite
   // corner says what the app knows about that point. A plain corner button
@@ -5026,7 +5130,9 @@ function stationsMapPanels(map) {
   // lets one set of controls drive both modes.
   MapChrome.button(map, {
     className: 'mn-map-3d', icon: Glyphs.rail('view3d'), name: '3-D view',
-    title: '3-D view — tilt the map and see the ground it is drawn on, with its settings beside it',
+    title: '3-D view — tilt the map and see the ground it is drawn on, with its settings beside it. '
+         + 'Pressed again it puts the settings away or brings them back; Leave 3-D is in them',
+    ariaLabel: '3-D view — tilt the map and see the ground it is drawn on, with its settings beside it',
     group: '3d', order: 10, pair: '3d', pressed: Map3D.active(),
     onClick: () => toggleStations3d(),
   });
@@ -5113,26 +5219,27 @@ function stationsMapPanels(map) {
 // what the relief is — and then tilts the map: the pane first, so that a side
 // panel that was shut has taken its width before the 3-D view is built, rather
 // than the canvas being resized under a camera that has just been placed.
-// Coming out flattens the map and, if the 3-D pane is still the one showing,
-// puts the side panel back as it was under it — the pane that was open, or
-// shut. A pane chosen since is left alone: that is the operator's.
 //
-// Leaving by the pane's own Leave 3-D keeps the pane, which is where the
-// operator is, and it says Enter 3-D then. On a phone the pane is a drawer
+// Pressed while the map is in 3-D, ⛰️ is a pane's button like every other in
+// the rail: it puts the 3-D pane away, or brings it back, and the map stays
+// tilted. Until November 2026 that second press left 3-D, which nobody
+// pressing a rail button to get the map's width back was asking for. Leaving
+// is the pane's own Leave 3-D (red-edged while 3-D is on, map-3d.js), which
+// keeps the pane, where the operator is, and says Enter 3-D then. While 3-D
+// is on and its pane is not the one showing, ⛰️ wears the ring every tool
+// with something on wears (syncDockLive). On a phone the pane is a drawer
 // over the map, as every pane there is.
+//
+// Only where the 3-D pane has nowhere to stand — the control back in the
+// map's corner, with its ▾ flyout beside it — does a second press still
+// leave 3-D, as the corner's split button always has.
 let stations3dBefore = null;   // { tab, open } — the side panel as ⛰️ found it
 
 async function toggleStations3d() {
   if (Map3D.active()) {
-    await Map3D.toggle();
-    const back = stations3dBefore;
-    stations3dBefore = null;
-    if (dockShowing() !== 'map-3d') return;
-    if (back && back.open && back.tab !== 'map-3d' && dockHas(back.tab)) setDockTab(back.tab);
-    else {
-      if (back && back.tab !== 'map-3d') state.dockTab = back.tab;
-      shutDock();
-    }
+    if (!dockHas('map-3d')) { await Map3D.toggle(); return; }
+    if (dockShowing() === 'map-3d') shutDock();
+    else setDockTab('map-3d');
     return;
   }
   const showing = dockShowing();
@@ -5220,6 +5327,13 @@ function clearStationsMapMarks() {
   try_(() => { if (MapMovePin.armed()) MapMovePin.cancel(); });
   try_(() => LinkBudget.setPicking(false));
   try_(() => { if (Places.dropping()) Places.arm(false); });
+  //    …and every other mode the map's banner knows (map-mode.js, MODES): Best
+  //    repeater's pick, What's here?, the drive's start, site features. Asked
+  //    of the banner's own list, so a mode added there is disarmed here.
+  try_(() => MapMode.leaveAll());
+  //    The magnifier is a mode too, with a switch in the rail instead of a
+  //    line in the banner.
+  try_(() => { if (MapMagnify.on()) MapMagnify.toggle(false); });
 
   // 2. The cards on the map, and the radio path on the profile card at the
   //    head of the path tools. `false` on the three that take it: nothing is
@@ -5246,6 +5360,12 @@ function clearStationsMapMarks() {
   try_(() => MapRelocate.clear());
   try_(() => MapBestRepeater.clear());
   try_(() => MapHops.clear({ quiet: true }));
+  //    A tool that says how to clear itself where it makes its panel
+  //    (MapChrome.panel's `clear`, map-controls.js) needs no line above:
+  //    Repeater comparison is the first.
+  for (const e of dockMapItems.values()) {
+    if (typeof e.clear === 'function') try_(() => e.clear());
+  }
   try_(() => MapSpider.reset());
   // Find a place's outline and every pin it dropped, as ↺ always took its pin.
   try_(() => Places.resetMap());
@@ -6344,6 +6464,7 @@ function mapLegendHtml() {
     MapSites.active() ? MapSites.legendHtml() : '',
     MapRelocate.active() ? MapRelocate.legendHtml() : '',
     MapBestRepeater.active() ? MapBestRepeater.legendHtml() : '',
+    MapRepCompare.active() ? MapRepCompare.legendHtml() : '',
     MapHops.active() ? MapHops.legendHtml() : '',
     MapDirect.active() ? MapDirect.legendHtml() : '',
     MapPeaks.active() ? `
@@ -6561,6 +6682,7 @@ function stopStationsMap() {
   MapSites.detach();
   MapRelocate.detach();
   MapBestRepeater.detach();
+  MapRepCompare.detach();
   MapHops.detach();
   MapDirect.detach();
   MapLatency.detach();
@@ -6823,6 +6945,9 @@ function initMap() {
   // goes in, and every mast already standing near it comes out in order of
   // how well it would hear it — and hand it on to a base.
   MapBestRepeater.attach(state.map);
+  // ⚖️ Repeater comparison: two or more masts already standing go in, and the
+  // sites they both carry come out, each path up to each of them side by side.
+  MapRepCompare.attach(state.map);
   // 🪜 Hops to base: a pane for its lines, and the hops of a station lit
   // before the map was built again drawn on the new one.
   MapHops.attach(state.map);
@@ -6845,6 +6970,9 @@ function initMap() {
   MapLots.attach(state.map);
   // …and what land is under the pointer while they are drawn (map-property-tip.js).
   MapPropTip.attach(state.map);
+  // 💬 under ↺: the hover notes — that one and every other name that follows
+  // the pointer — on or off, remembered (map-tip-stack.js).
+  MapTipStack.attachSwitch(state.map);
   MapPhotos.attach(state.map);
   MapCameras.attach(state.map);
   MapRain.attach(state.map);
@@ -9376,6 +9504,7 @@ function stnCardHtml(s) {
   // on the state border, none for the 1,620 it does not carry.
   const flood = `
     ${RiverDetails.cardHtml(s)}
+    ${RiverDetails.historyCardHtml(s)}
     ${located ? `<div class="acma-sect stn-card-cams-sect" id="${escAttr(camsId)}"
          data-mn-cams="${escAttr(MapCameras.key(s))}">${MapCameras.html(s)}</div>` : ''}
     ${RiverCatchments.cardHtml(s)}

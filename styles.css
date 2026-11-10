@@ -4778,6 +4778,11 @@ tr.hops-picked td { background: color-mix(in srgb, var(--accent) 12%, transparen
 .rhs-minor    { color: var(--flood-minor); }
 .rhs-moderate { color: var(--flood-moderate); }
 .rhs-major    { color: var(--flood-major); }
+/* Flood history (river-details.js historyCardHtml): the class a flood reached
+   sits after its height as a word in the class's colour. */
+.stn-card-fh-class { margin-left: .35rem; font-weight: 600; }
+.stn-card-fh-cols { margin-top: .2rem; }
+.stn-card-fh-from { margin: .25rem 0 0; }
 .stn-card-rhs-earlier { margin-top: .3rem; }
 .stn-card-rhs-earlier > summary { cursor: pointer; color: var(--muted); }
 .stn-card-rhs-earlier[open] > summary { margin-bottom: .2rem; }
@@ -5254,6 +5259,44 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   padding: 3px 7px;
   border-color: rgba(121, 85, 72, .55);
 }
+/* 💬 the hover notes' switch (map-tip-stack.js): its own small control under
+   the map's top-right corner bar. Smaller and quieter than the corner's
+   buttons on a mouse — it is a preference, not a tool — and the full 44 px on
+   a finger. Off, the bubble is dimmed and struck through, so the state does
+   not rest on colour alone (it carries aria-pressed too). */
+.mn-map-tips {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  margin-left: auto;
+  font-size: .85rem;
+  line-height: 1;
+  border-radius: 50%;
+  opacity: .85;
+  box-shadow: var(--shadow-2);
+}
+.mn-map-tips:hover,
+.mn-map-tips:focus-visible { opacity: 1; }
+.mn-map-tips.is-off > span { opacity: .4; filter: grayscale(1); }
+.mn-map-tips.is-off::after {
+  content: '';
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  top: calc(50% - 1px);
+  border-top: 2px solid var(--bad);
+  transform: rotate(-45deg);
+}
+@media (pointer: coarse) {
+  .mn-map-tips { width: 2.75rem; height: 2.75rem; font-size: 1.05rem; }
+}
+/* …and what it switches: every name that comes and goes with the pointer. */
+.mn-tips-off .mn-hover-tip { display: none !important; }
+
 .mn-prop-tip-h { font-weight: 700; }
 .mn-prop-tip-l { font-weight: 500; font-size: .68rem; color: #5d4037; }
 
@@ -6166,6 +6209,14 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   gap: var(--sp-1, 0.5rem);
 }
 
+/* Leave 3-D, while the map is in 3-D: edged in red, because it is the one way
+   out now that ⛰️ in the rail only puts this pane away, and the eye has to
+   find it. The word says what it does; the red is not the only signal. */
+.map3d-actions .map3d-leave {
+  border: 2px solid var(--bad);
+  font-weight: 600;
+}
+
 /* ── Elevation base map (map-elevation.js) ──────────────────────────────── */
 /* The extras that only mean anything while the Elevation base is the chosen
    one: the relief switch and the colour file's own ramp, shown as a key. Hidden
@@ -6937,6 +6988,29 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   overflow-wrap: anywhere;
 }
 
+/* A row that goes to the map when pressed (MapSites.showPath): the hand, a
+   tint under the pointer, and — for the one whose path is lit on the map — the
+   leader's gold down its near edge. The name is the row's button, so it reads
+   as the name it is and not as a link. */
+.sites-table tr.sites-row-go { cursor: pointer; }
+.sites-table tr.sites-row-go:hover > td { background: var(--subtle); }
+.sites-table tr.sites-row-go.is-lit > td { background: color-mix(in srgb, var(--map-leader) 16%, transparent); }
+.sites-table tr.sites-row-go.is-lit > td:first-child { box-shadow: inset 3px 0 0 var(--map-leader); }
+.sites-t-go {
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.sites-t-go:hover,
+.sites-t-go:focus-visible { text-decoration: underline; }
+
+/* The box that finds the repeater to move by name (repFindHtml). */
+.sites-rep-find { margin: .45rem 0 .35rem; }
+.sites-rep-find > label { display: block; color: var(--muted); margin-bottom: .2rem; }
+
 /* The site finder's table carries each path's ground beside its figures
    (picHtml, map-sites.js). The picture grows with the panel — a side panel
    pulled wide has the room — and, where the table is too narrow for a column
@@ -7232,6 +7306,12 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
   min-width: 0;
   margin-top: 0;
 }
+
+/* The one box's reading of a lat, lon: a new site, offered as the list's
+   only row and marked so it is not taken for a station's. */
+.polar-hit.bestrep-newsite { border-color: var(--accent); }
+
+.bestrep-find-hint { margin: var(--sp-1) 0 0; }
 
 /* Armed is a state the map does not show until the click lands (#sites-circle). */
 #bestrep-arm.is-on {
@@ -8765,6 +8845,9 @@ body .map-panel.is-driving {
   color: var(--text);
   overflow-wrap: anywhere;
 }
+/* An end with a station (or a point) picked reads green; "not set" stays the
+   text colour, so a glance tells a chosen end from an empty one. */
+.rl-end-name.is-set { color: var(--ok); }
 .rl-end-role {
   font-size: .8rem;
   color: var(--muted);
@@ -9227,6 +9310,61 @@ body .map-panel.is-driving {
 .path-key-los  { border-top: 2px solid var(--accent); }
 .path-key-fres { border-top: 2px dashed var(--accent); }
 .path-key-obs  { border-top: 3px solid var(--bad); }
+
+/* The pins of a drawn line with corners (pathPins): A at its start, B at its
+   end, a number at each change of direction, standing on the ground of the
+   profile at that distance along. */
+.path-pin { cursor: default; }
+.path-pin line { stroke: var(--text); stroke-width: 1; opacity: .7; }
+.path-pin circle { fill: var(--panel); stroke: var(--text); stroke-width: 1.4; }
+.path-pin circle.path-pin-foot { fill: var(--text); stroke: var(--panel); stroke-width: 1; }
+.path-pin text { fill: var(--text); font-weight: 700; pointer-events: none; }
+.path-pin.is-end circle { fill: var(--accent); stroke: var(--panel); }
+.path-pin.is-end circle.path-pin-foot { fill: var(--accent); }
+.path-pin.is-end text { fill: var(--panel); }
+.path-key i.path-key-pin {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--text);
+  border-radius: 50%;
+}
+.path-pins {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .15rem .8rem;
+  margin: .3rem 0 0;
+  color: var(--muted);
+  max-height: 6.5rem;
+  overflow-y: auto;
+}
+.path-pins-item { white-space: nowrap; }
+.path-pins-tag {
+  display: inline-block;
+  min-width: 1.25rem;
+  padding: 0 .2rem;
+  border: 1px solid var(--text);
+  border-radius: 999px;
+  color: var(--text);
+  text-align: center;
+  font-size: .72rem;
+}
+.path-pins-tag.is-end { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+
+/* The same letters and numbers on the selected line's corners on the map. */
+.mn-draw-corner { background: none; border: none; pointer-events: none; }
+.mn-draw-corner i {
+  display: block;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border: 2px solid var(--draw);
+  border-radius: 50%;
+  background: #fff;
+  color: #111;
+  font: 700 10px/14px system-ui, sans-serif;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .45);
+}
 
 .path-key-gnd {
   height: 8px !important;
@@ -13642,8 +13780,23 @@ details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
+/* ⛰️ in the strip is a pane's button since November 2026: .is-on is its pane
+   showing (app.js, syncDockLive), dressed as every open pane's button is.
+   The 3-D view on behind another pane is the ring below. */
 .dock-strip .mn-mapctl-btn.mn-map-3d.is-on {
-  background: var(--accent);
+  background: var(--panel);
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* A tool with something on — a result on the map, ends picked, a mode armed,
+   the map in 3-D — whose pane is not the one showing: a gold ring, in the
+   gold of the open pane's tile, round a button otherwise as it was. The
+   tooltip says "on now" as well (app.js, dockLiveTitle), so the ring is not
+   the only thing saying it. */
+.dock-strip .is-live {
+  border-color: var(--map-leader-lo);
+  box-shadow: inset 0 0 0 2px var(--map-leader);
 }
 
 .dock-ico {
@@ -13663,7 +13816,7 @@ details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
 /* …and its halo, which is a spread shadow outside the button, is clipped with
    it — so it goes, except on the button that is on, whose inset accent ring is
    that button's own state and has to stay while it has focus. */
-.dock-strip :focus-visible:not(.is-on) {
+.dock-strip :focus-visible:not(.is-on):not(.is-live) {
   box-shadow: none;
 }
 
@@ -13768,10 +13921,26 @@ details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
    card to its pin (--map-leader): a ramp from pale through deep, cased in the
    leader's ink. A tile of colour lit with more colour round it did not show
    which one was on, least of all in a column of tiles. */
-:root[data-look="tiles"] .dock-strip :is(.is-on, [aria-pressed="true"]) .rail-ico {
+:root[data-look="tiles"] .dock-strip :is(.is-on, [aria-pressed="true"]:not(.mn-map-3d)) .rail-ico {
   background: linear-gradient(155deg, var(--map-leader-hi) 0%, var(--map-leader) 46%, var(--map-leader-lo) 100%);
   color: var(--map-leader-ink);
   box-shadow: inset 0 0 0 1.5px rgba(29, 20, 2, .55), 0 0 6px 1px rgba(255, 186, 40, .7);
+}
+
+/* …and the tool with something on behind another pane (.is-live, above) keeps
+   its own colour inside a gold ring stood off the tile: gilded, not gold. The
+   ring is the tile's here, so the button's own goes. */
+:root[data-look="tiles"] .dock-strip .is-live .rail-ico,
+:root[data-look="instrument"] .dock-strip .is-live .rail-ico,
+:root[data-look="signs"] .dock-strip .is-live .rail-ico {
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--map-leader), 0 0 7px 4px rgba(255, 186, 40, .55);
+}
+
+:root[data-look="tiles"] .dock-strip .is-live,
+:root[data-look="instrument"] .dock-strip .is-live,
+:root[data-look="signs"] .dock-strip .is-live {
+  border-color: transparent;
+  box-shadow: none;
 }
 
 /* …and with icons alone the gold is the only mark: no ring or fill round the
@@ -13788,7 +13957,7 @@ details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
   background: transparent;
 }
 
-:root[data-look="instrument"] .dock-strip :is(.is-on, [aria-pressed="true"]) .rail-ico {
+:root[data-look="instrument"] .dock-strip :is(.is-on, [aria-pressed="true"]:not(.mn-map-3d)) .rail-ico {
   background: #0b5cab;
   color: #ffffff;
 }
@@ -13985,13 +14154,14 @@ details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
   transform: rotate(-90deg);
 }
 
-#help-panel.rail-names .dock-group.is-folded > :not(.dock-fold):not(.is-on):not([aria-pressed="true"]) {
+#help-panel.rail-names .dock-group.is-folded > :not(.dock-fold):not(.is-on):not(.is-live):not([aria-pressed="true"]) {
   display: none;
 }
 
 /* The pane that is open: its row tinted and its name in the accent, as the
    left bar marks the open group. */
-#help-panel.rail-names .dock-tab.is-on {
+#help-panel.rail-names .dock-tab.is-on,
+#help-panel.rail-names .dock-strip .mn-mapctl-btn.mn-map-3d.is-on {
   background: var(--calm-soft, color-mix(in srgb, var(--accent) 14%, var(--panel-sub)));
   border-color: transparent;
   box-shadow: none;
@@ -14000,11 +14170,17 @@ details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
 }
 
 /* A mode says it is on with its switch, so its row is not lit as well. */
-#help-panel.rail-names .dock-strip .mn-mapctl-btn.is-on,
-#help-panel.rail-names .dock-strip .mn-mapctl-btn.mn-map-3d.is-on {
+#help-panel.rail-names .dock-strip .mn-mapctl-btn.is-on:not(.mn-map-3d) {
   background: transparent;
   border-color: transparent;
   box-shadow: none;
+}
+
+/* ⛰️ is a pane's button, not a switch: pressed while 3-D is on it puts its
+   pane away rather than switching 3-D off, so it wears no switch to be read
+   as one. 3-D on is the ring (.is-live), or the open pane itself. */
+#help-panel.rail-names .dock-strip .mn-map-3d > .rail-switch {
+  display: none;
 }
 
 #help-panel.rail-names .rail-switch {
@@ -14054,7 +14230,8 @@ details.ot-more[open] > summary { margin-bottom: var(--sp-2); }
 
 /* Signs: the open row a black sign with yellow on it, the headings in black,
    and a switch drawn as one — black on white off, yellow on black on. */
-:root[data-look="signs"] #help-panel.rail-names .dock-tab.is-on {
+:root[data-look="signs"] #help-panel.rail-names .dock-tab.is-on,
+:root[data-look="signs"] #help-panel.rail-names .dock-strip .mn-mapctl-btn.mn-map-3d.is-on {
   background: var(--sign-ink);
   color: var(--sign);
 }
@@ -20926,6 +21103,49 @@ body.has-sort-bridge .signin-nudge { display: none; }
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 45%, transparent);
 }
 .twin-scale-mark.is-peak { left: calc(50% - .3rem); width: .6rem; }
+/* The station's own ground and instruments (digital-twin.js floodRefs): not
+   flood levels, so a dashed line right across the track rather than a tick,
+   and a name in italics. */
+.twin-scale-refmark {
+  position: absolute;
+  top: var(--y);
+  left: calc(50% - .7rem);
+  width: 1.4rem;
+  height: 0;
+  transform: translateY(-50%);
+  border-top: 2px dashed var(--sw);
+  filter: drop-shadow(0 0 1px color-mix(in srgb, var(--bg) 80%, transparent));
+}
+.twin-flood-scale.is-rescaling .twin-scale-refmark,
+.twin-flood-scale.is-rescaling .twin-scale-ref { transition: none; }
+.twin-scale-ref {
+  position: absolute;
+  top: var(--y);
+  right: 0;
+  max-width: 100%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 0 .35rem;
+  min-height: 0;
+  font: inherit;
+  font-style: italic;
+  line-height: calc(var(--scale-gap) - 3px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--text) 35%, transparent);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  pointer-events: auto;
+}
+.twin-scale-leaders polyline.is-ref { stroke-dasharray: 3 2; }
+.twin-scale-ref[aria-disabled="true"] { cursor: default; }
+.twin-scale-ref:hover { background: var(--panel); }
+.twin-scale-ref .twin-flood-sw { flex: 0 0 auto; }
 
 /* The lines from the marks to the names. */
 .twin-scale-leaders { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
@@ -29335,3 +29555,101 @@ select.kl-in { width: auto; font-family: inherit; }
 .adm-team-words summary { cursor: pointer; }
 .adm-team-words dt { font-weight: 600; margin-top: var(--sp-1); }
 .adm-team-words dd { margin: 0; }
+
+/* ── ⚖️ Repeater comparison (map-repcompare.js) ─────────────────────────────
+   The finders' shared panel (.sites-panel, .sites-table, .sites-band,
+   .sites-thumb) with a grid of its own: shared sites down the side, the
+   picked repeaters across. Each repeater has a number — in its chip, its
+   column heading, its row in a site's table and on its pin — so a column is
+   matched to a mast without reading a long name twice. */
+.repcmp-key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 .25rem;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent, #fff);
+  font-size: .72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.repcmp-chosen li { align-items: center; }
+
+.repcmp-sum {
+  list-style: none;
+  margin: var(--sp-2) 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.repcmp-sum li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-1) var(--sp-2);
+}
+
+.repcmp-pics {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  margin: var(--sp-1) 0;
+  font-size: .8rem;
+}
+
+.repcmp-grid { table-layout: auto; }
+
+.repcmp-grid thead th { vertical-align: bottom; white-space: normal; }
+
+.repcmp-grid .repcmp-col { text-align: right; white-space: nowrap; }
+
+.repcmp-grid thead .repcmp-col { white-space: normal; }
+
+.repcmp-grid tbody th {
+  text-align: left;
+  font-weight: 600;
+}
+
+.repcmp-num { display: block; font-weight: 400; }
+
+.repcmp-row { cursor: pointer; }
+
+.repcmp-row:hover,
+.repcmp-row:focus-visible { background: var(--subtle); }
+
+.repcmp-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* The row whose paths are lit on the map: the leader's gold, as a path's row
+   in 🗼 Move/New Repeater wears it. */
+.repcmp-row.is-on > * { background: color-mix(in srgb, var(--map-leader) 16%, transparent); }
+
+.repcmp-row.is-on > th { box-shadow: inset 3px 0 0 var(--map-leader); }
+
+.repcmp-best { text-align: center; }
+
+/* A row's paths open under it, as wide as the pane and no wider — the grid
+   may scroll sideways with six repeaters across, and the pictures should not
+   go with it. */
+.repcmp-wrap { container: repcmp-wrap / inline-size; }
+
+.repcmp-star { margin-left: .2em; color: var(--accent); }
+
+.repcmp-detail-row > td {
+  padding: 0;
+  white-space: normal;
+}
+
+.repcmp-detail {
+  position: sticky;
+  left: 0;
+  box-sizing: border-box;
+  width: 100cqw;
+  padding: var(--sp-1) var(--sp-2) var(--sp-2);
+  border-left: 3px solid var(--map-leader);
+}
+
+.repcmp-only p { margin: var(--sp-1) 0; }

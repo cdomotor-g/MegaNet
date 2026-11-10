@@ -1615,6 +1615,10 @@ const Places = (function () {
     // ── Tap the map to drop pins ──
     arm,
     dropping() { return dropArmed; },
+    // Anything of this pane's on the map: the found place's outline or pin,
+    // pins dropped, or tap-to-drop armed. The side panel rings its button
+    // while so (app.js, syncDockLive); resetMap() ends it.
+    live() { return dropArmed || !!layer || pinList().length > 0; },
     // From the 3-D view's click on bare ground, with the terrain's coordinate.
     dropAt,
 

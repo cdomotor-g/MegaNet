@@ -237,6 +237,90 @@ async function main() {
     check('inside the map, clear of the zoom buttons, the station trail and ↺',
       geo.inMap && geo.clear && geo.found.every(Boolean), J(geo));
     await page.evaluate(() => { MapHere.arm(false); closeStnCard(); });
+
+    // ── The rail's rings, and 🧹 ─────────────────────────────────────────────
+    // A rail button is gold (.is-on) while its pane is the one open, and ringed
+    // (.is-live) while its tool has something on behind another pane (app.js,
+    // syncDockLive). 🧹 Clear the selection disarms every mode and takes every
+    // tool's answer off, so no ring is left — but for the views it leaves on.
+    log('\nThe rail rings a tool with something on, and Clear the selection takes the rings off\n');
+    const railLook = () => page.evaluate(() => {
+      syncDockLive();
+      const strip = document.querySelector('#help-panel .dock-strip');
+      const one = k => { const b = strip.querySelector(`.dock-tab[data-dock="${k}"]`);
+        return b ? { gold: b.classList.contains('is-on'), ring: b.classList.contains('is-live'), title: b.title } : null; };
+      return { showing: dockShowing(), draw: one('map-draw'), bestrep: one('map-bestrep'), paths: one('paths'), places: one('places'),
+               rings: [...strip.querySelectorAll('.is-live')].map(b => b.dataset.dock || b.className),
+               modes: MapMode.shown(), magnify: MapMagnify.on(), shapes: state.draw.shapes.length, tool: state.draw.tool || '',
+               linkPicking: !!state.link.picking, here: MapHere.armed(), bestArmed: MapBestRepeater.armed() };
+    });
+    await page.evaluate(() => { setDockTab('map-display'); });
+    let rl = await railLook();
+    check('nothing on: no button in the rail is ringed', !rl.rings.length, J(rl.rings));
+    await page.evaluate(() => MapDraw.setTool('line'));
+    await settle(page);
+    rl = await railLook();
+    check('a draw tool armed behind the Layers pane: ✏️ ringed, not gold, its tooltip ending "on now"',
+      rl.draw && rl.draw.ring && !rl.draw.gold && /on now$/.test(rl.draw.title), J(rl.draw));
+    const ringCss = await page.evaluate(() => {
+      const b = document.querySelector('#help-panel .dock-tab[data-dock="map-draw"]');
+      const ico = b.querySelector('.rail-ico');
+      return { btn: getComputedStyle(b).boxShadow, ico: ico ? getComputedStyle(ico).boxShadow : 'none' };
+    });
+    check('…and the ring is drawn', ringCss.btn !== 'none' || ringCss.ico !== 'none', J(ringCss));
+    await page.evaluate(() => setDockTab('map-draw'));
+    rl = await railLook();
+    check('its own pane opened: gold, and no ring', rl.draw.gold && !rl.draw.ring && !/on now$/.test(rl.draw.title), J(rl.draw));
+    // Several things on at once, behind the Layers pane: a drawing, Best
+    // repeater's pick armed, a link-budget end, pins being dropped is not
+    // possible beside them (one click-taker at a time), and the magnifier.
+    await page.evaluate(() => {
+      MapDraw.setTool('');
+      const c = state.map.getCenter();
+      state.draw.shapes.push({ id: 'rail-check', kind: 'line', pts: [[c.lat, c.lng], [c.lat + 0.05, c.lng + 0.05]], colour: '#f00' });
+      MapDraw.render();
+      const s = state.data.stations.find(x => x.lat != null);
+      Places.arm(true);
+      MapBestRepeater.pickStation(s.id);
+      MapBestRepeater.arm(true);
+      MapMagnify.toggle(true);
+      setDockTab('map-display');
+    });
+    await settle(page);
+    rl = await railLook();
+    check('a drawing, Best repeater armed with a site chosen, and the magnifier on: ✏️ and 🎯 both ringed',
+      rl.draw.ring && rl.bestrep && rl.bestrep.ring && rl.magnify && rl.modes.includes('bestrep'), J(rl));
+    await page.evaluate(() => clearStationsMapSelection());
+    await settle(page);
+    rl = await railLook();
+    check('🧹 Clear the selection: no mode armed, the magnifier away, nothing drawn, Best repeater emptied',
+      !rl.modes.length && !rl.magnify && !rl.shapes && !rl.tool && !rl.linkPicking && !rl.here && !rl.bestArmed
+        && !(await page.evaluate(() => MapBestRepeater.live())), J(rl));
+    check('…and no ring left in the rail; the open pane is still the gold one',
+      !rl.rings.length && rl.showing === 'map-display'
+        && await page.evaluate(() => document.querySelector('.dock-tab[data-dock="map-display"]').classList.contains('is-on')),
+      J(rl.rings));
+    // A tool that says how to clear itself where it makes its panel
+    // (MapChrome.panel's live / clear) is ringed and cleared with no line of
+    // its own in app.js.
+    const hook = await page.evaluate(async () => {
+      const e = dockMapItems.get('map-polar');
+      const was = { live: e.live, clear: e.clear };
+      let on = true, cleared = 0;
+      e.live = () => on; e.clear = () => { on = false; cleared++; };
+      const saved = DOCK_LIVE['map-polar'];
+      delete DOCK_LIVE['map-polar'];
+      syncDockLive();
+      const b = document.querySelector('.dock-tab[data-dock="map-polar"]');
+      const ringed = b.classList.contains('is-live');
+      await clearStationsMapSelection();
+      syncDockLive();
+      const after = b.classList.contains('is-live');
+      DOCK_LIVE['map-polar'] = saved; e.live = was.live; e.clear = was.clear;
+      return { ringed, cleared, after };
+    });
+    check('a panel\'s own live() rings its button and its clear() is called by 🧹', hook.ringed && hook.cleared === 1 && !hook.after, J(hook));
+
     await context.close();
 
     const phone = await openStations(browser, server, errors, { viewport: { width: 375, height: 800 } });

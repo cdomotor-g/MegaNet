@@ -98,8 +98,8 @@ live pulses the backbone was most of what the eye saw).
 | Group | View | What it sets |
 |---|---|---|
 | Everyone | **Overview** | The base map left alone; every station; each field station's best path until you zoom in (zoom 11), as lines; auto-contrast on; backbone on; links coloured by channel; rivers, flood cameras, field photos and site features on, everything else off. |
-| Everyone | **Site visit** | Satellite; every path as tails, the spotlight following the pointer; auto-contrast; Balance a little toward the photo (35); pins coloured by health; backbone off; property boundaries, easements, road parcels, survey marks, photos, site features, cameras, the digital twin and rivers. |
-| Technicians | **Radio paths** | Satellite; every path as tails; Balance toward the network (62); arrows; health; backbone off; maintenance hubs; rivers, photos, site features and the twin. No property layers. |
+| Everyone | **Site visit** | Satellite; every path as tails, the spotlight following the pointer; auto-contrast; Balance a little toward the photo (35); pins coloured by health; backbone off; property boundaries, easements, road parcels, survey marks, photos, site features, cameras and rivers. |
+| Technicians | **Radio paths** | Satellite; every path as tails; Balance toward the network (62); arrows; health; backbone off; maintenance hubs; rivers, photos and site features. No property layers. |
 | Technicians | **Weak links** | The base map left alone; every path as lines, coloured by fade margin; Balance well toward the network (85) so the weak ones stand out; backbone off. Working out a margin that is not saved fetches the ground heights along that path. |
 | Technicians | **Backbone** | Only repeaters and bases (the field pins and their paths off); the backbone, drawn as Flow, with arrows, health and the maintenance hubs. |
 | Technicians | **Live traffic** | Each field station's best path, faded, with ⏱️ Latency's live pulses running along it as readings arrive (the network is asked every 15 seconds); health on; backbone off. |
@@ -128,7 +128,7 @@ A view is a list of **knobs**, each one of the map's own switches:
 | backbone, arrows, colour, health, outlines | `state.mapShowBackbone`, `mapArrows`, `mapLinkColour`, `mapHealth`, `mapPinSls` | `setMapBackbone`, `MapArrows.setEnabled`, `setMapLinkColour`, `HealthGlance.setPins`, `MapSymbols.setOutlines` |
 | riverLines, riverCatchment, rain, elev, catchments | the layer's `state.map…` flag | its module's `setEnabled` (`MapRiverLines.setCatchment` for the catchment) |
 | lots, easements, tenure | `state.mapLots`, `mapEasements`, `mapTenure` | `MapLots.setEnabled`, `.setEasements`, `.setTenure` |
-| roads, roadOwners, councils, survey, hubs, wind, cameras, photos, siteFeatures, twinOffer | the layer's flag | its module's `setEnabled` |
+| roads, roadOwners, councils, survey, hubs, wind, cameras, photos, siteFeatures | the layer's flag | its module's `setEnabled` |
 | drawing | `MapViews.settings()` | `MapViews.set(…)` |
 
 Applying one reads each knob and calls its setter only where it differs, so a

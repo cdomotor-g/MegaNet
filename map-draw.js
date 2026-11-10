@@ -520,6 +520,21 @@ const MapDraw = (function () {
       const el = tt && tt.getElement();
       if (el) el.style.borderColor = colourOf(sh);
     }
+    // A selected line with corners: A, 1, 2… B written on its points, the same
+    // pins its ground profile stands at those distances (PathProfile's
+    // pathPins), so a stretch of the profile can be matched to a leg.
+    if (sh.kind === 'line' && sh.id === D().selectedId && sh.pts.length > 2) {
+      const c = colourOf(sh), n = sh.pts.length;
+      sh.pts.forEach((p, i) => {
+        const label = i === 0 ? 'A' : i === n - 1 ? 'B' : String(i);
+        L.marker(p, {
+          interactive: false, keyboard: false,
+          icon: L.divIcon({ className: 'mn-draw-corner',
+                            html: `<i style="border-color:${c}">${label}</i>`,
+                            iconSize: [18, 18], iconAnchor: [9, 9] }),
+        }).addTo(group);
+      });
+    }
     layer.on('click', e => {
       if (D().tool) return;                 // a tool is armed: the click is a draw click
       L.DomEvent.stop(e);

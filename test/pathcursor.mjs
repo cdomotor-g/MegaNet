@@ -396,6 +396,57 @@ try {
   check('deleting the line takes the chart and the marker on the ground with it',
     cleared.chart === false && cleared.m === null, JSON.stringify(cleared));
 
+  // ── A line with a corner: pins on its profile ───────────────────────────
+  // The same hop drawn through a point a quarter of the way along. Its
+  // profile is one picture by distance, so each point of the line is pinned
+  // to it — A, 1, B — and the corner's pin has to stand a quarter of the way
+  // between the other two, over 250 m of ramp.
+  const twoPoint = await page.evaluate((h) => {
+    MapDraw.addLine([[h.lat, h.lonA], [h.lat, h.lonB]], []);
+    return null;
+  }, HOP);
+  await page.waitForFunction(() => !!document.querySelector('svg.path-chart'), null, { timeout: 30_000 });
+  const straight = await page.evaluate(() => ({
+    pins: document.querySelectorAll('svg.path-chart .path-pin').length,
+    corners: document.querySelectorAll('.mn-draw-corner').length,
+  }));
+  check('a two-point line has no pins — its ends are its masts',
+    straight.pins === 0 && straight.corners === 0, JSON.stringify(straight) + (twoPoint || ''));
+  await page.evaluate((h) => {
+    MapDraw.clearAll();
+    MapDraw.addLine([[h.lat, h.lonA], [h.lat, h.lonA + (h.lonB - h.lonA) / 4], [h.lat, h.lonB]], []);
+  }, HOP);
+  await page.waitForFunction(() => document.querySelectorAll('svg.path-chart .path-pin').length > 0, null, { timeout: 30_000 });
+  const pinned = await page.evaluate(() => {
+    const pins = [...document.querySelectorAll('svg.path-chart .path-pin')].map(g => ({
+      label: g.querySelector('text').textContent,
+      x: Number(g.querySelector('line').getAttribute('x1')),
+      title: g.querySelector('title').textContent,
+    }));
+    return {
+      pins,
+      list: [...document.querySelectorAll('[data-path-pins] .path-pins-item')].map(e => e.textContent.replace(/\s+/g, ' ').trim()),
+      term: !!document.querySelector('[data-path-pins] [title]'),
+      map: [...document.querySelectorAll('.mn-draw-corner i')].map(e => e.textContent),
+    };
+  });
+  const [pa, p1, pb] = pinned.pins;
+  check('a line with a corner gets a pin at its start, its corner and its end',
+    pinned.pins.map(p => p.label).join() === 'A,1,B', JSON.stringify(pinned.pins));
+  const frac = pa && pb && p1 ? (p1.x - pa.x) / (pb.x - pa.x) : NaN;
+  check('the corner\'s pin stands where the corner is along the profile',
+    Math.abs(frac - 0.25) < 0.01, `fraction ${frac}`);
+  const gm = p1 && /ground (\d+) m/.exec(p1.title);
+  check('the pin says how far along it is and the ground height there',
+    !!gm && Math.abs(Number(gm[1]) - groundAt(0.25)) <= 15 && /along/.test(p1.title) && /corner 1/.test(p1.title),
+    p1 ? p1.title : 'no pin');
+  check('the same is listed under the chart, with the word explained on hover',
+    pinned.list.length === 3 && /^A /.test(pinned.list[0]) && /^1 .*ground \d+ m/.test(pinned.list[1]) && pinned.term,
+    JSON.stringify(pinned.list));
+  check('the map writes the same letters and numbers on the selected line\'s corners',
+    pinned.map.join() === 'A,1,B', JSON.stringify(pinned.map));
+  await page.evaluate(() => { MapDraw.clearAll(); });
+
   check('no pageerror', errors.length === 0, errors.join(' | '));
 } finally {
   await browser.close();

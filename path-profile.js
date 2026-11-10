@@ -1360,6 +1360,89 @@ const PathProfile = (function () {
       </details>`;
   }
 
+  // ── the pins of a drawn line ──
+
+  // A line drawn with corners gives one profile, laid out by distance along
+  // it — and nothing on that picture says where a corner is. So each point the
+  // line was clicked out through gets a pin on the ground of the profile: A
+  // where it starts, B where it ends, and 1, 2, 3… at each change of
+  // direction between, the same letters and numbers the map writes on the
+  // line's corners while it is selected (MapDraw.draw).
+  const PATH_PINS_MEANING = 'A pin stands where the line you drew starts (A), ends (B) and changes direction '
+    + '(1, 2, 3… in the order drawn), so you can tell which stretch of the profile is which leg of the line. '
+    + 'The same letters and numbers are written on the line\'s corners on the map while it is selected. '
+    + 'Each pin gives how far along the line it is and the ground height there.';
+
+  // Metres along the line to each of its points, fitted to the profile's own
+  // length `D` so the last pin lands on the profile's last sample however the
+  // two were measured.
+  function pathCorners(pts, D) {
+    if (!Array.isArray(pts) || pts.length < 2) return [];
+    const at = [0];
+    for (let i = 1; i < pts.length; i++) {
+      at.push(at[i - 1] + acmaHaversineKm(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]) * 1000);
+    }
+    const total = at[at.length - 1];
+    const k = total > 0 && D > 0 ? D / total : 1;
+    return at.map((d, i) => ({
+      d: i === at.length - 1 ? D : d * k,
+      label: pathPinLabel(i, at.length),
+      what: i === 0 ? 'start' : i === at.length - 1 ? 'end' : `corner ${i}`,
+      lat: pts[i][0], lon: pts[i][1],
+    }));
+  }
+  function pathPinLabel(i, n) { return i === 0 ? 'A' : i === n - 1 ? 'B' : String(i); }
+
+  // The profile sample nearest `d` metres along that has ground under it.
+  function pathSampleAt(pts, d) {
+    let best = null, gap = Infinity;
+    for (const p of pts) {
+      if (p.bulged == null) continue;
+      const g = Math.abs(p.d1 - d);
+      if (g < gap) { gap = g; best = p; }
+    }
+    return best;
+  }
+
+  // The pins as SVG, and as the line of text under the chart that says the
+  // same to a finger or a keyboard, which a hover never reaches.
+  function pathPins(an, prof, x, y, top, clickable) {
+    const corners = prof && prof.corners;
+    if (!corners || corners.length < 2) return { svg: '', list: '' };
+    const rows = corners.map(c => {
+      const p = pathSampleAt(an.pts, c.d);
+      return { ...c, p, ground: p && p.ground != null ? Math.round(p.ground) : null };
+    });
+    const said = r => `${fmtKm(r.d / 1000)} along${r.ground != null ? ` · ground ${r.ground} m` : ' · no ground data here'}`;
+    // Corners close together would print their numbers on top of each other,
+    // so a pin within a head's width of the one before stands a step taller.
+    let lastX = -Infinity, level = 0;
+    const svg = rows.map(r => {
+      if (!r.p) return '';
+      const px = x(r.d), gy = y(r.p.bulged);
+      level = px - lastX < 17 ? (level + 1) % 4 : 0;
+      lastX = px;
+      const end = r.label === 'A' || r.label === 'B';
+      const cy = Math.max(top + 9, gy - 20 - level * 17);
+      return `
+        <g class="path-pin${end ? ' is-end' : ''}"${clickable ? ' onclick="PathProfile.openFull()"' : ''}>
+          <title>${esc(`${r.label} — ${r.what} of the line · ${said(r)}`)}</title>
+          <line x1="${px.toFixed(1)}" y1="${gy.toFixed(1)}" x2="${px.toFixed(1)}" y2="${cy.toFixed(1)}"/>
+          <circle cx="${px.toFixed(1)}" cy="${gy.toFixed(1)}" r="2.5" class="path-pin-foot"/>
+          <circle cx="${px.toFixed(1)}" cy="${cy.toFixed(1)}" r="8"/>
+          <text x="${px.toFixed(1)}" y="${(cy + 3.5).toFixed(1)}" text-anchor="middle"
+                font-size="${r.label.length > 2 ? 7.5 : r.label.length > 1 ? 9 : 10.5}">${esc(r.label)}</text>
+        </g>`;
+    }).join('');
+    const list = `
+      <p class="path-pins small" data-path-pins>
+        <b>${termHtml('Pins', PATH_PINS_MEANING)}</b>
+        ${rows.map(r => `<span class="path-pins-item"><b class="path-pins-tag${
+          r.label === 'A' || r.label === 'B' ? ' is-end' : ''}">${esc(r.label)}</b> ${esc(said(r))}</span>`).join('')}
+      </p>`;
+    return { svg, list };
+  }
+
   // ── the chart ──
 
   // `flat` draws the ground and nothing else — the multi-leg case, where there
@@ -1721,6 +1804,10 @@ const PathProfile = (function () {
             onmouseleave="PathProfile.hoverOff()"${size ? '' : `
             onclick="PathProfile.openFull()"`}/>`;
 
+    // The corners of a drawn line, pinned to its profile (pathPins). Only the
+    // multi-leg picture has them: a two-point path's ends are its masts.
+    const pins = flat ? pathPins(an, prof, x, y, T, !size) : { svg: '', list: '' };
+
     return `
       <div class="path-chart-wrap">
         <svg viewBox="0 0 ${W} ${H}" class="path-chart" role="img"
@@ -1756,7 +1843,10 @@ const PathProfile = (function () {
           ${sigOn ? '<g id="path-sig-over" pointer-events="none"></g>' : ''}
           ${cursor}
           ${catcher}
+          <!-- After the catcher, so pointing at a pin shows what it marks. -->
+          ${pins.svg}
         </svg>
+        ${pins.list}
         <div class="path-key small">
           ${flat ? '' : `
             <span><i class="path-key-los"></i> Line of sight</span>
@@ -1766,6 +1856,7 @@ const PathProfile = (function () {
           ${lidarLine ? '<span><i class="path-key-lidar"></i> 5 m LiDAR</span>' : ''}
           ${earth ? `<span><i class="path-key-earth"></i> Earth curvature${sag > 0.5 ? ` · ${Math.round(sag)} m at mid-path` : ''}</span>` : ''}
           ${flat ? '' : '<span><i class="path-key-obs"></i> Inside the Fresnel zone</span>'}
+          ${pins.svg ? `<span><i class="path-key-pin"></i> ${termHtml('Pin', PATH_PINS_MEANING)} — start, corner or end of the line</span>` : ''}
           ${ext.length ? `<span class="path-key-beyond-item"><i class="path-key-beyond"></i> ${
             termHtml('Ground past each end', PATH_BEYOND_MEANING)} · ${fmtKm(Math.max(padA, padB) / 1000)}, for context</span>` : ''}
           ${coverKey}
@@ -2771,6 +2862,9 @@ const PathProfile = (function () {
           <strong>distance profile only</strong> — no line of sight and no Fresnel zone.
           A dog-leg is not a radio path. Draw a two-point line to analyse a hop.</p>
         ${warn}`;
+      // Where each corner of the drawn line falls along the profile, for
+      // the pins chartSvg stands on the ground there.
+      if (an.ok) prof.corners = pathCorners(sh.pts, an.D);
       if (an.ok) shown = { an, prof, a, b, flat: true, sig: null, warn: legs, datum: '' };
       return `${head}${legs}
         ${an.ok ? chartHere() : `<p class="filter-note">${esc(an.error)}</p>`}
@@ -2918,7 +3012,7 @@ const PathProfile = (function () {
   function rlEndsBareHtml(a, b) {
     const end = (which, tag, e) => `
       <section class="rl-end" aria-label="${tag === 'TX' ? 'Transmitter' : 'Receiver'} — end ${which.toUpperCase()}">
-        <div class="rl-end-head"><span class="rl-kick">${tag}</span> <b class="rl-end-name">${esc(e.name)}</b></div>
+        <div class="rl-end-head"><span class="rl-kick">${tag}</span> <b class="rl-end-name${e.name && e.name !== 'not set' ? ' is-set' : ''}">${esc(e.name)}</b></div>
         ${findHostHtml(which)}
       </section>`;
     return `<div class="rl-win rl-win-bare"><div class="rl-ends">${end('a', 'TX', a)}${end('b', 'RX', b)}</div></div>`;
@@ -3180,7 +3274,7 @@ const PathProfile = (function () {
       <section class="rl-end" aria-label="${tag === 'TX' ? 'Transmitter' : 'Receiver'} — end ${which.toUpperCase()}">
         <div class="rl-end-head">
           <span class="rl-kick">${tag}</span>
-          <b class="rl-end-name">${esc(P.name)}</b>
+          <b class="rl-end-name is-set">${esc(P.name)}</b>
           <span class="rl-end-role">${esc(P.role)}</span>
           <b class="rl-end-s" title="${escAttr(P.meterNote)}">${esc(P.meter ? P.meter.label : '—')}</b>
         </div>

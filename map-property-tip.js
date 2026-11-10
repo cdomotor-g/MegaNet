@@ -78,6 +78,8 @@ const MapPropTip = (function () {
   }
   function busy() {
     if (typeof state === 'undefined') return true;
+    // 💬 off (map-tip-stack.js): no tip, so no question to the State either.
+    if (typeof MapTipStack !== 'undefined' && MapTipStack.off && MapTipStack.off()) return true;
     if (state.map3d) return true;
     if (state.draw && state.draw.tool) return true;
     if (state.link && state.link.picking) return true;
