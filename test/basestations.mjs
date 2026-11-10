@@ -318,7 +318,10 @@ const FNS = {
   // stations only it hears, the report-only station on legacy ALERT alone.
   admin_base_station_ingest: a => {
     const day = g => new Date(dbNow() - g * 86400e3).toISOString().slice(0, 10);
-    const days = (x, y) => [...Array(Math.min(a.p_days, 7))].map((_, i) => [day(Math.min(a.p_days, 7) - 1 - i), x, y, x + y + 5]);
+    const days = (x, y) => [...Array(Math.min(a.p_days, 7))].map((_, i) => [day(Math.min(a.p_days, 7) - 1 - i), x, y, x + y + 5, x + 5, y, 100, y ? 12 : 0]);
+    // 0112: each counted station by name — two legacy IDs of one registered
+    // station, one nobody has registered, an ALERT2 repeater — and its paths.
+    const REG = { id: 'amiens_knob_al' };   // in stations.json; the SLS names its owner
     return { now: new Date(dbNow()).toISOString(), days: a.p_days, from: ago(a.p_days * 86400), to: ago(900), min_decodes: 3,
       network: [{ protocol: 'alert', ids: 150, known: 141 }, { protocol: 'alert2', ids: 12, known: 12 }],
       stations: [
@@ -326,10 +329,14 @@ const FNS = {
           protocols: [{ protocol: 'alert', n: 4000, ok: 3500, undecoded: 400, dup: 0, bad: 100, ids: 120, known: 111, only_here: 30, last: ago(90) },
                       { protocol: 'alert2', n: 10600, ok: 10500, undecoded: 0, dup: 0, bad: 100, ids: 12, known: 12, only_here: 2, last: ago(30) }],
           receivers: [{ point_id: 'rx-1', protocol: 'alert', n: 4000, ok: 3500, ids: 120, last: ago(90), name: 'RTL-SDR 1' },
-                      { point_id: 'rx-1', protocol: 'alert2', n: 10600, ok: 10500, ids: 12, last: ago(30), name: 'RTL-SDR 1' }] },
+                      { point_id: 'rx-1', protocol: 'alert2', n: 10600, ok: 10500, ids: 12, last: ago(30), name: 'RTL-SDR 1' }],
+          ids: [['alert2', 65001, 10000, REG.id, null, true], ['alert', 9001, 2000, REG.id, 'Rainfall', false], ['alert', 9002, 1000, REG.id, 'Water Level', true],
+                ['alert', 7777, 400, null, null, true]],
+          paths: [{ protocol: 'alert2', path: [], ok: 6000, ids: 8, names: [] }, { protocol: 'alert2', path: [65001, 64000], ok: 4500, ids: 4, names: ['Mt Stuart', null] }] },
         { id: 12, label: 'Depot roof', revoked: false, host_station: null, days: days(300, 0),
           protocols: [{ protocol: 'alert', n: 2400, ok: 2100, undecoded: 300, dup: 0, bad: 0, ids: 120, known: 120, only_here: 0, last: ago(300) }],
-          receivers: [{ point_id: 'rx-9', protocol: 'alert', n: 2400, ok: 2100, ids: 120, last: ago(300), name: null }] },
+          receivers: [{ point_id: 'rx-9', protocol: 'alert', n: 2400, ok: 2100, ids: 120, last: ago(300), name: null }],
+          ids: [['alert', 9001, 2100, REG.id, 'Rainfall', false]], paths: [] },
         { id: 14, label: 'Never heard', revoked: false, host_station: null, days: [], protocols: [], receivers: [] }] };
   },
   // Its receivers' own SNR shift by day (0083): RTL-SDR 1's ALERT stepped down
@@ -741,8 +748,8 @@ try {
 
   // ── What comes in through each (0111) ────────────────────────────────────────
   ok('the tab asks what came in through each base station over a week', sent('admin_base_station_ingest').some(a => a.p_days === 7), JSON.stringify(sent('admin_base_station_ingest')));
-  await until(() => page.evaluate(() => document.querySelectorAll('#bs-in tbody tr').length === 3), 'a row a base station');
-  const inRows = await page.evaluate(() => [...document.querySelectorAll('#bs-in tbody tr')].map(tr => [...tr.children].map(c => c.innerText.replace(/\s+/g, ' ').trim())));
+  await until(() => page.evaluate(() => document.querySelectorAll('#bs-in-body tbody tr').length === 3), 'a row a base station');
+  const inRows = await page.evaluate(() => [...document.querySelectorAll('#bs-in-body tbody tr')].map(tr => [...tr.children].map(c => c.innerText.replace(/\s+/g, ' ').trim())));
   ok('a station\'s row: its stations, legacy ALERT and ALERT2 apart with what decoded, the ALERT2 share and a day\'s worth',
     /^Mt Stuart hut at Mt Stuart$/.test(inRows[0][0]) && /^132 32 only here$/.test(inRows[0][1])
       && /^3,500 of 4,000 heard \(88%\) 120 stations 9 not in the register 30 only here$/.test(inRows[0][2])
@@ -755,8 +762,38 @@ try {
   ok('a line adds it up for the network',
     /^In the last 7 days, 2 base stations brought in 16,100 decoded messages: 5,600 legacy ALERT \(35%\) and 10,500 ALERT2 \(65%\), from 150 legacy IDs and 12 ALERT2 stations across the network — 9 of them not in the register\./.test(inSum), inSum);
   ok('its headings carry their meanings, listed under it too',
-    await page.evaluate(() => { const th = [...document.querySelectorAll('#bs-in thead .term')]; return th.length === 5 && th.every(t => t.title.length > 40)
+    await page.evaluate(() => { const th = [...document.querySelectorAll('#bs-in-body thead .term')]; return th.length === 5 && th.every(t => t.title.length > 40)
       && [...document.querySelectorAll('#bs-in dl.rd-words dd')].some(d => d.textContent === th[0].title); }));
+  // …a day's bar says its numbers on hover, and the breakdown under it (0112)
+  const barTip = await page.evaluate(() => document.querySelector('#bs-in-body tbody tr svg.bs-in-bars g title').textContent);
+  ok('a day\'s bar says that day\'s numbers on hover: the total, then a line a protocol with what was heard and from how many',
+    /, UTC\n2,000 decoded of 2,005 heard \(100%\)\nLegacy ALERT: 500 decoded of 505 heard \(99%\), from 100 IDs — 25% of the day\nALERT2: 1,500 decoded of 1,500 heard \(100%\), from 12 stations — 75% of the day$/.test(barTip), barTip);
+  const byRows = () => page.evaluate(() => [...document.querySelectorAll('#bs-in-by tbody tr')].map(tr => [...tr.children].map(c => c.innerText.replace(/\s+/g, ' ').trim())));
+  await until(async () => (await byRows()).some(r => r[0] === 'Southern Downs Regional Council'), 'the breakdown opens by owner, once the owners are on hand');
+  let by = await byRows();
+  ok('by owner, all base stations: a station two of them decode is one station, its messages counted at each',
+    by.length === 3 && by[0].join('|') === 'Southern Downs Regional Council|3|5,100|10,000|15,100|94%'
+      && by[1].join('|') === 'Not in the register|1|400|—|400|2%' && by[2].join('|') === 'Too few to count, or no ID|—|100|500|600|4%', JSON.stringify(by));
+  await page.click('#bs-in-by button:has-text("Kind of sensor")');
+  by = await byRows();
+  ok('by kind of sensor: the legacy sensor\'s type, and for ALERT2 what the station is',
+    by.some(r => r[0] === 'ALERT2 repeater' && r[3] === '10,000') && by.some(r => r[0] === 'Rainfall' && r[2] === '4,100') && by.some(r => r[0] === 'Water Level' && r[2] === '1,000'), JSON.stringify(by));
+  await page.click('#bs-in-by button:has-text("Mt Stuart hut")');
+  await page.click('#bs-in-by button:has-text("Station by station")');
+  by = await byRows();
+  ok('one base station, station by station: its IDs added up under the station, with what only it hears',
+    by[0].join('|') === 'Amiens Knob AL|3 2 only here|3,000|10,000|13,000|93%' && /^Legacy ID 7777 — not in the register$/.test(by[1][0]), JSON.stringify(by));
+  await page.click('#bs-in-by button:has-text("Relay path")');
+  by = await byRows();
+  ok('by relay path: straight from the station, or the repeaters it came through, named where the register has them',
+    by[0].join('|') === 'Straight from the station|8|6,000|57%' && by[1].join('|') === 'via Mt Stuart, then address 64000|4|4,500|43%', JSON.stringify(by));
+  await page.click('#bs-in-by button:has-text("Day by day")');
+  by = await byRows();
+  ok('day by day: the bars\' numbers as a table, newest first, with the stations for one base station',
+    by.length === 7 && /\(so far\)$/.test(by[0][0]) && by[0].slice(1).join('|') === '500 of 505 (99%)|100|1,500 of 1,500 (100%)|12|2,000 of 2,005 (100%)|75%', JSON.stringify(by[0]));
+  ok('the breakdown\'s headings carry their meanings too, listed in the same fold',
+    await page.evaluate(() => { const th = [...document.querySelectorAll('#bs-in-by thead .term')]; return th.length >= 3 && th.every(t => t.title.length > 40
+      && [...document.querySelectorAll('#bs-in dl.rd-words dd')].some(d => d.textContent === t.title)); }));
   await page.click('#bs-in button:has-text("30 days")');
   await until(() => sent('admin_base_station_ingest').some(a => a.p_days === 30), 'the 30 days button asks for thirty');
   await until(() => page.evaluate(() => /In the last 30 days/.test(document.getElementById('bs-in-sum').textContent)), '…and says so');

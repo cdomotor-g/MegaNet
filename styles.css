@@ -23036,6 +23036,24 @@ a.adm-kpi--go:hover::after, a.adm-kpi--go:focus-visible::after { color: var(--ac
 .bs-in-bars { display: block; width: 120px; height: 28px; }
 .bs-in-a, .qs-sw.bs-sw-in-a { fill: var(--accent); background: var(--accent); }
 .bs-in-a2, .qs-sw.bs-sw-in-a2 { fill: var(--c-ident); background: var(--c-ident); }
+/* A day's bar says its numbers on hover (the whole column is the target, so a
+   short bar is as easy to hit as a tall one); and the breakdown under the
+   table (0112): what to group by, for which base station, and a row a group
+   with its two protocols as one bar. */
+.bs-in-hit { fill: var(--text); opacity: 0; }
+.bs-in-bars g:hover .bs-in-hit { opacity: .12; }
+.bs-in-by { margin-top: var(--sp-4); padding-top: var(--sp-3); border-top: 1px solid var(--border); }
+.bs-in-by .pill-row { margin-bottom: var(--sp-2); }
+.bs-in-bhead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.bs-in-bh { margin: 0; font-size: var(--fs-md, 1rem); }
+.table-wrap table.bs-in-b { min-width: 40rem; }
+.bs-in-b td, .bs-in-b th { vertical-align: top; overflow-wrap: break-word; }
+.bs-in-b .bs-in-g { width: 34%; }
+.bs-in-b .bs-in-p { width: 22%; }
+.bs-in-mix { display: inline-flex; width: calc(100% - 5rem); min-width: 3rem; height: .6rem; margin-right: .4rem; vertical-align: middle; background: var(--panel-sub); border-radius: 2px; overflow: hidden; }
+.bs-in-mix i { display: block; height: 100%; }
+.bs-in-mix .bs-sw-in-a { background: var(--accent); }
+.bs-in-mix .bs-sw-in-a2 { background: var(--c-ident); }
 
 /* ── A header's "?" (Repeaters listening) ────────────────────────────────────
    How-to text that every visit would otherwise pay for in card height, moved

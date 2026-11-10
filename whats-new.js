@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 259, date: '2026-11-10', items: [
+      '📥 <strong>What comes in through each, broken down.</strong> On the Base Stations tab, under the table: the decoded messages '
+        + 'by station owner, radio network, Bureau region, catchment, council area, kind of sensor, the repeaters an ALERT2 message '
+        + 'came through, station by station, or day by day — for all base stations or one, each row with its legacy ALERT and ALERT2 '
+        + 'messages. Rest the pointer on a day\'s bar for that day\'s numbers. The breakdown saves as CSV.',
+    ] },
     { n: 258, date: '2026-11-10', items: [
       '⭕ <strong>The 30 km question, answered in plain words first.</strong> Knowledge base › 🪪 Radio Licensing › The 30 km question now opens with '
         + 'the answer — a gauge beyond 30 km of its licensed repeater is legal, but unprotected — and a small table setting the law beside ACMA\'s '

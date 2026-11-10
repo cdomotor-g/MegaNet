@@ -258,6 +258,28 @@ or month, from the reception rollups:
 A line above adds it up for the network. A message heard by two base stations
 counts for both; drive surveys are left out. **Save as CSV** writes the table.
 
+Resting the pointer on a day's bar says that day's numbers: the total, then a
+line a protocol — decoded of heard, from how many stations, and its share of
+the day.
+
+Under the table, **Whose it is** (`0112`) breaks the same decoded messages
+down, for all base stations together or one of them:
+
+- by **Owner** (from the Bureau's Service Level Specification, else the owner
+  recorded on the station), **Radio network**, **Bureau region**, **Catchment**
+  and **Council area**, as the station register has them;
+- by **Kind of sensor** — what the legacy sensor behind the ID measures, and
+  for ALERT2 whether the station sending is a repeater or a field station;
+- by **Relay path** — the repeaters an ALERT2 message came through;
+- **Station by station**, and **Day by day** (the bars' numbers as a table).
+
+Each row gives its stations, its legacy ALERT and ALERT2 messages and its
+share. IDs **not in the register** are a row of their own, and so is what was
+decoded from an ID heard fewer than three times or with no ID (**Too few to
+count, or no ID**). The database names each counted station; the grouping is
+done in the browser, which holds the owners. **Save this breakdown as CSV**
+writes every row of the one on screen.
+
 ## Channel by channel
 
 Under the waterfall, **Channel by channel** (`0081`) takes the last day, week or

@@ -4030,7 +4030,7 @@ const DB_SCHEMA = 'meganet';
 // reads changes. 111: a base station's spectrum by the hour and its ingest
 // (0111), applied by db-migrate.yml on 10 November 2026, bumped after; the
 // Base Stations tab reads both, and a database without them says which file.
-const DB_SCHEMA_VERSION = 111;
+const DB_SCHEMA_VERSION = 112;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

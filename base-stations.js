@@ -1718,10 +1718,24 @@ const BaseStations = (function () {
     ['in-register', 'Not in the register', 'IDs Flood-Net\'s station register does not hold: another network\'s stations, or ones not entered yet.'],
     ['in-only', 'Only here', 'Stations this base station decoded that no other base station did in the period. If this base station goes down, these go dark.'],
     ['in-share', 'ALERT2 share', 'The part of the decoded messages that came as ALERT2 rather than legacy ALERT.'],
+    ['in-owner', 'Owner', 'Who owns the station sending: from the Bureau\'s Service Level Specification where it lists the station, else the owner recorded on the station. A station owned jointly is counted under the pair, not under each.'],
+    ['in-network', 'Radio network', 'The local radio network the register puts the station in: the repeater it reports through and the gauges round it.'],
+    ['in-hub', 'Bureau region', 'The Bureau field maintenance region (hub) the station falls in.'],
+    ['in-kind', 'Kind of sensor', 'For legacy ALERT, what the sensor behind the ID measures, as the register has it (rainfall, water level, battery…). For ALERT2, whether the station sending is a repeater or a field station.'],
+    ['in-path', 'Relay path', 'The repeaters an ALERT2 message says it came through before the base station heard it. "Straight from the station" means it names none.'],
+    ['in-few', 'Too few to count, or no ID', 'Messages decoded from an ID heard fewer than three times in the period, or with no ID read at all. Mostly corrupted copies of other messages, so they are kept apart rather than counted as stations.'],
+    ['in-part', 'Share', 'This row\'s part of all the decoded messages in the table.'],
   ];
   const inTerm = (k, text) => { const w = IN_WORDS.find(x => x[0] === k); return termHtml(text || w[1], w[2]); };
   // { days, r, err } — r as the database answered.
   let ing = null, inDays = 7, inBusy = false;
+  // The breakdown under the table (0112): by what, for which base station
+  // ('all' or an ingest token's id), and whether a long list is opened out.
+  const IN_BY = [['owner', 'Owner'], ['network', 'Radio network'], ['hub', 'Bureau region'], ['catchment', 'Catchment'], ['lga', 'Council area'],
+    ['kind', 'Kind of sensor'], ['path', 'Relay path'], ['station', 'Station by station'], ['day', 'Day by day']];
+  const IN_BY_TERM = { owner: 'in-owner', network: 'in-network', hub: 'in-hub', kind: 'in-kind', path: 'in-path' };
+  const IN_TOP = 25;
+  let inBy = 'owner', inAt = 'all', inMore = false, inSlsAsked = false;
 
   // A station's row, read: its two protocols and their totals.
   function inRead(x) {
@@ -1732,16 +1746,34 @@ const BaseStations = (function () {
       last: [a.last, a2.last].filter(Boolean).sort().pop() || null };
   }
 
+  // A day's numbers in words: what its bar says on hover, a line a protocol.
+  // The four numbers after the first four are 0112's; without them, what there is.
+  const inPct = (a, b) => (Number(b) ? ' (' + Math.round(Number(a) / Number(b) * 100) + '%)' : '');
+  function inDayName(day) {
+    const t = new Date(String(day).slice(0, 10) + 'T00:00:00Z');
+    const today = new Date(now()).toISOString().slice(0, 10) === String(day).slice(0, 10);
+    return (isFinite(t) ? t.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }) : String(day)) + (today ? ' (so far)' : '');
+  }
+  function inDayText(v) {
+    const a = Number(v[1]), a2 = Number(v[2]), n = Number(v[3]), full = v.length >= 8;
+    const line = (name, ok, heard, ids, word) => name + ': ' + chN(ok) + ' decoded'
+      + (full ? ' of ' + chN(heard) + ' heard' + inPct(ok, heard) + ', from ' + chN(ids) + ' ' + word + (Number(ids) === 1 ? '' : 's') : '');
+    return inDayName(v[0]) + ', UTC\n' + chN(a + a2) + ' decoded of ' + chN(n) + ' heard' + inPct(a + a2, n)
+      + '\n' + line('Legacy ALERT', a, v[4], v[6], 'ID') + (a + a2 ? ' — ' + Math.round(a / (a + a2) * 100) + '% of the day' : '')
+      + '\n' + line('ALERT2', a2, v[5], v[7], 'station') + (a + a2 ? ' — ' + Math.round(a2 / (a + a2) * 100) + '% of the day' : '');
+  }
+
   function inBarsHtml(x) {
     const d = x.days || [];
     if (!d.length) return '<span class="qs-dim">—</span>';
     const W = 120, H = 28, max = Math.max(1, ...d.map(v => Number(v[1]) + Number(v[2]))), w = W / d.length;
     const bars = d.map((v, i) => {
       const h1 = Number(v[1]) / max * H, h2 = Number(v[2]) / max * H;
-      return `<rect class="bs-in-a" x="${(i * w).toFixed(1)}" y="${(H - h1).toFixed(1)}" width="${Math.max(1, w - 1).toFixed(1)}" height="${h1.toFixed(1)}"></rect>`
-        + `<rect class="bs-in-a2" x="${(i * w).toFixed(1)}" y="${(H - h1 - h2).toFixed(1)}" width="${Math.max(1, w - 1).toFixed(1)}" height="${h2.toFixed(1)}"></rect>`;
+      return `<g><title>${esc(inDayText(v))}</title><rect class="bs-in-hit" x="${(i * w).toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${H}"></rect>`
+        + `<rect class="bs-in-a" x="${(i * w).toFixed(1)}" y="${(H - h1).toFixed(1)}" width="${Math.max(1, w - 1).toFixed(1)}" height="${h1.toFixed(1)}"></rect>`
+        + `<rect class="bs-in-a2" x="${(i * w).toFixed(1)}" y="${(H - h1 - h2).toFixed(1)}" width="${Math.max(1, w - 1).toFixed(1)}" height="${h2.toFixed(1)}"></rect></g>`;
     }).join('');
-    return `<svg class="bs-in-bars" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Decoded messages a day, ${esc(String(d[0][0]).slice(0, 10))} to ${esc(String(d[d.length - 1][0]).slice(0, 10))}: at most ${esc(chN(max))} in a day">${bars}</svg>`;
+    return `<svg class="bs-in-bars" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Decoded messages a day, ${esc(String(d[0][0]).slice(0, 10))} to ${esc(String(d[d.length - 1][0]).slice(0, 10))}: at most ${esc(chN(max))} in a day. Each day's numbers are under Day by day, below.">${bars}</svg>`;
   }
 
   function inProtoHtml(p) {
@@ -1784,7 +1816,156 @@ const BaseStations = (function () {
           <th scope="col">${inTerm('in-share')}</th><th scope="col">${inTerm('in-messages', 'Decoded a day')}</th><th scope="col">Day by day</th><th scope="col" class="bs-wide">By receiver</th><th scope="col">Last heard</th></tr></thead>
         <tbody>${body}</tbody></table></div>
       <div class="qs-legend"><span><i class="qs-sw bs-sw-in-a" aria-hidden="true"></i>legacy ALERT</span><span><i class="qs-sw bs-sw-in-a2" aria-hidden="true"></i>ALERT2</span>
-        <span class="qs-dim">a bar a day (UTC), decoded messages</span></div>`;
+        <span class="qs-dim">a bar a day (UTC), decoded messages — rest the pointer on a bar for that day's numbers, or see Day by day below</span></div>`;
+  }
+
+  // ── …and whose it is (0112) ──────────────────────────────────────────────
+  // The same messages by who owns the station sending, its radio network,
+  // Bureau region, catchment, council area, kind of sensor, the repeaters an
+  // ALERT2 message came through, station by station, and day by day. The
+  // database names each counted station (ids: [protocol, id, decoded, the
+  // register's station, sensor type, only here]); what groups them is looked
+  // up here, in the register the app already holds — owners mostly come from
+  // the SLS, which the database does not have.
+
+  let inStnMemo = { src: null, map: null };
+  function inStn(id) {
+    const list = (state.data && state.data.stations) || [];
+    if (inStnMemo.src !== list) inStnMemo = { src: list, map: new Map(list.map(st => [st.id, st])) };
+    return id == null ? null : inStnMemo.map.get(id) || null;
+  }
+  const inOwnersReady = () => typeof SLS === 'undefined' || SLS.loaded() || inSlsAsked === 'failed';
+  const inNamed = (list, id) => { const e = ((state.data && state.data[list]) || []).find(q => q.id === id); return e ? e.name : id; };
+
+  // What a counted station falls under: [key, label]. One not in the register
+  // is its own row whatever the question.
+  function inGroupOf(row) {
+    const [proto, id, , stationId, type] = row;
+    if (stationId == null) return inBy === 'station' ? ['?' + proto + id, (proto === 'alert2' ? 'ALERT2 station ' : 'Legacy ID ') + id + ' — not in the register'] : ['?', 'Not in the register'];
+    const st = inStn(stationId);
+    if (inBy === 'station') return ['s' + stationId, st ? st.name : stationId];
+    if (inBy === 'kind') {
+      if (proto !== 'alert2') return ['k' + (type || ''), type || 'No sensor type recorded'];
+      const role = st && ['repeater', 'base', 'field'].find(r => (st.roles || []).includes(r));
+      return ['r' + (role || ''), 'ALERT2 ' + (role ? ROLE_LABEL[role].toLowerCase() : 'station')];
+    }
+    if (!st) return ['-', 'In the register, but not in the list this browser holds'];
+    if (inBy === 'owner') {
+      if (!inOwnersReady()) return ['…', 'Owners still loading…'];
+      const o = typeof stationOwner === 'function' ? stationOwner(st) : null;
+      return o ? ['o' + o.name, o.name] : ['', 'No owner on record'];
+    }
+    if (inBy === 'network') { const n = (st.radio_network_ids || []).map(netName); return n.length ? ['n' + n.join('|'), n.join(' / ')] : ['', 'No radio network recorded']; }
+    if (inBy === 'hub') return st.hub_id ? ['h' + st.hub_id, inNamed('hubs', st.hub_id)] : ['', 'No Bureau region recorded'];
+    if (inBy === 'catchment') { const c = (st.catchment_ids || [])[0]; return c ? ['c' + c, inNamed('catchments', c)] : ['', 'No catchment recorded']; }
+    return st.lga ? ['l' + st.lga, st.lga] : ['', 'No council area recorded'];
+  }
+
+  const inPathLabel = p => ((p.path || []).length
+    ? 'via ' + p.path.map((a, i) => (p.names && p.names[i]) || 'address ' + a).join(', then ') : 'Straight from the station');
+
+  // The breakdown, read: { cols, rows: [{ label, sub, ids, a, a2, only, warn, dim }], total, note } —
+  // or { need } when the database is still 0111's, or { days } for day by day.
+  function inBreak() {
+    const all = ((ing && ing.r && ing.r.stations) || []).filter(x => inRead(x).n > 0);
+    const xs = inAt === 'all' ? all : all.filter(x => String(x.id) === String(inAt));
+    if (!xs.length) return { rows: [], total: 0 };
+    if (inBy === 'day') {
+      const by = new Map();
+      for (const x of xs) for (const v of x.days || []) {
+        const e = by.get(v[0]) || [v[0], 0, 0, 0, 0, 0, 0, 0];
+        for (let i = 1; i < 8; i++) e[i] += Number(v[i] || 0);
+        by.set(v[0], e);
+      }
+      return { days: [...by.values()].sort((a, b) => (a[0] < b[0] ? 1 : -1)), full: xs.every(x => (x.days || []).every(v => v.length >= 8)), one: xs.length === 1 };
+    }
+    if (xs.some(x => !Array.isArray(x.ids))) return { need: true };
+    const by = new Map();
+    const at = (key, label, sub) => { let g = by.get(key); if (!g) { g = { label, sub, ids: new Set(), a: 0, a2: 0, only: 0 }; by.set(key, g); } return g; };
+    if (inBy === 'path') {
+      for (const x of xs) for (const p of x.paths || []) {
+        const g = at(JSON.stringify(p.path || []) + (xs.length > 1 ? x.id : ''), inPathLabel(p), xs.length > 1 ? 'heard at ' + x.label : '');
+        g.a2 += Number(p.ok); g.n = (g.n || 0) + Number(p.ids);
+      }
+    } else {
+      for (const x of xs) for (const row of x.ids) {
+        const [key, label] = inGroupOf(row), g = at(key, label);
+        g.ids.add(row[0] + ':' + row[1]);
+        g[row[0] === 'alert2' ? 'a2' : 'a'] += Number(row[2]);
+        if (row[5]) g.only++;
+        if (key[0] === '?') g.warn = true;
+      }
+    }
+    const rows = [...by.values()].map(g => Object.assign(g, { n: g.n != null ? g.n : g.ids.size }))
+      .sort((p, q) => (q.a + q.a2) - (p.a + p.a2) || String(p.label).localeCompare(String(q.label)));
+    // What was decoded but not counted as a station: the rest of each protocol's total.
+    const tot = xs.map(inRead).reduce((t, v) => ({ a: t.a + Number(v.a.ok), a2: t.a2 + Number(v.a2.ok) }), { a: 0, a2: 0 });
+    const rest = { a: inBy === 'path' ? 0 : Math.max(0, tot.a - rows.reduce((n, g) => n + g.a, 0)), a2: Math.max(0, tot.a2 - rows.reduce((n, g) => n + g.a2, 0)) };
+    if (rest.a + rest.a2 > 0) rows.push({ label: 'Too few to count, or no ID', few: true, n: null, a: rest.a, a2: rest.a2, only: 0, dim: true });
+    return { rows, total: rows.reduce((n, g) => n + g.a + g.a2, 0), one: xs.length === 1, several: all.length > 1 };
+  }
+
+  function inDaysTableHtml(b) {
+    const cell = (ok, heard) => `<strong>${esc(chN(ok))}</strong>${b.full ? ` <span class="qs-dim">of ${esc(chN(heard))}${esc(inPct(ok, heard))}</span>` : ''}`;
+    const body = b.days.map(v => `<tr><th scope="row">${esc(inDayName(v[0]))}</th>
+        <td class="small">${cell(v[1], v[4])}</td>${b.full && b.one ? `<td class="small">${esc(chN(v[6]))}</td>` : ''}
+        <td class="small">${cell(v[2], v[5])}</td>${b.full && b.one ? `<td class="small">${esc(chN(v[7]))}</td>` : ''}
+        <td class="small"><strong>${esc(chN(Number(v[1]) + Number(v[2])))}</strong> <span class="qs-dim">of ${esc(chN(v[3]))}${esc(inPct(Number(v[1]) + Number(v[2]), v[3]))}</span></td>
+        <td class="small">${Number(v[1]) + Number(v[2]) ? Math.round(Number(v[2]) / (Number(v[1]) + Number(v[2])) * 100) + '%' : '<span class="qs-dim">—</span>'}</td></tr>`).join('');
+    return `<div class="table-wrap" role="region" tabindex="0" aria-label="Day by day"><table class="adm-table bs-in-b">
+        <caption class="sr-only">Each UTC day, newest first: legacy ALERT and ALERT2 messages decoded of those heard, the stations on each, the day's total and its ALERT2 share</caption>
+        <thead><tr><th scope="col">Day (UTC)</th><th scope="col">${inTerm('in-legacy', 'Legacy ALERT decoded')}</th>${b.full && b.one ? '<th scope="col">Legacy IDs</th>' : ''}
+          <th scope="col">${inTerm('in-alert2', 'ALERT2 decoded')}</th>${b.full && b.one ? '<th scope="col">ALERT2 stations</th>' : ''}
+          <th scope="col">${inTerm('in-messages', 'All decoded')}</th><th scope="col">${inTerm('in-share')}</th></tr></thead>
+        <tbody>${body}</tbody></table></div>`
+      + (b.full && !b.one ? '<p class="small qs-dim">Pick one base station for how many stations it decoded each day.</p>' : '');
+  }
+
+  function inBreakHtml() {
+    if (!ing || ing.err || !ing.r) return '';
+    const heard = (ing.r.stations || []).filter(x => inRead(x).n > 0);
+    if (!heard.length) return '';
+    if (inAt !== 'all' && !heard.some(x => String(x.id) === String(inAt))) inAt = 'all';
+    const pill = (on, text, call) => `<button type="button" class="pill${on ? ' is-on' : ''}" aria-pressed="${on}" onclick="${call}">${esc(text)}</button>`;
+    const picks = `<div class="pill-row" role="group" aria-label="Break it down by">${IN_BY.map(([k, t]) => pill(k === inBy, t, `BaseStations.inGroup('${k}')`)).join('')}</div>`
+      + (heard.length > 1 ? `<div class="pill-row" role="group" aria-label="For which base station">${pill(inAt === 'all', 'All base stations', "BaseStations.inFor('all')")}${heard.map(x => pill(String(x.id) === String(inAt), x.label, `BaseStations.inFor(${Number(x.id)})`)).join('')}</div>` : '');
+    const b = inBreak();
+    let out;
+    if (b.need) out = '<p class="small txt-warn">The database does not have this yet — apply db/migrations/0112_base_station_ingest_breakdown.sql. Day by day works without it.</p>';
+    else if (b.days) out = b.days.length ? inDaysTableHtml(b) : '<p class="small qs-dim">Nothing in the period.</p>';
+    else if (!b.rows.length) out = `<p class="small qs-dim">${inBy === 'path' ? 'No ALERT2 decoded in the period.' : 'Nothing decoded in the period.'}</p>`;
+    else {
+      const path = inBy === 'path', max = Math.max(1, ...b.rows.map(g => g.a + g.a2));
+      const shown = inMore ? b.rows : b.rows.slice(0, IN_TOP).concat(b.rows.length > IN_TOP ? b.rows.slice(IN_TOP).filter(g => g.few) : []);
+      const head = (IN_BY.find(q => q[0] === inBy) || [])[1], term = IN_BY_TERM[inBy];
+      const body = shown.map(g => `<tr${g.dim ? ' class="qs-dim"' : ''}>
+          <th scope="row">${g.few ? inTerm('in-few') : `<span${g.warn ? ' class="txt-warn"' : ''}>${esc(g.label)}</span>`}${g.sub ? `<div class="small qs-dim">${esc(g.sub)}</div>` : ''}</th>
+          <td class="small">${g.n == null ? '—' : esc(chN(g.n))}${!path && b.one && b.several && g.only ? `<div class="qs-dim">${esc(chN(g.only))} only here</div>` : ''}</td>
+          ${path ? '' : `<td class="small">${g.a ? esc(chN(g.a)) : '<span class="qs-dim">—</span>'}</td>`}
+          <td class="small">${g.a2 ? esc(chN(g.a2)) : '<span class="qs-dim">—</span>'}</td>
+          ${path ? '' : `<td class="small"><strong>${esc(chN(g.a + g.a2))}</strong></td>`}
+          <td class="small"><span class="bs-in-mix" aria-hidden="true"><i class="bs-sw-in-a" style="width:${(g.a / max * 100).toFixed(1)}%"></i><i class="bs-sw-in-a2" style="width:${(g.a2 / max * 100).toFixed(1)}%"></i></span>
+            ${b.total ? ((g.a + g.a2) / b.total * 100 < 1 ? 'under 1%' : Math.round((g.a + g.a2) / b.total * 100) + '%') : ''}</td>
+        </tr>`).join('');
+      const hidden = b.rows.length - shown.length;
+      out = `<div class="table-wrap" role="region" tabindex="0" aria-label="Decoded messages by ${esc(head.toLowerCase())}"><table class="adm-table bs-in-b">
+          <caption class="sr-only">Decoded messages by ${esc(head.toLowerCase())}: the stations in each row, their legacy ALERT and ALERT2 messages, and the row's share of them all</caption>
+          <thead><tr><th scope="col" class="bs-in-g">${term ? inTerm(term) : esc(inBy === 'station' ? 'Station' : head)}</th><th scope="col">${inTerm('in-stations', path ? 'ALERT2 stations' : 'Stations')}</th>
+            ${path ? '' : `<th scope="col">${inTerm('in-legacy', 'Legacy ALERT decoded')}</th>`}<th scope="col">${inTerm('in-alert2', 'ALERT2 decoded')}</th>
+            ${path ? '' : '<th scope="col">Both</th>'}<th scope="col" class="bs-in-p">${inTerm('in-part')}</th></tr></thead>
+          <tbody>${body}</tbody></table></div>`
+        + (hidden > 0 || (inMore && b.rows.length > IN_TOP) ? `<p class="small"><button type="button" class="pill" onclick="BaseStations.inAll()">${inMore ? 'Show the top ' + IN_TOP + ' only' : 'Show all ' + chN(b.rows.length) + ' rows'}</button></p>` : '')
+        + (inAt === 'all' && heard.length > 1 ? '<p class="small qs-dim">All base stations together: a station two of them decode is one station, and its messages are counted at each.</p>' : '');
+    }
+    return `<div class="bs-in-bhead"><h3 class="bs-in-bh">Whose it is: the decoded messages, broken down</h3>
+        <button type="button" class="pill" onclick="BaseStations.inBreakSave()">Save this breakdown as CSV</button></div>${picks}<div id="bs-in-by-t">${out}</div>`;
+  }
+
+  // The owners come from the SLS file, which the tab may not have yet.
+  function inOwnersAsk() {
+    if (inBy !== 'owner' || inSlsAsked || typeof SLS === 'undefined' || SLS.loaded()) return;
+    inSlsAsked = true;
+    SLS.ensureData().then(paintIn, () => { inSlsAsked = 'failed'; paintIn(); });
   }
 
   function inSummaryHtml() {
@@ -1812,6 +1993,7 @@ const BaseStations = (function () {
       <p class="small" id="bs-in-sum" aria-live="polite"></p>
       <div id="bs-in-body"></div>
       <p class="small qs-dim">From the hourly reception rollups, so the last hour may not be in yet; a month comes by the day. A message heard by two base stations counts for both, and one relayed by two repeaters is two messages. Drive surveys are left out.</p>
+      <div id="bs-in-by" class="bs-in-by"></div>
       <details class="rd-fold"><summary><h3 class="bk-inline-h">What these words mean</h3></summary>
         <dl class="rd-words">${IN_WORDS.map(w => `<dt>${esc(w[1])}</dt><dd>${esc(w[2])}</dd>`).join('')}</dl></details>
     </section>`;
@@ -1827,6 +2009,8 @@ const BaseStations = (function () {
     const set = (id, html) => { const e = document.getElementById(id); if (e && e.innerHTML !== html) keepFocus(e, () => { e.innerHTML = html; }); };
     set('bs-in-sum', inSummaryHtml());
     set('bs-in-body', inTableHtml());
+    set('bs-in-by', inBreakHtml());
+    inOwnersAsk();
   }
 
   async function loadIn() {
@@ -1853,6 +2037,36 @@ const BaseStations = (function () {
     inDays = days; ing = null;
     paintIn();
     loadIn();
+  }
+
+  function inGroup(by) {
+    if (!IN_BY.some(q => q[0] === by) || by === inBy) return;
+    inBy = by; inMore = false;
+    paintIn();
+  }
+  function inFor(id) {
+    if (String(id) === String(inAt)) return;
+    inAt = id; inMore = false;
+    paintIn();
+  }
+  function inAll() { inMore = !inMore; paintIn(); }
+
+  // The breakdown on screen, every row of it, as a file.
+  function inBreakSave() {
+    if (!ing || !ing.r) { announce('Nothing to save yet.'); return; }
+    const b = inBreak();
+    const at = inAt === 'all' ? 'All base stations' : ((ing.r.stations || []).find(x => String(x.id) === String(inAt)) || {}).label || '';
+    let rows;
+    if (b && b.days && b.days.length) {
+      rows = [['Base station', 'Day (UTC)', 'Legacy ALERT decoded', 'Legacy ALERT heard', 'Legacy IDs', 'ALERT2 decoded', 'ALERT2 heard', 'ALERT2 stations', 'All decoded', 'All heard']]
+        .concat(b.days.map(v => [at, String(v[0]).slice(0, 10), v[1], b.full ? v[4] : '', b.full && b.one ? v[6] : '', v[2], b.full ? v[5] : '', b.full && b.one ? v[7] : '', Number(v[1]) + Number(v[2]), v[3]]));
+    } else if (b && b.rows && b.rows.length) {
+      const head = (IN_BY.find(q => q[0] === inBy) || [])[1];
+      rows = [['Base station', head, 'Heard at', 'Stations', 'Only here', 'Legacy ALERT decoded', 'ALERT2 decoded', 'Both', 'Share %']]
+        .concat(b.rows.map(g => [at, g.label, (g.sub || '').replace(/^heard at /, ''), g.n == null ? '' : g.n, b.one && b.several ? g.only : '', g.a, g.a2, g.a + g.a2, b.total ? ((g.a + g.a2) / b.total * 100).toFixed(1) : '']));
+    } else { announce('Nothing to save yet.'); return; }
+    saveCsv('floodnet-base-station-ingest-by-' + inBy + '-' + ing.r.days + 'd.csv', rows);
+    announce('Saved ' + (rows.length - 1) + ' rows.');
   }
 
   function inSave() {
@@ -2404,7 +2618,7 @@ const BaseStations = (function () {
   }
 
   return { render, init, load, open, close, ask, askFrom, cancel, field, stick, resetForm, saveSettings,
-           keyField, addKey, removeKey, authChanged, wfWindow, chWindow, stWindow, stSave, inWindow, inSave, sub, fold,
+           keyField, addKey, removeKey, authChanged, wfWindow, chWindow, stWindow, stSave, inWindow, inSave, inGroup, inFor, inAll, inBreakSave, sub, fold,
            // Pure, for test/basestations.mjs.
            _liveness: liveness, _flags: flags, _patchFrom: patchFrom, _formFrom: formFrom, _stickNowHtml: stickNowHtml, _parseChans: parseChans, _checksHtml: checksHtml, _decodersFor: decodersFor, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf,
            _chRows: chRows, _chVerdict: chVerdict, _inRead: inRead };
