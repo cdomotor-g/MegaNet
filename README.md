@@ -6514,8 +6514,8 @@ network's radios need by way of an ACMA licence. It is a guide, not legal
 advice, and says so first.
 
 - **Who needs a licence** — anything that sends, nothing that only listens; the
-  three kinds of licence; what the Act allows a court to impose. Flood-Net's
-  base stations only receive, so none needs one: in a licence, "base station"
+  three kinds of licence; what the Act allows a court to impose. Base
+  stations only receive, so none needs one: in a licence, "base station"
   means the transmitting station it names, which here is always a repeater.
 - **One repeater, many gauges** — how a point-to-multipoint licence names one
   repeater and covers the unlisted gauges round it, role by role, beside a

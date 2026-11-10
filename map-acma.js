@@ -181,7 +181,7 @@ const MapAcma = (() => {
         + 'the weekly copy can lag, the licence may be held by somebody not in the list, or a transmitter of 100 mW EIRP '
         + 'or less may run under the class licence for low-power devices.',
       na: 'The station has no ALERT address and is not a repeater, so it is not recorded as transmitting. Receiving '
-        + 'needs no licence. Every Flood-Net base station is of this kind: they only receive.',
+        + 'needs no licence. Every base station is of this kind: it only receives.',
       nearmiss: `A station with none found whose nearest point-to-multipoint transmitter on its channel is ${NEAR_MISS_KM} km or less `
         + 'beyond the circle, though no repeater on record carries it to that transmitter. Most likely it talks to it and is '
         + 'a little outside the service area ACMA plans on; widen Service area to see them fall inside.',
@@ -504,7 +504,7 @@ const MapAcma = (() => {
     if (!a.located) return 'It has no position on record, so no licence can be matched to it.';
     if (!a.transmits) {
       const isBase = Array.isArray(s.roles) && s.roles.includes('base');
-      return `${isBase ? 'A base station: Flood-Net’s base stations only receive, and this one has' : 'Not recorded as a transmitter — it has'} `
+      return `${isBase ? 'A base station: base stations only receive, and this one has' : 'Not recorded as a transmitter — it has'} `
         + 'no ALERT address and is not a repeater — so there is nothing here to license. Receiving needs no licence.';
     }
     const offNote = a.off.length ? ` A licence here on another channel was left out: ${a.off[0].lic.no} (${freqText(a.off[0].lic)}).` : '';
@@ -1018,8 +1018,8 @@ const MapAcma = (() => {
           <dd>One base station “at a fixed location specified in the licence”, and remote stations whose “locations … are not
             specified in the licence” (${src('fixed', 's 5(2) and its note')}; the definition is in the ${src('interp', 'Interpretation determination')}).
             ${n ? `${n.pmp} of the Bureau’s licences in this register copy are of this type` : 'Most of the Bureau’s ALERT licences are of this type'} — a repeater
-            taking in many gauges on one channel. In this network the licence’s “base station” is always a repeater: Flood-Net’s own base
-            stations only receive. In the register a variant reads <em>Point to Multipoint – Land Mobile
+            taking in many gauges on one channel. In this network the licence’s “base station” is always a repeater: a base
+            station in the everyday sense only receives. In the register a variant reads <em>Point to Multipoint – Land Mobile
             Spec</em>: the same kind of licence on channels otherwise set aside for land mobile radio.</dd>
           <dt>Fixed — point to point</dt>
           <dd>A link “principally for communication with one other fixed station” (${src('interp', 'Interpretation determination')}).
@@ -1103,7 +1103,7 @@ const MapAcma = (() => {
           <li><strong>Protection</strong>: a remote station is covered but not individually protected from interference — it is protected
             only by being where the plan expects it (${src('fx16', 'RALI FX16, s 3.1')}). ACMA’s guidance is that protecting one takes its
             own point-to-point licence as well (${src('options', 'ACMA’s guidance')}).</li>
-          <li><strong>A base station</strong>: nothing is required. Every Flood-Net base station only receives, and receiving needs no licence.</li>
+          <li><strong>A base station</strong>: nothing is required. Every base station only receives, and receiving needs no licence.</li>
           <li><strong>Who holds it</strong>: the licence belongs to its holder — the Bureau, a council, a water authority. Anybody else
             operating a transmitter under it needs the holder’s written authorisation (${src('act', 'Act, s 114')}), which the holder may
             not give in some cases (${src('auth', 'Authorisations and Transfers determination')}). A council’s gauge on a Bureau channel,

@@ -827,7 +827,7 @@ const HELP = {
            + 'and decibels taken apart word by word, the antennas with their patterns, a six-question helper for one station, the Bureau\'s '
            + 'licences counted, ACMA\'s own pages and a question to send. Every rule has a 📖 link that opens its document at the sentence.',
     watch: [
-      '<strong>Flood-Net\'s base stations only receive</strong>, so none needs a licence. Where a licence or the law says “base station” it means the transmitting station the licence names — in this network, always a repeater.',
+      '<strong>The network is shared</strong>: the Bureau, councils and water authorities each hold the licences for their own transmitters, and Flood-Net only shows it. <strong>Base stations only receive</strong>, so none needs a licence. Where a licence or the law says “base station” it means the transmitting station the licence names — in this network, always a repeater.',
       '<strong>A guide, not legal advice.</strong> It was written from copies of the documents saved on one day. Rules change and a licence can carry its own conditions: read the licence document and ask ACMA before acting.',
       '<strong>30 km is ACMA\'s planning circle, not a distance in the law.</strong> A gauge beyond it is outside what its licence was planned for — unprotected, and it must not interfere — but it is not unlicensed for that reason alone. A repeater that carries the signal further is different and needs its own licence.',
       'Each rule is marked <strong>The law</strong> or <strong>ACMA policy</strong>. The law binds; a RALI decides what licence is issued and what is protected.',

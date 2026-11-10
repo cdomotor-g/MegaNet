@@ -376,7 +376,7 @@
       },
       {
         "id": "acma-30km-confirmation",
-        "what": "What a gauge more than 30 km from the licensed repeater it reports to may do is worked out from the law and RALI FX16 (covered by that repeater's licence, unprotected, must not interfere) but not confirmed by ACMA; 203 gauges are in that position and 37 repeaters stand inside another licence's area with no licence at their own site. Flood-Net's base stations only receive and need none",
+        "what": "What a gauge more than 30 km from the licensed repeater it reports to may do is worked out from the law and RALI FX16 (covered by that repeater's licence, unprotected, must not interfere) but not confirmed by ACMA; 203 gauges are in that position and 37 repeaters stand inside another licence's area with no licence at their own site. base stations only receive and need none",
         "on": "human",
         "kind": "decision",
         "since": "2026-11-10",

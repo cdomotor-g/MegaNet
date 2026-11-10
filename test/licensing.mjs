@@ -157,9 +157,9 @@ ok('every drawing has a name that says what it shows', pg.figs.length >= 9 && pg
 ok('the short answer on 30 km: not in the law, not unlicensed, a repeater is different',
    /30 km is not in the law and not on the Bureau’s licences/.test(pg.answer) && /it is not unlicensed/.test(pg.answer) && /A repeater is different/.test(pg.answer), pg.answer);
 const whole = await page.evaluate(() => document.getElementById('rlc-page').textContent.replace(/\s+/g, ' '));
-ok('it says Flood-Net’s base stations never transmit, and that a licence’s “base station” is a repeater here',
-   /Flood-Net’s base stations never transmit/.test(whole) && /In this network that hub is always a repeater/.test(whole)
-   && /Base station \(Flood-Net’s\)/.test(whole), '');
+ok('it says base stations never transmit, that a licence’s “base station” is a repeater here, and that the network is nobody’s alone',
+   /base stations never transmit/.test(whole) && /Nobody’s alone/.test(whole) && !/Flood-Net’s (own )?base station/.test(whole) && /In this network that hub is always a repeater/.test(whole)
+   && /Base station \(a receiving site\)/.test(whole), '');
 ok('…and nowhere suggests a base station transmits', !/base (station )?that (also )?transmits|receiving base that|bases? transmit(?!ter)/i.test(whole)
    && !/base (station )?that (also )?transmits/i.test(JSON.stringify(Object.values(LicensingWords.WORDS).map(w => w.m))), '');
 ok('ACMA’s pages and the law are linked at acma.gov.au and legislation.gov.au', pg.links.length >= 16 && pg.links.every(h => /^https:\/\/www\.(acma|legislation)\.gov\.au\//.test(h)), J(pg.links.filter(h => !/^https:\/\/www\.(acma|legislation)\.gov\.au\//.test(h))));

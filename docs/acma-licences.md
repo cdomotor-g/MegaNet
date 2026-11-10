@@ -12,8 +12,15 @@ the document at the sentence. The documents are kept in [`docs/acma/`](acma/READ
 It is a different question from the interference layer (🗺️ Layers › ACMA
 licences, 📡 RF Changes), which asks who *else* transmits near the receivers.
 
-**Two meanings of "base station".** Flood-Net's base stations — the
-receivers that take the readings in — **only receive**. None transmits, so
+**Whose network.** The ALERT and ALERT2 flood-warning network is nobody's
+alone: the Bureau of Meteorology, councils and water authorities each put up
+and run their own gauges and repeaters and hold the licences for them. The
+Bureau holds many and is the nearest thing the network has to a custodian,
+but no one body owns it all. Flood-Net shows the network; it does not own it.
+"The network" below means that shared network.
+
+**Two meanings of "base station".** Base stations — the receiving sites
+that take the readings in — **only receive**. None transmits, so
 none needs a licence, and the tool marks each *Not a transmitter*. In a
 licence and in the law, "base station" means something else: the one
 transmitting station a point-to-multipoint licence names. In this network
@@ -129,7 +136,7 @@ For a station that transmits — it has an ALERT address, or is a repeater:
 | **Inside a licence's area** | Otherwise: it is inside the circle of a point-to-multipoint licence in force, on its channel. For a **repeater** the verdict adds that a circle covers it only as a fill-in, and that it normally needs its own licence. |
 | **Beyond a licence's area** | Otherwise, for a gauge: a repeater that carries it (by its pass ranges), within the map's Max TX distance, stands within 500 m of the transmitter of a point-to-multipoint licence in force on its channel. Covered in law by that licence; outside the service area ACMA planned it on. |
 | **None found** | None of those. Never "unlicensed": the weekly copy can lag, the holder may not be in the list, or a transmitter of 100 mW EIRP or less may run under the class licence. |
-| **Not a transmitter** | No ALERT address and not a repeater. Receiving needs no licence. Every Flood-Net base station is here: they only receive. |
+| **Not a transmitter** | No ALERT address and not a repeater. Receiving needs no licence. Every base station is here: it only receives. |
 
 A station's channel is its own transmit frequency where one is recorded, else
 the listening frequency of each repeater that likely hears it directly

@@ -57,7 +57,7 @@ const KbLicensing = (function () {
     ['who', '📡', 'Who needs a licence'], ['pmp', '🛰️', 'One repeater, many gauges'], ['km30', '⭕', 'The 30 km question'],
     ['gauge', '🌧️', 'A gauge’s limits'], ['base', '🗼', 'A repeater’s limits'], ['rx', '👂', 'Receivers'],
     ['power', '🔆', 'EIRP and decibels'], ['ant', '📶', 'Antennas'], ['need', '🧭', 'Does it need its own?'],
-    ['ours', '🧮', 'Ours, counted'], ['ask', '☎️', 'ACMA’s pages'], ['docs', '📚', 'The documents'], ['quiz', '✅', 'Try seven cases'],
+    ['ours', '🧮', 'The network, counted'], ['ask', '☎️', 'ACMA’s pages'], ['docs', '📚', 'The documents'], ['quiz', '✅', 'Try seven cases'],
   ];
 
   // ── Pieces ──────────────────────────────────────────────────────────────────
@@ -83,11 +83,11 @@ const KbLicensing = (function () {
         <span class="rlc-fact-n">${big}</span><span class="rlc-fact-t">${text}</span></button></li>`;
     return `<section class="panel rlc-hero" aria-labelledby="rlc-h">
       <h2 class="rlc-title" id="rlc-h"><span aria-hidden="true">🪪</span> Radio licensing</h2>
-      <p class="rlc-lede">Every radio in this network that <em>sends</em> needs a licence from ${t('acma')} to do it. This page says which
+      <p class="rlc-lede">Every radio in the ALERT flood-warning network that <em>sends</em> needs a licence from ${t('acma')} to do it. This page says which
         licence covers what, the limits a gauge and a repeater must keep, and where each rule is written — press any
         <span class="rlc-cite-eg"><span aria-hidden="true">📖</span> link like this</span> to read the rule in its own document.</p>
       <ul class="rlc-facts" aria-label="The six things to know">
-        ${fact('Send = licence', 'Transmitting needs a licence. Listening does not — and Flood-Net’s base stations only listen.', 'who')}
+        ${fact('Send = licence', 'Transmitting needs a licence. Listening does not — so a base station, which only receives, needs none.', 'who')}
         ${fact('1 repeater, many gauges', 'A licence names one repeater. The gauges that report to it ride on it, unlisted.', 'pmp')}
         ${fact('1 W · 2 s · 10 s', 'A gauge on a repeater’s licence: 1 W into its antenna, bursts of 2 seconds, 10 seconds apart.', 'gauge')}
         ${fact('30 km', 'ACMA’s planning circle round a licensed repeater. Not a distance written in the law.', 'km30')}
@@ -110,14 +110,17 @@ const KbLicensing = (function () {
     return sect('who', `${head('who', '📡', 'Who needs a licence', 'Anything that transmits. Nothing that only listens.')}
       ${figure('A gauge, a repeater and a base station that only listens', D().scene(),
         'The reading leaves the gauge, is heard and sent on by the repeater, and arrives at a base station. Two of the three transmit; the base station only listens.')}
-      <p class="rlc-note"><strong>Flood-Net’s base stations never transmit.</strong> Every one is a receiver: it takes the readings in off the air and passes them on by the internet.
-        So none of them needs a licence, and nothing on this page about transmitters applies to them. One word needs care, though: in a licence, and in the law,
+      <p class="rlc-note"><strong>Whose network is it? Nobody’s alone.</strong> The gauges and repeaters that speak ALERT and ALERT2 were put up, and are kept
+        running, by many organisations — the Bureau of Meteorology, councils, water authorities — each holding the licences for its own transmitters. The Bureau holds
+        many of them and is the nearest thing the network has to a custodian, but no one body owns or runs it all. Flood-Net shows the network; it does not own it.</p>
+      <p class="rlc-note"><strong>One word needs care: base stations never transmit.</strong> In everyday use a base station is a receiving site: it takes the readings in
+        off the air and passes them on. So it needs no licence, and nothing on this page about transmitters applies to it. In a licence, and in the law,
         <em>“base station”</em> means something else — the transmitting hub the licence names. In this network that hub is always a <strong>repeater</strong>,
         and this page says “repeater” for it wherever it can.</p>
       <p>The rule is one sentence of ${t('act', 'the Act')}: ${c('act-46', 'section 46')} says nobody may operate a radio device
         “otherwise than as authorised by” a licence. There are three kinds:</p>
       <ul class="rlc-cards">
-        <li class="rlc-card rlc-card-on"><h4>${t('apparatus', 'Apparatus licence')} <span class="rlc-chip rlc-chip-yes">ours</span></h4>
+        <li class="rlc-card rlc-card-on"><h4>${t('apparatus', 'Apparatus licence')} <span class="rlc-chip rlc-chip-yes">used here</span></h4>
           <p>Issued to one holder, for a transmitter at a named place, on a set frequency and power, usually for a year at a time. Every licence
             this network runs under is one of these, and each is in ${t('register', 'ACMA’s public register')}.</p></li>
         <li class="rlc-card"><h4>${t('classlic', 'Class licence')}</h4>
@@ -148,7 +151,7 @@ const KbLicensing = (function () {
   const ROLES = {
     base: {
       n: 1, name: 'The licence’s “base station”', aka: 'The law’s word for the hub. RALI FX16 calls it the master station.',
-      ours: 'A repeater — always. Flood-Net’s own base stations only receive, so none of them is one of these.',
+      ours: 'A repeater — always. A base station in the everyday sense only receives, so it is never one of these.',
       listed: 'Yes — its site, frequency, power and antenna are written on the licence and shown in the register.',
       rules: () => [`The one station the licence names: ${c('lcd-base')}.`,
         `It may run the transmitter power and ${t('eirp')} its licence lists, and no more.`,
@@ -197,7 +200,7 @@ const KbLicensing = (function () {
     return sect('pmp', `${head('pmp', '🛰️', 'One repeater, many gauges', 'How a point-to-multipoint licence works — the kind most of this network runs under.')}
       <p>A ${t('pmp', 'point-to-multipoint')} licence is a wheel: a hub and its spokes. ACMA’s description: ${c('fx16-system')}.
         The licence names the hub — it calls it the <em>base station</em>, and in this network it is a repeater. Everything else that talks to the hub is covered
-        by the same licence without being written on it. Flood-Net’s own base stations are not part of the wheel at all: they only listen.</p>
+        by the same licence without being written on it. The receiving sites people call base stations are not part of the wheel at all: they only listen.</p>
       <div class="rlc-sys">
         ${figure('A point-to-multipoint system, numbered by role', `<div id="rlc-system">${D().system(S.role)}</div>`,
           'The shaded area is the ground ACMA plans the licence to serve. Pick a role to light it.')}
@@ -346,7 +349,7 @@ const KbLicensing = (function () {
         <li><strong>A new licence would not be issued that way.</strong> An assigner certifies against FX16, so a system designed with gauges at 45 km needs an exception agreed first.</li>
       </ul>
 
-      <h4>So what do we do with a station beyond 30 km?</h4>
+      <h4>So what can be done with a station beyond 30 km?</h4>
       <div class="table-wrap"><table class="rlc-table rlc-opts">
         <caption>The ways through, least effort first</caption>
         <thead><tr><th scope="col">Option</th><th scope="col">When it fits</th><th scope="col">What it takes</th></tr></thead>
@@ -370,7 +373,7 @@ const KbLicensing = (function () {
           <li><strong>Certain:</strong> what RALI FX16 says. Read in full; the two sentences quoted above are its words.</li>
           <li><strong>Checked on one licence, counted on the rest:</strong> that the Bureau’s licence documents state no distance. One was read; the register’s list of
             special conditions was counted for all of them.</li>
-          <li><strong>Not written anywhere we could find:</strong> what ACMA does about an <em>existing</em> gauge beyond the service area of a licence already issued.
+          <li><strong>Not written anywhere this guide’s author could find:</strong> what ACMA does about an <em>existing</em> gauge beyond the service area of a licence already issued.
             The reading here — unprotected, must not interfere, not an offence in itself — follows from the documents, but only ACMA can confirm it.</li>
           <li><strong>Not read:</strong> RALI MS42 (the band plan for 148–174 MHz) and RALI LM08; ACMA’s website would not let this guide’s author open them.
             They would say which of FX16’s two routes the 151.5 MHz licences were assigned by. Both routes use the same 30 km.</li>
@@ -523,11 +526,11 @@ const KbLicensing = (function () {
       <p><strong>A repeater is what the law calls a base station.</strong> It transmits to carry other stations’ messages, so it cannot ride on another licence the way a gauge
         does. It needs a licence naming its own site; the ACMA licences tool on the Stations map shows which repeaters have one. A repeater with none, sitting inside another
         licensed repeater’s circle, is covered only if it is a true ${t('fillin', 'fill-in')}; one that reaches further is “another master station” (${c('fx16-another-master')}).
-        Flood-Net’s base stations are not in this section: they only receive, and a receiver has no limits to keep.</p>
+        A base station in the everyday sense is not in this section: it only receives, and a receiver has no limits to keep.</p>
 
       <h4>What ACMA plans each kind of system on</h4>
       <div class="table-wrap"><table class="rlc-table rlc-models">
-        <caption>RALI FX16’s two service models — its “master station” is our licensed repeater</caption>
+        <caption>RALI FX16’s two service models — its “master station” is the licensed repeater</caption>
         <thead><tr><th scope="col">&nbsp;</th><th scope="col">High power</th><th scope="col">Low power</th></tr></thead>
         <tbody>
           <tr><th scope="row">Repeater’s ${t('eirp')}, at most</th><td>40 W (${c('fx16-eirp-master', 's 3.1')})</td><td>8.3 W (${c('fx16-low-eirp', 's 3.2')})</td></tr>
@@ -611,7 +614,7 @@ const KbLicensing = (function () {
   function rxHtml() {
     return sect('rx', `${head('rx', '👂', 'Receivers', 'Listening needs no licence. A licence for a receiver buys protection, not permission.')}
       <ul class="rlc-cards">
-        <li class="rlc-card rlc-card-on"><h4>A Flood-Net base station</h4>
+        <li class="rlc-card rlc-card-on"><h4>A base station</h4>
           <p>Only listens, so it needs nothing — and that is every base station in this network. Section 46 applies to a receiver only if it is one of six listed kinds (${c('types-receivers', 'the list')}), and a plain
             listening station is not one of them unless somebody has had it coordinated and licensed.</p></li>
         <li class="rlc-card"><h4>The repeater’s receiver on a point-to-multipoint licence</h4>
@@ -734,7 +737,7 @@ const KbLicensing = (function () {
   // ── Does it need its own licence? ───────────────────────────────────────────
 
   const WIZ = {
-    start: { q: 'Does it transmit?', help: 'A gauge with a radio and an ALERT address does. So does a repeater. A base station does not: Flood-Net’s only receive.',
+    start: { q: 'Does it transmit?', help: 'A gauge with a radio and an ALERT address does. So does a repeater. A base station does not: it only receives.',
       a: [['Yes', 'tiny'], ['No — it only listens', 'r-listen']] },
     tiny: { q: 'Is it a very low-power device — 100 mW EIRP or less, on 150.7875–152.49375 MHz?', help: 'A tenth of a watt. Almost no flood gauge is; a short-range sensor link might be.',
       a: [['Yes', 'r-class'], ['No — a watt or more', 'relay']] },
@@ -835,7 +838,7 @@ const KbLicensing = (function () {
       </details>`;
   }
   function oursHtml() {
-    return sect('ours', `${head('ours', '🧮', 'Ours, counted', 'The licences this network runs under, from the register copy Flood-Net refreshes each week.')}
+    return sect('ours', `${head('ours', '🧮', 'The network, counted', 'The licences the ALERT network runs under, whoever holds them, from the register copy Flood-Net refreshes each week.')}
       <div id="rlc-ours-body">${oursBody()}</div>
       <p><button type="button" class="primary" onclick="KbLicensing.tool()"><span aria-hidden="true">📜</span> Open the ACMA licences tool on the Stations map</button></p>
       <p class="small txt-muted">The tool draws every licence at its site with its service area, and says for each transmitting station whether a licence is at its site, it is
@@ -877,14 +880,14 @@ const KbLicensing = (function () {
   const ASK = `To: freqplan@acma.gov.au (copy info@acma.gov.au)
 Subject: RALI FX16 — remote stations beyond the 30 km service area of an existing point-to-multipoint licence
 
-We operate flood-warning telemetry in the VHF high band. Rain and river gauges report as remote stations to repeaters, each the base station of a Fixed (Point to Multipoint) licence, most of them on 151.5 MHz, single frequency. Our own receiving sites do not transmit.
+I am writing about the ALERT flood-warning telemetry network in the VHF high band, which the Bureau of Meteorology, councils and water authorities run between them. Rain and river gauges report as remote stations to repeaters, each the base station of a Fixed (Point to Multipoint) licence held by the body that runs it, most of them on 151.5 MHz, single frequency.
 
 RALI FX16 (25 March 2025), section 3.1, gives a service area radius of 30 km and says all stations must be contained within it. The Radiocommunications Licence Conditions (Fixed Licence) Determination 2025 sets no distance for a remote station, and its explanatory statement says such transmitters "can be located anywhere".
 
-Some of our gauges are more than 30 km from the licensed base station (repeater) they report to. Could you confirm:
+Some gauges in the network are more than 30 km from the licensed base station (repeater) they report to. Could you confirm:
 
 1. Is a remote station that reports to a licensed base station from beyond 30 km authorised by that base station's licence, provided it meets sections 13, 15 and 23 of the Determination and causes no harmful interference?
-2. If it is, is our understanding right that it has no protection beyond the service area and operates on a no-interference basis?
+2. If it is, is it right that it has no protection beyond the service area and operates on a no-interference basis?
 3. Would ACMA prefer such stations to be brought under a licence for a nearer base station, and is there a preferred way to do that for an existing network?
 4. Do the service models of FX16 apply to these single-frequency licences on 151.5 MHz, or were they assigned under another RALI?
 
@@ -930,7 +933,7 @@ Thank you.`;
       'Over the power limit — close, but not covered as it stands.', () => `About 4.5 W reaches the antenna; the limit for a remote station is 1 W (${c('lcd-power', 's 15(4)')}). Turn it down or fit an attenuator, or license its own site for 5 W.`],
     ['A solar-powered repeater on a ridge 50 km from the nearest licensed repeater, relaying six gauges to it.',
       'Needs its own licence.', () => `It relays, and it carries the signal beyond the repeater’s reach. The law forbids a fill-in extending coverage (${c('lcd-no-extend', 's 14(4)')}) and FX16 calls it another master station (${c('fx16-another-master')}).`],
-    ['A Flood-Net base station: a receiver and an antenna, and no transmitter.',
+    ['A base station: a receiver and an antenna, and no transmitter.',
       'No licence needed.', () => `Listening needs none, and every base station in this network only listens. A ${t('rxlic', 'fixed receive licence')} is optional, for protection (${c('int-receive')}).`],
     ['A council wants to put its own gauge on the Bureau’s 151.5 MHz channel near a Bureau repeater.',
       'It needs the Bureau’s written permission, or its own licence.', () => `Only the licensee and those it has authorised in writing may transmit under a licence (${c('act-114', 'Act, s 114')}). The council’s alternative is a licence of its own.`],

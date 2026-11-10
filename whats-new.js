@@ -29,7 +29,7 @@ const WhatsNew = (() => {
       '🪪 <strong>Radio Licensing, a new lesson in the Knowledge base.</strong> What the network\'s transmitters and receivers need by '
         + 'way of an ACMA licence, in plain words: who needs one, how one licence covers a repeater and the gauges round it, the limits on a '
         + 'gauge\'s power and timing with a checker, EIRP and decibels taken apart word by word, the antennas with their patterns, and a '
-        + 'six-question helper for any one station. Every rule has a 📖 link that opens its document at the sentence. Flood-Net\'s base '
+        + 'six-question helper for any one station. Every rule has a 📖 link that opens its document at the sentence. Base '
         + 'stations only receive, so none of it applies to them: in a licence, “base station” means the repeater it names.',
       '⭕ <strong>The 30 km question, answered from the documents.</strong> 30 km is not in the law and not on the Bureau\'s licences. '
         + 'It is the service area ACMA plans a licence on. A gauge beyond it is unprotected and must not interfere, but is not unlicensed for '
@@ -76,7 +76,7 @@ const WhatsNew = (() => {
         + 'stations into those just past a circle and those well outside one — the likelier real gaps — and a click lists them.',
     ] },
     { n: 252, date: '2026-11-10', items: [
-      '📜 <strong>ACMA licences.</strong> A new tool on the Stations map shows the radio licences our own transmitters run '
+      '📜 <strong>ACMA licences.</strong> A new tool on the Stations map shows the radio licences the network\'s transmitters run '
         + 'under — the Bureau\'s, councils\' and Seqwater\'s — each drawn with the area it covers: a shaded circle round a '
         + 'point-to-multipoint base, a shaded line for a point-to-point link. Search a station or a licence number, ring '
         + 'every transmitting station by whether a licence was found for it, and save the list. It has a plain-words guide '
