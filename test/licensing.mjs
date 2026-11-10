@@ -154,8 +154,13 @@ ok('every 📖 link names a quotation that exists', pg.cites.length >= 80 && pg.
 ok('a quotation set apart on the page is the document’s own words', pg.quotes.length >= 4 && pg.quotes.every(([k, t]) => t.includes(`“${pg.said[k]}”`)), J(pg.quotes.filter(([k, t]) => !t.includes(`“${pg.said[k]}”`)).map(q => q[0])));
 ok('every marked word has a meaning of a sentence or more', pg.terms.length >= 60 && pg.terms.every(t => t[1] >= 40), J(pg.terms.filter(t => t[1] < 40).slice(0, 5)));
 ok('every drawing has a name that says what it shows', pg.figs.length >= 9 && pg.figs.every(n => n >= 30), J(pg.figs));
-ok('the short answer on 30 km: not in the law, not unlicensed, a repeater is different',
-   /30 km is not in the law and not on the Bureau’s licences/.test(pg.answer) && /it is not unlicensed/.test(pg.answer) && /A repeater is different/.test(pg.answer), pg.answer);
+const whole0 = await page.evaluate(() => document.getElementById('rlc-page').textContent.replace(/\s+/g, ' '));
+ok('the short answer on 30 km: legal but unprotected, the law beside the policy, a repeater is different, not yet confirmed',
+   /still licensed\. It is legal, but unprotected/.test(pg.answer) && /Both are true, because they are two different kinds of rule/.test(pg.answer)
+   && /It sets no distance at all/.test(pg.answer) && /the price of being protected, not of being legal/.test(pg.answer)
+   && /A repeater is different/.test(pg.answer) && /ACMA has not yet confirmed it in writing/.test(pg.answer), pg.answer);
+ok('the page says a hub is not a Bureau office, and sends no radar data to an office by radio',
+   /not a Bureau hub, the office its technicians work from/.test(whole0) && !/radar site to an office/.test(whole0) && /goes over the internet, not by radio/.test(whole0), '');
 const whole = await page.evaluate(() => document.getElementById('rlc-page').textContent.replace(/\s+/g, ' '));
 ok('it says base stations never transmit, that a licence’s “base station” is a repeater here, and that the network is nobody’s alone',
    /base stations never transmit/.test(whole) && /Nobody’s alone/.test(whole) && !/Flood-Net’s (own )?base station/.test(whole) && /In this network that hub is always a repeater/.test(whole)

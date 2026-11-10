@@ -921,7 +921,7 @@ const BitScene = (function () {
     intermod: {
       tag: 'a pager mast and a phone tower',
       where: 'A pager mast and a phone tower stand beside the repeater. Their strong signals mix in its overloaded front end — or in a '
-        + 'corroded joint on its mast — and one of the products, 2f₁ − f₂, lands on our channel whenever both are on the air.',
+        + 'corroded joint on its mast — and one of the products, 2f₁ − f₂, lands on the channel whenever both are on the air.',
       close: 'Two frequencies in, a third out',
       still: 0.5,
       inBand: p => Math.abs(BM().nearestProduct(p.f1, p.f2).offsetHz) <= BM().IF_HALF_HZ,
@@ -938,7 +938,7 @@ const BitScene = (function () {
           K.flow([p2, b], C.ok, { n: 4, speed: 30, dash: [2, 3] });
         }
         if (hit) { K.spark(b, C.bad, 10, t * 3); K.rings(b, C.bad, { R: 9, n: 2, v: 10 }); }
-        K.mark(b, hit ? 'Mixing at the repeater' : SPOTS.intermod.inBand(p) ? 'Waiting for both to key up' : 'Products miss our channel', { lift: 6 });
+        K.mark(b, hit ? 'Mixing at the repeater' : SPOTS.intermod.inBand(p) ? 'Waiting for both to key up' : 'Products miss the channel', { lift: 6 });
         const q1 = K.at(p1), q2 = K.at(p2);
         if (q1) pill(K.ctx, `Pager f₁ ${fmt(p.f1, 3)}`, q1[0], q1[1] - 14, C, { align: 'center' });
         if (q2) pill(K.ctx, `Phone f₂ ${fmt(p.f2, 3)}`, q2[0], q2[1] - 14, C, { align: 'center' });
@@ -964,7 +964,7 @@ const BitScene = (function () {
         // is, or it would be a hair at this scale).
         ctx.fillStyle = alpha(C.wave, 0.18);
         ctx.fillRect(X(151.5) - 3, b.y + 12, 6, yb - b.y - 12);
-        text(ctx, 'our channel', X(151.5) + 6, b.y + 20, C.wave, { font: FONT_B });
+        text(ctx, 'the channel', X(151.5) + 6, b.y + 20, C.wave, { font: FONT_B });
         bar(151.5, 40, C.wave, '', 3);
         bar(p.f1, 62, C.sum, 'f₁');
         bar(p.f2, 62, C.ok, 'f₂');
@@ -1334,7 +1334,7 @@ const BitScene = (function () {
     if (sp.sky) sp.sky(K, t);
     // The two ends, always named, so the site reads before the fault does.
     const tq = K.at(up(PLACE.hut.x + 2, PLACE.hut.y + 2, -1.5)), rq = K.at(up(PLACE.rhut.x, PLACE.rhut.y, -1.5));
-    if (tq) pill(ctx, 'Our gauge — sends', tq[0], tq[1] + 16, C, { align: 'center', col: C.muted, font: FONT });
+    if (tq) pill(ctx, 'The gauge — sends', tq[0], tq[1] + 16, C, { align: 'center', col: C.muted, font: FONT });
     if (rq) pill(ctx, 'Repeater — hears', rq[0], rq[1] + 16, C, { align: 'center', col: C.muted, font: FONT });
     sp.scene(K, t);
     // The title, top left: the fault, and where.

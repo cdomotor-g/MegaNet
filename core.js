@@ -2129,7 +2129,7 @@ const HELP = {
            + 'a chart built for finding noise rather than presenting a trend. Nothing is uploaded — '
            + 'files are read in the tab and stay there.',
     watch: [
-      'This tab is <strong>ARRO\'s</strong> numbers. Readings our own field stations sent us live '
+      'This tab is <strong>ARRO\'s</strong> numbers. Readings the base stations\' receivers heard off the air live '
       + 'next door on <strong>Field Data</strong>, and the two are never combined — different '
       + 'source of truth, different retention, different trust.',
       'The <strong>3/5/7 thresholds are in counts, not millimetres</strong>. A rain accumulator '

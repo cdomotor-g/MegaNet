@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 258, date: '2026-11-10', items: [
+      '⭕ <strong>The 30 km question, answered in plain words first.</strong> Knowledge base › 🪪 Radio Licensing › The 30 km question now opens with '
+        + 'the answer — a gauge beyond 30 km of its licensed repeater is legal, but unprotected — and a small table setting the law beside ACMA\'s '
+        + 'policy: what each is, what each says about 30 km, and what being outside it costs. The page also says that its “hub” is the middle of '
+        + 'a local radio network, not a Bureau office.',
+    ] },
     { n: 257, date: '2026-11-10', items: [
       '🪪 <strong>Radio Licensing, a new lesson in the Knowledge base.</strong> What the network\'s transmitters and receivers need by '
         + 'way of an ACMA licence, in plain words: who needs one, how one licence covers a repeater and the gauges round it, the limits on a '

@@ -2684,7 +2684,7 @@ picture goes no further than Cloudflare's edge cache, for a minute.
 covers, and why storing the pictures was not done.
 
 **Rainfall heat map.** *Rainfall heat map (the network's gauges)*, under the
-rivers in **Map display**, paints the rain Flood-Net's own gauges have
+rivers in **Map display**, paints the rain the network's gauges have
 measured — out of the datastore, so signed in or not — as a heat map between
 them, in twelve steps from pale blue through green and yellow to red and
 purple, the order the Bureau's rain maps use. Pick the window (the last hour,

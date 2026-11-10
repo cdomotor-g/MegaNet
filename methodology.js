@@ -75,7 +75,7 @@ const Methodology = (function () {
       carrier: 'How far a transmitter\'s radio frequency sits from its channel, in hertz, measured on every burst by our receiver\'s decoder. Every transmitter\'s crystal sits a little differently, so the offset tells transmitters apart like a fingerprint.',
       clear: 'A corrupted copy that arrived as strong as the clean one, within 6 dB. The transmitter sent the wrong bits; one much weaker could be our receiver mishearing a faint burst.',
       rate: 'A repeater\'s share of the corrupted copies, set against its share of everything heard from the addresses it passes. It stops a repeater that passes many stations looking guilty just for passing them.',
-      check: 'The timed report an ALERT station sends from every sensor at a fixed interval — every three hours at most of our stations — between whatever events it reports.',
+      check: 'The timed report an ALERT station sends from every sensor at a fixed interval — every three hours at most stations — between whatever events it reports.',
       slot: 'A moment the station\'s learned schedule says a check is due. Each slot is judged: received, received with a sensor missing, missed, or unknown.',
       listening: `A receiver that has heard this station delivered other traffic within ${min(L.LISTEN_PAD * L.BIN)} before the moment and within ${min(L.LISTEN_PAD * L.BIN)} after it — proof it was working then.`,
       unknown: 'A slot when no receiver that hears the station was shown to be listening. It is never counted against the station.',

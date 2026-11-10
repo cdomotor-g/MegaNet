@@ -353,19 +353,19 @@ const BitErrors = (function () {
       return `<tr><th scope="row">${x.key === '2f1-f2' ? '2f₁ − f₂' : '2f₂ − f₁'}</th><td>${num(x.mhz, 4)} MHz</td><td>${hz(x.offsetHz)}</td>
         <td class="${inside ? 'txt-bad' : 'txt-ok'}">${inside ? 'inside the filter — it gets in' : 'outside — no harm here'}</td></tr>`;
     }).join('');
-    return `<div class="table-wrap"><table class="be-table be-table--im"><caption>The third-order products of ${num(S.f1, 4)} and ${num(S.f2, 4)} MHz, against our channel at 151.5 MHz</caption>
-      <thead><tr><th scope="col">Product</th><th scope="col">Lands at</th><th scope="col">From our channel</th><th scope="col">With a ±${num(M.IF_HALF_HZ / 1000)} kHz filter</th></tr></thead>
+    return `<div class="table-wrap"><table class="be-table be-table--im"><caption>The third-order products of ${num(S.f1, 4)} and ${num(S.f2, 4)} MHz, against the channel at 151.5 MHz</caption>
+      <thead><tr><th scope="col">Product</th><th scope="col">Lands at</th><th scope="col">From the channel</th><th scope="col">With a ±${num(M.IF_HALF_HZ / 1000)} kHz filter</th></tr></thead>
       <tbody>${rows}</tbody></table></div>`;
   }
 
   function intermodHtml() {
     return sec('be-intermod', `
-      ${head('be-intermod', 8, '🔀', 'Intermodulation', 'Two strong signals, mixed in something non-linear, make a third — sometimes on our channel.')}
+      ${head('be-intermod', 8, '🔀', 'Intermodulation', 'Two strong signals, mixed in something non-linear, make a third — sometimes on the channel.')}
       <p>Anything that does not pass a signal in exact proportion mixes the signals going through it. Two strong transmitters near a receiver — a
         pager, a phone tower, a broadcaster, another radio network on the same mast — mixed in that receiver's overloaded front end, or in a
         corroded joint, a loose connector or a rusty bolt on the tower (the "rusty bolt effect"), produce new signals at sums and differences
         of their frequencies. The ones that matter are the <strong>third-order products</strong>, at <strong>2f₁ − f₂</strong> and
-        <strong>2f₂ − f₁</strong>, because they land close to the two that made them. One that lands in our channel is interference whenever
+        <strong>2f₂ − f₁</strong>, because they land close to the two that made them. One that lands in the channel is interference whenever
         both transmitters are on the air — and a third-order product grows <strong>3 dB for every 1 dB</strong> the two signals grow, so a small
         change in them makes a big change in it.</p>
       <div class="be-im">
@@ -374,10 +374,10 @@ const BitErrors = (function () {
           <label for="be-f2">Transmitter 2 (MHz) <input type="number" id="be-f2" step="0.0001" min="148" max="174" value="${S.f2}" oninput="BitErrors.im('f2', this.value)"></label>
         </div>
         <div id="be-im-out">${imReadout()}</div>
-        ${figure('be-cv-imd', 'be-cv--wide', 'The two transmitters, their third-order products and our channel, on one frequency scale.', 'Type any two frequencies: the products move with them. The two here put 2f₁ − f₂ 2.1 kHz below our channel — inside the receiver\'s filter.')}
+        ${figure('be-cv-imd', 'be-cv--wide', 'The two transmitters, their third-order products and the channel, on one frequency scale.', 'Type any two frequencies: the products move with them. The two here put 2f₁ − f₂ 2.1 kHz below the channel — inside the receiver\'s filter.')}
       </div>
       ${parts('intermod', {
-        bits: `<p>While both transmitters are on, the product sits in our channel like another station's carrier: within ${PropPhysics.CAPTURE_DB} dB
+        bits: `<p>While both transmitters are on, the product sits in the channel like another station's carrier: within ${PropPhysics.CAPTURE_DB} dB
           of our signal, bits flip all through the frame; stronger than ours, and the receiver hears nothing of ours at all. When either
           transmitter stops, the product stops. So frames are wrecked whole, or untouched.</p>`,
         print: ['Whole frames wrecked, the rest perfect.', '<strong>Every station that receiver hears</strong>, strong or weak, at the same moments.',
@@ -795,7 +795,7 @@ const BitErrors = (function () {
       bar(S.f2, h * 0.5, C.accent, 'f₂', num(S.f2, 4));
       prods.forEach(x => bar(x.mhz, h * 0.22, Math.abs(x.offsetHz) <= M.IF_HALF_HZ ? C.bad : C.echo, x.key === '2f1-f2' ? '2f₁ − f₂' : '2f₂ − f₁', num(x.mhz, 4)));
       k.line(ctx, X(M.fMhz()), base + 6, X(M.fMhz()), base - h * 0.62, C.ok, 1.5, [3, 2]);
-      k.text(ctx, 'our channel, 151.5', X(M.fMhz()), base + 18, C.ok, { font: k.FONT_B, align: 'center' });
+      k.text(ctx, 'the channel, 151.5', X(M.fMhz()), base + 18, C.ok, { font: k.FONT_B, align: 'center' });
       k.text(ctx, 'MHz', w - 10, base + 18, C.muted, { align: 'right' });
     },
 

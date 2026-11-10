@@ -165,7 +165,7 @@ const BitBench = (function () {
       icon: '🔀', name: 'Intermodulation',
       what: 'Two strong transmitters near a receiver — a pager, a phone tower, another radio network — mix in anything non-linear: the '
         + 'receiver\'s own overloaded front end, or a corroded joint on the mast. The mixture has products at 2f₁ − f₂ and 2f₂ − f₁, and '
-        + 'one landing in our channel is interference whenever both are on the air: on their schedule, not ours, and for every station '
+        + 'one landing in the channel is interference whenever both are on the air: on their schedule, not the network’s, and for every station '
         + 'that receiver hears.',
       bits: 'Whole frames wrecked while both are on the air, and the rest untouched.',
       params: {
@@ -683,7 +683,7 @@ const BitBench = (function () {
   function siteHtml() {
     return `
     ${secOpen('bb-site')}
-      <p>One made-up site with every fault's cause somewhere in it. Our gauge by the river sends; the repeater on the far hill hears;
+      <p>One made-up site with every fault's cause somewhere in it. The gauge by the river sends; the repeater on the far hill hears;
         and between and around them stand a hill, a shed beside the road, another gauge, a pager mast and a phone tower, a storm and an
         electric fence. The tour lights each fault where it happens, with a close-up of what goes wrong there beside it, and the
         Faults section below moves with it — the same fault, with the settings you give it there. Picking a fault, or moving one of
@@ -1646,9 +1646,9 @@ const BitBench = (function () {
       bar(l.p.f2, box.h * 0.26, C.accent, 'f₂', `${num(l.p.f2, 4)}`);
       prods.forEach(x => bar(x.mhz, box.h * 0.13 * pulse, on && Math.abs(x.offsetHz) <= M.IF_HALF_HZ ? C.bad : C.echo, x.key === '2f1-f2' ? '2f₁−f₂' : '2f₂−f₁', `${num(x.mhz, 4)}`));
       line(ctx, X(M.fMhz()), ax + 4, X(M.fMhz()), ax - box.h * 0.36, C.ok, 1.5, [3, 2]);
-      text(ctx, 'our channel', X(M.fMhz()), ax + 15, C.ok, { font: FONT_B, align: 'center' });
+      text(ctx, 'the channel', X(M.fMhz()), ax + 15, C.ok, { font: FONT_B, align: 'center' });
       text(ctx, 'MHz', box.x + box.w, ax + 15, C.muted, { align: 'right' });
-      // the zoom: ±6 kHz round our channel
+      // the zoom: ±6 kHz round the channel
       const zy = box.y + box.h * 0.66, zh = box.h * 0.22;
       const span = M.IF_HALF_HZ + 2500;
       const Z = d => box.x + box.w / 2 + d / span * (box.w / 2 - 8);
@@ -1666,7 +1666,7 @@ const BitBench = (function () {
       } else {
         text(ctx, `nearest product ${hz(near.offsetHz)} away — outside`, Z(0), zy + zh + 14, C.muted, { align: 'center' });
       }
-      text(ctx, on ? 'Both transmitters on the air: the product is in our channel for this frame.'
+      text(ctx, on ? 'Both transmitters on the air: the product is in the channel for this frame.'
         : tr.inBand ? `Not both on the air for this frame (they are together ${pct(l.p.duty)} of the time).` : 'The products land outside our filter.',
         box.x, box.y + 12, on ? C.bad : C.muted, { font: FONT_B });
     },

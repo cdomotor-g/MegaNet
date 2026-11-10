@@ -1,11 +1,11 @@
 # Trees and buildings round the stations — which open data to use
 
-Issue #277 asks for the trees and buildings that stand round our stations to
+Issue #277 asks for the trees and buildings that stand round the network's stations to
 be drawn in the ⛰️ 3-D view (`map-3d.js`, MapLibre GL JS 6 on draped terrain)
 and then in the digital twin (`digital-twin.js`, three.js) — where each one
 stands, and how tall. This page is the research for that: which **open** data
 says so in Queensland and in the part of New South Wales the network reaches,
-how good it is at our own stations, under what licence, and how a browser can
+how good it is at the sampled stations, under what licence, and how a browser can
 get at it. Paid data is out (the owner's decision), so the State's paid LiDAR
 surface products and Geoscape are noted only to say why they are not used.
 
@@ -72,7 +72,7 @@ stations** was used for the building coverage figures.
 
 ## Trees
 
-### What each source says at our stations
+### What each source says at the sampled stations
 
 Read off the real files. "At the mast" is the pixel the station stands on.
 "Tallest nearby" is the 95th percentile within 100 m — the height most of the
@@ -131,12 +131,12 @@ show why:
 | | |
 |---|---|
 | What it is | A canopy height in whole metres for every 1.19 m square of ground, worldwide, from a machine-learning model (DINOv3) run over Vantor (formerly Maxar) satellite photos. Version 2 was released in 2026 and replaces version 1 (2024). |
-| Coverage at our stations | **22 of 22.** Every station's tile exists and holds readings. |
+| Coverage at the sampled stations | **22 of 22.** Every station's tile exists and holds readings. |
 | Licence and attribution | **CC BY 4.0** (AWS Open Data registry entry). Credit: *Meta and World Resources Institute (WRI) — 2026. Version 2 High Resolution Canopy Height Maps (CHMv2). Source imagery © Vantor.* |
 | How a browser gets it | Files on Amazon S3 (`dataforgood-fb-data`, `forests/v2/global/dinov3_global_chm_v2_ml3/chm/<quadkey>.tif`, one per zoom-10 map square, about 35 km across). They are **cloud-optimised GeoTIFFs**: a reader can ask for just the bytes covering a small area (range requests work, 206 answers). But **the bucket refuses cross-site reads** — a GET carries no `Access-Control-Allow-Origin` and a preflight answers *"CORS is not enabled for this bucket."* So a page on `floodwarning.net` cannot read them directly. Inside, each file is 512 × 512 blocks packed with plain deflate, which a browser can unpack with its own built-in `DecompressionStream` — no library needed. |
 | Size | 128 MB per file on average; **3,050 files and 390 GB** over the Queensland–New South Wales box. A 2 km × 2 km patch round one station is **0.1–0.7 MB** (measured: Birdsville 0.08 MB, Brisbane 0.22, Goondiwindi 0.31, Saddle Mtn 0.71) — about 2 GB for every station in the network. Each file carries smaller overview copies (2.4 m, 4.8 m, 9.6 m … 76 m), so one source serves a close look and a wide view. |
 | A coarser copy | Meta also publish a 9.55 m "mean height" version (`…_10m_mean/`, 66 files and 11.6 GB over the same box, packed with zstd, which a browser cannot unpack without a library). The 1 m files' own overviews do the same job, so this one is not needed. |
-| Date | The photos behind it date from **2010 to 2020** at our stations (mostly 2016–2020; each tile has a list of photo dates in `metadata/<quadkey>.geojson`). Trees cleared or grown since then are not in it. |
+| Date | The photos behind it date from **2010 to 2020** at the sampled stations (mostly 2016–2020; each tile has a list of photo dates in `metadata/<quadkey>.geojson`). Trees cleared or grown since then are not in it. |
 | Verdict | **Use it for tree heights.** Best placed, finest detail, open licence, covers everything. Its one obstacle is the cross-site refusal, which a pass-through on our own Worker removes. |
 
 Version 1 (`forests/v1/alsgedi_global_v6_float/`) is still in the bucket but
@@ -148,7 +148,7 @@ overviews, so even a small area means reading a large part of the file.
 | | |
 |---|---|
 | What it is | A canopy height for every 10 m square, worldwide, for 2020 (ETH Zürich, Lang et al.), from Sentinel-2 satellite photos and NASA's GEDI space laser. Served by Esri as a tiled image layer. |
-| Coverage at our stations | **22 of 22 tiles**, but no reading on the station's own pixel at 6 town stations (Atherton, Innisfail, Castle Hill, Mackay, Charleville, Brisbane). |
+| Coverage at the sampled stations | **22 of 22 tiles**, but no reading on the station's own pixel at 6 town stations (Atherton, Innisfail, Castle Hill, Mackay, Charleville, Brisbane). |
 | Licence and attribution | **CC BY 4.0** (Esri's item for the layer). Credit as `land-cover.js` already gives it: *Esri Global Canopy Height 2020 (ETH Zürich, Lang et al., 10 m, ±5 m).* |
 | How a browser gets it | `tiledimageservices.arcgis.com/…/10m_Tree_Canopy_Height/ImageServer/tile/{level}/{row}/{col}` — 256-pixel tiles in Esri's LERC packing, **cross-site reads allowed** (`*`). Tiles only — no "what is the height here" query. `land-cover.js` already reads it for the path profile. |
 | Size | 7–20 KB per tile at ~9 m pixels. |
@@ -211,7 +211,7 @@ buildings the State has already done the equivalent (next section).
 
 ## Buildings
 
-### What each source says at our stations
+### What each source says at the sampled stations
 
 Counted in a 600 m × 600 m square centred on each station (300 m each way).
 "With height" counts buildings that carry a height of any kind (for
@@ -289,7 +289,7 @@ the top.
 
 The same State service also has two hand-drawn topographic layers —
 *Building areas* (large buildings over 625 m², with fields for eave and roof
-height) and *Building points* (small buildings as dots). At our stations the
+height) and *Building points* (small buildings as dots). At the sampled stations the
 height fields were empty on every one, so they add nothing here.
 
 ### OpenStreetMap
@@ -297,7 +297,7 @@ height fields were empty on every one, so they add nothing here.
 | | |
 |---|---|
 | What it is | The volunteer-made world map. Buildings are outlines, sometimes tagged with `height` or `building:levels` (storeys). |
-| Coverage | Good in most towns at our stations (often hand-traced from imagery); thin or absent out of town. **Heights are rare**: near our 19 Queensland stations, 22 of 1,484 buildings have a height (all in Brisbane's centre) and 106 have a storey count; 108 have one or the other. Out of the big towns, 0 of 217 had a height. Armidale is the exception, with storeys on 167 of 279. |
+| Coverage | Good in most towns at the sampled stations (often hand-traced from imagery); thin or absent out of town. **Heights are rare**: near the 19 Queensland stations, 22 of 1,484 buildings have a height (all in Brisbane's centre) and 106 have a storey count; 108 have one or the other. Out of the big towns, 0 of 217 had a height. Armidale is the exception, with storeys on 167 of 279. |
 | Licence and attribution | **ODbL** (share-alike — see below). *© OpenStreetMap contributors.* |
 | How a browser gets it | Through Overpass (the app already asks `overpass-api.de` and `overpass.kumi.systems` for bridges). During this check both reset or timed out from here, so the counts above came from the main OpenStreetMap server instead, which is not for use by an app. Overture (below) carries the same outlines as ready-made tiles. |
 | Verdict | **Use it through Overture**, not on its own. |

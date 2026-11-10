@@ -1023,8 +1023,8 @@ const MapAcma = (() => {
             Spec</em>: the same kind of licence on channels otherwise set aside for land mobile radio.</dd>
           <dt>Fixed — point to point</dt>
           <dd>A link “principally for communication with one other fixed station” (${src('interp', 'Interpretation determination')}).
-            Both ends are written on the licence. ${n ? `The Bureau holds ${n.ptp} here` : 'The Bureau holds some'}, mostly links that carry
-            data from a repeater or radar site to an office. Where the licence names no antenna, a link in 148–174 MHz must use
+            Both ends are written on the licence. ${n ? `The Bureau holds ${n.ptp} here` : 'The Bureau holds some'}, each a fixed
+            radio link between two named sites. Where the licence names no antenna, a link in 148–174 MHz must use
             one at least as directional as a 6-element Yagi — 12 dBi, a beam of 44° or less (${src('fixed', 's 11, Table 1')}).</dd>
           <dt>Land mobile (land mobile system)</dt>
           <dd>A fixed radio and the vehicles or handhelds that talk to it, “operated principally for two-way communications”

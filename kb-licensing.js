@@ -115,7 +115,7 @@ const KbLicensing = (function () {
         many of them and is the nearest thing the network has to a custodian, but no one body owns or runs it all. Flood-Net shows the network; it does not own it.</p>
       <p class="rlc-note"><strong>One word needs care: base stations never transmit.</strong> In everyday use a base station is a receiving site: it takes the readings in
         off the air and passes them on. So it needs no licence, and nothing on this page about transmitters applies to it. In a licence, and in the law,
-        <em>“base station”</em> means something else — the transmitting hub the licence names. In this network that hub is always a <strong>repeater</strong>,
+        <em>“base station”</em> means something else — the transmitting ${t('hub', 'hub')} the licence names (the middle of a local radio network, not a Bureau office). In this network that hub is always a <strong>repeater</strong>,
         and this page says “repeater” for it wherever it can.</p>
       <p>The rule is one sentence of ${t('act', 'the Act')}: ${c('act-46', 'section 46')} says nobody may operate a radio device
         “otherwise than as authorised by” a licence. There are three kinds:</p>
@@ -198,7 +198,7 @@ const KbLicensing = (function () {
 
   function pmpHtml() {
     return sect('pmp', `${head('pmp', '🛰️', 'One repeater, many gauges', 'How a point-to-multipoint licence works — the kind most of this network runs under.')}
-      <p>A ${t('pmp', 'point-to-multipoint')} licence is a wheel: a hub and its spokes. ACMA’s description: ${c('fx16-system')}.
+      <p>A ${t('pmp', 'point-to-multipoint')} licence is a wheel: a ${t('hub', 'hub')} and its spokes. “Hub” here is a picture of how one local radio network is arranged, with one station in the middle — not a Bureau hub, the office its technicians work from. ACMA’s description: ${c('fx16-system')}.
         The licence names the hub — it calls it the <em>base station</em>, and in this network it is a repeater. Everything else that talks to the hub is covered
         by the same licence without being written on it. The receiving sites people call base stations are not part of the wheel at all: they only listen.</p>
       <div class="rlc-sys">
@@ -218,7 +218,7 @@ const KbLicensing = (function () {
           <tr><th scope="row">In the register</th><td>The repeater only (${c('es-register', 'why')})</td><td>Both ends</td></tr>
           <tr><th scope="row">${t('protection', 'Protected')} from later licences</th><td>The repeater, and its planned service area</td><td>Each end, by name</td></tr>
           <tr><th scope="row">Antenna the law asks for</th><td>None stated</td><td>At 148–174 MHz, at least 12 dBi and a beam of 44° or less — a 6-element ${t('yagi')} (${c('lcd-antenna')})</td></tr>
-          <tr><th scope="row">Used here for</th><td>A repeater and the gauges round it</td><td>Carrying data from a repeater or a radar site to an office</td></tr>
+          <tr><th scope="row">Used here for</th><td>A repeater and the gauges round it</td><td>A fixed radio link between two named sites. Not the leg from a radar or a base station to an office: that goes over the internet, not by radio.</td></tr>
         </tbody></table></div>`);
   }
 
@@ -280,13 +280,32 @@ const KbLicensing = (function () {
     const m = MODELS[S.model];
     const pdf = typeof MapAcma !== 'undefined' && MapAcma.pdfUrl ? MapAcma.pdfUrl('1463975/1') : '';
     return sect('km30', `${head('km30', '⭕', 'The 30 km question', 'Must a station more than 30 km from a licensed repeater have a licence of its own?')}
-      <div class="rlc-answer">
+      <div class="rlc-answer" data-rlc="plain">
         <p class="rlc-answer-h">The short answer</p>
-        <p><strong>No — not for a gauge, and not for that reason alone.</strong> 30 km is not in the law and not on the Bureau’s licences. It is the
-          ${t('servicearea', 'service area')} ACMA plans a licence on — and in that plan it is written as a “must”. So a gauge beyond 30 km is
-          <em>outside what its licence was planned for</em>, which has consequences, but it is not unlicensed.</p>
-        <p><strong>A repeater is different.</strong> A transmitter that carries the signal past the repeater’s reach may not run on the repeater’s licence at all.
-          It needs its own.</p>
+        <p class="rlc-answer-big"><strong>A gauge more than 30 km from its licensed repeater is still licensed. It is legal, but unprotected.</strong></p>
+        <p>You will read two things that sound like opposites: “the law sets no distance” and “all stations must be within 30 km”.
+          <strong>Both are true, because they are two different kinds of rule.</strong></p>
+        <div class="table-wrap"><table class="rlc-table rlc-lawpol">
+          <caption>The law beside ACMA’s policy, for a gauge 45 km from the licensed repeater it reports to</caption>
+          <thead><tr><th scope="col">&nbsp;</th><th scope="col">${kind('law')} The law</th><th scope="col">${kind('policy')} ACMA’s policy</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">What it is</th><td>The Act and the licence conditions. Everybody is bound by it; breaking it is an offence.</td>
+              <td>RALI FX16: the rulebook ACMA plans and hands out licences by. It is not law, and being outside it is not, in itself, an offence.</td></tr>
+            <tr><th scope="row">What it says about 30 km</th><td><strong>Nothing.</strong> It sets no distance at all, and none is written on the licences themselves.</td>
+              <td><strong>“All stations must be contained within”</strong> 30 km of the repeater.</td></tr>
+            <tr><th scope="row">So the gauge at 45 km is…</th><td><strong>Legal.</strong> It runs under the repeater’s licence, so long as it keeps a gauge’s limits (1 W, short bursts) and interferes with nobody.</td>
+              <td><strong>Outside the plan.</strong> ACMA planned, and protects, only the 30 km circle.</td></tr>
+            <tr><th scope="row">What that costs</th><td>Nothing. No offence, no penalty.</td>
+              <td>No protection if another user’s signal drowns it out. It must be fixed or switched off if it ever interferes with somebody. ACMA would not issue a <em>new</em> licence designed that way.</td></tr>
+          </tbody></table></div>
+        <p><strong>So is it one or the other?</strong> The policy’s “must” is the price of being <em>protected</em>, not of being <em>legal</em>.
+          Inside 30 km a gauge is legal and protected. Beyond it, the gauge is legal, not protected, and must give way if it troubles anybody.</p>
+        <p><strong>What that means in practice:</strong> no gauge needs a licence of its own just because of its distance. It is worth knowing which gauges are beyond
+          30 km, moving one to a nearer licensed repeater where that is easy, and licensing one separately only where it must be protected.</p>
+        <p><strong>A repeater is different.</strong> A transmitter that carries the signal past the licensed repeater’s reach may not run on that repeater’s licence at all.
+          It needs its own — and that <em>is</em> the law.</p>
+        <p class="small txt-muted">This is what the documents say when read together. ACMA has not yet confirmed it in writing; the question to send is in
+          <button type="button" class="link-btn" onclick="KbLicensing.go('ask')">ACMA’s pages</button> below.</p>
       </div>
 
       <h4>Three places a rule can live — and what each says about distance</h4>

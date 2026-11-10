@@ -81,6 +81,22 @@ The panel's holder list is the same set, with a tick box each.
 **Must a station more than 30 km from the licensed repeater it reports to
 have a licence of its own? Not a gauge, and not for that reason alone.**
 
+**In the simplest terms: a gauge beyond 30 km is legal, but unprotected.**
+"The law sets no distance" and "all stations must be within 30 km" are both
+true, because they are two different kinds of rule.
+
+| | The law | ACMA's policy (RALI FX16) |
+|---|---|---|
+| What it is | The Act and the licence conditions. Binding; breaking it is an offence. | The rulebook ACMA plans and hands out licences by. Not law; being outside it is not, in itself, an offence. |
+| What it says about 30 km | Nothing — no distance at all. | "All stations must be contained within" 30 km of the repeater. |
+| A gauge at 45 km is… | Legal: under the repeater's licence, if it keeps a gauge's limits and interferes with nobody. | Outside the plan: ACMA planned, and protects, only the circle. |
+| What that costs | Nothing. | No protection; it must give way if it interferes; no new licence would be issued that way. |
+
+The policy's "must" is the price of being *protected*, not of being *legal*.
+A repeater is different: one that carries the signal past the licensed
+repeater's reach needs its own licence, and that is the law. ACMA has not yet
+confirmed this reading in writing (#286).
+
 There are three places a rule can live, and they say different things:
 
 1. **The law** — the Act and the Fixed Licence determination — **sets no
