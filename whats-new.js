@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 270, date: '2026-11-11', items: [
+      '🌊 <strong>Flood peaks near here, side by side.</strong> The 🧊 digital twin pane has a new panel listing the floods recorded '
+        + 'at the station and at the gauges within 25 km, flood by flood. Each peak is shown three ways — as it read on its own gauge, '
+        + 'in metres AHD, and as it would read on the gauge you have chosen (LGH) — and a last column says how much higher or lower the '
+        + 'water peaked there than at the reference gauge in the same flood. Press <em>Compare from here</em> beside any gauge to make '
+        + 'it the reference; every figure is worked again.',
+    ] },
     { n: 269, date: '2026-11-11', items: [
       '🧊 <strong>The digital twin\'s ground can be wider than the square.</strong> In the 🧊 pane\'s <em>Scene</em> panel, '
         + '<em>Ground area</em> now has squares up to 6.4 km, and four boxes under it say how many metres of ground to keep west, '

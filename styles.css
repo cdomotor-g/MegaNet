@@ -20994,6 +20994,53 @@ body.has-sort-bridge .signin-nudge { display: none; }
 .twin-words-list dt { font-weight: 600; }
 .twin-words-list dd { margin: 0 0 var(--sp-1); color: var(--muted); }
 
+/* Flood peaks near here: the sites as a list (a narrow pane has no room for
+   them as a table), then every flood with each site's peak in its three
+   datums and against the reference site. The table sizes its own columns and
+   its headings wrap — the page's tables are fixed-layout and cut a cell off,
+   which five columns of figures in 28rem cannot afford. The reference's rows
+   are marked by weight and a rule, never by colour alone. */
+.twin-peaks-lead,
+.twin-peaks-sites-lead { margin: 0 0 var(--sp-2); }
+.twin-peaks-sites { margin: 0 0 var(--sp-3); padding: 0; list-style: none; border-top: 1px solid var(--border); }
+.twin-peaks-site {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0 var(--sp-2);
+  align-items: baseline;
+  padding: .3rem 0 .3rem .5rem;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-sm);
+}
+.twin-peaks-site.is-ref { box-shadow: inset 3px 0 0 var(--accent); }
+.twin-peaks-site.is-ref .twin-peaks-site-name { font-weight: 600; }
+.twin-peaks-site-facts { grid-column: 1 / -1; color: var(--muted); }
+.twin-peaks-table { table-layout: auto; width: 100%; font-variant-numeric: tabular-nums; }
+.twin-peaks-table th,
+.twin-peaks-table td { padding: .3rem .4rem; overflow: visible; text-overflow: clip; }
+.twin-peaks-table thead th { white-space: normal; vertical-align: bottom; }
+.twin-peaks-table tbody th { position: static; background: none; }
+.twin-peaks-table th[scope="row"] { white-space: normal; font-weight: 400; text-align: left; }
+.twin-peaks-table td,
+.twin-peaks-table thead th:not(:first-child) { text-align: right; }
+.twin-peaks-table .twin-peaks-flood th {
+  padding-top: var(--sp-2);
+  text-align: left;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.twin-peaks-table tr.is-ref th[scope="row"],
+.twin-peaks-table tr.is-ref td { font-weight: 600; }
+.twin-peaks-table tr.is-ref th[scope="row"] { box-shadow: inset 3px 0 0 var(--accent); }
+.twin-peaks-day { white-space: nowrap; }
+.twin-peaks-ref {
+  display: inline-block;
+  padding: 0 .4rem;
+  font-size: var(--fs-xs);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
 /* Drawing the area on the map (map-twin.js): the twin is put aside, the map
    shows what the twin is built on now, and a rectangle is dragged over it. */
 #map-twin.is-aside { display: none; }

@@ -7740,6 +7740,9 @@ void main() {
     fall: 'How much lower the second point is than the first, and that as a slope: 1 in 100 falls a metre in every hundred along.',
     section: 'The ground cut along the straight line from A to B, seen from the side, with the water at the level now shown.',
     far: 'Ground past the edge of the modelled area. It comes from ~30 m heights, not the LiDAR, so it is good to a few metres only.',
+    ownGauge: 'The peak as it read on that site\'s own gauge board: metres above that gauge\'s own zero. Two sites\' figures in this column cannot be compared with each other, because every gauge has a different zero.',
+    against: 'How much higher (+) or lower (−) the water peaked at this site than at the reference site in the same flood, in metres — one level in m AHD less the other. Blank where either site has no level in AHD for that flood.',
+    sameFlood: 'Peaks within three days of each other at different sites are taken to be the same flood: a flood takes hours to a day or two to pass down a reach.',
   };
 
   function gaugeZeroOf(s) {
@@ -8207,8 +8210,252 @@ void main() {
     if (f && !typing) { lghWriting = true; try { f.innerHTML = lghFieldHtml(); } finally { lghWriting = false; } }
     else if (f) { const n = document.getElementById('twin-lgh-note'); if (n) { const d = lghDatum(); n.textContent = d.kind === 'none' ? d.why : `0 m LGH is ${d.zero.toFixed(2)} m AHD — ${d.whose}.`; } }
     refreshMarks();
+    refreshPeaks();
     centreKey = '\u0000';
     refreshCentre();
+  }
+
+  // ── the flood peaks near here ──────────────────────────────────────────────
+  // What the river has reached, at this station and at the gauges round it —
+  // side by side, because a flood is one event read on several gauge boards
+  // and the question asked of it is nearly always a comparison: how much
+  // higher did 2013 come at the weir than in town, and what would that have
+  // read on our gauge.
+  //
+  // The heights a station carries (`flood_peaks`, from the Bureau's record) are
+  // each a height on its own gauge and, where the gauge's zero on the day is
+  // known in AHD, a level in m AHD. Neither compares across gauges by itself:
+  // one is measured from a zero that is different at every gauge, the other
+  // says nothing a gauge reader would recognise. So every peak is given three
+  // ways — on its own gauge, in m AHD, and as a local gauge height on the
+  // gauge chosen in Heights and measuring (the same choice, so the readout
+  // under the pointer and this table speak one language) — and a fourth, which
+  // is the differential: how far above or below it stood the peak of the same
+  // flood at the **reference** site. The reference is the gauge the LGH is
+  // measured from, when that is a gauge; pressing Compare from here beside any
+  // site makes it that gauge. With the channel bed or a typed level as the
+  // datum there is no site to compare with, and the reference is this station.
+  //
+  // "The same flood" is peaks within PEAK_GAP_DAYS of each other, a site once:
+  // a flood takes hours to a day or two to pass down a reach, and the record's
+  // date is the day of the peak at that gauge. A peak dated to a month joins
+  // the one flood of that month the other sites record, where there is exactly
+  // one; one dated to a year stands by itself unless another says the same
+  // year. Nothing here is drawn on the ground, and none of it is a model: they
+  // are the recorded heights, set beside one another.
+  const PEAK_SITES = 8;        // the nearest gauges with recorded floods that are listed
+  const PEAK_GAP_DAYS = 3;     // peaks this close together are the same flood
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const peakNum = v => (v == null || v === '' || !isFinite(Number(v)) ? null : Number(v));
+
+  // A record's date as far as it goes: { prec: 'day' | 'month' | 'year', key
+  // (sortable), t (days, for a day), label } or null.
+  function peakDate(d) {
+    const m = /^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?/.exec(String(d || ''));
+    if (!m) return null;
+    const y = Number(m[1]), mo = m[2] ? Number(m[2]) : null, da = m[3] ? Number(m[3]) : null;
+    if (mo != null && (mo < 1 || mo > 12)) return null;
+    if (da != null && mo != null) {
+      return { prec: 'day', key: `${m[1]}-${m[2]}-${m[3]}`, ym: `${m[1]}-${m[2]}`, t: Math.round(Date.UTC(y, mo - 1, da) / 86400000),
+               label: `${da} ${MONTHS[mo - 1]} ${y}` };
+    }
+    if (mo != null) return { prec: 'month', key: `${m[1]}-${m[2]}`, ym: `${m[1]}-${m[2]}`, t: null, label: `${MONTHS[mo - 1]} ${y}` };
+    return { prec: 'year', key: m[1], ym: null, t: null, label: String(y) };
+  }
+
+  function sitePeaks(s) {
+    const out = [];
+    for (const p of (s && s.flood_peaks) || []) {
+      if (!p) continue;
+      const own = peakNum(p.height_m), ahd = peakNum(p.level_m_ahd), when = peakDate(p.date);
+      if (own == null && ahd == null) continue;
+      out.push({ own, ahd, when, date: p.date ? String(p.date).slice(0, 10) : null });
+    }
+    return out;
+  }
+
+  // The sites: this station first, then the nearest gauges within
+  // LGH_REACH_KM that record floods — and the reference, if it is neither.
+  function peakSites(st, refId) {
+    const out = [];
+    if (!st || !state.data) return out;
+    const site = (s, km, bearing) => ({ s, id: s.id, name: s.name, own: s.id === st.id, km, bearing, zero: gaugeZeroOf(s), peaks: sitePeaks(s) });
+    out.push(site(st, 0, null));
+    if (!located(st)) return out;
+    const near = [];
+    for (const s of state.data.stations) {
+      if (s.id === st.id || !located(s) || !Array.isArray(s.flood_peaks) || !s.flood_peaks.length) continue;
+      const km = acmaHaversineKm(st.lat, st.lon, s.lat, s.lon);
+      if (km <= LGH_REACH_KM) near.push({ s, km });
+    }
+    near.sort((a, b) => a.km - b.km);
+    for (const n of near.slice(0, PEAK_SITES)) out.push(site(n.s, n.km, bearingDeg(st.lat, st.lon, n.s.lat, n.s.lon)));
+    if (refId && !out.some(o => o.id === refId)) {
+      const r = stationById(refId);
+      if (r && located(r)) out.push(site(r, acmaHaversineKm(st.lat, st.lon, r.lat, r.lon), bearingDeg(st.lat, st.lon, r.lat, r.lon)));
+    }
+    for (const o of out) {
+      // The highest each site records, by level where it has levels, else by height.
+      let top = null;
+      for (const p of o.peaks) { const v = p.ahd != null ? p.ahd : p.own; if (v != null && (!top || v > top.v)) top = { v, p }; }
+      if (top) top.p.highest = true;
+    }
+    return out;
+  }
+
+  // The floods: every peak of every site, gathered into the events they were.
+  //   [{ key, label, rows: [{ si, p }] }], newest first.
+  function peakFloods(sites) {
+    const days = [], months = [], years = [];
+    sites.forEach((o, si) => {
+      for (const p of o.peaks) {
+        if (!p.when) { years.push({ si, p, loose: true }); continue; }
+        (p.when.prec === 'day' ? days : p.when.prec === 'month' ? months : years).push({ si, p });
+      }
+    });
+    days.sort((a, b) => a.p.when.t - b.p.when.t);
+    const floods = [];
+    let cur = null;
+    for (const e of days) {
+      const t = e.p.when.t;
+      if (cur && t - cur.last <= PEAK_GAP_DAYS && t - cur.first <= 2 * PEAK_GAP_DAYS && !cur.rows.some(r => r.si === e.si)) { cur.rows.push(e); cur.last = t; continue; }
+      cur = { key: e.p.when.key, label: e.p.when.label, first: t, last: t, ym: new Set(), rows: [e] };
+      floods.push(cur);
+    }
+    for (const f of floods) {
+      for (const r of f.rows) f.ym.add(r.p.when.ym);
+      // A flood that peaked on different days down the reach is named for all of them.
+      const a = f.rows.reduce((m, r) => (r.p.when.t < m.t ? r.p.when : m), f.rows[0].p.when);
+      const b = f.rows.reduce((m, r) => (r.p.when.t > m.t ? r.p.when : m), f.rows[0].p.when);
+      if (b.t > a.t) {
+        const [da, ma, ya] = a.label.split(' '), [db, mb, yb] = b.label.split(' ');
+        f.label = ya !== yb ? `${a.label} – ${b.label}` : ma !== mb ? `${da} ${ma} – ${db} ${mb} ${yb}` : `${da}–${db} ${mb} ${yb}`;
+        f.spread = true;
+      }
+    }
+    for (const e of months) {
+      const fits = floods.filter(f => f.ym && f.ym.has(e.p.when.ym) && !f.rows.some(r => r.si === e.si));
+      if (fits.length === 1) { fits[0].rows.push(e); continue; }
+      const same = floods.find(f => f.month === e.p.when.key && !f.rows.some(r => r.si === e.si));
+      if (same) { same.rows.push(e); continue; }
+      floods.push({ key: e.p.when.key, label: e.p.when.label, month: e.p.when.key, rows: [e] });
+    }
+    for (const e of years) {
+      const key = e.loose ? '' : e.p.when.key;
+      const same = key ? floods.find(f => f.year === key && !f.rows.some(r => r.si === e.si)) : null;
+      if (same) { same.rows.push(e); continue; }
+      floods.push({ key: key || '0000', label: e.loose ? 'Undated' : e.p.when.label, year: key || null, rows: [e] });
+    }
+    for (const f of floods) f.rows.sort((a, b) => a.si - b.si);
+    floods.sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0));
+    return floods.map(f => ({ key: f.key, label: f.label, spread: !!f.spread, rows: f.rows }));
+  }
+
+  // Everything the panel says, as data: the sites, the floods, the datum the
+  // gauge heights are on and the site the differences are against.
+  function peaksModel(st = currentStation()) {
+    if (!st) return null;
+    const datum = lghDatum(st);
+    const refId = datum.kind === 'station' ? datum.id : st.id;
+    const sites = peakSites(st, refId);
+    const ri = sites.findIndex(o => o.id === refId);
+    const floods = peakFloods(sites).map(f => {
+      const ref = ri >= 0 ? f.rows.find(r => r.si === ri && r.p.ahd != null) : null;
+      return {
+        key: f.key, label: f.label, spread: f.spread, hasRef: !!ref,
+        rows: f.rows.map(r => ({
+          si: r.si, id: sites[r.si].id, name: sites[r.si].name, date: r.p.date, own: r.p.own, ahd: r.p.ahd, highest: !!r.p.highest,
+          // The day it peaked here, where the flood's days differ: "19 Oct".
+          day: f.spread && r.p.when && r.p.when.prec === 'day' ? r.p.when.label.replace(/ \d{4}$/, '') : null,
+          lgh: r.p.ahd != null && datum.kind !== 'none' ? r.p.ahd - datum.zero : null,
+          isRef: r.si === ri,
+          diff: ref && r.si !== ri && r.p.ahd != null ? r.p.ahd - ref.p.ahd : null,
+        })),
+      };
+    });
+    return { datum, refId, ref: ri >= 0 ? sites[ri] : null, sites, floods, count: sites.reduce((n, o) => n + o.peaks.length, 0) };
+  }
+
+  const fix2 = v => (v == null ? '—' : v.toFixed(2));
+  const plusMinus = v => (v == null ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v).toFixed(2)}`);
+
+  function peaksPanelBodyHtml() {
+    const st = currentStation();
+    if (!st) return '<p class="small">Pick a station and the floods recorded round it are listed here.</p>';
+    const M = peaksModel(st);
+    const listed = M.sites.filter(o => o.peaks.length);
+    if (!M.count) {
+      return `<p class="small">No flood peaks are recorded at ${esc(st.name)} or at any gauge within ${LGH_REACH_KM} km of it.</p>`;
+    }
+    const d = M.datum, ref = M.ref;
+    const refName = ref ? (ref.own ? 'this station' : ref.name) : null;
+    const whose = d.kind === 'none' ? null : d.whose;
+    // The sites, a line each: a narrow pane has no room for them as a table.
+    const siteRows = M.sites.filter(o => o.peaks.length || o.own || o.id === M.refId).map(o => {
+      const z = o.zero;
+      const zero = !z ? 'no gauge zero surveyed'
+        : z.datum === 'AHD' ? `zero ${z.m.toFixed(2)} m AHD`
+        : `zero ${z.m.toFixed(2)} m on ${z.datum && typeof FloodStages !== 'undefined' ? `the ${FloodStages.datumWord(z.datum)}` : 'no stated datum'}, not AHD`;
+      const isRef = o.id === M.refId, can = !!z && z.datum === 'AHD';
+      const btn = isRef && d.kind === 'station'
+        ? '<span class="term-chip twin-peaks-ref" title="Gauge heights are measured from this gauge\'s zero, and every other site\'s peak is compared with the peak here in the same flood.">Reference</span>'
+        : `<button type="button" class="link-btn twin-peaks-pick" ${can ? '' : 'disabled'} onclick="DigitalTwin.comparePeaksFrom('${escAttr(o.id)}')"
+                   title="${can ? `Measure gauge heights from ${escAttr(o.name)}'s zero and compare every other site's peaks with the peaks here` : 'Its gauge zero is not surveyed in AHD, so heights in AHD cannot be set against it'}">Compare from here</button>`;
+      return `<li class="twin-peaks-site${isRef ? ' is-ref' : ''}">
+            <span class="twin-peaks-site-name">${esc(o.name)}${o.own ? ' <span class="small">(this station)</span>' : ''}</span>
+            <span class="twin-peaks-site-do">${btn}</span>
+            <span class="small twin-peaks-site-facts">${o.own ? 'here' : `${esc(fmtKm(o.km))} ${esc(compassWord(o.bearing))}`} · ${esc(zero)} · ${plural(o.peaks.length, 'peak')}</span>
+          </li>`;
+    }).join('');
+    const againstHead = refName ? `Against ${ref.own ? 'this station' : ref.name}` : 'Against';
+    const floods = M.floods.map(f => `
+          <tr class="twin-peaks-flood"><th colspan="5" scope="colgroup">${esc(f.label)}${f.rows.length > 1 ? ` <span class="small">· ${f.rows.length} sites</span>` : ''}</th></tr>
+          ${f.rows.map(r => `<tr${r.isRef ? ' class="is-ref"' : ''}>
+            <th scope="row">${esc(r.name)}${r.highest ? ' <span title="The highest this site records" aria-label="the highest this site records">★</span>' : ''}${r.day ? ` <span class="small twin-peaks-day">· ${esc(r.day)}</span>` : ''}</th>
+            <td>${fix2(r.own)}</td>
+            <td>${r.ahd == null ? '<span title="Not placed in AHD: the gauge\'s zero on the day is not known in AHD">—</span>' : fix2(r.ahd)}</td>
+            <td>${r.lgh == null ? '—' : signed(r.lgh)}</td>
+            <td>${r.isRef ? '<span class="small">reference</span>' : r.diff != null ? plusMinus(r.diff)
+              : `<span title="${escAttr(r.ahd == null ? 'This peak is not placed in AHD, so it cannot be compared' : `No peak is recorded at ${refName || 'the reference'} for this flood`)}">—</span>`}</td>
+          </tr>`).join('')}`).join('');
+    const lead = `Recorded flood peaks at ${esc(st.name)}${listed.length > 1 || !listed.some(o => o.own) ? ` and the ${listed.filter(o => !o.own).length === 1 ? 'nearest gauge' : `${listed.filter(o => !o.own).length} nearest gauges`} within ${LGH_REACH_KM} km that record some` : ''}. `
+      + `Each is given three ways so they can be set side by side: as read on its own gauge, in metres ${termHtml('AHD', WORDS.ahd)}, and `
+      + (whose ? `as it would read on ${esc(whose)} (${termHtml('LGH', WORDS.lgh)}).` : `as a ${termHtml('local gauge height', WORDS.lgh)} once a gauge is chosen in Heights and measuring.`)
+      + (refName ? ` The last column is how much higher (+) or lower (−) the water peaked there than at ${esc(refName)} in the same flood.` : '');
+    return `
+      <p class="small twin-peaks-lead">${lead}</p>
+      <p class="small twin-peaks-sites-lead" id="twin-peaks-sites-lead">The gauges, nearest first — each with its ${termHtml('gauge zero', WORDS.zero)}. Pick the one the others are compared with:</p>
+      <ul class="twin-peaks-sites" aria-labelledby="twin-peaks-sites-lead">${siteRows}</ul>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="The flood peaks, flood by flood">
+        <table class="twin-table twin-peaks-table" data-tour="twin-peaks">
+          <caption class="sr-only">Recorded flood peaks, newest flood first, each site's peak on its own gauge, in metres AHD, as a local gauge height, and against the reference site's peak in the same flood</caption>
+          <thead><tr>
+            <th scope="col">Flood, site</th>
+            <th scope="col">${termHtml('Own gauge', WORDS.ownGauge)}</th>
+            <th scope="col">${termHtml('m AHD', WORDS.ahd)}</th>
+            <th scope="col">${termHtml('m LGH', WORDS.lgh)}</th>
+            <th scope="col">${termHtml(againstHead, WORDS.against)}</th>
+          </tr></thead>
+          <tbody>${floods}</tbody>
+        </table>
+      </div>
+      <details class="twin-details twin-words">
+        <summary>What the columns mean</summary>
+        <dl class="twin-words-list">
+          ${[['Own gauge', WORDS.ownGauge], ['m AHD', WORDS.ahd], ['m LGH', WORDS.lgh], [againstHead, WORDS.against], ['The same flood', WORDS.sameFlood], ['★', 'The highest flood this site records.']]
+            .map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}
+        </dl>
+      </details>
+      <p class="small">From the Bureau's record of flood peaks, as each station carries it. Recorded heights set beside one another — not a model of how the river falls between the gauges.</p>`;
+  }
+  function peaksPanelHtml() {
+    return `<div class="panel-header"><h2>Flood peaks near here</h2></div>
+      <div id="twin-peaks">${peaksPanelBodyHtml()}</div>`;
+  }
+  function refreshPeaks() {
+    const el = document.getElementById('twin-peaks');
+    if (el) el.innerHTML = peaksPanelBodyHtml();
   }
 
   // ── the frame loop ─────────────────────────────────────────────────────────
@@ -8891,6 +9138,7 @@ void main() {
         <p class="small twin-flood" id="twin-pane-flood" hidden></p>
       </div>
       <div class="panel twin-heights" id="twin-panel-heights">${heightsPanelHtml()}</div>
+      <div class="panel twin-peaks-panel" id="twin-panel-peaks">${peaksPanelHtml()}</div>
       <div class="panel" id="twin-panel-scene">${scenePanelHtml()}</div>
       <div class="panel twin-vel" id="twin-panel-velocity">${velPanelHtml()}</div>
       <div class="panel">
@@ -9419,6 +9667,15 @@ void main() {
       announce(`Gauge heights are now measured from ${m.toFixed(2)} m AHD.`);
     },
     clearMarks() { clearMarks(); announce('The pinned points are cleared.'); },
+    // Flood peaks near here: the site every other is compared with, which is
+    // the gauge the gauge heights are measured from.
+    comparePeaksFrom(id) { this.setLgh(`station:${id}`); },
+    _peaks() {
+      const M = peaksModel();
+      return M ? { refId: M.refId, datum: M.datum, count: M.count,
+                   sites: M.sites.map(o => ({ id: o.id, name: o.name, own: o.own, km: o.km, zero: o.zero, peaks: o.peaks.length })),
+                   floods: M.floods } : null;
+    },
     pinCentre() {
       if (!tw.ground || !tw.live || !rig.target) return;
       const x = rig.target.x, z = rig.target.z, h = heightAt(x, z);

@@ -614,6 +614,57 @@ The words — AHD, LGH, gauge zero, the channel bed, sample, apart, fall — hav
 their meanings on hover, and in *What the words here mean* at the foot of the
 panel.
 
+## Flood peaks near here
+
+The third panel of the pane, under *Heights and measuring*: what the river
+has reached at this station **and at the gauges round it**, set side by side.
+A flood is one event read on several gauge boards, and the question asked of
+it is nearly always a comparison — how much higher did 2013 come at the weir
+than in town, and what would that have read on our gauge.
+
+**The sites.** This station, then the eight nearest gauges within 25 km that
+record floods (`flood_peaks`, from the Bureau's record), each on a line with
+how far it is and which way, its gauge zero and how many peaks it carries.
+
+**The floods.** Every peak of every site, gathered into the floods they were
+and listed newest first. *The same flood* is peaks within three days of each
+other at different sites — a flood takes hours to a day or two to pass down a
+reach, and the record's date is the day of the peak at that gauge — so the
+flood of January 2013 is one group named *27–28 Jan 2013*, with the day
+beside each site that peaked on a different one. A peak dated only to a month
+joins the one flood of that month the other sites record, where there is
+exactly one; a peak dated only to a year stands alone unless another site
+says the same year. ★ marks the highest each site records.
+
+**Each peak, four ways.**
+
+| Column | What it is |
+|---|---|
+| **Own gauge** | The peak as it read on that site's own gauge board — metres above that gauge's own zero. Not comparable between sites: every gauge has a different zero. |
+| **m AHD** | The level it reached, where the record places it in AHD. Comparable anywhere. |
+| **m LGH** | The same level as a local gauge height on the gauge chosen in *Heights and measuring*: m AHD less that gauge's zero. What that flood would have read on *that* board, had the water been level between the two — which it is not, and the next column is by how much. |
+| **Against** *the reference* | The differential: this site's peak less the reference site's peak **in the same flood**, in metres. +1.84 at Wharton Weir against Gayndah in 2013 is the water standing 1.84 m higher at the weir than at the town gauge at their peaks. |
+
+**The reference** is the gauge the gauge heights are measured from — the one
+choice, so the readout under the pointer, the cross-section and this table
+all speak the same language. **Compare from here** beside any site makes it
+that gauge (it is the same as picking it under *Gauge heights (LGH) measured
+from*), and every LGH and every difference is worked again. A site whose zero
+is not surveyed in AHD cannot be the reference, and says why. With the
+channel bed or a typed level as the datum there is no site to compare with:
+the gauge heights are over that level and the differences are against this
+station.
+
+A peak the record does not place in AHD (the gauge's zero on the day is not
+known in AHD) keeps its own gauge height and has a dash in the other three
+columns; a flood the reference site has no peak for has a dash in the last.
+Nothing is filled in.
+
+These are **recorded heights set beside one another**, not a model: the
+difference between two gauges' peaks is the fall of the water surface between
+them at their peaks, which need not have happened at the same hour. Nothing
+of this panel is drawn on the ground.
+
 ## In the Stations map
 
 The same twin is inside the Stations map (`map-twin.js`), and that is the
@@ -1475,8 +1526,12 @@ aside, Escape putting it back, and a rectangle dragged on the map that leaves
 the station out, widened to hold it; the readout beside a real pointer saying
 the ground a ray from it meets, in m AHD and m LGH; whose gauge — the
 station's own, the channel bed, a typed level, another gauge near by, each
-kept — and a station with no zero given no gauge height; and two clicks
-pinning A and B, the distance, the fall and the cross-section between them.
+kept — and a station with no zero given no gauge height; two clicks
+pinning A and B, the distance, the fall and the cross-section between them;
+and the flood peaks near Gayndah's flume — January 2013 one group across the
+flume, the weir and the town, each peak on its own gauge, in m AHD, as a
+gauge height and against the reference's, the reference changed to Gayndah
+and every figure with it, no cell cut off in the pane.
 
 `npm run twincadastre` holds the cadastre, on a curved valley the check makes
 and a neighbourhood it lays over it in the service's own shape — two lots and

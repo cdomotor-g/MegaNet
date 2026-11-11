@@ -44,6 +44,11 @@
 //                    rest.
 //   Measuring        a click pins A, another B: the distance, the fall, the
 //                    cross-section with the water in it; a third starts over.
+//   Flood peaks      the floods recorded at this station and the gauges near
+//                    it, flood by flood: each peak on its own gauge, in m AHD,
+//                    as a gauge height on the gauge chosen, and against the
+//                    reference site's peak in the same flood — and the
+//                    reference changed, which changes all of them.
 //
 // Needs WebGL2, which Playwright's Chromium has through SwiftShader; skips
 // rather than fails if that is ever absent, as twin and twinsite do.
@@ -496,6 +501,79 @@ async function main() {
     await page.selectOption('#twin-lgh', 'channel');
     const ch = await page.evaluate(() => DigitalTwin._lgh().datum);
     ok('…and the channel bed can still be chosen there', ch.kind === 'channel' && isFinite(ch.zero), J(ch));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    section('Flood peaks near here');
+
+    // Gayndah Flume TM (zero 85.41 m AHD) and, near it on the Burnett, Wharton
+    // Weir TM, Gayndah (zero 85.30 m AHD) and Mt Lawless: the flood of January
+    // 2013 is on all of their records (stations.json).
+    d = await open('gayndah_flume_tm');
+    const rec = id => byId(id).flood_peaks.find(p => String(p.date).startsWith('2013-01-28'));
+    const flume = rec('gayndah_flume_tm'), town = rec('gayndah'), weir = rec('wharton_weir_tm');
+    let P = await page.evaluate(() => DigitalTwin._peaks());
+    const f13 = P.floods.find(f => f.rows.some(r => r.id === 'gayndah_flume_tm' && r.date === '2013-01-28'));
+    const row = (f, id) => f.rows.find(r => r.id === id);
+    ok('the panel lists this station first, then the gauges near it that record floods, nearest first',
+      P.sites[0].id === 'gayndah_flume_tm' && P.sites[0].own && P.sites.length > 3 && P.sites.slice(1).every((o, i, a) => i === 0 || o.km >= a[i - 1].km)
+        && P.sites.some(o => o.id === 'gayndah') && P.sites.some(o => o.id === 'wharton_weir_tm'), J(P.sites.map(o => [o.id, +o.km.toFixed(1), o.peaks])));
+    ok('one flood is one group, a site once: January 2013 at the flume, the weir and the town together',
+      !!f13 && ['gayndah_flume_tm', 'gayndah', 'wharton_weir_tm'].every(id => f13.rows.filter(r => r.id === id).length === 1), J(f13 && f13.rows.map(r => [r.id, r.date])));
+    const a = row(f13, 'gayndah_flume_tm'), b = row(f13, 'gayndah'), c = row(f13, 'wharton_weir_tm');
+    ok('each peak three ways: on its own gauge, in m AHD, and on this station\'s gauge — whose zero is 85.41 m AHD',
+      P.refId === 'gayndah_flume_tm' && a.own === flume.height_m && a.ahd === flume.level_m_ahd && near(a.lgh, flume.level_m_ahd - 85.41, 1e-9)
+        && b.own === town.height_m && b.ahd === town.level_m_ahd && near(b.lgh, town.level_m_ahd - 85.41, 1e-9), J({ a, b }));
+    ok('…and against the reference: the town\'s peak 0.79 m below the flume\'s, the weir\'s 1.05 m above, the flume itself the reference',
+      a.isRef && a.diff === null && near(b.diff, town.level_m_ahd - flume.level_m_ahd, 1e-9) && near(b.diff, -0.79, 0.006)
+        && near(c.diff, weir.level_m_ahd - flume.level_m_ahd, 1e-9) && near(c.diff, 1.05, 0.006), J({ b: b.diff, c: c.diff }));
+    ok('floods run newest first', P.floods.every((f, i, all) => i === 0 || f.key <= all[i - 1].key), J(P.floods.map(f => f.key)));
+    const noAhd = P.floods.flatMap(f => f.rows).find(r => r.ahd === null);
+    ok('a peak with no level in AHD keeps its own gauge height and is compared with nothing',
+      !noAhd || (noAhd.own !== null && noAhd.lgh === null && noAhd.diff === null), J(noAhd));
+    const dom = await page.evaluate(() => {
+      const t = document.querySelector('.twin-peaks-table');
+      const rows = [...t.querySelectorAll('tbody tr')].map(tr => [...tr.children].map(td => td.textContent.replace(/\s+/g, ' ').trim()));
+      return { head: [...t.querySelectorAll('thead th')].map(th => th.textContent.trim()), rows,
+               terms: t.querySelectorAll('thead .term[title]').length, lead: document.querySelector('.twin-peaks-lead').textContent.replace(/\s+/g, ' '),
+               sites: [...document.querySelectorAll('.twin-peaks-sites li')].map(li => li.textContent.replace(/\s+/g, ' ').trim()),
+               cut: [...t.querySelectorAll('th, td')].filter(c => c.scrollWidth > c.clientWidth + 1).length };
+    });
+    // (Mt Lawless and Ban Ban peaked a day earlier, so the flood is named for both days.)
+    const i13 = dom.rows.findIndex(r => r.length === 1 && r[0].startsWith(f13.label));
+    const after13 = dom.rows.slice(i13 + 1, i13 + 1 + f13.rows.length);
+    const domTown = after13.find(r => r[0].startsWith('Gayndah') && !/Flume|TM/.test(r[0]));
+    ok('the table says it: 27–28 Jan 2013, then Gayndah (28 Jan) at 18.61 on its own gauge, 103.91 m AHD, 18.50 m LGH, −0.79 against this station',
+      i13 >= 0 && f13.label === '27–28 Jan 2013' && !!domTown && /· 28 Jan$/.test(domTown[0]) && domTown[1] === '18.61' && domTown[2] === '103.91' && domTown[3] === '18.50' && domTown[4] === '−0.79', J({ head: dom.head, domTown, after13 }));
+    ok('…every column heading has its meaning on hover, and the lead says whose gauge and who is the reference',
+      dom.terms === 4 && J(dom.head) === J(['Flood, site', 'Own gauge', 'm AHD', 'm LGH', 'Against this station'])
+        && /as it would read on Gayndah Flume TM's gauge/.test(dom.lead) && /than at this station in the same flood/.test(dom.lead), J({ head: dom.head, lead: dom.lead }));
+    ok('…and the sites are listed with their zero and a way to compare from each', dom.sites[0].includes('Gayndah Flume TM') && /zero 85\.41 m AHD/.test(dom.sites[0]) && /Reference/.test(dom.sites[0])
+      && dom.sites.some(r => r.startsWith('Gayndah Compare from here') && /zero 85\.30 m AHD/.test(r) && /\d peaks?$/.test(r)), J(dom.sites));
+    ok('…and no cell of the table is cut off in the pane', dom.cut === 0, `${dom.cut} cell(s) wider than their column`);
+
+    // The differential the other way round: Gayndah the reference.
+    await page.evaluate(() => DigitalTwin.comparePeaksFrom('gayndah'));
+    P = await page.evaluate(() => DigitalTwin._peaks());
+    const g13 = P.floods.find(f => f.rows.some(r => r.id === 'gayndah_flume_tm' && r.date === '2013-01-28'));
+    const a2 = row(g13, 'gayndah_flume_tm'), b2 = row(g13, 'gayndah');
+    const dom2 = await page.evaluate(() => ({ head: [...document.querySelectorAll('.twin-peaks-table thead th')].map(th => th.textContent.trim()),
+      lgh: document.getElementById('twin-lgh').value, kept: JSON.parse(localStorage.getItem('mn-twin')).lgh.gayndah_flume_tm,
+      probe: DigitalTwin._probe(5, 5).datum.id }));
+    ok('Compare from here on Gayndah makes it the reference: its zero (85.30) the datum, and the flume\'s peak +0.79 m against it',
+      P.refId === 'gayndah' && b2.isRef && near(a2.diff, 0.79, 0.006) && near(a2.lgh, flume.level_m_ahd - 85.3, 1e-9) && near(b2.lgh, town.height_m, 0.006), J({ a2, b2 }));
+    ok('…the one choice everywhere: the table\'s heading, the gauge picked in Heights and measuring, the readout under the pointer, and it is kept',
+      dom2.head[4] === 'Against Gayndah' && dom2.lgh === 'station:gayndah' && dom2.probe === 'gayndah' && J(dom2.kept) === J({ kind: 'station', id: 'gayndah' }), J(dom2));
+    await page.evaluate(() => DigitalTwin.setLgh('custom'));
+    await page.evaluate(() => DigitalTwin.setLghZero(100));
+    P = await page.evaluate(() => DigitalTwin._peaks());
+    const c13 = P.floods.find(f => f.rows.some(r => r.id === 'gayndah_flume_tm' && r.date === '2013-01-28'));
+    ok('with a typed level as the datum the gauge heights are over it, and the comparison is with this station again',
+      P.refId === 'gayndah_flume_tm' && near(row(c13, 'gayndah').lgh, town.level_m_ahd - 100, 1e-9) && near(row(c13, 'gayndah').diff, -0.79, 0.006), J(row(c13, 'gayndah')));
+    await page.evaluate(() => DigitalTwin.setLgh('station:gayndah_flume_tm'));
+
+    d = await open('babinda_post_office');
+    const quiet = await page.evaluate(() => ({ P: DigitalTwin._peaks(), text: document.getElementById('twin-peaks').textContent.replace(/\s+/g, ' ').trim() }));
+    ok('a station with no floods on record round it says so, or lists only its neighbours\'', quiet.P.sites[0].own && (quiet.P.count === 0 ? /No flood peaks are recorded/.test(quiet.text) : /Recorded flood peaks at/.test(quiet.text)), quiet.text.slice(0, 160));
 
     ok('no uncaught page errors', errors.length === 0, errors.join(' | '));
   } catch (err) {

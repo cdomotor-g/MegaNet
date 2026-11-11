@@ -3205,6 +3205,12 @@ const TWIN_HELP = {
     + 'pinned points give the distance and fall between them and a cross-section of the ground, with the '
     + 'water at the level now shown. The ground between samples is drawn flat, so anything narrower than the '
     + 'spacing may not show.',
+    '<strong>Flood peaks near here.</strong> The pane lists the floods recorded at this station and at the '
+    + 'gauges within 25 km, flood by flood. Each peak is given as it read on its own gauge, in metres AHD, and '
+    + 'as it would read on the gauge you have chosen (LGH); the last column is how much higher or lower the water '
+    + 'peaked there than at the reference gauge in the same flood. <em>Compare from here</em> beside any gauge makes '
+    + 'it the reference, and every figure is worked again. These are recorded heights set side by side, not a '
+    + 'model of the river between the gauges.',
     '<strong>The twin is inside the Stations map.</strong> With <em>Offer the digital twin at close '
     + 'zoom</em> ticked in Layers (it starts off), from zoom 17 with a station under the view a card '
     + 'on the map offers it, saying what aerial imagery covers the station and when '
