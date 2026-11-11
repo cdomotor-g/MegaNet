@@ -1074,6 +1074,49 @@ async function browserHalf() {
     ok('⟲ turns it back, and nothing is left remembered',
       await rot() === '' && await page.evaluate(() => localStorage.getItem('mn-fp-rot')) === '{}');
 
+    // − Fit +: into the photo, on the stage and not the browser's whole page.
+    const zm = () => page.evaluate(() => {
+      const i = document.getElementById('fp-v-img').getBoundingClientRect(), st = document.getElementById('fp-v-stage').getBoundingClientRect();
+      return { t: document.getElementById('fp-v-img').style.transform, w: i.width, sw: st.width, left: i.left - st.left, right: st.right - i.right,
+               fit: document.getElementById('fp-v-zfit').textContent, out: document.getElementById('fp-v-zout').disabled,
+               inFocus: document.querySelector('#fp-viewer .fp-v-card').contains(document.activeElement) };
+    });
+    const z0 = await zm();
+    ok('a photo opens whole: Fit, and nothing to zoom out of', z0.fit === 'Fit' && z0.out && z0.t === '', JSON.stringify(z0));
+    await page.click('#fp-v-zin');
+    const z1 = await zm();
+    ok('+ zooms into the photo and says how far', /scale\(1\.5\)/.test(z1.t) && z1.fit === '150%' && !z1.out && Math.abs(z1.w - z0.w * 1.5) < 2, JSON.stringify(z1));
+    const stageBox = await page.locator('#fp-v-stage').boundingBox();
+    const sx = stageBox.x + stageBox.width / 2, sy = stageBox.y + stageBox.height / 2;
+    await page.mouse.move(sx, sy);
+    const wheelStopped = await page.evaluate(() => new Promise(res => {
+      const st = document.getElementById('fp-v-stage');
+      const e = new WheelEvent('wheel', { deltaY: -300, ctrlKey: true, bubbles: true, cancelable: true, clientX: innerWidth / 2, clientY: innerHeight / 2 });
+      st.dispatchEvent(e);
+      res(e.defaultPrevented);
+    }));
+    const z2 = await zm();
+    ok('Ctrl + wheel on the photo zooms the photo, and the browser is told not to zoom the page', wheelStopped && z2.w > z1.w * 2, JSON.stringify(z2));
+    await page.mouse.wheel(0, -4000);
+    const z3 = await zm();
+    ok('the wheel alone zooms too, and stops at eight times', z3.fit === '800%' && await page.evaluate(() => document.getElementById('fp-v-zin').disabled), JSON.stringify(z3));
+    await page.mouse.down();
+    await page.mouse.move(sx + 5000, sy, { steps: 4 });
+    await page.mouse.up();
+    const z4 = await zm();
+    ok('a drag moves the zoomed photo, and its edge stops at the stage\'s', z4.w > z4.sw && Math.abs(z4.left) < 1.5 && z4.right < -10, JSON.stringify(z4));
+    await page.keyboard.press('-');
+    ok('the − key steps back out', (await zm()).w < z4.w - 10);
+    await page.click('.fp-v-next');
+    ok('the next photo opens whole', (await zm()).fit === 'Fit');
+    await page.click('.fp-v-prev');
+    await page.mouse.dblclick(sx, sy);
+    ok('a double click zooms in', (await zm()).fit === '250%');
+    await page.focus('#fp-v-zout');
+    await page.keyboard.press('0');
+    const z5 = await zm();
+    ok('0 fits the whole photo again, and the focus stays in the dialog', z5.fit === 'Fit' && z5.t === '' && z5.out && z5.inFocus, JSON.stringify(z5));
+
     // A caption, typed and left.
     await page.keyboard.press('Home');
     await page.fill('#fp-v-details textarea', 'The staff gauge from the bridge, looking downstream');

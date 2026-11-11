@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 265, date: '2026-11-11', items: [
+      '🔎 <strong>Zoom into a field photo.</strong> Open a photo on 📷 Field Photos and the top-right corner of the picture has '
+        + '<em>−</em> and <em>+</em> beside the rotate buttons. The mouse wheel zooms too — with or without Ctrl, it is the photo that '
+        + 'zooms now and not the whole page — and so do a pinch, a double click and the + and − keys. Drag a zoomed photo to move '
+        + 'around it; the button between − and + shows how far in you are and fits the whole photo again.',
+    ] },
     { n: 264, date: '2026-11-11', items: [
       '🔍 <strong>The magnifier shows the property lines now.</strong> Whatever the Stations map is drawing of the ground itself is '
         + 'inside the glass too, closer up: property boundaries with their lot numbers, easements, land tenure, road reserves and '

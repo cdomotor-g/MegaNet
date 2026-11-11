@@ -1815,7 +1815,7 @@ const FieldPhotos = (function () {
   // Tab kept inside, focus handed back to whatever opened it — Modal's rules —
   // and ← → to walk the photos, swipe on a touch screen.
 
-  let v = null;             // { ids, i, title, opener, editing, onKey, gold, goldSay, readingAcc }
+  let v = null;             // { ids, i, title, opener, editing, onKey, gold, goldSay, readingAcc, zoom }
 
   function view(ids, startId, { title = '' } = {}) {
     ids = (ids || []).filter(id => S().byId[id]);
@@ -1826,7 +1826,7 @@ const FieldPhotos = (function () {
     // `gold`: the photos the compass last picked out — every one facing the
     // direction clicked, boxed on the strip — or null; `goldSay`, what the
     // note under the dial says about them.
-    v = { ids, i: Math.max(0, ids.indexOf(startId)), title, opener, editing: false, gold: null, goldSay: '', readingAcc: false };
+    v = { ids, i: Math.max(0, ids.indexOf(startId)), title, opener, editing: false, gold: null, goldSay: '', readingAcc: false, zoom: { s: 1, x: 0, y: 0 } };
     let el = document.getElementById('fp-viewer');
     if (!el) {
       el = document.createElement('div');
@@ -1892,6 +1892,9 @@ const FieldPhotos = (function () {
     else if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
     else if (e.key === 'Home') { e.preventDefault(); goTo(0); }
     else if (e.key === 'End') { e.preventDefault(); goTo(v.ids.length - 1); }
+    else if ((e.key === '+' || e.key === '=') && !e.ctrlKey && !e.metaKey) { e.preventDefault(); zoom(1); }
+    else if ((e.key === '-' || e.key === '_') && !e.ctrlKey && !e.metaKey) { e.preventDefault(); zoom(-1); }
+    else if (e.key === '0' && !e.ctrlKey && !e.metaKey) { e.preventDefault(); zoom(0); }
     else if (e.key === 'Tab') {
       const card = document.querySelector('#fp-viewer .fp-v-card');
       const f = card ? [...card.querySelectorAll('button, a[href], input, textarea, select, [tabindex="0"]')].filter(x => !x.disabled && x.offsetParent !== null) : [];
@@ -1917,6 +1920,7 @@ const FieldPhotos = (function () {
     unmountMoveMap();
     const r = S().byId[v.ids[v.i]];
     const n = v.ids.length;
+    v.zoom = { s: 1, x: 0, y: 0 };   // every photo opens whole
     // The gold is about one spot's photos; walked on to another spot, it goes.
     if (v.gold && !spotRows(r).some(x => v.gold.has(x.id))) v.gold = null;
     const gold = v.gold || new Set();
@@ -1928,8 +1932,11 @@ const FieldPhotos = (function () {
         </div>
         <div class="fp-v-body">
           <div class="fp-v-stage" id="fp-v-stage">
-            <img id="fp-v-img" class="fp-v-img" alt="${escAttr(altOf(r))}" data-fp-src="${escAttr(r.storage_path)}">
-            <div class="fp-v-rot" role="group" aria-label="Rotate the photo">
+            <img id="fp-v-img" class="fp-v-img" alt="${escAttr(altOf(r))}" data-fp-src="${escAttr(r.storage_path)}" draggable="false">
+            <div class="fp-v-rot" role="group" aria-label="Zoom and rotate the photo">
+              <button type="button" id="fp-v-zout" onclick="FieldPhotos.zoom(-1)" aria-label="Zoom out" title="Zoom out (− key)">−</button>
+              <button type="button" class="fp-v-zpct" id="fp-v-zfit" onclick="FieldPhotos.zoom(0)" aria-label="Fit the whole photo" title="How far in the photo is zoomed — press to fit the whole photo again (0 key)">Fit</button>
+              <button type="button" id="fp-v-zin" onclick="FieldPhotos.zoom(1)" aria-label="Zoom in" title="Zoom in (+ key, the mouse wheel, a pinch, or a double click)">+</button>
               <button type="button" onclick="FieldPhotos.rotate(-90)" aria-label="Rotate left" title="Rotate left">⟲</button>
               <button type="button" onclick="FieldPhotos.rotate(90)" aria-label="Rotate right" title="Rotate right">⟳</button>
             </div>
@@ -1969,7 +1976,7 @@ const FieldPhotos = (function () {
     }
     const strip = el.querySelector('.fp-v-thumb.is-here');
     if (strip && strip.scrollIntoView) strip.scrollIntoView({ block: 'nearest', inline: 'center' });
-    swipe(el.querySelector('#fp-v-stage'));
+    gestures(el.querySelector('#fp-v-stage'));
   }
 
   // ── Rotation ──────────────────────────────────────────────────────────────
@@ -1997,9 +2004,53 @@ const FieldPhotos = (function () {
     if (!img || !stage || !v) return;
     const deg = rotationOf(v.ids[v.i]);
     const quarter = deg === 90 || deg === 270;
-    img.style.transform = deg ? `rotate(${deg}deg)` : '';
     img.style.maxWidth  = quarter ? `${stage.clientHeight}px` : '';
     img.style.maxHeight = quarter ? `${stage.clientWidth}px` : '';
+    // The zoom, kept inside the stage: the picture's edge never comes in past
+    // the stage's, so there is no dragging it out of sight.
+    const z = v.zoom;
+    const w = (quarter ? img.offsetHeight : img.offsetWidth) * z.s;
+    const h = (quarter ? img.offsetWidth : img.offsetHeight) * z.s;
+    const mx = Math.max(0, (w - stage.clientWidth) / 2), my = Math.max(0, (h - stage.clientHeight) / 2);
+    z.x = Math.max(-mx, Math.min(mx, z.x));
+    z.y = Math.max(-my, Math.min(my, z.y));
+    if (z.s <= 1) { z.s = 1; z.x = 0; z.y = 0; }
+    const zoomed = z.s > 1;
+    img.style.transform = [zoomed ? `translate(${z.x.toFixed(1)}px, ${z.y.toFixed(1)}px) scale(${+z.s.toFixed(3)})` : '', deg ? `rotate(${deg}deg)` : '']
+      .filter(Boolean).join(' ');
+    stage.classList.toggle('is-zoomed', zoomed);
+    const out = document.getElementById('fp-v-zout'), fit = document.getElementById('fp-v-zfit'), inn = document.getElementById('fp-v-zin');
+    // A button that goes dead under the focus would drop it to the page behind.
+    const off = (b, is) => { if (b) { if (is && document.activeElement === b) keepFocusOn(inn && !inn.disabled && b !== inn ? inn : out); b.disabled = is; } };
+    off(out, !zoomed);
+    off(inn, z.s >= ZOOM_MAX);
+    if (fit) fit.textContent = zoomed ? `${Math.round(z.s * 100)}%` : 'Fit';
+  }
+  function keepFocusOn(b) { if (b && !b.disabled) b.focus({ preventScroll: true }); }
+
+  // ── Zoom ──────────────────────────────────────────────────────────────────
+  // Into the photo, for a label or a serial number: − and + on the stage, the
+  // wheel (Ctrl or not — on the photo it is the photo that zooms, not the
+  // browser's whole page), a pinch, a double click, and + − 0 on the keyboard.
+  // A drag moves a zoomed photo. 1 is the whole photo fitted to the stage; the
+  // zoom is the viewer's for the photo on screen and the next one opens whole.
+  const ZOOM_MAX = 8;
+  // To `s`, keeping the point (px, py) — measured from the stage's centre —
+  // under the pointer; with none given, the stage's centre.
+  function zoomTo(s, px = 0, py = 0) {
+    if (!v) return;
+    const z = v.zoom;
+    s = Math.max(1, Math.min(ZOOM_MAX, s));
+    const k = s / z.s;
+    z.x = px - (px - z.x) * k;
+    z.y = py - (py - z.y) * k;
+    z.s = s;
+    applyRot();
+  }
+  // The buttons and keys: a step in (1), a step out (-1), or the whole photo (0).
+  function zoom(dir) {
+    if (!v) return;
+    zoomTo(dir ? v.zoom.s * (dir > 0 ? 1.5 : 1 / 1.5) : 1);
   }
 
   function altOf(r) {
@@ -2019,17 +2070,73 @@ const FieldPhotos = (function () {
     return bits.join(', ') + (v && v.gold && v.gold.has(x.id) ? ' — faces the direction picked on the compass' : '');
   }
 
-  function swipe(stage) {
+  // The stage's pointer: the wheel and a pinch zoom, a double click zooms in
+  // and back out, a drag moves a zoomed photo, and on a touch screen a flick
+  // across a photo that is not zoomed walks to the next.
+  function gestures(stage) {
     if (!stage) return;
-    let x0 = null, id = null;
-    stage.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') { x0 = e.clientX; id = e.pointerId; } });
-    stage.addEventListener('pointerup', e => {
-      if (x0 === null || e.pointerId !== id) return;
-      const dx = e.clientX - x0;
-      x0 = null;
-      if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
+    const centre = e => {
+      const b = stage.getBoundingClientRect();
+      return [e.clientX - b.left - b.width / 2, e.clientY - b.top - b.height / 2];
+    };
+    const onPhoto = e => !(e.target && e.target.closest && e.target.closest('button'));
+    stage.addEventListener('wheel', e => {
+      if (!v) return;
+      // Always ours on the photo — otherwise Ctrl + wheel zooms the whole page.
+      e.preventDefault();
+      const d = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+      // A trackpad's pinch arrives as Ctrl + wheel in small steps.
+      const [px, py] = centre(e);
+      zoomTo(v.zoom.s * Math.exp(-d * (e.ctrlKey ? 0.01 : 0.0015)), px, py);
+    }, { passive: false });
+    stage.addEventListener('dblclick', e => {
+      if (!v || !onPhoto(e)) return;
+      e.preventDefault();
+      const [px, py] = centre(e);
+      zoomTo(v.zoom.s > 1 ? 1 : 2.5, px, py);
     });
-    stage.addEventListener('pointercancel', () => { x0 = null; });
+    const pts = new Map();    // the pointers down on the photo
+    let x0 = null, moved = false, pinch = null;
+    const span = () => { const [a, b] = [...pts.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
+    const mid = () => {
+      const [a, b] = [...pts.values()], r = stage.getBoundingClientRect();
+      return [(a.x + b.x) / 2 - r.left - r.width / 2, (a.y + b.y) / 2 - r.top - r.height / 2];
+    };
+    stage.addEventListener('pointerdown', e => {
+      if (!v || !onPhoto(e) || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 1) { x0 = e.clientX; moved = false; }
+      if (pts.size === 2) { pinch = { d: span(), s: v.zoom.s }; x0 = null; }
+      if (v.zoom.s > 1 || pts.size === 2) { try { stage.setPointerCapture(e.pointerId); } catch {} }
+    });
+    stage.addEventListener('pointermove', e => {
+      const p = pts.get(e.pointerId);
+      if (!p || !v) return;
+      const dx = e.clientX - p.x, dy = e.clientY - p.y;
+      p.x = e.clientX; p.y = e.clientY;
+      if (pts.size === 2 && pinch) {
+        const [px, py] = mid();
+        zoomTo(pinch.s * span() / pinch.d, px, py);
+      } else if (pts.size === 1 && v.zoom.s > 1) {
+        moved = true;
+        stage.classList.add('is-dragging');
+        v.zoom.x += dx; v.zoom.y += dy;
+        applyRot();
+      }
+    });
+    const up = e => {
+      if (!pts.delete(e.pointerId)) return;
+      stage.classList.remove('is-dragging');
+      if (pts.size < 2) pinch = null;
+      // A flick across a whole photo, by finger: the next one, or the one before.
+      if (e.type === 'pointerup' && !pts.size && x0 !== null && !moved && e.pointerType !== 'mouse' && v && v.zoom.s === 1) {
+        const dx = e.clientX - x0;
+        if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
+      }
+      if (!pts.size) x0 = null;
+    };
+    stage.addEventListener('pointerup', up);
+    stage.addEventListener('pointercancel', up);
   }
 
   // The side, in its three parts, each painted on its own: the facts and the
@@ -2832,7 +2939,7 @@ const FieldPhotos = (function () {
     queuePlace, queueAtStation, queueNoStation, queueEdit, queueFind,
     queuePick, queuePickAll, bulkFind, bulkAtStation,
     dragOver, dragLeave, drop,
-    view, close, isOpen, go, goTo, rotate, openFromLib, openOne, openSpot, openStation, pillHtml,
+    view, close, isOpen, go, goTo, rotate, zoom, openFromLib, openOne, openSpot, openStation, pillHtml,
     setCaption, editPlace, moveTo, moveTyped, moveWith, fileUnder, removePhoto, openOriginal, showOnMap, showInTwin,
     compassClick, compassKey, readAccuracy,
     inBox, spots, sign, thumbOf, urlFor, paintThumbs, row: id => S().byId[id] || null,
