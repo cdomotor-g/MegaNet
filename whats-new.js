@@ -25,6 +25,11 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 263, date: '2026-11-11', items: [
+      '🎨 <strong>A message\'s bits, in colour.</strong> Open a row on the 📜 Message Log and <em>On the wire</em> now draws the whole '
+        + 'message the way the 🧪 Bit Bench does: an ALERT message as its four words of ten bits, an ALERT2 reading as its four bytes — '
+        + 'blue for the address, green for the value, purple for the check bits, grey for start and stop — each bit named underneath.',
+    ] },
     { n: 262, date: '2026-11-11', items: [
       '🕵️ <strong>Stations nobody has registered: whose are they?</strong> Base Stations tab › What comes in through each › '
         + '<em>Not in the register</em> lists every unknown station a base station decodes with what narrows down its owner: the frequency '

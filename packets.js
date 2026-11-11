@@ -651,6 +651,8 @@ const Packets = (function () {
   }
 
   return { render, init, decode, encode, loadExample, onFormatChange, setEnc, copyTxt, prefillEncoder,
-           decodeMessage, stationName, loadStationsFile };
+           decodeMessage, stationName, loadStationsFile,
+           // A layout's 32 cells ({ f, i }), for a tab that draws one (the Message Log).
+           formatMap: k => FORMATS[k].map };
 })();
 

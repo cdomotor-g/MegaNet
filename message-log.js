@@ -981,8 +981,95 @@ const MessageLog = (() => {
   // conversion, the pathway, and the decode — the row's journey from the wire
   // to the columns above it, leaning on the tabs that already know how.
 
-  function bits(n, w) {
-    return (n >>> 0).toString(2).padStart(w, '0');
+  // ── the message, bit by bit ────────────────────────────────────────────────
+  // The whole message as it travels, drawn the way the 🧪 Bit Bench draws its
+  // frame (the same cells and colours, styles.css .bb-*): blue for the
+  // address, green for the value, purple for the fixed check bits, grey for
+  // framing. The stored record is the decoded address and value, so the bits
+  // here are rebuilt from those two numbers — exact, because the layout leaves
+  // nothing else free — except an ALERT2 record's fourth byte, the seconds the
+  // repeater held the reading, which the record does not keep and which is
+  // drawn as unknown rather than guessed.
+
+  const WIRE_KINDS = {
+    addr: ['Address', 'who sent it'],
+    val:  ['Value', 'what it read, as the raw count'],
+    chk:  ['Check bits', 'fixed 1s and 0s the receiver expects; a wrong one and the message is thrown out'],
+    frm:  ['Start and stop', 'a 0 before each word and a 1 after it, so the receiver can find the word'],
+    held: ['Time held', 'the seconds a repeater held the reading before passing it on — not kept with the stored reading'],
+  };
+
+  // groups: [{ head, sub, cells: [{ b, kind, name, said }] }]
+  function wireStripHtml(groups, caption, kinds, wide) {
+    const n = Math.max(...groups.map(g => g.cells.length));
+    const words = groups.map(g => `
+      <div class="bb-word" role="group" aria-label="${escAttr(g.head + (g.sub ? ', ' + g.sub : ''))}">
+        <div class="bb-word-h" aria-hidden="true"><b>${esc(g.head)}</b><span>${esc(g.sub || '')}</span></div>
+        <div class="bb-cells">${g.cells.map(c => `<span class="bb-cell bb-cell--${c.kind === 'held' ? 'frm' : c.kind}" title="${escAttr(`${c.said}: ${c.b}`)}"><span class="bb-cell-v" aria-hidden="true">${c.b}</span><span class="sr-only">${esc(`${c.said}: ${c.b}`)}</span></span>`).join('')}</div>
+        <div class="bb-names" aria-hidden="true">${g.cells.map(c => `<span>${esc(c.name)}</span>`).join('')}</div>
+      </div>`).join('');
+    const key = kinds.map(k => `<span title="${escAttr(WIRE_KINDS[k][1])}"><i class="bb-sw bb-sw--${k === 'held' ? 'frm' : k}" aria-hidden="true"></i> ${esc(WIRE_KINDS[k][0])} <span class="small">${esc(WIRE_KINDS[k][1])}</span></span>`).join('');
+    return `
+      <figure class="bb-strip bb-strip--small ml-wire${wide ? ' ml-wire--wide' : ''}" style="--ml-wire-n:${n}" aria-label="${escAttr(caption)}">
+        <div class="bb-words">${words}</div>
+        <div class="ml-wire-key">${key}</div>
+      </figure>`;
+  }
+
+  // Legacy ALERT: the 40 bits on the air, four words of ten (BitModel's frame,
+  // the one the Bit Bench and the ALERT Packets tab hold to each other).
+  function wireAlert(addr, value) {
+    const M = BitModel, L = M.layout(), tx = M.air(addr, value), T = M.bitMs();
+    const KIND = { start: 'frm', stop: 'frm', A: 'addr', D: 'val', K: 'chk' };
+    const groups = [0, 1, 2, 3].map(w => ({
+      head: `Word ${w + 1}`, sub: `${Math.round(w * 10 * T)}–${Math.round((w + 1) * 10 * T)} ms`,
+      cells: L.slice(w * 10, w * 10 + 10).map(c => ({
+        b: tx[c.j], kind: KIND[c.kind],
+        name: c.kind === 'start' ? 'S' : c.kind === 'stop' ? 'P' : c.kind === 'K' ? 'K' : `${c.kind}${c.i}`,
+        said: c.kind === 'start' ? 'start bit, always 0' : c.kind === 'stop' ? 'stop bit, always 1'
+          : c.kind === 'K' ? `check bit, always ${c.i}` : M.cellName(c),
+      })),
+    }));
+    return {
+      title: 'On the air: four words of ten bits',
+      html: wireStripHtml(groups, `Address ${addr}, value ${value}, as the 40 bits on the air: four words of ten, word 1 first`, ['addr', 'val', 'chk', 'frm']),
+      note: `Word 1 goes first, and each word the same way: a start bit, eight bits least significant first, a stop bit. Each bit lasts ${T.toFixed(2)} ms and the frame ${Math.round(40 * T)} ms. Rebuilt from the stored address and value — the layout leaves nothing else free.`,
+    };
+  }
+
+  // ALERT2: the reading's four bytes inside the frame's concentration payload
+  // (Packets' A2C map — the same arithmetic as Alert2.decodeRecord()).
+  function wireA2c(addr, value) {
+    const map = Packets.formatMap('a2c');
+    const what = ['address, low 8 bits', 'value, top 3 bits · address, top 5 bits', 'value, low 8 bits', 'time held, seconds'];
+    const groups = [0, 1, 2, 3].map(w => ({
+      head: `Byte ${w + 1}`, sub: what[w],
+      cells: map.slice(w * 8, w * 8 + 8).map(c => c.f === 'A'
+        ? { b: (addr >> c.i) & 1, kind: 'addr', name: `A${c.i}`, said: `address bit ${c.i}` }
+        : c.f === 'D'
+          ? { b: (value >> c.i) & 1, kind: 'val', name: `D${c.i}`, said: `value bit ${c.i}` }
+          : { b: '·', kind: 'held', name: `T${c.i}`, said: `time-held bit ${c.i} — not kept with the stored reading` }),
+    }));
+    return {
+      title: 'In the ALERT2 frame: four bytes of eight bits',
+      html: wireStripHtml(groups, `Address ${addr}, value ${value}, as the four bytes this reading takes up inside an ALERT2 frame, byte 1 first`, ['addr', 'val', 'held']),
+      note: 'Byte 1 goes first, each byte most significant bit first. Bytes 1 to 3 are rebuilt from the stored address and value; byte 4, the seconds a repeater held the reading, is not kept with it. There are no check bits here — the ALERT2 frame around these bytes carries the checks, and the whole frame is in the submission below.',
+    };
+  }
+
+  // Anything that fits neither layout: the two numbers, most significant first.
+  function wirePlain(addr, value) {
+    const aw = addr <= 8191 ? 13 : 16, vw = value <= 2047 ? 11 : 16;
+    const run = (v, w, kind, k, word) => ({
+      head: `${word} ${v}`, sub: `${w} bits`,
+      cells: Array.from({ length: w }, (_, n) => { const i = w - 1 - n; return { b: (v >> i) & 1, kind, name: `${k}${i}`, said: `${word.toLowerCase()} bit ${i}` }; }),
+    });
+    return {
+      title: 'The two numbers, bit by bit',
+      html: wireStripHtml([run(addr, aw, 'addr', 'A', 'Address'), run(value, vw, 'val', 'D', 'Value')],
+        `Address ${addr} as ${aw} bits and value ${value} as ${vw} bits, most significant first`, ['addr', 'val'], true),
+      note: 'Most significant bit first. These numbers are too big for the 13-bit address and 11-bit value of an ALERT frame, so no frame layout is drawn.',
+    };
   }
 
   function detailDecodeHtml(r) {
@@ -991,12 +1078,13 @@ const MessageLog = (() => {
     const out = [];
     if (proto === 'alert' || proto === 'alert2') {
       if (r.alert_id != null && Number.isInteger(raw) && raw >= 0 && raw <= 65535) {
-        const aw = r.alert_id <= 8191 ? 13 : 16;
-        const vw = raw <= 2047 ? 11 : 16;
+        const fits = r.alert_id <= 8191 && raw <= 2047;
+        const w = !fits ? wirePlain(r.alert_id, raw)
+          : proto === 'alert2' ? wireA2c(r.alert_id, raw) : wireAlert(r.alert_id, raw);
         out.push(`
-          <div><span>On the wire</span>
-            <b class="mono">addr ${r.alert_id} = ${bits(r.alert_id, aw)}<span class="small"> (${aw} bits)</span>
-            · value ${raw} = ${bits(raw, vw)}<span class="small"> (${vw} bits)</span></b></div>`);
+          <div class="ml-wire-row"><span>On the wire</span><b>${esc(w.title)}</b>
+            ${w.html}
+            <span class="small ml-wire-note">${esc(w.note)}</span></div>`);
       }
       if (proto === 'alert' && r.alert_id != null && r.alert_id <= 8191
           && Number.isInteger(raw) && raw >= 0 && raw <= 2047) {

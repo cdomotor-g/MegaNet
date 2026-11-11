@@ -18384,6 +18384,14 @@ body.has-sort-bridge .signin-nudge { display: none; }
   white-space: pre-wrap; word-break: break-word;
 }
 .ml-frame { white-space: normal; word-break: break-all; }
+/* A message's bits in the detail drawer: the Bit Bench's strip (.bb-*), with
+   as many cells to a group as the layout has (10 to a word, 8 to a byte). */
+.ml-wire-row > .ml-wire, .ml-wire-row > .ml-wire-note { flex: 1 1 100%; }
+.ml-wire { margin: .1rem 0 0; max-width: 72rem; }
+.ml-wire .bb-cells, .ml-wire .bb-names { grid-template-columns: repeat(var(--ml-wire-n, 10), minmax(0, 1fr)); }
+@container (min-width: 30rem) { .ml-wire--wide .bb-words { grid-template-columns: minmax(0, 36rem); } }
+.ml-wire-key { display: flex; flex-wrap: wrap; gap: .2rem var(--sp-3); margin-top: var(--sp-1); font-size: var(--fs-xs); }
+.ml-wire-key > span { display: inline-flex; align-items: baseline; gap: .3rem; }
 
 /* Claiming an address from the drawer (#172). It sits inside the Station cell of
    the detail grid, which is a flex row of baseline-aligned pieces — so this takes

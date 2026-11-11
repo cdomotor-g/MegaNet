@@ -45,6 +45,8 @@ const ROWS = [
   row(1, 'serial-monitor/rpi-83071968-sdr1-151.5375'),
   row(2, 'serial-monitor/rpi-6dfef7f4-sdr1'),
   row(3, 'serial-monitor/laptop-quansheng'),
+  { ...row(4, 'serial-monitor/laptop-quansheng'), alert_id: 8187, value_raw: 1502, protocol: 2 },
+  { ...row(5, 'serial-monitor/laptop-quansheng'), alert_id: 10000, value_raw: 5 },
 ];
 
 async function main() {
@@ -118,7 +120,32 @@ async function main() {
     page = await open(false);
     check('no Base station filter', (await filter(page)) === null);
     c = await cells(page);
-    check('paths as they are kept, and the log still loads', c.length === 3 && c[0].text === 'serial-monitor/rpi-83071968-sdr1-151.5375', J(c));
+    check('paths as they are kept, and the log still loads', c.length === 5 && c[0].text === 'serial-monitor/rpi-83071968-sdr1-151.5375', J(c));
+
+    console.log('\n4. A message opened: its bits, coloured');
+    const wire = async key => {
+      await page.evaluate(k => MessageLog.toggleRow(k), key);
+      const got = await page.evaluate(() => {
+        const f = document.querySelector('.ml-detail .ml-wire');
+        return f && { title: f.parentElement.querySelector('b').textContent,
+          groups: [...f.querySelectorAll('.bb-word')].map(w => [...w.querySelectorAll('.bb-cell-v')].map(v => v.textContent).join('')),
+          kinds: [...f.querySelectorAll('.bb-cell')].map(c => c.className.replace(/.*bb-cell--/, '')[0]).join(''),
+          names: [...f.querySelectorAll('.bb-names span')].length, key: f.querySelectorAll('.ml-wire-key .bb-sw').length,
+          wide: f.scrollWidth <= f.clientWidth + 1 };
+      });
+      await page.evaluate(k => MessageLog.toggleRow(k), key);
+      return got;
+    };
+    const k = r => `${r.addr}|${r.reading_ts}|${r.value_raw}`;
+    let w = await wire(k(ROWS[0]));
+    const air = await page.evaluate(r => [...BitModel.air(r.alert_id, r.value_raw)].join(''), ROWS[0]);
+    check('a legacy ALERT message is the 40 bits on the air, four words of ten', w && w.groups.length === 4 && w.groups.join('') === air && /four words of ten/.test(w.title), J(w));
+    check('…coloured by what each bit carries, named underneath, with a key', w && w.kinds === 'faaaaaaccf'.repeat(2) + 'favvvvvccf' + 'fvvvvvvccf' && w.names === 40 && w.key === 4 && w.wide, J(w));
+    w = await wire(k(ROWS[3]));
+    check('an ALERT2 message is its four bytes, the time-held byte left unknown',
+      w && J(w.groups) === J(['11111011', '10111111', '11011110', '········']) && w.kinds === 'a'.repeat(8) + 'vvvaaaaa' + 'v'.repeat(8) + 'f'.repeat(8) && w.key === 3, J(w));
+    w = await wire(k(ROWS[4]));
+    check('numbers too big for a frame are drawn as the two numbers, not a frame', w && J(w.groups) === J(['0010011100010000', '00000000101']) && /two numbers/.test(w.title), J(w));
     check('no page errors', errors.length === 0, errors.join(' | '));
   } finally {
     await browser.close();
