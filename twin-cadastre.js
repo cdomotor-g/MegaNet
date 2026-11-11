@@ -1262,6 +1262,10 @@ const TwinCadastre = (function () {
     remove,
     relift,
     frame,
+    // A sign went up or came down with the view where it was (a pinned point,
+    // say): the labels are worked out again on the next frame, since a label
+    // gives way to a sign and takes its place back when the sign goes.
+    signsChanged() { lab.key = null; },
 
     // A click on the ground: which parcel it is in — of what is drawn.
     pickWords(x, z) {

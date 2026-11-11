@@ -74,6 +74,9 @@ const CardGrip = (() => {
   const keyOf = new WeakMap();    // scroller → the key its height is kept under
   const ownCap = new WeakMap();   // scroller → the inline max-height its module gave it, if any
   const moved = new WeakSet();    // scrollers whose height somebody has set
+  let live = null;                // the drag in progress, if there is one (dragStart)
+  let focusKey = null;            // the card whose handle has the keyboard (attach)
+  let focusGrip = null;           // …and that handle
 
   // ── Remembering ───────────────────────────────────────────────────────────
 
@@ -164,6 +167,17 @@ const CardGrip = (() => {
     grip.addEventListener('pointerdown', dragStart);
     grip.addEventListener('keydown', onKey);
     grip.addEventListener('dblclick', toggle);
+    // Which card's handle has the keyboard. A handle taken away with its
+    // table either hears no blur or hears it while it is still on the page
+    // (Chromium) and is gone a moment later — so the blur is believed only
+    // if the handle is still there after it. The key then outlives a handle
+    // that was drawn over, and the handle of the table drawn in its place
+    // takes the keyboard back (below), where it would otherwise have dropped
+    // to the page mid-way through somebody's arrow presses.
+    grip.addEventListener('focus', () => { focusKey = keyOf.get(el); focusGrip = grip; });
+    grip.addEventListener('blur', () => {
+      queueMicrotask(() => { if (grip.isConnected && focusGrip === grip) { focusKey = null; focusGrip = null; } });
+    });
     gripOf.set(el, grip);
     ownerOf.set(grip, el);
     keyOf.set(el, cardKey(el));
@@ -173,7 +187,14 @@ const CardGrip = (() => {
       el.style.maxHeight = `${Math.max(MIN, px)}px`;
       moved.add(el);
     }
+    // Drawn again under a drag of the card it replaces: the drag is its now.
+    if (live && live.key === keyOf.get(el)) live.adopt(el, grip);
     el.after(grip);
+    if (focusKey && focusKey === keyOf.get(el)) {
+      const at = document.activeElement;
+      if (!at || at === document.body) { grip.hidden = false; grip.focus({ preventScroll: true }); }
+      else { focusKey = null; focusGrip = null; }   // the keyboard has gone elsewhere since
+    }
     ro.observe(el);    // and the first notification shows or hides it
   }
 
@@ -218,6 +239,10 @@ const CardGrip = (() => {
         if (grip && grip.isConnected) grip.remove();
       }
     }
+    // The handle that had the keyboard went and nothing drawn just now took
+    // its place: the tab was left, and coming back to it later is not a
+    // reason to take the keyboard.
+    if (focusGrip && !focusGrip.isConnected) { focusKey = null; focusGrip = null; }
   }
 
   // ── Sizing ────────────────────────────────────────────────────────────────
@@ -259,10 +284,11 @@ const CardGrip = (() => {
 
   function dragStart(e) {
     if (e.button != null && e.button !== 0) return;
-    const grip = e.currentTarget;
-    const el = ownerOf.get(grip);
+    let grip = e.currentTarget;
+    let el = ownerOf.get(grip);
     if (!el || !el.isConnected) return;
     e.preventDefault();                       // no text selection while dragging
+    if (live) live.end();
     // Captured, so the drag survives the pointer leaving a handle a few pixels
     // tall — which it does at once.
     try { grip.setPointerCapture(e.pointerId); } catch (_) {}
@@ -271,28 +297,45 @@ const CardGrip = (() => {
     let done = false, dragged = false;
     grip.classList.add('is-dragging');
     document.body.classList.add('mn-grip-dragging');
+    const end = () => {
+      if (done) return;
+      done = true;
+      live = null;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      grip.classList.remove('is-dragging');
+      document.body.classList.remove('mn-grip-dragging');
+      if (dragged && el.isConnected) remember(el, Math.round(parseFloat(el.style.maxHeight)));
+    };
     // A finger that lands and lifts again wobbles a pixel or two; that is a
     // tap, not a height.
     const move = ev => {
+      // Its card went and no other came in its place (the tab was left), or
+      // the button came up somewhere this window never heard of.
+      if (!el.isConnected || (ev.pointerType === 'mouse' && ev.buttons === 0)) { end(); return; }
       if (!dragged && Math.abs(ev.clientY - y0) < 3) return;
       dragged = true;
       setHeight(el, h0 + ev.clientY - y0, false);
     };
-    const end = () => {
-      if (done) return;
-      done = true;
-      grip.removeEventListener('pointermove', move);
-      grip.removeEventListener('pointerup', end);
-      grip.removeEventListener('pointercancel', end);
-      grip.removeEventListener('lostpointercapture', end);
-      grip.classList.remove('is-dragging');
-      document.body.classList.remove('mn-grip-dragging');
-      if (dragged) remember(el, Math.round(parseFloat(el.style.maxHeight)));
+    // Heard on the window, not the handle: a tab that draws its table again
+    // while late readings arrive (Repeaters does, for a second or two after it
+    // opens) takes the handle away mid-drag, and the capture with it. The
+    // drag carries on under the card drawn in its place — attach() hands it
+    // over — instead of stopping dead with the table back at its old height.
+    live = {
+      key: keyOf.get(el),
+      end,
+      adopt(el2, grip2) {
+        grip.classList.remove('is-dragging');
+        if (dragged) { el2.style.maxHeight = el.style.maxHeight; moved.add(el2); }
+        el = el2; grip = grip2;
+        grip.classList.add('is-dragging');
+      },
     };
-    grip.addEventListener('pointermove', move);
-    grip.addEventListener('pointerup', end);
-    grip.addEventListener('pointercancel', end);
-    grip.addEventListener('lostpointercapture', end);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
   }
 
   function onKey(e) {

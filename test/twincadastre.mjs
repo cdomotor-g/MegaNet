@@ -431,7 +431,14 @@ async function browserHalf() {
     // The clicks above each pinned a point (digital-twin.js, "measuring"), and
     // a pinned point's sign is a sign: a label under it is not written. Off
     // they come, so that what is counted here is the labels.
-    await page.evaluate(() => DigitalTwin.clearMarks());
+    //
+    // The line of help along the stage's foot is put away too. Since 39348e6
+    // it also says how to pin a point, which in this 530 px stage wraps it to
+    // a third line — over the southern Railway Street, whose label rightly
+    // gives way to it ("furnitureBoxes"), while the northern one gives way to
+    // Lot 1's. What is counted here is the labels the ground has room for; a
+    // label's giving way to a control is asked below, with the help back up.
+    await page.evaluate(() => { document.getElementById('twin-hud').hidden = true; DigitalTwin.clearMarks(); });
     await frame();
     c = await page.evaluate(() => TwinCadastre.debug());
     const titles = c.labels.placed.map(l => `${l.title}${l.sub ? ` ${l.sub}` : ''}`);
@@ -454,13 +461,16 @@ async function browserHalf() {
     });
     ok('the words are written on a canvas laid exactly over the scene, that the pointer goes through and a reader is not told about',
       ink && ink.inked > 20 && ink.events === 'none' && ink.hidden === 'true' && ink.over, J(ink));
+    // The help comes back, and the labels are worked out again round it.
+    await page.evaluate(() => { document.getElementById('twin-hud').hidden = false; DigitalTwin.clearMarks(); });
+    await frame();
     const clash = await page.evaluate(() => {
       const boxes = [...TwinCadastre._signBoxes(), ...TwinCadastre._furnitureBoxes()], placed = TwinCadastre.debug().labels.placed;
       return placed.filter(p => boxes.some(b => p.sx - p.w / 2 < b.x1 && p.sx + p.w / 2 > b.x0 && p.sy - p.h / 2 < b.y1 && p.sy + p.h / 2 > b.y0)).map(p => p.title);
     });
     const furniture = await page.evaluate(() => TwinCadastre._furnitureBoxes().length);
     ok('no label is written over a sign the scene stands up, or under the stage\'s own controls — the compass, the line of help',
-      clash.length === 0 && furniture >= 2, J({ clash, furniture }));
+      clash.length === 0 && furniture >= 3, J({ clash, furniture }));
     await page.evaluate(() => DigitalTwin._pov({ px: 5, pz: 12, yaw: 0, pitch: -0.25 }));
     await frame();
     c = await page.evaluate(() => TwinCadastre.debug());

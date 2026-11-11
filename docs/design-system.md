@@ -669,7 +669,10 @@ to write it down rather than let each of them re-derive a different half.
     it back; ↓ ↑ step 40 px, PageDown and PageUp 200, End fills and Home puts
     back. It shows only while rows are hidden (or once moved), and the height is
     kept on the device per tab and card (`mn-grip-h`) and put back whenever the
-    tab redraws the card. Pattern 13's objection to a drag edge is met by where
+    tab redraws the card. A redraw under a drag, or under a handle that has the
+    keyboard, hands the drag or the keyboard to the new card's handle (Repeaters
+    redraws its table for a second or two after it opens, as late readings
+    arrive). Pattern 13's objection to a drag edge is met by where
     it lies rather than by not having one: under a mouse the band is 2 px over
     the edge and 10 under, clear of a horizontal scroll bar's thumb.
 

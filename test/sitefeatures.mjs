@@ -316,6 +316,18 @@ async function tilted(page, db, pin) {
 
   // Left, with the flat map at 15: its own floor again, so nothing on it —
   // once the card's pick is put down, which 2-D draws at any zoom.
+  //
+  // Showing the track fitted the flat map to it, which Leaflet animates, and
+  // the camera then eases after it. A camera moved by a script while the flat
+  // map is still on its way is not handed back (map-3d.js, onCameraEnd: the
+  // flat map's own move wins) — so on a slow runner, where that animation was
+  // still running here, the jump below was dropped and the flat map stayed at
+  // the 16 the fit had put it at. Both are let finish first.
+  await page.waitForFunction(() => {
+    const m = state.map;
+    return !m._animatingZoom && !(m._panAnim && m._panAnim._inProgress) && !m._flyToFrame;
+  }, null, { timeout: 10_000 }).catch(() => {});
+  await idle();
   await page.evaluate(() => state.map.fire('click', { latlng: state.map.getCenter() }));
   await page.evaluate(() => Map3D._map().jumpTo({ zoom: 14 }));
   await idle();

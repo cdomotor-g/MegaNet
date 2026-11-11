@@ -7945,6 +7945,7 @@ void main() {
   const MARK_PX = { head: 7, post: 34, sign: 104 };
   function buildMarks() {
     removeMarks();
+    if (typeof TwinCadastre !== 'undefined') TwinCadastre.signsChanged();
     if (!sc.scene || !THREE || !tw.ground || !tw.marks.length) { requestFrame(); return; }
     const g = tw.ground;
     const grp = new THREE.Group();

@@ -62,8 +62,18 @@ const inView = async page => {
         && !w.nextElementSibling.hidden);
     if (wrap) wrap.nextElementSibling.scrollIntoView({ block: 'center' });
   });
-  await page.waitForTimeout(50);
-  return readTable(page);
+  // The scroll, and whatever the page is still laying out, have to have
+  // landed before the handle's place is read: it is a few pixels tall, and a
+  // pointer sent to where it was a frame ago misses it on a busy runner. So
+  // its place is read until two readings 50 ms apart agree.
+  let last = null;
+  for (let i = 0; i < 40; i++) {
+    await page.waitForTimeout(50);
+    const now = await readTable(page);
+    if (last && now && last.grip && now.grip && last.grip.top === now.grip.top && last.left === now.left && last.h === now.h) return now;
+    last = now;
+  }
+  return last;
 };
 
 const stored = page => page.evaluate(k => JSON.parse(localStorage.getItem(k) || '{}'), STORE);
@@ -72,9 +82,14 @@ async function drag(page, from, dy) {
   const x = from.left + from.width / 2;
   const y = (from.grip.top + from.grip.bottom) / 2;
   await page.mouse.move(x, y);
+  const under = await page.evaluate(([x_, y_]) => { const e = document.elementFromPoint(x_, y_); return e ? `${e.tagName}.${e.className}` : null; }, [x, y]);
+  if (!/mn-grip/.test(under || '')) log(`  (the pointer at ${Math.round(x)},${Math.round(y)} is over ${under}, not the handle)`);
   await page.mouse.down();
+  // The press has to have reached the handle before the pointer moves on.
+  await page.waitForFunction(() => document.body.classList.contains('mn-grip-dragging'), null, { timeout: 2000 }).catch(() => log('  (the handle did not take the press)'));
   for (let i = 1; i <= 6; i++) await page.mouse.move(x, y + (dy * i) / 6);
   await page.mouse.up();
+  await page.waitForFunction(() => !document.body.classList.contains('mn-grip-dragging'), null, { timeout: 2000 }).catch(() => {});
   await page.waitForTimeout(80);
 }
 
@@ -174,6 +189,46 @@ async function main() {
     const tMin = await readTable(page);
     check('dragged far up, it stops at the floor (72 px)', near(tMin.h, 72, 1), J(tMin.h));
 
+    // A tab may draw its table again under a drag: Repeaters does as its late
+    // readings arrive, for a second or two after it opens — which on a slow
+    // runner was during the first drag above, and the drag stopped dead with
+    // the table back at its old height. The drag carries on under the table
+    // drawn in its place.
+    {
+      const from = await inView(page);
+      const x = from.left + from.width / 2, y = (from.grip.top + from.grip.bottom) / 2;
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      await page.mouse.move(x, y + 30);
+      await page.mouse.move(x, y + 60);
+      const redrawn = await page.evaluate(() => new Promise(resolve => {
+        const old = document.querySelector('#main-content .table-wrap.tall + .mn-grip.is-dragging, #main-content .table-wrap.medium + .mn-grip.is-dragging');
+        const wrap = old && old.previousElementSibling, host = wrap && wrap.parentElement;
+        if (!host) { resolve(null); return; }
+        const copy = host.cloneNode(true);
+        copy.querySelectorAll('.mn-grip').forEach(g => g.remove());
+        copy.querySelectorAll('.table-wrap').forEach(w => w.removeAttribute('style'));
+        host.innerHTML = copy.innerHTML;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const now = host.querySelector('.table-wrap.tall, .table-wrap.medium');
+          resolve({ fresh: !!now && now !== wrap, gone: !wrap.isConnected, h: now ? now.getBoundingClientRect().height : null,
+                    dragging: !!(now && now.nextElementSibling && now.nextElementSibling.classList.contains('is-dragging')) });
+        }));
+      }));
+      check('a table drawn again mid-drag comes back at the height it had been dragged to, its handle still held',
+        redrawn && redrawn.fresh && redrawn.gone && near(redrawn.h, tMin.h + 60, 3) && redrawn.dragging, J(redrawn));
+      await page.mouse.move(x, y + 90);
+      await page.mouse.move(x, y + 120);
+      await page.mouse.up();
+      await page.waitForTimeout(80);
+      const tOn = await readTable(page);
+      const sOn = await stored(page);
+      check('…and the drag carries on to where the pointer is let go: 120 px taller, kept, and nothing left held',
+        near(tOn.h, tMin.h + 120, 3) && near(sOn[key], tOn.h, 3)
+          && await page.evaluate(() => !document.body.classList.contains('mn-grip-dragging') && !document.querySelector('.mn-grip.is-dragging')),
+        J({ h: tOn.h, stored: sOn[key] }));
+    }
+
     // ── 4. Put back when the tab draws it again ──────────────────────────────
     log('\n4. Put back when the tab draws the card again\n');
     await drag(page, await inView(page), 200);
@@ -228,6 +283,23 @@ async function main() {
     await page.keyboard.press('ArrowUp');
     const k2 = await readTable(page);
     check('↑: 40 px shorter', near(k2.h, k1.h - 40, 2), J(k2.h));
+    // Drawn again with the keyboard on its handle (as Repeaters does while its
+    // late readings arrive): the new table's handle has the keyboard, and the
+    // next key is its.
+    const kept = await page.evaluate(() => new Promise(resolve => {
+      const old = document.activeElement;
+      const wrap = old && old.classList.contains('mn-grip') && old.previousElementSibling, host = wrap && wrap.parentElement;
+      if (!host) { resolve(null); return; }
+      const copy = host.cloneNode(true);
+      copy.querySelectorAll('.mn-grip').forEach(g => g.remove());
+      copy.querySelectorAll('.table-wrap').forEach(w => w.removeAttribute('style'));
+      host.innerHTML = copy.innerHTML;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const at = document.activeElement;
+        resolve({ fresh: at !== old, grip: !!at && at.classList.contains('mn-grip') && at.isConnected });
+      }));
+    }));
+    check('a table drawn again while its handle has the keyboard: the new handle has it', kept && kept.fresh && kept.grip, J(kept));
     await page.keyboard.press('End');
     const k3 = await readTable(page);
     check('End fills the window', near(k3.h, Math.min(Math.round(900 * 0.85), k3.scroll + 2), 3), J(k3.h));

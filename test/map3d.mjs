@@ -2982,12 +2982,17 @@ const out2 = await rail3dLook();
 ok('…from a shut side panel: opened on the 3-D settings — remembered as shut while it is — and shut again by ⛰️, still in 3-D',
    in2.showing === 'map-3d' && in2.storedOpen === 'collapsed' && out2.showing === null && out2.on3d && out2.ring,
    JSON.stringify({ in2, out2 }));
-// 🧹 Clear the selection leaves the view alone: 3-D is not a selection.
+// 🧹 Clear the selection leaves nothing on, 3-D included (96732bc: "Clear the
+// selection also leaves 3-D and the digital twin and switches off Latency
+// colouring") — so no ring is left in the strip.
 await page.evaluate(() => clearStationsMapSelection());
-await page.waitForTimeout(150);
-const kept = await rail3dLook();
-ok('🧹 Clear the selection leaves the map in 3-D', kept.on3d && kept.ring, JSON.stringify(kept));
-// Still in 3-D for the teardown below, which is about leaving the tab with it on.
+await flat3d();
+const swept = await rail3dLook();
+ok('🧹 Clear the selection leaves 3-D too: the map is flat, ⛰️ has no ring and its pane would say Enter 3-D',
+   !swept.on3d && !swept.ring && swept.pressed === 'false' && swept.leave === 'Enter 3-D', JSON.stringify(swept));
+// Back into 3-D for the teardown below, which is about leaving the tab with it on.
+await btn3d.click();
+await tilted3d();
 await page.evaluate(() => setDockTab('stations'));
 await tilted3d();
 
