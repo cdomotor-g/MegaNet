@@ -38,6 +38,10 @@
 //      back, a laptop woken) is kept, not signed out, and refreshed once, not
 //      twice; back online, the retry signs in properly. A refresh GoTrue
 //      itself refuses still signs out.
+//   8. **A sign-in the browser keeps** — with localStorage full the session
+//      still survives a reload; a browser that keeps nothing says so and
+//      where to change it; and another tab's refresh, sign-out and sign-in
+//      are followed, so no tab sends a refresh token that has been spent.
 //
 // Why a check of its own: every failure here is a door that looks shut or
 // open when it is the other. A sign-up that never says it is waiting, a code
@@ -94,9 +98,22 @@ async function main() {
   // refusal if `refuse`, else a session.
   const refreshes = { down: 0, refuse: false };
 
-  async function open(url, { nudge = false, store = null, viewport = { width: 1440, height: 900 } } = {}) {
+  // `refuse`: 'storage' has localStorage turn the session down, as a full one
+  // does; 'all' has the cookie refused as well, as a browser set to keep
+  // nothing for the site does.
+  async function open(url, { nudge = false, store = null, refuse = null, viewport = { width: 1440, height: 900 } } = {}) {
     const context = await browser.newContext({ viewport });
     const page = await context.newPage();
+    if (refuse) {
+      await page.addInitScript(what => {
+        const set = Storage.prototype.setItem;
+        Storage.prototype.setItem = function (k, v) {
+          if (this === localStorage && k === 'meganet.session') throw new DOMException('full', 'QuotaExceededError');
+          return set.call(this, k, v);
+        };
+        if (what === 'all') Object.defineProperty(document, 'cookie', { get: () => '', set() {}, configurable: true });
+      }, refuse);
+    }
     await applyNetworkPolicy(page, server.origin);
     const auth = async route => {
       const req = route.request();
@@ -625,6 +642,68 @@ async function main() {
       refreshes.refuse = false;
       await context.close();
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    log('\n8. A sign-in the browser keeps\n');
+    const LANDING = '/index.html?tab=stations#access_token=tok-sam&refresh_token=r-tok-sam&expires_in=3600&token_type=bearer';
+    const toasts = page => page.evaluate(() => document.body.innerText.includes('not letting Flood-Net save anything'));
+    {
+      // localStorage will not take the session (full): it is kept all the same.
+      const b8 = sent.length;
+      const { context, page } = await open(server.url(LANDING), { refuse: 'storage' });
+      await page.waitForFunction(() => Auth.known(), null, { timeout: 10_000 });
+      const first = await page.evaluate(() => ({ in: Auth.isSignedIn(), ls: !!localStorage.getItem('meganet.session'),
+        cookie: /mn_keep=/.test(document.cookie), access: /tok-sam/.test(decodeURIComponent(document.cookie).replace(/r-tok-sam/g, '')) }));
+      check('with localStorage full the sign-in is kept another way, without the access token',
+        first.in && !first.ls && first.cookie && !first.access, J(first));
+      check('…and nothing is said, because it will survive a reload', !await toasts(page));
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForFunction(() => typeof Auth !== 'undefined' && Auth.known(), null, { timeout: LOAD_TIMEOUT });
+      const again = await page.evaluate(() => ({ in: Auth.isSignedIn(), token: Auth.accessToken(),
+        header: document.getElementById('btn-auth').textContent.trim() }));
+      check('after a reload the person is still signed in, on a refreshed token',
+        again.in && again.token === 'tok-sam' && /sam/.test(again.header) && sentTo('token', b8).length === 1
+          && sentTo('logout', b8).length === 0, J(again));
+      await page.evaluate(() => Auth.signOut());
+      await page.waitForFunction(() => !Auth.isSignedIn(), null, { timeout: 10_000 });
+      check('signing out forgets it', await page.evaluate(() => !/mn_keep=[^;]/.test(document.cookie)));
+      await context.close();
+    }
+    {
+      // A browser that keeps nothing for the site: the person is told why.
+      const { context, page } = await open(server.url(LANDING), { refuse: 'all' });
+      await page.waitForFunction(() => Auth.known(), null, { timeout: 10_000 });
+      await page.waitForFunction(() => document.body.innerText.includes('not letting Flood-Net save anything'), null, { timeout: 10_000 }).catch(() => {});
+      check('a browser that will keep nothing says so, and where to change it',
+        await toasts(page) && await page.evaluate(() => Auth.isSignedIn() && /Site settings/.test(document.body.innerText)));
+      await context.close();
+    }
+    {
+      // Another tab: its refresh, its sign-out and its sign-in are followed.
+      const mine = { access_token: 'tok-sam', refresh_token: 'r-tok-sam', expires_at: Date.now() + 3600e3, email: 'sam@bom.gov.au' };
+      const b8 = sent.length;
+      const { context, page } = await open(server.url('/index.html?tab=stations'), { store: mine });
+      await page.waitForFunction(() => Auth.known(), null, { timeout: 10_000 });
+      const tell = v => page.evaluate(v => {
+        if (v) localStorage.setItem('meganet.session', JSON.stringify(v)); else localStorage.removeItem('meganet.session');
+        window.dispatchEvent(new StorageEvent('storage', { key: 'meganet.session' }));
+      }, v);
+      await tell({ access_token: 'tok-sam-2', refresh_token: 'r-tok-sam-2', expires_at: Date.now() + 3600e3, email: 'sam@bom.gov.au' });
+      const taken = await page.evaluate(() => ({ token: Auth.accessToken(),
+        stored: JSON.parse(localStorage.getItem('meganet.session')).refresh_token }));
+      check('a refresh made in another tab is taken up here, so the spent token is never sent again',
+        taken.token === 'tok-sam-2' && taken.stored === 'r-tok-sam-2' && sentTo('token', b8).length === 0, J(taken));
+      await tell(null);
+      await page.waitForFunction(() => !Auth.isSignedIn(), null, { timeout: 10_000 }).catch(() => {});
+      const out = await page.evaluate(() => ({ in: Auth.isSignedIn(), header: document.getElementById('btn-auth').textContent.trim() }));
+      check('a sign-out in another tab signs this one out, with nothing more sent to the server',
+        !out.in && /Sign in/.test(out.header) && sentTo('logout', b8).length === 0, J(out));
+      await tell(mine);
+      await page.waitForFunction(() => Auth.isSignedIn() && Auth.known(), null, { timeout: 10_000 }).catch(() => {});
+      const inAgain = await page.evaluate(() => ({ in: Auth.isSignedIn(), header: document.getElementById('btn-auth').textContent.trim() }));
+      check('a sign-in in another tab signs this one in', inAgain.in && /sam/.test(inAgain.header), J(inAgain));
+      await context.close();
+    }
   } finally {
     await browser.close();
     server.close();
@@ -634,7 +713,7 @@ async function main() {
   const failed = results.filter(r => !r.ok);
   log(failed.length
     ? `\nFAIL — ${failed.length} of ${results.length}:\n${failed.map(f => `  ✗ ${f.label}`).join('\n')}`
-    : `\nPASS — accounts: the visitor note, a password, a new account waiting, a reset, and an administrator deciding, and a refresh with no answer kept (${results.length} checks).`);
+    : `\nPASS — accounts: the visitor note, a password, a new account waiting, a reset, and an administrator deciding, a refresh with no answer kept, and a sign-in the browser keeps (${results.length} checks).`);
   process.exit(failed.length ? 1 : 0);
 }
 

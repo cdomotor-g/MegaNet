@@ -183,18 +183,73 @@ const Auth = (function () {
 
   // ── session plumbing ──
 
-  function load() {
+  // The session is kept in localStorage, and — only when that will not take it
+  // — in a cookie. Seen 11 Nov 2026: a person on Chrome asked to sign in again
+  // at every reload, with nothing refused in the auth log, so the browser had
+  // never kept the session. Two ways that happens on our side of things:
+  //
+  //   · the site's 5 MB of localStorage is full (the tabs keep a lot there), so
+  //     setItem throws and the session lived in memory only. Removing the old
+  //     session first makes room for the new one; failing that the cookie,
+  //     which has its own allowance, holds just enough to refresh from.
+  //   · another tab (below, follow) spending the single-use refresh token.
+  //
+  // What is left is the browser refusing to keep anything for this site at
+  // all — Chrome's "on-device site data" set to don't allow, or a policy —
+  // where the cookie is refused too. Nothing here can fix that, so sayKept()
+  // tells the person what to change rather than leaving them to wonder.
+  const COOKIE = 'mn_keep';
+  const COOKIE_MAX_AGE = 400 * 24 * 3600;     // the longest Chrome allows
+  let kept = true;         // false: this session will not survive a reload
+
+  function cookieWrite(value, age) {
     try {
-      const raw = localStorage.getItem(KEY);
-      return raw ? JSON.parse(raw) : null;
+      document.cookie = `${COOKIE}=${value}; Path=/; Max-Age=${age}; SameSite=Strict`
+        + (location.protocol === 'https:' ? '; Secure' : '');
+    } catch (_) { /* cookies refused */ }
+  }
+
+  function cookieRead() {
+    try {
+      const m = document.cookie.match(new RegExp(`(?:^|; )${COOKIE}=([^;]*)`));
+      const s = m ? JSON.parse(decodeURIComponent(m[1])) : null;
+      return s && s.refresh_token ? s : null;
     } catch (_) { return null; }
   }
 
-  function store(s) {
+  function load() {
     try {
-      if (s) localStorage.setItem(KEY, JSON.stringify(s));
-      else localStorage.removeItem(KEY);
-    } catch (_) { /* private mode; this session lives in memory only */ }
+      const raw = localStorage.getItem(KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (_) { /* blocked, or not JSON: the cookie, if there is one */ }
+    return cookieRead();
+  }
+
+  function store(s) {
+    if (!s) {
+      try { localStorage.removeItem(KEY); } catch (_) { /* nothing was kept there */ }
+      cookieWrite('', 0);
+      kept = true;
+      return;
+    }
+    const raw = JSON.stringify(s);
+    let ok = false;
+    try {
+      localStorage.setItem(KEY, raw);
+      ok = true;
+    } catch (_) {
+      // Full: the session already there is about to be out of date anyway, and
+      // taking it out is what makes room for this one.
+      try { localStorage.removeItem(KEY); localStorage.setItem(KEY, raw); ok = true; } catch (__) { /* the cookie, then */ }
+    }
+    if (ok) { cookieWrite('', 0); kept = true; return; }
+    // Only what a reload needs to get a session back: an access token is over a
+    // kilobyte and a cookie holds four. expires_at 0 makes start() refresh.
+    cookieWrite(encodeURIComponent(JSON.stringify({
+      refresh_token: s.refresh_token, expires_at: 0, email: s.email || null, ...(s.via ? { via: s.via } : {}),
+    })), COOKIE_MAX_AGE);
+    const back = cookieRead();
+    kept = !!(s.refresh_token && back && back.refresh_token === s.refresh_token);
   }
 
   // Everything that has to happen for a token to count as adopted, in one place
@@ -205,6 +260,32 @@ const Auth = (function () {
     store(s);
     dbSetAccessToken(s ? s.access_token : null);
     scheduleRefresh();
+  }
+
+  // A session another tab stored: taken up here, not written back.
+  function take(s) {
+    session = s;
+    retries = 0;
+    dbSetAccessToken(s ? s.access_token : null);
+    scheduleRefresh();
+  }
+
+  // The stored session changed under this tab — another tab refreshed, signed
+  // in or signed out. Follow it, so that no tab is left holding a refresh
+  // token that has been spent, or a name for somebody who has signed out.
+  function follow(e) {
+    if (e.key !== KEY && e.key !== null) return;
+    const s = load();
+    if (s && s.refresh_token && s.access_token) {
+      if (session && session.refresh_token === s.refresh_token) return;
+      const fresh = !session;
+      take(s);
+      if (fresh) { hideNudge(); settle(); }
+    } else if (!s && session) {
+      // Signed out over there, which ended the session at GoTrue as well:
+      // nothing to tell the server, and nothing to take out of storage.
+      signOut({ announce: false, server: false });
+    }
   }
 
   function fromTokenResponse(body, email) {
@@ -246,6 +327,19 @@ const Auth = (function () {
 
   async function redeem() {
     if (!session || !session.refresh_token) return false;
+    // Another tab may have spent this refresh token already and stored what it
+    // got. Sending the old one again is what GoTrue calls reuse, and outside
+    // its ten seconds' grace it ends the session in every tab.
+    const theirs = load();
+    if (theirs && theirs.refresh_token && theirs.refresh_token !== session.refresh_token
+        && theirs.access_token && theirs.expires_at - Date.now() > REFRESH_MARGIN_MS) {
+      take(theirs);
+      if (settleLater) { settleLater = false; settle(); }
+      return true;
+    }
+    // Stored by a tab that could keep no more than the refresh token (store's
+    // cookie): that one is the live one, and ours is spent.
+    if (theirs && theirs.refresh_token) session.refresh_token = theirs.refresh_token;
     try {
       const body = await post(`token?grant_type=refresh_token`,
                               { refresh_token: session.refresh_token });
@@ -523,6 +617,7 @@ const Auth = (function () {
     hideNudge();
     tabsAuthChanged();
     sayStanding();
+    sayKept();
   }
 
   async function signIn(e) {
@@ -804,8 +899,8 @@ const Auth = (function () {
   // a token the database disowns) are cleaning up and should still be allowed
   // to recover through the door. `everywhere` ends every session the account
   // has, on every device — GoTrue's global scope.
-  async function signOut({ announce = true, suppressGate = announce, everywhere = false } = {}) {
-    const token = session && session.access_token;
+  async function signOut({ announce = true, suppressGate = announce, everywhere = false, server = true } = {}) {
+    const token = server && session && session.access_token;
     if (suppressGate) {
       try { sessionStorage.setItem(NO_GATE_KEY, '1'); } catch (_) { /* memory only */ }
     }
@@ -1012,6 +1107,18 @@ const Auth = (function () {
       Toast.show(`${n} account${n === 1 ? ' is' : 's are'} waiting for your approval — on the Admin tab.`,
                  { kind: 'note', ms: 9000 });
     }
+  }
+
+  // Said at each sign-in the browser will not keep, because the next thing the
+  // person meets is the sign-in form again with no reason given. Where storage
+  // is refused outright the whole site's settings are forgotten too.
+  function sayKept() {
+    if (kept || told.kept || !session || typeof Toast === 'undefined') return;
+    told.kept = true;
+    Toast.show('Signed in — but this browser is not letting Flood-Net save anything, so it will ask you to sign in '
+      + 'again when the page is reloaded. In Chrome or Edge: press the icon at the left of the address bar → Site '
+      + 'settings → set “On-device site data” (or “Cookies and site data”) to Allow, then sign in once more.',
+      { kind: 'note', ms: 20000 });
   }
 
   // ── panel ──
@@ -1642,6 +1749,7 @@ const Auth = (function () {
 
     window.addEventListener('online', wake);
     document.addEventListener('visibilitychange', wake);
+    window.addEventListener('storage', follow);
   }
 
   // The rest of start(), once the token held is one the database can be asked
@@ -1657,6 +1765,7 @@ const Auth = (function () {
     if (typeof rerenderStationEditorCard === 'function') rerenderStationEditorCard();
     tabsAuthChanged();
     sayStanding();
+    sayKept();
   }
 
   // Back on screen, or back online: a token that fell due meanwhile is
