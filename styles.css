@@ -10726,13 +10726,25 @@ body .map-panel.is-driving {
   background: transparent;
 }
 
+/* The survey marks, bridges and other marks of the ground's own layers,
+   copied into the glass (map-magnify.js, syncMarks): over its map, under the
+   lines and the pins' dots. Each copy is placed by its own transform. */
+.mn-magnify-marks {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.mn-magnify-marks > * { pointer-events: none !important; }
+
 /* The stations' small dots and faint names (map-magnify.js, drawPins), over
    the glass's map — which z 0 above keeps as one layer, so its panes' own
    z-indexes cannot climb over this — and inside the lens's circle. */
 .mn-magnify-pins {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: 2;
   width: 100%;
   height: 100%;
   pointer-events: none;

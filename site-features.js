@@ -496,13 +496,14 @@ const SiteFeatures = (function () {
     if (isLine) {
       L.polyline(pts, { color: LOOK.casing, opacity: sel ? LOOK.casingOpacitySel : LOOK.casingOpacity,
                         weight: sel ? LOOK.casingWeightSel : LOOK.casingWeight,
-                        lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(layer);
+                        lineCap: 'round', lineJoin: 'round', interactive: false,
+                        mnGround: true }).addTo(layer);   // in the magnifier's glass too (map-magnify.js)
       // A dashed run squared off at its ends: Leaflet's round caps lengthen
       // every dash by half the weight each way, and close a short gap
       // (docs/design-system.md, the health pins).
       const line = L.polyline(pts, { color: safeColour(k.colour), weight: sel ? LOOK.weightSel : LOOK.weight, opacity: 1,
                                      dashArray: k.dash || null, lineCap: k.dash ? 'butt' : 'round', lineJoin: 'round',
-                                     bubblingMouseEvents: false });
+                                     bubblingMouseEvents: false, mnGround: true });
       line.bindTooltip(`${esc(title)} · ${esc(measureText(f, s))}`,
                        { sticky: true, direction: 'top', offset: [0, -10], className: 'mn-sf-tip' });
       line.on('click', e => { L.DomEvent.stop(e); onFeatureClick(f, e.latlng); });

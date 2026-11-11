@@ -25,6 +25,15 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 264, date: '2026-11-11', items: [
+      '🔍 <strong>The magnifier shows the property lines now.</strong> Whatever the Stations map is drawing of the ground itself is '
+        + 'inside the glass too, closer up: property boundaries with their lot numbers, easements, land tenure, road reserves and '
+        + 'road owners, rivers, council areas, contours, survey marks, bridges and site features. The radio paths still stay out. '
+        + 'Rest the glass for a moment and the lines sharpen.',
+      '🛣️ <strong>The road and the bridge, in the property tooltip.</strong> In <em>Property &amp; easements</em> and '
+        + '<em>Land &amp; tenure</em>, rest the pointer on the land and the tooltip adds the nearest road, how far away it is and '
+        + 'who manages it, and the nearest bridge — the same answer a station card gives under <em>Road and bridge</em>.',
+    ] },
     { n: 263, date: '2026-11-11', items: [
       '🎨 <strong>A message\'s bits, in colour.</strong> Open a row on the 📜 Message Log and <em>On the wire</em> now draws the whole '
         + 'message the way the 🧪 Bit Bench does: an ALERT message as its four words of ten bits, an ALERT2 reading as its four bytes — '

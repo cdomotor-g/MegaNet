@@ -33,6 +33,11 @@
 //     lot on plan first, its area and tenure, the easements over the spot
 //     (with Easements on: or "no easement here"), the street address, and
 //     where — the locality and the council.
+//   * In both, once the pointer has rested: the nearest road within 150 m and
+//     who manages it, and the nearest bridge — the station card's "Road and
+//     bridge — who manages them" (site-roads.js), a line each. Asked for in
+//     these words (11 Nov 2026): "please add the road and bridge details to
+//     the tooltip in property views".
 // A road reserve or a watercourse says so in place of a lot. Never who owns a
 // lot: Queensland does not publish it (site-land.js says why), and Flood-Net
 // holds no landholder's name.
@@ -43,7 +48,11 @@
 // (simplified to about a pixel), so moving about inside the same lot asks
 // nothing more; the easements in that lot's box come with a second question,
 // once a lot and only while Easements is on; the address is asked once a lot;
-// the land use once a land-use area, only while the tenure tint is on. An
+// the land use once a land-use area, only while the tenure tint is on. The
+// road and the bridge are three questions (the roads, and the two bridge
+// registers) once the pointer has rested ROAD_PAUSE_MS on a spot — spots a few
+// metres apart are one spot (ROAD_GRID), and site-roads.js keeps the answers,
+// so the same ground is asked about once a visit. An
 // answer still out when the pointer moves on is abandoned; a failure is not
 // asked again for FAIL_MS, and the tip says the State could not be read.
 //
@@ -59,9 +68,12 @@ const MapPropTip = (function () {
   const FAIL_MS = 30000;      // a failed question is not asked again for this long
   const KEEP = 60;            // lots and land-use areas kept, newest first
   const OFFSET_PX = 1.5;      // outlines simplified to about this many screen pixels
+  const ROAD_PAUSE_MS = 500;  // the pointer rests this long before the road and bridge are asked
+  const ROAD_GRID = 20000;    // …of a spot on a grid of 1/20000° — about 5 m
 
   let map = null, tip = null, moveRaf = null, timer = null, ctl = null;
   let failedAt = 0, asked = 0, lastLL = null, lastText = '';
+  let roadTimer = null, roadWatched = false;
   const lots = [];            // { box, rings, main, others, ease: null | [...] , easeAsked }
   const uses = [];            // { box, rings, f }
   const addrs = new Map();    // lotplan → { list } | 'asking' | 'failed'
@@ -261,6 +273,32 @@ const MapPropTip = (function () {
   const sameSpot = (a, b) => Math.abs(a.lat - b.lat) < 1e-9 && Math.abs(a.lng - b.lng) < 1e-9;
   const failedText = () => ({ head: 'The State’s cadastre could not be read just now', lines: ['What is here? asks again for one point'] });
 
+  // ── The road and the bridge beside the spot ───────────────────────────────
+  const roadSpot = ll => ({ id: 'tip', lat: Math.round(ll.lat * ROAD_GRID) / ROAD_GRID,
+                            lon: Math.round(ll.lng * ROAD_GRID) / ROAD_GRID });
+  // The lines known now for the spot; and, when it has not been asked about,
+  // the question once the pointer has rested there.
+  function roadLines(ll) {
+    if (typeof SiteRoads === 'undefined' || typeof SiteRoads.brief !== 'function') return [];
+    if (!roadWatched) {
+      roadWatched = true;
+      SiteRoads.watch(k => { if (lastLL && SiteRoads.key(roadSpot(lastLL)) === k) refresh(); });
+    }
+    const spot = roadSpot(ll);
+    const b = SiteRoads.brief(spot);
+    if (!b) return [];
+    if (!b.asked && !roadTimer) {
+      roadTimer = setTimeout(() => {
+        roadTimer = null;
+        if (!lastLL || busy() || !drawn()) return;
+        SiteRoads.askPoint(roadSpot(lastLL));
+        refresh();
+      }, ROAD_PAUSE_MS);
+    }
+    return b.lines;
+  }
+  const stopRoad = () => { clearTimeout(roadTimer); roadTimer = null; };
+
   // ── What it says ───────────────────────────────────────────────────────────
   function content(lot, ll, w) {
     const parts = P();
@@ -309,6 +347,7 @@ const MapPropTip = (function () {
     }
     if (lot.others.length) lines.push(`On the line with ${lot.others.map(o => parts.parcelWords(o)).join(', ')}`);
     if (where) lines.push(where);
+    lines.push(...roadLines(ll));
     return { head, lines };
   }
 
@@ -317,14 +356,31 @@ const MapPropTip = (function () {
       + c.lines.filter(Boolean).map(l => `<div class="mn-prop-tip-l">${esc(l)}</div>`).join('');
   }
 
+  // Where the tip stands from the pointer: just above it — or, while the
+  // magnifier's glass is round the pointer (map-magnify.js), clear of the
+  // glass, on the first side with room for it: above, right, left, below.
+  const TIP_H = 165, TIP_W = 270;   // about the room a full tip takes
+  function standing(ll) {
+    const r = typeof MapMagnify !== 'undefined' && typeof MapMagnify.radius === 'function' ? MapMagnify.radius() : 0;
+    if (!r) return { direction: 'top', offset: [0, -10] };
+    const p = map.latLngToContainerPoint(ll), box = map.getContainer();
+    if (p.y - r >= TIP_H) return { direction: 'top', offset: [0, -(r + 8)] };
+    if (box.clientWidth - p.x - r >= TIP_W) return { direction: 'right', offset: [r + 8, 0] };
+    if (p.x - r >= TIP_W) return { direction: 'left', offset: [-(r + 8), 0] };
+    return { direction: 'bottom', offset: [0, r + 22] };
+  }
+
   function show(ll, c) {
     if (!map) return;
     const body = html(c);
     lastText = [c.head, ...c.lines].filter(Boolean).join('\n');
+    const st = standing(ll);
     if (!tip) {
-      tip = L.tooltip({ className: 'mn-road-label mn-prop-tip', direction: 'top', offset: [0, -10], interactive: false })
+      tip = L.tooltip({ className: 'mn-road-label mn-prop-tip', ...st, interactive: false })
         .setContent(body).setLatLng(ll).addTo(map);
     } else {
+      tip.options.direction = st.direction;
+      tip.options.offset = st.offset;
       tip.setLatLng(ll).setContent(body);
     }
   }
@@ -342,8 +398,13 @@ const MapPropTip = (function () {
     const lot = lotAt(ll);
     if (!lot) return;
     // A road reserve with the road reserves on is named by their own label
-    // (map-roads.js); two names for one road would be one too many.
-    if ((lot.main.kind === 'road' || lot.main.kind === 'junction') && state.mapRoads) { hide(); return; }
+    // (map-roads.js); two names for one road would be one too many. So here
+    // the tip is only the road and the bridge, once they are known.
+    if ((lot.main.kind === 'road' || lot.main.kind === 'junction') && state.mapRoads) {
+      const lines = roadLines(ll);
+      if (lines.length) show(ll, { head: 'Road and bridge', lines }); else hide();
+      return;
+    }
     if (w.easements && !lot.easeAsked) askEasements(lot);
     if (!w.tenure && lot.main.kind === 'lot') askAddress(lot.main);
     if (w.tenure && !useAt(ll) && !timer) timer = setTimeout(() => { timer = null; if (lastLL && !useAt(lastLL)) askUse(lastLL); }, PAUSE_MS);
@@ -356,16 +417,22 @@ const MapPropTip = (function () {
   const onPress = ev => { press = { type: ev.pointerType || '', at: Date.now() }; };
   const fingerLately = () => press.type === 'touch' && Date.now() - press.at < 1200;
 
+  // The frame answers for the latest move in it, not the first: the pointer
+  // comes to rest on its last one.
+  let nextLL = null;
   function onMove(e) {
-    if (!map || moveRaf) return;
+    if (!map) return;
     const ev = e && e.originalEvent;
     if (ev && ev.pointerType && ev.pointerType === 'touch') return;
     if (fingerLately()) return;
-    const ll = e.latlng;
+    nextLL = e.latlng;
+    if (moveRaf) return;
     moveRaf = requestAnimationFrame(() => {
       moveRaf = null;
+      const ll = nextLL;
       lastLL = ll;
       clearTimeout(timer); timer = null;
+      stopRoad();
       const w = drawn();
       if (!w || busy() || !inQld(ll)) { hide(); return; }
       if (lotAt(ll)) { refresh(); return; }
@@ -387,6 +454,7 @@ const MapPropTip = (function () {
       const w = drawn();
       if (!w || busy() || !inQld(ll)) { hide(); return; }
       clearTimeout(timer); timer = null;
+      stopRoad();
       lastLL = ll;
       if (lotAt(ll)) refresh(); else askHere(ll);
     }, 0);
@@ -395,6 +463,7 @@ const MapPropTip = (function () {
   function onOut() {
     lastLL = null;
     clearTimeout(timer); timer = null;
+    stopRoad();
     if (ctl) { ctl.abort(); ctl = null; }
     hide();
   }

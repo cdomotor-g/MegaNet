@@ -260,7 +260,7 @@ const Capabilities = (function () {
           what: 'Press any spot for its height, land cover, wind region, basin, council, land, road owner, mobile signal and nearest stations.',
           src: 'Queensland Government, Esri' },
         { name: 'Magnifier', tab: 'stations', where: 'map › Magnifier',
-          what: 'A glass that follows the mouse and shows the ground under the pins, names and lines, closer up — the pins as small dots, their names faint, the lines left out.',
+          what: 'A glass that follows the mouse and shows the ground under the pins, names and lines, closer up — the pins as small dots, their names faint, the property lines, roads, rivers and survey marks the map is drawing kept, the radio paths left out.',
           src: 'Esri, Queensland Government, NSW Spatial Services, OpenStreetMap, OpenTopoMap', find: 'zoom loupe lens magnify hide pins labels imagery' },
         { name: 'Find a place', tab: 'stations', where: 'side panel › Find a place', open: { dock: 'places' },
           what: 'Street addresses, coordinates, towns, basins, survey marks, rivers and councils — a pin and an outline where it is.',

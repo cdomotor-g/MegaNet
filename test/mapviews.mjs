@@ -1298,6 +1298,33 @@ try {
       return json(route, { features: [{ attributes: { address: '12 Example Road, Gatton' } }] });
     });
     await pg.route(/LandUse\/MapServer\/0\/query\?/, route => { asked.push('use'); return json(route, { features: [USE] }); });
+    // The road and the bridge beside the spot (site-roads.js, through the tip):
+    // a State-controlled street along the lot's north side, with a bridge on it.
+    const ROAD_LAYERS = {
+      RoadsAndTracks: { layers: [{ id: 24, name: 'Bridges' }, { id: 11, name: 'Roads and tracks' }] },
+      StateRoadInformation: { layers: [{ id: 9, name: 'State controlled bridge' }] },
+    };
+    const ROAD_DATA = {
+      'RoadsAndTracks/11': [{ type: 'Feature', properties: { road_name_full: 'Example Street', class: 'Highway', road_owner: 'TMR',
+          road_maintainer: 'TMR', scr_indicator: 'T', nat_route_no: '', ste_route_no: '', user_access: 'Public',
+          lga_name_left: 'Lockyer Valley Regional', lga_name_right: 'Lockyer Valley Regional' },
+        geometry: { type: 'LineString', coordinates: [[C.lng - 0.01, C.lat + 0.0009], [C.lng + 0.01, C.lat + 0.0009]] } }],
+      'RoadsAndTracks/24': [],
+      'StateRoadInformation/9': [{ type: 'Feature', properties: { name: 'Example Creek Bridge', struc_id: 777, struc_type: 'Bridge',
+          cons_type: 'Deck Unit', cons_mtrl: 'Concrete', rsect_name: 'Example Street', road_code: 'ON' },
+        geometry: { type: 'Point', coordinates: [C.lng - 0.0012, C.lat + 0.0009] } }],
+    };
+    await pg.route(/arcgis\/rest\/services\/Transportation\//, route => {
+      const u = new URL(route.request().url());
+      const m = u.pathname.match(/Transportation\/(RoadsAndTracks|StateRoadInformation)\/MapServer(?:\/(\d+|export)(?:\/query)?)?$/);
+      if (!m) return route.fulfill({ status: 404, body: 'not found' });
+      if (!m[2]) return json(route, ROAD_LAYERS[m[1]]);
+      if (m[2] === 'export') return route.abort();
+      // The tip's question is a box 300 m across; the road owners' layer asks about the whole view.
+      const env = (u.searchParams.get('geometry') || '').split(',').map(Number);
+      if (env.length === 4 && env[2] - env[0] < 0.01) asked.push('road');
+      return json(route, { type: 'FeatureCollection', features: ROAD_DATA[`${m[1]}/${m[2]}`] || [] });
+    });
     await pg.goto(server.url('/index.html?tab=stations'), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
     await pg.waitForFunction(() => typeof state !== 'undefined' && !!state.data && !!state.map
       && state.mapMarkers.length > 1000, null, { timeout: LOAD_TIMEOUT });
@@ -1323,10 +1350,20 @@ try {
       /Lot 3 on RP12345/.test(west.text) && /5\.20 ha · Reserve/.test(west.text) && /No easement here/.test(west.text)
         && /Address: 12 Example Road, Gatton/.test(west.text) && /Gatton · Lockyer Valley Regional Council/.test(west.text)
         && west.shown, J({ west, asked }));
-    const before = asked.length;
+    const roadAsks = () => asked.filter(a => a === 'road').length;
+    const rested = await hover(-0.0012, 0.0004, 1600);
+    check('…and, the pointer rested: the nearest road and who manages it, and the nearest bridge',
+      /Road: Example Street · \d+ m away/.test(rested.text) && /Managed by: Transport and Main Roads — State-controlled/.test(rested.text)
+        && /Bridge: Example Creek Bridge · \d+ m away · Transport and Main Roads/.test(rested.text)
+        && /Lot 3 on RP12345/.test(rested.text) && roadAsks() === 3, J({ rested, asked }));
+    const again = await hover(-0.0012, 0.0004, 900);
+    check('…the same spot again asks about its road and bridge no more', /Road: Example Street/.test(again.text) && roadAsks() === 3,
+      J({ again, asked }));
+    const landAsks = () => asked.filter(a => a !== 'road').length;
+    const before = landAsks();
     const east = await hover(0.0012, -0.0004, 600);
-    check('…over the easement, it is named — and moving about inside the lot asks the State nothing more',
-      /Easement A on SP99999 — under the pointer/.test(east.text) && asked.length === before, J({ east, asked }));
+    check('…over the easement, it is named — and moving about inside the lot asks the State nothing more about the land',
+      /Easement A on SP99999 — under the pointer/.test(east.text) && landAsks() === before, J({ east, asked }));
     await pg.evaluate(() => MapViews.apply('land'));
     await pg.waitForTimeout(1200);
     await hover(-0.0011, 0.0003, 200);

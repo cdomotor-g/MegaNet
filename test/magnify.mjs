@@ -24,6 +24,10 @@
 //   8. **A phone** — the glass takes the finger: dragged, it moves and the map
 //      does not; tapped, it steps the power.
 //
+//   9. **The ground's own layers** — a property picture, a road reserve and a
+//      survey mark the map draws are in the glass (the picture asked again at
+//      the glass's scale); a radio path is not.
+//
 // Why a check of its own: every failure here is a page that looks fine. A line
 // that got into the glass, a pin drawn full size or not at all, a glass that zooms the map with the power, a lens
 // still fetching tiles behind another tab, a pointer left hidden after the
@@ -175,7 +179,7 @@ async function main() {
       under.near > 0 && S.m.pins >= under.near && S.m.pinR > 0 && S.m.pinR < under.r / 2,
       J({ under, pins: S.m.pins, pinR: S.m.pinR }));
     check('…on a layer of their own over the glass\'s map and inside its circle, not in that map',
-      under.cv.inLens && !under.cv.inMap && under.cv.z === '1' && near(under.cv.w, S.centre.d, 1), J(under.cv));
+      under.cv.inLens && !under.cv.inMap && under.cv.z === '2' && near(under.cv.w, S.centre.d, 1), J(under.cv));
     // Close in on one station, where the map names the pins in view: its name
     // is in the glass too, faint.
     const named = await page.evaluate(() => {
@@ -327,6 +331,98 @@ async function main() {
     await context.close();
 
     // ═══════════════════════════════════════════════════════════════════════
+    log('\nThe ground\'s own layers (1440 × 900)\n');
+    {
+      const gctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const gp = await gctx.newPage();
+      await applyNetworkPolicy(gp, server.origin);
+      gp.on('pageerror', e => errors.push(String(e)));
+      const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+      const exports = [];
+      await gp.route(/example\.invalid\/arcgis\/MapServer\/export\?/, route => {
+        const q = new URL(route.request().url()).searchParams;
+        exports.push({ bbox: q.get('bbox'), size: q.get('size'), keep: q.get('dynamicLayers') });
+        return route.fulfill({ status: 200, contentType: 'image/png', body: PNG });
+      });
+      await gp.goto(server.origin + '/index.html?tab=stations', { waitUntil: 'load', timeout: LOAD_TIMEOUT });
+      await gp.waitForFunction(() => typeof state !== 'undefined' && !!state.map && state.mapMarkers.length > 0,
+        null, { timeout: LOAD_TIMEOUT });
+      // Out at sea, where the map draws nothing of its own: what is in the
+      // glass is what this puts on the map.
+      await gp.evaluate(() => state.map.setView([-27.2, 154.6], 15, { animate: false }));
+      await settle(gp);
+      await gp.evaluate(() => MapMagnify.toggle(true));
+      await gp.waitForTimeout(300);
+      await gp.evaluate(() => {
+        // Round the point under the glass's middle.
+        const m = state.map, a = MapMagnify.drawn().at, c = m.containerPointToLatLng([a.x, a.y]);
+        for (const n of ['mnLots', 'mnRoads', 'mnSurvey']) if (!m.getPane(n)) m.createPane(n);
+        window.__g = {
+          // The lots' picture, as a map server's export.
+          pic: L.imageOverlay('https://example.invalid/arcgis/MapServer/export?f=image&bboxSR=3857&imageSR=3857&size=100%2C100'
+            + '&bbox=1%2C2%2C3%2C4&dynamicLayers=the-lots', m.getBounds().pad(.3), { pane: 'mnLots', opacity: .9 }).addTo(m),
+          // A road reserve, a survey mark — and a radio path, which is not the ground's.
+          road: L.polygon([[c.lat - .001, c.lng - .001], [c.lat - .001, c.lng + .001], [c.lat + .001, c.lng]],
+            { pane: 'mnRoads', renderer: L.svg({ pane: 'mnRoads' }), color: '#ff8800', weight: 2, interactive: false }).addTo(m),
+          mark: L.marker(c, { pane: 'mnSurvey', interactive: false, keyboard: false,
+            icon: L.divIcon({ className: 'mn-test-mark', html: '<b>PM1</b>', iconSize: [20, 20] }) }).addTo(m),
+          path: L.polyline([[c.lat - .002, c.lng - .002], [c.lat + .002, c.lng + .002]], { color: '#00ff00', weight: 4 }).addTo(m),
+        };
+      });
+      await gp.waitForTimeout(900);
+      let G = await gp.evaluate(() => {
+        const lens = MapMagnify.map(), el = lens.getContainer(), b = lens.getBounds();
+        const sw = L.CRS.EPSG3857.project(b.getSouthWest()), ne = L.CRS.EPSG3857.project(b.getNorthEast());
+        const cv = document.querySelector('.mn-magnify-pins');
+        // Is anything orange (the road reserve's line) or green (the radio path's) on the canvas?
+        const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+        let orange = 0, green = 0;
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i + 3] < 120) continue;
+          if (d[i] > 200 && d[i + 1] > 90 && d[i + 1] < 180 && d[i + 2] < 60) orange++;
+          if (d[i] < 60 && d[i + 1] > 200 && d[i + 2] < 60) green++;
+        }
+        const copy = document.querySelector('.mn-magnify-marks .mn-test-mark');
+        const gr = document.querySelector('.mn-magnify').getBoundingClientRect();
+        const cr = copy ? copy.getBoundingClientRect() : null;
+        return { g: MapMagnify.drawn().ground, box: [sw.x, sw.y, ne.x, ne.y], size: `${el.clientWidth},${el.clientHeight}`,
+                 orange, green, copies: document.querySelectorAll('.mn-magnify-marks > *').length,
+                 copyText: copy ? copy.textContent : '',
+                 copyOff: cr ? { x: cr.left + cr.width / 2 - (gr.left + gr.width / 2), y: cr.top + cr.height / 2 - (gr.top + gr.height / 2) } : null,
+                 inLens: el.querySelectorAll('.leaflet-marker-icon, path').length,
+                 imgs: el.querySelectorAll('img.leaflet-image-layer').length };
+      });
+      check('the map\'s property picture is in the glass', J(G.g.pictures) === J(['mnLots']) && G.imgs >= 1, J(G));
+      const last = exports[exports.length - 1];
+      const bb = last ? last.bbox.split(',').map(Number) : [];
+      check('…asked again for the glass\'s own box at its own size, the rest of the request kept',
+        !!last && last.size === G.size && last.keep === 'the-lots' && bb.length === 4 && bb.every((v, i) => near(v, G.box[i], 1)),
+        J({ last, G }));
+      check('…and once that has come, the stretched copy of the map\'s picture is put away',
+        J(G.g.sharp) === J(['mnLots']) && G.g.softShown.length === 0, J(G.g));
+      check('a road reserve the map draws is painted in the glass, in its own colour', G.g.paths === 1 && G.orange > 20, J(G));
+      check('…a radio path is not', G.green === 0, J({ green: G.green }));
+      check('a survey mark is copied in, at the glass\'s middle where its point is',
+        G.g.marks === 1 && G.copies === 1 && G.copyText === 'PM1' && G.copyOff && Math.abs(G.copyOff.x) < 3 && Math.abs(G.copyOff.y) < 3, J(G));
+      check('…and none of it is a layer in the glass\'s map but the picture', G.inLens === 0, J(G));
+      await gp.mouse.move(700, 450);
+      await gp.waitForTimeout(700);
+      const n0 = exports.length;
+      await gp.mouse.move(712, 458, { steps: 3 });
+      await gp.waitForTimeout(700);
+      G = await gp.evaluate(() => MapMagnify.drawn().ground);
+      check('a small move of the glass asks for no new picture', exports.length === n0 && J(G.sharp) === J(['mnLots']), J({ n0, n: exports.length, G }));
+      await gp.evaluate(() => { for (const l of Object.values(window.__g)) l.remove(); });
+      await gp.waitForTimeout(400);
+      const gone = await gp.evaluate(() => ({ g: MapMagnify.drawn().ground,
+        copies: document.querySelectorAll('.mn-magnify-marks > *').length,
+        imgs: MapMagnify.map().getContainer().querySelectorAll('img.leaflet-image-layer').length }));
+      check('taken off the map, they are out of the glass',
+        gone.g.pictures.length === 0 && gone.g.paths === 0 && gone.g.marks === 0 && gone.copies === 0 && gone.imgs === 0, J(gone));
+      await gctx.close();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     log('\nA phone (375 × 740, touch)\n');
     const phone = await browser.newContext({ viewport: { width: 375, height: 740 }, hasTouch: true, isMobile: true });
     const pp = await openStations(phone, server, errors);
@@ -387,7 +483,7 @@ async function main() {
     process.exit(1);
   }
   log('\nPASS — the Stations map\'s magnifier shows the ground under the pins, the pins small\n'
-    + '       and their names faint, and no line or overlay,\n'
+    + '       and their names faint, the ground\'s own layers and no radio path,\n'
     + '       follows the mouse or the finger, changes its power without zooming the map,\n'
     + '       and goes away with Escape and with the tab.');
 }

@@ -39,7 +39,7 @@ const SiteRoads = (function () {
   const ROAD_M    = 150;
   const BRIDGE_M  = 150;
   const KEY_DP    = 5;
-  const CACHE_MAX = 64;
+  const CACHE_MAX = 200;   // the property tip asks about spots as the pointer rests (brief, askPoint)
   const FAIL_TTL  = 60000;
   // site-land.js's box: outside it nothing is asked.
   const QLD_BOX = { w: 137.9, e: 153.7, s: -29.3, n: -9.0 };
@@ -133,11 +133,12 @@ const SiteRoads = (function () {
   };
 
   // `again` is Try again, which the lookup's own failure cache has to hear.
-  function run(k, again) {
+  // `only` names the questions to ask, for a caller that shows no contact.
+  function run(k, again, only) {
     if (typeof MapRoadOwners === 'undefined') return;
     const a = entry(k);
     const [lat, lon] = pointOf(k);
-    for (const name of Object.keys(QUESTIONS)) {
+    for (const name of only || Object.keys(QUESTIONS)) {
       if (a.busy[name] || settled(a[name])) continue;
       a.busy[name] = true;
       Promise.resolve()
@@ -159,6 +160,47 @@ const SiteRoads = (function () {
       if (el.dataset.mnRoads !== k) continue;
       paint(el, s);
     }
+    for (const fn of watchers) { try { fn(k); } catch (_) { /* one watcher's fault is not the others' */ } }
+  }
+
+  // ── The same answers in a line each, for the property tip ─────────────────
+  // map-property-tip.js names the land under the pointer; these are the road
+  // and the bridge beside it, in the tip's own short lines. brief() only reads
+  // what is known; askPoint() asks the road and the bridge (never who to call:
+  // a tip has no room for a phone number, and the card has it); watch() hears
+  // when an answer lands.
+  const watchers = new Set();
+
+  function brief(s) {
+    const k = key(s);
+    if (!k || !inBox(k)) return null;
+    const a = answers.get(k);
+    if (!a || !(a.road || a.bridge || a.busy.road || a.busy.bridge)) return { asked: false, lines: [] };
+    if (failed(a.road) && failed(a.bridge)) return { asked: true, lines: ['Road and bridge: could not be read'] };
+    const lines = [];
+    if (failed(a.road)) lines.push('Road: could not be read');
+    else if (!a.road) lines.push('Road: asking…');
+    else if (!a.road.road) lines.push(`No road within ${a.road.radiusM} m`);
+    else {
+      const r = a.road.road;
+      const extra = [r.routes.length ? `route ${r.routes.join(' · ')}` : '', away(r.distM)].filter(Boolean);
+      lines.push(`Road: ${roadName(r)} · ${extra.join(' · ')}`);
+      lines.push(`Managed by: ${managerWords(r)}`);
+    }
+    if (failed(a.bridge)) lines.push('Bridge: could not be read');
+    else if (!a.bridge) lines.push('Bridge: asking…');
+    else if (a.bridge.bridge) {
+      const b = a.bridge.bridge;
+      lines.push(`Bridge: ${MapRoadOwners.bridgeTitle(b)} · ${away(b.distM)} · ${
+        b.kind === 'tmr' ? 'Transport and Main Roads’' : 'goes with its road'}`);
+    }
+    return { asked: true, lines };
+  }
+
+  function askPoint(s) {
+    const k = key(s);
+    if (!k || !inBox(k)) return;
+    run(k, false, ['road', 'bridge']);
   }
 
   function paint(el, s) {
@@ -401,6 +443,9 @@ const SiteRoads = (function () {
     html,
     ask,
     retry,
+    brief,
+    askPoint,
+    watch(fn) { watchers.add(fn); },
     clear() {
       answers.clear();
       asked.clear();

@@ -318,7 +318,16 @@ through `SiteLand.parts`:
   plan — or "No easement here" and how many are nearby, while Easements is on —
   the street address, the locality and council.
 
-A road reserve is left to the road layer's own name when that is on. Never who
+Both then add, once the pointer has rested half a second (since 11 Nov 2026):
+the nearest road within 150 m, how far it is and who manages it, and the
+nearest bridge and whether it is Transport and Main Roads' — the station card's
+*Road and bridge — who manages them* (`site-roads.js`: `brief`, `askPoint`), a
+line each, without who to call. Three questions a spot (the roads and the two
+bridge registers); spots within about 5 m are one spot and the answers are kept
+for the visit.
+
+A road reserve is left to the road layer's own name when that is on, with the
+road and bridge lines under it once they are known. Never who
 owns a lot (the State does not publish it). The lot comes back with its
 outline, so moving about inside it asks nothing more; its easements come in one
 question a lot, its address in one, and the land use in one an area. A tap

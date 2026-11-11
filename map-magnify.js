@@ -4,7 +4,10 @@
 //               mouse (or is dragged by a finger) and shows the ground under
 //               it closer up — the base maps, with each station's pin shrunk
 //               to a dot, its name, where the map names it, barely there,
-//               and every line, shape and overlay this app draws left out.
+//               the ground's own layers the map is drawing (property lines,
+//               road reserves, rivers, survey marks — "The ground's own
+//               layers", below), and every other line, shape and overlay
+//               this app draws left out.
 //
 // After core.js and map-controls.js, before init.js — index.html holds the
 // order and the reasons. Reaches back to core.js for announce, removeMap,
@@ -34,7 +37,8 @@
 // The glass is a second, small Leaflet map holding only fresh copies of the
 // base maps the main map has on — the same blend, opacities and stacking order
 // (map.mnBases, map-controls.js) — and, with Satellite, the State imagery that
-// rides along with it. Nothing else is ever added to it, so there is nothing to
+// rides along with it. The only other thing ever added to it is the picture of
+// a ground layer the map itself is showing (syncGround), so there is nothing to
 // hide and nothing a new layer could forget to hide. Esri's place and road
 // names over Satellite, Dark and Light are left out as well: they are writing
 // over the ground too.
@@ -96,6 +100,17 @@ const MapMagnify = (function () {
   const NAME_ALPHA = 0.2;   // a name in the glass: barely there
   const NAME_GAP = 3;       // px from the dot's edge down to its name
 
+  // The layers that are the ground's own, by the pane each module draws in:
+  // what the land is and whose — never what the network does over it.
+  const GROUND = new Set(['mnCouncils', 'mnCatchments', 'mnCatchLine', 'mnContours', 'mnLots', 'mnRoads',
+    'mnRoadOwners', 'mnRivers', 'mnRiverLines', 'mnSurvey', 'mnBridges', 'mnSiteFeat']);
+  const SHARP_MS = 220;     // the glass rests this long before a picture is asked for at its scale
+  const SHARP_FAIL_MS = 30000;
+  const SHARP_MAX_PX = 1024;
+  const MARKS_MAX = 150;    // survey marks, bridges and the like copied into the glass
+  const VERTS_MAX = 80000;  // the points of the lines painted in one frame
+  const STYLE_MS = 500;     // how long a line's look, read off the page, is kept
+
   let map = null;           // the Stations map
   let on = false;           // survives a rebuild of the map, not leaving the tab
   let power = 4;
@@ -104,7 +119,13 @@ const MapMagnify = (function () {
   let lens = null;          // the map inside it
   let badge = null;
   let pinsCv = null;        // the canvas the dots and the names are painted on
-  let painted = { pins: 0, names: 0, r: 0, alpha: 0 };   // the last paint, for checks
+  let painted = { pins: 0, names: 0, r: 0, alpha: 0, paths: 0 };   // the last paint, for checks
+  let marksEl = null;       // where the copied survey marks, bridges and labels stand
+  let ground = null;        // { images, paths, marks } off the main map; null when it must be read again
+  const mirrors = new Map();   // pane → the glass's copy of that pane's picture
+  const marks = new Map();     // a marker on the map → its copy in the glass
+  let styles = new WeakMap();  // a line → { at, look }
+  let sharpTimer = 0;
   let layers = null;        // { base name: [its layers] }, the glass's own copies
   let at = null;            // the glass's centre, in the map container's px
   let raf = 0;
@@ -198,10 +219,11 @@ const MapMagnify = (function () {
     glass = L.DomUtil.create('div', 'mn-magnify', map.getContainer());
     glass.setAttribute('aria-hidden', 'true');
     glass.innerHTML = '<div class="mn-magnify-lens"><div class="mn-magnify-map"></div>'
-      + '<canvas class="mn-magnify-pins"></canvas></div>'
+      + '<div class="mn-magnify-marks"></div><canvas class="mn-magnify-pins"></canvas></div>'
       + '<span class="mn-magnify-aim"></span><span class="mn-magnify-power"></span>';
     badge = glass.querySelector('.mn-magnify-power');
     pinsCv = glass.querySelector('.mn-magnify-pins');
+    marksEl = glass.querySelector('.mn-magnify-marks');
     // Nothing done to the glass reaches the map under it — on a touch screen,
     // where the glass takes the pointer (styles.css), a finger dragging it
     // must not pan the map too, and a tap on it must not open the pin beneath.
@@ -231,11 +253,18 @@ const MapMagnify = (function () {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
     clearTimeout(hintTimer);
     hintTimer = 0;
+    clearTimeout(sharpTimer);
+    sharpTimer = 0;
+    for (const m of mirrors.values()) m.seq++;
+    mirrors.clear();
+    marks.clear();
+    ground = null;
+    styles = new WeakMap();
     lens = removeMap(lens);
     layers = null;
     if (glass) glass.remove();
-    glass = badge = pinsCv = null;
-    painted = { pins: 0, names: 0, r: 0, alpha: 0 };
+    glass = badge = pinsCv = marksEl = null;
+    painted = { pins: 0, names: 0, r: 0, alpha: 0, paths: 0 };
     drag = null;
     shownBefore = false;
     if (map) map.getContainer().classList.remove('mn-magnifying');
@@ -275,11 +304,297 @@ const MapMagnify = (function () {
       shownBefore = true;
     }
     lens.setView(map.containerPointToLatLng(at), zoom(), { animate: false });
+    syncGround();
     drawPins();
     const p = `${shownPower()}×`;
     badge.textContent = performance.now() < hintUntil
       ? `${p} · ${touchOnly() ? 'tap the glass to change' : 'Shift + scroll to change'}`
       : p;
+  }
+
+  // ── The ground's own layers ────────────────────────────────────────────────
+  // Asked for in these words (11 Nov 2026): "please add the layers inside the
+  // magnifier (eg property boundaries". The glass first left out everything
+  // this app draws; but a lot line, a road reserve, a river or a survey mark
+  // is not in the way of the ground — it is what somebody looking at a site
+  // closer up wants to read against it. So whatever the map is drawing in a
+  // GROUND pane is in the glass too, and nothing else: the radio paths, the
+  // links, the coverage and the rest stay out, as before.
+  //
+  // Read off the map rather than switched on here, as the pins are: a layer
+  // the map is not drawing — switched off, or too far out for its scale gate
+  // — is not in the glass, and a new ground layer needs only its pane's name
+  // in GROUND. Three kinds, each its own way:
+  //
+  //   pictures  (the lots, easements and tenure, the road owners, the
+  //             contours — one image from the State's map server). The map's
+  //             own picture is put in the glass at once, stretched, so the
+  //             lines are there while the glass moves; and when the glass has
+  //             rested SHARP_MS the same request is made for the glass's own
+  //             box at its own scale, which is the picture with fine lines
+  //             and, close enough, the lot numbers. One request a rest a
+  //             picture, none while the sharp one still covers the glass.
+  //   lines     (road reserves, rivers, council areas, catchments, the site
+  //             features' fences and tracks) painted on the pins' canvas,
+  //             under the names and the dots, each with the look it has on
+  //             the map at the width it has there.
+  //   marks     (survey marks, bridges, a site feature's point, a council's
+  //             name) — a copy of the marker's own icon, moved as the glass
+  //             moves.
+  const isGround = l => !!(l && l.options && (GROUND.has(l.options.pane) || l.options.mnGround));
+  function onLayerChange(e) {
+    if (!on || !isGround(e.layer)) return;
+    ground = null;
+    schedule();
+  }
+
+  function readGround() {
+    const g = { images: [], paths: [], marks: [] };
+    const zOf = name => { const p = map.getPane(name); return p ? Number(p.style.zIndex) || 0 : 0; };
+    map.eachLayer(l => {
+      if (!isGround(l)) return;
+      if (l instanceof L.ImageOverlay) g.images.push(l);
+      else if (l instanceof L.Polyline) g.paths.push({ l, z: zOf(l.options.pane) });
+      else if (l instanceof L.Marker) g.marks.push(l);
+    });
+    g.paths.sort((a, b) => a.z - b.z);
+    return g;
+  }
+
+  function lensPane(name) {
+    if (!lens.getPane(name)) {
+      const p = lens.createPane(name), from = map.getPane(name);
+      p.style.zIndex = (from && from.style.zIndex) || 300;
+      p.style.pointerEvents = 'none';
+    }
+    return name;
+  }
+
+  // The part of the glass's map the circle shows.
+  function glassBounds() {
+    const d = glass.clientWidth, off = (lens.getContainer().clientWidth - d) / 2;
+    return L.latLngBounds(lens.containerPointToLatLng([off, off + d]), lens.containerPointToLatLng([off + d, off]));
+  }
+
+  function dropMirror(pane) {
+    const m = mirrors.get(pane);
+    if (!m) return;
+    m.seq++;
+    if (m.soft) m.soft.remove();
+    if (m.sharp) m.sharp.remove();
+    mirrors.delete(pane);
+  }
+
+  function syncGround() {
+    if (!lens || !map) return;
+    if (!ground) ground = readGround();
+    const seen = new Set();
+    for (const src of ground.images) {
+      const pane = src.options.pane;
+      seen.add(pane);
+      let m = mirrors.get(pane);
+      if (m && m.url !== src._url) { dropMirror(pane); m = null; }
+      if (!m) {
+        m = { url: src._url, op: src.options.opacity == null ? 1 : src.options.opacity, seq: 0, failedAt: 0,
+              soft: L.imageOverlay(src._url, src.getBounds(), { pane: lensPane(pane), interactive: false }).addTo(lens),
+              sharp: null, sharpBounds: null, sharpZoom: null };
+        mirrors.set(pane, m);
+      }
+    }
+    for (const pane of [...mirrors.keys()]) if (!seen.has(pane)) dropMirror(pane);
+    let wanting = false;
+    if (mirrors.size) {
+      const gb = glassBounds(), z = lens.getZoom();
+      for (const m of mirrors.values()) {
+        if (m.sharp && m.sharpZoom !== z) { m.sharp.remove(); m.sharp = null; }
+        const covered = !!m.sharp && m.sharpBounds.contains(gb);
+        m.soft.setOpacity(covered ? 0 : m.op);
+        if (!covered) wanting = true;
+      }
+    }
+    clearTimeout(sharpTimer);
+    sharpTimer = wanting ? setTimeout(sharpen, SHARP_MS) : 0;
+    syncMarks();
+  }
+
+  // The map's own request, made again for the glass's box at the glass's
+  // scale. Only a map server's export is known how to ask again: its address
+  // carries the box and the size, and everything else in it is the picture.
+  function sharpUrl(src, bounds, w, h) {
+    let u;
+    try { u = new URL(src); } catch (_) { return null; }
+    const q = u.searchParams;
+    if (!/\/export$/.test(u.pathname) || !q.has('bbox') || !q.has('size') || q.get('bboxSR') !== '3857') return null;
+    const sw = L.CRS.EPSG3857.project(bounds.getSouthWest()), ne = L.CRS.EPSG3857.project(bounds.getNorthEast());
+    q.set('bbox', `${sw.x},${sw.y},${ne.x},${ne.y}`);
+    q.set('size', `${w},${h}`);
+    return u.toString();
+  }
+
+  function sharpen() {
+    sharpTimer = 0;
+    if (!lens || !glass || glass.hidden || !mirrors.size) return;
+    const bounds = lens.getBounds(), z = lens.getZoom(), gb = glassBounds();
+    const box = lens.getContainer();
+    let w = box.clientWidth, h = box.clientHeight;
+    const over = Math.max(w, h) / SHARP_MAX_PX;
+    if (over > 1) { w = Math.round(w / over); h = Math.round(h / over); }
+    if (!w || !h) return;
+    for (const [pane, m] of mirrors) {
+      if (m.sharp && m.sharpZoom === z && m.sharpBounds.contains(gb)) continue;
+      if (Date.now() - m.failedAt < SHARP_FAIL_MS) continue;
+      const url = sharpUrl(m.url, bounds, w, h);
+      if (!url) continue;
+      const mine = ++m.seq;
+      const img = new Image();
+      img.onload = () => {
+        if (mine !== m.seq || !lens || mirrors.get(pane) !== m) return;
+        if (m.sharp) m.sharp.remove();
+        m.sharp = L.imageOverlay(url, bounds, { pane: lensPane(pane), opacity: m.op, interactive: false }).addTo(lens);
+        m.sharpBounds = bounds;
+        m.sharpZoom = z;
+        schedule();
+      };
+      img.onerror = () => { if (mine === m.seq) m.failedAt = Date.now(); };
+      img.src = url;
+    }
+  }
+
+  // The marks: a copy of each marker's own icon, placed where the glass's map
+  // puts its point. The copy keeps the icon's size and anchor (they are in
+  // its style) and its classes, so it looks as it does on the map.
+  function syncMarks() {
+    if (!marksEl) return;
+    const list = (ground && ground.marks) || [];
+    const keep = new Set();
+    if (list.length) {
+      const d = glass.clientWidth, off = (lens.getContainer().clientWidth - d) / 2, pad = 60;
+      const box = L.latLngBounds(lens.containerPointToLatLng([off - pad, off + d + pad]),
+                                 lens.containerPointToLatLng([off + d + pad, off - pad]));
+      for (const mk of list) {
+        if (keep.size >= MARKS_MAX) break;
+        const icon = mk._icon;
+        if (!icon || !mk._map || icon.style.display === 'none') continue;
+        const ll = mk.getLatLng();
+        if (!box.contains(ll)) continue;
+        let c = marks.get(mk);
+        if (!c || c.src !== icon || c.cls !== icon.className) {
+          if (c) c.el.remove();
+          const el = icon.cloneNode(true);
+          el.removeAttribute('id');
+          el.removeAttribute('tabindex');
+          el.removeAttribute('title');
+          el.classList.remove('leaflet-interactive');
+          el.style.zIndex = '';
+          for (const n of el.querySelectorAll('[id]')) n.removeAttribute('id');
+          marksEl.appendChild(el);
+          c = { el, src: icon, cls: icon.className };
+          marks.set(mk, c);
+        }
+        const p = lens.latLngToContainerPoint(ll);
+        c.el.style.transform = `translate3d(${Math.round(p.x - off)}px, ${Math.round(p.y - off)}px, 0)`;
+        keep.add(mk);
+      }
+    }
+    for (const [mk, c] of marks) if (!keep.has(mk)) { c.el.remove(); marks.delete(mk); }
+  }
+
+  // A line's look: read off the page where the map draws it as a shape of its
+  // own (so a style sheet's say, a hover and a theme are all in it), off the
+  // line's own settings where it is on a shared canvas.
+  function lookOf(l) {
+    const now = performance.now();
+    const had = styles.get(l);
+    if (had && now - had.at < STYLE_MS) return had.look;
+    const o = l.options, el = l._path;
+    let look;
+    const num = (v, d) => { const n = parseFloat(v); return isFinite(n) ? n : d; };
+    const dashOf = v => (!v || v === 'none' ? null
+      : String(v).split(/[\s,]+/).map(parseFloat).filter(n => isFinite(n) && n >= 0));
+    if (el && typeof SVGElement !== 'undefined' && el instanceof SVGElement) {
+      const cs = getComputedStyle(el);
+      const all = num(cs.opacity, 1);
+      look = cs.display === 'none' || cs.visibility === 'hidden' ? null : {
+        stroke: cs.stroke && cs.stroke !== 'none' ? cs.stroke : null,
+        width: num(cs.strokeWidth, 1), sOp: num(cs.strokeOpacity, 1) * all, dash: dashOf(cs.strokeDasharray),
+        cap: cs.strokeLinecap || 'round', join: cs.strokeLinejoin || 'round',
+        fill: cs.fill && cs.fill !== 'none' ? cs.fill : null, fOp: num(cs.fillOpacity, 1) * all,
+        rule: cs.fillRule === 'nonzero' ? 'nonzero' : 'evenodd',
+      };
+    } else {
+      look = {
+        stroke: o.stroke === false ? null : (o.color || '#3388ff'),
+        width: num(o.weight, 3), sOp: num(o.opacity, 1), dash: dashOf(o.dashArray),
+        cap: o.lineCap || 'round', join: o.lineJoin || 'round',
+        fill: o.fill ? (o.fillColor || o.color || '#3388ff') : null, fOp: num(o.fillOpacity, .2),
+        rule: o.fillRule === 'nonzero' ? 'nonzero' : 'evenodd',
+      };
+    }
+    if (look && look.dash && !look.dash.some(n => n > 0)) look.dash = null;
+    styles.set(l, { at: now, look });
+    return look;
+  }
+
+  // The lines, on the pins' canvas before the names and the dots. The glass's
+  // map is plain web mercator, so a point is placed by that arithmetic here
+  // rather than through Leaflet, which makes three objects a point: a river
+  // system in view is tens of thousands of them, every frame the glass moves.
+  function drawGround(ctx, d) {
+    const list = (ground && ground.paths) || [];
+    if (!list.length) return;
+    const z = lens.getZoom(), scale = 256 * Math.pow(2, z);
+    const c = lens.project(lens.getCenter(), z);
+    const ox = d / 2 - c.x, oy = d / 2 - c.y;
+    const R = Math.PI / 180, MAX_LAT = 85.0511287798;
+    const gb = glassBounds().pad(0.15);
+    let budget = VERTS_MAX;
+    const trace = (pts, close) => {
+      let lx = NaN, ly = NaN, n = 0;
+      for (const ll of pts) {
+        const lat = Math.max(-MAX_LAT, Math.min(MAX_LAT, ll.lat));
+        const sin = Math.sin(lat * R);
+        const x = scale * (ll.lng / 360 + 0.5) + ox;
+        const y = scale * (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) + oy;
+        if (n && Math.abs(x - lx) < .5 && Math.abs(y - ly) < .5) continue;
+        if (n) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+        lx = x; ly = y; n++;
+      }
+      budget -= pts.length;
+      if (close && n) ctx.closePath();
+    };
+    const walk = (a, close) => {
+      if (!a || !a.length || budget <= 0) return;
+      if (Array.isArray(a[0])) { for (const b of a) walk(b, close); return; }
+      trace(a, close);
+    };
+    for (const { l } of list) {
+      if (budget <= 0) break;
+      if (!l._map || !l._bounds || !l._bounds.isValid() || !l._bounds.intersects(gb)) continue;
+      const look = lookOf(l);
+      if (!look || (!look.stroke && !look.fill)) continue;
+      const poly = l instanceof L.Polygon;
+      ctx.beginPath();
+      walk(l._latlngs, poly);
+      if (poly && look.fill && look.fOp > 0) {
+        ctx.globalAlpha = look.fOp;
+        ctx.fillStyle = look.fill;
+        ctx.fill(look.rule);
+      }
+      if (look.stroke && look.width > 0 && look.sOp > 0) {
+        ctx.globalAlpha = look.sOp;
+        ctx.strokeStyle = look.stroke;
+        ctx.lineWidth = look.width;
+        ctx.lineCap = look.cap;
+        ctx.lineJoin = look.join;
+        ctx.setLineDash(look.dash || []);
+        ctx.stroke();
+      }
+      painted.paths++;
+    }
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'miter';
   }
 
   // ── The pins, small, and their names, faint ────────────────────────────────
@@ -298,9 +613,11 @@ const MapMagnify = (function () {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, px, px);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    painted = { pins: 0, names: 0, r: 0, alpha: NAME_ALPHA };
+    painted = { pins: 0, names: 0, r: 0, alpha: NAME_ALPHA, paths: 0 };
+    if (!d) return;
+    drawGround(ctx, d);
     const markers = (typeof state !== 'undefined' && state.mapMarkers) || [];
-    if (!markers.length || !d) return;
+    if (!markers.length) return;
 
     const off = (lens.getContainer().clientWidth - d) / 2;
     const pad = 120;   // a name hanging into the glass from a pin just outside it
@@ -514,7 +831,7 @@ const MapMagnify = (function () {
     if (map) schedule();
     if (quiet || !map) return;
     announce(on
-      ? `Magnifier on, ${power} times. The glass shows the ground with the pins as small dots, their names faint, and the lines left out. `
+      ? `Magnifier on, ${power} times. The glass shows the ground with the pins as small dots, their names faint, the property lines, roads and rivers the map is drawing, and the radio paths left out. `
         + (touchOnly() ? 'Drag the glass to move it.' : 'Move the mouse over the map; Shift and scroll changes how close.')
       : 'Magnifier off.');
   }
@@ -530,6 +847,7 @@ const MapMagnify = (function () {
     wheelHost.addEventListener('wheel', onWheel, { capture: true, passive: false });
     map.on('move zoomend resize', schedule);
     map.on('mnbasechange', syncBases);
+    map.on('layeradd layerremove', onLayerChange);
     map.on('click', onMapClick);
     // The file that builds a map registers it and its teardown (npm run
     // registry). Leaving the tab puts the glass away; a rebuild of the map
@@ -551,6 +869,7 @@ const MapMagnify = (function () {
       box.classList.remove('mn-magnifying');
       map.off('move zoomend resize', schedule);
       map.off('mnbasechange', syncBases);
+      map.off('layeradd layerremove', onLayerChange);
       map.off('click', onMapClick);
     }
     if (wheelHost) wheelHost.removeEventListener('wheel', onWheel, { capture: true });
@@ -564,6 +883,14 @@ const MapMagnify = (function () {
     // The rail's switch. No argument toggles.
     toggle(want) { set(want == null ? !on : want); },
     on: () => on,
+
+    // How far the glass reaches from the pointer, in px, while it is following
+    // a mouse — 0 when it is not. A hover name that opens at the pointer is
+    // under the glass; map-property-tip.js stands its own clear of it by this.
+    radius() {
+      if (!showing() || !glass || glass.hidden || touchOnly()) return 0;
+      return glass.clientWidth / 2 + 5;   // …and the glass's ring
+    },
 
     // For checks: what the glass is showing, counted rather than read off its
     // pixels — where it is, how close, which base layers are in it, whether
@@ -584,6 +911,15 @@ const MapMagnify = (function () {
         bases: layers ? Object.keys(layers).filter(n => layers[n].some(l => lens && lens.hasLayer(l))) : [],
         badge: badge ? badge.textContent : '',
         pins: painted.pins, names: painted.names, pinR: painted.r, nameAlpha: painted.alpha,
+        // The ground's own layers in the glass: the panes whose picture is in
+        // it, which of those have one at the glass's own scale, the lines
+        // painted at its last move and the marks copied in.
+        ground: {
+          pictures: [...mirrors.keys()],
+          sharp: [...mirrors].filter(([, m]) => !!m.sharp).map(([p]) => p),
+          softShown: [...mirrors].filter(([, m]) => m.soft.options.opacity > 0).map(([p]) => p),
+          paths: painted.paths, marks: marks.size,
+        },
       };
     },
     map: () => lens,
