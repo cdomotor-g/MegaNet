@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-11** (revision 254 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-11** (revision 255 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -448,6 +448,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ## Standalone issues
 - **#287** `[Standalone]` `[Sonnet5/High]` — **OPEN, opened revision 253** — the inspection form records whether a licensed transmitter's ACMA label is fitted (its frequency assignment number and "Do Not Remove": Radiocommunications (Labelling) Determination 2023), shows the number it should carry from `MapAcma`, reads back in Inspection History and its CSV, and the ACMA licences tool says what the last inspection found. Migration `0112`. Touches `inspections.js`, `history.js` and `map-acma.js`: not at once with #283, #284 or another inspection-form change. Depends on nothing.
 - **#286** `[Standalone]` `[Human]` — **OPEN, opened revision 253** — the owner sends ACMA's Spectrum Planning Section the question drafted in the 🪪 Radio Licensing lesson: is a gauge that reports to a licensed repeater from beyond the 30 km service area covered by that licence, unprotected and bound not to interfere, as the documents imply? 203 gauges and 37 repeaters turn on the answer. Blocks nothing in the code; an agent updates the lesson, the tool's wording and `docs/acma-licences.md` once the reply is on the issue. On the Atlas as `acma-30km-confirmation`.
+- **#289** `[Standalone]` `[Sonnet5/High]` — **OPEN, opened revision 255** — a finding raised with the tab closed when a steady signal sits on a channel a base station decodes, from `base_station_spectrum_hourly` (`0111`) by the same rule as `base-station-bands.js`; one migration, a check file and how the Base Stations tab shows it. Depends on nothing; not at once with another `base-stations.js` change.
 - **#285** `[Standalone]` `[Haiku4.5/Low]` — **OPEN, opened revision 250** — regenerate the private repository's derived benchmarks file now that the reader (`tools/ingest/benchmarks.py`) drops a private person's name from one comment (`0110` already took it out of the live table). Needs a session with `cdomotor-g/flood-net-private` attached; the raw report there is the owner's call. Depends on nothing.
 - **#284** `[Standalone]` `[Sonnet5/Med]` — **OPEN, opened revision 250** — a licensing-state column and filter on the Stations list, and the same columns in the station exports, read from `MapAcma.stateOf`. Touches the Stations list and `export.js`; independent of #283. *Since revision 252 there are four states for a transmitter, not three — Beyond a licence's area is new — and `stateOf` also says whether the station is a repeater and which repeater it reports through.*
 - **#283** `[Standalone]` `[Sonnet5/High]` — **OPEN, opened revision 250** — 📜 ACMA licences draws land mobile, scientific and area-wide licences too (today only fixed ones: point to multipoint and point to point). Extends `tools/acma_station_licences.py` and `map-acma.js`; do before or after #284, not at once with another `map-acma.js` change.
@@ -883,6 +884,10 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 255 — 2026-11-11: #289 opened
+
+**Opens #289** `[Standalone]` `[Sonnet5/High]` — the database raising a finding by itself when a steady signal lands on a channel a base station decodes, the follow-up revision 251 left open. Closes nothing.
+
 ### Revision 254 — 2026-11-11: 🛟 a base station cut off for a night — RPi ALERT 0.23, `0113`, EPIC #288 opened
 
 A base station on Wi-Fi lost its internet link at 22:18 on 10 November and sat cut off until its operator switched it off and on at 06:27. The owner asked what could be done so a unit gets back by itself, and for a baseline epic for an agent that watches the network. **Opens #288**; closes nothing; **edits #216** (its first slice is live).
@@ -922,7 +927,7 @@ The owner saw bright bands that never leave both base stations' waterfalls and a
 - **`0111`** (`base_station_spectrum_hourly`, `roll_up_spectrum()`, `admin_base_station_bands(id, days)`, `admin_base_station_ingest(days)`): each stick's spectrum folded by the hour to the level every bin was at or above in nine rows of ten and its median, a row a tuning, ninety days kept, pg_cron at minute 13; and every base station's ingest from the reception rollups. `tools/check_base_station_steady.sql`, 27 checks.
 - **On screen** (`base-stations.js`, new `base-station-bands.js`): **Steady signals** under the waterfall — a line a stick with its bands numbered, and a table saying what each probably is, why, whether it matters to a channel the station decodes and what to do, with the tests, the remedies and when to report to the ACMA folded under it; **What comes in through each** under the list — stations, legacy ALERT and ALERT2 apart, what only that base station hears, a bar a day, by receiver. Both save as CSV. `docs/base-stations.md` has both.
 - **Checks added:** `bsbands` (Node, 43); `basestations` extended to both panels.
-- **Not done, and nobody's yet:** a finding raised with the tab closed when a steady band lands on a channel a station decodes (the hours are kept for it); the bands marked on the waterfall itself.
+- **Not done:** a finding raised with the tab closed when a steady band lands on a channel a station decodes — **#289**, opened revision 255; the bands marked on the waterfall itself, nobody's yet.
 
 ### Revision 250 — 2026-11-10: 📜 ACMA licences for our own transmitters, ⚖️ Repeater comparison, benchmarks on the Flood tab — 0110; #283, #284 and #285 opened
 
