@@ -396,19 +396,19 @@ const FloodVelocity = (function () {
 
   // The lowest ground in the square r samples about each sample (two passes,
   // a row and a column), holes skipped.
-  function lowAbout(e, n, r) {
-    const row = new Float64Array(n * n), out = new Float64Array(n * n);
-    for (let j = 0; j < n; j++) {
+  function lowAbout(e, n, r, nz = n) {
+    const row = new Float64Array(n * nz), out = new Float64Array(n * nz);
+    for (let j = 0; j < nz; j++) {
       for (let i = 0; i < n; i++) {
         let m = Infinity;
         for (let x = Math.max(0, i - r); x <= Math.min(n - 1, i + r); x++) { const h = e[j * n + x]; if (h < m) m = h; }
         row[j * n + i] = m;
       }
     }
-    for (let j = 0; j < n; j++) {
+    for (let j = 0; j < nz; j++) {
       for (let i = 0; i < n; i++) {
         let m = Infinity;
-        for (let y = Math.max(0, j - r); y <= Math.min(n - 1, j + r); y++) { const h = row[y * n + i]; if (h < m) m = h; }
+        for (let y = Math.max(0, j - r); y <= Math.min(nz - 1, j + r); y++) { const h = row[y * n + i]; if (h < m) m = h; }
         out[j * n + i] = m;
       }
     }
@@ -445,6 +445,13 @@ const FloodVelocity = (function () {
 
   // The flow line on a grid of the twin's: { elev (m AHD, n × n, row 0 north),
   // n, size } — x east and z south of the station at the middle sample.
+  //
+  // The twin's ground need not be that square (digital-twin.js, "the area"):
+  // a grid may also say { nz, step, x0, z0 } — n columns by nz rows, `step`
+  // apart, its north-west sample at (x0, z0) from the station. The line is
+  // then traced to the patch's edge wherever that is — the "ring" its two ends
+  // are looked for on is the rectangle a margin inside the edge, not a circle
+  // — so a long reach is read along its whole length.
   //   opts.from  { x, z } to start from (default the station), and
   //   opts.near  m round it to look for the lowest sample to start on.
   // Returns { ok: false, why } or
@@ -459,15 +466,18 @@ const FloodVelocity = (function () {
   //     falls (its pairs agree which way it falls), clear (both) }
   function flowLine(g, opts = {}) {
     const n = g && g.n, e = g && g.elev;
-    if (!(n >= 9) || !e || e.length !== n * n || !(g.size > 0)) return { ok: false, why: 'no ground' };
-    const half = g.size / 2, step = g.size / (n - 1);
-    const X = k => -half + (k % n) * step, Z = k => -half + Math.floor(k / n) * step;
+    const rect = !!g && g.nz != null && g.step > 0 && g.x0 != null && g.z0 != null;
+    const nz = rect ? g.nz : n;
+    if (!(n >= 9) || !(nz >= 9) || !e || e.length !== n * nz || !(g.size > 0)) return { ok: false, why: 'no ground' };
+    const half = g.size / 2, step = rect ? g.step : g.size / (n - 1);
+    const x0 = rect ? g.x0 : -half, z0 = rect ? g.z0 : -half;
+    const X = k => x0 + (k % n) * step, Z = k => z0 + Math.floor(k / n) * step;
     const from = opts.from || { x: 0, z: 0 }, near = opts.near != null ? opts.near : 60;
     // The start: the lowest sample within `near` of the point given.
     let start = -1;
-    const ci = Math.round((from.x + half) / step), cj = Math.round((from.z + half) / step);
+    const ci = Math.round((from.x - x0) / step), cj = Math.round((from.z - z0) / step);
     const rr = Math.ceil(near / step);
-    for (let j = Math.max(0, cj - rr); j <= Math.min(n - 1, cj + rr); j++) {
+    for (let j = Math.max(0, cj - rr); j <= Math.min(nz - 1, cj + rr); j++) {
       for (let i = Math.max(0, ci - rr); i <= Math.min(n - 1, ci + rr); i++) {
         const k = j * n + i;
         if (!Number.isFinite(e[k]) || Math.hypot(X(k) - from.x, Z(k) - from.z) > near + 1e-9) continue;
@@ -478,18 +488,21 @@ const FloodVelocity = (function () {
 
     // What a step costs, per metre: more the higher it stands over the lowest
     // ground round it, and over where the line began.
-    const rho = half - Math.max(8 * step, LINE_LOW_M);
-    if (!(rho > 4 * step)) return { ok: false, why: 'the patch is too small' };
-    const low = lowAbout(e, n, Math.max(3, Math.round(LINE_LOW_M / step)));
+    const margin = Math.max(8 * step, LINE_LOW_M);
+    // The rectangle a margin inside the patch's edge, where there is one.
+    const rx0 = x0 + margin, rx1 = x0 + (n - 1) * step - margin, rz0 = z0 + margin, rz1 = z0 + (nz - 1) * step - margin;
+    const rho = rect ? Math.max(rx1 - rx0, rz1 - rz0) / 2 : half - margin;
+    if (!(rho > 4 * step) || (rect && !(Math.min(rx1 - rx0, rz1 - rz0) > 8 * step))) return { ok: false, why: 'the patch is too small' };
+    const low = lowAbout(e, n, Math.max(3, Math.round(LINE_LOW_M / step)), nz);
     const h0 = e[start], rise = Math.max(1, LINE_RISE * rho);
-    const cost = new Float64Array(n * n);
-    for (let k = 0; k < n * n; k++) {
+    const cost = new Float64Array(n * nz);
+    for (let k = 0; k < n * nz; k++) {
       if (!Number.isFinite(e[k])) { cost[k] = Infinity; continue; }
       const a = (e[k] - low[k]) / LINE_RELIEF, b = Math.max(0, e[k] - h0) / rise;
       cost[k] = 1 + a * a + b * b;
     }
     // The least cost from the start to every sample (Dijkstra), and the way back.
-    const D = new Float64Array(n * n).fill(Infinity), prev = new Int32Array(n * n).fill(-1);
+    const D = new Float64Array(n * nz).fill(Infinity), prev = new Int32Array(n * nz).fill(-1);
     const q = heap(), top = [0, 0];
     D[start] = 0; q.push(0, start);
     while (q.size) {
@@ -499,7 +512,7 @@ const FloodVelocity = (function () {
       const i0 = k % n, j0 = (k - i0) / n;
       for (let dj = -1; dj <= 1; dj++) {
         const j = j0 + dj;
-        if (j < 0 || j >= n) continue;
+        if (j < 0 || j >= nz) continue;
         for (let di = -1; di <= 1; di++) {
           const i = i0 + di;
           if ((!di && !dj) || i < 0 || i >= n) continue;
@@ -514,8 +527,17 @@ const FloodVelocity = (function () {
     // cost a metre to reach from the start.
     const sx = X(start), sz = Z(start);
     const ring = [];
-    for (let k = 0; k < n * n; k++) {
-      if (!Number.isFinite(D[k]) || Math.abs(Math.hypot(X(k), Z(k)) - rho) > 0.75 * step) continue;
+    // How far a sample is from the ring: the circle about the station, or the
+    // rectangle inside the edge (outside it, or inside it, by the nearest side).
+    const offRing = rect
+      ? (x, z) => {
+        const ox = Math.max(rx0 - x, 0, x - rx1), oz = Math.max(rz0 - z, 0, z - rz1);
+        if (ox > 0 || oz > 0) return Math.hypot(ox, oz);
+        return Math.min(x - rx0, rx1 - x, z - rz0, rz1 - z);
+      }
+      : (x, z) => Math.abs(Math.hypot(x, z) - rho);
+    for (let k = 0; k < n * nz; k++) {
+      if (!Number.isFinite(D[k]) || offRing(X(k), Z(k)) > 0.75 * step) continue;
       const far = Math.hypot(X(k) - sx, Z(k) - sz);
       if (far < 2 * step) continue;
       ring.push({ k, per: D[k] / far, ang: Math.atan2(X(k) - sx, -(Z(k) - sz)) });

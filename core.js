@@ -3178,7 +3178,9 @@ const TWIN_HELP = {
          + 'extension ladder, its staff gauge and its flood levels marked on it, a manual collector or staff gauge, or a red post where the record cannot say — with '
          + 'the other stations, the bridges and the trees and buildings in the patch, and a 1.75 m figure beside it for scale. Orbit it, '
          + 'look straight down on it, or take the POV and walk about in it at eye height (and up the '
-         + 'ladder); click the ground for its height; move the station\'s pin to where it stands on '
+         + 'ladder); widen the ground past the square round the station — to a bridge down the river, '
+         + 'or to a rectangle you draw on the map; point at the ground for its height in m AHD and as a '
+         + 'local gauge height, and click two points to measure between them; move the station\'s pin to where it stands on '
          + '10 cm imagery; and '
          + 'download the whole scene as a <code>.glb</code> that Blender opens in one step.',
   watch: [
@@ -3187,6 +3189,22 @@ const TWIN_HELP = {
     + 'up: the ground is an elevation model, the imagery is draped on it, the station is built from '
     + 'its record, and the water is a level surface at the recorded levels. None of it is a survey, '
     + 'a flood map or a forecast; check anything that matters on site.',
+    '<strong>The ground can be wider than the square.</strong> In <em>Scene</em>, <em>Ground area</em> '
+    + 'has squares to 6.4 km, and under it four boxes say how many metres of ground to keep west, east, north '
+    + 'and south of the station — so the area can run a kilometre down the river and no further up it. '
+    + '<em>Widen the area to hold a bridge</em> lists the bridges up to 3 km past the edge, and one press '
+    + 'rebuilds the twin wide enough to hold the one picked; <em>▭ Draw it on the map</em> puts the twin aside '
+    + 'so you can drag a rectangle on the map. An area that is not the plain square is kept for that station; '
+    + '<em>Back to the square</em> undoes it. A wide area is sampled more coarsely than a small one — the panel '
+    + 'says how far apart the samples are — and <em>Ground detail</em> asks for finer, which takes longer.',
+    '<strong>Heights, two ways.</strong> Point at the ground and its height shows beside the pointer in '
+    + 'metres AHD (above sea level, near enough) and as a <em>local gauge height</em> (LGH): what a gauge board '
+    + 'would read there, which is the height above that gauge\'s zero. <em>Heights and measuring</em> in this '
+    + 'pane says whose gauge that is and lets you pick another — a gauge near by, the channel bed, or a level '
+    + 'you type in. On a phone, tap the ground instead: a tap pins the point and the pane reads it out. Two '
+    + 'pinned points give the distance and fall between them and a cross-section of the ground, with the '
+    + 'water at the level now shown. The ground between samples is drawn flat, so anything narrower than the '
+    + 'spacing may not show.',
     '<strong>The twin is inside the Stations map.</strong> With <em>Offer the digital twin at close '
     + 'zoom</em> ticked in Layers (it starts off), from zoom 17 with a station under the view a card '
     + 'on the map offers it, saying what aerial imagery covers the station and when '

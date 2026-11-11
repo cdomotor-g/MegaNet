@@ -97,7 +97,11 @@
 // x east, z south (three.js is right-handed with y up, so north is −z). The
 // lat/lon → metres step is the equirectangular one core.js already carries
 // (KM_PER_DEG_LAT, kmPerDegLon), which over a 1.6 km patch is exact to a few
-// centimetres. Heights are AHD: Queensland's service is, and the tiles'
+// centimetres and over the widest area there is (6.4 km) to about a metre at
+// its far corners — and everything on the ground is placed by the same step,
+// so nothing is off against anything else. The patch is a rectangle that
+// holds the station and need not be round it ("the area", below), but the
+// origin is the station whatever the patch. Heights are AHD: Queensland's service is, and the tiles'
 // EGM96 is put into AHD through geoid.js — AHD = EGM96 − 2.07 m to
 // + 0.64 m over the stations (groundFor says why); the panel says by how
 // much here. The far sheets of the horizon are left as they come.
@@ -185,8 +189,20 @@ const DigitalTwin = (function () {
   const POLE_R     = 0.15;    // metres — 300 mm across
   const FIGURE_H   = 1.75;    // metres — a person, for scale
   const EYE_H      = 1.70;    // metres — walk mode's camera
-  const SIZES      = [200, 400, 800, 1600];   // patch widths offered, metres
-  const N          = 201;     // samples per side; odd, so the centre sample IS the station
+  const SIZES      = [200, 400, 800, 1600, 3200, 6400];   // square patch widths offered, metres
+  const N          = 201;     // samples per side of a standard square; odd, so the centre sample IS the station
+  // The patch need not be that square (see "the area"). How finely any other
+  // shape is sampled: SEG segments along a side of a square as wide as the
+  // area is big — 200 as ever to 1.6 km, 400 past it or where Fine is asked
+  // for, 800 at Finest — and never more than SEG_SIDE along one side, which is
+  // under what the State's service will answer in one image (4,096 × 2,048).
+  const SEG        = { normal: N - 1, fine: 400, finest: 800 };
+  const SEG_SIDE   = 800;
+  const WIDE_M     = 1600;    // a longest side past this is sampled Fine without being asked
+  const EXT_MIN    = 20;      // metres of ground kept on every side of the station
+  const EXT_MAX    = 6400;    // metres: the furthest an edge may stand from the station
+  const SIDE_MAX   = 6400;    // metres: the longest side
+  const WIRE_MAX   = 170000;  // vertices past which the mesh's wireframe is built only when it is asked for
   const FETCH_MS   = 45000;   // a raster that has not arrived by now has failed
   const CACHE_MAX  = 6;       // ground grids kept decoded — 162 KB each
   const IMAGE_CACHE_BYTES = 40 * 1024 * 1024;   // decoded imagery kept — one wide patch and a few narrow ones
@@ -220,7 +236,7 @@ const DigitalTwin = (function () {
     seq: 0,            // build sequence; an async step that finds it moved stands down
     status: '',        // the status line
     notes: [],         // the warnings under it
-    ground: null,      // { elev: Float32Array N*N (AHD), source, resolution_m, attribution, holes, filled, min, max, h0 }
+    ground: null,      // { elev: Float32Array nx*nz (AHD), nx, nz, step, x0, x1, z0, z1, source, resolution_m, attribution, holes, filled, min, max, h0 }
     image: null,       // { canvas, source, attribution, mpp } or null
     elvis: null,       // Elvis.at() result for the pin, or null
     live: false,       // a renderer exists
@@ -253,6 +269,13 @@ const DigitalTwin = (function () {
     bridgesFound: null,    // what the sources said, kept to rebuild the decks at another exaggeration
     tier: null,            // the State's finest imagery over the station (imageryAt), or null
     cover: null,           // the trees and buildings: { status, trees, buildings, placedTrees, placedBuildings, drawn, … } — see "the trees and buildings"
+    ext: null,             // the area asked for, as metres of ground each way from the station: { w, e, n, s } — see "the area"
+    reach: null,           // the bridges past the patch's edge it could be widened to: { status, list } — see "the area"
+    probe: null,           // the ground under the pointer: { x, z, h, far } — see "the ground under the pointer"
+    marks: [],             // the points pinned on the ground, two at most: [{ x, z, h }] — see "measuring"
+    askBox: null,          // the box the bridges were asked over for this build
+    builtKeys: null,       // the cache keys this build read, for Rebuild to drop
+    frameNext: false,      // the next build opens on the whole area (it was just changed), not on the pole
   };
 
   // Ground under a far station that has no recorded height, read off the
@@ -277,6 +300,7 @@ const DigitalTwin = (function () {
     flood: null,      // the flood water and its staff: { water, staff, tex, data, mat, palette, speed }
     flowLine: null,   // the flow line's ribbons and arrowheads
     cover: null,      // the trees and buildings: one group, the buildings' mesh and the trees' two instanced meshes
+    marks: null,      // the pinned points' posts and the line between them
     off: [],          // listener removers
   };
 
@@ -304,9 +328,16 @@ const DigitalTwin = (function () {
   // water's colour says — the level it has passed, or its speed — and
   // `flowLine` whether the flow line is drawn (see "the flood velocity").
   // `cover` whether the trees and buildings stand on the ground.
+  // `areas` is the area drawn for a station where it is not the square every
+  // station gets — station id → { w, e, n, s } — and `detail` how finely the
+  // ground is sampled ('auto', 'fine', 'finest'). `probe` is whether the
+  // ground under the pointer is read out, and `lgh` whose gauge zero a local
+  // gauge height is measured from, station by station (see "the ground under
+  // the pointer").
   const DEFAULTS = { size: 400, exag: 1, imagery: true, figure: true, label: true, wire: false, horizon: true,
                      flood: true, floodAnim: null, floodHold: null, fitBridges: true, waterColour: 'level', flowLine: false,
-                     cover: true };
+                     cover: true, areas: {}, detail: 'auto', probe: true, lgh: {} };
+  const AREAS_KEPT = 40;   // custom areas remembered, newest last
 
   function loadSettings() {
     let s = {};
@@ -315,7 +346,20 @@ const DigitalTwin = (function () {
     if (SIZES.includes(Number(s.size))) out.size = Number(s.size);
     const ex = Number(s.exag);
     if (isFinite(ex) && ex >= 1 && ex <= 3) out.exag = ex;
-    for (const k of ['imagery', 'figure', 'label', 'wire', 'horizon', 'flood', 'fitBridges', 'flowLine', 'cover']) if (typeof s[k] === 'boolean') out[k] = s[k];
+    for (const k of ['imagery', 'figure', 'label', 'wire', 'horizon', 'flood', 'fitBridges', 'flowLine', 'cover', 'probe']) if (typeof s[k] === 'boolean') out[k] = s[k];
+    if (s.detail === 'fine' || s.detail === 'finest') out.detail = s.detail;
+    out.areas = {};
+    if (s.areas && typeof s.areas === 'object') {
+      for (const [id, e] of Object.entries(s.areas).slice(-AREAS_KEPT)) { const x = normExt(e); if (x) out.areas[id] = x; }
+    }
+    out.lgh = {};
+    if (s.lgh && typeof s.lgh === 'object') {
+      for (const [id, d] of Object.entries(s.lgh).slice(-AREAS_KEPT)) {
+        if (d && d.kind === 'station' && typeof d.id === 'string') out.lgh[id] = { kind: 'station', id: d.id };
+        else if (d && d.kind === 'custom' && typeof d.m === 'number' && isFinite(d.m)) out.lgh[id] = { kind: 'custom', m: d.m };
+        else if (d && d.kind === 'channel') out.lgh[id] = { kind: 'channel' };
+      }
+    }
     if (s.waterColour === 'speed' || s.waterColour === 'level') out.waterColour = s.waterColour;
     if (typeof s.floodAnim === 'boolean') out.floodAnim = s.floodAnim;
     if ((typeof s.floodHold === 'number' && s.floodHold >= 0 && s.floodHold <= 1) || (typeof s.floodHold === 'string' && s.floodHold)) out.floodHold = s.floodHold;
@@ -366,33 +410,136 @@ const DigitalTwin = (function () {
     return { x: (lon - lon0) * metresPerDegLon(lat0), z: -(lat - lat0) * metresPerDegLat() };
   }
 
-  // The patch: `size` metres square, centred on the station.
-  function patchBox(lat0, lon0, size) {
-    const half = size / 2;
-    const dLat = half / metresPerDegLat();
-    const dLon = half / metresPerDegLon(lat0);
-    return { west: lon0 - dLon, east: lon0 + dLon, south: lat0 - dLat, north: lat0 + dLat, half, size };
+  // ── the area ───────────────────────────────────────────────────────────────
+  // What ground the twin is built on. It was a square centred on the station,
+  // 200 m to 1.6 km across, and for most stations that is still what is asked
+  // for. But a gauge is read against a reach of river, and the thing worth
+  // seeing is often not round it: the bridge the town floods at is a
+  // kilometre downstream of Gayndah's flume and nothing is upstream of it. So
+  // the area is a rectangle that holds the station, said as the metres of
+  // ground each way from it — { w, e, n, s } — and three things set it: the
+  // square sizes (now to 6.4 km), the Scene panel's four sides and its "widen
+  // to" a bridge, and a rectangle drawn on the map (map-twin.js). An area
+  // that is not a plain square is the station's own and is kept for it.
+  //
+  // The scene's origin stays on the ground at the station whatever the area,
+  // so nothing that stands at the station moved: the patch is what slid. A
+  // ground carries where it is — x0…x1 west to east, z0…z1 north to south, in
+  // the scene's metres — and how it is sampled: nx × nz samples `step` apart,
+  // square cells, the station on a sample. A plain square is 201 × 201 as it
+  // always was; anything else spends the same number of samples on its own
+  // shape (so a long reach is sampled finer than the square round it would
+  // be), and four times as many once its longest side passes 1.6 km.
+  function squareExt(size) { const h = size / 2; return { w: h, e: h, n: h, s: h }; }
+  function isSquareExt(x) { return !!x && x.w === x.e && x.e === x.n && x.n === x.s; }
+  function sameExt(a, b) { return !!a && !!b && a.w === b.w && a.e === b.e && a.n === b.n && a.s === b.s; }
+
+  // An area as asked, made one that can be built: whole metres, the station
+  // inside it with EXT_MIN to spare, no edge past EXT_MAX and no side past
+  // SIDE_MAX (the far side gives way). Null for anything that is not four
+  // numbers.
+  function normExt(x) {
+    if (!x || typeof x !== 'object') return null;
+    const out = {};
+    for (const k of ['w', 'e', 'n', 's']) {
+      const v = Number(x[k]);
+      if (x[k] == null || x[k] === '' || !isFinite(v)) return null;
+      out[k] = Math.min(EXT_MAX, Math.max(EXT_MIN, Math.round(v)));
+    }
+    const trim = (a, b) => {
+      const over = out[a] + out[b] - SIDE_MAX;
+      if (over <= 0) return;
+      const big = out[a] >= out[b] ? a : b;
+      out[big] = Math.max(EXT_MIN, out[big] - over);
+    };
+    trim('w', 'e'); trim('n', 's');
+    return out;
+  }
+
+  // The area a station's twin is built on: its own, where one was set for it,
+  // else the square every station gets.
+  function extFor(st) {
+    const a = st && S().areas[st.id];
+    return a ? { ...a } : squareExt(S().size);
+  }
+  function customArea(st) { return !!(st && S().areas[st.id]); }
+
+  // How many segments a square as big as this area gets along a side.
+  function segsFor(x, detail = S().detail) {
+    if (detail === 'finest') return SEG.finest;
+    if (detail === 'fine') return SEG.fine;
+    return Math.max(x.w + x.e, x.n + x.s) > WIDE_M ? SEG.fine : SEG.normal;
+  }
+
+  // The sampling of an area: { step, iw, ie, in, is } — the step, and the
+  // whole steps of ground each way from the station. A plain square keeps
+  // its own arithmetic (size / segments), to the last bit.
+  function gridOf(x, segs) {
+    if (isSquareExt(x)) { const h = segs / 2; return { step: (2 * x.w) / segs, iw: h, ie: h, in: h, is: h }; }
+    const sx = x.w + x.e, sz = x.n + x.s;
+    const step = Math.max(Math.sqrt(sx * sz) / segs, Math.max(sx, sz) / SEG_SIDE);
+    const steps = v => Math.max(1, Math.ceil(v / step - 1e-9));
+    return { step, iw: steps(x.w), ie: steps(x.e), in: steps(x.n), is: steps(x.s) };
+  }
+
+  // The box of an area about a point: its edges in degrees and in the scene's
+  // metres, and its sampling. `size` is its longest side and `half` half of
+  // that — what a distance or a width is scaled by — never where its edge is:
+  // that is x0, x1, z0, z1.
+  function areaBox(lat0, lon0, x, segs = segsFor(x)) {
+    const g = gridOf(x, segs), step = g.step;
+    const square = isSquareExt(x);
+    const w = square ? x.w : g.iw * step, e = square ? x.e : g.ie * step;
+    const n = square ? x.n : g.in * step, s = square ? x.s : g.is * step;
+    const mLat = metresPerDegLat(), mLon = metresPerDegLon(lat0);
+    const sizeX = w + e, sizeZ = n + s, size = Math.max(sizeX, sizeZ);
+    return {
+      west: lon0 - w / mLon, east: lon0 + e / mLon, south: lat0 - s / mLat, north: lat0 + n / mLat,
+      half: size / 2, size, sizeX, sizeZ, x0: -w, x1: e, z0: -n, z1: s,
+      nx: g.iw + g.ie + 1, nz: g.in + g.is + 1, step, ci: g.iw, cj: g.in, lat0, lon0,
+      square: square && segs === N - 1,
+    };
+  }
+
+  // A square `size` metres across, centred on a point, at 201 × 201: the
+  // patch as it always was, and every other square this file asks for — a
+  // sheet of the horizon, a bridge query, the sharp drape.
+  function patchBox(lat0, lon0, size) { return areaBox(lat0, lon0, squareExt(size), N - 1); }
+
+  // Whether a scene point is on the patch, `inset` metres in from its edge.
+  function onPatch(x, z, inset = 0, g = tw.ground) {
+    return !!g && x >= g.x0 + inset && x <= g.x1 - inset && z >= g.z0 + inset && z <= g.z1 - inset;
+  }
+  // The nearest point of the patch to a scene point, `inset` metres in.
+  function clampToPatch(x, z, inset = 0, g = tw.ground) {
+    if (!g) return { x, z };
+    return { x: Math.max(g.x0 + inset, Math.min(g.x1 - inset, x)), z: Math.max(g.z0 + inset, Math.min(g.z1 - inset, z)) };
+  }
+  // The patch's box in degrees with its size, for whoever is asked what is in
+  // it (the cadastre, the trees and buildings, the field photos).
+  function groundBox(g = tw.ground) {
+    return { ...g.box, size: g.size, half: g.half, sizeX: g.sizeX, sizeZ: g.sizeZ, x0: g.x0, x1: g.x1, z0: g.z0, z1: g.z1 };
   }
 
   function insideBox(box, lim) {
     return box.west >= lim.west && box.east <= lim.east && box.south >= lim.south && box.north <= lim.north;
   }
 
-  // Ground height (AHD, metres) at a scene point, bilinear in the N × N grid.
-  // Row 0 is the north edge (z = −half), column 0 the west edge (x = −half) —
-  // the raster's own order. Outside the patch, the station's own height: the
-  // camera clamp and the figure both ask, and neither should fall off the edge
-  // of the world.
+  // Ground height (AHD, metres) at a scene point, bilinear in the nx × nz grid.
+  // Row 0 is the north edge (z = z0), column 0 the west edge (x = x0) — the
+  // raster's own order. Outside the patch, the height at its nearest edge:
+  // the camera clamp and the figure both ask, and neither should fall off the
+  // edge of the world.
   function heightAt(x, z) {
     const g = tw.ground;
     if (!g) return 0;
-    const step = g.size / (N - 1);
-    const fx = Math.min(N - 1, Math.max(0, (x + g.half) / step));
-    const fy = Math.min(N - 1, Math.max(0, (z + g.half) / step));
-    const ix = Math.min(N - 2, Math.floor(fx)), iy = Math.min(N - 2, Math.floor(fy));
+    const nx = g.nx, nz = g.nz, step = g.step;
+    const fx = Math.min(nx - 1, Math.max(0, (x - g.x0) / step));
+    const fy = Math.min(nz - 1, Math.max(0, (z - g.z0) / step));
+    const ix = Math.min(nx - 2, Math.floor(fx)), iy = Math.min(nz - 2, Math.floor(fy));
     const tx = fx - ix, ty = fy - iy;
     const e = g.elev;
-    const a = e[iy * N + ix], b = e[iy * N + ix + 1], c = e[(iy + 1) * N + ix], d = e[(iy + 1) * N + ix + 1];
+    const a = e[iy * nx + ix], b = e[iy * nx + ix + 1], c = e[(iy + 1) * nx + ix], d = e[(iy + 1) * nx + ix + 1];
     const v = a * (1 - tx) * (1 - ty) + b * tx * (1 - ty) + c * (1 - tx) * ty + d * tx * ty;
     return isFinite(v) ? v : g.h0;
   }
@@ -408,7 +555,7 @@ const DigitalTwin = (function () {
   // off it (when there is one), the station's own level where neither knows.
   function surfaceY(x, z) {
     const g = tw.ground;
-    if (g && sc.horizon && Math.max(Math.abs(x), Math.abs(z)) > g.half) {
+    if (g && sc.horizon && !onPatch(x, z)) {
       const r = ringSurface(x, z);
       if (isFinite(r)) return r;
     }
@@ -590,22 +737,22 @@ const DigitalTwin = (function () {
   // that, and a raster that came back a different shape is a failure, not a
   // ground.
   function demBox(box) {
-    const step = box.size / (N - 1);
+    const step = box.step;
     const hLat = step / 2 / metresPerDegLat();
-    const hLon = step / 2 / metresPerDegLon((box.south + box.north) / 2);
+    const hLon = step / 2 / metresPerDegLon(box.lat0);
     return { west: box.west - hLon, south: box.south - hLat, east: box.east + hLon, north: box.north + hLat };
   }
 
   function qldDemUrl(box) {
     const b = demBox(box);
     const bb = [b.west, b.south, b.east, b.north].map(v => v.toFixed(8)).join(',');
-    return `${QLD_DEM}?bbox=${bb}&bboxSR=4326&imageSR=4326&size=${N},${N}&adjustAspectRatio=false`
+    return `${QLD_DEM}?bbox=${bb}&bboxSR=4326&imageSR=4326&size=${box.nx},${box.nz}&adjustAspectRatio=false`
          + '&format=tiff&pixelType=F32&noData=-9999&interpolation=RSP_BilinearInterpolation&f=image';
   }
 
-  function qldImgUrl(box, px) {
+  function qldImgUrl(box, pw, ph = pw) {
     const bb = [box.west, box.south, box.east, box.north].map(v => v.toFixed(8)).join(',');
-    return `${QLD_IMG}?bbox=${bb}&bboxSR=4326&imageSR=4326&size=${px},${px}&adjustAspectRatio=false&format=jpg&f=image`;
+    return `${QLD_IMG}?bbox=${bb}&bboxSR=4326&imageSR=4326&size=${pw},${ph}&adjustAspectRatio=false&format=jpg&f=image`;
   }
 
   // The State's raster, as an N × N grid, or the reason there is none — and
@@ -620,12 +767,12 @@ const DigitalTwin = (function () {
     if (typeof fetch !== 'function') return Promise.resolve({ kind: 'failed', error: 'no fetch' });
     return once(() => fetchBytes(qldDemUrl(box))).then(buf => {
       const t = readTiffF32(buf);
-      if (t.W !== N || t.H !== N) throw new Error(`it answered ${t.W} × ${t.H} pixels, not ${N} × ${N}`);
+      if (t.W !== box.nx || t.H !== box.nz) throw new Error(`it answered ${t.W} × ${t.H} pixels, not ${box.nx} × ${box.nz}`);
       // The pixels have to be where they were asked for, on both axes, or
       // the rows land on the wrong vertices — see qldDemUrl. Half a percent is
       // rounding; the aspect snap this guards against is 4–15%.
       const b = demBox(box);
-      const wantX = (b.east - b.west) / N, wantY = (b.north - b.south) / N;
+      const wantX = (b.east - b.west) / box.nx, wantY = (b.north - b.south) / box.nz;
       if (t.pixelScale && (Math.abs(t.pixelScale[0] - wantX) > wantX * 0.005
                         || Math.abs(t.pixelScale[1] - wantY) > wantY * 0.005)) {
         throw new Error('it answered a different extent from the one asked for');
@@ -647,23 +794,26 @@ const DigitalTwin = (function () {
   // lift of a coarse lattice is at least a surface.
   function tileGround(box) {
     if (typeof Terrain === 'undefined') return Promise.resolve(null);
-    const n = Math.max(9, Math.min(65, Math.ceil(box.size / 30) + 1));
-    return Terrain.grid({ west: box.west, east: box.east, south: box.south, north: box.north }, n, n)
+    // A lattice node every ~30 m: 65 a side holds the 1.6 km square, and a
+    // wider area takes what its own sides need.
+    const cap = box.size > 1950 ? 257 : 65;
+    const lat = side => Math.max(9, Math.min(cap, Math.ceil(side / 30) + 1));
+    return Terrain.grid({ west: box.west, east: box.east, south: box.south, north: box.north }, lat(box.sizeX), lat(box.sizeZ))
       .then(r => {
         if (!r || !r.ok) return null;
-        return { elev: upsample(r.elev, r.nx, r.ny, N), resolution_m: r.resolution_m, attribution: r.attribution };
+        return { elev: upsample(r.elev, r.nx, r.ny, box.nx, box.nz), resolution_m: r.resolution_m, attribution: r.attribution };
       })
       .catch(() => null);
   }
 
-  // Bilinear resample of an nx × ny grid (row 0 north) to an N × N one over the
-  // same box. A NaN in the source stays a hole rather than bleeding: a corner
-  // that is NaN takes its cell's nearest finite neighbour, and a cell with no
-  // finite corner is NaN.
-  function upsample(src, nx, ny, n) {
-    const out = new Float32Array(n * n);
-    for (let j = 0; j < n; j++) {
-      const fy = (j / (n - 1)) * (ny - 1);
+  // Bilinear resample of an nx × ny grid (row 0 north) to an n × m one (m rows;
+  // n × n where m is left out) over the same box. A NaN in the source stays a
+  // hole rather than bleeding: a corner that is NaN takes its cell's nearest
+  // finite neighbour, and a cell with no finite corner is NaN.
+  function upsample(src, nx, ny, n, m = n) {
+    const out = new Float32Array(n * m);
+    for (let j = 0; j < m; j++) {
+      const fy = (j / (m - 1)) * (ny - 1);
       const iy = Math.min(ny - 2, Math.floor(fy)), ty = fy - iy;
       for (let i = 0; i < n; i++) {
         const fx = (i / (n - 1)) * (nx - 1);
@@ -696,7 +846,7 @@ const DigitalTwin = (function () {
   // says so (`datum`), the flood water refuses to stand AHD levels on it, and
   // it is not cached, so the next build asks again.
   function groundFor(box) {
-    const key = `${box.south.toFixed(6)},${box.west.toFixed(6)}|${box.size}`;
+    const key = boxKey(box);
     if (groundCache.has(key)) return Promise.resolve(groundCache.get(key));
     return qldGround(box).then(q => {
       if (q.kind === 'ok' && q.holes === 0) return finishGround(box, q.elev, 'qld', 0, 0, null, q, null);
@@ -734,7 +884,7 @@ const DigitalTwin = (function () {
   // where none did) — { ok: true, m } when they were put into AHD by m, else
   // the reason they could not be, and the ground is EGM96 where they are.
   function finishGround(box, elev, source, holes, filled, tiles, q, sep) {
-    const c = elev[Math.floor(N / 2) * N + Math.floor(N / 2)];
+    const c = elev[box.cj * box.nx + box.ci];   // the sample the station stands on
     let min = Infinity, max = -Infinity, nan = 0;
     for (let i = 0; i < elev.length; i++) {
       const v = elev[i];
@@ -748,9 +898,13 @@ const DigitalTwin = (function () {
     // silently, so the count goes in the notes.
     const h0 = isFinite(c) ? c : (min + max) / 2;
     if (nan) for (let i = 0; i < elev.length; i++) if (!isFinite(elev[i])) elev[i] = h0;
-    const step = box.size / (N - 1);
+    const step = box.step;
     return {
       elev, size: box.size, half: box.half, source, h0, min, max, holes, filled, unfilled: nan,
+      // Where it is and how it is sampled (see "the area").
+      nx: box.nx, nz: box.nz, step, x0: box.x0, x1: box.x1, z0: box.z0, z1: box.z1,
+      sizeX: box.sizeX, sizeZ: box.sizeZ, square: !!box.square && box.x0 === -box.x1 && box.z0 === -box.z1,
+      box: { west: box.west, east: box.east, south: box.south, north: box.north },
       // Why the State's raster is not the whole answer, when it is not:
       // 'outside' | 'empty' | 'failed' (or 'ok'), and for a failure, what
       // went wrong in the notes' own words.
@@ -848,7 +1002,16 @@ const DigitalTwin = (function () {
   // Texture width for a patch: 1024 px is 0.4 m/px over 400 m, which is near
   // what the aerial program resolves outside the towns; the two wide patches
   // take 2048 so a 1.6 km square is not 1.6 m blocks.
-  function texturePx(size) { return size > 600 ? 2048 : 1024; }
+  // Any other shape gets the same texels a metre along its longer side, and
+  // one whose longer side is past 1.6 km twice as many where the State's
+  // service will answer them — it stops at 4,096 across and 2,048 down, so a
+  // reach that runs east–west is draped finer than one that runs north–south.
+  function texturePx(box) {
+    const long = box.size, per = (long > 600 ? 2048 : 1024) / long;
+    if (box.sizeX === box.sizeZ && long <= WIDE_M) { const p = long > 600 ? 2048 : 1024; return [p, p]; }
+    const k = long > WIDE_M ? Math.min(4096 / box.sizeX, 2048 / box.sizeZ, 2 * per) : per;
+    return [Math.max(64, Math.round(box.sizeX * k)), Math.max(64, Math.round(box.sizeZ * k))];
+  }
 
   // The State answers a patch it has no photography for with a plain grey
   // sheet rather than an error. Sixty-four pixels on an 8 × 8 lattice across
@@ -872,21 +1035,21 @@ const DigitalTwin = (function () {
     return max - min < 6;
   }
 
-  function drawToCanvas(img, px) {
+  function drawToCanvas(img, pw, ph = pw) {
     const cv = document.createElement('canvas');
-    cv.width = cv.height = px;
-    cv.getContext('2d').drawImage(img, 0, 0, px, px);
+    cv.width = pw; cv.height = ph;
+    cv.getContext('2d').drawImage(img, 0, 0, pw, ph);
     return cv;
   }
 
   // The State's photography, or why not — on qldGround's terms:
   //   { kind: 'ok', canvas, … } | { kind: 'outside' | 'blank' | 'failed' }
-  function qldImagery(box, px) {
+  function qldImagery(box, pw, ph) {
     if (!insideBox(box, QLD_IMG_BOX)) return Promise.resolve({ kind: 'outside' });
-    return once(() => loadImage(qldImgUrl(box, px))).then(img => {
-      const cv = drawToCanvas(img, px);
+    return once(() => loadImage(qldImgUrl(box, pw, ph))).then(img => {
+      const cv = drawToCanvas(img, pw, ph);
       if (isBlank(cv)) return { kind: 'blank' };
-      return { kind: 'ok', canvas: cv, source: 'qld', attribution: ATTR_QLD_IMG, mpp: box.size / px };
+      return { kind: 'ok', canvas: cv, source: 'qld', attribution: ATTR_QLD_IMG, mpp: box.sizeX / pw };
     }).catch(() => ({ kind: 'failed' }));
   }
 
@@ -905,9 +1068,9 @@ const DigitalTwin = (function () {
   // is 170 tiles, at z17 it is 36, and 1 m texels over 1.6 km is still a
   // drape and not a mosaic of requests.
   const ESRI_MAX_TILES = 64;
-  function esriImagery(box, px) {
+  function esriImagery(box, pw, ph = pw) {
     const midLat = (box.south + box.north) / 2;
-    const want = box.size / px;                                   // metres per texel
+    const want = box.sizeX / pw;                                  // metres per texel
     const mpp = zz => 156543.03392 * Math.cos(midLat * Math.PI / 180) / Math.pow(2, zz);
     let z = 0;
     while (z < 19 && mpp(z) > want) z++;
@@ -930,14 +1093,14 @@ const DigitalTwin = (function () {
       const got = tiles.filter(Boolean);
       if (!got.length) return null;
       const cv = document.createElement('canvas');
-      cv.width = cv.height = px;
+      cv.width = pw; cv.height = ph;
       const cx = cv.getContext('2d');
       // White under the tiles, so a tile that did not arrive is a white gap
       // — as the note says — rather than the black a transparent texel
       // renders as on an opaque material, and composites to in the JPEG.
       cx.fillStyle = '#ffffff';
-      cx.fillRect(0, 0, px, px);
-      const sx = px / (x1 - x0), sy = px / (y1 - y0);            // texels per tile unit
+      cx.fillRect(0, 0, pw, ph);
+      const sx = pw / (x1 - x0), sy = ph / (y1 - y0);            // texels per tile unit
       for (const t of got) {
         cx.drawImage(t.img, (t.tx - x0) * sx, (t.ty - y0) * sy, sx + 0.5, sy + 0.5);
       }
@@ -948,15 +1111,21 @@ const DigitalTwin = (function () {
     });
   }
 
-  function boxKey(box) { return `${box.south.toFixed(6)},${box.west.toFixed(6)}|${box.size}`; }
+  // A square at the standard sampling keys as it always did; any other shape
+  // or sampling says so.
+  function boxKey(box) {
+    const k = `${box.south.toFixed(6)},${box.west.toFixed(6)}|${box.size}`;
+    return box.square ? k : `${k}|${box.sizeX.toFixed(2)}x${box.sizeZ.toFixed(2)}|${box.nx}x${box.nz}`;
+  }
 
-  function imageryFor(box, px = texturePx(box.size)) {
+  function imageryFor(box, px) {
     const key = boxKey(box);
     if (imageCache.has(key)) return Promise.resolve(imageCache.get(key));
-    return qldImagery(box, px)
+    const [pw, ph] = px ? [px, px] : texturePx(box);
+    return qldImagery(box, pw, ph)
       .then(q => {
         if (q.kind === 'ok') return q;
-        return esriImagery(box, px).then(e => (e ? { ...e, qld: q.kind } : null), () => null);
+        return esriImagery(box, pw, ph).then(e => (e ? { ...e, qld: q.kind } : null), () => null);
       })
       .catch(() => null)
       .then(im => {
@@ -1045,6 +1214,7 @@ const DigitalTwin = (function () {
     removeBridges();
     removeCover();
     removeSharp();
+    removeMarks();
     if (typeof TwinCadastre !== 'undefined') TwinCadastre.remove();
     tw.photoNear = -1;
     sc.pole = null; sc.band = null; sc.doors = []; sc.towerStaff = null;
@@ -1137,15 +1307,18 @@ const DigitalTwin = (function () {
     col.needsUpdate = true;
   }
 
-  // The ground: one plane, N × N, its vertices lifted to the grid. Row 0 of the
-  // raster is north; PlaneGeometry's first row is its top, which rotateX(−90°)
-  // sends to −z — north. So the raster indexes the vertices directly, and the
-  // default UVs (v = 1 along that first row) put the top of the imagery on it.
+  // The ground: one plane, nx × nz, its vertices lifted to the grid. Row 0 of
+  // the raster is north; PlaneGeometry's first row is its top, which
+  // rotateX(−90°) sends to −z — north. So the raster indexes the vertices
+  // directly, and the default UVs (v = 1 along that first row) put the top of
+  // the imagery on it. The plane is made about its own middle and slid to
+  // where the patch is, which is not round the station unless the area is.
   function buildTerrain() {
     const g = tw.ground;
-    const size = g.size, exag = S().exag;
-    const geo = new THREE.PlaneGeometry(size, size, N - 1, N - 1);
+    const exag = S().exag;
+    const geo = new THREE.PlaneGeometry(g.sizeX, g.sizeZ, g.nx - 1, g.nz - 1);
     geo.rotateX(-Math.PI / 2);
+    if (!g.square) geo.translate((g.x0 + g.x1) / 2, 0, (g.z0 + g.z1) / 2);
     const pos = geo.attributes.position;
     const col = new Float32Array(pos.count * 3);
     const c = new THREE.Color();
@@ -1174,15 +1347,22 @@ const DigitalTwin = (function () {
     sc.scene.add(mesh);
 
     // The wireframe rides the same geometry, so the mesh's sample spacing can
-    // be seen against the imagery.
-    const wire = new THREE.LineSegments(new THREE.WireframeGeometry(geo),
+    // be seen against the imagery. A fine mesh's is six lines a sample — tens
+    // of megabytes at Finest — so past WIRE_MAX it is made when it is asked for.
+    sc.wire = null;
+    if (S().wire || pos.count <= WIRE_MAX) buildWire();
+    applyImagery();
+  }
+
+  function buildWire() {
+    if (sc.wire || !sc.terrain || !sc.scene) return;
+    const wire = new THREE.LineSegments(new THREE.WireframeGeometry(sc.terrain.geometry),
       new THREE.LineBasicMaterial({ color: 0x1b2a3a, transparent: true, opacity: 0.35 }));
     wire.visible = !!S().wire;
     wire.name = 'wireframe';
     wire.userData.export = false;
     sc.wire = wire;
     sc.scene.add(wire);
-    applyImagery();
   }
 
   function applyImagery() {
@@ -1247,9 +1427,8 @@ const DigitalTwin = (function () {
   // The square's centre for a point: snapped to SHARP_STEP, and kept inside
   // the patch.
   function sharpCentre(x, z) {
-    const g = tw.ground, h = SHARP_M / 2;
-    const lim = v => Math.max(-g.half + h, Math.min(g.half - h, Math.round(v / SHARP_STEP) * SHARP_STEP));
-    return { x: lim(x), z: lim(z) };
+    const h = SHARP_M / 2, snap = v => Math.round(v / SHARP_STEP) * SHARP_STEP;
+    return clampToPatch(snap(x), snap(z), h);
   }
 
   function sharpenAt(x, z) {
@@ -1383,49 +1562,103 @@ const DigitalTwin = (function () {
     return NaN;
   }
 
-  // The squares. Vertex t of a square of half-width h with M segments a side
-  // goes clockwise seen from above: the north edge west → east, the east
-  // north → south, the south east → west, the west south → north. The
-  // innermost square has M0 = N − 1 segments, so its vertices are the
-  // patch's own edge vertices.
+  // The rings. The patch's own edge is the innermost; each one out is a few
+  // percent further from the station, and they end as squares about it on
+  // each sheet's edge. Vertex t of a ring goes clockwise seen from above: the
+  // north edge west → east (Mx segments), the east north → south (Mz), the
+  // south east → west, the west south → north.
+  //
+  // Round a plain square (201 × 201, the station in the middle) the rings are
+  // squares the whole way and the innermost has the patch's own 800 edge
+  // vertices, as it always did. Round any other area the first ring is the
+  // patch's edge as it is — however many samples a side, wherever the station
+  // stands in it — and the next, a hair outside it, is the horizon's own 200 a
+  // side, the two zipped together triangle by triangle so every edge vertex of
+  // the patch is used at its own height. From there each side moves out by its
+  // own even ratio, the near side further each time than the far, until all
+  // four stand the same distance from the station on the first sheet's edge
+  // that clears the patch by a quarter; a sheet the patch outgrows is not
+  // drawn (the next one out covers what it would have).
   const M0 = N - 1;
-  function squareXZ(h, M, t) {
-    const side = Math.floor(t / M), u = (t % M) / M;
-    switch (side) {
-      case 0:  return { x: -h + 2 * h * u, z: -h };
-      case 1:  return { x: h, z: -h + 2 * h * u };
-      case 2:  return { x: h - 2 * h * u, z: h };
-      default: return { x: -h, z: h - 2 * h * u };
-    }
+
+  // The patch's own ring, and what the others are worked out from: the
+  // furthest any edge stands from the station (the rings' own measure, `h`),
+  // the first sheet out past it, and how the segments thin on the way.
+  function ringFrame(g = tw.ground) {
+    if (!g) return null;
+    if (g.ring) return g.ring;
+    const w = -g.x0, e = g.x1, n = -g.z0, s = g.z1;
+    const H0 = Math.max(w, e, n, s);
+    let kT = SHELL_HALF.findIndex(h => h >= 1.25 * H0);
+    if (kT < 0) kT = SHELL_HALF.length - 1;
+    const T = SHELL_HALF[kT];
+    const plain = g.nx - 1 === M0 && g.nz - 1 === M0;
+    g.ring = { w, e, n, s, H0, T, kT, lnT: Math.log(T / H0), plain, Mx: g.nx - 1, Mz: g.nz - 1,
+               r2: Math.max(w, e) * Math.max(w, e) + Math.max(n, s) * Math.max(n, s) };
+    return g.ring;
+  }
+  // How far a side that starts d0 from the station stands on the ring `h`.
+  function ringDist(F, d0, h) {
+    if (h >= F.T || d0 === F.H0) return h;
+    return d0 * Math.pow(F.T / d0, Math.log(h / F.H0) / F.lnT);
+  }
+  // …and its inverse: the ring a point d out on that side is on.
+  function ringLevel(F, d0, d) {
+    if (!(d > 0)) return 0;
+    if (d >= F.T || d0 === F.H0) return d;
+    return F.H0 * Math.pow(F.T / F.H0, Math.log(d / d0) / Math.log(F.T / d0));
+  }
+  function ringOf(F, h, Mx, Mz) {
+    return { h, M: Mx, Mx, Mz, w: ringDist(F, F.w, h), e: ringDist(F, F.e, h), n: ringDist(F, F.n, h), s: ringDist(F, F.s, h) };
+  }
+  function ringCount(r) { return 2 * (r.Mx + r.Mz); }
+  function ringXZ(r, t) {
+    if (t < r.Mx) return { x: -r.w + (r.w + r.e) * (t / r.Mx), z: -r.n };
+    t -= r.Mx;
+    if (t < r.Mz) return { x: r.e, z: -r.n + (r.n + r.s) * (t / r.Mz) };
+    t -= r.Mz;
+    if (t < r.Mx) return { x: r.e - (r.w + r.e) * (t / r.Mx), z: r.s };
+    t -= r.Mx;
+    return { x: -r.w, z: r.s - (r.n + r.s) * (t / r.Mz) };
   }
 
-  // The inverse: where a point stands round its own square, as a (fractional)
-  // index into the innermost square's 4·M0 vertices — which is what the lift
-  // at the patch's edge is stored by.
-  function perimeterT(x, z) {
-    const hq = Math.max(Math.abs(x), Math.abs(z));
-    if (hq === 0) return 0;
-    let side, u;
-    if (-z >= Math.abs(x))     { side = 0; u = (x + hq) / (2 * hq); }
-    else if (x >= Math.abs(z)) { side = 1; u = (z + hq) / (2 * hq); }
-    else if (z >= Math.abs(x)) { side = 2; u = (hq - x) / (2 * hq); }
-    else                       { side = 3; u = (hq - z) / (2 * hq); }
-    return (side + u) * M0;
+  // The inverse: the ring a point is on (`h`), and where it stands round it as
+  // a (fractional) index into the innermost ring's vertices — which is what
+  // the lift at the patch's edge is stored by.
+  function ringAt(x, z) {
+    const F = ringFrame();
+    if (!F) return { h: 0, t: 0 };
+    const hN = ringLevel(F, F.n, -z), hE = ringLevel(F, F.e, x), hS = ringLevel(F, F.s, z), hW = ringLevel(F, F.w, -x);
+    const h = Math.max(hN, hE, hS, hW);
+    if (h === 0) return { h: 0, t: 0 };
+    const w = ringDist(F, F.w, h), e = ringDist(F, F.e, h), n = ringDist(F, F.n, h), s = ringDist(F, F.s, h);
+    if (hN === h) return { h, t: ((x + w) / (w + e)) * F.Mx };
+    if (hE === h) return { h, t: F.Mx + ((z + n) / (n + s)) * F.Mz };
+    if (hS === h) return { h, t: F.Mx + F.Mz + ((e - x) / (w + e)) * F.Mx };
+    return { h, t: 2 * F.Mx + F.Mz + ((s - z) / (n + s)) * F.Mz };
   }
+  function perimeterT(x, z) { return ringAt(x, z).t; }
 
-  // The squares from the patch's edge to the horizon: 200 segments a side to
-  // 1.5 patch-halves, 100 to 4, then 50 all the way; each a few percent wider
-  // than the last, a run of them ending exactly on each sheet's edge so a
-  // shell's mesh starts and stops on a square.
-  function squareList(half) {
-    const segs = [[half, 1.5 * half, M0], [1.5 * half, 4 * half, M0 / 2], [4 * half, SHELL_HALF[0], M0 / 4]];
-    for (let k = 1; k < SHELL_HALF.length; k++) segs.push([SHELL_HALF[k - 1], SHELL_HALF[k], M0 / 4]);
-    const out = [{ h: half, M: M0 }];
+  // The rings from the patch's edge to the horizon: 200 segments a side to
+  // 1.5 times the patch's reach, 100 to 4 times, then 50 all the way; each a
+  // few percent wider than the last, a run of them ending exactly on each
+  // sheet's edge so a shell's mesh starts and stops on a square. Where the
+  // patch is so wide that the first sheet past it is nearer than 4 times its
+  // reach, the three runs share the way to that sheet evenly.
+  function ringList(g) {
+    const F = ringFrame(g);
+    const out = [{ h: F.H0, M: F.Mx, Mx: F.Mx, Mz: F.Mz, w: F.w, e: F.e, n: F.n, s: F.s }];
+    let from = F.H0;
+    if (!F.plain) { from = F.H0 * (1 + 3 / M0); out.push(ringOf(F, from, M0, M0)); }
+    const wide = 4 * F.H0 > F.T, r = F.T / F.H0;
+    const b1 = wide ? F.H0 * Math.pow(r, 1 / 3) : 1.5 * F.H0, b2 = wide ? F.H0 * Math.pow(r, 2 / 3) : 4 * F.H0;
+    const segs = [[from, b1, M0], [b1, b2, M0 / 2], [b2, F.T, M0 / 4]];
+    for (let k = F.kT + 1; k < SHELL_HALF.length; k++) segs.push([SHELL_HALF[k - 1], SHELL_HALF[k], M0 / 4]);
     for (const [a, b, M] of segs) {
       if (!(b > a)) continue;
       const n = Math.max(1, Math.ceil(Math.log(b / a) / Math.log(1 + 3 / M)));
       const q = Math.pow(b / a, 1 / n);
-      for (let i = 1; i <= n; i++) out.push({ h: i === n ? b : a * Math.pow(q, i), M });
+      for (let i = 1; i <= n; i++) out.push(ringOf(F, i === n ? b : a * Math.pow(q, i), M, M));
     }
     return out;
   }
@@ -1440,7 +1673,7 @@ const DigitalTwin = (function () {
   }
 
   // The Earth's curve, from the patch's circumscribed circle out.
-  function earthDrop(d, half) { return Math.max(0, d * d - 2 * half * half) / (2 * EARTH_R_EYE); }
+  function earthDrop(d) { const F = ringFrame(); return F ? Math.max(0, d * d - F.r2) / (2 * EARTH_R_EYE) : 0; }
 
   // The far ground as drawn, at any point outside the patch: the sheet's
   // height, lifted to meet the LiDAR edge where that is near, exaggerated
@@ -1449,12 +1682,12 @@ const DigitalTwin = (function () {
   function ringSurface(x, z) {
     const g = tw.ground;
     if (!g || !tw.horizon) return NaN;
-    const hq = Math.max(Math.abs(x), Math.abs(z));
-    if (hq < g.half) return NaN;
-    const w = Math.min(1, Math.max(0, (hq / g.half - 1) / (BLEND_OUT - 1)));
+    const F = ringFrame(g), at = ringAt(x, z);
+    if (at.h < F.H0) return NaN;
+    const w = Math.min(1, Math.max(0, (at.h / F.H0 - 1) / (BLEND_OUT - 1)));
     const r = ringHeight(x, z);
-    const H = (isFinite(r) ? r : g.h0) + (1 - w) * offsetAt(perimeterT(x, z));
-    return (H - g.h0) * S().exag - earthDrop(Math.hypot(x, z), g.half);
+    const H = (isFinite(r) ? r : g.h0) + (1 - w) * offsetAt(at.t);
+    return (H - g.h0) * S().exag - earthDrop(Math.hypot(x, z));
   }
 
   function removeHorizon() {
@@ -1483,48 +1716,70 @@ const DigitalTwin = (function () {
     removeHorizon();
     const g = tw.ground, hz = tw.horizon;
     if (!g || !hz || !hz.grids.some(Boolean) || !sc.scene) return;
-    const off = new Float32Array(4 * M0);
+    const F = ringFrame(g);
+    const squares = ringList(g), edge = squares[0], P0 = ringCount(edge);
+    const off = new Float32Array(P0);
     let unfilled = 0;
-    for (let t = 0; t < 4 * M0; t++) {
-      const p = squareXZ(g.half, M0, t);
+    for (let t = 0; t < P0; t++) {
+      const p = ringXZ(edge, t);
       const r = ringHeight(p.x, p.z);
       if (!isFinite(r)) unfilled++;
       off[t] = heightAt(p.x, p.z) - (isFinite(r) ? r : g.h0);
     }
     tw.horizonOffsets = off;
     tw.horizonUnfilled = unfilled;
-    const squares = squareList(g.half);
     const group = new THREE.Group();
     group.name = 'horizon';
     const shells = [];
     for (let k = 0; k < SHELL_HALF.length; k++) {
       // A sheet that did not arrive is a shell not drawn — a ring of nothing,
       // rather than a ring of flat ground at the station's level.
-      if (!hz.grids[k]) continue;
-      const outerH = SHELL_HALF[k], innerH = k === 0 ? g.half : SHELL_HALF[k - 1];
+      // Nor is a sheet the patch has outgrown: the next one out starts at the
+      // patch's edge instead.
+      if (!hz.grids[k] || k < F.kT) continue;
+      const outerH = SHELL_HALF[k], innerH = k === F.kT ? F.H0 : SHELL_HALF[k - 1];
       const mine = squares.filter(s => s.h >= innerH - 1e-6 && s.h <= outerH + 1e-6);
       if (mine.length < 2) continue;
       const base = [];
       let count = 0;
-      for (const s of mine) { base.push(count); count += 4 * s.M; }
+      for (const s of mine) { base.push(count); count += ringCount(s); }
       const pos = new Float32Array(count * 3), uv = new Float32Array(count * 2), col = new Float32Array(count * 3);
       const isInner = new Uint8Array(count), meta = new Int32Array(count * 2);
       for (let qi = 0; qi < mine.length; qi++) {
         const s = mine[qi];
-        for (let t = 0; t < 4 * s.M; t++) {
-          const i = base[qi] + t, p = squareXZ(s.h, s.M, t);
+        for (let t = 0, nT = ringCount(s); t < nT; t++) {
+          const i = base[qi] + t, p = ringXZ(s, t);
           pos[i * 3] = p.x; pos[i * 3 + 2] = p.z;
           uv[i * 2] = (p.x + outerH) / (2 * outerH); uv[i * 2 + 1] = (outerH - p.z) / (2 * outerH);
-          isInner[i] = s.h === g.half ? 1 : 0;
+          isInner[i] = s === edge ? 1 : 0;
           meta[i * 2] = qi; meta[i * 2 + 1] = t;
         }
       }
       // Outermost pair of squares first. Between a square and a coarser one
       // outside it, every second vertex of the finer is used; its odd ones
-      // are the seam list, put on the line between their neighbours.
+      // are the seam list, put on the line between their neighbours. The
+      // patch's own edge is never thinned that way — its vertices are the
+      // patch's, and stay where the ground has them — so where the ring
+      // outside it has other counts the two are zipped, side by side: one
+      // triangle for every segment of either, each to the nearest vertex
+      // across.
       const idx = [], seams = [];
       for (let qi = mine.length - 2; qi >= 0; qi--) {
-        const A = mine[qi], B = mine[qi + 1], r = A.M / B.M, nA = 4 * A.M, nB = 4 * B.M;
+        const A = mine[qi], B = mine[qi + 1], nA = ringCount(A), nB = ringCount(B);
+        const r = A.Mx / B.Mx;
+        if (A.Mz / B.Mz !== r || (r !== 1 && r !== 2) || (A === edge && r !== 1)) {
+          let oa = 0, ob = 0;
+          for (const [ma, mb] of [[A.Mx, B.Mx], [A.Mz, B.Mz], [A.Mx, B.Mx], [A.Mz, B.Mz]]) {
+            let i = 0, j = 0;
+            while (i < ma || j < mb) {
+              const a = base[qi] + (oa + i) % nA, d = base[qi + 1] + (ob + j) % nB;
+              if (j === mb || (i < ma && (i + 1) * mb <= (j + 1) * ma)) { idx.push(a, base[qi] + (oa + i + 1) % nA, d); i++; }
+              else { idx.push(a, base[qi + 1] + (ob + j + 1) % nB, d); j++; }
+            }
+            oa += ma; ob += mb;
+          }
+          continue;
+        }
         for (let t = 0; t < nB; t++) {
           const a = base[qi] + (t * r) % nA, b = base[qi] + ((t + 1) * r) % nA;
           const c = base[qi + 1] + (t + 1) % nB, d = base[qi + 1] + t;
@@ -1567,7 +1822,7 @@ const DigitalTwin = (function () {
         const x = pos.getX(i), z = pos.getZ(i);
         const y = sh.isInner[i] ? yAt(x, z) : ringSurface(x, z);
         pos.setY(i, isFinite(y) ? y : 0);
-        H[i] = (pos.getY(i) + earthDrop(Math.hypot(x, z), g.half)) / exag + g.h0;
+        H[i] = (pos.getY(i) + earthDrop(Math.hypot(x, z))) / exag + g.h0;
         if (H[i] < lo) lo = H[i];
         if (H[i] > hi) hi = H[i];
       }
@@ -2784,8 +3039,8 @@ void main() {
     if (!a || !tw.ground) return;
     const now = performance.now();
     a.pose = p;
-    const onPatch = p.mode === 'walk' && Math.abs(p.x) <= tw.ground.half && Math.abs(p.z) <= tw.ground.half;
-    if (!onPatch) { a.group.visible = false; a.laser.visible = false; a.dot.visible = false; a.to = null; requestFrame(); return; }
+    const here = p.mode === 'walk' && onPatch(p.x, p.z);
+    if (!here) { a.group.visible = false; a.laser.visible = false; a.dot.visible = false; a.to = null; requestFrame(); return; }
     const target = { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch };
     a.from = a.group.visible && a.shown ? { ...a.shown } : { ...target };
     a.dur = a.group.visible ? Math.min(400, Math.max(60, now - a.t0)) : 0;
@@ -3051,7 +3306,8 @@ void main() {
       const brg = bearingDeg(station.lat, station.lon, p.far.lat, p.far.lon);
       const rad = brg * Math.PI / 180;
       const ux = Math.sin(rad), uz = -Math.cos(rad);
-      const edge = g.half / Math.max(Math.abs(ux), Math.abs(uz), 1e-9);
+      // How far along the bearing the patch's edge is.
+      const edge = Math.min((ux >= 0 ? g.x1 : -g.x0) / Math.max(Math.abs(ux), 1e-9), (uz >= 0 ? g.z1 : -g.z0) / Math.max(Math.abs(uz), 1e-9));
       const dE = Math.min(D, edge);
       let hF = farGround(p.far);
       if (hF == null) { missing.push(p.far); hF = g.h0; }
@@ -3289,12 +3545,11 @@ void main() {
     tw.photos = Object.assign({ spots: [], count: 0 }, tw.photos && tw.photos.status === 'ok' ? tw.photos : {}, { status: 'loading' });
     refreshPhotosLine();
     const g = tw.ground;
-    FieldPhotos.inBox(patchBox(st.lat, st.lon, g.size)).then(rows => {
+    FieldPhotos.inBox(groundBox(g)).then(rows => {
       if (seq !== tw.seq || !tw.ground) return;
-      const half = tw.ground.half;
       const spots = FieldPhotos.spots(rows)
         .map(sp => Object.assign(sp, localXZ(sp.lat, sp.lon, st.lat, st.lon)))
-        .filter(sp => Math.abs(sp.x) <= half - 0.3 && Math.abs(sp.z) <= half - 0.3);
+        .filter(sp => onPatch(sp.x, sp.z, 0.3));
       tw.photos = { status: 'ok', spots, count: spots.reduce((n, sp) => n + sp.rows.length, 0) };
       buildPhotoMarkers();
       refreshPhotosLine();
@@ -3473,7 +3728,7 @@ void main() {
     for (const s of state.data.stations) {
       if (s.id === st.id || !located(s)) continue;
       const p = localXZ(Number(s.lat), Number(s.lon), o.lat, o.lon);
-      if (Math.abs(p.x) > g.half || Math.abs(p.z) > g.half) continue;
+      if (!onPatch(p.x, p.z)) continue;
       all.push({ s, x: p.x, z: p.z, d: Math.hypot(p.x, p.z) });
     }
     all.sort((a, b) => a.d - b.d);
@@ -3596,6 +3851,15 @@ void main() {
 
   function edgeMargin(size) { return Math.max(30, Math.round(size * BRIDGE_EDGE)); }
   function bridgeQueryBox(lat, lon, size) { return patchBox(lat, lon, size + 2 * edgeMargin(size)); }
+  // The same for an area that is not the plain square: grown by the margin
+  // its longest side earns, on every side.
+  function growExt(x, m) { return { w: x.w + m, e: x.e + m, n: x.n + m, s: x.s + m }; }
+  function bridgeAskBox(st, x, custom) {
+    if (!custom) return bridgeQueryBox(st.lat, st.lon, S().size);
+    return areaBox(Number(st.lat), Number(st.lon), growExt(x, edgeMargin(Math.max(x.w + x.e, x.n + x.s))), N - 1);
+  }
+  // How far a point stands outside the patch (negative inside it).
+  function pastPatch(p, g = tw.ground) { return Math.max(g.x0 - p.x, p.x - g.x1, g.z0 - p.z, p.z - g.z1); }
 
   function removeBridges() {
     if (sc.bridges && sc.scene) { sc.scene.remove(sc.bridges); disposeObject(sc.bridges); }
@@ -3709,7 +3973,7 @@ void main() {
   // The part in the patch, with the distance along it from its own first point.
   function clipToPatch(all) {
     const g = tw.ground;
-    const inside = all.filter(p => Math.abs(p.x) <= g.half && Math.abs(p.z) <= g.half).map(p => ({ x: p.x, z: p.z }));
+    const inside = all.filter(p => onPatch(p.x, p.z, 0, g)).map(p => ({ x: p.x, z: p.z }));
     let s = 0;
     for (let i = 0; i < inside.length; i++) {
       if (i) s += Math.hypot(inside[i].x - inside[i - 1].x, inside[i].z - inside[i - 1].z);
@@ -3785,7 +4049,7 @@ void main() {
         const x = pts[i].x + nx * half * sgn, z = pts[i].z + nz * half * sgn;
         top.push(x, y, z);
         bot.push(x, y - DECK_THICK, z);
-        uv.push((x + g.half) / g.size, (g.half - z) / g.size);
+        uv.push((x - g.x0) / g.sizeX, (g.z1 - z) / g.sizeZ);
       }
     }
     const n = pts.length;
@@ -3963,16 +4227,15 @@ void main() {
     }
     const grp = new THREE.Group();
     grp.name = 'bridges';
-    const half = g.half;
-    const inPatch = p => Math.abs(p.x) <= half - 1 && Math.abs(p.z) <= half - 1;
+    const inPatch = p => onPatch(p.x, p.z, 1, g);
     for (const sp of cands) {
       const nm = sp.b.name || (sp.b.kind === 'rail' ? 'a railway bridge' : 'a bridge');
       if (!sp.drawn) {
         // Not in the patch at all: said, not drawn.
         let best = null;
-        for (const p of sp.all) { const e = Math.max(Math.abs(p.x), Math.abs(p.z)); if (!best || e < best.e) best = { e, p }; }
-        if (best && best.e <= half + edgeMargin(g.size)) {
-          tw.bridges.beyond.push({ name: sp.b.name, kind: sp.b.kind, past: best.e - half, bearing: compassOf(best.p.x, best.p.z), length: sp.all[sp.all.length - 1].s });
+        for (const p of sp.all) { const e = pastPatch(p, g); if (!best || e < best.e) best = { e, p }; }
+        if (best && best.e <= edgeMargin(g.size)) {
+          tw.bridges.beyond.push({ name: sp.b.name, kind: sp.b.kind, past: best.e, bearing: compassOf(best.p.x, best.p.z), length: sp.all[sp.all.length - 1].s });
         }
         continue;
       }
@@ -4015,7 +4278,7 @@ void main() {
       notes.push(`The Bureau lists the crossing this gauge is read against at ${own.height.toFixed(2)} m on the gauge (${own.ahd.toFixed(2)} m AHD), but no road bridge in this patch is within ${CROSSING_REACH} m of the gauge to carry it, so ${tw.bridges.list.length === 1 ? 'the bridge here stands at its banks' : 'the bridges here stand at their banks'}.`);
     }
     for (const b of tw.bridges.beyond) {
-      notes.push(`${b.name || (b.kind === 'rail' ? 'A railway bridge' : 'A bridge')} stands ${Math.round(b.past)} m past the patch's edge to the ${b.bearing}, out of it, so it is not drawn. Widen the patch on the Scene panel to include it.`);
+      notes.push(`${b.name || (b.kind === 'rail' ? 'A railway bridge' : 'A bridge')} stands ${Math.round(b.past)} m past the patch's edge to the ${b.bearing}, out of it, so it is not drawn. Widen the area on the Scene panel to include it — Widen to a bridge does it in one press.`);
     }
     if (tw.bridges.skipped.length) {
       notes.push(`${tw.bridges.skipped.length === 1 ? 'A bridge passes' : `${tw.bridges.skipped.length} bridges pass`} through the patch with both ends out of it, so nothing here says how high ${tw.bridges.skipped.length === 1 ? 'its deck stands' : 'their decks stand'}; not drawn.`);
@@ -4031,7 +4294,7 @@ void main() {
   function loadBridges(st, seq, notes, askP) {
     tw.bridges = { status: 'loading', list: [], source: null, failed: null, crossing: null, beyond: [], skipped: [] };
     refreshSiteLine();
-    return (askP || bridgesFor(bridgeQueryBox(tw.origin.lat, tw.origin.lon, (tw.fit && tw.fit.size0) || tw.ground.size))).then(found => {
+    return (askP || bridgesFor(tw.askBox || bridgeQueryBox(tw.origin.lat, tw.origin.lon, (tw.fit && tw.fit.size0) || tw.ground.size))).then(found => {
       if (seq !== tw.seq || !sc.scene) return;
       tw.bridgesFound = found;
       const said = buildBridges(st, found);
@@ -4040,6 +4303,7 @@ void main() {
       }
       if (said.length) notes.push(...said);
       if (found.failed || said.length) setNotes(notes);
+      loadReach(st, seq);
     });
   }
 
@@ -4053,7 +4317,7 @@ void main() {
     const o = { ...tw.origin };
     TwinCadastre.load({
       THREE, scene: sc.scene, camera: sc.camera, canvas: sc.canvas, stage: sc.stage, terrain: sc.terrain,
-      ground: tw.ground, origin: o, box: patchBox(o.lat, o.lon, tw.ground.size),
+      ground: tw.ground, origin: o, box: groundBox(tw.ground),
       exag: () => S().exag,
       toXZ: (lat, lon) => localXZ(lat, lon, o.lat, o.lon),
       surfaceY,
@@ -4133,7 +4397,12 @@ void main() {
       tw.cover = null; refreshCover(); return;
     }
     const o = tw.origin;
-    const box = patchBox(o.lat, o.lon, tw.ground.size);
+    const box = groundBox(tw.ground);
+    // The trees and buildings are read for areas up to ~3 km along their
+    // longer side (ground-cover.js). Wider, nothing is asked — and that is
+    // said, rather than called a source that could not be reached.
+    const widest = (GroundCover.TREES_MAX_M || 3000) * 1.1;
+    if (tw.ground.size > widest) { tw.cover = { status: 'wide', widest, size: tw.ground.size }; refreshCover(); return; }
     const C = tw.cover = { status: 'loading', pending: 2, trees: null, buildings: null, treesError: null, buildingsError: null,
                            placedTrees: [], placedBuildings: [], drawn: { trees: 0, buildings: 0 } };
     refreshCover();
@@ -4160,7 +4429,7 @@ void main() {
   // Every building in the patch, one mesh: walls wound outward and a flat
   // roof wound up, as plain triangles, so each face is lit flat.
   function buildingsMesh(list, placed) {
-    const o = tw.origin, half = tw.ground.half;
+    const o = tw.origin;
     const pos = [];
     const area2 = r => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += r[j].x * r[i].z - r[i].x * r[j].z; return a; };
     const tri = (a, b, c) => { pos.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]); };
@@ -4183,7 +4452,7 @@ void main() {
       let cx = 0, cz = 0;
       for (const p of outer) { cx += p.x; cz += p.z; }
       cx /= outer.length; cz /= outer.length;
-      if (Math.abs(cx) > half || Math.abs(cz) > half) continue;
+      if (!onPatch(cx, cz)) continue;
       const holes = (b.holes || []).map(toXZ).filter(r => r.length >= 3);
       let base = Infinity;
       for (const p of outer) base = Math.min(base, yAt(p.x, p.z));
@@ -4228,11 +4497,11 @@ void main() {
 
   // Every tree in the patch: two instanced meshes, the trunks and the crowns.
   function treeMeshes(list, placed) {
-    const o = tw.origin, half = tw.ground.half;
+    const o = tw.origin;
     const crownR = h => (typeof GroundCover.crownRadius === 'function' ? GroundCover.crownRadius(h) : Math.max(1.5, Math.min(8, 0.18 * h + 1)));
     for (const t of list) {
       const p = localXZ(t.lat, t.lon, o.lat, o.lon);
-      if (Math.abs(p.x) > half || Math.abs(p.z) > half) continue;
+      if (!onPatch(p.x, p.z)) continue;
       const base = yAt(p.x, p.z);
       if (!isFinite(base)) continue;
       placed.push({ x: p.x, z: p.z, base, top: base + t.h, h: t.h, r: t.r > 0 ? t.r : crownR(t.h) });
@@ -4304,6 +4573,7 @@ void main() {
     const C = tw.cover;
     if (!C) return '';
     if (C.status === 'off') return 'Off — nothing is asked for.';
+    if (C.status === 'wide') return `Not drawn on an area this wide: trees and buildings are read for areas up to ${(C.widest / 1000).toFixed(1)} km along their longer side, and this one is ${(C.size / 1000).toFixed(1)} km.`;
     if (C.status === 'loading' && !C.trees && !C.buildings && !C.treesError && !C.buildingsError) return 'Reading the trees and buildings for this patch…';
     const away = 'could not be reached just now';
     const parts = [];
@@ -4421,7 +4691,7 @@ void main() {
     if (!o || !latlon) return null;
     const p = localXZ(latlon[0], latlon[1], o.lat, o.lon);
     const g = tw.ground;
-    return g && Math.abs(p.x) <= g.half && Math.abs(p.z) <= g.half ? p : null;
+    return g && onPatch(p.x, p.z, 0, g) ? p : null;
   }
   function latLonAt(x, z) {
     const o = tw.origin;
@@ -4750,15 +5020,17 @@ void main() {
 
   // The channel by the gauge: the lowest sample within FLOOD_SEED_M of it.
   function floodSeed(g) {
-    const step = g.size / (N - 1), c = (N - 1) / 2, r = Math.ceil(FLOOD_SEED_M / step);
+    const step = g.step, nx = g.nx, nz = g.nz, r = Math.ceil(FLOOD_SEED_M / step);
+    // The sample the station stands on (the middle one, of a square round it).
+    const ci = Math.round(-g.x0 / step), cj = Math.round(-g.z0 / step);
     let best = null;
-    for (let j = Math.max(0, c - r); j <= Math.min(N - 1, c + r); j++) {
-      for (let i = Math.max(0, c - r); i <= Math.min(N - 1, c + r); i++) {
-        const x = -g.half + i * step, z = -g.half + j * step;
+    for (let j = Math.max(0, cj - r); j <= Math.min(nz - 1, cj + r); j++) {
+      for (let i = Math.max(0, ci - r); i <= Math.min(nx - 1, ci + r); i++) {
+        const x = g.x0 + i * step, z = g.z0 + j * step;
         if (Math.hypot(x, z) > FLOOD_SEED_M) continue;
-        const e = g.elev[j * N + i];
+        const e = g.elev[j * nx + i];
         if (!isFinite(e)) continue;
-        if (!best || e < best.elev) best = { idx: j * N + i, i, j, x, z, elev: e };
+        if (!best || e < best.elev) best = { idx: j * nx + i, i, j, x, z, elev: e };
       }
     }
     return best;
@@ -4767,8 +5039,8 @@ void main() {
   // For every sample, the level at which it joins the channel (see above).
   // Doubles, whatever the ground came as: a level stored rounded would compare
   // unequal to the one queued, and the sample it was queued for never expand.
-  function fillLevels(elev, seed) {
-    const n = N * N;
+  function fillLevels(elev, seed, nx = N, nz = N) {
+    const n = nx * nz;
     const fill = new Float64Array(n).fill(Infinity);
     const hk = [], hi = [];
     const push = (k, i) => {
@@ -4800,14 +5072,14 @@ void main() {
       pop();
       const f = popped[0], cell = popped[1];
       if (f > fill[cell]) continue;
-      const cx = cell % N, cy = (cell - cx) / N;
+      const cx = cell % nx, cy = (cell - cx) / nx;
       for (let dy = -1; dy <= 1; dy++) {
         const y = cy + dy;
-        if (y < 0 || y >= N) continue;
+        if (y < 0 || y >= nz) continue;
         for (let dx = -1; dx <= 1; dx++) {
           const x = cx + dx;
-          if ((!dx && !dy) || x < 0 || x >= N) continue;
-          const nb = y * N + x;
+          if ((!dx && !dy) || x < 0 || x >= nx) continue;
+          const nb = y * nx + x;
           const e = elev[nb];
           const nf = isFinite(e) ? Math.max(f, e) : Infinity;
           if (nf < fill[nb]) { fill[nb] = nf; push(nf, nb); }
@@ -4860,7 +5132,7 @@ void main() {
       return notes;
     }
     const start = FloodStages.start(lad, seed ? seed.elev : null);
-    const fill = seed ? fillLevels(g.elev, seed.idx) : null;
+    const fill = seed ? fillLevels(g.elev, seed.idx, g.nx, g.nz) : null;
     if (seed && seed.elev >= lad.top) {
       notes.push(`Every flood level ${lad.borrowed ? 'borrowed' : 'recorded here'} is below the lowest ground by the gauge in this patch (${seed.elev.toFixed(2)} m AHD against ${lad.top.toFixed(2)} m AHD), so the water has nothing to cover.`);
     }
@@ -5029,16 +5301,18 @@ void main() {
     const pal = floodPalette();
     // The mask: one texel per sample, in the ground's own order (row 0 north),
     // and the plane's corners sampling the corner texels' centres.
-    const data = new Uint8Array(N * N * 4);
-    const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+    const nx = g.nx, nz = g.nz;
+    const data = new Uint8Array(nx * nz * 4);
+    const tex = new THREE.DataTexture(data, nx, nz, THREE.RGBAFormat);
     tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
     tex.needsUpdate = true;
-    const geo = new THREE.PlaneGeometry(g.size, g.size, 1, 1);
+    const geo = new THREE.PlaneGeometry(g.sizeX, g.sizeZ, 1, 1);
     const uv = geo.attributes.uv;
     for (let i = 0; i < uv.count; i++) {
-      uv.setXY(i, (uv.getX(i) * (N - 1) + 0.5) / N, ((1 - uv.getY(i)) * (N - 1) + 0.5) / N);
+      uv.setXY(i, (uv.getX(i) * (nx - 1) + 0.5) / nx, ((1 - uv.getY(i)) * (nz - 1) + 0.5) / nz);
     }
     geo.rotateX(-Math.PI / 2);
+    if (!g.square) geo.translate((g.x0 + g.x1) / 2, 0, (g.z0 + g.z1) / 2);
     const mat = new THREE.MeshStandardMaterial({ color: pal.below, transparent: true, opacity: FLOOD_ALPHA.below,
                                                  alphaMap: tex, depthWrite: false, side: THREE.DoubleSide,
                                                  roughness: 0.2, metalness: 0 });
@@ -5250,8 +5524,15 @@ void main() {
     F.band = band;
     F.bandKey = key;
     scaleWater();
+    // The pinned points' depths and the cross-section's water, twice a second
+    // at most while it rises.
+    if (tw.marks.length) {
+      const now = performance.now();
+      if (now - marksWaterAt > 500) { marksWaterAt = now; refreshMarks(); }
+    }
     return true;
   }
+  let marksWaterAt = 0;
 
   // The water in the scale's track, for every frame the level moves: two
   // custom properties, the rest waiting for the reading's slower beat.
@@ -5266,7 +5547,7 @@ void main() {
   function floodMask(L) {
     const F = tw.flood, d = sc.flood.data, fill = F.fill;
     let n = 0;
-    for (let i = 0, o = 0; i < N * N; i++, o += 4) {
+    for (let i = 0, o = 0, cells = d.length / 4; i < cells; i++, o += 4) {
       const v = fill && fill[i] < L ? 255 : 0;
       if (v) n++;
       d[o] = d[o + 1] = d[o + 2] = d[o + 3] = v;
@@ -6020,8 +6301,9 @@ void main() {
   // plane's UVs that sample the one sample the other.
   function speedTex() {
     if (!sc.flood.speed) {
-      const data = new Uint8Array(N * N * 4);
-      const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+      const nx = tw.ground.nx, nz = tw.ground.nz;
+      const data = new Uint8Array(nx * nz * 4);
+      const tex = new THREE.DataTexture(data, nx, nz, THREE.RGBAFormat);
       tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.needsUpdate = true;
@@ -6039,7 +6321,7 @@ void main() {
     const sp = speedTex(), d = sp.data, fill = F.fill, e = g.elev, rgb = sp.rgb;
     const root = Math.sqrt(a.slope.used), kc = root / a.nChannel.n, kp = root / a.nPlain.n, bank = a.ground;
     const edges = FloodVelocity.SPEEDS.map(b => (b.below == null ? Infinity : b.below));
-    for (let i = 0, o = 0; i < N * N; i++, o += 4) {
+    for (let i = 0, o = 0, cells = d.length / 4; i < cells; i++, o += 4) {
       let band = 0;
       if (fill && fill[i] < L && isFinite(e[i])) {
         const depth = L - e[i];
@@ -6079,15 +6361,30 @@ void main() {
   }
 
   // ── the flow line, traced and drawn ──
+  // The grid the line is traced on: the ground itself where it is the plain
+  // square, else the ground as a rectangle that says where it is — every
+  // second or third sample of a fine one, since the trace visits every sample
+  // and a reach's fall does not turn on a metre.
+  const FLOW_CELLS = 170000;
+  const READ_OVER_M = 1600;    // the square the card's "Read it over" button rebuilds on
+  function flowGrid(g) {
+    if (g.square) return { elev: g.elev, n: g.nx, size: g.size };
+    const k = Math.max(1, Math.ceil(Math.sqrt(g.nx * g.nz / FLOW_CELLS)));
+    if (k === 1) return { elev: g.elev, n: g.nx, nz: g.nz, size: g.size, step: g.step, x0: g.x0, z0: g.z0 };
+    const n = Math.floor((g.nx - 1) / k) + 1, nz = Math.floor((g.nz - 1) / k) + 1;
+    const elev = new Float32Array(n * nz);
+    for (let j = 0; j < nz; j++) for (let i = 0; i < n; i++) elev[j * n + i] = g.elev[j * k * g.nx + i * k];
+    return { elev, n, nz, size: g.size, step: g.step * k, x0: g.x0, z0: g.z0 };
+  }
   function traceFlowLine(st) {
     tw.vel = { line: null, from: null };
     const g = tw.ground;
     if (!g || !st || typeof FloodVelocity === 'undefined' || !FloodVelocity.flowLine) return;
     const c = velChoice(st), seed = floodSeed(g);
-    const step = g.size / (N - 1);
+    const step = g.step;
     const from = c.from || (seed ? { x: seed.x, z: seed.z } : { x: 0, z: 0 });
     tw.vel.from = c.from ? 'picked' : 'gauge';
-    tw.vel.line = FloodVelocity.flowLine({ elev: g.elev, n: N, size: g.size },
+    tw.vel.line = FloodVelocity.flowLine(flowGrid(g),
                                         { from, near: c.from ? LINE_PICK_NEAR : seed ? step / 2 : FLOOD_SEED_M });
   }
 
@@ -6303,7 +6600,7 @@ void main() {
         <div class="button-group">
           <button type="button" id="twin-vel-trace-pick" onclick="DigitalTwin.traceFromPick()" ${tw.picked ? '' : 'disabled'} title="${tw.picked ? 'Trace the flow line from the point last clicked on the ground' : 'Click the ground on the river first'}">Trace from the point clicked</button>
           ${c.from ? '<button type="button" onclick="DigitalTwin.traceFromGauge()">Trace from the gauge</button>' : ''}
-          ${tw.ground && tw.ground.size < SIZES[SIZES.length - 1] ? `<button type="button" onclick="DigitalTwin.setSize(${SIZES[SIZES.length - 1]})" title="Rebuild the twin on the ${SIZES[SIZES.length - 1]} m patch, which reads the slope over a reach four times as long">Read it over ${SIZES[SIZES.length - 1].toLocaleString('en-AU')} m</button>` : ''}
+          ${tw.ground && tw.ground.size < READ_OVER_M ? `<button type="button" onclick="DigitalTwin.setSize(${READ_OVER_M})" title="Rebuild the twin on the ${READ_OVER_M} m square, which reads the slope over a reach four times as long as the 400 m one">Read it over ${READ_OVER_M.toLocaleString('en-AU')} m</button>` : ''}
         </div>
       </fieldset>
       <details class="twin-details" id="twin-vel-levels-box">
@@ -6514,9 +6811,24 @@ void main() {
 
   function lookDown() {
     rig.mode = 'orbit';
-    if (rig.target) rig.target.set(0, 0, 0);
-    rig.radius = tw.ground ? tw.ground.size * 0.9 : 120;
+    const g = tw.ground;
+    // Over the middle of the patch, which is the station unless the area was
+    // slid off it.
+    if (rig.target) { if (g && !g.square) rig.target.set((g.x0 + g.x1) / 2, 0, (g.z0 + g.z1) / 2); else rig.target.set(0, 0, 0); }
+    rig.radius = g ? g.size * 0.9 : 120;
     rig.phi = 0.06;
+    syncModeUi();
+  }
+
+  // The whole area in view, from the south and above: where the camera goes
+  // when the area has just been changed.
+  function frameArea() {
+    const g = tw.ground;
+    if (!g) { resetOrbit(); return; }
+    rig.mode = 'orbit';
+    const cx = (g.x0 + g.x1) / 2, cz = (g.z0 + g.z1) / 2;
+    if (rig.target) rig.target.set(cx, yAt(cx, cz) + 1, cz);
+    rig.radius = Math.min(maxRadius(), Math.max(26, g.size * 0.85)); rig.theta = 0; rig.phi = 0.8;
     syncModeUi();
   }
 
@@ -6524,9 +6836,8 @@ void main() {
     if (!tw.ground) return;
     // Start where the orbit camera was standing if that is on the patch, else
     // a few metres off the pole looking at it.
-    const half = tw.ground.half - 2;
     const cam = sc.camera;
-    if (cam && Math.abs(cam.position.x) < half && Math.abs(cam.position.z) < half && rig.mode === 'orbit') {
+    if (cam && onPatch(cam.position.x, cam.position.z, 2) && rig.mode === 'orbit') {
       rig.px = cam.position.x; rig.pz = cam.position.z;
       const dx = -rig.px, dz = -rig.pz;
       rig.yaw = Math.atan2(dx, -dz);
@@ -6740,9 +7051,9 @@ void main() {
           ? `POV at eye height: drag to look, slide two fingers up to walk and down to step back, 👁 to leave.${ladder}${spots ? ' Tap a 📷 for its photos.' : ''}`
           : `POV at eye height: W A S D or the arrow keys move, drag to look, Shift to hurry, Space points, Esc to leave.${ladder}${spots ? ' Walk up to a 📷 and press Enter for its photos.' : ''}`)
         : tw.hooks
-          ? (touch ? `${move} Tap the ground for its height, a 📷 for its photos. ← Map for the map.`
-                   : `${move} Click the ground for its height, a 📷 for its photos. Wheel out past the edge, or Esc, for the map.`)
-          : `${move} ${touch ? 'Tap' : 'Click'} the ground for its height, a 📷 for the photos taken there.`;
+          ? (touch ? `${move} Tap the ground to pin a point and read its height, a 📷 for its photos. ← Map for the map.`
+                   : `${move} Point at the ground for its height, click to pin the point, a 📷 for its photos. Wheel out past the edge, or Esc, for the map.`)
+          : `${move} ${touch ? 'Tap the ground to pin a point and read its height' : 'Point at the ground for its height, click to pin the point'}, a 📷 for the photos taken there.`;
       // A new mode says its words in full — on a phone for a few seconds,
       // then back to the "?" (see "a phone's stage, kept clear").
       if (hud.dataset.mode !== rig.mode) {
@@ -6903,9 +7214,8 @@ void main() {
       const out = e.shiftKey;
       const hit = out ? null : groundHit(e.clientX, e.clientY);
       if (hit) {
-        const lim = tw.ground ? tw.ground.half : 200;
-        rig.target.x = Math.max(-lim, Math.min(lim, (rig.target.x + hit.x) / 2));
-        rig.target.z = Math.max(-lim, Math.min(lim, (rig.target.z + hit.z) / 2));
+        const to = clampToPatch((rig.target.x + hit.x) / 2, (rig.target.z + hit.z) / 2);
+        rig.target.x = to.x; rig.target.z = to.z;
         rig.target.y = yAt(rig.target.x, rig.target.z) + 1;
       }
       dolly(out ? Math.LN2 : -Math.LN2);
@@ -6949,6 +7259,35 @@ void main() {
       cv.classList.toggle('is-over-pin', pinArmedHere() && pinUnder(e.clientX, e.clientY));
     });
     on(cv, 'pointerleave', () => cv.classList.remove('is-over-photo', 'is-over-pin'));
+
+    // The ground's height beside the pointer (see "the ground under the
+    // pointer"): a mouse's or a pen's, not a finger's — a finger covers what
+    // it points at, and its tap pins the point instead. Put away while a
+    // drag is turning the view.
+    // Read at most PROBE_HZ times a second — and once more when the pointer
+    // stops, so what is shown is the ground under where it came to rest and
+    // not under where it was a twentieth of a second before.
+    let probeAt = 0, probeLast = null, probeTimer = 0;
+    const probeNow = () => {
+      probeTimer = 0;
+      if (!probeLast || rig.pointers.size) return;
+      probeAt = performance.now();
+      showProbe(probeLast);
+    };
+    const probeOff = () => { probeLast = null; if (probeTimer) { clearTimeout(probeTimer); probeTimer = 0; } hideProbe(); };
+    on(cv, 'pointermove', e => {
+      if (e.pointerType === 'touch') return;
+      if (rig.pointers.size) { if (tw.probe) probeOff(); return; }
+      probeLast = { clientX: e.clientX, clientY: e.clientY };
+      const wait = 1000 / PROBE_HZ - (performance.now() - probeAt);
+      if (wait <= 0) probeNow();
+      else if (!probeTimer) probeTimer = setTimeout(probeNow, wait);
+    });
+    on(cv, 'pointerleave', probeOff);
+    on(cv, 'pointerdown', probeOff);
+    // The wheel moves the ground under a pointer that has not moved: read again.
+    on(cv, 'wheel', () => { if (probeLast && !probeTimer) probeTimer = setTimeout(probeNow, 120); }, { passive: true });
+    sc.off.push(probeOff);
 
     on(cv, 'wheel', e => {
       e.preventDefault();
@@ -7055,9 +7394,8 @@ void main() {
     // right is forward × up = (cosθ, 0, −sinθ).
     rig.target.x += (-ct * dx - st * dy) * k;
     rig.target.z += (st * dx - ct * dy) * k;
-    const lim = tw.ground ? tw.ground.half : 200;
-    rig.target.x = Math.max(-lim, Math.min(lim, rig.target.x));
-    rig.target.z = Math.max(-lim, Math.min(lim, rig.target.z));
+    const to = clampToPatch(rig.target.x, rig.target.z);
+    rig.target.x = to.x; rig.target.z = to.z;
     rig.target.y = yAt(rig.target.x, rig.target.z) + 1;
   }
 
@@ -7096,9 +7434,8 @@ void main() {
     }
     const oz = toLocal(rig.px, rig.pz).z;
     rig.px = nx; rig.pz = nz;
-    const lim = (tw.ground ? tw.ground.half : 100) - 1;
-    rig.px = Math.max(-lim, Math.min(lim, rig.px));
-    rig.pz = Math.max(-lim, Math.min(lim, rig.pz));
+    const held = clampToPatch(rig.px, rig.pz, 1);
+    rig.px = held.x; rig.pz = held.z;
     if (m && m.ladder && rig.level === 'ground' && f > 0 && lcy > 0.5) {
       // The foot of the ladder is a gate from its feet to 0.9 m south of
       // them (in the station's frame): a step that ends past the gate's
@@ -7182,14 +7519,696 @@ void main() {
     tw.picked = { x, z, h };
     const trace = document.getElementById('twin-vel-trace-pick');
     if (trace) { trace.disabled = false; trace.title = 'Trace the flow line from the point last clicked on the ground'; }
+    const lgh = lghText(h), dat = lghDatum();
     if (out) {
       const ew = x >= 0 ? `${x.toFixed(1)} m E` : `${(-x).toFixed(1)} m W`;
       const ns = z <= 0 ? `${(-z).toFixed(1)} m N` : `${z.toFixed(1)} m S`;
       const d  = Math.hypot(x, z);
       out.textContent = `Clicked: ${ew}, ${ns} of the pole (${d.toFixed(1)} m away) — ground ${h.toFixed(2)} m ${tw.ground.datum}, `
                       + `${(h - tw.ground.h0) >= 0 ? '+' : ''}${(h - tw.ground.h0).toFixed(2)} m against the station.`
+                      + (lgh ? ` On ${dat.whose}: ${lgh}.` : '')
                       + (typeof TwinCadastre !== 'undefined' ? TwinCadastre.pickWords(x, z) : '');
     }
+    // …and pinned, to be measured from — unless the click was putting the
+    // station's pin somewhere, which is its own job.
+    if (!pinArmedHere()) {
+      const n = addMark(x, z, h);
+      const m = measure();
+      announce(n === 2 && m
+        ? `Point B pinned: ${h.toFixed(2)} m ${tw.ground.datum}${lgh ? `, ${lgh}` : ''}. ${m.d.toFixed(1)} m from A, ${Math.abs(m.dh).toFixed(2)} m ${m.dh < 0 ? 'lower' : 'higher'}.`
+        : `Point A pinned: ${h.toFixed(2)} m ${tw.ground.datum}${lgh ? `, ${lgh}` : ''}.`);
+    }
+  }
+
+  // ── the area, set ──────────────────────────────────────────────────────────
+  // "the area" (near the top of this file) says what an area is. This is how
+  // one is asked for: the station's own area kept in the settings, the build
+  // run again on it, and the camera put where the whole of it shows.
+  function spanText(v) { return Number.isInteger(v) ? String(v) : String(Math.round(v)); }
+  // "400 m" for a square — as the status line always said it — else "1250 × 800 m".
+  function areaWords(g) {
+    return g.sizeX === g.sizeZ ? `${spanText(g.size)} m` : `${spanText(g.sizeX)} × ${spanText(g.sizeZ)} m`;
+  }
+  function extWords(x) {
+    return `${x.w} m west, ${x.e} m east, ${x.n} m north and ${x.s} m south of the station`;
+  }
+
+  function setAreaFor(st, x, why, bridge) {
+    if (!st || !located(st)) return false;
+    const ext = normExt(x);
+    if (!ext) return false;
+    const s = S();
+    delete s.areas[st.id];
+    // The square every station gets is not an area of this station's own.
+    if (!(isSquareExt(ext) && ext.w * 2 === s.size)) {
+      s.areas[st.id] = ext;
+      const ids = Object.keys(s.areas);
+      for (const id of ids.slice(0, Math.max(0, ids.length - AREAS_KEPT))) delete s.areas[id];
+    }
+    saveSettings();
+    tw.frameNext = true;
+    const span = `${ext.w + ext.e} × ${ext.n + ext.s} m`;
+    announce(why === 'bridge' && bridge
+      ? `Widening ${st.name}'s area to hold ${bridge.name || 'the bridge'}, ${distWords(bridge.d)} to the ${bridge.bearing}: ${span}.`
+      : `${st.name}: building ${span} of ground — ${extWords(ext)}.`);
+    init();
+    return true;
+  }
+
+  // ── the bridges past the edge ──
+  // The first thing an area is widened for is a bridge: the crossing the town
+  // floods at, a kilometre down the river from the gauge. So once the patch's
+  // own bridges are drawn, the State is asked once more over REACH_M past
+  // every edge, and each bridge out there that is not whole in the patch is
+  // offered by name with the area that would hold it — the patch as it is,
+  // pushed out on the sides the bridge is past, with REACH_PAD of ground
+  // beyond its far end for the approach. Nearest first, a handful.
+  const REACH_M = 3000, REACH_PAD = 40, REACH_SHOW = 5;
+
+  function distWords(m) { return m < 950 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`; }
+
+  function reachList(found, o, x) {
+    let cands = ((found && found.list) || []).map(b => ({ b, all: spanMetres(b.points, o.lat, o.lon) })).filter(c => c.all.length >= 2);
+    cands = mergeParallel(cands);
+    const out = [];
+    for (const c of cands) {
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (const p of c.all) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z); }
+      if (x0 >= -x.w + 1 && x1 <= x.e - 1 && z0 >= -x.n + 1 && z1 <= x.s - 1) continue;   // whole in the patch already
+      const want = { w: Math.max(x.w, -x0 + REACH_PAD), e: Math.max(x.e, x1 + REACH_PAD), n: Math.max(x.n, -z0 + REACH_PAD), s: Math.max(x.s, z1 + REACH_PAD) };
+      const need = normExt(want);
+      // An area that cannot be that wide does not hold it, and is not offered.
+      if (!need || need.w < -x0 || need.e < x1 || need.n < -z0 || need.s < z1) continue;
+      const mid = c.all[c.all.length >> 1], d = Math.hypot(mid.x, mid.z);
+      out.push({ name: c.b.name || null, kind: c.b.kind, d, bearing: compassOf(mid.x, mid.z), need, length: c.all[c.all.length - 1].s });
+    }
+    out.sort((a, b) => a.d - b.d);
+    return out.slice(0, REACH_SHOW);
+  }
+
+  function loadReach(st, seq) {
+    const o = tw.origin, x = tw.ext;
+    if (!tw.ground || !o || !x) { tw.reach = null; refreshArea(); return; }
+    tw.reach = { status: 'loading', list: [] };
+    refreshArea();
+    const far = {};
+    for (const k of ['w', 'e', 'n', 's']) far[k] = Math.min(EXT_MAX, x[k] + REACH_M);
+    const box = areaBox(o.lat, o.lon, far, N - 1);
+    if (tw.builtKeys) tw.builtKeys.push(boxKey(box));
+    bridgesFor(box).then(found => {
+      if (seq !== tw.seq || !tw.ground) return;
+      tw.reach = { status: found.failed ? 'failed' : 'ok', list: reachList(found, o, x) };
+      refreshArea();
+    });
+  }
+
+  function bridgeLabel(b) {
+    const what = b.name || (b.kind === 'rail' ? 'A railway bridge' : b.kind === 'track' ? 'A track bridge' : 'A road bridge');
+    return `${what} — ${distWords(b.d)} ${b.bearing}`;
+  }
+  function reachHtml() {
+    const R = tw.reach;
+    if (!tw.ground || !tw.live) return '';
+    if (!R || R.status === 'loading') return '<p class="small twin-reach-lead">Looking for bridges past the edge…</p>';
+    if (R.status === 'failed') return '<p class="small twin-reach-lead">Where the bridges are could not be asked, so none is offered. Press Rebuild to ask again.</p>';
+    if (!R.list.length) return `<p class="small twin-reach-lead">No bridge stands within ${REACH_M / 1000} km past the edge of this area.</p>`;
+    return `<p class="small twin-reach-lead" id="twin-reach-lead">Widen the area to hold a bridge past its edge:</p>
+        <div class="twin-reach-list" role="group" aria-labelledby="twin-reach-lead">
+          ${R.list.map((b, i) => `<button type="button" class="twin-reach-btn" data-tour="twin-reach" onclick="DigitalTwin.reachBridge(${i})"
+              title="Rebuild on ${escAttr(`${b.need.w + b.need.e} × ${b.need.n + b.need.s} m`)}: ${escAttr(extWords(b.need))} — the area as it is, pushed out to hold this bridge whole">${esc(bridgeLabel(b))}</button>`).join('')}
+        </div>`;
+  }
+
+  // ── the area's own fields in the Scene panel ──
+  const SIDE_NAMES = { w: 'West', e: 'East', n: 'North', s: 'South' };
+  const DETAIL_WORDS = {
+    auto: 'Standard — finer by itself past 1.6 km',
+    fine: 'Fine — four times the samples',
+    finest: 'Finest — sixteen times; slow on a phone',
+  };
+  function areaNoteHtml() {
+    const g = tw.ground, st = currentStation();
+    if (!st) return 'Pick a station and its area can be set.';
+    const x = (tw.ext && tw.live) ? tw.ext : extFor(st);
+    const own = customArea(st);
+    const lead = own ? `This station's own area: ${x.w + x.e} × ${x.n + x.s} m.` : `The ${S().size} m square every station gets.`;
+    const built = g && tw.live
+      ? ` Built as ${esc(areaWords(g))}, sampled every ${g.sample_m.toFixed(1)} m (${g.nx.toLocaleString()} × ${g.nz.toLocaleString()} ${termHtml('samples', WORDS.sample)}).` : '';
+    return `${esc(lead)}${built}`;
+  }
+  function areaFieldHtml() {
+    const s = S(), st = currentStation();
+    const x = st ? ((tw.ext && tw.live && tw.stationId === st.id) ? tw.ext : extFor(st)) : squareExt(s.size);
+    const own = customArea(st);
+    const sides = ['w', 'e', 'n', 's'].map(k => `
+            <label class="twin-side">${SIDE_NAMES[k]}
+              <input type="number" id="twin-side-${k}" inputmode="numeric" min="${EXT_MIN}" max="${EXT_MAX}" step="10" value="${Math.round(x[k])}" ${st ? '' : 'disabled'}
+                     onchange="DigitalTwin.setSide('${k}', this.value)"
+                     title="Metres of ground modelled ${SIDE_NAMES[k].toLowerCase()} of the station — ${EXT_MIN} to ${EXT_MAX.toLocaleString('en-AU')}">
+            </label>`).join('');
+    const canDraw = !!(tw.live && tw.hooks && st);
+    return `
+        <label class="twin-field">${termHtml('Ground area', WORDS.area)}
+          <select id="twin-size" onchange="DigitalTwin.setSize(this.value)">
+            ${own ? `<option value="" selected disabled>This station's own — ${x.w + x.e} × ${x.n + x.s} m</option>` : ''}
+            ${SIZES.map(v => `<option value="${v}" ${!own && v === s.size ? 'selected' : ''}>${v} m square</option>`).join('')}
+          </select>
+        </label>
+        <fieldset class="twin-sides" data-tour="twin-area">
+          <legend>Metres of ground each way from the station</legend>
+          <div class="twin-sides-grid">${sides}</div>
+        </fieldset>
+        <div class="button-group twin-area-actions">
+          <button type="button" id="twin-area-draw" onclick="DigitalTwin.drawArea()" ${canDraw ? '' : 'disabled'}
+                  title="${canDraw ? 'Put the twin aside, drag a rectangle on the map, and the twin is built on it — widened if need be to hold the station' : 'Open a station\'s twin on the map first'}">▭ Draw it on the map</button>
+          <button type="button" id="twin-area-reset" onclick="DigitalTwin.resetArea()" ${own ? '' : 'disabled'}
+                  title="Put this station's own area away and build the ${s.size} m square round it again">Back to the square</button>
+        </div>
+        <div id="twin-reach">${reachHtml()}</div>
+        <label class="twin-field">${termHtml('Ground detail', WORDS.detail)}
+          <select id="twin-detail" onchange="DigitalTwin.setDetail(this.value)">
+            ${Object.entries(DETAIL_WORDS).map(([k, w]) => `<option value="${k}" ${k === s.detail ? 'selected' : ''}>${esc(w)}</option>`).join('')}
+          </select>
+        </label>
+        <p class="small twin-area-note" id="twin-area-note">${areaNoteHtml()}</p>`;
+  }
+  // Rewritten in place — and whoever was typing in it keeps their place.
+  function refreshArea() {
+    const el = document.getElementById('twin-area');
+    if (!el) return;
+    const a = document.activeElement, id = a && el.contains(a) ? a.id : null;
+    el.innerHTML = areaFieldHtml();
+    if (id) { const again = document.getElementById(id); if (again && !again.disabled) { try { again.focus({ preventScroll: true }); } catch (_) {} } }
+  }
+
+  // ── the ground under the pointer ───────────────────────────────────────────
+  // Point anywhere at the ground and its height is read out beside the
+  // pointer: in metres AHD, and as a **local gauge height** — the same height
+  // as it would read on a gauge board, which is the height the Bureau's flood
+  // classes, the warnings and the people who live on the river all speak in.
+  // A gauge height is a height above a gauge's zero, so it needs a gauge:
+  // this station's own, where its zero is surveyed in AHD, and otherwise — or
+  // whenever the operator would rather — any gauge near by whose zero is, the
+  // lowest ground in the channel by the gauge, or a level typed in. Whose it
+  // is, is kept for the station (settings `lgh`) and said wherever a gauge
+  // height is.
+  //
+  // A pointer is a mouse's. A finger and a keyboard get the same numbers
+  // another way: a tap or a click pins the point (see "measuring"), and the
+  // pane reads out the ground under the middle of the view, which the arrow
+  // keys move — with a button that pins it.
+  //
+  // Off the patch the horizon's ground is read too, and said to be what it
+  // is: ~30 m heights, far ground, about. Nothing is read through a bridge
+  // deck, the station or the water — the ray is to the ground alone.
+  const PROBE_HZ = 20;         // the readout follows the pointer at most this often
+  const LGH_REACH_KM = 25;     // gauges offered as a datum: within this of the station
+  const LGH_OFFER = 8;         // …and the nearest so many
+  const lghZeros = new Map();  // station id → its gauge zero { m, datum, from } or null, for the session
+
+  // What the words mean (CLAUDE.md "Plain words"): the hovers', and the fold
+  // at the foot of the Heights panel, are both this list.
+  const WORDS = {
+    ahd: 'Australian Height Datum: the national height reference — metres above (about) mean sea level. Every surveyed height, gauge zero and flood level here is in it.',
+    lgh: 'Local gauge height: the height as a gauge board would read it — metres above that gauge\'s zero, not above sea level. It is the ground\'s height in m AHD less the gauge zero in m AHD, so it depends on which gauge is chosen.',
+    zero: 'Gauge zero: the level the 0 m mark of a gauge stands at, surveyed in m AHD. Flood classes are heights above it.',
+    channel: 'The lowest ground within 60 m of the station on this model — a stand-in for a gauge zero where none is surveyed. A height above it is a height over the river bed here, not a reading on any gauge.',
+    area: 'The ground the twin is built on: a rectangle that holds the station. A square round it by default; widen any side, widen it to a bridge, or draw it on the map.',
+    detail: 'How closely the ground is sampled. Standard is 200 samples across a square, 400 once the area is wider than 1.6 km. Fine and Finest sample closer (down to the LiDAR\'s own 1 m on a small area) and take longer to build.',
+    sample: 'One height read from the ground model. The ground is drawn flat between samples, so anything narrower than the spacing — a drain, a levee — may not show.',
+    apart: 'The straight-line distance on the ground between the two pinned points, ignoring the rise and fall between them.',
+    fall: 'How much lower the second point is than the first, and that as a slope: 1 in 100 falls a metre in every hundred along.',
+    section: 'The ground cut along the straight line from A to B, seen from the side, with the water at the level now shown.',
+    far: 'Ground past the edge of the modelled area. It comes from ~30 m heights, not the LiDAR, so it is good to a few metres only.',
+  };
+
+  function gaugeZeroOf(s) {
+    if (!s) return null;
+    if (lghZeros.has(s.id)) return lghZeros.get(s.id);
+    let z = null;
+    if (typeof FloodStages !== 'undefined' && Array.isArray(s.gauge_survey) && s.gauge_survey.length) {
+      try { const lad = FloodStages.ladder(s); z = lad.zero ? { m: lad.zero.m, datum: lad.zero.datum || null, from: lad.zero.from || null } : null; } catch (_) { z = null; }
+    }
+    lghZeros.set(s.id, z);
+    return z;
+  }
+  function ahdZeroOf(s) { const z = gaugeZeroOf(s); return z && z.datum === 'AHD' ? z.m : null; }
+
+  // The gauges a local gauge height may be measured from: this station's own
+  // first (whatever its zero's datum — it is said why where it cannot be
+  // used), then the nearest with a zero in AHD.
+  function lghGauges(st) {
+    const out = [];
+    if (!st || !state.data) return out;
+    const own = gaugeZeroOf(st);
+    if (own) out.push({ s: st, zero: own, km: 0, bearing: null, own: true, ok: own.datum === 'AHD' });
+    if (!located(st)) return out;
+    const near = [];
+    for (const s of state.data.stations) {
+      if (s.id === st.id || !located(s) || !Array.isArray(s.gauge_survey) || !s.gauge_survey.length) continue;
+      const km = acmaHaversineKm(st.lat, st.lon, s.lat, s.lon);
+      if (km > LGH_REACH_KM) continue;
+      const z = gaugeZeroOf(s);
+      if (z && z.datum === 'AHD') near.push({ s, zero: z, km, bearing: bearingDeg(st.lat, st.lon, s.lat, s.lon), own: false, ok: true });
+    }
+    near.sort((a, b) => a.km - b.km);
+    return out.concat(near.slice(0, LGH_OFFER));
+  }
+
+  // The datum in force for the station on screen:
+  //   { kind: 'station' | 'channel' | 'custom', zero (m AHD), whose (words), id? }
+  // or { kind: 'none', why } where no gauge height can honestly be said.
+  function lghDatum(st = currentStation()) {
+    const g = tw.ground;
+    if (!st) return { kind: 'none', why: 'No station is chosen.' };
+    if (g && g.egm96) return { kind: 'none', why: 'The ground here could not be put into AHD, so no height on it can be set against a gauge zero.' };
+    const pick = S().lgh[st.id] || null;
+    if (pick && pick.kind === 'custom') return { kind: 'custom', zero: pick.m, whose: `a zero of ${pick.m.toFixed(2)} m AHD` };
+    if (pick && pick.kind === 'channel') {
+      const seed = g ? floodSeed(g) : null;
+      return seed ? { kind: 'channel', zero: seed.elev, whose: 'the channel bed by the station' }
+                  : { kind: 'none', why: 'There is no ground by the station to take as the channel bed.' };
+    }
+    const id = pick && pick.kind === 'station' ? pick.id : st.id;
+    const s = id === st.id ? st : stationById(id);
+    const zero = ahdZeroOf(s);
+    if (s && zero != null) return { kind: 'station', id: s.id, zero, whose: `${s.name}'s gauge`, own: s.id === st.id };
+    const z = gaugeZeroOf(st);
+    return { kind: 'none', why: z
+      ? `${st.name}'s gauge zero is on ${z.datum ? `the ${typeof FloodStages !== 'undefined' ? FloodStages.datumWord(z.datum) : z.datum}` : 'no stated datum'}, not AHD, so heights in AHD cannot be set against it. Pick another gauge, the channel bed, or type a level.`
+      : `${st.name} has no surveyed gauge zero. Pick a gauge near by, the channel bed, or type a level.` };
+  }
+  function lghOf(h, d = lghDatum()) { return d && d.kind !== 'none' && isFinite(h) ? h - d.zero : null; }
+  function signed(v, dp = 2) { return `${v < 0 ? '−' : ''}${Math.abs(v).toFixed(dp)}`; }
+  function lghText(h, d = lghDatum()) { const v = lghOf(h, d); return v == null ? null : `${signed(v)} m LGH`; }
+
+  function lghValue(st) {
+    const d = lghDatum(st), pick = st && S().lgh[st.id];
+    if (pick && pick.kind === 'custom') return 'custom';
+    if (pick && pick.kind === 'channel') return 'channel';
+    return d.kind === 'station' ? `station:${d.id}` : 'none';
+  }
+  function lghFieldHtml() {
+    const st = currentStation();
+    if (!st) return '<p class="small">Pick a station and its gauge can be chosen.</p>';
+    const d = lghDatum(st), val = lghValue(st), g = tw.ground;
+    const seed = g ? floodSeed(g) : null;
+    const pick = S().lgh[st.id];
+    const opts = lghGauges(st).map(o => {
+      const where = o.own ? 'this station' : `${fmtKm(o.km)} ${compassWord(o.bearing)}`;
+      const zero = o.ok ? `zero ${o.zero.m.toFixed(2)} m AHD` : `zero not in AHD`;
+      return `<option value="station:${escAttr(o.s.id)}" ${val === `station:${o.s.id}` ? 'selected' : ''} ${o.ok ? '' : 'disabled'}>${esc(o.s.name)} — ${esc(zero)} · ${esc(where)}</option>`;
+    }).join('');
+    return `
+        <label class="twin-field">${termHtml('Gauge heights (LGH)', WORDS.lgh)} measured from
+          <select id="twin-lgh" onchange="DigitalTwin.setLgh(this.value)">
+            ${val === 'none' ? '<option value="none" selected>No gauge chosen</option>' : ''}
+            ${opts}
+            <option value="channel" ${val === 'channel' ? 'selected' : ''} ${seed ? '' : 'disabled'}>The channel bed by the station${seed ? ` — ${seed.elev.toFixed(2)} m ${esc(g.datum)}` : ''}</option>
+            <option value="custom" ${val === 'custom' ? 'selected' : ''}>A level I type in…</option>
+          </select>
+        </label>
+        <label class="twin-field twin-lgh-custom" ${val === 'custom' ? '' : 'hidden'}>${termHtml('Zero', WORDS.zero)}, in m AHD
+          <input type="number" id="twin-lgh-m" step="0.01" inputmode="decimal" value="${pick && pick.kind === 'custom' ? pick.m : ''}"
+                 onchange="DigitalTwin.setLghZero(this.value)">
+        </label>
+        <p class="small twin-lgh-note" id="twin-lgh-note">${d.kind === 'none' ? esc(d.why)
+          : `0 m ${termHtml('LGH', WORDS.lgh)} is ${d.zero.toFixed(2)} m ${termHtml('AHD', WORDS.ahd)} — ${esc(d.whose)}${d.kind === 'channel' ? ` (${termHtml('what this is', WORDS.channel)})` : ''}.`}</p>`;
+  }
+
+  // Where a screen point meets the ground: the patch, or — past its edge —
+  // the horizon. { x, z, h, far, source } with h in the ground's datum, or null.
+  function sheetAt(x, z) {
+    const hz = tw.horizon;
+    if (!hz) return null;
+    for (const g of hz.grids) {
+      if (!g) continue;
+      const v = gridAt(g, x, z, hz.lat, hz.lon);
+      if (isFinite(v)) return { v, source: g.source };
+    }
+    return null;
+  }
+  function probeHit(clientX, clientY) {
+    if (!sc.terrain || !sc.camera || !sc.canvas || !tw.ground) return null;
+    const r = sc.canvas.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) return null;
+    const nd = new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    const rc = new THREE.Raycaster();
+    rc.setFromCamera(nd, sc.camera);
+    const hit = rc.intersectObject(sc.terrain, false)[0];
+    if (hit) return { x: hit.point.x, z: hit.point.z, h: heightAt(hit.point.x, hit.point.z), far: false, source: tw.ground.source };
+    if (!sc.horizon) return null;
+    const out = rc.intersectObjects(sc.horizon.children, false)[0];
+    if (!out) return null;
+    const sh = sheetAt(out.point.x, out.point.z);
+    if (!sh) return null;
+    // The outer sheets are heights over the EGM96 geoid, left as they come;
+    // put into AHD here where the patch's own tiles were (the same few
+    // decimetres to two metres), and said to be about either way.
+    const sep = sh.source === 'srtm' && tw.ground.geoid ? tw.ground.geoid.m : 0;
+    return { x: out.point.x, z: out.point.z, h: sh.v + sep, far: true, source: sh.source };
+  }
+
+  function whereWords(x, z, dp = 0) {
+    const ew = x >= 0 ? `${x.toFixed(dp)} m E` : `${(-x).toFixed(dp)} m W`;
+    const ns = z <= 0 ? `${(-z).toFixed(dp)} m N` : `${z.toFixed(dp)} m S`;
+    return `${ew}, ${ns}`;
+  }
+  // How deep the water now shown stands over a point of the patch, or null.
+  function depthAt(x, z, h) {
+    const F = tw.flood, g = tw.ground;
+    if (!F || F.none || !F.fill || F.level == null || !g || !S().flood || !onPatch(x, z)) return null;
+    const i = Math.round((x - g.x0) / g.step), j = Math.round((z - g.z0) / g.step);
+    if (!(F.fill[j * g.nx + i] < F.level)) return null;
+    const d = F.level - h;
+    return d > 0 ? d : null;
+  }
+
+  function probeHtml(p) {
+    const g = tw.ground, d = lghDatum();
+    const lgh = lghText(p.h, d);
+    const depth = p.far ? null : depthAt(p.x, p.z, p.h);
+    const head = p.far ? `≈ ${Math.round(p.h)} m ${esc(g.datum)}` : `${p.h.toFixed(2)} m ${esc(g.datum)}`;
+    return `<strong class="twin-probe-h">${head}</strong>`
+      + `<span class="twin-probe-lgh">${lgh ? `${p.far ? '≈ ' : ''}${esc(p.far ? `${signed(lghOf(p.h, d), 0)} m LGH` : lgh)} <span class="twin-probe-whose">${esc(d.whose)}</span>` : 'no gauge chosen for LGH'}</span>`
+      + `<span class="twin-probe-where">${esc(whereWords(p.x, p.z))} of the station${p.far ? ' · far ground, ~30 m data' : ''}${depth != null ? ` · ${depth.toFixed(2)} m of water` : ''}</span>`;
+  }
+
+  function hideProbe() {
+    tw.probe = null;
+    const el = document.getElementById('twin-probe');
+    if (el) el.hidden = true;
+  }
+  function showProbe(e) {
+    const el = document.getElementById('twin-probe'), stage = sc.stage || document.getElementById('twin-stage');
+    if (!el || !stage) return;
+    const p = S().probe && rig.mode === 'orbit' ? probeHit(e.clientX, e.clientY) : null;
+    if (!p) { hideProbe(); return; }
+    tw.probe = p;
+    el.innerHTML = probeHtml(p);
+    el.hidden = false;
+    // Beside the pointer, and turned to stay on the stage.
+    const r = stage.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
+    let x = e.clientX - r.left + 14, y = e.clientY - r.top + 16;
+    if (x + w > r.width - 4) x = e.clientX - r.left - w - 14;
+    if (y + h > r.height - 4) y = e.clientY - r.top - h - 12;
+    el.style.setProperty('--px', `${Math.max(4, x).toFixed(0)}px`);
+    el.style.setProperty('--py', `${Math.max(4, y).toFixed(0)}px`);
+  }
+
+  // ── measuring ──────────────────────────────────────────────────────────────
+  // A click (or a tap) on the ground pins the point: A, then B, and a third
+  // starts again at A. One point is its height, both ways; two are the
+  // distance between them, how much one is above the other and the slope that
+  // is, and the ground cut along the line between them — a cross-section —
+  // with the water now shown standing in it. The points are posts on the
+  // ground with a line draped between them, and they go with the build: they
+  // are a question asked of this ground. Never in the .glb.
+  const MARK_COLOURS = [0xffc400, 0x35d0ff];
+  const MARK_NAMES = ['A', 'B'];
+  const SECTION = { W: 320, H: 150, pl: 40, pr: 34, pt: 10, pb: 22 };
+  let markAt = 0;
+
+  function removeMarks() {
+    if (sc.marks && sc.scene) { sc.scene.remove(sc.marks); disposeObject(sc.marks); }
+    sc.marks = null;
+  }
+
+  // The posts are kept one size on the screen whatever the camera's distance
+  // (scaleMarks, each frame, as the photo badges are): on a patch two
+  // kilometres across a post the height of a person is not there to be seen.
+  // The line between two is a ribbon on the ground, a dark edge under a white
+  // core, as wide as the patch is big.
+  const MARK_PX = { head: 7, post: 34, sign: 104 };
+  function buildMarks() {
+    removeMarks();
+    if (!sc.scene || !THREE || !tw.ground || !tw.marks.length) { requestFrame(); return; }
+    const g = tw.ground;
+    const grp = new THREE.Group();
+    grp.name = 'pinned points';
+    tw.marks.forEach((m, i) => {
+      const one = new THREE.Group();
+      one.name = `point ${MARK_NAMES[i]}`;
+      one.position.set(m.x, yAt(m.x, m.z), m.z);
+      const mat = new THREE.MeshBasicMaterial({ color: MARK_COLOURS[i], depthTest: false, transparent: true });
+      const postGeo = new THREE.CylinderGeometry(1, 1, 1, 10);
+      postGeo.translate(0, 0.5, 0);
+      const post = new THREE.Mesh(postGeo, mat);
+      post.renderOrder = 6;
+      post.name = 'post';
+      const head = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), mat);
+      head.renderOrder = 6;
+      head.name = 'head';
+      const sign = makeSign(MARK_NAMES[i], `${m.h.toFixed(2)} m ${g.datum}`);
+      sign.renderOrder = 7;
+      sign.name = 'sign';
+      one.userData.parts = { post, head, sign, aspect: sign.scale.y / sign.scale.x };
+      one.add(post, head, sign);
+      grp.add(one);
+    });
+    if (tw.marks.length === 2) {
+      const [a, b] = tw.marks, L = Math.hypot(b.x - a.x, b.z - a.z);
+      const n = Math.max(2, Math.min(600, Math.ceil(L / g.step) + 1));
+      const ux = L > 0 ? (b.x - a.x) / L : 1, uz = L > 0 ? (b.z - a.z) / L : 0;
+      const core = Math.max(0.25, g.size * 0.0022);
+      const ribbon = (half, colour, lift, order, name) => {
+        const pos = new Float32Array(n * 6), idx = [];
+        for (let i = 0; i < n; i++) {
+          const t = i / (n - 1), x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
+          for (const sgn of [-1, 1]) {
+            const px = x - uz * half * sgn, pz = z + ux * half * sgn, o = (i * 2 + (sgn > 0 ? 1 : 0)) * 3;
+            pos[o] = px; pos[o + 1] = yAt(px, pz) + lift; pos[o + 2] = pz;
+          }
+          if (i) idx.push(2 * i - 2, 2 * i - 1, 2 * i, 2 * i - 1, 2 * i + 1, 2 * i);
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        geo.setIndex(idx);
+        const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: colour, depthTest: false, transparent: true, opacity: 0.95, side: THREE.DoubleSide }));
+        mesh.renderOrder = order;
+        mesh.name = name;
+        return mesh;
+      };
+      grp.add(ribbon(core * 1.9, 0x10202a, 0.12, 4, 'line A to B edge'), ribbon(core, 0xffffff, 0.15, 5, 'line A to B'));
+    }
+    grp.traverse(o => { o.userData.export = false; });
+    sc.marks = grp;
+    sc.scene.add(grp);
+    scaleMarks();
+    requestFrame();
+  }
+
+  function scaleMarks() {
+    if (!sc.marks || !sc.camera || !sc.canvas) return;
+    const h = sc.canvas.clientHeight || 600;
+    const perM = (h / 2) / Math.tan((sc.camera.fov * Math.PI / 180) / 2);   // pixels a metre spans, a metre away
+    for (const one of sc.marks.children) {
+      const P = one.userData.parts;
+      if (!P) continue;
+      const k = Math.max(0.05, sc.camera.position.distanceTo(one.position)) / perM;   // metres a pixel spans there
+      const r = MARK_PX.head * k, tall = MARK_PX.post * k, w = MARK_PX.sign * k;
+      P.post.scale.set(r * 0.3, tall, r * 0.3);
+      P.head.scale.setScalar(r);
+      P.head.position.y = tall;
+      P.sign.scale.set(w, w * P.aspect, 1);
+      P.sign.position.y = tall + r + w * P.aspect * 0.62;
+    }
+  }
+
+  // Pin a point of the ground. A second press on the same spot straight after
+  // is a double click — the zoom — and moves the point rather than adding one.
+  function addMark(x, z, h) {
+    const now = performance.now(), last = tw.marks[tw.marks.length - 1], g = tw.ground;
+    if (last && now - markAt < 450 && Math.hypot(last.x - x, last.z - z) <= Math.max(1, g.step * 2)) tw.marks[tw.marks.length - 1] = { x, z, h };
+    else if (tw.marks.length >= 2) tw.marks = [{ x, z, h }];
+    else tw.marks.push({ x, z, h });
+    markAt = now;
+    buildMarks();
+    refreshMarks();
+    return tw.marks.length;
+  }
+  function clearMarks() { tw.marks = []; buildMarks(); refreshMarks(); }
+
+  // The figures between two pinned points.
+  function measure() {
+    if (tw.marks.length < 2) return null;
+    const [a, b] = tw.marks;
+    const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), dh = b.h - a.h;
+    return { d, dh, bearing: ((Math.atan2(dx, -dz) * 180 / Math.PI) + 360) % 360, slope: d > 0 ? dh / d : null };
+  }
+  function slopeWords(s) {
+    if (s == null || !isFinite(s)) return '';
+    const a = Math.abs(s);
+    if (a < 1e-5) return 'level';
+    return `${(a * 100).toFixed(a < 0.01 ? 2 : 1)} % (1 in ${Math.round(1 / a).toLocaleString('en-AU')})`;
+  }
+  // The ground along A → B: [{ s, x, z, h }], a sample a step.
+  function sectionPoints() {
+    if (tw.marks.length < 2 || !tw.ground) return [];
+    const [a, b] = tw.marks, L = Math.hypot(b.x - a.x, b.z - a.z);
+    const n = Math.max(2, Math.min(400, Math.ceil(L / tw.ground.step) + 1));
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1), x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
+      out.push({ s: L * t, x, z, h: heightAt(x, z) });
+    }
+    return out;
+  }
+  function sectionHtml() {
+    const pts = sectionPoints();
+    if (pts.length < 2) return '';
+    const g = tw.ground, d = lghDatum(), F = tw.flood;
+    const L = pts[pts.length - 1].s;
+    const water = F && !F.none && F.level != null && S().flood ? F.level : null;
+    const hs = pts.map(p => p.h);
+    let lo = Math.min(...hs), hi = Math.max(...hs);
+    const reaches = water != null && pts.some(p => depthAt(p.x, p.z, p.h) != null);
+    if (reaches && water > lo) hi = Math.max(hi, Math.min(water, hi + (hi - lo) * 0.5 + 1));
+    if (!(hi > lo)) hi = lo + 1;
+    const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+    const { W, H, pl, pr, pt, pb } = SECTION;
+    const X = s => pl + (L > 0 ? s / L : 0) * (W - pl - pr), Y = h => pt + (1 - (h - lo) / (hi - lo)) * (H - pt - pb);
+    const line = pts.map(p => `${X(p.s).toFixed(1)},${Y(p.h).toFixed(1)}`).join(' ');
+    const fillPts = `${X(0).toFixed(1)},${(H - pb).toFixed(1)} ${line} ${X(L).toFixed(1)},${(H - pb).toFixed(1)}`;
+    // The water where the twin's own water covers the line — the samples the
+    // level reaches from the channel, not everywhere low — as runs along it.
+    let wet = '', anyWet = false;
+    if (water != null) {
+      const wy = Math.max(pt, Y(Math.min(water, hi)));
+      let run = [];
+      const flush = () => {
+        if (run.length > 1) {
+          anyWet = true;
+          const top = `${X(run[0].s).toFixed(1)},${wy.toFixed(1)} ${X(run[run.length - 1].s).toFixed(1)},${wy.toFixed(1)}`;
+          const bed = run.slice().reverse().map(p => `${X(p.s).toFixed(1)},${Math.max(wy, Y(p.h)).toFixed(1)}`).join(' ');
+          wet += `<polygon class="twin-sec-water" points="${top} ${bed}"/>
+          <line class="twin-sec-level" x1="${X(run[0].s).toFixed(1)}" y1="${wy.toFixed(1)}" x2="${X(run[run.length - 1].s).toFixed(1)}" y2="${wy.toFixed(1)}"/>`;
+        }
+        run = [];
+      };
+      for (const p of pts) { if (depthAt(p.x, p.z, p.h) != null) run.push(p); else flush(); }
+      flush();
+    }
+    const tick = h => `<text class="twin-vel-prof-tick" x="${pl - 4}" y="${(Y(h) + 4).toFixed(1)}" text-anchor="end">${h.toFixed(1)}</text>`
+      + (d.kind !== 'none' ? `<text class="twin-vel-prof-tick" x="${W - pr + 4}" y="${(Y(h) + 4).toFixed(1)}">${signed(h - d.zero, 1)}</text>` : '');
+    const m = measure();
+    const label = `The ground from A to B, ${Math.round(L)} m: from ${pts[0].h.toFixed(2)} to ${pts[pts.length - 1].h.toFixed(2)} m ${g.datum}, `
+      + `lowest ${Math.min(...hs).toFixed(2)}, highest ${Math.max(...hs).toFixed(2)}`
+      + (water != null ? (reaches ? `; the water now shown is at ${water.toFixed(2)} m ${g.datum}.` : `; the water now shown, at ${water.toFixed(2)} m ${g.datum}, does not reach this line.`) : '.');
+    const rows = [];
+    const K = 10;
+    for (let k = 0; k <= K; k++) {
+      const p = pts[Math.round(k / K * (pts.length - 1))];
+      const dep = water != null ? depthAt(p.x, p.z, p.h) : null;
+      rows.push(`<tr><td>${Math.round(p.s)}</td><td>${p.h.toFixed(2)}</td>${d.kind !== 'none' ? `<td>${signed(p.h - d.zero)}</td>` : ''}${water != null ? `<td>${dep != null ? dep.toFixed(2) : 'dry'}</td>` : ''}</tr>`);
+    }
+    return `<figure class="twin-vel-prof twin-sec" data-tour="twin-section">
+        <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${escAttr(label)}" id="twin-sec-svg">
+          ${wet}
+          <polygon class="twin-sec-ground" points="${fillPts}"/>
+          <polyline class="twin-vel-prof-ground" points="${line}"/>
+          <line class="twin-vel-prof-axis" x1="${pl}" y1="${H - pb}" x2="${W - pr}" y2="${H - pb}"/>
+          ${tick(hi - pad)}${tick(lo + pad)}
+          <text class="twin-vel-prof-tick" x="${pl}" y="${H - 6}">A</text>
+          <text class="twin-vel-prof-tick" x="${W - pr}" y="${H - 6}" text-anchor="end">B · ${Math.round(L)} m</text>
+        </svg>
+        <figcaption class="small">${termHtml('Cross-section', WORDS.section)} from A to B: m ${esc(g.datum)} on the left${d.kind !== 'none' ? `, m LGH (${esc(d.whose)}) on the right` : ''}${water != null ? (anyWet ? `; the water is at ${water.toFixed(2)} m ${esc(g.datum)}${d.kind !== 'none' ? ` (${signed(water - d.zero)} m LGH)` : ''}` : `; the water now shown (${water.toFixed(2)} m ${esc(g.datum)}) does not reach this line`) : ''}.${m && L < 2 * g.step ? ' The two points are closer than the samples are apart, so there is little to cut.' : ''}</figcaption>
+        <details class="twin-details">
+          <summary>The cross-section, as numbers</summary>
+          <div class="table-wrap">
+            <table class="twin-table twin-sec-table">
+              <caption class="sr-only">The ground along the line from A to B, at eleven points</caption>
+              <thead><tr><th scope="col">m from A</th><th scope="col">m ${esc(g.datum)}</th>${d.kind !== 'none' ? '<th scope="col">m LGH</th>' : ''}${water != null ? '<th scope="col">Water, m</th>' : ''}</tr></thead>
+              <tbody>${rows.join('')}</tbody>
+            </table>
+          </div>
+        </details>
+      </figure>`;
+  }
+
+  function markLineHtml(m, i) {
+    const g = tw.ground, d = lghDatum();
+    const lgh = lghText(m.h, d), depth = depthAt(m.x, m.z, m.h);
+    return `<li><span class="twin-mark-dot twin-mark-${i}" aria-hidden="true"></span><strong>${MARK_NAMES[i]}</strong> — ${m.h.toFixed(2)} m ${termHtml(g.datum, g.datum === 'AHD' ? WORDS.ahd : '')}`
+      + (lgh ? `, ${esc(lgh.replace(' LGH', ''))} ${termHtml('LGH', WORDS.lgh)}` : '')
+      + ` · ${esc(whereWords(m.x, m.z, 1))} of the station` + (depth != null ? ` · under ${depth.toFixed(2)} m of water` : '') + '</li>';
+  }
+  function marksHtml() {
+    const g = tw.ground;
+    if (!g || !tw.live) return '<p class="small">Open a twin, then click or tap the ground to pin a point.</p>';
+    if (!tw.marks.length) return '<p class="small">Click or tap the ground to pin a point and read its height. A second point measures between the two and cuts a cross-section.</p>';
+    const m = measure();
+    const between = m ? `<p class="twin-measure" data-tour="twin-measure"><strong>A → B:</strong> ${m.d.toFixed(1)} m ${termHtml('apart', WORDS.apart)}, bearing ${Math.round(m.bearing)}° (${compassWord(m.bearing)}). `
+      + `B is ${Math.abs(m.dh).toFixed(2)} m ${m.dh < 0 ? 'lower' : m.dh > 0 ? 'higher' : 'level with A'}${m.dh ? ` — ${termHtml(m.dh < 0 ? 'a fall of' : 'a rise of', WORDS.fall)} ${esc(slopeWords(m.slope))}` : ''}.</p>` : '';
+    return `<ul class="twin-marks-list">${tw.marks.map(markLineHtml).join('')}</ul>
+        ${between}
+        ${sectionHtml()}
+        <div class="button-group"><button type="button" onclick="DigitalTwin.clearMarks()" title="Take the pinned points off the ground">Clear the points</button></div>`;
+  }
+  function refreshMarks() {
+    const el = document.getElementById('twin-marks');
+    if (el) el.innerHTML = marksHtml();
+  }
+
+  // The ground under the middle of the view — where the orbit turns about,
+  // which the arrow keys move: the keyboard's pointer.
+  function centreHtml() {
+    const g = tw.ground;
+    if (!g || !tw.live || rig.mode !== 'orbit' || !rig.target) return '';
+    const x = rig.target.x, z = rig.target.z, h = heightAt(x, z), lgh = lghText(h);
+    return `Under the middle of the view: <strong>${h.toFixed(2)} m ${esc(g.datum)}</strong>${lgh ? `, ${esc(lgh)}` : ''} · ${esc(whereWords(x, z))} of the station.`;
+  }
+  let centreKey = '';
+  function refreshCentre() {
+    const el = document.getElementById('twin-centre');
+    if (!el) return;
+    const t = rig.target, key = tw.live && t && rig.mode === 'orbit' ? `${t.x.toFixed(1)},${t.z.toFixed(1)},${tw.seq},${lghValue(currentStation())}` : '';
+    if (key === centreKey) return;
+    centreKey = key;
+    el.innerHTML = centreHtml();
+    const btn = document.getElementById('twin-centre-pin');
+    if (btn) btn.disabled = !key;
+  }
+
+  function wordsFoldHtml() {
+    const rows = [['AHD', WORDS.ahd], ['LGH — local gauge height', WORDS.lgh], ['Gauge zero', WORDS.zero], ['The channel bed', WORDS.channel],
+                  ['Ground area', WORDS.area], ['Ground detail', WORDS.detail], ['Sample', WORDS.sample], ['Apart', WORDS.apart],
+                  ['Fall, rise and slope', WORDS.fall], ['Cross-section', WORDS.section], ['Far ground', WORDS.far]];
+    return `<details class="twin-details twin-words">
+        <summary>What the words here mean</summary>
+        <dl class="twin-words-list">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+      </details>`;
+  }
+
+  // The Heights panel of the pane: the switch, whose gauge, the pinned points
+  // and what is between them, the middle of the view, and the words.
+  function heightsPanelHtml() {
+    return `
+      <div class="panel-header"><h2>Heights and measuring</h2></div>
+      <div class="twin-fields">
+        <label class="check-label"><input type="checkbox" id="twin-probe-on" ${S().probe ? 'checked' : ''} onchange="DigitalTwin.setProbe(this.checked)"><span>Read out the ground's height under the pointer</span></label>
+        <div id="twin-lgh-field">${lghFieldHtml()}</div>
+      </div>
+      <div id="twin-marks" aria-live="polite">${marksHtml()}</div>
+      <p class="small twin-centre"><span id="twin-centre">${centreHtml()}</span>
+        <button type="button" class="link-btn" id="twin-centre-pin" onclick="DigitalTwin.pinCentre()" ${tw.live ? '' : 'disabled'}
+                title="Pin the ground under the middle of the view, as a click on it would — the arrow keys move the view">Pin this point</button></p>
+      ${wordsFoldHtml()}`;
+  }
+  let lghWriting = false;
+  function refreshProbePane() {
+    const f = document.getElementById('twin-lgh-field');
+    // Rewritten, unless a level is being typed into it and is still what is
+    // in force — then only the line under it changes, and the caret stays.
+    const a = document.activeElement;
+    const typing = !!(f && a && a.id === 'twin-lgh-m' && f.contains(a) && lghValue(currentStation()) === 'custom');
+    // (Taking a box with unsent typing in it out of the page sends its change
+    // as it goes: `lghWriting` keeps that from undoing the choice just made.)
+    if (f && !typing) { lghWriting = true; try { f.innerHTML = lghFieldHtml(); } finally { lghWriting = false; } }
+    else if (f) { const n = document.getElementById('twin-lgh-note'); if (n) { const d = lghDatum(); n.textContent = d.kind === 'none' ? d.why : `0 m LGH is ${d.zero.toFixed(2)} m AHD — ${d.whose}.`; } }
+    refreshMarks();
+    centreKey = '\u0000';
+    refreshCentre();
   }
 
   // ── the frame loop ─────────────────────────────────────────────────────────
@@ -7216,6 +8235,7 @@ void main() {
     placeCamera();
     updateLocalLaser();
     scalePhotoBadges();
+    scaleMarks();
     sc.scene.background = skyColour();
     if (sc.scene.fog) sc.scene.fog.color.copy(sc.scene.background);
     syncSky();
@@ -7223,7 +8243,11 @@ void main() {
     // The lot numbers and road names, written over the frame just drawn.
     if (typeof TwinCadastre !== 'undefined') TwinCadastre.frame();
     tw.frames++;
+    // The pane's reading of the ground under the middle of the view, a few
+    // times a second while the view moves.
+    if (now - centreAt > 250) { centreAt = now; refreshCentre(); }
   }
+  let centreAt = 0;
 
   function startLoop() {
     if (!sc.raf && tw.live) sc.raf = requestAnimationFrame(tick);
@@ -7362,6 +8386,8 @@ void main() {
       tw.photos = null;
       tw.flood = null; tw.vel = null;
       tw.neighbours = null; tw.bridges = null; tw.bridgesFound = null; tw.tier = null; tw.cover = null;
+      tw.ext = null; tw.reach = null; tw.probe = null; tw.marks = [];
+      refreshArea(); refreshProbePane();
       if (typeof TwinPresence !== 'undefined') { try { TwinPresence.leave(); } catch (_) {} }
       clearScene();
       requestFrame();
@@ -7377,13 +8403,17 @@ void main() {
     if (!located(st)) { nothing(`${st.name} has no position, so there is no ground to stand it on.`, `<p><strong>${esc(st.name)}</strong> has no coordinates. Give it a position in the station editor and the twin can be built.</p>`); return; }
     const gl = webglOk();
     const size0 = S().size;
+    // The area: the station's own where one was set for it — built exactly as
+    // asked, never widened behind the operator's back — else the square.
+    const custom = customArea(st), ext0 = extFor(st);
     const notes = [];
     // Where the bridges are, asked first and over more than the patch: a bridge
     // that runs to the patch's edge or stands just past it widens the patch to
     // hold it (fitBridges). The State answers in a second or so; the build
     // waits for it no longer than BRIDGE_FIT_WAIT and outside Queensland, where
     // the answer is Overpass's and slow, not at all.
-    const askP = bridgesFor(bridgeQueryBox(st.lat, st.lon, size0));
+    const askBox = bridgeAskBox(st, ext0, custom);
+    const askP = bridgesFor(askBox);
     tw.fit = { size0, size: size0, widened: false, held: 0, tooLong: 0 };
 
     // The renderer, only where it can draw: without WebGL there is no point
@@ -7404,12 +8434,13 @@ void main() {
     // draped when it arrives. Waiting for both held a ground that took
     // seconds behind an imagery host that took a minute to say no.
     setStatus('Reading the ground…');
-    if (S().fitBridges && insideBox(bridgeQueryBox(st.lat, st.lon, size0), QLD_DEM_BOX)) {
+    if (!custom && S().fitBridges && insideBox(askBox, QLD_DEM_BOX)) {
       const found = await Promise.race([askP, new Promise(res => setTimeout(() => res(null), BRIDGE_FIT_WAIT))]);
       if (seq !== tw.seq) return;
       if (found && found.source === 'qld' && !found.failed) tw.fit = fitBridges(found, Number(st.lat), Number(st.lon), size0);
     }
-    const box = patchBox(st.lat, st.lon, tw.fit.size);
+    const ext = custom ? ext0 : squareExt(tw.fit.size);
+    const box = areaBox(Number(st.lat), Number(st.lon), ext);
     const imageP = imageryFor(box);
     // The SLS says which stations a person reads — asked for alongside the
     // ground, which takes longer, so the station is not held up by it.
@@ -7423,6 +8454,12 @@ void main() {
     if (!slsOk) notes.push('The Service Level Specification could not be read, so whether this station is read by hand or by a radio is decided from its record alone.');
     tw.ground = ground;
     tw.origin = ground ? { lat: Number(st.lat), lon: Number(st.lon) } : null;
+    tw.ext = ground ? ext : null;
+    tw.askBox = askBox;
+    tw.builtKeys = [boxKey(box), boxKey(askBox)];
+    tw.reach = null;
+    tw.probe = null;
+    tw.marks = [];
     tw.image = null;
     tw.elvis = null;
     tw.vel = null;
@@ -7458,7 +8495,7 @@ void main() {
         ? `The tiles are heights above the EGM96 geoid, not AHD: ${geoidWords(ground.geoid)}, so the ground is put into AHD by that much — the datum the gauge zeros, the flood levels and the surveyed heights are in.`
         : `The tiles are heights above the EGM96 geoid, not AHD, and how far apart the two are here could not be had (${ground.geoidError || 'no answer'}), so the ground is left in EGM96 — up to 2 m from AHD — and no level in AHD is stood on it. Press Rebuild to ask again.`);
     } else if (ground.filled) {
-      notes.push(`${ground.filled.toLocaleString()} of ${(N * N).toLocaleString()} samples were outside the State's data and were filled from ~30 m terrain tiles, `
+      notes.push(`${ground.filled.toLocaleString()} of ${(ground.nx * ground.nz).toLocaleString()} samples were outside the State's data and were filled from ~30 m terrain tiles, `
         + (ground.geoid ? `put into AHD from EGM96 (${geoidWords(ground.geoid)}).`
                         : `in EGM96: how far that is from AHD here could not be had (${ground.geoidError || 'no answer'}), so the fill may stand up to 2 m off the State's ground.`));
     }
@@ -7482,7 +8519,10 @@ void main() {
       buildLabel(st);
       buildPaths(st);
       setFog(false);
-      resetOrbit();
+      // The opening view of the pole — or, where the area was just changed,
+      // the whole of it, since that is what was asked to be seen.
+      if (tw.frameNext) frameArea(); else resetOrbit();
+      tw.frameNext = false;
       presenceJoin(st);
       loadPhotos(st, seq);
       loadBridges(st, seq, notes, askP);
@@ -7490,6 +8530,7 @@ void main() {
       loadCover(seq);
       notes.push(...buildFlood(st));
       refreshVelocity(true);
+      buildMarks();
       // A pin being moved, armed before this build — on the map before the
       // twin was opened, or on this station before a rebuild.
       movePinChanged();
@@ -7505,13 +8546,15 @@ void main() {
       showPlaceholder('<p>The 3-D renderer could not be fetched. The ground has been read and is tabled below; press <strong>Rebuild</strong> to try the renderer again.</p>');
     }
     syncExportButton();
-    const groundLine = `${st.name}: ${ground.size} m of ground at ${ground.sample_m.toFixed(1)} m samples `
+    const groundLine = `${st.name}: ${areaWords(ground)} of ground at ${ground.sample_m.toFixed(1)} m samples `
                      + `(${ground.source === 'qld' ? 'Queensland LiDAR/SRTM DTM' : 'SRTM ~30 m'}), `
                      + `${(ground.max - ground.min).toFixed(1)} m of relief`;
     setStatus(`${groundLine}; fetching the imagery…`);
     setNotes(notes);
     refreshTruth();
     refreshTable();
+    refreshArea();
+    refreshProbePane();
     syncCanvasName();
     if (typeof Elvis !== 'undefined') {
       Elvis.at(st.lat, st.lon).then(r => {
@@ -7571,7 +8614,7 @@ void main() {
     const g = tw.ground;
     let name = 'Three-dimensional view. No station is built yet.';
     if (st && g) {
-      name = `Three-dimensional view of ${st.name}: ${g.size} m of ground at ${g.sample_m.toFixed(1)} m, `
+      name = `Three-dimensional view of ${st.name}: ${areaWords(g)} of ground at ${g.sample_m.toFixed(1)} m, `
            + `${(g.max - g.min).toFixed(1)} m of relief, ${modelWords(tw.model)} at the station and a 1.75 m figure beside it`
            + (tw.cover && tw.cover.drawn && (tw.cover.drawn.trees || tw.cover.drawn.buildings)
              ? `, ${plural(tw.cover.drawn.trees, 'tree')} and ${plural(tw.cover.drawn.buildings, 'building')} standing round it` : '')
@@ -7615,8 +8658,8 @@ void main() {
         rows.push(['Difference', `${d >= 0 ? '+' : ''}${d.toFixed(2)} m <span class="small">recorded − ground</span>`]);
       }
       rows.push(['Ground model', g.source === 'qld'
-        ? `Queensland Government DTM — LiDAR at 0.5–1 m where flown, SRTM elsewhere; sampled every ${g.sample_m.toFixed(1)} m over ${g.size} m`
-        : `AWS Terrain Tiles — SRTM at ~${g.native_m} m, lifted to ${g.sample_m.toFixed(1)} m samples over ${g.size} m`]);
+        ? `Queensland Government DTM — LiDAR at 0.5–1 m where flown, SRTM elsewhere; sampled every ${g.sample_m.toFixed(1)} m over ${areaWords(g)}`
+        : `AWS Terrain Tiles — SRTM at ~${g.native_m} m, lifted to ${g.sample_m.toFixed(1)} m samples over ${areaWords(g)}`]);
       rows.push(['Relief in the patch', `${fmtM(g.min)} to ${fmtM(g.max)} ${g.datum} (${fmtM(g.max - g.min)})`]);
     }
     const e = tw.elvis;
@@ -7652,7 +8695,7 @@ void main() {
     const g = tw.ground;
     const st = currentStation();
     if (!g || !st) return '<p class="small">The table fills in once a twin is built.</p>';
-    const offs = TABLE_OFFSETS.filter(o => Math.abs(o) <= g.half);
+    const offs = TABLE_OFFSETS.filter(o => onPatch(o, 0, 0, g) && onPatch(0, -o, 0, g));
     const cell = v => `<td>${v.toFixed(1)}</td>`;
     return `
       <div class="table-wrap">
@@ -7765,11 +8808,7 @@ void main() {
     return `
       <div class="panel-header"><h2>Scene</h2></div>
       <div class="twin-fields">
-        <label class="twin-field">Ground patch
-          <select id="twin-size" onchange="DigitalTwin.setSize(this.value)">
-            ${SIZES.map(v => `<option value="${v}" ${v === s.size ? 'selected' : ''}>${v} m square</option>`).join('')}
-          </select>
-        </label>
+        <div class="twin-area" id="twin-area">${areaFieldHtml()}</div>
         <div id="twin-tower-field">${towerFieldHtml()}</div>
         <label class="twin-field">Vertical exaggeration <span class="small" id="twin-exag-out">${s.exag.toFixed(1)}×</span>
           <input type="range" id="twin-exag" min="1" max="3" step="0.1" value="${s.exag}"
@@ -7782,7 +8821,7 @@ void main() {
           <p class="small twin-cover-note" id="twin-cover-note">${coverNoteHtml()}</p>
           ${coverWordsHtml()}
         </div>
-        <label class="check-label"><input type="checkbox" ${s.fitBridges ? 'checked' : ''} onchange="DigitalTwin.setFitBridges(this.checked)"><span>Widen the patch to hold a bridge at its edge</span></label>
+        <label class="check-label"><input type="checkbox" ${s.fitBridges ? 'checked' : ''} onchange="DigitalTwin.setFitBridges(this.checked)"><span>Widen a square to hold a bridge at its edge (a station's own area is built as drawn)</span></label>
         <label class="check-label"><input type="checkbox" ${s.horizon ? 'checked' : ''} onchange="DigitalTwin.setHorizon(this.checked)"><span>The horizon: far ground to ${HORIZON_M / 1000} km, a sky and haze (a few more requests)</span></label>
         ${floodPanelHtml()}
         ${avatarPanelHtml()}
@@ -7851,6 +8890,7 @@ void main() {
         <p class="small twin-photos" id="twin-pane-photos" hidden></p>
         <p class="small twin-flood" id="twin-pane-flood" hidden></p>
       </div>
+      <div class="panel twin-heights" id="twin-panel-heights">${heightsPanelHtml()}</div>
       <div class="panel" id="twin-panel-scene">${scenePanelHtml()}</div>
       <div class="panel twin-vel" id="twin-panel-velocity">${velPanelHtml()}</div>
       <div class="panel">
@@ -7911,6 +8951,10 @@ void main() {
     if (hits && !(a && hits.contains(a))) hits.innerHTML = hitsHtml();
     const scene = document.getElementById('twin-panel-scene');
     if (scene && !(a && scene.contains(a))) scene.innerHTML = scenePanelHtml();
+    else refreshArea();
+    const on = document.getElementById('twin-probe-on');
+    if (on) on.checked = !!S().probe;
+    refreshProbePane();
     for (const id of ['twin-top', 'twin-rebuild']) {
       const b = document.getElementById(id);
       if (b) b.disabled = !tw.live;
@@ -7960,7 +9004,8 @@ void main() {
           <button type="button" class="twin-flood-pill" id="twin-flood-pill" hidden onclick="DigitalTwin.floodPill()"></button>
           ${floodScaleHtml()}
           ${speedKeyHtml()}
-          <p class="twin-hud" id="twin-hud">${esc(viewMoveWords(coarsePointer()))} Click the ground for its height.</p>
+          <p class="twin-hud" id="twin-hud">${esc(viewMoveWords(coarsePointer()))} ${coarsePointer() ? 'Tap the ground to pin a point and read its height.' : 'Point at the ground for its height; click to pin the point.'}</p>
+          <div class="twin-probe" id="twin-probe" aria-hidden="true" hidden></div>
           <button type="button" class="twin-hud-q" id="twin-hud-q" aria-controls="twin-hud" aria-expanded="true"
                   aria-label="How to move the view" title="How to move the view" onclick="DigitalTwin.toggleHud()" hidden>?</button>
           ${caveatHtml()}
@@ -8021,6 +9066,7 @@ void main() {
     tw.flood = null; tw.vel = null;
     tw.neighbours = null; tw.bridges = null; tw.bridgesFound = null;
     tw.cover = null;
+    tw.ext = null; tw.reach = null; tw.probe = null; tw.marks = []; tw.frameNext = false;
     rig.pointLatch = false; rig.pointing = false;
     // The next build is an opening: the lines open again, and fold again.
     clearInfoTimer();
@@ -8120,6 +9166,8 @@ void main() {
                     ground_m: g.h0, datum: g.datum, axes: 'x east, y up, z south; metres',
                     ...(g.geoid ? { ahd_less_egm96_m: Number(g.geoid.m.toFixed(3)), datum_from: 'EGM96 (terrain tiles), by AUSGeoid2020 less EGM96' } : {}) },
           ground: { source: g.source, sample_m: g.sample_m, size_m: g.size, exaggeration: S().exag,
+                    // The patch's edges from the origin, metres: it need not be round the station.
+                    extent_m: { west: -g.x0, east: g.x1, north: -g.z0, south: g.z1 },
                     attribution: g.attribution },
           imagery: tw.image && S().imagery ? { source: tw.image.source, attribution: tw.image.attribution } : null,
           pole: tw.model && (tw.model.structure === 'pole' || tw.model.structure === 'tower' || tw.model.structure === 'repeater')
@@ -8248,7 +9296,9 @@ void main() {
     const st = currentStation();
     buildGlb().then(buf => {
       if (!buf) { setStatus('Nothing to export yet — build a twin first.'); return; }
-      const name = floodnetName(`twin-${(st && st.id) || 'station'}-${tw.ground ? tw.ground.size : S().size}m.glb`);
+      const gg = tw.ground;
+      const span = !gg ? S().size : gg.sizeX === gg.sizeZ ? gg.size : `${Math.round(gg.sizeX)}x${Math.round(gg.sizeZ)}`;
+      const name = floodnetName(`twin-${(st && st.id) || 'station'}-${span}m.glb`);
       const a = Object.assign(document.createElement('a'), {
         href: URL.createObjectURL(new Blob([buf], { type: 'model/gltf-binary' })),
         download: name,
@@ -8292,11 +9342,118 @@ void main() {
 
     // The scene settings — each persisted, each applied without a refetch
     // where it can be.
+    // A square size is every station's; picking one also puts away the area
+    // drawn for the station on screen, which is how to get back to the square.
     setSize(v) {
       const n = Number(v);
-      if (!SIZES.includes(n) || n === S().size) return;
+      if (!SIZES.includes(n)) return;
+      const st = currentStation(), had = !!(st && S().areas[st.id]);
+      if (n === S().size && !had) return;
+      if (had) delete S().areas[st.id];
       S().size = n; saveSettings();
+      tw.frameNext = had || n > WIDE_M;
       init();
+    },
+    // The area for the station on screen (see "the area"): all four sides, one
+    // side, the square again, a bridge past the edge, and how finely it is
+    // sampled.
+    setArea(x, why) { return setAreaFor(currentStation(), x, why); },
+    setSide(k, v) {
+      const st = currentStation();
+      if (!st || !['w', 'e', 'n', 's'].includes(k)) return false;
+      const now = (tw.ext && tw.stationId === st.id) ? tw.ext : extFor(st);
+      return setAreaFor(st, { ...now, [k]: Number(v) }, 'side');
+    },
+    resetArea() {
+      const st = currentStation();
+      if (!st || !S().areas[st.id]) return;
+      delete S().areas[st.id]; saveSettings();
+      tw.frameNext = false;
+      announce(`${st.name}: back to the ${S().size} m square round the station.`);
+      init();
+    },
+    reachBridge(i) {
+      const st = currentStation(), b = tw.reach && tw.reach.list && tw.reach.list[i];
+      if (!st || !b) return false;
+      return setAreaFor(st, b.need, 'bridge', b);
+    },
+    setDetail(v) {
+      const d = v === 'fine' || v === 'finest' ? v : 'auto';
+      if (d === S().detail) return;
+      S().detail = d; saveSettings();
+      init();
+    },
+    // The ground under the pointer, whose gauge a gauge height is measured
+    // from, and the pinned points (see "the ground under the pointer").
+    setProbe(on) { S().probe = !!on; saveSettings(); if (!on) hideProbe(); },
+    setLgh(v) {
+      const st = currentStation();
+      if (!st) return;
+      const s = S();
+      delete s.lgh[st.id];
+      if (v === 'channel') s.lgh[st.id] = { kind: 'channel' };
+      else if (v === 'custom') {
+        const d = lghDatum(st), seed = tw.ground ? floodSeed(tw.ground) : null;
+        const m = d.kind !== 'none' ? d.zero : seed ? seed.elev : tw.ground ? tw.ground.h0 : 0;
+        s.lgh[st.id] = { kind: 'custom', m: Math.round(m * 100) / 100 };
+      } else if (typeof v === 'string' && v.startsWith('station:')) {
+        const id = v.slice(8);
+        // The station's own gauge is what is used when nothing is kept.
+        if (id !== st.id || ahdZeroOf(st) == null) s.lgh[st.id] = { kind: 'station', id };
+      }
+      const ids = Object.keys(s.lgh);
+      for (const id of ids.slice(0, Math.max(0, ids.length - AREAS_KEPT))) delete s.lgh[id];
+      saveSettings();
+      refreshProbePane();
+      buildMarks();
+      const d = lghDatum(st);
+      announce(d.kind === 'none' ? `No gauge chosen. ${d.why}` : `Gauge heights are now measured from ${d.whose}: 0 m is ${d.zero.toFixed(2)} m AHD.`);
+      if (v === 'custom') { const el = document.getElementById('twin-lgh-m'); if (el) { try { el.focus(); el.select(); } catch (_) {} } }
+    },
+    setLghZero(v) {
+      const st = currentStation(), m = Number(v);
+      if (lghWriting || !st || v === '' || !isFinite(m)) return;
+      S().lgh[st.id] = { kind: 'custom', m }; saveSettings();
+      refreshProbePane();
+      buildMarks();
+      announce(`Gauge heights are now measured from ${m.toFixed(2)} m AHD.`);
+    },
+    clearMarks() { clearMarks(); announce('The pinned points are cleared.'); },
+    pinCentre() {
+      if (!tw.ground || !tw.live || !rig.target) return;
+      const x = rig.target.x, z = rig.target.z, h = heightAt(x, z);
+      const n = addMark(x, z, h);
+      announce(`Point ${MARK_NAMES[n - 1]} pinned under the middle of the view: ${h.toFixed(2)} m ${tw.ground.datum}.`);
+    },
+    // For the checks: the readout a pointer at a scene point would get, the
+    // pinned points and what is between them, and the datum in force.
+    _probe(x, z) {
+      if (!tw.ground) return null;
+      const far = !onPatch(x, z), sh = far ? sheetAt(x, z) : null;
+      if (far && !sh) return null;
+      const h = far ? sh.v + (sh.source === 'srtm' && tw.ground.geoid ? tw.ground.geoid.m : 0) : heightAt(x, z);
+      const d = lghDatum();
+      return { x, z, h, far, lgh: lghOf(h, d), datum: d, depth: far ? null : depthAt(x, z, h), html: probeHtml({ x, z, h, far }) };
+    },
+    _probeHit(cx, cy) { return probeHit(cx, cy); },
+    _pin(x, z) { return tw.ground ? addMark(x, z, heightAt(x, z)) : 0; },
+    _marks() { return { list: tw.marks.map(m => ({ ...m })), measure: measure(), section: sectionPoints(), drawn: sc.marks ? sc.marks.children.map(c => c.name) : [] }; },
+    _lgh() { return { datum: lghDatum(), value: lghValue(currentStation()), gauges: lghGauges(currentStation()).map(o => ({ id: o.s.id, zero: o.zero.m, datum: o.zero.datum, km: o.km, own: o.own, ok: o.ok })) }; },
+    _reach() { return tw.reach ? { status: tw.reach.status, list: tw.reach.list.map(b => ({ ...b })) } : null; },
+    _areaBox: areaBox, _normExt: normExt, _gridOf: gridOf, _ringList: g => ringList(g || tw.ground), _ringAt: ringAt, _ringFrame: () => { const F = ringFrame(); return F ? { ...F } : null; },
+    _flowGrid: () => (tw.ground ? flowGrid(tw.ground) : null),
+    // Draw the area on the map (map-twin.js puts the twin aside for it).
+    drawArea() { if (typeof MapTwin !== 'undefined' && MapTwin.drawArea) MapTwin.drawArea(); },
+    // An area from two corners on the map, in degrees — grown to hold the station.
+    setAreaLatLon(a, b) {
+      const st = currentStation();
+      if (!st || !located(st) || !a || !b) return false;
+      const p = localXZ(a.lat, a.lon, Number(st.lat), Number(st.lon)), q = localXZ(b.lat, b.lon, Number(st.lat), Number(st.lon));
+      return setAreaFor(st, { w: -Math.min(p.x, q.x), e: Math.max(p.x, q.x), n: -Math.min(p.z, q.z), s: Math.max(p.z, q.z) }, 'drawn');
+    },
+    area() {
+      const st = currentStation();
+      return st ? { ext: extFor(st), custom: customArea(st), built: tw.ext ? { ...tw.ext } : null } : null;
     },
     // Saved on the station (0040) and the twin rebuilt from what came back.
     // Picking 3.0 m on a station that records nothing records 3.0 m.
@@ -8339,6 +9496,7 @@ void main() {
         placePhotoMarkers();
         placeFlood();
         liftHorizon();
+        buildMarks();
         requestFrame();
       }
     },
@@ -8377,7 +9535,7 @@ void main() {
         fetchHorizon(st, tw.seq, horizonNotes(tw.notes)).catch(() => {});
       }
     },
-    setWire(on)    { S().wire = !!on; saveSettings(); if (sc.wire) { sc.wire.visible = !!on; requestFrame(); } },
+    setWire(on)    { S().wire = !!on; saveSettings(); if (on) buildWire(); if (sc.wire) { sc.wire.visible = !!on; requestFrame(); } },
     setFigure(on)  { S().figure = !!on; saveSettings(); if (sc.figure) { sc.figure.visible = !!on; requestFrame(); } },
     setLabel(on)   {
       S().label = !!on; saveSettings();
@@ -8399,10 +9557,12 @@ void main() {
       const st = currentStation();
       if (st && located(st)) {
         for (const sz of new Set([S().size, tw.fit ? tw.fit.size : S().size])) {
-          const key = boxKey(patchBox(st.lat, st.lon, sz));
+          const key = boxKey(areaBox(Number(st.lat), Number(st.lon), squareExt(sz)));
           groundCache.delete(key); imageCache.delete(key);
         }
         bridgeCache.delete(boxKey(bridgeQueryBox(st.lat, st.lon, S().size)));
+        // …and whatever the twin on screen was built from, its own area included.
+        for (const key of tw.builtKeys || []) { groundCache.delete(key); imageCache.delete(key); bridgeCache.delete(key); }
         horizonCache.delete(horizonKey(st));
         for (const h of SHELL_HALF) imageCache.delete(boxKey(shellBox(st.lat, st.lon, h)));
       }
@@ -8484,6 +9644,12 @@ void main() {
     },
     _latLonAt(x, z) { return tw.origin ? latLonAt(x, z) : null; },
     _heightAt(x, z) { return heightAt(x, z); },
+    // A vertex of the ground's own mesh, by its index in the raster's order.
+    _terrainVertex(i) {
+      if (!sc.terrain) return null;
+      const p = sc.terrain.geometry.attributes.position;
+      return i >= 0 && i < p.count ? { x: p.getX(i), y: p.getY(i), z: p.getZ(i) } : null;
+    },
     _xzOf(lat, lon) { return tw.origin ? localXZ(lat, lon, tw.origin.lat, tw.origin.lon) : null; },
     // For the check: the stations the modal would offer.
     _donors(id) { const st = stationById(id) || currentStation(); return nearestDonors(st).map(d => ({ id: d.s.id, km: d.km, same: d.same, self: !!d.self })); },
@@ -8515,11 +9681,14 @@ void main() {
     prefetch(id) {
       const s = stationById(id);
       if (!located(s) || typeof fetch !== 'function') return;
-      const size0 = S().size, qbox = bridgeQueryBox(s.lat, s.lon, size0);
-      const go = size => { const box = patchBox(s.lat, s.lon, size); groundFor(box).catch(() => {}); imageryFor(box).catch(() => {}); };
+      const size0 = S().size, custom = customArea(s), x0 = extFor(s), qbox = bridgeAskBox(s, x0, custom);
+      const go = size => {
+        const box = areaBox(Number(s.lat), Number(s.lon), custom ? x0 : squareExt(size));
+        groundFor(box).catch(() => {}); imageryFor(box).catch(() => {});
+      };
       // The patch a build would stand: widened for a bridge at its edge, which
       // the State says (and the build then has from the cache).
-      if (S().fitBridges && insideBox(qbox, QLD_DEM_BOX)) {
+      if (!custom && S().fitBridges && insideBox(qbox, QLD_DEM_BOX)) {
         bridgesFor(qbox).then(f => go(f && f.source === 'qld' && !f.failed ? fitBridges(f, Number(s.lat), Number(s.lon), size0).size : size0), () => go(size0));
       } else go(size0);
     },
@@ -8608,6 +9777,9 @@ void main() {
         live: tw.live, lib: !!THREE, built: !!sc.terrain, frames: tw.frames, seq: tw.seq,
         stationId: tw.stationId, mode: rig.mode,
         size: g ? g.size : null, N, sample_m: g ? g.sample_m : null,
+        // The area as built: its edges in the scene's metres and its sampling.
+        area: g ? { x0: g.x0, x1: g.x1, z0: g.z0, z1: g.z1, nx: g.nx, nz: g.nz, step: g.step, square: !!g.square,
+                    custom: customArea(currentStation()), ext: tw.ext ? { ...tw.ext } : null, box: { ...g.box } } : null,
         source: g ? g.source : null, holes: g ? g.holes : null, filled: g ? g.filled : null, qld: g ? g.qld : null,
         datum: g ? g.datum : null, geoid: g && g.geoid ? g.geoid.m : null, egm96: g ? !!g.egm96 : null,
         h0: g ? g.h0 : null, min: g ? g.min : null, max: g ? g.max : null,
@@ -9045,17 +10217,15 @@ void main() {
     _floodWet(x, z) {
       const F = tw.flood, g = tw.ground;
       if (!F || F.none || !F.fill || !g || F.level == null) return false;
-      const step = g.size / (N - 1);
-      const i = Math.round((x + g.half) / step), j = Math.round((z + g.half) / step);
-      if (i < 0 || j < 0 || i >= N || j >= N) return false;
-      return F.fill[j * N + i] < F.level;
+      const i = Math.round((x - g.x0) / g.step), j = Math.round((z - g.z0) / g.step);
+      if (i < 0 || j < 0 || i >= g.nx || j >= g.nz) return false;
+      return F.fill[j * g.nx + i] < F.level;
     },
     _floodFill(x, z) {
       const F = tw.flood, g = tw.ground;
       if (!F || F.none || !F.fill || !g) return null;
-      const step = g.size / (N - 1);
-      const i = Math.round((x + g.half) / step), j = Math.round((z + g.half) / step);
-      return (i < 0 || j < 0 || i >= N || j >= N) ? null : F.fill[j * N + i];
+      const i = Math.round((x - g.x0) / g.step), j = Math.round((z - g.z0) / g.step);
+      return (i < 0 || j < 0 || i >= g.nx || j >= g.nz) ? null : F.fill[j * g.nx + i];
     },
     // Whether the water as drawn covers a scene point: the texel of the mask
     // the plane samples there, found through the plane's own positions and
@@ -9073,10 +10243,11 @@ void main() {
       if (bx < 0 || bz < 0) return null;
       const u = uv.getX(0) + (x - pos.getX(0)) / (pos.getX(bx) - pos.getX(0)) * (uv.getX(bx) - uv.getX(0));
       const v = uv.getY(0) + (z - pos.getZ(0)) / (pos.getZ(bz) - pos.getZ(0)) * (uv.getY(bz) - uv.getY(0));
-      const ti = Math.floor(u * N), tj = Math.floor(v * N);
-      if (ti < 0 || tj < 0 || ti >= N || tj >= N) return null;
+      const nx = tw.ground.nx, nz = tw.ground.nz;
+      const ti = Math.floor(u * nx), tj = Math.floor(v * nz);
+      if (ti < 0 || tj < 0 || ti >= nx || tj >= nz) return null;
       // three reads an alpha map's green channel.
-      return sc.flood.data[(tj * N + ti) * 4 + 1] > 0;
+      return sc.flood.data[(tj * nx + ti) * 4 + 1] > 0;
     },
     // The speed colour the water as drawn has at a scene point — the texel
     // of the speed texture the plane samples there, found through the
@@ -9092,13 +10263,14 @@ void main() {
       if (bx < 0 || bz < 0) return null;
       const u = uv.getX(0) + (x - pos.getX(0)) / (pos.getX(bx) - pos.getX(0)) * (uv.getX(bx) - uv.getX(0));
       const v = uv.getY(0) + (z - pos.getZ(0)) / (pos.getZ(bz) - pos.getZ(0)) * (uv.getY(bz) - uv.getY(0));
-      const ti = Math.floor(u * N), tj = Math.floor(v * N);
-      if (ti < 0 || tj < 0 || ti >= N || tj >= N) return null;
-      const d = sc.flood.speed.data, o = (tj * N + ti) * 4;
+      const nx = tw.ground.nx, nz = tw.ground.nz;
+      const ti = Math.floor(u * nx), tj = Math.floor(v * nz);
+      if (ti < 0 || tj < 0 || ti >= nx || tj >= nz) return null;
+      const d = sc.flood.speed.data, o = (tj * nx + ti) * 4;
       return `#${[d[o], d[o + 1], d[o + 2]].map(c => c.toString(16).padStart(2, '0')).join('')}`;
     },
     // The ground grid the twin stands on, for a check to trace on itself.
-    _ground() { const g = tw.ground; return g ? { elev: Array.from(g.elev), n: N, size: g.size } : null; },
+    _ground() { const g = tw.ground; return g ? { elev: Array.from(g.elev), n: g.nx, nz: g.nz, size: g.size } : null; },
     // The others in the room, driven by twin-presence.js.
     remote: { set: remoteSet, pose: remotePose, remove: remoteRemove, clear: remoteClear },
     presenceChanged() { refreshPeersLine(); },

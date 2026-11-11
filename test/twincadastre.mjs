@@ -428,6 +428,11 @@ async function browserHalf() {
     // ═══════════════════════════════════════════════════════════════════════
     section('The lot numbers and the road names');
 
+    // The clicks above each pinned a point (digital-twin.js, "measuring"), and
+    // a pinned point's sign is a sign: a label under it is not written. Off
+    // they come, so that what is counted here is the labels.
+    await page.evaluate(() => DigitalTwin.clearMarks());
+    await frame();
     c = await page.evaluate(() => TwinCadastre.debug());
     const titles = c.labels.placed.map(l => `${l.title}${l.sub ? ` ${l.sub}` : ''}`);
     ok('looking down on the patch: every lot\'s number and plan, each road\'s name and the creek\'s — the station\'s own lot first',

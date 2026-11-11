@@ -25,6 +25,18 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 269, date: '2026-11-11', items: [
+      '🧊 <strong>The digital twin\'s ground can be wider than the square.</strong> In the 🧊 pane\'s <em>Scene</em> panel, '
+        + '<em>Ground area</em> now has squares up to 6.4 km, and four boxes under it say how many metres of ground to keep west, '
+        + 'east, north and south of the station — so the twin can run a kilometre down the river without taking in a kilometre every '
+        + 'other way. <em>Widen the area to hold a bridge</em> lists the bridges past the edge; one press rebuilds the twin wide enough '
+        + 'to hold it. <em>▭ Draw it on the map</em> puts the twin aside so you can drag a rectangle on the map. The area is kept for '
+        + 'that station, and <em>Back to the square</em> undoes it.',
+      '📏 <strong>Point at the ground for its height.</strong> In a twin, the height under the pointer shows beside it in metres AHD '
+        + 'and as a local gauge height (LGH) — what a gauge board would read there. <em>Heights and measuring</em> in the 🧊 pane says '
+        + 'whose gauge that is and lets you pick another: a gauge near by, the channel bed, or a level you type in. Click (or tap) to pin '
+        + 'a point; pin two and the pane gives the distance and fall between them and a cross-section of the ground, with the water in it.',
+    ] },
     { n: 268, date: '2026-11-11', items: [
       '✏️ <strong>A fade margin between any two points.</strong> A line drawn between two places that are not stations used to say '
         + '<em>no fade margin — both ends need a radio</em>. It now works one out as if a field station stood at each such end '

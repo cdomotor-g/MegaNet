@@ -415,11 +415,21 @@ const TwinCadastre = (function () {
   // point is on: cell (ix, iz) is split along the diagonal from its south-west
   // corner to its north-east, PlaneGeometry's (a, b, d) / (b, c, d), which in
   // the cell's own u east and v south is u + v = 1.
-  function reliefAt(g, x, z) {
+  //
+  // The patch is a rectangle that need not be round the station (the twin's
+  // "the area"): the ground says where it is (x0…x1 west to east, z0…z1 north
+  // to south) and how it is sampled (nx × nz, `step` apart). `rectOf` reads
+  // that, and a ground that says only its size is the square round the origin
+  // it always was.
+  function rectOf(g) {
+    if (g.x0 != null && g.nx) return g;
     const n = Math.round(Math.sqrt(g.elev.length));
-    const step = g.size / (n - 1);
-    const fx = (x + g.half) / step, fz = (z + g.half) / step;
-    const ix = Math.min(n - 2, Math.max(0, Math.floor(fx))), iz = Math.min(n - 2, Math.max(0, Math.floor(fz)));
+    return { x0: -g.half, x1: g.half, z0: -g.half, z1: g.half, nx: n, nz: n, step: g.size / (n - 1) };
+  }
+  function reliefAt(g, x, z) {
+    const R = rectOf(g), n = R.nx, step = R.step;
+    const fx = (x - R.x0) / step, fz = (z - R.z0) / step;
+    const ix = Math.min(n - 2, Math.max(0, Math.floor(fx))), iz = Math.min(R.nz - 2, Math.max(0, Math.floor(fz)));
     const u = fx - ix, v = fz - iz;
     const e = g.elev, h0 = g.h0;
     const at = k => (isFinite(e[k]) ? e[k] : h0);
@@ -429,10 +439,11 @@ const TwinCadastre = (function () {
   }
 
   // One segment, clipped to the patch (Liang–Barsky), or null.
-  function clip(ax, az, bx, bz, L) {
+  function clip(ax, az, bx, bz, R) {
+    if (typeof R === 'number') R = { x0: -R, x1: R, z0: -R, z1: R };   // a square round the origin, by its half-width
     let t0 = 0, t1 = 1;
     const dx = bx - ax, dz = bz - az;
-    const p = [-dx, dx, -dz, dz], q = [ax + L, L - ax, az + L, L - az];
+    const p = [-dx, dx, -dz, dz], q = [ax - R.x0, R.x1 - ax, az - R.z0, R.z1 - az];
     for (let i = 0; i < 4; i++) {
       if (p[i] === 0) { if (q[i] < 0) return null; continue; }
       const r = q[i] / p[i];
@@ -446,17 +457,16 @@ const TwinCadastre = (function () {
   // points (xz) with the relief at each (rel). Everything it pushes is on the
   // ground exactly.
   function drape(g, ax, az, bx, bz, xz, rel) {
-    const n = Math.round(Math.sqrt(g.elev.length));
-    const step = g.size / (n - 1), half = g.half;
+    const R = rectOf(g), step = R.step;
     const ts = [0, 1];
     const cross = (a, b, off) => {
       const lo = Math.min(a, b), hi = Math.max(a, b);
       if (hi - lo < 1e-12) return;
       for (let k = Math.floor((lo - off) / step) + 1; off + k * step < hi; k++) ts.push((off + k * step - a) / (b - a));
     };
-    cross(ax, bx, -half);
-    cross(az, bz, -half);
-    cross(ax + az, bx + bz, -2 * half);
+    cross(ax, bx, R.x0);
+    cross(az, bz, R.z0);
+    cross(ax + az, bx + bz, R.x0 + R.z0);
     ts.sort((p, q) => p - q);
     let px = null, pz = null, pr = null, last = -1;
     for (const t of ts) {
@@ -501,7 +511,7 @@ const TwinCadastre = (function () {
   function lineGeometry(THREE, g, segs, exag) {
     const xz = [], rel = [];
     for (const s of segs) {
-      const c = clip(s.ax, s.az, s.bx, s.bz, g.half);
+      const c = clip(s.ax, s.az, s.bx, s.bz, rectOf(g));
       if (c) drape(g, c[0], c[1], c[2], c[3], xz, rel);
     }
     const pos = new Float32Array(rel.length * 3);
@@ -584,7 +594,7 @@ const TwinCadastre = (function () {
     const cv = document.createElement('canvas');
     cv.width = cv.height = WASH_PX;
     const cx = cv.getContext('2d');
-    const k = WASH_PX / g.size;
+    const R = rectOf(g), kx = WASH_PX / (R.x1 - R.x0), kz = WASH_PX / (R.z1 - R.z0);
     const hex = roadColour().replace('#', '');
     const rgb = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16) || 0);
     cx.fillStyle = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${WASH_A})`;
@@ -593,7 +603,7 @@ const TwinCadastre = (function () {
         cx.beginPath();
         for (const r of part.rings) {
           for (let i = 0; i < r.length; i += 2) {
-            const X = (r[i] + g.half) * k, Y = (r[i + 1] + g.half) * k;
+            const X = (r[i] - R.x0) * kx, Y = (r[i + 1] - R.z0) * kz;
             if (i) cx.lineTo(X, Y); else cx.moveTo(X, Y);
           }
           cx.closePath();
@@ -615,10 +625,11 @@ const TwinCadastre = (function () {
 
   // ── where a label goes ─────────────────────────────────────────────────────
   // A ring clipped to the patch (Sutherland–Hodgman), flat [x, z, …].
-  function clipRing(r, L) {
+  function clipRing(r, R) {
+    if (typeof R === 'number') R = { x0: -R, x1: R, z0: -R, z1: R };
     let pts = [];
     for (let i = 0; i < r.length; i += 2) pts.push([r[i], r[i + 1]]);
-    const edges = [[0, -1, L], [0, 1, L], [1, -1, L], [1, 1, L]];   // axis, sign, limit: sign·p[axis] ≤ L
+    const edges = [[0, -1, -R.x0], [0, 1, R.x1], [1, -1, -R.z0], [1, 1, R.z1]];   // axis, sign, limit: sign·p[axis] ≤ limit
     for (const [ax, sg, lim] of edges) {
       if (!pts.length) break;
       const out = [];
@@ -736,7 +747,7 @@ const TwinCadastre = (function () {
     if (!title) return null;
     let best = null;
     for (const part of p.xz) {
-      const rings = part.rings.map(r => clipRing(r, g.half)).filter(r => r.length >= 6);
+      const rings = part.rings.map(r => clipRing(r, rectOf(g))).filter(r => r.length >= 6);
       if (!rings.length || rings[0].length < 6) continue;
       const area = ringArea(rings[0]);
       if (!best || area > best.area) best = { rings, area };

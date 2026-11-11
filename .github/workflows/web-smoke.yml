@@ -1803,6 +1803,20 @@ jobs:
         working-directory: test
         run: npm run twincadastre
 
+      # The twin's area and the heights read off it (digital-twin.js,
+      # map-twin.js). `twin` holds the square round the station — 201 × 201,
+      # the station in the middle — and passes whether or not the twin can
+      # stand on anything else. This is the other case: a rectangle that is
+      # not round the station, at its own count of samples a side, where a
+      # mesh slid half a patch from its heights, a flood mask laid on the
+      # wrong corner or a horizon with a gap where the square used to end all
+      # draw a perfectly plausible scene. Also the readout under the pointer,
+      # whose gauge a gauge height is on, and the two-point measure.
+      - name: The twin's area — widened to a bridge, drawn on the map; heights under the pointer in AHD and LGH; measuring
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run twinarea
+
       # The two navigators under and beside the Arrow chart. Their edge handles
       # were ungrabbable for a reason no check here could see: the drawing and
       # the hit-test each converted client coordinates to viewBox coordinates

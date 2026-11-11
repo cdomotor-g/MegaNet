@@ -10,13 +10,29 @@
 //
 // After core.js, digital-twin.js and map-3d.js, before init.js — index.html
 // holds the order and the reasons. Reaches back to core.js for `state`,
-// esc, escAttr, announce and acmaHaversineKm; across to digital-twin.js for
+// esc, escAttr, announce, cssVar, acmaHaversineKm, KM_PER_DEG_LAT and
+// kmPerDegLon; across to digital-twin.js for
 // the scene (DigitalTwin.stageHtml, mountAt, stop, prefetch, patchSize), to
 // app.js for the Leaflet map it is attached to, to station-trail.js for
 // the pill that stands at the top of its stage, and to site-features.js,
 // whose mode the offer waits for. Every one of those is a
 // runtime call from inside this file's own functions, so its position among
 // the modules is free. Nothing executes at load (`npm run toplevel`).
+//
+// ── Drawing the twin's area ───────────────────────────────────────────────
+//
+// The twin is built on a rectangle of ground that holds the station
+// (digital-twin.js, "the area"), and one of the ways to say which is to draw
+// it — on the map, since the ground worth adding is by definition not in the
+// twin yet. ▭ Draw it on the map (the Scene panel) puts the twin aside
+// without taking it down: the map comes back under a banner, zoomed out to
+// show the area as it is (a dashed box) with room round it, and a drag over
+// it is the new area — DigitalTwin.setAreaLatLon, which widens it if need be
+// to hold the station and builds the twin on it. Escape or Cancel puts the
+// twin back as it was. The map cannot be dragged about while this is up (a
+// drag is the drawing); the wheel and the zoom buttons still zoom it. A
+// keyboard has the four distances in the Scene panel instead, and the banner
+// says so.
 //
 // ── What this is, next to ⛰️ 3-D ─────────────────────────────────────────
 //
@@ -104,6 +120,7 @@ const MapTwin = (function () {
   let offerEl = null;            // the card on the map, while it exists
   let offerId = null;            // the station it is offering
   const dismissed = new Set();   // stations put away with ×, until the map is next zoomed out past ZOOM
+  let drawing = null;            // the area being drawn: { was, box, rect, banner, off, from }
   const told = new Set();        // stations the live region has already announced an offer for
 
   // Off until ticked (core.js, twinOfferStored).
@@ -121,7 +138,9 @@ const MapTwin = (function () {
   // and still be the one this view is about.
   function reach() {
     const size = typeof DigitalTwin !== 'undefined' && DigitalTwin.patchSize ? DigitalTwin.patchSize() : 400;
-    return size / 2;
+    // The wide squares are for looking along a river, not for deciding which
+    // station a view is about: no further than the 1.6 km square's half.
+    return Math.min(size, 1600) / 2;
   }
 
   function metresFromCentre(s) {
@@ -152,6 +171,9 @@ const MapTwin = (function () {
   // zoom — nothing, the offer, or (once it has been asked for) the twin.
   function sync() {
     if (!map || typeof DigitalTwin === 'undefined') return;
+    // While the twin's area is being drawn the map is zoomed out under a twin
+    // that is only put aside: nothing is offered and nothing is taken down.
+    if (drawing) return;
     const z = map.getZoom();
     // The switch in Map display is the offer's: a twin opened by name (the
     // card's pill, the side panel's pane) stays up with it off.
@@ -399,6 +421,7 @@ const MapTwin = (function () {
   // the station) changes nothing about the map.
   function leave(zoomOut, { offer = true } = {}) {
     if (!up) return;
+    endDraw(false);
     up = false;
     stationId = null;
     DigitalTwin.stop();
@@ -418,6 +441,97 @@ const MapTwin = (function () {
     // has already asked, through zoomend, for anything else. Not for a map
     // that is itself going (detach).
     if (!zoomOut && offer) sync();
+  }
+
+  // ── drawing the area ──
+  function areaBounds(st, x) {
+    const mLat = KM_PER_DEG_LAT * 1000, mLon = kmPerDegLon(st.lat) * 1000;
+    return L.latLngBounds([st.lat - x.s / mLat, st.lon - x.w / mLon], [st.lat + x.n / mLat, st.lon + x.e / mLon]);
+  }
+
+  function drawArea() {
+    if (!map || !up || drawing || typeof L === 'undefined' || !host) return false;
+    const st = stationById(stationId);
+    const a = DigitalTwin.area ? DigitalTwin.area() : null;
+    if (!located(st) || !a) return false;
+    const el = map.getContainer();
+    const now = areaBounds(st, a.built || a.ext);
+    const colour = typeof cssVar === 'function' ? cssVar('--accent', '#3d8bfd') : '#3d8bfd';
+    const box = L.rectangle(now, { color: colour, weight: 2, dashArray: '6 5', fill: false, interactive: false }).addTo(map);
+    const banner = document.createElement('div');
+    banner.className = 'map-twin-draw';
+    banner.id = 'map-twin-draw';
+    banner.setAttribute('role', 'region');
+    banner.setAttribute('aria-label', 'Draw the digital twin\'s area');
+    banner.innerHTML = `<p><strong>Drag a rectangle</strong> over the ground to model round ${esc(st.name)}. The dashed box is the area now; the new one is widened if need be to hold the station. With a keyboard, type the four distances in the Scene panel instead.</p>
+      <button type="button" onclick="MapTwin.cancelDraw()" title="Put the twin back as it was — Escape does the same">Cancel</button>`;
+    L.DomEvent.disableClickPropagation(banner);
+    L.DomEvent.disableScrollPropagation(banner);
+    el.appendChild(banner);
+    drawing = { was: { centre: map.getCenter(), zoom: map.getZoom() }, box, rect: null, banner, off: [], from: null };
+    host.classList.add('is-aside');
+    el.classList.add('is-drawing-area');
+    // The map's own handlers back, all but the drag: a drag is the drawing.
+    releaseLeaflet();
+    drawing.held = ['dragging', 'boxZoom', 'doubleClickZoom'].filter(k => map[k] && map[k].enabled());
+    for (const k of drawing.held) map[k].disable();
+    map.fitBounds(now.pad(0.9), { animate: false });
+    const on = (target, type, fn, opts) => { target.addEventListener(type, fn, opts); drawing.off.push(() => target.removeEventListener(type, fn, opts)); };
+    const at = e => map.mouseEventToLatLng(e);
+    on(el, 'pointerdown', e => {
+      if (!drawing || e.button !== 0 || banner.contains(e.target) || (e.target.closest && e.target.closest('.leaflet-control'))) return;
+      drawing.from = { ll: at(e), x: e.clientX, y: e.clientY, id: e.pointerId };
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault();
+    });
+    on(el, 'pointermove', e => {
+      if (!drawing || !drawing.from || e.pointerId !== drawing.from.id) return;
+      const b = L.latLngBounds(drawing.from.ll, at(e));
+      if (drawing.rect) drawing.rect.setBounds(b);
+      else drawing.rect = L.rectangle(b, { color: colour, weight: 2, fillOpacity: 0.12, interactive: false }).addTo(map);
+    });
+    const done = e => {
+      if (!drawing || !drawing.from || e.pointerId !== drawing.from.id) return;
+      const f = drawing.from;
+      drawing.from = null;
+      try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+      // A press that did not move is not a rectangle.
+      if (e.type !== 'pointerup' || Math.abs(e.clientX - f.x) < 8 || Math.abs(e.clientY - f.y) < 8) {
+        if (drawing.rect) { map.removeLayer(drawing.rect); drawing.rect = null; }
+        return;
+      }
+      const to = at(e);
+      endDraw(true);
+      DigitalTwin.setAreaLatLon({ lat: f.ll.lat, lon: f.ll.lng }, { lat: to.lat, lon: to.lng });
+    };
+    on(el, 'pointerup', done);
+    on(el, 'pointercancel', done);
+    on(document, 'keydown', e => { if (e.key === 'Escape' && drawing) { e.preventDefault(); e.stopPropagation(); endDraw(false); announce('Drawing cancelled. The twin is back as it was.'); } }, true);
+    announce(`Draw the area: drag a rectangle on the map round ${st.name}. Escape cancels.`);
+    return true;
+  }
+
+  // The drawing put away and the twin back over the map as it was. `drawn`
+  // says a rectangle was drawn (the twin is about to be rebuilt on it).
+  function endDraw(drawn) {
+    if (!drawing) return;
+    const d = drawing;
+    drawing = null;
+    for (const off of d.off) { try { off(); } catch (_) {} }
+    if (map) {
+      try { map.removeLayer(d.box); if (d.rect) map.removeLayer(d.rect); } catch (_) {}
+      const el = map.getContainer();
+      if (el) el.classList.remove('is-drawing-area');
+      if (map.getPane && map.getPane('mapPane')) map.setView(d.was.centre, d.was.zoom, { animate: false });
+    }
+    if (d.banner && d.banner.parentNode) d.banner.parentNode.removeChild(d.banner);
+    if (host) host.classList.remove('is-aside');
+    // …and the map held off again under the twin, as it was before.
+    if (up && map) {
+      for (const k of d.held || []) { try { map[k].enable(); } catch (_) {} }
+      holdLeaflet();
+    }
+    void drawn;
   }
 
   return {
@@ -456,6 +570,11 @@ const MapTwin = (function () {
       hideOffer();
       announce('Put away. Zoom out and back in to be offered the twin again.');
     },
+    // ▭ Draw it on the map, in the Scene panel: the twin's area, dragged out
+    // on the map (see "Drawing the twin's area").
+    drawArea,
+    cancelDraw() { if (drawing) { endDraw(false); announce('Drawing cancelled. The twin is back as it was.'); } },
+    drawing() { return !!drawing; },
     // ⚙ on the overlay's bar: the side panel open on the 🧊 pane — what the
     // Digital Twin tab's left column was — beside the twin it sets.
     openPane() { if (typeof setDockTab === 'function') setDockTab('twin'); },

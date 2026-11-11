@@ -197,10 +197,10 @@ metres is the equirectangular step `core.js` already carries
 (`KM_PER_DEG_LAT`, `kmPerDegLon`), exact to a few centimetres over the widest
 patch offered.
 
-**The patch.** 200, 400 (default), 800 or 1600 m square, always 201 × 201
-samples — 1, 2, 4 or 8 m apart. 200 m at 1 m is the State's LiDAR at
-something close to its own resolution; 1600 m is the setting for a site on a
-ridge whose relief is what matters.
+**The patch.** A rectangle of ground that holds the station — by default the
+400 m square round it, 201 × 201 samples 2 m apart. *The area*, below, has
+the rest: the squares to 6.4 km, widening it past the square, and how finely
+any of it is sampled.
 
 **The station as built.** What stands at the origin is the station the
 network puts there, read from the record — and where the record cannot say,
@@ -473,6 +473,146 @@ is here".
 two lines through the pole (west → east, south → north) at offsets that fit
 the patch — part 3 of the design system's chart pattern, so the numbers are
 there for whoever cannot see the picture.
+
+## The area
+
+What ground the twin is built on. It used to be a square centred on the
+station and no more than 1.6 km across, and for most stations a square is
+still the right answer. But a gauge is read against a reach of river, and the
+thing worth seeing is often not round it: the bridge Gayndah floods at is a
+kilometre down the Burnett from the flume, and there is nothing a twin of the
+flume needs upstream of it. So the area is a **rectangle that holds the
+station**, said as the metres of ground kept each way from it — west, east,
+north and south — and the Scene panel sets it four ways:
+
+- **Ground area** — the squares: 200, 400 (the default), 800, 1,600, 3,200 and
+  6,400 m. The size picked is every station's.
+- **Metres of ground each way from the station** — four number boxes. Type
+  1,200 into *East* and the area runs 1.2 km east of the station and stays
+  where it was on the other three sides. 20 m to 6,400 m a side; no side of
+  the rectangle longer than 6,400 m.
+- **Widen the area to hold a bridge past its edge** — once the patch's own
+  bridges are drawn, the State's road network is asked once more for 3 km
+  past every edge, and each bridge out there that is not whole in the patch
+  is a button: its name where the State has one, how far it is and which way
+  (*A road bridge — 1.1 km ESE*). One press rebuilds on the area as it is,
+  pushed out on the sides that bridge is past, with 40 m of ground beyond its
+  far end for the approach. The nearest five are offered.
+- **▭ Draw it on the map** — the twin steps aside (it is not taken down), the
+  map comes back zoomed out with the area as it is in a dashed box, and a
+  rectangle dragged over it is the new area. One that leaves the station out
+  is widened to hold it with 20 m to spare, because the twin is the station's.
+  Escape or Cancel puts the twin back as it was. A keyboard has the four
+  number boxes instead, and the banner says so.
+
+An area that is not the plain square is **the station's own**: it is kept for
+that station on this device (the last 40 stations given one), the Ground area
+list says *This station's own — 960 × 400 m*, and **Back to the square** — or
+picking a square — puts it away. A station's own area is built exactly as
+asked: *Widen a square to hold a bridge at its edge* leaves it alone.
+
+**Where things are.** The scene's origin stays on the ground at the station
+whatever the area, so nothing that stands at the station moved; the patch is
+what slid. The ground carries its own edges (x₀…x₁ west to east, z₀…z₁ north
+to south, metres from the station) and everything that used to ask "is this
+within half a patch of the origin" asks the patch instead — the walker, the
+orbit's pan, the field photos, the other stations, the bridges, the trees and
+buildings, the property boundaries, the flood's fill and its mask.
+
+**How finely it is sampled.** A plain square is 201 × 201, to the last bit as
+it always was. Any other shape spends about the same number of samples on its
+own rectangle — square cells, the station on a sample — so a long reach is
+sampled finer than the square round it would be: 960 × 400 m is 312 × 131
+samples 3.1 m apart, where the 1,600 m square that holds the same bridge is
+8 m. Past 1.6 km along its longest side an area gets four times the samples
+without being asked (the 3,200 m square is 401 × 401 at 8 m; the 6,400 m one
+401 × 401 at 16 m). **Ground detail** asks for more anywhere: *Fine* is four
+times the samples (a 400 m square every metre — the LiDAR's own spacing),
+*Finest* sixteen times, which is slow to build and to draw on a phone. No
+side is ever more than 800 samples: the State's service answers 4,096 × 2,048
+pixels at most, and a raster asked for is always one request.
+
+**The imagery** follows the shape at the same texels a metre along the longer
+side, and twice as many past 1.6 km where the State's service will answer
+them — it stops at 4,096 across and 2,048 down, so a reach that runs east–west
+is draped finer than one that runs north–south, and the 6,400 m square is
+3 m a pixel. The sharp square round the station is unchanged.
+
+**The horizon** stands round whatever the patch is. Round a plain square its
+rings are the squares they always were. Round any other area the innermost
+ring is the patch's edge as it is — however many samples a side, wherever the
+station stands in it — and the next, a hair outside, is the horizon's own 200
+a side, the two zipped together triangle by triangle so every edge vertex of
+the patch is used at its own height and nothing gapes. From there each side
+moves out by its own even ratio until all four stand the same distance from
+the station on the first sheet's edge that clears the patch by a quarter. A
+sheet the patch has outgrown is not drawn: past a reach of 3.2 km the ±4 km
+sheet is under the patch, and the ±20 km one starts at its edge.
+
+**The flow line** (*Flood velocity*) is traced on the same rectangle, to
+wherever its edge is — the two ends are looked for on the rectangle a margin
+inside the edge rather than on a circle about the station — so a long reach
+has its fall read along its whole length. A fine ground is thinned to every
+second or third sample for the trace, which visits every one.
+
+**What it costs.** Each change of area is one more raster and one more image
+from the State, and a wide or fine one is bigger: 401 × 401 is 640 KB against
+the square's 160 KB, Finest is 2.5 MB. A wide area's far corners are also
+where the scene's flat-earth step is least exact — about a metre at the
+corner of the 6,400 m square — though everything on the ground is placed by
+the same step, so nothing is off against anything else.
+
+## Heights under the pointer, and measuring
+
+**The readout.** Point anywhere at the ground and its height is beside the
+pointer: in **m AHD**, as a **local gauge height (LGH)** with whose gauge it
+is, where the point is from the station, and — where the water now shown
+covers it — how deep. A gauge height is what a gauge board would read: the
+height above that gauge's zero, which is the height the Bureau's flood
+classes, the warnings and the people on the river all speak in. It is the
+ground's height in AHD less the gauge zero in AHD, so it needs a gauge:
+
+- **This station's own**, where its zero is surveyed in AHD — the default.
+- **Another gauge near by** — the nearest eight within 25 km whose zero is in
+  AHD, each with its zero, its distance and its bearing. At Gayndah Flume AL
+  the town gauge a kilometre downstream is one of them, and picking it reads
+  the ground at the bridge as that gauge would.
+- **The channel bed by the station** — the lowest ground within 60 m on this
+  model, for a station with no surveyed zero. A height over the bed, not a
+  reading on any gauge, and the panel says so.
+- **A level typed in**, in m AHD.
+
+*Gauge heights (LGH) measured from*, in the pane's **Heights and measuring**
+panel, picks it; the choice is kept for the station on this device, and every
+place a gauge height is shown says whose gauge it is. A station whose zero is
+on another datum, or that has none, gets no gauge height until one of the
+others is picked — the readout is AHD alone and the panel says why. Nor is
+one given on ground that could not be put into AHD.
+
+Past the patch's edge the horizon's ground is read too, and said to be what
+it is: *≈ 152 m AHD · far ground, ~30 m data*. The ray is to the ground alone
+— not a bridge deck, the station or the water.
+
+The readout is a mouse's. A finger covers what it points at and a keyboard
+has no pointer, so both get the same numbers another way: a tap or a click
+pins the point (below), and the pane reads **the ground under the middle of
+the view** — which the arrow keys move — with **Pin this point** beside it.
+*Read out the ground's height under the pointer* switches the readout off.
+
+**Measuring.** A click or a tap on the ground pins the point: **A**, then
+**B**, and a third starts over at A. Each is a post on the ground with its
+height, and the pane lists it in AHD and LGH with where it is. Two points give
+the distance between them, the bearing, how much higher or lower B is, the
+slope that is (as a percentage and as 1 in *n*), and a **cross-section** — the
+ground cut along the line from A to B, m AHD up the left side and m LGH up the
+right, with the water now shown standing in it; the same at eleven points as
+a table, for whoever would rather read it. Clear the points takes them off.
+They go with the build (they are a question asked of this ground) and are
+never in the `.glb`.
+
+The words — AHD, LGH, gauge zero, the channel bed, sample, apart, fall — have
+their meanings on hover, and in *What the words here mean* at the foot of the
+panel.
 
 ## In the Stations map
 
@@ -1319,6 +1459,24 @@ writes the database's current copy with only the position changed and none of
 its lists, and the twin rebuilds on the new spot), inside the Stations map's
 twin, and in ⛰️ 3-D (the pin on the terrain, a click moved to MapLibre's own
 coordinate for the pixel and not the flat map's, a real drag, cancel).
+
+`npm run twinarea` holds the area and the heights read off it, on the same
+valley with a second bridge 640–720 m east of the station: an area made one
+that can be built, and a plain square sampled as it always was; the far
+bridge offered by name and distance and one press building the rectangle
+that holds it — the raster asked for (nx × nz, grown by half a sample), the
+mesh's corners on the patch's corners and the station's own sample at the
+origin, every height the valley's, the bridge drawn whole, the water laid on
+this ground in the fill and in the mask as drawn, the horizon's innermost
+ring the patch's edge vertex for vertex and its rings ending square on the
+first sheet, the area kept for the station; a side typed in, and Back to the
+square; the 3.2 km square at 401 a side and Fine on a 400 m one; the twin put
+aside, Escape putting it back, and a rectangle dragged on the map that leaves
+the station out, widened to hold it; the readout beside a real pointer saying
+the ground a ray from it meets, in m AHD and m LGH; whose gauge — the
+station's own, the channel bed, a typed level, another gauge near by, each
+kept — and a station with no zero given no gauge height; and two clicks
+pinning A and B, the distance, the fall and the cross-section between them.
 
 `npm run twincadastre` holds the cadastre, on a curved valley the check makes
 and a neighbourhood it lays over it in the service's own shape — two lots and
