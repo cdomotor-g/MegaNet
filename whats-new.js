@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 268, date: '2026-11-11', items: [
+      '✏️ <strong>A fade margin between any two points.</strong> A line drawn between two places that are not stations used to say '
+        + '<em>no fade margin — both ends need a radio</em>. It now works one out as if a field station stood at each such end '
+        + '(1 W, a 5.15 dBi antenna 4 m up) and marks it <em>theoretical</em>, in the Draw &amp; measure list, on the map and on '
+        + 'the Elevation profile card — where you can type your own power, antenna and height.',
+    ] },
     { n: 267, date: '2026-11-11', items: [
       '📡 <strong>Base stations go by name.</strong> <em>18 Bateson</em>, not <em>rpi-83071968</em>: the <em>Heard by</em> box '
         + 'on Field Data offers and takes base stations by name, a chart point\'s Paths say the name (the code is on hover), '

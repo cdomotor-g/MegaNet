@@ -619,12 +619,12 @@ ok('the line’s row has its ground drawn small, with the line of sight and the 
    /Line of sight (clear|partly clear)/.test(fg.text) && /Clearance \d+ m under the line/.test(fg.text), fg.text);
 ok('…and the clearance is the card’s own figure for the same line',
    !!fg.cardUnder && fg.text.includes(`Clearance ${fg.cardUnder} m under the line`), `${fg.cardUnder} / ${fg.text}`);
-ok('…a point on the ground has no radio, and the row says why there is no fade margin rather than quote one',
-   /No fade margin — both ends need a radio/.test(fg.text), fg.text);
+ok('…two points on the ground get a fade margin all the same, priced as field stations and marked theoretical',
+   /[+-]\d+\.\d dB fade margin · (good|marginal|poor) · theoretical/.test(fg.text), fg.text);
 ok('every word marked on the row has a meaning on hover', fg.terms.length >= 3 && fg.terms.every(n => n > 40),
    JSON.stringify(fg.terms));
 ok('…and the same words are in a fold under the list, for a finger',
-   ['Ground profile', 'Fade margin', 'Line of sight', 'Clearance'].every(w => fg.words.includes(w)), JSON.stringify(fg.words));
+   ['Ground profile', 'Fade margin', 'Theoretical', 'Line of sight', 'Clearance'].every(w => fg.words.includes(w)), JSON.stringify(fg.words));
 ok('the picture is a button that says what it opens', /Open its ground profile/.test(fg.label), fg.label);
 ok('the line’s label on the map carries the same picture', fg.mini === true);
 await page.evaluate(() => MapDraw.toggleMinis(false));

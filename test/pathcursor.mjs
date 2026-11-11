@@ -239,7 +239,7 @@ try {
   check('a pointer halfway across the plot shows the cursor',
     half.c.shown === true, JSON.stringify(half.c));
   check('and it reads the ground height there — 500 m up a 1,000 m ramp',
-    /^(4[89]\d|5[01]\d) m$/.test(half.c.text || ''), String(half.c.text));
+    /^(4[89]\d|5[01]\d) m( · [+-]?\d+\.\d dB)?$/.test(half.c.text || ''), String(half.c.text));
   const wrapRight = await page.evaluate(() =>
     document.querySelector('.path-chart-wrap').getBoundingClientRect().right);
   check('the card draws the whole plot at the width its column gives it, with nothing to scroll to',
@@ -265,7 +265,7 @@ try {
 
   const quarter = await hoverChart(0.25);
   check('a quarter of the way along, the reading is a quarter of the ramp',
-    /^(2[34]\d|2[56]\d) m$/.test(quarter.c.text || ''), String(quarter.c.text));
+    /^(2[34]\d|2[56]\d) m( · [+-]?\d+\.\d dB)?$/.test(quarter.c.text || ''), String(quarter.c.text));
   check('the dot has moved left with it, and the marker west along the line',
     quarter.c.x < half.c.x && !!quarter.m && quarter.m.lon < half.m.lon,
     JSON.stringify({ x: quarter.c.x, lon: quarter.m && quarter.m.lon }));
@@ -329,7 +329,7 @@ try {
   check('running the pointer along the line on the map brings the chart’s cursor with it',
     onLine.c.shown === true, JSON.stringify(onLine.c));
   check('and it reads three quarters of the ramp, from the map’s side',
-    /^(7[34]\d|7[56]\d) m$/.test(onLine.c.text || ''), String(onLine.c.text));
+    /^(7[34]\d|7[56]\d) m( · [+-]?\d+\.\d dB)?$/.test(onLine.c.text || ''), String(onLine.c.text));
   check('the dot is three quarters of the way from A to B',
     Math.abs(onLine.c.x - along(cs, 0.75)) < 25, String(onLine.c.x));
 
@@ -370,7 +370,7 @@ try {
   await page.waitForTimeout(120);
   const bigHalf = await page.evaluate(() => ({ c: window.__cursor(), m: window.__mapDot() }));
   check('full screen, halfway between the ends still reads 500 m, with the dot halfway along the wider plot',
-    /^(4[89]\d|5[01]\d) m$/.test(bigHalf.c.text || '')
+    /^(4[89]\d|5[01]\d) m( · [+-]?\d+\.\d dB)?$/.test(bigHalf.c.text || '')
       && Math.abs(bigHalf.c.x - bigMid) < 12
       && !!bigHalf.m && Math.abs(bigHalf.m.lon - (HOP.lonA + SPAN * 0.5)) < SPAN * 0.03,
     JSON.stringify(bigHalf));

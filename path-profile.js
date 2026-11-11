@@ -281,7 +281,7 @@ function radioDefaults(st, key) {
 
 // A mast a finder proposed on a point on the ground (🗼 Repeater sites, 🚚
 // Relocate station), with the radio it priced the place with. A point on its
-// own has no radio, and the elevation profile will not invent one for it
+// own has no radio on file, and is priced as an assumed field station
 // (profileMargin) — but a proposed site is not a point on its own: the finder
 // that proposed it said what would stand there, and the card prices the path
 // with that, says whose it is, and takes whatever is typed over it like any
@@ -1040,7 +1040,14 @@ const PathProfile = (function () {
       station: st, sys, key, def, placed,
       name: st ? st.name : placed ? `${placed.name} · ${where}` : where,
       isStation: !!st,
-      hasRadio: !!st || !!placed,
+      // Every end has a radio to price the path with. A point on the ground
+      // with nothing placed on it is priced as the field station most of the
+      // network is (radioDefaults: 1 W, a 5.15 dBi antenna 4 m up) — `assumed`,
+      // and said to be wherever its margin is quoted, because nobody chose it.
+      // A line is drawn between two places to ask whether a path would work,
+      // and "not computed" was no answer to that.
+      hasRadio: true,
+      assumed: !st && !placed,
       elev: st && st.elevation_ahd != null ? st.elevation_ahd : null,
       // A repeater's or base's mast, where its system says less (stationAntenna),
       // or whatever has been typed for this site in either card.
@@ -1140,6 +1147,7 @@ const PathProfile = (function () {
       ok: true, flat: multi, thumb: pathThumbOf(an), km: an.D / 1000, a: a.name, b: b.name,
       verdict: multi ? null : an.verdict,
       margin: multi ? null : profileMargin(an, a, b),
+      assumedNote: multi ? '' : assumedNote(profileMargin(an, a, b)),
       // The worst point on the path: how far the ground (or what stands on
       // it) is under the straight line there, or over it when negative.
       worst: multi || !w ? null : {
@@ -2155,7 +2163,16 @@ const PathProfile = (function () {
     const missing = missingTerms(a, ra, b, rb);
     if (missing.length) return { m: null, why: !a.sys || !b.sys ? 'system' : 'missing', missing };
     if (an.pathLoss_db == null) return { m: null, why: 'loss' };
-    return { m: (wattsToDbm(ra.txW) + ra.gain - ra.loss) - an.pathLoss_db + rb.gain - rb.loss - rb.thr };
+    return { m: (wattsToDbm(ra.txW) + ra.gain - ra.loss) - an.pathLoss_db + rb.gain - rb.loss - rb.thr,
+             assumed: [a, b].filter(e => e.assumed).map(e => e.name) };
+  }
+
+  // What is said beside a margin priced with a radio nobody chose.
+  function assumedNote(r) {
+    if (!r || !r.assumed || !r.assumed.length) return '';
+    const d = radioDefaults(null, null);
+    return `Theoretical: ${r.assumed.length === 2 ? 'both ends are points' : `${r.assumed[0]} is a point`} on the ground, priced as a `
+      + `field station — ${d.tx_w} W, a ${d.gain_dbi} dBi antenna ${d.agl_m} m up — unless you type other figures.`;
   }
 
   // The row itself. The band is the link budget's own (lbMarginClass), so the
@@ -2181,8 +2198,10 @@ const PathProfile = (function () {
     // for it (verdictHtml); the figure here said "line of sight obstructed,
     // priced in" beside it when the box led with the line of sight.
     const cls = lbMarginClass(r.m);
+    const note = assumedNote(r);
     return `<span class="txt-${cls.cls}">${r.m > 0 ? '+' : ''}${r.m.toFixed(1)} dB</span>
-      <span class="small">${esc(cls.label.toLowerCase())} · ${esc(a.name)} → ${esc(b.name)}</span>`;
+      <span class="small">${esc(cls.label.toLowerCase())} · ${esc(a.name)} → ${esc(b.name)}</span>${
+      note ? ` <span class="small path-assumed">${esc(note)}</span>` : ''}`;
   }
 
   // "a, b and c" — the budget card's fmtList, which lives inside its IIFE.
@@ -2830,7 +2849,7 @@ const PathProfile = (function () {
         </label>`;
     // The margin is A → B (profileMargin), so the TX power that moves it is
     // A's and A's alone: B gets no box to change nothing with, and neither
-    // does a point on the ground, which has no radio at all. ⇄ Flip direction
+    // does a point on the ground get one it cannot use. ⇄ Flip direction
     // makes B the transmitter, and the box follows it.
     const tx = (tag, e) => (e.hasRadio
       ? box(tag, e, 'tx_w', 'TX power (W)', '0.1', radioVal(e.key, e.def, 'tx_w')) : '');
@@ -3146,7 +3165,7 @@ const PathProfile = (function () {
     const fMhz = shown && shown.rep ? shown.rep.an.fMhz : radioFreq(e.station, null);
     const own = k => (e.def[k] == null ? 'none on file' : `${rlNum(e.def[k])} ${RL_FIELD[k].unit}`);
     const from = e.placed ? `the radio ${e.placed.by || 'a finder'} proposed${e.placed.sysName ? `, ${e.placed.sysName}` : ''}`
-      : e.isStation ? (e.sys ? `its own, ${e.sys.name}` : 'none on file') : 'the default';
+      : e.isStation ? (e.sys ? `its own, ${e.sys.name}` : 'none on file') : 'a field station\'s, assumed for a point on the ground';
     const box = k => {
       const F = RL_FIELD[k];
       return `
@@ -3694,7 +3713,7 @@ const PathProfile = (function () {
       groundOf(e, end),
       aglOf(e, agl),
       `${z.toFixed(1)} m`,
-      e.sys ? `${e.sys.name}${e.sys.antenna_type ? ` (${e.sys.antenna_type})` : ''}` : (e.hasRadio ? 'none on file' : '—'),
+      e.sys ? `${e.sys.name}${e.sys.antenna_type ? ` (${e.sys.antenna_type})` : ''}` : (e.assumed ? 'assumed — a field station' : e.hasRadio ? 'none on file' : '—'),
       r.txW != null ? `${r.txW} W (${wattsToDbm(r.txW).toFixed(2)} dBm)${edited(e, 'tx_w')}` : 'not on file',
       r.gain != null ? `${+r.gain.toFixed(2)} dBi (${lbDbd(r.gain)} dBd)${edited(e, 'gain_dbi')}` : 'not on file',
       r.loss != null ? `${+r.loss.toFixed(2)} dB${edited(e, 'loss_db')}` : 'not on file',
@@ -4114,7 +4133,7 @@ const PathProfile = (function () {
   function summaryOf(rep) {
     const { an, a, b, prof } = rep;
     // A radio only where there is a station, or a finder's proposed site: a
-    // point on the ground has none, and the card does not invent one for it
+    // point on the ground is priced as an assumed field station and says so
     // (profileMargin).
     const none = { txW: null, gain: null, loss: null, thr: null };
     const ra = a.hasRadio ? rep.ra : none, rb = b.hasRadio ? rep.rb : none;

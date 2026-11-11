@@ -8233,6 +8233,9 @@ body .map-panel.is-driving {
    gives up its rule so the two read as one entry. */
 .draw-row-line { border-bottom: none; }
 
+/* Beside a fade margin priced with a radio nobody chose (assumedNote). */
+.path-assumed { display: block; color: var(--muted); }
+
 .draw-fig {
   display: flex;
   align-items: center;

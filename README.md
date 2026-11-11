@@ -4001,7 +4001,10 @@ line two ways. A press on the picture makes that line the current one and opens
 the card's chart in a window (`MapDraw.model` → `PathProfile.openFull`);
 *Open in 〽️ Path tools* there goes on to the card (`PathProfile.toCard`).
 Finishing a line therefore leaves the ✏️ pane up — it used to give way to the
-path tools' pane. A line with corners gets its ground alone. The words on a row
+path tools' pane. An end that is not a station is priced as a field station
+(`radioDefaults`: 1 W, 5.15 dBi, 4 m up) and its margin marked *theoretical*,
+on the row and on the card, where the figures can be typed over — it was
+"not computed" before. A line with corners gets its ground alone. The words on a row
 have their meanings on hover and in a fold under the list.
 
 **The elevation profile** appears under the map once a line exists in *Draw &

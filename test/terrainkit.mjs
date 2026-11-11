@@ -1461,12 +1461,12 @@ const noRadio = await page.evaluate(async () => {
   }
   return null;
 });
-ok('two points on the ground get a stated reason, not a number',
-   /both ends need a radio — a point on the ground has none/.test((noRadio || {}).row || ''), JSON.stringify(noRadio));
-ok('…and no signal along the line, with the key saying why',
-   !!noRadio && !noRadio.layer && /No signal drawn/.test(noRadio.sig), JSON.stringify(noRadio));
-ok('…and with no margin to lead with, the box leads with the line of sight',
-   !!noRadio && /^(Clear|Partly clear|Obstructed) line of sight$/.test(noRadio.box), JSON.stringify(noRadio));
+ok('two points on the ground get a theoretical margin, priced as field stations and saying so',
+   /[+-]?\d+\.\d dB/.test((noRadio || {}).row || '') && /Theoretical: both ends are points on the ground/.test(noRadio.row),
+   JSON.stringify(noRadio));
+ok('…with the signal drawn along the line', !!noRadio && noRadio.layer, JSON.stringify(noRadio));
+ok('…and the box leads with that margin',
+   !!noRadio && /^(Good|Marginal|Poor) fade margin$/.test(noRadio.box), JSON.stringify(noRadio));
 await page.evaluate(() => { MapDraw.clearAll(); PathProfile.setOpen(false); });
 
 // ── 5. polar radio coverage ─────────────────────────────────────────────────

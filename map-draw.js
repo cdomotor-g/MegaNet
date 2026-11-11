@@ -565,6 +565,9 @@ const MapDraw = (function () {
         + 'what grows or stands on them, the straight line between the two antennas and the room round it the signal needs. '
         + 'Ground or trees inside that room are drawn in red.'],
       ['Fade margin', pathMarginMeaning()],
+      ['Theoretical', 'An end of the line that is not a station has no radio on file, so the fade margin is worked out as if a '
+        + 'field station stood there: 1 W, a 5.15 dBi antenna 4 m above the ground. It says whether a path between the two places '
+        + 'could work. Type your own power, antenna and height on the Elevation profile card to change it.'],
       ['Line of sight', PATH_LOS_MEANING],
       ['Clearance', 'At the worst point on the path, how far the ground — or the trees and buildings on it — is under the straight '
         + 'line between the two antennas. "Above the line" means something stands in the way there, and the signal reaches the '
@@ -587,9 +590,10 @@ const MapDraw = (function () {
     const r = f.margin;
     if (r && r.m != null) {
       const band = lbMarginClass(r.m);
-      out.push(`<span><strong class="txt-${band.cls}">${dbText(r.m)}</strong> ${termHtml('fade margin', figWord('Fade margin'))} · ${esc(band.label.toLowerCase())}</span>`);
+      out.push(`<span><strong class="txt-${band.cls}">${dbText(r.m)}</strong> ${termHtml('fade margin', figWord('Fade margin'))} · ${esc(band.label.toLowerCase())}${
+        f.assumedNote ? ` · ${termHtml('theoretical', f.assumedNote + ' Press the picture, then Open in 〽️ Path tools, to change them.')}` : ''}</span>`);
     } else {
-      const why = !r || r.why === 'ends' ? 'both ends need a radio: snap the line to stations'
+      const why = !r ? 'not worked out'
         : r.why === 'system' ? 'no radio system on file at one end'
         : r.why === 'loss' ? 'the model did not run'
         : 'a radio figure is missing at one end';
