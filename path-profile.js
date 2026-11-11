@@ -847,8 +847,11 @@ function pathThumbKeyHtml() {
   </p>`;
 }
 
-// opt: { flip, label } — `label` is the picture's whole reading, for a screen
-// reader, since the picture itself is nothing a screen reader can read.
+// opt: { flip, label, flat } — `label` is the picture's whole reading, for a
+// screen reader, since the picture itself is nothing a screen reader can read.
+// `flat` is the ground and what stands on it and nothing else: a line with
+// corners is not one radio path, so it gets no line of sight, no Fresnel zone
+// and no masts (Draw & measure's list, as the card's own chart draws it).
 function pathThumbSvg(th, opt = {}) {
   if (!th || !th.pts || th.pts.length < 2) return '';
   const W = 240, H = 92, P = 3;
@@ -857,7 +860,7 @@ function pathThumbSvg(th, opt = {}) {
   for (const p of th.pts) {
     if (p.g != null) { lo = Math.min(lo, p.g); hi = Math.max(hi, p.g); }
     if (p.s != null) hi = Math.max(hi, p.s);
-    if (p.los != null && p.r1 != null) { hi = Math.max(hi, p.los + 0.6 * p.r1); lo = Math.min(lo, p.los - 0.6 * p.r1); }
+    if (!opt.flat && p.los != null && p.r1 != null) { hi = Math.max(hi, p.los + 0.6 * p.r1); lo = Math.min(lo, p.los - 0.6 * p.r1); }
   }
   if (!isFinite(lo) || !isFinite(hi)) return '';
   const pad = Math.max(10, (hi - lo) * 0.08);
@@ -911,7 +914,7 @@ function pathThumbSvg(th, opt = {}) {
     <line x1="${x(D)}" y1="${y(th.groundB)}" x2="${x(D)}" y2="${y(th.rxZ)}" stroke="var(--map-repeater)" stroke-width="2.2"/>`;
   return `<svg class="path-thumb" viewBox="0 0 ${W} ${H}" role="img"${opt.label ? ` aria-label="${escAttr(opt.label)}"` : ' aria-hidden="true"'}>
     <rect x="${P}" y="${P}" width="${iw}" height="${ih}" fill="var(--profile-sky)" stroke="var(--border)" stroke-width="1"/>
-    ${ground}${bands.join('')}${zone}${los}${red}${masts}
+    ${ground}${bands.join('')}${opt.flat ? '' : `${zone}${los}${red}${masts}`}
   </svg>`;
 }
 
@@ -1079,6 +1082,73 @@ const PathProfile = (function () {
     });
   }
 
+  // The ground under a line. pathGround decides LiDAR ground for the card as
+  // it does for the map and the Network Review; the tiles are asked for
+  // directly otherwise, because a drawn line may have more than two points.
+  function groundFor(sh) {
+    return lidarFor(sh)
+      ? pathGround(...[0, 1].map(end => {
+          const e = endpoint(sh, end), i = end === 0 ? 0 : sh.pts.length - 1;
+          return { lat: sh.pts[i][0], lon: sh.pts[i][1], elev: e.elev, agl: e.agl, mast: !!(e.station && stationIsMast(e.station)) };
+        }), { samples: SAMPLES, freqMhz: freqFor(endpoint(sh, 0), endpoint(sh, 1)) })
+      : Terrain.profile(sh.pts, SAMPLES).then(res => (res.ok ? { ok: true, prof: res, lidar: null, ends: null } : res));
+  }
+
+  // ── a line's figures, without the card ────────────────────────────────────
+  // ✏️ Draw & measure lists every line drawn with its ground in miniature and
+  // the figures the card would lead with — the fade margin, the line of sight
+  // and the worst clearance — so a line no longer has to be the card's one
+  // line to be read. figure() works one line out exactly as the card does: the
+  // same ground (groundFor), the same cover on the same samples, the same ends
+  // and radios (endpoint), the same analysis and the same margin
+  // (profileMargin) — so a row and the card cannot quote one line two ways.
+  // Nothing of the card's own state is touched.
+  //
+  // figureKey() is everything the answer depends on, as a string: the line,
+  // what its ends are snapped to, and the settings both cards write. The list
+  // asks again when it changes and not before.
+  function figureKey(sh) {
+    if (!sh || sh.kind !== 'line' || !sh.pts || sh.pts.length < 2) return null;
+    const R = state.radio || {};
+    const typed = Object.entries(R.ends || {}).filter(([, v]) => v && Object.keys(v).length);
+    const t = sh.snappedTo || [];
+    return JSON.stringify([
+      sh.pts.map(p => p[0].toFixed(5) + ',' + p[1].toFixed(5)),
+      t.length ? [t[0] || null, t[t.length - 1] || null] : null,
+      !!P().cover, (state.link && state.link.prop) || null,
+      typed, R.placed || null, R.freqMhz || null,
+    ]);
+  }
+
+  async function figure(sh) {
+    const a = endpoint(sh, 0), b = endpoint(sh, 1);
+    const multi = sh.pts.length > 2;
+    const opts = { elevA: a.elev, elevB: b.elev, aglA: multi ? 0 : a.agl, aglB: multi ? 0 : b.agl };
+    if (!multi) opts.freqMhz = freqFor(a, b);
+    const coverOn = !!P().cover;
+    const res = await groundFor(sh);
+    if (!res || !res.ok) return { ok: false, error: (res && res.error) || '' };
+    let c = null;
+    if (coverOn && !res.lidar) {
+      try { const r = await LandCover.sample(res.prof.lat, res.prof.lon); c = r && r.ok ? r : null; } catch (_) { c = null; }
+    }
+    const an = pathAnalyse(res.prof, { ...opts,
+      cover: c ? c.cls : null, canopy: c && c.canopyOk ? c.canopy : null, coverOff: !coverOn });
+    if (!an.ok) return { ok: false, error: an.error || '' };
+    const w = an.worst;
+    return {
+      ok: true, flat: multi, thumb: pathThumbOf(an), km: an.D / 1000, a: a.name, b: b.name,
+      verdict: multi ? null : an.verdict,
+      margin: multi ? null : profileMargin(an, a, b),
+      // The worst point on the path: how far the ground (or what stands on
+      // it) is under the straight line there, or over it when negative.
+      worst: multi || !w ? null : {
+        m: w.clearance, ratio: w.ratio, km: w.d1 / 1000,
+        what: w.cover != null && w.los - w.bulged >= 0 ? 'cover' : 'ground',
+      },
+    };
+  }
+
   // Called on every draw-panel re-render. Cheap when nothing moved: the
   // signature is the debounce, so dragging a line out costs nothing and only a
   // finished (or edited, or re-selected) line fetches terrain.
@@ -1095,16 +1165,7 @@ const PathProfile = (function () {
     rerender();
     if (!sh) return;
     const mine = sig;
-    // pathGround decides LiDAR ground for the card as it does for the map and
-    // the Network Review; the tiles are asked for directly otherwise, because
-    // a drawn line may have more than two points.
-    const ask = lidarFor(sh)
-      ? pathGround(...[0, 1].map(end => {
-          const e = endpoint(sh, end), i = end === 0 ? 0 : sh.pts.length - 1;
-          return { lat: sh.pts[i][0], lon: sh.pts[i][1], elev: e.elev, agl: e.agl, mast: !!(e.station && stationIsMast(e.station)) };
-        }), { samples: SAMPLES, freqMhz: freqFor(endpoint(sh, 0), endpoint(sh, 1)) })
-      : Terrain.profile(sh.pts, SAMPLES).then(res => (res.ok ? { ok: true, prof: res, lidar: null, ends: null } : res));
-    Promise.all([ask, pathBeyond(sh.pts, SAMPLES)]).then(([res, beyond]) => {
+    Promise.all([groundFor(sh), pathBeyond(sh.pts, SAMPLES)]).then(([res, beyond]) => {
       if (cur.sig !== mine) return;                 // the line moved on while we fetched
       cur.status = res.ok ? 'ready' : 'failed';
       cur.prof   = res.ok ? res.prof : null;
@@ -3401,10 +3462,16 @@ const PathProfile = (function () {
       host.innerHTML = `<p class="filter-note">${cur.status === 'loading'
         ? `Sampling terrain along ${fmtKm(MapDraw.lineKm(sh.pts))} of path…`
         : cur.status === 'failed' ? `Terrain data unavailable — ${esc(cur.error)}`
-        : 'No profile to draw for this line.'}</p>`;
+        : 'No profile to draw for this line.'}</p>
+        <div class="path-actions">
+          <button type="button" id="path-full-card" onclick="PathProfile.toCard()">Open in 〽️ Path tools →</button>
+          <button type="button" onclick="Modal.close()">Close</button>
+        </div>`;
     } else {
       host.innerHTML = `
-        <p class="small path-full-sub">${esc(MapDraw.measure(sh))}</p>
+        <p class="small path-full-sub">${esc(MapDraw.measure(sh))} ·
+          <button type="button" class="lb-link" id="path-full-card" onclick="PathProfile.toCard()"
+                  title="Close this window and open this path on the Elevation profile card, in 〽️ Path tools — its radios, antenna heights, link budget and report are there">Open in 〽️ Path tools →</button></p>
         ${s.flat ? s.warn : readoutHtml(s.an, s.a, s.b) + s.warn}
         <div class="path-full-chart" id="path-full-chart"></div>
         ${s.flat ? '' : `<p class="small path-cover-note">${coverStatusHtml(s.an)}</p>${s.datum}${elvisHtml(s.an)}`}
@@ -3412,6 +3479,7 @@ const PathProfile = (function () {
           ${s.flat ? '' : `<button type="button" id="path-full-flip" onclick="PathProfile.flip()"
                   aria-label="Flip direction: make ${escAttr(s.b.name)} end A and ${escAttr(s.a.name)} end B"
                   title="Turn the line round — ${escAttr(s.b.name)} becomes A, ${escAttr(s.a.name)} becomes B">⇄ Flip direction</button>`}
+          <button type="button" onclick="PathProfile.toCard()">Open in 〽️ Path tools →</button>
           <button type="button" onclick="Modal.close()">Close</button>
         </div>`;
       const slot = document.getElementById('path-full-chart');
@@ -3427,9 +3495,12 @@ const PathProfile = (function () {
   // their path in and open it in one press, before its ground has landed.
   // fullPaint() says it is sampling meanwhile, and the chart comes in with the
   // ground (rerender repaints this too).
-  function openFull() {
+  //
+  // `back`, when given, answers the control focus should return to when the
+  // window closes — the opener itself has usually been redrawn by then.
+  function openFull(back) {
     if (full || !target()) return;
-    full = { t: 0, onResize: null };
+    full = { t: 0, onResize: null, back: typeof back === 'function' ? back : null };
     // Redrawn to the new size once the window has stopped moving.
     full.onResize = () => {
       if (!full) return;
@@ -3450,11 +3521,31 @@ const PathProfile = (function () {
     if (!full) return;
     clearTimeout(full.t);
     window.removeEventListener('resize', full.onResize);
+    const back = full.back;
     full = null;
     rerender();
     const f = document.activeElement;
-    const btn = document.getElementById('path-full-open');
-    if (btn && (!f || f === document.body)) btn.focus({ preventScroll: true });
+    if (f && f !== document.body && f.isConnected) return;
+    const from = back ? back() : null;
+    const btn = from && from.getClientRects().length ? from : document.getElementById('path-full-open');
+    if (btn) btn.focus({ preventScroll: true });
+  }
+
+  // From the full-screen view on to the card itself: the window shuts, the
+  // card is opened and its pane brought up (the side panel's 〽️, or under the
+  // map where the cards are there), and focus goes to the card's header.
+  function toCard() {
+    if (full) full.back = null;
+    Modal.close();
+    if (state.mapFullscreen && typeof toggleMapFullscreen === 'function') toggleMapFullscreen(false);
+    P().open = true;
+    rerender();
+    const el = document.getElementById('path-profile-panel');
+    if (!el) return;
+    if (typeof dockReveal === 'function') dockReveal(el);
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const to = el.querySelector('summary');
+    if (to) to.focus({ preventScroll: true });
   }
 
   // ── copy for a report ──
@@ -4950,6 +5041,9 @@ const PathProfile = (function () {
     // pricing chartSvg started pours them in when it finishes.
     sigFill();
     fitCard(el);
+    // Draw & measure's rows quote the same settings this card was just drawn
+    // from (a radio typed over, the cover switched, the model changed).
+    if (typeof MapDraw !== 'undefined' && MapDraw.figuresCheck) MapDraw.figuresCheck();
   }
 
   // The card's chart is drawn at its column's width, and that is only known
@@ -4978,7 +5072,7 @@ const PathProfile = (function () {
   }
 
   return {
-    sync, rerender, toolbarHtml,
+    sync, rerender, toolbarHtml, figure, figureKey, toCard,
 
     // ── the cursor's three doors ──
     // A pointer over the chart. The SVG is drawn in viewBox units and stretched

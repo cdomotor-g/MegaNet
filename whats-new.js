@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 266, date: '2026-11-11', items: [
+      '✏️ <strong>A drawn line shows its ground where you drew it.</strong> Finishing a line in <em>Draw &amp; measure</em> no '
+        + 'longer jumps to 〽️ Path tools. Each line in the list has a small picture of the ground under it, with its fade margin, '
+        + 'line of sight and clearance beside it. Press the picture to open the whole path model in a window; '
+        + '<em>Open in 〽️ Path tools</em> there goes on to the Elevation profile card. The same small picture sits under the '
+        + 'line\'s measurement on the map — a tick box in the panel turns it off.',
+    ] },
     { n: 265, date: '2026-11-11', items: [
       '🔎 <strong>Zoom into a field photo.</strong> Open a photo on 📷 Field Photos and the top-right corner of the picture has '
         + '<em>−</em> and <em>+</em> beside the rotate buttons. The mouse wheel zooms too — with or without Ctrl, it is the photo that '

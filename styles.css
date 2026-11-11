@@ -8227,6 +8227,62 @@ body .map-panel.is-driving {
   color: var(--text);
 }
 
+/* A line's ground and figures, under its row (figHtml, map-draw.js): the
+   picture — a button, the finders' .sites-thumb — with the fade margin, the
+   line of sight and the clearance beside it, one to a line. The row above
+   gives up its rule so the two read as one entry. */
+.draw-row-line { border-bottom: none; }
+
+.draw-fig {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: 0 .2rem .4rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.draw-fig.sel { background: var(--subtle); }
+
+.draw-fig-pic.sites-thumb {
+  flex: none;
+  width: 8.5rem;
+  padding: 2px;
+}
+
+.draw-fig-nums {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.draw-fig-nums[aria-busy="true"] { opacity: .6; }
+
+.draw-words { margin-top: .5rem; }
+.draw-words > summary { cursor: pointer; }
+.draw-words .path-words { margin-top: .35rem; grid-template-columns: 1fr; gap: 0; }
+.draw-words .path-words dd { margin-bottom: .35rem; }
+
+/* …and on the map, in the line's label: the fade margin after the
+   measurement, in its band's colour on the label's fixed near-white ground,
+   and the same picture under it. */
+.mn-draw-db-ok   { color: #1b6e2f; }
+.mn-draw-db-warn { color: #8a5a00; }
+.mn-draw-db-bad  { color: #b3261e; }
+
+.mn-draw-mini {
+  display: block;
+  width: 112px;
+  margin: 0 auto 3px;
+}
+
+.mn-draw-mini .path-thumb {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .draw-edit {
   padding: .1rem .2rem .5rem;
   border-bottom: 1px solid var(--border);

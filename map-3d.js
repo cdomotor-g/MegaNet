@@ -1849,7 +1849,10 @@ const Map3D = (function () {
         const el = document.createElement('div');
         el.className = 'mn-draw-label mn-draw-3d';
         el.style.borderColor = s.colour;
-        el.textContent = s.label;
+        // A line's label may carry its fade margin and its ground in
+        // miniature: MapDraw's own markup (labelHtml), its text escaped there.
+        if (s.labelHtml) el.innerHTML = s.labelHtml;
+        else el.textContent = s.label;
         // Over a pin, as 2-D's tooltip is; on the middle of everything else.
         const pin = s.kind === 'pin';
         add(el, s.labelAt, { anchor: pin ? 'bottom' : 'center', offset: pin ? [0, -18] : [0, 0] });

@@ -943,10 +943,11 @@ try {
   check('<main>\'s own heading says it holds the map alone while the cards are beside it',
     await page.evaluate(() => document.getElementById('stations-main-h')?.textContent === 'Stations — map'));
 
-  // A line drawn from the ✏️ pane is drawn to see the ground under it, and the
-  // card that shows that is in the path tools' pane — which the ✏️ pane hides.
-  // Finishing the line brings the card up, and focus, which was on Finish
-  // line in the pane that just went, goes with it rather than to <body>.
+  // A line drawn from the ✏️ pane is drawn to see the ground under it, and its
+  // row in that pane's list shows it — the ground in miniature, a button that
+  // opens the whole model in a window. So finishing the line leaves the ✏️
+  // pane where it is (it used to give way to 〽️ Path tools), and focus, which
+  // was on Finish line, goes to the new line's row rather than to <body>.
   await page.click('#help-panel .dock-tab[data-dock="map-draw"]');
   await page.waitForTimeout(250);
   await page.locator('#map-draw-panel .draw-tool', { hasText: 'Line' }).click();
@@ -959,13 +960,14 @@ try {
   await page.click('#draw-finish');
   await page.waitForTimeout(400);
   const drew = await page.evaluate(() => {
-    const el = document.getElementById('path-profile-panel');
     const a = document.activeElement;
-    return { showing: dockShowing(), visible: !!el && el.checkVisibility(), lines: state.draw.shapes.filter(x => x.kind === 'line').length,
-             focus: a ? a.tagName : null, focusSeen: !!(a && a !== document.body && a.getClientRects().length) };
+    return { showing: dockShowing(), lines: state.draw.shapes.filter(x => x.kind === 'line').length,
+             fig: !!document.querySelector('#map-draw-panel .draw-fig .draw-fig-pic'),
+             focus: a ? a.className : null, focusSeen: !!(a && a !== document.body && a.getClientRects().length) };
   });
-  check('finishing a line from the ✏️ pane brings its elevation profile up, with focus on something that is on screen',
-    drew.lines === 1 && drew.showing === 'paths' && drew.visible && drew.focusSeen, JSON.stringify(drew));
+  check('finishing a line from the ✏️ pane leaves that pane up, the line’s ground in its row, with focus on the row',
+    drew.lines === 1 && drew.showing === 'map-draw' && drew.fig && drew.focusSeen && /draw-row-main/.test(drew.focus || ''),
+    JSON.stringify(drew));
   await page.evaluate(() => { MapDraw.setTool(''); state.draw.shapes = []; state.draw.selectedId = null; MapDraw.render(); MapDraw.rerenderPanel(); });
   await page.waitForTimeout(200);
 
@@ -974,7 +976,8 @@ try {
   // box inside it (MapChrome's `after`) — and nothing at all before they do.
   // Taking a station out shortens the list and keeps focus in the card;
   // Clear takes the card off the page with focus on something that is on it.
-  await page.click('#help-panel .dock-tab[data-dock="map-draw"]');
+  // (The ✏️ pane is still up from the line above; its own button would shut it.)
+  if (await page.evaluate(() => dockShowing() !== 'map-draw')) await page.click('#help-panel .dock-tab[data-dock="map-draw"]');
   await page.waitForTimeout(250);
   const selBefore = await page.evaluate(() => {
     const el = document.getElementById('map-draw-sel');

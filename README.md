@@ -3989,6 +3989,20 @@ it saying what AHD and EGM96 are, giving a tile end in AHD as well, and that
 GDA2020 is for positions, not heights; the panel says so under every profile it
 draws.
 
+**Every line in *Draw & measure*'s list carries its own ground.** Under a
+line's row is its profile in miniature (`pathThumbSvg`, the finders' small
+picture) with the fade margin, the line of sight and the worst clearance beside
+it, and the same picture sits under the line's measurement on the map (a tick
+box turns it off). They are worked out by the card's own code, a line at a time
+(`PathProfile.figure`, kept by `MapDraw` until `PathProfile.figureKey` says
+something they depend on has changed), so a row and the card cannot quote one
+line two ways. A press on the picture makes that line the current one and opens
+the card's chart in a window (`MapDraw.model` → `PathProfile.openFull`);
+*Open in 〽️ Path tools* there goes on to the card (`PathProfile.toCard`).
+Finishing a line therefore leaves the ✏️ pane up — it used to give way to the
+path tools' pane. A line with corners gets its ground alone. The words on a row
+have their meanings on hover and in a fold under the list.
+
 **The elevation profile** appears under the map once a line exists in *Draw &
 measure*, and plots ground (with the earth-curvature bulge folded in so the line
 of sight can be drawn straight — k derived from the surface refractivity at the

@@ -18,7 +18,9 @@
 // dockReveal — to health-glance.js for when each was last heard (HealthGlance),
 // to export.js for downloadDrawingKml (the
 // panel's Google Earth button, #183), and sideways to path-profile.js for
-// PathProfile, which reaches back here for MapDraw, and to map-3d.js for
+// PathProfile, which reaches back here for MapDraw — and which works out the
+// ground and figures each line's row in the list carries (figHtml) — to
+// link-budget.js for the margin's bands (lbMarginClass), and to map-3d.js for
 // Map3D, which draws what this file drew on its terrain and hands its own
 // pointer back through click3d() and move3d(). All mutual, and all free: the
 // IIFE body only defines.
@@ -510,7 +512,7 @@ const MapDraw = (function () {
     // its measurement written next to it.
     if (D().showLabels && sh.kind !== 'text') {
       const anchor = sh.kind === 'pin' ? 'top' : 'center';
-      layer.bindTooltip(measure(sh), {
+      layer.bindTooltip(labelHtml(sh), {
         permanent: true, direction: anchor, className: 'mn-draw-label',
         offset: sh.kind === 'pin' ? [0, -18] : [0, 0],
       });
@@ -540,6 +542,178 @@ const MapDraw = (function () {
       L.DomEvent.stop(e);
       select(sh.id);
     });
+  }
+
+  // ── a line's ground and figures ──
+  // Every line in the list carries its ground in miniature and the figures
+  // the Elevation profile card would lead with — worked out by that card's
+  // own code (PathProfile.figure), a line at a time, and kept here by the
+  // line's id until something the answer depends on changes
+  // (PathProfile.figureKey). A figure being worked out again keeps the last
+  // one on show meanwhile, so a flipped line or a typed-over radio does not
+  // blank its row.
+  //
+  // The picture is a button: it opens the card's chart full screen over the
+  // map for that line (model), which has a way on to the card itself.
+  const figs = new Map();          // line id → { key, state: 'pending' | 'done', fig }
+
+  // The words the rows use, and what each means here — one list for the
+  // hover and for the fold under the list that a finger can read.
+  function figWords() {
+    return [
+      ['Ground profile', 'The ground under the line, seen from the side, with A — the line\'s first point — on the left: the hills, '
+        + 'what grows or stands on them, the straight line between the two antennas and the room round it the signal needs. '
+        + 'Ground or trees inside that room are drawn in red.'],
+      ['Fade margin', pathMarginMeaning()],
+      ['Line of sight', PATH_LOS_MEANING],
+      ['Clearance', 'At the worst point on the path, how far the ground — or the trees and buildings on it — is under the straight '
+        + 'line between the two antennas. "Above the line" means something stands in the way there, and the signal reaches the '
+        + 'far end only by bending over it.'],
+    ];
+  }
+  const figWord = k => (figWords().find(w => w[0] === k) || [])[1] || '';
+
+  function dbText(v) { return `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`; }
+
+  function figNumsHtml(sh, e) {
+    const f = e && e.fig;
+    if (!f) return `<span class="txt-muted">${e && e.state === 'done' ? 'No figures for this line.' : 'Reading the ground…'}</span>`;
+    if (!f.ok) return `<span class="txt-warn">The ground could not be read.</span>${f.error ? ` <span class="txt-muted">${esc(f.error)}</span>` : ''}`;
+    if (f.flat) {
+      return `<span>${termHtml('Ground profile', figWord('Ground profile'))} only</span>
+        <span class="txt-muted">A line with corners is not one radio path, so it has no line of sight and no fade margin.</span>`;
+    }
+    const out = [];
+    const r = f.margin;
+    if (r && r.m != null) {
+      const band = lbMarginClass(r.m);
+      out.push(`<span><strong class="txt-${band.cls}">${dbText(r.m)}</strong> ${termHtml('fade margin', figWord('Fade margin'))} · ${esc(band.label.toLowerCase())}</span>`);
+    } else {
+      const why = !r || r.why === 'ends' ? 'both ends need a radio: snap the line to stations'
+        : r.why === 'system' ? 'no radio system on file at one end'
+        : r.why === 'loss' ? 'the model did not run'
+        : 'a radio figure is missing at one end';
+      out.push(`<span>No ${termHtml('fade margin', figWord('Fade margin'))} <span class="txt-muted">— ${why}</span></span>`);
+    }
+    const V = PATH_VERDICT[f.verdict];
+    if (V) out.push(`<span>${termHtml('Line of sight', figWord('Line of sight'))} <span class="txt-${V.cls}">${termHtml(V.label.toLowerCase(), V.meaning)}</span></span>`);
+    const w = f.worst;
+    if (w && isFinite(w.m)) {
+      out.push(`<span>${termHtml('Clearance', figWord('Clearance'))} ${w.m >= 0
+        ? `${Math.round(w.m)} m under the line`
+        : `<span class="txt-bad">${w.what} ${Math.round(-w.m)} m above the line</span>`} <span class="txt-muted">at ${fmtKm(w.km)}</span></span>`);
+    }
+    return out.join('');
+  }
+
+  // What a screen reader hears for the picture, and the button's whole name.
+  function figReading(sh, e) {
+    const f = e && e.fig;
+    const name = snapLabel(sh) || measure(sh);
+    if (!f || !f.ok) return `${name}: open its ground profile in a window`;
+    if (f.flat) return `${name}: ground profile only. Open it in a window`;
+    const bits = [];
+    if (f.margin && f.margin.m != null) bits.push(`fade margin ${dbText(f.margin.m)}`);
+    if (f.verdict) bits.push(`line of sight ${pathVerdictWord(f.verdict)}`);
+    return `${name}: ${bits.join(', ') || 'no figures'}. Open its ground profile and path model in a window`;
+  }
+
+  function figPicHtml(e) {
+    const f = e && e.fig;
+    if (f && f.ok && f.thumb) return pathThumbSvg(f.thumb, { flat: f.flat });
+    return `<span class="sites-thumb-none small txt-muted">${!f && !(e && e.state === 'done') ? 'Drawing the ground…' : 'No picture'}</span>`;
+  }
+
+  // Under a line's row: its picture, and its figures beside it.
+  function figInnerHtml(sh) {
+    const e = figs.get(sh.id);
+    return `
+      <button type="button" class="sites-thumb draw-fig-pic" onclick="MapDraw.model('${escAttr(sh.id)}')"
+              title="Open this path's ground profile and model in a window"
+              aria-label="${escAttr(figReading(sh, e))}">${figPicHtml(e)}</button>
+      <div class="draw-fig-nums small"${e && e.state === 'pending' && e.fig ? ' aria-busy="true"' : ''}>${figNumsHtml(sh, e)}</div>`;
+  }
+
+  function figHtml(sh, sel) {
+    return `<div class="draw-fig${sel ? ' sel' : ''}" id="draw-fig-${escAttr(sh.id)}" data-tour="draw-fig">${figInnerHtml(sh)}</div>`;
+  }
+
+  // The fold under the list: the same meanings, where a finger can read them.
+  function figWordsHtml() {
+    if (!D().shapes.some(s => s.kind === 'line')) return '';
+    return `
+      <details class="draw-words" ${D().wordsOpen ? 'open' : ''} ontoggle="MapDraw.wordsOpen(this.open)">
+        <summary class="small">What the words on a line's row mean</summary>
+        <dl class="path-words">${figWords().map(([t, m]) => `<dt>${esc(t)}</dt><dd>${esc(m)}</dd>`).join('')}</dl>
+        ${pathThumbKeyHtml()}
+        <p class="small txt-muted">Press a picture to open that path's whole model in a window; <em>Open in 〽️ Path tools</em>
+          there goes on to the Elevation profile card, with its radios, antenna heights and link budget.</p>
+      </details>`;
+  }
+
+  // What a shape's label on the map says. A line's has its fade margin after
+  // the measurement and, unless they are switched off, its ground in miniature
+  // under it. Markup: Leaflet's tooltip takes it as such.
+  function labelHtml(sh) {
+    const text = esc(measure(sh));
+    if (sh.kind !== 'line') return text;
+    const e = figs.get(sh.id), f = e && e.fig;
+    if (!f || !f.ok) return text;
+    const m = f.margin && f.margin.m != null ? ` · <span class="mn-draw-db mn-draw-db-${lbMarginClass(f.margin.m).cls}">${dbText(f.margin.m)}</span>` : '';
+    const pic = D().showMinis !== false && f.thumb ? `<span class="mn-draw-mini">${pathThumbSvg(f.thumb, { flat: f.flat })}</span>` : '';
+    return `${text}${m}${pic}`;
+  }
+
+  // A figure landed, or went: its row, its label on the map, and the 3-D
+  // view's copy of that label — in place, so nothing else is redrawn and focus
+  // stays where it is unless it was on the picture itself.
+  function paintFigure(id) {
+    const sh = D().shapes.find(s => s.id === id);
+    if (!sh) return;
+    const el = document.getElementById(`draw-fig-${id}`);
+    if (el) {
+      const had = el.contains(document.activeElement);
+      el.innerHTML = figInnerHtml(sh);
+      if (had) { const b = el.querySelector('.draw-fig-pic'); if (b) b.focus({ preventScroll: true }); }
+    }
+    const tt = sh._layer && sh._layer.getTooltip && sh._layer.getTooltip();
+    if (tt) sh._layer.setTooltipContent(labelHtml(sh));
+    tell3d();
+  }
+
+  // Asks for the figure of every line that has none for what it is now.
+  function figuresCheck() {
+    if (typeof PathProfile === 'undefined' || !PathProfile.figure) return;
+    const lines = D().shapes.filter(s => s.kind === 'line' && s.pts.length >= 2);
+    for (const id of [...figs.keys()]) if (!lines.some(s => s.id === id)) figs.delete(id);
+    for (const sh of lines) {
+      const key = PathProfile.figureKey(sh);
+      const was = figs.get(sh.id);
+      if (was && was.key === key) continue;
+      const e = { key, state: 'pending', fig: was ? was.fig : null };
+      figs.set(sh.id, e);
+      let ask;
+      try { ask = PathProfile.figure(sh); } catch (err) { ask = Promise.reject(err); }
+      ask.then(f => f, () => ({ ok: false, error: '' })).then(f => {
+        if (figs.get(sh.id) !== e) return;        // the line moved on while we fetched
+        e.state = 'done'; e.fig = f;
+        paintFigure(sh.id);
+      });
+    }
+  }
+
+  // A picture's press: that line becomes the current one — the card's chart
+  // is of the current line — and its chart opens full screen over the map,
+  // this pane left as it is behind it. Focus comes back to the picture.
+  function model(id) {
+    const sh = D().shapes.find(s => s.id === id && s.kind === 'line');
+    if (!sh) return;
+    if (D().selectedId !== id) {
+      D().selectedId = id;
+      render();
+      rerenderPanel();
+    }
+    PathProfile.openFull(() => document.querySelector(`#draw-fig-${CSS.escape(id)} .draw-fig-pic`));
   }
 
   function render() {
@@ -702,21 +876,18 @@ const MapDraw = (function () {
       const f = document.activeElement;
       const fromPane = !!(f && f.closest && f.closest('#map-draw-panel'));
       add({ kind: 'line', pts: pending.pts, snappedTo: pending.sids.slice() });
-      // A line is drawn to see the ground under it, and that card is one of
-      // the path tools — in the side panel's 〽️ pane when the cards are
-      // beside the map, which this pane (Draw & measure) is hiding. So the
-      // pane that has the profile comes up, the way the link budget's and the
-      // site finder's profile buttons bring it up; the tool stays armed, so
-      // the next line needs no trip back here. Under the map (a window at or
-      // below `lg`) the card is already on the page and nothing moves.
-      const card = document.getElementById('path-profile-panel');
-      if (card && typeof dockReveal === 'function') dockReveal(card);
+      // A line is drawn to see the ground under it — and its row in this
+      // pane's list now shows that (figHtml): the ground in miniature, the
+      // fade margin and the clearance, and a press on the picture opens the
+      // whole model in a window. So the pane stays where it is; it used to
+      // give way to 〽️ Path tools with every line finished.
+      //
       // Finish was pressed in this pane, whose list add() has just redrawn
-      // (so the button focus was on is gone): focus follows the profile
-      // rather than falling to the page.
-      const a = document.activeElement;
-      if (card && fromPane && (!a || a === document.body || !a.getClientRects().length)) {
-        const to = card.querySelector('summary, button:not([disabled])');
+      // (so the button focus was on is gone): focus goes to the new line's
+      // row rather than falling to the page.
+      const at = document.activeElement;
+      if (fromPane && (!at || at === document.body || !at.getClientRects().length)) {
+        const to = document.querySelector('#map-draw-panel .draw-row.sel .draw-row-main');
         if (to && to.getClientRects().length) to.focus({ preventScroll: true });
       }
     }
@@ -1115,7 +1286,7 @@ const MapDraw = (function () {
       // everything else in this panel.
       const canPick = sh.kind === 'circle' || sh.kind === 'rect';
       return `
-        <div class="draw-row${sel ? ' sel' : ''}">
+        <div class="draw-row${sel ? ' sel' : ''}${sh.kind === 'line' ? ' draw-row-line' : ''}">
           <button class="draw-row-main" onclick="MapDraw.select('${escAttr(sh.id)}')"
                   title="Select and centre on it">
             <span class="draw-row-icon" style="--ink:${colourOf(sh)}">${DRAW_TOOLS[sh.kind].icon}</span>
@@ -1132,8 +1303,9 @@ const MapDraw = (function () {
           <button class="draw-del" title="Delete"
                   onclick="MapDraw.remove('${escAttr(sh.id)}')">✕</button>
         </div>
+        ${sh.kind === 'line' ? figHtml(sh, sel) : ''}
         ${editable ? editFormHtml(sh) : ''}`;
-    }).join('')}</div>`;
+    }).join('')}</div>${figWordsHtml()}`;
   }
 
   function colourHtml() {
@@ -1203,6 +1375,12 @@ const MapDraw = (function () {
                onchange="MapDraw.toggleLabels(this.checked)">
         Show measurements on the map
       </label>
+      ${D_.showLabels ? `
+      <label class="filter-check">
+        <input type="checkbox" ${D_.showMinis !== false ? 'checked' : ''}
+               onchange="MapDraw.toggleMinis(this.checked)">
+        <span>…and each line's ${termHtml('ground profile', figWord('Ground profile'))}, small, under its measurement</span>
+      </label>` : ''}
       ${listHtml()}`;
   }
 
@@ -1214,6 +1392,9 @@ const MapDraw = (function () {
     // being dragged out never gets here, which is the debounce — PathProfile
     // compares the geometry itself and only fetches when it actually moved.
     PathProfile.sync();
+    // Every line's ground and figures, for the rows just drawn (the card asks
+    // too when it repaints; a second ask of the same line is a no-op).
+    figuresCheck();
     // The repeater site finder selects its sites with this module's circle, so
     // it has to hear the circle land — and its list of drawn shapes to take
     // stations from goes stale with every add and delete, for the same reason.
@@ -1599,6 +1780,13 @@ const MapDraw = (function () {
     finishLine, addFromForm, applyEdit, useMapCentre, toggleLabels, measure,
     setColour, toggleSnap, selectInside, lineKm, flipLine,
 
+    // A line's ground and figures in its row (figHtml): the press on its
+    // picture, the ask PathProfile makes when a setting the figures quote has
+    // moved, and the two switches.
+    model, figuresCheck,
+    toggleMinis(on) { D().showMinis = !!on; render(); rerenderPanel(); },
+    wordsOpen(on) { D().wordsOpen = !!on; },
+
     // The selection's card: its markup for MapChrome's `after` (app.js), the
     // repaint mapSelectionChanged() asks for, and what its buttons press.
     selectionHtml, zoomToSelection, listSelection, copySelection, openSelected, unselect,
@@ -1677,6 +1865,9 @@ const MapDraw = (function () {
           path:    sh.kind === 'line' ? sh.pts.map(pt => pt.slice()) : null,
           ring:    ringFor(sh),
           label:   D_.showLabels && sh.kind !== 'text' ? measure(sh) : '',
+          // The same label as markup when it carries more than the words: a
+          // line's fade margin and its ground in miniature (labelHtml).
+          labelHtml: D_.showLabels && sh.kind === 'line' ? labelHtml(sh) : '',
           labelAt: labelPoint(sh),
         })),
       };

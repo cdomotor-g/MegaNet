@@ -589,6 +589,95 @@ ok('pressed again, it is back as it was',
      && backFlip.aglA === 7 && backFlip.aglB === null, JSON.stringify(backFlip));
 await page.evaluate(() => PathProfile.setAgl('A', ''));
 
+// ── A line's ground and figures, in the Draw & measure list ──────────────────
+// Every line in the list has its ground drawn small under its row, with the
+// figures the Elevation profile card leads with beside it, worked out by the
+// card's own code — so the pane no longer gives way to 〽️ Path tools when a
+// line is finished. The picture opens the card's chart in a window, which has
+// a way on to the card.
+console.log('\nA line’s ground and figures in the Draw & measure list');
+
+await openPane('draw');
+await page.waitForFunction(() => !!document.querySelector('#map-draw-panel .draw-fig .path-thumb'),
+  null, { timeout: LOAD_TIMEOUT });
+const figNow = () => page.evaluate(() => {
+  const el = document.querySelector('#map-draw-panel .draw-fig');
+  const pic = el.querySelector('.draw-fig-pic');
+  const card = document.getElementById('path-profile-panel').textContent.replace(/\s+/g, ' ');
+  return {
+    text: el.textContent.replace(/\s+/g, ' ').trim(),
+    label: pic.getAttribute('aria-label') || '',
+    terms: [...el.querySelectorAll('.term')].map(t => (t.getAttribute('title') || '').length),
+    words: [...document.querySelectorAll('#map-draw-panel .draw-words dt')].map(t => t.textContent),
+    mini: !!document.querySelector('.leaflet-tooltip.mn-draw-label .mn-draw-mini svg'),
+    cardUnder: (/Worst Fresnel\s*(\d+) m under the line/.exec(card) || [])[1] || null,
+    showing: dockShowing(),
+  };
+});
+let fg = await figNow();
+ok('the line’s row has its ground drawn small, with the line of sight and the clearance beside it',
+   /Line of sight (clear|partly clear)/.test(fg.text) && /Clearance \d+ m under the line/.test(fg.text), fg.text);
+ok('…and the clearance is the card’s own figure for the same line',
+   !!fg.cardUnder && fg.text.includes(`Clearance ${fg.cardUnder} m under the line`), `${fg.cardUnder} / ${fg.text}`);
+ok('…a point on the ground has no radio, and the row says why there is no fade margin rather than quote one',
+   /No fade margin — both ends need a radio/.test(fg.text), fg.text);
+ok('every word marked on the row has a meaning on hover', fg.terms.length >= 3 && fg.terms.every(n => n > 40),
+   JSON.stringify(fg.terms));
+ok('…and the same words are in a fold under the list, for a finger',
+   ['Ground profile', 'Fade margin', 'Line of sight', 'Clearance'].every(w => fg.words.includes(w)), JSON.stringify(fg.words));
+ok('the picture is a button that says what it opens', /Open its ground profile/.test(fg.label), fg.label);
+ok('the line’s label on the map carries the same picture', fg.mini === true);
+await page.evaluate(() => MapDraw.toggleMinis(false));
+// Leaflet fades a label it is taking away, for 200 ms.
+await page.waitForTimeout(400);
+const off = await page.evaluate(() => ({ mini: document.querySelectorAll('.leaflet-tooltip.mn-draw-label .mn-draw-mini').length,
+  labels: document.querySelectorAll('.leaflet-tooltip.mn-draw-label').length }));
+ok('…until it is switched off', off.mini === 0 && off.labels > 0, JSON.stringify(off));
+await page.evaluate(() => MapDraw.toggleMinis(true));
+
+ok('the picture was there to click', !!(await clickInside('draw', '.draw-fig-pic')));
+await page.waitForFunction(() => !!document.querySelector('#path-full-chart svg'), null, { timeout: LOAD_TIMEOUT });
+const win = await page.evaluate(() => ({
+  showing: dockShowing(),
+  title: document.getElementById('app-modal-title').textContent,
+  on: !!document.getElementById('path-full-card'),
+}));
+ok('a click on it opens that line’s chart in a window, the Draw & measure pane left where it was',
+   win.showing === 'map-draw' && /^Elevation profile — /.test(win.title), JSON.stringify(win));
+ok('…and the window has a way on to the path tools', win.on);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(250);
+ok('Escape shuts it and hands focus back to the picture',
+   await page.evaluate(() => document.getElementById('app-modal').style.display === 'none'
+     && !!document.activeElement && document.activeElement.classList.contains('draw-fig-pic')),
+   await page.evaluate(() => document.activeElement && document.activeElement.className));
+await page.keyboard.press('Enter');
+await page.waitForFunction(() => !!document.getElementById('path-full-card'), null, { timeout: LOAD_TIMEOUT });
+await page.click('#path-full-card');
+await page.waitForTimeout(500);
+const went = await page.evaluate(() => ({
+  shut: document.getElementById('app-modal').style.display === 'none',
+  showing: dockShowing(),
+  seen: document.getElementById('path-profile-panel').checkVisibility(),
+  focus: document.activeElement ? document.activeElement.tagName : null,
+}));
+ok('Open in Path tools shuts the window and brings the Elevation profile card up, focus on its header',
+   went.shut && went.showing === 'paths' && went.seen && went.focus === 'SUMMARY', JSON.stringify(went));
+
+// A line with corners is not one radio path: its ground, and nothing on it.
+await page.evaluate(({ latA, lonA }) => {
+  MapDraw.addLine([[latA, lonA], [latA - 0.03, lonA + 0.04], [latA - 0.06, lonA + 0.01]], [null, null, null]);
+}, HOP);
+await page.waitForFunction(() => document.querySelectorAll('#map-draw-panel .draw-fig .path-thumb').length === 2,
+  null, { timeout: LOAD_TIMEOUT });
+const legs = await page.evaluate(() => {
+  const el = document.querySelectorAll('#map-draw-panel .draw-fig')[1];
+  return { text: el.textContent.replace(/\s+/g, ' ').trim(), dashed: el.querySelectorAll('[stroke-dasharray]').length,
+           first: document.querySelectorAll('#map-draw-panel .draw-fig')[0].querySelectorAll('[stroke-dasharray]').length };
+});
+ok('a line with corners gets its ground alone — no line of sight, no Fresnel zone, no margin',
+   /Ground profile only/.test(legs.text) && legs.dashed === 0 && legs.first === 2, JSON.stringify(legs));
+
 console.log('\nA line snapping onto a drawn pin');
 
 // A spot on screen with no station pin within 60 px, so the only thing there
