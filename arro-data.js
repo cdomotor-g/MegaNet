@@ -2812,15 +2812,33 @@ const ArroData = (function () {
   // takes that name whole or by its last part, as the agent API's
   // /readings/heard does. A reading counts as heard by it whether its copy
   // was the one stored or a later one.
+  //
+  // What is typed is a base station's name — "18 Bateson", which stands for
+  // every receiver it has had (SensorValues.bases, 0115) — or, for a receiver
+  // nobody has named, its code. `want` is the list of hosts either comes to.
   function fieldRxOf(path) { return SensorValues.hostOf(path || '') || ''; }
   function fieldRxMatch(path, want) {
     const host = fieldRxOf(path).toLowerCase();
-    return !!host && (host === want || host.endsWith('/' + want));
+    return !!host && want.some(w => host === w || host.endsWith('/' + w));
   }
   function fieldRxWant(q) {
     const typed = String(q.rx || '').trim();
-    return typed ? fieldRxOf(typed).toLowerCase() : '';
+    if (!typed) return null;
+    const base = SensorValues.baseNamed(typed);
+    return base ? base.hosts.map(h => h.toLowerCase()) : [fieldRxOf(typed).toLowerCase()];
   }
+  // What to call what was typed: the base station's name, also for its code.
+  function fieldRxLabel(q) {
+    const typed = String(q.rx || '').trim();
+    const base = SensorValues.baseNamed(typed);
+    if (base) return base.name;
+    const code = fieldRxOf(typed).toLowerCase();
+    const hit = SensorValues.bases().find(b => b.hosts.some(h => h.toLowerCase() === code || h.toLowerCase().endsWith('/' + code)));
+    return hit ? `${hit.name} (${typed})` : typed;
+  }
+  // A receiver as the box offers it and a sentence names it: its base
+  // station's name where it has one.
+  function fieldRxName(host) { const at = SensorValues.baseOf(host); return at ? at.name : host; }
   // The rows a receiver heard, how many of them it was first with, and every
   // receiver on the rows it was asked of.
   function fieldHeardBy(rows, want) {
@@ -2836,7 +2854,8 @@ const ArroData = (function () {
         if (r.path && fieldRxMatch(r.path, want)) first++;
       }
     }
-    return { rows: want ? kept : rows, first, seen: [...seen].sort((a, b) => b[1] - a[1]).map(x => x[0]) };
+    const named = [...new Set([...seen].sort((a, b) => b[1] - a[1]).map(x => fieldRxName(x[0])))];
+    return { rows: want ? kept : rows, first, seen: named };
   }
   function fieldSetRx(v) { const q = fq(); q.rx = String(v || '').trim(); q.error = ''; q.empty = ''; renderSide(); }
 
@@ -2854,7 +2873,10 @@ const ArroData = (function () {
     const win = fieldWindow(q);
     if (!win) { q.error = 'That is not a time window — the "from" date has to fall before the "to" date.'; renderSide(); return; }
     const res = fieldRes(q, win);
+    try { await SensorValues.loadBases(); } catch (_) { /* no names: a code still works */ }
     const rx = fieldRxWant(q);
+    const rxKey = rx ? rx.join('|') : '';
+    const rxName = rx ? fieldRxLabel(q) : '';
     if (rx && res !== 'raw') {
       q.error = `Only raw readings say which receiver heard them, and this window would be drawn from ${AD_RES_LABEL[res]}. `
               + `Pick a window of ${AD_RAW_MAX_DAYS} days or less, or clear “Heard by”.`;
@@ -2904,7 +2926,7 @@ const ArroData = (function () {
     // A load for one receiver stands beside a load for another, or for all of
     // them: that comparison is what the filter is for.
     const replacing = new Set(addrs);
-    const sameRx = s => (s.prov.rx || '') === rx;
+    const sameRx = s => (s.prov.rx || '') === rxKey;
     // The replaced series are part of the step the new ones arrive in, so one
     // Undo puts the previous answer back.
     if (inst.series.some(s => s.prov && replacing.has(s.prov.addr) && sameRx(s)) && checkpoint(inst, 'adopt', 'field load')) {
@@ -2916,7 +2938,7 @@ const ArroData = (function () {
       // Readings, and none of them by this receiver: say who did hear them,
       // so a mistyped name is seen for what it is.
       q.empty = `None of the ${all.length.toLocaleString()} readings between ${fmtFull(win.t0)} and ${fmtFull(win.t1)} `
-              + `came by a receiver named “${q.rx.trim()}”. `
+              + `came by “${rxName}”. `
               + (heard.seen.length ? `They came by ${heard.seen.slice(0, 6).join(', ')}${heard.seen.length > 6 ? ' and others' : ''}.`
                                    : 'None of them names the receiver it came by.');
       if (ad === inst) renderAll();
@@ -2963,7 +2985,7 @@ const ArroData = (function () {
           : named;
         const label = [owner?.name || fieldAddrLabel(addr),
                        sensor?.type || hit?.label || fieldAddrLabel(addr),
-                       rx ? `heard by ${q.rx.trim()}` : ''].filter(Boolean).join(' · ');
+                       rx ? `heard by ${rxName}` : ''].filter(Boolean).join(' · ');
         const warn = [];
         if (out.capped) warn.push(`The row cap (${AD_FIELD_ROW_CAP.toLocaleString()}) was reached — this is the start of the window, not all of it. Narrow the window or pick a coarser resolution.`);
         if (res !== 'raw') warn.push(`Drawn from ${AD_RES_LABEL[res]}: each point is the counter as it read at the end of its bucket. Within-bucket minimum and maximum are in the inspector and the export.`);
@@ -2971,14 +2993,14 @@ const ArroData = (function () {
         if (rx) {
           const of = all.filter(r => r.addr === addr).length;
           const mine = rows.filter(r => r.path && fieldRxMatch(r.path, rx)).length;
-          warn.push(`Only the readings ${q.rx.trim()} heard: ${rows.length.toLocaleString()} of the ${of.toLocaleString()} in this window. `
-            + `It was first with ${mine.toLocaleString()}; another receiver posted the other ${(rows.length - mine).toLocaleString()} first and its copy was counted on them. `
-            + 'A gap here is a reading this receiver missed, not one the station did not send.');
+          warn.push(`Only the readings ${rxName} heard: ${rows.length.toLocaleString()} of the ${of.toLocaleString()} in this window. `
+            + `It was first with ${mine.toLocaleString()}; another base station posted the other ${(rows.length - mine).toLocaleString()} first and its copy was counted on them. `
+            + 'A gap here is a reading this base station missed, not one the station did not send.');
         }
         data.warn = warn;
 
         const s = adoptSeries(data, {
-          fileName: `${addr} · ${AD_RES_LABEL[res]}${rx ? ` · heard by ${q.rx.trim()}` : ''}`,
+          fileName: `${addr} · ${AD_RES_LABEL[res]}${rx ? ` · heard by ${rxName}` : ''}`,
           meta:     { sensorId: sensor?.sensor_id || null },
           label,
           station:  owner || null,
@@ -2991,7 +3013,7 @@ const ArroData = (function () {
           prov: {
             source: 'field',
             addr, res,
-            ...(rx ? { rx } : {}),
+            ...(rx ? { rx: rxKey } : {}),
             t0: win.t0, t1: win.t1,
             at: Date.now(),
             host: dbHostLabel(),
@@ -3010,17 +3032,18 @@ const ArroData = (function () {
     if (ad === inst) {
       renderAll();
       note(`${out.rows.length.toLocaleString()} ${AD_RES_LABEL[res]} from ${dbHostLabel()}`
-        + `${rx ? `, the ones ${q.rx.trim()} heard of ${all.length.toLocaleString()}` : ''}.`);
+        + `${rx ? `, the ones ${rxName} heard of ${all.length.toLocaleString()}` : ''}.`);
     }
   }
 
   // ── the picker ───────────────────────────────────────────────────────────────
 
+  let fieldBasesAsked = false;
   // The one word on the picker that means something particular here.
-  const AD_HEARD_BY_MEANING = 'A receiver is a base station\'s radio computer, named as readings name it — rpi-83071968. '
-    + 'With one typed here, only the readings it heard are drawn: the ones it posted first, and the ones another receiver '
-    + 'posted first that it also heard. Raw readings only (a window of 14 days or less). After a load, the box offers the '
-    + 'receivers that heard those readings.';
+  const AD_HEARD_BY_MEANING = 'A base station is a place whose receivers post what they hear to Flood-Net — 18 Bateson. '
+    + 'With one named here, only the readings it heard are drawn: the ones it posted first, and the ones another base '
+    + 'station posted first that it also heard. Raw readings only (a window of 14 days or less). The box offers the base '
+    + 'stations by name; a receiver nobody has named goes by its code.';
 
   const AD_FIND_CAP = 25;   // matches offered before the operator is asked to type more
 
@@ -3042,6 +3065,11 @@ const ArroData = (function () {
 
   function fieldPickerHtml() {
     const q = fq();
+    // The base stations' names, for the Heard by box: asked once, drawn when they come.
+    if (!fieldBasesAsked) {
+      fieldBasesAsked = true;
+      SensorValues.loadBases().then(rows => { if (rows && rows.length) renderSide(); else fieldBasesAsked = false; }, () => { fieldBasesAsked = false; });
+    }
     const st = fieldStation();
     const addrs = fieldAddrs(st);
     const noAddr = fieldNoAddr(st);
@@ -3151,16 +3179,16 @@ const ArroData = (function () {
                title="${escAttr(AD_HEARD_BY_MEANING)}">
           <span>${termHtml('Heard by', AD_HEARD_BY_MEANING)}</span>
           <input type="search" class="ad-field-input" id="ad-field-rx" data-keep list="ad-field-rx-list"
-                 placeholder="Any receiver — or e.g. rpi-83071968"
+                 placeholder="Any base station — or e.g. 18 Bateson"
                  value="${escAttr(q.rx)}"
                  onchange="ArroData.fieldSetRx(this.value)">
           <datalist id="ad-field-rx-list">
-            ${q.rxSeen.map(h => `<option value="${escAttr(h)}"></option>`).join('')}
+            ${[...new Set([...SensorValues.bases().map(b => b.name), ...q.rxSeen])].map(h => `<option value="${escAttr(h)}"></option>`).join('')}
           </datalist>
         </label>
         <p class="small ad-cfg-note">${q.rx.trim()
-          ? `Only the readings <b>${esc(q.rx.trim())}</b> heard, raw readings only. It stands beside a load for every receiver, so the two compare.`
-          : `Leave empty for every receiver. ${esc(AD_HEARD_BY_MEANING)}`}</p>
+          ? `Only the readings <b>${esc(fieldRxLabel(q))}</b> heard, raw readings only. It stands beside a load for every base station, so the two compare.`
+          : `Leave empty for every base station. ${esc(AD_HEARD_BY_MEANING)}`}</p>
 
         <button class="ad-field-run" ${q.loading ? 'disabled' : ''}
                 onclick="ArroData.fieldRun()">${q.loading ? 'Reading…' : 'Load readings'}</button>
@@ -3517,7 +3545,8 @@ const ArroData = (function () {
     const dup = e.dup ? e.dup[i] : 0;
     const via = e.paths ? e.paths[i] : null;
     rows.push(`<div><span>Copies</span><b>${dup ? `heard ${dup + 1} times` : 'heard once'}</b></div>`);
-    if (via && via.length) rows.push(`<div><span>Paths</span><b class="mono">${esc(via.join(', '))}</b></div>`);
+    // By the base station's name where it has one; the path as kept, on hover.
+    if (via && via.length) rows.push(`<div><span>Paths</span><b title="${escAttr(via.join(', '))}">${esc(via.map(SensorValues.pathLabel).join(', '))}</b></div>`);
     rows.push(`<div><span>Source</span><b>Field · <span class="mono">${esc(s.prov.addr)}</span></b></div>`);
     // The same reading, seen as a message: the ingress pathway, the duplicate
     // copies and the decode live on the Message Log, and this is the join

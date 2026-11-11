@@ -2,6 +2,16 @@
   "about": "Every change to Flood-Net's agent API (https://floodwarning.net/api/v1 and https://floodwarning.net/api/mcp) that someone using it would notice — a route, a field, a limit, a tool — newest first. Each entry is emailed once to everyone on the API notify list (sign up at https://floodwarning.net/api#notify). Served as JSON at https://floodwarning.net/api/v1/changelog and written up in docs/agent-api.md, under Changes. Add an entry in the same push as the change: it is what tells people.",
   "entries": [
     {
+      "id": "2026-11-11-base-station-names",
+      "date": "2026-11-11",
+      "title": "Base stations go by name",
+      "summary": "A reading now says which base station took it in by the name people call it: base_station, for example \"18 Bateson\", beside path on GET /api/v1/readings/heard, on a station's raw readings and on /readings/latest. /readings/heard takes that name too — receiver=18 Bateson lists what every receiver the base station has had took in — and copy_base_stations names the base stations a reading's later copies came by. A new route, GET /api/v1/base-stations (the list_base_stations tool), lists the base stations by name with their receivers' codes. A receiver's code (rpi-…) still works wherever it did, a receiver nobody has named simply has no base_station, and no field was removed or renamed.",
+      "breaking": false,
+      "links": [
+        { "text": "The base stations route", "url": "https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md#get-apiv1base-stations" }
+      ]
+    },
+    {
       "id": "2026-11-10-receiver-readings",
       "date": "2026-11-10",
       "title": "What one receiver heard: a new route to follow a base station live",

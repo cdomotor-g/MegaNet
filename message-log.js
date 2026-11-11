@@ -428,31 +428,24 @@ const MessageLog = (() => {
   // ── base stations by name ──────────────────────────────────────────────────
   // A path names the receiver that took the kept copy in —
   // "serial-monitor/rpi-83071968-sdr1-151.5375" — which nobody says aloud. The
-  // receivers each say whose they are (ingest_point_latest, 0045: the base
+  // receivers each say whose they are (base_station_name, 0115: the base
   // station's name is its token's label, and the station it stands at when
   // that is on file), so the log can be asked for a base by its name and the
-  // Path column can say it. That list is the editors' to read; anybody else
-  // gets none, and the filter and the names simply are not there.
+  // Path column can say it. The names are public since 0115, so everybody
+  // gets them.
   const hostOfPoint = id => { const m = String(id || '').match(/^(.*?)-sdr\d+(?:-[\d.]+)?$/); return m ? m[1] : String(id || ''); };
   async function loadBases() {
     if (ml.bases || ml.basesAsked) return;
     ml.basesAsked = true;
-    let rows = [];
-    try { rows = await dbSelect('ingest_point_latest?select=token_label,point_id,host_station_id&order=point_id.asc&limit=1000') || []; }
-    catch (_) { rows = []; }
-    const by = new Map();
-    for (const p of rows) {
-      const name = String(p.token_label || '').trim();
-      if (!name || !p.point_id) continue;
-      let b = by.get(name);
-      if (!b) by.set(name, b = { name, hosts: new Set(), at: '' });
-      b.hosts.add(hostOfPoint(p.point_id));
-      if (!b.at && p.host_station_id) {
-        const st = ((state.data && state.data.stations) || []).find(x => x.id === p.host_station_id);
-        if (st && st.name && st.name !== name) b.at = st.name;
-      }
-    }
-    ml.bases = [...by.values()].sort((a, b) => a.name.localeCompare(b.name));
+    // The names are public (meganet.base_station_name, 0115), read once for
+    // the whole app by SensorValues.loadBases(); before 0115 it falls back to
+    // the editors' list.
+    try { await SensorValues.loadBases(); } catch (_) { /* no names */ }
+    ml.bases = SensorValues.bases().map(b => {
+      const st = b.stationId && ((state.data && state.data.stations) || []).find(x => x.id === b.stationId);
+      return { name: b.name, hosts: new Set(b.hosts.map(h => hostOfPoint(h.replace(/^serial-monitor\//, '')))),
+               at: st && st.name && st.name !== b.name ? st.name : '' };
+    });
     if (ml.bases.length) rerender();
   }
   function baseList() { return ml.bases || []; }

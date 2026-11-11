@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 267, date: '2026-11-11', items: [
+      '📡 <strong>Base stations go by name.</strong> <em>18 Bateson</em>, not <em>rpi-83071968</em>: the <em>Heard by</em> box '
+        + 'on Field Data offers and takes base stations by name, a chart point\'s Paths say the name (the code is on hover), '
+        + 'and the Message Log\'s Base station filter and Path column show names to everybody, signed in or not. One name '
+        + 'covers every receiver a base station has had. The API does the same.',
+    ] },
     { n: 266, date: '2026-11-11', items: [
       '✏️ <strong>A drawn line shows its ground where you drew it.</strong> Finishing a line in <em>Draw &amp; measure</em> no '
         + 'longer jumps to 〽️ Path tools. Each line in the list has a small picture of the ground under it, with its fade margin, '

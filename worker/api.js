@@ -221,6 +221,7 @@ export const READABLE_RELATIONS = Object.freeze(new Set([
   'link_fade_margin', 'app_meta',
   'health_finding', 'health_refresh',
   'health_card', 'health_card_run',
+  'base_station_name',
 ]));
 
 // Relations on that list that a migration still to be applied to the live
@@ -2763,10 +2764,11 @@ async function readingsEndpoint(rc, rawId, params) {
   for (const r of rows) {
     if (!channels[r.addr]) channels[r.addr] = stripNulls({ sensor_types: types.get(r.addr) || null, unit: r.unit || null, alert_id: r.alert_id ?? null, channel: r.channel || null });
   }
+  const names = resolution === 'raw' && rows.some(r => r.path) ? await baseNamesOf(rc) : NO_BASE_NAMES;
   const shaped = rows.map(r => (resolution === 'raw'
     ? stripNulls({ t: r.reading_ts, addr: r.addr, value_raw: num(r.value_raw), value: num(r.value), unit: r.unit,
-        quality: r.quality, received_at: r.received_at, path: r.path, dup_count: r.dup_count || null,
-        copy_paths: copyPaths(r),
+        quality: r.quality, received_at: r.received_at, base_station: baseOfPath(names, r.path), path: r.path,
+        dup_count: r.dup_count || null, copy_paths: copyPaths(r),
         freq_mhz: num(r.freq_mhz), rssi_dbm: num(r.rssi_dbm), level_dbfs: num(r.level_dbfs), snr_db: num(r.snr_db) })
     : stripNulls({ t: r.bucket, addr: r.addr, n: r.n, raw_min: num(r.raw_min), raw_max: num(r.raw_max),
         raw_mean: num(r.raw_mean), raw_last: num(r.raw_last), val_min: num(r.val_min), val_max: num(r.val_max),
@@ -2863,7 +2865,7 @@ const minutesSince = (t, now) => Math.round((now - Date.parse(t)) / 60000);
 
 // A station and its channels' newest readings. A channel is labelled with the
 // station's sensor types on that address, as /readings labels its channels.
-function latestRow(st, readings, now) {
+function latestRow(st, readings, now, names = NO_BASE_NAMES) {
   const types = new Map();
   for (const s of st.sensor || []) {
     for (const addr of [s.alert_id != null ? `a:${s.alert_id}` : null,
@@ -2889,6 +2891,7 @@ function latestRow(st, readings, now) {
     unit: r.unit,
     quality: r.quality,
     received_at: r.received_at,
+    base_station: baseOfPath(names, r.path),
     path: r.path,
     dup_count: r.dup_count || null,
     freq_mhz: num(r.freq_mhz),
@@ -2995,8 +2998,9 @@ async function latestReadingsEndpoint(rc, params) {
     byStation.get(r.station_id).push(r);
   }
   const pageIds = pageOf(candidates);
+  const names = rows.some(r => r.path) ? await baseNamesOf(rc) : NO_BASE_NAMES;
   const stations = pageIds.map(id => rowsById.get(id)).filter(st => st && byStation.has(st.id))
-    .map(st => latestRow(st, byStation.get(st.id), rc.now));
+    .map(st => latestRow(st, byStation.get(st.id), rc.now, names));
 
   notes.push('Telemetry ingested into Flood-Net only. Most stations report through the Bureau\'s own systems and so are not here — which says nothing about whether they work.');
   notes.push('Each channel is its address\'s newest reading that meganet.reading still holds (about two years), by the station\'s own clock; minutes_since runs from that time to now, and a negative one is a clock running ahead. Stations are in id order.');
@@ -3054,6 +3058,65 @@ async function latestReadingsEndpoint(rc, params) {
 
 export const HEARD_PARAMS = ['receiver', 'since', 'limit'];
 
+// ── Base stations by name ────────────────────────────────────────────────────
+// A receiver's code — "rpi-83071968" — is what a reading's path carries and
+// nobody says aloud. meganet.base_station_name (0115) gives each receiver the
+// base station's name, "18 Bateson", and that is what this API says and takes
+// wherever a path is. One base station can have several receivers: a Pi that
+// was replaced keeps the readings it took in. Until 0115 is applied, or when
+// the read fails, there are simply no names — the codes still work.
+const BASE_NAMES_MS = 300000;
+const NO_BASE_NAMES = Object.freeze({ rows: [], byReceiver: new Map(), byName: new Map() });
+async function baseNamesOf(rc) {
+  try {
+    return await memo('base-names', BASE_NAMES_MS, async () => {
+      const rows = (await rc.up.select('base_station_name',
+        [['select', 'name,receiver,station_id,last_seen_at'], ['order', 'name.asc,receiver.asc'], ['limit', 1000]])).rows
+        .filter(r => r && r.name && r.receiver);
+      const byReceiver = new Map(rows.map(r => [r.receiver, r]));
+      const byName = new Map();
+      for (const r of rows) {
+        const k = r.name.trim().toLowerCase();
+        if (!byName.has(k)) byName.set(k, []);
+        byName.get(k).push(r);
+      }
+      return { rows, byReceiver, byName };
+    });
+  } catch (_) {
+    return NO_BASE_NAMES;
+  }
+}
+// The base station a path came in at, by name; null when nobody has named it.
+function baseOfPath(names, path) {
+  if (!path) return null;
+  const hit = names.byReceiver.get(receiverOfPath(path));
+  return hit ? hit.name : null;
+}
+
+async function baseStationsEndpoint(rc) {
+  const names = await baseNamesOf(rc);
+  const by = new Map();
+  for (const r of names.rows) {
+    if (!by.has(r.name)) by.set(r.name, { name: r.name, station_id: null, last_seen_at: null, receivers: [] });
+    const b = by.get(r.name);
+    b.receivers.push(stripNulls({ receiver: r.receiver, last_seen_at: r.last_seen_at || null }));
+    if (r.station_id && !b.station_id) b.station_id = r.station_id;
+    if (r.last_seen_at && (!b.last_seen_at || Date.parse(r.last_seen_at) > Date.parse(b.last_seen_at))) b.last_seen_at = r.last_seen_at;
+  }
+  const base_stations = [...by.values()].map(b => stripNulls(b));
+  return {
+    count: base_stations.length,
+    base_stations,
+    notes: [
+      'A base station is a place with one or more receivers that post what they hear to Flood-Net. name is what to call it, and what receiver= takes at /api/v1/readings/heard; a reading\'s base_station is this name.',
+      'receivers are the codes a reading\'s path carries, without the stick and frequency; one that was replaced stays listed, because the readings it took in are still this base station\'s. station_id is the register station it stands at, where on file. last_seen_at is when a receiver last checked in.',
+      'A path with no base station here — an MQTT topic, a repeater\'s name — is not a named base station\'s.',
+    ],
+    source: 'meganet.base_station_name',
+    generated_at: new Date().toISOString(),
+  };
+}
+
 const HEARD_SELECT = 'addr,alert_id,a2_station,a2_sensor,station_number,channel,station_id,reading_ts,received_at,'
   + 'value_raw,value,unit,quality,path,dup_count,dup_paths,last_dup_at,freq_mhz,rssi_dbm,level_dbfs,snr_db';
 
@@ -3086,13 +3149,14 @@ const isoMicros = us => new Date(Math.floor(us / 1000)).toISOString()
 
 function parseReceiver(v) {
   if (v === undefined) {
-    throw bad('"receiver" is required: the receiver whose readings to list, as a reading\'s path names it without the '
-      + 'stick and frequency — e.g. receiver=rpi-6dfef7f4 for the path "serial-monitor/rpi-6dfef7f4-sdr1-152.400".');
+    throw bad(`"receiver" is required: the base station whose readings to list, by its name — e.g. receiver=18 Bateson; ${API_PREFIX}/base-stations lists them — `
+      + 'or one receiver by the code a reading\'s path carries, without the stick and frequency — e.g. receiver=rpi-6dfef7f4 '
+      + 'for the path "serial-monitor/rpi-6dfef7f4-sdr1-152.400".');
   }
   const s = String(v).trim();
   if (!/^[A-Za-z0-9][A-Za-z0-9 ._/-]{1,119}$/.test(s) || /[/ .-]$/.test(s)) {
-    throw bad('"receiver" must be 2–120 letters, digits, spaces and . _ / - — a receiver as a reading\'s path names it, '
-      + 'e.g. rpi-6dfef7f4 or serial-monitor/rpi-6dfef7f4.');
+    throw bad('"receiver" must be 2–120 letters, digits, spaces and . _ / - — a base station\'s name ("18 Bateson"), or a '
+      + 'receiver as a reading\'s path names it, e.g. rpi-6dfef7f4 or serial-monitor/rpi-6dfef7f4.');
   }
   // A stick's own path is taken for its receiver.
   return receiverOfPath(s);
@@ -3100,7 +3164,13 @@ function parseReceiver(v) {
 
 async function heardReadingsEndpoint(rc, params) {
   const notes = [];
-  const rx = parseReceiver(params.receiver);
+  const asked = parseReceiver(params.receiver);
+  const names = await baseNamesOf(rc);
+  // A base station's name stands for every receiver it has had; a code for itself.
+  const named = names.byName.get(String(params.receiver).trim().toLowerCase());
+  const rxs = named ? named.map(r => r.receiver) : [asked];
+  const rx = named ? named[0].name : asked;
+  const mineOf = p => rxs.some(x => receiverMatches(p, x));
   const limit = parseIntParam(params.limit, 'limit', { min: 1, max: LIMITS.heardMax, dflt: LIMITS.heardDefault, clampMax: true }, notes);
   const nowUs = (rc.now - LIMITS.heardSettleSeconds * 1000) * 1000;
   let sinceUs;
@@ -3126,7 +3196,7 @@ async function heardReadingsEndpoint(rc, params) {
     ['received_at', `gt.${isoMicros(lookUs)}`],
     ['received_at', `lte.${isoMicros(untilUs)}`],
     ['and', `(or(received_at.gt.${pgQuote(isoMicros(sinceUs))},last_dup_at.gt.${pgQuote(isoMicros(sinceUs))}),`
-      + `or(path.like.${pgQuote(`*${rx}*`)},dup_count.gt.0))`],
+      + `or(${rxs.map(x => `path.like.${pgQuote(`*${x}*`)}`).join(',')},dup_count.gt.0))`],
     ['order', 'received_at.asc,addr.asc,reading_ts.asc,value_raw.asc'],
   ];
   const heard = [];              // this receiver's, in arrival order
@@ -3139,7 +3209,7 @@ async function heardReadingsEndpoint(rc, params) {
     for (const r of got.rows) {
       const us = microsOf(r.received_at);
       if (us !== lastUs) { prevUs = lastUs; lastUs = us; }
-      const mine = [r.path, ...(Array.isArray(r.dup_paths) ? r.dup_paths : [])].filter(p => p && receiverMatches(p, rx));
+      const mine = [r.path, ...(Array.isArray(r.dup_paths) ? r.dup_paths : [])].filter(p => p && mineOf(p));
       if (mine.length) heard.push({ r, us, mine: uniq(mine) });
     }
     if (got.rows.length < LIMITS.upstreamPageRows) { exhausted = true; break; }
@@ -3166,8 +3236,10 @@ async function heardReadingsEndpoint(rc, params) {
   const ids = uniq(list.map(h => h.r.station_id).filter(Boolean));
   const stations = byKey(ids.length ? await stationRowsByIds(rc, ids, 'id,name,station_number', []) : []);
   const rows = list.map(({ r, mine }) => {
-    const first = !!r.path && receiverMatches(r.path, rx);
+    const first = !!r.path && mineOf(r.path);
     const st = stations.get(r.station_id);
+    const copies = copyPaths(r);
+    const copiesBy = copies ? uniq(copies.map(p => baseOfPath(names, p)).filter(Boolean)) : [];
     return stripNulls({
       t: r.reading_ts,
       received_at: r.received_at,
@@ -3184,24 +3256,29 @@ async function heardReadingsEndpoint(rc, params) {
       quality: r.quality,
       heard: first ? 'first' : 'copy',
       via: mine,
+      base_station: baseOfPath(names, r.path),
       path: r.path,
       dup_count: r.dup_count || null,
-      copy_paths: copyPaths(r),
+      copy_paths: copies,
+      copy_base_stations: copiesBy.length ? copiesBy : null,
       last_copy_at: r.last_dup_at || null,
       // The signal is the stored copy's: this receiver's only when it was first.
       ...(first ? { freq_mhz: num(r.freq_mhz), rssi_dbm: num(r.rssi_dbm), level_dbfs: num(r.level_dbfs), snr_db: num(r.snr_db) } : {}),
     });
   });
 
-  notes.push('Telemetry ingested into Flood-Net only, in the order it arrived (received_at). heard says whether this receiver\'s copy was the one stored ("first") or another receiver posted the reading first and this one\'s copy was counted on it ("copy"); via is this receiver\'s own paths on it, path the stored copy\'s, copy_paths the later copies\'. The signal (freq_mhz, rssi_dbm, level_dbfs, snr_db) is the stored copy\'s, so it is given only where heard is "first".');
+  notes.push('Telemetry ingested into Flood-Net only, in the order it arrived (received_at). heard says whether this receiver\'s copy was the one stored ("first") or another receiver posted the reading first and this one\'s copy was counted on it ("copy"); via is this receiver\'s own paths on it, path the stored copy\'s and base_station the base station that posted it, copy_paths the later copies\' and copy_base_stations theirs, by name. The signal (freq_mhz, rssi_dbm, level_dbfs, snr_db) is the stored copy\'s, so it is given only where heard is "first".');
   notes.push(`To follow a receiver, call again with since=next_since. A reading comes again, with the same addr, t and value_raw, when this receiver's copy landed after it was first listed for another's — and a copy that lands more than ${LIMITS.heardCopyLookbackMin} minutes after its reading was first stored is not picked up by a later call. A call stops ${LIMITS.heardSettleSeconds} seconds short of now, and reads at most ${LIMITS.heardWindowHours} hours of arrivals: more says whether there is further to read now.`);
   if (!rows.length) {
-    notes.push(`No reading that arrived in this stretch came by a receiver named "${rx}". A receiver is named as a reading's path names it, without the stick and frequency — "serial-monitor/rpi-6dfef7f4-sdr1-152.400" is receiver rpi-6dfef7f4 — and the paths in use are on the readings of ${API_PREFIX}/readings/latest.`);
+    notes.push(`No reading that arrived in this stretch came by "${rx}". Ask by a base station's name — ${API_PREFIX}/base-stations lists them — or by a receiver's code as a reading's path carries it, without the stick and frequency: "serial-monitor/rpi-6dfef7f4-sdr1-152.400" is receiver rpi-6dfef7f4.`);
   }
   const nextParams = { receiver: rx, since: isoMicros(nextUs) };
   if (params.limit !== undefined) nextParams.limit = String(limit);
+  const whose = named ? rx : baseOfPath(names, rxs[0]) || (names.rows.find(r => r.receiver.endsWith(`/${rxs[0]}`)) || {}).name || null;
   return {
     receiver: rx,
+    ...(whose ? { base_station: whose } : {}),
+    receivers: named ? rxs : undefined,
     since: isoMicros(sinceUs),
     until: isoMicros(untilUs),
     count: rows.length,
@@ -3211,7 +3288,7 @@ async function heardReadingsEndpoint(rc, params) {
     next: `${rc.origin}${API_PREFIX}/readings/heard?${buildQuery(Object.entries(nextParams))}`,
     readings: rows,
     notes,
-    source: 'meganet.reading (path, dup_paths); meganet.station',
+    source: 'meganet.reading (path, dup_paths); meganet.station; meganet.base_station_name',
     generated_at: new Date().toISOString(),
   };
 }
@@ -3824,6 +3901,7 @@ export const ENDPOINTS = Object.freeze([
   { path: '/api/v1/catchments', op: 'listCatchments', summary: 'The 77 Queensland drainage basins.' },
   { path: '/api/v1/catchments/{id}', op: 'getCatchment', summary: 'One basin and its stations.' },
   { path: '/api/v1/networks', op: 'listNetworks', summary: 'Radio networks, maintenance hubs and Radio Mobile systems.' },
+  { path: '/api/v1/base-stations', op: 'listBaseStations', summary: 'The base stations that post what they hear to Flood-Net, by name, each with its receivers\' codes.' },
   { path: '/api/v1/changelog', op: 'getApiChangelog', summary: 'Every change to this API someone using it would notice, newest first — and how to be emailed the next one.' },
 ]);
 
@@ -3991,7 +4069,7 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
       '/api/v1/readings/heard': op('getReceiverReadings', 'Get what a receiver heard',
         'Every reading one receiver took in since a time, in the order it arrived — whether its copy was the one stored or another receiver posted the reading first and this one\'s copy was counted on it. Made for polling: call again with since=next_since.',
         [
-          { ...q('receiver', 'The receiver, as a reading\'s path names it without the stick and frequency: "rpi-6dfef7f4" or "serial-monitor/rpi-6dfef7f4" for the path "serial-monitor/rpi-6dfef7f4-sdr1-152.400".', { type: 'string', minLength: 2, maxLength: 120 }), required: true },
+          { ...q('receiver', 'A base station by name — "18 Bateson", every receiver it has had; /api/v1/base-stations lists them — or one receiver by the code a reading\'s path carries without the stick and frequency: "rpi-6dfef7f4" for the path "serial-monitor/rpi-6dfef7f4-sdr1-152.400".', { type: 'string', minLength: 2, maxLength: 120 }), required: true },
           q('since', `Readings that arrived after this instant, ISO 8601 (default ${LIMITS.heardSinceDefaultMin} minutes ago; at most ${LIMITS.heardSinceMaxDays} days ago). Pass the last answer's next_since.`, { type: 'string' }),
           limitParam(LIMITS.heardMax, LIMITS.heardDefault),
         ], ok('The readings the receiver heard, in arrival order, and next_since for the next call.')),
@@ -4024,6 +4102,7 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
         [{ name: 'id', in: 'path', required: true, description: 'Catchment id, e.g. "herbert".', schema: { type: 'string' } },
           limitParam(LIMITS.listMax, LIMITS.listDefault), offsetParam], ok('The catchment and a page of its stations.')),
       '/api/v1/networks': op('listNetworks', 'List networks and hubs', 'Radio networks, maintenance hubs and Radio Mobile system presets — the ids ?network= and ?hub= take.', [], ok('Networks, hubs and systems.')),
+      '/api/v1/base-stations': op('listBaseStations', 'List the base stations', 'The base stations that post what they hear to Flood-Net, by the name people call them — the name ?receiver= takes at /api/v1/readings/heard and a reading\'s base_station gives — each with its receivers\' codes, the register station it stands at and when it last checked in.', [], ok('The base stations, by name.')),
       '/api/v1/changelog': op('getApiChangelog', 'Get the API\'s changes',
         'Every change to this API that someone using it would notice — a route, a field, a limit, a tool — newest first, each with its date, a plain-words summary, whether it is breaking, and links. Sign up at /api#notify to be emailed each one.',
         [], ok('The changes, newest first.')),
@@ -4122,6 +4201,7 @@ async function routeRest(rc, sub, params) {
     if (parts.length === 2) return catchmentEndpoint(rc, parts[1], allowParams(params, ['limit', 'offset']));
   }
   if (parts[0] === 'networks' && parts.length === 1) { none(); return networksEndpoint(rc); }
+  if (parts[0] === 'base-stations' && parts.length === 1) { none(); return baseStationsEndpoint(rc); }
   if (parts[0] === 'changelog' && parts.length === 1) { none(); return changelogEndpoint(rc); }
   throw new ApiError(404, 'not found', `No endpoint at ${API_PREFIX}${sub}. GET ${API_PREFIX}/ lists them.`);
 }
@@ -4415,7 +4495,7 @@ export const MCP_INSTRUCTIONS = [
   'Flood-Net (floodwarning.net) is the engineering register of the Bureau of Meteorology\'s Queensland (and neighbouring) flood-warning telemetry network: rainfall and river-height field stations, the repeaters that relay them, base stations, and the radio paths between. This server is READ-ONLY and serves only public data.',
   'Station ids are lowercase slugs such as "abergowrie_br_al" (a Bureau number also works). Find stations with search_stations or stations_near, then call get_station_dossier for everything about one station in a single call — identity, location, radio, telemetry and health, the Service Level Specification entry, the Bureau\'s flood classes, crossings and gauge zero, AEP levels, inspection numbers and nearby stations, each labelled with its source. Use get_flood_levels or get_service_level when only that is needed.',
   'For what Station Health says about a station — its findings with what to do, its check schedule day by day, its battery\'s night lows — call get_station_health; for a maintenance run\'s worth of stations, get_health_findings by owner or by station ids.',
-  'For what every gauge is saying now, call get_latest_readings once — by radio network, basin, kind or bounding box if you like — rather than get_readings station by station; it covers only telemetry ingested into Flood-Net, which most stations do not send. For everything one receiver (a base station) heard since a time, the readings another receiver posted first included, call get_receiver_readings and follow its next_since. For what has gone quiet, call get_silent_stations. For a map, search_stations, stations_near, get_latest_readings and get_silent_stations answer GeoJSON with format "geojson".',
+  'For what every gauge is saying now, call get_latest_readings once — by radio network, basin, kind or bounding box if you like — rather than get_readings station by station; it covers only telemetry ingested into Flood-Net, which most stations do not send. For everything one base station heard since a time, the readings another posted first included, call get_receiver_readings with its name (list_base_stations lists them) and follow its next_since. Call a base station by its name, as base_station gives it on a reading, not by the code of its receiver. For what has gone quiet, call get_silent_stations. For a map, search_stations, stations_near, get_latest_readings and get_silent_stations answer GeoJSON with format "geojson".',
   'For how a station\'s readings reach a base station, call get_radio_path: the repeaters that pass its ALERT addresses, the routes on along the backbone, and the fade margin Flood-Net saved for every hop — with whether each is stale (worked out with an older model, or an end has changed since), the best path and its weakest hop, and the path margins measured at site visits. Say which figures are stale when you quote them.',
   'For radio licensing, get_acma_licences gives the ACMA licences Flood-Net records for a station and every licence the ACMA register has near it (licensee, frequencies, power, distance, whether it is on the station\'s frequency); acma_licences_near does the same for a point where a site might go. The register is a weekly extract kept for the network\'s area — say its source_date, and check a licence on the ACMA\'s register before relying on it.',
   'Heights: flood classes, crossings and flood effects are metres on the gauge, not AHD; AEP levels are modelled metres AHD and indicative only. Say which source a figure came from. Sections report status "ok", "not recorded" or "unavailable" — never read "not recorded" as zero.',
@@ -4510,9 +4590,9 @@ export const MCP_TOOLS = Object.freeze([
   {
     name: 'get_receiver_readings',
     title: 'Get what a receiver heard',
-    description: `Every reading one receiver (a base station's Pi, named as readings' paths name it — "rpi-6dfef7f4") took in since a time, in the order it arrived: each says whether this receiver's copy was the one stored (heard "first") or another receiver posted the reading first and this one's copy was counted on it ("copy"). To follow a receiver live, call again with since set to the answer's next_since. ${LIMITS.heardDefault} readings a call by default, up to ${LIMITS.heardMax}; since defaults to ${LIMITS.heardSinceDefaultMin} minutes ago and may be at most ${LIMITS.heardSinceMaxDays} days ago.`,
+    description: `Every reading one base station took in since a time — asked for by its name ("18 Bateson"; list_base_stations lists them) or by one receiver's code ("rpi-6dfef7f4"), in the order it arrived: each says whether this receiver's copy was the one stored (heard "first") or another receiver posted the reading first and this one's copy was counted on it ("copy"). To follow a receiver live, call again with since set to the answer's next_since. ${LIMITS.heardDefault} readings a call by default, up to ${LIMITS.heardMax}; since defaults to ${LIMITS.heardSinceDefaultMin} minutes ago and may be at most ${LIMITS.heardSinceMaxDays} days ago.`,
     inputSchema: { type: 'object', properties: {
-      receiver: { type: 'string', minLength: 2, maxLength: 120, description: 'The receiver, as a reading\'s path names it without the stick and frequency, e.g. "rpi-6dfef7f4".' },
+      receiver: { type: 'string', minLength: 2, maxLength: 120, description: 'A base station by name, e.g. "18 Bateson" (list_base_stations lists them), or one receiver\'s code as a reading\'s path carries it, e.g. "rpi-6dfef7f4".' },
       since: { type: 'string', maxLength: 40, description: 'Readings that arrived after this instant, ISO 8601. Pass the last answer\'s next_since.' },
       limit: limitArg(LIMITS.heardMax, LIMITS.heardDefault),
     }, required: ['receiver'], additionalProperties: false },
@@ -4631,6 +4711,13 @@ export const MCP_TOOLS = Object.freeze([
     description: 'Radio networks, the Bureau\'s maintenance hubs and the Radio Mobile system presets — the ids search_stations takes for network and hub.',
     inputSchema: { type: 'object', additionalProperties: false },
     route: () => ['/networks', {}],
+  },
+  {
+    name: 'list_base_stations',
+    title: 'List the base stations',
+    description: 'The base stations that post what they hear to Flood-Net, by the name people call them ("18 Bateson") — the name get_receiver_readings takes as receiver, and a reading\'s base_station gives — each with its receivers\' codes, the register station it stands at and when it last checked in.',
+    inputSchema: { type: 'object', additionalProperties: false },
+    route: () => ['/base-stations', {}],
   },
 ].map(t => Object.freeze({ ...t, annotations: { title: t.title, ...ANNOTATIONS } })));
 

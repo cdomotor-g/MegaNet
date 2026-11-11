@@ -99,6 +99,8 @@ const COLUMNS = Object.fromEntries(Object.entries({
   // 0085: each station as Station Health shows it, per window.
   health_card: 'days station_id status worst findings attention card changed_at',
   health_card_run: 'days at detail',
+  // 0115: base stations by name — no position, no hardware, no token.
+  base_station_name: 'name receiver station_id last_seen_at',
 }).map(([k, v]) => [k, new Set(v.split(' '))]));
 
 const T = Object.fromEntries(Object.keys(COLUMNS).map(k => [k, []]));
@@ -2201,7 +2203,7 @@ function toolArgs(name) {
     case 'get_receiver_readings': return { receiver: 'rpi-0a0b0c0d', limit: 3 };
     case 'get_silent_stations': return { limit: 3 };
     case 'get_health_findings': return { min_severity: 'warn', limit: 3 };
-    case 'list_catchments': case 'list_networks': return {};
+    case 'list_catchments': case 'list_networks': case 'list_base_stations': return {};
     case 'get_catchment': return { id: RICH.catchment_ids[0], limit: 3 };
     case 'acma_licences_near': return { lat: RICH.lat, lon: RICH.lon, radius_m: 2000 };
     default: return { id: RICH.id };
@@ -2364,7 +2366,7 @@ section('MCP');
   const tools = list.json.result.tools;
   const expected = ['search_stations', 'get_station', 'get_station_dossier', 'stations_near', 'get_readings', 'get_latest_readings', 'get_receiver_readings', 'get_silent_stations',
     'get_station_health', 'get_health_findings', 'list_catchments', 'get_catchment', 'get_flood_levels', 'get_benchmarks', 'get_service_level',
-    'get_acma_licences', 'acma_licences_near', 'get_radio_path', 'list_networks'];
+    'get_acma_licences', 'acma_licences_near', 'get_radio_path', 'list_networks', 'list_base_stations'];
   check('tools/list has every tool', expected.every(n => tools.some(t => t.name === n)) && tools.length === expected.length, tools.map(t => t.name).join(', '));
   check('every tool is annotated read-only and has an object input schema', tools.every(t => t.annotations.readOnlyHint === true
     && t.annotations.destructiveHint === false && t.inputSchema.type === 'object' && t.description.length > 40));
@@ -2590,7 +2592,55 @@ section('The existing routes');
     heardRow('namesake', 5 * hour - 6 * min, 6 * min, 307, { path: `${RX}9-sdr1-152.400` }),
   ].map(({ _name, ...r }) => r);
   T.reading.push(...added);
+  // The base stations by name (0115): this one has had two Pis, the other one.
+  const NAMES = [
+    { name: 'Hill Base', receiver: RX, station_id: null, last_seen_at: iso(NOW - min) },
+    { name: 'Hill Base', receiver: 'serial-monitor/rpi-0a0b0c0d9', station_id: null, last_seen_at: iso(NOW - 30 * 24 * hour) },
+    { name: 'Other Base', receiver: 'serial-monitor/rpi-ffff0000', station_id: ELPRO.id, last_seen_at: iso(NOW - min) },
+  ];
+  T.base_station_name.push(...NAMES);
   try {
+    {
+      const byName = await get('/api/v1/readings/heard?receiver=' + encodeURIComponent('hill base'));
+      check('readings/heard by a base station\'s name: every receiver it has had, whatever the capitals',
+        byName.status === 200 && JSON.stringify(byName.json.readings.map(x => x.value_raw)) === '[304,301,302,307]'
+        && byName.json.receiver === 'Hill Base' && byName.json.base_station === 'Hill Base' && byName.json.receivers.length === 2
+        && new URL(byName.json.next).searchParams.get('receiver') === 'Hill Base',
+        JSON.stringify({ v: (byName.json.readings || []).map(x => x.value_raw), r: byName.json.receiver, d: byName.json.detail }));
+      const copyRow = byName.json.readings.find(x => x.value_raw === 302), firstRow = byName.json.readings.find(x => x.value_raw === 301);
+      check('…each reading names the base station that posted it, and the ones its copies came by',
+        copyRow && copyRow.base_station === 'Other Base' && JSON.stringify(copyRow.copy_base_stations) === '["Hill Base"]'
+        && firstRow.base_station === 'Hill Base' && firstRow.copy_base_stations === undefined, JSON.stringify(copyRow));
+      const byCode = await get('/api/v1/readings/heard?receiver=rpi-0a0b0c0d');
+      check('…a receiver\'s code still works, and says whose it is', byCode.json.base_station === 'Hill Base' && byCode.json.receiver === 'rpi-0a0b0c0d'
+        && byCode.json.receivers === undefined && byCode.json.count === 3, JSON.stringify({ b: byCode.json.base_station, n: byCode.json.count }));
+      const list = await get('/api/v1/base-stations');
+      const hill = (list.json.base_stations || []).find(b => b.name === 'Hill Base');
+      check('base-stations lists each base once by name, with its receivers and where it stands',
+        list.status === 200 && list.json.count === 2 && hill && hill.receivers.length === 2 && hill.receivers[0].receiver === RX
+        && Date.parse(hill.last_seen_at) === NOW - min && list.json.base_stations.find(b => b.name === 'Other Base').station_id === ELPRO.id,
+        JSON.stringify(list.json.base_stations));
+      check('…and nothing but names, codes, the station and when seen',
+        (list.json.base_stations || []).every(b => Object.keys(b).every(k => ['name', 'station_id', 'last_seen_at', 'receivers'].includes(k))
+          && b.receivers.every(r => Object.keys(r).every(k => ['receiver', 'last_seen_at'].includes(k)))));
+      const rawNamed = await get(`/api/v1/stations/${ELPRO.id}/readings?resolution=raw&from=${encodeURIComponent(iso(NOW - 6 * hour))}`);
+      check('a station\'s raw readings name the base station each came in at',
+        (rawNamed.json.rows || []).find(x => x.value_raw === 301).base_station === 'Hill Base'
+        && (rawNamed.json.rows || []).find(x => x.value_raw === 302).base_station === 'Other Base');
+      T.base_station_name.length = 0;
+      api.resetApiState();
+      const { base_station_name: _notYet, ...before } = COLUMNS;
+      const real = globalThis.fetch;
+      const old = new PostgrestStub({ base: api.SUPABASE_REST_URL, columns: before, tables: T });
+      globalThis.fetch = (input, init) => old.fetch(input, init);
+      try {
+        const w = await get('/api/v1/readings/heard?receiver=rpi-0a0b0c0d');
+        check('before 0115 is applied the codes still answer, with no names', w.status === 200 && w.json.count === 3
+          && w.json.base_station === undefined && w.json.readings.every(x => x.base_station === undefined), `${w.status} ${w.json.detail || ''}`);
+        const l = await get('/api/v1/base-stations');
+        check('…and the list is empty rather than an error', l.status === 200 && l.json.count === 0, `${l.status}`);
+      } finally { globalThis.fetch = real; api.resetApiState(); }
+    }
     const r = await get('/api/v1/readings/heard?receiver=rpi-0a0b0c0d');
     const vals = (r.json.readings || []).map(x => x.value_raw);
     check('readings/heard: a receiver\'s readings in arrival order — first, counted as a copy, and a copy that landed late — and nobody else\'s',
@@ -2630,7 +2680,7 @@ section('The existing routes');
     }
     const none = await get('/api/v1/readings/heard?receiver=rpi-nobody');
     check('…a receiver nothing came by: an empty answer that says how a receiver is named',
-      none.status === 200 && none.json.count === 0 && none.json.notes.some(n => /named/.test(n)));
+      none.status === 200 && none.json.count === 0 && none.json.notes.some(n => /base-stations/.test(n)));
     const raw = await get(`/api/v1/stations/${ELPRO.id}/readings?resolution=raw&from=${encodeURIComponent(iso(NOW - 6 * hour))}`);
     const withCopy = (raw.json.rows || []).find(x => x.value_raw === 302);
     check('a station\'s raw readings carry their later copies\' paths', withCopy && JSON.stringify(withCopy.copy_paths) === JSON.stringify([`${RX}-sdr2-151.5375`])

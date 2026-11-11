@@ -189,6 +189,76 @@ const SensorValues = (() => {
     return m ? m[1] : p;
   }
 
+  // ── base stations by name ───────────────────────────────────────────────────
+  // A host is a code — "serial-monitor/rpi-83071968" — which nobody says
+  // aloud. Each receiver says whose it is, and the base station's name is
+  // public (meganet.base_station_name, 0115): "18 Bateson". Wherever the app
+  // shows or asks for a receiver it says the name, and keeps the code for the
+  // hover. One base station can have several hosts: a Pi that was replaced
+  // keeps the readings it took in. Until 0115 is applied the editors' own
+  // list (ingest_point_latest, 0045) stands in, and anybody else gets none —
+  // the codes are simply shown as they are kept.
+  let baseRows = [];          // { name, host, stationId }
+  let baseAsk = null;
+  const baseByHost = new Map();
+  async function loadBases() {
+    if (baseAsk) return baseAsk;
+    baseAsk = (async () => {
+      let rows = [];
+      try {
+        const got = await dbSelect('base_station_name?select=name,receiver,station_id&order=name.asc,receiver.asc&limit=1000');
+        rows = (got || []).map(r => ({ name: String(r.name || '').trim(), host: String(r.receiver || ''), stationId: r.station_id || null }));
+      } catch (_) { rows = []; }
+      if (!rows.length) {
+        try {
+          const got = await dbSelect('ingest_point_latest?select=token_label,point_id,host_station_id&order=point_id.asc&limit=1000');
+          const seen = new Set();
+          for (const p of got || []) {
+            const host = 'serial-monitor/' + hostOf(p.point_id);
+            if (!p.point_id || seen.has(host)) continue;
+            seen.add(host);
+            rows.push({ name: String(p.token_label || '').trim(), host, stationId: p.host_station_id || null });
+          }
+        } catch (_) { /* not an editor: no names */ }
+      }
+      baseRows = rows.filter(r => r.name && r.host);
+      baseByHost.clear();
+      for (const r of baseRows) baseByHost.set(r.host, r);
+      if (!baseRows.length) baseAsk = null;      // nothing yet: ask again next time
+      return baseRows;
+    })();
+    return baseAsk;
+  }
+  // Each base station once: its name, its hosts, the station it stands at.
+  function bases() {
+    const by = new Map();
+    for (const r of baseRows) {
+      if (!by.has(r.name)) by.set(r.name, { name: r.name, hosts: [], stationId: null });
+      const b = by.get(r.name);
+      b.hosts.push(r.host);
+      if (r.stationId && !b.stationId) b.stationId = r.stationId;
+    }
+    return [...by.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }
+  // The base station a path came in at — its name, and what is left of the
+  // path (the stick and frequency) — or null when nobody has named its host.
+  function baseOf(path) {
+    const p = String(path || '');
+    const host = hostOf(p);
+    const hit = host && baseByHost.get(host);
+    return hit ? { name: hit.name, host, rest: p.slice(host.length).replace(/^-/, ''), stationId: hit.stationId } : null;
+  }
+  // A path as a person reads it: "18 Bateson sdr1-151.550", or the path as kept.
+  function pathLabel(path) {
+    const at = baseOf(path);
+    return at ? at.name + (at.rest ? ' ' + at.rest : '') : String(path || '');
+  }
+  // The base station of that name, whatever the capitals; or null.
+  function baseNamed(name) {
+    const want = String(name || '').trim().toLowerCase();
+    return (want && bases().find(b => b.name.toLowerCase() === want)) || null;
+  }
+
   // ── resolving rows ──────────────────────────────────────────────────────────
 
   // A resolver over a set of rows in meganet.reading's shape. The rows are the
@@ -433,6 +503,7 @@ const SensorValues = (() => {
   return {
     GAP_KM, FAR_KM, BATT_MIN_V, BATT_MAX_V,
     kindOf, kindLabel, index, invalidate, resolver, convert, rowValue, hostOf, km, median,
+    loadBases, bases, baseOf, baseNamed, pathLabel,
   };
 })();
 

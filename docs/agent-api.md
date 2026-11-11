@@ -234,7 +234,8 @@ says what to change; an unknown tool or malformed request is a JSON-RPC error.
 | `get_station_dossier` | Everything a report needs about one station, in one call | `GET /api/v1/stations/{id}/dossier` |
 | `get_readings` | Telemetry ingested into Flood-Net: raw, hourly or daily | `GET /api/v1/stations/{id}/readings` |
 | `get_latest_readings` | What every gauge is saying now: each station's newest reading on every channel, in one call, by network, basin, kind or bounding box; `format: "geojson"` for a map | `GET /api/v1/readings/latest` |
-| `get_receiver_readings` | Everything one receiver (a base station's Pi) took in since a time, in the order it arrived — the readings another receiver posted first included. For polling: follow `next_since` | `GET /api/v1/readings/heard` |
+| `list_base_stations` | The base stations that post what they hear to Flood-Net, by name, each with its receivers' codes | `GET /api/v1/base-stations` |
+| `get_receiver_readings` | Everything one base station — asked for by name, or one receiver by its code — took in since a time, in the order it arrived — the readings another receiver posted first included. For polling: follow `next_since` | `GET /api/v1/readings/heard` |
 | `get_silent_stations` | What Flood-Net has stopped hearing: the stations silent (not heard) now, worst first, with when each was last heard, and the groups that went unheard together; by network, basin, kind, bounding box or severity; `format: "geojson"` for a map | `GET /api/v1/health/silent` |
 | `get_station_health` | What Station Health says about one station over 3, 7 or 14 days: its findings with what to do, its check schedule day by day, its battery's night lows and trend | `GET /api/v1/stations/{id}/health` |
 | `get_health_findings` | The same for a page of stations, worst first: by owner, station ids, network, basin, kind or bounding box | `GET /api/v1/health/findings` |
@@ -524,7 +525,8 @@ curl -s 'https://floodwarning.net/api/v1/stations/abergowrie_br_al/readings?reso
 
 A **raw** row is one reading as it was received: `t` (the device's own time),
 `addr`, `value_raw` as transmitted, `value` and `unit` where Flood-Net had a
-conversion, `quality`, `received_at`, the `path` it came by (which receiver),
+conversion, `quality`, `received_at`, the `path` it came by (which receiver)
+and `base_station`, that base station's name where it has one,
 `dup_count` (copies heard again — for an ALERT address, any copy stamped
 within 8 s, since a legacy ALERT frame carries no time and each receiver
 stamps it when it heard it) — and the frequency and signal the receiver
@@ -618,8 +620,8 @@ curl -s 'https://floodwarning.net/api/v1/readings/latest?type=river&bbox=145.5,-
 
 ### `GET /api/v1/readings/heard`
 
-**What one receiver heard** — every reading a receiver (a base station's
-Raspberry Pi) took in since a time, in the order it arrived. It is for an app
+**What one base station heard** — every reading a base station, or one of its
+receivers (a Raspberry Pi), took in since a time, in the order it arrived. It is for an app
 that follows one base station live by polling.
 [`/readings/latest`](#get-apiv1readingslatest) cannot do that job: it keeps one
 reading an address, so a second burst between two polls is gone, and it names
@@ -628,33 +630,34 @@ first looks as if yours never heard it. This route lists those too.
 
 | Parameter | Meaning |
 |---|---|
-| `receiver` | **required** — the receiver, as a reading's `path` names it without the stick and frequency: the path `serial-monitor/rpi-6dfef7f4-sdr1-152.400` is receiver `rpi-6dfef7f4` (or `serial-monitor/rpi-6dfef7f4`, whole) |
+| `receiver` | **required** — a base station by its name, `18 Bateson` (every receiver it has had; [`/base-stations`](#get-apiv1base-stations) lists them, capitals do not matter), or one receiver by the code a reading's `path` carries without the stick and frequency: the path `serial-monitor/rpi-6dfef7f4-sdr1-152.400` is receiver `rpi-6dfef7f4` |
 | `since` | readings that **arrived after** this instant, ISO 8601 (no zone means UTC). Default 15 minutes ago; at most 7 days ago. Pass the last answer's `next_since` |
 | `limit` | at most 2,000 readings a call (default 500) |
 
 ```sh
-curl -s 'https://floodwarning.net/api/v1/readings/heard?receiver=rpi-6dfef7f4'
+curl -s 'https://floodwarning.net/api/v1/readings/heard?receiver=18%20Bateson'
 ```
 
 ```json
 {
-  "receiver": "rpi-6dfef7f4",
+  "receiver": "18 Bateson", "base_station": "18 Bateson",
+  "receivers": ["serial-monitor/rpi-6dfef7f4", "serial-monitor/rpi-83071968"],
   "since": "2026-11-10T02:00:00.000000Z", "until": "2026-11-10T02:14:50.000000Z",
   "count": 2, "limit": 500, "more": false,
   "next_since": "2026-11-10T02:14:50.000000Z",
-  "next": "https://floodwarning.net/api/v1/readings/heard?receiver=rpi-6dfef7f4&since=2026-11-10T02%3A14%3A50.000000Z",
+  "next": "https://floodwarning.net/api/v1/readings/heard?receiver=18+Bateson&since=2026-11-10T02%3A14%3A50.000000Z",
   "readings": [
     { "t": "2026-11-10T02:03:11+00:00", "received_at": "2026-11-10T02:03:12.4+00:00",
       "addr": "a:6128", "alert_id": 6128, "station_id": "loudoun_br_al", "station_name": "Loudoun Br AL",
       "value_raw": 412, "quality": 0, "heard": "first",
-      "via": ["serial-monitor/rpi-6dfef7f4-sdr1-152.400"],
+      "via": ["serial-monitor/rpi-6dfef7f4-sdr1-152.400"], "base_station": "18 Bateson",
       "path": "serial-monitor/rpi-6dfef7f4-sdr1-152.400", "freq_mhz": 152.4, "level_dbfs": -41.2, "snr_db": 17.5 },
     { "t": "2026-11-10T02:09:40+00:00", "received_at": "2026-11-10T02:09:41.1+00:00",
       "addr": "a:6039", "alert_id": 6039, "station_id": "abergowrie_br_al", "station_name": "Abergowrie Br AL",
       "value_raw": 233, "quality": 0, "heard": "copy",
       "via": ["serial-monitor/rpi-6dfef7f4-sdr1-152.400"],
-      "path": "serial-monitor/rpi-83071968-sdr1-152.400", "dup_count": 1,
-      "copy_paths": ["serial-monitor/rpi-6dfef7f4-sdr1-152.400"], "last_copy_at": "2026-11-10T02:09:43.8+00:00" }
+      "base_station": "IRM Salisbury", "path": "serial-monitor/rpi-1a0b7cd6-sdr1-152.400", "dup_count": 1,
+      "copy_paths": ["serial-monitor/rpi-6dfef7f4-sdr1-152.400"], "copy_base_stations": ["18 Bateson"], "last_copy_at": "2026-11-10T02:09:43.8+00:00" }
   ]
 }
 ```
@@ -662,8 +665,12 @@ curl -s 'https://floodwarning.net/api/v1/readings/heard?receiver=rpi-6dfef7f4'
 - `heard` is **`first`** when this receiver's copy was the one stored, and
   **`copy`** when another receiver posted the reading first and this one's was
   counted on it. `via` is this receiver's own paths on the reading; `path` the
-  stored copy's; `copy_paths` the later copies', in the order they landed;
-  `last_copy_at` when the newest landed.
+  stored copy's and `base_station` the base station that posted it, by name;
+  `copy_paths` the later copies', in the order they landed, and
+  `copy_base_stations` theirs by name; `last_copy_at` when the newest landed.
+- Asked by name, the answer's `receivers` lists the codes the name stood for;
+  asked by a code, `base_station` says whose it is. A receiver nobody has
+  named has no `base_station`, and its code still works.
 - The signal — `freq_mhz`, `rssi_dbm`, `level_dbfs`, `snr_db` — is the stored
   copy's, so it is given only where `heard` is `first`. Flood-Net keeps a
   later copy's path, not its signal.
@@ -680,6 +687,34 @@ curl -s 'https://floodwarning.net/api/v1/readings/heard?receiver=rpi-6dfef7f4'
 - Answers are cached for a minute like every other, so the same `since` asked
   twice inside a minute gives the same answer; `next_since` always moves on.
 - It reads `meganet.reading` in arrival order (its index, migration `0106`).
+
+### `GET /api/v1/base-stations`
+
+The base stations that post what they hear to Flood-Net, **by the name people
+call them** — the name `receiver=` takes at
+[`/readings/heard`](#get-apiv1readingsheard), and what `base_station` gives
+beside a reading's `path` there, on a station's raw readings and at
+`/readings/latest`. No parameters.
+
+```json
+{ "count": 2, "base_stations": [
+  { "name": "18 Bateson", "station_id": "18_bateson", "last_seen_at": "2026-11-11T02:10:25+00:00",
+    "receivers": [ { "receiver": "serial-monitor/rpi-6dfef7f4", "last_seen_at": "2026-10-05T21:43:07+00:00" },
+                   { "receiver": "serial-monitor/rpi-83071968", "last_seen_at": "2026-11-11T02:10:25+00:00" } ] },
+  { "name": "IRM Salisbury", "last_seen_at": "2026-11-11T02:05:21+00:00",
+    "receivers": [ { "receiver": "serial-monitor/rpi-1a0b7cd6", "last_seen_at": "2026-11-11T02:05:21+00:00" } ] } ] }
+```
+
+- `receivers` are the codes a reading's `path` carries, without the stick and
+  frequency. A receiver that was replaced stays listed: the readings it took in
+  are still that base station's.
+- `station_id` is the register station the base stands at, where that is on
+  file; `last_seen_at` when a receiver last checked in.
+- Call a base station by its name. A path with no base station here — an MQTT
+  topic, a repeater's name — is not a named base station's.
+- It reads `meganet.base_station_name` (migration `0115`): the name, the code,
+  the station and the time, and nothing else about a receiver. Until `0115` is
+  applied the list is empty and no reading carries a `base_station`.
 
 ### `GET /api/v1/stations/{id}/flood-levels`
 
@@ -1654,6 +1689,15 @@ at [`GET /api/v1/changelog`](#get-apiv1changelog), newest first — both from
 in the same push. A change with nothing to notice (a fix inside, a faster
 answer) is not listed.
 
+- **11 November 2026 — Base stations go by name.** A reading now says which
+  base station took it in by the name people call it — `base_station`, e.g.
+  `18 Bateson`, beside `path` on `/readings/heard`, a station's raw readings and
+  `/readings/latest` — and `/readings/heard` takes that name:
+  `receiver=18 Bateson` lists what every receiver the base has had took in, and
+  `copy_base_stations` names the bases its later copies came by. A new route,
+  `GET /api/v1/base-stations` (the `list_base_stations` tool), lists the base
+  stations by name with their receivers' codes. The codes still work, and no
+  field was removed or renamed.
 - **10 November 2026 — What one receiver heard: a new route to follow a base
   station live.** `GET /api/v1/readings/heard?receiver=` (the
   `get_receiver_readings` tool) lists every reading one receiver — a base

@@ -55,7 +55,7 @@ async function main() {
   const errors = [];
   const asked = [];
 
-  async function open(editor) {
+  async function open(editor, named = false) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
     await applyNetworkPolicy(page, server.origin);
@@ -65,14 +65,19 @@ async function main() {
     await page.exposeFunction('__asked', q => { asked.push(q); });
     // The datastore, stood in for: the receivers' list (or a refusal), and
     // the readings — every question recorded as it was asked.
-    await page.evaluate(({ points, rows, editor }) => {
+    await page.evaluate(({ points, rows, editor, named }) => {
       window.dbSelect = async q => {
         window.__asked(q);
+        // The public names (0115), once the migration is applied.
+        if (q.startsWith('base_station_name')) {
+          return named ? [{ name: 'Hilltop base', receiver: 'serial-monitor/rpi-83071968', station_id: null },
+            { name: 'Depot base', receiver: 'serial-monitor/rpi-6dfef7f4', station_id: null }] : [];
+        }
         if (q.startsWith('ingest_point_latest')) { if (!editor) throw new Error('permission denied'); return points; }
         if (q.startsWith('reading?')) return /path=like|or=\(path\.like/.test(q) ? rows.slice(0, 1) : rows;
         return [];
       };
-    }, { points: POINTS, rows: ROWS, editor });
+    }, { points: POINTS, rows: ROWS, editor, named });
     await page.evaluate(() => switchTab('msglog'));
     await page.waitForFunction(() => document.querySelectorAll('#main-content table tbody tr').length >= 3, null, { timeout: LOAD_TIMEOUT });
     return page;
@@ -121,6 +126,14 @@ async function main() {
     check('no Base station filter', (await filter(page)) === null);
     c = await cells(page);
     check('paths as they are kept, and the log still loads', c.length === 5 && c[0].text === 'serial-monitor/rpi-83071968-sdr1-151.5375', J(c));
+
+    console.log('\n3b. Not an editor, the names public (0115): the same names');
+    const pub = await open(false, true);
+    await pub.waitForFunction(() => /Base station/.test(document.querySelector('.ml-more')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
+    check('anybody gets the Base station filter', J(await filter(pub)) === J(['any', 'Depot base', 'Hilltop base']), J(await filter(pub)));
+    const pc = await cells(pub);
+    check('…and the Path column by name', pc[0] && pc[0].text === 'Hilltop base sdr1-151.5375' && pc[1].text === 'Depot base sdr1', J(pc));
+    await pub.context().close();
 
     console.log('\n4. A message opened: its bits, coloured');
     const wire = async key => {

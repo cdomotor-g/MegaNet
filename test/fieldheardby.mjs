@@ -61,6 +61,12 @@ try {
     const asked = [];
     window.dbSelect = async q => {
       if (/^quality\?/.test(q)) return [{ code: 0, key: 'good' }];
+      // The base stations by name (0115): Hill Base has had two Pis.
+      if (/^base_station_name\?/.test(q)) return [
+        { name: 'Hill Base', receiver: 'serial-monitor/rpi-0a0b0c0d', station_id: null },
+        { name: 'Hill Base', receiver: 'serial-monitor/rpi-0a0b0c0d9', station_id: null },
+        { name: 'Other Base', receiver: 'serial-monitor/rpi-ffff0000', station_id: null },
+      ];
       if (/^reading(_hourly|_daily)?\?/.test(q)) { asked.push(q); return /^reading\?/.test(q) ? rows : []; }
       return [];
     };
@@ -82,6 +88,10 @@ try {
     await run();
     log.both = seriesOut();
 
+    A.fieldSetRx('hill base');
+    await run();
+    log.named = seriesOut().find(s => /heard by Hill Base$/.test(s.label)) || null;
+
     A.fieldSetRx('rpi-nobody');
     await run();
     log.nobody = A.ad.fq.empty;
@@ -100,17 +110,17 @@ try {
   const every = (out.both || []).find(s => !s.rx);
   ok('the picker has a Heard by box', out.box);
   ok('a load with it empty draws every reading', out.all.length === 1 && out.all[0].n === 10, JSON.stringify(out.all));
-  ok('and then offers the receivers those readings came by, by name',
-    out.offered.includes('serial-monitor/rpi-0a0b0c0d') && out.offered.includes('serial-monitor/rpi-ffff0000')
-    && out.offered.includes('serial-monitor/rpi-0a0b0c0d9'), out.offered.join(', '));
+  ok('the box offers the base stations by name, each once, and no codes for them',
+    out.offered.join('|') === 'Hill Base|Other Base', out.offered.join(', '));
   ok('with a receiver typed, only what it heard is drawn — first, or as a later copy',
     mine && mine.n === 7 && mine.v.join(',') === '100,101,102,104,105,108,109', JSON.stringify(mine));
   ok('a receiver whose name only starts the same is not taken for it', mine && !mine.v.includes(106));
-  ok('the series says whose it is, and its share', mine && /heard by rpi-0a0b0c0d/.test(mine.label)
+  ok('the series says whose it is, and its share', mine && /heard by Hill Base \(rpi-0a0b0c0d\)/.test(mine.label)
     && /7 of the 10/.test(mine.warn) && /first with 4/.test(mine.warn) && /other 3/.test(mine.warn), mine && `${mine.label} — ${mine.warn}`);
   ok('it stands beside the load for every receiver', every && every.n === 10 && out.both.length === 2, JSON.stringify(out.both.map(s => s.label)));
-  ok('a receiver nothing came by says who did hear the readings', /rpi-nobody/.test(out.nobody) && /rpi-ffff0000/.test(out.nobody)
-    && out.afterNobody === 2, out.nobody);
+  ok('a receiver nothing came by says who did hear the readings', /rpi-nobody/.test(out.nobody) && /Other Base/.test(out.nobody) && !/rpi-ffff0000/.test(out.nobody)
+    && out.afterNobody === 3, out.nobody);
+  ok('a base station\'s name stands for every receiver it has had', out.named && out.named.n === 8 && out.named.v.includes(106), JSON.stringify(out.named));
   ok('a window drawn from a rollup is refused with a sentence, and nothing is asked',
     /Only raw readings say which receiver/.test(out.refused) && out.askedWhenRefused === 0, `${out.refused} (${out.askedWhenRefused} asked)`);
   ok('no page errors for the whole run', errors.length === 0, errors.join(' | '));
