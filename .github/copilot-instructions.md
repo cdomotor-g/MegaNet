@@ -30,6 +30,10 @@ See [`docs/agent-api.md`](../docs/agent-api.md).
 - `get_receiver_readings` (`/api/v1/readings/heard?receiver=<name>`) lists what
   one base station took in since a time, copies another receiver
   posted first included; poll it with `since` = `next_since`.
+- `get_receptions` (`/api/v1/stations/{id}/receptions`) lists every copy the
+  fixed base stations heard of a station (for a repeater, of what it passes)
+  in the last 3 days, each with its signal and `sent_by` — the station or the
+  repeater that relayed it. At most 6 hours a call.
 - `get_silent_stations` (`/api/v1/health/silent`) lists what Flood-Net has stopped
   hearing — stations silent (not heard) now and groups that went unheard together.
   A station may still be reporting to the Bureau: ARRO (`arro_site`) says whether.

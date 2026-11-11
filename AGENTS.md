@@ -52,6 +52,13 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     them) or one receiver's code (`rpi-6dfef7f4`) — in arrival order, the readings another receiver posted
     first included (`heard`: `first` or `copy`). To follow one, call again
     with `since` = `next_since` (500 readings a call, up to 2,000).
+  - `get_receptions` — `GET /api/v1/stations/{id}/receptions?since=&until=`:
+    every copy the fixed base stations heard of a station's addresses (for a
+    repeater, also of each address it passes) in the last 3 days — time, base
+    station, frequency, level, SNR, carrier offset — and `sent_by`, the
+    station or repeater it is put down to. For confirming a repeater passes
+    its IDs: `summary.relayed_by_this_station`. ≤ 6 hours a call, ≤ 2,000
+    copies; `at=` for one reading's copies.
   - `list_base_stations` — `GET /api/v1/base-stations`: the base stations by
     name with their receivers' codes. A reading's `base_station` is this name;
     call a base station by it, not by its code.

@@ -40,6 +40,10 @@ Documentation: [`docs/agent-api.md`](docs/agent-api.md).
   `get_receiver_readings` (`/api/v1/readings/heard?receiver=<its name>`), then
   follow `next_since`. `list_base_stations` (`/api/v1/base-stations`) lists the
   names; a reading's `base_station` is one. Use the name, not the `rpi-…` code.
+- Every copy the base stations heard of a station, and whether a repeater
+  relayed it: `get_receptions` (`/api/v1/stations/{id}/receptions`; the last 3
+  days, ≤ 6 hours a call). For a repeater, `summary.relayed_by_this_station`
+  lists the addresses it was heard passing.
 - What every gauge is saying now: `get_latest_readings`
   (`/api/v1/readings/latest`) — each station's newest reading on every
   channel, in one call, by network, basin, kind or `bbox=west,south,east,north`.

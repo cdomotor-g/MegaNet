@@ -236,6 +236,7 @@ says what to change; an unknown tool or malformed request is a JSON-RPC error.
 | `get_latest_readings` | What every gauge is saying now: each station's newest reading on every channel, in one call, by network, basin, kind or bounding box; `format: "geojson"` for a map | `GET /api/v1/readings/latest` |
 | `list_base_stations` | The base stations that post what they hear to Flood-Net, by name, each with its receivers' codes | `GET /api/v1/base-stations` |
 | `get_receiver_readings` | Everything one base station — asked for by name, or one receiver by its code — took in since a time, in the order it arrived — the readings another receiver posted first included. For polling: follow `next_since` | `GET /api/v1/readings/heard` |
+| `get_receptions` | Every copy the base stations heard of one station's addresses — for a repeater, also of each address it passes — with its time, base station, frequency, level, SNR and carrier offset, and the station or repeater it is put down to: to confirm a repeater is passing its IDs | `GET /api/v1/stations/{id}/receptions` |
 | `get_silent_stations` | What Flood-Net has stopped hearing: the stations silent (not heard) now, worst first, with when each was last heard, and the groups that went unheard together; by network, basin, kind, bounding box or severity; `format: "geojson"` for a map | `GET /api/v1/health/silent` |
 | `get_station_health` | What Station Health says about one station over 3, 7 or 14 days: its findings with what to do, its check schedule day by day, its battery's night lows and trend | `GET /api/v1/stations/{id}/health` |
 | `get_health_findings` | The same for a page of stations, worst first: by owner, station ids, network, basin, kind or bounding box | `GET /api/v1/health/findings` |
@@ -715,6 +716,102 @@ beside a reading's `path` there, on a station's raw readings and at
 - It reads `meganet.base_station_name` (migration `0115`): the name, the code,
   the station and the time, and nothing else about a receiver. Until `0115` is
   applied the list is empty and no reading carries a `base_station`.
+
+### `GET /api/v1/stations/{id}/receptions`
+
+**Every copy the base stations heard** of one station's addresses, each with
+its own signal and **what sent it** — the station itself, or the repeater that
+relayed it. A reading in [`/stations/{id}/readings`](#get-apiv1stationsidreadings)
+is kept once, its other copies only counted (`dup_count`, `copy_paths`); this
+lists every copy. For a **repeater** it lists also the copies of every address
+it passes, and says which it was heard relaying — so after a site visit you can
+confirm a repeater is passing its IDs without opening the web app.
+
+| Parameter | Meaning |
+|---|---|
+| `since` | start, ISO 8601 (no zone means UTC). Default 1 hour before `until`; at most 3 days ago |
+| `until` | end, ISO 8601. Default now, or 6 hours after `since`; **at most 6 hours after `since`** |
+| `at` | one reading's time, instead of `since`/`until`: that reading's copies, 10 seconds either side |
+| `base_station` | only one base station's copies, by name ([`/base-stations`](#get-apiv1base-stations) lists them; capitals do not matter) |
+| `limit` | at most 2,000 copies a call (default 500) |
+| `offset` | copies to skip, for paging (`next` carries it) |
+
+```sh
+curl -s 'https://floodwarning.net/api/v1/stations/hillcrest_wine_glass/receptions?since=2026-11-11T00:00:00Z'
+```
+
+```json
+{
+  "id": "hillcrest_wine_glass", "name": "Hillcrest AL (Wine Glass)",
+  "from": "2026-11-11T00:00:00.000Z", "to": "2026-11-11T06:00:00.000Z",
+  "looked_for": { "alert_ids": [6200, 6201], "passes": ["1900-2200", "4151-4199", "4800-4899", "5304-5399", "6200-6274"] },
+  "count": 2, "limit": 500, "offset": 0, "more": false,
+  "next": "https://floodwarning.net/api/v1/stations/hillcrest_wine_glass/receptions?since=2026-11-11T06%3A00%3A00.000Z",
+  "summary": {
+    "by_sender": [ { "how": "repeater", "station_id": "hillcrest_wine_glass", "station_name": "Hillcrest AL (Wine Glass)",
+                     "receptions": 1, "alert_ids": [4160], "base_stations": ["18 Bateson"] },
+                   { "how": "station", "station_id": "waller_rd_al", "station_name": "Waller Rd AL",
+                     "receptions": 1, "alert_ids": [4160], "base_stations": ["18 Bateson"] } ],
+    "by_base_station": [ { "base_station": "18 Bateson", "receptions": 2, "decoded": 2, "copies": 1, "snr_db_median": 15.2 } ],
+    "relayed_by_this_station": [ { "alert_id": 4160, "station_id": "waller_rd_al", "station_name": "Waller Rd AL",
+                                   "receptions": 1, "last_heard_at": "2026-11-11T02:03:12.9+00:00", "base_stations": ["18 Bateson"] } ]
+  },
+  "receptions": [
+    { "heard_at": "2026-11-11T02:03:11.4+00:00", "base_station": "18 Bateson",
+      "path": "serial-monitor/rpi-83071968-sdr1-151.525", "protocol": "alert", "alert_id": 4160,
+      "station_id": "waller_rd_al", "station_name": "Waller Rd AL",
+      "value_raw": 412, "ok": true, "copy": false, "freq_mhz": 151.525, "level_dbfs": -38.1, "snr_db": 21.3,
+      "cfo_hz": 112, "format": "ABF",
+      "sent_by": { "how": "station", "station_id": "waller_rd_al", "station_name": "Waller Rd AL" } },
+    { "heard_at": "2026-11-11T02:03:12.9+00:00", "base_station": "18 Bateson",
+      "path": "serial-monitor/rpi-83071968-sdr1-151.525", "protocol": "alert", "alert_id": 4160,
+      "station_id": "waller_rd_al", "station_name": "Waller Rd AL",
+      "value_raw": 412, "ok": true, "copy": true, "freq_mhz": 151.525, "level_dbfs": -44.6, "snr_db": 9.1,
+      "cfo_hz": 548, "format": "ABF",
+      "sent_by": { "how": "repeater", "station_id": "hillcrest_wine_glass", "station_name": "Hillcrest AL (Wine Glass)", "carrier_hz": 545 },
+      "relayed_by_this_station": true }
+  ]
+}
+```
+
+- **`sent_by.how`** says what Flood-Net puts the copy down to:
+  - `station` — the station itself, straight to the base station;
+  - `repeater` — relayed, by the repeater `sent_by.station_id` names;
+  - `ambiguous` — on the carrier of two repeaters that both pass the address
+    (`candidates` lists them);
+  - `unexplained` — a copy no repeater on record accounts for: a relay the
+    register does not explain (a missing pass range, or a repeater not yet on
+    file);
+  - `not_measured` — no carrier offset to tell by: an undecoded burst, or a
+    burst of two carriers (`cfo_split`).
+- **How it tells.** An ALERT2 message carries its path: the last repeater on
+  `a2_path` sent it, or `a2_source` itself when the path is empty. A legacy
+  ALERT burst does not say, so it is told by its carrier: every hour Flood-Net
+  finds each base station stick's repeater carriers for the UTC day (the same
+  rule the 🔁 Repeaters and Signal Routes tabs use), and a burst within 30 Hz of
+  one, of an address that repeater passes, is that repeater's. Today's carriers
+  are the day so far, so a burst heard in the last hour may read `station` until
+  the next hourly run.
+- `station_id` and `station_name` (beside `alert_id`) are the station that
+  holds the address — whose reading it is. `copy` is whether the decoder had
+  heard it already (another path's copy, or a repeat); `ok` whether it decoded.
+  The signal — `freq_mhz`, `level_dbfs`, `rssi_dbm`, `snr_db`, `cfo_hz` — is
+  this copy's own.
+- `summary` sums the page by sender and by base station; for a repeater,
+  `relayed_by_this_station` lists the addresses heard on its carrier or its
+  ALERT2 path. An address it should pass and does not list may simply not have
+  sent in the window — widen it, or look again after the station's next report.
+- **Fixed base stations only**, and the **last 3 days**: a receiver on a drive
+  or a site survey is never listed, and nothing says where any receiver is.
+  Older copies are not public; each reading's `dup_count` and `copy_paths`
+  stay at `/stations/{id}/readings`.
+- **Paging.** `more` and `next` page through the window (`offset`); with no
+  `until`, a window that ends before now has a `next` that reads on from its
+  end. A call reads at most 6 hours, because the receptions are the database's
+  biggest table — ask for the hours you need.
+- It reads `meganet.reception_public` and `meganet.repeater_carrier_public`
+  (migration `0116`). Until `0116` is applied the route answers 503
+  `"not available yet"` naming it.
 
 ### `GET /api/v1/stations/{id}/flood-levels`
 
@@ -1689,6 +1786,15 @@ at [`GET /api/v1/changelog`](#get-apiv1changelog), newest first — both from
 in the same push. A change with nothing to notice (a fix inside, a faster
 answer) is not listed.
 
+- **11 November 2026 — Every copy the base stations heard, and what sent it.**
+  A new route, `GET /api/v1/stations/{id}/receptions` (the `get_receptions`
+  tool), lists every copy Flood-Net's fixed base stations heard of a station's
+  addresses in the last 3 days — and, for a repeater, of every address it
+  passes — each with its time, base station, frequency, level, SNR and carrier
+  offset, and `sent_by`: the station itself, or the repeater that relayed it.
+  `summary.relayed_by_this_station` lists what a repeater was heard passing, to
+  confirm one after a site visit. Up to 6 hours a call; `at=` gives one
+  reading's copies. Nothing else changed.
 - **11 November 2026 — Base stations go by name.** A reading now says which
   base station took it in by the name people call it — `base_station`, e.g.
   `18 Bateson`, beside `path` on `/readings/heard`, a station's raw readings and
@@ -1921,6 +2027,22 @@ Like every migration it raises `meganet.app_meta.schema_version` (to 57, never
 down), so `DB_SCHEMA_VERSION` in `core.js` follows it in a commit of its own;
 until then the app's Data source panel reports the database as newer than the
 app, which is true and harmless.
+
+### Apply 0116, for a station's receptions
+
+`GET /api/v1/stations/{id}/receptions` (the `get_receptions` tool) reads two
+views `db/migrations/0116_receptions_public.sql` creates. Until it is applied
+the route answers 503 `"not available yet"` naming the migration; nothing else
+depends on it. It publishes the fixed base stations' receptions for three days
+— never a position, a payload or a token, never a drive or a survey — and the
+repeater carriers each stick found by the day; it checks its own columns and
+grants, and changes nothing if they are not as written. Apply it with the
+`db-migrate.yml` workflow (`gh workflow run db-migrate.yml --ref main`), then
+check from anywhere — the answer should have a `count`, not an `error`:
+
+```sh
+curl -s 'https://floodwarning.net/api/v1/stations/18_bateson/receptions' | jq '{count, error}'
+```
 
 ### Apply 0085, for Station Health per station
 

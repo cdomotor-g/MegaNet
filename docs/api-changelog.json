@@ -2,6 +2,16 @@
   "about": "Every change to Flood-Net's agent API (https://floodwarning.net/api/v1 and https://floodwarning.net/api/mcp) that someone using it would notice — a route, a field, a limit, a tool — newest first. Each entry is emailed once to everyone on the API notify list (sign up at https://floodwarning.net/api#notify). Served as JSON at https://floodwarning.net/api/v1/changelog and written up in docs/agent-api.md, under Changes. Add an entry in the same push as the change: it is what tells people.",
   "entries": [
     {
+      "id": "2026-11-11-station-receptions",
+      "date": "2026-11-11",
+      "title": "Every copy the base stations heard, and what sent it",
+      "summary": "A new route, GET /api/v1/stations/{id}/receptions (the get_receptions tool), lists every copy Flood-Net's fixed base stations heard of one station's addresses in the last 3 days — and, for a repeater, of every address it passes. Each copy has its time, base station, frequency, level, SNR and carrier offset (cfo_hz), whether it decoded and whether it was a copy, and sent_by: the station itself, or the repeater that relayed it (an ALERT2 message by its path, a legacy burst by its carrier), ambiguous, unexplained or not measured. summary.relayed_by_this_station lists the addresses a repeater was heard passing, to confirm one after a site visit without opening the web app. A call reads up to 6 hours (since, until), or one reading's copies (at). Receivers on a drive or a site survey are never listed, and nothing says where a receiver is. Nothing else changed.",
+      "breaking": false,
+      "links": [
+        { "text": "The receptions route", "url": "https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md#get-apiv1stationsidreceptions" }
+      ]
+    },
+    {
       "id": "2026-11-11-base-station-names",
       "date": "2026-11-11",
       "title": "Base stations go by name",

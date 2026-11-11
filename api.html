@@ -338,6 +338,18 @@
           </td>
         </tr>
         <tr>
+          <td><code>GET /api/v1/stations/{id}/receptions</code></td>
+          <td><code>get_receptions</code></td>
+          <td>
+            Every copy the base stations heard of one station &mdash; for a
+            repeater, also of each address it passes &mdash; with its time,
+            base station, frequency, level, SNR and carrier offset, and
+            whether the station sent it or a repeater relayed it. The last 3
+            days, up to 6 hours a call.
+            <a href="/api/v1/stations/hillcrest_wine_glass/receptions">Example</a>
+          </td>
+        </tr>
+        <tr>
           <td><code>GET /api/v1/readings/heard</code></td>
           <td><code>get_receiver_readings</code></td>
           <td>

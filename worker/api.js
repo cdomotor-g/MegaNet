@@ -150,6 +150,18 @@ export const LIMITS = Object.freeze({
   heardCopyLookbackMin: 15,    // a later copy is looked for on readings that first arrived up to this long before "since"
   heardSettleSeconds: 10,      // a call stops this short of now, so a reading still being stored is not stepped over
   heardUpstreamPages: 8,
+  // A station's receptions (/stations/{id}/receptions, 0116): every base
+  // station's copies, read by heard_at off reception_heard_idx and filtered by
+  // address in the database — reception has no address index — so a call's
+  // window is what it costs: ~3,000 rows an hour in November 2026.
+  receptionsDefault: 500,
+  receptionsMax: 2000,
+  receptionsDefaultHours: 1,     // since, when not given: an hour back from until (or now)
+  receptionsWindowHours: 6,      // the most one call reads
+  receptionsSinceMaxDays: 3,     // meganet.reception_public's own horizon
+  receptionsAtSeconds: 10,       // at=: a reading's copies, this either side of it (alert_copy_window_s is 8)
+  receptionsCarrierHz: 30,       // 0077's carrier tolerance
+  receptionsWindowsMax: 40,      // a repeater's pass-range windows looked for in one call
   latestAddressMax: 15000,     // addresses one whole-network read of reading_latest takes (6,738 in October 2026)
   idsPerRead: 100,             // ids in one `in.(…)` list: a longer URL is one a proxy on the way may refuse
   windowMaxDays: Object.freeze({ raw: 7, hourly: 31, daily: 731 }),
@@ -222,6 +234,7 @@ export const READABLE_RELATIONS = Object.freeze(new Set([
   'health_finding', 'health_refresh',
   'health_card', 'health_card_run',
   'base_station_name',
+  'reception_public', 'repeater_carrier_public',
 ]));
 
 // Relations on that list that a migration still to be applied to the live
@@ -238,6 +251,10 @@ const ARRIVES_WITH = Object.freeze({
     meanwhile: 'the stations silent now are at GET /api/v1/health/silent' }),
   health_card_run: Object.freeze({ migration: 'db/migrations/0085_health_cards.sql',
     meanwhile: 'the stations silent now are at GET /api/v1/health/silent' }),
+  reception_public: Object.freeze({ migration: 'db/migrations/0116_receptions_public.sql',
+    meanwhile: 'a station\'s raw readings, each with its dup_count and copy_paths, are at GET /api/v1/stations/{id}/readings?resolution=raw' }),
+  repeater_carrier_public: Object.freeze({ migration: 'db/migrations/0116_receptions_public.sql',
+    meanwhile: 'a station\'s raw readings, each with its dup_count and copy_paths, are at GET /api/v1/stations/{id}/readings?resolution=raw' }),
   station_benchmark_public: Object.freeze({ migration: 'db/migrations/0102_benchmarks_public.sql',
     meanwhile: 'the station\'s gauge zero and its datum are at GET /api/v1/stations/{id}/flood-levels' }),
 });
@@ -3293,6 +3310,321 @@ async function heardReadingsEndpoint(rc, params) {
   };
 }
 
+// ── GET /api/v1/stations/{id}/receptions ─────────────────────────────────────
+// "Did the base stations hear this station — and through which repeater?" A
+// reading is kept once, its copies only counted (dup_count, copy_paths); this
+// lists every copy a named base station heard of one station's addresses, each
+// with its time, base station, frequency, level, SNR and carrier offset, and
+// the transmitter Flood-Net puts it down to. For a repeater it lists also the
+// copies of every address it passes, so a maintainer can confirm after a site
+// visit that it is passing its IDs (asked for 11 November 2026).
+//
+// Two public views (0116): meganet.reception_public — the fixed base
+// stations' receptions, three days, no position — and
+// meganet.repeater_carrier_public — the repeater carriers the hourly roll-up
+// found in each stick's UTC day of legacy bursts. A copy is put down as 0077
+// puts each burst down:
+//   * ALERT2: the last repeater on its path, or its source when the path is
+//     empty — the message says;
+//   * legacy ALERT, carrier measured: the repeater whose carrier that stick
+//     found that day within 30 Hz of this burst's, when the address is one it
+//     passes (or one of its own sensors'); two such → ambiguous; none → the
+//     station holding the address, or unexplained when the decoder had heard
+//     it already (a relay the register does not account for);
+//   * no carrier measured (undecoded, a burst of two carriers) → not measured.
+//
+// reception is the database's biggest table on a small disk budget, and has
+// no index on the address: a call reads its window by heard_at
+// (reception_heard_idx) — at most receptionsWindowHours of every base
+// station, ~3,000 rows an hour in November 2026 — and filters in the database.
+
+export const RECEPTION_PARAMS = ['since', 'until', 'at', 'base_station', 'limit', 'offset'];
+const RECEPTION_SELECT = 'id,heard_at,base_station,path,protocol,alert_id,value_raw,ok,fault,copy,a2_source,a2_path,'
+  + 'freq_mhz,level_dbfs,rssi_dbm,snr_db,cfo_hz,cfo_split,fmt';
+const RECEPTION_HOW = Object.freeze({
+  station: 'sent by the station itself, straight to the base station',
+  repeater: 'relayed: sent on by the repeater named',
+  ambiguous: 'on the carrier of two repeaters that both pass the address: either could have sent it',
+  unexplained: 'a copy (the decoder had heard it already) that no repeater on record accounts for — a relay the register does not explain',
+  not_measured: 'no carrier offset to tell by: undecoded, or a burst of two carriers',
+});
+
+// A station's addresses, its ALERT2 address and, for a repeater, its open
+// pass-range windows — what its receptions are found by.
+function receptionTargets(id, doc) {
+  const own = uniq([...flattenAlertIds(doc.alert_ids),
+    ...(doc.sensors || []).map(s => num(s.alert_id)).filter(x => Number.isInteger(x))]).sort((a, b) => a - b);
+  const a2 = Number.isInteger(num(doc.alert2_station_id)) ? num(doc.alert2_station_id) : null;
+  const node = doc.repeater ? stationNode({ ...doc, id }, doc.repeater) : null;
+  const windows = node && node.isRepeater ? node.windows : [];
+  return { own, a2, windows, repeater: !!(node && node.isRepeater) };
+}
+
+const inWindows = (windows, a) => windows.some(([lo, hi]) => a >= lo && a <= hi);
+
+async function receptionsEndpoint(rc, rawId, params) {
+  const notes = [];
+  const loaded = await loadStationDoc(rc, rawId);
+  const { id, doc } = loaded;
+  const limit = parseIntParam(params.limit, 'limit', { min: 1, max: LIMITS.receptionsMax, dflt: LIMITS.receptionsDefault, clampMax: true }, notes);
+  const offset = parseIntParam(params.offset, 'offset', { min: 0, max: LIMITS.offsetMax, dflt: 0 });
+
+  // The window: around one reading (at), or since … until.
+  let from, to;
+  if (params.at !== undefined) {
+    if (params.since !== undefined || params.until !== undefined) throw bad('Give "at" (one reading\'s time) or "since"/"until", not both.');
+    const at = parseInstant(params.at, 'at');
+    from = at - LIMITS.receptionsAtSeconds * 1000;
+    to = at + LIMITS.receptionsAtSeconds * 1000;
+  } else {
+    to = params.until !== undefined ? parseInstant(params.until, 'until') : null;
+    from = params.since !== undefined ? parseInstant(params.since, 'since')
+      : (to ?? rc.now) - LIMITS.receptionsDefaultHours * 3600000;
+    if (to === null) to = Math.min(rc.now, from + LIMITS.receptionsWindowHours * 3600000);
+    if (from >= to) throw bad('"since" must be before "until".');
+    if ((to - from) > LIMITS.receptionsWindowHours * 3600000 + 1) {
+      throw bad(`One call reads at most ${LIMITS.receptionsWindowHours} hours of receptions; this asks for ${round((to - from) / 3600000, 1)}. `
+        + 'Follow next to read on, or ask for a shorter stretch.');
+    }
+  }
+  if (from < rc.now - LIMITS.receptionsSinceMaxDays * 86400000) {
+    throw bad(`Receptions are public for ${LIMITS.receptionsSinceMaxDays} days; that starts further back. `
+      + `What reached Flood-Net earlier is at ${API_PREFIX}/stations/{id}/readings — each reading with its dup_count and copy_paths.`);
+  }
+  if (from > rc.now) throw bad('That window starts in the future.');
+
+  let baseName = null;
+  const names = await baseNamesOf(rc);
+  if (params.base_station !== undefined) {
+    const want = String(params.base_station).trim().toLowerCase();
+    const hit = names.byName.get(want);
+    if (!hit) {
+      throw bad(`"base_station" must be a base station's name, as ${API_PREFIX}/base-stations lists them: `
+        + `${uniq(names.rows.map(r => r.name)).slice(0, 20).join(', ') || 'none named yet'}.`);
+    }
+    baseName = hit[0].name;
+  }
+
+  const tg = receptionTargets(id, doc);
+  const windows = tg.windows.slice(0, LIMITS.receptionsWindowsMax);
+  if (tg.windows.length > windows.length) {
+    notes.push(`This repeater has ${tg.windows.length} pass-range windows; the first ${windows.length} are looked for.`);
+  }
+  const terms = [
+    ...(tg.own.length ? [`alert_id.in.(${tg.own.join(',')})`] : []),
+    ...windows.map(([lo, hi]) => (lo === hi ? `alert_id.eq.${lo}` : `and(alert_id.gte.${lo},alert_id.lte.${hi})`)),
+    ...(tg.a2 != null ? [`a2_source.eq.${tg.a2}`, `a2_path.cs.{${tg.a2}}`] : []),
+  ];
+  const span = { from: new Date(from).toISOString(), to: new Date(to).toISOString() };
+  const base = {
+    id,
+    ...(loaded.resolved_from ? { resolved_from: loaded.resolved_from } : {}),
+    name: doc.name || id,
+    ...span,
+    ...(baseName ? { base_station: baseName } : {}),
+    looked_for: stripNulls({ alert_ids: tg.own.length ? tg.own : null, alert2_id: tg.a2,
+      passes: windows.length ? windows.map(([lo, hi]) => (lo === hi ? String(lo) : `${lo}-${hi}`)) : null }),
+  };
+  if (!terms.length) {
+    notes.push('This station has no ALERT or ALERT2 address on record, so none of its receptions can be found.');
+    return { ...base, count: 0, limit, offset, more: false, next: null, summary: null, receptions: [], notes,
+      source: 'meganet.station_json', generated_at: new Date().toISOString() };
+  }
+
+  const pairs = [
+    ['select', RECEPTION_SELECT],
+    ['heard_at', `gte.${span.from}`],
+    ['heard_at', `lt.${span.to}`],
+    ...(baseName ? [['base_station', `eq.${baseName}`]] : []),
+    ['or', `(${terms.join(',')})`],
+    ['order', 'heard_at.asc,id.asc'],
+  ];
+  // One more than the page, so "more" needs no count — a count would read the window twice.
+  const rows = [];
+  while (rows.length <= limit) {
+    const want = Math.min(LIMITS.upstreamPageRows, limit + 1 - rows.length);
+    const got = await rc.up.select('reception_public', [...pairs, ['limit', want], ['offset', offset + rows.length]]);
+    rows.push(...got.rows);
+    if (got.rows.length < want) break;
+  }
+  const more = rows.length > limit;
+  if (more) rows.length = limit;
+
+  // The carriers each stick found on the days these legacy bursts were heard.
+  const measured = rows.filter(r => r.protocol !== 'alert2' && r.cfo_hz != null && !r.cfo_split && Number.isInteger(r.alert_id));
+  const days = uniq(measured.map(r => String(r.heard_at).slice(0, 10)));
+  const sticks = uniq(measured.map(r => r.path));
+  const carriers = new Map();      // `${day}|${path}` → [{ station_id, centre_hz }]
+  if (measured.length) {
+    const got = await rc.up.select('repeater_carrier_public', [['select', 'day,path,station_id,centre_hz'],
+      ['day', `in.${pgList(days)}`], ['path', `in.${pgList(sticks.slice(0, LIMITS.idsPerRead))}`], ['limit', LIMITS.upstreamPageRows]]);
+    for (const c of got.rows) {
+      const k = `${String(c.day).slice(0, 10)}|${c.path}`;
+      if (!carriers.has(k)) carriers.set(k, []);
+      carriers.get(k).push({ station_id: c.station_id, centre_hz: num(c.centre_hz) });
+    }
+  }
+  // Those repeaters' pass ranges (the radio topology, held a few minutes) and own sensors.
+  const repIds = uniq([...carriers.values()].flat().map(c => c.station_id));
+  let topo = null;
+  const ownOf = new Map();
+  if (repIds.length) {
+    const [t, sens] = await Promise.all([radioTopologyOf(rc),
+      rc.up.select('sensor', [['select', 'station_id,alert_id'], ['station_id', `in.${pgList(repIds.slice(0, LIMITS.idsPerRead))}`],
+        ['alert_id', 'not.is.null'], ['limit', LIMITS.upstreamPageRows]])]);
+    topo = t;
+    for (const s of sens.rows) {
+      if (!ownOf.has(s.station_id)) ownOf.set(s.station_id, new Set());
+      ownOf.get(s.station_id).add(num(s.alert_id));
+    }
+  }
+  const mayHaveSent = (rid, a) => {
+    const n = topo && topo.nodes.get(rid);
+    return (n && inWindows(n.windows, a)) || (ownOf.get(rid) || new Set()).has(a);
+  };
+
+  // Whose each address and ALERT2 address is, by the register.
+  const addrs = uniq(rows.map(r => r.alert_id).filter(Number.isInteger)).slice(0, 3 * LIMITS.idsPerRead);
+  const a2s = uniq(rows.flatMap(r => (r.protocol === 'alert2'
+    ? [Array.isArray(r.a2_path) && r.a2_path.length ? r.a2_path[r.a2_path.length - 1] : r.a2_source] : []))
+    .filter(Number.isInteger)).slice(0, LIMITS.idsPerRead);
+  const [addrRows, a2Rows] = await Promise.all([
+    Promise.all(Array.from({ length: Math.ceil(addrs.length / LIMITS.idsPerRead) }, (_, i) => addrs.slice(i * LIMITS.idsPerRead, (i + 1) * LIMITS.idsPerRead))
+      .map(c => rc.up.select('sensor', [['select', 'station_id,alert_id'], ['alert_id', `in.(${c.join(',')})`], ['limit', LIMITS.upstreamPageRows]])))
+      .then(got => ({ rows: got.flatMap(g => g.rows) })),
+    a2s.length ? rc.up.select('station', [['select', 'id,alert2_station_id'], ['deleted_at', 'is.null'],
+      ['alert2_station_id', `in.(${a2s.join(',')})`], ['limit', LIMITS.upstreamPageRows]]) : { rows: [] },
+  ]);
+  const holders = new Map();
+  for (const s of addrRows.rows) {
+    const a = num(s.alert_id);
+    if (!holders.has(a)) holders.set(a, new Set());
+    holders.get(a).add(s.station_id);
+  }
+  for (const a of tg.own) { if (!holders.has(a)) holders.set(a, new Set()); holders.get(a).add(id); }
+  const a2Holder = new Map(a2Rows.rows.map(s => [num(s.alert2_station_id), s.id]));
+  if (tg.a2 != null) a2Holder.set(tg.a2, id);
+  const holderOf = a => { const h = holders.get(a); return h && h.size === 1 ? [...h][0] : null; };
+
+  const sentBy = r => {
+    if (r.protocol === 'alert2') {
+      const path = Array.isArray(r.a2_path) ? r.a2_path.filter(Number.isInteger) : [];
+      const tx = path.length ? path[path.length - 1] : num(r.a2_source);
+      if (tx == null) return { how: 'not_measured' };
+      return { how: path.length ? 'repeater' : 'station', station_id: a2Holder.get(tx) || null, alert2_id: tx };
+    }
+    if (!Number.isInteger(r.alert_id)) return { how: 'not_measured' };
+    if (r.cfo_hz == null || r.cfo_split) return { how: 'not_measured', station_id: r.copy ? null : holderOf(r.alert_id) };
+    const cfo = num(r.cfo_hz);
+    const found = carriers.get(`${String(r.heard_at).slice(0, 10)}|${r.path}`) || [];
+    const claims = found.filter(c => c.centre_hz != null && Math.abs(cfo - c.centre_hz) <= LIMITS.receptionsCarrierHz
+      && mayHaveSent(c.station_id, r.alert_id));
+    if (claims.length === 1) return { how: 'repeater', station_id: claims[0].station_id, carrier_hz: claims[0].centre_hz };
+    if (claims.length > 1) return { how: 'ambiguous', candidates: uniq(claims.map(c => c.station_id)) };
+    if (r.copy) return { how: 'unexplained' };
+    return { how: 'station', station_id: holderOf(r.alert_id) };
+  };
+
+  const attributed = rows.map(r => ({ r, by: sentBy(r) }));
+  const nameIds = uniq(attributed.flatMap(({ r, by }) => [by.station_id, ...(by.candidates || []), holderOf(r.alert_id),
+    r.protocol === 'alert2' ? a2Holder.get(num(r.a2_source)) : null]).filter(Boolean));
+  const named = byKey(nameIds.length ? await stationRowsByIds(rc, nameIds, 'id,name', []) : []);
+  const nameOf = sid => (named.get(sid) || {}).name || null;
+
+  const receptions = attributed.map(({ r, by }) => {
+    const ofStation = r.protocol === 'alert2' ? a2Holder.get(num(r.a2_source)) || null : holderOf(r.alert_id);
+    return stripNulls({
+      heard_at: r.heard_at,
+      base_station: r.base_station,
+      path: r.path,
+      protocol: r.protocol,
+      alert_id: r.alert_id ?? null,
+      a2_source: r.a2_source ?? null,
+      a2_path: Array.isArray(r.a2_path) && r.a2_path.length ? r.a2_path : null,
+      station_id: ofStation,
+      station_name: ofStation ? nameOf(ofStation) : null,
+      value_raw: num(r.value_raw),
+      ok: r.ok,
+      fault: r.fault || null,
+      copy: !!r.copy,
+      freq_mhz: num(r.freq_mhz),
+      level_dbfs: num(r.level_dbfs),
+      rssi_dbm: num(r.rssi_dbm),
+      snr_db: num(r.snr_db),
+      cfo_hz: num(r.cfo_hz),
+      cfo_split: r.cfo_split ? true : null,
+      format: r.fmt || null,
+      sent_by: stripNulls({
+        how: by.how,
+        station_id: by.station_id || null,
+        station_name: by.station_id ? nameOf(by.station_id) : null,
+        alert2_id: by.alert2_id ?? null,
+        carrier_hz: by.carrier_hz ?? null,
+        candidates: by.candidates ? by.candidates.map(c => ({ station_id: c, station_name: nameOf(c) })) : null,
+      }),
+      ...(by.how === 'repeater' && by.station_id === id ? { relayed_by_this_station: true } : {}),
+    });
+  });
+
+  // The page in a few lines: who sent what, and what each base station heard.
+  const senders = new Map(), bases = new Map(), relayed = new Map();
+  for (const x of receptions) {
+    const k = `${x.sent_by.how}|${x.sent_by.station_id || ''}`;
+    if (!senders.has(k)) senders.set(k, { how: x.sent_by.how, station_id: x.sent_by.station_id || null, station_name: x.sent_by.station_name || null, receptions: 0, alert_ids: new Set(), base_stations: new Set() });
+    const s = senders.get(k);
+    s.receptions++;
+    if (x.alert_id != null) s.alert_ids.add(x.alert_id);
+    s.base_stations.add(x.base_station);
+    if (!bases.has(x.base_station)) bases.set(x.base_station, { base_station: x.base_station, receptions: 0, decoded: 0, copies: 0, snr: [] });
+    const b = bases.get(x.base_station);
+    b.receptions++; if (x.ok) b.decoded++; if (x.copy) b.copies++; if (x.snr_db != null) b.snr.push(x.snr_db);
+    if (x.relayed_by_this_station && x.alert_id != null) {
+      if (!relayed.has(x.alert_id)) relayed.set(x.alert_id, { alert_id: x.alert_id, station_id: x.station_id || null, station_name: x.station_name || null, receptions: 0, last_heard_at: null, base_stations: new Set() });
+      const v = relayed.get(x.alert_id);
+      v.receptions++; v.last_heard_at = x.heard_at; v.base_stations.add(x.base_station);
+    }
+  }
+  const median = a => { const s = a.slice().sort((p, q) => p - q); return s.length ? round((s[(s.length - 1) >> 1] + s[s.length >> 1]) / 2, 1) : null; };
+  const summary = {
+    by_sender: [...senders.values()].sort((a, b) => b.receptions - a.receptions)
+      .map(s => stripNulls({ ...s, alert_ids: [...s.alert_ids].sort((a, b) => a - b), base_stations: [...s.base_stations].sort() })),
+    by_base_station: [...bases.values()].sort((a, b) => b.receptions - a.receptions)
+      .map(({ snr, ...b }) => stripNulls({ ...b, snr_db_median: median(snr) })),
+    ...(tg.repeater ? { relayed_by_this_station: [...relayed.values()].sort((a, b) => a.alert_id - b.alert_id)
+      .map(v => stripNulls({ ...v, base_stations: [...v.base_stations].sort() })) } : {}),
+  };
+
+  notes.push('Every copy a named base station heard of this station\'s addresses' + (tg.repeater ? ', and of every address this repeater passes' : '')
+    + `, oldest first. Only fixed base stations — never a drive or a site survey — and the last ${LIMITS.receptionsSinceMaxDays} days. ok is whether it decoded; copy whether the decoder had heard it already (a repeater's copy, or another path's). A reading kept once in ${API_PREFIX}/stations/{id}/readings is every copy here of the same address and value within a few seconds.`);
+  notes.push('sent_by.how: ' + Object.entries(RECEPTION_HOW).map(([k, v]) => `${k} — ${v}`).join('; ')
+    + `. An ALERT2 message says its path; a legacy burst is put down by its carrier offset (cfo_hz), within ${LIMITS.receptionsCarrierHz} Hz of a repeater carrier that base station's stick found that UTC day, as the Repeaters and Signal Routes tabs do. Today's carriers are the day so far, found again every hour, so a burst heard in the last hour may read station until they are.`);
+  if (summary.relayed_by_this_station) {
+    notes.push('summary.relayed_by_this_station is every address heard on this repeater\'s carrier (or on its ALERT2 path) in this page — what it was heard passing. An address it should pass and does not appear may simply not have sent in the window.');
+  }
+  if (!receptions.length) {
+    notes.push('No base station heard any of these addresses in this window. Flood-Net\'s base stations hear only part of the network; GET ' + API_PREFIX + '/base-stations lists them.');
+  }
+  const nextParams = more
+    ? { ...(params.at !== undefined ? { at: params.at } : { since: span.from, until: span.to }), offset: String(offset + limit) }
+    : (params.at === undefined && to < rc.now - 1000 && params.until === undefined
+      ? { since: span.to } : null);
+  if (nextParams && params.base_station !== undefined) nextParams.base_station = baseName;
+  if (nextParams && params.limit !== undefined) nextParams.limit = String(limit);
+  return {
+    ...base,
+    count: receptions.length,
+    limit,
+    offset,
+    more,
+    next: nextParams ? `${rc.origin}${API_PREFIX}/stations/${encodeURIComponent(id)}/receptions?${buildQuery(Object.entries(nextParams))}` : null,
+    summary,
+    receptions,
+    notes,
+    source: 'meganet.reception_public; meganet.repeater_carrier_public; meganet.station_json / sensor / station / pass_range / repeater',
+    generated_at: new Date().toISOString(),
+  };
+}
+
 // ── GET /api/v1/health/silent ────────────────────────────────────────────────
 // "What has Flood-Net stopped hearing?" — the stations Station Health finds
 // silent (not heard) now, and the groups that went unheard together (an area,
@@ -3892,6 +4224,7 @@ export const ENDPOINTS = Object.freeze([
   { path: '/api/v1/stations/{id}/benchmarks', op: 'getStationBenchmarks', summary: 'The Bureau\'s benchmarks at a station in numbers: each mark\'s number, level and datum, and what it reads on the gauge.' },
   { path: '/api/v1/stations/{id}/service-level', op: 'getStationServiceLevel', summary: 'The station\'s entries in the Service Level Specifications (Queensland; New South Wales and the ACT).' },
   { path: '/api/v1/stations/{id}/acma', op: 'getStationAcmaLicences', summary: 'The ACMA licences Flood-Net records for a station, and the ACMA register\'s licences at sites within radius_m of it.' },
+  { path: '/api/v1/stations/{id}/receptions', op: 'getStationReceptions', summary: 'Every copy the base stations heard of a station\'s addresses — or a repeater\'s, and what it passes — each with its time, base station, frequency, level, SNR and carrier offset, and the station or repeater Flood-Net puts it down to.' },
   { path: '/api/v1/acma', op: 'getAcmaLicencesNear', summary: 'The ACMA register\'s licences at sites within radius_m of a point — for a site not built yet, or a move.' },
   { path: '/api/v1/stations/{id}/radio-path', op: 'getStationRadioPath', summary: 'How a station\'s readings reach a base station: its repeaters, the backbone on, and the fade margin Flood-Net saved for each hop, stale or not.' },
   { path: '/api/v1/readings/latest', op: 'getLatestReadings', summary: 'Every station\'s newest reading on each channel, in one call: by network, basin, kind or bounding box.' },
@@ -4056,6 +4389,16 @@ export function openApiDocument(origin = PUBLIC_ORIGIN) {
       '/api/v1/stations/{id}/radio-path': op('getStationRadioPath', 'Get a station\'s radio path to base',
         'How a station\'s readings reach a base station: the repeaters that pass its ALERT addresses, the routes on along the backbone, each hop\'s saved fade margin and whether it is stale, the best path and its weakest hop, and its measured path margins.',
         [idParam], ok('The routes to a base station, hop by hop, with the saved figures.')),
+      '/api/v1/stations/{id}/receptions': op('getStationReceptions', 'Get a station\'s receptions',
+        `Every copy the base stations heard of a station's addresses — for a repeater, also of each address it passes: time, base station, frequency, level, SNR, carrier offset, and sent_by, the station or repeater it is put down to. The last ${LIMITS.receptionsSinceMaxDays} days, ${LIMITS.receptionsWindowHours} hours a call.`,
+        [
+          idParam,
+          q('since', `Start, ISO 8601 (default ${LIMITS.receptionsDefaultHours} hour before until; at most ${LIMITS.receptionsSinceMaxDays} days ago).`, { type: 'string' }),
+          q('until', `End, ISO 8601 (default now, or ${LIMITS.receptionsWindowHours} hours after since). At most ${LIMITS.receptionsWindowHours} hours after since.`, { type: 'string' }),
+          q('at', `One reading's time, ISO 8601, instead of since/until: its copies, ${LIMITS.receptionsAtSeconds} s either side.`, { type: 'string' }),
+          q('base_station', 'Only one base station\'s copies, by name — /api/v1/base-stations lists them.', { type: 'string', maxLength: 120 }),
+          limitParam(LIMITS.receptionsMax, LIMITS.receptionsDefault), offsetParam,
+        ], ok('The copies heard, oldest first, each with what sent it, and a summary by sender and base station.')),
       '/api/v1/readings/latest': op('getLatestReadings', 'Get the latest readings',
         'Every station Flood-Net holds telemetry for, each channel\'s newest reading and its age, in one call — filtered by radio network, basin, kind or bounding box. Most stations report through the Bureau\'s own systems and are absent.',
         [
@@ -4179,6 +4522,7 @@ async function routeRest(rc, sub, params) {
         case 'service-level': none(); return serviceLevelEndpoint(rc, parts[1]);
         case 'acma': return acmaEndpoint(rc, parts[1], allowParams(params, ACMA_PARAMS));
         case 'radio-path': none(); return radioPathEndpoint(rc, parts[1]);
+        case 'receptions': return receptionsEndpoint(rc, parts[1], allowParams(params, RECEPTION_PARAMS));
         default: break;
       }
     }
@@ -4697,6 +5041,20 @@ export const MCP_TOOLS = Object.freeze([
       all: acmaAllArg,
     }, required: ['lat', 'lon'], additionalProperties: false },
     route: a => ['/acma', { near: `${a.lat},${a.lon}`, ...pick(a, ['radius_m', 'freq_mhz', 'all']) }],
+  },
+  {
+    name: 'get_receptions',
+    title: 'Get a station\'s receptions',
+    description: `Every copy Flood-Net's base stations heard of one station's addresses — for a repeater, also of every address it passes — so you can confirm a repeater is passing its IDs: each copy's time, base station, frequency, level, RSSI, SNR and carrier offset (cfo_hz), whether it decoded, whether it was a copy, and sent_by — the station itself, or the repeater that relayed it (an ALERT2 message's path; a legacy burst by its carrier), ambiguous, unexplained, or not measured. summary groups them by sender and base station, and for a repeater lists the addresses heard through it. Fixed base stations only, the last ${LIMITS.receptionsSinceMaxDays} days; give since/until (at most ${LIMITS.receptionsWindowHours} hours, default the last ${LIMITS.receptionsDefaultHours}) or at, one reading's time.`,
+    inputSchema: { type: 'object', properties: {
+      id: idArg,
+      since: { type: 'string', maxLength: 40, description: 'Start, ISO 8601.' },
+      until: { type: 'string', maxLength: 40, description: `End, ISO 8601 (default now; at most ${LIMITS.receptionsWindowHours} hours after since).` },
+      at: { type: 'string', maxLength: 40, description: `One reading's time, instead of since/until: its copies, ${LIMITS.receptionsAtSeconds} s either side.` },
+      base_station: { type: 'string', maxLength: 120, description: 'Only one base station\'s copies, by name (list_base_stations).' },
+      limit: limitArg(LIMITS.receptionsMax, LIMITS.receptionsDefault), offset: offsetArg,
+    }, required: ['id'], additionalProperties: false },
+    route: a => [`/stations/${enc(a.id)}/receptions`, pick(a, RECEPTION_PARAMS)],
   },
   {
     name: 'get_radio_path',

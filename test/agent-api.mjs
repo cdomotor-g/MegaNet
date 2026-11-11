@@ -101,6 +101,10 @@ const COLUMNS = Object.fromEntries(Object.entries({
   health_card_run: 'days at detail',
   // 0115: base stations by name — no position, no hardware, no token.
   base_station_name: 'name receiver station_id last_seen_at',
+  // 0116: the fixed base stations' receptions — no position, payload or token —
+  // and the repeater carriers each stick found by the day.
+  reception_public: 'id heard_at base_station receiver path protocol alert_id value_raw ok fault copy a2_source a2_path freq_mhz level_dbfs rssi_dbm snr_db cfo_hz cfo_split fmt',
+  repeater_carrier_public: 'day base_station receiver path station_id centre_hz addresses',
 }).map(([k, v]) => [k, new Set(v.split(' '))]));
 
 const T = Object.fromEntries(Object.keys(COLUMNS).map(k => [k, []]));
@@ -2230,7 +2234,8 @@ const everything = stub.requests.slice();
   const coreOrigin = (/const DB_ORIGIN\s*=\s*'([^']+)'/.exec(coreJs) || [])[1];
   check('the key is the one core.js publishes, for the same project', coreKey === api.PUBLISHABLE_KEY && api.SUPABASE_REST_URL === `${coreOrigin}/rest/v1`,
     `${coreKey} ${coreOrigin}`);
-  const privateRels = ['reading_raw', 'app_user', 'editor_allow', 'ingest_token', 'inspection', 'field_photo', 'stations_json'];
+  const privateRels = ['reading_raw', 'app_user', 'editor_allow', 'ingest_token', 'inspection', 'field_photo', 'stations_json',
+    'reception', 'carrier_receiver_day', 'ingest_point_report'];
   check('none of the private relations is on the read list', privateRels.every(r => !api.READABLE_RELATIONS.has(r)));
 
   for (const m of ['POST', 'PUT', 'PATCH', 'DELETE']) {
@@ -2366,7 +2371,7 @@ section('MCP');
   const tools = list.json.result.tools;
   const expected = ['search_stations', 'get_station', 'get_station_dossier', 'stations_near', 'get_readings', 'get_latest_readings', 'get_receiver_readings', 'get_silent_stations',
     'get_station_health', 'get_health_findings', 'list_catchments', 'get_catchment', 'get_flood_levels', 'get_benchmarks', 'get_service_level',
-    'get_acma_licences', 'acma_licences_near', 'get_radio_path', 'list_networks', 'list_base_stations'];
+    'get_acma_licences', 'acma_licences_near', 'get_receptions', 'get_radio_path', 'list_networks', 'list_base_stations'];
   check('tools/list has every tool', expected.every(n => tools.some(t => t.name === n)) && tools.length === expected.length, tools.map(t => t.name).join(', '));
   check('every tool is annotated read-only and has an object input schema', tools.every(t => t.annotations.readOnlyHint === true
     && t.annotations.destructiveHint === false && t.inputSchema.type === 'object' && t.description.length > 40));
@@ -2687,6 +2692,139 @@ section('The existing routes');
       && (raw.json.rows || []).find(x => x.value_raw === 301).copy_paths === undefined, JSON.stringify(withCopy));
   } finally {
     for (const r of added) T.reading.splice(T.reading.indexOf(r), 1);
+    api.resetApiState();
+  }
+}
+
+// ── A station's receptions (/stations/{id}/receptions, 0116) ─────────────────
+// Every copy the fixed base stations heard of a station's addresses, each put
+// down to what sent it: the station itself, the repeater whose carrier that
+// stick found that day, unexplained, not measured — and an ALERT2 message by
+// its path. A repeater's own call lists the addresses it passes, and says
+// which it was heard relaying.
+{
+  api.resetApiState();
+  // A repeater (not a base) that passes an address only one other station holds.
+  const holdersOf = new Map();
+  for (const s of live) for (const x of s.sensors || []) {
+    if (x.alert_id == null) continue;
+    if (!holdersOf.has(x.alert_id)) holdersOf.set(x.alert_id, new Set());
+    holdersOf.get(x.alert_id).add(s.id);
+  }
+  let REP = null, FIELD = null, A = null;
+  for (const r of live) {
+    if (!(r.roles || []).includes('repeater') || (r.roles || []).includes('base') || !r.repeater) continue;
+    const win = rp.openWindows([...(r.repeater.pass_ranges || []).map(p => ({ kind: 'pass', lo: p.low, hi: p.high })),
+      ...(r.repeater.exclusions || []).map(p => ({ kind: 'exclusion', lo: p.low, hi: p.high }))]);
+    if (win.length !== 1 || win[0][1] - win[0][0] > 10) continue;
+    const a = [...holdersOf.keys()].find(k => k >= win[0][0] && k <= win[0][1] && holdersOf.get(k).size === 1 && !holdersOf.get(k).has(r.id));
+    if (a != null) { REP = r; A = a; FIELD = live.find(s => s.id === [...holdersOf.get(a)][0]); break; }
+  }
+  check('the receptions fixtures exist in stations.json: a repeater passing an address one field station holds', REP && FIELD && A != null,
+    `${REP && REP.id} ${A} ${FIELD && FIELD.id}`);
+
+  const min = 60000;
+  const P1 = 'serial-monitor/rpi-0a0b0c0d-sdr1-151.525';
+  const OTHER_P = 'serial-monitor/rpi-ffff0000-sdr1';
+  const t0 = NOW - 2 * hour;
+  const today = day(t0);
+  // ALERT2 for the check of a path: the field station sends as 7001, through the repeater as 7002.
+  const a2Field = 7001, a2Rep = 7002;
+  const setA2 = (sid, v) => {
+    T.station.find(s => s.id === sid).alert2_station_id = v;
+    T.station_json.find(s => s.id === sid).doc = { ...T.station_json.find(s => s.id === sid).doc, alert2_station_id: v };
+  };
+  const reception = (id, at, extra) => ({ id, heard_at: iso(at), base_station: 'Hill Base', receiver: 'serial-monitor/rpi-0a0b0c0d', path: P1,
+    protocol: 'alert', alert_id: A, value_raw: 100 + id, ok: true, fault: null, copy: false, a2_source: null, a2_path: null,
+    freq_mhz: 151.525, level_dbfs: -40, rssi_dbm: null, snr_db: 20 - id, cfo_hz: null, cfo_split: false, fmt: 'ABF', ...extra });
+  const rows = [
+    reception(1, t0, { cfo_hz: 100 }),                                  // its own carrier: the station
+    reception(2, t0 + 1500, { cfo_hz: 520, copy: true }),               // on the repeater's: relayed
+    reception(3, t0 + 3000, { cfo_hz: 900, copy: true }),               // a copy on nobody's carrier: unexplained
+    reception(4, t0 + 60000, { cfo_hz: null }),                         // no carrier measured
+    reception(5, t0 + 90000, { alert_id: 1, cfo_hz: 100 }),             // someone else's address: not listed
+    reception(6, t0 + 120000, { base_station: 'Other Base', receiver: 'serial-monitor/rpi-ffff0000', path: OTHER_P, cfo_hz: 515 }),
+    reception(7, t0 + 150000, { protocol: 'alert2', alert_id: null, a2_source: a2Field, a2_path: [a2Rep], cfo_hz: 30, copy: true }),
+    reception(8, t0 + 151000, { protocol: 'alert2', alert_id: null, a2_source: a2Field, a2_path: [], cfo_hz: 60 }),
+  ];
+  const carriers = [
+    { day: today, base_station: 'Hill Base', receiver: 'serial-monitor/rpi-0a0b0c0d', path: P1, station_id: REP.id, centre_hz: 515, addresses: 6 },
+  ];
+  const NAMES = [
+    { name: 'Hill Base', receiver: 'serial-monitor/rpi-0a0b0c0d', station_id: null, last_seen_at: iso(NOW - min) },
+    { name: 'Other Base', receiver: 'serial-monitor/rpi-ffff0000', station_id: null, last_seen_at: iso(NOW - min) },
+  ];
+  T.reception_public.push(...rows);
+  T.repeater_carrier_public.push(...carriers);
+  T.base_station_name.push(...NAMES);
+  setA2(FIELD.id, a2Field); setA2(REP.id, a2Rep);
+  const since = encodeURIComponent(iso(t0 - 10 * min));
+  try {
+    stub.requests = [];
+    const r = await get(`/api/v1/stations/${FIELD.id}/receptions?since=${since}`);
+    const by = Object.fromEntries((r.json.receptions || []).map(x => [x.value_raw, x]));
+    check('receptions: a station\'s copies, oldest first, someone else\'s address left out',
+      r.status === 200 && JSON.stringify((r.json.receptions || []).map(x => x.value_raw)) === '[101,102,103,104,106,107,108]',
+      JSON.stringify(r.json).slice(0, 400));
+    check('…a burst on its own carrier is the station\'s, a copy on the repeater\'s carrier the repeater\'s',
+      by[101] && by[101].sent_by.how === 'station' && by[101].sent_by.station_id === FIELD.id
+      && by[102] && by[102].sent_by.how === 'repeater' && by[102].sent_by.station_id === REP.id && by[102].sent_by.carrier_hz === 515,
+      JSON.stringify([by[101] && by[101].sent_by, by[102] && by[102].sent_by]));
+    check('…a copy on nobody\'s carrier is unexplained, a burst with no offset not measured',
+      by[103] && by[103].sent_by.how === 'unexplained' && by[104] && by[104].sent_by.how === 'not_measured');
+    check('…the carrier is that stick\'s: another base station\'s burst near it is still the station\'s',
+      by[106] && by[106].sent_by.how === 'station' && by[106].base_station === 'Other Base');
+    check('…an ALERT2 message goes to the last repeater on its path, or its source when the path is empty',
+      by[107] && by[107].sent_by.how === 'repeater' && by[107].sent_by.station_id === REP.id && by[107].sent_by.alert2_id === a2Rep
+      && by[108] && by[108].sent_by.how === 'station' && by[108].sent_by.station_id === FIELD.id,
+      JSON.stringify([by[107] && by[107].sent_by, by[108] && by[108].sent_by]));
+    check('…each with its signal, and never a position, payload or token',
+      by[101].snr_db === 19 && by[101].freq_mhz === 151.525 && by[101].cfo_hz === 100 && by[101].base_station === 'Hill Base'
+      && !/"(lat|lon|accuracy_m|speed_mps|heading_deg|payload_hex|ingest_token_id|point_id)"/.test(r.text));
+    const fromView = stub.requests.filter(q => q.url.includes('/reception_public?'));
+    const u = fromView[0] && new URL(fromView[0].url);
+    check('…read from the public view, bounded by heard_at both ways and filtered by address in the database',
+      fromView.length === 1 && u.searchParams.getAll('heard_at').length === 2 && /^gte\./.test(u.searchParams.getAll('heard_at')[0])
+      && /^lt\./.test(u.searchParams.getAll('heard_at')[1]) && /alert_id/.test(u.searchParams.get('or') || ''),
+      fromView.map(q => q.url).join(' '));
+    check('…and summed up by sender and base station',
+      r.json.summary && r.json.summary.by_sender.some(s => s.how === 'repeater' && s.station_id === REP.id && s.receptions === 2)
+      && r.json.summary.by_base_station.some(b => b.base_station === 'Other Base' && b.receptions === 1));
+
+    const rr = await get(`/api/v1/stations/${REP.id}/receptions?since=${since}`);
+    const relayed = rr.json.summary && rr.json.summary.relayed_by_this_station;
+    check('a repeater\'s receptions take in the addresses it passes, and say which it was heard relaying',
+      rr.status === 200 && rr.json.looked_for && rr.json.looked_for.passes && rr.json.receptions.some(x => x.value_raw === 101)
+      && rr.json.receptions.filter(x => x.relayed_by_this_station).map(x => x.value_raw).join() === '102,107'
+      && relayed && relayed.some(v => v.alert_id === A && v.station_id === FIELD.id && v.receptions === 1),
+      JSON.stringify(rr.json.summary));
+
+    const at = await get(`/api/v1/stations/${FIELD.id}/receptions?at=${encodeURIComponent(iso(t0 + 1000))}`);
+    check('at= gives one reading\'s copies, a few seconds either side',
+      at.status === 200 && JSON.stringify(at.json.receptions.map(x => x.value_raw)) === '[101,102,103]', JSON.stringify(at.json).slice(0, 300));
+    const one = await get(`/api/v1/stations/${FIELD.id}/receptions?since=${since}&limit=1`);
+    check('limit pages: more, and next carries the window and the offset',
+      one.json.count === 1 && one.json.more === true && /offset=1/.test(one.json.next) && /until=/.test(one.json.next));
+    const hill = await get(`/api/v1/stations/${FIELD.id}/receptions?since=${since}&base_station=hill%20base`);
+    check('base_station takes a base station\'s name, whatever the capitals',
+      hill.status === 200 && hill.json.base_station === 'Hill Base' && hill.json.receptions.every(x => x.base_station === 'Hill Base')
+      && hill.json.receptions.length === 6);
+
+    const wide = await get(`/api/v1/stations/${FIELD.id}/receptions?since=${encodeURIComponent(iso(NOW - 10 * hour))}&until=${encodeURIComponent(iso(NOW))}`);
+    check(`a window over ${api.LIMITS.receptionsWindowHours} hours is refused`, wide.status === 400 && /at most/.test(wide.json.detail));
+    const old = await get(`/api/v1/stations/${FIELD.id}/receptions?since=${encodeURIComponent(iso(NOW - 4 * 24 * hour))}`);
+    check(`a start more than ${api.LIMITS.receptionsSinceMaxDays} days back is refused, pointing at the readings`, old.status === 400 && /readings/.test(old.json.detail));
+    const both = await get(`/api/v1/stations/${FIELD.id}/receptions?at=${encodeURIComponent(iso(t0))}&since=${since}`);
+    check('at with since is refused', both.status === 400);
+    const nobody = await get(`/api/v1/stations/${FIELD.id}/receptions?base_station=Nowhere`);
+    check('an unknown base station is refused, listing the names', nobody.status === 400 && /Hill Base/.test(nobody.json.detail));
+    const unknown = await get(`/api/v1/stations/${FIELD.id}/receptions?lat=1`);
+    check('an unknown parameter is refused', unknown.status === 400);
+  } finally {
+    for (const x of rows) T.reception_public.splice(T.reception_public.indexOf(x), 1);
+    for (const x of carriers) T.repeater_carrier_public.splice(T.repeater_carrier_public.indexOf(x), 1);
+    for (const x of NAMES) T.base_station_name.splice(T.base_station_name.indexOf(x), 1);
+    setA2(FIELD.id, null); setA2(REP.id, null);
     api.resetApiState();
   }
 }
