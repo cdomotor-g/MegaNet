@@ -4069,7 +4069,8 @@ const DB_SCHEMA = 'meganet';
 // a database without it says the slot table is not there yet. 121: one ALERT2
 // address for several stations, told apart by sensor (0121), applied by
 // db-migrate.yml on 12 November 2026, bumped after; no shape the app reads changes.
-const DB_SCHEMA_VERSION = 121;
+// 122: Mt Glorious Primary and Secondary to AL-P and AL-B (0122), the same day; data only.
+const DB_SCHEMA_VERSION = 122;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
