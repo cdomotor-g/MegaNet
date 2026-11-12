@@ -150,6 +150,12 @@ const Busy = (() => {
     } else if (own) {
       where = 'this site';
       try { what = decodeURIComponent(path.split('/').pop() || ''); } catch (_) { what = ''; }
+    } else if (u && /(^|\.)overpass[a-z0-9.-]*\.(de|systems|org|fr|ch)$/i.test(u.hostname)) {
+      // Overpass takes its question as a POST body, but it only reads the
+      // OpenStreetMap map data; nothing is stored anywhere.
+      kind = 'load';
+      where = 'OpenStreetMap map data';
+      what = 'via ' + u.hostname;
     } else {
       where = u ? u.hostname.replace(/^www\./, '') : 'the web';
     }
