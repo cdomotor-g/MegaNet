@@ -78,7 +78,7 @@ set search_path = ''
 as $$
   select case
     when p_point_id ~ '-sdr[0-9]+-[0-9]{2,4}(\.[0-9]+)?$'
-      then pg_catalog.round(pg_catalog.substring(p_point_id from '-sdr[0-9]+-([0-9.]+)$')::numeric, 4)
+      then pg_catalog.round(pg_catalog.substring(p_point_id, '-sdr[0-9]+-([0-9.]+)$')::numeric, 4)
     when p_freq_min is not null
          and pg_catalog.round((p_freq_min / 0.0125)::numeric)
            = pg_catalog.round((coalesce(p_freq_max, p_freq_min) / 0.0125)::numeric)
@@ -105,7 +105,7 @@ begin
   if v_hourly then
     v_from := pg_catalog.date_trunc('hour', pg_catalog.now()) - (v_days * 24 - 1) * interval '1 hour';
     select coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
-             pg_catalog.extract(epoch from x.bucket)::bigint, x.base, x.ch, x.protocol,
+             pg_catalog.date_part('epoch', x.bucket)::bigint, x.base, x.ch, x.protocol,
              x.n, x.decoded, x.copies, x.shadow, x.undecoded, x.frame, x.chk, x.other,
              x.snr_n, x.snr_sum, x.nf_n, x.nf_sum)
            order by x.bucket, x.base, x.ch, x.protocol), '[]'::jsonb)
@@ -136,7 +136,7 @@ begin
   else
     v_from := ((pg_catalog.now() at time zone 'utc')::date - (v_days - 1))::timestamp at time zone 'utc';
     select coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
-             pg_catalog.extract(epoch from (x.bucket::timestamp at time zone 'utc'))::bigint, x.base, x.ch, x.protocol,
+             pg_catalog.date_part('epoch', (x.bucket::timestamp at time zone 'utc'))::bigint, x.base, x.ch, x.protocol,
              x.n, x.decoded, x.copies, x.shadow, x.undecoded, x.frame, x.chk, x.other,
              x.snr_n, x.snr_sum, x.nf_n, x.nf_sum)
            order by x.bucket, x.base, x.ch, x.protocol), '[]'::jsonb)
@@ -227,7 +227,7 @@ as $$
               case when g.protocol = 'alert2' then meganet.resolve_a2_station(g.addr)
                    else meganet.resolve_station(g.addr, null) end,
               g.decoded, g.copies, coalesce(g.relayed, 0), g.snr_n, g.snr_sum, g.snr_min, g.snr_max, g.days,
-              pg_catalog.extract(epoch from g.last_heard)::bigint)
+              pg_catalog.date_part('epoch', g.last_heard)::bigint)
             order by g.base, g.protocol, g.addr, g.ch), '[]'::jsonb))
     from g;
 $$;
