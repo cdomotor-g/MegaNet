@@ -578,7 +578,7 @@ ground's height in AHD less the gauge zero in AHD, so it needs a gauge:
   the town gauge a kilometre downstream is one of them, and picking it reads
   the ground at the bridge as that gauge would.
 - **The channel bed by the station** — the lowest ground within 60 m on this
-  model, for a station with no surveyed zero. A height over the bed, not a
+  model (further out where that is too high for the river — see *Where 0 m is*), for a station with no surveyed zero. A height over the bed, not a
   reading on any gauge, and the panel says so.
 - **A level typed in**, in m AHD.
 
@@ -1057,6 +1057,15 @@ ground shows — no more than 30 m below the lowest ground by the gauge (a
 dam's headwater gauge often reads AHD straight off a zero of 0) and no more
 than 10 m above it. Otherwise the lowest ground within 60 m of the station,
 and the notes say which and why. A storage's zero is never its bed.
+
+**The channel by the gauge** is the lowest ground within 60 m of the station's
+pin — unless that is too high to be the river by the station's own record:
+more than 5 m over its gauge zero, or over the lowest of its levels. A pin is
+where the hut or pole stands, and that can be up the bank: Gayndah Flume AL's
+is 130 m from the Burnett, and the lowest ground within 60 m of it was the
+bank's slope at 100.9 m AHD, so no level but major drew any water. Then the
+twin looks further — 120 m, 250 m, 500 m — and takes the lowest ground in the
+first ring that holds some low enough, and the notes say so.
 
 **Where the water goes.** Not everywhere low. Every sample of the ground
 carries the lowest level at which it joins the channel by the gauge — the

@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 275, date: '2026-11-12', items: [
+      '🌊 <strong>Flood water in the digital twin, where a station stands up the bank.</strong> Where a station\'s pin is on high '
+        + 'ground away from its river — Gayndah Flume AL\'s is 130 m from the Burnett — the 🧊 twin looked for the river only within '
+        + '60 m of the pin, found the bank instead, and drew no water below major. It now looks further out (up to 500 m) when the '
+        + 'ground near the pin is too high for the station\'s own levels, so the water rises in the river from minor up, and a note '
+        + 'under the view says how far it looked.',
+    ] },
     { n: 274, date: '2026-11-12', items: [
       '📋 <strong>The ALERT2 slot table.</strong> The ⏱️ TDMA Planner tab now opens with the slots the Mt Glorious ALERT2 network '
         + 'actually runs, channel by channel: which site sends in which half-second, under which ALERT2 ID, which station it is, and '

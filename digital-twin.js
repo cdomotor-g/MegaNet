@@ -5018,22 +5018,72 @@ void main() {
   }
   function floodY(ahd) { const g = tw.ground; return g ? (ahd - g.h0) * S().exag : 0; }
 
-  // The channel by the gauge: the lowest sample within FLOOD_SEED_M of it.
-  function floodSeed(g) {
-    const step = g.step, nx = g.nx, nz = g.nz, r = Math.ceil(FLOOD_SEED_M / step);
+  // The channel by the gauge: the lowest sample within FLOOD_SEED_M of it —
+  // or, where that is too high to be the river by the station's own record,
+  // the lowest within a wider ring. A station's pin is where its hut or pole
+  // stands, and that can be up the bank: Gayndah Flume AL's is 130 m from
+  // the Burnett, on ground at 105 m AHD over a bed at 86, and the lowest
+  // ground within 60 m of it was the bank's slope at 100.9 m — so every level
+  // under that (all but major) drew no water at all. "Too high" is over the
+  // gauge zero by more than FLOOD_SEED_ZERO_M, or over the lowest of its
+  // levels: the river is in its channel at its first level, whatever else.
+  // The rings widen in FLOOD_SEED_WIDER_M and stop at the first that holds
+  // ground low enough; the widest's lowest is taken if none does (it is
+  // still nearer the river). `within` says how far it looked.
+  const FLOOD_SEED_WIDER_M = [120, 250, 500];
+  const FLOOD_SEED_ZERO_M = 5;
+  function lowestWithin(g, R) {
+    const step = g.step, nx = g.nx, nz = g.nz, r = Math.ceil(R / step);
     // The sample the station stands on (the middle one, of a square round it).
     const ci = Math.round(-g.x0 / step), cj = Math.round(-g.z0 / step);
     let best = null;
     for (let j = Math.max(0, cj - r); j <= Math.min(nz - 1, cj + r); j++) {
       for (let i = Math.max(0, ci - r); i <= Math.min(nx - 1, ci + r); i++) {
         const x = g.x0 + i * step, z = g.z0 + j * step;
-        if (Math.hypot(x, z) > FLOOD_SEED_M) continue;
+        if (Math.hypot(x, z) > R) continue;
         const e = g.elev[j * nx + i];
         if (!isFinite(e)) continue;
         if (!best || e < best.elev) best = { idx: j * nx + i, i, j, x, z, elev: e };
       }
     }
     return best;
+  }
+  // The height the channel by the gauge has to be under, from the station's
+  // own ladder, or null where it has nothing to say it by.
+  function seedCeiling(st) {
+    if (!st || typeof FloodStages === 'undefined') return null;
+    let lad;
+    try { lad = FloodStages.ladder(st); } catch (_) { return null; }
+    let t = lad.ahdZero != null && !lad.storage ? lad.ahdZero + FLOOD_SEED_ZERO_M : null;
+    for (const l of lad.levels || []) if (isFinite(l.ahd)) t = t == null ? l.ahd : Math.min(t, l.ahd);
+    return t;
+  }
+  const seedMemo = new WeakMap();   // ground → { id, seed }: the same answer for the same ground and station
+  function floodSeed(g, st = currentStation()) {
+    const id = st ? st.id : '';
+    const kept = seedMemo.get(g);
+    if (kept && kept.id === id) return kept.seed;
+    let best = lowestWithin(g, FLOOD_SEED_M);
+    if (best) best.within = FLOOD_SEED_M;
+    const ceil = seedCeiling(st);
+    if (best && ceil != null && best.elev > ceil) {
+      const near60 = best.elev;
+      for (const R of FLOOD_SEED_WIDER_M) {
+        const b = lowestWithin(g, R);
+        if (!b) break;
+        best = { ...b, within: R, near: near60, ceiling: ceil };
+        if (b.elev <= ceil) break;
+      }
+      if (best.within === FLOOD_SEED_M) delete best.near;
+    }
+    seedMemo.set(g, { id, seed: best });
+    return best;
+  }
+  // How the channel by the gauge was found, in words: "the lowest ground
+  // within 60 m", or within the wider ring it took.
+  function seedWords(seed, of = '') {
+    const R = seed && seed.within ? seed.within : FLOOD_SEED_M;
+    return `the lowest ground within ${R} m${of}`;
   }
 
   // For every sample, the level at which it joins the channel (see above).
@@ -5133,6 +5183,9 @@ void main() {
     }
     const start = FloodStages.start(lad, seed ? seed.elev : null);
     const fill = seed ? fillLevels(g.elev, seed.idx, g.nx, g.nz) : null;
+    if (seed && seed.within > FLOOD_SEED_M && seed.near != null) {
+      notes.push(`The station's pin stands up the bank: the lowest ground within ${FLOOD_SEED_M} m of it is ${seed.near.toFixed(2)} m ${g.datum}, too high for the river by the station's own levels, so the channel by the gauge is the lowest ground within ${seed.within} m — ${seed.elev.toFixed(2)} m ${g.datum}, ${Math.round(Math.hypot(seed.x, seed.z))} m ${compassWord(Math.atan2(seed.x, -seed.z) * 180 / Math.PI)} of it.`);
+    }
     if (seed && seed.elev >= lad.top) {
       notes.push(`Every flood level ${lad.borrowed ? 'borrowed' : 'recorded here'} is below the lowest ground by the gauge in this patch (${seed.elev.toFixed(2)} m AHD against ${lad.top.toFixed(2)} m AHD), so the water has nothing to cover.`);
     }
@@ -5280,7 +5333,7 @@ void main() {
     const ch = seed ? `${seed.elev.toFixed(2)} m ${g.datum}` : null;
     return `
       <p>No flood heights are recorded for <strong>${esc(st.name)}</strong> that can be put on its ground. Here are the ${donors.filter(d => !d.self).length} nearest stations that have some — their distance, their flood heights, the datum their gauge is on, and their catchment. Pick one to draw its levels as water over this station's ground.</p>
-      <p class="twin-borrow-here"><strong>Datum here:</strong> ${esc(groundDatumWords(g))}.${ch ? ` The channel by the gauge — the lowest ground within ${FLOOD_SEED_M} m — is at ${esc(ch)}.` : ''} Every height drawn is in metres AHD.</p>
+      <p class="twin-borrow-here"><strong>Datum here:</strong> ${esc(groundDatumWords(g))}.${ch ? ` The channel by the gauge — ${esc(seedWords(seed))} — is at ${esc(ch)}.` : ''} Every height drawn is in metres AHD.</p>
       <fieldset class="twin-borrow-mode">
         <legend>Carry the heights across</legend>
         <label class="check-label"><input type="radio" name="twin-borrow-mode" value="gauge" ${mode === 'gauge' ? 'checked' : ''}><span>As heights on the gauge, laid over this station's channel — the better guide across a river's fall. Only the heights over the other gauge's zero cross, so its zero's datum does not matter: h m on its gauge is drawn at ${ch ? `${esc(seed.elev.toFixed(2))} + h m AHD` : 'h m over the channel'}. Its AEP levels and floods cross only where its zero is AHD.</span></label>
@@ -6233,7 +6286,7 @@ void main() {
     if (!g) return null;
     if (F && !F.none && F.start != null) return { m: F.start, basis: F.startBasis };
     const seed = floodSeed(g);
-    return seed ? { m: seed.elev, basis: `the lowest ground within ${FLOOD_SEED_M} m of the gauge` } : null;
+    return seed ? { m: seed.elev, basis: seedWords(seed, ' of the gauge') } : null;
   }
 
   // The card's slope: its estimate's where the station has an AEP row, else
@@ -6495,7 +6548,7 @@ void main() {
     const v = tw.vel, L = v && v.line;
     if (!L) return 'Not traced: there is no ground to trace it on.';
     if (!L.ok) return `Not traced: ${L.why}.`;
-    const from = v.from === 'picked' ? 'from the point clicked' : `from the channel by the gauge (the lowest ground within ${FLOOD_SEED_M} m)`;
+    const from = v.from === 'picked' ? 'from the point clicked' : `from the channel by the gauge (${seedWords(tw.ground ? floodSeed(tw.ground) : null)})`;
     const km = L.length >= 1000 ? `${(L.length / 1000).toFixed(1)} km` : `${Math.round(L.length)} m`;
     const parts = [`Traced along the lowest ground ${from}, ${km} to the patch's edge both ways, running ${Math.round(L.heading)}° (${compassWord(L.heading)}) past the station`
       + `${L.sinuosity > 1.15 ? `, ${L.sinuosity.toFixed(2)} times the straight distance between its ends` : ''}.`];
@@ -7732,7 +7785,7 @@ void main() {
     ahd: 'Australian Height Datum: the national height reference — metres above (about) mean sea level. Every surveyed height, gauge zero and flood level here is in it.',
     lgh: 'Local gauge height: the height as a gauge board would read it — metres above that gauge\'s zero, not above sea level. It is the ground\'s height in m AHD less the gauge zero in m AHD, so it depends on which gauge is chosen.',
     zero: 'Gauge zero: the level the 0 m mark of a gauge stands at, surveyed in m AHD. Flood classes are heights above it.',
-    channel: 'The lowest ground within 60 m of the station on this model — a stand-in for a gauge zero where none is surveyed. A height above it is a height over the river bed here, not a reading on any gauge.',
+    channel: 'The lowest ground within 60 m of the station on this model (further out, up to 500 m, where nothing that near is low enough for the river by the station\'s own levels) — a stand-in for a gauge zero where none is surveyed. A height above it is a height over the river bed here, not a reading on any gauge.',
     area: 'The ground the twin is built on: a rectangle that holds the station. A square round it by default; widen any side, widen it to a bridge, or draw it on the map.',
     detail: 'How closely the ground is sampled. Standard is 200 samples across a square, 400 once the area is wider than 1.6 km. Fine and Finest sample closer (down to the LiDAR\'s own 1 m on a small area) and take longer to build.',
     sample: 'One height read from the ground model. The ground is drawn flat between samples, so anything narrower than the spacing — a drain, a levee — may not show.',

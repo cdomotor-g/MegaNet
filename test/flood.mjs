@@ -931,6 +931,32 @@ async function browserHalf(FS) {
     ok('…and the notes say why the classes are not drawn', notes.some(n => /assumed datum rather than AHD/.test(n)), notes.join(' | '));
     await page.evaluate(() => { state.data.stations.find(x => x.id === 'gatton').gauge_survey = window.__zero; });
 
+    // A pin up the bank (Gayndah Flume AL's, 130 m from the Burnett): moved
+    // 90 m east of the channel, nothing within 60 m of it is lower than the
+    // hollow's floor (96 m), well over Gatton's zero and its minor class. The
+    // channel is looked for further out, and the water stands in it.
+    section('A pin up the bank');
+    await page.evaluate(m => {
+      const s = state.data.stations.find(x => x.id === 'gatton');
+      window.__gattonLon = s.lon; s.lon += 60 / m;
+      DigitalTwin.rebuild();
+    }, M_LON);
+    await settled();
+    F = await fl();
+    const bankNotes = await page.evaluate(() => DigitalTwin.debug().notes);
+    ok('the channel is the lowest ground within 120 m — the river\'s bed at 89 m, 90 m west — not the hollow\'s floor within 60 m',
+      F.seed && near(F.seed.elev, 89, 0.05) && near(F.seed.x, -90, 2.5) && F.start === 87.54, J({ seed: F.seed, start: F.start }));
+    ok('…and the notes say the pin stands up the bank, and how far the twin looked',
+      bankNotes.some(n => /pin stands up the bank/.test(n) && /within 120 m/.test(n) && /W of it/.test(n)), bankNotes.join(' | '));
+    await page.evaluate(() => DigitalTwin.floodAt('minor_m'));
+    ok('at minor the river is wet and the floodplain by the pin is not', (await wet(-90, 0)) && !(await wet(0, 0)), J(await fl()));
+    await page.evaluate(() => {
+      const s = state.data.stations.find(x => x.id === 'gatton');
+      s.lon = window.__gattonLon;
+      DigitalTwin.rebuild();
+    });
+    await settled();
+
     // Gatton's own floods, as HDB records them and 0037 puts them on the
     // station: 1893 is over the rarest AEP level, so the water rises to it.
     section('The floods Gatton has seen');
