@@ -239,6 +239,26 @@ function nodeHalf(FS) {
     borrowedPeaks.levels.filter(l => l.kind === 'peak').length === GATTON_PEAKS.length
       && borrowedPeaks.notes.some(n => /Bureau's record at .*40444.*takes its flood history from/.test(n))
       && !peaks.notes.some(n => /takes its flood history/.test(n)), J(borrowedPeaks.notes));
+  // Floods recorded near by (the twin's panel offers them): Gatton AL, 250 m
+  // away, on Gatton's ladder beside Gatton's own five.
+  const AL = STATIONS.find(s => s.id === 'gatton_al');
+  const alSet = { id: 'gatton_al', name: 'Gatton AL', where: '250 m NE', peaks: AL.flood_peaks.map(p => ({ date: p.date, ahd: p.level_m_ahd, height: p.height_m })) };
+  const own5 = FS.ladder({ ...GATTON, flood_peaks: GATTON_PEAKS });
+  const withAL = FS.withPeaks(own5, [alSet]);
+  const fromAL = withAL.levels.filter(l => l.from);
+  const same = AL.flood_peaks.filter(p => GATTON_PEAKS.some(g => FS.sameFlood(g.date, p.date)));
+  ok('a gauge near by: its floods join the ladder at their own levels in m AHD, named for it, on this gauge through its zero — one level a flood, its own record first',
+    fromAL.length === AL.flood_peaks.filter(p => p.level_m_ahd != null).length - same.length && same.length >= 1
+      && fromAL.every(l => l.kind === 'peak' && l.rank === null && / @gatton_al$/.test(l.key) && / · Gatton$/.test(l.short) && near(l.gauge, l.ahd - 87.54, 1e-9)
+        && AL.flood_peaks.some(p => p.level_m_ahd === l.ahd)),
+    J({ fromAL: fromAL.map(l => [l.key, l.ahd]), same: same.map(p => p.date) }));
+  ok('…the levels still lowest first, one highest of them all, the top the highest level, and a note saying whose',
+    withAL.levels.every((l, i, a) => i === 0 || l.ahd >= a[i - 1].ahd) && withAL.levels.filter(l => l.highest).length === 1
+      && withAL.top === Math.max(...withAL.levels.map(l => l.ahd)) && /Gatton AL \(250 m NE\) — \d floods?, 1 more already drawn/.test(withAL.notes[withAL.notes.length - 1])
+      && own5.levels.filter(l => l.highest).length === 1, J(withAL.notes));
+  ok('…and nothing near by leaves the ladder as it was', FS.withPeaks(own5, []) === own5 && FS.withPeaks(own5, [{ id: 'x', name: 'X', peaks: [] }]).levels.length === own5.levels.length);
+  ok('the same flood: three days apart or less, a month or a year by its own', FS.sameFlood('2011-01-11', '2011-01-13') && !FS.sameFlood('2011-01-11', '2011-01-16')
+    && FS.sameFlood('1954-07', '1954-07-14') && FS.sameFlood('1875', '1875-03-01') && !FS.sameFlood('1875', '1876'));
   const onlyHeights = FS.ladder({ ...GATTON, flood_peaks: [{ date: '2011-01-10', height_m: 18.92 }] });
   ok('…and a station whose floods all lack one draws none, and says why',
     !onlyHeights.levels.some(l => l.kind === 'peak') && near(onlyHeights.top, 103.75, 1e-9)
@@ -402,8 +422,10 @@ async function browserHalf(FS) {
     // does the scale turn itself logarithmic, which Gatton's levels warrant,
     // except in the section about that.
     await page.evaluate(() => { DigitalTwin._infoFold(null); DigitalTwin._floodScaleAuto(null); });
-    // Gatton's floods wait for their own section (see the head).
-    await page.evaluate(() => { delete state.data.stations.find(x => x.id === 'gatton').flood_peaks; });
+    // Gatton's floods wait for their own section (see the head) — and so do
+    // Gatton AL's, 250 m away on Lockyer Creek, which the scale would take
+    // from the gauges near by (twinarea checks that, at Gayndah).
+    await page.evaluate(() => { for (const id of ['gatton', 'gatton_al']) delete state.data.stations.find(x => x.id === id).flood_peaks; });
     const gl = await page.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); });
     if (!gl) { console.log('\n  SKIP — this Chromium has no WebGL; the twin\'s water cannot be exercised here.'); return; }
 
@@ -1202,7 +1224,7 @@ async function browserHalf(FS) {
     await qp.goto(server.origin + '/index.html', { waitUntil: 'domcontentloaded' });
     await qp.waitForFunction(() => typeof state !== 'undefined' && !!state.data && Array.isArray(state.data.stations), null, { timeout: LOAD_TIMEOUT });
     await qp.evaluate(() => { DigitalTwin._infoFold(null); DigitalTwin._floodScaleAuto(null); });
-    await qp.evaluate(() => { delete state.data.stations.find(x => x.id === 'gatton').flood_peaks; });
+    await qp.evaluate(() => { for (const id of ['gatton', 'gatton_al']) delete state.data.stations.find(x => x.id === id).flood_peaks; });
     await qp.evaluate(() => DigitalTwin.openStation('gatton'));
     await qp.waitForFunction(() => { const d = DigitalTwin.debug(); return d.built && d.flood && !d.flood.none && d.flood.level != null; }, null, { timeout: BUILD_TIMEOUT });
     const q = await qp.evaluate(() => DigitalTwin.debug().flood);
@@ -1242,7 +1264,7 @@ async function browserHalf(FS) {
       DigitalTwin._infoFold(null);
       DigitalTwin._compact(null);
       DigitalTwin._floodScaleAuto(null);
-      delete state.data.stations.find(x => x.id === 'gatton').flood_peaks;
+      for (const id of ['gatton', 'gatton_al']) delete state.data.stations.find(x => x.id === id).flood_peaks;
       switchTab('stations');
     });
     await hp.waitForFunction(() => !!state.map, null, { timeout: LOAD_TIMEOUT });

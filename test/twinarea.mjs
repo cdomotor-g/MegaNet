@@ -548,7 +548,7 @@ async function main() {
       dom.terms === 4 && J(dom.head) === J(['Flood, site', 'Own gauge', 'm AHD', 'm LGH', 'Against this station'])
         && /as it would read on Gayndah Flume TM's gauge/.test(dom.lead) && /than at this station in the same flood/.test(dom.lead), J({ head: dom.head, lead: dom.lead }));
     ok('…and the sites are listed with their zero and a way to compare from each', dom.sites[0].includes('Gayndah Flume TM') && /zero 85\.41 m AHD/.test(dom.sites[0]) && /Reference/.test(dom.sites[0])
-      && dom.sites.some(r => r.startsWith('Gayndah Compare from here') && /zero 85\.30 m AHD/.test(r) && /\d peaks?$/.test(r)), J(dom.sites));
+      && dom.sites.some(r => r.startsWith('Gayndah Compare from here') && /zero 85\.30 m AHD/.test(r) && /\d peaks? On the 3-D scale$/.test(r)), J(dom.sites));
     ok('…and no cell of the table is cut off in the pane', dom.cut === 0, `${dom.cut} cell(s) wider than their column`);
 
     // The differential the other way round: Gayndah the reference.
@@ -570,6 +570,74 @@ async function main() {
     ok('with a typed level as the datum the gauge heights are over it, and the comparison is with this station again',
       P.refId === 'gayndah_flume_tm' && near(row(c13, 'gayndah').lgh, town.level_m_ahd - 100, 1e-9) && near(row(c13, 'gayndah').diff, -0.79, 0.006), J(row(c13, 'gayndah')));
     await page.evaluate(() => DigitalTwin.setLgh('station:gayndah_flume_tm'));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    section('Floods near by on the 3-D scale, the colours, and sorting');
+
+    P = await page.evaluate(() => DigitalTwin._peaks());
+    const cho = id => P.choices.find(c => c.id === id);
+    ok('the gauges with floods in AHD can go on the scale: on by default within 2 km on the Burnett, off for the weir\'s pool and for Mt Lawless 10 km down',
+      cho('gayndah_flume_al').dflt && cho('gayndah_flume_al').on && cho('gayndah').dflt && cho('gayndah').on
+        && !cho('wharton_weir_tm').dflt && !cho('wharton_weir_tm').on && /pool/.test(cho('wharton_weir_tm').why)
+        && !cho('mt_lawless_tm').on && /away/.test(cho('mt_lawless_tm').why)
+        && !cho('dalgangal_rd_al') && !cho('brian_pastures'), J(P.choices));
+    const lv = () => page.evaluate(() => { const f = DigitalTwin.debug().flood; return f && !f.none ? { levels: f.levels.map(l => ({ key: l.key, ahd: l.ahd, highest: !!l.highest, label: l.label })), notes: DigitalTwin.debug().notes } : null; });
+    let L = await lv();
+    if (L) {
+      const keys = L.levels.map(l => l.key);
+      ok('on the water\'s scale: the town gauge\'s 1942 flood and Gayndah Flume AL\'s 2015 one beside this station\'s own — the weir\'s none, and 2013 once',
+        keys.includes('peak 1942-02-11 @gayndah') && keys.includes('peak 2015-02-22 @gayndah_flume_al') && !keys.some(k => /@wharton_weir_tm/.test(k))
+          && keys.filter(k => /^peak 2013-01-2/.test(k)).length === 1 && keys.includes('peak 2013-01-28'), J(keys));
+      const hi = L.levels.filter(l => l.highest);
+      ok('…the highest recorded is the highest of them all, named for its gauge, and the notes say where they came from',
+        hi.length === 1 && hi[0].key === 'peak 1942-02-11 @gayndah' && /at Gayndah\)$/.test(hi[0].label)
+          && L.notes.some(n => /Floods recorded at gauges near by are on the scale too: Gayndah Flume AL/.test(n) && /Gayndah \(1\.26 km SE\)/.test(n)), J({ hi, notes: L.notes }));
+    } else ok('the twin drew water at Gayndah Flume TM to put the floods on', false, 'no flood');
+    await page.evaluate(() => DigitalTwin.setNearPeaks('wharton_weir_tm', true));
+    await page.evaluate(() => DigitalTwin.setNearPeaks('gayndah', false));
+    L = await lv();
+    let nk = await page.evaluate(() => ({ k: JSON.parse(localStorage.getItem('mn-twin')).nearPeaks, box: !!document.querySelector('#twin-peaks input[data-near-peaks="wharton_weir_tm"]:checked') }));
+    ok('ticking the weir puts on its floods the others have not recorded, unticking the town takes its off — and both are nk for the station',
+      L && L.levels.some(l => l.key === 'peak 1998-05-05 @wharton_weir_tm') && !L.levels.some(l => /@gayndah$/.test(l.key)) && nk.box
+        && J(nk.k.gayndah_flume_tm) === J({ wharton_weir_tm: true, gayndah: false }), J({ keys: L && L.levels.map(l => l.key), nk }));
+    await page.evaluate(() => { DigitalTwin.setNearPeaks('wharton_weir_tm', false); DigitalTwin.setNearPeaks('gayndah', true); });
+    nk = await page.evaluate(() => JSON.parse(localStorage.getItem('mn-twin')).nearPeaks);
+    ok('…and back to the defaults, nothing is nk', !nk.gayndah_flume_tm, J(nk));
+
+    P = await page.evaluate(() => DigitalTwin._peaks());
+    const r13 = P.floods.find(f => f.rows.some(r => r.id === 'gayndah_flume_tm' && r.date === '2013-01-28')).rows.find(r => r.id === 'gayndah_flume_tm');
+    const bands = await page.evaluate(() => [...document.querySelectorAll('.twin-peaks-table tbody tr.has-band')].map(tr => ({
+      label: tr.querySelector('.twin-peaks-band').getAttribute('aria-label'), band: tr.style.getPropertyValue('--band'),
+      tint: getComputedStyle(tr.querySelector('.twin-peaks-ahd')).backgroundColor })));
+    const majorCol = await page.evaluate(() => cssVar(FloodStages.COLOURS.major.token, FloodStages.COLOURS.major.hex));
+    ok('colours: the 2013 flood at the flume, 19.29 m, is past its major level (15.5 m) and coloured as the scale colours major',
+      r13.band && r13.band.kind === 'major' && r13.band.colour === majorCol, J(r13.band));
+    ok('…each coloured row says its class in words, and its heights are tinted', bands.length > 5 && bands.every(b => /^past /.test(b.label) && b.band && b.tint !== 'rgba(0, 0, 0, 0)'), J(bands.slice(0, 3)));
+
+    await page.evaluate(() => DigitalTwin.sortPeaks('ahd'));
+    P = await page.evaluate(() => DigitalTwin._peaks());
+    let sd = await page.evaluate(() => ({ groups: document.querySelectorAll('.twin-peaks-table .twin-peaks-flood').length,
+      sort: [...document.querySelectorAll('.twin-peaks-table thead th')].map(th => th.getAttribute('aria-sort')),
+      head: [...document.querySelectorAll('.twin-peaks-table thead th')].map(th => th.textContent.trim()),
+      first: [...document.querySelectorAll('.twin-peaks-table tbody tr')][0].textContent.replace(/\s+/g, ' ').trim(),
+      focus: document.activeElement && document.activeElement.dataset.sort }));
+    const ahds = P.rows.map(r => r.ahd), placed = ahds.filter(v => v != null);
+    ok('m AHD pressed: one list, highest first, the peaks with none last — the headings as they were, the one in use marked for a screen reader, the focus kept on it',
+      sd.groups === 0 && placed.every((v, i) => i === 0 || v <= placed[i - 1]) && ahds.indexOf(null) === -1 || ahds.slice(ahds.indexOf(null)).every(v => v == null)
+        && J(sd.sort) === J(['none', 'none', 'descending', 'none', 'none']) && J(sd.head) === J(['Flood, site', 'Own gauge', 'm AHD', 'm LGH', 'Against this station'])
+        && sd.focus === 'ahd' && placed[0] === Math.max(...placed), J({ ahds, sd }));
+    ok('…each row says its date, there being no flood above it', /· \d{1,2} \w{3} \d{4}|· \d{4}/.test(sd.first), sd.first);
+    await page.evaluate(() => DigitalTwin.sortPeaks('ahd'));
+    P = await page.evaluate(() => DigitalTwin._peaks());
+    const up = P.rows.map(r => r.ahd).filter(v => v != null);
+    ok('pressed again, lowest first', P.sort.dir === 1 && up.every((v, i) => i === 0 || v >= up[i - 1]), J(up));
+    await page.evaluate(() => DigitalTwin.sortPeaks('site'));
+    P = await page.evaluate(() => DigitalTwin._peaks());
+    ok('site pressed: by name, A to Z', P.rows.every((r, i, a) => i === 0 || r.name.localeCompare(a[i - 1].name) >= 0), J(P.rows.map(r => r.name)));
+    await page.evaluate(() => DigitalTwin.sortPeaks('flood'));
+    sd = await page.evaluate(() => ({ groups: document.querySelectorAll('.twin-peaks-table .twin-peaks-flood').length, sort: document.querySelector('.twin-peaks-table thead th').getAttribute('aria-sort') }));
+    P = await page.evaluate(() => DigitalTwin._peaks());
+    ok('Flood pressed: grouped by flood again, newest first', sd.groups === P.floods.length && sd.sort === 'descending' && P.sort.dir === -1 && P.rows === null, J(sd));
 
     d = await open('babinda_post_office');
     const quiet = await page.evaluate(() => ({ P: DigitalTwin._peaks(), text: document.getElementById('twin-peaks').textContent.replace(/\s+/g, ' ').trim() }));

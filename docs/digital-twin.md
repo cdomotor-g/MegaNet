@@ -658,6 +658,42 @@ station.
 A peak the record does not place in AHD (the gauge's zero on the day is not
 known in AHD) keeps its own gauge height and has a dash in the other three
 columns; a flood the reference site has no peak for has a dash in the last.
+
+**Colours.** A peak's row is coloured by the flood level it passed *at its own
+gauge* — that gauge's minor, moderate and major classes, then its AEP flood
+levels — in the colours the water and the scale use: a swatch before the
+site's name (saying the class in words to a screen reader) and its two height
+cells tinted. By its level in m AHD on the gauge's own ladder where it has
+one, else by its height on the gauge against its classes. No colour: below
+minor there, or a gauge with no levels to say by. The key above the table
+names the colours.
+
+**Sorting.** The headings are buttons. *Flood* (as it opens) groups the
+table flood by flood, newest first; *site*, *Own gauge*, *m AHD*, *m LGH* and
+*Against* make it one list sorted by that column — by name A to Z, the
+figures highest first — each row then saying its own date. Pressed again, the
+other way. A row with nothing in the column sorts last either way. The order
+is for the session.
+
+**On the 3-D scale.** A station carries only its own gauge's five largest
+floods, and a new gauge has few: Gayndah Flume AL's go back to 2015, where
+the old gauge on the same spot and the town gauge 1.3 km down the Burnett
+record 1942, 2011 and 2013. So each site with a flood in m AHD has a tick
+box, *On the 3-D scale*: ticked, its floods join the station's own on the
+water's scale — a mark, a ring on the staff and a name each, *Jan 2013 ·
+Gayndah Flume*, colouring nothing, as the station's own floods do — and the
+water can be held at any of them. The water is one level over the patch, so
+a gauge's level in m AHD is only right a short way along the same reach:
+ticked by default are the gauges within 2 km on the same river (by the
+station records' stream, else their catchment) that are not a weir's or a
+dam's pool; any other can be ticked, and says why it was not. One level a
+flood: a flood on the station's own record is drawn from that, and one two
+gauges near by recorded from the nearer. A gauge that takes its flood
+history from another (`flood_peaks_from`) is not offered — its floods are
+that gauge's. ★ on the scale is then the highest of them all, named for its
+gauge, and the notes under the view say which gauges' floods are drawn. A
+choice that is not the default is kept for the station (settings
+`nearPeaks`). Never on borrowed levels, which are another river's.
 Nothing is filled in.
 
 These are **recorded heights set beside one another**, not a model: the

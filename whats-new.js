@@ -25,18 +25,27 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 277, date: '2026-11-12', items: [
+      '🌊 <strong>More floods on the digital twin\'s scale.</strong> In the 🧊 pane\'s <em>Flood peaks near here</em>, a gauge near by '
+        + 'has a tick box, <em>On the 3-D scale</em>: ticked, its recorded floods are drawn as water here beside the station\'s own, '
+        + 'on the slider and the staff. Gauges within 2 km on the same river start ticked — at Gayndah Flume AL that brings in '
+        + '1942, 2011 and 2013 from the old flume gauge and the town gauge.',
+      '🎨 <strong>The peaks table, coloured and sortable.</strong> Each peak is coloured by the flood level it passed at its own '
+        + 'gauge — minor, moderate, major or an AEP flood, in the scale\'s colours — and every heading sorts the table: by flood, '
+        + 'by site, or by any column of heights, highest first. Press it again for the other way.',
+    ] },
+    { n: 276, date: '2026-11-12', items: [
+      '🛰️ <strong>ALERT2 on the ALERT IDs tab.</strong> A new <em>ALERT / ALERT2</em> switch at the top of 🔗 ALERT IDs shows '
+        + 'every ALERT2 ID Flood-Net knows — the stations holding it, its slots on the slot table, and what the base stations '
+        + 'heard — with warnings for an ID heard that no station holds, and a finder for the next free ID. One ALERT2 ID can now '
+        + 'belong to two stations at one site, such as a weir\'s headwater and tailwater gauges, told apart by sensor number.',
+    ] },
     { n: 275, date: '2026-11-12', items: [
       '🌊 <strong>Flood water in the digital twin, where a station stands up the bank.</strong> Where a station\'s pin is on high '
         + 'ground away from its river — Gayndah Flume AL\'s is 130 m from the Burnett — the 🧊 twin looked for the river only within '
         + '60 m of the pin, found the bank instead, and drew no water below major. It now looks further out (up to 500 m) when the '
         + 'ground near the pin is too high for the station\'s own levels, so the water rises in the river from minor up, and a note '
         + 'under the view says how far it looked.',
-    ] },
-    { n: 275, date: '2026-11-12', items: [
-      '🛰️ <strong>ALERT2 on the ALERT IDs tab.</strong> A new <em>ALERT / ALERT2</em> switch at the top of 🔗 ALERT IDs shows '
-        + 'every ALERT2 ID Flood-Net knows — the stations holding it, its slots on the slot table, and what the base stations '
-        + 'heard — with warnings for an ID heard that no station holds, and a finder for the next free ID. One ALERT2 ID can now '
-        + 'belong to two stations at one site, such as a weir\'s headwater and tailwater gauges, told apart by sensor number.',
     ] },
     { n: 274, date: '2026-11-12', items: [
       '📋 <strong>The ALERT2 slot table.</strong> The ⏱️ TDMA Planner tab now opens with the slots the Mt Glorious ALERT2 network '

@@ -3215,8 +3215,10 @@ const TWIN_HELP = {
     + 'gauges within 25 km, flood by flood. Each peak is given as it read on its own gauge, in metres AHD, and '
     + 'as it would read on the gauge you have chosen (LGH); the last column is how much higher or lower the water '
     + 'peaked there than at the reference gauge in the same flood. <em>Compare from here</em> beside any gauge makes '
-    + 'it the reference, and every figure is worked again. These are recorded heights set side by side, not a '
-    + 'model of the river between the gauges.',
+    + 'it the reference, and every figure is worked again. Each row is coloured by the flood level it passed at '
+    + 'its own gauge — minor, moderate, major or an AEP flood — and the headings sort the table. Tick <em>On the 3-D '
+    + 'scale</em> beside a gauge to draw its floods as water here; gauges within 2 km on the same river are ticked '
+    + 'to begin with. These are recorded heights set side by side, not a model of the river between the gauges.',
     '<strong>The twin is inside the Stations map.</strong> With <em>Offer the digital twin at close '
     + 'zoom</em> ticked in Layers (it starts off), from zoom 17 with a station under the view a card '
     + 'on the map offers it, saying what aerial imagery covers the station and when '

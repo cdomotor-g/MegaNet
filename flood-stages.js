@@ -219,6 +219,80 @@ const FloodStages = (function () {
     };
   }
 
+  // ── Floods recorded near by ──────────────────────────────────────────────
+  // A station carries only its own gauge's five largest floods, and a new
+  // gauge has few: Gayndah Flume AL's go back to 2015, where the old gauge on
+  // the same spot (Gayndah Flume TM) and the town gauge 1.3 km down the
+  // Burnett record 1942, 2011 and 2013 — higher than anything on its own
+  // record. The twin's "Flood peaks near here" panel offers those floods to
+  // the scale, gauge by gauge, and this puts them on the ladder: each at the
+  // level its own gauge's record gives in m AHD (only those that have one),
+  // named for the gauge, a peak like the station's own — a mark and a ring,
+  // colouring nothing. One level a flood: where a flood is on the station's
+  // own record it is drawn from that, and where two gauges near by recorded
+  // the same flood, from the nearer (the sets come nearest first). The water
+  // is one level over the patch, so carrying a gauge's level in m AHD is
+  // right only a short way along the same reach — the twin offers by default
+  // only the gauges within 2 km on the same river, and says what it drew.
+  //
+  //   sets: [{ id, name, where, peaks: [{ date, ahd, height }] }], nearest first
+  //   → the ladder with the peaks added, `near` saying what came from where
+  function peakDay(date) {
+    const m = /^(\d{4})(?:-(\d\d)(?:-(\d\d))?)?/.exec(String(date || ''));
+    if (!m) return null;
+    return { y: m[1], ym: m[2] ? `${m[1]}-${m[2]}` : null, t: m[3] ? Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000 : null };
+  }
+  const SAME_FLOOD_DAYS = 3;   // the twin's PEAK_GAP_DAYS: peaks this close together are one flood
+  function sameFlood(a, b) {
+    const x = peakDay(a), y = peakDay(b);
+    if (!x || !y) return false;
+    if (x.t != null && y.t != null) return Math.abs(x.t - y.t) <= SAME_FLOOD_DAYS;
+    if (x.ym && y.ym) return x.ym === y.ym;
+    return x.y === y.y;
+  }
+  // The gauge's name as a scale label carries it: its type left off.
+  function siteTag(name) {
+    const t = String(name || '').replace(/\s+(AL|TM|AWS|ALERT|AUTO|TM AL)$/i, '').trim();
+    return t.length > 16 ? `${t.slice(0, 15)}…` : t;
+  }
+  function withPeaks(lad, sets) {
+    if (!lad || !Array.isArray(sets) || !sets.length) return lad;
+    const levels = lad.levels.map(l => ({ ...l }));
+    const dates = levels.filter(l => l.kind === 'peak').map(l => l.date);
+    const near = [];
+    for (const set of sets) {
+      let drawn = 0, same = 0;
+      for (const p of set.peaks || []) {
+        const ahd = num(p && p.ahd);
+        if (ahd == null) continue;
+        const date = p.date ? String(p.date).slice(0, 10) : null;
+        if (date && dates.some(d => sameFlood(d, date))) { same++; continue; }
+        dates.push(date);
+        levels.push({ key: `peak ${date || ''} @${set.id}`.replace(/\s+@/, ' @'), kind: 'peak', label: `Peak${date ? ` ${date}` : ''} at ${set.name}`,
+                      short: `${peakWhen(date)} · ${siteTag(set.name)}`, ahd, gauge: lad.ahdZero == null ? null : ahd - lad.ahdZero,
+                      recorded: num(p.height), rank: null, date, from: { id: set.id, name: set.name, where: set.where || null } });
+        drawn++;
+      }
+      near.push({ id: set.id, name: set.name, where: set.where || null, drawn, same });
+    }
+    if (!near.some(n => n.drawn)) return { ...lad, near };
+    // The highest recorded is the highest of them all now, wherever it was.
+    const peaks = levels.filter(l => l.kind === 'peak');
+    for (const l of peaks) {
+      if (!l.highest) continue;
+      delete l.highest;
+      l.label = l.from ? `Peak${l.date ? ` ${l.date}` : ''} at ${l.from.name}` : `Peak${l.date ? ` ${l.date}` : ''}`;
+    }
+    const high = peaks.reduce((a, b) => (b.ahd > a.ahd ? b : a));
+    high.highest = true;
+    high.label = `Highest recorded${high.date ? ` (${high.date}${high.from ? `, at ${high.from.name}` : ''})` : high.from ? ` (at ${high.from.name})` : ''}`;
+    levels.sort((a, b) => a.ahd - b.ahd || (a.rank ?? 99) - (b.rank ?? 99));
+    const said = near.filter(n => n.drawn).map(n => `${n.name}${n.where ? ` (${n.where})` : ''} — ${n.drawn} flood${n.drawn === 1 ? '' : 's'}`
+      + (n.same ? `, ${n.same} more already drawn from ${n.same === 1 ? 'a record' : 'records'} nearer` : ''));
+    const notes = [...lad.notes, `Floods recorded at gauges near by are on the scale too: ${said.join('; ')}. Each is the level its own gauge recorded, in m AHD — the river's fall between the gauges is not modelled. The Flood peaks near here panel chooses which gauges.`];
+    return { ...lad, levels, top: levels[levels.length - 1].ahd, notes, near };
+  }
+
   // ── Borrowed levels ──────────────────────────────────────────────────────
   // 3,710 stations have no heights at all to draw water from, and many of
   // them are a few kilometres up or down a river from one that has. The twin
@@ -802,6 +876,7 @@ const FloodStages = (function () {
     CLASSES, COLOURS, RISE_S, HOLD_S, DRAIN_S, ZERO_MAX_BELOW, ZERO_MAX_ABOVE,
     ladder, start, passed, colourOf, mix, cycle, gaugeText, ahdText, levelText,
     borrowable, borrowed, onGround, datumWords, datumWord, scale, spread, scaleText, peakWhen,
+    withPeaks, sameFlood, siteTag,
     curve, crowding, logFit, LOG_PX, LOG_GAP,
     lines, lineText, lineFigure, lineHow, figure,
   };

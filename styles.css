@@ -21033,6 +21033,34 @@ body.has-sort-bridge .signin-nudge { display: none; }
 .twin-peaks-table tr.is-ref td { font-weight: 600; }
 .twin-peaks-table tr.is-ref th[scope="row"] { box-shadow: inset 3px 0 0 var(--accent); }
 .twin-peaks-day { white-space: nowrap; }
+/* The class a peak passed at its own gauge (--band, the water's colours):
+   a swatch before the name, and the two height cells tinted with it — the
+   swatch carries its name for a screen reader, so colour is never alone. */
+.twin-peaks-band {
+  display: inline-block;
+  width: .7em; height: .7em;
+  margin-right: .35em;
+  vertical-align: baseline;
+  border-radius: 2px;
+  background: var(--band);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 25%, transparent);
+}
+.twin-peaks-band.is-none { background: none; box-shadow: none; }
+.twin-peaks-table tr.has-band td.twin-peaks-own,
+.twin-peaks-table tr.has-band td.twin-peaks-ahd { background: color-mix(in srgb, var(--band) 24%, transparent); }
+.twin-peaks-key { margin: 0 0 var(--sp-2); }
+.twin-peaks-chip { border-left: .6em solid var(--band); }
+/* The headings sort the table: a button each, the arrow on the one in use. */
+.twin-peaks-sort {
+  font: inherit; color: inherit; font-weight: 600;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  text-align: inherit;
+}
+.twin-peaks-sort:hover { text-decoration: underline; }
+.twin-peaks-sort:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.twin-peaks-sort[data-dir="desc"]::after { content: " \25BE"; }
+.twin-peaks-sort[data-dir="asc"]::after { content: " \25B4"; }
+.twin-peaks-onscale { grid-column: 1 / -1; font-size: var(--fs-sm); margin: .15rem 0 0; }
 .twin-peaks-ref {
   display: inline-block;
   padding: 0 .4rem;
