@@ -242,7 +242,7 @@ const TdmaSlots = (function () {
     }
     const ticks = [];
     const step = frame > 30 ? 10 : 5;
-    for (let t = 0; t <= frame; t += step) ticks.push(`<line x1="${x(t)}" x2="${x(t)}" y1="${H}" y2="${H + 4}" class="tds-tick"/><text x="${x(t)}" y="${H + 15}" class="tds-tick-t">${t} s</text>`);
+    for (let t = 0; t <= frame; t += step) ticks.push(`<line x1="${x(t)}" x2="${x(t)}" y1="${H}" y2="${H + 4}" class="tds-tick"/><text x="${x(t)}" y="${H + 15}" class="tds-tick-t"${t === 0 ? ' text-anchor="start"' : t >= frame ? ' text-anchor="end"' : ''}>${t} s</text>`);
     return `<figure class="tds-fig"><svg viewBox="0 -1 ${W} ${H + 19}" role="img" aria-label="${esc(`The ${fmtS(frame)} s frame on ${fmtMhz(C.freq_mhz)} MHz: ${K.used} slots held, ${K.spare} spare`)}">
       <rect x="0" y="2" width="${W}" height="${H - 4}" class="tds-spare-bg"/>${bars.join('')}${ticks.join('')}</svg>
       <figcaption class="small txt-muted">The frame, left to right; each block a site's run of slots (hover for whose). The gaps are spare.</figcaption></figure>`;
@@ -256,7 +256,7 @@ const TdmaSlots = (function () {
     const parts = [];
     if (e.air.source) parts.push(`${fmtN(e.air.source)} sent`);
     if (e.air.relay) parts.push(`${fmtN(e.air.relay)} passed on`);
-    return `${parts.join(', ')}${e.air.last ? `<br><span class="small txt-muted">last ${esc(dmy(e.air.last))}</span>` : ''}`;
+    return `${parts.join('<br>')}${e.air.last ? `<br><span class="small txt-muted">last ${esc(dmy(e.air.last))}</span>` : ''}`;
   }
   function stationCell(e) {
     if (e.station) return `<button type="button" class="link-btn" onclick="goToStation('${escAttr(e.station.id)}')">${esc(e.station.name || e.station.id)}</button>`;
@@ -273,7 +273,7 @@ const TdmaSlots = (function () {
         <td>${stationCell(e)}</td>
         <td>${e.runs.map(r => `${esc(runText(r, slotS))}${ed ? ` <button type="button" class="link-btn small" onclick="TdmaSlots.openRemove(${r.start}, ${r.n})" aria-label="${escAttr(`Make ${runText(r, slotS)} spare`)}">✕</button>` : ''}`).join('<br>')}
           <span class="small txt-muted">(${e.count} slot${e.count === 1 ? '' : 's'})</span></td>
-        <td class="tdp-num">${airHtml(e)}</td>
+        <td class="tdp-num tds-air">${airHtml(e)}</td>
         <td class="small">${notesHtml(e)}</td>
         ${ed ? `<td><button type="button" class="link-btn" onclick="TdmaSlots.openSite(${i})">Change</button></td>` : ''}
       </tr>`).join('');

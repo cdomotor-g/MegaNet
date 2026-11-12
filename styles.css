@@ -28744,8 +28744,10 @@ select.kl-in { width: auto; font-family: inherit; }
 .tds-spare-bg { fill: var(--surface-2, var(--border)); opacity: .5; }
 .tds-bar-warn { stroke: var(--warn, #b45309); stroke-width: 2; }
 .tds-tick { stroke: var(--muted); }
-.tds-tick-t { fill: var(--muted); font-size: 11px; text-anchor: middle; }
+.tds-tick-t { fill: var(--muted); font-size: 11px; }
+.tds-tick-t:not([text-anchor]) { text-anchor: middle; }
 .tds-table td, .tds-table th { vertical-align: top; }
+.tds-table td.tds-air { white-space: normal; overflow: visible; text-overflow: clip; min-width: 8rem; }
 .tds-form { margin: var(--sp-2) 0; padding: var(--sp-3); }
 .tds-form-h { margin: 0 0 var(--sp-2); font-size: var(--fs-md, 1rem); }
 .tds-form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(12rem, 100%), 1fr)); gap: var(--sp-2) var(--sp-3); }

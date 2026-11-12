@@ -4056,8 +4056,10 @@ const DB_SCHEMA = 'meganet';
 // Base Stations tab reads both, and a database without them says which file.
 // 118: tags on tasks (0118), applied by db-migrate.yml on 12 November 2026,
 // bumped after; tasks.js and admin-tags.js read them, and a database without
-// them shows no tags.
-const DB_SCHEMA_VERSION = 119;
+// them shows no tags. 120: the ALERT2 slot table on file (0120), applied by
+// db-migrate.yml on 12 November 2026, bumped after; tdma-slots.js reads it, and
+// a database without it says the slot table is not there yet.
+const DB_SCHEMA_VERSION = 120;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
