@@ -297,6 +297,11 @@ row but *Relay path*, *Day by day* and *Too few to count* opens. The days come
 from the same rollup rows the rest of the table reads, so opening a row asks
 the database for nothing more.
 
+**Sorting.** Click a heading of the breakdown, or of the stations in an opened
+row, to sort by it — words A to Z, numbers biggest first — and again for the
+other way; ▲ or ▼ says which. *Too few to count* stays at the foot. Both
+tables start busiest first, and the CSVs follow the order on screen.
+
 ### Not in the register — whose are they?
 
 **Not in the register** (`0114`; also the button on that row of any other

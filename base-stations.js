@@ -1820,6 +1820,28 @@ const BaseStations = (function () {
   // The rows opened out into their stations, by row key, and those showing every station (0124).
   const IN_OPEN_TOP = 25;
   let inOpened = new Set(), inOpenedAll = new Set();
+  // How the breakdown's rows, and the stations in an opened row, are sorted:
+  // a heading clicked once sorts by it (words A to Z, numbers biggest first),
+  // again the other way. Busiest first until somebody picks.
+  let inSort = { key: 'both', dir: -1 }, inMSort = { key: 'both', dir: -1 };
+  const IN_SORT_KEYS = { label: g => String(g.label), n: g => (g.n == null ? -1 : g.n), a: g => g.a, a2: g => g.a2, both: g => g.a + g.a2, share: g => g.a + g.a2 };
+  const IN_MSORT_KEYS = { name: m => inMemberName(m), id: m => Math.min(...[...m.ids.values()].map(e => Number(e.id))), a: m => m.a, a2: m => m.a2,
+    both: m => m.a + m.a2, share: m => m.a + m.a2, days: m => (m.days == null ? -1 : m.days), heard: m => m.at.size };
+  function inSorted(list, how, keys) {
+    const f = keys[how.key] || keys.both;
+    return list.slice().sort((p, q) => {
+      const x = f(p), y = f(q);
+      const c = typeof x === 'string' ? x.localeCompare(y, 'en-AU', { numeric: true, sensitivity: 'base' }) : x - y;
+      return c * how.dir || (q.a + q.a2) - (p.a + p.a2) || String(p.label || p.key).localeCompare(String(q.label || q.key));
+    });
+  }
+  // A heading that sorts: the control inside the cell, aria-sort on the cell (as Repeaters).
+  function inSortTh(which, key, inner, cls) {
+    const s = which === 'm' ? inMSort : inSort, on = s.key === key;
+    return `<th scope="col"${cls ? ` class="${cls}"` : ''}${on ? ` aria-sort="${s.dir > 0 ? 'ascending' : 'descending'}"` : ''}>`
+      + `<button type="button" class="th-sort" onclick="BaseStations.inSortBy('${which}', '${key}')" title="Sort by this">${inner}`
+      + (on ? `<span class="th-arrow" aria-hidden="true">${s.dir > 0 ? '▲' : '▼'}</span>` : '') + '</button></th>';
+  }
   // The ACMA's devices, for the unknown stations' frequencies: { loading } | { list: [{ f, client, site, lat, lon }] } | { err }.
   let inAcma = null;
 
@@ -1983,14 +2005,14 @@ const BaseStations = (function () {
   }
   // …read once the rows are added up: busiest first, with its days decoded and whether it has gone quiet.
   function inMembers(g, nDays) {
-    const ms = [...g.m.values()].sort((p, q) => (q.a + q.a2) - (p.a + p.a2) || String(p.key).localeCompare(String(q.key)));
+    const ms = [...g.m.values()];
     for (const m of ms) {
       if (!nDays) continue;
       const t = m.dA.map((v, i) => v + m.dA2[i]);
       m.days = t.filter(v => v > 0).length;
       m.quiet = nDays >= 3 && t.slice(0, -2).some(v => v > 0) && !t.slice(-2).some(v => v > 0);
     }
-    return ms;
+    return inSorted(ms, inMSort, IN_MSORT_KEYS);
   }
 
   const inPathLabel = p => ((p.path || []).length
@@ -2037,8 +2059,7 @@ const BaseStations = (function () {
         }
       }
     }
-    const rows = [...by.values()].map(g => Object.assign(g, { n: g.n != null ? g.n : g.ids.size, members: inBy === 'path' ? null : inMembers(g, nDays) }))
-      .sort((p, q) => (q.a + q.a2) - (p.a + p.a2) || String(p.label).localeCompare(String(q.label)));
+    const rows = inSorted([...by.values()].map(g => Object.assign(g, { n: g.n != null ? g.n : g.ids.size, members: inBy === 'path' ? null : inMembers(g, nDays) })), inSort, IN_SORT_KEYS);
     // What was decoded but not counted as a station: the rest of each protocol's total.
     const tot = xs.map(inRead).reduce((t, v) => ({ a: t.a + Number(v.a.ok), a2: t.a2 + Number(v.a2.ok) }), { a: 0, a2: 0 });
     const listed = inBy === 'path' ? { a: 0, a2: rows.reduce((n, g) => n + g.a2, 0) }
@@ -2097,12 +2118,12 @@ const BaseStations = (function () {
       const hidden = b.rows.length - shown.length;
       out = `<div class="table-wrap" role="region" tabindex="0" aria-label="Decoded messages by ${esc(head.toLowerCase())}"><table class="adm-table bs-in-b">
           <caption class="sr-only">Decoded messages by ${esc(head.toLowerCase())}: the stations in each row, their legacy ALERT and ALERT2 messages, and the row's share of them all</caption>
-          <thead><tr><th scope="col" class="bs-in-g">${term ? inTerm(term) : esc(inBy === 'station' ? 'Station' : head)}</th><th scope="col">${inTerm('in-stations', path ? 'ALERT2 stations' : 'Stations')}</th>
-            ${path ? '' : `<th scope="col">${inTerm('in-legacy', 'Legacy ALERT decoded')}</th>`}<th scope="col">${inTerm('in-alert2', 'ALERT2 decoded')}</th>
-            ${path ? '' : '<th scope="col">Both</th>'}<th scope="col" class="bs-in-p">${inTerm('in-part')}</th></tr></thead>
+          <thead><tr>${inSortTh('b', 'label', term ? inTerm(term) : esc(inBy === 'station' ? 'Station' : head), 'bs-in-g')}${inSortTh('b', 'n', inTerm('in-stations', path ? 'ALERT2 stations' : 'Stations'))}
+            ${path ? '' : inSortTh('b', 'a', inTerm('in-legacy', 'Legacy ALERT decoded'))}${inSortTh('b', path ? 'both' : 'a2', inTerm('in-alert2', 'ALERT2 decoded'))}
+            ${path ? '' : inSortTh('b', 'both', 'Both')}${inSortTh('b', 'share', inTerm('in-part'), 'bs-in-p')}</tr></thead>
           <tbody>${body}</tbody></table></div>`
-        + (hidden > 0 || (inMore && b.rows.length > IN_TOP) ? `<p class="small"><button type="button" class="pill" onclick="BaseStations.inAll()">${inMore ? 'Show the top ' + IN_TOP + ' only' : 'Show all ' + chN(b.rows.length) + ' rows'}</button></p>` : '')
-        + (path ? '' : '<p class="small qs-dim">Open a row (▸, or anywhere on it) for the stations in it, each with a bar a day.</p>')
+        + (hidden > 0 || (inMore && b.rows.length > IN_TOP) ? `<p class="small"><button type="button" class="pill" onclick="BaseStations.inAll()">${inMore ? 'Show the first ' + IN_TOP + ' only' : 'Show all ' + chN(b.rows.length) + ' rows'}</button></p>` : '')
+        + (path ? '' : '<p class="small qs-dim">Open a row (▸, or anywhere on it) for the stations in it, each with a bar a day. Click a heading to sort by it, again to sort the other way.</p>')
         + (b.joint ? '<p class="small qs-dim">A station owned jointly is counted under each of its owners, so these rows add up to more than the total; each share is of the total.</p>' : '')
         + (inAt === 'all' && heard.length > 1 ? '<p class="small qs-dim">All base stations together: a station two of them decode is one station, and its messages are counted at each.</p>' : '');
     }
@@ -2175,11 +2196,11 @@ const BaseStations = (function () {
     return `<div class="bs-in-open-in">
         <p class="small">${facts.join(' · ')}</p>${spark}
         <div class="table-wrap" role="region" tabindex="0" aria-label="The ${esc(what)} in ${esc(g.label)}"><table class="adm-table bs-in-m">
-          <caption class="sr-only">The ${esc(what)} in ${esc(g.label)}, busiest first: ${idsMode ? '' : 'the station, '}its IDs, legacy ALERT and ALERT2 messages decoded, its share of the row, the days it was decoded on, a bar a day and the base stations that heard it</caption>
-          <thead><tr>${idsMode ? '' : '<th scope="col">Station</th>'}<th scope="col">${idsMode ? 'ID' : 'IDs'}</th><th scope="col">${inTerm('in-legacy', 'Legacy ALERT')}</th><th scope="col">${inTerm('in-alert2')}</th>
-            <th scope="col">${inTerm('in-row-share')}</th><th scope="col">${inTerm('in-days')}</th><th scope="col">${inTerm('in-day-bars')}</th><th scope="col">${inTerm('in-heard-at')}</th></tr></thead>
+          <caption class="sr-only">The ${esc(what)} in ${esc(g.label)}: ${idsMode ? '' : 'the station, '}its IDs, legacy ALERT and ALERT2 messages decoded, its share of the row, the days it was decoded on, a bar a day and the base stations that heard it</caption>
+          <thead><tr>${idsMode ? '' : inSortTh('m', 'name', 'Station')}${inSortTh('m', 'id', idsMode ? 'ID' : 'IDs')}${inSortTh('m', 'a', inTerm('in-legacy', 'Legacy ALERT'))}${inSortTh('m', 'a2', inTerm('in-alert2'))}
+            ${inSortTh('m', 'share', inTerm('in-row-share'))}${inSortTh('m', 'days', inTerm('in-days'))}<th scope="col">${inTerm('in-day-bars')}</th>${inSortTh('m', 'heard', inTerm('in-heard-at'))}</tr></thead>
           <tbody>${body}</tbody></table></div>
-        <p class="small pill-row">${ms.length > IN_OPEN_TOP ? `<button type="button" class="pill" onclick="BaseStations.inOpenAll(this)">${all ? 'Show the busiest ' + IN_OPEN_TOP + ' only' : 'Show all ' + esc(chN(ms.length)) + ' ' + what}</button>` : ''}
+        <p class="small pill-row">${ms.length > IN_OPEN_TOP ? `<button type="button" class="pill" onclick="BaseStations.inOpenAll(this)">${all ? 'Show the first ' + IN_OPEN_TOP + ' only' : 'Show all ' + esc(chN(ms.length)) + ' ' + what}</button>` : ''}
           <button type="button" class="pill" onclick="BaseStations.inOpenSave(this)">Save ${idsMode ? (ms.length === 1 ? 'this ID' : 'these IDs') : (ms.length === 1 ? 'this station' : 'these stations')} as CSV</button></p>
         ${days ? '' : '<p class="small qs-dim">A bar a day for each needs db/migrations/0124_base_station_ingest_station_days.sql applied.</p>'}
       </div>`;
@@ -2460,6 +2481,16 @@ const BaseStations = (function () {
     paintIn();
   }
   function inAll() { inMore = !inMore; paintIn(); }
+
+  // A sorting heading clicked: 'b' the breakdown, 'm' the stations in its opened rows.
+  function inSortBy(which, key) {
+    const keys = which === 'm' ? IN_MSORT_KEYS : IN_SORT_KEYS;
+    if (!keys[key]) return;
+    const s = which === 'm' ? inMSort : inSort;
+    const next = s.key === key ? { key, dir: -s.dir } : { key, dir: key === 'label' || key === 'name' || key === 'id' ? 1 : -1 };
+    if (which === 'm') inMSort = next; else inSort = next;
+    paintIn();
+  }
 
   // A row opened out into its stations, or closed (0124): a click anywhere on
   // it but a link or another button, or its ▸ from the keyboard.
@@ -3105,7 +3136,7 @@ const BaseStations = (function () {
   }
 
   return { render, init, load, open, close, ask, askFrom, cancel, field, stick, resetForm, saveSettings,
-           keyField, addKey, removeKey, mailSet, authChanged, wfWindow, chWindow, stWindow, stSave, inWindow, inSave, inGroup, inFor, inAll, inBreakSave, inOpen, inOpenAll, inOpenSave, inStation, sub, fold,
+           keyField, addKey, removeKey, mailSet, authChanged, wfWindow, chWindow, stWindow, stSave, inWindow, inSave, inGroup, inFor, inAll, inBreakSave, inOpen, inOpenAll, inOpenSave, inStation, inSortBy, sub, fold,
            // Pure, for test/basestations.mjs.
            _liveness: liveness, _flags: flags, _recoverHtml: recoverHtml, _lostHtml: lostHtml, _patchFrom: patchFrom, _formFrom: formFrom, _stickNowHtml: stickNowHtml, _parseChans: parseChans, _checksHtml: checksHtml, _decodersFor: decodersFor, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf,
            _chRows: chRows, _chVerdict: chVerdict, _inRead: inRead };

@@ -869,6 +869,26 @@ try {
       && rowCsv.rows[1].slice(13).reduce((n, v) => n + Number(v), 0) === 14700, JSON.stringify(rowCsv));
   await page.click('#bs-in-by tr.is-open:has-text("Southern Downs Regional Council") th');
   ok('a second click closes it', await page.evaluate(() => document.querySelectorAll('#bs-in-by tr.bs-in-sub').length === 1));
+  // …and its headings sort, the rows' and the stations' apart
+  const firstCells = () => page.evaluate(() => [...document.querySelectorAll('#bs-in-by table.bs-in-b > tbody > tr:not(.bs-in-sub) > th')].map(c => c.innerText.replace(/\s+/g, ' ').trim()));
+  ok('the breakdown is busiest first to begin with, its heading saying so',
+    await page.evaluate(() => [...document.querySelectorAll('#bs-in-by table.bs-in-b > thead th[aria-sort]')].map(t => t.innerText.replace(/\s+/g, ' ').trim() + ' ' + t.getAttribute('aria-sort')).join('|') === 'Both ▼ descending'));
+  await page.click('#bs-in-by table.bs-in-b > thead button.th-sort:has-text("Owner")');
+  let order = await firstCells();
+  ok('a click on a heading sorts by it — words A to Z — with "too few to count" kept at the foot',
+    order.join('|') === 'Byron Shire Council|Not in the register — who are they?|NSW DCCEEW|Southern Downs Regional Council|Too few to count, or no ID', JSON.stringify(order));
+  await page.click('#bs-in-by table.bs-in-b > thead button.th-sort:has-text("Owner")');
+  order = await firstCells();
+  ok('…and a second click the other way, the heading saying which',
+    order.join('|') === 'Southern Downs Regional Council|NSW DCCEEW|Not in the register — who are they?|Byron Shire Council|Too few to count, or no ID'
+      && await page.evaluate(() => document.querySelector('#bs-in-by table.bs-in-b > thead th[aria-sort]').getAttribute('aria-sort') === 'descending'), JSON.stringify(order));
+  await page.click('#bs-in-by table.bs-in-m thead button.th-sort:has-text("ALERT2")');
+  const ids = await page.evaluate(() => [...document.querySelectorAll('#bs-in-by table.bs-in-m tbody tr')].map(tr => tr.children[1].innerText.trim()));
+  ok('an opened row\'s stations sort by their own headings, numbers biggest first',
+    ids.join('|') === 'ALERT2 33300|Legacy ID 7777'
+      && await page.evaluate(() => document.querySelector('#bs-in-by table.bs-in-m thead th[aria-sort]').innerText.trim().startsWith('ALERT2')), JSON.stringify(ids));
+  await page.click('#bs-in-by table.bs-in-b > thead button.th-sort:has-text("Both")');
+  await page.click('#bs-in-by table.bs-in-m thead button.th-sort:has-text("Share of the row")');
   await page.click('#bs-in-by button:has-text("Kind of sensor")');
   by = await byRows();
   ok('by kind of sensor: the legacy sensor\'s type, and for ALERT2 what the station is',
