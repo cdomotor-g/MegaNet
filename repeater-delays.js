@@ -32,7 +32,7 @@
 const RepeaterDelays = (function () {
   const LS_KEY = 'mn-delay-plan';
   const LIMITS = [
-    { ms: 999,  label: 'Under 1 s (999 ms)', note: 'what the register can hold now' },
+    { ms: 999,  label: 'Under 1 s (999 ms)', note: 'a delay is recorded up to 9999 ms' },
     { ms: 1499, label: 'Up to 1.5 s', note: '' },
     { ms: 1999, label: 'Up to 2 s', note: '' },
     { ms: 2999, label: 'Up to 3 s', note: '' },
@@ -87,7 +87,7 @@ const RepeaterDelays = (function () {
       oneDelay: `How far apart the two copies would land if every repeater had the same delay — assumed, since ${nowIs}. Predicted, not measured.`,
       planned: 'How far apart the two copies would land with the suggested delays — predicted, not measured.',
       used: 'How many different delay values the plan needs, and the longest of them.',
-      limit: 'The longest delay the repeaters\' own settings accept — your pick, not something on record. Flood-Net\'s register can only record up to 999 ms today, so a longer plan cannot be written down yet.',
+      limit: 'The longest delay the repeaters\' own settings accept — your pick, not something on record. Flood-Net\'s register records a delay up to 9999 ms.',
       current: 'If you know every repeater is set to the same delay now, enter it: the plan then leaves as many as it can on that value, so fewer sites need a visit. Leave it blank if nobody knows.',
       keep: 'Treat a delay already recorded on a station as set in the field and fixed, and plan the other repeaters around it. Untick to plan every repeater afresh.',
       recorded: 'This delay is recorded on the repeater\'s station, so the plan keeps it as it is rather than suggesting another.',
@@ -261,7 +261,7 @@ self.onmessage = e => {
   function suggestion(station) {
     if (!station || !station.id) return null;
     const r = planAtDefaults().repeaters.find(x => x.id === station.id);
-    return r ? { delay: r.delay, status: r.status, cluster: r.cluster } : null;
+    return r ? { delay: r.delay, status: r.status, cluster: r.cluster, recorded: r.recorded } : null;
   }
 
   // ── Drawing ────────────────────────────────────────────────────────────────
@@ -390,8 +390,8 @@ self.onmessage = e => {
               <td>${num(p.counts.delaysUsed.length)}, up to ${ms(p.counts.delaysUsed[p.counts.delaysUsed.length - 1] || 0)}</td></tr>`).join('')}
           </tbody>
         </table></div>
-        <p class="small txt-muted">Every count here is predicted, from the same register and assumptions. A delay over 999 ms cannot be
-          recorded on a station yet — the register's limit (0015). Check the repeaters' own limit before planning past a second.</p>`;
+        <p class="small txt-muted">Every count here is predicted, from the same register and assumptions. The register records a delay up to
+          9999 ms (0117). Check the repeaters' own limit before planning past a second.</p>`;
     return `<details class="rd-fold" data-k="compare"><summary><h3 class="bk-inline-h" id="rd-h-compare">What a longer delay buys</h3></summary>
       ${body}</details>`;
   }
@@ -513,7 +513,7 @@ self.onmessage = e => {
           <button class="link-btn" onclick="switchTab('health')">Station Health</button> tabs show whether the corrupted copies fall once a
           group is set.</li>
         <li><strong>Recording it.</strong> Record each delay on its station as it is set — the Stations tab, the repeater's card, <em>Repeater
-          delay (ms)</em> — and from then on it shows here as on record and the plan keeps it. The register takes up to 999 ms.</li>
+          delay (ms)</em> — and from then on it shows here as on record and the plan keeps it. The register takes up to 9999 ms.</li>
       </ul>
       <p><button class="btn" onclick="RepeaterDelays.reset()">Put the settings back</button></p>
     </details>`;

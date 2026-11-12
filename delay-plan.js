@@ -62,7 +62,7 @@
 //
 // ── The search ───────────────────────────────────────────────────────────────
 // Delays are whole steps of gridMs (50 ms, easy to set and to read back) from
-// 0 to maxMs (999: the register's own limit, 0015_repeater_delay.sql). Every
+// 0 to maxMs (999 by default; the register takes up to 9999, 0117_repeater_delay_9999.sql). Every
 // repeater starts on the delay it has now — recorded, or the one value they
 // are all thought to share — and then, busiest first, each moves to whichever
 // step costs least given the rest, over and over until nothing improves; then
@@ -79,7 +79,7 @@ const DelayPlan = (function () {
     leadMs: 300,        // key-up and preamble before the frame
     frameMs: 133,       // 40 bits at 300 baud
     gridMs: 50,         // delays are whole steps of this
-    maxMs: 999,         // the longest delay the repeaters (and the register) take
+    maxMs: 999,         // the longest delay the repeaters take (the register records up to 9999)
     maxHops: 4,         // a reading is followed this many repeaters from its station
     currentMs: null,    // the one delay every repeater is thought to be on now, if known
     keepRecorded: true, // a delay recorded on a station is kept as it is

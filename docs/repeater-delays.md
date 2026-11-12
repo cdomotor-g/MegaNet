@@ -20,7 +20,7 @@ repeaters accept longer delays, every pair can be cleared:
 | Longest delay | On top | Close | Clear | Delays used |
 | --- | ---: | ---: | ---: | --- |
 | Every repeater on one delay (now, presumably) | 157 | 0 | 37 | one |
-| Under 1 s (999 ms) — what the register holds | 7 | 33 | 154 | 18, up to 950 ms |
+| Under 1 s (999 ms) — a delay is recorded up to 9999 ms | 7 | 33 | 154 | 18, up to 950 ms |
 | Up to 1.5 s | 0 | 15 | 179 | 19, up to 1,450 ms |
 | Up to 2 s | 0 | 5 | 189 | 16, up to 1,950 ms |
 | Up to 3 s | 0 | 0 | 194 | 18, up to 2,900 ms |
@@ -30,10 +30,9 @@ frame apart or more, but the later repeater keys up during the earlier one's fra
 that copy is spoilt wherever the two arrive at about the same strength (no ghost, but a
 lost copy). *Clear*: a lead-in and a frame apart (433 ms) — neither copy touches the other.
 
-A delay over 999 ms cannot be recorded on a station yet (`meganet.repeater.delay_ms` is
-checked under 1000, migration `0015`), and the repeaters' own limit is not on record. If
-they take 3 s, use the **Delay, up to 3 s** column instead and the register's limit can
-be raised to match.
+The register records a delay up to 9999 ms (`meganet.repeater.delay_ms`, migration `0117`;
+it was 999 until a repeater set to 2700 ms would not save). The repeaters' own limit is not
+on record: if they take 3 s, use the **Delay, up to 3 s** column.
 
 ## What was found
 

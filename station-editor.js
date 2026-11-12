@@ -461,6 +461,13 @@ function editorChecksPaint(id) {
 function efDelaySuggestionHtml(s) {
   const sug = typeof RepeaterDelays !== 'undefined' ? RepeaterDelays.suggestion(s) : null;
   if (!sug) return '';
+  // A delay on record is kept by the plan as it is, so the plan's figure for
+  // this repeater is that delay, not a suggestion: say so rather than echo it.
+  if (sug.recorded != null) return `<div class="full small ef-hint">
+          On record: <strong>${sug.recorded} ms</strong> — the
+          <button type="button" class="link-btn" onclick="switchTab('repdelays')">⏳ Repeater Delays</button> plan keeps a recorded delay
+          and plans the other repeaters around it. Clear the field to see what the plan would suggest.
+        </div>`;
   return sug.status === 'free' || !sug.cluster ? `<div class="full small ef-hint">
           Suggested: <strong>any</strong> — no other repeater relays its readings to a receiver that hears both
           (<button type="button" class="link-btn" onclick="switchTab('repdelays')">⏳ Repeater Delays</button>).
@@ -726,7 +733,7 @@ function editorForm(s) {
       <div class="form-grid ef-grid">
         <label>ACMA Licence<input type="text" id="ef-acma" value="${esc(s.repeater?.acma_licence || '')}"></label>
         ${efFieldHtml({ id: 'ef-delay', caption: 'Repeater delay (ms)', hint: 'ef-h-delay',
-          control: `<input type="number" min="0" max="999" step="1" id="ef-delay"
+          control: `<input type="number" min="0" max="9999" step="1" id="ef-delay"
                  value="${s.repeater?.delay_ms ?? ''}" placeholder="not set">` })}
         <div class="full small ef-hint hint-fold" id="ef-h-delay" hidden>
           How long this repeater waits before re-transmitting a message its pass ranges accept.
@@ -1187,7 +1194,7 @@ function editorReadForm() {
       tx_mhz:       pFloat(document.getElementById('ef-tx')?.value),
       pass_ranges:  parseRangeLines(document.getElementById('ef-pass')?.value || ''),
       exclusions:   parseRangeLines(document.getElementById('ef-excl')?.value || ''),
-      delay_ms:     delay == null ? null : Math.max(0, Math.min(999, delay)),
+      delay_ms:     delay == null ? null : Math.max(0, Math.min(9999, delay)),
       notes:        d.repeater?.notes || '',
     };
   }
