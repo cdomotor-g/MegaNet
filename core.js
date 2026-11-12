@@ -4064,8 +4064,10 @@ const DB_SCHEMA = 'meganet';
 // bumped after; tasks.js and admin-tags.js read them, and a database without
 // them shows no tags. 120: the ALERT2 slot table on file (0120), applied by
 // db-migrate.yml on 12 November 2026, bumped after; tdma-slots.js reads it, and
-// a database without it says the slot table is not there yet.
-const DB_SCHEMA_VERSION = 120;
+// a database without it says the slot table is not there yet. 121: one ALERT2
+// address for several stations, told apart by sensor (0121), applied by
+// db-migrate.yml on 12 November 2026, bumped after; no shape the app reads changes.
+const DB_SCHEMA_VERSION = 121;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

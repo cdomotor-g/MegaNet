@@ -28780,7 +28780,7 @@ select.kl-in { width: auto; font-family: inherit; }
 .tds-form-grid input { width: 100%; }
 .tds-words dt { font-weight: 600; margin-top: var(--sp-1); }
 .tds-words dd { margin: 0 0 0 var(--sp-3); }
-.pr-proto { display: inline-flex; gap: 0; margin-bottom: var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+.pr-proto { display: inline-flex; width: max-content; max-width: 100%; justify-self: start; align-self: flex-start; gap: 0; margin-bottom: var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
 .pr-proto-btn { border: 0; border-radius: 0; padding: var(--sp-1) var(--sp-4); background: var(--surface); color: var(--text); font-weight: 600; }
 .pr-proto-btn + .pr-proto-btn { border-left: 1px solid var(--border); }
 .pr-proto-btn.active { background: var(--accent); color: var(--accent-contrast, #fff); }
