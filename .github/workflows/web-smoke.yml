@@ -2658,6 +2658,13 @@ jobs:
       - name: check_teams_and_tasks.sql
         if: ${{ !cancelled() && steps.load.outcome == 'success' }}
         run: psql -v ON_ERROR_STOP=1 -f tools/check_teams_and_tasks.sql
+      # Tags on tasks (0118): every approved account reads the list, nobody
+      # else; a task's team and whoever manages it tag it, a new name making a
+      # new tag; every change in the thread; only an administrator renames,
+      # retires, merges and removes one.
+      - name: check_task_tags.sql
+        if: ${{ !cancelled() && steps.load.outcome == 'success' }}
+        run: psql -v ON_ERROR_STOP=1 -f tools/check_task_tags.sql
       # One person, one account (0100): an administrator folds a second
       # account into the first — teams, owning, tasks, notes, the plan's list,
       # devices, views, role, approval and editing move over — and its address

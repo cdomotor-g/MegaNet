@@ -352,6 +352,13 @@ so a stranger can cause a notification; at most one a minute reaches each device
   Somebody has to be approved before they can be put on a team. Telling a team when a task
   arrives waits for #237's email (and #216's alerts); until then it waits on the Tasks tab
   and on the station's card.
+* **Tags on tasks** (`0118`). Anybody tasks are for puts tags on them — RTS, QA,
+  Assessment to start — and makes a new one by typing it on a task. Admin tab → **Tags**
+  is where an administrator tidies them: open one to change its name, what it means or its
+  colour, tick *Retired* so it is no longer offered (the tasks that have it keep it), or
+  merge it into another that means the same. A tag no task has can be removed. Every
+  member reads the tag list; who made each and how many tasks have it are for
+  administrators.
 * **Somebody with two accounts** — a personal address and a Bureau one, say. Admin tab →
   users table → **Same person…** on the account they will stop signing in with → type the
   address of the account they keep → **Next** → leave *Send Flood-Net's emails to …* ticked

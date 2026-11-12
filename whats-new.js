@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 273, date: '2026-11-12', items: [
+      '🏷️ <strong>Tags on tasks.</strong> Put short words of your own on a task to say what kind of job it is — it starts with '
+        + '<em>RTS</em> (Return to service), <em>QA</em> (Quality assurance) and <em>Assessment</em> (FWIN site assessment). On the ✅ '
+        + 'Tasks tab, press a tag on a task\'s form to put it on, or type a new one and say what it means: it is offered to everybody '
+        + 'from then on. Tags show on each row and pin, hover one for its meaning, and the new <em>Tag</em> filter picks the tasks with one. '
+        + 'Administrators rename, recolour, retire and merge tags on the Admin tab, under <em>Tags</em>.',
+    ] },
     { n: 272, date: '2026-11-12', items: [
       '✏️ <strong>Change a task where you see it.</strong> On the ✅ Tasks tab, the list\'s Team, Status and Due columns are now '
         + 'pickers: choose a team for an unassigned task, hand one to another team, move it on or set its date right in its row, and '

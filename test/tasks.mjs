@@ -38,6 +38,14 @@
 //                   box offering the approved accounts not on it; take
 //                   somebody off; remove one with tasks refused in words; an
 //                   editor shown the panel's purpose and no control.
+//   Tags (0118)     a row's tags as chips that say what they mean; the Tag
+//                   filter, No tag among it; its team tags a task by pressing a
+//                   tag and types a new one, asked what it means, sent with its
+//                   meaning and threaded as tagged; a new task sent with its
+//                   tags; the fold says each tag's meaning. Admin › Tags: every
+//                   tag with its tasks; rename and retire one, a retired one no
+//                   longer offered but kept on its task; merge one into another,
+//                   asked first; remove refused while a task has it.
 //
 // Run:  npm run tasks
 //       npm run tasks -- -v    also print what passed
@@ -105,6 +113,13 @@ function freshStore() {
         due_on: null, source: 'sort', source_date: '2026-10-07', source_ref: 'sort:sess-1:alertIds', created_by: 'u-sort',
         created_at: '2026-10-07T03:00:00Z', thread: [] },
     ],
+    tags: [
+      { id: 'g-rts', name: 'RTS', meaning: 'Return to service: getting a station that is out of action working and reporting again.', colour: 'red', retired: false },
+      { id: 'g-qa', name: 'QA', meaning: 'Quality assurance: checking that a station\'s readings, or the work done at it, are right.', colour: 'blue', retired: false },
+      { id: 'g-asm', name: 'Assessment', meaning: 'FWIN site assessment: assessing a site for the Flood Warning Infrastructure Network program.', colour: 'green', retired: false },
+    ],
+    // Which tasks have which tags: task id → tag ids.
+    tagged: { k2: ['g-rts'] },
     refuse: null,
   };
 }
@@ -132,6 +147,31 @@ function teamsRead() {
     hubs: p.admin ? store.hubs : null,
   };
 }
+const tagNames = id => (store.tagged[id] || []).map(g => store.tags.find(x => x.id === g)).filter(Boolean)
+  .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+function tagsRead() {
+  const p = me();
+  return { me: { admin: !!p.admin, may_tag: !!p.admin || teamsOf(p).length > 0 },
+    colours: ['blue', 'green', 'amber', 'red', 'purple', 'teal', 'pink', 'grey'],
+    tags: [...store.tags].sort((a, b) => (a.retired - b.retired) || a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
+      .map(g => ({ id: g.id, name: g.name, meaning: g.meaning, colour: g.colour, retired: g.retired,
+        ...(p.admin ? { tasks: Object.values(store.tagged).filter(l => l.includes(g.id)).length, live: 0, created_by: 'Ada Admin', created_at: '2026-11-12T00:00:00Z' } : {}) })) };
+}
+// As tag_resolve() does: a known name (case aside) is that tag, a new one made.
+function resolveTags(list) {
+  const out = [];
+  for (const e of list || []) {
+    const name = String(typeof e === 'string' ? e : e.name).replace(/\s+/g, ' ').trim();
+    let g = store.tags.find(x => x.name.toLowerCase() === name.toLowerCase());
+    if (!g) {
+      g = { id: `g-new-${store.tags.length}`, name, meaning: typeof e === 'object' ? (e.meaning || '') : '', colour: 'purple', retired: false };
+      store.tags.push(g);
+    }
+    if (!out.includes(g.id)) out.push(g.id);
+  }
+  return out;
+}
+const tagLine = id => tagNames(id).map(g => g.name).join(', ');
 function listJson(k) {
   const p = me();
   return { id: k.id, station_id: k.station_id, title: k.title, team_id: k.team_id, team: teamName(k.team_id), status: k.status,
@@ -139,7 +179,8 @@ function listJson(k) {
     created_at: k.created_at, created_by: byId(k.created_by).who, updated_at: k.created_at,
     closed_at: ['done', 'cancelled'].includes(k.status) ? '2026-10-30T00:00:00Z' : null,
     my_team: !!(k.team_id && teamsOf(p).includes(k.team_id)), by_me: k.created_by === p.id,
-    notes: k.thread.filter(n => n.kind === 'note').length, last_at: k.created_at };
+    notes: k.thread.filter(n => n.kind === 'note').length, last_at: k.created_at,
+    tags: tagNames(k.id).map(g => ({ id: g.id, name: g.name, colour: g.colour })) };
 }
 function mayOn(k) {
   const p = me();
@@ -188,6 +229,7 @@ function answer(fn, a) {
           source_date: t.source_date || null, source_ref: t.source_ref || null, created_by: p.id, created_at: now,
           thread: [{ kind: 'created', to: teamName(t.team_id), by: p.id, at: now }] };
         store.tasks.push(k);
+        if (t.tags && t.tags.length) { store.tagged[k.id] = resolveTags(t.tags); k.thread.push({ kind: 'tags', from: '', to: tagLine(k.id), by: p.id, at: now }); }
         created.push({ id: k.id, ref: k.source_ref, title: k.title });
       }
       return yes({ created, existing });
@@ -225,6 +267,15 @@ function answer(fn, a) {
         if (changed.includes('due date')) k.due_on = c.due_on || null;
         if (changed.includes('station')) k.station_id = c.station_id || null;
         k.thread.push({ kind: 'edit', to: changed.join(', '), body: body(), by: p.id, at: now }); used = true;
+      }
+      if (Array.isArray(c.tags)) {
+        const want = resolveTags(c.tags), had = store.tagged[k.id] || [];
+        if (want.length !== had.length || want.some(x => !had.includes(x))) {
+          if (!(may.work || may.manage)) return no(403, '42501', 'only the team it is handed to, or whoever manages it, tags a task');
+          const was = tagLine(k.id);
+          store.tagged[k.id] = want;
+          k.thread.push({ kind: 'tags', from: was, to: tagLine(k.id), body: body(), by: p.id, at: now }); used = true;
+        }
       }
       if (c.note && !used) k.thread.push({ kind: 'note', body: c.note, by: p.id, at: now });
       return yes(getJson(k));
@@ -267,6 +318,33 @@ function answer(fn, a) {
       if (n) return no(409, '23503', `${n} task${n === 1 ? ' has' : 's have'} been handed to it, so it stays — rename it, or hand them to another team first`);
       store.teams = store.teams.filter(t => t.id !== a.p_id);
       return yes(teamsRead());
+    }
+    case 'tags_read': return yes(tagsRead());
+    case 'tag_save': {
+      const name = String(a.p_name || '').replace(/\s+/g, ' ').trim();
+      if (a.p_id && !p.admin) return no(403, '42501', 'only an administrator changes a tag');
+      if (store.tags.some(g => g.name.toLowerCase() === name.toLowerCase() && g.id !== a.p_id)) return no(409, '23505', `there is a tag called ${name} already`);
+      if (a.p_id) {
+        const g = store.tags.find(x => x.id === a.p_id);
+        Object.assign(g, { name, meaning: a.p_meaning || '', colour: a.p_colour || g.colour, retired: a.p_retired == null ? g.retired : !!a.p_retired });
+      } else store.tags.push({ id: `g-made-${store.n}`, name, meaning: a.p_meaning || '', colour: a.p_colour || 'teal', retired: false });
+      return yes(tagsRead());
+    }
+    case 'tag_merge': {
+      if (!p.admin) return no(403, '42501', 'only an administrator merges tags');
+      for (const [id, l] of Object.entries(store.tagged)) {
+        if (!l.includes(a.p_from)) continue;
+        store.tagged[id] = [...new Set(l.map(x => (x === a.p_from ? a.p_into : x)))];
+      }
+      store.tags = store.tags.filter(g => g.id !== a.p_from);
+      return yes(tagsRead());
+    }
+    case 'tag_remove': {
+      if (!p.admin) return no(403, '42501', 'only an administrator removes a tag');
+      const n = Object.values(store.tagged).filter(l => l.includes(a.p_id)).length;
+      if (n) return no(409, '23503', `that tag is on ${n} task${n === 1 ? '' : 's'}`);
+      store.tags = store.tags.filter(g => g.id !== a.p_id);
+      return yes(tagsRead());
     }
     // The Admin tab's Users panel; the Teams panel suggests its approved accounts.
     case 'admin_users':
@@ -958,6 +1036,146 @@ try {
   await q.click('[data-ask="yes"]');
   await q.waitForFunction(() => /handed to it, so it stays/.test(document.getElementById('adm-teams').textContent), null, { timeout: 10_000 });
   ok('removing a team tasks were handed to is refused in the database\'s words', calls('team_remove').length === 1);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log('\nTags\n');
+  store = freshStore();
+  await as(q, 'member');
+  await q.evaluate(() => { Tasks.authChanged(); switchTab('tasks'); });
+  await q.waitForFunction(() => document.querySelectorAll('#tk-table tbody tr').length > 0 && !!document.getElementById('tk-f-tag'), null, { timeout: 10_000 });
+  const rowTags = () => q.evaluate(() => Object.fromEntries([...document.querySelectorAll('#tk-table tbody tr')].map(tr => [
+    tr.querySelector('.row-open').textContent.trim(), [...tr.querySelectorAll('.tk-tag')].map(e => [e.textContent.trim(), e.getAttribute('title') || ''])])));
+  let rt = await rowTags();
+  ok('a task\'s tags are chips on its row, each saying what it means',
+    J(rt['Replace the battery'].map(x => x[0])) === J(['RTS']) && /^Return to service/.test(rt['Replace the battery'][0][1])
+    && rt['Clear the orifice line'].length === 0, J(rt));
+  await q.selectOption('#tk-f-tag', 'g-rts');
+  r = await rows();
+  ok('the Tag filter narrows to a tag', r.length === 1 && /Replace the battery/.test(r[0]), J(r));
+  await q.selectOption('#tk-f-tag', '-');
+  r = await rows();
+  ok('…and No tag to the tasks without one', r.length === 2 && !r.some(x => /battery/.test(x)), J(r));
+  await q.selectOption('#tk-f-tag', '');
+  ok('the fold says what each tag means without hovering', await q.evaluate(() =>
+    [...document.querySelectorAll('.tk-words-tags dd')].map(e => e.textContent).filter(t => /Return to service|Quality assurance|FWIN site assessment/.test(t)).length === 3));
+
+  // Its team tags it: a tag pressed, a new one typed and given its meaning.
+  await q.click('[data-k="open:k1"]');
+  await q.waitForSelector('#tk-tags-work', { timeout: 10_000 });
+  await q.click('[data-k="tag:work:qa"]');
+  ok('pressing a tag puts it on, and the button says so, keeping focus', await q.evaluate(() => {
+    const b = document.querySelector('[data-k="tag:work:qa"]');
+    return b.getAttribute('aria-pressed') === 'true' && document.activeElement === b;
+  }));
+  await q.click('#tk-tag-in-work');
+  const offered = await q.evaluate(() => [...document.querySelectorAll('#tk-tag-names-work option')].map(o => o.value));
+  ok('the box offers the tags in use that it does not have yet', J(offered.sort()) === J(['Assessment', 'RTS']), J(offered));
+  await q.keyboard.type('Fence');
+  ok('…and says a name nobody has used is a new tag', /“Fence” is a new tag/.test(await q.evaluate(() => document.getElementById('tk-tag-hint-work').textContent)));
+  await q.keyboard.press('Enter');
+  await settle(q);
+  const fresh = await q.evaluate(() => ({ chip: !!document.querySelector('[data-k="tag:work:fence"][aria-pressed="true"]'),
+    focus: document.activeElement && document.activeElement.dataset.k }));
+  ok('Enter puts it on, and asks what it means', fresh.chip && fresh.focus === 'tagmean:work:fence', J(fresh));
+  await q.keyboard.type('Fence work at the site.');
+  await q.click('#tk-u-save');
+  await q.waitForFunction(() => /tagged it/.test(document.querySelector('.tk-thread')?.textContent || ''), null, { timeout: 10_000 });
+  ok('Save sends the tags — the new one with its meaning — once',
+    J(calls('task_update').pop().a) === J({ p_id: 'k1', p_change: { tags: ['QA', { name: 'Fence', meaning: 'Fence work at the site.' }] } }),
+    J(calls('task_update').pop()));
+  ok('…the thread says it was tagged, and the new tag is offered from then on',
+    /You tagged it Fence QA/.test((await main(q)).replace(/\s+/g, ' '))
+    && await q.evaluate(() => Tasks.tags().some(g => g.name === 'Fence' && g.meaning === 'Fence work at the site.')));
+  await q.click('[data-k="tag:work:fence"]');
+  await q.click('#tk-u-save');
+  await q.waitForFunction(() => /took off/.test(document.querySelector('.tk-thread')?.textContent || ''), null, { timeout: 10_000 });
+  ok('taking one off is sent as the list as it is to be, and threaded as taken off',
+    J(calls('task_update').pop().a.p_change) === J({ tags: ['QA'] }) && /took off Fence/.test((await main(q)).replace(/\s+/g, ' ')));
+  const nUpd = calls('task_update').length;
+  await q.click('#tk-u-save');
+  await settle(q);
+  ok('nothing changed is said, and nothing sent', calls('task_update').length === nUpd && /Nothing to save/.test(await main(q)));
+
+  // A new task with its tags.
+  await as(q, 'sort');
+  await q.evaluate(() => { Tasks.authChanged(); });
+  await q.waitForSelector('#tk-new-btn', { timeout: 10_000 });
+  await q.evaluate(() => Tasks.newAt('loudoun_br_al'));
+  await q.waitForSelector('#tk-tags-new', { timeout: 5000 });
+  await q.fill('#tk-n-title', 'Bring the gauge back');
+  await q.click('[data-k="tag:new:rts"]');
+  await q.selectOption('#tk-n-team', 't-bris');
+  await q.click('#tk-n-go');
+  await q.waitForFunction(() => document.getElementById('tk-task-h')?.textContent === 'Bring the gauge back', null, { timeout: 10_000 });
+  ok('a new task is sent with its tags, and opens showing them',
+    J(calls('task_create').pop().a.p_tasks[0].tags) === J(['RTS'])
+    && /TagsRTS/.test(await q.evaluate(() => document.querySelector('.tk-facts').textContent.replace(/\s+/g, ' '))), J({ sent: calls('task_create').pop().a, facts: await q.evaluate(() => document.querySelector('.tk-facts').textContent.replace(/\s+/g, ' ')) }));
+
+  // Admin › Tags.
+  store.calls = [];
+  await as(q, 'member');
+  await q.evaluate(() => { AdminTags.authChanged(); switchTab('admin'); });
+  await q.waitForSelector('#adm-tags-h', { timeout: 10_000 });
+  out = await q.evaluate(() => ({ text: document.getElementById('adm-tags').textContent.replace(/\s+/g, ' '),
+    controls: document.querySelectorAll('#adm-tags input, #adm-tags select, #adm-tags button').length }));
+  ok('Admin › Tags shows anybody not an administrator what it is for, no control, and asks nothing',
+    /tidied here by administrators/.test(out.text) && out.controls === 0 && calls('tags_read').length === 0, J(out));
+  await as(q, 'admin');
+  await q.evaluate(() => AdminTags.authChanged());
+  await q.waitForSelector('.adm-tags-table', { timeout: 10_000 });
+  const tagRows = () => q.evaluate(() => [...document.querySelectorAll('.adm-tags-table tbody tr')].map(tr => [...tr.children].map(c => c.textContent.replace(/\s+/g, ' ').trim())));
+  let tr2 = await tagRows();
+  ok('an administrator sees every tag, what it means and how many tasks have it',
+    tr2.length === 4 && tr2.find(x => x[0] === 'RTS')[2] === '2' && tr2.find(x => x[0] === 'Fence')[2] === '0'
+    && /^Quality assurance/.test(tr2.find(x => x[0] === 'QA')[1]), J(tr2));
+  await q.click('[data-k="tag:g-qa"]');
+  await q.waitForSelector('#adm-tag-name', { timeout: 5000 });
+  await q.fill('#adm-tag-name', 'Q.A.');
+  await q.check('#adm-tag-retired');
+  await q.click('#adm-tag-save');
+  await q.waitForFunction(() => /Q\.A\. saved — retired/.test(document.getElementById('adm-tags').textContent), null, { timeout: 10_000 });
+  ok('renamed and retired, in one Save', J(calls('tag_save').pop().a) === J({ p_id: 'g-qa', p_name: 'Q.A.', p_meaning:
+    'Quality assurance: checking that a station\'s readings, or the work done at it, are right.', p_colour: 'blue', p_retired: true }));
+  await q.evaluate(() => { Tasks.authChanged(); switchTab('tasks'); });
+  await q.waitForFunction(() => Tasks.tags().length > 0 && !!document.getElementById('tk-f-tag'), null, { timeout: 10_000 });
+  await q.evaluate(() => Tasks.newAt('loudoun_br_al'));
+  await q.waitForSelector('#tk-tags-new', { timeout: 5000 });
+  out = await q.evaluate(() => ({ offered: [...document.querySelectorAll('#tk-tags-new .tk-tag-opt')].map(b => b.dataset.name) }));
+  ok('…a retired tag is no longer offered', !out.offered.includes('Q.A.') && out.offered.includes('RTS'), J(out));
+  await q.evaluate(() => Tasks.back());
+  await q.waitForSelector('#tk-table', { timeout: 5000 });
+  rt = await rowTags();
+  ok('…but stays on the task that has it', rt['Clear the orifice line'].map(x => x[0]).includes('Q.A.'), J(rt));
+  await q.evaluate(() => switchTab('admin'));
+  await q.waitForSelector('.adm-tags-table', { timeout: 10_000 });
+  const fenceId = await q.evaluate(() => Tasks.tags().find(g => g.name === 'Fence').id);
+  await q.click(`[data-k="tag:${fenceId}"]`);
+  await q.waitForSelector('#adm-tag-into', { timeout: 5000 });
+  await q.selectOption('#adm-tag-into', 'g-asm');
+  await q.click('#adm-tag-merge');
+  await q.waitForSelector('[data-ask="yes"]', { timeout: 5000 });
+  await q.click('[data-ask="yes"]');
+  await q.waitForFunction(() => /Fence is merged into Assessment/.test(document.getElementById('adm-tags').textContent), null, { timeout: 10_000 });
+  tr2 = await tagRows();
+  ok('merging one into another is asked first, sent once, and the one merged is gone',
+    J(calls('tag_merge').pop().a) === J({ p_from: fenceId, p_into: 'g-asm' }) && !tr2.some(x => x[0] === 'Fence'), J(tr2));
+  await q.click('[data-k="tag:g-rts"]');
+  await q.waitForSelector('#adm-tag-remove', { timeout: 5000 });
+  ok('a tag on tasks cannot be removed here, and it says why', await q.evaluate(() =>
+    document.getElementById('adm-tag-remove').disabled && /retire it/.test(document.getElementById('adm-tag-open').textContent)));
+  await q.fill('#adm-tag-new-name', 'Solar');
+  await q.fill('#adm-tag-new-meaning', 'Solar panel and charger work.');
+  await q.click('#adm-tag-new-go');
+  await q.waitForFunction(() => /Solar is a tag now/.test(document.getElementById('adm-tags').textContent), null, { timeout: 10_000 });
+  ok('Make the tag sends its name and meaning', J(calls('tag_save').pop().a) === J({ p_id: null, p_name: 'Solar', p_meaning: 'Solar panel and charger work.', p_colour: null, p_retired: null }));
+  const solarId = await q.evaluate(() => [...document.querySelectorAll('.adm-tags-table [data-k^="tag:"]')].find(b => b.getAttribute('aria-label') === 'Solar').dataset.k.slice(4));
+  await q.click(`[data-k="tag:${solarId}"]`);
+  await q.waitForSelector('#adm-tag-remove:not([disabled])', { timeout: 5000 });
+  await q.click('#adm-tag-remove');
+  await q.waitForSelector('[data-ask="yes"]', { timeout: 5000 });
+  await q.click('[data-ask="yes"]');
+  await q.waitForFunction(() => /Solar removed/.test(document.getElementById('adm-tags').textContent), null, { timeout: 10_000 });
+  ok('…and one no task has is removed, asked first', calls('tag_remove').length === 1 && !(await tagRows()).some(x => x[0] === 'Solar'));
   await c5.close();
 
   ok('no uncaught page errors', errors.length === 0, errors.join(' | '));

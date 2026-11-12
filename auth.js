@@ -28,7 +28,8 @@
 // push.js for Push.authChanged (0066: an administrator's notifications and the
 // icon's count); to tasks.js for Tasks.authChanged and admin-teams.js for
 // AdminTeams.authChanged (0095: a team's tasks and roster are its own
-// people's, the teams an administrator's to make); to sort-benchmarks.js for
+// people's, the teams an administrator's to make) and admin-tags.js for
+// AdminTags.authChanged (0118: the tags' counts are an administrator's); to sort-benchmarks.js for
 // SortBenchmarks.authChanged (0101: the Bureau's benchmarks SoRT asks for are
 // an editor's to see and send); to toast.js for the
 // once-a-page notes; and to datastore.js for dbSetAccessToken.
@@ -1070,6 +1071,7 @@ const Auth = (function () {
                        typeof AdminTokens !== 'undefined' ? AdminTokens : null,
                        typeof AdminLinks  !== 'undefined' ? AdminLinks  : null,
                        typeof AdminTeams  !== 'undefined' ? AdminTeams  : null,
+                       typeof AdminTags   !== 'undefined' ? AdminTags   : null,
                        typeof Tasks       !== 'undefined' ? Tasks       : null,
                        typeof SortBenchmarks !== 'undefined' ? SortBenchmarks : null,
                        typeof BaseStations !== 'undefined' ? BaseStations : null,

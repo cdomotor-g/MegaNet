@@ -20,6 +20,8 @@
 // the dashboard; to admin-teams.js for AdminTeams, whose Teams panel (0095) it
 // draws under the ingest tokens and loads from init(), and which it tells when
 // the accounts its Add somebody box suggests come back (accountsChanged); to
+// admin-tags.js for AdminTags, whose Tags panel (0118) it draws under the
+// teams and loads from init(); to
 // admin-costs.js for AdminCosts, whose Running costs it draws under the teams
 // and repaints with the rest on a sign-in or sign-out; and
 // to station-history.js for StationHistory, whose Deleted stations panel it draws
@@ -661,6 +663,7 @@ const Admin = (function () {
         <div id="adm-people" class="stack">${peopleHtml()}</div>
         <div id="adm-tokens">${typeof AdminTokens !== 'undefined' ? AdminTokens.render() : ''}</div>
         <div id="adm-teams">${typeof AdminTeams !== 'undefined' ? AdminTeams.render() : ''}</div>
+        <div id="adm-tags">${typeof AdminTags !== 'undefined' ? AdminTags.render() : ''}</div>
         <div id="adm-costs">${typeof AdminCosts !== 'undefined' ? AdminCosts.render() : ''}</div>
         <div class="adm-cards">
           ${dataHtml()}
@@ -689,6 +692,8 @@ const Admin = (function () {
     if (typeof AdminTokens !== 'undefined' && isAdmin()) AdminTokens.load();
     // The teams and every roster (admin-teams.js, 0095).
     if (typeof AdminTeams !== 'undefined' && isAdmin()) AdminTeams.load();
+    // The tags on tasks (admin-tags.js, 0118).
+    if (typeof AdminTags !== 'undefined' && isAdmin()) AdminTags.load();
     // This device's notifications (push.js, 0066), and the icon's count.
     if (typeof Push !== 'undefined' && isAdmin()) Push.refresh();
   }

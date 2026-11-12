@@ -8,6 +8,11 @@
 //           adds a member. Also the station card's own open tasks (cardHtml,
 //           cardAsk), and the SoRT scope builder's hand-off (#tasks=…),
 //           reviewed here before anything is made.
+//           Tags (0118): short words of people's own on a task — RTS, QA,
+//           Assessment… — picked from the ones in use or typed new, shown
+//           as chips with their meaning on hover, and a filter by them. The
+//           Admin tab's Tags panel (admin-tags.js) renames, merges, recolours
+//           and retires them.
 //
 // After core.js (esc, escAttr, termHtml, announce, state, TAB_LIST), app.js
 // (switchTab, renderTabs, renderMain, goToStation), datastore.js (dbRpc),
@@ -92,11 +97,13 @@ const Tasks = (function () {
     mine: 'The tasks handed to a team you are on.',
     overdue: 'Past its due date and not done yet.',
     map: 'Each pin is a station with tasks that fit the filters above, coloured by the most pressing of them: overdue first, then waiting, in progress and open. The number is how many tasks are there. Pins close together on screen are drawn as one, with a dashed ring, until you zoom in.',
+    tag: 'A short word put on a task to say what kind of job it is — RTS, QA, Assessment and so on. Hover one for what it means. Pick the ones in use, or type a new one: it is offered to everybody from then on.',
+    newtag: 'A tag nobody has used yet. Saving the task makes it, with the meaning you give it, and offers it to everybody after.',
     second: 'Another address of the same person — an account of its own until an administrator made the two one. It does not sign in, but adding them to a team by it finds them.',
   };
   const GLOSSARY = [['task', 'Task'], ['team', 'Team'], ['status', 'Status'],
     ...STATUS.map(s => [`st:${s.key}`, s.label]),
-    ['due', 'Due'], ['overdue', 'Overdue'], ['map', 'The map\'s pins'], ['unassigned', 'Unassigned'], ['handsout', 'Hands out tasks'], ['owner', 'Owner'],
+    ['tag', 'Tag'], ['due', 'Due'], ['overdue', 'Overdue'], ['map', 'The map\'s pins'], ['unassigned', 'Unassigned'], ['handsout', 'Hands out tasks'], ['owner', 'Owner'],
     ['member', 'Member'], ['second', 'Second address'], ['sort', 'From SoRT'], ['thread', 'Thread']];
   const word = k => (k.startsWith('st:') ? (STATUS_OF[k.slice(3)] || {}).meaning : WORDS[k]) || '';
 
@@ -107,6 +114,7 @@ const Tasks = (function () {
 
   // ── State ──────────────────────────────────────────────────────────────────
   let teams = null;        // teams_read(): { me, teams, hubs }
+  let tags = null;         // tags_read(): { me, colours, tags } — or { tags: [], missing } before 0118
   let list = null;         // task_list()
   let loading = false;
   let missing = false;     // the database has no 0095
@@ -119,10 +127,10 @@ const Tasks = (function () {
   let taskErr = '';
   let busy = false;
   let note = '';           // the last thing done, said under the heading
-  const filt = { scope: '', status: 'live', team: '', q: '' };
+  const filt = { scope: '', status: 'live', team: '', tag: '', q: '' };
   let draft = freshDraft();
   // The open task's forms, mirrored: edit null until something in it changes.
-  let upd = { status: '', note: '', edit: null };
+  let upd = { status: '', note: '', edit: null, tagPick: null };
   let handoff = null;      // parseHandoff()'s data, with the review's rows
   let hoError = '';
   let refsAsked = '';      // which hand-off's references were last asked about
@@ -137,7 +145,7 @@ const Tasks = (function () {
   let rowErr = '';         // …or why it could not
 
   function freshDraft(stationId) {
-    return { station: stationId || '', general: false, q: '', title: '', details: '', team: '', due: '' };
+    return { station: stationId || '', general: false, q: '', title: '', details: '', team: '', due: '', tagPick: freshPick([]) };
   }
 
   // ── Who may do what (the database decides; this decides what to offer) ────
@@ -152,6 +160,57 @@ const Tasks = (function () {
   const teamById = id => (teams && teams.teams || []).find(t => t.id === id) || null;
   const teamName = id => (teamById(id) || {}).name || '';
   const myTeams = () => (teams && teams.teams || []).filter(t => t.role);
+
+  // ── Tags (0118) ────────────────────────────────────────────────────────────
+  // The list from tags_read(); a task carries its own as [{id, name, colour}].
+  // A tag picker's state is { sel: [names], fresh: {lower name → meaning},
+  // typed, err } — fresh for the names nobody has used yet, which the save
+  // makes into tags.
+  const TAG_MAX = 12;
+  const tagsOn = () => !!tags && !tags.missing;
+  const allTags = () => (tags && Array.isArray(tags.tags) ? tags.tags : []);
+  const activeTags = () => allTags().filter(g => !g.retired);
+  const tagByName = n => allTags().find(g => g.name.toLowerCase() === String(n || '').toLowerCase()) || null;
+  const tagById = id => allTags().find(g => g.id === id) || null;
+  const taskTags = t => (t && Array.isArray(t.tags) ? t.tags : []);
+  function tagMeaning(g) {
+    const k = g && (tagById(g.id) || tagByName(g.name));
+    const m = k && k.meaning ? k.meaning : '';
+    if (m) return m;
+    return tags ? 'A tag people put on tasks. Nobody has said what this one means yet — an administrator can, on the Admin tab under Tags.'
+      : 'A tag people put on tasks. The Tasks tab says what it means.';
+  }
+  const TAG_COLOURS = ['blue', 'green', 'amber', 'red', 'purple', 'teal', 'pink', 'grey'];
+  const tagColour = g => {
+    const k = g && (tagById(g.id) || tagByName(g.name));
+    const c = (k && k.colour) || (g && g.colour) || 'grey';
+    return TAG_COLOURS.includes(c) ? c : 'grey';
+  };
+  function tagChip(g) {
+    return `<span class="tk-tag tk-tag-${tagColour(g)} term-chip" title="${escAttr(tagMeaning(g))}">${esc(g.name)}</span>`;
+  }
+  function tagChipsHtml(t, cls = '') {
+    const ts = taskTags(t);
+    return ts.length ? `<span class="tk-tags ${cls}">${ts.map(tagChip).join('')}</span>` : '';
+  }
+  // A name as the database keeps it: spaces closed up, trimmed.
+  const cleanTag = v => String(v || '').replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ').replace(/\s+/g, ' ').trim();
+  function freshPick(names) { return { sel: [...names], fresh: {}, typed: '', err: '' }; }
+  const sameTags = (a, b) => {
+    const x = a.map(n => n.toLowerCase()).sort(), y = b.map(n => n.toLowerCase()).sort();
+    return x.length === y.length && x.every((n, i) => n === y[i]);
+  };
+  // What a picker sends: a known name as the tag's own, a new one with the
+  // meaning typed for it.
+  function tagsPayload(p) {
+    return p.sel.map(n => {
+      const k = tagByName(n);
+      if (k) return k.name;
+      const m = String(p.fresh[n.toLowerCase()] || '').replace(/\s+/g, ' ').trim();
+      return m ? { name: n, meaning: m.slice(0, 300) } : n;
+    });
+  }
+  const pickHasNew = p => p.sel.some(n => !tagByName(n));
 
   // ── Small things ───────────────────────────────────────────────────────────
   const pad = n => String(n).padStart(2, '0');
@@ -214,7 +273,7 @@ const Tasks = (function () {
     loading = true; error = ''; refused = '';
     paint();
     try {
-      const [t, l] = await Promise.all([dbRpc('teams_read', {}), dbRpc('task_list', {})]);
+      const [t, l] = await Promise.all([dbRpc('teams_read', {}), dbRpc('task_list', {}), loadTags()]);
       teams = t && typeof t === 'object' ? t : { me: {}, teams: [] };
       list = Array.isArray(l) ? l : [];
       listAt = Date.now();
@@ -234,6 +293,19 @@ const Tasks = (function () {
     if (handoff) askRefs();
     if (view === 'task' && openId && !task && opening !== openId) openTask(openId);
   }
+
+  // The tags, apart: a database without 0118 still has its tasks.
+  async function loadTags() {
+    try {
+      const g = await dbRpc('tags_read', {});
+      tags = g && typeof g === 'object' && Array.isArray(g.tags) ? g : { tags: [] };
+    } catch (err) {
+      tags = { tags: [], missing: true };
+      if (!(err && err.status === 404)) tags.error = errTextQuiet(err);
+    }
+    return tags;
+  }
+  function errTextQuiet(err) { return err && err.message ? err.message : 'no answer'; }
 
   async function reloadList() {
     try {
@@ -339,6 +411,8 @@ const Tasks = (function () {
       if (filt.status !== 'live' && filt.status !== 'any' && t.status !== filt.status) return false;
       if (filt.team === '-' && t.team_id) return false;
       if (filt.team && filt.team !== '-' && t.team_id !== filt.team) return false;
+      if (filt.tag === '-' && taskTags(t).length) return false;
+      if (filt.tag && filt.tag !== '-' && !taskTags(t).some(g => g.id === filt.tag)) return false;
       if (words.length) {
         const s = stationOf(t.station_id);
         const hay = `${s ? s.name : ''} ${s && s.station_number ? s.station_number : ''} ${t.station_id || ''}`.toLowerCase();
@@ -351,6 +425,13 @@ const Tasks = (function () {
       if ((a.due_on || '9') !== (b.due_on || '9')) return (a.due_on || '9') < (b.due_on || '9') ? -1 : 1;
       return String(b.created_at).localeCompare(String(a.created_at));
     });
+  }
+
+  // The tags worth filtering by: every one in use, and the retired ones only
+  // where a task in the list still has them.
+  function tagFilterOpts() {
+    const used = new Set((list || []).flatMap(t => taskTags(t).map(g => g.id)));
+    return allTags().filter(g => !g.retired || used.has(g.id));
   }
 
   function filtersHtml() {
@@ -369,6 +450,10 @@ const Tasks = (function () {
           <select id="tk-f-team" onchange="Tasks.filter('team', this.value)">
             ${opt('', 'Every team', filt.team)}${opt('-', 'Unassigned', filt.team)}${teamOpts}
           </select></label>
+        ${tagsOn() ? `<label>${termHtml('Tag', word('tag'))}
+          <select id="tk-f-tag" onchange="Tasks.filter('tag', this.value)">
+            ${opt('', 'Any tag', filt.tag)}${opt('-', 'No tag', filt.tag)}${tagFilterOpts().map(g => opt(g.id, g.retired ? `${g.name} (retired)` : g.name, filt.tag)).join('')}
+          </select></label>` : ''}
         <label>Station
           <input type="search" id="tk-f-q" value="${escAttr(filt.q)}" placeholder="name or number" autocomplete="off"
                  oninput="Tasks.filter('q', this.value)"></label>
@@ -435,7 +520,8 @@ const Tasks = (function () {
             onclick="event.stopPropagation(); Tasks.rename('${id}')">✎</button>` : ''}`;
     return `<tr class="row-link${busyRow ? ' is-busy' : ''}" onclick="Tasks.open('${id}')">
         <th scope="row">${title}${from}
-          ${t.notes ? `<span class="small txt-muted"> · ${Number(t.notes)} note${Number(t.notes) === 1 ? '' : 's'}</span>` : ''}</th>
+          ${t.notes ? `<span class="small txt-muted"> · ${Number(t.notes)} note${Number(t.notes) === 1 ? '' : 's'}</span>` : ''}${
+          taskTags(t).length ? `<div class="tk-row-tags">${tagChipsHtml(t)}</div>` : ''}</th>
         <td>${st}</td>
         <td>${team}</td>
         <td>${status}</td>
@@ -592,7 +678,7 @@ const Tasks = (function () {
   function pinPopupHtml(g, { card = false } = {}) {
     const rows = g.tasks.map(t => `<li><button type="button" class="link-btn" onclick="Tasks.open('${escAttr(t.id)}')">${esc(t.title)}</button>
         ${statusChip(t.status)}${isLate(t) ? ' <span class="tk-late"><strong>overdue</strong></span>' : ''}
-        <span class="small txt-muted">· ${t.team_id ? esc(t.team || teamName(t.team_id)) : 'no team yet'}</span></li>`).join('');
+        <span class="small txt-muted">· ${t.team_id ? esc(t.team || teamName(t.team_id)) : 'no team yet'}</span>${tagChipsHtml(t, 'tk-pop-tags')}</li>`).join('');
     return `<div class="tk-pop"><strong>${esc(g.name)}</strong>
         <ul class="tk-pop-list">${rows}</ul>
         ${card ? '' : `<button type="button" class="link-btn small" onclick="Tasks.goStation('${escAttr(g.id)}')">Open the station on the Stations map</button>`}</div>`;
@@ -611,6 +697,7 @@ const Tasks = (function () {
     if (!forMe() || typeof dbRpc !== 'function') return Promise.resolve(null);
     if (list && Date.now() - listAt < FRESH) return Promise.resolve(list);
     if (listAsk) return listAsk;
+    if (!tags) loadTags().then(() => listChanged());
     listAsk = dbRpc('task_list', {})
       .then(l => { if (Array.isArray(l)) { list = l; listAt = Date.now(); } return list || []; })
       .finally(() => { listAsk = null; });
@@ -740,6 +827,16 @@ const Tasks = (function () {
     else if (n.kind === 'status') what = `${who} moved it from ${statusChip(n.from)} to ${statusChip(n.to)}`;
     else if (n.kind === 'team') what = `${who} handed it from ${esc(n.from || 'no team')} to ${esc(n.to || 'no team')}`;
     else if (n.kind === 'edit') what = `${who} changed its ${esc(n.to || 'words')}`;
+    else if (n.kind === 'tags') {
+      const split = v => String(v || '').split(', ').filter(Boolean);
+      const was = split(n.from), now = split(n.to);
+      const low = a => new Set(a.map(x => x.toLowerCase()));
+      const lw = low(was), ln = low(now);
+      const added = now.filter(x => !lw.has(x.toLowerCase())), gone = was.filter(x => !ln.has(x.toLowerCase()));
+      const names = a => a.map(x => tagChip({ name: x })).join(' ');
+      const parts = [added.length ? `tagged it ${names(added)}` : '', gone.length ? `took off ${names(gone)}` : ''].filter(Boolean);
+      what = `${who} ${parts.length ? parts.join(' and ') : 'left its tags as they were'}`;
+    }
     else what = `${who} wrote`;
     return `<li class="tk-entry tk-entry-${escAttr(n.kind)}">
         <div class="tk-entry-h small">${what} <span class="txt-muted">· ${esc(when(n.at))}</span></div>
@@ -773,6 +870,7 @@ const Tasks = (function () {
       [termHtml('Team', word('team')), t.team_id ? esc(t.team || teamName(t.team_id)) : termHtml('Unassigned', word('unassigned'))],
       [termHtml('Status', word('status')), statusChip(t.status) + (t.closed_at ? ` <span class="small txt-muted">since ${esc(when(t.closed_at))}</span>` : '')],
       [termHtml('Due', word('due')), dueHtml(t)],
+      ...(tagsOn() || taskTags(t).length ? [[termHtml('Tags', word('tag')), tagChipsHtml(t) || '<span class="txt-muted">None</span>']] : []),
       ['From', t.source === 'sort' ? `<span class="tk-src term-chip" title="${esc(word('sort'))}">SoRT</span>${t.source_date ? ` forum of ${esc(dmy(t.source_date))}` : ''}` : 'Flood-Net'],
       ['Made', `${esc(t.by_me ? 'by you' : `by ${t.created_by || 'somebody no longer here'}`)} on ${esc(when(t.created_at))}`],
     ];
@@ -785,6 +883,7 @@ const Tasks = (function () {
           <label>${termHtml('Status', word('status'))}
             <select id="tk-u-status" onchange="Tasks.updField('status', this.value)"${busy ? ' disabled' : ''}>${statusOptions(t)}</select></label>
         </div>
+        ${tagPickerWrap('work')}
         <label class="tk-wide">A note for the thread (optional)
           <textarea id="tk-u-note" rows="3" maxlength="4000" oninput="Tasks.updField('note', this.value)"${busy ? ' disabled' : ''}>${esc(upd.note)}</textarea></label>
         <div class="button-group"><button type="submit" class="primary" id="tk-u-save"${busy ? ' disabled' : ''}>Save</button></div>
@@ -806,7 +905,8 @@ const Tasks = (function () {
 
   function seedEdit(t) {
     return { title: t.title, details: t.details || '', due: t.due_on || '', station: t.station_id || '',
-             team: t.team_id || '', status: t.status, picking: false, q: '' };
+             team: t.team_id || '', status: t.status, picking: false, q: '',
+             tagPick: freshPick(taskTags(t).map(g => g.name)) };
   }
 
   function editPicksHtml(e) {
@@ -850,6 +950,7 @@ const Tasks = (function () {
           ${only ? '<p class="small txt-muted">You may hand it to your own team; somebody who hands out tasks gives it to any other.</p>' : ''}
           <label class="tk-wide">Title
             <input type="text" id="tk-e-title" maxlength="200" value="${escAttr(e.title)}" oninput="Tasks.editField('title', this.value)"${dis}></label>
+          ${tagPickerWrap('edit')}
           <label class="tk-wide">Details
             <textarea id="tk-e-details" rows="4" maxlength="8000" oninput="Tasks.editField('details', this.value)"${dis}>${esc(e.details)}</textarea></label>
           ${station}
@@ -865,7 +966,7 @@ const Tasks = (function () {
 
   async function openTask(id) {
     openId = id; view = 'task'; taskErr = '';
-    if (!task || task.id !== id) { task = null; upd = { status: '', note: '', edit: null }; }
+    if (!task || task.id !== id) { task = null; upd = { status: '', note: '', edit: null, tagPick: null }; }
     opening = id;
     paint();
     try {
@@ -893,7 +994,8 @@ const Tasks = (function () {
     try {
       out = await dbRpc('task_update', { p_id: task.id, p_change });
       task = out;
-      upd = { status: '', note: '', edit: null };
+      if (Array.isArray(p_change.tags) && p_change.tags.some(x => typeof x === 'object' || !tagByName(x))) await loadTags();
+      upd = { status: '', note: '', edit: null, tagPick: null };
       note = said;
       announce(said);
       await reloadList();
@@ -970,6 +1072,112 @@ const Tasks = (function () {
     }
   }
 
+  // ── The tag picker ─────────────────────────────────────────────────────────
+  // One on each form that may change a task's tags: a new task ('new'), the
+  // form whoever manages it uses ('edit') and its team's Move it on ('work').
+  // Every tag in use is a button, pressed or not; the box under them takes a
+  // name — one in use, offered as it is typed, or a new one, which asks what
+  // it means. Drawn into its own wrapper, so a press repaints the picker
+  // alone and nothing typed elsewhere in the form is touched.
+
+  function pickerOf(ctx) {
+    if (ctx === 'new') { if (!draft.tagPick) draft.tagPick = freshPick([]); return draft.tagPick; }
+    if (!task) return null;
+    if (ctx === 'edit') { if (!upd.edit) upd.edit = seedEdit(task); return upd.edit.tagPick; }
+    if (!upd.tagPick) upd.tagPick = freshPick(taskTags(task).map(g => g.name));
+    return upd.tagPick;
+  }
+
+  function tagPickerWrap(ctx) {
+    if (!tagsOn()) return '';
+    return `<div class="tk-tags-pick" id="tk-tags-${ctx}">${tagPickerHtml(ctx)}</div>`;
+  }
+
+  function tagPickerHtml(ctx) {
+    const p = pickerOf(ctx);
+    if (!p) return '';
+    const dis = busy ? ' disabled' : '';
+    const on = new Set(p.sel.map(n => n.toLowerCase()));
+    // Every tag in use, the retired ones this task still has, and the new
+    // ones picked — A to Z.
+    const shown = [...activeTags(), ...allTags().filter(g => g.retired && on.has(g.name.toLowerCase()))]
+      .map(g => ({ name: g.name, colour: g.colour, id: g.id, retired: g.retired, isNew: false }));
+    for (const n of p.sel) if (!tagByName(n)) shown.push({ name: n, colour: 'grey', isNew: true });
+    shown.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+    const btns = shown.map(g => {
+      const pressed = on.has(g.name.toLowerCase());
+      const tip = g.isNew ? word('newtag') : `${tagMeaning(g)}${g.retired ? ' (Retired: no longer offered for new tasks.)' : ''}`;
+      return `<button type="button" class="tk-tag tk-tag-${g.isNew ? 'new' : tagColour(g)} tk-tag-opt${pressed ? ' is-on' : ''}" aria-pressed="${pressed}"
+          data-k="tag:${ctx}:${escAttr(g.name.toLowerCase())}" data-name="${escAttr(g.name)}" title="${escAttr(tip)}"${dis}
+          onclick="Tasks.tagToggle('${ctx}', this.dataset.name)"><span aria-hidden="true">${pressed ? '✓' : '+'}</span> ${esc(g.name)}${g.isNew ? ' <em>new</em>' : ''}</button>`;
+    }).join('');
+    const offer = activeTags().filter(g => !on.has(g.name.toLowerCase()));
+    const typed = cleanTag(p.typed);
+    const typedNew = typed && !tagByName(typed) && !on.has(typed.toLowerCase());
+    const fresh = p.sel.filter(n => !tagByName(n));
+    return `<div class="tk-tags-h small">${termHtml('Tags', word('tag'))} <span class="txt-muted">— press one to put it on or take it off${p.sel.length ? ` · ${p.sel.length} on` : ''}</span></div>
+        <div class="tk-tag-opts" role="group" aria-label="Tags">${btns || '<span class="small txt-muted">No tags yet — type the first below.</span>'}</div>
+        <div class="tk-tag-add">
+          <label class="small">Another tag — one in use, or a new one
+            <input type="text" id="tk-tag-in-${ctx}" list="tk-tag-names-${ctx}" maxlength="30" autocomplete="off" spellcheck="false"
+                   value="${escAttr(p.typed)}" placeholder="e.g. RTS"${dis}
+                   oninput="Tasks.tagTyped('${ctx}', this.value)" onkeydown="if (event.key === 'Enter') { event.preventDefault(); Tasks.tagAdd('${ctx}'); }"></label>
+          <datalist id="tk-tag-names-${ctx}">${offer.map(g => `<option value="${escAttr(g.name)}"${g.meaning ? ` label="${escAttr(g.meaning)}"` : ''}></option>`).join('')}</datalist>
+          <button type="button" class="exp-btn-sm" id="tk-tag-go-${ctx}"${dis} onclick="Tasks.tagAdd('${ctx}')">Add</button>
+        </div>
+        <p class="small txt-muted" id="tk-tag-hint-${ctx}" role="status">${typedNew ? `“${esc(typed)}” is a ${termHtml('new tag', word('newtag'))}: Add puts it on, and saving makes it.` : ''}</p>
+        ${fresh.map(n => `<label class="tk-wide">What “${esc(n)}” means — say it for everybody (optional)
+            <input type="text" data-k="tagmean:${ctx}:${escAttr(n.toLowerCase())}" data-name="${escAttr(n)}" maxlength="300"
+                   value="${escAttr(p.fresh[n.toLowerCase()] || '')}" placeholder="e.g. Return to service: getting a station working again"${dis}
+                   oninput="Tasks.tagMeaningTyped('${ctx}', this.dataset.name, this.value)"></label>`).join('')}
+        ${p.err ? `<p class="small txt-bad" role="alert">${esc(p.err)}</p>` : ''}`;
+  }
+
+  function repaintPicker(ctx, focusKey) {
+    const el = document.getElementById(`tk-tags-${ctx}`);
+    if (!el) return;
+    const had = focusKey || (el.contains(document.activeElement) ? focusKeyOf(document.activeElement) : null);
+    el.innerHTML = tagPickerHtml(ctx);
+    refocus(had);
+  }
+
+  function tagToggle(ctx, name) {
+    const p = pickerOf(ctx);
+    if (!p || !name) return;
+    const k = name.toLowerCase();
+    p.err = '';
+    if (p.sel.some(n => n.toLowerCase() === k)) {
+      p.sel = p.sel.filter(n => n.toLowerCase() !== k);
+      delete p.fresh[k];
+      announce(`${name} taken off.`);
+    } else {
+      if (p.sel.length >= TAG_MAX) { p.err = `At most ${TAG_MAX} tags on a task.`; repaintPicker(ctx); return; }
+      p.sel.push((tagByName(name) || { name }).name);
+      announce(`${name} put on.`);
+    }
+    repaintPicker(ctx, `k:tag:${ctx}:${k}`);
+  }
+
+  function tagAdd(ctx) {
+    const p = pickerOf(ctx);
+    if (!p) return;
+    const name = cleanTag(p.typed);
+    p.err = '';
+    if (!name) { p.err = 'Type a tag first — one in use, or a new one.'; repaintPicker(ctx, `#tk-tag-in-${ctx}`); return; }
+    if (name.length > 30) { p.err = 'A tag is at most 30 characters.'; repaintPicker(ctx, `#tk-tag-in-${ctx}`); return; }
+    if (name.includes(',')) { p.err = 'A tag has no comma — make two tags instead.'; repaintPicker(ctx, `#tk-tag-in-${ctx}`); return; }
+    const known = tagByName(name);
+    const want = known ? known.name : name;
+    if (!p.sel.some(n => n.toLowerCase() === want.toLowerCase())) {
+      if (p.sel.length >= TAG_MAX) { p.err = `At most ${TAG_MAX} tags on a task.`; repaintPicker(ctx, `#tk-tag-in-${ctx}`); return; }
+      p.sel.push(want);
+    }
+    p.typed = '';
+    announce(known ? `${want} put on.` : `${want} put on — a new tag, made when you save.`);
+    // A new one asks what it means next.
+    repaintPicker(ctx, known ? `#tk-tag-in-${ctx}` : `k:tagmean:${ctx}:${want.toLowerCase()}`);
+  }
+
   // ── A new task ─────────────────────────────────────────────────────────────
 
   function stationMatches(q) {
@@ -1016,6 +1224,7 @@ const Tasks = (function () {
             <label>${termHtml('Due', word('due'))} (optional)
               <input type="date" id="tk-n-due" value="${escAttr(draft.due)}" onchange="Tasks.draftField('due', this.value)"></label>
           </div>
+          ${tagPickerWrap('new')}
           ${only ? '<p class="small txt-muted">As a team\'s owner you hand tasks to your own team. Somebody who hands out tasks — the SoRT Forum, or an administrator — gives them to any.</p>' : ''}
           <div class="button-group"><button type="submit" class="primary" id="tk-n-go"${busy ? ' disabled' : ''}>Hand it out</button></div>
         </form>
@@ -1033,11 +1242,15 @@ const Tasks = (function () {
     const t = { title, details: draft.details, team_id: draft.team || null };
     if (draft.station && !draft.general) t.station_id = draft.station;
     if (draft.due) t.due_on = draft.due;
+    const pick = draft.tagPick;
+    if (tagsOn() && pick && pick.sel.length) t.tags = tagsPayload(pick);
+    const madeNew = !!(t.tags && pickHasNew(pick));
     busy = true; paint('#tk-n-go');
     try {
       const out = await dbRpc('task_create', { p_tasks: [t] });
       const made = out && out.created && out.created[0];
       draft = freshDraft();
+      if (madeNew) await loadTags();
       note = `Handed out: ${title}${t.team_id ? ` — to ${teamName(t.team_id)}` : ', with no team yet'}.`;
       announce(note);
       await reloadList();
@@ -1150,7 +1363,7 @@ const Tasks = (function () {
     const head = `<span class="small txt-muted stn-card-equip-h">${termHtml('Tasks', word('task'))} still going here</span>`;
     const body = rows.length ? rows.slice(0, 8).map(t => `<div class="acma-row"><span>${statusChip(t.status)}</span><span>
           <button type="button" class="link-btn" onclick="Tasks.open('${escAttr(t.id)}')">${esc(t.title)}</button>
-          <span class="small txt-muted"> · ${esc(t.team || 'unassigned')}${t.due_on ? ` · due ${esc(dmy(t.due_on))}` : ''}</span></span></div>`).join('')
+          <span class="small txt-muted"> · ${esc(t.team || 'unassigned')}${t.due_on ? ` · due ${esc(dmy(t.due_on))}` : ''}</span>${tagChipsHtml(t)}</span></div>`).join('')
         + (rows.length > 8 ? `<div class="small txt-muted">and ${rows.length - 8} more on the Tasks tab</div>` : '')
       : '<div class="small txt-muted">None.</div>';
     const make = mayHandOut() ? `<div><button type="button" class="link-btn tk-new-here" onclick="Tasks.newAt('${escAttr(id)}')">✅ New task here</button></div>` : '';
@@ -1493,6 +1706,8 @@ const Tasks = (function () {
   function glossaryHtml() {
     return `<details class="tk-fold tk-words"><summary><h2 class="bk-inline-h" id="tk-words-h">What the words on this page mean</h2></summary>
         <dl class="tk-words-list">${GLOSSARY.map(([k, label]) => `<dt>${esc(label)}</dt><dd>${esc(word(k))}</dd>`).join('')}</dl>
+        ${activeTags().length ? `<h3 class="tk-words-sub">The tags</h3>
+        <dl class="tk-words-list tk-words-tags">${activeTags().map(g => `<dt>${tagChip(g)}</dt><dd>${esc(tagMeaning(g))}</dd>`).join('')}</dl>` : ''}
       </details>`;
   }
 
@@ -1506,9 +1721,10 @@ const Tasks = (function () {
   }
 
   function authChanged() {
-    teams = null; list = null; task = null; taskErr = ''; error = ''; refused = ''; missing = false;
+    teams = null; tags = null; list = null; task = null; taskErr = ''; error = ''; refused = ''; missing = false;
     // Another person, or nobody: the filters start again from theirs.
-    Object.assign(filt, { scope: '', status: 'live', team: '', q: '' });
+    Object.assign(filt, { scope: '', status: 'live', team: '', tag: '', q: '' });
+    draft = freshDraft();
     loading = false; busy = false; note = ''; refsAsked = ''; teamErr = {};
     rowBusy.clear(); rowEdit = null; rowNote = ''; rowErr = '';
     for (const k of Object.keys(cards)) delete cards[k];
@@ -1573,16 +1789,17 @@ const Tasks = (function () {
       upd.edit.picking = false; upd.edit.q = '';
       paint('#tk-e-station');
     },
-    editReset() { upd = { status: '', note: '', edit: null }; taskErr = ''; paint('#tk-e-team'); },
+    editReset() { upd = { status: '', note: '', edit: null, tagPick: null }; taskErr = ''; paint('#tk-e-team'); },
     async save() {
       if (!task) return;
       const c = {};
       if (upd.status && upd.status !== task.status) c.status = upd.status;
+      if (upd.tagPick && tagsOn() && !sameTags(upd.tagPick.sel, taskTags(task).map(g => g.name))) c.tags = tagsPayload(upd.tagPick);
       if (upd.note.trim()) c.note = upd.note.trim();
-      if (!Object.keys(c).length) { taskErr = 'Nothing to save: change the status, or write a note.'; paint('#tk-u-save'); return; }
+      if (!Object.keys(c).length) { taskErr = 'Nothing to save: change the status or the tags, or write a note.'; paint('#tk-u-save'); return; }
       if (c.status === 'cancelled' && !(await confirmDialog({ title: `Cancel “${task.title}”?`,
         message: 'Its team stops seeing it as something to do. It can be brought back.', confirm: 'Cancel the task', cancel: 'Keep it', danger: true }))) return;
-      await change(c, c.status ? `${task.title}: ${STATUS_OF[c.status].label}.` : 'Note added.', 'tk-u-save');
+      await change(c, c.status ? `${task.title}: ${STATUS_OF[c.status].label}${c.tags ? ', tags saved' : ''}.` : c.tags ? 'Tags saved.' : 'Note added.', 'tk-u-save');
     },
     async saveEdit() {
       if (!task || busy) return;
@@ -1599,6 +1816,10 @@ const Tasks = (function () {
       if (e.details !== (task.details || '')) { c.details = e.details; said.push('details changed'); }
       if ((e.due || '') !== (task.due_on || '')) { c.due_on = e.due || null; said.push(e.due ? `due ${dmy(e.due)}` : 'no due date'); }
       if ((e.station || '') !== (task.station_id || '')) { c.station_id = e.station || null; said.push(e.station ? `at ${stationLabel(e.station)}` : 'a general task now'); }
+      if (tagsOn() && e.tagPick && !sameTags(e.tagPick.sel, taskTags(task).map(g => g.name))) {
+        c.tags = tagsPayload(e.tagPick);
+        said.push(e.tagPick.sel.length ? `tagged ${e.tagPick.sel.join(', ')}` : 'no tags now');
+      }
       if (upd.note.trim()) { c.note = upd.note.trim(); if (!said.length) said.push('note added'); }
       if (!Object.keys(c).length) { taskErr = 'Nothing has changed.'; paint('#tk-e-save'); return; }
       if (c.status === 'cancelled' && !(await confirmDialog({ title: `Cancel “${task.title}”?`,
@@ -1607,6 +1828,22 @@ const Tasks = (function () {
       await change(c, `Saved: ${line.charAt(0).toUpperCase()}${line.slice(1)}.`, 'tk-e-save');
     },
     rowSet,
+    tagToggle, tagAdd,
+    tagTyped(ctx, v) {
+      const p = pickerOf(ctx);
+      if (!p) return;
+      p.typed = v;
+      // The hint under the box, in place, so the caret stays where it is.
+      const typed = cleanTag(v);
+      const isNew = typed && !tagByName(typed) && !p.sel.some(n => n.toLowerCase() === typed.toLowerCase());
+      const el = document.getElementById(`tk-tag-hint-${ctx}`);
+      if (el) el.innerHTML = isNew ? `“${esc(typed)}” is a ${termHtml('new tag', word('newtag'))}: Add puts it on, and saving makes it.` : '';
+    },
+    tagMeaningTyped(ctx, name, v) {
+      const p = pickerOf(ctx);
+      if (p && name) p.fresh[name.toLowerCase()] = v;
+    },
+    tags: () => allTags(),
     rename(id) {
       if (!(list || []).some(x => x.id === id)) return;
       rowEdit = id;
@@ -1670,7 +1907,11 @@ const Tasks = (function () {
       if (typeof Toast !== 'undefined') Toast.show(ok ? 'Link copied.' : 'Could not copy the link here.', { kind: ok ? 'ok' : 'note' });
     },
     // For the tests: where it stands.
-    _state: () => ({ view, openId, teams: !!teams, list: list ? list.length : null, handoff: handoff ? {
+    _state: () => ({ view, openId, teams: !!teams, list: list ? list.length : null,
+      tags: tags ? { n: allTags().length, missing: !!tags.missing } : null,
+      picks: { new: draft.tagPick ? [...draft.tagPick.sel] : [], edit: upd.edit && upd.edit.tagPick ? [...upd.edit.tagPick.sel] : null,
+               work: upd.tagPick ? [...upd.tagPick.sel] : null },
+      handoff: handoff ? {
       session: handoff.session, forum: handoff.forum, station: { ...handoff.station },
       rows: handoff.rows.map(r => ({ ref: r.ref, title: r.title, team: r.team, include: r.include, due: r.due,
                                      created: r.created, existing: !!r.existing, notYours: !!r.notYours })) } : null,

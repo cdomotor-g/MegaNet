@@ -884,6 +884,16 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 
 ## What changed
 
+### Revision 256 — 2026-11-12: 🏷️ Tags on tasks — 0118
+
+The owner asked for tags of their own on tasks, starting with RTS (Return to service), QA (Quality assurance) and Assessment (FWIN site assessment), with the tags in use suggested and new ones easy to add, and a tag manager for administrators. No issue; this entry is its record. **Opens nothing; closes nothing.**
+
+- **Tags** (`0118`, `task_tag`, `task_tagging`): a name (1–30 characters, no comma, unique case aside), what it means, a colour from a short list, retired or not. Every approved account reads the list (`tags_read()`); a task's team or whoever manages it tags it through `task_create()`/`task_update()`'s `tags`, a name nobody has used making a new tag with the meaning given. Every change in the task's thread. Never public.
+- **The Tasks tab** (`tasks.js`): a tag picker on the new-task form, *Change this task* and *Move it on* — every tag in use a button to press, a box that offers them as you type and takes a new one, asking what it means; tags as chips on each row, the task's facts, its station card and the map's pins, each saying its meaning on hover and in the words fold; a **Tag** filter (and *No tag*).
+- **Admin › Tags** (`admin-tags.js`): every tag with how many tasks have it (and how many are still going); rename, re-word, recolour, retire or bring back; merge one into another (each task's thread says so); remove one no task has.
+- **Checks:** `check_task_tags.sql` (41, new, in db-checks); `tasks` (126, 22 of them new for tags).
+- **To apply:** `db-migrate.yml` runs `0118`; until then the app works as before with no tags shown.
+
 ### Revision 255 — 2026-11-11: #289 opened
 
 **Opens #289** `[Standalone]` `[Sonnet5/High]` — the database raising a finding by itself when a steady signal lands on a channel a base station decodes, the follow-up revision 251 left open. Closes nothing.

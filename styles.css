@@ -29816,6 +29816,37 @@ select.kl-in { width: auto; font-family: inherit; }
 .tk-src, .tk-chip, .tk-role { display: inline-block; padding: 0 .45em; border: 1px solid var(--border); border-radius: var(--r-pill);
                               font-size: var(--fs-xs); font-weight: 400; line-height: 1.6; color: var(--muted); white-space: nowrap; }
 .tk-late { color: var(--bad); }
+/* Tags (0118): a chip in the tag's colour with the word in the page's own
+   ink, like a status, so the colour only helps the eye and never has to carry
+   the word. The hues are the page's status tokens where there is one, and
+   three mid-tones that read on both grounds for the rest. A picker's tag is
+   a button: pressed is filled, and says ✓. */
+.tk-tag { --c: var(--muted); display: inline-block; white-space: nowrap; padding: 0 .5em; margin: 0 .25em .15em 0;
+          border: 1px solid var(--c); border-radius: var(--r-pill); background: color-mix(in srgb, var(--c) 12%, transparent);
+          color: var(--text); font-size: var(--fs-xs); font-weight: 400; line-height: 1.6; }
+.tk-tag-blue   { --c: var(--accent); }
+.tk-tag-green  { --c: var(--ok); }
+.tk-tag-amber  { --c: var(--warn); }
+.tk-tag-red    { --c: var(--bad); }
+.tk-tag-purple { --c: #8b5cf6; }
+.tk-tag-teal   { --c: #0d9488; }
+.tk-tag-pink   { --c: #db2777; }
+.tk-tag-grey   { --c: var(--muted); }
+.tk-tag-new    { --c: var(--muted); border-style: dashed; }
+.tk-tags { display: inline-flex; flex-wrap: wrap; gap: 0; vertical-align: middle; }
+.tk-row-tags { margin-top: .2em; }
+.tk-pop-tags { display: flex; margin-top: .15em; }
+.tk-tags-pick { margin: var(--sp-2) 0; max-width: 48rem; }
+.tk-tags-h { color: var(--muted); margin-bottom: var(--sp-1); }
+.tk-tag-opts { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.tk-tag-opt { font-size: var(--fs-sm); min-height: 2rem; padding: 0 .7em; margin: 0; cursor: pointer; }
+.tk-tag-opt.is-on { background: color-mix(in srgb, var(--c) 34%, transparent); font-weight: 600; }
+.tk-tag-opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tk-tag-opt em { font-style: normal; color: var(--muted); font-size: var(--fs-xs); }
+.tk-tag-add { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-2); margin-top: var(--sp-2); }
+.tk-tag-add label { display: grid; gap: var(--sp-1); color: var(--muted); }
+.tk-tag-add input { color: var(--text); width: 14rem; max-width: 100%; }
+.tk-words-sub { margin: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-md, 1rem); }
 /* A row's own controls: a team, a status and a date changed where they are
    read. The status picker wears its chip's colour on its border; a task with
    no team yet is ringed amber, so it stands out as the one to pick for. */

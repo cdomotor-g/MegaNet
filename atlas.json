@@ -530,8 +530,11 @@
       "paths": [
         "tasks.js",
         "admin-teams.js",
+        "admin-tags.js",
         "db/migrations/0095_teams_and_tasks.sql",
+        "db/migrations/0118_task_tags.sql",
         "tools/check_teams_and_tasks.sql",
+        "tools/check_task_tags.sql",
         "test/tasks.mjs"
       ],
       "status": "live"
