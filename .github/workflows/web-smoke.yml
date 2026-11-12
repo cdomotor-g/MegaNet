@@ -1987,6 +1987,14 @@ jobs:
         working-directory: test
         run: npm run tdmaslots
 
+      # Node only. The ALERT2 half of the ALERT IDs tab (alert2-ids.js) and
+      # 0121's shared addresses: a row an ID from the register, the slot table
+      # and what was heard, the checks, the filter, the free-ID finder.
+      - name: ALERT2 IDs — the rows, the checks, shared addresses, free IDs
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run alert2ids
+
       # Node, then Chromium. The 🎓 Radio Propagation tab (propagation-*.js):
       # its physics against figures worked by hand, its ALERT frame against
       # packets.js's own decoder, each of the made-up catchment's stories

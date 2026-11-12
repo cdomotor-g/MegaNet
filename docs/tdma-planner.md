@@ -60,6 +60,13 @@ one register station, and gave those stations their ALERT2 ID
 both a headwater and a tailwater station, a hill with a primary and a backup
 gauge, or a site the register does not have — are left for a person.
 
+Since `0121` one ALERT2 ID may belong to several stations at one site, told
+apart by sensor number: Bromelton Weir (11047) and Cedar Grove Weir (11081)
+each have their headwater station on sensors 7 and 8 and their tailwater on 17
+— at both, 7 reads the higher level. Every ALERT2 ID, from the stations, this
+table and what was heard, is also on the 🔗 ALERT IDs tab, behind its
+*ALERT2* switch.
+
 **Editing** (editors only): *Change* on a site renames it, changes its ID or links
 its station on every channel at once (linking a station with no ALERT2 ID gives
 it the site's); *＋ Put a site into slots* puts a site into a run of slots,

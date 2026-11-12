@@ -95,7 +95,39 @@ function passRangeRepeaterMatch(r, matched, q) {
 // keystroke, so it keeps focus while only #pr-tables refreshes below it. The
 // status line lives out here for the same reason: a live region replaced
 // wholesale is a live region the screen reader has stopped watching.
+// Legacy ALERT or ALERT2: two address spaces, one switch (alert2-ids.js has
+// the second). Remembered on this device.
+function passRangeProto() {
+  if (state.prProto) return state.prProto;
+  let v = 'alert';
+  try { v = localStorage.getItem('mn-pr-proto') === 'alert2' ? 'alert2' : 'alert'; } catch (_) {}
+  state.prProto = v;
+  return v;
+}
+function passRangeProtoHtml(p) {
+  const b = (k, label, hint) => `<button type="button" class="pr-proto-btn${p === k ? ' active' : ''}" aria-pressed="${p === k}"
+      onclick="setPassRangeProto('${k}')" title="${escAttr(hint)}">${label}</button>`;
+  return `<div class="pr-proto" role="group" aria-label="Which addresses">
+    ${b('alert', 'ALERT', 'Legacy ALERT addresses, 1–8,191: the wheel, the grid and the repeaters\' pass ranges.')}
+    ${b('alert2', 'ALERT2', 'ALERT2 IDs, 1–65,534: the stations holding them, the slot table and what the base stations hear.')}</div>`;
+}
+function setPassRangeProto(p) {
+  state.prProto = p === 'alert2' ? 'alert2' : 'alert';
+  try { localStorage.setItem('mn-pr-proto', state.prProto); } catch (_) {}
+  const page = document.querySelector('.as-page');
+  const host = page && page.parentElement;
+  if (!host) return;
+  host.innerHTML = renderPassRangesHtml();
+  if (state.prProto === 'alert') AddressSpace.init();
+  const btn = host.querySelector('.pr-proto-btn.active');
+  if (btn) btn.focus();
+}
+if (typeof window !== 'undefined') window.setPassRangeProto = setPassRangeProto;
+
 function renderPassRangesHtml() {
+  if (passRangeProto() === 'alert2' && typeof Alert2Ids !== 'undefined') {
+    return `<div class="page as-page">${passRangeProtoHtml('alert2')}${Alert2Ids.pageHtml()}</div>`;
+  }
   const all       = state.data.stations;
   const repeaters = all.filter(s => s.roles.includes('repeater') && s.repeater);
   const fields    = all.filter(s => s.roles.includes('field'));
@@ -104,6 +136,7 @@ function renderPassRangesHtml() {
 
   return `
     <div class="page as-page">
+      ${passRangeProtoHtml('alert')}
       <div class="panel">
         <div class="panel-header"><h2>ALERT IDs</h2></div>
         <div class="stats stats-row">

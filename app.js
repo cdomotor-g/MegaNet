@@ -4067,7 +4067,7 @@ function renderMain() {
     case 'nearby':     el.innerHTML = Nearby.render();        Nearby.init();       break;
     case 'home':       el.innerHTML = Home.render();          Home.init();         break;
     case 'maps':       el.innerHTML = Maps.render();          Maps.init();         break;
-    case 'passranges': el.innerHTML = renderPassRangesHtml(); AddressSpace.init(); break;
+    case 'passranges': el.innerHTML = renderPassRangesHtml(); if (passRangeProto() === 'alert') AddressSpace.init(); break;
     case 'repeaters':  el.innerHTML = Repeaters.render();     Repeaters.init();    break;
     case 'repdelays':  el.innerHTML = RepeaterDelays.render(); RepeaterDelays.init(); break;
     case 'rf':         el.innerHTML = renderRfHtml();        initRf();    break;

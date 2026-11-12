@@ -1013,6 +1013,11 @@
        ALERT2 ID and slots. After core.js, datastore.js and auth.js, read at
        call time; runs nothing at load. -->
   <script src="tdma-slots.js?v=20261112l"></script>
+  <!-- The ALERT2 half of the 🔗 ALERT IDs tab (alert2-ids.js): every ALERT2 ID
+       from the register, the slot table and what the base stations heard, the
+       checks, and a free-ID finder. After tdma-slots.js and pass-ranges.js,
+       read at call time; runs nothing at load. -->
+  <script src="alert2-ids.js?v=20261112l"></script>
   <!-- The 🎓 Radio Propagation tab: a lesson in how a reading travels, with
        drawings that move. The physics first (pure, no DOM — test/propagation.mjs
        holds every figure to one worked by hand), then the 3-D scene, which draws

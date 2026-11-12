@@ -712,7 +712,9 @@ function editorForm(s) {
           Set this only when the station's readings reach Flood-Net relayed over ALERT2 — an
           ELPRO 115E-2 publishes them under this address, and it is what attributes them here.
           The <b>A2 slot</b> on each row above then says which of that station's sensors the row is.
-          One address belongs to one station: claiming one another station holds is refused.
+          Stations at one site may share an address — a weir's headwater and tailwater gauges on one logger — when each
+          station's sensors carry their own <b>A2 slot</b> numbers; then the slot says whose a reading is. Sharing without
+          them is refused.
         </div>
         <div id="ef-a2-seen" class="small ef-note"></div>
         <!-- Its carrier fingerprint, as its card on the map has it

@@ -1683,8 +1683,14 @@ const HELP = {
            + '(point at a wedge for the repeaters that carry it); the <strong>Address grid</strong>, the '
            + 'same a hundred to a row; the <strong>Address map</strong>, whose numbered circles are the '
            + 'free addresses a region has left; and <strong>Address space</strong>, each repeater\'s pass '
-           + 'ranges, or each radio network\'s with a lane a repeater.',
+           + 'ranges, or each radio network\'s with a lane a repeater. The <strong>ALERT / ALERT2</strong> switch '
+           + 'at the top turns the page to <strong>ALERT2 IDs</strong>: every ALERT2 ID from the stations, the slot table and '
+           + 'what the base stations heard in 90 days, with checks — heard but held by no station, shared without sensor '
+           + 'numbers, not heard — and a finder for the next free ID.',
     watch: [
+      '<strong>ALERT2 IDs are their own numbers.</strong> 1–65,534, not the legacy 1–8,191: the same number in each is '
+      + 'two different things. Stations at one site may share an ALERT2 ID — a weir\'s headwater and tailwater gauges on '
+      + 'one logger — when each station\'s sensors carry their own sensor numbers (the editor\'s <em>A2 slot</em>).',
       '<strong>Free means free in the hub.</strong> The Bureau\'s hubs reuse addresses — Brisbane\'s '
       + '6039 is a river gauge, Perth\'s an orchard — so an address is in use when a station in the '
       + 'same hub holds it, set aside when an allocation does, and free otherwise. An allocation is '
@@ -5034,6 +5040,7 @@ const state = {
   nvMapRepeaters: [],   // pass-range repeater pins + their lines — see refreshNvMap
   nvMapBackbone:  [],   // repeater backbone paths on the mini-map — see refreshNvMap
   prFilter:       '',      // Pass Ranges tab: station number / AlertID / name filter
+  prProto:        null,    // ALERT IDs tab: 'alert' or 'alert2' (pass-ranges.js), null until read
   // ARRO launcher. `search` drives the station lookup, `siteId`/`deviceId` are
   // the ids actually opened — a search result writes into them rather than
   // opening straight away, so a mis-click is visible before it costs a tab.

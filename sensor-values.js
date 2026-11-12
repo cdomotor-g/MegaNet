@@ -392,7 +392,12 @@ const SensorValues = (() => {
       // The slot's type is the register's, when a sensor row carries the slot
       // number (0024's alert2_sensor_id).
       if (r.a2_station != null) {
-        const st = ((state.data && state.data.stations) || []).find(x => x.alert2_station_id === r.a2_station);
+        // One address can belong to several stations at one site (0121), told
+        // apart by the slot: the station whose sensor carries it, else the only
+        // holder.
+        const holders = ((state.data && state.data.stations) || []).filter(x => x.alert2_station_id === r.a2_station);
+        const st = holders.find(x => stationSensors(x).some(se => se && se.alert2_sensor_id === r.a2_sensor))
+          || (holders.length === 1 ? holders[0] : null);
         if (st) {
           const se = stationSensors(st).find(x => x && x.alert2_sensor_id === r.a2_sensor);
           const types = se && se.type ? [se.type] : [];

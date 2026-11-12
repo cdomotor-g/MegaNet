@@ -32,6 +32,12 @@ const WhatsNew = (() => {
         + 'ground near the pin is too high for the station\'s own levels, so the water rises in the river from minor up, and a note '
         + 'under the view says how far it looked.',
     ] },
+    { n: 275, date: '2026-11-12', items: [
+      '🛰️ <strong>ALERT2 on the ALERT IDs tab.</strong> A new <em>ALERT / ALERT2</em> switch at the top of 🔗 ALERT IDs shows '
+        + 'every ALERT2 ID Flood-Net knows — the stations holding it, its slots on the slot table, and what the base stations '
+        + 'heard — with warnings for an ID heard that no station holds, and a finder for the next free ID. One ALERT2 ID can now '
+        + 'belong to two stations at one site, such as a weir\'s headwater and tailwater gauges, told apart by sensor number.',
+    ] },
     { n: 274, date: '2026-11-12', items: [
       '📋 <strong>The ALERT2 slot table.</strong> The ⏱️ TDMA Planner tab now opens with the slots the Mt Glorious ALERT2 network '
         + 'actually runs, channel by channel: which site sends in which half-second, under which ALERT2 ID, which station it is, and '

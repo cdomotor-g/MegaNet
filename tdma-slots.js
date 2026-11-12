@@ -105,8 +105,15 @@ const TdmaSlots = (function () {
     const f = fkey(channel.freq_mhz), slotS = Number(channel.slot_s) || 0.5;
     const H = heardIndex(heard);
     const byId = new Map((stations || []).map(s => [String(s.id), s]));
-    const holder = new Map();
-    for (const s of stations || []) if (s.alert2_station_id != null) holder.set(Number(s.alert2_station_id), s);
+    // An ID's holders: more than one where stations at one site share it (0121).
+    const holders = new Map();
+    for (const s of stations || []) if (s.alert2_station_id != null) {
+      const k = Number(s.alert2_station_id);
+      if (!holders.has(k)) holders.set(k, []);
+      holders.get(k).push(s);
+    }
+    const holderNames = id => (holders.get(Number(id)) || []).map(h => h.name || h.id).join(', ');
+    const holder = { get: id => (holders.get(Number(id)) || [])[0] || null };
     const namesOfId = new Map();
     for (const s of slots) if (s.alert2_id != null) {
       if (!namesOfId.has(Number(s.alert2_id))) namesOfId.set(Number(s.alert2_id), new Set());
@@ -125,14 +132,18 @@ const TdmaSlots = (function () {
       if (st && e.alert2_id != null && st.alert2_station_id != null && Number(st.alert2_station_id) !== Number(e.alert2_id)) {
         notes.push({ k: 'station-other-id', level: 'warn', text: `The register gives ${st.name || st.id} ALERT2 ID ${st.alert2_station_id}` });
       }
+      if (st && e.alert2_id != null && (holders.get(Number(e.alert2_id)) || []).length > 1) {
+        const others = holders.get(Number(e.alert2_id)).filter(h => String(h.id) !== String(st.id));
+        if (others.length) notes.push({ k: 'shared', level: 'info', text: `Shared with ${others.map(h => h.name || h.id).join(', ')}, told apart by sensor number` });
+      }
       if (st && e.alert2_id != null && st.alert2_station_id == null) {
         const h = holder.get(Number(e.alert2_id));
-        notes.push(h ? { k: 'id-elsewhere', level: 'warn', text: `The register gives ID ${e.alert2_id} to ${h.name || h.id}` }
+        notes.push(h ? { k: 'id-elsewhere', level: 'warn', text: `The register gives ID ${e.alert2_id} to ${holderNames(e.alert2_id)}` }
                      : { k: 'station-no-id', level: 'info', text: `${st.name || st.id} has no ALERT2 ID in the register yet` });
       }
       if (!e.station_id) {
         const h = e.alert2_id != null ? holder.get(Number(e.alert2_id)) : null;
-        notes.push(h ? { k: 'unlinked-held', level: 'info', text: `Not linked; the register gives ID ${e.alert2_id} to ${h.name || h.id}` }
+        notes.push(h ? { k: 'unlinked-held', level: 'info', text: `Not linked; the register gives ID ${e.alert2_id} to ${holderNames(e.alert2_id)}` }
                      : { k: 'unlinked', level: 'info', text: 'Not linked to a register station' });
       }
       let air = null;
@@ -446,7 +457,13 @@ const TdmaSlots = (function () {
       const slotS = Number(c.slot_s) || 0.5;
       lines.push(`${esc(fmtMhz(c.freq_mhz))} MHz: ${esc(runsOf(on.map(x => x.slot_s), slotS).map(r => runText(r, slotS)).join(', '))} of a ${esc(fmtS(c.frame_s))} s frame`);
     }
-    return `<div class="acma-row"><span>${termHtml('ALERT2 ID', WORDS.a2id)}</span><span>${esc(ids.join(', '))}</span></div>${lines.length
+    const slotsOf = st => [...new Set(((typeof stationSensors === 'function' ? stationSensors(st) : st.sensors) || [])
+      .filter(x => x && x.alert2_sensor_id != null).map(x => Number(x.alert2_sensor_id)))].sort((a, b) => a - b);
+    const mineSlots = slotsOf(s);
+    const sharers = id == null ? [] : stations().filter(x => x && String(x.id) !== String(s.id) && Number(x.alert2_station_id) === id);
+    const extra = [mineSlots.length ? `sensor${mineSlots.length === 1 ? '' : 's'} ${mineSlots.join(', ')}` : '',
+                   sharers.length ? `shared with ${sharers.map(x => x.name || x.id).join(', ')}` : ''].filter(Boolean).join('; ');
+    return `<div class="acma-row"><span>${termHtml('ALERT2 ID', WORDS.a2id)}</span><span>${esc(ids.join(', '))}${extra ? ` <span class="small txt-muted">(${esc(extra)})</span>` : ''}</span></div>${lines.length
       ? `<div class="acma-row"><span>${termHtml('Time slots', WORDS.slot)}</span><span>${lines.join('<br>')}</span></div>` : ''}`;
   }
   function cardHtml(s) {
