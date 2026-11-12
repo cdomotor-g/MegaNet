@@ -9192,6 +9192,8 @@ function repaintStnCard() {
   // …and its benchmarks, in Flood (station-benchmarks.js): the Bureau's and any
   // an editor entered for an editor, the Bureau's numbers for anybody else.
   if (typeof StationBenchmarks !== 'undefined') StationBenchmarks.cardAsk(s);
+  // …and the ALERT2 slot table, once a page (tdma-slots.js).
+  if (typeof TdmaSlots !== 'undefined') TdmaSlots.cardAsk(s);
   // And the station's history (station-history.js).
   if (typeof StationHistory !== 'undefined') StationHistory.cardAsk(s);
   // Its health (#218): one request for its readings, kept per station for a
@@ -9565,6 +9567,8 @@ function stnCardHtml(s) {
     idTypes.length ? `<div class="stn-card-ids"><span class="small txt-muted">AlertID</span><br>${idTypes.map(t =>
       `<span class="mn-pop-line mn-pop-indent">${esc(t.id)}${t.types.length ? ' — ' + esc(t.types.join(' / ')) : ''}</span>`).join('<br>')}</div>` : '',
     Frequencies.cardHtml(s),
+    // Its ALERT2 ID and its time slots on file (tdma-slots.js, 0120).
+    typeof TdmaSlots !== 'undefined' ? TdmaSlots.cardHtml(s) : '',
     typeof HealthDrift !== 'undefined' ? HealthDrift.cardHtml(s) : '',
     acmaRepeaterPopupExtra(s),
   ].join('');

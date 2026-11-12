@@ -766,6 +766,7 @@ const TdmaPlanner = (function () {
     ensure();
     return `<div class="page tdp-page" style="--page-max:1200px"><h2 class="sr-only">TDMA Planner</h2><div class="stack" id="tdp-page">
       ${headHtml()}
+      ${typeof TdmaSlots !== 'undefined' ? TdmaSlots.panelHtml() : ''}
       <div id="tdp-kpis">${kpisHtml()}</div>
       ${networkHtml()}
       ${controlsHtml()}

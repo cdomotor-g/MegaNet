@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 274, date: '2026-11-12', items: [
+      '📋 <strong>The ALERT2 slot table.</strong> The ⏱️ TDMA Planner tab now opens with the slots the Mt Glorious ALERT2 network '
+        + 'actually runs, channel by channel: which site sends in which half-second, under which ALERT2 ID, which station it is, and '
+        + 'whether the base stations have heard it — with warnings for a missing ID, an ID under two names, or one not heard in a month. '
+        + 'A station\'s card shows its ALERT2 ID and time slots, in its radio section. Editors can rename a site, link its station, '
+        + 'put a site into slots or make slots spare, right on the tab.',
+    ] },
     { n: 273, date: '2026-11-12', items: [
       '🏷️ <strong>Tags on tasks.</strong> Put short words of your own on a task to say what kind of job it is — it starts with '
         + '<em>RTS</em> (Return to service), <em>QA</em> (Quality assurance) and <em>Assessment</em> (FWIN site assessment). On the ✅ '

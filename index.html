@@ -1007,6 +1007,12 @@
        (stationIsMast) and map-backbone.js (backboneIndex), read at call
        time; runs nothing at load. -->
   <script src="tdma-planner.js?v=20261112i"></script>
+  <!-- The slot table on file (0120): the ALERT2 slots the network runs, by
+       channel, with each site's ID, its register station and what the base
+       stations heard — the TDMA Planner's first panel, and a station card's
+       ALERT2 ID and slots. After core.js, datastore.js and auth.js, read at
+       call time; runs nothing at load. -->
+  <script src="tdma-slots.js?v=20261112i"></script>
   <!-- The 🎓 Radio Propagation tab: a lesson in how a reading travels, with
        drawings that move. The physics first (pure, no DOM — test/propagation.mjs
        holds every figure to one worked by hand), then the 3-D scene, which draws

@@ -18,6 +18,54 @@ plan is kept on the device that made it and nowhere else. It is a planning tool,
 not a configuration tool: nothing it works out is written to a radio or to the
 station register.
 
+## The slot table on file
+
+The tab's first panel, **📋 The slot table on file** ([`tdma-slots.js`](../tdma-slots.js),
+`db/migrations/0120_tdma_slots.sql`), is not a plan: it is the slots the
+network actually runs, from the slot sheet supplied for the Mt Glorious ALERT2
+network on 12 November 2026. It is kept in the database, so everybody sees the
+same table, and editors change it in place.
+
+| Channel | What it carries | Frame |
+|---|---|---|
+| 151.5375 MHz | field stations heard through the repeaters | 60 s |
+| 152.4625 MHz | field stations heard direct by Mt Glorious | 60 s |
+| 173.9 MHz | Mt Glorious Primary (0–9.5 s) | 20 s, read off the sheet |
+| 173.95 MHz | Mt Glorious Secondary (10–19.5 s) | 20 s, read off the sheet |
+
+Pick a channel and the panel shows the frame as a strip (each block a site's run
+of half-second slots, the gaps spare), then one row a site: its name as the
+sheet gives it, its ALERT2 ID, the register station it is, its slots, what the
+base stations decoded of its ID on that channel in the last 30 days (sent by it,
+or passed on by it as a repeater), and the checks:
+
+- a slot with **no ALERT2 ID** (Mt Mee RF, on the sheet);
+- one ID under **two site names**;
+- a site **not linked** to a register station — and, where the register already
+  gives its ID to a station, which one; a linked station whose own ALERT2 ID is
+  **another**, or which has **none yet**;
+- an ID **not heard** in 30 days on a channel the base stations hear, or heard
+  on **another channel** instead (Mt Pechey's 10315, heard on 151.5 MHz). On a
+  channel no base station hears at all (152.4625 and the two Mt Glorious links,
+  today) nothing is said either way;
+- under the table, the IDs **heard on the channel that no slot holds**.
+
+What was heard comes from `meganet.tdma_heard(days)`, over the daily reception
+rollup: per ID and 12.5 kHz channel, never a receiver.
+
+A site linked to a register station puts its ALERT2 ID and slots on that
+station's card, in its radio section. 0120 linked the 17 sites that match exactly
+one register station, and gave those stations their ALERT2 ID
+(`station.alert2_station_id`, 0024) where they had none. The rest — a weir with
+both a headwater and a tailwater station, a hill with a primary and a backup
+gauge, or a site the register does not have — are left for a person.
+
+**Editing** (editors only): *Change* on a site renames it, changes its ID or links
+its station on every channel at once (linking a station with no ALERT2 ID gives
+it the site's); *＋ Put a site into slots* puts a site into a run of slots,
+saying first which slots it would take over from whom; *✕* beside a run makes
+it spare. *⤓ Slot table CSV* saves `floodnet-tdma-slots.csv`, a row a slot.
+
 ## What it is for
 
 A legacy ALERT network is contention: every gauge transmits when it has

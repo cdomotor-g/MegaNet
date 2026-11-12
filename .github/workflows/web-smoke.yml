@@ -1979,6 +1979,14 @@ jobs:
         working-directory: test
         run: npm run tdma
 
+      # Node only. The slot table on file (tdma-slots.js, 0120): the slot sheet
+      # as 0120 seeds it, runs, the checks against the register and what the
+      # base stations heard, and what a save would take over.
+      - name: TDMA slot table — the sheet, the runs, the checks
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run tdmaslots
+
       # Node, then Chromium. The 🎓 Radio Propagation tab (propagation-*.js):
       # its physics against figures worked by hand, its ALERT frame against
       # packets.js's own decoder, each of the made-up catchment's stories
