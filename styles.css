@@ -22587,7 +22587,7 @@ body.has-sort-bridge .signin-nudge { display: none; }
   .rlc-wave, .rlc-pkt, .rlc-st-pulse, .rlc-shape-pulse, .rlc-sweep, .rlc-word.is-lit { animation: none; }
   .rlc-wave { opacity: .7; }
   .rlc-sweep { display: none; }
-  .fw-pane.is-active, .fw-ledchip-dot { animation: none; }
+  .fw-pane.is-active, .fw-ledchip-dot, .fw-player[data-mode="live"] .fw-stage:not(:focus) .fw-typehint { animation: none; }
   .fw-ledchip-dot { background: #ffe35a; }
 
   /* The loading card's logo (#212's card, its detailed mark brought to life):
@@ -26847,6 +26847,32 @@ td.bb-heat .bb-bit-k { margin-top: .05rem; }
 .fw-live-row { display: flex; flex-wrap: wrap; gap: var(--sp-1); align-items: center; }
 .fw-live-text { flex: 1 1 12rem; min-width: 8rem; font-family: var(--font-mono); }
 .fw-player[data-mode="live"] .fw-term .tm-m { cursor: pointer; border-radius: 2px; }
+/* Interactive: keys reach the terminal only while the stage has the focus,
+   so the laptop pane says which — and PuTTY's cursor goes hollow, as the
+   real one does, while the focus is elsewhere. */
+.fw-typehint { display: none; }
+.fw-player[data-mode="live"] .fw-typehint {
+  display: block;
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  padding: .15rem .6rem;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.fw-typehint-on { display: none; }
+.fw-player[data-mode="live"] .fw-stage:not(:focus) .fw-typehint { color: #4d3a00; background: #fff4ce; border: 1px solid #e8d48a; animation: fw-due 1.6s var(--ease) infinite; }
+.fw-player[data-mode="live"] .fw-stage:focus .fw-typehint { color: var(--muted); background: var(--panel); border: 1px solid var(--border); }
+.fw-player[data-mode="live"] .fw-stage:focus .fw-typehint-off { display: none; }
+.fw-player[data-mode="live"] .fw-stage:focus .fw-typehint-on { display: inline; }
+.fw-player[data-mode="live"] .fw-stage:not(:focus) .tm-cur { color: transparent; outline: 1px solid #00ff00; outline-offset: -1px; }
+.fw-player[data-mode="live"] .fw-pane--pc { cursor: text; container: fwpc / inline-size; grid-template-rows: auto auto minmax(0, 1fr); }
+.fw-player[data-mode="live"] .fw-pane--pc > .fw-pc-wrap { grid-row: 3; }
+/* A narrow laptop pane: the hint on its own line, under the pane's tag. */
+@container fwpc (max-width: 30rem) {
+  .fw-player[data-mode="live"] .fw-typehint { position: static; justify-self: start; margin: 0 0 var(--sp-2); }
+}
 .fw-player[data-mode="live"] .fw-term .tm-m:hover { background: rgba(243, 227, 90, .16); }
 .fw-player[data-mode="live"] #fw-stick, .fw-player[data-mode="live"] #fw-reset-hit { cursor: pointer; }
 .fw-offline { padding: .3rem .6rem; background: #fff4ce; color: #4d3a00; border-top: 1px solid #e8d48a; font-family: "Segoe UI", system-ui, sans-serif; font-size: var(--fs-sm); font-weight: 600; text-align: center; }

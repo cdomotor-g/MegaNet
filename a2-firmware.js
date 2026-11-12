@@ -1193,6 +1193,7 @@ const A2Firmware = (function () {
         </figure>
         <figure class="fw-pane fw-pane--pc${side === 'pc' ? ' is-active' : ''}" id="fw-pane-pc">
           <figcaption class="fw-pane-tag"><span aria-hidden="true">⌨️</span> On the laptop<span class="fw-now">${side === 'pc' ? ' — now' : ''}</span></figcaption>
+          <span class="fw-typehint" aria-hidden="true"><span class="fw-typehint-off">👆 Click the terminal, then type</span><span class="fw-typehint-on">⌨ Your keys go to the terminal</span></span>
           <div class="fw-pc-wrap" id="fw-pc" onclick="A2Firmware.tapLine(event)"></div>
         </figure>
       </div>
@@ -1289,8 +1290,8 @@ const A2Firmware = (function () {
       now = LV.anim ? 'The unit is busy: watch the board. The terminal is off-line until it is done.'
         : LV.wait === 'pull' ? 'All four DIO LEDs are on: take the stick out (the button above, or the stick on the board) to restart the unit.'
           : 'The USB link is off-line and PuTTY says (inactive). Press <strong>🔌 Restart Session</strong>, then a key.';
-    } else if (a.k === 'asleep') now = 'Press <strong>Enter</strong> (or Send) to wake the console.';
-    else if (a.k === 'login') now = 'Log in: <strong>a</strong> for Engineer.';
+    } else if (a.k === 'asleep') now = 'Click the terminal and press <strong>Enter</strong> to wake the console — or press the Enter button below.';
+    else if (a.k === 'login') now = 'Log in: press <strong>a</strong> for Engineer — no Enter needed; the A2 asks for the password next. Click the terminal first so your keys reach it, or type in the box below and Send.';
     else if (a.k === 'password') now = 'Type a password and Enter. The simulator takes any but an empty one; a real unit takes your network\'s.';
     else if (a.k === 'menu') now = `${ABOUT[a.id] || ''} Press a letter, or tap a line in the terminal; Enter goes back up a menu.`;
     else if (a.k === 'choose') now = 'A choice: the one starred is the current setting. Press its letter, or the last one to cancel.';
@@ -1409,6 +1410,10 @@ const A2Firmware = (function () {
     if (box) box.value = '';
     if (!LV) return;
     if (!text) { liveKey('Enter'); return; }
+    // Enter after a password only if the box was typed at the Password
+    // prompt: an "a" sent at the login takes it there, and an Enter then
+    // would send an empty password and land back at the login.
+    const atPw = LV.e.link && LV.e.at.k === 'password';
     if (LV.e.link && LV.e.at.k === 'value') {
       A2Terminal.type(LV.e, text);
       LV.keys.push({ k: `${text} ⏎`, at: performance.now() / 1000 });
@@ -1417,7 +1422,7 @@ const A2Firmware = (function () {
       scheduleLive();
     } else {
       for (const ch of text) liveKey(ch);
-      if (LV.e.link && LV.e.at.k === 'password') liveKey('Enter');
+      if (atPw && LV.e.link && LV.e.at.k === 'password') liveKey('Enter');
     }
     if (box) box.focus();
   }

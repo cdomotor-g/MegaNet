@@ -391,7 +391,26 @@ try {
   await page.click('.fw-mode[onclick*="live"]');
   let lv = await page.evaluate(() => ({ mode: A2Firmware.state().mode, demoHidden: document.getElementById('fw-demo-foot').hidden, liveShown: !document.getElementById('fw-live-foot').hidden }));
   ok('Interactive swaps the demo\'s controls for the terminal\'s', lv.mode === 'live' && lv.demoHidden && lv.liveShown, J(lv));
-  await page.focus('#fw-stage');
+  // The box: "a" then Send at the login reaches the Password prompt, not an
+  // empty password straight back to the login (the bug of 12 Nov 2026).
+  await page.evaluate(() => document.activeElement && document.activeElement.blur());
+  const hint = () => page.evaluate(() => { const v = el => el && getComputedStyle(el).display !== 'none'; return { off: v(document.querySelector('.fw-typehint-off')), on: v(document.querySelector('.fw-typehint-on')) }; });
+  let hn = await hint();
+  ok('the terminal not focused: its tag says to click it, then type', hn.off && !hn.on, J(hn));
+  await page.click('#fw-live-text');
+  await page.keyboard.press('Enter');
+  await page.fill('#fw-live-text', 'a');
+  await page.keyboard.press('Enter');
+  lv = await page.evaluate(() => A2Firmware.state().live);
+  ok('the box: a and Send at the login asks for the password', /Password:\s*$/.test(lv.log) && !/Invalid Password/.test(lv.log), lv.log.slice(-200));
+  await page.fill('#fw-live-text', 'pw');
+  await page.keyboard.press('Enter');
+  lv = await page.evaluate(() => A2Firmware.state().live);
+  ok('the box: a password and Send logs in', /Login Successful!/.test(lv.log) && lv.menu === 'main', lv.log.slice(-200));
+  await page.evaluate(() => A2Firmware.liveReset());
+  await page.click('#fw-pc');
+  hn = await hint();
+  ok('the terminal clicked: its tag says the keys go to it', !hn.off && hn.on, J(hn));
   await page.keyboard.press('Enter');
   await page.keyboard.press('a');
   await page.keyboard.type('anything');
