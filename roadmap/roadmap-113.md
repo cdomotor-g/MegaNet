@@ -892,7 +892,7 @@ The owner asked for tags of their own on tasks, starting with RTS (Return to ser
 - **The Tasks tab** (`tasks.js`): a tag picker on the new-task form, *Change this task* and *Move it on* — every tag in use a button to press, a box that offers them as you type and takes a new one, asking what it means; tags as chips on each row, the task's facts, its station card and the map's pins, each saying its meaning on hover and in the words fold; a **Tag** filter (and *No tag*).
 - **Admin › Tags** (`admin-tags.js`): every tag with how many tasks have it (and how many are still going); rename, re-word, recolour, retire or bring back; merge one into another (each task's thread says so); remove one no task has.
 - **Checks:** `check_task_tags.sql` (41, new, in db-checks); `tasks` (126, 22 of them new for tags).
-- **To apply:** `db-migrate.yml` runs `0118`; until then the app works as before with no tags shown.
+- **Applied** by `db-migrate.yml` (a dry run listing `0118` alone, then the run) in 10 s; `schema_version` 118 read back through the connector, with RTS, QA and Assessment there and `anon` holding nothing on the tags or `tags_read()`; `core.js` `DB_SCHEMA_VERSION` 118 after.
 
 ### Revision 255 — 2026-11-11: #289 opened
 

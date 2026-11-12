@@ -4054,7 +4054,10 @@ const DB_SCHEMA = 'meganet';
 // reads changes. 111: a base station's spectrum by the hour and its ingest
 // (0111), applied by db-migrate.yml on 10 November 2026, bumped after; the
 // Base Stations tab reads both, and a database without them says which file.
-const DB_SCHEMA_VERSION = 117;
+// 118: tags on tasks (0118), applied by db-migrate.yml on 12 November 2026,
+// bumped after; tasks.js and admin-tags.js read them, and a database without
+// them shows no tags.
+const DB_SCHEMA_VERSION = 118;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
