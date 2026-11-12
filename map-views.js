@@ -193,7 +193,7 @@ const MapViews = (function () {
 
   // The overlay layers a view switches, each on its own module's setter.
   const LAYER_KNOBS = ['riverLines', 'riverCatchment', 'rain', 'elev', 'catchments', 'lots', 'easements', 'tenure',
-    'roads', 'roadOwners', 'councils', 'survey', 'hubs', 'wind', 'cameras', 'photos', 'siteFeatures'];
+    'roads', 'roadOwners', 'councils', 'survey', 'hubs', 'wind', 'cameras', 'photos', 'siteFeatures', 'tasks'];
   // Not among them: Offer the digital twin at close zoom (MapTwin.setEnabled).
   // It was a view's to set until November 2026, and seven of the ten views
   // set it on — so an operator who unticked it had it ticked again by the
@@ -206,7 +206,7 @@ const MapViews = (function () {
     catchments: 'river basins', lots: 'property boundaries', easements: 'easements', tenure: 'land tenure',
     roads: 'road parcels', roadOwners: 'road owners', councils: 'council areas', survey: 'survey marks',
     hubs: 'maintenance hubs', wind: 'wind regions', cameras: 'flood cameras', photos: 'field photos',
-    siteFeatures: 'site features',
+    siteFeatures: 'site features', tasks: 'tasks',
   };
   const PATH_WORDS = {
     every: 'every path', best: 'the best path only', lod: 'the best path until zoomed in',
@@ -256,6 +256,22 @@ const MapViews = (function () {
         outlines: false,
         ...only('lots', 'easements', 'roads', 'survey', 'photos', 'siteFeatures', 'cameras', 'riverLines'),
         drawing: { paths: 'every', draw: 'tails', tails: { follow: true }, auto: true, balance: 35 },
+      },
+    },
+    {
+      // Asked for 12 Nov 2026: "a new view in the everyone group … to help the
+      // user see the locations of sites that have tasks assigned to them".
+      // A light map, no paths and no health colours, so the task rings are
+      // what the eye finds.
+      id: 'tasks', group: 'everyone', label: 'Tasks',
+      say: 'Where the jobs are: every station with an unfinished task you may see, ringed in the colour of its most pressing '
+        + 'task — red overdue, amber waiting, blue in progress or open — with how many on a badge, on a light map. Press a '
+        + 'badge for the station\'s card and its tasks. No radio paths.',
+      caution: 'Only the tasks you may see: sign in first. Reads your task list when it is turned on.',
+      knobs: {
+        base: 'Light', links: false, roles: ALL_ROLES, backbone: false, arrows: false, health: false, outlines: false,
+        ...only('riverLines', 'tasks'),
+        drawing: { paths: 'every', draw: 'lines', auto: true, balance: 40 },
       },
     },
     {
@@ -880,6 +896,7 @@ const MapViews = (function () {
     MapCameras: () => (typeof MapCameras !== 'undefined' ? MapCameras : null),
     MapPhotos: () => (typeof MapPhotos !== 'undefined' ? MapPhotos : null),
     SiteFeatures: () => (typeof SiteFeatures !== 'undefined' ? SiteFeatures : null),
+    MapTasks: () => (typeof MapTasks !== 'undefined' ? MapTasks : null),
     MapTwin: () => (typeof MapTwin !== 'undefined' ? MapTwin : null),
   };
   const M = name => MOD[name];
@@ -950,6 +967,7 @@ const MapViews = (function () {
     cameras: boolKnob('mapCameras', M('MapCameras'), 'setEnabled'),
     photos: boolKnob('mapPhotos', M('MapPhotos'), 'setEnabled'),
     siteFeatures: boolKnob('mapSiteFeatures', M('SiteFeatures'), 'setEnabled'),
+    tasks: boolKnob('mapTasks', M('MapTasks'), 'setEnabled'),
     drawing: {
       avail: () => true,
       read: () => settings(),
@@ -1164,7 +1182,7 @@ const MapViews = (function () {
   const SHARE_V = 'm1';
   const SHARE_SWITCHES = ['links', 'backbone', 'arrows', 'health', 'outlines', 'riverLines', 'riverCatchment', 'rain',
     'elev', 'catchments', 'lots', 'easements', 'tenure', 'roads', 'roadOwners', 'councils', 'survey', 'hubs', 'wind',
-    'cameras', 'photos', 'siteFeatures', 'twinOffer'];
+    'cameras', 'photos', 'siteFeatures', 'twinOffer', 'tasks'];
   // (twinOffer keeps its place so older links still line up; it is no longer
   // a knob, so it is written as "-" and ignored when read.)
   // A base map's name, with the code's own separators kept out of it.
@@ -1605,6 +1623,7 @@ const MapViews = (function () {
       case 'rivers': b = G.topo + '<path d="M6 6 C24 2 40 8 52 4 L66 18 C60 34 50 44 30 44 C14 42 6 30 6 6z" fill="#4fa3d9" fill-opacity=".18" stroke="#0b4f8a" stroke-width=".8"/>' + river('#1f6fd1') + '<path d="M30 36 L36 14" stroke="#1f6fd1" stroke-width="1.3"/>' + pin(20, 33) + pin(44, 27) + '<circle cx="44" cy="27" r="4" fill="none" stroke="#e05aa8" stroke-width="1"/>'; break;
       case 'rain': b = G.light + '<circle cx="22" cy="20" r="14" fill="#7c4dff" fill-opacity=".22"/><circle cx="26" cy="22" r="7" fill="#3a2ea8" fill-opacity=".35"/><circle cx="54" cy="32" r="10" fill="#2979ff" fill-opacity=".2"/>' + river('#1f6fd1') + pin(24, 21) + pin(54, 32) + pin(10, 38); break;
       case 'property': b = G.sat + '<path d="M4 10H68M4 26H68M4 40H68M14 4V44M34 4V44M54 4V44" stroke="#fff" stroke-width=".7"/><path d="M24 4V44" stroke="#fff" stroke-width=".8" stroke-dasharray="2 2"/><path d="M0 34 L72 20" stroke="#f9a825" stroke-width="1.6"/>' + pin(44, 16); break;
+      case 'tasks': b = G.light + river('#1f6fd1') + [[18, 30, '#c7401a'], [44, 16, '#9e5e00'], [58, 34, '#0b5cab']].map(([x, y, c]) => pin(x, y) + `<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="${c}" stroke-width="1.8"/><rect x="${x + 4}" y="${y - 11}" width="9" height="7" rx="3.5" fill="${c}"/>`).join('') + pin(30, 12) + pin(8, 12); break;
       case 'land': b = G.topo + '<rect x="4" y="4" width="30" height="20" fill="#2e8b3e" opacity=".45"/><rect x="38" y="26" width="30" height="18" fill="#1b7f79" opacity=".4"/><rect x="40" y="4" width="16" height="16" fill="#d6539b" opacity=".35"/><path d="M4 24H68M34 4V44M56 4V44" stroke="#555" stroke-width=".6"/>' + river('#1f6fd1'); break;
       default: b = G.light + P.slice(0, 4).map(p => ln(p, R2, '#2979ff', 1, 0.6)).join('') + rpt(...R2);
     }
@@ -1617,7 +1636,7 @@ const MapViews = (function () {
     riverLines: 'Rivers', riverCatchment: 'Catchment of a picked river', rain: 'Rain heat map', elev: 'Ground height',
     catchments: 'River basins', lots: 'Property lines', easements: 'Easements', tenure: 'Land tenure', roads: 'Road parcels',
     roadOwners: 'Road owners', councils: 'Council areas', survey: 'Survey marks', hubs: 'Maintenance hubs',
-    wind: 'Wind regions', photos: 'Field photos', siteFeatures: 'Site features',
+    wind: 'Wind regions', photos: 'Field photos', siteFeatures: 'Site features', tasks: 'Task rings',
   };
   function tagsOf(v) {
     const k = (v && v.knobs) || {};

@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 271, date: '2026-11-12', items: [
+      '🗺️ <strong>Tasks on a map.</strong> The ✅ Tasks tab has a map above the list: a pin on each station with tasks that fit '
+        + 'your filters, coloured by the most pressing one there — red overdue, amber waiting, blue in progress or open — and a '
+        + 'badge with how many. Press a pin for its tasks.',
+      '✅ <strong>A Tasks view on the Stations map.</strong> In Layers › Views › Everyone, <em>Tasks</em> rings every station with an '
+        + 'unfinished task you may see, in the same colours, on a light map. Press a badge for the station\'s card and its tasks.',
+    ] },
     { n: 270, date: '2026-11-11', items: [
       '🌊 <strong>Flood peaks near here, side by side.</strong> The 🧊 digital twin pane has a new panel listing the floods recorded '
         + 'at the station and at the gauges within 25 km, flood by flood. Each peak is shown three ways — as it read on its own gauge, '

@@ -90,11 +90,13 @@ const Tasks = (function () {
     sort: 'Made from the list the SoRT forum agreed for a station, handed over from SoRT\'s scope builder — the date is the forum\'s.',
     thread: 'Everything that has happened to the task, oldest first: who made it, every change of status or team, every edit and every note, with who and when.',
     mine: 'The tasks handed to a team you are on.',
+    overdue: 'Past its due date and not done yet.',
+    map: 'Each pin is a station with tasks that fit the filters above, coloured by the most pressing of them: overdue first, then waiting, in progress and open. The number is how many tasks are there. Pins close together on screen are drawn as one, with a dashed ring, until you zoom in.',
     second: 'Another address of the same person — an account of its own until an administrator made the two one. It does not sign in, but adding them to a team by it finds them.',
   };
   const GLOSSARY = [['task', 'Task'], ['team', 'Team'], ['status', 'Status'],
     ...STATUS.map(s => [`st:${s.key}`, s.label]),
-    ['due', 'Due'], ['unassigned', 'Unassigned'], ['handsout', 'Hands out tasks'], ['owner', 'Owner'],
+    ['due', 'Due'], ['overdue', 'Overdue'], ['map', 'The map\'s pins'], ['unassigned', 'Unassigned'], ['handsout', 'Hands out tasks'], ['owner', 'Owner'],
     ['member', 'Member'], ['second', 'Second address'], ['sort', 'From SoRT'], ['thread', 'Thread']];
   const word = k => (k.startsWith('st:') ? (STATUS_OF[k.slice(3)] || {}).meaning : WORDS[k]) || '';
 
@@ -127,6 +129,8 @@ const Tasks = (function () {
   const memberAdd = {};    // team id → the address being typed
   let teamErr = {};        // team id → what the database said
   const cards = {};        // station id → { at, rows, p, error }
+  let listAt = 0;          // when the list was last read
+  let listAsk = null;      // a read of the list for the Stations map, in flight
 
   function freshDraft(stationId) {
     return { station: stationId || '', general: false, q: '', title: '', details: '', team: '', due: '' };
@@ -209,6 +213,7 @@ const Tasks = (function () {
       const [t, l] = await Promise.all([dbRpc('teams_read', {}), dbRpc('task_list', {})]);
       teams = t && typeof t === 'object' ? t : { me: {}, teams: [] };
       list = Array.isArray(l) ? l : [];
+      listAt = Date.now();
       missing = false;
       // Somebody who hands out tasks starts on all of them; anybody else on
       // their own teams' — or, on none, on everything they may see, which is
@@ -221,6 +226,7 @@ const Tasks = (function () {
     }
     loading = false;
     paint();
+    listChanged();
     if (handoff) askRefs();
     if (view === 'task' && openId && !task && opening !== openId) openTask(openId);
   }
@@ -229,8 +235,14 @@ const Tasks = (function () {
     try {
       const l = await dbRpc('task_list', {});
       list = Array.isArray(l) ? l : list;
+      listAt = Date.now();
     } catch (_) { /* the list as it was; the next load says why */ }
     for (const k of Object.keys(cards)) delete cards[k];
+    listChanged();
+  }
+  // The Stations map's Tasks layer draws from the same list.
+  function listChanged() {
+    if (typeof MapTasks !== 'undefined' && MapTasks.refresh) MapTasks.refresh();
   }
 
   // ── Painting ───────────────────────────────────────────────────────────────
@@ -254,7 +266,9 @@ const Tasks = (function () {
     const el = document.getElementById('main-content');
     if (!el) return;
     const had = focusKey || (el.contains(document.activeElement) ? focusKeyOf(document.activeElement) : null);
+    if (TM.el && TM.el.parentNode) TM.el.remove();   // kept alive across the repaint (placeMap)
     el.innerHTML = render();
+    placeMap();
     refocus(had);
   }
   function paintPart(id, html) {
@@ -413,8 +427,207 @@ const Tasks = (function () {
     if (note) body += `<p class="small txt-ok" role="status">${esc(note)}</p>`;
     if (error) body += `<p class="small txt-bad" role="alert">${esc(error)} <button type="button" class="link-btn" onclick="Tasks.load()">Try again</button></p>`;
     if (loading && !list) body += '<p class="small" role="status">Loading the tasks…</p>';
-    if (list) body += filtersHtml() + `<div id="tk-table">${tableHtml()}</div>`;
+    if (list) body += filtersHtml() + mapSlotHtml() + `<div id="tk-table">${tableHtml()}</div>`;
     return `<div class="panel" aria-labelledby="tk-list-h">${head}${body}</div>`;
+  }
+
+  // ── The map ────────────────────────────────────────────────────────────────
+  // Where the tasks in the list are: a pin per station, coloured by its most
+  // pressing task, with how many on a badge. The same pins, from the same
+  // functions, are the Stations map's Tasks layer (map-tasks.js), so the two
+  // never disagree about what a colour means.
+  //
+  // The page is repainted whole on most changes (paint), and a Leaflet map
+  // torn down and built again on every filter would lose where somebody had
+  // zoomed to. So the map's element is made once and kept: paint() lifts it
+  // out before the repaint and placeMap() puts it into the new #tk-map-slot,
+  // tells Leaflet its size, and draws the pins for what the filters now pick.
+  // Leaving the tab takes it down (the teardown init() registers).
+
+  // The colours, most pressing first. A station's pin takes the first of
+  // these any of its tasks is.
+  const PINS = [
+    { key: 'late',        label: 'Overdue',     meaning: 'At least one task here is past its due date and not done yet.' },
+    { key: 'waiting',     label: 'Waiting',     meaning: `At least one task here is waiting: ${STATUS_OF.waiting.meaning}` },
+    { key: 'in_progress', label: 'In progress', meaning: 'At least one task here is being worked on, and none is overdue or waiting.' },
+    { key: 'open',        label: 'Open',        meaning: 'The tasks here are handed to a team and not started yet.' },
+    { key: 'done',        label: 'Finished',    meaning: 'Every task here that fits the filters is done or cancelled.' },
+  ];
+  const PIN_RANK = Object.fromEntries(PINS.map((p, i) => [p.key, i]));
+  const MAP_MERGE_PX = 34;     // pins closer than this on screen are drawn as one
+  const TM = { el: null, map: null, layer: null, groups: [], fitKey: '', unplaced: 0 };
+
+  const placed = s => !!s && s.lat != null && s.lon != null && Number.isFinite(Number(s.lat)) && Number.isFinite(Number(s.lon));
+  const isLate = t => LIVE.includes(t.status) && !!t.due_on && t.due_on < today();
+  function pinKeyOf(t) {
+    if (isLate(t)) return 'late';
+    return LIVE.includes(t.status) ? t.status : 'done';
+  }
+  const worse = (a, b) => (PIN_RANK[a] <= PIN_RANK[b] ? a : b);
+
+  // Tasks → one group a station: { id, name, lat, lon, tasks, n, key }.
+  // `unplaced` counts the tasks with no station, or a station with no place.
+  function stationGroups(rows) {
+    const by = new Map();
+    let unplaced = 0;
+    for (const t of rows || []) {
+      const st = t && t.station_id ? stationOf(t.station_id) : null;
+      if (!placed(st)) { unplaced++; continue; }
+      let g = by.get(st.id);
+      if (!g) { g = { id: st.id, name: stationLabel(st.id), lat: Number(st.lat), lon: Number(st.lon), tasks: [], key: 'done' }; by.set(st.id, g); }
+      g.tasks.push(t);
+      g.key = worse(g.key, pinKeyOf(t));
+    }
+    const groups = [...by.values()];
+    for (const g of groups) {
+      g.n = g.tasks.length;
+      g.tasks.sort((a, b) => PIN_RANK[pinKeyOf(a)] - PIN_RANK[pinKeyOf(b)] || String(a.due_on || '9').localeCompare(String(b.due_on || '9')));
+    }
+    // The most pressing drawn last, so on top.
+    groups.sort((a, b) => PIN_RANK[b.key] - PIN_RANK[a.key]);
+    return { groups, unplaced };
+  }
+
+  // Groups that would overlap on screen at the map's zoom, drawn as one — in
+  // the order given, so the same list and zoom always merge the same way. A
+  // merged pin is { many: true, members, n, key, lat, lon }.
+  function mergeOnScreen(map, groups, px = MAP_MERGE_PX) {
+    const out = [];
+    for (const g of groups) {
+      const p = map.latLngToLayerPoint([g.lat, g.lon]);
+      const m = out.find(o => Math.hypot(o.p.x - p.x, o.p.y - p.y) <= px);
+      if (m) { m.members.push(g); continue; }
+      out.push({ p, members: [g] });
+    }
+    return out.map(o => {
+      if (o.members.length === 1) return o.members[0];
+      const ms = o.members;
+      return {
+        many: true, members: ms, n: ms.reduce((a, g) => a + g.n, 0),
+        key: ms.reduce((k, g) => worse(k, g.key), 'done'),
+        lat: ms.reduce((a, g) => a + g.lat, 0) / ms.length,
+        lon: ms.reduce((a, g) => a + g.lon, 0) / ms.length,
+      };
+    });
+  }
+
+  // The pin: a ring round the station and a badge standing up and right off
+  // it, so the station's own pin is never covered. Colours are the page's
+  // tokens, through the class (styles.css, .mn-task-*).
+  function pinIcon(g, { ring = true } = {}) {
+    const cls = `mn-task-pin mn-task-${g.key}${g.many ? ' mn-task-many' : ''}`;
+    return L.divIcon({
+      className: 'mn-task-icon',
+      html: `<span class="${cls}">${ring ? '<i class="mn-task-ring" aria-hidden="true"></i>' : ''}<span class="mn-task-badge"><span aria-hidden="true">✅</span><b>${g.n}</b></span></span>`,
+      iconSize: [0, 0],
+      iconAnchor: [0, 0],
+    });
+  }
+  function pinTitle(g) {
+    const what = (PINS.find(p => p.key === g.key) || {}).label || '';
+    if (g.many) return `${g.n} task${g.n === 1 ? '' : 's'} at ${g.members.length} stations close together (the most pressing ${what.toLowerCase()}) — zoom in to tell them apart`;
+    const first = g.tasks.slice(0, 3).map(t => `${t.title} (${isLate(t) ? 'overdue' : (STATUS_OF[t.status] || { label: t.status }).label.toLowerCase()})`).join('; ');
+    return `${g.name} — ${g.n} task${g.n === 1 ? '' : 's'}: ${first}${g.n > 3 ? `; and ${g.n - 3} more` : ''}`;
+  }
+  // What pressing a single station's pin shows: its tasks, each opening.
+  function pinPopupHtml(g, { card = false } = {}) {
+    const rows = g.tasks.map(t => `<li><button type="button" class="link-btn" onclick="Tasks.open('${escAttr(t.id)}')">${esc(t.title)}</button>
+        ${statusChip(t.status)}${isLate(t) ? ' <span class="tk-late"><strong>overdue</strong></span>' : ''}
+        <span class="small txt-muted">· ${t.team_id ? esc(t.team || teamName(t.team_id)) : 'no team yet'}</span></li>`).join('');
+    return `<div class="tk-pop"><strong>${esc(g.name)}</strong>
+        <ul class="tk-pop-list">${rows}</ul>
+        ${card ? '' : `<button type="button" class="link-btn small" onclick="Tasks.goStation('${escAttr(g.id)}')">Open the station on the Stations map</button>`}</div>`;
+  }
+  // The key under a map: a swatch and its word for each colour, the word
+  // saying on hover what it means (and the page's fold says it again).
+  function keyHtml(keys) {
+    const want = keys ? PINS.filter(p => keys.includes(p.key)) : PINS;
+    return want.map(p => `<span class="tk-key-item"><i class="tk-key-sw mn-task-${p.key}" aria-hidden="true"></i>${termHtml(p.label, p.meaning)}</span>`).join('')
+      + `<span class="tk-key-item"><i class="tk-key-sw mn-task-many" aria-hidden="true"></i>${termHtml('Several stations', 'Pins close together on screen, drawn as one until you zoom in. The number is all their tasks; pressing it zooms in to them.')}</span>`;
+  }
+
+  // The whole list, for the Stations map's Tasks layer: the one this tab read
+  // if it is fresh, otherwise asked for again (once, however many ask).
+  function mapRows() {
+    if (!forMe() || typeof dbRpc !== 'function') return Promise.resolve(null);
+    if (list && Date.now() - listAt < FRESH) return Promise.resolve(list);
+    if (listAsk) return listAsk;
+    listAsk = dbRpc('task_list', {})
+      .then(l => { if (Array.isArray(l)) { list = l; listAt = Date.now(); } return list || []; })
+      .finally(() => { listAsk = null; });
+    return listAsk;
+  }
+
+  function mapSlotHtml() {
+    return `<div class="tk-map-wrap">
+        <div id="tk-map-slot" class="tk-map-slot" role="region" aria-label="Map of where the tasks are"></div>
+        <div class="tk-key small" id="tk-map-key">${keyHtml()}</div>
+        <p class="small txt-muted" id="tk-map-note" role="status"></p>
+      </div>`;
+  }
+
+  function stopMap() {
+    if (TM.map) TM.map = removeMap(TM.map);
+    if (TM.el && TM.el.parentNode) TM.el.remove();
+    TM.el = null; TM.layer = null; TM.groups = []; TM.fitKey = '';
+  }
+
+  function placeMap() {
+    if (typeof document === 'undefined' || state.activeTab !== 'tasks') return;
+    const slot = document.getElementById('tk-map-slot');
+    if (!slot || typeof L === 'undefined') return;
+    if (!TM.el) {
+      TM.el = document.createElement('div');
+      TM.el.id = 'tk-map';
+      TM.el.className = 'tk-map';
+    }
+    slot.appendChild(TM.el);
+    if (!TM.map) {
+      TM.map = L.map(TM.el, { scrollWheelZoom: false, zoomControl: true }).setView([-24, 147], 5);
+      if (typeof registerLiveMap === 'function') registerLiveMap('Tasks', () => TM.map);
+      if (typeof addBaseLayers === 'function') addBaseLayers(TM.map);
+      TM.layer = L.layerGroup().addTo(TM.map);
+      TM.map.on('zoomend', () => drawPins());
+    } else {
+      TM.map.invalidateSize();
+    }
+    drawMap();
+  }
+
+  // The pins for what the filters pick, and the map fitted to them when that
+  // set of stations changes.
+  function drawMap() {
+    if (!TM.map) return;
+    const { groups, unplaced } = stationGroups(scoped());
+    TM.groups = groups; TM.unplaced = unplaced;
+    const key = groups.map(g => g.id).sort().join(',');
+    if (key !== TM.fitKey) {
+      TM.fitKey = key;
+      if (groups.length === 1) TM.map.setView([groups[0].lat, groups[0].lon], 11);
+      else if (groups.length) { try { TM.map.fitBounds(groups.map(g => [g.lat, g.lon]), { padding: [36, 36], maxZoom: 11 }); } catch (_) { /* not sized yet */ } }
+    }
+    drawPins();
+    const n = groups.reduce((a, g) => a + g.n, 0);
+    const el = document.getElementById('tk-map-note');
+    if (el) {
+      el.textContent = (groups.length
+        ? `${n} task${n === 1 ? '' : 's'} at ${groups.length} station${groups.length === 1 ? '' : 's'} on the map. Press a pin for its tasks.`
+        : 'No task picked above is at a station on the map.')
+        + (unplaced ? ` ${unplaced} ${unplaced === 1 ? 'is' : 'are'} not on it: general tasks, or a station with no position.` : '');
+    }
+  }
+  function drawPins() {
+    if (!TM.map || !TM.layer) return;
+    TM.layer.clearLayers();
+    for (const g of mergeOnScreen(TM.map, TM.groups)) {
+      const m = L.marker([g.lat, g.lon], { icon: pinIcon(g), keyboard: true, riseOnHover: true, title: pinTitle(g), alt: pinTitle(g) });
+      if (g.many) {
+        m.on('click', () => { try { TM.map.fitBounds(g.members.map(x => [x.lat, x.lon]), { padding: [48, 48], maxZoom: 13 }); } catch (_) { /* gone */ } });
+      } else {
+        m.bindPopup(() => pinPopupHtml(g), { maxWidth: 320 });
+      }
+      m.addTo(TM.layer);
+    }
   }
 
   // ── One task ───────────────────────────────────────────────────────────────
@@ -1091,6 +1304,8 @@ const Tasks = (function () {
   // ── The tab ────────────────────────────────────────────────────────────────
 
   function init() {
+    placeMap();
+    if (typeof registerTabTeardown === 'function') registerTabTeardown('tasks-map', stopMap);
     if (signedIn() && (forMe() || handoff) && teams === null && !loading && !missing) load();
     else if (handoff && teams) askRefs();
   }
@@ -1101,6 +1316,8 @@ const Tasks = (function () {
     Object.assign(filt, { scope: '', status: 'live', team: '', q: '' });
     loading = false; busy = false; note = ''; refsAsked = ''; teamErr = {};
     for (const k of Object.keys(cards)) delete cards[k];
+    listAt = 0; listAsk = null;
+    listChanged();
     if (handoff) for (const r of handoff.rows) { r.existing = null; r.teamPicked = false; r.notYours = false; r.include = true; }
     // …and the list: the task open was the last person's.
     view = 'list'; openId = null;
@@ -1109,10 +1326,10 @@ const Tasks = (function () {
 
   return {
     render, init, load, authChanged, restoreFromUrl, cardHtml, cardAsk, parseHandoff,
-    WORDS, STATUS,
+    WORDS, STATUS, PINS, forMe, mapRows, stationGroups, mergeOnScreen, pinIcon, pinTitle, pinPopupHtml, keyHtml,
     filter(k, v) {
       filt[k] = v;
-      if (k === 'q') { paintPart('tk-table', tableHtml()); return; }
+      if (k === 'q') { paintPart('tk-table', tableHtml()); drawMap(); return; }
       paint();
     },
     open(id) {

@@ -148,7 +148,7 @@ const STATE_KEY = {
   rain: 'mapRain', elev: 'mapElev', catchments: 'mapCatchments', lots: 'mapLots', easements: 'mapEasements',
   tenure: 'mapTenure', roads: 'mapRoads', roadOwners: 'mapRoadOwners', councils: 'mapCouncils',
   survey: 'mapSurvey', hubs: 'mapHubs', wind: 'mapWind', cameras: 'mapCameras', photos: 'mapPhotos',
-  siteFeatures: 'mapSiteFeatures',
+  siteFeatures: 'mapSiteFeatures', tasks: 'mapTasks',
 };
 const SPEC = {
   overview: { links: true, roles: ALL, backbone: true, arrows: false, colour: 'freq', health: false, outlines: false,
@@ -161,6 +161,8 @@ const SPEC = {
     riverLines: true, rain: false, elev: false, catchments: false, tenure: false, roadOwners: false,
     councils: false, hubs: false, wind: false,
     drawing: { paths: 'every', draw: 'tails', follow: true, auto: true, balance: 35 } },
+  tasks: { base: 'Light', links: false, roles: ALL, backbone: false, arrows: false, health: false, outlines: false,
+    riverLines: true, tasks: true, photos: false, cameras: false, siteFeatures: false, lots: false, hubs: false },
   radio: { base: 'Satellite', links: true, colour: 'freq', backbone: false, arrows: true, health: true, hubs: true,
     riverLines: true, photos: true, siteFeatures: true, lots: false, easements: false,
     tenure: false, roads: false, roadOwners: false, councils: false, rain: false, elev: false, catchments: false,
@@ -565,7 +567,7 @@ try {
   section('3. Every built-in view, pressed');
   await countBuilds();
   const VIEWS = await page.evaluate(() => MapViews.VIEWS.map(v => ({ id: v.id, label: v.label, knobs: v.knobs })));
-  check('the built-in views are the ten the spec names',
+  check('the built-in views are the eleven the spec names',
     J(VIEWS.map(v => v.id)) === J(Object.keys(SPEC)), J(VIEWS.map(v => v.id)));
   for (const v of VIEWS) {
     const nErr = errors.length;

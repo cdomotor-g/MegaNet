@@ -5854,6 +5854,16 @@ function mapDisplayControlsHtml() {
       Maintenance hubs (BoM)
     </label>
     <p class="filter-note" id="map-hub-note">${MapHubs.noteHtml()}</p>
+    <!-- Tasks (map-tasks.js): where the unfinished tasks this person may see
+         are, ringed in the colour of the most pressing one at each station.
+         The Tasks view in Views turns it on. -->
+    <label class="filter-check"
+           title="Every station with an unfinished task you may see: a ring in the colour of its most pressing task (red overdue, amber waiting, blue in progress or open) and a badge with how many. Press a badge for the station's card.">
+      <input type="checkbox" ${state.mapTasks ? 'checked' : ''}
+             onchange="MapTasks.setEnabled(this.checked)">
+      Tasks (the ones you may see)
+    </label>
+    <p class="filter-note" id="map-tasks-note">${MapTasks.noteHtml()}</p>
     <!-- Council areas (map-councils.js): the third boundary layer, and the
          finest — whose local government area a site is in. Lines by default,
          each council named once it fits; shaded on request, every council its
@@ -6202,6 +6212,7 @@ function mapLegendOffLayersHtml() {
     !state.mapWind            && 'Wind regions',
     !state.mapCatchments      && 'River catchments',
     !state.mapHubs            && 'Maintenance hubs',
+    !state.mapTasks && typeof Tasks !== 'undefined' && Tasks.forMe() && 'Tasks',
     !state.mapCouncils        && 'Council areas',
     !state.mapLos             && 'Line-of-sight checks',
     !state.filters.acma.show  && 'ACMA licences',
@@ -6506,6 +6517,7 @@ function mapLegendHtml() {
     MapRoadOwners.active() ? MapRoadOwners.legendHtml() : '',
     MapCatchments.active() ? mapCatchmentLegendHtml() : '',
     MapHubs.active() ? mapHubLegendHtml() : '',
+    MapTasks.active() ? MapTasks.legendHtml() : '',
     MapCouncils.active() ? mapCouncilLegendHtml() : '',
     state.mapWind ? mapWindLegendHtml() : '',
   ].map(mapLegendCard);
@@ -6683,6 +6695,7 @@ function stopStationsMap() {
   MapRivers.detach();
   MapCatchments.detach();
   MapHubs.detach();
+  MapTasks.detach();
   MapCouncils.detach();
   MapSurvey.detach();
   MapContours.detach();
@@ -6933,6 +6946,7 @@ function initMap() {
   MapRivers.attach(state.map);
   MapCatchments.attach(state.map);
   MapHubs.attach(state.map);
+  MapTasks.attach(state.map);
   MapCouncils.attach(state.map);
   MapSurvey.attach(state.map);
   MapContours.attach(state.map);

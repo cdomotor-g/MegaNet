@@ -546,6 +546,34 @@ try {
     && !r.some(x => /Licence transfer/.test(x)), J(r));
   let late = await q.evaluate(() => document.querySelector('#tk-table tbody tr td .tk-late')?.textContent || '');
   ok('a task past its due date and not done says overdue', /20\/10\/2026 overdue/.test(late), late);
+  // The map above the list: a pin a station, coloured by its most pressing
+  // task, the same map kept across a repaint, and narrowed with the filters.
+  const mapNow = () => q.evaluate(() => ({
+    pins: [...document.querySelectorAll('#tk-map .mn-task-pin')].map(e => ({ n: e.textContent.replace(/\D/g, ''), cls: e.className }))
+      .sort((a, b) => a.n.localeCompare(b.n)),
+    note: document.getElementById('tk-map-note')?.textContent || '',
+    keys: [...document.querySelectorAll('#tk-map-key .term')].map(e => [e.textContent, e.getAttribute('title') || '']),
+    el: !!document.querySelector('#tk-map-slot > #tk-map.leaflet-container'),
+  }));
+  await q.waitForFunction(() => document.querySelectorAll('#tk-map .mn-task-pin').length > 0, null, { timeout: 10_000 });
+  let mp = await mapNow();
+  ok('the map pins each station with tasks: the overdue one red, the two at Fifteen Mile as one pin in progress',
+    mp.el && mp.pins.length === 2 && mp.pins.some(x => x.n === '1' && /mn-task-late/.test(x.cls))
+    && mp.pins.some(x => x.n === '2' && /mn-task-in_progress/.test(x.cls)) && /3 tasks at 2 stations/.test(mp.note), J(mp));
+  ok('…with a key whose every colour says what it means', mp.keys.length >= 5 && mp.keys.every(([, m]) => m.length > 25), J(mp.keys));
+  await q.evaluate(() => { window.__tkMap = document.getElementById('tk-map'); });
+  await q.selectOption('#tk-f-status', 'any');
+  mp = await mapNow();
+  ok('a filter repaints the pins on the same map, and a general task is said to be off it',
+    await q.evaluate(() => document.getElementById('tk-map') === window.__tkMap)
+    && mp.pins.some(x => x.n === '2' && /mn-task-late/.test(x.cls)) && !/not on it/.test(mp.note), J(mp));
+  await q.selectOption('#tk-f-status', 'live');
+  await q.click('#tk-map .mn-task-in_progress .mn-task-badge');
+  await q.waitForFunction(() => !!document.querySelector('#tk-map .tk-pop'), null, { timeout: 5_000 });
+  const pop = await q.evaluate(() => document.querySelector('#tk-map .tk-pop').textContent.replace(/\s+/g, ' '));
+  ok('pressing a pin lists the tasks there', /Replace the battery/.test(pop) && /Check the ALERT IDs/.test(pop) && !/orifice/.test(pop), pop);
+  await q.evaluate(() => Tasks.render && document.querySelector('#tk-map .leaflet-popup-close-button')?.click());
+
   const terms = await q.evaluate(() => [...document.querySelectorAll('#main-content .term, #main-content .term-chip')]
     .map(e => [e.textContent.trim(), e.getAttribute('title') || '']));
   ok('every heading and chip that means something here says what, in a sentence',
@@ -760,6 +788,34 @@ try {
   await settle(q);
   ok('anybody else gets no section, and nothing is asked', await q.evaluate(() => !document.getElementById('mn-tasks-card-loudoun_br_al'))
     && calls('task_list').length === 0, J(store.calls));
+
+  // The Stations map's Tasks view: the same pins, for the person's own tasks.
+  store.calls = [];
+  await as(q, 'member');
+  await q.evaluate(() => { Tasks.authChanged(); switchTab('stations'); });
+  await q.waitForFunction(() => !!state.map, null, { timeout: LOAD_TIMEOUT });
+  await q.evaluate(() => { closeStnCard(false); state.map.setView([-16.9, 145.7], 9, { animate: false }); });
+  await settle(q);
+  await q.evaluate(() => MapViews.apply('tasks'));
+  await q.waitForFunction(() => MapTasks._groups().length > 0, null, { timeout: 10_000 });
+  await q.waitForTimeout(600);
+  ok('…turned on, the map moves to take in every station with a task',
+    await q.evaluate(() => ['fifteen_mile_al', 'loudoun_br_al'].every(id => {
+      const st = state.data.stations.find(x => x.id === id);
+      return state.map.getBounds().contains([st.lat, st.lon]);
+    })));
+  const lay = await q.evaluate(() => ({ g: MapTasks._groups(), badges: document.querySelectorAll('.mn-task-badge').length,
+    note: MapTasks._note(), on: state.mapTasks, links: state.mapShowLinks, view: MapViews.active() }));
+  ok('the Stations map\'s Tasks view rings the member\'s stations with unfinished tasks (Loudoun has the one made above too), and draws no radio paths',
+    lay.on && lay.links === false && lay.view === 'tasks' && lay.badges >= 1
+    && J(lay.g.map(x => `${x.id}:${x.n}:${x.key}`).sort()) === J(['fifteen_mile_al:2:in_progress', 'loudoun_br_al:2:late']), J(lay));
+  await as(q, 'outsider');
+  await q.evaluate(() => Tasks.authChanged());
+  await settle(q);
+  ok('…and for anybody tasks are not for, no pin and the note says why',
+    await q.evaluate(() => MapTasks._groups().length === 0 && document.querySelectorAll('.mn-task-badge').length === 0
+      && MapTasks._note().kind === 'not-yours'));
+  await q.evaluate(() => MapTasks.setEnabled(false));
 
   // ═══════════════════════════════════════════════════════════════════════════
   console.log('\nAdmin › Teams\n');

@@ -5303,6 +5303,10 @@ const state = {
   // unless switched off, for everybody: one small file the first time the map
   // is zoomed in.
   mapCameras:    localStorage.getItem('mn-council-cameras') !== 'off',
+  // The Stations map's Tasks layer (map-tasks.js): each station with an
+  // unfinished task the person may see. Off unless switched on (the Tasks
+  // view does), and remembered once it is.
+  mapTasks:      localStorage.getItem('mn-map-tasks') === 'on',
   // The Stations map's rainfall heat map (map-rain.js): the rain the
   // network's own gauges measured, painted between them. Off unless switched
   // on, and remembered once it is: it reads the datastore and paints over
