@@ -127,6 +127,14 @@ const ExportMenu = (function () {
       { label: 'The messages listed — CSV', sub: 'as filtered, with their decoded values', call: ['MessageLog.exportCsv'],
         empty: 'There are no messages listed.' },
     ],
+    telemetry: () => [
+      { label: 'The chart builder\'s numbers — CSV', sub: 'what the builder is drawing now, row by row', call: ['Telemetry.exportCsv'],
+        empty: 'Nothing is drawn yet — the tallies are still being read.' },
+      { label: 'The tallies — CSV', sub: 'each hour or day, base station, channel and protocol, as filtered', call: ['Telemetry.exportTraffic'],
+        empty: 'Nothing is read yet.' },
+      { label: 'The links — CSV', sub: 'each address each base station decoded, with its signal and how much it caught', call: ['Telemetry.exportLinks'],
+        empty: 'The links are still being read.' },
+    ],
     health: () => [
       { label: 'The findings — CSV', sub: 'every finding, with its evidence and the station\'s owner', call: ['Health.exportCsv'],
         empty: 'There are no findings yet — the week is still being read, or nothing was found.' },

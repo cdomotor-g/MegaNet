@@ -30558,3 +30558,143 @@ select.kl-in { width: auto; font-family: inherit; }
 .tk-wheel-btn { display: block; width: 30px; height: 30px; padding: 0; border: 0; background: var(--panel); color: var(--text); cursor: pointer; font-size: 15px; line-height: 30px; opacity: .55; }
 .tk-wheel-btn.is-on { opacity: 1; background: color-mix(in srgb, var(--accent) 22%, var(--panel)); }
 .tk-wheel-btn:focus-visible { outline: var(--focus-width) solid var(--focus); outline-offset: 1px; }
+
+/* ── 📻 Telemetry (telemetry.js) ──────────────────────────────────────────────
+   Charts drawn as SVG text after the page is in place, every colour a class
+   (no inline fills, so the theme owns them and npm run tabs holds the page to
+   no inline style). The categorical eight are the validated chart palette —
+   light and dark stepped separately, not flipped; protocols take the Pi's own
+   chip colours (ALERT blue, ALERT2 violet); channels slots 1–6 and 8; base
+   stations the same hues in another order, so a page of both rarely puts one
+   colour on two things side by side. What became of a burst takes the status
+   steps: decoded green, copies slate, then orange, amber, rose and red for
+   the ways it failed. Beyond seven of a thing, the rest fold into Other. */
+:root {
+  --tm-s1: #2a78d6;
+  --tm-s2: #eb6834;
+  --tm-s3: #1baf7a;
+  --tm-s4: #eda100;
+  --tm-s5: #e87ba4;
+  --tm-s6: #008300;
+  --tm-s7: #6250d6;
+  --tm-s8: #e34948;
+  --tm-other: #8a9aab;
+  --tm-copy: #9aaec2;
+  --tm-shadow: #ec835a;
+  --tm-frame: #fab219;
+  --tm-check: #b4235f;
+  --tm-und: #d03b3b;
+  --tm-seq: #2a78d6;
+  --tm-hot: #d03b3b;
+  --tm-edge: #fff1dc;
+  --tm-up: #2a78d6;
+  --tm-down: #eb6834;
+}
+[data-theme="dark"] {
+  --tm-s1: #3987e5;
+  --tm-s2: #d95926;
+  --tm-s3: #199e70;
+  --tm-s4: #c98500;
+  --tm-s5: #d55181;
+  --tm-s6: #2f9a2f;
+  --tm-s7: #9085e9;
+  --tm-s8: #e66767;
+  --tm-other: #6b7c8f;
+  --tm-copy: #5f7489;
+  --tm-shadow: #e07a52;
+  --tm-frame: #d9a01e;
+  --tm-check: #e0559a;
+  --tm-und: #e05555;
+  --tm-seq: #4a97f0;
+  --tm-hot: #ef5f5f;
+  --tm-edge: #3a2c17;
+  --tm-up: #4a97f0;
+  --tm-down: #e06a3a;
+}
+.tm-f-p1 { fill: var(--tm-s1); } .tm-bg-p1 { background: var(--tm-s1); } .tm-st-p1 { stroke: var(--tm-s1); }
+.tm-f-p2 { fill: var(--tm-s7); } .tm-bg-p2 { background: var(--tm-s7); } .tm-st-p2 { stroke: var(--tm-s7); }
+.tm-f-co { fill: var(--tm-other); } .tm-bg-co { background: var(--tm-other); } .tm-st-co { stroke: var(--tm-other); }
+.tm-f-c1 { fill: var(--tm-s1); } .tm-bg-c1 { background: var(--tm-s1); } .tm-st-c1 { stroke: var(--tm-s1); }
+.tm-f-c2 { fill: var(--tm-s2); } .tm-bg-c2 { background: var(--tm-s2); } .tm-st-c2 { stroke: var(--tm-s2); }
+.tm-f-c3 { fill: var(--tm-s3); } .tm-bg-c3 { background: var(--tm-s3); } .tm-st-c3 { stroke: var(--tm-s3); }
+.tm-f-c4 { fill: var(--tm-s4); } .tm-bg-c4 { background: var(--tm-s4); } .tm-st-c4 { stroke: var(--tm-s4); }
+.tm-f-c5 { fill: var(--tm-s5); } .tm-bg-c5 { background: var(--tm-s5); } .tm-st-c5 { stroke: var(--tm-s5); }
+.tm-f-c6 { fill: var(--tm-s6); } .tm-bg-c6 { background: var(--tm-s6); } .tm-st-c6 { stroke: var(--tm-s6); }
+.tm-f-c7 { fill: var(--tm-s8); } .tm-bg-c7 { background: var(--tm-s8); } .tm-st-c7 { stroke: var(--tm-s8); }
+.tm-f-b1 { fill: var(--tm-s3); } .tm-bg-b1 { background: var(--tm-s3); } .tm-st-b1 { stroke: var(--tm-s3); }
+.tm-f-b2 { fill: var(--tm-s2); } .tm-bg-b2 { background: var(--tm-s2); } .tm-st-b2 { stroke: var(--tm-s2); }
+.tm-f-b3 { fill: var(--tm-s5); } .tm-bg-b3 { background: var(--tm-s5); } .tm-st-b3 { stroke: var(--tm-s5); }
+.tm-f-b4 { fill: var(--tm-s4); } .tm-bg-b4 { background: var(--tm-s4); } .tm-st-b4 { stroke: var(--tm-s4); }
+.tm-f-b5 { fill: var(--tm-s6); } .tm-bg-b5 { background: var(--tm-s6); } .tm-st-b5 { stroke: var(--tm-s6); }
+.tm-f-b6 { fill: var(--tm-s8); } .tm-bg-b6 { background: var(--tm-s8); } .tm-st-b6 { stroke: var(--tm-s8); }
+.tm-f-b7 { fill: var(--tm-s1); } .tm-bg-b7 { background: var(--tm-s1); } .tm-st-b7 { stroke: var(--tm-s1); }
+.tm-f-ok { fill: var(--ok); } .tm-bg-ok { background: var(--ok); } .tm-st-ok { stroke: var(--ok); }
+.tm-f-cp { fill: var(--tm-copy); } .tm-bg-cp { background: var(--tm-copy); } .tm-st-cp { stroke: var(--tm-copy); }
+.tm-f-sh { fill: var(--tm-shadow); } .tm-bg-sh { background: var(--tm-shadow); } .tm-st-sh { stroke: var(--tm-shadow); }
+.tm-f-fr { fill: var(--tm-frame); } .tm-bg-fr { background: var(--tm-frame); } .tm-st-fr { stroke: var(--tm-frame); }
+.tm-f-ck { fill: var(--tm-check); } .tm-bg-ck { background: var(--tm-check); } .tm-st-ck { stroke: var(--tm-check); }
+.tm-f-un { fill: var(--tm-und); } .tm-bg-un { background: var(--tm-und); } .tm-st-un { stroke: var(--tm-und); }
+.tm-f-acc { fill: var(--accent); } .tm-bg-acc { background: var(--accent); } .tm-st-acc { stroke: var(--accent); }
+.tm-f-seq { fill: var(--tm-seq); } .tm-bg-seq { background: var(--tm-seq); } .tm-st-seq { stroke: var(--tm-seq); }
+.tm-f-hot { fill: var(--tm-hot); } .tm-bg-hot { background: var(--tm-hot); } .tm-st-hot { stroke: var(--tm-hot); }
+.tm-f-none { fill: var(--subtle); } .tm-bg-none { background: var(--subtle); } .tm-st-none { stroke: var(--subtle); }
+.tm-f-edge { fill: var(--tm-edge); } .tm-bg-edge { background: var(--tm-edge); } .tm-st-edge { stroke: var(--tm-edge); }
+.tm-f-up { fill: var(--tm-up); } .tm-bg-up { background: var(--tm-up); } .tm-st-up { stroke: var(--tm-up); }
+.tm-f-down { fill: var(--tm-down); } .tm-bg-down { background: var(--tm-down); } .tm-st-down { stroke: var(--tm-down); }
+/* One column the width of the screen: the page is a grid, and an auto column
+   would grow to the widest chart (the heat map's 560 px) on a phone. */
+.tm-page { grid-template-columns: minmax(0, 1fr); }
+.tm-controls { display: grid; gap: var(--sp-2); margin-block: var(--sp-2); }
+.tm-seg-row { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+.tm-seg-l { font-size: var(--fs-sm); color: var(--muted); font-weight: 600; min-width: 6.5rem; }
+.tm-selects { flex-wrap: wrap; align-items: flex-end; gap: var(--sp-2); }
+.tm-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.25rem, 1fr)); gap: var(--sp-2); margin-top: var(--sp-2); }
+.tm-tile { display: flex; flex-direction: column; gap: .1rem; min-width: 0; border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3); }
+.tm-tile-n { font-size: var(--fs-xl); font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tm-tile-l { font-size: var(--fs-sm); color: var(--muted); }
+.tm-demo-chip { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; border: 1px solid var(--warn); color: var(--warn); border-radius: var(--r-pill); padding: .05rem .5rem; }
+.tm-intro { margin: 0 0 var(--sp-2); max-width: 80ch; }
+.tm-panel { min-width: 0; }
+.tm-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); gap: var(--sp-3); align-items: start; }
+.tm-two > * { min-width: 0; }
+.tm-multi { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: var(--sp-3); }
+.tm-multi > div { min-width: 0; }
+.tm-sub { margin: var(--sp-2) 0 var(--sp-1); font-size: var(--fs-md); }
+.tm-chart { width: 100%; min-width: 0; margin-top: var(--sp-1); }
+.tm-scroll { overflow-x: auto; }
+.tm-svg { display: block; max-width: none; height: auto; overflow: visible; }
+.tm-svg text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tm-svg .tm-grid { stroke: var(--border); stroke-dasharray: 2 3; }
+.tm-svg .tm-axis { stroke: var(--border); }
+.tm-svg.tm-gap .tm-seg { stroke: var(--panel); stroke-width: 1; }
+.tm-svg .tm-hit { fill: transparent; }
+.tm-svg .tm-hit:hover { fill: var(--text); fill-opacity: .06; }
+.tm-svg .tm-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.tm-svg .tm-dot { stroke: var(--panel); stroke-width: 2; }
+.tm-legend { list-style: none; display: flex; flex-wrap: wrap; gap: .25rem 1rem; padding: 0; margin: var(--sp-1) 0 0; font-size: var(--fs-sm); }
+.tm-sw { display: inline-block; width: .7rem; height: .7rem; border-radius: 3px; margin-right: .35rem; vertical-align: -1px; }
+.table-wrap table.tm-cmp, .table-wrap table.tm-who, .table-wrap table.tm-table { table-layout: auto; }
+.tm-cmp .num, .tm-who .num, .tm-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tm-cmp td, .tm-cmp th { vertical-align: middle; }
+.tm-cmp th[scope="row"], .tm-table th[scope="row"] { white-space: nowrap; }
+.tm-barcell { width: 22%; }
+.tm-bar { display: block; height: .5rem; border-radius: 0 4px 4px 0; width: var(--w, 0); }
+.tm-who .tm-cell { text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tm-who .tm-cell small { display: block; color: var(--muted); font-size: var(--fs-xs); }
+.tm-q0 { background: color-mix(in oklab, var(--tm-seq) 6%, var(--panel)); }
+.tm-q1 { background: color-mix(in oklab, var(--tm-seq) 13%, var(--panel)); }
+.tm-q2 { background: color-mix(in oklab, var(--tm-seq) 21%, var(--panel)); }
+.tm-q3 { background: color-mix(in oklab, var(--tm-seq) 30%, var(--panel)); }
+.tm-q4 { background: color-mix(in oklab, var(--tm-seq) 40%, var(--panel)); }
+.tm-tip { position: fixed; left: var(--x, 0); top: var(--y, 0); z-index: 60; pointer-events: none; background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--r-md); padding: .4rem .6rem; font-size: var(--fs-sm); box-shadow: 0 4px 14px rgba(0,0,0,.18);
+  max-width: 18rem; font-variant-numeric: tabular-nums; }
+.tm-tip b { display: block; margin-bottom: .15rem; }
+.tm-tip-r { display: flex; justify-content: space-between; gap: .75rem; }
+details.tm-fold { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--sp-2) var(--sp-3); margin-top: var(--sp-3); }
+details.tm-fold summary { cursor: pointer; }
+.tm-fold-h { display: inline; font-size: var(--fs-md); }
+.tm-words { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1rem; margin: var(--sp-2) 0 0; }
+.tm-words dt { font-weight: 600; }
+.tm-words dd { margin: 0; color: var(--muted); max-width: 75ch; }
+@media (max-width: 560px) { .tm-words { grid-template-columns: 1fr; } .tm-words dd { margin-bottom: .4rem; } .tm-seg-l { min-width: 100%; } }

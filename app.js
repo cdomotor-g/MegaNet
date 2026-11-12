@@ -4033,7 +4033,7 @@ function renderMain() {
   // 📟 The SWR Meter works on made-up stations and readings typed in, and
   // 💾 A2 Firmware on a made-up unit and versions pasted in. 🎬 Videos are
   // about the app; with no list a video's counts fall back to its own.
-  const noDataTabs = ['sitemap', 'capabilities', 'videos', 'offline', 'views', 'bitbench', 'biterrors', 'swr', 'pinouts', 'a2firmware', 'licensing', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'mapgen', 'photos', 'camera', 'levels', 'twopeg', 'surveyguide', 'kbstaff', 'kblogbook', 'kblifecycle', 'kblevel', 'kbriver', 'admin', 'basestations', 'tdma'];
+  const noDataTabs = ['sitemap', 'capabilities', 'videos', 'offline', 'views', 'bitbench', 'biterrors', 'swr', 'pinouts', 'a2firmware', 'licensing', 'packets', 'alert2', 'hfem', 'maps', 'serial', 'arro', 'arrodata', 'history', 'msglog', 'telemetry', 'mapgen', 'photos', 'camera', 'levels', 'twopeg', 'surveyguide', 'kbstaff', 'kblogbook', 'kblifecycle', 'kblevel', 'kbriver', 'admin', 'basestations', 'tdma'];
   // The Stations cards may be in the side panel rather than in here, and the
   // innerHTML below does not reach them there. Out first, whatever is about to
   // be drawn: a render of the Stations tab emits a fresh copy of every card,
@@ -4087,6 +4087,7 @@ function renderMain() {
     // Same module, second instance — see the comment at the top of ArroData.
     case 'field':      el.innerHTML = ArroData.render('field'); ArroData.init();  break;
     case 'msglog':     el.innerHTML = MessageLog.render();      MessageLog.init(); break;
+    case 'telemetry':  el.innerHTML = Telemetry.render();       Telemetry.init();  break;
     case 'health':     el.innerHTML = Health.render();          Health.init();     break;
     case 'signalroutes': el.innerHTML = SignalRoutes.render(); SignalRoutes.init(); break;
     case 'mapgen':     el.innerHTML = MapGen.render();          MapGen.init();     break;

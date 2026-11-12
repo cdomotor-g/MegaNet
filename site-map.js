@@ -338,6 +338,14 @@ const SiteMap = (function () {
         'See a raw count worked out in volts or millimetres',
       ],
     },
+    telemetry: {
+      what: 'Charts what the base stations hear: how much comes in, how much of it decodes, ALERT against ALERT2, channel against channel and base station against base station.',
+      use: [
+        'See whether a channel or a base station is decoding worse than it was',
+        'Build your own chart: any measure, split and side by side as you like',
+        'Find the links near the edge, and the addresses only one base station hears',
+      ],
+    },
     health: {
       what: 'What the readings say about each station and the network carrying them, ranked by what needs doing.',
       use: [

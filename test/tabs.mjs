@@ -340,6 +340,23 @@ const SEED_BACKBONE = `async () => {
   await new Promise(r => setTimeout(r, 300));
 }`;
 
+// 📻 Telemetry: the harness never answers the datastore, so the tab opens on
+// its error with Try again and a demo; the demo is its own door to every
+// panel. The builder shown as a table as well, so its table is measured, and
+// every fold opened.
+const SEED_TELEMETRY = `async () => {
+  Telemetry.demo();
+  Telemetry.build('bf', 'b');
+  document.querySelectorAll('#main-content details').forEach(d => { d.open = true; d.dispatchEvent(new Event('toggle')); });
+  await new Promise(r => setTimeout(r, 300));
+}`;
+const SEED_TELEMETRY_TABLE = `async () => {
+  Telemetry.demo();
+  Telemetry.build('bv', 'table');
+  document.querySelectorAll('#main-content details').forEach(d => { d.open = true; });
+  await new Promise(r => setTimeout(r, 300));
+}`;
+
 // 🔁 Repeaters: its heard column needs receptions, which this harness cannot
 // read, so Signal Routes' demo analysis stands in — its demo flag taken off
 // so the tab takes it. The delay plan is waited for, the row heard on the air
@@ -1097,6 +1114,9 @@ const CONVERTED = [
   { id: 'signalroutes', label: 'Signal Routes — signed out', issue: 'born converted' },
   { id: 'signalroutes', label: 'Signal Routes — the demo, a repeater picked, every fold open', issue: 'born converted', seed: SEED_SIGNALROUTES },
   { id: 'backbone',   label: 'Backbone — no datastore', issue: 'born converted' },
+  { id: 'telemetry',  label: 'Telemetry — no datastore', issue: 'born converted' },
+  { id: 'telemetry',  label: 'Telemetry — the demo, side by side by base station, every fold open', issue: 'born converted', seed: SEED_TELEMETRY },
+  { id: 'telemetry',  label: 'Telemetry — the demo, the builder as a table', issue: 'born converted', seed: SEED_TELEMETRY_TABLE },
   { id: 'backbone',   label: 'Backbone — the demo, a repeater picked, every fold open', issue: 'born converted', seed: SEED_BACKBONE },
   { id: 'methodology', label: 'Methodology — every section open', issue: 'born converted', seed: SEED_METHODOLOGY },
   { id: 'workbench',  label: 'Interference Workbench — intro',       issue: '#139' },

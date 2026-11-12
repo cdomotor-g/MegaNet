@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 278, date: '2026-11-12', items: [
+      '📻 <strong>Telemetry: what the base stations hear, charted.</strong> A new tab in the Data group, beside 📨 Message Log. '
+        + 'Every burst the named base stations picked up, hour by hour for a week or day by day for a year: how much came in, how '
+        + 'much of it decoded, ALERT against ALERT2, channel against channel and base station against base station — with a heat '
+        + 'map of the channels over time, the day\'s rhythm, and each base station\'s chart side by side on one scale.',
+      '🧩 <strong>A chart builder for the layered questions.</strong> Pick what to show (bursts, readings, decoded %, signal, noise '
+        + 'floor), what runs along the bottom, what the colours are and what goes side by side — as a chart, a table or a CSV. '
+        + '<em>Who hears what</em> lists the addresses only one base station hears, and <em>Links near the edge</em> the ones close '
+        + 'to dropping out, weakest first.',
+    ] },
     { n: 277, date: '2026-11-12', items: [
       '🌊 <strong>More floods on the digital twin\'s scale.</strong> In the 🧊 pane\'s <em>Flood peaks near here</em>, a gauge near by '
         + 'has a tick box, <em>On the 3-D scale</em>: ticked, its recorded floods are drawn as water here beside the station\'s own, '

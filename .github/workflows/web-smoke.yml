@@ -1606,6 +1606,15 @@ jobs:
         working-directory: test
         run: npm run msglogbase
 
+      # 📻 Telemetry (telemetry.js, 0123): the database's two answers stood in
+      # for by a fixture whose sums are known; before 0123 the demo; the
+      # tiles, every chart, the filters, the builder as a chart, a table and
+      # a CSV, the words' meanings and a phone's width.
+      - name: Telemetry — what the base stations hear, charted
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run telemetry
+
       # 🪜 Hops to base (map-hops.js), on the committed register with the
       # datastore answered by the check: the station card's pill pressed with
       # a real click; every route from the station to a base through

@@ -516,6 +516,7 @@
         "investigations.js",
         "methodology.js",
         "message-log.js",
+        "telemetry.js",
         "arro-data.js",
         "plot-lines.js",
         "tools/health/",

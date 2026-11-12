@@ -255,6 +255,12 @@ const TABS = [
       find: 'readings telemetry datastore sensors chart plot window rainfall level quality' },
     { id: 'msglog',     label: 'Message Log',            icon: '📨',
       find: 'messages telemetry arrivals incoming ingest raw log fade margin ingress base pathway follow live decode calibration value volts battery converted' },
+    // 📻 Telemetry (telemetry.js) is the fifth: the readings' traffic as a
+    // whole — every named base station's tallies, charted. Its find words are
+    // the ones nobody else answers to; "telemetry" itself is shared with the
+    // four above, and the label wins it.
+    { id: 'telemetry',  label: 'Telemetry',              icon: '📻',
+      find: 'traffic bursts quality decoded undecoded failed broken frames shadows copies duplicates alert2 versus compare comparison channels frequencies heatmap chart builder pivot layered breakdown hourly rhythm weekly links edge weakest hears coverage redundancy noise snr' },
   ] },
   // ── Network health: Data, cut in two ───────────────────────────────────────
   // Data held six — the readings, and what they say about the network — until
@@ -2326,6 +2332,36 @@ const HELP = {
         href: 'docs/ingest-mqtt.md' },
     ],
     related: ['health', 'field', 'alert2', 'packets', 'stations'],
+  },
+
+  telemetry: {
+    summary: 'What the named base stations hear, charted: every burst they picked up, hour by hour for a '
+           + 'week or day by day for a year — how much came in, how much of it decoded, ALERT against '
+           + 'ALERT2, channel against channel and base station against base station. Ready-made panels '
+           + 'answer the usual questions; the <strong>Chart builder</strong> lays any measure along time, '
+           + 'hour of day, channel or base station, coloured by a second thing and side by side by a third. '
+           + '<strong>Who hears what</strong> and <strong>Links near the edge</strong> go down to each '
+           + 'address a base station decodes.',
+    watch: [
+      '<strong>A burst is not a reading.</strong> Most readings arrive as several bursts — the '
+      + 'station\'s own and each repeater\'s copy, and ALERT2 sends each message more than once — so '
+      + 'bursts run well ahead of readings, and a high share of copies is the network working, not '
+      + 'failing.',
+      '<strong>Didn\'t decode is not all interference.</strong> An ALERT decoder listening on a channel '
+      + 'that carries ALERT2 counts every ALERT2 burst as one it could not decode; split by protocol and '
+      + 'channel before reading a high failure share as a fault.',
+      '<strong>The latest hour is still filling.</strong> The database tallies the receptions at nine '
+      + 'minutes past each hour, so the last bar is short. Windows longer than a week are read by the '
+      + 'UTC day: 10 am to 10 am in Queensland.',
+      '<strong>Caught compares base stations, not stations.</strong> It is how many of an address\'s '
+      + 'readings one base station decoded against the base station that decoded the most of them, so '
+      + 'an address only one base station hears is always 100% — and is listed under Who hears what as '
+      + 'heard by one base station only.',
+      'Only base stations with a name on file are counted, and never a drive or a site survey. Nothing '
+      + 'here says where a receiver is or which of its sticks heard what; Base Stations has that, for '
+      + 'editors.',
+    ],
+    related: ['msglog', 'basestations', 'reception', 'flipsources', 'health'],
   },
 
   health: {

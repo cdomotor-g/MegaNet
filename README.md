@@ -256,6 +256,9 @@ MegaNet/
 ├── message-log.js          ← MessageLog — Message Log tab (the arrival log:
 │                             every message the datastore accepted, filterable,
 │                             with a plot-and-map tray and a decode drawer)
+├── telemetry.js            ← Telemetry — Telemetry tab (what the base stations
+│                             hear, charted: traffic, decoding, ALERT against
+│                             ALERT2, channels and bases, a chart builder; 0123)
 ├── bug-report.js           ← BugReport — sends a report via /api/report, or a prefilled GitHub issue
 ├── base-stations.js        ← BaseStations — Base Stations tab (every ingest point's
 │                             health; asking a base station that checks in, 0049)
