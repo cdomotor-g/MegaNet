@@ -356,6 +356,22 @@ def build(data, out):
                 q((s.get('flood_peaks_from') or '').strip() or None)]
                for i, s in enumerate(stations)],
               prune_where='t.document_managed')
+    # A station the file does not carry (one a migration made, as 0121 made
+    # maleny_wwtp, before the next snapshot takes it in) keeps the ord it was
+    # given — max(ord) + 1 of whatever register the migration found, which on a
+    # register loaded from zero is a number this file then gives one of its own
+    # stations. Two stations on one ord come back out of stations_doc() in no
+    # set order, and the next load_stations_doc() renumbers everything after
+    # them. So those stations go after the file's, in the order they had (a
+    # deleted one is in no document, so it is left where it is).
+    if stations:
+        out.write('\n-- stations the file does not carry: after the file\'s own\n')
+        out.write('update meganet.station t set ord = x.n from (\n'
+                  '  select s.id, %d - 1 + pg_catalog.row_number() over (order by s.ord, s.id) as n\n'
+                  '    from meganet.station s\n'
+                  '   where s.deleted_at is null and s.id <> all (array[%s]::text[])\n'
+                  ') x\n where t.id = x.id and t.ord <> x.n;\n'
+                  % (len(stations), ', '.join(q(s['id']) for s in stations)))
 
     sensors = []
     for s in stations:

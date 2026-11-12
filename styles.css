@@ -30551,7 +30551,7 @@ select.kl-in { width: auto; font-family: inherit; }
 .tk-key-sw { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 3px var(--tc-ring, solid) var(--tc, var(--muted)); box-sizing: border-box; }
 .tk-map-wrap > p { margin: var(--sp-1) 0 0; }
 .tk-pop-list { list-style: none; padding: 0; margin: var(--sp-1) 0; display: grid; gap: var(--sp-1); }
-@media (max-width: 640px) { .tk-map { height: 240px; } }
+@media (max-width: 700px) { .tk-map { height: 240px; } }
 /* In progress and Open share the accent: in progress is the filled one. */
 .mn-task-in_progress .mn-task-ring, .tk-key-sw.mn-task-in_progress { background: color-mix(in srgb, var(--tc) 30%, transparent); }
 /* The Tasks map's Scroll to zoom button (tasks.js wheelControl): lit while on. */

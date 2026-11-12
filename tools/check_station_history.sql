@@ -399,8 +399,11 @@ begin
   perform pg_temp.check_that('its station number now another station''s: refused (23505), naming that station',
     v like '23505%' and v like '%998562%' and v like '%Check History Dropped (_check_hist_x)%', v);
   v := pg_temp.refusal_of(format('select meganet.restore_station(%L, %L::timestamptz)', '_check_hist_c', pg_temp.stamp('_check_hist_c')));
-  perform pg_temp.check_that('its ALERT2 address now another station''s: refused (23505), naming that station',
-    v like '23505%' and v like '%64561%' and v like '%(_check_hist_a)%', v);
+  -- Since 0121 (ad97c6a) an address may be shared, so no unique index refuses
+  -- this with 23505: save_station() does, in a sentence naming the holder.
+  perform pg_temp.check_that('its ALERT2 address now another station''s: refused (22023), naming that station',
+    v like '22023%' and v like '%64561%'
+      and v like '%' || (select name from meganet.station where id = '_check_hist_a') || '%', v);
   v := pg_temp.refusal_of(format('select meganet.restore_station(%L, %L::timestamptz)', '_check_hist_d', pg_temp.stamp('_check_hist_d')));
   perform pg_temp.check_that('its radio network gone: refused by 0053''s guard (23503)',
     v like '23503%' and v like '%_check_hist_net%', v);
