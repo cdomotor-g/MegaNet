@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 272, date: '2026-11-12', items: [
+      '✏️ <strong>Change a task where you see it.</strong> On the ✅ Tasks tab, the list\'s Team, Status and Due columns are now '
+        + 'pickers: choose a team for an unassigned task, hand one to another team, move it on or set its date right in its row, and '
+        + 'press ✎ beside a title to rename it. Open a task and <em>Change this task</em> is there in view — team, status, due date, '
+        + 'title, details and station in one form, with one Save.',
+    ] },
     { n: 271, date: '2026-11-12', items: [
       '🗺️ <strong>Tasks on a map.</strong> The ✅ Tasks tab has a map above the list: a pin on each station with tasks that fit '
         + 'your filters, coloured by the most pressing one there — red overdue, amber waiting, blue in progress or open — and a '

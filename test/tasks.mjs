@@ -197,26 +197,36 @@ function answer(fn, a) {
       if (!k || !sees(p, k)) return no(500, 'P0002', 'no such task, or not one you may see');
       const may = mayOn(k), c = a.p_change;
       if (c.note && !(may.work || may.manage)) return no(403, '42501', 'only the team it is handed to writes on a task');
+      // As task_update() does: every change in one call, the note on the first.
+      let used = false;
+      const body = () => (used ? '' : (c.note || ''));
       if (c.status && c.status !== k.status) {
         if ((c.status === 'cancelled' || k.status === 'cancelled') && !may.manage) return no(403, '42501', 'only whoever handed it out cancels a task');
-        k.thread.push({ kind: 'status', from: k.status, to: c.status, body: c.note || '', by: p.id, at: now });
+        if (!(may.work || may.manage)) return no(403, '42501', 'only the team it is handed to moves a task on');
+        k.thread.push({ kind: 'status', from: k.status, to: c.status, body: body(), by: p.id, at: now }); used = true;
         k.status = c.status;
-      } else if ('team_id' in c && (c.team_id || null) !== k.team_id) {
-        if (!may.manage) return no(403, '42501', 'only whoever manages a task hands it to another team');
-        if (c.team_id && !may.any_team && !may.owns.includes(c.team_id)) return no(403, '42501', 'a team\'s owner hands tasks to their own team only');
-        k.thread.push({ kind: 'team', from: teamName(k.team_id) || '', to: teamName(c.team_id) || '', body: c.note || '', by: p.id, at: now });
-        k.team_id = c.team_id || null;
-      } else if (['title', 'details', 'due_on', 'station_id'].some(x => x in c)) {
-        if (!may.manage) return no(403, '42501', 'only whoever manages a task changes its words');
-        const changed = [];
-        if ('title' in c) { k.title = c.title; changed.push('title'); }
-        if ('details' in c) { k.details = c.details; changed.push('details'); }
-        if ('due_on' in c) { k.due_on = c.due_on; changed.push('due date'); }
-        if ('station_id' in c) { k.station_id = c.station_id; changed.push('station'); }
-        k.thread.push({ kind: 'edit', to: changed.join(', '), body: c.note || '', by: p.id, at: now });
-      } else if (c.note) {
-        k.thread.push({ kind: 'note', body: c.note, by: p.id, at: now });
       }
+      if ('team_id' in c && (c.team_id || null) !== k.team_id) {
+        if (!may.manage) return no(403, '42501', 'only whoever manages a task hands it to another team');
+        if (!c.team_id && !may.any_team) return no(403, '42501', 'only the people who hand out tasks leave one with no team');
+        if (c.team_id && !may.any_team && !may.owns.includes(c.team_id)) return no(403, '42501', 'a team\'s owner hands tasks to their own team only');
+        k.thread.push({ kind: 'team', from: teamName(k.team_id) || '', to: teamName(c.team_id) || '', body: body(), by: p.id, at: now }); used = true;
+        k.team_id = c.team_id || null;
+      }
+      const changed = [];
+      if ('title' in c && c.title !== k.title) changed.push('title');
+      if ('details' in c && c.details !== k.details) changed.push('details');
+      if ('due_on' in c && (c.due_on || null) !== k.due_on) changed.push('due date');
+      if ('station_id' in c && (c.station_id || null) !== k.station_id) changed.push('station');
+      if (changed.length) {
+        if (!may.manage) return no(403, '42501', 'only whoever manages a task changes its words');
+        if (changed.includes('title')) k.title = c.title;
+        if (changed.includes('details')) k.details = c.details;
+        if (changed.includes('due date')) k.due_on = c.due_on || null;
+        if (changed.includes('station')) k.station_id = c.station_id || null;
+        k.thread.push({ kind: 'edit', to: changed.join(', '), body: body(), by: p.id, at: now }); used = true;
+      }
+      if (c.note && !used) k.thread.push({ kind: 'note', body: c.note, by: p.id, at: now });
       return yes(getJson(k));
     }
     case 'team_member_save': {
@@ -544,6 +554,13 @@ try {
   ok('a member starts on their teams\' tasks still going, unfinished first',
     r.length === 3 && /Clear the orifice line/.test(r[0]) && r.some(x => /Replace the battery/.test(x)) && !r.some(x => /Old job/.test(x))
     && !r.some(x => /Licence transfer/.test(x)), J(r));
+  const memRow = await q.evaluate(() => ({
+    status: !!document.querySelector('#tk-table [data-k="status:k1"]'),
+    team: !!document.querySelector('#tk-table [data-k="team:k1"]'),
+    rename: !!document.querySelector('#tk-table [data-k="rename:k1"]'),
+    due: !!document.querySelector('#tk-table [data-k="due:k1"]') }));
+  ok('a member moves their team\'s task on from its row, and is offered no hand-over, rename or date there',
+    memRow.status && !memRow.team && !memRow.rename && !memRow.due, J(memRow));
   let late = await q.evaluate(() => document.querySelector('#tk-table tbody tr td .tk-late')?.textContent || '');
   ok('a task past its due date and not done says overdue', /20\/10\/2026 overdue/.test(late), late);
   // The map above the list: a pin a station, coloured by its most pressing
@@ -664,15 +681,15 @@ try {
   await q.waitForFunction(() => document.getElementById('tk-task-h')?.textContent === 'Order spare radios', null, { timeout: 10_000 });
   ok('an unassigned task says so, with what it means', await q.evaluate(() =>
     [...document.querySelectorAll('.tk-facts .term')].some(t => t.textContent === 'Unassigned' && /waits/.test(t.title))));
-  await q.click('#tk-manage summary');
-  await q.selectOption('#tk-u-team', 't-radio');
-  await q.click('#tk-u-hand');
+  ok('whoever manages it has the form to change it in view, not folded away',
+    await q.evaluate(() => { const m = document.getElementById('tk-manage'); return !!m && m.tagName === 'SECTION' && m.offsetParent !== null
+      && !document.getElementById('tk-u-save'); }));
+  await q.selectOption('#tk-e-team', 't-radio');
+  await q.click('#tk-e-save');
   await q.waitForFunction(() => /Radio licensing/.test(document.querySelector('.tk-facts')?.textContent || ''), null, { timeout: 10_000 });
   ok('it is handed to a team, and the thread says from and to',
     J(calls('task_update').pop().a) === J({ p_id: 'k5', p_change: { team_id: 't-radio' } })
     && /handed it from no team to Radio licensing/.test(await main(q)), J(calls('task_update').pop()));
-  await q.click('#tk-manage summary').catch(() => {});
-  if (!(await q.evaluate(() => document.getElementById('tk-manage').open))) await q.click('#tk-manage summary');
   await q.fill('#tk-e-title', 'Order four spare radios');
   await q.fill('#tk-e-due', '2026-11-30');
   await q.click('#tk-e-save');
@@ -680,19 +697,80 @@ try {
   ok('its words and date are changed, the thread saying which',
     J(calls('task_update').pop().a.p_change) === J({ title: 'Order four spare radios', due_on: '2026-11-30' })
     && /changed its title, due date/.test(await main(q)), J(calls('task_update').pop()));
-  ok('…and Cancelled is offered to them', await q.evaluate(() => [...document.querySelectorAll('#tk-u-status option')].some(o => o.value === 'cancelled')));
-  await q.selectOption('#tk-u-status', 'cancelled');
-  await q.click('#tk-u-save');
+  ok('…and Cancelled is offered to them', await q.evaluate(() => [...document.querySelectorAll('#tk-e-status option')].some(o => o.value === 'cancelled')));
+  await q.selectOption('#tk-e-status', 'cancelled');
+  await q.click('#tk-e-save');
   await q.waitForSelector('[data-ask="yes"]', { timeout: 5000 });
   const asked = await q.evaluate(() => document.querySelector('[data-ask="yes"]').textContent);
   await q.click('[data-ask="no"]');
   await settle(q);
   ok('a cancel asks first, as something with weight, and a no sends nothing',
     asked === 'Cancel the task' && calls('task_update').length === 3, J({ asked, n: calls('task_update').length }));
+  await q.click('#tk-e-reset');
+  await settle(q);
+  await q.selectOption('#tk-e-team', 't-ote');
+  await q.selectOption('#tk-e-status', 'waiting');
+  await q.click('#tk-e-station');
+  await q.waitForSelector('#tk-e-q', { timeout: 5000 });
+  await q.keyboard.type('loudoun br');
+  await q.waitForSelector('[data-k="epick:loudoun_br_al"]', { timeout: 5000 });
+  await q.click('[data-k="epick:loudoun_br_al"]');
+  await q.fill('#tk-e-note', 'Needs OTE to quote first.');
+  await q.click('#tk-e-save');
+  await q.waitForFunction(() => /OTE/.test(document.querySelector('.tk-facts')?.textContent || '')
+    && /Loudoun/.test(document.querySelector('.tk-facts')?.textContent || ''), null, { timeout: 10_000 });
+  ok('team, status, station and a note are changed together, in one call',
+    calls('task_update').length === 4 && J(calls('task_update').pop().a.p_change)
+      === J({ team_id: 't-ote', status: 'waiting', station_id: 'loudoun_br_al', note: 'Needs OTE to quote first.' })
+    && /Needs OTE to quote first/.test(await main(q)), J(calls('task_update').pop()));
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log('\nChanging tasks in the list\n');
+  await q.click('#tk-back');
+  await q.waitForFunction(() => !!document.querySelector('#tk-table table'), null, { timeout: 10_000 });
+  const n0 = calls('task_update').length;
+  const lastUpd = () => calls('task_update').slice(-1)[0];
+  await q.selectOption('[data-k="team:k5"]', 't-radio');
+  await q.waitForFunction(() => /handed to Radio licensing/.test(document.getElementById('tk-table')?.textContent || ''), null, { timeout: 10_000 });
+  let cell = await q.evaluate(() => ({ v: document.querySelector('[data-k="team:k5"]').value,
+    focus: document.activeElement && document.activeElement.dataset.k, view: Tasks._state().view }));
+  ok('a team picked in a row hands it over there, the list staying open and focus on the picker',
+    J(lastUpd().a) === J({ p_id: 'k5', p_change: { team_id: 't-radio' } }) && cell.v === 't-radio'
+    && cell.focus === 'team:k5' && cell.view === 'list', J({ a: lastUpd().a, cell }));
+  await q.selectOption('[data-k="status:k5"]', 'in_progress');
+  await q.waitForFunction(() => document.querySelector('[data-k="status:k5"]')?.value === 'in_progress'
+    && !document.querySelector('[data-k="status:k5"]').disabled, null, { timeout: 10_000 });
+  ok('a status picked in a row moves it on', J(lastUpd().a.p_change) === J({ status: 'in_progress' }), J(lastUpd().a));
+  await q.fill('[data-k="due:k5"]', '2026-12-05');
+  await q.waitForFunction(() => /due 05\/12\/2026/.test(document.getElementById('tk-table')?.textContent || ''), null, { timeout: 10_000 });
+  ok('a date put in a row sets its due date', J(lastUpd().a.p_change) === J({ due_on: '2026-12-05' }), J(lastUpd().a));
+  await q.click('[data-k="rename:k5"]');
+  await q.waitForSelector('[data-k="title:k5"]', { timeout: 5000 });
+  ok('✎ turns the title into a box, with focus in it',
+    await q.evaluate(() => document.activeElement && document.activeElement.dataset.k === 'title:k5'));
+  await q.keyboard.press('Escape');
+  await settle(q);
+  ok('…Escape puts it back, sending nothing', !(await q.$('[data-k="title:k5"]')) && calls('task_update').length === n0 + 3);
+  await q.click('[data-k="rename:k5"]');
+  await q.fill('[data-k="title:k5"]', 'Order five spare radios');
+  await q.press('[data-k="title:k5"]', 'Enter');
+  await q.waitForFunction(() => /Order five spare radios/.test(document.querySelector('[data-k="open:k5"]')?.textContent || ''), null, { timeout: 10_000 });
+  ok('…and Enter renames it', J(lastUpd().a.p_change) === J({ title: 'Order five spare radios' }) && calls('task_update').length === n0 + 4, J(lastUpd().a));
+  await q.selectOption('[data-k="status:k5"]', 'cancelled');
+  await q.waitForSelector('[data-ask="no"]', { timeout: 5000 });
+  await q.click('[data-ask="no"]');
+  await settle(q);
+  ok('a cancel from a row asks first, and a no sends nothing and puts the picker back',
+    calls('task_update').length === n0 + 4 && await q.evaluate(() => document.querySelector('[data-k="status:k5"]').value === 'in_progress'));
+  ok('clicking a row\'s picker does not open the task', (await q.evaluate(() => Tasks._state().view)) === 'list');
+  await q.selectOption('[data-k="status:k5"]', 'done');
+  await q.waitForFunction(() => !document.querySelector('[data-k="status:k5"]'), null, { timeout: 10_000 });
+  ok('a task marked done leaves the Not finished list, and the page says why',
+    /left the list/.test(await q.evaluate(() => document.getElementById('tk-table').textContent)));
 
   // ═══════════════════════════════════════════════════════════════════════════
   console.log('\nA new task\n');
-  await q.click('#tk-back');
+  if (await q.$('#tk-back')) await q.click('#tk-back');
   await q.waitForSelector('#tk-new-btn', { timeout: 10_000 });
   await q.click('#tk-new-btn');
   await q.waitForSelector('#tk-n-q', { timeout: 5000 });

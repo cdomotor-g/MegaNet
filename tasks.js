@@ -121,8 +121,8 @@ const Tasks = (function () {
   let note = '';           // the last thing done, said under the heading
   const filt = { scope: '', status: 'live', team: '', q: '' };
   let draft = freshDraft();
-  // The open task's forms, mirrored: team null until one is picked.
-  let upd = { status: '', note: '', team: null, edit: null };
+  // The open task's forms, mirrored: edit null until something in it changes.
+  let upd = { status: '', note: '', edit: null };
   let handoff = null;      // parseHandoff()'s data, with the review's rows
   let hoError = '';
   let refsAsked = '';      // which hand-off's references were last asked about
@@ -131,6 +131,10 @@ const Tasks = (function () {
   const cards = {};        // station id → { at, rows, p, error }
   let listAt = 0;          // when the list was last read
   let listAsk = null;      // a read of the list for the Stations map, in flight
+  const rowBusy = new Set(); // tasks a change from the list is being saved for
+  let rowEdit = null;      // the task whose title is being typed in its row
+  let rowNote = '';        // what the last change from the list did
+  let rowErr = '';         // …or why it could not
 
   function freshDraft(stationId) {
     return { station: stationId || '', general: false, q: '', title: '', details: '', team: '', due: '' };
@@ -371,20 +375,71 @@ const Tasks = (function () {
       </div>`;
   }
 
+  // What this page offers on a row of the list — task_list() has no `may`, so
+  // it is worked out the way task_may() does (0095); the database still
+  // decides. Its team moves it on; whoever manages it (hands out tasks, made
+  // it, owns its team) also hands it over and changes its words and date.
+  const rowManage = t => handsOut() || !!t.by_me || (!!t.team_id && owns().includes(t.team_id));
+  const rowWork = t => !!t.my_team || rowManage(t);
+  // The teams a row may be handed to: any, for somebody who hands out tasks;
+  // otherwise their own, and the one it has now (shown, not picked).
+  function rowTeamsHtml(t) {
+    const cur = t.team_id || '';
+    const all = (teams && teams.teams || []);
+    const may = handsOut() ? all : all.filter(x => owns().includes(x.id) || x.id === cur);
+    if (!may.some(x => x.id !== cur)) return '';
+    const none = handsOut() || !cur
+      ? `<option value=""${!cur ? ' selected' : ''}${handsOut() ? '' : ' disabled'}>${cur ? 'No team (unassign)' : 'Unassigned — pick a team'}</option>` : '';
+    return none + may.map(x => `<option value="${escAttr(x.id)}"${x.id === cur ? ' selected' : ''}${!handsOut() && !owns().includes(x.id) ? ' disabled' : ''}>${esc(x.name)}</option>`).join('');
+  }
+  function rowStatusHtml(t) {
+    const m = rowManage(t);
+    return STATUS.filter(s => s.key === t.status || m || (s.key !== 'cancelled' && t.status !== 'cancelled'))
+      .map(s => `<option value="${s.key}"${s.key === t.status ? ' selected' : ''}>${esc(s.label)}</option>`).join('');
+  }
+  // Every control in a row keeps its click to itself, so changing one does
+  // not open the task.
+  const STAY = 'onclick="event.stopPropagation()" onkeydown="event.stopPropagation()"';
+
   function rowHtml(t) {
+    const id = escAttr(t.id);
+    const busyRow = rowBusy.has(t.id);
+    const dis = busyRow ? ' disabled' : '';
     const st = t.station_id ? `<button type="button" class="link-btn" onclick="event.stopPropagation(); Tasks.goStation('${escAttr(t.station_id)}')">${esc(stationLabel(t.station_id))}</button>`
       : '<span class="txt-muted">General</span>';
-    const team = t.team_id ? esc(t.team || teamName(t.team_id))
-      : termHtml('Unassigned', word('unassigned'));
+    const manage = rowManage(t);
+    const label = esc(t.title);
+    // The team: a picker for whoever may hand it over, the name for anybody else.
+    const teamOpts = manage ? rowTeamsHtml(t) : '';
+    const team = teamOpts
+      ? `<select class="tk-cell-sel${t.team_id ? '' : ' tk-unassigned'}" data-k="team:${id}" aria-label="Team for ${escAttr(t.title)}"${dis} ${STAY}
+            onchange="Tasks.rowSet('${id}', 'team_id', this.value)">${teamOpts}</select>`
+      : t.team_id ? esc(t.team || teamName(t.team_id)) : termHtml('Unassigned', word('unassigned'));
+    const status = rowWork(t)
+      ? `<select class="tk-cell-sel tk-st-sel tk-st-${escAttr(t.status)}" data-k="status:${id}" aria-label="Status of ${escAttr(t.title)}"
+            title="${escAttr((STATUS_OF[t.status] || {}).meaning || '')}"${dis} ${STAY}
+            onchange="Tasks.rowSet('${id}', 'status', this.value)">${rowStatusHtml(t)}</select>`
+      : statusChip(t.status);
+    const late = isLate(t) ? ' <span class="tk-late"><strong>overdue</strong></span>' : '';
+    const due = manage
+      ? `<input type="date" class="tk-cell-date" data-k="due:${id}" value="${escAttr(t.due_on || '')}" aria-label="Due date for ${escAttr(t.title)}"${dis} ${STAY}
+            onchange="Tasks.rowSet('${id}', 'due_on', this.value)">${late}`
+      : dueHtml(t);
     const from = t.source === 'sort'
       ? ` <span class="tk-src term-chip" title="${esc(word('sort'))}">SoRT${t.source_date ? ' ' + esc(dmy(t.source_date)) : ''}</span>` : '';
-    return `<tr class="row-link" onclick="Tasks.open('${escAttr(t.id)}')">
-        <th scope="row"><button type="button" class="row-open" data-k="open:${escAttr(t.id)}" onclick="event.stopPropagation(); Tasks.open('${escAttr(t.id)}')">${esc(t.title)}</button>${from}
+    const title = rowEdit === t.id
+      ? `<input type="text" class="tk-cell-title" data-k="title:${id}" maxlength="200" value="${escAttr(t.title)}" aria-label="New title"${dis} onclick="event.stopPropagation()"
+            onkeydown="event.stopPropagation(); Tasks.titleKey(event, '${id}', this)" onblur="Tasks.titleDone('${id}', this.value)">`
+      : `<button type="button" class="row-open" data-k="open:${id}" onclick="event.stopPropagation(); Tasks.open('${id}')">${label}</button>${
+          manage ? ` <button type="button" class="tk-rename" data-k="rename:${id}" title="Rename it here" aria-label="Rename ${escAttr(t.title)}"${dis}
+            onclick="event.stopPropagation(); Tasks.rename('${id}')">✎</button>` : ''}`;
+    return `<tr class="row-link${busyRow ? ' is-busy' : ''}" onclick="Tasks.open('${id}')">
+        <th scope="row">${title}${from}
           ${t.notes ? `<span class="small txt-muted"> · ${Number(t.notes)} note${Number(t.notes) === 1 ? '' : 's'}</span>` : ''}</th>
         <td>${st}</td>
         <td>${team}</td>
-        <td>${statusChip(t.status)}</td>
-        <td>${dueHtml(t)}</td>
+        <td>${status}</td>
+        <td>${due}</td>
         <td class="small col-optional">${esc(t.created_by || '—')}<div class="txt-muted">${esc(dmy(String(t.created_at).slice(0, 10)))}</div></td>
       </tr>`;
   }
@@ -397,7 +452,11 @@ const Tasks = (function () {
         ? 'No task fits what is picked above.'
         : 'No tasks yet that are yours to see.'}${mayHandOut() ? ' <button type="button" class="link-btn" onclick="Tasks.newTask()">Hand one out</button>.' : ''}</p>`;
     }
-    return `<p class="small txt-muted" role="status">${rows.length} of ${total} task${total === 1 ? '' : 's'}</p>
+    const editable = rows.some(rowWork);
+    return `<p class="small txt-muted" role="status">${rows.length} of ${total} task${total === 1 ? '' : 's'}${editable
+        ? ' · change a team, status or due date right in its row (✎ renames it); open a task for its details and thread' : ''}</p>
+      ${rowNote ? `<p class="small txt-ok" role="status">${esc(rowNote)}</p>` : ''}
+      ${rowErr ? `<p class="small txt-bad" role="alert">${esc(rowErr)}</p>` : ''}
       <div class="table-wrap medium" role="region" tabindex="0" aria-labelledby="tk-list-h">
         <table class="tk-table">
           <caption class="sr-only">Tasks, unfinished first, soonest due first</caption>
@@ -718,7 +777,9 @@ const Tasks = (function () {
       ['Made', `${esc(t.by_me ? 'by you' : `by ${t.created_by || 'somebody no longer here'}`)} on ${esc(when(t.created_at))}`],
     ];
     const work = may.work || may.manage;
-    const updForm = work ? `<form class="tk-form" onsubmit="event.preventDefault(); Tasks.save()">
+    // Whoever manages it changes everything in one form, always in view; its
+    // team alone moves it on and writes on it.
+    const updForm = may.manage ? editHtml(t) : work ? `<form class="tk-form" onsubmit="event.preventDefault(); Tasks.save()">
         <h3 id="tk-upd-h">Move it on</h3>
         <div class="control-row">
           <label>${termHtml('Status', word('status'))}
@@ -728,19 +789,6 @@ const Tasks = (function () {
           <textarea id="tk-u-note" rows="3" maxlength="4000" oninput="Tasks.updField('note', this.value)"${busy ? ' disabled' : ''}>${esc(upd.note)}</textarea></label>
         <div class="button-group"><button type="submit" class="primary" id="tk-u-save"${busy ? ' disabled' : ''}>Save</button></div>
       </form>` : '<p class="small txt-muted">Only the team it is handed to, or whoever manages it, moves it on.</p>';
-    const only = may.any_team ? null : (Array.isArray(may.owns) ? may.owns : []);
-    const manage = may.manage ? `<details class="tk-fold" id="tk-manage"${upd.edit ? ' open' : ''} ontoggle="Tasks.manageToggled(this.open)">
-        <summary><h3 class="bk-inline-h">Hand it over, or change it</h3></summary>
-        <form class="tk-form" onsubmit="event.preventDefault(); Tasks.reassign()">
-          <div class="control-row">
-            <label>Hand it to
-              <select id="tk-u-team" onchange="Tasks.updField('team', this.value)"${busy ? ' disabled' : ''}>${teamOptions(upd.team !== null ? upd.team : (t.team_id || ''), { none: !!may.any_team, only })}</select></label>
-            <button type="submit" class="exp-btn-sm" id="tk-u-hand"${busy ? ' disabled' : ''}>Hand it over</button>
-          </div>
-          ${only ? '<p class="small txt-muted">You may hand it to your own team; somebody who hands out tasks gives it to any other.</p>' : ''}
-        </form>
-        ${editHtml(t)}
-      </details>` : '';
     const thread = (t.thread || []).length
       ? `<ol class="tk-thread" aria-labelledby="tk-thread-h">${t.thread.map(threadEntryHtml).join('')}</ol>`
       : '<p class="small txt-muted">Nothing yet.</p>';
@@ -751,33 +799,73 @@ const Tasks = (function () {
         <dl class="tk-facts">${facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
         ${t.details ? `<div class="tk-details tk-body">${esc(t.details)}</div>` : '<p class="small txt-muted">No details.</p>'}
         ${updForm}
-        ${manage}
         <h3 id="tk-thread-h">${termHtml('Thread', word('thread'))}</h3>
         ${thread}
       </div>`;
   }
 
+  function seedEdit(t) {
+    return { title: t.title, details: t.details || '', due: t.due_on || '', station: t.station_id || '',
+             team: t.team_id || '', status: t.status, picking: false, q: '' };
+  }
+
+  function editPicksHtml(e) {
+    if (!e.q.trim()) return '';
+    const hits = stationMatches(e.q);
+    if (!hits.length) return '<p class="small txt-muted" role="status">No station by that name or number.</p>';
+    return `<ul class="tk-picks" aria-label="Matching stations">${hits.map(s =>
+      `<li><button type="button" class="link-btn" data-k="epick:${escAttr(s.id)}" onclick="Tasks.editPick('${escAttr(s.id)}')">${esc(s.name)}${s.station_number ? ` <span class="txt-muted">${esc(s.station_number)}</span>` : ''}</button></li>`).join('')}</ul>`;
+  }
+
+  // Everything whoever manages a task may change, in one form: who has it,
+  // how far it has got, when it is due, its words and its station, and a note
+  // for the thread — one Save, one task_update().
   function editHtml(t) {
-    const e = upd.edit || { title: t.title, details: t.details || '', due: t.due_on || '', station: t.station_id || '' };
-    return `<form class="tk-form" onsubmit="event.preventDefault(); Tasks.saveEdit()">
-        <label class="tk-wide">Title
-          <input type="text" id="tk-e-title" maxlength="200" value="${escAttr(e.title)}" oninput="Tasks.editField('title', this.value)"></label>
-        <label class="tk-wide">Details
-          <textarea id="tk-e-details" rows="4" maxlength="8000" oninput="Tasks.editField('details', this.value)">${esc(e.details)}</textarea></label>
-        <div class="control-row">
-          <label>${termHtml('Due', word('due'))}
-            <input type="date" id="tk-e-due" value="${escAttr(e.due)}" onchange="Tasks.editField('due', this.value)"></label>
-          <label>Station id
-            <input type="text" id="tk-e-station" value="${escAttr(e.station)}" autocomplete="off" spellcheck="false"
-                   placeholder="none for a general task" oninput="Tasks.editField('station', this.value)"></label>
-        </div>
-        <div class="button-group"><button type="submit" class="exp-btn-sm" id="tk-e-save"${busy ? ' disabled' : ''}>Save the changes</button></div>
-      </form>`;
+    const may = t.may || {};
+    const e = upd.edit || seedEdit(t);
+    const only = may.any_team ? null : (Array.isArray(may.owns) ? may.owns : []);
+    const dis = busy ? ' disabled' : '';
+    const statusOpts = STATUS.map(s => `<option value="${s.key}"${s.key === e.status ? ' selected' : ''}>${esc(s.label)}</option>`).join('');
+    const station = e.picking
+      ? `<label class="tk-wide">Station — its name or number
+          <input type="search" id="tk-e-q" value="${escAttr(e.q)}" autocomplete="off" oninput="Tasks.editStationTyped(this.value)"${dis}></label>
+        <div id="tk-e-picks">${editPicksHtml(e)}</div>
+        <p class="small"><button type="button" class="link-btn" id="tk-e-general" onclick="Tasks.editPick('')">Make it a general task, at no one station</button>
+          · <button type="button" class="link-btn" id="tk-e-keep" onclick="Tasks.editPick(null)">Keep ${e.station ? esc(stationLabel(e.station)) : 'it general'}</button></p>`
+      : `<div class="tk-wide"><span>Station</span>
+          <span class="tk-picked">${e.station ? esc(stationLabel(e.station)) : '<span class="txt-muted">None — a general task</span>'}
+          <button type="button" class="link-btn" id="tk-e-station" onclick="Tasks.editPicking()"${dis}>Change</button></span></div>`;
+    return `<section class="tk-edit" id="tk-manage" aria-labelledby="tk-edit-h">
+        <h3 id="tk-edit-h">Change this task</h3>
+        <p class="small txt-muted">Hand it to a team, move it on, change its date or its words — then Save. Every change goes in the thread.</p>
+        <form class="tk-form" onsubmit="event.preventDefault(); Tasks.saveEdit()">
+          <div class="control-row">
+            <label>${termHtml('Team', word('team'))}
+              <select id="tk-e-team" onchange="Tasks.editField('team', this.value)"${dis}>${teamOptions(e.team, { none: !!may.any_team, only })}</select></label>
+            <label>${termHtml('Status', word('status'))}
+              <select id="tk-e-status" onchange="Tasks.editField('status', this.value)"${dis}>${statusOpts}</select></label>
+            <label>${termHtml('Due', word('due'))}
+              <input type="date" id="tk-e-due" value="${escAttr(e.due)}" onchange="Tasks.editField('due', this.value)"${dis}></label>
+          </div>
+          ${only ? '<p class="small txt-muted">You may hand it to your own team; somebody who hands out tasks gives it to any other.</p>' : ''}
+          <label class="tk-wide">Title
+            <input type="text" id="tk-e-title" maxlength="200" value="${escAttr(e.title)}" oninput="Tasks.editField('title', this.value)"${dis}></label>
+          <label class="tk-wide">Details
+            <textarea id="tk-e-details" rows="4" maxlength="8000" oninput="Tasks.editField('details', this.value)"${dis}>${esc(e.details)}</textarea></label>
+          ${station}
+          <label class="tk-wide">A note for the thread (optional)
+            <textarea id="tk-e-note" rows="2" maxlength="4000" oninput="Tasks.updField('note', this.value)"${dis}>${esc(upd.note)}</textarea></label>
+          <div class="button-group">
+            <button type="submit" class="primary" id="tk-e-save"${dis}>Save</button>
+            <button type="button" class="ghost" id="tk-e-reset" onclick="Tasks.editReset()"${dis}>Undo my changes</button>
+          </div>
+        </form>
+      </section>`;
   }
 
   async function openTask(id) {
     openId = id; view = 'task'; taskErr = '';
-    if (!task || task.id !== id) { task = null; upd = { status: '', note: '', team: null, edit: null }; }
+    if (!task || task.id !== id) { task = null; upd = { status: '', note: '', edit: null }; }
     opening = id;
     paint();
     try {
@@ -805,7 +893,7 @@ const Tasks = (function () {
     try {
       out = await dbRpc('task_update', { p_id: task.id, p_change });
       task = out;
-      upd = { status: '', note: '', team: null, edit: null };
+      upd = { status: '', note: '', edit: null };
       note = said;
       announce(said);
       await reloadList();
@@ -815,6 +903,71 @@ const Tasks = (function () {
     busy = false;
     paint(focusId ? `#${focusId}` : null);
     return out;
+  }
+
+  // ── Changing a task from its row in the list ──────────────────────────────
+  // The same task_update() the open task uses, for one field at a time; the
+  // row takes the answer, and the table alone is drawn again, focus going
+  // back to the control it was on.
+
+  function paintTable(focusKey) {
+    if (typeof document === 'undefined' || state.activeTab !== 'tasks' || view !== 'list') return;
+    const el = document.getElementById('tk-table');
+    if (!el) return;
+    const had = focusKey || (el.contains(document.activeElement) ? focusKeyOf(document.activeElement) : null);
+    el.innerHTML = tableHtml();
+    refocus(had);
+  }
+
+  async function rowChange(id, p_change, said, focusKey) {
+    const t = (list || []).find(x => x.id === id);
+    if (!t || rowBusy.has(id)) return;
+    rowBusy.add(id); rowErr = ''; rowNote = ''; note = '';
+    paintTable(focusKey);
+    try {
+      const out = await dbRpc('task_update', { p_id: id, p_change });
+      if (out && typeof out === 'object') {
+        const { details, may, thread, ...rest } = out;
+        Object.assign(t, rest);
+        if (task && task.id === id) task = out;
+      }
+      const gone = !scoped().some(x => x.id === id);
+      rowNote = said + (gone ? ' It no longer fits the filters above, so it has left the list.' : '');
+      announce(rowNote);
+      for (const k of Object.keys(cards)) delete cards[k];
+    } catch (err) {
+      rowErr = errText(err, 'save that');
+    }
+    rowBusy.delete(id);
+    paintTable(focusKey);
+    drawMap();
+    listChanged();
+  }
+
+  async function rowSet(id, key, value) {
+    const t = (list || []).find(x => x.id === id);
+    if (!t) return;
+    const fk = `k:${key === 'team_id' ? 'team' : key === 'due_on' ? 'due' : 'status'}:${id}`;
+    if (key === 'team_id') {
+      const to = value || null;
+      if (to === (t.team_id || null)) return;
+      return rowChange(id, { team_id: to }, to ? `${t.title}: handed to ${teamName(to)}.` : `${t.title}: left with no team.`, fk);
+    }
+    if (key === 'status') {
+      if (!STATUS_OF[value] || value === t.status) return;
+      if (value === 'cancelled' && !(await confirmDialog({ title: `Cancel “${t.title}”?`,
+        message: 'Its team stops seeing it as something to do. It can be brought back.', confirm: 'Cancel the task', cancel: 'Keep it', danger: true }))) {
+        paintTable(fk);          // the picker back to what it was
+        return;
+      }
+      return rowChange(id, { status: value }, `${t.title}: ${STATUS_OF[value].label}.`, fk);
+    }
+    if (key === 'due_on') {
+      const to = value || null;
+      if (to === (t.due_on || null)) return;
+      if (to && !validDate(to)) { rowErr = 'That is not a date.'; paintTable(fk); return; }
+      return rowChange(id, { due_on: to }, to ? `${t.title}: due ${dmy(to)}.` : `${t.title}: no due date now.`, fk);
+    }
   }
 
   // ── A new task ─────────────────────────────────────────────────────────────
@@ -1357,6 +1510,7 @@ const Tasks = (function () {
     // Another person, or nobody: the filters start again from theirs.
     Object.assign(filt, { scope: '', status: 'live', team: '', q: '' });
     loading = false; busy = false; note = ''; refsAsked = ''; teamErr = {};
+    rowBusy.clear(); rowEdit = null; rowNote = ''; rowErr = '';
     for (const k of Object.keys(cards)) delete cards[k];
     listAt = 0; listAsk = null;
     listChanged();
@@ -1372,6 +1526,7 @@ const Tasks = (function () {
     WORDS, STATUS, PINS, forMe, mapRows, stationGroups, mergeOnScreen, pinIcon, pinTitle, pinPopupHtml, keyHtml,
     filter(k, v) {
       filt[k] = v;
+      rowNote = ''; rowErr = ''; rowEdit = null;
       if (k === 'q') { paintPart('tk-table', tableHtml()); drawMap(); return; }
       paint();
     },
@@ -1379,7 +1534,7 @@ const Tasks = (function () {
       if (state.activeTab !== 'tasks') switchTab('tasks');
       openTask(id);
     },
-    back() { view = 'list'; task = null; openId = null; taskErr = ''; note = ''; paint('#tk-list-h'); },
+    back() { view = 'list'; task = null; openId = null; taskErr = ''; note = ''; rowNote = ''; rowErr = ''; rowEdit = null; paint('#tk-list-h'); },
     newTask() { view = 'new'; taskErr = ''; note = ''; paint(draft.station ? '#tk-n-title' : '#tk-n-q'); },
     newAt(stationId) {
       draft = freshDraft(stationId);
@@ -1402,10 +1557,23 @@ const Tasks = (function () {
     updField(k, v) { upd[k] = v; },
     editField(k, v) {
       if (!task) return;
-      if (!upd.edit) upd.edit = { title: task.title, details: task.details || '', due: task.due_on || '', station: task.station_id || '' };
+      if (!upd.edit) upd.edit = seedEdit(task);
       upd.edit[k] = v;
     },
-    manageToggled(open) { if (open && !upd.edit && task) upd.edit = { title: task.title, details: task.details || '', due: task.due_on || '', station: task.station_id || '' }; },
+    editPicking() {
+      if (!task) return;
+      if (!upd.edit) upd.edit = seedEdit(task);
+      upd.edit.picking = true; upd.edit.q = '';
+      paint('#tk-e-q');
+    },
+    editStationTyped(v) { if (upd.edit) { upd.edit.q = v; paintPart('tk-e-picks', editPicksHtml(upd.edit)); } },
+    editPick(id) {
+      if (!upd.edit) return;
+      if (id !== null) upd.edit.station = id;
+      upd.edit.picking = false; upd.edit.q = '';
+      paint('#tk-e-station');
+    },
+    editReset() { upd = { status: '', note: '', edit: null }; taskErr = ''; paint('#tk-e-team'); },
     async save() {
       if (!task) return;
       const c = {};
@@ -1416,22 +1584,47 @@ const Tasks = (function () {
         message: 'Its team stops seeing it as something to do. It can be brought back.', confirm: 'Cancel the task', cancel: 'Keep it', danger: true }))) return;
       await change(c, c.status ? `${task.title}: ${STATUS_OF[c.status].label}.` : 'Note added.', 'tk-u-save');
     },
-    async reassign() {
-      if (!task) return;
-      const to = upd.team === null ? (task.team_id || '') : upd.team;
-      if (to === '' && !(task.may || {}).any_team) { taskErr = 'Pick the team to hand it to.'; paint('#tk-u-hand'); return; }
-      if ((to || null) === (task.team_id || null)) { taskErr = 'It is with that team already.'; paint('#tk-u-hand'); return; }
-      await change({ team_id: to || null }, to ? `Handed to ${teamName(to)}.` : 'Left with no team.', 'tk-u-hand');
-    },
     async saveEdit() {
-      if (!task || !upd.edit) return;
-      const e = upd.edit, c = {};
-      if (e.title.trim() !== task.title) c.title = e.title.trim();
-      if (e.details !== (task.details || '')) c.details = e.details;
-      if ((e.due || '') !== (task.due_on || '')) c.due_on = e.due || null;
-      if ((e.station || '').trim() !== (task.station_id || '')) c.station_id = (e.station || '').trim() || null;
+      if (!task || busy) return;
+      const e = upd.edit || seedEdit(task), c = {}, said = [];
+      const title = e.title.trim();
+      if (!title) { taskErr = 'Give it a title — what is to be done, in a line.'; paint('#tk-e-title'); return; }
+      if ((e.team || null) !== (task.team_id || null)) {
+        if (!e.team && !(task.may || {}).any_team) { taskErr = 'Pick the team to hand it to.'; paint('#tk-e-team'); return; }
+        c.team_id = e.team || null;
+        said.push(e.team ? `handed to ${teamName(e.team)}` : 'left with no team');
+      }
+      if (e.status !== task.status) { c.status = e.status; said.push(STATUS_OF[e.status].label.toLowerCase()); }
+      if (title !== task.title) { c.title = title; said.push('renamed'); }
+      if (e.details !== (task.details || '')) { c.details = e.details; said.push('details changed'); }
+      if ((e.due || '') !== (task.due_on || '')) { c.due_on = e.due || null; said.push(e.due ? `due ${dmy(e.due)}` : 'no due date'); }
+      if ((e.station || '') !== (task.station_id || '')) { c.station_id = e.station || null; said.push(e.station ? `at ${stationLabel(e.station)}` : 'a general task now'); }
+      if (upd.note.trim()) { c.note = upd.note.trim(); if (!said.length) said.push('note added'); }
       if (!Object.keys(c).length) { taskErr = 'Nothing has changed.'; paint('#tk-e-save'); return; }
-      await change(c, 'Changes saved.', 'tk-e-save');
+      if (c.status === 'cancelled' && !(await confirmDialog({ title: `Cancel “${task.title}”?`,
+        message: 'Its team stops seeing it as something to do. It can be brought back.', confirm: 'Cancel the task', cancel: 'Keep it', danger: true }))) return;
+      const line = said.join(', ');
+      await change(c, `Saved: ${line.charAt(0).toUpperCase()}${line.slice(1)}.`, 'tk-e-save');
+    },
+    rowSet,
+    rename(id) {
+      if (!(list || []).some(x => x.id === id)) return;
+      rowEdit = id;
+      paintTable(`k:title:${id}`);
+      const el = document.querySelector(`#tk-table [data-k="title:${CSS.escape(id)}"]`);
+      if (el) el.select();
+    },
+    titleKey(ev, id, el) {
+      if (ev.key === 'Enter') { ev.preventDefault(); Tasks.titleDone(id, el.value); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); rowEdit = null; paintTable(`k:rename:${id}`); }
+    },
+    titleDone(id, v) {
+      if (rowEdit !== id) return;
+      rowEdit = null;
+      const t = (list || []).find(x => x.id === id);
+      const title = String(v || '').replace(/\s+/g, ' ').trim();
+      if (!t || !title || title === t.title) { paintTable(`k:rename:${id}`); return; }
+      rowChange(id, { title }, `Renamed: ${title}.`, `k:rename:${id}`);
     },
     memberTyped(teamId, v) { memberAdd[teamId] = v; },
     async addMember(teamId) {

@@ -10530,7 +10530,7 @@ body .map-panel.is-driving {
   max-width: calc(100% - 1.8rem);
   max-height: calc(100% - 5.5rem);
   border: 2px solid var(--panel);
-  border-radius: var(--r-md, 8px);
+  border-radius: var(--r-md);
   /* A hairline outside the white (or, in the dark theme, near-black) frame,
      which on its own is lost against a base of the same tone. */
   box-shadow: 0 0 0 1px var(--border), var(--shadow-2);
@@ -10956,7 +10956,7 @@ body .map-panel.is-driving {
   gap: .35rem;
   padding-left: .45rem;
   border: 1px solid var(--ctl-border);
-  border-radius: var(--r-md, 8px);
+  border-radius: var(--r-md);
   background: var(--panel-sub);
   color: var(--muted);
 }
@@ -10968,7 +10968,7 @@ body .map-panel.is-driving {
   margin: 0;
   padding: 0 .4rem 0 0;
   border: 0;
-  border-radius: 0 var(--r-md, 8px) var(--r-md, 8px) 0;
+  border-radius: 0 var(--r-md) var(--r-md, 8px) 0;
   background: transparent;
   box-shadow: none;
   color: var(--text);
@@ -10980,7 +10980,7 @@ body .map-panel.is-driving {
   flex: none;
   display: inline-flex;
   border: 1px solid var(--ctl-border);
-  border-radius: var(--r-md, 8px);
+  border-radius: var(--r-md);
   overflow: hidden;
 }
 .stn-cv-views .stn-cv-view {
@@ -11145,7 +11145,7 @@ body .map-panel.is-driving {
   margin: 0;
   padding: .2rem .15rem;
   border: 1px solid var(--border);
-  border-radius: var(--r-md, 8px);
+  border-radius: var(--r-md);
   background: var(--panel-sub);
   color: var(--text);
   font-size: .74rem;
@@ -29816,6 +29816,19 @@ select.kl-in { width: auto; font-family: inherit; }
 .tk-src, .tk-chip, .tk-role { display: inline-block; padding: 0 .45em; border: 1px solid var(--border); border-radius: var(--r-pill);
                               font-size: var(--fs-xs); font-weight: 400; line-height: 1.6; color: var(--muted); white-space: nowrap; }
 .tk-late { color: var(--bad); }
+/* A row's own controls: a team, a status and a date changed where they are
+   read. The status picker wears its chip's colour on its border; a task with
+   no team yet is ringed amber, so it stands out as the one to pick for. */
+.tk-cell-sel, .tk-cell-date, .tk-cell-title { font-size: var(--fs-sm); max-width: 100%; min-height: 2rem; padding: 0 .4em; }
+.tk-cell-sel { max-width: 13rem; }
+.tk-st-sel { border: 1px solid var(--c); border-radius: var(--r-pill); background: color-mix(in srgb, var(--c) 14%, var(--bg)); color: var(--text); }
+.tk-cell-sel.tk-unassigned { border: 1px dashed var(--warn); color: var(--text); }
+.tk-cell-title { width: 100%; min-width: 12rem; }
+.tk-rename { background: none; border: 0; padding: 0 .3em; color: var(--muted); cursor: pointer; font-size: var(--fs-sm); }
+.tk-rename:hover, .tk-rename:focus-visible { color: var(--accent); }
+.tk-table tr.is-busy { opacity: .6; }
+.tk-edit { margin-top: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); }
+.tk-edit h3 { margin: 0 0 var(--sp-1); }
 .tk-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--sp-1) var(--sp-3); margin: var(--sp-3) 0; }
 .tk-facts dt { color: var(--muted); font-size: var(--fs-sm); }
 .tk-facts dd { margin: 0; overflow-wrap: anywhere; }
