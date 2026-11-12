@@ -1799,6 +1799,11 @@ const BaseStations = (function () {
     ['in-from', 'Heard from', 'The transmitter the base station itself heard the message from: the last repeater in its relay path, or the station itself when it came straight. A strong, steady signal from one repeater means the stations behind it belong to that repeater\'s network.'],
     ['in-snr', 'Signal', 'How far the messages stood above the noise at the receiver, on average, in dB (SNR). Higher is closer or better placed; it is the last transmitter\'s signal, not the far station\'s.'],
     ['in-since', 'First heard', 'The first day the daily records have this ID decoded at the base station, however long ago. A group of IDs that all began on one day is a network that was switched on, or a channel the base station began listening to, that day.'],
+    ['in-row-share', 'Share of the row', 'This station\'s part of the decoded messages in the row it sits under.'],
+    ['in-days', 'Days decoded', 'On how many of the period\'s UTC days the base station decoded this station at least once; the last day is today, so far. Decoded every day is steady. Decoded on a few days only is a station that talks mainly when it rains, or one at the edge of range.'],
+    ['in-day-bars', 'A bar a day', 'Its decoded messages each UTC day, oldest on the left: legacy ALERT at the foot, ALERT2 above. Each station is drawn to its own scale, so read the shape, not the height — a gap is a day nothing of it came through. Rest the pointer on a bar for that day\'s numbers.'],
+    ['in-heard-at', 'Heard at', 'The base stations that decoded it in the period, with how many of its messages each. "Only here" means no other base station decoded it, so it goes dark if this one does.'],
+    ['in-quiet', 'Gone quiet', 'Decoded earlier in the period but not at all yesterday or today (UTC). Worth a look: the station, the repeater it comes through or the base station\'s reception may have stopped.'],
     ['in-clue', 'Clues', 'What else can be said from here: whether an ALERT2 address also relays others (so it is a repeater), and for a legacy ID the nearest IDs the register does hold — agencies are given IDs in blocks, so a neighbour\'s owner is a fair first guess.'],
   ];
   const inTerm = (k, text) => { const w = IN_WORDS.find(x => x[0] === k); return termHtml(text || w[1], w[2]); };
@@ -1812,6 +1817,9 @@ const BaseStations = (function () {
   const IN_BY_TERM = { owner: 'in-owner', network: 'in-network', hub: 'in-hub', kind: 'in-kind', path: 'in-path' };
   const IN_TOP = 25;
   let inBy = 'owner', inAt = 'all', inMore = false, inSlsAsked = false;
+  // The rows opened out into their stations, by row key, and those showing every station (0124).
+  const IN_OPEN_TOP = 25;
+  let inOpened = new Set(), inOpenedAll = new Set();
   // The ACMA's devices, for the unknown stations' frequencies: { loading } | { list: [{ f, client, site, lat, lon }] } | { err }.
   let inAcma = null;
 
@@ -1931,11 +1939,7 @@ const BaseStations = (function () {
     if (stationId == null) return inBy === 'station' ? ['?' + proto + id, (proto === 'alert2' ? 'ALERT2 station ' : 'Legacy ID ') + id + ' — not in the register'] : ['?', 'Not in the register'];
     const st = inStn(stationId);
     if (inBy === 'station') return ['s' + stationId, st ? st.name : stationId];
-    if (inBy === 'kind') {
-      if (proto !== 'alert2') return ['k' + (type || ''), type || 'No sensor type recorded'];
-      const role = st && ['repeater', 'base', 'field'].find(r => (st.roles || []).includes(r));
-      return ['r' + (role || ''), 'ALERT2 ' + (role ? ROLE_LABEL[role].toLowerCase() : 'station')];
-    }
+    if (inBy === 'kind') return inKindOf(proto, type, st);
     if (!st) return ['-', 'In the register, but not in the list this browser holds'];
     if (inBy === 'owner') {
       if (!inOwnersReady()) return ['…', 'Owners still loading…'];
@@ -1946,6 +1950,47 @@ const BaseStations = (function () {
     if (inBy === 'hub') return st.hub_id ? ['h' + st.hub_id, inNamed('hubs', st.hub_id)] : ['', 'No Bureau region recorded'];
     if (inBy === 'catchment') { const c = (st.catchment_ids || [])[0]; return c ? ['c' + c, inNamed('catchments', c)] : ['', 'No catchment recorded']; }
     return st.lga ? ['l' + st.lga, st.lga] : ['', 'No council area recorded'];
+  }
+
+  // What kind of sensor a counted ID is: the legacy sensor's type, or what the ALERT2 station is.
+  function inKindOf(proto, type, st) {
+    if (proto !== 'alert2') return ['k' + (type || ''), type || 'No sensor type recorded'];
+    const role = st && ['repeater', 'base', 'field'].find(r => (st.roles || []).includes(r));
+    return ['r' + (role || ''), 'ALERT2 ' + (role ? ROLE_LABEL[role].toLowerCase() : 'station')];
+  }
+
+  // A row's stations (0124), one counted ID at a time: a register station
+  // with its IDs together (each ID apart when the rows are stations already),
+  // one the register does not hold by its ID; what it decoded, where, and a
+  // day at a time when the database gives the days.
+  function inMember(g, row, x, nDays) {
+    const [proto, id, ok, stationId, type, only] = row;
+    const mk = inBy === 'station' || stationId == null ? proto + ':' + id : 's' + stationId;
+    let m = g.m.get(mk);
+    if (!m) {
+      m = { key: mk, station: stationId, ids: new Map(), kinds: new Set(), a: 0, a2: 0, at: new Map(), only: true,
+        dA: nDays ? new Array(nDays).fill(0) : null, dA2: nDays ? new Array(nDays).fill(0) : null };
+      g.m.set(mk, m);
+    }
+    const k = proto + ':' + id, e = m.ids.get(k) || { proto, id, type, ok: 0 };
+    e.ok += Number(ok);
+    m.ids.set(k, e);
+    m.kinds.add(inKindOf(proto, type, stationId == null ? null : inStn(stationId))[1]);
+    m[proto === 'alert2' ? 'a2' : 'a'] += Number(ok);
+    m.at.set(x.label, (m.at.get(x.label) || 0) + Number(ok));
+    if (!only) m.only = false;
+    if (nDays) { const d = proto === 'alert2' ? m.dA2 : m.dA; row[6].forEach((v, i) => { d[i] += Number(v) || 0; }); }
+  }
+  // …read once the rows are added up: busiest first, with its days decoded and whether it has gone quiet.
+  function inMembers(g, nDays) {
+    const ms = [...g.m.values()].sort((p, q) => (q.a + q.a2) - (p.a + p.a2) || String(p.key).localeCompare(String(q.key)));
+    for (const m of ms) {
+      if (!nDays) continue;
+      const t = m.dA.map((v, i) => v + m.dA2[i]);
+      m.days = t.filter(v => v > 0).length;
+      m.quiet = nDays >= 3 && t.slice(0, -2).some(v => v > 0) && !t.slice(-2).some(v => v > 0);
+    }
+    return ms;
   }
 
   const inPathLabel = p => ((p.path || []).length
@@ -1969,7 +2014,10 @@ const BaseStations = (function () {
     if (xs.some(x => !Array.isArray(x.ids))) return { need: true };
     const by = new Map();
     let joint = false;
-    const at = (key, label, sub) => { let g = by.get(key); if (!g) { g = { label, sub, ids: new Set(), a: 0, a2: 0, only: 0 }; by.set(key, g); } return g; };
+    // 0124: each ID's decoded messages a day, one for each of day_list — when every ID has them.
+    const dayList = (ing.r.day_list || []).map(d => String(d).slice(0, 10));
+    const nDays = dayList.length && xs.every(x => x.ids.every(r => Array.isArray(r[6]) && r[6].length === dayList.length)) ? dayList.length : 0;
+    const at = (key, label, sub) => { let g = by.get(key); if (!g) { g = { key, label, sub, ids: new Set(), a: 0, a2: 0, only: 0, m: new Map() }; by.set(key, g); } return g; };
     if (inBy === 'path') {
       for (const x of xs) for (const p of x.paths || []) {
         const g = at(JSON.stringify(p.path || []) + (xs.length > 1 ? x.id : ''), inPathLabel(p), xs.length > 1 ? 'heard at ' + x.label : '');
@@ -1985,10 +2033,11 @@ const BaseStations = (function () {
           g[row[0] === 'alert2' ? 'a2' : 'a'] += Number(row[2]);
           if (row[5]) g.only++;
           if (key[0] === '?') g.warn = true;
+          inMember(g, row, x, nDays);
         }
       }
     }
-    const rows = [...by.values()].map(g => Object.assign(g, { n: g.n != null ? g.n : g.ids.size }))
+    const rows = [...by.values()].map(g => Object.assign(g, { n: g.n != null ? g.n : g.ids.size, members: inBy === 'path' ? null : inMembers(g, nDays) }))
       .sort((p, q) => (q.a + q.a2) - (p.a + p.a2) || String(p.label).localeCompare(String(q.label)));
     // What was decoded but not counted as a station: the rest of each protocol's total.
     const tot = xs.map(inRead).reduce((t, v) => ({ a: t.a + Number(v.a.ok), a2: t.a2 + Number(v.a2.ok) }), { a: 0, a2: 0 });
@@ -1996,7 +2045,7 @@ const BaseStations = (function () {
       : xs.reduce((t, x) => { for (const r of x.ids) t[r[0] === 'alert2' ? 'a2' : 'a'] += Number(r[2]); return t; }, { a: 0, a2: 0 });
     const rest = { a: inBy === 'path' ? 0 : Math.max(0, tot.a - listed.a), a2: Math.max(0, tot.a2 - listed.a2) };
     if (rest.a + rest.a2 > 0) rows.push({ label: 'Too few to count, or no ID', few: true, n: null, a: rest.a, a2: rest.a2, only: 0, dim: true });
-    return { rows, total: listed.a + listed.a2 + rest.a + rest.a2, one: xs.length === 1, several: all.length > 1, joint };
+    return { rows, total: listed.a + listed.a2 + rest.a + rest.a2, one: xs.length === 1, several: all.length > 1, joint, dayList: nDays ? dayList : null };
   }
 
   function inDaysTableHtml(b) {
@@ -2033,15 +2082,18 @@ const BaseStations = (function () {
       const path = inBy === 'path', max = Math.max(1, ...b.rows.map(g => g.a + g.a2));
       const shown = inMore ? b.rows : b.rows.slice(0, IN_TOP).concat(b.rows.length > IN_TOP ? b.rows.slice(IN_TOP).filter(g => g.few) : []);
       const head = (IN_BY.find(q => q[0] === inBy) || [])[1], term = IN_BY_TERM[inBy];
-      const body = shown.map(g => `<tr${g.dim ? ' class="qs-dim"' : ''}>
-          <th scope="row">${g.few ? inTerm('in-few') : g.warn && inBy !== 'station' ? `<button type="button" class="pill bs-in-go" title="Each of them, with its frequency, the repeater it came through and who is licensed there" onclick="BaseStations.inGroup('unknown')">${esc(g.label)} — who are they?</button>` : `<span${g.warn ? ' class="txt-warn"' : ''}>${esc(g.label)}</span>`}${g.sub ? `<div class="small qs-dim">${esc(g.sub)}</div>` : ''}</th>
+      const body = shown.map((g, i) => {
+        const can = !path && !g.few && g.members && g.members.length > 0, open = can && inOpened.has(g.key);
+        return `<tr class="${[g.dim ? 'qs-dim' : '', can ? 'bs-in-can' : '', open ? 'is-open' : ''].filter(Boolean).join(' ')}"${can ? ` data-k="${esc(g.key)}" onclick="BaseStations.inOpen(event, this)"` : ''}>
+          <th scope="row">${can ? `<button type="button" class="bs-in-open" id="bs-in-ob-${i}" aria-expanded="${open}" aria-controls="bs-in-o-${i}" aria-label="The stations in ${esc(g.label)}" title="${open ? 'Close' : 'Open out'} the stations in this row"></button>` : ''}${g.few ? inTerm('in-few') : g.warn && inBy !== 'station' ? `<button type="button" class="pill bs-in-go" title="Each of them, with its frequency, the repeater it came through and who is licensed there" onclick="BaseStations.inGroup('unknown')">${esc(g.label)} — who are they?</button>` : `<span${g.warn ? ' class="txt-warn"' : ''}>${esc(g.label)}</span>`}${g.sub ? `<div class="small qs-dim">${esc(g.sub)}</div>` : ''}</th>
           <td class="small">${g.n == null ? '—' : esc(chN(g.n))}${!path && b.one && b.several && g.only ? `<div class="qs-dim">${esc(chN(g.only))} only here</div>` : ''}</td>
           ${path ? '' : `<td class="small">${g.a ? esc(chN(g.a)) : '<span class="qs-dim">—</span>'}</td>`}
           <td class="small">${g.a2 ? esc(chN(g.a2)) : '<span class="qs-dim">—</span>'}</td>
           ${path ? '' : `<td class="small"><strong>${esc(chN(g.a + g.a2))}</strong></td>`}
           <td class="small"><span class="bs-in-mix" aria-hidden="true"><i class="bs-sw-in-a" style="width:${(g.a / max * 100).toFixed(1)}%"></i><i class="bs-sw-in-a2" style="width:${(g.a2 / max * 100).toFixed(1)}%"></i></span>
             ${b.total ? ((g.a + g.a2) / b.total * 100 < 1 ? 'under 1%' : Math.round((g.a + g.a2) / b.total * 100) + '%') : ''}</td>
-        </tr>`).join('');
+        </tr>${open ? `<tr class="bs-in-sub" id="bs-in-o-${i}"><td colspan="${path ? 4 : 6}">${inOpenHtml(g, b)}</td></tr>` : ''}`;
+      }).join('');
       const hidden = b.rows.length - shown.length;
       out = `<div class="table-wrap" role="region" tabindex="0" aria-label="Decoded messages by ${esc(head.toLowerCase())}"><table class="adm-table bs-in-b">
           <caption class="sr-only">Decoded messages by ${esc(head.toLowerCase())}: the stations in each row, their legacy ALERT and ALERT2 messages, and the row's share of them all</caption>
@@ -2050,11 +2102,87 @@ const BaseStations = (function () {
             ${path ? '' : '<th scope="col">Both</th>'}<th scope="col" class="bs-in-p">${inTerm('in-part')}</th></tr></thead>
           <tbody>${body}</tbody></table></div>`
         + (hidden > 0 || (inMore && b.rows.length > IN_TOP) ? `<p class="small"><button type="button" class="pill" onclick="BaseStations.inAll()">${inMore ? 'Show the top ' + IN_TOP + ' only' : 'Show all ' + chN(b.rows.length) + ' rows'}</button></p>` : '')
+        + (path ? '' : '<p class="small qs-dim">Open a row (▸, or anywhere on it) for the stations in it, each with a bar a day.</p>')
         + (b.joint ? '<p class="small qs-dim">A station owned jointly is counted under each of its owners, so these rows add up to more than the total; each share is of the total.</p>' : '')
         + (inAt === 'all' && heard.length > 1 ? '<p class="small qs-dim">All base stations together: a station two of them decode is one station, and its messages are counted at each.</p>' : '');
     }
     return `<div class="bs-in-bhead"><h3 class="bs-in-bh">Whose it is: the decoded messages, broken down</h3>
         <button type="button" class="pill" onclick="BaseStations.inBreakSave()">Save this breakdown as CSV</button></div>${picks}<div id="bs-in-by-t">${out}</div>`;
+  }
+
+  // ── …a row opened out into its stations (0124) ────────────────────────
+  // What is in the row, at a glance — how many, how much the busiest carry,
+  // the ones gone quiet, what kinds and which base stations — then each
+  // station with its IDs, messages, days decoded and a bar a day.
+
+  // A bar a day, legacy ALERT at the foot and ALERT2 above, to the station's own scale.
+  function inSparkHtml(dA, dA2, days, what) {
+    const W = 96, H = 20, w = W / days.length, max = Math.max(1, ...dA.map((v, i) => v + dA2[i]));
+    const bars = days.map((d, i) => {
+      const h1 = dA[i] / max * H, h2 = dA2[i] / max * H, x = (i * w).toFixed(1), bw = Math.max(1, w - 1).toFixed(1);
+      const tip = inDayName(d) + ', UTC\n' + (dA[i] + dA2[i] ? chN(dA[i]) + ' legacy ALERT, ' + chN(dA2[i]) + ' ALERT2' : 'nothing decoded');
+      return `<g><title>${esc(tip)}</title><rect class="bs-in-hit" x="${x}" y="0" width="${w.toFixed(1)}" height="${H}"></rect>`
+        + (h1 ? `<rect class="bs-in-a" x="${x}" y="${(H - h1).toFixed(1)}" width="${bw}" height="${h1.toFixed(1)}"></rect>` : '')
+        + (h2 ? `<rect class="bs-in-a2" x="${x}" y="${(H - h1 - h2).toFixed(1)}" width="${bw}" height="${h2.toFixed(1)}"></rect>` : '') + '</g>';
+    }).join('');
+    const none = dA.filter((v, i) => !(v + dA2[i])).length;
+    return `<svg class="bs-in-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(what)}: decoded messages a day, ${esc(days[0])} to ${esc(days[days.length - 1])}, at most ${esc(chN(max))} in a day${none ? ', nothing on ' + none + ' of them' : ''}">${bars}</svg>`;
+  }
+
+  const inIdText = e => (e.proto === 'alert2' ? 'ALERT2 ' : 'Legacy ID ') + e.id + (e.proto !== 'alert2' && e.type ? ' · ' + e.type : '');
+  const inMemberName = m => (m.station != null ? (inStn(m.station) || {}).name || m.station : 'Not in the register');
+
+  function inOpenHtml(g, b) {
+    const ms = g.members || [], days = b.dayList, tot = g.a + g.a2, idsMode = inBy === 'station';
+    const all = inOpenedAll.has(g.key), shown = all ? ms : ms.slice(0, IN_OPEN_TOP);
+    const what = idsMode ? (ms.length === 1 ? 'ID' : 'IDs') : (ms.length === 1 ? 'station' : 'stations');
+    const facts = [`<strong>${esc(chN(ms.length))} ${what}</strong>`];
+    if (ms.length > 5 && tot) facts.push(`the busiest 5 send ${Math.round(ms.slice(0, 5).reduce((n, m) => n + m.a + m.a2, 0) / tot * 100)}% of the row's messages`);
+    if (days) {
+      const quiet = ms.filter(m => m.quiet).length, few = ms.filter(m => m.days < Math.ceil(days.length / 2)).length;
+      if (quiet) facts.push(`<span class="txt-warn">${esc(chN(quiet))} ${inTerm('in-quiet', 'gone quiet')}</span>`);
+      if (few && days.length >= 3) facts.push(`${esc(chN(few))} decoded on fewer than half the days`);
+    }
+    if (inBy !== 'kind') {
+      const k = new Map();
+      for (const m of ms) for (const t of m.kinds) k.set(t, (k.get(t) || 0) + 1);
+      const top = [...k].sort((p, q) => q[1] - p[1] || String(p[0]).localeCompare(String(q[0])));
+      if (top.length) facts.push(top.slice(0, 4).map(([t, n]) => esc(t) + ' ' + esc(chN(n))).join(', ') + (top.length > 4 ? ', and ' + (top.length - 4) + ' more kinds' : ''));
+    }
+    const several = inAt === 'all' && b.several;
+    if (several) {
+      const h = new Map();
+      for (const m of ms) for (const l of m.at.keys()) h.set(l, (h.get(l) || 0) + 1);
+      facts.push('heard at ' + [...h].sort((p, q) => q[1] - p[1]).map(([l, n]) => esc(l) + ' (' + esc(chN(n)) + ')').join(', '));
+    }
+    let spark = '';
+    if (days) {
+      const dA = days.map((_, i) => ms.reduce((n, m) => n + m.dA[i], 0)), dA2 = days.map((_, i) => ms.reduce((n, m) => n + m.dA2[i], 0));
+      spark = `<div class="bs-in-ohead">${inSparkHtml(dA, dA2, days, 'The whole row')}<span class="small qs-dim">the whole row, a bar a day</span></div>`;
+    }
+    const heardAt = m => (several ? [...m.at].sort((p, q) => q[1] - p[1]).map(([l, n]) => `<div>${esc(l)} <span class="qs-dim">${esc(chN(n))}</span></div>`).join('')
+      + (m.at.size === 1 && m.only ? `<div class="qs-dim">only here</div>` : '') : m.only && b.several ? 'only here' : '<span class="qs-dim">—</span>');
+    const body = shown.map(m => `<tr>
+        ${idsMode ? '' : `<th scope="row">${m.station != null ? `<a href="${esc('?tab=stations&station=' + encodeURIComponent(m.station))}" onclick="return BaseStations.inStation(event, '${escAttr(m.station)}')" title="Open it on the Stations tab">${esc(inMemberName(m))}</a>` : '<span class="txt-warn">Not in the register</span>'}</th>`}
+        <${idsMode ? 'th scope="row"' : 'td'} class="small">${[...m.ids.values()].sort((p, q) => q.ok - p.ok).map(e => `<div>${esc(inIdText(e))}</div>`).join('')}</${idsMode ? 'th' : 'td'}>
+        <td class="small">${m.a ? esc(chN(m.a)) : '<span class="qs-dim">—</span>'}</td>
+        <td class="small">${m.a2 ? esc(chN(m.a2)) : '<span class="qs-dim">—</span>'}</td>
+        <td class="small">${tot ? ((m.a + m.a2) / tot * 100 < 1 ? 'under 1%' : Math.round((m.a + m.a2) / tot * 100) + '%') : ''}</td>
+        <td class="small">${days ? `${esc(chN(m.days))} of ${esc(chN(days.length))}${m.quiet ? `<div><span class="badge term-chip txt-warn" title="${esc(IN_WORDS.find(w => w[0] === 'in-quiet')[2])}">gone quiet</span></div>` : ''}` : '<span class="qs-dim">—</span>'}</td>
+        <td>${days ? inSparkHtml(m.dA, m.dA2, days, inMemberName(m)) : '<span class="qs-dim">—</span>'}</td>
+        <td class="small">${heardAt(m)}</td>
+      </tr>`).join('');
+    return `<div class="bs-in-open-in">
+        <p class="small">${facts.join(' · ')}</p>${spark}
+        <div class="table-wrap" role="region" tabindex="0" aria-label="The ${esc(what)} in ${esc(g.label)}"><table class="adm-table bs-in-m">
+          <caption class="sr-only">The ${esc(what)} in ${esc(g.label)}, busiest first: ${idsMode ? '' : 'the station, '}its IDs, legacy ALERT and ALERT2 messages decoded, its share of the row, the days it was decoded on, a bar a day and the base stations that heard it</caption>
+          <thead><tr>${idsMode ? '' : '<th scope="col">Station</th>'}<th scope="col">${idsMode ? 'ID' : 'IDs'}</th><th scope="col">${inTerm('in-legacy', 'Legacy ALERT')}</th><th scope="col">${inTerm('in-alert2')}</th>
+            <th scope="col">${inTerm('in-row-share')}</th><th scope="col">${inTerm('in-days')}</th><th scope="col">${inTerm('in-day-bars')}</th><th scope="col">${inTerm('in-heard-at')}</th></tr></thead>
+          <tbody>${body}</tbody></table></div>
+        <p class="small pill-row">${ms.length > IN_OPEN_TOP ? `<button type="button" class="pill" onclick="BaseStations.inOpenAll(this)">${all ? 'Show the busiest ' + IN_OPEN_TOP + ' only' : 'Show all ' + esc(chN(ms.length)) + ' ' + what}</button>` : ''}
+          <button type="button" class="pill" onclick="BaseStations.inOpenSave(this)">Save ${idsMode ? (ms.length === 1 ? 'this ID' : 'these IDs') : (ms.length === 1 ? 'this station' : 'these stations')} as CSV</button></p>
+        ${days ? '' : '<p class="small qs-dim">A bar a day for each needs db/migrations/0124_base_station_ingest_station_days.sql applied.</p>'}
+      </div>`;
   }
 
   // ── …and the ones nobody has registered (0114) ───────────────────────────
@@ -2323,15 +2451,56 @@ const BaseStations = (function () {
 
   function inGroup(by) {
     if (!IN_BY.some(q => q[0] === by) || by === inBy) return;
-    inBy = by; inMore = false;
+    inBy = by; inMore = false; inOpened = new Set(); inOpenedAll = new Set();
     paintIn();
   }
   function inFor(id) {
     if (String(id) === String(inAt)) return;
-    inAt = id; inMore = false;
+    inAt = id; inMore = false; inOpened = new Set(); inOpenedAll = new Set();
     paintIn();
   }
   function inAll() { inMore = !inMore; paintIn(); }
+
+  // A row opened out into its stations, or closed (0124): a click anywhere on
+  // it but a link or another button, or its ▸ from the keyboard.
+  function inOpen(ev, tr) {
+    if (ev && ev.target && ev.target.closest && ev.target.closest('a, button:not(.bs-in-open), .bs-in-sub')) return;
+    const k = tr && tr.dataset.k;
+    if (k == null) return;
+    if (inOpened.has(k)) inOpened.delete(k); else inOpened.add(k);
+    const b = tr.querySelector('.bs-in-open');
+    paintIn();
+    if (b && b.id && document.activeElement !== document.getElementById(b.id)) { const n = document.getElementById(b.id); if (n) n.focus({ preventScroll: true }); }
+  }
+  const inOpenKey = el => { const sub = el && el.closest('tr.bs-in-sub'), row = sub && sub.previousElementSibling; return row ? row.dataset.k : null; };
+  function inOpenAll(el) {
+    const k = inOpenKey(el);
+    if (k == null) return;
+    if (inOpenedAll.has(k)) inOpenedAll.delete(k); else inOpenedAll.add(k);
+    paintIn();
+  }
+  function inStation(ev, id) {
+    if (ev && (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey || ev.button === 1)) return true;
+    if (ev && ev.preventDefault) ev.preventDefault();
+    if (typeof goToStation === 'function') goToStation(id);
+    return false;
+  }
+  // The stations in an opened row, as a file: one line each, its days as columns.
+  function inOpenSave(el) {
+    const k = inOpenKey(el), b = k == null ? null : inBreak(), g = b && b.rows && b.rows.find(r => r.key === k);
+    if (!g || !g.members || !g.members.length) { announce('Nothing to save yet.'); return; }
+    const head = (IN_BY.find(q => q[0] === inBy) || [])[1], days = b.dayList || [];
+    const at = inAt === 'all' ? 'All base stations' : ((ing.r.stations || []).find(x => String(x.id) === String(inAt)) || {}).label || '';
+    const tot = g.a + g.a2;
+    const rows = [['Base station', head, 'Station', 'Register ID', 'IDs', 'Kind of sensor', 'Legacy ALERT decoded', 'ALERT2 decoded', 'Both', 'Share of the row %', 'Days decoded', 'Gone quiet', 'Heard at (decoded)']
+      .concat(days.map(d => d + ' decoded'))]
+      .concat(g.members.map(m => [at, g.label, inMemberName(m), m.station == null ? '' : m.station, [...m.ids.values()].map(inIdText).join('; '), [...m.kinds].join('; '),
+        m.a, m.a2, m.a + m.a2, tot ? ((m.a + m.a2) / tot * 100).toFixed(1) : '', days.length ? m.days : '', days.length ? (m.quiet ? 'yes' : '') : '',
+        [...m.at].map(([l, n]) => l + ' (' + n + ')').join('; ')].concat(days.map((_, i) => m.dA[i] + m.dA2[i]))));
+    const slug = String(g.label).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'row';
+    saveCsv('floodnet-base-station-ingest-' + inBy + '-' + slug + '-' + ing.r.days + 'd.csv', rows);
+    announce('Saved ' + (rows.length - 1) + ' stations.');
+  }
 
   // The breakdown on screen, every row of it, as a file.
   function inBreakSave() {
@@ -2936,7 +3105,7 @@ const BaseStations = (function () {
   }
 
   return { render, init, load, open, close, ask, askFrom, cancel, field, stick, resetForm, saveSettings,
-           keyField, addKey, removeKey, mailSet, authChanged, wfWindow, chWindow, stWindow, stSave, inWindow, inSave, inGroup, inFor, inAll, inBreakSave, sub, fold,
+           keyField, addKey, removeKey, mailSet, authChanged, wfWindow, chWindow, stWindow, stSave, inWindow, inSave, inGroup, inFor, inAll, inBreakSave, inOpen, inOpenAll, inOpenSave, inStation, sub, fold,
            // Pure, for test/basestations.mjs.
            _liveness: liveness, _flags: flags, _recoverHtml: recoverHtml, _lostHtml: lostHtml, _patchFrom: patchFrom, _formFrom: formFrom, _stickNowHtml: stickNowHtml, _parseChans: parseChans, _checksHtml: checksHtml, _decodersFor: decodersFor, _cmpVersion: cmpVersion, _lastInstall: lastInstall, _wfLoad: loadWf,
            _chRows: chRows, _chVerdict: chVerdict, _inRead: inRead };

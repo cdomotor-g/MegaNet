@@ -23327,6 +23327,24 @@ a.adm-kpi--go:hover::after, a.adm-kpi--go:focus-visible::after { color: var(--ac
 .pill.bs-in-go { color: var(--warn); border-color: currentColor; white-space: normal; text-align: left; }
 .bs-in-mix .bs-sw-in-a { background: var(--accent); }
 .bs-in-mix .bs-sw-in-a2 { background: var(--c-ident); }
+/* A row opened out into its stations (0124): ▸ turns to ▾, the stations in
+   a panel under the row, each with a bar a day to its own scale. */
+.bs-in-b tr.bs-in-can { cursor: pointer; }
+.bs-in-b tr.bs-in-can:hover > th, .bs-in-b tr.bs-in-can:hover > td, .bs-in-b tr.is-open > th, .bs-in-b tr.is-open > td { background: var(--panel-sub); }
+.bs-in-open { appearance: none; border: 0; background: none; color: var(--accent); font: inherit; padding: 0 var(--sp-1) 0 0; margin: 0; cursor: pointer; min-width: 1.4em; min-height: 1.4em; vertical-align: baseline; }
+.bs-in-open::before { content: '\25B8'; display: inline-block; transition: transform .15s ease; }
+.bs-in-open[aria-expanded="true"]::before { transform: rotate(90deg); }
+.bs-in-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.bs-in-b tr.bs-in-sub > td { background: var(--panel-sub); padding: var(--sp-2) var(--sp-3) var(--sp-3); border-left: 3px solid var(--accent); }
+.bs-in-open-in > p { margin: 0 0 var(--sp-2); }
+.bs-in-ohead { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.bs-in-ohead .bs-in-spark { width: 160px; height: 24px; }
+.bs-in-spark { display: block; width: 96px; height: 20px; }
+.bs-in-spark g:hover .bs-in-hit { opacity: .12; }
+.table-wrap table.bs-in-m { min-width: 38rem; background: var(--panel); }
+.bs-in-m td, .bs-in-m th { vertical-align: top; overflow-wrap: break-word; }
+.bs-in-m td > div + div, .bs-in-m th > div + div { margin-top: 2px; }
+@media (prefers-reduced-motion: reduce) { .bs-in-open::before { transition: none; } }
 
 /* ── A header's "?" (Repeaters listening) ────────────────────────────────────
    How-to text that every visit would otherwise pay for in card height, moved

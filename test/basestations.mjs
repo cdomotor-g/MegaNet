@@ -331,7 +331,13 @@ const FNS = {
     // 0112: each counted station by name — two legacy IDs of one registered
     // station, one nobody has registered, an ALERT2 repeater — and its paths.
     const REG = { id: 'amiens_knob_al' };   // in stations.json; the SLS names its owner
-    return { now: new Date(dbNow()).toISOString(), days: a.p_days, from: ago(a.p_days * 86400), to: ago(900), min_decodes: 3,
+    // 0124: each ID's decoded messages a day, one for each of day_list — spread
+    // evenly, or (quiet) all in the first days and nothing yesterday or today.
+    const nd = Math.min(a.p_days, 7), dayList = [...Array(nd)].map((_, i) => day(nd - 1 - i));
+    const spread = (t, quiet) => { const k = quiet ? Math.max(1, nd - 2) : nd, out = new Array(nd).fill(0);
+      for (let i = 0; i < k; i++) out[i] = Math.floor(t / k) + (i < t % k ? 1 : 0); return out; };
+    const id = (r, quiet) => r.concat([spread(r[2], quiet)]);
+    return { now: new Date(dbNow()).toISOString(), days: a.p_days, from: ago(a.p_days * 86400), to: ago(900), min_decodes: 3, day_list: dayList,
       network: [{ protocol: 'alert', ids: 150, known: 141 }, { protocol: 'alert2', ids: 12, known: 12 }],
       stations: [
         { id: 11, label: 'Mt Stuart hut', revoked: false, host_station: 'Mt Stuart', days: days(500, 1500),
@@ -339,8 +345,8 @@ const FNS = {
                       { protocol: 'alert2', n: 10600, ok: 10500, undecoded: 0, dup: 0, bad: 100, ids: 12, known: 12, only_here: 2, last: ago(30) }],
           receivers: [{ point_id: 'rx-1', protocol: 'alert', n: 4000, ok: 3500, ids: 120, last: ago(90), name: 'RTL-SDR 1' },
                       { point_id: 'rx-1', protocol: 'alert2', n: 10600, ok: 10500, ids: 12, last: ago(30), name: 'RTL-SDR 1' }],
-          ids: [['alert2', 65001, 9700, REG.id, null, true], ['alert', 9001, 2000, REG.id, 'Rainfall', false], ['alert', 9002, 1000, REG.id, 'Water Level', true],
-                ['alert', 7777, 400, null, null, true], ['alert2', 33300, 300, null, null, true]],
+          ids: [id(['alert2', 65001, 9700, REG.id, null, true]), id(['alert', 9001, 2000, REG.id, 'Rainfall', false]), id(['alert', 9002, 1000, REG.id, 'Water Level', true]),
+                id(['alert', 7777, 400, null, null, true], true), id(['alert2', 33300, 300, null, null, true])],
           // 0114: the two nobody has registered — a legacy ID on the council's
           // frequency, an ALERT2 address on the Bureau's, mostly through a repeater.
           site: { lat: -19.35, lon: 146.78 },
@@ -354,7 +360,7 @@ const FNS = {
           protocols: [{ protocol: 'alert', n: 2400, ok: 2100, undecoded: 300, dup: 0, bad: 0, ids: 120, known: 120, only_here: 0, last: ago(300) }],
           receivers: [{ point_id: 'rx-9', protocol: 'alert', n: 2400, ok: 2100, ids: 120, last: ago(300), name: null }],
           // …and a station two bodies own, which is under each of them
-          ids: [['alert', 9001, 2000, REG.id, 'Rainfall', false], ['alert', 9100, 100, 'billinudgel_marshal', 'Battery', true]], paths: [], strangers: [], site: null },
+          ids: [id(['alert', 9001, 2000, REG.id, 'Rainfall', false]), id(['alert', 9100, 100, 'billinudgel_marshal', 'Battery', true])], paths: [], strangers: [], site: null },
         { id: 14, label: 'Never heard', revoked: false, host_station: null, days: [], protocols: [], receivers: [] }] };
   },
   // Its receivers' own SNR shift by day (0083): RTL-SDR 1's ALERT stepped down
@@ -821,6 +827,48 @@ try {
   ok('…and a station owned jointly is under each of its owners, the page saying the rows then add up to more',
     by[2].join('|') === 'Byron Shire Council|1|100|—|100|under 1%' && by[3].join('|') === 'NSW DCCEEW|1|100|—|100|under 1%'
       && /counted under each of its owners/.test(await text('#bs-in-by')), JSON.stringify(by));
+  // …and a row opens out into its stations, each with a bar a day (0124)
+  ok('a row that can open says so, and none is open to begin with',
+    await page.evaluate(() => document.querySelectorAll('#bs-in-by tr.bs-in-can .bs-in-open[aria-expanded="false"]').length === 4
+      && !document.querySelector('#bs-in-by tr.bs-in-sub')));
+  await page.click('#bs-in-by tr.bs-in-can:has-text("Southern Downs Regional Council") td:nth-child(3)');
+  const subRows = () => page.evaluate(() => [...document.querySelectorAll('#bs-in-by tr.bs-in-sub table.bs-in-m tbody tr')].map(tr => [...tr.children].map(c => c.innerText.replace(/\s+/g, ' ').trim())));
+  let sub = await subRows();
+  const subText = (await text('#bs-in-by tr.bs-in-sub')).replace(/\s+/g, ' ');
+  ok('a click anywhere on a row opens it: its one station, its IDs together, heard at both base stations, a bar a day',
+    sub.length === 1 && sub[0][0] === 'Amiens Knob AL' && sub[0][1] === 'ALERT2 65001 Legacy ID 9001 · Rainfall Legacy ID 9002 · Water Level'
+      && sub[0].slice(2, 6).join('|') === '5,000|9,700|100%|7 of 7' && /Mt Stuart hut 12,700/.test(sub[0][7]) && /Depot roof 2,000/.test(sub[0][7])
+      && await page.evaluate(() => document.querySelectorAll('#bs-in-by tr.bs-in-sub table.bs-in-m tbody svg.bs-in-spark g').length === 7
+        && document.querySelector('#bs-in-by tr.is-open .bs-in-open').getAttribute('aria-expanded') === 'true'),
+    JSON.stringify(sub) + ' ' + subText);
+  ok('…with what is in it at a glance: how many, what kinds, where heard, and the whole row a bar a day',
+    /^1 station · ALERT2 repeater 1, Rainfall 1, Water Level 1 · heard at Mt Stuart hut \(1\), Depot roof \(1\)/.test(subText)
+      && await page.evaluate(() => !!document.querySelector('#bs-in-by tr.bs-in-sub .bs-in-ohead svg.bs-in-spark')), subText);
+  const sparkTip = await page.evaluate(() => [...document.querySelectorAll('#bs-in-by table.bs-in-m tbody svg.bs-in-spark g title')].pop().textContent);
+  ok('a station\'s bar says that day\'s numbers on hover', /, UTC\n(\d|,)+ legacy ALERT, (\d|,)+ ALERT2$/.test(sparkTip), sparkTip);
+  ok('the new headings carry their meanings, listed in the fold too',
+    await page.evaluate(() => { const th = [...document.querySelectorAll('#bs-in-by table.bs-in-m thead .term')]; return th.length === 6 && th.every(t => t.title.length > 40
+      && [...document.querySelectorAll('#bs-in dl.rd-words dd')].some(d => d.textContent === t.title)); }));
+  await page.click('#bs-in-by tr.bs-in-can:has-text("Not in the register") .bs-in-open');
+  ok('the ▸ opens a row from the keyboard as well, and two rows can be open at once',
+    await page.evaluate(() => document.querySelectorAll('#bs-in-by tr.bs-in-sub').length === 2));
+  sub = await page.evaluate(() => [...document.querySelectorAll('#bs-in-by tr.bs-in-sub')].pop().innerText.replace(/\s+/g, ' '));
+  ok('a station decoded earlier but not yesterday or today is marked gone quiet, and counted in the row\'s line',
+    /2 stations · 1 gone quiet/.test(sub) && /Legacy ID 7777 400 — 57% 5 of 7 gone quiet/.test(sub) && /ALERT2 33300 — 300 43% 7 of 7/.test(sub), sub);
+  const rowCsv = await page.evaluate(() => {
+    const keep = window.dlText; let got = null;
+    window.dlText = (name, text) => { got = { name, rows: text.replace(/^\ufeff/, '').trim().split('\r\n').map(l => l.split(',')) }; };
+    try { [...document.querySelectorAll('#bs-in-by tr.bs-in-sub button')].find(b => /Save this station as CSV/.test(b.textContent)).click(); } finally { window.dlText = keep; }
+    return got;
+  });
+  ok('an opened row\'s stations save as a file, a line each with its days as columns',
+    rowCsv && rowCsv.name === 'floodnet-base-station-ingest-owner-southern-downs-regional-council-7d.csv' && rowCsv.rows.length === 2
+      && rowCsv.rows[0].slice(0, 13).join('|') === 'Base station|Owner|Station|Register ID|IDs|Kind of sensor|Legacy ALERT decoded|ALERT2 decoded|Both|Share of the row %|Days decoded|Gone quiet|Heard at (decoded)'
+      && rowCsv.rows[0].length === 20 && /^\d{4}-\d\d-\d\d decoded$/.test(rowCsv.rows[0][13])
+      && rowCsv.rows[1].slice(0, 4).join('|') === 'All base stations|Southern Downs Regional Council|Amiens Knob AL|amiens_knob_al'
+      && rowCsv.rows[1].slice(13).reduce((n, v) => n + Number(v), 0) === 14700, JSON.stringify(rowCsv));
+  await page.click('#bs-in-by tr.is-open:has-text("Southern Downs Regional Council") th');
+  ok('a second click closes it', await page.evaluate(() => document.querySelectorAll('#bs-in-by tr.bs-in-sub').length === 1));
   await page.click('#bs-in-by button:has-text("Kind of sensor")');
   by = await byRows();
   ok('by kind of sensor: the legacy sensor\'s type, and for ALERT2 what the station is',

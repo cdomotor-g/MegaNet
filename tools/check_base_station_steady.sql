@@ -1,4 +1,4 @@
--- check_base_station_steady.sql — Prove 0111, 0112 and 0114: a base station's spectrum folded
+-- check_base_station_steady.sql — Prove 0111, 0112, 0114 and 0124: a base station's spectrum folded
 -- by the hour — per stick and tuning, each bin's lowest tenth and its median,
 -- closed hours only, from a watermark, once — and what comes in through each
 -- base station from the reception rollups: messages and stations by protocol,
@@ -263,6 +263,13 @@ begin
     and (s -> 'ids') @> '[["alert", 8273, 6, null, null, true]]'::jsonb
     and (s -> 'ids') @> '[["alert2", 65511, 20, "_check_bs_gauge", null, true]]'::jsonb
     and not (s -> 'ids')::text like '%8274%', s -> 'ids' #>> '{}');
+  -- 0124: each counted station's decoded messages a day, one for each of day_list
+  perform pg_temp.check_that('each counted station says its decoded messages on each day of the period, adding up to its total',
+    jsonb_array_length(r -> 'day_list') >= 1
+    and not exists (select 1 from jsonb_array_elements(s -> 'ids') e
+                     where jsonb_array_length(e -> 6) <> jsonb_array_length(r -> 'day_list')
+                        or (select pg_catalog.sum(d::text::bigint) from jsonb_array_elements(e -> 6) d) <> (e ->> 2)::bigint),
+    (r -> 'day_list')::text || ' ' || (s -> 'ids')::text);
   perform pg_temp.check_that('ALERT2 by the repeaters it came through, named where the register has the address',
     jsonb_array_length(s -> 'paths') = 1
     and (s -> 'paths' -> 0 -> 'path') = '[65511, 64999]'::jsonb and (s -> 'paths' -> 0 ->> 'ok')::int = 20 and (s -> 'paths' -> 0 ->> 'ids')::int = 1

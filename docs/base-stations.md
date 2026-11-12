@@ -283,6 +283,20 @@ writes every row of the one on screen.
 A station owned jointly is counted under each of its owners, so the owner rows
 can add up to more than the total; each share is of the total.
 
+**Open a row** (▸, or a click anywhere on it; `0124`) for the stations in it,
+busiest first. A line on top says how many there are, how much the busiest five
+carry, how many have **gone quiet** (decoded earlier in the period but not at
+all yesterday or today, UTC), what kinds of sensor they are and which base
+stations heard them, with the whole row drawn a bar a day. Then a line a
+station: its IDs (a register station's legacy IDs and ALERT2 address together;
+under *Station by station*, each ID apart), legacy ALERT and ALERT2 decoded,
+its share of the row, the days it was decoded on, **a bar a day** to its own
+scale (rest the pointer on a bar for that day's numbers), and where it was
+heard. **Save these stations as CSV** writes them with a column a day. Every
+row but *Relay path*, *Day by day* and *Too few to count* opens. The days come
+from the same rollup rows the rest of the table reads, so opening a row asks
+the database for nothing more.
+
 ### Not in the register — whose are they?
 
 **Not in the register** (`0114`; also the button on that row of any other
