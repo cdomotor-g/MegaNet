@@ -394,7 +394,11 @@ check('and the program refuses anything outside them',
 // So the danger is unchanged and the check keeps its teeth — it still fails if
 // any *gauge* claims the address — but the rig owning its own address is not
 // that danger.
-const RIGS = new Set(['bateson_test', 'elpro_test']);
+//
+// Since 0119 the Bateson rig is not a row of its own: its sensors, 8101
+// among them, are 18_bateson's — the base station the logger sits in, not a
+// gauge — so 18_bateson is the rig here.
+const RIGS = new Set(['18_bateson', 'elpro_test']);
 const stations = JSON.parse(fs.readFileSync(repo('stations.json'), 'utf8'));
 const registryIds = new Set();
 const rigIds = new Set();

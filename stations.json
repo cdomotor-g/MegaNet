@@ -1020,7 +1020,7 @@
     {
       "id": "18_bateson",
       "name": "18 Bateson",
-      "station_number": "",
+      "station_number": "999998",
       "lat": -27.39,
       "lon": 152.7791,
       "elevation_ahd": 524.4,
@@ -1039,8 +1039,40 @@
       },
       "rm_system_id": 1,
       "enabled": true,
-      "notes": "",
+      "notes": "The base station at 18 Bateson, with sensors wired to its logger in the workshop: a tipping bucket (rain), two SDI-12 level sensors (level_1, level_2) and the supply voltage (battery), posted as station number 999998, plus the logger's ALERT2 self-test on address 8101. These are bench readings for testing Flood-Net, not gauged rainfall or river levels. Until 12 November 2026 they were filed under a separate station, \"18 Bateson workshop test rig\" (bateson_test).",
       "legacy_unit_id": 2,
+      "sensors": [
+        {
+          "alert_id": null,
+          "type": "Rainfall",
+          "sensor_id": "rain",
+          "device_id": null
+        },
+        {
+          "alert_id": null,
+          "type": "Water Level",
+          "sensor_id": "level_1",
+          "device_id": null
+        },
+        {
+          "alert_id": null,
+          "type": "Water Level",
+          "sensor_id": "level_2",
+          "device_id": null
+        },
+        {
+          "alert_id": null,
+          "type": "Battery",
+          "sensor_id": "battery",
+          "device_id": null
+        },
+        {
+          "alert_id": 8101,
+          "type": "Self-test",
+          "sensor_id": "alert2_selftest",
+          "device_id": null
+        }
+      ],
       "hub_id": "brisbane"
     },
     {
@@ -242520,56 +242552,6 @@
           "alert_id": 9003,
           "type": "Battery",
           "sensor_id": "elpro_test_battery",
-          "device_id": null
-        }
-      ]
-    },
-    {
-      "id": "bateson_test",
-      "name": "18 Bateson workshop test rig",
-      "station_number": "999998",
-      "lat": null,
-      "lon": null,
-      "elevation_ahd": null,
-      "roles": [
-        "base"
-      ],
-      "radio_network_ids": [],
-      "catchment_ids": [],
-      "alert_ids": {},
-      "satcom": {},
-      "rm_system_id": null,
-      "enabled": true,
-      "notes": "The base station at 18 Bateson and the sensors wired to its logger — a tipping bucket, two SDI-12 level sensors and the supply voltage. Not a gauging station and not network data: it is where Flood-Net's ingest path is exercised live. Local channels post as station_number 999998 with a channel (s:999998/rain and so on); alert_id 8101 is the logger's ALERT2 self-test, which builds a real frame and feeds it to its own decoder. See logger/README.md and docs/live-end-to-end-test.md. No lat/lon on purpose — the site itself is on the map as 18_bateson. Not in stations.json, so document_managed is false and a stations load leaves it alone (0022). Retire with update meganet.station set deleted_at = now() where id = 'bateson_test'.",
-      "sensors": [
-        {
-          "alert_id": null,
-          "type": "Rainfall",
-          "sensor_id": "rain",
-          "device_id": null
-        },
-        {
-          "alert_id": null,
-          "type": "Water Level",
-          "sensor_id": "level_1",
-          "device_id": null
-        },
-        {
-          "alert_id": null,
-          "type": "Water Level",
-          "sensor_id": "level_2",
-          "device_id": null
-        },
-        {
-          "alert_id": null,
-          "type": "Battery",
-          "sensor_id": "battery",
-          "device_id": null
-        },
-        {
-          "alert_id": 8101,
-          "type": "Self-test",
-          "sensor_id": "alert2_selftest",
           "device_id": null
         }
       ]

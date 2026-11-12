@@ -304,8 +304,8 @@ T.link_fade_margin.push({ station_a_id: la, station_b_id: lb, kind: 'field', mar
   computed_at: '2026-09-01T00:00:00+00:00', computed_by: null });
 
 // Latest readings (#230): besides RICH, a station in a radio network RICH is
-// not in, a rain gauge whose clock runs half an hour fast, the two test rigs —
-// placed nowhere, one reporting by satellite address — two addresses no
+// not in, a rain gauge whose clock runs half an hour fast, the ELPRO test rig
+// (placed nowhere), 18 Bateson reporting by station-number address, two addresses no
 // station can be named for, and the deleted twin, whose readings must not
 // bring it back.
 const firstAlert = s => (s.sensors || []).find(x => x.alert_id != null);
@@ -314,12 +314,14 @@ const NETWORKED = live.find(s => (s.radio_network_ids || []).length && s.basin &
 const RAINY = NETWORKED && live.find(s => JSON.stringify(api.stationKinds(s)) === '["rain"]' && s.lat != null && firstAlert(s)
   && s.basin !== RICH.basin && s.basin !== NETWORKED.basin && !(s.radio_network_ids || []).includes(NETWORKED.radio_network_ids[0]));
 const ELPRO = live.find(s => s.id === 'elpro_test');
-const BATESON = live.find(s => s.id === 'bateson_test');
+// 18 Bateson: since 0119 the workshop rig's channels are the site's own, so a
+// placed station that reports on a station-number address.
+const BATESON = live.find(s => s.id === '18_bateson');
 // …and a second ELPRO channel, last heard hours before the first: a station's
 // latest_at is the newest of its channels, which only differing channels show.
 const ELPRO_SECOND = ELPRO && firstAlert(ELPRO)
   && (ELPRO.sensors || []).filter(x => x.alert_id != null && x.alert_id !== firstAlert(ELPRO).alert_id)[0];
-const latestFixtures = NETWORKED && RAINY && ELPRO && BATESON && ELPRO_SECOND && ELPRO.lat == null && BATESON.lat == null;
+const latestFixtures = NETWORKED && RAINY && ELPRO && BATESON && ELPRO_SECOND && ELPRO.lat == null && BATESON.lat != null;
 check('the latest-readings fixtures exist in stations.json', latestFixtures,
   `networked ${NETWORKED && NETWORKED.id}, rain-only ${RAINY && RAINY.id}, rigs ${ELPRO && ELPRO.id} ${BATESON && BATESON.id}`);
 if (!latestFixtures) {
@@ -1630,7 +1632,7 @@ const ageless = row => JSON.parse(JSON.stringify(row, (k, v) => (/^minutes_since
   const bc = bateson && bateson.channels[0];
   check('a satellite address is a channel like any other: its channel name, value and unit', bc && bateson.channels.length === 1
     && bc.addr === BATESON_ADDR && bc.channel === 'level_1' && bc.value_raw === 1.234 && bc.value === 1.234 && bc.unit === 'm'
-    && !('sensor_types' in bc) && bateson.lat === null, JSON.stringify(bateson));
+    && !('sensor_types' in bc) && bateson.lat != null, JSON.stringify(bateson));
   const elpro = row(ELPRO.id);
   check('…and a rig with no position is still a row, its ALERT address named by its sensor', elpro && elpro.lat === null
     && JSON.stringify(elpro.channels[0].sensor_types) === JSON.stringify([firstAlert(ELPRO).type])
@@ -1663,7 +1665,7 @@ const ageless = row => JSON.parse(JSON.stringify(row, (k, v) => (/^minutes_since
   const box = [RICH.lon - 0.05, RICH.lat - 0.05, RICH.lon + 0.05, RICH.lat + 0.05].map(x => Math.round(x * 1e4) / 1e4);
   const inside = await get(`/api/v1/readings/latest?bbox=${box.join(',')}`);
   check('bbox=west,south,east,north keeps the stations inside it, and none without a position', inside.status === 200
-    && sameList(idsOf(inside), expectLatest(inBox(box))) && idsOf(inside).includes(RICH.id) && !idsOf(inside).includes(BATESON.id),
+    && sameList(idsOf(inside), expectLatest(inBox(box))) && idsOf(inside).includes(RICH.id) && !idsOf(inside).includes(ELPRO.id),
     `${inside.status} ${idsOf(inside).join(' ')} ${inside.json && inside.json.detail}`);
   // A box around one site is the quick path: no read of the whole network.
   const small = [RICH.lon - 0.01, RICH.lat - 0.01, RICH.lon + 0.01, RICH.lat + 0.01].map(x => Math.round(x * 1e4) / 1e4);
@@ -2130,8 +2132,8 @@ section('GeoJSON');
       && fc.features.length === placed.length && fc.features.every((f, i) => f.id === placed[i].id
         && f.geometry.coordinates[0] === placed[i].lon && f.geometry.coordinates[1] === placed[i].lat
         && JSON.stringify(ageless(f.properties)) === JSON.stringify(ageless(placed[i]))), `${fc.features && fc.features.length} features`);
-  check('…the rigs with no position named in omitted_without_position, the total unchanged',
-    sameList([...fc.omitted_without_position.ids].sort(), [BATESON.id, ELPRO.id].sort()) && fc.total === heardIds.length
+  check('…the rig with no position named in omitted_without_position, the total unchanged',
+    sameList([...fc.omitted_without_position.ids].sort(), [ELPRO.id]) && fc.total === heardIds.length
       && fc.unattributed_addresses === plain.json.unattributed_addresses, JSON.stringify(fc.omitted_without_position));
   const first = await get('/api/v1/readings/latest?format=geojson&limit=2');
   const second = first.json.next ? await get(first.json.next.replace('https://floodwarning.net', '')) : null;

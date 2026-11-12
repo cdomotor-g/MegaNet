@@ -2,7 +2,8 @@
 //
 // The Field Data picker offered a station's sensors out of `stations.json` and
 // nothing else. For most of the network that is right and sufficient. For the
-// station this check is written against it is not even close:
+// station this check is written against it was not even close (until
+// db/migrations/0119 merged the rig into it; the check puts that shape back):
 //
 //   `18_bateson` is document-managed and carries no station number, no ALERT
 //   ids and no sensor rows, so `fieldAddrs()` returns an empty list, the picker
@@ -54,9 +55,10 @@ const ok = (name, cond, detail = '') => {
   console.log(`  FAIL ${name}${detail ? `\n         ${detail}` : ''}`);
 };
 
-// The rig as 0026 creates it, and the surveyed site as stations.json carries
-// it. The point of both being here is that they are two rows: the readings are
-// the rig's and the map pin is the site's.
+// The rig as 0026 created it, and the surveyed site as stations.json carried
+// it until 0119 merged the two. The point of both being here is that they are
+// two rows: the readings are the rig's and the map pin is the site's — the
+// general case of readings filed under a row the picked station is not.
 const RIG = {
   id: 'bateson_test', name: '18 Bateson workshop test rig', station_number: '999998',
   roles: ['base'], lat: null, lon: null, sensors: [
@@ -123,6 +125,13 @@ try {
     };
 
     state.data.stations.push(RIG);
+    // Since db/migrations/0119 the real 18_bateson carries the rig's sensors and
+    // number itself, and the rig row is gone. What this check is about is a
+    // station with nothing in the registry and its readings filed under another
+    // row, so 18 Bateson is put back here as it was before the merge — the
+    // shape the probe exists for, which any station can still be in.
+    const site = state.data.stations.find(s => s.id === '18_bateson');
+    if (site) { site.sensors = []; site.station_number = ''; site.alert_ids = {}; }
 
     // ── the filter, on its own ────────────────────────────────────────────
     // Asserted through the queries the probe actually issues, below; what is

@@ -34,12 +34,14 @@ Two things make it possible now, and they are independent. Use either, or both.
   allocation and changes nothing about what reaches Flood-Net. It also makes the
   self-test frame **binary** rather than ASCII, which is what this receiver
   actually emits — so the decoder under test is the decoder in use.
-- **`db/migrations/0026_bateson_test_rig.sql` has been applied.** Check it in one
-  line — if this returns nothing, stop and apply it:
+- **`db/migrations/0026_bateson_test_rig.sql` and `0119_one_18_bateson.sql` have
+  been applied.** Since `0119` the rig's sensors, its station number and its
+  readings are 18 Bateson's own (one station, not two). Check it in one line —
+  if this returns nothing, stop and apply them:
 
   ```sql
-  select id, station_number from meganet.station where id = 'bateson_test';
-  -- bateson_test | 999998
+  select id, station_number from meganet.station where id = '18_bateson' and station_number = '999998';
+  -- 18_bateson | 999998
   ```
 
   The self-test half works without it, but the reading resolves to nobody and
@@ -134,7 +136,7 @@ select r.addr, r.reading_ts, r.value_raw, r.value, r.unit,
   from meganet.reading r
   join meganet.protocol p on p.code = r.protocol
   join meganet.ingest_source s on s.code = r.source
- where r.station_id = 'bateson_test'
+ where r.station_id = '18_bateson'
  order by r.received_at desc
  limit 20;
 ```
@@ -206,9 +208,9 @@ cannot: *is the path from THIS site working, today, over THIS link.*
 Two things to know before firing one at a real site:
 
 - **The reading is real.** It is stored, it is on the Message Log, and it stays
-  there. It is addressed `a:8101` and resolves to `bateson_test`, so it is
-  distinguishable from network data by a query and never mixed in with a site's
-  own readings — but it is not a dry run and there is no undo. That is
+  there. It is addressed `a:8101` and, at 18 Bateson, resolves to `18_bateson`
+  (`0119`; it was `bateson_test` until then); its address and the Self-test
+  sensor type tell it apart from real readings — but it is not a dry run and there is no undo. That is
   deliberate: a path that knows it is being tested is not the path under test.
 - **Leave `TestEvery` at 0.** It is the interval, in minutes, for firing shots
   automatically, and it ships off. It is genuinely useful during a commissioning
@@ -216,12 +218,11 @@ Two things to know before firing one at a real site:
   it is a synthetic reading written into the live database forever if it is left
   on. Set it back before you leave site.
 
-To take the rig out of service entirely, without deleting the readings it
-explains:
-
-```sql
-update meganet.station set deleted_at = now() where id = 'bateson_test';
-```
+To take the rig's sensors off 18 Bateson without deleting the readings they
+sent, remove them in the station editor (or delete the five `meganet.sensor`
+rows for `18_bateson` named rain, level_1, level_2, battery and alert2_selftest)
+and clear its station number. Since `0119` there is no separate rig station to
+retire.
 
 ---
 
@@ -235,7 +236,7 @@ name almost every failure.
 | `LastReject` says `unknown protocol: wired` | `0026` has not been applied to the database this logger posts to. The radio readings in the same batch were stored; the local ones were not. Apply it — nothing on the logger needs to change |
 | `LastReject` says `no address: a reading needs an alert_id, or a station_number…` | A local reading was built without `LOCAL_NUMBER`. Check the Const is not empty |
 | `LastReject` says `unknown unit: …` | A `LocUnit()` entry is not in `meganet.unit`. `npm run logger` catches this before it ships |
-| Readings accepted, but the app shows `s:999998/rain` rather than a station name | The station row is missing or its number is not 999998. `select meganet.resolve_station(null, '999998');` should answer `bateson_test` |
+| Readings accepted, but the app shows `s:999998/rain` rather than a station name | The station row is missing or its number is not 999998. `select meganet.resolve_station(null, '999998');` should answer `18_bateson` (it was `bateson_test` before `0119`) |
 | Readings accepted, but the Message Log is empty | Almost always the clock. See *When readings arrive but the Message Log is empty* in [`logger/README.md`](../logger/README.md) — a logger on local time posts readings ten hours in the future, which are accepted and invisible |
 | `LastStatus` is `401` | The token. Mint and load a new one — [`ingest-http.md`](ingest-http.md) § Getting a token |
 | `LastStatus` is `404` | The `Content-Profile: meganet` header, or the URL. Neither changes per site |
@@ -268,7 +269,8 @@ renamed on the logger only, a fourth column added back to the ring buffer, and a
 `MAX_YEAR` set one year too generous. Each went red on the assertion it should
 have and on no others.
 
-`0026` asserts the rest at apply time — that both addresses resolve to
-`bateson_test` — and CI applies every migration from zero on every push. A rig
+`0026` asserted the rest at apply time — that both addresses resolve to
+`bateson_test` — and `0119`, which merged the rig into 18 Bateson, asserts they
+resolve to `18_bateson` now; CI applies every migration from zero on every push. A rig
 that half exists fails the migration rather than sending somebody to look at the
 logger.
