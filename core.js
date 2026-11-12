@@ -4109,7 +4109,7 @@ const DB_SCHEMA = 'meganet';
 // 123: what the base stations hear, for anybody (0123), applied by db-migrate.yml
 // on 12 November 2026, bumped after; telemetry.js reads it, and a database
 // without it says the Telemetry summary is not there yet and offers the demo.
-const DB_SCHEMA_VERSION = 123;
+const DB_SCHEMA_VERSION = 124;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
