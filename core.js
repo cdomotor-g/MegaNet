@@ -4106,7 +4106,10 @@ const DB_SCHEMA = 'meganet';
 // address for several stations, told apart by sensor (0121), applied by
 // db-migrate.yml on 12 November 2026, bumped after; no shape the app reads changes.
 // 122: Mt Glorious Primary and Secondary to AL-P and AL-B (0122), the same day; data only.
-const DB_SCHEMA_VERSION = 122;
+// 123: what the base stations hear, for anybody (0123), applied by db-migrate.yml
+// on 12 November 2026, bumped after; telemetry.js reads it, and a database
+// without it says the Telemetry summary is not there yet and offers the demo.
+const DB_SCHEMA_VERSION = 123;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
