@@ -419,7 +419,11 @@ const SiteFeatures = (function () {
   // benchmark can be off the screen its station is on.
   function stationsInView() {
     if (!map || !state.data) return [];
-    const b = map.getBounds().pad(0.5);
+    // Tilted, the camera sees far more than the flat map under it does: at a
+    // close zoom that map is a few hundred metres across and a station near
+    // the top of the screen, with its access track, would fall outside it.
+    const vb = tilted() && Map3D.viewBounds ? Map3D.viewBounds() : null;
+    const b = vb ? L.latLngBounds([vb[0], vb[1]], [vb[2], vb[3]]).pad(0.25) : map.getBounds().pad(0.5);
     const c = map.getCenter();
     const mid = [c.lat, c.lng];
     return state.data.stations

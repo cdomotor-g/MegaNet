@@ -4988,6 +4988,15 @@ const Map3D = (function () {
     // switch, signing in or out, a feature saved or shown from the card. Two
     // early returns while 3-D is shut.
     siteFeaturesChanged() { syncSiteFeat(); },
+    // What the tilted camera sees, as [south, west, north, east], or null
+    // while 3-D is shut. A tilted camera looks kilometres past the flat map
+    // under it, which shrinks as you zoom in, so the stations whose site
+    // features are drawn here are picked from this box (site-features.js).
+    viewBounds() {
+      if (!map || !ready || !state.map3d) return null;
+      const b = map.getBounds();
+      return [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()];
+    },
     // 🛣️ Route on map drew again or took its route down (map-drive.js), or a
     // drive took the route over or let it go (map-drive-mode.js). Two early
     // returns while 3-D is shut.
