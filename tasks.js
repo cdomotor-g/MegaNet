@@ -566,6 +566,47 @@ const Tasks = (function () {
       </div>`;
   }
 
+  // Scroll to zoom: the mouse wheel zooms the map (on unless switched off,
+  // and remembered on this device), or, switched off, scrolls the page past
+  // it. A button under + and −, pressed or not (aria-pressed).
+  const WHEEL_KEY = 'mn-tasks-map-wheel';
+  function wheelOn() {
+    try { return localStorage.getItem(WHEEL_KEY) !== 'off'; } catch (_) { return true; }
+  }
+  function wheelTitle(on) {
+    return on ? 'Scroll to zoom is on: the mouse wheel zooms the map. Press to have the wheel scroll the page instead.'
+      : 'Scroll to zoom is off: the mouse wheel scrolls the page. Press to have it zoom the map.';
+  }
+  function wheelControl() {
+    const C = L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd() {
+        const box = L.DomUtil.create('div', 'leaflet-bar tk-wheel');
+        const b = L.DomUtil.create('button', 'tk-wheel-btn', box);
+        b.type = 'button';
+        b.id = 'tk-map-wheel';
+        b.innerHTML = '<span aria-hidden="true">🖱️</span><span class="sr-only">Scroll to zoom</span>';
+        const paintBtn = () => {
+          const on = wheelOn();
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+          b.title = wheelTitle(on);
+          b.classList.toggle('is-on', on);
+        };
+        paintBtn();
+        L.DomEvent.disableClickPropagation(box);
+        L.DomEvent.on(b, 'click', () => {
+          const on = !wheelOn();
+          try { localStorage.setItem(WHEEL_KEY, on ? 'on' : 'off'); } catch (_) { /* this session only */ }
+          if (TM.map) { if (on) TM.map.scrollWheelZoom.enable(); else TM.map.scrollWheelZoom.disable(); }
+          paintBtn();
+          if (typeof announce === 'function') announce(on ? 'Scroll to zoom on.' : 'Scroll to zoom off: the wheel scrolls the page.');
+        });
+        return box;
+      },
+    });
+    return new C();
+  }
+
   function stopMap() {
     if (TM.map) TM.map = removeMap(TM.map);
     if (TM.el && TM.el.parentNode) TM.el.remove();
@@ -583,7 +624,8 @@ const Tasks = (function () {
     }
     slot.appendChild(TM.el);
     if (!TM.map) {
-      TM.map = L.map(TM.el, { scrollWheelZoom: false, zoomControl: true }).setView([-24, 147], 5);
+      TM.map = L.map(TM.el, { scrollWheelZoom: wheelOn(), zoomControl: true }).setView([-24, 147], 5);
+      wheelControl().addTo(TM.map);
       if (typeof registerLiveMap === 'function') registerLiveMap('Tasks', () => TM.map);
       if (typeof addBaseLayers === 'function') addBaseLayers(TM.map);
       TM.layer = L.layerGroup().addTo(TM.map);
@@ -1326,6 +1368,7 @@ const Tasks = (function () {
 
   return {
     render, init, load, authChanged, restoreFromUrl, cardHtml, cardAsk, parseHandoff,
+    _mapWheel: () => (TM.map ? TM.map.scrollWheelZoom.enabled() : null),
     WORDS, STATUS, PINS, forMe, mapRows, stationGroups, mergeOnScreen, pinIcon, pinTitle, pinPopupHtml, keyHtml,
     filter(k, v) {
       filt[k] = v;

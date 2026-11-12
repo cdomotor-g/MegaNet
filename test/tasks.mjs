@@ -561,6 +561,17 @@ try {
     mp.el && mp.pins.length === 2 && mp.pins.some(x => x.n === '1' && /mn-task-late/.test(x.cls))
     && mp.pins.some(x => x.n === '2' && /mn-task-in_progress/.test(x.cls)) && /3 tasks at 2 stations/.test(mp.note), J(mp));
   ok('…with a key whose every colour says what it means', mp.keys.length >= 5 && mp.keys.every(([, m]) => m.length > 25), J(mp.keys));
+  const wheel = () => q.evaluate(() => ({ pressed: document.getElementById('tk-map-wheel')?.getAttribute('aria-pressed'),
+    zooms: Tasks._mapWheel() }));
+  let wh = await wheel();
+  ok('scroll to zoom is on to begin with, and its button says so', wh.pressed === 'true' && wh.zooms === true, J(wh));
+  await q.click('#tk-map-wheel');
+  wh = await wheel();
+  const kept = await q.evaluate(() => localStorage.getItem('mn-tasks-map-wheel'));
+  ok('…pressed, the wheel scrolls the page instead, remembered on this device',
+    wh.pressed === 'false' && wh.zooms === false && kept === 'off', J({ wh, kept }));
+  await q.click('#tk-map-wheel');
+  ok('…and pressed again it zooms the map', J(await wheel()) === J({ pressed: 'true', zooms: true }));
   await q.evaluate(() => { window.__tkMap = document.getElementById('tk-map'); });
   await q.selectOption('#tk-f-status', 'any');
   mp = await mapNow();

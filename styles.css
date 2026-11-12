@@ -30428,3 +30428,7 @@ select.kl-in { width: auto; font-family: inherit; }
 @media (max-width: 640px) { .tk-map { height: 240px; } }
 /* In progress and Open share the accent: in progress is the filled one. */
 .mn-task-in_progress .mn-task-ring, .tk-key-sw.mn-task-in_progress { background: color-mix(in srgb, var(--tc) 30%, transparent); }
+/* The Tasks map's Scroll to zoom button (tasks.js wheelControl): lit while on. */
+.tk-wheel-btn { display: block; width: 30px; height: 30px; padding: 0; border: 0; background: var(--panel); color: var(--text); cursor: pointer; font-size: 15px; line-height: 30px; opacity: .55; }
+.tk-wheel-btn.is-on { opacity: 1; background: color-mix(in srgb, var(--accent) 22%, var(--panel)); }
+.tk-wheel-btn:focus-visible { outline: var(--focus-width) solid var(--focus); outline-offset: 1px; }
