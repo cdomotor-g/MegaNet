@@ -2303,8 +2303,11 @@ const ArroData = (function () {
   // `s:999998/rain`, `/level_1`, `/level_2` and `/battery`, filed against a
   // *second* station row (`bateson_test`) that db/migrations/0026 created
   // deliberately so that workshop rain could never be read as gauged rainfall.
-  // Both halves of that are right. What was missing was any way to get from
-  // one to the other without reading the migration.
+  // What was missing was any way to get from one to the other without reading
+  // the migration. (db/migrations/0119, 12 Nov 2026, merged the rig into
+  // 18_bateson at the owner's request, so 18 Bateson's own sensors find those
+  // channels now; the probe is still how any station whose readings are filed
+  // under another row gets found.)
   //
   // So: ask. The probe is a search over the four things a reading carries its
   // identity as — station_id, channel, station_number, alert_id — and it
@@ -2970,9 +2973,9 @@ const ArroData = (function () {
         const sensor = hit?.sensor || null;
         // Whose readings these are, according to the readings. An address
         // ticked out of the datastore probe can belong to another station
-        // entirely — 18 Bateson's four channels are stored under
-        // `bateson_test`, deliberately, so that workshop rain can never be
-        // read as gauged rainfall (db/migrations/0026) — and labelling them
+        // entirely — 18 Bateson's four channels were stored under
+        // `bateson_test` from db/migrations/0026 until 0119 merged the two —
+        // and labelling them
         // with whichever station the picker was showing would undo exactly
         // that separation. The picked station stands when the readings name
         // nobody, which is the 244 unresolved addresses' case.

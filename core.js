@@ -4057,7 +4057,7 @@ const DB_SCHEMA = 'meganet';
 // 118: tags on tasks (0118), applied by db-migrate.yml on 12 November 2026,
 // bumped after; tasks.js and admin-tags.js read them, and a database without
 // them shows no tags.
-const DB_SCHEMA_VERSION = 118;
+const DB_SCHEMA_VERSION = 119;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //
