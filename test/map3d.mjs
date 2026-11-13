@@ -1499,7 +1499,13 @@ if (pin) {
        JSON.stringify({ pin: a.pin, card: a.card }));
     // The svg is never a click target (pointer-events: none), which also hides
     // it from elementFromPoint — so it is made one for the length of the probe.
-    const painted = await page.evaluate(() => {
+    // The line draws itself in (drawIn, a dash animation); a slow runner can
+    // still be part-way through it, so the probe waits for it to finish.
+    const painted = await page.evaluate(async () => {
+      await Promise.all(document.getAnimations()
+        .filter(an => an.effect && an.effect.target && an.effect.target.classList
+                      && an.effect.target.classList.contains('mn-leader-line'))
+        .map(an => an.finished.catch(() => {})));
       const g = MapLeader.geometry(), svg = document.querySelector('.mn-leader');
       const cont = state.map.getContainer().getBoundingClientRect();
       const x = cont.left + (g.from.x + g.to.x) / 2, y = cont.top + (g.from.y + g.to.y) / 2;

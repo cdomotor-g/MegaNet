@@ -22629,6 +22629,9 @@ body.has-sort-bridge .signin-nudge { display: none; }
   .busy[data-state="spin"] .busy-out { animation: busy-glow 1.4s ease-in-out infinite alternate !important; }
   .busy .busy-in, .busy .busy-drop { animation: none !important; }
 
+  /* Base stations' "Whose it is" row arrow turns without easing. */
+  .bs-in-open::before { transition: none; }
+
   *,
   *::before,
   *::after {
@@ -23344,7 +23347,6 @@ a.adm-kpi--go:hover::after, a.adm-kpi--go:focus-visible::after { color: var(--ac
 .table-wrap table.bs-in-m { min-width: 38rem; background: var(--panel); }
 .bs-in-m td, .bs-in-m th { vertical-align: top; overflow-wrap: break-word; }
 .bs-in-m td > div + div, .bs-in-m th > div + div { margin-top: 2px; }
-@media (prefers-reduced-motion: reduce) { .bs-in-open::before { transition: none; } }
 
 /* ── A header's "?" (Repeaters listening) ────────────────────────────────────
    How-to text that every visit would otherwise pay for in card height, moved
