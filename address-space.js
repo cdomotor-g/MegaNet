@@ -458,8 +458,8 @@ const AddressSpace = (() => {
       <figcaption class="small">${meterHtml(t)} ${head} ${num(t.use + t.clash)} of ${plural(t.n, 'address', 'addresses')} in use
         (<b class="${fullCls(t.full)}">${t.full}% taken</b>) · ${num(t.alloc)} set aside · ${num(t.free)} free${t.clash ? ` · <span class="txt-bad">${num(t.clash)} held by two</span>` : ''}
         ${t.longest ? ` · longest free run <b>${t.longest.lo}–${t.longest.hi}</b> (${num(t.longest.n)})` : ''}
-        ${t.free ? ` · <button type="button" class="link-btn" onclick="AddressSpace.allocateIn(${escAttr(JSON.stringify(sc.id))})">Allocate here</button>` : ''}
-        ${sc.kind === 'rep' && typeof goToStation === 'function' ? ` · <button type="button" class="link-btn" onclick="goToStation(${escAttr(JSON.stringify(sc.reps[0].id))})">Open in Stations</button>` : ''}</figcaption>
+        ${t.free ? ` · <button type="button" class="link-btn" onclick="AddressSpace.allocateIn(${esc(JSON.stringify(sc.id))})">Allocate here</button>` : ''}
+        ${sc.kind === 'rep' && typeof goToStation === 'function' ? ` · <button type="button" class="link-btn" onclick="goToStation(${esc(JSON.stringify(sc.reps[0].id))})">Open in Stations</button>` : ''}</figcaption>
       <div class="chart-scroll" role="region" tabindex="0" aria-label="${escAttr(`${sc.name}'s address space — scroll sideways for the whole of it`)}">
         ${rulerSvg(I, sc, lanes)}
       </div></figure>`;
@@ -636,7 +636,7 @@ const AddressSpace = (() => {
     const carriers = by.length ? `carried by ${by.map(repName).join(', ')}`
       : every ? 'no repeater carries it' : `no repeater in ${esc(sc.hubs.map(h => hubName(I, h)).join(' or '))} carries it`;
     const open = s => (!plain && typeof goToStation === 'function'
-      ? `<button type="button" class="link-btn" onclick="goToStation(${escAttr(JSON.stringify(s.id))})">${esc(s.name)}</button>` : esc(s.name));
+      ? `<button type="button" class="link-btn" onclick="goToStation(${esc(JSON.stringify(s.id))})">${esc(s.name)}</button>` : esc(s.name));
     let what;
     if (every && hs.length) {
       // Hub by hub: reuse across hubs is ordinary; two in one hub is not.
@@ -649,7 +649,7 @@ const AddressSpace = (() => {
       // Every hub together, an address is allocated in a hub: through the
       // repeater that carries it, or not offered here.
       const where = by.length ? 'rep:' + by[0].id : sc.kind === 'hub' ? sc.id : every ? null : 'hub:' + sc.hubs[0];
-      what = `<b class="as-f-low">free${every ? ' in every hub' : ''}</b>${where && !plain ? ` <button type="button" class="link-btn" onclick="AddressSpace.allocateIn(${escAttr(JSON.stringify(where))}, ${a})">Allocate ${a}</button>` : ''}`;
+      what = `<b class="as-f-low">free${every ? ' in every hub' : ''}</b>${where && !plain ? ` <button type="button" class="link-btn" onclick="AddressSpace.allocateIn(${esc(JSON.stringify(where))}, ${a})">Allocate ${a}</button>` : ''}`;
     }
     return `<b>${a}</b> — ${what} · ${carriers}${sc.kind === 'net' && !sc.set.has(a) ? ' · outside this network\'s ranges' : ''}`;
   }
@@ -884,7 +884,7 @@ const AddressSpace = (() => {
       + `${c.clash ? ` · <span class="txt-bad">${num(c.clash)} held by two${every ? ' in one hub' : ''}</span>` : ''}${c.out ? ` · ${num(c.out)} outside the network's ranges` : ''}`;
     const LIMIT = rich ? 24 : 8;
     const label = x => (every ? `${x.r.name} (${hubName(I, x.r.hub)})` : x.r.name);
-    const name = x => (rich ? `<button type="button" class="link-btn" onclick="AddressSpace.showRep(${escAttr(JSON.stringify(x.r.id))})">${esc(label(x))}</button>` : esc(label(x)));
+    const name = x => (rich ? `<button type="button" class="link-btn" onclick="AddressSpace.showRep(${esc(JSON.stringify(x.r.id))})">${esc(label(x))}</button>` : esc(label(x)));
     const reps = c.reps.length
       ? `<p class="as-tip-h">Carried by ${plural(c.reps.length, 'repeater')}:</p>
         <ul class="hl-plain as-tip-reps">${c.reps.slice(0, LIMIT).map(x => `<li>${name(x)} <span class="small">${esc(runsText(x.part, 3))}${x.part.length > 1 ? ` (${num(x.part.length)})` : ''}</span></li>`).join('')}</ul>
@@ -901,7 +901,7 @@ const AddressSpace = (() => {
     if (first != null) {
       const by = (I.coverBy.get(first) || []).filter(r => sc.hubs.includes(r.hub));
       const where = by.length ? 'rep:' + by[0].id : sc.kind === 'hub' ? sc.id : every ? null : 'hub:' + sc.hubs[0];
-      if (where) act = ` · <button type="button" class="link-btn" onclick="AddressSpace.allocateIn(${escAttr(JSON.stringify(where))}, ${first})">Allocate ${first}</button>`;
+      if (where) act = ` · <button type="button" class="link-btn" onclick="AddressSpace.allocateIn(${esc(JSON.stringify(where))}, ${first})">Allocate ${first}</button>`;
     }
     act += ` · <button type="button" class="link-btn" onclick="AddressSpace.toGrid(${first ?? c.lo})">On the address grid</button>`;
     return `<p>${head} · ${counts}${act}</p>${reps}`;
@@ -1434,8 +1434,8 @@ const AddressSpace = (() => {
         m.bindPopup(`<b>${esc(r.name)}</b><br>${esc(r.nets.map(id => (I.nets.get(id) || {}).name || id).join(', ') || 'no radio network')} · ${esc(hubName(I, r.hub))}
           <br>${num(t.use + t.clash)} in use, ${num(t.alloc)} set aside, <b>${num(t.free)} free</b> of ${num(t.n)} (${t.full}% taken)
           ${t.longest ? `<br>Longest free run ${t.longest.lo}–${t.longest.hi} (${num(t.longest.n)})` : ''}
-          <br>${t.free ? `<button type="button" class="link-btn" onclick="AddressSpace.allocateIn(${escAttr(JSON.stringify('rep:' + r.id))})">Allocate here</button> · ` : ''}
-          <button type="button" class="link-btn" onclick="AddressSpace.showRep(${escAttr(JSON.stringify(r.id))})">Its address space</button>`);
+          <br>${t.free ? `<button type="button" class="link-btn" onclick="AddressSpace.allocateIn(${esc(JSON.stringify('rep:' + r.id))})">Allocate here</button> · ` : ''}
+          <button type="button" class="link-btn" onclick="AddressSpace.showRep(${esc(JSON.stringify(r.id))})">Its address space</button>`);
       } else {
         m.on('click', () => {
           const b = L.latLngBounds(c.lls);
@@ -1664,7 +1664,7 @@ const AddressSpace = (() => {
           <td class="small col-optional">${b.rep ? esc(name(b.rep)) : 'straight to a base'}</td>
           <td class="small col-optional">${esc(b.by || '—')}<br>${esc(day(b.at))}</td>
           <td class="small">${b.taken.length ? `<span class="txt-ok">taken up by ${b.taken.map(s => esc(s.name)).join(', ')}</span>` : 'waiting'}</td>
-          <td>${mayWrite() ? `<button type="button" class="pill" onclick="AddressSpace.release(${escAttr(JSON.stringify(b.batch))})">Release</button>` : ''}</td>
+          <td>${mayWrite() ? `<button type="button" class="pill" onclick="AddressSpace.release(${esc(JSON.stringify(b.batch))})">Release</button>` : ''}</td>
         </tr>`).join('')}</tbody></table></div>
       <p class="small">An address taken up by a station is that station's now — release the allocation to tidy the list. Releasing one that is still waiting
         makes it free again.</p>`;

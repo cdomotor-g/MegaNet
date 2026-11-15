@@ -1245,7 +1245,7 @@ const MapAcma = (() => {
               <th scope="col">${term('nearmiss', 'Just past a circle')}</th><th scope="col">${term('farout', 'Well outside')}</th>
               <th scope="col">${term('nochan', 'No licence on its channel')}</th>
               <th scope="col" title="The holder whose point-to-multipoint transmitter is nearest to most of this owner’s none-found stations.">Nearest holder</th></tr></thead>
-            <tbody>${noneByOwner().map(o => `<tr class="sites-row-go${noneOwner === o.owner ? ' is-lit' : ''}" onclick="MapAcma.set('noneOwner', ${escAttr(JSON.stringify(o.owner))})">
+            <tbody>${noneByOwner().map(o => `<tr class="sites-row-go${noneOwner === o.owner ? ' is-lit' : ''}" onclick="MapAcma.set('noneOwner', ${esc(JSON.stringify(o.owner))})">
               <td><button type="button" class="link-btn">${esc(o.owner)}</button></td><td class="num">${o.n}</td><td class="num">${o.near || '—'}</td>
               <td class="num">${o.far || '—'}</td><td class="num">${o.nochan || '—'}</td><td>${esc(o.holder) || '<span class="lic-muted">—</span>'}</td></tr>`).join('')}</tbody></table></div>
           ${noneOwner ? `<p class="small">Listing only <strong>${esc(noneOwner)}</strong> above. <button type="button" class="link-btn" onclick="MapAcma.set('noneOwner', '')">Show every owner</button></p>` : ''}

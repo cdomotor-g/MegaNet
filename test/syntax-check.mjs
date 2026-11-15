@@ -35,9 +35,28 @@ for (const s of scripts) {
   }
 }
 
+// Two ways to put a name into the page unescaped that parse perfectly well.
+// escAttr is for a value inside '…' in an attribute; around JSON.stringify it
+// doubles the backslash JSON put before a quote, and the quote ends the
+// string — esc(JSON.stringify(x)) is the form. And Leaflet writes a tooltip or
+// popup string as HTML, so a name goes in through esc().
+const { readFileSync } = await import('node:fs');
+const UNSAFE = [
+  [/escAttr\(JSON\.stringify\(/, 'escAttr(JSON.stringify(…)) — use esc(JSON.stringify(…))'],
+  [/\.(bindTooltip|bindPopup)\(`[^`]*\$\{[\w.]*\.name\}/, 'a name in a Leaflet tooltip or popup without esc()'],
+];
+for (const s of scripts) {
+  readFileSync(s.path, 'utf8').split('\n').forEach((line, i) => {
+    for (const [re, why] of UNSAFE) if (re.test(line)) {
+      failed++;
+      console.log(`  ✗ ${path.relative(REPO_ROOT, s.path)}:${i + 1} ${why}`);
+    }
+  });
+}
+
 console.log('');
 if (failed) {
-  console.log(`FAIL — ${failed} of ${scripts.length} script(s) did not parse.`);
+  console.log(`FAIL — ${failed} problem(s) in ${scripts.length} script(s): a script that did not parse, or a name put in the page unescaped.`);
   process.exit(1);
 }
 console.log(`PASS — ${scripts.length} script(s) parse.`);

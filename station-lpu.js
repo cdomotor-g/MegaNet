@@ -321,7 +321,7 @@ const StationLpu = (function () {
         <div class="ef-field">
           <span class="ef-cap"><label for="ef-lpu-type">${cap('lpu_type_key')}</label></span>
           <input type="text" id="ef-lpu-type" list="ef-lpu-types" value="${escAttr(typeDefault)}" autocomplete="off" spellcheck="false"
-                 placeholder="not recorded — e.g. ERT-A2, CR300"${newType ? ` data-new-type="${escAttr(JSON.stringify(newType))}"` : ''}
+                 placeholder="not recorded — e.g. ERT-A2, CR300"${newType ? ` data-new-type="${esc(JSON.stringify(newType))}"` : ''}
                  ${typeText !== typeDefault ? ` data-lpu-draft="${escAttr(typeText)}"` : ''}
                  onchange="StationLpu.typed(this)"${dis}>
           ${provHtml('lpu_type_key', typeProv, may && typeText === typeDefault, draft)}
