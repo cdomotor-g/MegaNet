@@ -870,7 +870,7 @@ const SignalRoutes = (() => {
     const rxs = [...new Set(F0.map(r => r.R))];
     const chip = (col, id, word, n) => {
       const on = S.pick && S.pick.col === col && S.pick.id === id;
-      return `<button class="btn btn-sm${on ? ' btn-primary' : ''}" aria-pressed="${on}" onclick="SignalRoutes.pick('${col}', ${escAttr(JSON.stringify(id))})">${esc(word)} <span class="small">${num(n)}</span></button>`;
+      return `<button class="btn btn-sm${on ? ' btn-primary' : ''}" aria-pressed="${on}" onclick="SignalRoutes.pick('${col}', ${esc(JSON.stringify(id))})">${esc(word)} <span class="small">${num(n)}</span></button>`;
     };
     return `<div class="control-row" role="group" aria-label="Protocol">
         ${modes.map(([m, w]) => `<button class="btn${S.mode === m ? ' btn-primary' : ''}" aria-pressed="${S.mode === m}" onclick="SignalRoutes.setMode('${m}')">${esc(w)}</button>`).join('')}
@@ -929,7 +929,7 @@ const SignalRoutes = (() => {
     const body = S.mode === 'alert2'
       ? shown.map(r => {
         const s = A.a2.sources.get(r.src);
-        return `<tr><th scope="row"><button class="link-btn" onclick="SignalRoutes.pick('l', ${escAttr(JSON.stringify('a2:' + r.src))})">${esc(keyName(A.reg, 'a2:' + r.src))}</button>
+        return `<tr><th scope="row"><button class="link-btn" onclick="SignalRoutes.pick('l', ${esc(JSON.stringify('a2:' + r.src))})">${esc(keyName(A.reg, 'a2:' + r.src))}</button>
           ${s && s.carried.size ? `<br><span class="small">carries ${plural(s.carried.size, 'ALERT address', 'ALERT addresses')}</span>` : ''}</th>
           <td>${esc(viaWord(A, 'p:' + r.path.join('>')))}</td><td>${esc(rxLong(A, r.pt))}</td><td class="num">${num(r.n)}</td><td class="num">${num(r.dup)}</td></tr>`;
       }).join('')
@@ -937,7 +937,7 @@ const SignalRoutes = (() => {
         const st = keyStation(A.reg, r.key);
         const d = fromBase(st, r.pts);
         const ways = [...r.via.entries()].sort((a, b) => b[1] - a[1]);
-        return `<tr><th scope="row"><button class="link-btn" onclick="SignalRoutes.pick('l', ${escAttr(JSON.stringify(r.key))})">${esc(keyName(A.reg, r.key))}</button>
+        return `<tr><th scope="row"><button class="link-btn" onclick="SignalRoutes.pick('l', ${esc(JSON.stringify(r.key))})">${esc(keyName(A.reg, r.key))}</button>
             <br><span class="small">${[...r.addrs].sort((a, b) => a - b).map(a => esc(String(a))).join(', ')}</span></th>
           <td>${ways.map(([v, n]) => `<span class="sr-sw ${viaCls(v)}" aria-hidden="true"></span>${esc(viaWord(A, v))} <span class="small">${num(n)}</span>`).join('<br>')}</td>
           <td class="small">${[...r.pts].map(x => esc(rxName(A, x))).join(', ')}</td><td class="num">${num(r.n)}</td><td class="num">${kmText(d)}</td></tr>`;
@@ -965,7 +965,7 @@ const SignalRoutes = (() => {
       const conf = r.confirmed.size, else_ = r.elsewhere.size, copies = r.offrec.filter(o => o.evidence === 'copies').length, poss = r.offrec.filter(o => o.evidence === 'possible').length;
       const sel = S.rep === r.rid;
       return `<tr class="${sel ? 'is-selected' : ''}">
-        <th scope="row"><button class="link-btn" aria-pressed="${sel}" onclick="SignalRoutes.pickRep(${escAttr(JSON.stringify(r.rid))})">${esc(r.name)}</button>
+        <th scope="row"><button class="link-btn" aria-pressed="${sel}" onclick="SignalRoutes.pickRep(${esc(JSON.stringify(r.rid))})">${esc(r.name)}</button>
           <br><span class="small">${r.ranges.map(q => `${q.low}–${q.high}`).join(', ') || 'no pass ranges'}${r.exclusions.length ? ` · except ${r.exclusions.map(q => `${q.low}–${q.high}`).join(', ')}` : ''}</span></th>
         <td class="num">${r.centre == null ? '—' : `${r.centre > 0 ? '+' : ''}${Math.round(r.centre)} Hz`}${r.spread > 40 ? `<br><span class="small">±${Math.round(r.spread / 2)} over the days</span>` : ''}</td>
         <td class="num">${num(r.days)}</td>
@@ -1094,8 +1094,8 @@ const SignalRoutes = (() => {
     return `<div class="sr-detail">
       <p class="small">${esc(r.name)}: carrier ${r.centre == null ? '—' : `${r.centre > 0 ? '+' : ''}${Math.round(r.centre)} Hz`} from the channel, found on
         ${plural(r.days, 'day')} by ${r.pts.map(x => esc(rxLong(A, x))).join(', ')}. ${r.rx != null || r.tx != null ? `On record it listens on ${esc(String(r.rx ?? '—'))} and sends on ${esc(String(r.tx ?? '—'))} MHz.` : ''}
-        ${st && typeof goToStation === 'function' ? `<button class="link-btn" onclick="goToStation(${escAttr(JSON.stringify(st.id))})">Open it in Stations</button>` : ''}
-        <button class="link-btn" onclick="SignalRoutes.pick('m', ${escAttr(JSON.stringify('rep:' + r.rid))}); SignalRoutes.scrollTo('sr-h-routes')">Its routes</button></p>
+        ${st && typeof goToStation === 'function' ? `<button class="link-btn" onclick="goToStation(${esc(JSON.stringify(st.id))})">Open it in Stations</button>` : ''}
+        <button class="link-btn" onclick="SignalRoutes.pick('m', ${esc(JSON.stringify('rep:' + r.rid))}); SignalRoutes.scrollTo('sr-h-routes')">Its routes</button></p>
       ${r.offrec.length ? `<h5>Off its record</h5><ul class="hl-plain">${r.offrec.map(o => `<li class="${o.evidence === 'copies' ? 'txt-bad' : ''}"><b>${esc(String(o.a))}</b> ${esc(name(o.a))} —
         ${o.evidence === 'copies' ? `${plural(o.dup, 'copy', 'copies')} on its carrier a second after the original: it relays this address, and no range on record says so`
           : `${plural(o.own, 'burst')} on its carrier, no copies: it may relay it, or the station's own carrier sits within 30 Hz of this one`}</li>`).join('')}</ul>` : ''}
@@ -1330,12 +1330,12 @@ const SignalRoutes = (() => {
       if (r.n < 2) return;
       if (r.via === 'own' && placed(base)) {
         const k = r.key + '>' + base.id;
-        if (!lines.has(k)) { lines.add(k); L.polyline([ll(st), ll(base)], { color: col.direct, weight: 1.2, opacity: 0.55 }).bindTooltip(`${st.name} → ${base.name}, direct: ${num(r.n)} bursts`).addTo(S.layer); }
+        if (!lines.has(k)) { lines.add(k); L.polyline([ll(st), ll(base)], { color: col.direct, weight: 1.2, opacity: 0.55 }).bindTooltip(esc(`${st.name} → ${base.name}, direct: ${num(r.n)} bursts`)).addTo(S.layer); }
       } else if (r.via.startsWith('rep:')) {
         const rep = A.reg.byId.get(r.via.slice(4));
         if (!placed(rep)) return;
         const k = r.key + '>' + rep.id;
-        if (!lines.has(k)) { lines.add(k); L.polyline([ll(st), ll(rep)], { color: col.relay, weight: 1.6, opacity: 0.7 }).bindTooltip(`${st.name} → ${rep.name}: ${num(r.n)} bursts on its carrier`).addTo(S.layer); }
+        if (!lines.has(k)) { lines.add(k); L.polyline([ll(st), ll(rep)], { color: col.relay, weight: 1.6, opacity: 0.7 }).bindTooltip(esc(`${st.name} → ${rep.name}: ${num(r.n)} bursts on its carrier`)).addTo(S.layer); }
         const u = repUsed.get(rep.id) || { rep, n: 0, bases: new Set() };
         u.n += r.n; if (placed(base)) u.bases.add(base); repUsed.set(rep.id, u);
       } else if (r.via.startsWith('unk:') && S.gaps) {
@@ -1346,13 +1346,13 @@ const SignalRoutes = (() => {
         if (!lines.has(k)) {
           lines.add(k);
           L.polyline([ll(st), ll(rep)], { color: col.off, weight: 1.6, dashArray: '6 5', opacity: 0.8 })
-            .bindTooltip(`${st.name}: ${num(r.n)} copies on ${hz(m.centre)}, probably ${rep.name} relaying it`).addTo(S.layer);
+            .bindTooltip(esc(`${st.name}: ${num(r.n)} copies on ${hz(m.centre)}, probably ${rep.name} relaying it`)).addTo(S.layer);
         }
       }
     });
     repUsed.forEach(u => u.bases.forEach(b => {
       L.polyline([ll(u.rep), ll(b)], { color: col.relay, weight: 2 + Math.min(6, Math.sqrt(u.n) / 6), opacity: 0.85 })
-        .bindTooltip(`${u.rep.name} → ${b.name}: ${num(u.n)} bursts relayed`).addTo(S.layer);
+        .bindTooltip(esc(`${u.rep.name} → ${b.name}: ${num(u.n)} bursts relayed`)).addTo(S.layer);
     }));
     // Where pass ranges and carriers disagree.
     if (S.gaps) {
@@ -1362,7 +1362,7 @@ const SignalRoutes = (() => {
           const st = keyStation(A.reg, o.key);
           if (!placed(st) || (p && p.col === 'l' && p.id !== o.key)) return;
           L.polyline([ll(st), ll(r.st)], { color: col.off, weight: 2, dashArray: '6 5', opacity: o.evidence === 'copies' ? 0.95 : 0.55 })
-            .bindTooltip(`${st.name} on ${r.name}'s carrier, in no range on record (${num(o.dup)} copies, ${num(o.own)} other bursts)`).addTo(S.layer);
+            .bindTooltip(esc(`${st.name} on ${r.name}'s carrier, in no range on record (${num(o.dup)} copies, ${num(o.own)} other bursts)`)).addTo(S.layer);
           if (!stDone.has(o.key)) stDone.set(o.key, { st, n: o.dup + o.own, via: new Map([['unexplained', o.dup + o.own]]) });
         });
         if (p && p.col === 'm' && p.id === 'rep:' + r.rid) {
@@ -1370,7 +1370,7 @@ const SignalRoutes = (() => {
             const st = keyStation(A.reg, stationKey(A.reg, a));
             if (!placed(st)) return;
             L.polyline([ll(st), ll(r.st)], { color: col.els, weight: 1.2, dashArray: '3 5', opacity: 0.8 })
-              .bindTooltip(`${st.name} is in ${r.name}'s range, and was heard ${num(e.n)} times — never on its carrier`).addTo(S.layer);
+              .bindTooltip(esc(`${st.name} is in ${r.name}'s range, and was heard ${num(e.n)} times — never on its carrier`)).addTo(S.layer);
           });
         }
       });
@@ -1382,7 +1382,7 @@ const SignalRoutes = (() => {
       const s = A.stations.get(key);
       const a2 = s && s.a2n > 0;
       const m = L.circleMarker(ll(d.st), { radius: 3 + Math.min(5, Math.sqrt(d.n) / 3), weight: a2 ? 3 : 1, color: a2 ? col.a2 : c, fillColor: c, fillOpacity: 0.75 });
-      m.bindTooltip(`${d.st.name}: ${num(d.n)} bursts — ${[...d.via.entries()].map(([v, n]) => `${viaWord(A, v)} ${num(n)}`).join(', ')}${a2 ? '; carried on ALERT2 too' : ''}`);
+      m.bindTooltip(esc(`${d.st.name}: ${num(d.n)} bursts — ${[...d.via.entries()].map(([v, n]) => `${viaWord(A, v)} ${num(n)}`).join(', ')}${a2 ? '; carried on ALERT2 too' : ''}`));
       m.on('click', () => pick('l', key));
       m.addTo(S.layer);
       pts.push(ll(d.st));
@@ -1392,14 +1392,14 @@ const SignalRoutes = (() => {
       if (!placed(r.st)) return;
       const sel = p && p.col === 'm' && p.id === 'rep:' + r.rid;
       const m = L.circleMarker(ll(r.st), { radius: 7 + Math.min(8, Math.sqrt(r.n) / 4), weight: sel ? 4 : 2, color: col.relay, fillColor: cssVar('--panel', '#fff'), fillOpacity: 0.95 });
-      m.bindTooltip(`${r.name}: carrier found on ${plural(r.days, 'day')}, ${plural(r.confirmed.size, 'address', 'addresses')} relayed${r.offrec.length ? `, ${num(r.offrec.length)} off its record` : ''}`);
+      m.bindTooltip(esc(`${r.name}: carrier found on ${plural(r.days, 'day')}, ${plural(r.confirmed.size, 'address', 'addresses')} relayed${r.offrec.length ? `, ${num(r.offrec.length)} off its record` : ''}`));
       m.on('click', () => pick('m', 'rep:' + r.rid));
       m.addTo(S.layer);
       pts.push(ll(r.st));
     });
     bases.forEach(b => {
       L.marker(ll(b), { icon: L.divIcon({ className: 'sr-base-icon', html: '<span aria-hidden="true">▣</span>', iconSize: [18, 18] }), title: b.name, alt: `Base station ${b.name}` })
-        .bindTooltip(`${b.name} — the base station`).addTo(S.layer);
+        .bindTooltip(esc(`${b.name} — the base station`)).addTo(S.layer);
       pts.push(ll(b));
     });
     if (pts.length && !S.fitted) { try { S.map.fitBounds(pts, { padding: [24, 24], maxZoom: 10 }); S.fitted = true; } catch (_) { /* one point */ } }

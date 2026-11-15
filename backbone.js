@@ -1263,19 +1263,19 @@ const Backbone = (() => {
           color: quiet ? cssVar('--bad', '#c7401a') : cssVar('--muted', '#4f6478'), dashArray: quiet ? null : '3 4' }).addTo(S.layer);
         L.circleMarker([s.lat, s.lon], { radius: quiet ? 4 : 3, weight: 1, fillOpacity: 0.8,
           color: quiet ? cssVar('--bad', '#c7401a') : cssVar('--accent', '#0b5cab') })
-          .bindTooltip(`${s.name}${quiet ? ' — quiet now' : ''}${pick.R.only.includes(s) ? ' (only through this repeater)' : ''}`).addTo(S.layer);
+          .bindTooltip(esc(`${s.name}${quiet ? ' — quiet now' : ''}${pick.R.only.includes(s) ? ' (only through this repeater)' : ''}`)).addTo(S.layer);
         pts.push([s.lat, s.lon]);
       });
     }
     stations().filter(s => (s.roles || []).includes('base') && placed(s)).forEach(s => {
       L.marker([s.lat, s.lon], { icon: L.divIcon({ className: 'bk-base-icon', html: '◆', iconSize: [14, 14] }), keyboard: false })
-        .bindTooltip(`${s.name} (base station)`).addTo(S.layer);
+        .bindTooltip(esc(`${s.name} (base station)`)).addTo(S.layer);
     });
     A.rows.filter(r => r.level !== 'info').reverse().forEach(r => {
       if (!placed(r.R.st)) return;
       const m = L.circleMarker([r.R.st.lat, r.R.st.lon], { radius: 5 + Math.min(12, Math.sqrt(r.score)), weight: S.pick === r.id ? 3 : 1.5,
         color: colour(r), fillOpacity: 0.65 });
-      m.bindTooltip(`${r.rank}. ${r.name} — ${r.resolved ? 'cleared' : SEV[r.level].label.toLowerCase()}, score ${Math.round(r.score)}: ${r.issues.slice(0, 2).map(i => i.short).join('; ')}`);
+      m.bindTooltip(esc(`${r.rank}. ${r.name} — ${r.resolved ? 'cleared' : SEV[r.level].label.toLowerCase()}, score ${Math.round(r.score)}: ${r.issues.slice(0, 2).map(i => i.short).join('; ')}`));
       m.on('click', () => showOnMap(r.id));
       m.addTo(S.layer);
       if (!pick) pts.push([r.R.st.lat, r.R.st.lon]);

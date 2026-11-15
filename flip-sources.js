@@ -324,7 +324,7 @@ const FlipSources = (() => {
       placed.set(s.addr, st);
       const m = L.circleMarker([st.lat, st.lon], { radius: 2 + Math.min(8, Math.sqrt(Number(s.n))), weight: 1,
         color: cssVarOr('--accent', '#0b5cab'), fillOpacity: 0.35 });
-      m.bindTooltip(`${st.name} (${s.addr}): ${s.n} corrupted`);
+      m.bindTooltip(esc(`${st.name} (${s.addr}): ${s.n} corrupted`));
       m.addTo(S.layer);
       pts.push([st.lat, st.lon]);
     });
@@ -348,7 +348,7 @@ const FlipSources = (() => {
       if (lat == null || lon == null) return;
       const m = L.circleMarker([lat, lon], { radius: 5 + Math.min(10, Math.sqrt(Number(c.blame) || 0)), weight: S.selected === c.rid ? 3 : 1.5,
         color: colourOf(c, d), fillOpacity: 0.7 });
-      m.bindTooltip(`${c.name || c.rid}: ${verdict(c, d).word} — ${c.by_carrier} by carrier, ${c.blame} by pass range, rate ${pct(c.rate)}`);
+      m.bindTooltip(esc(`${c.name || c.rid}: ${verdict(c, d).word} — ${c.by_carrier} by carrier, ${c.blame} by pass range, rate ${pct(c.rate)}`));
       m.on('click', () => select(c.rid));
       m.addTo(S.layer);
       pts.push([lat, lon]);
