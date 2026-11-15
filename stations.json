@@ -16535,8 +16535,8 @@
       "name": "Cairns Airport AL",
       "station_number": "531049",
       "station_type": "auto_water_level",
-      "lat": -16.8622,
-      "lon": 145.7419,
+      "lat": -16.862138,
+      "lon": 145.741936,
       "elevation_ahd": 2.5,
       "roles": [
         "field"
@@ -16546,7 +16546,9 @@
         "barron"
       ],
       "alert_ids": {
-        "rainfall": 6838
+        "rainfall": 6837,
+        "battery": 6839,
+        "water_level": 6838
       },
       "satcom": {
         "enabled": false,
@@ -16707,8 +16709,8 @@
       "name": "Cairns Harbour Tide AL",
       "station_number": "531050",
       "station_type": "auto_water_level",
-      "lat": -16.9267,
-      "lon": 145.7808,
+      "lat": -16.930542,
+      "lon": 145.779712,
       "elevation_ahd": 10.1,
       "roles": [
         "field"
@@ -16717,7 +16719,10 @@
       "catchment_ids": [
         "mulgrave_russell"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "battery": 6841,
+        "water_level": 6840
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -18441,8 +18446,8 @@
       "id": "carrs_lookout_al",
       "name": "Carrs Lkt AL",
       "station_number": "541064",
-      "lat": -28.2944,
-      "lon": 152.4156,
+      "lat": -28.293047,
+      "lon": 152.41568,
       "elevation_ahd": 1093.7,
       "roles": [
         "repeater"
@@ -18453,7 +18458,10 @@
       "catchment_ids": [
         "balonne_condamine"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 6878,
+        "battery": 6879
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -21460,8 +21468,8 @@
       "name": "Clump Point Tide AL",
       "station_number": "532114",
       "station_type": "auto_water_level",
-      "lat": -17.8503,
-      "lon": 146.1061,
+      "lat": -17.850203,
+      "lon": 146.106757,
       "elevation_ahd": 3.2,
       "roles": [
         "field"
@@ -21470,7 +21478,11 @@
       "catchment_ids": [
         "tully"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 5247,
+        "battery": 5244,
+        "water_level": 5243
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -34234,7 +34246,8 @@
           "slope_basis": "1% AEP water surface from here to Sandy Creek Road Alert, 6.4 km downstream: 31.94 m over 6.4 km (straight line × 1.3)"
         }
       ],
-      "facing_deg": 272.0
+      "facing_deg": 272.0,
+      "alert2_station_id": 11058
     },
     {
       "id": "fossickers_flat_sho",
@@ -41467,7 +41480,10 @@
       "catchment_ids": [
         "logan_albert"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 6200,
+        "battery": 6201
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -41481,21 +41497,62 @@
         "acma_licence": "1411025",
         "rx_mhz": 151.5,
         "tx_mhz": 151.5,
+        "delay_ms": 2700,
         "pass_ranges": [
           {
-            "low": 1900,
-            "high": 2200
+            "low": 103,
+            "high": 113
+          },
+          {
+            "low": 2051,
+            "high": 2053
+          },
+          {
+            "low": 2065,
+            "high": 2067
+          },
+          {
+            "low": 2101,
+            "high": 2104
+          },
+          {
+            "low": 2107,
+            "high": 2108
+          },
+          {
+            "low": 2111,
+            "high": 2111
+          },
+          {
+            "low": 2179,
+            "high": 2181
           },
           {
             "low": 4151,
             "high": 4199
           },
           {
-            "low": 4800,
-            "high": 4899
+            "low": 4840,
+            "high": 4845
           },
           {
-            "low": 5304,
+            "low": 5308,
+            "high": 5312
+          },
+          {
+            "low": 5325,
+            "high": 5327
+          },
+          {
+            "low": 5356,
+            "high": 5367
+          },
+          {
+            "low": 5374,
+            "high": 5376
+          },
+          {
+            "low": 5391,
             "high": 5399
           },
           {
@@ -41760,8 +41817,8 @@
       "name": "Homebush Station Tm",
       "station_number": "543011",
       "station_type": "auto_water_level",
-      "lat": -26.393,
-      "lon": 147.9415,
+      "lat": -26.39159,
+      "lon": 147.939856,
       "elevation_ahd": 349.18,
       "elevation_source": "Elvis ~30 m (Geoscience Australia SRTM)",
       "roles": [
@@ -48367,7 +48424,8 @@
           "level_difference": 1,
           "confidence": 1
         }
-      ]
+      ],
+      "tower_height": 3.0
     },
     {
       "id": "kings_ck_brg_rada",
@@ -55310,8 +55368,8 @@
       "name": "Maleny AL",
       "station_number": "540336",
       "station_type": "auto_rain_gauge",
-      "lat": -26.7631,
-      "lon": 152.8475,
+      "lat": -26.762919,
+      "lon": 152.847475,
       "elevation_ahd": 421.3,
       "roles": [
         "field"
@@ -55321,7 +55379,8 @@
         "mary"
       ],
       "alert_ids": {
-        "rainfall": 6427
+        "rainfall": 6427,
+        "battery": 6428
       },
       "satcom": {
         "enabled": false,
@@ -55404,8 +55463,8 @@
       "name": "Mapleton AL",
       "station_number": "540085",
       "station_type": "auto_rain_gauge",
-      "lat": -26.6247,
-      "lon": 152.8664,
+      "lat": -26.624869,
+      "lon": 152.866368,
       "elevation_ahd": 392.7,
       "roles": [
         "field"
@@ -55415,7 +55474,8 @@
         "mary"
       ],
       "alert_ids": {
-        "rainfall": 6447
+        "rainfall": 6447,
+        "battery": 6448
       },
       "satcom": {
         "enabled": false,
@@ -61185,8 +61245,8 @@
       "name": "Mourilyan Mill AL",
       "station_number": "532025",
       "station_type": "auto_water_level",
-      "lat": -17.5806,
-      "lon": 146.0297,
+      "lat": -17.580532,
+      "lon": 146.029885,
       "elevation_ahd": 14.7,
       "roles": [
         "field"
@@ -61196,7 +61256,9 @@
         "johnstone"
       ],
       "alert_ids": {
-        "rainfall": 2578
+        "rainfall": 2577,
+        "battery": 2579,
+        "water_level": 2578
       },
       "satcom": {
         "enabled": false,
@@ -85024,8 +85086,8 @@
       "name": "Stony Ck AL",
       "station_number": "532110",
       "station_type": "auto_water_level",
-      "lat": -19.2486,
-      "lon": 146.6658,
+      "lat": -19.248649,
+      "lon": 146.665957,
       "elevation_ahd": 16.7,
       "roles": [
         "field"
@@ -85035,7 +85097,9 @@
         "ross"
       ],
       "alert_ids": {
-        "rainfall": 2842
+        "rainfall": 2841,
+        "battery": 2843,
+        "water_level": 2842
       },
       "satcom": {
         "enabled": false,
@@ -95730,8 +95794,8 @@
       "id": "upper_rosenthal_aler",
       "name": "Upper Rosenthal AL",
       "station_number": "541163",
-      "lat": -28.4025,
-      "lon": 152.0386,
+      "lat": -28.402598,
+      "lon": 152.038644,
       "elevation_ahd": 855,
       "roles": [
         "repeater"
@@ -95742,7 +95806,10 @@
       "catchment_ids": [
         "balonne_condamine"
       ],
-      "alert_ids": {},
+      "alert_ids": {
+        "rainfall": 5767,
+        "battery": 5768
+      },
       "satcom": {
         "enabled": false,
         "provider": "",
@@ -98086,8 +98153,8 @@
       "name": "Warwick AL",
       "station_number": "41534",
       "station_type": "auto_water_level",
-      "lat": -28.2111,
-      "lon": 152.0275,
+      "lat": -28.20911,
+      "lon": 152.026794,
       "elevation_ahd": 458.4,
       "roles": [
         "field"
@@ -98097,7 +98164,9 @@
         "balonne_condamine"
       ],
       "alert_ids": {
-        "rainfall": 6853
+        "rainfall": 6852,
+        "battery": 6854,
+        "water_level": 6853
       },
       "satcom": {
         "enabled": false,
@@ -125753,7 +125822,8 @@
           "effect": "Spillway",
           "detail": "Bill Gunn Dam spillway"
         }
-      ]
+      ],
+      "alert2_station_id": 10184
     },
     {
       "id": "billaboo_al",
@@ -129425,7 +129495,8 @@
           "height_m": 2.40,
           "level_m_ahd": 137.41
         }
-      ]
+      ],
+      "alert2_station_id": 8234
     },
     {
       "id": "bowen_hills_al",
@@ -148626,7 +148697,8 @@
           "height_m": 3.52,
           "level_m_ahd": 102.52
         }
-      ]
+      ],
+      "alert2_station_id": 10057
     },
     {
       "id": "diamond_valley_al",
@@ -169180,7 +169252,8 @@
           "section": "1",
           "as_at": "2026-09-25"
         }
-      ]
+      ],
+      "alert2_station_id": 10004
     },
     {
       "id": "jindalee_boat_ramp_park_al_b",
@@ -172716,7 +172789,8 @@
           "section": "1",
           "as_at": "2026-09-25"
         }
-      ]
+      ],
+      "alert2_station_id": 10100
     },
     {
       "id": "killabakh",
@@ -193430,7 +193504,8 @@
           "section": "1",
           "as_at": "2026-09-25"
         }
-      ]
+      ],
+      "alert2_station_id": 11056
     },
     {
       "id": "mt_crosby_al",
@@ -193591,7 +193666,8 @@
           "height_m": 8.55,
           "level_m_ahd": 8.55
         }
-      ]
+      ],
+      "alert2_station_id": 10019
     },
     {
       "id": "mt_elliot_al",
@@ -193742,7 +193818,8 @@
           "device_id": 2
         }
       ],
-      "hub_id": "brisbane"
+      "hub_id": "brisbane",
+      "alert2_station_id": 9601
     },
     {
       "id": "mt_glorious_al_p",
@@ -193802,7 +193879,8 @@
           "section": "1",
           "as_at": "2026-09-25"
         }
-      ]
+      ],
+      "alert2_station_id": 9511
     },
     {
       "id": "mt_gravatt_al",
@@ -194682,7 +194760,8 @@
           "section": "1",
           "as_at": "2026-09-25"
         }
-      ]
+      ],
+      "alert2_station_id": 10134
     },
     {
       "id": "mt_mongrel_al",
@@ -195209,7 +195288,8 @@
           "section": "1",
           "as_at": "2026-09-25"
         }
-      ]
+      ],
+      "alert2_station_id": 10315
     },
     {
       "id": "mt_piddington",
@@ -205586,7 +205666,8 @@
         "logan_albert"
       ],
       "alert_ids": {
-        "rainfall": 6262
+        "rainfall": 6262,
+        "battery": 113
       },
       "satcom": {
         "enabled": false,
@@ -205613,6 +205694,12 @@
           "type": "Rainfall Increment",
           "sensor_id": "540787.0.R.6262",
           "device_id": 2
+        },
+        {
+          "alert_id": 113,
+          "type": "Battery",
+          "sensor_id": "park_ridge_stoney_camp_rd_al:113",
+          "device_id": null
         }
       ],
       "hub_id": "brisbane",
@@ -207846,10 +207933,15 @@
         "acma_licence": "10954034/1",
         "rx_mhz": 151.5,
         "tx_mhz": 151.5,
+        "delay_ms": 999,
         "pass_ranges": [
           {
             "low": 2006,
             "high": 2007
+          },
+          {
+            "low": 2195,
+            "high": 2196
           }
         ],
         "exclusions": [],
@@ -222794,7 +222886,8 @@
           "section": "1",
           "as_at": "2026-09-25"
         }
-      ]
+      ],
+      "alert2_station_id": 11762
     },
     {
       "id": "tallangatta_ck_mccallums",
@@ -227413,7 +227506,8 @@
           "section": "1",
           "as_at": "2026-09-25"
         }
-      ]
+      ],
+      "alert2_station_id": 33300
     },
     {
       "id": "top_of_brisbane_al",
@@ -236088,7 +236182,8 @@
           "section": "1",
           "as_at": "2026-09-25"
         }
-      ]
+      ],
+      "alert2_station_id": 11099
     },
     {
       "id": "whiteheads_creek_at_whiteheads_creek",
@@ -241254,7 +241349,8 @@
           "section": "1",
           "as_at": "2026-09-25"
         }
-      ]
+      ],
+      "alert2_station_id": 10083
     },
     {
       "id": "yarras_mount_seaview",
@@ -257560,6 +257656,22 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "sensors": [
+        {
+          "alert_id": null,
+          "type": "Water Level",
+          "sensor_id": "540270.a2.7",
+          "device_id": null,
+          "alert2_sensor_id": 7
+        },
+        {
+          "alert_id": null,
+          "type": "Battery",
+          "sensor_id": "540270.a2.8",
+          "device_id": null,
+          "alert2_sensor_id": 8
+        }
+      ],
       "hub_id": "brisbane",
       "awrc_number": "145024",
       "stream": "LOGAN RIVER",
@@ -257615,7 +257727,8 @@
           "height_m": 1.42,
           "level_m_ahd": 1.42
         }
-      ]
+      ],
+      "alert2_station_id": 11047
     },
     {
       "id": "bromelton_weir_tw_tm",
@@ -257641,6 +257754,15 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "sensors": [
+        {
+          "alert_id": null,
+          "type": "Water Level",
+          "sensor_id": "540271.a2.17",
+          "device_id": null,
+          "alert2_sensor_id": 17
+        }
+      ],
       "hub_id": "brisbane",
       "awrc_number": "145025",
       "stream": "LOGAN RIVER",
@@ -257685,7 +257807,8 @@
           "height_m": 6.99,
           "level_m_ahd": 43.69
         }
-      ]
+      ],
+      "alert2_station_id": 11047
     },
     {
       "id": "bromfleet_tm",
@@ -263250,6 +263373,22 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "sensors": [
+        {
+          "alert_id": null,
+          "type": "Water Level",
+          "sensor_id": "540590.a2.7",
+          "device_id": null,
+          "alert2_sensor_id": 7
+        },
+        {
+          "alert_id": null,
+          "type": "Battery",
+          "sensor_id": "540590.a2.8",
+          "device_id": null,
+          "alert2_sensor_id": 8
+        }
+      ],
       "hub_id": "brisbane",
       "awrc_number": "145030",
       "stream": "LOGAN RIVER",
@@ -263290,7 +263429,8 @@
           "height_m": 20.50,
           "effect": "Full Supply"
         }
-      ]
+      ],
+      "alert2_station_id": 11081
     },
     {
       "id": "cedar_grove_weir_tw_tm",
@@ -263316,6 +263456,15 @@
       "rm_system_id": 1,
       "enabled": true,
       "notes": "",
+      "sensors": [
+        {
+          "alert_id": null,
+          "type": "Water Level",
+          "sensor_id": "540748.a2.17",
+          "device_id": null,
+          "alert2_sensor_id": 17
+        }
+      ],
       "hub_id": "brisbane",
       "awrc_number": "145030",
       "stream": "LOGAN RIVER",
@@ -263328,7 +263477,8 @@
           "section": "3",
           "as_at": "2026-09-26"
         }
-      ]
+      ],
+      "alert2_station_id": 11081
     },
     {
       "id": "cedar_pocket_dam_hw_tm",
@@ -264889,7 +265039,8 @@
           "height_m": 5.79,
           "level_m_ahd": 44.40
         }
-      ]
+      ],
+      "alert2_station_id": 10156
     },
     {
       "id": "clare",
@@ -265258,7 +265409,8 @@
           "date": "2017-04-01",
           "height_m": 8.59
         }
-      ]
+      ],
+      "alert2_station_id": 10020
     },
     {
       "id": "clarke_hills_station",
@@ -290634,7 +290786,8 @@
           "height_m": 12.48,
           "level_m_ahd": 49.08
         }
-      ]
+      ],
+      "alert2_station_id": 8233
     },
     {
       "id": "gyranda_weir_tm",
@@ -300469,7 +300622,8 @@
           "section": "3",
           "as_at": "2026-09-26"
         }
-      ]
+      ],
+      "alert2_station_id": 10293
     },
     {
       "id": "kiamba_tm",
@@ -304934,7 +305088,8 @@
           "date": "2015-05-01",
           "height_m": 17.12
         }
-      ]
+      ],
+      "alert2_station_id": 11086
     },
     {
       "id": "leyburn",
@@ -309891,7 +310046,8 @@
           "date": "2013-01-29",
           "height_m": 209.87
         }
-      ]
+      ],
+      "alert2_station_id": 11082
     },
     {
       "id": "marqua",
@@ -314354,7 +314510,8 @@
           "section": "3",
           "as_at": "2026-09-26"
         }
-      ]
+      ],
+      "alert2_station_id": 10208
     },
     {
       "id": "mooloolaba_tide_tm",
@@ -335289,7 +335446,8 @@
           "height_m": 9.92,
           "level_m_ahd": 18.85
         }
-      ]
+      ],
+      "alert2_station_id": 11039
     },
     {
       "id": "south_maclean_tw_tm",
@@ -335338,7 +335496,8 @@
           "height_m": 8.05,
           "level_m_ahd": 15.17
         }
-      ]
+      ],
+      "alert2_station_id": 11070
     },
     {
       "id": "south_plains",
@@ -358865,8 +359024,8 @@
       "id": "dalby_base_station",
       "name": "Dalby Base Station",
       "station_number": "41555",
-      "lat": -27.187778,
-      "lon": 151.269722,
+      "lat": -27.188648,
+      "lon": 151.269261,
       "elevation_ahd": 342.33,
       "elevation_source": "Elvis 1 m (QLD Government)",
       "roles": [
@@ -361012,6 +361171,239 @@
       "enabled": false,
       "notes": "In the Bureau's 2024 FldWarn KMZ (Georgina folder, RN : ROT) and in neither its December 2025 service level specification nor its September 2026 lists, so probably closed. Added switched off in Oct 2026.",
       "hub_id": "cairns"
+    },
+    {
+      "id": "qro_turbot_st_brisbane_city",
+      "name": "QRO Turbot St Brisbane City",
+      "station_number": "",
+      "lat": -27.468847,
+      "lon": 153.02054,
+      "elevation_ahd": null,
+      "owner": "Bureau",
+      "roles": [
+        "base"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [],
+      "alert_ids": {},
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": ""
+    },
+    {
+      "id": "ooh_b",
+      "name": "OOH-B",
+      "station_number": "",
+      "lat": -27.373606,
+      "lon": 153.061295,
+      "elevation_ahd": null,
+      "roles": [
+        "field"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [],
+      "alert_ids": {},
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": ""
+    },
+    {
+      "id": "norris_creek_al",
+      "name": "Norris Creek AL",
+      "station_number": "",
+      "station_type": "auto_water_level",
+      "lat": -27.75918,
+      "lon": 153.0466,
+      "elevation_ahd": null,
+      "owner": "Logan City Council",
+      "roles": [
+        "field"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [],
+      "alert_ids": {
+        "rainfall": 111,
+        "battery": 110,
+        "water_level": 112
+      },
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "Logan City Council site ID 12314. Council-allocated ALERT IDs (not Bureau). Hogan Park, Greenvale Road, Chambers Flat. Battery 110, rain 111, river 112. Added 12 Nov 2026 from council's telemetry site list; 110 and 111 heard on 151.5 MHz via Hillcrest (Wine Glass) repeater.",
+      "sensors": [
+        {
+          "alert_id": 110,
+          "type": "Battery",
+          "sensor_id": "norris_creek_al:110",
+          "device_id": null
+        },
+        {
+          "alert_id": 111,
+          "type": "Rainfall",
+          "sensor_id": "norris_creek_al:111",
+          "device_id": null
+        },
+        {
+          "alert_id": 111,
+          "type": "Rainfall Increment",
+          "sensor_id": "norris_creek_al:111",
+          "device_id": null
+        },
+        {
+          "alert_id": 112,
+          "type": "Water Level",
+          "sensor_id": "norris_creek_al:112",
+          "device_id": null
+        }
+      ],
+      "stream": "Norris Creek"
+    },
+    {
+      "id": "cochranes_bridge_al",
+      "name": "Cochranes Bridge AL",
+      "station_number": "",
+      "station_type": "auto_water_level",
+      "lat": -27.86869,
+      "lon": 152.94439,
+      "elevation_ahd": null,
+      "owner": "Logan City Council",
+      "roles": [
+        "field"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [],
+      "alert_ids": {
+        "rainfall": 104,
+        "battery": 105,
+        "water_level": 103
+      },
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "Logan City Council site ID 12312. Council-allocated ALERT IDs (not Bureau). Cochranes Bridge Park, Undullah Road. Battery 105, rain 104, river 103. Added 12 Nov 2026 from council's telemetry site list; not heard at IRM Salisbury 10-12 Nov 2026.",
+      "sensors": [
+        {
+          "alert_id": 105,
+          "type": "Battery",
+          "sensor_id": "cochranes_bridge_al:105",
+          "device_id": null
+        },
+        {
+          "alert_id": 104,
+          "type": "Rainfall",
+          "sensor_id": "cochranes_bridge_al:104",
+          "device_id": null
+        },
+        {
+          "alert_id": 104,
+          "type": "Rainfall Increment",
+          "sensor_id": "cochranes_bridge_al:104",
+          "device_id": null
+        },
+        {
+          "alert_id": 103,
+          "type": "Water Level",
+          "sensor_id": "cochranes_bridge_al:103",
+          "device_id": null
+        }
+      ],
+      "stream": "Logan River"
+    },
+    {
+      "id": "yarrabilba_al",
+      "name": "Yarrabilba AL",
+      "station_number": "",
+      "station_type": "auto_water_level",
+      "lat": -27.81704,
+      "lon": 153.12612,
+      "elevation_ahd": null,
+      "owner": "Logan City Council",
+      "roles": [
+        "field"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [],
+      "alert_ids": {
+        "rainfall": 109,
+        "battery": 106,
+        "water_level": 108
+      },
+      "satcom": {
+        "enabled": false,
+        "provider": "",
+        "terminal_id": ""
+      },
+      "rm_system_id": 1,
+      "enabled": true,
+      "notes": "Logan City Council site ID 12313. Council-allocated ALERT IDs (not Bureau). Fauna Way, Yarrabilba. Battery 106, rain 109, river 108. Added 12 Nov 2026 from council's telemetry site list; not heard at IRM Salisbury 10-12 Nov 2026.",
+      "sensors": [
+        {
+          "alert_id": 106,
+          "type": "Battery",
+          "sensor_id": "yarrabilba_al:106",
+          "device_id": null
+        },
+        {
+          "alert_id": 109,
+          "type": "Rainfall",
+          "sensor_id": "yarrabilba_al:109",
+          "device_id": null
+        },
+        {
+          "alert_id": 109,
+          "type": "Rainfall Increment",
+          "sensor_id": "yarrabilba_al:109",
+          "device_id": null
+        },
+        {
+          "alert_id": 108,
+          "type": "Water Level",
+          "sensor_id": "yarrabilba_al:108",
+          "device_id": null
+        }
+      ]
+    },
+    {
+      "id": "maleny_wwtp",
+      "name": "Maleny WWTP",
+      "station_number": "",
+      "lat": -26.765182,
+      "lon": 152.867250,
+      "elevation_ahd": null,
+      "roles": [
+        "field"
+      ],
+      "radio_network_ids": [],
+      "catchment_ids": [
+        "mary"
+      ],
+      "alert_ids": {},
+      "satcom": {},
+      "rm_system_id": null,
+      "enabled": true,
+      "notes": "ALERT2 site 8278 on 151.5375 MHz (slots 20 and 20.5 s), from the slot sheet of 12 November 2026. Position from the owner. Not Maleny AL, which is another site.",
+      "lga": "Sunshine Coast Regional",
+      "basin": "Mary River (Qld)",
+      "hub_id": "brisbane",
+      "alert2_station_id": 8278
     }
   ]
 }
