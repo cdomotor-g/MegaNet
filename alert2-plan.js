@@ -286,6 +286,19 @@ const Alert2Plan = (function () {
     delete out.sites;
     return out;
   }
+  // A figure held to what the card lets anyone set: a slider's own range, and
+  // for the rest a ceiling no real plan comes near. A scenario is somebody's
+  // saved JSON — a shared card or this device's copy — and a month count in
+  // the millions would have the plan work out every month of it.
+  function figureRange(k) {
+    for (const g of CONTROLS) for (const c of g.items) if (c.k === k && c.kind === 'range') return [c.min, c.max];
+    if (/Months$/.test(k)) return [0, 120];
+    if (/(Days|Hours)$/.test(k)) return [0, 365];
+    if (k === 'pilotSites') return [0, 5000];
+    if (k === 'pmFte') return [0, 100];
+    return [0, 1e9];
+  }
+  function clampFigure(k, n) { const [lo, hi] = figureRange(k); return Math.min(hi, Math.max(lo, n)); }
   function sanitize(raw) {
     const out = { ...DEFAULTS };
     if (raw && typeof raw === 'object') {
@@ -293,7 +306,7 @@ const Alert2Plan = (function () {
         const d = DEFAULTS[k], v = raw[k];
         if (v == null) continue;
         if (typeof d === 'boolean') out[k] = !!v;
-        else if (typeof d === 'number') { const n = Number(v); if (isFinite(n) && n >= 0) out[k] = n; }
+        else if (typeof d === 'number') { const n = Number(v); if (isFinite(n) && n >= 0) out[k] = clampFigure(k, n); }
         else if (k === 'start') { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(String(v))) out[k] = String(v); }
         else if (k === 'scope') { if (['qld', 'hubs', 'all'].includes(v)) out[k] = v; }
       }

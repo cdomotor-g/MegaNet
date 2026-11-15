@@ -309,6 +309,15 @@ try {
   const crews = await page.evaluate(() => [1, 2, 3, 4, 6, 8, 10].map(n => Alert2Plan.model({ ...Alert2Plan.defaults(), fieldCrews: n }).fieldEnd));
   ok('more crews is never slower', crews.every((v, i) => !i || v <= crews[i - 1] + 1e-6), crews.map(v => v.toFixed(1)).join(' ≥ '));
 
+  // A saved scenario is somebody's JSON: figures far past what the card can
+  // set are held to its ranges, so the plan still works out in a moment.
+  const wild = await page.evaluate(() => {
+    const t0 = performance.now();
+    const M = Alert2Plan.model({ ...Alert2Plan.defaults(), closeMonths: 1e9, procureMonths: 1e9, pilotMonths: 1e9, fieldCrews: 0, wetFactor: 1e6 });
+    return { ms: performance.now() - t0, end: M && M.end };
+  });
+  ok('a scenario with impossible figures is held to the card\'s ranges', wild.end > 0 && wild.end < 1000 && wild.ms < 5000, JSON.stringify(wild));
+
   const cont = await page.evaluate(() => {
     const a = Alert2Plan.model({ ...Alert2Plan.defaults(), contingency: 10 });
     const b = Alert2Plan.model({ ...Alert2Plan.defaults(), contingency: 40 });
