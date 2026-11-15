@@ -5573,9 +5573,14 @@ function termHtml(text, meaning) {
   return meaning ? `<span class="term" title="${esc(meaning)}">${esc(text)}</span>` : esc(text);
 }
 
+// A cell that a spreadsheet would read as a formula (=, @, a tab or carriage
+// return first, or + or - before anything but a number) gets a leading
+// apostrophe, so text that came from a base station or the register is shown,
+// never worked out, when somebody opens the file in Excel.
 function csvEscape(s) {
   s = String(s ?? '');
-  return (s.includes(',') || s.includes('"') || s.includes('\n'))
+  if (/^[=@\t\r]/.test(s) || (/^[+-]./s.test(s) && !/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(s))) s = "'" + s;
+  return (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r'))
     ? `"${s.replace(/"/g,'""')}"` : s;
 }
 

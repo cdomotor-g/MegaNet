@@ -305,6 +305,13 @@ jobs:
         working-directory: test
         run: npm run check
 
+      # Node. The cell writer most CSVs go through (core.js csvEscape): quoted
+      # where it must be, a formula never live, numbers left as numbers.
+      - name: CSV cells — no formula runs when a download is opened
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run csvcells
+
       - name: Duplicate top-level names
         if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test
