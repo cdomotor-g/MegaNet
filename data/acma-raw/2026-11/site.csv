@@ -108,15 +108,10 @@ SITE_ID,LATITUDE,LONGITUDE,NAME,STATE,LICENSING_AREA_ID,POSTCODE,SITE_PRECISION,
 10018387,-19.27217,146.7557,411 Bayswater Road  GARBUTT,QLD,4,,Within 10 metres,,LR2H,castle_hill_al,Castle Hill AL,5.199
 10018864,-17.264043,145.393139,"Energy Qld site Mt Wallum, 9 km W of ATHERTON",QLD,4,,Within 10 metres,,LQ4F,bones_knob_al,Bones Knob AL,7.479
 10018986,-27.450996,153.030885,"Brisbane Exhibition Grounds, 600 Gregory Terrace Bowen Hills",QLD,2,,Within 10 metres,,NT9E,eildon_hill_al,EILDON HILL AL,2.128
-10019343,-26.19358,149.7911,Atlas Compressor Station 20km South West of WANDOAN,QLD,5,,Within 10 metres,,MT5D,bundi_rd_al,Bundi Rd AL,20.103
 10019484,-33.94605,151.1939,17 Byrnes St BOTANY,NSW,2,,Within 10 metres,,NV7M,kincumber,Kincumber,58.455
 10019963,-21.424344,149.223137,Council Site Brewers Rd SARINA,QLD,4,,Within 10 metres,,MR8E,hospital_br_aler,Hospital Br Aler,31.933
 10020275,-22.811104,148.676103,"BoM Site, Nolan Drive MIDDLEMOUNT",QLD,4,,Unknown,,MS1O,middlemount_al,Middlemount AL,0.016
 10020277,-26.992197,152.431402,"BoM Site, Pohlmans Range Road GREGORS CREEK",QLD,4,,Within 100 metres,,NT5N,pohlmans_range_al,Pohlmans Range AL,0.003
-10020298,-24.35954,150.16014,QGP 9481 Leichhardt Hwy BANANA,QLD,4,,Within 10 metres,,MS9E,banana_range_al,Banana Range AL,18.598
-10020299,-23.822531,151.154657,QGP 5 Gladstone Mount Larcom Rd YARWUN,QLD,4,,Within 10 metres,,NS4M,gladstone_radar_al,Gladstone Radar AL,11.556
-10020301,-27.11637,150.891945,DDP 472 Grahams Road KOGAN,QLD,5,,Within 10 metres,,MT9D,braziers_hill_al,Braziers Hill AL,49.532
-10020302,-26.890255,150.353208,DDP 4839 Kogan Condamine Rd WIEAMBILLA,QLD,5,,Within 10 metres,,MT6N,bottle_tree_al,Bottle Tree AL,12.733
 10020495,-23.7904,148.873125,Ramp 47 Blackwater Mine 23 km S BLACKWATER,QLD,4,,Within 10 metres,,MS4P,blackdown_tableland_al,Blackdown Tableland AL,24.901
 10020747,-22.637148,148.44611,Ramp 59 Mine Site NORWICH PARK,QLD,4,4745,Within 10 metres,,MS1J,middlemount_al,Middlemount AL,30.49
 10020758,-23.712551,148.804317,New Ramp 26 Blackwater Mine BLACKWATER,QLD,4,,Within 10 metres,,MS4L,blackdown_tableland_al,Blackdown Tableland AL,32.584
@@ -236,7 +231,6 @@ SITE_ID,LATITUDE,LONGITUDE,NAME,STATE,LICENSING_AREA_ID,POSTCODE,SITE_PRECISION,
 10037786,-21.441317,148.71132,"Ergon Energy lattice tower, Mt Seaview Mount Britton",QLD,4,,Within 10 metres,,MR7G,mt_pinnacle_al,Mt Pinnacle AL,31.974
 10038455,-27.640861,151.866917,DGPS Site 416 Toowoomba Karara Rd WYREEMA,QLD,4,,Within 10 metres,,NT7L,toowoomba_al,Toowoomba AL,16.965
 10039043,-33.512789,149.220691,CTW Site Browns Creek Rd  BLAYNEY,NSW,4,,Within 10 metres,,MV8I,orange_stp_enviromon,Orange Stp Enviromon,28.889
-10039664,-23.86304,151.22672,3 George Mamalis Pl CALLEMONDAH,QLD,4,,Within 10 metres,,NS4M,gladstone_radar_al,Gladstone Radar AL,3.75
 10040030,-21.145456,149.154468,"DGPS Site, Mackay Hospital 475 Bridge St MACKAY",QLD,4,,Within 10 metres,,MR8A,hospital_br_aler,Hospital Br Aler,0.118
 10040132,-27.94108,153.192212,Little Athletics 400 Long Rd TAMBORINE MOUNTAIN,QLD,2,,Within 10 metres,,NT9M,mt_tamborine_al,Mt Tamborine AL,3.764
 10040191,-33.78188,151.121161,St John Macquarie Park 12 Lyonpark Road MACQUARIE PARK,NSW,2,,Within 10 metres,,NV7M,kincumber,Kincumber,45.205
@@ -498,7 +492,6 @@ SITE_ID,LATITUDE,LONGITUDE,NAME,STATE,LICENSING_AREA_ID,POSTCODE,SITE_PRECISION,
 14187,-27.502263,152.591633,Broadcast Site THE KNOBBY,QLD,2,4311,Within 10 metres,348,NT8K,mt_marrow_al,Mt Marrow AL,11.514
 141870,-23.832464,151.259335,End of Auckland Point 3 Cnr Macfarlane Rd and McLintock St GLADSTONE,QLD,4,4680,Within 10 metres,,NS4N,gladstone_radar_al,Gladstone Radar AL,2.536
 141871,-23.838832,151.260369,Origin Depot Mark Fenton Drive GLADSTONE,QLD,4,4680,Within 10 metres,,NS4N,gladstone_radar_al,Gladstone Radar AL,1.82
-141997,-27.341976,153.0709,Brisbane Entertainment Centre  BRISBANE,QLD,2,4034,Within 10 metres,,NT9E,eildon_hill_al,EILDON HILL AL,11.102
 142047,-18.520395,146.386057,Lucinda Bulk Sugar Terminal 2 Dungeness Rd LUCINDA,QLD,4,,Within 10 metres,,LQ8J,poverty_hill_al,Poverty Hill AL,38.535
 14205,-27.594195,152.60183,Mt Marrow HAIGSLEA,QLD,2,4340,Within 100 metres,,NT8K,mt_marrow_al,Mt Marrow AL,1.428
 142089,-27.431242,153.115455,QLD Transport Marine Operations Centre Macarthur Ave East PINKENBA,QLD,2,4008,Within 10 metres,,NT9E,eildon_hill_al,EILDON HILL AL,9.008
@@ -746,7 +739,6 @@ SITE_ID,LATITUDE,LONGITUDE,NAME,STATE,LICENSING_AREA_ID,POSTCODE,SITE_PRECISION,
 17442,-23.729651,150.536014,Broadcast Australia Site 1046 Mt Hopeful Rd MOUNT HOPEFUL,QLD,4,4702,Within 10 metres,530,MS6K,mt_hopeful_al,Mt Hopeful AL,0.249
 17452,-23.529655,147.293125,TMR RoadTek Site  MT TABLETOP,QLD,5,4702,Within 100 metres,900,LS6J,billaboo_al,Billaboo AL,7.225
 17465,-23.875481,150.542044,Telstra Customer POMEGRANATE,QLD,4,4702,Unknown,233,MS6O,mt_hopeful_al,Mt Hopeful AL,16.2
-17475,-24.713865,148.842873,Duke Energy Operations Site ROLLESTON,QLD,5,4702,Unknown,276,MS7L,mt_pleasant_rollest,Mt Pleasant (Rollest,31.505
 17476,-24.529169,148.884577,Planet Downs via ROLLESTON,QLD,5,4702,Unknown,256,MS7L,rolleston_al,Rolleston AL,27.716
 17477,-24.675651,148.147618,Telstra Customer Deepdale via ROLLESTON,QLD,5,4702,Unknown,348,MS7I,mt_moffatt_al,Mt Moffatt AL,27.989
 17483,-23.528411,147.997071,Rural Fires/DPI Site State Forest 223 SELMA,QLD,5,4720,Unknown,272,LS6L,emerald_al,Emerald AL,17.264
@@ -2078,7 +2070,6 @@ SITE_ID,LATITUDE,LONGITUDE,NAME,STATE,LICENSING_AREA_ID,POSTCODE,SITE_PRECISION,
 9022344,-24.908875,152.488658,Fire Station 100 Welch St ELLIOT HEADS,QLD,4,4670,Within 10 metres,,NS8N,cherwell_river_rail,Cherwell River (Rail,43.061
 9022630,-27.787727,152.557666,Energex Repeater Site MT WALKER,QLD,4,4340,Within 10 metres,,NT8O,willowbank,Willowbank,16.328
 9022757,-27.48074,151.867452,GWN Site Hilltop Drive GOWRIE JUNCTION,QLD,4,4352,Within 10 metres,,NT7H,toowoomba_al,Toowoomba AL,9.185
-9022940,-27.95589,153.409957,Australian Volunteer Coast Guard 171 Marine Parade SOUTHPORT,QLD,2,4215,Within 10 metres,,NT9N,molendinar_al,Molendinar AL,6.169
 9022992,-34.88554,150.506224,Vertel Tower at Illaroo Near Bundanon Road ILLAROO,NSW,4,2577,Within 10 metres,91,MW3O,vincentia,Vincentia,26.799
 9023162,-27.461419,153.038265,505 Brunswick St FORTITUDE VALLEY,QLD,2,4006,Within 10 metres,,NT9E,eildon_hill_al,EILDON HILL AL,3.472
 9023215,-22.86253,148.651762,Repeater Site STH Middlemount Rd  (7.6km SW of) MIDDLEMOUNT,QLD,4,4746,Within 10 metres,,MS1O,middlemount_al,Middlemount AL,6.245

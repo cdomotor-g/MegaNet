@@ -690,6 +690,7 @@ ANTENNA_ID,GAIN,FRONT_TO_BACK,H_BEAMWIDTH,V_BEAMWIDTH,BAND_MIN_FREQ,BAND_MIN_FRE
 95208,35.3,61,3,,,MHz,,MHz,,Parabolic High Performance,ANT3 A 0.9 7/8 HPX (333D02Hb),Ericsson
 95209,37.1,63,2.2,,,MHz,,MHz,,Parabolic High Performance,ANT3 A 1.2 7/8 HPX (343D02Hb),Ericsson
 95211,34.3,61,3.3,,,MHz,,MHz,,Parabolic High Performance,ANT3 A 0.6 10/11 HPX (323D03Hc),Ericsson
+95213,40.5,66,1.6,,,MHz,,MHz,,Parabolic High Performance,ANT3 A 1.2 10/11 HPX (343D03Hb),Ericsson
 95385,40.8,67,1.5,,,MHz,,MHz,,Parabolic,TYA18U07WC-BUBT,TONGYU
 95545,18.2,25,65,,,MHz,,MHz,,Cellular,12052FM02 (824-960 MHz),CellMax Technologies
 95546,16.8,23,74,,,MHz,,MHz,,Cellular,12052FM02 (698-798 MHz),CellMax Technologies
@@ -717,3 +718,4 @@ ANTENNA_ID,GAIN,FRONT_TO_BACK,H_BEAMWIDTH,V_BEAMWIDTH,BAND_MIN_FREQ,BAND_MIN_FRE
 95912,0,0,360,,,MHz,,MHz,,Omni Directional,AD-25/CW-3512-H Rev.B,Trival
 96067,8.1,0,0,,,MHz,,MHz,,ColinearVertical,COL54-166-P,RFI
 96127,5,0,360,,,,,,,Dipole,ANTB000100,ELPRO Technologies 
+96141,24.1,30.1,103,,,,,,,Cellular,AIR 3266_B78V_Traffic,Ericsson
