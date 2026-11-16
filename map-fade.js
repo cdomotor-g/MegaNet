@@ -833,11 +833,14 @@ const MapFade = (function () {
       const todo = jobs.slice(0, cap);
       counts.left = jobs.length - todo.length;
 
-      const rows = [];
+      // Kept in the order worked out (stale first), not the order the
+      // workers happen to finish in.
+      const slots = new Array(todo.length);
       let next = 0, done = 0;
       const worker = async () => {
         while (next < todo.length) {
-          const job = todo[next++];
+          const at = next++;
+          const job = todo[at];
           let hit = mem.get(job.sig) || null;
           if (!hit || oneWay(hit, job.a, job.b) == null) {
             try { hit = await computeOne(job.a, job.b); } catch (_) { hit = null; }
@@ -849,13 +852,14 @@ const MapFade = (function () {
             if (failed.length < 50) failed.push({ a: job.a.id, b: job.b.id, names: `${nameOf(job.a.id)} → ${nameOf(job.b.id)}`, stale: job.stale });
           } else {
             counts.computed++;
-            rows.push(rowFor(job.a, job.b, job.kind, hit, m, job.sig));
+            slots[at] = rowFor(job.a, job.b, job.kind, hit, m, job.sig);
           }
           done++;
           if (onProgress) { try { onProgress(done, todo.length); } catch (_) {} }
         }
       };
       await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+      const rows = slots.filter(Boolean);
       persistSoon();
       pendingRows = null;
       return {

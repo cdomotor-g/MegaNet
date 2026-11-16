@@ -1288,6 +1288,7 @@ try {
     await applyNetworkPolicy(pg, server.origin);
     pg.on('pageerror', e => errors.push(`§13: ${e.message}`));
     const asked = [];
+    const roadAt = [];   // the middle of each road or bridge question's box
     const json = (route, body) => route.fulfill({ status: 200, contentType: 'application/json', body: J(body), headers: CORS });
     await pg.route(/LandParcelPropertyFramework\/MapServer\/4\/query\?/, route => {
       const q = new URL(route.request().url()).searchParams;
@@ -1324,7 +1325,10 @@ try {
       if (m[2] === 'export') return route.abort();
       // The tip's question is a box 300 m across; the road owners' layer asks about the whole view.
       const env = (u.searchParams.get('geometry') || '').split(',').map(Number);
-      if (env.length === 4 && env[2] - env[0] < 0.01) asked.push('road');
+      if (env.length === 4 && env[2] - env[0] < 0.01) {
+        asked.push('road');
+        roadAt.push([(env[0] + env[2]) / 2, (env[1] + env[3]) / 2]);
+      }
       return json(route, { type: 'FeatureCollection', features: ROAD_DATA[`${m[1]}/${m[2]}`] || [] });
     });
     await pg.goto(server.url('/index.html?tab=stations'), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
@@ -1352,15 +1356,19 @@ try {
       /Lot 3 on RP12345/.test(west.text) && /5\.20 ha · Reserve/.test(west.text) && /No easement here/.test(west.text)
         && /Address: 12 Example Road, Gatton/.test(west.text) && /Gatton · Lockyer Valley Regional Council/.test(west.text)
         && west.shown, J({ west, asked }));
-    const roadAsks = () => asked.filter(a => a === 'road').length;
+    // The questions about the spot the pointer rests on. hover() comes in from
+    // 3 px away, and a slow runner can leave the pointer there past the
+    // tip's 500 ms rest, which rightly asks about that spot too.
+    const roadAsks = () => roadAt.filter(([x, y]) =>
+      Math.abs(x - (C.lng - 0.0012)) < 0.00006 && Math.abs(y - (C.lat + 0.0004)) < 0.00006).length;
     const rested = await hover(-0.0012, 0.0004, 1600);
     check('…and, the pointer rested: the nearest road and who manages it, and the nearest bridge',
       /Road: Example Street · \d+ m away/.test(rested.text) && /Managed by: Transport and Main Roads — State-controlled/.test(rested.text)
         && /Bridge: Example Creek Bridge · \d+ m away · Transport and Main Roads/.test(rested.text)
-        && /Lot 3 on RP12345/.test(rested.text) && roadAsks() === 3, J({ rested, asked }));
+        && /Lot 3 on RP12345/.test(rested.text) && roadAsks() === 3, J({ rested, asked, roadAt }));
     const again = await hover(-0.0012, 0.0004, 900);
     check('…the same spot again asks about its road and bridge no more', /Road: Example Street/.test(again.text) && roadAsks() === 3,
-      J({ again, asked }));
+      J({ again, asked, roadAt }));
     const landAsks = () => asked.filter(a => a !== 'road').length;
     const before = landAsks();
     const east = await hover(0.0012, -0.0004, 600);
