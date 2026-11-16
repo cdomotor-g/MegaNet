@@ -4939,6 +4939,8 @@ const state = {
     // --draw is". The choice is worth keeping across a reload even though the
     // shapes themselves deliberately are not.
     colour:     localStorage.getItem('mn-draw-colour') || '',
+    // Line cards on the map shrunk to a dot (MapDraw.shrinkAll), kept like the colour.
+    smallAll:   localStorage.getItem('mn-draw-small') === '1',
     // The selected stations' card under the panel (MapDraw.selectionHtml):
     // the shape they were last picked with — what "from the centre" is
     // measured from — how its list is sorted, which role it is narrowed to,

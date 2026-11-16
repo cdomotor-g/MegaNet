@@ -568,6 +568,8 @@ const MapDraw = (function () {
       ['Theoretical', 'An end of the line that is not a station has no radio on file, so the fade margin is worked out as if a '
         + 'field station stood there: 1 W, a 5.15 dBi antenna 4 m above the ground. It says whether a path between the two places '
         + 'could work. Type your own power, antenna and height on the Elevation profile card to change it.'],
+      ['Shrunk to an icon', 'A line\'s card on the map can be made small: it becomes a dot on the line, coloured by its fade margin, '
+        + 'and pressing the dot brings the card back. Use the – on a card, or Shrink all / Show all in this panel.'],
       ['Line of sight', PATH_LOS_MEANING],
       ['Clearance', 'At the worst point on the path, how far the ground — or the trees and buildings on it — is under the straight '
         + 'line between the two antennas. "Above the line" means something stands in the way there, and the signal reaches the '
@@ -665,8 +667,24 @@ const MapDraw = (function () {
     if (!f || !f.ok) return text;
     const m = f.margin && f.margin.m != null ? ` · <span class="mn-draw-db mn-draw-db-${lbMarginClass(f.margin.m).cls}">${dbText(f.margin.m)}</span>` : '';
     const pic = D().showMinis !== false && f.thumb ? `<span class="mn-draw-mini">${pathThumbSvg(f.thumb, { flat: f.flat })}</span>` : '';
-    return `${text}${m}${pic}`;
+    if (!pic) return `${text}${m}`;
+    const id = escAttr(sh.id), stop = 'event.stopPropagation();';
+    // Shrunk to a dot on the link: its band's colour, its figures in the hover,
+    // a press brings the whole card back.
+    if (isSmall(sh)) {
+      const band = f.margin && f.margin.m != null ? lbMarginClass(f.margin.m).cls : 'none';
+      const tip = `${measure(sh)}${f.margin && f.margin.m != null ? ` · ${dbText(f.margin.m)}` : ''} — press to show the ground profile`;
+      return `<button type="button" class="mn-draw-dot mn-draw-dot-${band}" title="${escAttr(tip)}" aria-label="${escAttr(tip)}"
+                onmousedown="event.stopPropagation()" ondblclick="event.stopPropagation()"
+                onclick="${stop}MapDraw.shrink('${id}', false)">〽</button>`;
+    }
+    return `<button type="button" class="mn-draw-shrink" title="Shrink this card to a small icon on the line" aria-label="Shrink this card to a small icon"
+              onmousedown="event.stopPropagation()" ondblclick="event.stopPropagation()"
+              onclick="${stop}MapDraw.shrink('${id}', true)">–</button>${text}${m}${pic}`;
   }
+
+  // Shrunk to an icon: its own choice if it has made one, else the "all" one.
+  function isSmall(sh) { return sh.small === undefined ? !!D().smallAll : !!sh.small; }
 
   // A figure landed, or went: its row, its label on the map, and the 3-D
   // view's copy of that label — in place, so nothing else is redrawn and focus
@@ -1384,7 +1402,10 @@ const MapDraw = (function () {
         <input type="checkbox" ${D_.showMinis !== false ? 'checked' : ''}
                onchange="MapDraw.toggleMinis(this.checked)">
         <span>…and each line's ${termHtml('ground profile', figWord('Ground profile'))}, small, under its measurement</span>
-      </label>` : ''}
+      </label>
+      <p class="small draw-shrink-row">${termHtml('Shrunk to an icon', figWord('Shrunk to an icon'))}:
+        <button type="button" class="filter-reset" onclick="MapDraw.shrinkAll(true)">Shrink all</button>
+        <button type="button" class="filter-reset" onclick="MapDraw.shrinkAll(false)">Show all</button></p>` : ''}
       ${listHtml()}`;
   }
 
@@ -1788,6 +1809,18 @@ const MapDraw = (function () {
     // picture, the ask PathProfile makes when a setting the figures quote has
     // moved, and the two switches.
     model, figuresCheck,
+    // One card to a dot, or back; and every card at once, which is also what
+    // new lines start as, kept across visits.
+    shrink(id, on) {
+      const sh = D().shapes.find(x => x.id === id);
+      if (sh) { sh.small = !!on; render(); }
+    },
+    shrinkAll(on) {
+      D().smallAll = !!on;
+      D().shapes.forEach(sh => { delete sh.small; });
+      try { localStorage.setItem('mn-draw-small', on ? '1' : '0'); } catch (_) {}
+      render(); rerenderPanel();
+    },
     toggleMinis(on) { D().showMinis = !!on; render(); rerenderPanel(); },
     wordsOpen(on) { D().wordsOpen = !!on; },
 

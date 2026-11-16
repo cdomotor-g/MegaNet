@@ -8314,6 +8314,49 @@ body .map-panel.is-driving {
 .mn-draw-db-warn { color: #8a5a00; }
 .mn-draw-db-bad  { color: #b3261e; }
 
+/* A line's card shrunk to a dot, and the – that shrinks it. The label itself
+   ignores the pointer, so these two take it back. */
+.mn-draw-shrink,
+.mn-draw-dot {
+  pointer-events: auto;
+  cursor: pointer;
+  font: inherit;
+  color: #1a1a1a;
+}
+
+.mn-draw-shrink {
+  float: right;
+  margin: 0 -3px 0 4px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.mn-draw-shrink:hover,
+.mn-draw-shrink:focus-visible { background: rgba(0, 0, 0, .12); border-radius: 3px; }
+
+.mn-draw-dot {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 2px solid #5a5a5a;
+  border-radius: 50%;
+  background: #fff;
+  font-size: .7rem;
+  line-height: 1;
+}
+
+.mn-draw-dot-ok   { border-color: #1b6e2f; }
+.mn-draw-dot-warn { border-color: #8a5a00; }
+.mn-draw-dot-bad  { border-color: #b3261e; }
+
+.mn-draw-dot:hover,
+.mn-draw-dot:focus-visible { transform: scale(1.2); }
+
+.draw-shrink-row { margin: .2rem 0 .4rem; }
+
 .mn-draw-mini {
   display: block;
   width: 112px;
@@ -30764,3 +30807,12 @@ details.tm-fold summary { cursor: pointer; }
 .tm-words dt { font-weight: 600; }
 .tm-words dd { margin: 0; color: var(--muted); max-width: 75ch; }
 @media (max-width: 560px) { .tm-words { grid-template-columns: 1fr; } .tm-words dd { margin-bottom: .4rem; } .tm-seg-l { min-width: 100%; } }
+
+/* A card shrunk to its dot: no frame round it. */
+.leaflet-tooltip.mn-draw-label:has(.mn-draw-dot),
+.mn-draw-label.mn-draw-3d:has(.mn-draw-dot) {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}

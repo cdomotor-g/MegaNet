@@ -634,6 +634,31 @@ const off = await page.evaluate(() => ({ mini: document.querySelectorAll('.leafl
   labels: document.querySelectorAll('.leaflet-tooltip.mn-draw-label').length }));
 ok('…until it is switched off', off.mini === 0 && off.labels > 0, JSON.stringify(off));
 await page.evaluate(() => MapDraw.toggleMinis(true));
+await page.waitForTimeout(400);
+
+// The card can be shrunk to a dot on the line, and the dot brings it back.
+const shr = () => page.evaluate(() => ({
+  mini: document.querySelectorAll('.leaflet-tooltip.mn-draw-label .mn-draw-mini').length,
+  dot: document.querySelectorAll('.leaflet-tooltip.mn-draw-label .mn-draw-dot').length,
+  btn: document.querySelectorAll('.leaflet-tooltip.mn-draw-label .mn-draw-shrink').length,
+}));
+let sh0 = await shr();
+ok('the line’s card has a shrink button', sh0.btn === 1 && sh0.mini === 1, JSON.stringify(sh0));
+await page.evaluate(() => document.querySelector('.mn-draw-shrink').click());
+await page.waitForTimeout(400);
+sh0 = await shr();
+ok('…shrinking it leaves only a dot on the line', sh0.dot === 1 && sh0.mini === 0 && sh0.btn === 0, JSON.stringify(sh0));
+await page.evaluate(() => document.querySelector('.mn-draw-dot').click());
+await page.waitForTimeout(400);
+sh0 = await shr();
+ok('…and pressing the dot brings the card back', sh0.mini === 1 && sh0.dot === 0, JSON.stringify(sh0));
+await page.evaluate(() => MapDraw.shrinkAll(true));
+await page.waitForTimeout(400);
+sh0 = await shr();
+ok('Shrink all makes every card a dot', sh0.dot === 1 && sh0.mini === 0, JSON.stringify(sh0));
+await page.evaluate(() => MapDraw.shrinkAll(false));
+await page.waitForTimeout(400);
+ok('Show all brings them back', (await shr()).mini === 1);
 
 ok('the picture was there to click', !!(await clickInside('draw', '.draw-fig-pic')));
 await page.waitForFunction(() => !!document.querySelector('#path-full-chart svg'), null, { timeout: LOAD_TIMEOUT });
