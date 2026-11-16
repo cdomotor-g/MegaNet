@@ -361,7 +361,9 @@ try {
       // 💬, the hover-notes switch (map-tip-stack.js), is a small control of its
       // own under the bar, by design — it is counted apart.
       controls: document.querySelectorAll('.leaflet-top.leaflet-right > .leaflet-control:not(.mn-map-tips)').length,
-      tips: document.querySelectorAll('.leaflet-top.leaflet-right > .mn-map-tips').length,
+      tips: document.querySelectorAll('.leaflet-top.leaflet-right > .mn-map-tips:not(.mn-map-height)').length,
+      // …and AHD, the ground height switch (map-height.js), under it in its dress.
+      height: document.querySelectorAll('.leaflet-top.leaflet-right > .mn-map-tips.mn-map-height').length,
       known: Object.keys(MapChrome.groups()),
       loose: bar ? [...bar.children].filter(c => !c.classList.contains('mn-mapbar-group')).length : -1,
       groups: bar ? [...bar.querySelectorAll('.mn-mapbar-group')].map(g => ({
@@ -383,6 +385,7 @@ try {
   check('the corner is one control, not one per icon', corner.controls === 1,
     `${corner.controls} controls in the top-right corner`);
   check('…with the hover-notes switch its one small neighbour', corner.tips === 1, `${corner.tips} hover-notes switches`);
+  check('…and the ground height switch under that', corner.height === 1, `${corner.height} ground height switches`);
   check('and nothing is loose in it — every icon is in a group', corner.loose === 0,
     `${corner.loose} children of the bar are not groups`);
 

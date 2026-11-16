@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 279, date: '2026-11-16', items: [
+      '📏 <strong>Ground height under the pointer, on the Stations map.</strong> A small <em>AHD</em> button under 💬 in the '
+        + 'map\'s top-right corner turns it on: rest the mouse anywhere — flat map or ⛰️ 3-D — and a box beside the pointer '
+        + 'gives the ground\'s height in <em>m AHD</em> (metres on the Australian Height Datum, about metres above sea level), '
+        + 'as the digital twin does. Zoomed in close it reads Geoscience Australia\'s 5 m LiDAR laser survey, to the '
+        + 'centimetre; further out, or where the survey does not reach, it gives ≈ the height from the ~30 m satellite '
+        + 'terrain, to the metre. Remembered on this device.',
+    ] },
     { n: 278, date: '2026-11-12', items: [
       '📻 <strong>Telemetry: what the base stations hear, charted.</strong> A new tab in the Data group, beside 📨 Message Log. '
         + 'Every burst the named base stations picked up, hour by hour for a week or day by day for a year: how much came in, how '

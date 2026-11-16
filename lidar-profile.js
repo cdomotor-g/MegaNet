@@ -436,10 +436,41 @@ const LidarProfile = (function () {
     return { ok: true, prof: { ...base, terrain_m: terrain, lidar, ground: 'lidar' }, report };
   }
 
+  // ── one point ──
+  // The ground at a single spot, for the Stations map's height readout under
+  // the pointer (map-height.js): the same ~1 km tiles, so a spot a path has
+  // already fetched costs nothing, and a spot the pointer rests on fetches its
+  // tile once for every path and readout after it.
+  //   peek(lat, lon)  at once, from tiles already here: a height in m AHD, NaN
+  //                   where the grid holds nothing there, null where its tile
+  //                   has not been fetched
+  //   point(lat, lon) resolves — never rejects — to { ok: true, h } (m AHD),
+  //                   { ok: false, none: true } (no survey here) or
+  //                   { ok: false, failed: true } (the service did not answer)
+  function peek(lat, lon) {
+    const t = tileOf(lat, lon);
+    if (!inExtent(t)) return NaN;
+    const c = cache.get(t.key);
+    if (!c) return null;
+    return c.grid ? heightAt(t, c.grid, lat, lon) : NaN;
+  }
+  function point(lat, lon) {
+    const t = tileOf(lat, lon);
+    return tile(t).then(r => {
+      if (r && r.grid) {
+        const h = heightAt(t, r.grid, lat, lon);
+        return h === h ? { ok: true, h } : { ok: false, none: true };
+      }
+      return r && r.none ? { ok: false, none: true } : { ok: false, failed: true };
+    });
+  }
+
   return {
     attribution: ATTRIB,
     STEP_M, END_M, NEAR_M, MAX_SAMPLES,
     refine,
+    peek,
+    point,
     highest,
     roundingOf,
     zonesOf,

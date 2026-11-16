@@ -397,7 +397,7 @@ try {
   // the pointer and leaves the pins' own names; remembered across a reload.
   {
     const sw = await page.evaluate(() => {
-      const b = document.querySelector('#leaflet-map .leaflet-top.leaflet-right .mn-map-tips');
+      const b = document.querySelector('#leaflet-map .leaflet-top.leaflet-right .mn-map-tips:not(.mn-map-height)');
       const r = document.querySelector('#leaflet-map .mn-map-reset');
       if (!b) return null;
       const bb = b.getBoundingClientRect(), rb = r ? r.getBoundingClientRect() : null;
@@ -413,22 +413,22 @@ try {
       const perm = L.tooltip({ permanent: true, direction: 'bottom', className: 'mn-pin-label' }).setLatLng(state.map.getCenter()).setContent('A pin').addTo(state.map);
       const vis = t => t._container.offsetWidth > 0;
       const out = { hover: vis(hov), pin: vis(perm), off: MapTipStack.off(), stored: localStorage.getItem('mn-map-tips'),
-        pressed: document.querySelector('.mn-map-tips').getAttribute('aria-pressed'),
+        pressed: document.querySelector('.mn-map-tips:not(.mn-map-height)').getAttribute('aria-pressed'),
         cls: state.map.getContainer().classList.contains('mn-tips-off') };
       hov.remove(); perm.remove();
       return out;
     });
     let t = await tipState();
     check('on: a hover name shows', t.hover && t.pin && !t.off, J(t));
-    await page.click('.mn-map-tips');
+    await page.click('.mn-map-tips:not(.mn-map-height)');
     t = await tipState();
     check('pressed: hover names are hidden, a pin\'s own name stays, and the button says off',
       !t.hover && t.pin && t.off && t.stored === 'off' && t.pressed === 'false' && t.cls, J(t));
     await page.reload();
-    await page.waitForFunction(() => typeof state !== 'undefined' && state.map && document.querySelector('.mn-map-tips'), null, { timeout: LOAD_TIMEOUT });
+    await page.waitForFunction(() => typeof state !== 'undefined' && state.map && document.querySelector('.mn-map-tips:not(.mn-map-height)'), null, { timeout: LOAD_TIMEOUT });
     t = await tipState();
     check('…and it is still off after a reload', !t.hover && t.pin && t.off && t.pressed === 'false' && t.cls, J(t));
-    await page.click('.mn-map-tips');
+    await page.click('.mn-map-tips:not(.mn-map-height)');
     t = await tipState();
     check('pressed again: hover names are back', t.hover && !t.off && t.stored === 'on' && t.pressed === 'true' && !t.cls, J(t));
   }

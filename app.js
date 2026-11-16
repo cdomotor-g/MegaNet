@@ -7003,6 +7003,10 @@ function initMap() {
   // 💬 under ↺: the hover notes — that one and every other name that follows
   // the pointer — on or off, remembered (map-tip-stack.js).
   MapTipStack.attachSwitch(state.map);
+  // AHD under 💬: the ground's height under the pointer in m AHD, as the
+  // digital twin shows it — 5 m LiDAR where it covers, ~30 m terrain
+  // elsewhere — on or off, remembered (map-height.js).
+  MapHeight.attachSwitch(state.map);
   MapPhotos.attach(state.map);
   MapCameras.attach(state.map);
   MapRain.attach(state.map);

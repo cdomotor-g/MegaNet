@@ -5296,6 +5296,46 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 }
 /* …and what it switches: every name that comes and goes with the pointer. */
 .mn-tips-off .mn-hover-tip { display: none !important; }
+/* AHD under 💬: the ground height switch (map-height.js), in 💬's dress with
+   the letters for its face; on, it wears the accent, as an armed mode does. */
+.mn-map-tips.mn-map-height > span {
+  font-size: .5rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+.mn-map-tips.mn-map-height.is-on {
+  background: var(--accent, #0b5cab);
+  color: #fff;
+  opacity: 1;
+}
+@media (pointer: coarse) {
+  .mn-map-tips.mn-map-height > span { font-size: .7rem; }
+}
+/* …and its readout: the twin's probe (.twin-probe) in dress, below and left of
+   the pointer, over the 3-D canvas (750) and under the corner's controls. */
+.mn-height-tip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 760;
+  display: grid;
+  gap: .05rem;
+  max-width: 17rem;
+  padding: .3rem .5rem;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-2);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.mn-height-tip[hidden] { display: none; }
+.mn-height-tip > strong { font-size: var(--fs-sm); }
+.mn-height-tip > span { color: var(--muted); }
 
 .mn-prop-tip-h { font-weight: 700; }
 .mn-prop-tip-l { font-weight: 500; font-size: .68rem; color: #5d4037; }
@@ -21526,12 +21566,18 @@ body.has-sort-bridge .signin-nudge { display: none; }
 #map3d.has-water .maplibregl-ctrl-bottom-right { bottom: var(--twin-caveat-h); }
 
 #map3d .map3d-water-scale {
-  /* Under ↺, or under the digital twin's offer while that is up across the
-     top of the map (--map3d-top, from the script). */
-  top: max(calc(2 * var(--sp-2) + 2.4rem), calc(var(--map3d-top, 0px) + var(--sp-2)));
+  /* Under ↺ and the two small switches under it (💬 and AHD, each its size
+     and Leaflet's 10 px), or under the digital twin's offer while that is up
+     across the top of the map (--map3d-top, from the script). */
+  --map3d-switches: calc(2 * (1.75rem + 10px));
+  top: max(calc(2 * var(--sp-2) + 2.4rem + var(--map3d-switches)), calc(var(--map3d-top, 0px) + var(--sp-2)));
   bottom: calc(var(--map3d-foot-r, 7rem) + var(--sp-2));
   width: 10rem;
   z-index: 2;
+}
+
+@media (pointer: coarse) {
+  #map3d .map3d-water-scale { --map3d-switches: calc(2 * (2.75rem + 10px)); }
 }
 
 #map3d .map3d-water-scale .twin-scale-labels { right: calc(var(--scale-hit) + .25rem); }

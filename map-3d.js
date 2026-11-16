@@ -4264,10 +4264,16 @@ const Map3D = (function () {
     // over a spot a click would take. Not while a button is down: that is a
     // drag of the camera, and the label goes until it stops.
     map.on('mousemove', e => {
+      // The ground's height under the pointer, when its switch is on
+      // (map-height.js) — read here, where e.lngLat is the ground the
+      // pointer is on rather than the flat map's idea of it.
+      if (typeof MapHeight !== 'undefined' && MapHeight.enabled()) {
+        MapHeight.move3d(e.lngLat.lat, e.lngLat.lng, e.originalEvent, map.getZoom(), leaflet && leaflet.getContainer());
+      }
       if (e.originalEvent && e.originalEvent.buttons) { hideTip(); return; }
       hoverAt(e.point);
     });
-    map.on('mouseout', () => { tipAt = null; hideTip(); });
+    map.on('mouseout', () => { tipAt = null; hideTip(); if (typeof MapHeight !== 'undefined') MapHeight.hide(); });
     map.on('movestart', hideTip);
     // The credits kept folded while driving (foldCredit), and the ⓘ heard.
     map.on('sourcedata', foldCredit);
@@ -5358,6 +5364,9 @@ const Map3D = (function () {
     host = makeHost();
     if (!host) return Promise.resolve(false);
     host.classList.add('is-loading');
+    // The flat map's ground height readout (map-height.js) is about a point
+    // this view is about to stand somewhere else: its own moves bring it back.
+    if (typeof MapHeight !== 'undefined') MapHeight.hide();
     return loadLib().then(() => {
       state.map3d = true;
       demFails = 0;
@@ -5390,6 +5399,9 @@ const Map3D = (function () {
     // Leaflet's handlers back, and the follow off, before anything else — this
     // runs on every attach() and every stop(), open or not.
     releaseLeaflet();
+    // The ground height readout (map-height.js) was following this view's
+    // pointer; the flat map's next move puts it back.
+    if (typeof MapHeight !== 'undefined') MapHeight.hide();
     // The finder's pins are markers on this map; they would go with it, but
     // each also holds listeners on it, so they are taken off first.
     for (const p of sitePins) { try { p.remove(); } catch (_) {} }

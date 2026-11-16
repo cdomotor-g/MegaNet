@@ -394,6 +394,15 @@ jobs:
         working-directory: test
         run: npm run lidar
 
+      # Node-only and fast. The Stations map's ground height under the pointer
+      # (map-height.js): LidarProfile's one-point read off its test seam, and
+      # the readout's words — LiDAR in m AHD, the tiles put into AHD with ≈,
+      # above EGM96 where the geoid has nothing, and "No ground height".
+      - name: Ground height under the pointer — one point, the words
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run mapheight
+
       # Node-only and fast. plot-lines.js — the parser behind a function typed
       # on the Plots chart, and the curve fits — against answers known in
       # advance, and the parser refusing anything outside its grammar.
