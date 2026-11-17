@@ -599,7 +599,7 @@ const SignalRoutes = (() => {
     const placed = s => s && s.lat != null && s.lon != null;
     const reg = register();
     const home = list.find(s => s.id === '18_bateson' && placed(s)) || list.find(s => (s.roles || []).includes('base') && placed(s)) || list.find(placed);
-    const bases = list.filter(s => (s.roles || []).includes('base') && placed(s));
+    const bases = list.filter(s => (s.roles || []).includes('base') && !s.decommissioned && placed(s));
     const nearest = st => bases.slice().sort((p, q) => (km(st, p) || 0) - (km(st, q) || 0))[0] || home;
     // One pass over the stations: each one only a single repeater could send.
     const own = new Map();

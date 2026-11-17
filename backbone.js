@@ -1267,7 +1267,7 @@ const Backbone = (() => {
         pts.push([s.lat, s.lon]);
       });
     }
-    stations().filter(s => (s.roles || []).includes('base') && placed(s)).forEach(s => {
+    stations().filter(s => (s.roles || []).includes('base') && !s.decommissioned && placed(s)).forEach(s => {
       L.marker([s.lat, s.lon], { icon: L.divIcon({ className: 'bk-base-icon', html: '◆', iconSize: [14, 14] }), keyboard: false })
         .bindTooltip(esc(`${s.name} (base station)`)).addTo(S.layer);
     });

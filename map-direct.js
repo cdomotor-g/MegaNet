@@ -152,7 +152,7 @@ const MapDirect = (function () {
   // where the readings come in), a repeater, and a field station on the radio
   // — placed, and not proposed.
   function canList(s) {
-    if (!s || !Array.isArray(s.roles) || s.proposed) return false;
+    if (!s || !Array.isArray(s.roles) || s.proposed || s.decommissioned) return false;
     if (isBase(s)) return true;
     if (!placed(s)) return false;
     if (isRep(s)) return true;

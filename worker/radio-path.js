@@ -187,6 +187,8 @@ export function stationNode(r, repeaterRec) {
     lat: num(r.lat),
     lon: num(r.lon),
     elevation_ahd: num(r.elevation_ahd),
+    // The station's own antenna height (0125), null where not recorded.
+    antenna_height_m: num(r.antenna_height_m),
     roles,
     rm_system_id: r.rm_system_id ?? null,
     rx_mhz: rep ? num(rep.rx_mhz) : null,
@@ -206,6 +208,8 @@ export function stationNode(r, repeaterRec) {
 export function buildTopology(rows) {
   const nodes = new Map();
   for (const r of rows || []) {
+    // A decommissioned repeater or base (0125) relays nothing.
+    if (r && r.decommissioned === true) continue;
     const n = stationNode(r, r.repeater);
     if (n) nodes.set(n.id, n);
   }
@@ -336,10 +340,14 @@ export { pairKey };
 // The antenna height a station is modelled at under `model` — path-profile.js
 // stationAntenna at the default mast height for the field model, the radio
 // system's own height before it. null for a model whose rule is not known.
+//
+// A station's own antenna height (0125), where recorded, is the figure under
+// any model that is known, as stationAntenna takes it.
 export function antennaAgl(node, sys, model = FADE_MODEL) {
   const own = sys && sys.antenna_height_m != null ? Number(sys.antenna_height_m) : FADE_DEFAULT_AGL_M;
   const m = MODELS[model];
   if (!m) return null;
+  if (node && node.antenna_height_m != null && node.antenna_height_m > 0) return node.antenna_height_m;
   if (!m.mast) return own;
   const mast = node.roles.includes('repeater') || node.roles.includes('base') ? FADE_SETTINGS.mastAgl : 0;
   return mast > own ? mast : own;
@@ -409,7 +417,7 @@ function settingsWords(settings) {
 //   settings   the same model, other settings (the field allowance, LiDAR…)
 //   moved      an end's recorded position is not the one it was worked out at
 //   height     an end's ground height (m AHD) has changed
-//   antenna    an end's antenna height has changed (its radio system's)
+//   antenna    an end's antenna height has changed (its own, or its radio system's)
 //   radio      an end's transmit power, antenna gain, line loss or receive
 //              threshold has changed
 //   frequency  the line's frequency (its repeater's receive frequency) has changed

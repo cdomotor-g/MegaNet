@@ -46,7 +46,7 @@ const Home = (() => {
   const num = n => Number(n).toLocaleString();
 
   function stations() {
-    return ((state.data && state.data.stations) || []).filter(s => !s.proposed);
+    return ((state.data && state.data.stations) || []).filter(s => !s.proposed && !s.decommissioned);
   }
 
   function counts() {

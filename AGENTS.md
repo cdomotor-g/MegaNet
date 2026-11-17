@@ -133,6 +133,10 @@ Full documentation: [`docs/agent-api.md`](docs/agent-api.md).
     number (the dossier's `identity` and first lines say so, and search rows
     and the dossier's `nearby_stations` carry the flag); never report it as a
     station on the ground;
+  - a station with `decommissioned: true` was **taken out of service**, its
+    readings and record kept — not expected to report, so never call it overdue
+    or broken; `antenna_height_m`, where not null, is its antenna's recorded
+    height above the ground;
   - health and readings, the latest readings included, are only what reached
     Flood-Net's own ingest — most stations report through the Bureau's
     systems, so "not recorded" there, or a station missing from the latest

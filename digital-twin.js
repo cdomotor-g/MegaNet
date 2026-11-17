@@ -3221,6 +3221,8 @@ void main() {
   // antenna height itself, like the pole, is never scaled.
   function antennaAgl(st) {
     const sys = typeof rmSystemOf === 'function' ? rmSystemOf(st) : null;
+    // The station's own antenna height (0125) first, as the radio maths take it.
+    if (st && st.antenna_height_m != null && Number(st.antenna_height_m) > 0) return Number(st.antenna_height_m);
     if (sys && isFinite(sys.antenna_height_m)) return Number(sys.antenna_height_m);
     return typeof PATH_DEFAULT_AGL === 'number' ? PATH_DEFAULT_AGL : 4;
   }

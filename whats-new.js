@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 281, date: '2026-11-17', items: [
+      '📡 <strong>A station\'s own antenna height.</strong> The station editor has a new box beside <em>Radio system</em>: '
+        + '<em>Antenna height (m above ground)</em>, from the ground to the antenna, tower or mast included. Where it is filled in, '
+        + 'the radio paths, fade margins, hops, coverage and the digital twin use it in place of the radio system\'s 4 m — for '
+        + 'ALERT and ERTS stations with their antenna up a tower. The station card shows it.',
+      '🪦 <strong>Decommissioned stations.</strong> A new <em>Decommissioned</em> tick box beside <em>Proposed</em> and '
+        + '<em>Enabled</em>, with the year. Nothing is deleted: the station stays on the map and in the list, greyed, with its '
+        + 'readings, photos, inspections and history. It is left out of the "not heard" checks and no radio path runs through it. '
+        + 'Untick it to bring the station back.',
+    ] },
     { n: 280, date: '2026-11-17', items: [
       '🗺️ <strong>More map layers, from open government data.</strong> In the Stations map\'s <em>Map display</em>, a new '
         + '<em>More map layers</em> fold: high-voltage power lines and gas pipelines across Australia; Energex and Ergon\'s '

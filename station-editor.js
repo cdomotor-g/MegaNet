@@ -328,6 +328,72 @@ function editorProposedChanged(on) {
   if (blank) blank.textContent = on ? '— choose one —' : '— not recorded —';
 }
 
+// The Decommissioned box (0125), on the row with Proposed and Enabled, and the
+// year it was taken out of service beside it once ticked. Anybody who may edit
+// the station may tick it or untick it: nothing is deleted either way.
+function editorDecommissionedBoxHtml(s) {
+  const on = !!s.decommissioned;
+  return `
+        <label class="check-label ef-decom" title="${escAttr(DECOMMISSIONED_MEANS)}">
+          <input type="checkbox" id="ef-decom" ${on ? 'checked' : ''}
+                 onchange="editorDecommissionedChanged(this.checked)"> Decommissioned
+        </label>
+        <label class="ef-decom-year" id="ef-decom-year-wrap" ${on ? '' : 'hidden'}>in
+          <input type="number" id="ef-decom-year" min="1900" max="2200" step="1" inputmode="numeric"
+                 value="${s.decommissioned_year == null ? '' : esc(String(s.decommissioned_year))}"
+                 placeholder="year" aria-label="The year it was decommissioned, where known"></label>`;
+}
+
+// The box ticked or unticked: the year and the line under the row shown or
+// put away, in place, as editorProposedChanged does.
+function editorDecommissionedChanged(on) {
+  const wrap = document.getElementById('ef-decom-year-wrap');
+  if (wrap) wrap.hidden = !on;
+  const year = document.getElementById('ef-decom-year');
+  if (on && year && !year.value) year.value = String(new Date().getFullYear());
+  const hint = document.getElementById('ef-decom-hint');
+  if (hint) hint.hidden = !on;
+}
+
+// What the antenna height box says while it is blank: the height the radio
+// maths take instead — the radio system's, raised to the mast minimum at a
+// repeater or base (stationAntenna, path-profile.js).
+function editorAntennaPlaceholder(s) {
+  try {
+    if (typeof stationAntenna === 'function' && typeof rmSystemOf === 'function') {
+      const st = { ...s, antenna_height_m: null };
+      const a = stationAntenna(st, rmSystemOf(st));
+      return `not recorded — modelled at ${a.agl} m`;
+    }
+  } catch (_) { /* the placeholder is a courtesy */ }
+  return 'not recorded';
+}
+
+// What a decommissioning has to say before it is sent: that the station is not
+// also proposed, and a year a person could mean. Null when there is nothing
+// to say.
+function editorDecommissionProblem(d) {
+  if (d.antenna_height_m != null && !(d.antenna_height_m > 0 && d.antenna_height_m <= 150)) {
+    return `Not saved — an antenna height is more than 0 and at most 150 m above the ground, not ${d.antenna_height_m}. Your edits are still here.`;
+  }
+  if (!d.decommissioned) return null;
+  if (d.proposed) {
+    return 'Not saved — a station is not both proposed and decommissioned: untick one. Your edits are still here.';
+  }
+  if (d.decommissioned_year != null && (d.decommissioned_year < 1900 || d.decommissioned_year > 2200)) {
+    return `Not saved — ${d.decommissioned_year} is not a year a station could have been decommissioned (1900–2200). Your edits are still here.`;
+  }
+  return null;
+}
+
+// The schema a database needs before it can keep these (0125), or null when
+// it can or nobody knows — editorProposalsKnown's pattern.
+function editorDecommissionKnown() {
+  const v = typeof Auth !== 'undefined' && Auth.schemaVersion ? Auth.schemaVersion() : null;
+  const known = v != null ? v : (state.dbStatus && state.dbStatus.version != null ? state.dbStatus.version : null);
+  return known == null || known >= 125 ? null : known;
+}
+
 // What a proposal has to say before it is sent: the three things
 // save_station() asks of one, in the editor's words, so a missing one is found
 // at the keyboard rather than after a round trip. Null when there is nothing
@@ -535,7 +601,8 @@ function editorForm(s) {
   editorOwnerAsk(s);
   return `
     <div class="panel-header ef-head"><div class="ef-head-in">
-      <h3>${esc(s.name) || (s.proposed ? 'New Proposed Station' : 'New Station')}</h3>
+      <h3>${esc(s.name) || (s.proposed ? 'New Proposed Station' : 'New Station')}${
+        s.decommissioned ? ` ${decommissionedTagHtml(s, { short: true })}` : ''}</h3>
       ${editorHeardHtml(s)}
       <div class="button-group">
         <!-- Undo, only while something is unsaved (editorUnsavedRefresh shows
@@ -615,8 +682,11 @@ function editorForm(s) {
         <label class="check-label ef-enabled">
           <input type="checkbox" id="ef-enabled" ${s.enabled ? 'checked' : ''}> Enabled
         </label>
+        ${editorDecommissionedBoxHtml(s)}
       </div>
       ${editorProposedHintHtml(s)}
+      <div class="full small ef-hint" id="ef-decom-hint" ${s.decommissioned ? '' : 'hidden'}>
+        ${esc(DECOMMISSIONED_MEANS)} Nothing is deleted: untick it to bring the station back.</div>
       <label class="full">Notes<textarea id="ef-notes">${esc(s.notes || '')}</textarea></label>
     </div>
     <hr>
@@ -672,10 +742,23 @@ function editorForm(s) {
       ${typeof StationLpu !== 'undefined' ? StationLpu.editorHtml(s) : ''}
       ${efFieldHtml({ id: 'ef-rmsys', caption: 'Radio system', hint: 'ef-h-rmsys',
         control: `<select id="ef-rmsys">${editorRmSystemOptions(s.rm_system_id)}</select>` })}
+      <!-- The antenna's own height above the ground (0125), beside the radio
+           system whose height it replaces where it is recorded: an ALERT or
+           ERTS station with its antenna up a tower is well above the system's
+           4 m. Blank is not recorded. -->
+      ${efFieldHtml({ id: 'ef-antenna', caption: 'Antenna height (m above ground)', hint: 'ef-h-antenna',
+        control: `<input type="number" id="ef-antenna" min="0.1" max="150" step="0.1" inputmode="decimal"
+             value="${s.antenna_height_m == null ? '' : esc(String(s.antenna_height_m))}"
+             placeholder="${escAttr(editorAntennaPlaceholder(s))}">` })}
       <div class="full small ef-hint hint-fold" id="ef-h-rmsys" hidden>
         The transmitter this station is priced with in the link budget, the fade-margin map and the
         site finder: its power (1, 5 or 25 W), antenna gain, cable loss and receiver threshold, from
-        the Radio Mobile file. The station's own mast height, where it has one, wins over the system's.
+        the Radio Mobile file. The station's own antenna height, beside it, wins over the system's
+        where it is recorded.
+      </div>
+      <div class="full small ef-hint hint-fold" id="ef-h-antenna" hidden>
+        ${esc(ANTENNA_HEIGHT_MEANS)} Measure from the ground at the foot of the tower or mast to the
+        antenna. Not the <em>Tower platform height</em> above, which is the deck the Digital Twin draws.
       </div>
       ${efFieldHtml({ id: 'ef-bucket', caption: 'TBRG bucket size (mm/tip)', hint: 'ef-h-bucket',
         control: `<input type="number" step="0.1" min="0" id="ef-bucket" value="${s.TBRGbucketSize ?? ''}" placeholder="not recorded">` })}
@@ -1132,6 +1215,17 @@ function editorReadForm() {
   const towerBox = document.getElementById('ef-tower');
   const tower = towerBox ? pFloat(towerBox.value) : (d.tower_height ?? null);
   if (tower != null) d.tower_height = tower; else delete d.tower_height;
+  // 0125's, the same way: the antenna height absent where blank, and
+  // `decommissioned` only where it is, with its year only while it is.
+  const antBox = document.getElementById('ef-antenna');
+  const ant = antBox ? pFloat(antBox.value) : (d.antenna_height_m ?? null);
+  if (ant != null) d.antenna_height_m = Math.round(ant * 10) / 10; else delete d.antenna_height_m;
+  const decomBox = document.getElementById('ef-decom');
+  const decom = decomBox ? decomBox.checked : !!d.decommissioned;
+  if (decom) d.decommissioned = true; else delete d.decommissioned;
+  const dyBox = document.getElementById('ef-decom-year');
+  const dyear = decom ? (dyBox ? pInt(dyBox.value) : (d.decommissioned_year ?? null)) : null;
+  if (dyear != null) d.decommissioned_year = dyear; else delete d.decommissioned_year;
   // 0044's, the same way: absent where blank, 360 being north again.
   const facingBox = document.getElementById('ef-facing');
   const facing = facingBox ? pFloat(facingBox.value) : (d.facing_deg ?? null);
@@ -1250,9 +1344,21 @@ async function editorSave() {
 
   // A proposal that does not say what, when or where; and one headed for a
   // database that would take it for an ordinary station (0039).
-  const unproposed = editorProposalProblem(d);
+  const unproposed = editorProposalProblem(d) || editorDecommissionProblem(d);
   if (unproposed) {
     setEditorStatus({ kind: 'error', text: unproposed });
+    return;
+  }
+  // A database before 0125 would drop the antenna height and the
+  // decommissioning without a word: say so rather than save half of it.
+  const before125 = d.decommissioned || d.antenna_height_m != null ? editorDecommissionKnown() : null;
+  if (before125 != null) {
+    setEditorStatus({
+      kind: 'error',
+      text: `Not saved — the database is at schema ${before125} and cannot keep an antenna height or a`
+          + ' decommissioning yet. It needs db/migrations/0125_station_antenna_decommissioned.sql applied'
+          + ' first. Your edits are still here.',
+    });
     return;
   }
   const older = d.proposed || (!isNew && !!state.editorDraft.proposed) ? editorProposalsKnown() : null;

@@ -140,8 +140,9 @@ const MapHops = (function () {
   const stations = () => (state.data && state.data.stations) || [];
   const byId = id => stations().find(s => s.id === id) || null;
   const placed = s => !!s && s.lat != null && s.lon != null;
-  const isRep = s => !!s && Array.isArray(s.roles) && s.roles.includes('repeater') && !!s.repeater;
-  const isBase = s => !!s && Array.isArray(s.roles) && s.roles.includes('base');
+  // A decommissioned repeater or base (0125) is no hop: it is off the air.
+  const isRep = s => !!s && !s.decommissioned && Array.isArray(s.roles) && s.roles.includes('repeater') && !!s.repeater;
+  const isBase = s => !!s && !s.decommissioned && Array.isArray(s.roles) && s.roles.includes('base');
   const kmOf = (a, b) => (placed(a) && placed(b) ? acmaHaversineKm(a.lat, a.lon, b.lat, b.lon) : null);
   const linkKm = () => (state.mapMaxLinkKm > 0 ? state.mapMaxLinkKm : 100);
   const now_ = () => Date.now();

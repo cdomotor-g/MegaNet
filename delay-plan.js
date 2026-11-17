@@ -196,7 +196,7 @@ const DelayPlan = (function () {
   function plan(stations, opts) {
     const o = settings(opts);
     const list = Array.isArray(stations) ? stations : [];
-    const live = s => s && s.enabled !== false && !s.proposed;
+    const live = s => s && s.enabled !== false && !s.proposed && !s.decommissioned;
 
     // Repeaters, numbered. A repeater with no position or no open window can
     // relay nothing the plan can place; it is listed, and left out of the search.

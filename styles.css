@@ -11958,6 +11958,51 @@ body.mn-cardw-dragging {
 
 .stn-trail-item .proposed-tag { flex: 0 0 auto; margin-left: 0; }
 
+/* A decommissioned station (0125): the same tag, grey and solid — out of
+   service, not planned — and its list row and card band greyed to match its
+   pin. */
+.decom-tag {
+  display: inline-block;
+  margin-left: .35rem;
+  padding: 0 .45rem;
+  border: 1px solid var(--muted);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--muted) 14%, var(--panel));
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: .03em;
+  line-height: 1.5;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.stn-card-proposed-head .decom-tag { margin: 0 .35rem 0 0; }
+/* The editor's year beside its Decommissioned box, on the one line. */
+.ef-flags .ef-decom-year {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.ef-flags .ef-decom-year[hidden] { display: none; }
+.ef-flags .ef-decom-year input { width: 6rem; }
+tr.stn-row-decom td { color: var(--muted); }
+tr.stn-row-decom .stn-name { opacity: .7; }
+.stn-card-decom {
+  background: color-mix(in srgb, var(--muted) 10%, var(--panel));
+  box-shadow: inset 3px 0 0 var(--muted);
+}
+.legend-dot-decom {
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #9aa0a6;
+  background: #9aa0a6;
+  opacity: .7;
+}
+
 /* The band the card opens with: it qualifies everything under it. */
 .stn-card-proposed {
   background: color-mix(in srgb, var(--warn) 9%, var(--panel));

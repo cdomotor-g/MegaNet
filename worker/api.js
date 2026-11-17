@@ -617,6 +617,7 @@ const COMPACT_SELECT = [
   'id', 'name', 'station_number', 'lat', 'lon', 'elevation_ahd', 'elevation_source', 'roles',
   'radio_network_ids', 'catchment_ids', 'hub_id', 'basin', 'lga', 'stream', 'awrc_number',
   'location_types', 'alert_ids', 'satcom', 'enabled', 'proposed', 'station_type', 'proposed_year',
+  'decommissioned', 'decommissioned_year', 'antenna_height_m',
   'sensor(type,alert_id)', 'station_flood_class(ord)', 'station_aep_level(ord)',
   'station_crossing(ord)', 'station_gauge_survey(ord)', 'station_flood_effect(ord)',
 ].join(',');
@@ -686,6 +687,13 @@ function compactRow(r, { sls, health, catchments, from } = {}) {
     proposed: r.proposed === true,
     station_type: r.station_type || null,
     proposed_year: num(r.proposed_year),
+    // Taken out of service, its readings and record kept, and the year where
+    // known (0125). False and null on a station in service.
+    decommissioned: r.decommissioned === true,
+    decommissioned_year: num(r.decommissioned_year),
+    // The antenna's own height above the ground, in metres, where recorded
+    // (0125); null where the radio system's height stands in for it.
+    antenna_height_m: num(r.antenna_height_m),
     telemetry: {
       alert_ids: r.alert_ids || {},
       sensor_types: uniq(sensors.map(s => s.type).filter(Boolean)),
@@ -1878,7 +1886,7 @@ async function acmaSection(rc, st, relayP) {
 
 // station_frequency: every channel each one is on record on, beside its
 // repeater pair — what a hop on is checked against (radio-path.js channelTo).
-const RADIO_TOPOLOGY_SELECT = 'id,name,station_number,lat,lon,elevation_ahd,roles,rm_system_id,'
+const RADIO_TOPOLOGY_SELECT = 'id,name,station_number,lat,lon,elevation_ahd,roles,rm_system_id,antenna_height_m,decommissioned,'
   + 'repeater(rx_mhz,tx_mhz,pass_range(kind,lo,hi)),station_frequency(rx_mhz,tx_mhz)';
 const LINK_FADE_SELECT = 'station_a_id,station_b_id,kind,margin_db,margin_ab_db,margin_ba_db,distance_km,freq_mhz,verdict,'
   + 'signature,model,good_db,ok_db,band,computed_at';
@@ -2228,6 +2236,10 @@ function identitySection(st, doc) {
     proposed: doc.proposed === true,
     station_type: doc.station_type || null,
     proposed_year: doc.proposed_year ?? null,
+    // Taken out of service, its readings and record kept (0125).
+    decommissioned: doc.decommissioned === true,
+    decommissioned_year: doc.decommissioned_year ?? null,
+    antenna_height_m: doc.antenna_height_m ?? null,
     roles: doc.roles || [],
     kinds: stationKinds(doc),
     location_types: doc.location_types || [],
@@ -2560,6 +2572,12 @@ function summaryLines(doc, d) {
     lines.push(`It is proposed, not yet established${type ? `: ${type}` : ''}`
       + `${doc.proposed_year ? `, proposed for ${doc.proposed_year}` : ''}`
       + `${doc.station_number ? '' : ', with no Bureau number until it is'}.`);
+  }
+  // A decommissioned station says so as early (0125): it is not reporting
+  // because it was taken out, not because something is wrong with it.
+  if (doc.decommissioned === true) {
+    lines.push(`It is decommissioned${doc.decommissioned_year ? ` (since ${doc.decommissioned_year})` : ''}: taken out of service,`
+      + ' with its readings and record kept. It is not expected to report, and no radio path runs through it.');
   }
   if (d.location.elevation_ahd_m != null) lines.push(`Ground height ${d.location.elevation_ahd_m} m AHD (${d.location.elevation_source}).`);
   const sl = d.service_level;

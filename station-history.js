@@ -92,6 +92,8 @@ const StationHistory = (function () {
     ['urbs_label', 'URBS label'], ['location_types', 'Location types'],
     ['tbrg_bucket_size', 'TBRG bucket (mm a tip)'], ['inspection_config_key', 'Inspection form'],
     ['tower_height', 'Tower platform (m)'], ['facing_deg', 'Faces (° from true north)'],
+    ['antenna_height_m', 'Antenna height (m above ground)'], ['decommissioned', 'Decommissioned'],
+    ['decommissioned_year', 'Decommissioned in'],
     ['flood_peaks_from', 'Takes its floods from'], ['legacy_unit_id', 'Legacy unit'],
     ['site', 'Site'], ['document_managed', 'In stations.json'],
   ];

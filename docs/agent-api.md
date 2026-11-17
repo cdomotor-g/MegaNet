@@ -353,6 +353,7 @@ curl -s 'https://floodwarning.net/api/v1/stations?near=-18.51,146.0&radius_km=10
       "basin": "Herbert River", "stream": "HERBERT RIVER", "lga": "Hinchinbrook Shire", "hub_id": "cairns",
       "radio_network_ids": [], "awrc_number": "116914", "enabled": true,
       "proposed": false, "station_type": null, "proposed_year": null,
+      "decommissioned": false, "decommissioned_year": null, "antenna_height_m": null,
       "telemetry": { "alert_ids": { "rainfall": 6039 }, "sensor_types": ["Rainfall", "Rainfall Increment", "Water Level", "Battery"],
                      "satcom": false, "last_seen_at": null, "last_reading_at": null },
       "sls": { "gauge_type": "Automatic", "data_type": "Rainfall/River", "priority": "High", "owner": "Hinchinbrook Shire Council", "jurisdiction": "QLD" },
@@ -448,6 +449,15 @@ type or `null`, and `null` on a station that never was a proposal. A dossier's
 `nearby_stations` marks a proposed neighbour with `"proposed": true`. Check
 them before reporting a station as one on the ground.
 
+A **decommissioned** station — taken out of service, with its readings and
+record kept (0125) — carries `"decommissioned": true` and, where known,
+`decommissioned_year`. It is not expected to report: don't report it as
+overdue or broken, and no radio path runs through it. A station in service has
+`"decommissioned": false`. `antenna_height_m` is the antenna's own height
+above the ground in metres where somebody has recorded it — an antenna up a
+tower — and `null` where the radio system's height stands in; radio paths use
+it where it is recorded.
+
 ### `GET /api/v1/stations/{id}/dossier`
 
 Everything a report drafter needs about one station, in one call. Every section
@@ -458,7 +468,7 @@ never silently missing, and "not recorded" never means zero.
 | Section | What is in it |
 |---|---|
 | `summary` | a few plain sentences built from the sections below |
-| `identity` | name, Bureau/AWRC numbers, URBS label, ARRO site, owner, roles, kinds, location types, and whether it is only **proposed** — `proposed`, `station_type`, `proposed_year` (a station planned and not yet built, which `summary` says straight after its opening line) |
+| `identity` | name, Bureau/AWRC numbers, URBS label, ARRO site, owner, roles, kinds, location types, and whether it is only **proposed** — `proposed`, `station_type`, `proposed_year` (a station planned and not yet built, which `summary` says straight after its opening line) — or **decommissioned** — `decommissioned`, `decommissioned_year` (taken out of service, its record kept); and `antenna_height_m`, the antenna's own height above the ground where recorded |
 | `location` | lat/lon, height in m AHD **and where it came from** (surveyed, or modelled from a DEM via Elvis), LGA, basin, stream, catchment (with drainage division), maintenance hub |
 | `networks_and_radio` | radio networks, Radio Mobile system, ALERT/ALERT2 addresses, satcom, repeater record, frequencies, the repeaters whose pass ranges cover its addresses, saved modelled link margins |
 | `telemetry` | sensors, health (when Flood-Net last heard from it), a per-channel summary of the last 30 days of daily rollups |
@@ -1786,6 +1796,14 @@ at [`GET /api/v1/changelog`](#get-apiv1changelog), newest first — both from
 in the same push. A change with nothing to notice (a fix inside, a faster
 answer) is not listed.
 
+- **17 November 2026 — Decommissioned stations, and a station's own antenna
+  height.** Station records (search rows and the dossier's `identity`) gain
+  `decommissioned` and `decommissioned_year` — a station taken out of service,
+  its readings and record kept — and `antenna_height_m`, the antenna's own
+  height above the ground where recorded. The dossier's `summary` says when a
+  station is decommissioned. Radio paths leave decommissioned repeaters and base
+  stations out, and work a recorded antenna height in, so a route through one
+  that was taken out disappears. Nothing was removed or renamed.
 - **11 November 2026 — Every copy the base stations heard, and what sent it.**
   A new route, `GET /api/v1/stations/{id}/receptions` (the `get_receptions`
   tool), lists every copy Flood-Net's fixed base stations heard of a station's

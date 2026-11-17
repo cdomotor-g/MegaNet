@@ -3461,6 +3461,27 @@ function proposedTagHtml(s, { short = false } = {}) {
     + `>Proposed${!short && s.proposed_year ? ` ${esc(String(s.proposed_year))}` : ''}</span>`;
 }
 
+// A decommissioned station (0125): taken out of service, with its readings,
+// photos, inspections and history kept. Named the same way wherever it is
+// named — a grey tag beside it on the station card, in the station list and in
+// the editor — with the year on the tag (unless `short`) and the meaning on
+// its tooltip. Empty for a station still in service.
+const DECOMMISSIONED_MEANS = 'Taken out of service. Its readings, photos, inspections and history are kept, and it'
+  + ' stays on the map and in the list, greyed. Flood-Net does not expect to hear from it, leaves it out of the'
+  + ' not-heard checks, and routes no radio path through it.';
+function decommissionedTagHtml(s, { short = false } = {}) {
+  if (!s || !s.decommissioned) return '';
+  const yr = s.decommissioned_year ? String(s.decommissioned_year) : '';
+  return `<span class="decom-tag" title="${escAttr(`Decommissioned${yr ? ` in ${yr}` : ''}. ${DECOMMISSIONED_MEANS}`)}"`
+    + `>Decommissioned${!short && yr ? ` ${esc(yr)}` : ''}</span>`;
+}
+
+// A station's own antenna height (0125), in words for a hover and the editor's
+// ⓘ: what the number is and what it changes.
+const ANTENNA_HEIGHT_MEANS = 'How high the antenna is above the ground at the station, in metres — the tower or mast'
+  + ' included. Where it is recorded, the radio paths, fade margins, hops and coverage are worked out at this height;'
+  + ' where it is not, at the height its radio system says (4 m for a field station).';
+
 // ── ARRO ──────────────────────────────────────────────────────────────────────
 // ARRO (Contrail) is where a station's telemetry actually lives, and the only
 // key it accepts is `site.db_id` — an arbitrary database index, *not* the BoM
@@ -4109,7 +4130,7 @@ const DB_SCHEMA = 'meganet';
 // 123: what the base stations hear, for anybody (0123), applied by db-migrate.yml
 // on 12 November 2026, bumped after; telemetry.js reads it, and a database
 // without it says the Telemetry summary is not there yet and offers the demo.
-const DB_SCHEMA_VERSION = 124;
+const DB_SCHEMA_VERSION = 125;
 
 // Host without the /rest/v1, for showing the operator where they are pointed.
 //

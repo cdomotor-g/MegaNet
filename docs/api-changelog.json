@@ -2,6 +2,16 @@
   "about": "Every change to Flood-Net's agent API (https://floodwarning.net/api/v1 and https://floodwarning.net/api/mcp) that someone using it would notice — a route, a field, a limit, a tool — newest first. Each entry is emailed once to everyone on the API notify list (sign up at https://floodwarning.net/api#notify). Served as JSON at https://floodwarning.net/api/v1/changelog and written up in docs/agent-api.md, under Changes. Add an entry in the same push as the change: it is what tells people.",
   "entries": [
     {
+      "id": "2026-11-17-decommissioned-antenna-height",
+      "date": "2026-11-17",
+      "title": "Decommissioned stations, and a station's own antenna height",
+      "summary": "Station records — GET /api/v1/stations search rows and the dossier's identity — gain decommissioned and decommissioned_year (a station taken out of service, with its readings and record kept; false and null on a station in service) and antenna_height_m (the antenna's own height above the ground in metres, where somebody has recorded one, such as an antenna up a tower; null otherwise). The dossier's summary says when a station is decommissioned. Radio paths (get_radio_path) leave decommissioned repeaters and base stations out, and use a recorded antenna height in place of the radio system's, so a route through a station that was taken out disappears. Nothing was removed or renamed.",
+      "breaking": false,
+      "links": [
+        { "text": "What a station record says", "url": "https://github.com/cdomotor-g/MegaNet/blob/main/docs/agent-api.md" }
+      ]
+    },
+    {
       "id": "2026-11-11-station-receptions",
       "date": "2026-11-11",
       "title": "Every copy the base stations heard, and what sent it",

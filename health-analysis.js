@@ -1819,7 +1819,7 @@ const HealthAnalysis = (() => {
     let outOfRange = 0;
     if (heardRepIds.size) {
       for (const s of stations) {
-        if (stationIds.has(s.id) || s.enabled === false || s.proposed) continue;
+        if (stationIds.has(s.id) || s.enabled === false || s.proposed || s.decommissioned) continue;
         if (Array.isArray(s.roles) && s.roles.includes('repeater')) continue;
         const ids = typeof stationAlertIds === 'function' ? stationAlertIds(s).filter(a => a <= 8191) : [];
         if (!ids.length) continue;

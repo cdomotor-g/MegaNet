@@ -56,7 +56,7 @@ const iso = t => new Date(t).toISOString();
 const day = t => iso(t).slice(0, 10);
 
 const COLUMNS = Object.fromEntries(Object.entries({
-  station: 'id ord name station_number lat lon elevation_ahd elevation_source roles radio_network_ids catchment_ids alert_ids satcom rm_system_id enabled notes legacy_unit_id site lga basin location_types hub_id owner awrc_number stream urbs_label tbrg_bucket_size inspection_config_key alert2_station_id proposed station_type proposed_year deleted_at updated_at updated_by',
+  station: 'id ord name station_number lat lon elevation_ahd elevation_source roles radio_network_ids catchment_ids alert_ids satcom rm_system_id enabled notes legacy_unit_id site lga basin location_types hub_id owner awrc_number stream urbs_label tbrg_bucket_size inspection_config_key alert2_station_id proposed station_type proposed_year decommissioned decommissioned_year antenna_height_m deleted_at updated_at updated_by',
   station_json: 'id ord updated_at doc',
   sensor: 'station_id sensor_id type ord alert_id device_id alert2_sensor_id updated_at updated_by',
   repeater: 'station_id acma_licence rx_mhz tx_mhz notes delay_ms updated_at updated_by',
@@ -126,7 +126,9 @@ DOC.stations.forEach((s, ord) => {
     awrc_number: s.awrc_number ?? null, stream: s.stream ?? null, urbs_label: s.urbs_label ?? null,
     tbrg_bucket_size: s.TBRGbucketSize ?? null, inspection_config_key: s.inspection_config_key ?? null,
     alert2_station_id: s.alert2_station_id ?? null, proposed: s.proposed === true, station_type: s.station_type ?? null,
-    proposed_year: s.proposed_year ?? null, deleted_at: null, updated_at: stationUpdated, updated_by: null,
+    proposed_year: s.proposed_year ?? null, decommissioned: s.decommissioned === true,
+    decommissioned_year: s.decommissioned_year ?? null, antenna_height_m: s.antenna_height_m ?? null,
+    deleted_at: null, updated_at: stationUpdated, updated_by: null,
   });
   T.station_json.push({ id: s.id, ord, updated_at: stationUpdated, doc: s });
   (s.sensors || []).forEach((x, i) => T.sensor.push({ station_id: s.id, sensor_id: x.sensor_id, type: x.type, ord: i,

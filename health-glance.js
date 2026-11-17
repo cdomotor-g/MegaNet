@@ -558,7 +558,8 @@ const HealthGlance = (() => {
     if (m && m.classes === classes && m.list === list && m.n === list.length) return Object.assign({}, m.t);
     const t = { ok: 0, watch: 0, fault: 0, nodata: 0, total: 0 };
     list.forEach(s => {
-      if (s.lat == null || s.lon == null) return;
+      // A decommissioned station (0125) is in no class: it is not on the air.
+      if (s.lat == null || s.lon == null || s.decommissioned) return;
       t[classOf(s.id)]++;
       t.total++;
     });
@@ -689,6 +690,9 @@ const HealthGlance = (() => {
   function heard(s, now) {
     if (!s) return { cls: 'unknown', lastHeard: null };
     if (s.proposed) return { cls: 'proposed', lastHeard: null };
+    // Decommissioned (0125): not expected to report, so never overdue — when it
+    // was last heard is kept, as a record.
+    if (s.decommissioned) return { cls: 'decommissioned', lastHeard: knowledgeOf(s.id).lastHeard ?? null };
     const k = knowledgeOf(s.id);
     const c = cards.get(s.id);
     if (k.lastHeard == null) {
@@ -708,6 +712,11 @@ const HealthGlance = (() => {
     if (h.cls === 'asking') return '';
     if (h.cls === 'proposed') {
       return '<span class="txt-muted" title="Proposed — not built yet, so there is nothing to have heard">—</span>';
+    }
+    if (h.cls === 'decommissioned') {
+      const was = h.lastHeard != null ? `${agoHtml(now - h.lastHeard)}` : '—';
+      return `<span class="txt-muted" title="Decommissioned — not expected to report${h.lastHeard != null
+        ? `; last heard ${esc(HealthAnalysis.fmtWhen(h.lastHeard, now))}` : ''}">${was}</span>`;
     }
     if (h.cls === 'unknown') {
       return `<span class="txt-muted" title="${net.denied
@@ -785,6 +794,13 @@ const HealthGlance = (() => {
     const h = heard(s, now);
     const label = '<span class="txt-muted">Last heard</span> ';
     if (h.cls === 'asking') return `${label}<span class="txt-muted">asking…</span>`;
+    if (h.cls === 'decommissioned') {
+      const off = '<span class="txt-muted">— decommissioned, not expected to report</span>';
+      if (h.lastHeard == null) return `${label}<span class="txt-muted">never</span> ${off}`;
+      const y = new Date(h.lastHeard).getFullYear();
+      const stamp = HealthAnalysis.fmtWhen(h.lastHeard, now) + (y !== new Date(now).getFullYear() ? ` ${y}` : '');
+      return `${label}<time datetime="${esc(new Date(h.lastHeard).toISOString())}">${esc(stamp)}</time> ${off}`;
+    }
     if (h.cls === 'unknown') {
       return `${label}<span class="txt-muted" title="${net.denied
         ? 'The datastore would not let this browser read when stations were last heard'

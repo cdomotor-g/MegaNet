@@ -150,11 +150,19 @@ function stationIsMast(st) {
 // more than the mast height wins, so a register that records the real mast
 // is never overruled. The mast height is 4 m by default since 5 November 2026
 // (it was 10 m), so on the 4 m system it raises nothing unless the card's
-// setting asks. { agl, sysAgl, mast } — mast true when it was raised.
+// setting asks. { agl, sysAgl, mast, recorded } — mast true when it was
+// raised.
+//
+// A station's own antenna height (0125), where somebody has recorded it, is
+// the figure outright — an ALERT or ERTS antenna up a tower is where it is,
+// whatever the system says and whatever the mast minimum would make of it —
+// and `recorded` says so.
 function stationAntenna(st, sys) {
   const own = sys && sys.antenna_height_m != null ? Number(sys.antenna_height_m) : PATH_DEFAULT_AGL;
+  const rec = st && st.antenna_height_m != null && Number(st.antenna_height_m) > 0 ? Number(st.antenna_height_m) : null;
+  if (rec != null) return { agl: rec, sysAgl: own, mast: false, recorded: true };
   const mastAgl = stationIsMast(st) ? pathPropOf().mastAgl : 0;
-  return mastAgl > own ? { agl: mastAgl, sysAgl: own, mast: true } : { agl: own, sysAgl: own, mast: false };
+  return mastAgl > own ? { agl: mastAgl, sysAgl: own, mast: true, recorded: false } : { agl: own, sysAgl: own, mast: false, recorded: false };
 }
 
 // The effective-earth factor a path's refractivity implies. ITM reduces the
@@ -3698,6 +3706,7 @@ const PathProfile = (function () {
         ? `: the survey (${e.elev.toFixed(1)} m AHD) is ${E.lift.toFixed(1)} m under it, so the end stands on it` : ''}`;
     };
     const aglOf = (e, agl) => `${agl.toFixed(1)} m AGL — ${radioIsOver(e.key, 'agl_m') ? 'edited on the card'
+      : e.station && stationAntenna(e.station, e.sys).recorded ? 'recorded on the station'
       : e.station && stationAntenna(e.station, e.sys).mast ? `the repeater/base mast minimum (its radio system says ${stationAntenna(e.station, e.sys).sysAgl} m)`
       : e.sys ? 'its radio system' : 'default'}`;
     const coverAt = (cls, R, agl, db) => {

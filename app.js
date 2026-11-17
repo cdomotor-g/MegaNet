@@ -1475,7 +1475,9 @@ function primaryRole(s) {
 // turns that O(stations) scan into an O(repeaters) one.
 function repeaterList(allStations) {
   if (!state.repeaterIdx) {
-    state.repeaterIdx = allStations.filter(s => s.roles.includes('repeater') && s.repeater);
+    // A decommissioned repeater (0125) relays nothing: it is on the map, greyed,
+    // and in no route, hop, pass range or blast radius.
+    state.repeaterIdx = allStations.filter(s => s.roles.includes('repeater') && s.repeater && !s.decommissioned);
   }
   return state.repeaterIdx;
 }
@@ -6387,7 +6389,11 @@ function mapLegendHtml() {
     ${health ? '' : `<span class="legend-item">
       <span class="legend-dot legend-dot-proposed" style="--dot:${roleVar('field')}"></span>
       <span class="small">Proposed — not yet established</span>
-    </span>`}`),
+    </span>`}
+    <span class="legend-item" title="${escAttr(DECOMMISSIONED_MEANS)}">
+      <span class="legend-dot legend-dot-decom"></span>
+      <span class="small">Decommissioned — kept, greyed</span>
+    </span>`),
   ];
   const links = [
     // The plain link colour. With a colouring running it is not what a link
@@ -7092,6 +7098,7 @@ const MAP_PIN_HIT   = '#ffc400';
 const MAP_PIN_REL   = '#00b8d4';   // dashed ring: on the map by relation, not by name
 const MAP_PIN_PROPOSED_FILL = '#ffffff';   // a proposed station (0039): hollow…
 const MAP_PIN_PROPOSED_DASH = '3,3';       // …inside a dashed ring of its role's colour
+const MAP_PIN_DECOM = '#9aa0a6';           // a decommissioned station (0125): greyed, fill and ring
 const MAP_PIN_SEL   = '#7c4dff';   // heavy ring: hand-picked into the map selection.
                                    // Violet is none of the role fills, none of the
                                    // ACMA colours, and neither the amber of a filter
@@ -7584,6 +7591,9 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     // in its role's colour — the way a map marks something planned rather than
     // built, and it keeps that ring's dashes whatever else rings it.
     const proposed = !!s.proposed;
+    // A decommissioned station (0125) is greyed — fill and ring, a little faded —
+    // and takes no health or latency colour: it is not expected to report.
+    const decom = !!s.decommissioned;
     // Colour pins by health (#218): the fill is the station's health, and the
     // size and the ring say it again — bigger is worse, a dashed ring to
     // watch, a heavy one at fault, hollow in a dotted ring for no data. A
@@ -7595,8 +7605,8 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     // ⏱️ Latency (map-latency.js) takes the fill the same way, by how fresh the
     // station's data is, and the two are never on together — so whichever is
     // on is the one asked, and the rest of this reads either.
-    const lat = MapLatency.pinStyle(s);
-    const hg = lat || (MapLatency.on() ? null : HealthGlance.pinStyle(s));
+    const lat = decom ? null : MapLatency.pinStyle(s);
+    const hg = decom ? null : lat || (MapLatency.on() ? null : HealthGlance.pinStyle(s));
     // …and its signal bars beside it — its SNR band — under any of those
     // colourings or the roles', so latency and signal read at once.
     const bars = MapLatency.barsFor(s);
@@ -7606,11 +7616,11 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     const hgRadius = MapSymbols.radius(hg ? Math.max(3, radius + hg.grow) : radius, sym);
     const base = {
       radius:      hgRadius,
-      color:       hit ? MAP_PIN_HIT : rel ? MAP_PIN_REL : hg ? hg.ring : proposed ? color : MAP_PIN_RING,
+      color:       hit ? MAP_PIN_HIT : rel ? MAP_PIN_REL : hg ? hg.ring : proposed ? color : decom ? MAP_PIN_DECOM : MAP_PIN_RING,
       weight:      hit || rel ? 3 : hg && hg.weight ? hg.weight : proposed ? 3 : 2,
       dashArray:   rel ? '4,3' : hg ? hg.dash : proposed ? MAP_PIN_PROPOSED_DASH : null,
-      opacity:     dim ? 0.6 : 1,
-      fillOpacity: dim ? 0.45 : 1,
+      opacity:     dim ? 0.6 : decom ? 0.75 : 1,
+      fillOpacity: dim ? 0.45 : decom ? 0.55 : 1,
     };
     // A CircleMarker that can be a triangle and carry an outline
     // (MapSymbols.marker): every restyle below and in the modules that
@@ -7618,7 +7628,7 @@ function refreshMapLayers({ skipFit = false, animate } = {}) {
     // own, and the shape and the outline ride along untouched.
     const marker = MapSymbols.marker([s.lat, s.lon], {
       ...base,
-      fillColor:   hg ? hg.fill : proposed ? MAP_PIN_PROPOSED_FILL : color,
+      fillColor:   hg ? hg.fill : proposed ? MAP_PIN_PROPOSED_FILL : decom ? MAP_PIN_DECOM : color,
       className:   hit ? 'mn-pin mn-pin-hit' : rel ? 'mn-pin mn-pin-rel' : 'mn-pin',
       bubblingMouseEvents: false,          // a pin click is not an empty-map click
       mnShape:     sym.triangle ? 'triangle' : 'circle',
@@ -8544,7 +8554,7 @@ function stationsTable(allStations) {
         ${stations.map(s => {
           const aids = stationAlertIds(s);
           return `
-            <tr class="row-link ${state.selectedId === s.id ? 'selected' : ''}" data-sid="${escAttr(s.id)}"
+            <tr class="row-link ${state.selectedId === s.id ? 'selected' : ''}${s.decommissioned ? ' stn-row-decom' : ''}" data-sid="${escAttr(s.id)}"
                 onclick="pickStationFromList('${escAttr(s.id)}')">
               <td title="${esc(s.id)}"><button type="button" class="row-open stn-name role-${primaryRole(s)}"
                     aria-pressed="${state.selectedId === s.id}"
@@ -8553,6 +8563,7 @@ function stationsTable(allStations) {
               <td class="small stn-num">${markHits(s.station_number || '', marks.number)}</td>
               <td>${s.roles.map(r => `<span class="badge">${esc(r)}</span>`).join(' ')}${
                 s.proposed ? ` ${proposedTagHtml(s)}` : ''}${
+                s.decommissioned ? ` ${decommissionedTagHtml(s)}` : ''}${
                 s.roles.includes('repeater') && repeaterPassingCount(s) != null
                   ? ` <span class="badge" title="ALERT addresses carried, in this repeater's open pass ranges">passing ${repeaterPassingCount(s)}</span>`
                   : ''}${
@@ -9402,6 +9413,21 @@ function stnCardProposalHtml(s) {
     </div>`;
 }
 
+// The band a decommissioned station's card opens with (0125): that it is out
+// of service, since when where that is known, and that what it recorded is
+// still here. Greyed, as its pin and its list row are.
+function stnCardDecommissionedHtml(s) {
+  if (!s || !s.decommissioned) return '';
+  return `
+    <div class="acma-sect stn-card-decom" role="note" aria-label="Decommissioned station">
+      <p class="stn-card-proposed-head">${decommissionedTagHtml(s, { short: true })}
+        <strong>Out of service${s.decommissioned_year ? ` since ${esc(String(s.decommissioned_year))}` : ''}</strong></p>
+      <p class="small stn-card-proposed-line">Its readings, photos, inspections and history are kept. Flood-Net does not
+        expect to hear from it and routes no radio path through it. An editor brings it back by unticking
+        <em>Decommissioned</em>.</p>
+    </div>`;
+}
+
 // Who owns a station, as one answer — the station card's top row, the station
 // editor and the Station Health tab all read it. The Bureau's Service Level
 // Specification's "Station owner" (sls.js) is the word on it wherever it
@@ -9535,6 +9561,8 @@ function stnCardHtml(s) {
       ${acmaCardRow('Stn #', s.station_number ? esc(s.station_number)
         : s.proposed ? '<span class="txt-muted">none yet — proposed</span>' : null)}
       ${!s.proposed && s.station_type ? acmaCardRow('Type', esc(stationTypeLabel(s.station_type))) : ''}
+      ${s.antenna_height_m != null ? acmaCardRow(termHtml('Antenna', ANTENNA_HEIGHT_MEANS),
+          `${esc(String(s.antenna_height_m))} m above ground`) : ''}
     </div>`;
 
   // Its health (#218): when it was last heard, its battery's night lows and
@@ -9701,7 +9729,7 @@ function stnCardHtml(s) {
     head,
     // A proposed station says so before anything else on its card (0039):
     // nothing in it is about a station on the ground yet. On every tab.
-    proposal: stnCardProposalHtml(s),
+    proposal: stnCardProposalHtml(s) + stnCardDecommissionedHtml(s),
     // 📻 Radio ends with the ACMA licences near the station (map-acma.js).
     groups: { about, health, data: stnCardDataHtml(s), flood,
       radio: `${radio}${typeof MapAcma !== 'undefined' ? MapAcma.cardHtml(s) : ''}`, site, kit, act },

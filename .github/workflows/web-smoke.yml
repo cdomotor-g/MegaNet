@@ -1221,6 +1221,16 @@ jobs:
         working-directory: test
         run: npm run proposed
 
+      # A station's own antenna height and its decommissioning (0125): the
+      # editor's two fields, what a save sends, the radio maths taking a
+      # recorded height, and a decommissioned station greyed — pin, card, list
+      # and legend — and left out of the repeaters; what is refused at the
+      # keyboard, a database before 0125 included.
+      - name: Decommissioned stations and antenna heights — set in the editor, greyed, relaying nothing
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run decommissioned
+
       # The station history (0056, station-history.js) on the card and the
       # Admin tab, against a stand-in for the database that writes a change row
       # on a save the way the trigger does (tools/check_station_history.sql

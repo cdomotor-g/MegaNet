@@ -1183,7 +1183,7 @@ const MapLatency = (() => {
 
   function scopeList() {
     const b = U.scope === 'view' && map ? map.getBounds() : null;
-    return stations().filter(s => s.lat != null && s.lon != null && !s.proposed
+    return stations().filter(s => s.lat != null && s.lon != null && !s.proposed && !s.decommissioned
       && (!MapSymbols.drawn || MapSymbols.drawn(s))
       && (!b || b.contains([s.lat, s.lon])));
   }

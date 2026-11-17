@@ -153,7 +153,7 @@ function backboneIndex() {
   // built from the real file later — passRelationIndex's own convention.
   if (!state.data) return { pairs: [], cover: new Map(), offAir: [] };
   const reps = repeaterList(state.data.stations);
-  const bases = state.data.stations.filter(s => s.roles.includes('base'));
+  const bases = state.data.stations.filter(s => s.roles.includes('base') && !s.decommissioned);
   const addresses = passRelationIndex().addresses;
   const windows = new Map();
   const cover = new Map();
@@ -254,7 +254,7 @@ function repeaterPathsOf(rep, maxKm) {
   const isBase = s => Array.isArray(s.roles) && s.roles.includes('base');
   if (rep.repeater) {
     for (const f of passRelationIndex().byRepeater.get(rep.id) || []) {
-      if (!f || f.id === rep.id || isRep(f) || isBase(f) || f.proposed || f.lat == null || f.lon == null) continue;
+      if (!f || f.id === rep.id || isRep(f) || isBase(f) || f.proposed || f.decommissioned || f.lat == null || f.lon == null) continue;
       const km = acmaHaversineKm(rep.lat, rep.lon, f.lat, f.lon);
       if (km <= K) out.upTo.push({ s: f, km, how: 'carries' });
     }
@@ -262,7 +262,7 @@ function repeaterPathsOf(rep, maxKm) {
   for (const p of backboneIndex().pairs) {
     if (p.kind !== 'repeater' || p.km > K || (p.a.id !== rep.id && p.b.id !== rep.id)) continue;
     const other = p.a.id === rep.id ? p.b : p.a;
-    if (other.proposed) continue;
+    if (other.proposed || other.decommissioned) continue;
     const how = p.overlap > 0 ? 'shares' : p.oneWay ? 'carries' : 'each';
     if (!p.oneWay || p.b.id === rep.id) out.upTo.push({ s: other, km: p.km, how });
     if (!p.oneWay || p.a.id === rep.id) out.onFrom.push({ s: other, km: p.km, how });
