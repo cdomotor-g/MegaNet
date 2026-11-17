@@ -30881,3 +30881,13 @@ details.tm-fold summary { cursor: pointer; }
 }
 .mn-feed-sect > summary { cursor: pointer; font-weight: 600; }
 .mn-feed-chip { margin-left: .4em; font-weight: 400; }
+/* The Atlas's weed records and the storm tide pins (map-feeds.js, #293). */
+.legend-dot.mn-feed-ala, .mn-feed-ala { background: #6a1b9a; border: 1px solid #fff; }
+.mn-tide-pin {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%; font-size: 11px; line-height: 1;
+  background: #e8f1fb; box-shadow: 0 0 0 2px #1565c0; cursor: help;
+}
+.mn-tide-high { box-shadow: 0 0 0 2px #c62828; background: #fdecea; }
+.mn-tide-low  { box-shadow: 0 0 0 2px #6d4c41; }
+.mn-tide-none { opacity: .55; box-shadow: 0 0 0 2px #888; }

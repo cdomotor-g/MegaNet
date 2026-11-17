@@ -35,7 +35,7 @@ function check(name, pass, detail = '') {
 
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
-const HOSTS = /(services\.ga\.gov\.au|spatial-gis\.information\.qld\.gov\.au\/arcgis\/rest\/services\/(InlandWaters\/(FloodLines|GroundAndSurfaceWaterMonitoring)|Boundaries\/CulturalHeritage|Environment\/ParksTerrestrial|Farming\/Biosecurity)|gis\.environment\.gov\.au|ows\.dea\.ga\.gov\.au|services\.arcgis\.com\/[^/]+\/ArcGIS\/rest\/services\/Network_)/;
+const HOSTS = /(services\.ga\.gov\.au|spatial-gis\.information\.qld\.gov\.au\/arcgis\/rest\/services\/(InlandWaters\/(FloodLines|GroundAndSurfaceWaterMonitoring)|Boundaries\/CulturalHeritage|Environment\/ParksTerrestrial|Farming\/Biosecurity)|gis\.environment\.gov\.au|api\.ala\.org\.au|apps\.des\.qld\.gov\.au|ows\.dea\.ga\.gov\.au|services\.arcgis\.com\/[^/]+\/ArcGIS\/rest\/services\/Network_)/;
 const CENTER = { lat: -27.535, lon: 152.99 };
 
 const asked = [];   // every stubbed request: { path, params }
@@ -48,6 +48,25 @@ function answer(url) {
   const png = () => ({ status: 200, contentType: 'image/png', body: PNG });
 
   if (u.host === 'ows.dea.ga.gov.au') return png();
+  if (u.host === 'api.ala.org.au') {
+    // Near whatever point is asked about (the card), else the view's centre.
+    const lat = p.lat ? Number(p.lat) : CENTER.lat, lon = p.lon ? Number(p.lon) : CENTER.lon;
+    return json({ totalRecords: 3, occurrences: [
+      { vernacularName: 'Lantana', scientificName: 'Lantana camara', year: 2025, decimalLatitude: lat + 0.001, decimalLongitude: lon },
+      { vernacularName: 'Lantana', scientificName: 'Lantana camara', year: 2019, decimalLatitude: lat + 0.004, decimalLongitude: lon },
+      { vernacularName: null, scientificName: 'Pontederia crassipes', year: 2009, decimalLatitude: lat, decimalLongitude: lon + 0.01 },
+    ] });
+  }
+  if (u.host === 'apps.des.qld.gov.au') {
+    return { status: 200, contentType: 'text/csv', body: [
+      'Tide Data provided @ 13:05hrs on 17-11-2026',
+      'Site, Seconds, DateTime, Water Level, Prediction, Residual, Latitude, Longitude',
+      'whyteislandnx,1794883200,2026-11-17T12:40,1.762,1.745,0.017,-27.4017,153.1574',
+      'whyteislandnx,1794883800,2026-11-17T12:50,2.196,1.782,0.414,-27.4017,153.1574',
+      'whyteislandnx,1794884400,2026-11-17T13:00,-99.000,1.818,-99.000,-27.4017,153.1574',
+      'abellpoint,1794232800,2026-11-10T00:00,-99.000,1.915,-99.000,-20.2608,148.7103',
+    ].join('\n') };
+  }
   if (/Oil_Gas_Pipelines\/MapServer\/export$/.test(u.pathname)) return { status: 500, contentType: 'text/plain', body: 'down' };
   if (/\/export$/.test(u.pathname)) return png();
   if (/\/legend$/.test(u.pathname)) {
@@ -129,13 +148,13 @@ try {
   })));
   check('the list holds the feeds the epic asked for',
     ['ga-power', 'ga-pipes', 'qld-network', 'qld-flood-history', 'qld-dam-flood', 'dea-water', 'qld-gauges',
-     'qld-heritage', 'qld-parks', 'capad', 'qld-biosecurity', 'qld-fences', 'qld-weeds'].every(id => list.some(f => f.id === id)),
+     'qld-heritage', 'qld-parks', 'capad', 'qld-biosecurity', 'qld-fences', 'qld-weeds', 'ala-weeds', 'qld-tides'].every(id => list.some(f => f.id === id)),
     list.map(f => f.id).join(','));
   check('every feed has a label, a meaning of a sentence or more, and a source with a licence and a page',
     list.every(f => f.label && f.meaning.length > 60 && f.src && f.src.by && f.src.licence && /^https:/.test(f.src.page)),
     JSON.stringify(list.filter(f => !(f.label && f.meaning.length > 60))));
   check('every service address is https',
-    list.every(f => f.kind === 'network' || /^https:\/\//.test(f.url)));
+    list.every(f => ['network', 'ala', 'tide'].includes(f.kind) || /^https:\/\//.test(f.url)));
   check('ids are distinct', new Set(list.map(f => f.id)).size === list.length);
 
   // ── 2. The controls ───────────────────────────────────────────────────
@@ -220,6 +239,36 @@ try {
   const sel = await page.evaluate(() => [...document.querySelectorAll('#mn-feed-weed option')].map(o => o.textContent));
   check('the weed list is the service’s, alphabetical', sel.join('|') === 'African boxthorn|Lantana', sel.join('|'));
 
+  // The Atlas's weed records and the storm tide gauges.
+  asked.length = 0;
+  await page.evaluate(() => { MapFeeds.setEnabled('ala-weeds', true); MapFeeds.setEnabled('qld-tides', true); });
+  await page.waitForFunction(() => {
+    const d = MapFeeds._state().drawn;
+    return d['ala-weeds'] && d['ala-weeds'].note === 'ok' && d['qld-tides'] && d['qld-tides'].note === 'ok';
+  }, null, { timeout: 15_000 }).catch(() => {});
+  const alaAsk = asked.find(a => a.host === 'api.ala.org.au');
+  check('weed records are asked of the Atlas for the view: Queensland’s weed records and the national weeds list only',
+    alaAsk && /^POLYGON\(\(/.test(alaAsk.params.wkt || '') && alaAsk.params.fq === 'data_resource_uid:"dr18218" OR species_list_uid:"dr823"',
+    JSON.stringify(alaAsk && alaAsk.params));
+  const alaNote = await page.evaluate(() => document.getElementById('mn-feed-note-ala-weeds').textContent);
+  check('and the note counts the records drawn', /Drawn: 3 records in view/.test(alaNote), alaNote);
+  const tidePins = await page.evaluate(() => [...document.querySelectorAll('.leaflet-mnFeedPins-pane .mn-tide-pin')]
+    .map(e => ({ cls: e.className, label: e.getAttribute('aria-label') })));
+  check('a pin per storm tide gauge, the latest real reading on it, not the file’s -99 gap',
+    tidePins.length === 2 && tidePins.some(p => /Whyteisland storm tide gauge — 2\.20 m at 2026-11-17 12:50/.test(p.label)
+      && /surge is \+0\.41 m/.test(p.label) && /not AHD/.test(p.label) && /mn-tide-high/.test(p.cls)),
+    JSON.stringify(tidePins));
+  check('and a gauge with no reading in the week says so',
+    tidePins.some(p => /Abellpoint storm tide gauge — no reading/.test(p.label) && /mn-tide-none/.test(p.cls)), JSON.stringify(tidePins));
+  const pinPane = await page.evaluate(() => getComputedStyle(state.map.getPane('mnFeedPins')).pointerEvents);
+  check('the tide pins’ pane takes the pointer, for their figures on hover', pinPane !== 'none', pinPane);
+  asked.length = 0;
+  await page.evaluate(() => { MapFeeds.setEnabled('qld-tides', false); MapFeeds.setEnabled('qld-tides', true); });
+  await page.waitForTimeout(800);
+  check('the 5 MB tide file is read once a visit, not each time the layer is switched',
+    !asked.some(a => a.host === 'apps.des.qld.gov.au'), JSON.stringify(asked.map(a => a.host)));
+  await page.evaluate(() => { MapFeeds.setEnabled('ala-weeds', false); MapFeeds.setEnabled('qld-tides', false); });
+
   // Zoomed out past a feed's floor: no request, and the note says why.
   asked.length = 0;
   await page.evaluate(() => state.map.setZoom(9, { animate: false }));
@@ -269,9 +318,12 @@ try {
     /Example People — cultural heritage party/.test(open.text), open.text.slice(0, 400));
   check('Energex’s underground cable within 30 m',
     /Energex: low voltage \(street supply\), underground \(1\)/.test(open.text), open.text.slice(0, 600));
+  check('the weed records within 2 km, one line a weed, nearest first, with the latest year',
+    /Lantana — 2 records, nearest 110 m, latest 2025/.test(open.text) && /Pontederia crassipes — 1 record, nearest 9[0-9]0 m, latest 2009/.test(open.text)
+      && open.text.indexOf('Lantana — 2') < open.text.indexOf('Pontederia'), open.text);
   check('the weeds in its square, the restricted ones marked',
     /2: African lovegrass, Lantana \(restricted\)/.test(open.text), open.text);
-  check('each row’s word has its meaning on hover', open.terms >= 9, String(open.terms));
+  check('each row’s word has its meaning on hover', open.terms >= 10, String(open.terms));
 
   // ── 5. And the What is here card asks about a point the same way ─────
   const hereSrc = fs.readFileSync(new URL('../map-here.js', import.meta.url), 'utf8');

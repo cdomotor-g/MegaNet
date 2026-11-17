@@ -2,7 +2,7 @@ This is a living tracking issue, not a task to complete. It's the single point o
 
 **Maintenance:** kept up to date whenever any issue in this repo is opened, closed, or edited — see `CLAUDE.md`'s Git workflow section. If this looks stale, that's a bug in that process — flag it. **Since revision 29 the roadmap lives at `roadmap/roadmap-113.md` in the repo; `.github/workflows/roadmap-sync.yml` publishes an excerpt of it into this issue on every push that touches it — edit the file, not this box, or the next sync overwrites the edit.** The issue box holds the allocation, priority and sequencing views; the rest of the roadmap, including the full revision history, is in the file.
 
-Snapshot taken: **2026-11-17** (revision 257 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
+Snapshot taken: **2026-11-17** (revision 258 — see "What changed" at the bottom of [the file](https://github.com/cdomotor-g/MegaNet/blob/main/roadmap/roadmap-113.md)).
 
 ---
 
@@ -231,7 +231,7 @@ Six per-tab issues are about to restyle nineteen tabs in parallel. The decisions
 ### 🗺️ EPIC #291 — more map layers: power, pipes, floods, land and biosecurity from open government data — **OPEN, opened revision 257**
 `[Epic]` `[Opus5/High]` — the rating is for the layer builder; the batches are Sonnet5. Picked by the owner on 2026-11-17 (option B of the sizing card; bushfires, BoM warnings, RainViewer and power outages left out; video screenshots left for a later clean-up). `map-feeds.js` draws every layer from one list — ArcGIS `export`, DEA's WMS as tiles, Energex and Ergon's feature services as lines — in the **More map layers** fold of Map display, and asks the same services about one place in **Open data here** on the station card and What is here. None of it is for finding a cable before digging, and every note says so.
 - ~~**#292**~~ `[Sub-issue of #291]` `[Opus5/High]` — **CLOSED at revision 257, opened at 257** — batches 0–2: the builder and 13 feeds (GA power lines and pipelines; Energex/Ergon overhead and underground, Qld; past flood outlines and dam-failure areas; DEA water seen since 1986; State river gauges; cultural heritage groups; Qld protected areas and CAPAD; fire ant, electric ant and cattle tick zones; barrier fences; the weed survey one weed at a time). The card names a fire ant zone without being opened (one request) and asks the rest only when opened. `npm run feeds` (31, new).
-- **#293** `[Sub-issue of #291]` `[Sonnet5/High]` — **OPEN, opened revision 257** — point data: exact weed sightings near a station (ALA / QWeeds), NSW weed sightings through a Worker relay (**CC BY-NC — the owner confirms Flood-Net is non-commercial first**), Queensland storm tide gauges (find the live CSV first).
+- ~~**#293**~~ `[Sub-issue of #291]` `[Sonnet5/High]` — **CLOSED at revision 258, opened at 257** — point data. **Weed sightings, exact**: the Atlas of Living Australia (Queensland's weed records, dr18218, and the national weeds list, dr823) as dots from zoom 12, and on the card the weeds recorded within 2 km, one line a weed. **Storm tide gauges**: the State's 7-day file (CORS, ~5 MB, read once a visit) as a pin a gauge with its latest reading and surge. **NSW weeds dropped** — the owner chose not to rely on its CC BY-NC licence (revision 258). `npm run feeds` 38.
 - **#294** `[Sub-issue of #291]` `[Sonnet5/Med]` — **OPEN, opened revision 257** — council and water-utility pipe layers (Unitywater, Water Corporation, Barwon, Victorian mains, Ipswich, Ballarat, Surf Coast), each checked live.
 - **#295** `[Sub-issue of #291]` `[Opus5/High]` — **OPEN, opened revision 257** — the State's live river heights (WMIP API) beside ours; datum and CORS first.
 - **#296** `[Sub-issue of #291]` `[Sonnet5/Med]` — **OPEN, opened revision 257** — the new layers in the ⛰️ 3-D view (EPIC #186's rule) and in Views, and the Map display video shot if it now looks different.
@@ -758,7 +758,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ### AI agent — Sonnet5
 | Effort | Issues |
 |---|---|
-| High | **#293** (point data: weed sightings, NSW weeds, storm tide gauges — *pickable now; NSW part waits on the owner's licence answer*) · **#287** (inspection form: the transmitter's ACMA label — *pickable now; not alongside #283 or #284*) · **#283** (ACMA licences: land mobile and area-wide licences drawn too — *pickable now*) · **#217** (transmitter drift as a finding — *live; a week of legacy offsets to look at*) · **#238** (QLDTraffic on the map — flooded and closed roads, damaged bridges; *its flood cameras shipped at revision 192*) |
+| High | ~~#293~~ (*closed at revision 258: weed records and storm tide gauges; NSW weeds dropped*) · **#287** (inspection form: the transmitter's ACMA label — *pickable now; not alongside #283 or #284*) · **#283** (ACMA licences: land mobile and area-wide licences drawn too — *pickable now*) · **#217** (transmitter drift as a finding — *live; a week of legacy offsets to look at*) · **#238** (QLDTraffic on the map — flooded and closed roads, damaged bridges; *its flood cameras shipped at revision 192*) |
 | Med | **#294** (council and water-utility pipe layers — *pickable now*) · **#296** (more map layers in the 3-D view and Views — *pickable now; not at once with another `map-3d.js` change*) · **#284** (licensing state on the Stations list and in exports — *pickable now*) · **#266** (how-to: Flood-Net on your phone — *pickable now*) · **#282** (Supabase's API errors and advice, Cloudflare's Workers and R2 on the Admin tab — *waits on #281*) · **#267** (how-to: map layers and the site's look — *pickable now*) · **#254** (a route kept on the phone for no signal) · **#177** (NSW road parcels) · **#187** (ACMA transmitters in 3-D — its drawings half shipped at revision 147) · **#201** (place a field photo on the map) · **#205** (tides and soils on the card beyond Queensland) · **#220** (maintenance due list) · **#228** (accessibility follow-ups) |
 | Low | — |
 
@@ -875,7 +875,7 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 40. **#281 (the owner's keys, revision 249) before #282 (the Admin tab showing what they reach).** #281 is sign-in only and gates nothing else; #282 can ship the Cloudflare half alone if only that key is made, and the advice half with no key at all.
 41. **EPIC #288 (network watch, revision 254) waits on the owner: its ground rules first, then its children are opened.** Best after #216 (so there is a way to tell people — its first slice is live) and beside #220 (the visit list it would feed). It blocks nothing. Its guarded door would be a migration over `0049`'s requests, one at a time with any other change to `base_station_command` (constraint 2).
 
-42. **EPIC #291 (more map layers, revision 257): #293, #294, #295 and #296 are each pickable now and touch different parts** — #293 and #294 add entries to `map-feeds.js`'s list (one at a time, the list is one file), #295 a new reader beside the gauges layer, #296 `map-3d.js` and `map-views.js` (not at once with #187 or another 3-D change). Gates nothing outside the epic.
+42. **EPIC #291 (more map layers, revision 257): #294, #295 and #296 are each pickable now and touch different parts** (~~#293~~ closed at revision 258) — #294 adds entries to `map-feeds.js`'s list (one at a time, the list is one file), #295 a new reader beside the gauges layer, #296 `map-3d.js` and `map-views.js` (not at once with #187 or another 3-D change). Gates nothing outside the epic.
 
 ## Priority (as stated on each epic/issue, where given)
 - **P2:** ~~#100 (epic) → #102/#103~~ — **the whole epic is closed**; ~~#152 (epic) → #153/#154/#155~~ — **that epic is closed too, at revision 55**; ~~#78 (epic) → #115/#116/#117/#149/#146/#148/#118~~ — **EPIC #78 is closed out; every child of it is shut**; ~~#122 (epic) → #123/#124/#125/#126/#159/#128/#127~~ — **the whole epic is closed**; ~~#129 (epic) → #130/#132/#133/#134/#135~~ — **all closed**
@@ -894,6 +894,15 @@ Two new Leaflet overlay layers for the Stations map, both from QLD Globe/QSpatia
 ---
 
 ## What changed
+
+### Revision 258 — 2026-11-17: 🌊 Storm tide gauges and exact weed sightings — #293 closed
+
+**Closes #293.** The owner chose (Run 2 Q1.2) to leave out the NSW weed sightings rather than rely on their non-commercial licence; the Atlas of Living Australia stands in for them nationally.
+
+- **Weed sightings, exact** (`ala-weeds`): Queensland's weed records and anyone's record of a Weed of National Significance, from the Atlas, as dots from zoom 12 — darker when from the last five years. The Atlas refuses a page over 100 records (503), so a view asks up to three pages. On the card, *Weed sightings nearby*: within 2 km, one line a weed, nearest first, with how many and the latest year.
+- **Storm tide gauges** (`qld-tides`): the State's 7-day file (CC BY 4.0, CORS, ~5 MB) read once a visit while the layer is on; a pin a gauge with its latest real reading (the file's -99 is a gap), the predicted tide and the surge, ringed red at 0.3 m or more; heights above each gauge's tide datum, not AHD. The pins have a pane of their own that takes the pointer (347).
+- **Checks:** `npm run feeds` 31 → 38. Checked live from Brisbane: both drew, and the card listed five weeds within 700 m.
+
 
 ### Revision 257 — 2026-11-17: 🗺️ More map layers — EPIC #291 opened, #292 shipped
 

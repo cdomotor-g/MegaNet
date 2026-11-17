@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 282, date: '2026-11-17', items: [
+      '🌊 <strong>Storm tide gauges on the map.</strong> In <em>More map layers</em>: a pin on each of the State\'s coastal '
+        + 'storm tide gauges with its latest reading — the sea level, the tide predicted, and the surge between them, '
+        + 'ringed red at 0.3 m or more. Hover a pin for its figures.',
+      '🌿 <strong>Weed sightings, exact.</strong> Each recorded weed from the Atlas of Living Australia — Queensland\'s own '
+        + 'records and anyone\'s record of a Weed of National Significance — as a dot on the map from zoom 12, and on '
+        + 'every station card the weeds recorded within 2 km, nearest first, with the latest year.',
+    ] },
     { n: 281, date: '2026-11-17', items: [
       '📡 <strong>A station\'s own antenna height.</strong> The station editor has a new box beside <em>Radio system</em>: '
         + '<em>Antenna height (m above ground)</em>, from the ground to the antenna, tower or mast included. Where it is filled in, '

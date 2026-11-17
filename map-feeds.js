@@ -52,6 +52,12 @@ const MapFeeds = (function () {
   const DEA      = 'https://ows.dea.ga.gov.au/';
   const ENERGEX  = 'https://services.arcgis.com/bfVzktoY0OhzQCDj/ArcGIS/rest/services/Network_Energex/FeatureServer';
   const ERGON    = 'https://services.arcgis.com/33eHbTVqo7gtiCE8/ArcGIS/rest/services/Network_Extract/FeatureServer';
+  const ALA      = 'https://api.ala.org.au/occurrences/occurrences/search';
+  const TIDES    = 'https://apps.des.qld.gov.au/data-sets/storm-tides/tide-7dayopdata.csv';
+  // The weed records asked of the Atlas: Queensland's own weed records
+  // (QWeeds, dr18218) and any record of a Weed of National Significance
+  // (the WoNS list, dr823) from anyone — iNaturalist, councils, herbaria.
+  const ALA_WEEDS = 'data_resource_uid:"dr18218" OR species_list_uid:"dr823"';
 
   const WEED_GROUP = 200;      // the survey's "Weed distribution" group in BIO
   const STORE_KEY  = 'mn-map-feeds';
@@ -143,6 +149,14 @@ const MapFeeds = (function () {
       label: 'Weed survey, one weed at a time (Qld)',
       meaning: 'Where one invasive plant was found in the State’s 2022–23 survey, in squares about 17 km across — so it says the weed is somewhere in that square, not at a site. Pick the weed below. The What is here card lists every surveyed weed in a point’s square.',
       source: { by: 'State of Queensland (Department of Primary Industries)', licence: 'CC BY 4.0', page: 'https://daf.qld.gov.au/business-priorities/biosecurity/invasive-plants-animals/pest-mapping/distribution-maps' } },
+    { id: 'ala-weeds', group: 'bio', kind: 'ala', pane: 'lines', minZoom: 12,
+      label: 'Weed sightings, exact (Australia)',
+      meaning: 'Each place a weed was recorded: Queensland’s own weed records, and anyone’s record of a Weed of National Significance (iNaturalist, councils, herbaria), from the Atlas of Living Australia. A dot is one record, darker when recent. Shown from zoom 12; the station card lists those within 2 km.',
+      source: { by: 'Atlas of Living Australia (records from Biosecurity Queensland, iNaturalist and others)', licence: 'each record’s own, mostly CC BY', page: 'https://www.ala.org.au/biosecurity/' } },
+    { id: 'qld-tides', group: 'flood', kind: 'tide', pane: 'pins', minZoom: 5,
+      label: 'Storm tide gauges, latest reading (Qld)',
+      meaning: 'The State’s storm tide gauges along the coast, each with its latest reading: the sea level measured, the tide predicted for that time, and the difference — the surge a storm or flood is adding. Heights are above each gauge’s own tide datum (usually the lowest tide), not AHD. In calm weather a gauge may only report once a day. Hover a pin for its figures.',
+      source: { by: 'State of Queensland (Department of the Environment, Tourism, Science and Innovation)', licence: 'CC BY 4.0', page: 'https://www.data.qld.gov.au/dataset/coastal-data-system-near-real-time-storm-tide-data' } },
   ];
   const byId = Object.fromEntries(FEEDS.map(f => [f.id, f]));
 
@@ -150,6 +164,9 @@ const MapFeeds = (function () {
     areas: { name: 'mnFeedAreas', z: 327 },
     lines: { name: 'mnFeedLines', z: 333 },
     net:   { name: 'mnFeedNet',   z: 337 },
+    // The tide pins take the pointer, for their figures on hover: over the
+    // survey marks (345) and the bridges (346), under the peaks (348).
+    pins:  { name: 'mnFeedPins',  z: 347, pointer: true },
   };
 
   // The power network's lines, drawn here. Voltage class by colour, overhead
@@ -258,7 +275,7 @@ const MapFeeds = (function () {
     if (!d) return;
     if (d.overlay) {
       d.overlay.remove();
-      if (map && map.attributionControl && byId[id].kind === 'arcgis') map.attributionControl.removeAttribution(byId[id].source.by);
+      if (map && map.attributionControl && byId[id].kind !== 'wms') map.attributionControl.removeAttribution(byId[id].source.by);
     }
     d.overlay = null;
     d.box = null;
@@ -429,6 +446,162 @@ const MapFeeds = (function () {
     if (d) { d.box = null; if (!keepSeq) d.seq++; }
   }
 
+  // ── Drawing points we are handed ────────────────────────────────────────
+  // The Atlas's weed records (a dot each) and the storm tide gauges (a pin
+  // each, its latest reading on hover). Both live in d.overlay as a layer
+  // group, so clear(), active() and the key treat them as the pictures.
+
+  let alaRenderer = null;
+  // The Atlas refuses a page of more than 100 records (503), so a view or a
+  // card asks for up to ALA_PAGES pages of ALA_PAGE, the rest in parallel once
+  // the first has said how many there are.
+  const ALA_PAGE = 100, ALA_PAGES = 3, ALA_MAX = ALA_PAGE * ALA_PAGES;
+
+  function alaPages(extra) {
+    const page = i => askJson(alaParams({ ...extra, pageSize: String(ALA_PAGE), startIndex: String(i * ALA_PAGE) }));
+    return page(0).then(first => {
+      const total = (first && first.totalRecords) || 0;
+      const more = Math.min(ALA_PAGES, Math.ceil(total / ALA_PAGE)) - 1;
+      if (more <= 0) return first;
+      return Promise.all(Array.from({ length: more }, (_, i) => page(i + 1).catch(() => null))).then(rest => ({
+        totalRecords: total,
+        occurrences: [first, ...rest].flatMap(j => (j && j.occurrences) || []),
+      }));
+    });
+  }
+
+  function alaParams(extra) {
+    const p = new URLSearchParams({ q: '*:*', fq: ALA_WEEDS, facet: 'false',
+      fl: 'scientificName,vernacularName,year,decimalLatitude,decimalLongitude', ...(extra || {}) });
+    return `${ALA}?${p}`;
+  }
+
+  function runAla(f) {
+    const d = slot(f.id);
+    if (map.getZoom() < f.minZoom) { clear(f.id); setNote(f.id, 'zoom'); return; }
+    if (d.overlay && d.box && d.box.zoom <= map.getZoom() && d.box.bounds.contains(map.getBounds())) {
+      setNote(f.id, d.cut ? 'cut' : 'ok');
+      return;
+    }
+    if (Date.now() - d.failedAt < FAIL_TTL) { clear(f.id); setNote(f.id, 'fail'); return; }
+    const mine = ++d.seq;
+    const b = map.getBounds().pad(PAD);
+    const ring = [[b.getWest(), b.getSouth()], [b.getEast(), b.getSouth()], [b.getEast(), b.getNorth()],
+                  [b.getWest(), b.getNorth()], [b.getWest(), b.getSouth()]].map(([x, y]) => `${x.toFixed(5)} ${y.toFixed(5)}`).join(',');
+    setNote(f.id, 'loading');
+    alaPages({ wkt: `POLYGON((${ring}))` }).then(json => {
+      if (mine !== d.seq || !map || !on.has(f.id)) return;
+      if (!alaRenderer) alaRenderer = L.canvas({ pane: PANES.lines.name });
+      const group = L.layerGroup();
+      const now = new Date().getFullYear();
+      for (const o of (json && json.occurrences) || []) {
+        if (o.decimalLatitude == null || o.decimalLongitude == null) continue;
+        const age = o.year ? now - o.year : 99;
+        L.circleMarker([o.decimalLatitude, o.decimalLongitude], {
+          renderer: alaRenderer, interactive: false, radius: 4, weight: 1, color: '#fff',
+          fillColor: '#6a1b9a', fillOpacity: age <= 5 ? 0.95 : age <= 20 ? 0.6 : 0.3,
+        }).addTo(group);
+      }
+      const had = !!d.overlay;
+      if (d.overlay) d.overlay.remove();
+      d.overlay = group.addTo(map);
+      if (!had && map.attributionControl) map.attributionControl.addAttribution(f.source.by);
+      d.box = { bounds: b, zoom: map.getZoom(), layers: 'ala' };
+      d.cut = ((json && json.totalRecords) || 0) > ALA_MAX;
+      d.count = ((json && json.occurrences) || []).length;
+      d.url = ALA;
+      setNote(f.id, d.cut ? 'cut' : 'ok');
+      rerenderMapLegend();
+    }).catch(() => {
+      if (mine !== d.seq || !map) return;
+      d.failedAt = Date.now();
+      clear(f.id);
+      setNote(f.id, 'fail');
+    });
+  }
+
+  // The storm tide file is seven days of ten-minute readings from every gauge
+  // (about 5 MB), so it is read once a visit — again after TIDE_TTL — and
+  // only while the layer is on. -99 is the file's "no reading".
+  const TIDE_TTL = 30 * 60000;
+  let tides = null, tidesAt = 0, tidesAsking = null;
+
+  function prettySite(slug) {
+    return String(slug || '').replace(/nx$/, '').replace(/^./, c => c.toUpperCase());
+  }
+
+  function parseTides(text) {
+    const sites = new Map();
+    for (const line of text.split(/\r?\n/)) {
+      const c = line.split(',');
+      if (c.length < 8 || !/^\d+$/.test(c[1])) continue;
+      const level = Number(c[3]), pred = Number(c[4]), resid = Number(c[5]);
+      const lat = Number(c[6]), lon = Number(c[7]);
+      let g = sites.get(c[0]);
+      if (!g) { g = { site: c[0], name: prettySite(c[0]), lat, lon, last: null }; sites.set(c[0], g); }
+      if (level > -90 && isFinite(level)) g.last = { at: c[2], level, pred: pred > -90 ? pred : null, resid: resid > -90 ? resid : null };
+    }
+    return [...sites.values()].filter(g => isFinite(g.lat) && isFinite(g.lon));
+  }
+
+  function tideList() {
+    if (tides && Date.now() - tidesAt < TIDE_TTL) return Promise.resolve(tides);
+    if (tidesAsking) return tidesAsking;
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), TIMEOUT_MS * 2);
+    tidesAsking = fetch(TIDES, { signal: ctl.signal })
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+      .then(text => { tides = parseTides(text); tidesAt = Date.now(); return tides; })
+      .finally(() => { clearTimeout(t); tidesAsking = null; });
+    return tidesAsking;
+  }
+
+  const m2 = v => (v == null ? '—' : `${v.toFixed(2)} m`);
+  const signed = v => (v == null ? '—' : `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)} m`);
+
+  function tideWords(g) {
+    if (!g.last) return `${g.name} storm tide gauge — no reading in the last seven days`;
+    return `${g.name} storm tide gauge — ${m2(g.last.level)} at ${g.last.at.replace('T', ' ')} (AEST); `
+      + `tide predicted ${m2(g.last.pred)}, so the surge is ${signed(g.last.resid)}. Above the gauge’s tide datum, not AHD.`;
+  }
+
+  function runTides(f) {
+    const d = slot(f.id);
+    if (map.getZoom() < f.minZoom) { clear(f.id); setNote(f.id, 'zoom'); return; }
+    if (d.overlay && Date.now() - tidesAt < TIDE_TTL) { setNote(f.id, 'ok'); return; }
+    if (Date.now() - d.failedAt < FAIL_TTL) { clear(f.id); setNote(f.id, 'fail'); return; }
+    const mine = ++d.seq;
+    setNote(f.id, 'loading');
+    tideList().then(list => {
+      if (mine !== d.seq || !map || !on.has(f.id)) return;
+      const group = L.layerGroup();
+      for (const g of list) {
+        const words = tideWords(g);
+        const surge = g.last && g.last.resid != null ? g.last.resid : null;
+        const cls = surge == null ? 'none' : surge >= 0.3 ? 'high' : surge <= -0.3 ? 'low' : 'calm';
+        L.marker([g.lat, g.lon], {
+          pane: PANES.pins.name, keyboard: false, title: words, alt: words,
+          icon: L.divIcon({ className: '', iconSize: [18, 18], iconAnchor: [9, 9],
+            html: `<span class="mn-tide-pin mn-tide-${cls}" role="img" aria-label="${escAttr(words)}">🌊</span>` }),
+        }).addTo(group);
+      }
+      const had = !!d.overlay;
+      if (d.overlay) d.overlay.remove();
+      d.overlay = group.addTo(map);
+      if (!had && map.attributionControl) map.attributionControl.addAttribution(f.source.by);
+      d.count = list.length;
+      d.latest = list.map(g => (g.last ? g.last.at : '')).sort().pop() || '';
+      d.url = TIDES;
+      setNote(f.id, 'ok');
+      rerenderMapLegend();
+    }).catch(() => {
+      if (mine !== d.seq || !map) return;
+      d.failedAt = Date.now();
+      clear(f.id);
+      setNote(f.id, 'fail');
+    });
+  }
+
   // ── Running ─────────────────────────────────────────────────────────────
 
   function run() {
@@ -442,7 +615,10 @@ const MapFeeds = (function () {
       // One feed's fault is not the others': a throw here would leave every
       // feed after it on "Drawing…".
       try {
-        if (f.kind === 'network') runNetwork(f); else runPicture(f);
+        if (f.kind === 'network') runNetwork(f);
+        else if (f.kind === 'ala') runAla(f);
+        else if (f.kind === 'tide') runTides(f);
+        else runPicture(f);
       } catch (_) {
         slot(f.id).failedAt = Date.now();
         setNote(f.id, 'fail');
@@ -465,8 +641,11 @@ const MapFeeds = (function () {
       case 'zoom':    return `Zoom in to draw it (from zoom ${f.minZoom}).`;
       case 'loading': return 'Drawing…';
       case 'fail':    return `Could not be drawn — ${esc(f.source.by)}’s map service did not answer. It is asked again in a minute.`;
-      case 'cut':     return 'Drawn, but the view held more lines than the service hands over at once — zoom in for every line.';
-      case 'ok':      return f.kind === 'network' ? `Drawn: ${netClassesAt(map ? map.getZoom() : 0).map(k => NET_CLASS[k].words.toLowerCase()).join(', ')}.` : 'Drawn.';
+      case 'cut':     return 'Drawn, but the view held more than the service hands over at once — zoom in to see them all.';
+      case 'ok':
+        if (f.kind === 'ala') return `Drawn: ${d.count} record${d.count === 1 ? '' : 's'} in view.`;
+        if (f.kind === 'tide') return `Drawn: ${d.count} gauges, the latest reading ${esc((d.latest || '').replace('T', ' '))} (AEST).`;
+        return f.kind === 'network' ? `Drawn: ${netClassesAt(map ? map.getZoom() : 0).map(k => NET_CLASS[k].words.toLowerCase()).join(', ')}.` : 'Drawn.';
       default:        return '';
     }
   }
@@ -557,6 +736,14 @@ const MapFeeds = (function () {
             <span class="small">${esc(NET_CLASS[k].words)}</span></span>`).join('') + `
           <span class="legend-item"><span class="legend-line mn-feed-net mn-feed-net-ug" style="--dot:#555"></span>
             <span class="small">Dashed: underground cable</span></span>`;
+      } else if (f.kind === 'ala') {
+        body = `<span class="legend-item"><span class="legend-dot mn-feed-ala" aria-hidden="true"></span>
+          <span class="small">One weed record — darker when from the last five years</span></span>`;
+      } else if (f.kind === 'tide') {
+        body = `<span class="legend-item"><span class="mn-tide-pin mn-tide-high" aria-hidden="true">🌊</span>
+          <span class="small">Surge 0.3 m or more above the predicted tide</span></span>
+          <span class="legend-item"><span class="mn-tide-pin mn-tide-calm" aria-hidden="true">🌊</span>
+          <span class="small">Within 0.3 m of the prediction</span></span>`;
       } else if (f.kind === 'wms') {
         body = `<span class="legend-item"><span class="mn-feed-ramp" aria-hidden="true"></span>
           <span class="small">Seen wet: rarely → nearly always</span></span>`;
@@ -583,7 +770,7 @@ const MapFeeds = (function () {
 
   const SECTION_MEANING = 'On a station card and the What is here card: what these open-data maps say about that one place — '
     + 'its biosecurity zones straight away, and when opened, past floods, dam-failure areas, nearby power lines and pipelines, '
-    + 'underground cables within 30 m, cultural heritage groups, protected areas and the weeds surveyed in its square.';
+    + 'underground cables within 30 m, cultural heritage groups, protected areas, the weeds surveyed in its square and the weed records within 2 km.';
 
   const KEY_DP = 5, CACHE_MAX = 100;
   const NEAR_M = 200, CABLE_M = 30;
@@ -625,6 +812,7 @@ const MapFeeds = (function () {
   };
   const uniq = xs => [...new Set(xs.filter(Boolean))];
 
+  const SIGHT_KM = 2;
   const QUESTIONS = {
     zones: (lat, lon) => identify(BIO, [65, 75, 80, 100, 35, 40, 45, 50, 55, 60], lat, lon, 1)
       .then(rs => ({ ok: true, zones: uniq(rs.map(r => attr(r, 'Biosecurity zone', 'Feature') || r.value).map(v =>
@@ -674,9 +862,27 @@ const MapFeeds = (function () {
         const dec = attr(r, 'State declaration');
         return dec && !/not declared/i.test(dec) ? `${name} (${dec.toLowerCase()})` : name;
       })).sort() })),
+    // The Atlas's weed records within SIGHT_KM, one line a weed: how many, the
+    // nearest and the latest year — the exact half of the survey's squares.
+    sightings: (lat, lon) => alaPages({
+      lat: String(lat), lon: String(lon), radius: String(SIGHT_KM),
+    }).then(json => {
+      const by = new Map();
+      for (const o of (json && json.occurrences) || []) {
+        const name = o.vernacularName || o.scientificName;
+        if (!name || o.decimalLatitude == null) continue;
+        const m = L.latLng(lat, lon).distanceTo([o.decimalLatitude, o.decimalLongitude]);
+        const g = by.get(name) || { name, n: 0, near: Infinity, year: 0 };
+        g.n++; g.near = Math.min(g.near, m); g.year = Math.max(g.year, o.year || 0);
+        by.set(name, g);
+      }
+      const list = [...by.values()].sort((a, b) => a.near - b.near);
+      return { ok: true, total: (json && json.totalRecords) || 0, list: list.map(g =>
+        `${g.name} — ${g.n} record${g.n === 1 ? '' : 's'}, nearest ${g.near < 1000 ? `${Math.round(g.near / 10) * 10} m` : `${(g.near / 1000).toFixed(1)} km`}${g.year ? `, latest ${g.year}` : ''}`) };
+    }),
   };
   const FIRST = ['zones'];
-  const MORE = ['floods', 'power', 'cables', 'land', 'weeds'];
+  const MORE = ['floods', 'power', 'cables', 'land', 'weeds', 'sightings'];
 
   const settled = r => !!r && (r.ok || Date.now() - r.at < FAIL_TTL);
 
@@ -732,6 +938,7 @@ const MapFeeds = (function () {
     cables: `Energex or Ergon lines within ${CABLE_M} m, and whether each is overhead or an underground cable. A guide only: ring Before You Dig Australia (1100) before digging.`,
     heritage: 'The Aboriginal or Torres Strait Islander party or body for this area under the cultural heritage laws — who to talk to before ground is disturbed.',
     parks: 'A national park, State forest or other protected area this place is in. Working in one usually needs a permit.',
+    sightings: `Weeds actually recorded within ${SIGHT_KM} km, nearest first, from the Atlas of Living Australia: Queensland’s own weed records and anyone’s record of a Weed of National Significance. A record says a weed was seen there that year, not that it is still there.`,
     weeds: 'Invasive plants the State’s 2022–23 survey found in this place’s square (about 17 km across) — somewhere in the square, not necessarily here. Restricted and prohibited ones are marked.',
   };
 
@@ -755,6 +962,7 @@ const MapFeeds = (function () {
       ${row('Power network', TERMS.cables, answer(a, 'cables', r => list(r.found, `none within ${CABLE_M} m`), ''))}
       ${row('Cultural heritage', TERMS.heritage, answer(a, 'land', r => list(r.heritage, 'none listed'), ''))}
       ${row('Protected area', TERMS.parks, answer(a, 'land', r => list(r.parks, 'not in one'), ''))}
+      ${row('Weed sightings nearby', TERMS.sightings, answer(a, 'sightings', r => list(r.list.slice(0, 10), `none recorded within ${SIGHT_KM} km`) + (r.list.length > 10 ? `<br><span class="mn-pop-note">and ${r.list.length - 10} more</span>` : ''), ''))}
       ${row('Weeds in its square', TERMS.weeds, answer(a, 'weeds', r => (r.weeds.length ? `${r.weeds.length}: ${esc(r.weeds.join(', '))}` : ''), 'none surveyed'))}
       <p class="mn-pop-note">${esc(NOT_FOR_DIGGING)} What the words mean: hover them, or see <em>More map layers</em> in Map display.</p>`;
     return `<details class="mn-feed-sect" ${open ? 'open' : ''} ontoggle="MapFeeds._sect(this)">
@@ -790,7 +998,7 @@ const MapFeeds = (function () {
         if (!m.getPane(p.name)) {
           const el = m.createPane(p.name);
           el.style.zIndex = p.z;
-          el.style.pointerEvents = 'none';
+          if (!p.pointer) el.style.pointerEvents = 'none';
         }
       }
       m.on('moveend', sync);
