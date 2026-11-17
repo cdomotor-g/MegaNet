@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 284, date: '2026-11-17', items: [
+      '🚰 <strong>Water, sewer and drainage pipes.</strong> A new group in <em>More map layers</em>: Brisbane City Council\'s '
+        + 'stormwater pipes and open drains; Unitywater\'s water, sewer and recycled water mains (Moreton Bay, Sunshine '
+        + 'Coast, Noosa); Melbourne Water\'s trunk mains; and the drainage pipes of Ballarat, Surf Coast and Mitchell '
+        + 'councils. A station card lists the pipes within 30 m where they are published. A guide only — ring 1100 '
+        + 'before digging.',
+    ] },
     { n: 283, date: '2026-11-17', items: [
       '⛰️ <strong>More map layers in 3-D and in Views.</strong> Tilt the map and the layers you have on stay: past floods, '
         + 'zones and parks lie on the ground, power lines and pipelines over them, the Energex and Ergon network as lines '

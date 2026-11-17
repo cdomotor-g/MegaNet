@@ -54,6 +54,11 @@ const MapFeeds = (function () {
   const ERGON    = 'https://services.arcgis.com/33eHbTVqo7gtiCE8/ArcGIS/rest/services/Network_Extract/FeatureServer';
   const ALA      = 'https://api.ala.org.au/occurrences/occurrences/search';
   const TIDES    = 'https://apps.des.qld.gov.au/data-sets/storm-tides/tide-7dayopdata.csv';
+  const BCC_PIPES  = 'https://services2.arcgis.com/dEKgZETqwmDAh1rP/ArcGIS/rest/services/Stormwater_Pipe_Existing/FeatureServer';
+  const BCC_DRAINS = 'https://services2.arcgis.com/dEKgZETqwmDAh1rP/ArcGIS/rest/services/Stormwater_Surface_Drain_Existing/FeatureServer';
+  const UW         = 'https://services2.arcgis.com/tQg86iShPXJPWQWw/ArcGIS/rest/services';
+  const MW         = 'https://services5.arcgis.com/ZSYwjtv8RKVhkXIL/arcgis/rest/services';
+  const DGA_WMS    = 'https://data.gov.au/geoserver/wms';
   // The weed records asked of the Atlas: Queensland's own weed records
   // (QWeeds, dr18218) and any record of a Weed of National Significance
   // (the WoNS list, dr823) from anyone — iNaturalist, councils, herbaria.
@@ -69,6 +74,7 @@ const MapFeeds = (function () {
     { id: 'flood',     title: 'Floods and water' },
     { id: 'land',      title: 'Land and access' },
     { id: 'bio',       title: 'Biosecurity and weeds' },
+    { id: 'pipes',     title: 'Water, sewer and drainage pipes' },
   ];
 
   // ── The list ────────────────────────────────────────────────────────────
@@ -153,6 +159,46 @@ const MapFeeds = (function () {
       label: 'Weed sightings, exact (Australia)',
       meaning: 'Each place a weed was recorded: Queensland’s own weed records, and anyone’s record of a Weed of National Significance (iNaturalist, councils, herbaria), from the Atlas of Living Australia. A dot is one record, darker when recent. Shown from zoom 12; the station card lists those within 2 km.',
       source: { by: 'Atlas of Living Australia (records from Biosecurity Queensland, iNaturalist and others)', licence: 'each record’s own, mostly CC BY', page: 'https://www.ala.org.au/biosecurity/' } },
+    // ── Pipes (#294). Each `part` is one hosted feature layer, asked for the
+    // view (one request a part) and drawn here in its colour; `box` is where
+    // the owner has any, so a view or a card elsewhere asks nothing.
+    // Left out on their licences: Barwon Water (CC BY-NC-ND) and the Water
+    // Corporation, WA (personal or internal use only, no passing on, no AI).
+    { id: 'bcc-stormwater', group: 'pipes', kind: 'pipes', pane: 'net', minZoom: 15,
+      box: { w: 152.66, e: 153.22, s: -27.67, n: -27.02 },
+      parts: [
+        { url: `${BCC_PIPES}/0`,  colour: '#00838f', weight: 2.2, words: 'Stormwater pipe' },
+        { url: `${BCC_DRAINS}/0`, colour: '#00838f', weight: 2.2, dash: '5 4', words: 'Open drain or channel' },
+      ],
+      label: 'Stormwater pipes and drains (Brisbane)',
+      meaning: 'Brisbane City Council’s stormwater network as built: the pipes that carry rain off streets and roofs to the creeks, and the open drains and channels. Where a flood backs up a pipe, the street floods before the river does. Not every pipe in it is the council’s. From zoom 15.',
+      source: { by: 'Brisbane City Council', licence: 'CC BY 4.0', page: 'https://www.data.qld.gov.au/dataset/stormwater-pipe-existing' } },
+    { id: 'unitywater', group: 'pipes', kind: 'pipes', pane: 'net', minZoom: 15,
+      box: { w: 152.6, e: 153.2, s: -27.45, n: -26.1 },
+      parts: [
+        { url: `${UW}/UWPublicAccessWaterInfrastructureLayers/FeatureServer/10`, colour: '#1565c0', weight: 2, words: 'Water main' },
+        { url: `${UW}/UWPublicAccessSewerInfrastructureLayers/FeatureServer/11`, colour: '#795548', weight: 2, words: 'Sewer main (gravity)' },
+        { url: `${UW}/UWPublicAccessSewerInfrastructureLayers/FeatureServer/12`, colour: '#795548', weight: 2, dash: '5 4', words: 'Sewer main (pressure)' },
+        { url: `${UW}/UWPublicAccessRecycledWaterInfrastructureLayers/FeatureServer/9`, colour: '#7b1fa2', weight: 2, words: 'Recycled water main' },
+      ],
+      label: 'Water, sewer and recycled water mains (Unitywater)',
+      meaning: 'Unitywater’s mains across the Moreton Bay, Sunshine Coast and Noosa council areas: drinking water, sewer (flowing by gravity, or pumped under pressure) and recycled water. A guide only — Unitywater publishes it as public-access information without stating a licence. From zoom 15.',
+      source: { by: 'Unitywater', licence: 'published as public-access information; no licence stated', page: 'https://datahub.moretonbay.qld.gov.au/maps/moretonbay::unitywater-public-access-sewer-infrastructure' } },
+    { id: 'melbourne-water', group: 'pipes', kind: 'pipes', pane: 'net', minZoom: 11,
+      box: { w: 144.3, e: 146.3, s: -38.5, n: -37.2 },
+      parts: [
+        { url: `${MW}/Water_Supply_Main_Pipelines/FeatureServer/0`, colour: '#1565c0', weight: 3, words: 'Water supply main' },
+        { url: `${MW}/Sewerage_Network_Mains/FeatureServer/0`, colour: '#795548', weight: 3, words: 'Sewerage main' },
+      ],
+      label: 'Water and sewerage trunk mains (Melbourne Water)',
+      meaning: 'Melbourne Water’s big pipes: the water supply mains that carry water from the reservoirs to the city’s retailers, and the sewerage mains that carry sewage to the treatment plants. Not the street pipes. From zoom 11.',
+      source: { by: 'Melbourne Water', licence: 'CC BY 4.0', page: 'https://data-melbournewater.opendata.arcgis.com/' } },
+    { id: 'vic-drainage', group: 'pipes', kind: 'wms', url: DGA_WMS, pane: 'lines', minZoom: 13, opacity: 0.95,
+      box: { w: 143.4, e: 145.4, s: -38.6, n: -36.8 },
+      wmsLayer: 'ballarat-drainage-pipes:ckan_0f31544d_dc70_4b83_b4fb_2d72e97d82f5,surf-coast-shire-drainage-pipes:ckan_bf1baf60_4e07_4445_a33c_0cc69ec747ab,drainagepipes:ckan_8864509d_f46c_4c91_a4d7_85e1f71359d1',
+      label: 'Council drainage pipes (Ballarat, Surf Coast, Mitchell — Vic)',
+      meaning: 'The stormwater drainage pipes three Victorian councils publish: the City of Ballarat, Surf Coast Shire and Mitchell Shire. Other councils have not published theirs. From zoom 13.',
+      source: { by: 'City of Ballarat, Surf Coast Shire and Mitchell Shire, through data.gov.au', licence: 'CC BY 3.0 AU', page: 'https://data.gov.au/data/dataset/ballarat-drainage-pipes' } },
     { id: 'qld-tides', group: 'flood', kind: 'tide', pane: 'pins', minZoom: 5,
       label: 'Storm tide gauges, latest reading (Qld)',
       meaning: 'The State’s storm tide gauges along the coast, each with its latest reading: the sea level measured, the tide predicted for that time, and the difference — the surge a storm or flood is adding. Heights are above each gauge’s own tide datum (usually the lowest tide), not AHD. In calm weather a gauge may only report once a day. Hover a pin for its figures.',
@@ -293,7 +339,7 @@ const MapFeeds = (function () {
     d.overlay = null;
     d.box = null;
     d.seq++;
-    if (byId[id].kind === 'ala' || byId[id].kind === 'tide') tell3D('shapes');
+    if (['ala', 'tide', 'pipes'].includes(byId[id].kind)) tell3D('shapes');
   }
 
   function setNote(id, kind) {
@@ -307,6 +353,7 @@ const MapFeeds = (function () {
   function runTiles(f) {
     const d = slot(f.id);
     if (map.getZoom() < f.minZoom) { clear(f.id); setNote(f.id, 'zoom'); return; }
+    if (f.box && !boxMeets(f, map.getBounds())) { clear(f.id); setNote(f.id, 'away'); return; }
     if (d.overlay) { if (d.note !== 'fail') setNote(f.id, 'ok'); return; }
     let bad = 0, good = 0;
     d.overlay = L.tileLayer.wms(f.url, {
@@ -620,6 +667,78 @@ const MapFeeds = (function () {
     });
   }
 
+  // Pipes: hosted feature layers, one request a part for the padded view,
+  // drawn on this layer's canvas in each part's colour (dashed where the part
+  // says). Nothing is asked outside the owner's `box`.
+  let pipeRenderer = null;
+  const PIPE_MAX = 2000;
+
+  function inBox(f, lat, lon) {
+    const b = f.box;
+    return !b || (lon >= b.w && lon <= b.e && lat >= b.s && lat <= b.n);
+  }
+  function boxMeets(f, bounds) {
+    const b = f.box;
+    return !b || !(bounds.getEast() < b.w || bounds.getWest() > b.e || bounds.getNorth() < b.s || bounds.getSouth() > b.n);
+  }
+
+  function partQuery(part, extra) {
+    const p = new URLSearchParams({ where: '1=1', inSR: '4326', outSR: '4326', spatialRel: 'esriSpatialRelIntersects',
+      outFields: 'OBJECTID', f: 'json', ...(extra || {}) });
+    return askJson(`${part.url}/query?${p}`);
+  }
+
+  function runPipes(f) {
+    const d = slot(f.id);
+    if (map.getZoom() < f.minZoom) { clear(f.id); setNote(f.id, 'zoom'); return; }
+    const view = map.getBounds();
+    if (!boxMeets(f, view)) { clear(f.id); setNote(f.id, 'away'); return; }
+    if (d.overlay && d.box && d.box.zoom === map.getZoom() && d.box.bounds.contains(view)) { setNote(f.id, d.cut ? 'cut' : 'ok'); return; }
+    if (Date.now() - d.failedAt < FAIL_TTL) { clear(f.id); setNote(f.id, 'fail'); return; }
+    const mine = ++d.seq;
+    const b = view.pad(PAD);
+    const degPerPx = (b.getEast() - b.getWest()) / (map.getSize().x * (1 + 2 * PAD));
+    setNote(f.id, 'loading');
+    Promise.all(f.parts.map(part => partQuery(part, {
+      geometry: `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`, geometryType: 'esriGeometryEnvelope',
+      returnGeometry: 'true', geometryPrecision: '6', maxAllowableOffset: String(degPerPx), resultRecordCount: String(PIPE_MAX),
+    }).then(json => ({ part, json }), () => ({ part, json: null })))).then(results => {
+      if (mine !== d.seq || !map || !on.has(f.id)) return;
+      if (results.every(r => !r.json)) { d.failedAt = Date.now(); clear(f.id); setNote(f.id, 'fail'); rerenderMapLegend(); return; }
+      if (!pipeRenderer) pipeRenderer = L.canvas({ pane: PANES.net.name });
+      const group = L.layerGroup();
+      let cut = false, n = 0;
+      const missed = results.filter(r => !r.json).map(r => r.part.words.toLowerCase());
+      for (const { part, json } of results) {
+        if (!json) continue;
+        if (json.exceededTransferLimit) cut = true;
+        for (const ft of json.features || []) {
+          const paths = (ft.geometry && ft.geometry.paths) || [];
+          if (!paths.length) continue;
+          n++;
+          L.polyline(paths.map(pth => pth.map(([x, y]) => [y, x])), {
+            renderer: pipeRenderer, interactive: false, color: part.colour, weight: part.weight,
+            opacity: 0.95, dashArray: part.dash || null, lineCap: 'butt',
+          }).addTo(group);
+        }
+      }
+      const had = !!d.overlay;
+      if (d.overlay) d.overlay.remove();
+      d.overlay = group.addTo(map);
+      if (!had && map.attributionControl) map.attributionControl.addAttribution(f.source.by);
+      d.box = { bounds: b, zoom: map.getZoom(), layers: 'pipes' };
+      d.cut = cut;
+      d.count = n;
+      d.missed = missed;
+      d.url = f.parts[0].url;
+      // A part that did not answer is asked again on the next move.
+      if (missed.length) d.box = null;
+      tell3D('shapes');
+      setNote(f.id, cut ? 'cut' : 'ok');
+      rerenderMapLegend();
+    });
+  }
+
   // ── Running ─────────────────────────────────────────────────────────────
 
   function run() {
@@ -636,6 +755,7 @@ const MapFeeds = (function () {
         if (f.kind === 'network') runNetwork(f);
         else if (f.kind === 'ala') runAla(f);
         else if (f.kind === 'tide') runTides(f);
+        else if (f.kind === 'pipes') runPipes(f);
         else runPicture(f);
       } catch (_) {
         slot(f.id).failedAt = Date.now();
@@ -658,10 +778,12 @@ const MapFeeds = (function () {
     switch (kind) {
       case 'zoom':    return `Zoom in to draw it (from zoom ${f.minZoom}).`;
       case 'loading': return 'Drawing…';
+      case 'away':    return `Nothing here — ${esc(f.source.by)} publishes it only for its own area.`;
       case 'fail':    return `Could not be drawn — ${esc(f.source.by)}’s map service did not answer. It is asked again in a minute.`;
       case 'cut':     return 'Drawn, but the view held more than the service hands over at once — zoom in to see them all.';
       case 'ok':
         if (f.kind === 'ala') return `Drawn: ${d.count} record${d.count === 1 ? '' : 's'} in view.`;
+        if (f.kind === 'pipes') return `Drawn: ${d.count} pipe${d.count === 1 ? '' : 's'} in view.${d.missed && d.missed.length ? ` <span class="txt-warn">Could not be read: ${esc(d.missed.join(', '))}.</span>` : ''}`;
         if (f.kind === 'tide') return `Drawn: ${d.count} gauges, the latest reading ${esc((d.latest || '').replace('T', ' '))} (AEST).`;
         return f.kind === 'network' ? `Drawn: ${netClassesAt(map ? map.getZoom() : 0).map(k => NET_CLASS[k].words.toLowerCase()).join(', ')}.` : 'Drawn.';
       default:        return '';
@@ -754,6 +876,9 @@ const MapFeeds = (function () {
             <span class="small">${esc(NET_CLASS[k].words)}</span></span>`).join('') + `
           <span class="legend-item"><span class="legend-line mn-feed-net mn-feed-net-ug" style="--dot:#555"></span>
             <span class="small">Dashed: underground cable</span></span>`;
+      } else if (f.kind === 'pipes') {
+        body = f.parts.map(pt => `<span class="legend-item"><span class="legend-line mn-feed-net${pt.dash ? ' mn-feed-net-ug' : ''}" style="--dot:${pt.colour}"></span>
+          <span class="small">${esc(pt.words)}</span></span>`).join('');
       } else if (f.kind === 'ala') {
         body = `<span class="legend-item"><span class="legend-dot mn-feed-ala" aria-hidden="true"></span>
           <span class="small">One weed record — darker when from the last five years</span></span>`;
@@ -788,7 +913,7 @@ const MapFeeds = (function () {
 
   const SECTION_MEANING = 'On a station card and the What is here card: what these open-data maps say about that one place — '
     + 'its biosecurity zones straight away, and when opened, past floods, dam-failure areas, nearby power lines and pipelines, '
-    + 'underground cables within 30 m, cultural heritage groups, protected areas, the weeds surveyed in its square and the weed records within 2 km.';
+    + 'underground cables and published water, sewer and stormwater pipes within 30 m, cultural heritage groups, protected areas, the weeds surveyed in its square and the weed records within 2 km.';
 
   const KEY_DP = 5, CACHE_MAX = 100;
   const NEAR_M = 200, CABLE_M = 30;
@@ -831,6 +956,7 @@ const MapFeeds = (function () {
   const uniq = xs => [...new Set(xs.filter(Boolean))];
 
   const SIGHT_KM = 2;
+  const PIPE_M = 30;
   const QUESTIONS = {
     zones: (lat, lon) => identify(BIO, [65, 75, 80, 100, 35, 40, 45, 50, 55, 60], lat, lon, 1)
       .then(rs => ({ ok: true, zones: uniq(rs.map(r => attr(r, 'Biosecurity zone', 'Feature') || r.value).map(v =>
@@ -880,6 +1006,20 @@ const MapFeeds = (function () {
         const dec = attr(r, 'State declaration');
         return dec && !/not declared/i.test(dec) ? `${name} (${dec.toLowerCase()})` : name;
       })).sort() })),
+    // Pipes within PIPE_M, a line a kind, from each feed whose box holds the
+    // place — so a station outside every owner's area asks nothing.
+    pipes: (lat, lon) => {
+      const parts = FEEDS.filter(f => f.kind === 'pipes' && inBox(f, lat, lon))
+        .flatMap(f => f.parts.map(part => ({ f, part })));
+      if (!parts.length) return Promise.resolve({ ok: true, found: [], none: true });
+      return Promise.all(parts.map(({ f, part }) => partQuery(part, {
+        geometry: `${lon},${lat}`, geometryType: 'esriGeometryPoint', distance: String(PIPE_M), units: 'esriSRUnit_Meter',
+        returnCountOnly: 'true',
+      }).then(j => ({ f, part, n: (j && j.count) || 0 }), () => ({ f, part, n: null })))).then(rs => {
+        if (rs.every(r => r.n == null)) return { ok: false, why: 'the pipe services did not answer' };
+        return { ok: true, found: rs.filter(r => r.n).map(r => `${r.part.words} — ${r.n} within ${PIPE_M} m (${r.f.source.by})`) };
+      });
+    },
     // The Atlas's weed records within SIGHT_KM, one line a weed: how many, the
     // nearest and the latest year — the exact half of the survey's squares.
     sightings: (lat, lon) => alaPages({
@@ -900,7 +1040,7 @@ const MapFeeds = (function () {
     }),
   };
   const FIRST = ['zones'];
-  const MORE = ['floods', 'power', 'cables', 'land', 'weeds', 'sightings'];
+  const MORE = ['floods', 'power', 'cables', 'pipes', 'land', 'weeds', 'sightings'];
 
   const settled = r => !!r && (r.ok || Date.now() - r.at < FAIL_TTL);
 
@@ -954,6 +1094,7 @@ const MapFeeds = (function () {
     lines: `Geoscience Australia’s high-voltage lines and substations within about ${NEAR_M} m.`,
     pipes: `Gas and oil pipelines within about ${NEAR_M} m.`,
     cables: `Energex or Ergon lines within ${CABLE_M} m, and whether each is overhead or an underground cable. A guide only: ring Before You Dig Australia (1100) before digging.`,
+    pipes: `Stormwater pipes and drains, and water, sewer and recycled water mains, within ${PIPE_M} m — only where the council or water utility publishes them (Brisbane, Unitywater’s area, Melbourne Water). A guide only: ring Before You Dig Australia (1100) before digging.`,
     heritage: 'The Aboriginal or Torres Strait Islander party or body for this area under the cultural heritage laws — who to talk to before ground is disturbed.',
     parks: 'A national park, State forest or other protected area this place is in. Working in one usually needs a permit.',
     sightings: `Weeds actually recorded within ${SIGHT_KM} km, nearest first, from the Atlas of Living Australia: Queensland’s own weed records and anyone’s record of a Weed of National Significance. A record says a weed was seen there that year, not that it is still there.`,
@@ -978,6 +1119,7 @@ const MapFeeds = (function () {
       ${row('High-voltage lines', TERMS.lines, answer(a, 'power', r => list(r.lines, `none within ${NEAR_M} m`), ''))}
       ${row('Pipelines', TERMS.pipes, answer(a, 'power', r => list(r.pipes, `none within ${NEAR_M} m`), ''))}
       ${row('Power network', TERMS.cables, answer(a, 'cables', r => list(r.found, `none within ${CABLE_M} m`), ''))}
+      ${row('Pipes', TERMS.pipes, answer(a, 'pipes', r => (r.none ? `<span class="txt-muted">none published for this area</span>` : list(r.found, `none within ${PIPE_M} m`)), ''))}
       ${row('Cultural heritage', TERMS.heritage, answer(a, 'land', r => list(r.heritage, 'none listed'), ''))}
       ${row('Protected area', TERMS.parks, answer(a, 'land', r => list(r.parks, 'not in one'), ''))}
       ${row('Weed sightings nearby', TERMS.sightings, answer(a, 'sightings', r => list(r.list.slice(0, 10), `none recorded within ${SIGHT_KM} km`) + (r.list.length > 10 ? `<br><span class="mn-pop-note">and ${r.list.length - 10} more</span>` : ''), ''))}
@@ -1108,6 +1250,19 @@ const MapFeeds = (function () {
             if (r.length < 2) continue;
             lines.push({ type: 'Feature', properties: { colour: o.color, width: o.weight, ug: !!o.dashArray },
               geometry: { type: 'LineString', coordinates: r.map(p => [p.lng, p.lat]) } });
+          }
+        });
+      }
+      for (const f of FEEDS.filter(x => x.kind === 'pipes')) {
+        const d = drawn[f.id];
+        if (!on.has(f.id) || !d || !d.overlay) continue;
+        d.overlay.eachLayer(l => {
+          const o = l.options || {};
+          const parts = l.getLatLngs();
+          for (const r of (Array.isArray(parts[0]) ? parts : [parts])) {
+            if (r.length < 2) continue;
+            lines.push({ type: 'Feature', properties: { colour: o.color, width: o.weight, ug: !!o.dashArray },
+              geometry: { type: 'LineString', coordinates: r.map(pt => [pt.lng, pt.lat]) } });
           }
         });
       }

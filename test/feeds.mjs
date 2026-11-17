@@ -35,7 +35,7 @@ function check(name, pass, detail = '') {
 
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
-const HOSTS = /(services\.ga\.gov\.au|spatial-gis\.information\.qld\.gov\.au\/arcgis\/rest\/services\/(InlandWaters\/(FloodLines|GroundAndSurfaceWaterMonitoring)|Boundaries\/CulturalHeritage|Environment\/ParksTerrestrial|Farming\/Biosecurity)|gis\.environment\.gov\.au|api\.ala\.org\.au|apps\.des\.qld\.gov\.au|ows\.dea\.ga\.gov\.au|services\.arcgis\.com\/[^/]+\/ArcGIS\/rest\/services\/Network_)/;
+const HOSTS = /(services\.ga\.gov\.au|spatial-gis\.information\.qld\.gov\.au\/arcgis\/rest\/services\/(InlandWaters\/(FloodLines|GroundAndSurfaceWaterMonitoring)|Boundaries\/CulturalHeritage|Environment\/ParksTerrestrial|Farming\/Biosecurity)|gis\.environment\.gov\.au|api\.ala\.org\.au|services\d\.arcgis\.com|data\.gov\.au\/geoserver|apps\.des\.qld\.gov\.au|ows\.dea\.ga\.gov\.au|services\.arcgis\.com\/[^/]+\/ArcGIS\/rest\/services\/Network_)/;
 const CENTER = { lat: -27.535, lon: 152.99 };
 
 const asked = [];   // every stubbed request: { path, params }
@@ -48,6 +48,14 @@ function answer(url) {
   const png = () => ({ status: 200, contentType: 'image/png', body: PNG });
 
   if (u.host === 'ows.dea.ga.gov.au') return png();
+  if (/^services\d\.arcgis\.com$/.test(u.host)) {
+    // Brisbane's stormwater (pipes and drains) and the other utilities' mains.
+    const brisbane = /dEKgZETqwmDAh1rP/.test(u.pathname);
+    if (p.returnCountOnly === 'true') return json({ count: brisbane && /Stormwater_Pipe/.test(u.pathname) ? 3 : 0 });
+    const { lat, lon } = CENTER;
+    return json({ features: brisbane ? [{ attributes: { OBJECTID: 1 }, geometry: { paths: [[[lon - 0.001, lat + 0.0005], [lon + 0.001, lat + 0.0005]]] } }] : [] });
+  }
+  if (u.host === 'data.gov.au') return png();
   if (u.host === 'api.ala.org.au') {
     // Near whatever point is asked about (the card), else the view's centre.
     const lat = p.lat ? Number(p.lat) : CENTER.lat, lon = p.lon ? Number(p.lon) : CENTER.lon;
@@ -148,13 +156,14 @@ try {
   })));
   check('the list holds the feeds the epic asked for',
     ['ga-power', 'ga-pipes', 'qld-network', 'qld-flood-history', 'qld-dam-flood', 'dea-water', 'qld-gauges',
-     'qld-heritage', 'qld-parks', 'capad', 'qld-biosecurity', 'qld-fences', 'qld-weeds', 'ala-weeds', 'qld-tides'].every(id => list.some(f => f.id === id)),
+     'qld-heritage', 'qld-parks', 'capad', 'qld-biosecurity', 'qld-fences', 'qld-weeds', 'ala-weeds', 'qld-tides',
+     'bcc-stormwater', 'unitywater', 'melbourne-water', 'vic-drainage'].every(id => list.some(f => f.id === id)),
     list.map(f => f.id).join(','));
   check('every feed has a label, a meaning of a sentence or more, and a source with a licence and a page',
     list.every(f => f.label && f.meaning.length > 60 && f.src && f.src.by && f.src.licence && /^https:/.test(f.src.page)),
     JSON.stringify(list.filter(f => !(f.label && f.meaning.length > 60))));
   check('every service address is https',
-    list.every(f => ['network', 'ala', 'tide'].includes(f.kind) || /^https:\/\//.test(f.url)));
+    list.every(f => ['network', 'ala', 'tide', 'pipes'].includes(f.kind) || /^https:\/\//.test(f.url)));
   check('ids are distinct', new Set(list.map(f => f.id)).size === list.length);
 
   // ── 2. The controls ───────────────────────────────────────────────────
@@ -174,7 +183,7 @@ try {
   check('the words fold lists every feed and the card section, for a finger that cannot hover',
     ui.words === list.length + 1, String(ui.words));
   check('the feeds are grouped, and the fold says they are not for finding a cable before digging',
-    ui.groups === 4 && ui.digging, JSON.stringify(ui));
+    ui.groups === 5 && ui.digging, JSON.stringify(ui));
 
   // ── 3. Drawing ────────────────────────────────────────────────────────
   await page.evaluate((c) => state.map.setView([c.lat, c.lon], 16, { animate: false }), CENTER);
@@ -269,6 +278,28 @@ try {
     !asked.some(a => a.host === 'apps.des.qld.gov.au'), JSON.stringify(asked.map(a => a.host)));
   await page.evaluate(() => { MapFeeds.setEnabled('ala-weeds', false); MapFeeds.setEnabled('qld-tides', false); });
 
+  // Pipes (#294): Brisbane's stormwater drawn; Unitywater and Melbourne Water,
+  // whose areas the view is not in, not asked at all.
+  asked.length = 0;
+  await page.evaluate(() => { for (const id of ['bcc-stormwater', 'unitywater', 'melbourne-water', 'vic-drainage']) MapFeeds.setEnabled(id, true); });
+  await page.waitForFunction(() => (MapFeeds._state().drawn['bcc-stormwater'] || {}).note === 'ok', null, { timeout: 15_000 }).catch(() => {});
+  await page.waitForTimeout(400);
+  const pipeAsks = asked.filter(a => /^services\d\.arcgis\.com$/.test(a.host));
+  check('Brisbane’s stormwater is one request a part — pipes and open drains — for the view',
+    pipeAsks.length === 2 && pipeAsks.every(a => /dEKgZETqwmDAh1rP/.test(a.path) && a.params.geometryType === 'esriGeometryEnvelope'),
+    JSON.stringify(pipeAsks.map(a => a.path)));
+  const awayNotes = await page.evaluate(() => ['unitywater', 'melbourne-water', 'vic-drainage'].map(id =>
+    document.getElementById(`mn-feed-note-${id}`).textContent));
+  check('a utility whose area the view is not in is not asked, and says it only publishes its own area',
+    awayNotes.every(t => /Nothing here/.test(t)) && !asked.some(a => /tQg86iShPXJPWQWw|ZSYwjtv8RKVhkXIL/.test(a.path) || a.host === 'data.gov.au'),
+    JSON.stringify(awayNotes));
+  const pipeNote = await page.evaluate(() => document.getElementById('mn-feed-note-bcc-stormwater').textContent);
+  check('the note counts the pipes drawn', /Drawn: 2 pipes in view/.test(pipeNote), pipeNote);
+  const pipeLegend = await page.evaluate(() => MapFeeds.legendHtml());
+  check('the key has a line for each kind of pipe, the open drain dashed',
+    /Stormwater pipe/.test(pipeLegend) && /mn-feed-net-ug[^>]*>\s*<\/span>\s*<span class="small">Open drain/.test(pipeLegend), pipeLegend.slice(0, 200));
+  await page.evaluate(() => { for (const id of ['bcc-stormwater', 'unitywater', 'melbourne-water', 'vic-drainage']) MapFeeds.setEnabled(id, false); });
+
   // Zoomed out past a feed's floor: no request, and the note says why.
   asked.length = 0;
   await page.evaluate(() => state.map.setZoom(9, { animate: false }));
@@ -340,9 +371,11 @@ try {
   check('the weed records within 2 km, one line a weed, nearest first, with the latest year',
     /Lantana — 2 records, nearest 110 m, latest 2025/.test(open.text) && /Pontederia crassipes — 1 record, nearest 9[0-9]0 m, latest 2009/.test(open.text)
       && open.text.indexOf('Lantana — 2') < open.text.indexOf('Pontederia'), open.text);
+  check('a station outside every utility’s area says no pipes are published there, and asks none',
+    /Pipes\s*none published for this area/.test(open.text), open.text.slice(0, 500));
   check('the weeds in its square, the restricted ones marked',
     /2: African lovegrass, Lantana \(restricted\)/.test(open.text), open.text);
-  check('each row’s word has its meaning on hover', open.terms >= 10, String(open.terms));
+  check('each row’s word has its meaning on hover', open.terms >= 11, String(open.terms));
 
   // ── 5. And the What is here card asks about a point the same way ─────
   const hereSrc = fs.readFileSync(new URL('../map-here.js', import.meta.url), 'utf8');
