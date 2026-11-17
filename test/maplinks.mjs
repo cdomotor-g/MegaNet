@@ -702,7 +702,7 @@ try {
       && !/OSM-Topo/.test(bases) && !/OpenStreetMap/.test(bases),
     `${base.heads.join(' | ')}: ${bases.slice(0, 160)}`);
 
-  await page.fill('#map-display-find', 'licence');
+  await page.fill('#map-display-find', 'transmitters');
   await page.waitForTimeout(300);
   const acmaOnly = await panel();
   check('a term that is only in the ACMA block leaves that block and nothing else',
