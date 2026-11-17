@@ -5826,6 +5826,10 @@ function mapDisplayControlsHtml() {
     </label>
     <p class="filter-note" id="map-lots-note">${MapLots.noteHtml()}</p>
     ${MapLots.subRowsHtml()}
+    <!-- More map layers (map-feeds.js, EPIC #291): power, pipes, past floods,
+         satellite water, land and biosecurity, from government map services,
+         one list, its own fold and its own words. -->
+    ${MapFeeds.controlsHtml()}
     <!-- Wind and LOS repaint the legend from here (#175): rivers, survey
          marks and contours each repaint it from inside their own module, and
          these two never did, so the legend's entry for either — and its line
@@ -6516,6 +6520,7 @@ function mapLegendHtml() {
       <span class="small">Road parcel — the road reserve, not the road (Qld cadastre). Hover for its name</span>
     </span>` : '',
     MapRoadOwners.active() ? MapRoadOwners.legendHtml() : '',
+    MapFeeds.active() ? MapFeeds.legendHtml() : '',
     MapCatchments.active() ? mapCatchmentLegendHtml() : '',
     MapHubs.active() ? mapHubLegendHtml() : '',
     MapTasks.active() ? MapTasks.legendHtml() : '',
@@ -6716,6 +6721,7 @@ function stopStationsMap() {
   MapRoads.detach();
   MapRoadOwners.detach();
   MapLots.detach();
+  MapFeeds.detach();
   MapPhotos.detach();
   MapCameras.detach();
   MapRain.detach();
@@ -6998,6 +7004,7 @@ function initMap() {
   MapRoads.attach(state.map);
   MapRoadOwners.attach(state.map);
   MapLots.attach(state.map);
+  MapFeeds.attach(state.map);
   // …and what land is under the pointer while they are drawn (map-property-tip.js).
   MapPropTip.attach(state.map);
   // 💬 under ↺: the hover notes — that one and every other name that follows
@@ -9179,6 +9186,9 @@ function repaintStnCard() {
   SiteRoads.ask(`mn-roads-card-${s.id}`, s);
   // …and the mobile signal there, on the same terms (site-mobile.js).
   SiteMobile.ask(`mn-mobile-card-${s.id}`, s);
+  // …and what the open-data maps say about it (map-feeds.js): the biosecurity
+  // zones now, the rest when the section is opened.
+  MapFeeds.ask(`mn-feeds-card-${s.id}`, s);
   // …and the ACMA licences near it, out of a register copy read once (map-acma.js).
   if (typeof MapAcma !== 'undefined') MapAcma.cardAsk(`mn-lic-card-${s.id}`, s);
   // …and the councils' cameras near it, out of a list read once (map-cameras.js).
@@ -9493,6 +9503,7 @@ function stnCardHtml(s) {
   const landId   = `mn-land-card-${s.id}`;
   const roadsId  = `mn-roads-card-${s.id}`;
   const mobileId = `mn-mobile-card-${s.id}`;
+  const feedsId  = `mn-feeds-card-${s.id}`;
   const camsId   = `mn-cams-card-${s.id}`;
   const ownerId  = `mn-owner-card-${s.id}`;
   const nets     = (s.radio_network_ids || []).map(id => netName(id)).filter(Boolean).join(', ');
@@ -9619,6 +9630,8 @@ function stnCardHtml(s) {
          data-mn-mobile="${escAttr(SiteMobile.key(s))}">${SiteMobile.html(s)}</div>` : ''}
     ${located ? `<div class="acma-sect" id="${escAttr(expId)}"
          data-mn-exposure="${escAttr(SiteExposure.key(s))}">${SiteExposure.html(s)}</div>` : ''}
+    ${located ? `<div class="acma-sect" id="${escAttr(feedsId)}"
+         data-mn-feeds="${escAttr(MapFeeds.key(s))}">${MapFeeds.html(s)}</div>` : ''}
     ${typeof SiteFeatures !== 'undefined' ? SiteFeatures.cardHtml(s) : ''}`;
 
   // What is fitted and who changed it, each for the accounts it is for and

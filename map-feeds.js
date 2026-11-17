@@ -1,0 +1,857 @@
+// MegaNet — map-feeds.js
+//
+//   MapFeeds   Open-data layers from government map services, drawn over the
+//              Stations map from one list (FEEDS) instead of a file each:
+//              power lines and pipelines (Geoscience Australia), Energex and
+//              Ergon's overhead lines and underground cables, past flood
+//              outlines and dam-failure flood areas, water seen from
+//              satellites since 1986, the State's river gauges, cultural
+//              heritage groups, protected areas, biosecurity zones and the
+//              weed survey (EPIC #291). And the same services asked about one
+//              place: the "Open data here" section on the station card and on
+//              the What is here card.
+//
+// After core.js, before init.js — index.html holds the order and the reasons.
+// Reaches back to core.js for `state`, esc, escAttr and termHtml; across to
+// app.js for rerenderMapLegend. All from inside its own functions, so this
+// file's position among the modules is free.
+//
+// ── Why one list ────────────────────────────────────────────────────────────
+// Every layer here is somebody else's map service drawing its own picture:
+// an ArcGIS MapServer's `export`, or a WMS `GetMap`. What differs between them
+// is data — an address, the sublayers to show, a scale, who to credit — so a
+// new one is an entry in FEEDS and its words, not a module. The two kinds that
+// are not a picture are handled here too: Energex and Ergon publish only
+// feature services (no `export`), so their lines are asked for as vectors, one
+// request per company per view, and drawn on this layer's own canvas.
+//
+// MapContours' pattern for the pictures: one L.imageOverlay per feed, over a
+// padded box, so a pan inside it costs nothing; preloaded, so a pan swaps a
+// finished image in; a failure stops asking for FAIL_TTL and says so.
+//
+// ── What the layers are not ─────────────────────────────────────────────────
+// None of this is for finding a cable or a pipe before digging. Every source
+// says so, and so does every note here: Before You Dig Australia (1100) is.
+//
+// ── Where they sit ──────────────────────────────────────────────────────────
+// Areas (floods, parks, zones, weeds, water) at 327, between the catchments
+// (325) and the wind regions (330); lines and points at 333, between the polar
+// plot (332) and the contours (335); the power network's canvas at 337,
+// between the lots (336) and the road parcels (338). Nothing takes the
+// pointer: the What is here card answers "what is this?" for a point.
+const MapFeeds = (function () {
+  const GA_ELEC  = 'https://services.ga.gov.au/gis/rest/services/Electricity_Infrastructure/MapServer';
+  const GA_PIPES = 'https://services.ga.gov.au/gis/rest/services/Oil_Gas_Pipelines/MapServer';
+  const QLD      = 'https://spatial-gis.information.qld.gov.au/arcgis/rest/services';
+  const FLOOD    = `${QLD}/InlandWaters/FloodLines/MapServer`;
+  const GAUGES   = `${QLD}/InlandWaters/GroundAndSurfaceWaterMonitoring/MapServer`;
+  const HERITAGE = `${QLD}/Boundaries/CulturalHeritageBoundaries/MapServer`;
+  const PARKS    = `${QLD}/Environment/ParksTerrestrialProtectedAreas/MapServer`;
+  const BIO      = `${QLD}/Farming/Biosecurity/MapServer`;
+  const CAPAD    = 'https://gis.environment.gov.au/gispubmap/rest/services/ogc_services/CAPAD/MapServer';
+  const DEA      = 'https://ows.dea.ga.gov.au/';
+  const ENERGEX  = 'https://services.arcgis.com/bfVzktoY0OhzQCDj/ArcGIS/rest/services/Network_Energex/FeatureServer';
+  const ERGON    = 'https://services.arcgis.com/33eHbTVqo7gtiCE8/ArcGIS/rest/services/Network_Extract/FeatureServer';
+
+  const WEED_GROUP = 200;      // the survey's "Weed distribution" group in BIO
+  const STORE_KEY  = 'mn-map-feeds';
+  const WEED_KEY   = 'mn-map-feeds-weed';
+  const NOT_FOR_DIGGING = 'A guide only — never for finding a cable or pipe before digging. Ring Before You Dig Australia (1100).';
+
+  const GROUPS = [
+    { id: 'utilities', title: 'Power and pipelines' },
+    { id: 'flood',     title: 'Floods and water' },
+    { id: 'land',      title: 'Land and access' },
+    { id: 'bio',       title: 'Biosecurity and weeds' },
+  ];
+
+  // ── The list ────────────────────────────────────────────────────────────
+  // kind    'arcgis' (MapServer export), 'wms' (GetMap) or 'network' (the
+  //         Energex and Ergon feature services, drawn here).
+  // layers  the sublayers drawn; the weed survey's is the chosen species.
+  // pane    'areas' or 'lines' — see the header.
+  // minZoom below it nothing is asked; the note says to zoom in.
+  // meaning the words on hover and in the words fold — what it shows here.
+  const FEEDS = [
+    { id: 'ga-power', group: 'utilities', kind: 'arcgis', url: GA_ELEC, layers: [2, 0, 1], pane: 'lines',
+      minZoom: 5, opacity: 0.9,
+      label: 'High-voltage power lines and substations (Australia)',
+      meaning: 'The national transmission network: the big power lines between power stations and towns, with substations and major power stations. Not the local poles and wires in a street — those are Energex and Ergon’s, below.',
+      source: { by: 'Geoscience Australia', licence: 'CC BY 4.0', page: 'https://ecat.ga.gov.au/geonetwork/srv/eng/catalog.search#/metadata/3844c10c-ecfd-44a9-94f5-29222bb6d36d' } },
+    { id: 'ga-pipes', group: 'utilities', kind: 'arcgis', url: GA_PIPES, layers: [1, 0], pane: 'lines',
+      minZoom: 5, opacity: 0.9,
+      label: 'Gas and oil pipelines (Australia)',
+      meaning: 'High-pressure gas and oil pipelines across Australia, as the pipeline companies report them. Corridors rather than surveyed lines in Western Australia and the Northern Territory.',
+      source: { by: 'Geoscience Australia (data from Petrosys GPinfo)', licence: 'CC BY 4.0', page: 'https://www.data.gov.au/data/dataset/oil-and-gas-pipelines-database' } },
+    { id: 'qld-network', group: 'utilities', kind: 'network', pane: 'net', minZoom: 11,
+      label: 'Power network, overhead and underground (Qld)',
+      meaning: 'Energex (south-east Queensland) and Ergon (the rest of Queensland) power lines: sub-transmission from zoom 11, high voltage from zoom 14, the low-voltage street network from zoom 16. A solid line is overhead; a dashed line is an underground cable. Energex says its records have gaps.',
+      source: { by: 'Energex and Ergon Energy (Energy Queensland)', licence: 'published by the companies as a guide only', page: 'https://www.data.qld.gov.au/dataset/ergon-energy-electrical-distribution-network-series' } },
+
+    { id: 'qld-flood-history', group: 'flood', kind: 'arcgis', url: FLOOD, layers: [12, 13, 14, 15, 16, 17, 18, 19, 20],
+      pane: 'areas', minZoom: 7, opacity: 0.55,
+      label: 'Past flood outlines (Qld)',
+      meaning: 'How far some real floods reached: Brisbane and Bremer 1974; Bundaberg 2010 and 2013; Queensland towns January and April 2011; south-west towns 2012; the Fitzroy and the Logan–Albert 2017; western Queensland 2019. Mapped from aerial photos and council records — only those floods, only where they were mapped.',
+      source: { by: 'State of Queensland', licence: 'CC BY 4.0', page: 'https://www.qld.gov.au/emergency/dealing-disasters/disaster-types/flood/for-councils-and-flood-practitioners/flood-data-and-resources/floodcheck-queensland-application' } },
+    { id: 'qld-dam-flood', group: 'flood', kind: 'arcgis', url: FLOOD, layers: [53, 52, 51], pane: 'areas',
+      minZoom: 7, opacity: 0.45,
+      label: 'Dam-failure flood areas (Qld)',
+      meaning: 'Modelled flooding below the dams the State lists because a failure would put people at risk: a “sunny day” failure (the dam fails with no flood coming), the largest possible flood without a failure, and the largest possible flood with one. Worst cases, not forecasts.',
+      source: { by: 'State of Queensland', licence: 'CC BY 4.0', page: 'https://www.data.qld.gov.au/dataset/probable-maximum-flood-extent-referable-dams-queensland-series' } },
+    { id: 'dea-water', group: 'flood', kind: 'wms', url: DEA, wmsLayer: 'ga_ls_wo_fq_myear_3', pane: 'areas',
+      minZoom: 6, opacity: 0.7,
+      label: 'Water seen from satellites since 1986 (Australia)',
+      meaning: 'How often Landsat satellites have seen water on each 30 m patch of ground since 1986, from rarely (pale) to nearly always (deep blue). Ground that is wet now and then is ground that floods, even where no flood study has been done.',
+      source: { by: 'Geoscience Australia — Digital Earth Australia', licence: 'CC BY 4.0', page: 'https://knowledge.dea.ga.gov.au/data/product/dea-water-observations-statistics-landsat/' } },
+    { id: 'qld-gauges', group: 'flood', kind: 'arcgis', url: GAUGES, layers: [13, 14], pane: 'lines',
+      minZoom: 6, opacity: 1,
+      label: 'State river gauges (Qld)',
+      meaning: 'The Queensland Government’s own stream gauging stations, open and closed — other people’s river gauges, beside ours. Their readings are on the State’s Water Monitoring Information Portal.',
+      source: { by: 'State of Queensland', licence: 'CC BY 4.0', page: 'https://water-monitoring.information.qld.gov.au/' } },
+
+    { id: 'qld-heritage', group: 'land', kind: 'arcgis', url: HERITAGE, layers: [5, 1], pane: 'areas',
+      minZoom: 5, opacity: 0.5,
+      label: 'Cultural heritage groups (Qld)',
+      meaning: 'The Aboriginal and Torres Strait Islander parties and bodies for each area under the State’s cultural heritage laws — the people to talk to before work that disturbs ground. The What is here card names them for a point.',
+      source: { by: 'State of Queensland (Aboriginal and Torres Strait Islander Partnerships)', licence: 'CC BY 4.0', page: 'https://www.dsdsatsip.qld.gov.au/our-work/aboriginal-torres-strait-islander-cultural-heritage' } },
+    { id: 'qld-parks', group: 'land', kind: 'arcgis', url: PARKS, layers: [10, 15, 25], pane: 'areas',
+      minZoom: 5, opacity: 0.5,
+      label: 'National parks and State forests (Qld)',
+      meaning: 'Queensland’s protected areas and State forests, and its world heritage areas. Working in one usually needs a permit from the Parks and Wildlife Service.',
+      source: { by: 'State of Queensland', licence: 'CC BY 4.0', page: 'https://www.data.qld.gov.au/dataset/protected-areas-of-queensland-series' } },
+    { id: 'capad', group: 'land', kind: 'arcgis', url: CAPAD, layers: [0, 1], pane: 'areas',
+      minZoom: 4, opacity: 0.45,
+      label: 'Protected areas (Australia)',
+      meaning: 'Every protected area in Australia — national parks, reserves, Indigenous Protected Areas and private conservation land — from the national list (CAPAD), as at 30 June 2024. For outside Queensland, or for land the State list leaves out.',
+      source: { by: 'Australian Government (DCCEEW)', licence: 'CC BY 4.0', page: 'https://www.dcceew.gov.au/environment/land/nrs/science/capad' } },
+
+    // Only the zones that mark out a place: the banana, sugar cane, grape and
+    // papaya zones and the cattle tick area each cover most of the State, and
+    // drawn they tint everything. The card still names every zone a place is in.
+    { id: 'qld-biosecurity', group: 'bio', kind: 'arcgis', url: BIO, layers: [65, 75, 80, 35, 95],
+      pane: 'areas', minZoom: 5, opacity: 0.45,
+      label: 'Fire ant, electric ant and cattle tick zones (Qld)',
+      meaning: 'The State’s fire ant and electric ant biosecurity zones, the Asian honey bee area and the cattle tick line. Inside a fire ant zone, soil, mulch, gravel and hay may not be moved off a site without meeting the rules. The station card names every zone a site is in, the banana, sugar cane, grape and papaya ones too.',
+      source: { by: 'State of Queensland (Department of Primary Industries)', licence: 'CC BY 4.0', page: 'https://www.business.qld.gov.au/industries/farms-fishing-forestry/agriculture/biosecurity/plants/invasive/fire-ants' } },
+    { id: 'qld-fences', group: 'bio', kind: 'arcgis', url: BIO, layers: [21, 23, 24, 25], pane: 'lines',
+      minZoom: 4, opacity: 0.9,
+      label: 'Wild dog and rabbit fences (Qld)',
+      meaning: 'The State’s barrier fences: the wild dog barrier fence, its check fences and the rabbit fence. A gate in one is to be closed behind you.',
+      source: { by: 'State of Queensland (Department of Primary Industries)', licence: 'CC BY 4.0', page: 'https://www.business.qld.gov.au/industries/farms-fishing-forestry/agriculture/biosecurity/animals/invasive/barrier-fences' } },
+    { id: 'qld-weeds', group: 'bio', kind: 'arcgis', url: BIO, layers: [], weed: true, pane: 'areas',
+      minZoom: 4, opacity: 0.55,
+      label: 'Weed survey, one weed at a time (Qld)',
+      meaning: 'Where one invasive plant was found in the State’s 2022–23 survey, in squares about 17 km across — so it says the weed is somewhere in that square, not at a site. Pick the weed below. The What is here card lists every surveyed weed in a point’s square.',
+      source: { by: 'State of Queensland (Department of Primary Industries)', licence: 'CC BY 4.0', page: 'https://daf.qld.gov.au/business-priorities/biosecurity/invasive-plants-animals/pest-mapping/distribution-maps' } },
+  ];
+  const byId = Object.fromEntries(FEEDS.map(f => [f.id, f]));
+
+  const PANES = {
+    areas: { name: 'mnFeedAreas', z: 327 },
+    lines: { name: 'mnFeedLines', z: 333 },
+    net:   { name: 'mnFeedNet',   z: 337 },
+  };
+
+  // The power network's lines, drawn here. Voltage class by colour, overhead
+  // solid and underground dashed — the one difference the layer exists for.
+  const NET_SERVICES = [
+    { name: 'Energex', url: ENERGEX,
+      layers: { sub: [4, 5, 6, 7, 8, 9], hv: [10, 11], lv: [12, 13] }, cable: new Set([5, 7, 9, 11, 13]) },
+    { name: 'Ergon', url: ERGON,
+      layers: { sub: [1, 2], hv: [4, 5], lv: [6, 7] }, cable: new Set([2, 5, 7]) },
+  ];
+  const NET_CLASS = {
+    sub: { zoom: 11, colour: '#7b2cbf', weight: 3,   words: 'Sub-transmission (33–132 kV)' },
+    hv:  { zoom: 14, colour: '#d9480f', weight: 2.2, words: 'High voltage (11–22 kV)' },
+    lv:  { zoom: 16, colour: '#e0a800', weight: 1.6, words: 'Low voltage (street supply)' },
+  };
+
+  const PAD         = 0.3;
+  const MAX_PX      = 2048;
+  const DEBOUNCE_MS = 250;
+  const TIMEOUT_MS  = 25000;
+  const FAIL_TTL    = 60000;
+
+  // ── What is on ──────────────────────────────────────────────────────────
+  // Off by default and remembered, as the property boundaries are: an operator
+  // who turns the fire ant zones on wants them there tomorrow.
+  function load(k, fallback) {
+    try { const v = localStorage.getItem(k); return v == null ? fallback : JSON.parse(v); } catch (_) { return fallback; }
+  }
+  function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { /* private window */ } }
+
+  const on = new Set((load(STORE_KEY, []) || []).filter(id => byId[id]));
+  let weedId = Number(load(WEED_KEY, 0)) || 0;   // the chosen species' sublayer; 0 until the list is read
+  let weeds = null, weedsAsking = null;          // [{ id, name }] from the service
+
+  let map = null, timer = null;
+  const drawn = {};                              // feed id → { overlay, box, seq, failedAt, note, url }
+
+  function slot(id) { return drawn[id] || (drawn[id] = { overlay: null, box: null, seq: 0, failedAt: 0, note: 'off' }); }
+
+  // ── Asking ──────────────────────────────────────────────────────────────
+
+  async function askJson(url, init) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { ...(init || {}), signal: ctl.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json && json.error) throw new Error(json.error.message || 'map service error');
+      return json;
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  // The survey's weeds, by name, once a page load. The service lists 120-odd
+  // species as sublayers of one group; the list here is whatever it says now.
+  function weedList() {
+    if (weeds) return Promise.resolve(weeds);
+    if (weedsAsking) return weedsAsking;
+    weedsAsking = askJson(`${BIO}?f=json`).then(json => {
+      weeds = ((json && json.layers) || [])
+        .filter(l => l.parentLayerId === WEED_GROUP && !l.subLayerIds)
+        .map(l => ({ id: l.id, name: String(l.name || '').trim() }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      if (!weeds.some(w => w.id === weedId)) {
+        const lantana = weeds.find(w => /^lantana/i.test(w.name));
+        weedId = (lantana || weeds[0] || { id: 0 }).id;
+      }
+      return weeds;
+    }).catch(() => { weedsAsking = null; return []; });
+    return weedsAsking;
+  }
+
+  function layersOf(f) { return f.weed ? (weedId ? [weedId] : []) : (f.layers || []); }
+  const drawKey = f => (f.kind === 'wms' ? f.wmsLayer : layersOf(f).join(','));
+
+  // ── Drawing the pictures ────────────────────────────────────────────────
+
+  function projectBox(bounds) {
+    const sw = L.CRS.EPSG3857.project(bounds.getSouthWest());
+    const ne = L.CRS.EPSG3857.project(bounds.getNorthEast());
+    return { sw, ne };
+  }
+
+  function imageUrl(f, bounds, w, h) {
+    const { sw, ne } = projectBox(bounds);
+    if (f.kind === 'wms') {
+      const p = new URLSearchParams({
+        service: 'WMS', version: '1.3.0', request: 'GetMap', layers: f.wmsLayer, styles: '',
+        crs: 'EPSG:3857', bbox: `${sw.x},${sw.y},${ne.x},${ne.y}`,
+        width: String(w), height: String(h), format: 'image/png', transparent: 'true',
+      });
+      return `${f.url}?${p}`;
+    }
+    const p = new URLSearchParams({
+      f: 'image', format: 'png32', transparent: 'true', dpi: '96',
+      bbox: `${sw.x},${sw.y},${ne.x},${ne.y}`, bboxSR: '3857', imageSR: '3857',
+      size: `${w},${h}`, layers: `show:${layersOf(f).join(',')}`,
+    });
+    return `${f.url}/export?${p}`;
+  }
+
+  function clear(id) {
+    const d = drawn[id];
+    if (!d) return;
+    if (d.overlay) {
+      d.overlay.remove();
+      if (map && map.attributionControl && byId[id].kind === 'arcgis') map.attributionControl.removeAttribution(byId[id].source.by);
+    }
+    d.overlay = null;
+    d.box = null;
+    d.seq++;
+  }
+
+  function setNote(id, kind) {
+    slot(id).note = kind;
+    const el = document.getElementById(`mn-feed-note-${id}`);
+    if (el) el.innerHTML = noteHtml(id);
+  }
+
+  // DEA's WMS hands over at most 512 px a picture, so it is drawn as
+  // Leaflet's own WMS tiles (256 px) rather than one padded image.
+  function runTiles(f) {
+    const d = slot(f.id);
+    if (map.getZoom() < f.minZoom) { clear(f.id); setNote(f.id, 'zoom'); return; }
+    if (d.overlay) { if (d.note !== 'fail') setNote(f.id, 'ok'); return; }
+    let bad = 0, good = 0;
+    d.overlay = L.tileLayer.wms(f.url, {
+      layers: f.wmsLayer, styles: '', format: 'image/png', transparent: true, version: '1.3.0',
+      pane: PANES[f.pane].name, opacity: f.opacity, crossOrigin: 'anonymous', interactive: false,
+      attribution: f.source.by,
+    });
+    d.overlay.on('tileload', () => { good++; if (d.note !== 'ok') { setNote(f.id, 'ok'); rerenderMapLegend(); } });
+    d.overlay.on('tileerror', () => { bad++; if (!good && bad >= 4) setNote(f.id, 'fail'); });
+    d.overlay.addTo(map);
+    d.url = f.url;
+    setNote(f.id, 'loading');
+  }
+
+  function runPicture(f) {
+    if (f.kind === 'wms') { runTiles(f); return; }
+    const d = slot(f.id);
+    if (map.getZoom() < f.minZoom) { clear(f.id); setNote(f.id, 'zoom'); return; }
+    if (f.weed && !weedId) {
+      setNote(f.id, 'loading');
+      weedList().then(() => { if (on.has(f.id)) sync(); });
+      return;
+    }
+    const want = drawKey(f);
+    if (d.overlay && d.box && d.box.zoom === map.getZoom() && d.box.layers === want
+        && d.box.bounds.contains(map.getBounds())) { setNote(f.id, 'ok'); return; }
+    if (Date.now() - d.failedAt < FAIL_TTL) { clear(f.id); setNote(f.id, 'fail'); return; }
+
+    const mine = ++d.seq;
+    const bounds = map.getBounds().pad(PAD);
+    const px = map.getSize();
+    let w = Math.round(px.x * (1 + 2 * PAD)), h = Math.round(px.y * (1 + 2 * PAD));
+    const over = Math.max(w, h) / MAX_PX;
+    if (over > 1) { w = Math.round(w / over); h = Math.round(h / over); }
+    const url = imageUrl(f, bounds, w, h);
+    setNote(f.id, 'loading');
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    const t = setTimeout(() => { img.src = ''; }, TIMEOUT_MS);
+    img.onload = () => {
+      clearTimeout(t);
+      if (mine !== d.seq || !map || !on.has(f.id)) return;
+      if (d.overlay) d.overlay.remove();
+      else if (map.attributionControl) map.attributionControl.addAttribution(f.source.by);
+      d.overlay = L.imageOverlay(url, bounds, { pane: PANES[f.pane].name, opacity: f.opacity, interactive: false }).addTo(map);
+      d.box = { bounds, zoom: map.getZoom(), layers: want };
+      d.url = url;
+      setNote(f.id, 'ok');
+      rerenderMapLegend();
+    };
+    img.onerror = () => {
+      clearTimeout(t);
+      if (mine !== d.seq || !map) return;
+      d.failedAt = Date.now();
+      clear(f.id);
+      setNote(f.id, 'fail');
+      rerenderMapLegend();
+    };
+    img.src = url;
+  }
+
+  // ── Drawing the power network ───────────────────────────────────────────
+
+  let netLayer = null, netRenderer = null;
+
+  function netClassesAt(z) { return Object.keys(NET_CLASS).filter(k => z >= NET_CLASS[k].zoom); }
+
+  function netClassOf(svc, layerId) {
+    for (const k of Object.keys(svc.layers)) if (svc.layers[k].includes(layerId)) return k;
+    return null;
+  }
+
+  function netQuery(svc, ids, bounds, extra) {
+    const defs = {};
+    for (const id of ids) defs[id] = '1=1';
+    const p = new URLSearchParams({
+      layerDefs: JSON.stringify(defs), inSR: '4326', outSR: '4326', spatialRel: 'esriSpatialRelIntersects',
+      returnGeometry: 'true', f: 'json', ...(extra || {}),
+    });
+    if (bounds) {
+      p.set('geometry', `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`);
+      p.set('geometryType', 'esriGeometryEnvelope');
+    }
+    return askJson(`${svc.url}/query?${p}`);
+  }
+
+  function runNetwork(f) {
+    const d = slot(f.id);
+    const z = map.getZoom();
+    if (z < f.minZoom) { clearNet(); setNote(f.id, 'zoom'); return; }
+    const classes = netClassesAt(z);
+    const want = classes.join(',');
+    if (netLayer && d.box && d.box.zoom === z && d.box.layers === want && d.box.bounds.contains(map.getBounds())) {
+      setNote(f.id, d.cut ? 'cut' : 'ok');
+      return;
+    }
+    if (Date.now() - d.failedAt < FAIL_TTL) { clearNet(); setNote(f.id, 'fail'); return; }
+    const mine = ++d.seq;
+    const bounds = map.getBounds().pad(PAD);
+    // Thin the lines to about a pixel: a street's cable needs no centimetres.
+    const degPerPx = (bounds.getEast() - bounds.getWest()) / (map.getSize().x * (1 + 2 * PAD));
+    setNote(f.id, 'loading');
+    const asks = NET_SERVICES.map(svc => {
+      const ids = classes.flatMap(k => svc.layers[k]);
+      return netQuery(svc, ids, bounds, {
+        outFields: 'OBJECTID', geometryPrecision: '6', maxAllowableOffset: String(degPerPx),
+      }).then(json => ({ svc, json }), () => ({ svc, json: null }));
+    });
+    Promise.all(asks).then(results => {
+      if (mine !== d.seq || !map || !on.has(f.id)) return;
+      if (results.every(r => !r.json)) { d.failedAt = Date.now(); clearNet(); setNote(f.id, 'fail'); rerenderMapLegend(); return; }
+      if (!netRenderer) netRenderer = L.canvas({ pane: PANES.net.name });
+      const group = L.layerGroup();
+      let cut = false;
+      for (const { svc, json } of results) {
+        if (!json) continue;
+        for (const lyr of json.layers || []) {
+          if (lyr.exceededTransferLimit) cut = true;
+          const k = netClassOf(svc, lyr.id);
+          if (!k) continue;
+          const c = NET_CLASS[k];
+          const under = svc.cable.has(lyr.id);
+          for (const ft of lyr.features || []) {
+            const paths = (ft.geometry && ft.geometry.paths) || [];
+            if (!paths.length) continue;
+            L.polyline(paths.map(p => p.map(([x, y]) => [y, x])), {
+              renderer: netRenderer, interactive: false, color: c.colour, weight: c.weight,
+              opacity: 0.95, dashArray: under ? '6 5' : null, lineCap: 'butt',
+            }).addTo(group);
+          }
+        }
+      }
+      clearNet(true);
+      netLayer = group.addTo(map);
+      if (map.attributionControl) map.attributionControl.addAttribution(f.source.by);
+      d.box = { bounds, zoom: z, layers: want };
+      d.cut = cut;
+      setNote(f.id, cut ? 'cut' : 'ok');
+      rerenderMapLegend();
+    });
+  }
+
+  function clearNet(keepSeq) {
+    if (netLayer) {
+      netLayer.remove();
+      if (map && map.attributionControl) map.attributionControl.removeAttribution(byId['qld-network'].source.by);
+    }
+    netLayer = null;
+    const d = drawn['qld-network'];
+    if (d) { d.box = null; if (!keepSeq) d.seq++; }
+  }
+
+  // ── Running ─────────────────────────────────────────────────────────────
+
+  function run() {
+    if (!map) return;
+    for (const f of FEEDS) {
+      if (!on.has(f.id)) {
+        if (f.kind === 'network') clearNet(); else clear(f.id);
+        slot(f.id).note = 'off';
+        continue;
+      }
+      // One feed's fault is not the others': a throw here would leave every
+      // feed after it on "Drawing…".
+      try {
+        if (f.kind === 'network') runNetwork(f); else runPicture(f);
+      } catch (_) {
+        slot(f.id).failedAt = Date.now();
+        setNote(f.id, 'fail');
+      }
+    }
+  }
+
+  function sync() {
+    clearTimeout(timer);
+    timer = setTimeout(run, DEBOUNCE_MS);
+  }
+
+  // ── Notes, controls and the words ───────────────────────────────────────
+
+  function noteHtml(id) {
+    const f = byId[id];
+    const d = drawn[id];
+    const kind = on.has(id) ? (d ? d.note : 'loading') : 'off';
+    switch (kind) {
+      case 'zoom':    return `Zoom in to draw it (from zoom ${f.minZoom}).`;
+      case 'loading': return 'Drawing…';
+      case 'fail':    return `Could not be drawn — ${esc(f.source.by)}’s map service did not answer. It is asked again in a minute.`;
+      case 'cut':     return 'Drawn, but the view held more lines than the service hands over at once — zoom in for every line.';
+      case 'ok':      return f.kind === 'network' ? `Drawn: ${netClassesAt(map ? map.getZoom() : 0).map(k => NET_CLASS[k].words.toLowerCase()).join(', ')}.` : 'Drawn.';
+      default:        return '';
+    }
+  }
+
+  function weedSelectHtml() {
+    if (!weeds) {
+      return `<label class="filter-field mn-feed-sub"><span>Weed</span>
+        <select disabled aria-label="Weed to show"><option>${weedsAsking ? 'Reading the list…' : 'Turn the survey on to choose'}</option></select></label>`;
+    }
+    return `<label class="filter-field mn-feed-sub"><span>Weed</span>
+      <select onchange="MapFeeds.setWeed(this.value)" aria-label="Weed to show">
+        ${weeds.map(w => `<option value="${w.id}" ${w.id === weedId ? 'selected' : ''}>${esc(w.name)}</option>`).join('')}
+      </select></label>`;
+  }
+
+  function rowHtml(f) {
+    return `<label class="filter-check" title="${escAttr(f.meaning)}">
+        <input type="checkbox" ${on.has(f.id) ? 'checked' : ''} data-feed="${escAttr(f.id)}"
+               onchange="MapFeeds.setEnabled('${f.id}', this.checked)">
+        ${esc(f.label)}
+      </label>
+      ${f.weed ? `<div id="mn-feed-weed">${weedSelectHtml()}</div>` : ''}
+      <p class="filter-note" id="mn-feed-note-${escAttr(f.id)}">${on.has(f.id) ? noteHtml(f.id) : ''}</p>`;
+  }
+
+  function wordsHtml() {
+    return `<details class="rd-fold mn-feed-words"><summary>What the words on this list mean</summary>
+      <dl class="mn-feed-dl">${FEEDS.map(f => `<dt>${esc(f.label)}</dt><dd>${esc(f.meaning)}
+        <span class="mn-pop-note">${esc(f.source.by)} · ${esc(f.source.licence)} ·
+        <a href="${escAttr(f.source.page)}" target="_blank" rel="noopener" aria-label="${escAttr(`About ${f.label} — in a new tab`)}">about it<span aria-hidden="true"> ↗</span></a></span></dd>`).join('')}
+        <dt>Open data here</dt><dd>${esc(SECTION_MEANING)}</dd>
+      </dl></details>`;
+  }
+
+  let foldOpen = false;
+  function controlsHtml() {
+    const count = on.size;
+    return `<details class="rd-fold mn-feeds" data-tour="map-feeds" ${foldOpen || count ? 'open' : ''}
+        ontoggle="MapFeeds._fold(this.open)">
+      <summary>More map layers — power, pipes, floods, land${count ? ` <span class="mn-pop-note">(${count} on)</span>` : ''}</summary>
+      <p class="filter-note">Open data from government map services. ${esc(NOT_FOR_DIGGING)}</p>
+      ${GROUPS.map(g => `<fieldset class="mn-feed-group"><legend>${esc(g.title)}</legend>
+        ${FEEDS.filter(f => f.group === g.id).map(rowHtml).join('')}</fieldset>`).join('')}
+      ${wordsHtml()}
+    </details>`;
+  }
+
+  // ── The key ─────────────────────────────────────────────────────────────
+  // The services' own legend swatches, so the key is the picture's colours;
+  // the network's are this file's.
+  const legends = {};      // service url → Promise<{ layerId → { name, items:[{label, src}] } }>
+
+  function legendOf(url) {
+    if (legends[url]) return legends[url];
+    legends[url] = askJson(`${url}/legend?f=json`).then(json => {
+      const out = {};
+      for (const l of (json && json.layers) || []) {
+        out[l.layerId] = {
+          name: l.layerName,
+          items: (l.legend || []).map(x => ({ label: x.label || '', src: `data:${x.contentType || 'image/png'};base64,${x.imageData}` })),
+        };
+      }
+      return out;
+    }).catch(() => ({}));
+    legends[url].then(() => rerenderMapLegend());
+    return legends[url];
+  }
+
+  const legendDone = {};   // service url → resolved legend, for the synchronous render
+  function legendNow(url) {
+    if (legendDone[url]) return legendDone[url];
+    legendOf(url).then(v => { legendDone[url] = v; });
+    return null;
+  }
+
+  function legendHtml() {
+    const parts = [];
+    for (const f of FEEDS) {
+      const d = drawn[f.id];
+      if (!on.has(f.id)) continue;
+      const shown = f.kind === 'network' ? !!netLayer : !!(d && d.overlay);
+      if (!shown) continue;
+      let body = '';
+      if (f.kind === 'network') {
+        const z = map ? map.getZoom() : 0;
+        body = netClassesAt(z).map(k => `
+          <span class="legend-item"><span class="legend-line mn-feed-net" style="--dot:${NET_CLASS[k].colour}"></span>
+            <span class="small">${esc(NET_CLASS[k].words)}</span></span>`).join('') + `
+          <span class="legend-item"><span class="legend-line mn-feed-net mn-feed-net-ug" style="--dot:#555"></span>
+            <span class="small">Dashed: underground cable</span></span>`;
+      } else if (f.kind === 'wms') {
+        body = `<span class="legend-item"><span class="mn-feed-ramp" aria-hidden="true"></span>
+          <span class="small">Seen wet: rarely → nearly always</span></span>`;
+      } else {
+        const lg = legendNow(f.url);
+        if (lg) {
+          body = layersOf(f).map(id => lg[id]).filter(Boolean).flatMap(l => l.items.slice(0, 4).map(it => `
+            <span class="legend-item"><img class="mn-feed-swatch" src="${escAttr(it.src)}" alt="">
+              <span class="small">${esc(it.label ? `${l.name}: ${it.label}` : l.name)}</span></span>`)).slice(0, 12).join('');
+        }
+      }
+      parts.push(`<span class="legend-item"><span class="small"><strong>${termHtml(f.label, f.meaning)}</strong>
+        <span class="txt-muted">— ${esc(f.source.by)}${f.weed && weeds ? ` · ${esc((weeds.find(w => w.id === weedId) || {}).name || '')}` : ''}</span></span></span>${body}`);
+    }
+    if (!parts.length) return '';
+    return parts.join('') + `<span class="legend-item"><span class="small txt-muted">${esc(NOT_FOR_DIGGING)}</span></span>`;
+  }
+
+  // ── Open data here: the same services asked about one place ─────────────
+  // A section on the station card and on the What is here card. The fire ant
+  // and other zones are asked as soon as the card opens (one request, kept for
+  // the session per place); the rest only when the section is opened, so a
+  // card opened in passing costs one request, not ten.
+
+  const SECTION_MEANING = 'On a station card and the What is here card: what these open-data maps say about that one place — '
+    + 'its biosecurity zones straight away, and when opened, past floods, dam-failure areas, nearby power lines and pipelines, '
+    + 'underground cables within 30 m, cultural heritage groups, protected areas and the weeds surveyed in its square.';
+
+  const KEY_DP = 5, CACHE_MAX = 100;
+  const NEAR_M = 200, CABLE_M = 30;
+  const answers = new Map();        // place key → { zones, more, busy:{} }
+  const asked = new Map();          // element id → place
+
+  function key(s) {
+    if (!s || s.lat == null || s.lon == null || s.lat === '' || s.lon === '') return null;
+    const lat = Number(s.lat), lon = Number(s.lon);
+    if (!isFinite(lat) || !isFinite(lon)) return null;
+    return `${lat.toFixed(KEY_DP)},${lon.toFixed(KEY_DP)}`;
+  }
+
+  function entry(k) {
+    let a = answers.get(k);
+    if (a) return a;
+    a = { busy: {} };
+    answers.set(k, a);
+    if (answers.size > CACHE_MAX) answers.delete(answers.keys().next().value);
+    return a;
+  }
+
+  // ArcGIS identify at a point, `radiusM` round it: a box that size drawn as a
+  // 100 px image, and a tolerance of half of it in pixels.
+  function identify(url, layers, lat, lon, radiusM) {
+    const dLat = radiusM / 111320, dLon = radiusM / (111320 * Math.cos(lat * Math.PI / 180));
+    const p = new URLSearchParams({
+      f: 'json', geometry: `${lon},${lat}`, geometryType: 'esriGeometryPoint', sr: '4326',
+      layers: `all:${layers.join(',')}`, tolerance: radiusM > 1 ? '50' : '1',
+      mapExtent: `${lon - dLon},${lat - dLat},${lon + dLon},${lat + dLat}`, imageDisplay: '100,100,96',
+      returnGeometry: 'false',
+    });
+    return askJson(`${url}/identify?${p}`).then(j => (j && j.results) || []);
+  }
+
+  const attr = (r, ...names) => {
+    for (const n of names) { const v = r.attributes && r.attributes[n]; if (v != null && v !== '' && v !== 'Null') return String(v); }
+    return '';
+  };
+  const uniq = xs => [...new Set(xs.filter(Boolean))];
+
+  const QUESTIONS = {
+    zones: (lat, lon) => identify(BIO, [65, 75, 80, 100, 35, 40, 45, 50, 55, 60], lat, lon, 1)
+      .then(rs => ({ ok: true, zones: uniq(rs.map(r => attr(r, 'Biosecurity zone', 'Feature') || r.value).map(v =>
+        (/^(infested|free)$/i.test(v) ? `Cattle tick ${v.toLowerCase()} area` : v.trim()))) })),
+    floods: (lat, lon) => identify(FLOOD, [12, 13, 14, 15, 16, 17, 18, 19, 20, 51, 52, 53], lat, lon, 1)
+      .then(rs => ({ ok: true,
+        past: uniq(rs.filter(r => r.layerId < 50).map(r => r.layerName.replace(/ Floodline /, ' — '))),
+        dams: uniq(rs.filter(r => r.layerId >= 50).map(r => `${attr(r, 'Dam name') || r.value} — ${
+          r.layerId === 51 ? 'sunny day failure' : r.layerId === 52 ? 'largest flood, no failure' : 'largest flood with a failure'}`)) })),
+    power: (lat, lon) => Promise.all([
+      identify(GA_ELEC, [2, 0], lat, lon, NEAR_M),
+      identify(GA_PIPES, [0, 1], lat, lon, NEAR_M),
+    ]).then(([el, pp]) => ({ ok: true,
+      lines: uniq(el.map(r => {
+        const kv = attr(r, 'CAPACITY_KV', 'capacity_kv');
+        const name = attr(r, 'FEATURE_NAME', 'NAME', 'name') || r.value;
+        return `${r.layerId === 0 ? 'Substation' : 'Power line'}${name ? ` — ${name}` : ''}${kv ? ` (${kv} kV)` : ''}`;
+      })),
+      pipes: uniq(pp.map(r => `${r.layerId === 1 ? 'Gas' : 'Oil'} pipeline — ${attr(r, 'NAME', 'name', 'PIPELINE_NAME') || r.value}`)) })),
+    cables: (lat, lon) => Promise.all(NET_SERVICES.map(svc => netQuery(svc,
+      [...svc.layers.sub, ...svc.layers.hv, ...svc.layers.lv], null, {
+        geometry: `${lon},${lat}`, geometryType: 'esriGeometryPoint', distance: String(CABLE_M),
+        units: 'esriSRUnit_Meter', returnGeometry: 'false', outFields: '*',
+      }).then(json => ({ svc, json }), () => ({ svc, json: null }))))
+      .then(rs => {
+        if (rs.every(r => !r.json)) return { ok: false, why: 'Energex and Ergon’s services did not answer' };
+        const found = [];
+        for (const { svc, json } of rs) {
+          for (const l of (json && json.layers) || []) {
+            const k = netClassOf(svc, l.id);
+            if (!k || !(l.features || []).length) continue;
+            found.push(`${svc.name}: ${NET_CLASS[k].words.toLowerCase()}, ${svc.cable.has(l.id) ? 'underground' : 'overhead'} (${l.features.length})`);
+          }
+        }
+        return { ok: true, found };
+      }),
+    land: (lat, lon) => Promise.all([
+      identify(HERITAGE, [1, 5], lat, lon, 1),
+      identify(PARKS, [10, 15, 25], lat, lon, 1),
+      identify(CAPAD, [0], lat, lon, 1).catch(() => []),
+    ]).then(([ch, pk, cp]) => ({ ok: true,
+      heritage: uniq(ch.map(r => `${attr(r, 'Name', 'NAME') || r.value} — ${r.layerId === 5 ? 'cultural heritage body' : 'cultural heritage party'}`)),
+      parks: uniq([...pk, ...cp].map(r => attr(r, 'Estate name', 'ESTATENAME', 'NAME', 'Name') || r.value)) })),
+    weeds: (lat, lon) => identify(BIO, [WEED_GROUP], lat, lon, 1)
+      .then(rs => ({ ok: true, weeds: uniq(rs.map(r => {
+        const name = attr(r, 'Common name') || r.layerName;
+        const dec = attr(r, 'State declaration');
+        return dec && !/not declared/i.test(dec) ? `${name} (${dec.toLowerCase()})` : name;
+      })).sort() })),
+  };
+  const FIRST = ['zones'];
+  const MORE = ['floods', 'power', 'cables', 'land', 'weeds'];
+
+  const settled = r => !!r && (r.ok || Date.now() - r.at < FAIL_TTL);
+
+  function runQs(k, names) {
+    const a = entry(k);
+    const [lat, lon] = k.split(',').map(Number);
+    for (const n of names) {
+      if (a.busy[n] || settled(a[n])) continue;
+      a.busy[n] = true;
+      Promise.resolve().then(() => QUESTIONS[n](lat, lon))
+        .then(r => (r && r.ok ? r : { ok: false, why: (r && r.why) || 'no answer' }), () => ({ ok: false, why: 'no answer' }))
+        .then(r => {
+          a[n] = r.ok ? r : { ...r, at: Date.now() };
+          a.busy[n] = false;
+          notify(k);
+        });
+    }
+  }
+
+  function notify(k) {
+    for (const [elId, s] of asked) {
+      const el = document.getElementById(elId);
+      if (!el) { asked.delete(elId); continue; }
+      if (el.dataset.mnFeeds !== k) continue;
+      const open = !!el.querySelector('details[open]');
+      el.innerHTML = html(s, open);
+    }
+  }
+
+  const failed = r => !!(r && r.ok === false);
+
+  function row(label, meaning, value) {
+    return `<div class="acma-row"><span>${termHtml(label, meaning)}</span><span>${value}</span></div>`;
+  }
+
+  function list(xs, none) {
+    return xs && xs.length ? xs.map(esc).join('<br>') : `<span class="txt-muted">${esc(none)}</span>`;
+  }
+
+  function answer(a, n, fn, none) {
+    const r = a && a[n];
+    if (failed(r)) return '<span class="txt-warn">could not be read</span>';
+    if (!r) return '<span class="mn-pop-note">asking…</span>';
+    return fn(r) || `<span class="txt-muted">${esc(none)}</span>`;
+  }
+
+  const TERMS = {
+    zones: 'The State’s biosecurity zones this place is in. In a fire ant zone, soil, mulch, gravel and hay may not leave a site without meeting the rules.',
+    floods: 'Past floods whose mapped outline covers this place. Only the floods the State has mapped — not every flood there has been.',
+    dams: 'Modelled flooding below a dam the State lists because its failure would put people at risk. A worst case, not a forecast.',
+    lines: `Geoscience Australia’s high-voltage lines and substations within about ${NEAR_M} m.`,
+    pipes: `Gas and oil pipelines within about ${NEAR_M} m.`,
+    cables: `Energex or Ergon lines within ${CABLE_M} m, and whether each is overhead or an underground cable. A guide only: ring Before You Dig Australia (1100) before digging.`,
+    heritage: 'The Aboriginal or Torres Strait Islander party or body for this area under the cultural heritage laws — who to talk to before ground is disturbed.',
+    parks: 'A national park, State forest or other protected area this place is in. Working in one usually needs a permit.',
+    weeds: 'Invasive plants the State’s 2022–23 survey found in this place’s square (about 17 km across) — somewhere in the square, not necessarily here. Restricted and prohibited ones are marked.',
+  };
+
+  function zonesShort(a) {
+    const z = a && a.zones;
+    if (!z || !z.ok) return '';
+    const fire = z.zones.filter(v => /fire ant/i.test(v));
+    return fire.length ? `<span class="term-chip mn-feed-chip" title="${escAttr(TERMS.zones)}">🐜 ${esc(fire[0])}</span>` : '';
+  }
+
+  function html(s, open) {
+    const k = key(s);
+    if (!k) return '';
+    const a = answers.get(k);
+    const body = `
+      ${row('Biosecurity zones', TERMS.zones, answer(a, 'zones', r => list(r.zones, 'none'), 'none'))}
+      ${row('Past floods', TERMS.floods, answer(a, 'floods', r => list(r.past, 'none mapped here'), ''))}
+      ${row('Dam-failure areas', TERMS.dams, answer(a, 'floods', r => list(r.dams, 'none'), ''))}
+      ${row('High-voltage lines', TERMS.lines, answer(a, 'power', r => list(r.lines, `none within ${NEAR_M} m`), ''))}
+      ${row('Pipelines', TERMS.pipes, answer(a, 'power', r => list(r.pipes, `none within ${NEAR_M} m`), ''))}
+      ${row('Power network', TERMS.cables, answer(a, 'cables', r => list(r.found, `none within ${CABLE_M} m`), ''))}
+      ${row('Cultural heritage', TERMS.heritage, answer(a, 'land', r => list(r.heritage, 'none listed'), ''))}
+      ${row('Protected area', TERMS.parks, answer(a, 'land', r => list(r.parks, 'not in one'), ''))}
+      ${row('Weeds in its square', TERMS.weeds, answer(a, 'weeds', r => (r.weeds.length ? `${r.weeds.length}: ${esc(r.weeds.join(', '))}` : ''), 'none surveyed'))}
+      <p class="mn-pop-note">${esc(NOT_FOR_DIGGING)} What the words mean: hover them, or see <em>More map layers</em> in Map display.</p>`;
+    return `<details class="mn-feed-sect" ${open ? 'open' : ''} ontoggle="MapFeeds._sect(this)">
+      <summary title="${escAttr(SECTION_MEANING)}">Open data here ${zonesShort(a)}</summary>${open ? body : ''}</details>`;
+  }
+
+  // The card places <div id=elId data-mn-feeds=key(s)>html(s)</div> and calls this.
+  function ask(elId, s) {
+    const k = key(s);
+    if (!k) return;
+    asked.set(elId, s);
+    runQs(k, FIRST);
+  }
+
+  function sectionToggled(det) {
+    const host = det.parentElement;
+    if (!host || !host.dataset.mnFeeds) return;
+    const s = asked.get(host.id);
+    if (!s) return;
+    if (det.open) {
+      runQs(host.dataset.mnFeeds, MORE);
+      host.innerHTML = html(s, true);
+    }
+  }
+
+  // ── The face it shows the rest of the app ───────────────────────────────
+
+  return {
+    FEEDS,
+    attach(m) {
+      map = m;
+      for (const p of Object.values(PANES)) {
+        if (!m.getPane(p.name)) {
+          const el = m.createPane(p.name);
+          el.style.zIndex = p.z;
+          el.style.pointerEvents = 'none';
+        }
+      }
+      m.on('moveend', sync);
+      if (on.has('qld-weeds')) weedList().then(() => refreshWeedSelect());
+      sync();
+    },
+
+    detach() {
+      clearTimeout(timer);
+      if (map) map.off('moveend', sync);
+      for (const f of FEEDS) clear(f.id);
+      clearNet();
+      netRenderer = null;
+      map = null;
+    },
+
+    sync,
+    controlsHtml,
+    legendHtml,
+    noteHtml,
+
+    active() { return FEEDS.some(f => on.has(f.id) && (f.kind === 'network' ? !!netLayer : !!(drawn[f.id] && drawn[f.id].overlay))); },
+    enabled(id) { return on.has(id); },
+
+    setEnabled(id, yes) {
+      if (!byId[id]) return;
+      if (yes) on.add(id); else on.delete(id);
+      save(STORE_KEY, [...on]);
+      if (id === 'qld-weeds' && yes) weedList().then(() => { refreshWeedSelect(); sync(); });
+      if (!yes) {
+        if (byId[id].kind === 'network') clearNet(); else clear(id);
+        setNote(id, 'off');
+        rerenderMapLegend();
+      } else {
+        setNote(id, 'loading');
+      }
+      sync();
+    },
+
+    setWeed(v) {
+      const id = Number(v);
+      if (!weeds || !weeds.some(w => w.id === id)) return;
+      weedId = id;
+      save(WEED_KEY, id);
+      clear('qld-weeds');
+      sync();
+    },
+
+    weeds() { return weeds ? weeds.slice() : null; },
+
+    // Card section.
+    key, html, ask,
+    _sect: sectionToggled,
+    _fold(open) { foldOpen = open; },
+    _state() {
+      return { on: [...on], weedId, drawn: Object.fromEntries(Object.entries(drawn).map(([k, d]) => [k, { note: d.note, url: d.url || null, shown: !!d.overlay }])), net: !!netLayer };
+    },
+  };
+
+  function refreshWeedSelect() {
+    const el = document.getElementById('mn-feed-weed');
+    if (el) el.innerHTML = weedSelectHtml();
+  }
+})();

@@ -25,6 +25,18 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 280, date: '2026-11-17', items: [
+      '🗺️ <strong>More map layers, from open government data.</strong> In the Stations map\'s <em>Map display</em>, a new '
+        + '<em>More map layers</em> fold: high-voltage power lines and gas pipelines across Australia; Energex and Ergon\'s '
+        + 'power network in Queensland, overhead and underground; past flood outlines and dam-failure flood areas; water '
+        + 'seen by satellites since 1986; the State\'s river gauges; cultural heritage groups; national parks and protected '
+        + 'areas; fire ant and other biosecurity zones; barrier fences; and the weed survey, one weed at a time. A guide '
+        + 'only — never for finding a cable before digging (ring 1100).',
+      '🐜 <strong>Open data here, on every station card.</strong> A new section says at once if a site is in a fire ant '
+        + 'zone, and when opened lists its other biosecurity zones, past floods, dam-failure areas, nearby power lines, '
+        + 'pipelines and cables, the cultural heritage group to talk to, any protected area and the weeds surveyed '
+        + 'round it. The <em>What is here</em> card asks the same about any point.',
+    ] },
     { n: 279, date: '2026-11-16', items: [
       '📏 <strong>Ground height under the pointer, on the Stations map.</strong> A small <em>AHD</em> button under 💬 in the '
         + 'map\'s top-right corner turns it on: rest the mouse anywhere — flat map or ⛰️ 3-D — and a box beside the pointer '

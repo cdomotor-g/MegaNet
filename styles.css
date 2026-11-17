@@ -30816,3 +30816,23 @@ details.tm-fold summary { cursor: pointer; }
   background: none;
   box-shadow: none;
 }
+
+/* More map layers (map-feeds.js, EPIC #283). The fold in Map display, its
+   groups, the key's swatches and the power network's lines, and the "Open data
+   here" section on the station and What is here cards. */
+.mn-feeds { margin-top: var(--sp-3); }
+.mn-feeds > summary { cursor: pointer; font-weight: 600; }
+.mn-feed-group { border: 0; padding: 0; margin: var(--sp-2) 0 0; min-width: 0; }
+.mn-feed-group > legend { font-size: .85em; font-weight: 600; color: var(--muted); padding: 0; }
+.mn-feed-sub { margin-left: 1.6em; }
+.mn-feed-dl dt { font-weight: 600; margin-top: var(--sp-2); }
+.mn-feed-dl dd { margin: 0 0 0 .8em; }
+.mn-feed-swatch { width: 16px; height: 16px; object-fit: contain; vertical-align: middle; }
+.legend-line.mn-feed-net { border-top-color: var(--dot); }
+.legend-line.mn-feed-net-ug { border-top-style: dashed; }
+.mn-feed-ramp {
+  display: inline-block; width: 32px; height: 10px; border-radius: 2px;
+  background: linear-gradient(90deg, #d7ecfa, #6aa9e0, #08306b);
+}
+.mn-feed-sect > summary { cursor: pointer; font-weight: 600; }
+.mn-feed-chip { margin-left: .4em; font-weight: 400; }

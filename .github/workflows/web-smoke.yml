@@ -810,6 +810,17 @@ jobs:
         working-directory: test
         run: npm run roads
 
+      # More map layers (map-feeds.js, EPIC #291): the open-data layers drawn
+      # from one list, and "Open data here" on the station card. Every service
+      # is stubbed; one answers 500, and the check asserts the layers after it
+      # still draw, the weed survey reads its species from the service, the
+      # power network is one request per company per view, and the card names
+      # the fire ant zone before it is opened.
+      - name: More map layers — open data from one list
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run feeds
+
       # Who manages each road and bridge (map-road-owners.js, site-roads.js).
       # The State's Roads and Tracks, TMR's bridge register and QLDTraffic's
       # road lookup are stubbed with a highway, a council road, an unowned

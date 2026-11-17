@@ -73,6 +73,8 @@ const MapHere = (function () {
   const ROADS_ID = 'mn-roads-here';
   // The mobile signal section (site-mobile.js), on the same terms.
   const MOBILE_ID = 'mn-mobile-here';
+  // What the open-data maps say about the point (map-feeds.js), on the same terms.
+  const FEEDS_ID = 'mn-feeds-here';
   // How far apart the two land-cover samples are, in degrees of longitude —
   // about 20 m, which is two pixels of a 10 m raster. The service samples a
   // path rather than a point, so it is asked for the shortest honest path
@@ -339,6 +341,10 @@ const MapHere = (function () {
            about this point (site-mobile.js). -->
       <div class="acma-sect" id="${MOBILE_ID}"
            data-mn-mobile="${escAttr(SiteMobile.key(here))}">${SiteMobile.html(here)}</div>
+      <!-- What the open-data maps say about the point — zones, past floods,
+           power and pipes, heritage, parks, weeds (map-feeds.js). -->
+      <div class="acma-sect" id="${FEEDS_ID}"
+           data-mn-feeds="${escAttr(MapFeeds.key(here))}">${MapFeeds.html(here)}</div>
       <div class="acma-sect">
         <span class="small txt-muted stn-card-rhs-head">Nearby</span>
         ${awayRow('Nearest station', near, `MapHere.goToStation('${near ? escAttr(near.s.id) : ''}')`,
@@ -387,6 +393,7 @@ const MapHere = (function () {
     SiteLand.ask(LAND_ID, landPoint());
     SiteRoads.ask(ROADS_ID, landPoint());
     SiteMobile.ask(MOBILE_ID, landPoint());
+    MapFeeds.ask(FEEDS_ID, landPoint());
   }
 
   // ── Arming ─────────────────────────────────────────────────────────────────
