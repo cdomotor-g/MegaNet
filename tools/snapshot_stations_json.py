@@ -75,7 +75,7 @@ KEY_ORDER = {
                   'rx_threshold_dbm'],
     # A proposal (0039) says so beside its number, which it does not have yet.
     'station': ['id', 'name', 'station_number', 'proposed', 'station_type',
-                'proposed_year', 'lat', 'lon', 'elevation_ahd',
+                'proposed_year', 'decommissioned', 'decommissioned_year', 'lat', 'lon', 'elevation_ahd',
                 'elevation_source', 'owner',
                 'roles', 'radio_network_ids', 'catchment_ids', 'alert_ids',
                 'satcom', 'rm_system_id', 'enabled', 'notes', 'legacy_unit_id',
@@ -84,6 +84,7 @@ KEY_ORDER = {
                 'awrc_number', 'stream', 'urbs_label', 'bureau_listings',
                 'flood_classes', 'crossings', 'gauge_survey', 'flood_effects',
                 'aep_levels', 'frequencies', 'flood_peaks', 'tower_height',
+                'antenna_height_m',
                 'flood_peaks_from', 'flood_peaks_gauge'],
     'sensor':  ['alert_id', 'type', 'sensor_id', 'device_id'],
     'site':    ['db_id', 'number', 'name'],

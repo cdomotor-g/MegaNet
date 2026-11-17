@@ -326,7 +326,8 @@ def build(data, out):
                'rm_system_id', 'enabled', 'notes', 'legacy_unit_id', 'site', 'lga',
                'basin', 'location_types', 'awrc_number', 'stream', 'urbs_label',
                'proposed', 'station_type', 'proposed_year', 'tower_height',
-               'flood_peaks_from'],
+               'flood_peaks_from', 'antenna_height_m', 'decommissioned',
+               'decommissioned_year'],
               ['id'],
               [[q(s['id']), q(i), q(s.get('name', '')), q(s.get('station_number', '')),
                 q(s.get('lat')), q(s.get('lon')), q(s.get('elevation_ahd')),
@@ -353,7 +354,12 @@ def build(data, out):
                 # 0040's: absent where nobody has recorded one.
                 q(s.get('tower_height')),
                 # 0041's: absent where the station has floods of its own, or none.
-                q((s.get('flood_peaks_from') or '').strip() or None)]
+                q((s.get('flood_peaks_from') or '').strip() or None),
+                # 0125's three: the antenna height and the year absent where not
+                # recorded, `decommissioned` only where it is true.
+                q(s.get('antenna_height_m')),
+                q(s.get('decommissioned') is True),
+                q(s.get('decommissioned_year'))]
                for i, s in enumerate(stations)],
               prune_where='t.document_managed')
     # A station the file does not carry (one a migration made, as 0121 made
