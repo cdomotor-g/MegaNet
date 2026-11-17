@@ -223,6 +223,32 @@ await page.route(/LandParcelPropertyFramework\/MapServer\/export\?/, route => {
   return route.fulfill({ status: 200, contentType: 'image/png', body: baseTilePng(),
                          headers: { 'Access-Control-Allow-Origin': '*' } });
 });
+// More map layers (map-feeds.js, #296): Geoscience Australia's power lines
+// and the State's flood lines as pictures, Energex/Ergon's network as Esri
+// paths, the tide file as a gauge. What is asked is recorded, as for the
+// cadastre.
+const feedAsked = [];
+await page.route(/(services\.ga\.gov\.au|spatial-gis\.information\.qld\.gov\.au\/arcgis\/rest\/services\/InlandWaters\/FloodLines)\/.*\/(export|legend)\?/, route => {
+  const url = route.request().url();
+  feedAsked.push(url);
+  if (/\/legend\?/.test(url)) return route.fulfill({ status: 200, contentType: 'application/json', body: '{"layers":[]}', headers: { 'Access-Control-Allow-Origin': '*' } });
+  return route.fulfill({ status: 200, contentType: 'image/png', body: baseTilePng(), headers: { 'Access-Control-Allow-Origin': '*' } });
+});
+await page.route(/services\.arcgis\.com\/[^/]+\/ArcGIS\/rest\/services\/Network_(Energex|Extract)\/FeatureServer\/query/, route => {
+  const u = new URL(route.request().url());
+  const g = (u.searchParams.get('geometry') || '0,0,0,0').split(',').map(Number);
+  const cx = (g[0] + g[2]) / 2, cy = (g[1] + g[3]) / 2;
+  const energex = /Network_Energex/.test(u.pathname);
+  const body = { layers: [
+    { id: energex ? 13 : 7, features: [{ attributes: { OBJECTID: 1 }, geometry: { paths: [[[cx - 0.002, cy], [cx + 0.002, cy]]] } }] },
+    { id: energex ? 12 : 6, features: [{ attributes: { OBJECTID: 2 }, geometry: { paths: [[[cx, cy - 0.002], [cx, cy + 0.002]]] } }] },
+  ] };
+  return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body), headers: { 'Access-Control-Allow-Origin': '*' } });
+});
+await page.route(/apps\.des\.qld\.gov\.au\/data-sets\/storm-tides/, route => route.fulfill({
+  status: 200, contentType: 'text/csv', headers: { 'Access-Control-Allow-Origin': '*' },
+  body: 'Tide Data\nSite, Seconds, DateTime, Water Level, Prediction, Residual, Latitude, Longitude\n'
+      + 'whyteislandnx,1794883800,2026-11-17T12:50,2.196,1.782,0.414,-27.4017,153.1574\n' }));
 page.on('pageerror', e => errors.push(String(e)));
 
 await page.goto(server.url(), { waitUntil: 'load', timeout: LOAD_TIMEOUT });
@@ -2283,6 +2309,70 @@ ok('clearing the plot takes it off the 3-D view, and its caveat with it',
    cleared.type === null && cleared.srcType === null && !/no antenna patterns/.test(cleared.note),
    JSON.stringify({ type: cleared.type, src: cleared.srcType }));
 await page.evaluate(() => { MapLots.setEnabled(false); MapRoads.setEnabled(false); });
+
+// ── More map layers, in 3-D (map-feeds.js, #296) ─────────────────────────
+// The epic's rule: a layer on in 2-D must not vanish when the map tilts. The
+// pictures are draped from MapFeeds.tiles() as the cadastre is from its own
+// files; the power network and the gauges are drawn from MapFeeds.shapes(),
+// what the 2-D layer drew — nothing asked of a service for 3-D alone.
+console.log('\nMore map layers are draped and drawn in 3-D, off their own switches');
+const bne = [152.99, -27.535];
+await page.evaluate(c => Map3D._map().jumpTo({ center: c, zoom: 16, pitch: 50, bearing: 0 }), bne);
+await page.evaluate(() => { for (const id of ['ga-power', 'qld-flood-history', 'qld-network', 'qld-tides']) MapFeeds.setEnabled(id, true); });
+await page.waitForFunction(() => {
+  const m = Map3D._map();
+  return m.getLayer('mn-feed-ga-power') && m.getLayer('mn-feed-qld-flood-history') && m.getLayer('mn-feed-net')
+    && m.getSource('mn-feed-lines') && (m.getSource('mn-feed-lines').serialize().data.features || []).length > 0;
+}, null, { timeout: GL_TIMEOUT }).catch(() => {});
+await page.waitForTimeout(1500);
+const feeds3d = await page.evaluate(() => {
+  const m = Map3D._map(), st = m.getStyle();
+  const ids = st.layers.map(l => l.id);
+  const src = id => st.sources[id] || null;
+  const data = id => (m.getSource(id) ? m.getSource(id).serialize().data : null);
+  const lines = data('mn-feed-lines'), pts = data('mn-feed-pts');
+  return { ids: ids.filter(id => /^mn-(base|lots|roads|links|links-casing|feed-.*)$/.test(id)),
+           power: src('mn-feed-ga-power'), flood: src('mn-feed-qld-flood-history'),
+           lines: lines ? lines.features.map(f => f.properties) : [], points: pts ? pts.features.map(f => f.properties) : [] };
+});
+const ftpl = x => (x && x.tiles && x.tiles[0]) || '';
+ok('each picture layer that is on is a draped layer of its own, from its service’s export, 512 px, bbox left whole',
+   /Electricity_Infrastructure\/MapServer\/export\?/.test(ftpl(feeds3d.power)) && /layers=show%3A2%2C0%2C1/.test(ftpl(feeds3d.power))
+     && ftpl(feeds3d.power).endsWith('&bbox={bbox-epsg-3857}') && feeds3d.power.tileSize === 512
+     && /FloodLines\/MapServer\/export\?/.test(ftpl(feeds3d.flood)),
+   JSON.stringify([ftpl(feeds3d.power).slice(-80), ftpl(feeds3d.flood).slice(-60)]));
+ok('…each carrying its source’s credit', /Geoscience Australia/.test(feeds3d.power && feeds3d.power.attribution || ''));
+const fAt = id => feeds3d.ids.indexOf(id);
+ok('areas under the lines, lines and shapes under the radio paths',
+   fAt('mn-feed-qld-flood-history') > -1 && fAt('mn-feed-qld-flood-history') < fAt('mn-feed-ga-power')
+     && fAt('mn-feed-ga-power') < fAt('mn-feed-net') && fAt('mn-feed-net') < fAt('mn-links-casing'),
+   JSON.stringify(feeds3d.ids));
+ok('the power network is the 2-D layer’s own lines, the underground one dashed in its own layer',
+   feeds3d.lines.some(p => p.ug) && feeds3d.lines.some(p => !p.ug) && feeds3d.ids.includes('mn-feed-net-ug'),
+   JSON.stringify(feeds3d.lines));
+ok('the tide gauge is a dot, red for a surge of 0.3 m or more',
+   feeds3d.points.some(p => p.kind === 'tide' && p.colour === '#c62828'), JSON.stringify(feeds3d.points));
+const feedTiles = feedAsked.filter(u => /size=512%2C512/.test(u));
+ok('tiles were asked of the services for the tilted view', feedTiles.length > 0, String(feedTiles.length));
+await page.evaluate(() => MapFeeds.setEnabled('ga-power', false));
+await page.waitForTimeout(400);
+const offPower = await page.evaluate(() => ({ layer: !!Map3D._map().getLayer('mn-feed-ga-power'),
+                                              flood: !!Map3D._map().getLayer('mn-feed-qld-flood-history') }));
+ok('a layer switched off in Map display leaves the 3-D view, and only it', !offPower.layer && offPower.flood, JSON.stringify(offPower));
+await page.evaluate(() => { for (const f of MapFeeds.FEEDS) MapFeeds.setEnabled(f.id, false); });
+await page.waitForTimeout(400);
+// The shapes follow 2-D's redraw, which the switches debounce: wait for it.
+await page.waitForFunction(() => ['mn-feed-lines', 'mn-feed-pts'].every(id => {
+  const src = Map3D._map().getSource(id);
+  return !src || !(src.serialize().data.features || []).length;
+}), null, { timeout: 5000 }).catch(() => {});
+const allOff = await page.evaluate(() => {
+  const m = Map3D._map();
+  return { drapes: m.getStyle().layers.filter(l => /^mn-feed-(?!net|points)/.test(l.id)).length,
+           shapes: ['mn-feed-lines', 'mn-feed-pts'].reduce((n, id) =>
+             n + (m.getSource(id) ? (m.getSource(id).serialize().data.features || []).length : 0), 0) };
+});
+ok('with every one off, nothing of them is drawn in 3-D', allOff.drapes === 0 && allOff.shapes === 0, JSON.stringify(allOff));
 
 // ── 9. leaving the tab takes the GL context with it ─────────────────────────
 // ── a path clicked in 3-D opens the card its 2-D line opens (#196) ────────

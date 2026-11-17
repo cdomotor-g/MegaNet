@@ -204,6 +204,19 @@ const MapFeeds = (function () {
   let map = null, timer = null;
   const drawn = {};                              // feed id → { overlay, box, seq, failedAt, note, url }
 
+  // ── The 3-D view (map-3d.js, #296) ──────────────────────────────────────
+  // It drapes the pictures from tiles() and draws the lines, dots and pins
+  // from shapes() — what this file already drew in 2-D, never asked again.
+  // Told when either changes; a no-op while 3-D is shut.
+  let shapesTimer = null;
+  function tell3D(what) {
+    if (typeof Map3D === 'undefined') return;
+    if (what === 'drapes' && Map3D.cadastreChanged) { Map3D.cadastreChanged(); return; }
+    if (!Map3D.feedsChanged) return;
+    clearTimeout(shapesTimer);
+    shapesTimer = setTimeout(() => Map3D.feedsChanged(), 50);
+  }
+
   function slot(id) { return drawn[id] || (drawn[id] = { overlay: null, box: null, seq: 0, failedAt: 0, note: 'off' }); }
 
   // ── Asking ──────────────────────────────────────────────────────────────
@@ -280,6 +293,7 @@ const MapFeeds = (function () {
     d.overlay = null;
     d.box = null;
     d.seq++;
+    if (byId[id].kind === 'ala' || byId[id].kind === 'tide') tell3D('shapes');
   }
 
   function setNote(id, kind) {
@@ -428,6 +442,7 @@ const MapFeeds = (function () {
       }
       clearNet(true);
       netLayer = group.addTo(map);
+      tell3D('shapes');
       if (map.attributionControl) map.attributionControl.addAttribution(f.source.by);
       d.box = { bounds, zoom: z, layers: want };
       d.cut = cut;
@@ -442,6 +457,7 @@ const MapFeeds = (function () {
       if (map && map.attributionControl) map.attributionControl.removeAttribution(byId['qld-network'].source.by);
     }
     netLayer = null;
+    tell3D('shapes');
     const d = drawn['qld-network'];
     if (d) { d.box = null; if (!keepSeq) d.seq++; }
   }
@@ -508,6 +524,7 @@ const MapFeeds = (function () {
       if (!had && map.attributionControl) map.attributionControl.addAttribution(f.source.by);
       d.box = { bounds: b, zoom: map.getZoom(), layers: 'ala' };
       d.cut = ((json && json.totalRecords) || 0) > ALA_MAX;
+      tell3D('shapes');
       d.count = ((json && json.occurrences) || []).length;
       d.url = ALA;
       setNote(f.id, d.cut ? 'cut' : 'ok');
@@ -591,6 +608,7 @@ const MapFeeds = (function () {
       if (!had && map.attributionControl) map.attributionControl.addAttribution(f.source.by);
       d.count = list.length;
       d.latest = list.map(g => (g.last ? g.last.at : '')).sort().pop() || '';
+      tell3D('shapes');
       d.url = TIDES;
       setNote(f.id, 'ok');
       rerenderMapLegend();
@@ -1036,6 +1054,77 @@ const MapFeeds = (function () {
         setNote(id, 'loading');
       }
       sync();
+      tell3D('drapes');
+      if (!yes) tell3D('shapes');
+    },
+
+    // Views (map-views.js): what is on, as a list, and set to exactly a list.
+    enabledList() { return FEEDS.filter(f => on.has(f.id)).map(f => f.id); },
+    setOnly(ids) {
+      const want = new Set((ids || []).filter(id => byId[id]));
+      for (const f of FEEDS) if (on.has(f.id) !== want.has(f.id)) this.setEnabled(f.id, want.has(f.id));
+      const box = document.querySelectorAll('.mn-feeds input[data-feed]');
+      for (const b of box) b.checked = want.has(b.dataset.feed);
+    },
+    label(id) { return byId[id] ? byId[id].label : id; },
+
+    // The pictures the 3-D view drapes, ground up: areas, then lines.
+    drapes() {
+      return FEEDS.filter(f => f.kind === 'arcgis' || f.kind === 'wms')
+        .map(f => ({ id: f.id, label: f.label, by: f.source.by, band: f.pane === 'areas' ? 'areas' : 'lines' }));
+    },
+
+    // One drape's tile template: MapLibre fills {bbox-epsg-3857} itself, so
+    // the bbox goes on the end unencoded (map-lots.js's reason).
+    tiles(id) {
+      const f = byId[id];
+      if (!f || !(f.kind === 'arcgis' || f.kind === 'wms')) return Promise.reject(new Error('not a picture feed'));
+      const ready = f.weed ? weedList() : Promise.resolve();
+      return ready.then(() => {
+        if (f.kind === 'wms') {
+          const p = new URLSearchParams({ service: 'WMS', version: '1.3.0', request: 'GetMap', layers: f.wmsLayer, styles: '',
+            crs: 'EPSG:3857', width: '256', height: '256', format: 'image/png', transparent: 'true' });
+          return { url: `${f.url}?${p}&bbox={bbox-epsg-3857}`, size: 256, minzoom: f.minZoom, maxzoom: 19,
+                   opacity: f.opacity, attribution: f.source.by };
+        }
+        const p = new URLSearchParams({ f: 'image', format: 'png32', transparent: 'true', dpi: '96',
+          bboxSR: '3857', imageSR: '3857', size: '512,512', layers: `show:${layersOf(f).join(',')}` });
+        return { url: `${f.url}/export?${p}&bbox={bbox-epsg-3857}`, size: 512, minzoom: f.minZoom, maxzoom: 19,
+                 opacity: f.opacity, attribution: f.source.by };
+      });
+    },
+
+    // What 2-D drew that is not a picture, as GeoJSON: the power network's
+    // lines (colour, width, underground) and the weed records' and tide
+    // gauges' points (kind, colour, words).
+    shapes() {
+      const lines = [], points = [];
+      if (netLayer) {
+        netLayer.eachLayer(l => {
+          const o = l.options || {};
+          const parts = l.getLatLngs();
+          const rings = Array.isArray(parts[0]) ? parts : [parts];
+          for (const r of rings) {
+            if (r.length < 2) continue;
+            lines.push({ type: 'Feature', properties: { colour: o.color, width: o.weight, ug: !!o.dashArray },
+              geometry: { type: 'LineString', coordinates: r.map(p => [p.lng, p.lat]) } });
+          }
+        });
+      }
+      for (const id of ['ala-weeds', 'qld-tides']) {
+        const d = drawn[id];
+        if (!on.has(id) || !d || !d.overlay) continue;
+        d.overlay.eachLayer(l => {
+          const ll = l.getLatLng();
+          const o = l.options || {};
+          const cls = id === 'qld-tides' ? (/mn-tide-(high|low|calm|none)/.exec((o.icon && o.icon.options.html) || '') || [])[1] : null;
+          points.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [ll.lng, ll.lat] },
+            properties: id === 'ala-weeds'
+              ? { kind: 'weed', colour: '#6a1b9a', opacity: o.fillOpacity == null ? 0.8 : o.fillOpacity, words: '' }
+              : { kind: 'tide', colour: cls === 'high' ? '#c62828' : cls === 'none' ? '#888888' : '#1565c0', opacity: 1, words: o.title || '' } });
+        });
+      }
+      return { lines: { type: 'FeatureCollection', features: lines }, points: { type: 'FeatureCollection', features: points } };
     },
 
     setWeed(v) {
@@ -1045,6 +1134,7 @@ const MapFeeds = (function () {
       save(WEED_KEY, id);
       clear('qld-weeds');
       sync();
+      tell3D('drapes');
     },
 
     weeds() { return weeds ? weeds.slice() : null; },

@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 283, date: '2026-11-17', items: [
+      '⛰️ <strong>More map layers in 3-D and in Views.</strong> Tilt the map and the layers you have on stay: past floods, '
+        + 'zones and parks lie on the ground, power lines and pipelines over them, the Energex and Ergon network as lines '
+        + '(underground dashed), weed records and tide gauges as dots. A view you keep remembers which of these layers '
+        + 'are on.',
+    ] },
     { n: 282, date: '2026-11-17', items: [
       '🌊 <strong>Storm tide gauges on the map.</strong> In <em>More map layers</em>: a pin on each of the State\'s coastal '
         + 'storm tide gauges with its latest reading — the sea level, the tide predicted, and the surge between them, '

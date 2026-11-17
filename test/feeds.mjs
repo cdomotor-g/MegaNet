@@ -277,6 +277,25 @@ try {
   check('zoomed out, the power network is not asked for and says to zoom in',
     !asked.some(a => /FeatureServer\/query$/.test(a.path)) && /Zoom in/.test(netNote), netNote);
 
+  // Views (map-views.js, #296): which feeds are on is part of a view.
+  const views = await page.evaluate(async () => {
+    for (const f of MapFeeds.FEEDS) MapFeeds.setEnabled(f.id, ['qld-flood-history', 'qld-biosecurity'].includes(f.id));
+    const snap = MapViews.snapshot();
+    const id = MapViews.VIEWS[0].id;
+    MapViews.apply(id);
+    await new Promise(r => setTimeout(r, 300));
+    const after = MapFeeds.enabledList();
+    MapViews.undo();
+    await new Promise(r => setTimeout(r, 300));
+    return { snap: snap.feeds, after, undone: MapFeeds.enabledList(),
+             boxes: [...document.querySelectorAll('.mn-feeds input[data-feed]')].filter(b => b.checked).map(b => b.dataset.feed) };
+  });
+  check('a kept view remembers which More map layers are on',
+    JSON.stringify(views.snap) === JSON.stringify(['qld-flood-history', 'qld-biosecurity']), JSON.stringify(views.snap));
+  check('a built-in view turns them off, as it does every other layer, and Undo puts them back with their ticks',
+    views.after.length === 0 && JSON.stringify(views.undone) === JSON.stringify(['qld-flood-history', 'qld-biosecurity'])
+      && JSON.stringify(views.boxes.sort()) === JSON.stringify(['qld-biosecurity', 'qld-flood-history']), JSON.stringify(views));
+
   // Off is off.
   asked.length = 0;
   await page.evaluate(() => { for (const f of MapFeeds.FEEDS) MapFeeds.setEnabled(f.id, false); state.map.setZoom(14, { animate: false }); });

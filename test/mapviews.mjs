@@ -319,6 +319,8 @@ try {
     out.order = state.map.mnBases.order();
     out.basesOn = Object.entries(mix).filter(([, v]) => v && v.on).map(([n]) => n);
     out.settings = MapViews.settings();
+    // More map layers (map-feeds.js, #296): a list of what is on, not a flag.
+    out.feeds = typeof MapFeeds !== 'undefined' ? MapFeeds.enabledList() : null;
     return out;
   }, STATE_KEY);
   // Where a read differs from what a view (the spec's or its own) wants.
@@ -344,6 +346,8 @@ try {
           else { have = s[dk]; wantV = dv; }
           if (have !== wantV) bad.push(`drawing.${dk}: ${J(have)} not ${J(wantV)}`);
         }
+      } else if (k === 'feeds') {
+        if (J([...(got.feeds || [])].sort()) !== J([...w].sort())) bad.push(`feeds: ${J(got.feeds)} not ${J(w)}`);
       } else if (k in STATE_KEY) {
         const have = got[k];
         const same = typeof w === 'boolean' ? !!have === w : have === w;

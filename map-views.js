@@ -222,6 +222,9 @@ const MapViews = (function () {
   function only(...names) {
     const o = {};
     for (const k of LAYER_KNOBS) o[k] = names.includes(k);
+    // …and More map layers (map-feeds.js, #296) off with them: its switch is
+    // a list of what is on, not one more yes or no.
+    o.feeds = [];
     return o;
   }
 
@@ -893,6 +896,7 @@ const MapViews = (function () {
     MapSurvey: () => (typeof MapSurvey !== 'undefined' ? MapSurvey : null),
     MapHubs: () => (typeof MapHubs !== 'undefined' ? MapHubs : null),
     MapWind: () => (typeof MapWind !== 'undefined' ? MapWind : null),
+    MapFeeds: () => (typeof MapFeeds !== 'undefined' ? MapFeeds : null),
     MapCameras: () => (typeof MapCameras !== 'undefined' ? MapCameras : null),
     MapPhotos: () => (typeof MapPhotos !== 'undefined' ? MapPhotos : null),
     SiteFeatures: () => (typeof SiteFeatures !== 'undefined' ? SiteFeatures : null),
@@ -968,6 +972,15 @@ const MapViews = (function () {
     photos: boolKnob('mapPhotos', M('MapPhotos'), 'setEnabled'),
     siteFeatures: boolKnob('mapSiteFeatures', M('SiteFeatures'), 'setEnabled'),
     tasks: boolKnob('mapTasks', M('MapTasks'), 'setEnabled'),
+    // More map layers (map-feeds.js, #296): which of its layers are on, as a
+    // list — a kept view or a shared link puts back exactly those.
+    feeds: {
+      avail: () => has(M('MapFeeds')(), 'setOnly'),
+      read: () => M('MapFeeds')().enabledList(),
+      same: (a, b) => [...(a || [])].sort().join(',') === [...(b || [])].sort().join(','),
+      write: v => M('MapFeeds')().setOnly(Array.isArray(v) ? v : []),
+      rebuild: () => false,
+    },
     drawing: {
       avail: () => true,
       read: () => settings(),
@@ -1003,7 +1016,7 @@ const MapViews = (function () {
   // longest), the stations and paths, the overlays, the drawing last — it
   // restyles the lines the knobs before it decided are drawn.
   const ORDER = ['base', 'roles', 'links', 'backbone', 'arrows', 'colour', 'health', 'outlines',
-    ...LAYER_KNOBS, 'drawing'];
+    ...LAYER_KNOBS, 'feeds', 'drawing'];
   const CADASTRE = ['lots', 'easements', 'tenure'];
   // Not remembered by their own switches: a reload puts them back to all
   // stations and the paths on. The picked view puts them back (attach).
@@ -1569,6 +1582,9 @@ const MapViews = (function () {
       bits.push(`${PATH_WORDS[k.drawing.paths] || PATH_WORDS.every}, drawn as ${DRAW_WORDS[k.drawing.draw] || DRAW_WORDS.lines}`);
     }
     const on = LAYER_KNOBS.filter(n => k[n] === true).map(n => LAYER_NAMES[n]);
+    if (Array.isArray(k.feeds) && k.feeds.length && typeof MapFeeds !== 'undefined') {
+      on.push(...k.feeds.map(id => MapFeeds.label(id).replace(/ \((Qld|Australia)\)$/, '').toLowerCase()));
+    }
     if (on.length) bits.push(`with ${on.join(', ')}`);
     return bits.join('; ');
   }
@@ -1655,6 +1671,7 @@ const MapViews = (function () {
     if (k.arrows) out.push('Arrows');
     if (k.outlines) out.push('Forecast locations');
     for (const [key, word] of Object.entries(LAYER_WORDS)) if (k[key] === true) out.push(word);
+    if (Array.isArray(k.feeds) && k.feeds.length) out.push(`More map layers (${k.feeds.length})`);
     return out.filter(Boolean);
   }
   const tagsHtml = list => `<span class="mv-tags">${list.map(t => `<span class="mv-tag">${esc(t)}</span>`).join('')}</span>`;

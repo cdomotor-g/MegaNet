@@ -2791,8 +2791,33 @@ const Map3D = (function () {
                   'mn-drive-casing', 'mn-drive-gap-casing', 'mn-drive-line', 'mn-drive-gap',
                   'mn-links-casing', 'mn-links'];
 
+  // More map layers (map-feeds.js, #296): its pictures are draped the way the
+  // cadastre is — its areas under the property lines, its lines over the road
+  // parcels — and the power network, weed records and tide gauges it drew as
+  // shapes go over those (syncFeedShapes). Both read what the 2-D layer has
+  // on and drew; nothing here asks a service a question of its own.
+  function feedDrapes() {
+    if (typeof MapFeeds === 'undefined' || typeof MapFeeds.drapes !== 'function') return [];
+    return MapFeeds.drapes().map(f => ({
+      id: `mn-feed-${f.id}`, name: f.label, by: f.by, band: f.band,
+      on: () => MapFeeds.enabled(f.id),
+      mod: () => ({ tiles: () => MapFeeds.tiles(f.id) }),
+    }));
+  }
+  const drapes = () => CAD.concat(feedDrapes());
+  const FEED_SHAPES = ['mn-feed-net-ug', 'mn-feed-net', 'mn-feed-points'];
+
+  function ground() {
+    const fd = feedDrapes();
+    const g = GROUND.slice();
+    g.splice(g.indexOf('mn-lots'), 0, ...fd.filter(f => f.band === 'areas').map(f => f.id));
+    g.splice(g.indexOf('mn-roads') + 1, 0, ...fd.filter(f => f.band !== 'areas').map(f => f.id), ...FEED_SHAPES);
+    return g;
+  }
+
   function under(id) {
-    const above = GROUND.slice(GROUND.indexOf(id) + 1);
+    const G = ground();
+    const above = G.slice(G.indexOf(id) + 1);
     return above.find(l => map.getLayer(l)) || 'mn-links-casing';
   }
 
@@ -2805,7 +2830,7 @@ const Map3D = (function () {
   function syncCadastre() {
     if (!map || !ready) return;
     const gen = ++cadGen;
-    for (const c of CAD) {
+    for (const c of drapes()) {
       const mod = c.mod();
       if (!c.on() || !mod || typeof mod.tiles !== 'function') { dropCadastre(c.id); continue; }
       mod.tiles().then(t => {
@@ -2822,6 +2847,42 @@ const Map3D = (function () {
       }).catch(() => {});
     }
     setNote();
+  }
+
+  // The shapes More map layers drew in 2-D (MapFeeds.shapes()): the power
+  // network as lines on the ground, underground dashed; the weed records and
+  // tide gauges as dots. Sources made once and their data replaced.
+  function syncFeedShapes() {
+    if (!map || !ready) return;
+    const sh = typeof MapFeeds !== 'undefined' && typeof MapFeeds.shapes === 'function'
+      ? MapFeeds.shapes() : null;
+    const empty = { type: 'FeatureCollection', features: [] };
+    const want = { 'mn-feed-lines': sh ? sh.lines : empty, 'mn-feed-pts': sh ? sh.points : empty };
+    const any = want['mn-feed-lines'].features.length || want['mn-feed-pts'].features.length;
+    if (!any && !map.getSource('mn-feed-lines')) return;
+    for (const [src, data] of Object.entries(want)) {
+      if (map.getSource(src)) map.getSource(src).setData(data);
+      else map.addSource(src, { type: 'geojson', data });
+    }
+    if (!map.getLayer('mn-feed-net-ug')) {
+      map.addLayer({ id: 'mn-feed-net-ug', type: 'line', source: 'mn-feed-lines', filter: ['==', ['get', 'ug'], true],
+        layout: { 'line-cap': 'butt' },
+        paint: { 'line-color': ['get', 'colour'], 'line-width': ['get', 'width'], 'line-dasharray': [3, 2] } },
+        under('mn-feed-net-ug'));
+    }
+    if (!map.getLayer('mn-feed-net')) {
+      map.addLayer({ id: 'mn-feed-net', type: 'line', source: 'mn-feed-lines', filter: ['!=', ['get', 'ug'], true],
+        paint: { 'line-color': ['get', 'colour'], 'line-width': ['get', 'width'] } }, under('mn-feed-net'));
+    }
+    if (!map.getLayer('mn-feed-points')) {
+      map.addLayer({ id: 'mn-feed-points', type: 'circle', source: 'mn-feed-pts',
+        paint: {
+          'circle-radius': ['case', ['==', ['get', 'kind'], 'tide'], 7, 4],
+          'circle-color': ['get', 'colour'], 'circle-opacity': ['get', 'opacity'],
+          'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5,
+          'circle-pitch-alignment': 'map',
+        } }, under('mn-feed-points'));
+    }
   }
 
   // ── Polar radio coverage (map-polar.js, #188) ──────────────────────────
@@ -3989,6 +4050,8 @@ const Map3D = (function () {
       syncBaseRefs();
       syncElevation();
       syncCadastre();
+      // …and More map layers' lines and dots (map-feeds.js, #296).
+      syncFeedShapes();
       // A polar plot drawn before 3-D was opened is draped now (#188).
       syncPolar();
       // …and Views' repeater areas, when Which paths is Areas.
@@ -4666,10 +4729,13 @@ const Map3D = (function () {
                  could not be fetched — that ground is drawn flat, which reads as
                  a clear path and is not one.</span>`);
     }
-    for (const c of CAD) {
+    for (const c of drapes()) {
       const n = cadFails[c.id] || 0;
       if (!n || !cadKeys[c.id]) continue;
-      bits.push(`<span class="txt-warn">${n} ${c.name} tile${n === 1 ? '' : 's'} could not be
+      bits.push(c.by
+        ? `<span class="txt-warn">${n} tile${n === 1 ? '' : 's'} of ${esc(c.name)} could not be
+           fetched from ${esc(c.by)} — a gap there is not nothing there.</span>`
+        : `<span class="txt-warn">${n} ${c.name} tile${n === 1 ? '' : 's'} could not be
                  fetched from the Queensland spatial service — no line there is not no
                  boundary there.</span>`);
     }
@@ -4914,6 +4980,8 @@ const Map3D = (function () {
     // Map display's property boundaries or road parcels switch moved
     // (map-lots.js, map-roads.js). A no-op unless 3-D is actually open.
     cadastreChanged() { syncCadastre(); },
+    // From MapFeeds: its lines, weed records or tide gauges were redrawn (#296).
+    feedsChanged() { syncFeedShapes(); },
     // From MapPolar: the 2-D plot was painted or cleared (#188).
     polarChanged() { syncPolar(); },
     // From MapViews: Presenting went on or off (#279).
