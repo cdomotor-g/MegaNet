@@ -98,6 +98,12 @@
 // _ground/ — read by anybody, written by the build tool with the project's
 // secret key only. worker/ground.js, docs/ground-cover-sources.md.
 //
+// A fifteenth: /api/qld-gauges?sites=…, the latest river height at the
+// State's stream gauges for the State river gauges map layer and the station
+// card (#295) — passed on from the State's Water Monitoring Information Portal,
+// which sends no CORS header: public, read-only, one fixed call, only a list of
+// gauge numbers from the caller. worker/qld-gauges.js.
+//
 // And one that is not a door at all: scheduled() below, every minute
 // (wrangler.toml's [triggers]), sends the administrators' notifications —
 // worker/push.js, db/migrations/0066_push_notifications.sql — and every
@@ -116,6 +122,7 @@ import { isRainAheadPath, handleRainAhead } from './rain-ahead.js';
 import { isSortPath, handleSort } from './sort.js';
 import { isCanopyPath, handleCanopy } from './canopy.js';
 import { isGroundPath, handleGround } from './ground.js';
+import { isQldGaugesPath, handleQldGauges } from './qld-gauges.js';
 import { runPush } from './push.js';
 
 export { BriefingLedger } from './briefing.js';
@@ -623,6 +630,10 @@ export default {
     // Ground-cover map tiles in R2 (worker/ground.js): read by anybody, an
     // empty tile a 204; written with the project's secret key only.
     if (isGroundPath(url.pathname)) return handleGround(request, env);
+
+    // The State's live river heights (worker/qld-gauges.js): anybody, gauge
+    // numbers only, one fixed call to the State's portal, kept in the edge cache.
+    if (isQldGaugesPath(url.pathname)) return handleQldGauges(request, env, ctx);
 
     // Everything else is a static asset, and assets are served before this runs.
     // A request that gets here for any other path is a path that does not exist.

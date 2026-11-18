@@ -30891,3 +30891,8 @@ details.tm-fold summary { cursor: pointer; }
 .mn-tide-high { box-shadow: 0 0 0 2px #c62828; background: #fdecea; }
 .mn-tide-low  { box-shadow: 0 0 0 2px #6d4c41; }
 .mn-tide-none { opacity: .55; box-shadow: 0 0 0 2px #888; }
+
+/* State river gauge pins (map-feeds.js, #295): a reading in the last day and a half, an older one, none. */
+.mn-gauge-live { box-shadow: 0 0 0 2px #00838f; background: #e0f4f6; }
+.mn-gauge-old  { box-shadow: 0 0 0 2px #8d6e63; background: #efebe9; }
+.mn-gauge-none { opacity: .55; box-shadow: 0 0 0 2px #888; }

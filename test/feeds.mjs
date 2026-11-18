@@ -35,7 +35,7 @@ function check(name, pass, detail = '') {
 
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
-const HOSTS = /(services\.ga\.gov\.au|spatial-gis\.information\.qld\.gov\.au\/arcgis\/rest\/services\/(InlandWaters\/(FloodLines|GroundAndSurfaceWaterMonitoring)|Boundaries\/CulturalHeritage|Environment\/ParksTerrestrial|Farming\/Biosecurity)|gis\.environment\.gov\.au|api\.ala\.org\.au|services\d\.arcgis\.com|data\.gov\.au\/geoserver|apps\.des\.qld\.gov\.au|ows\.dea\.ga\.gov\.au|services\.arcgis\.com\/[^/]+\/ArcGIS\/rest\/services\/Network_)/;
+const HOSTS = /(services\.ga\.gov\.au|spatial-gis\.information\.qld\.gov\.au\/arcgis\/rest\/services\/(InlandWaters\/(FloodLines|GroundAndSurfaceWaterMonitoring)|Boundaries\/CulturalHeritage|Environment\/ParksTerrestrial|Farming\/Biosecurity)|gis\.environment\.gov\.au|api\.ala\.org\.au|services\d\.arcgis\.com|data\.gov\.au\/geoserver|apps\.des\.qld\.gov\.au|ows\.dea\.ga\.gov\.au|services\.arcgis\.com\/[^/]+\/ArcGIS\/rest\/services\/Network_|\/api\/qld-gauges)/;
 const CENTER = { lat: -27.535, lon: 152.99 };
 
 const asked = [];   // every stubbed request: { path, params }
@@ -47,6 +47,18 @@ function answer(url) {
   const json = (body, status = 200) => ({ status, contentType: 'application/json', body: JSON.stringify(body) });
   const png = () => ({ status: 200, contentType: 'image/png', body: PNG });
 
+  if (u.pathname === '/api/qld-gauges') {
+    const g = {};
+    for (const id of (p.sites || '').split(',')) if (id === '540001A') g[id] = { m: 2.345, at: '2026-11-18T18:00:00+10:00', tz: '+10:00' };
+    return json({ source: {}, asOf: '2026-11-18T08:30:00Z', gauges: g });
+  }
+  if (/GroundAndSurfaceWaterMonitoring\/MapServer\/1[34]\/query$/.test(u.pathname)) {
+    const open = /\/13\/query$/.test(u.pathname);
+    return json({ features: open
+      ? [{ attributes: { identifier: '540001A', title: 'Test Creek at Example', basin: 'CONDAMINE', latitude: -28.25, longitude: 152.2156 } },
+         { attributes: { identifier: '540002B', title: 'Quiet Creek at Nowhere', basin: 'CONDAMINE', latitude: CENTER.lat, longitude: CENTER.lon } }]
+      : [{ attributes: { identifier: '540003C', title: 'Old Creek', latitude: CENTER.lat + 0.001, longitude: CENTER.lon, commence: '1960', cease: '1999' } }] });
+  }
   if (u.host === 'ows.dea.ga.gov.au') return png();
   if (/^services\d\.arcgis\.com$/.test(u.host)) {
     // Brisbane's stormwater (pipes and drains) and the other utilities' mains.
@@ -278,6 +290,25 @@ try {
     !asked.some(a => a.host === 'apps.des.qld.gov.au'), JSON.stringify(asked.map(a => a.host)));
   await page.evaluate(() => { MapFeeds.setEnabled('ala-weeds', false); MapFeeds.setEnabled('qld-tides', false); });
 
+  // The State's river gauges (#295): a pin per open gauge with its latest
+  // height from our Worker, "gauge height, not AHD"; closed ones grey dots.
+  asked.length = 0;
+  await page.evaluate(() => MapFeeds.setEnabled('qld-gauges', true));
+  await page.waitForFunction(() => (MapFeeds._state().drawn['qld-gauges'] || {}).note === 'ok', null, { timeout: 15_000 }).catch(() => {});
+  const gpins = await page.evaluate(() => [...document.querySelectorAll('.leaflet-mnFeedPins-pane .mn-tide-pin')]
+    .map(e => ({ cls: e.className, label: e.getAttribute('aria-label') })));
+  check('a pin per open State gauge: the latest gauge height and its time on it, saying it is not AHD',
+    gpins.some(p => /Test Creek at Example \(540001A\) — State river gauge: gauge height 2\.35 m at 2026-11-18 18:00 \(AEST\)/.test(p.label)
+      && /not AHD/.test(p.label) && /mn-gauge-live/.test(p.cls)), JSON.stringify(gpins));
+  check('a gauge the Worker has no reading for says so',
+    gpins.some(p => /Quiet Creek at Nowhere \(540002B\) — State river gauge, no recent reading/.test(p.label) && /mn-gauge-none/.test(p.cls)), JSON.stringify(gpins));
+  const gAsk = asked.filter(a => a.path === '/api/qld-gauges');
+  check('the heights are asked of the Worker, the open gauges in one request, never the State’s portal from the browser',
+    gAsk.length === 1 && gAsk[0].params.sites === '540001A,540002B' && !asked.some(a => /water-monitoring/.test(a.host)), JSON.stringify(gAsk));
+  const gNote = await page.evaluate(() => document.getElementById('mn-feed-note-qld-gauges').textContent);
+  check('the note counts the open gauges and gives the latest reading', /Drawn: 2 open gauges, the latest reading 2026-11-18 18:00 \(AEST\)/.test(gNote), gNote);
+  await page.evaluate(() => MapFeeds.setEnabled('qld-gauges', false));
+
   // Pipes (#294): Brisbane's stormwater drawn; Unitywater and Melbourne Water,
   // whose areas the view is not in, not asked at all.
   asked.length = 0;
@@ -375,7 +406,9 @@ try {
     /Pipes\s*none published for this area/.test(open.text), open.text.slice(0, 500));
   check('the weeds in its square, the restricted ones marked',
     /2: African lovegrass, Lantana \(restricted\)/.test(open.text), open.text);
-  check('each row’s word has its meaning on hover', open.terms >= 11, String(open.terms));
+  check('the nearest open State gauge and its latest height on the card, as gauge height',
+    /State river gauges\s*Test Creek at Example \(540001A\), 5\.5 km — gauge height 2\.35 m at 2026-11-18 18:00 \(AEST\)/.test(open.text), open.text.slice(0, 700));
+  check('each row’s word has its meaning on hover', open.terms >= 12, String(open.terms));
 
   // ── 5. And the What is here card asks about a point the same way ─────
   const hereSrc = fs.readFileSync(new URL('../map-here.js', import.meta.url), 'utf8');

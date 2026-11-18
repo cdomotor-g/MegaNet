@@ -2146,6 +2146,14 @@ jobs:
         working-directory: test
         run: npm run groundcover
 
+      # And /api/qld-gauges (worker/qld-gauges.js, #295): the State's live river
+      # heights passed through, because its portal sends no CORS header — only
+      # gauge numbers from the caller, one fixed call, offline.
+      - name: State gauge heights route takes only gauge numbers and asks one fixed call
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run qldgauges
+
       # And /api/briefing (worker/briefing.js): Station Health's Ask Claude on
       # Flood-Net's own Anthropic key, the one server-side door that spends
       # money. Who may (Access and the database's word that this is an editor

@@ -115,10 +115,10 @@ const MapFeeds = (function () {
       label: 'Water seen from satellites since 1986 (Australia)',
       meaning: 'How often Landsat satellites have seen water on each 30 m patch of ground since 1986, from rarely (pale) to nearly always (deep blue). Ground that is wet now and then is ground that floods, even where no flood study has been done.',
       source: { by: 'Geoscience Australia — Digital Earth Australia', licence: 'CC BY 4.0', page: 'https://knowledge.dea.ga.gov.au/data/product/dea-water-observations-statistics-landsat/' } },
-    { id: 'qld-gauges', group: 'flood', kind: 'arcgis', url: GAUGES, layers: [13, 14], pane: 'lines',
-      minZoom: 6, opacity: 1,
+    { id: 'qld-gauges', group: 'flood', kind: 'gauge', url: GAUGES, pane: 'pins',
+      minZoom: 6,
       label: 'State river gauges (Qld)',
-      meaning: 'The Queensland Government’s own stream gauging stations, open and closed — other people’s river gauges, beside ours. Their readings are on the State’s Water Monitoring Information Portal.',
+      meaning: 'The Queensland Government’s own stream gauging stations — other people’s river gauges, beside ours. Each open gauge shows its latest river height, hourly. The height is “gauge height”: metres above that gauge’s own zero mark, not above sea level (AHD), so never set it beside a Flood-Net height. Closed gauges are small grey dots. Hover a pin for its figures.',
       source: { by: 'State of Queensland', licence: 'CC BY 4.0', page: 'https://water-monitoring.information.qld.gov.au/' } },
 
     { id: 'qld-heritage', group: 'land', kind: 'arcgis', url: HERITAGE, layers: [5, 1], pane: 'areas',
@@ -584,6 +584,119 @@ const MapFeeds = (function () {
     });
   }
 
+  // ── State river gauges ──────────────────────────────────────────────────
+  // Where the gauges are comes from the State's map service (401 open, 826
+  // closed — a few kB each, read once a visit). Their latest heights come from
+  // our own Worker's /api/qld-gauges, which asks the State's Water Monitoring
+  // Information Portal (a browser cannot: the portal sends no CORS header). The
+  // portal logs hourly, so heights are asked again after GAUGE_TTL.
+  const GAUGE_TTL = 30 * 60000;
+  const GAUGE_CHUNK = 100;
+  const GAUGE_NEAR_KM = 40;
+  const WORKER_ORIGIN = 'https://floodwarning.net';
+  let gaugeSites = null, gaugeSitesAsking = null;
+  const gaugeReads = new Map();
+  let gaugeReadsAt = 0, gaugeReadsAsking = null;
+
+  function workerOrigin() {
+    return typeof dbProxyAvailable === 'function' && dbProxyAvailable() ? '' : WORKER_ORIGIN;
+  }
+
+  function gaugeQuery(layer, fields) {
+    const p = new URLSearchParams({ where: '1=1', outFields: fields, returnGeometry: 'false', f: 'json', resultRecordCount: '2000' });
+    return askJson(`${GAUGES}/${layer}/query?${p}`).then(j => (j && j.features) || []);
+  }
+
+  function gaugeList() {
+    if (gaugeSites) return Promise.resolve(gaugeSites);
+    if (gaugeSitesAsking) return gaugeSitesAsking;
+    gaugeSitesAsking = Promise.all([
+      gaugeQuery(13, 'identifier,title,basin,latitude,longitude'),
+      gaugeQuery(14, 'identifier,title,latitude,longitude,commence,cease'),
+    ]).then(([open, closed]) => {
+      const mk = (fs, isOpen) => fs.map(f => f.attributes || {}).filter(a => a.identifier && isFinite(a.latitude) && isFinite(a.longitude))
+        .map(a => ({ id: String(a.identifier), name: String(a.title || a.identifier), lat: a.latitude, lon: a.longitude,
+          basin: a.basin ? String(a.basin) : '', open: isOpen, span: !isOpen && a.commence ? `${a.commence}–${a.cease || ''}` : '' }));
+      gaugeSites = [...mk(open, true), ...mk(closed, false)];
+      return gaugeSites;
+    }).finally(() => { gaugeSitesAsking = null; });
+    return gaugeSitesAsking;
+  }
+
+  // Latest readings for the open gauges, a chunk a request. A chunk that fails
+  // leaves its gauges without a reading; it never stops the pins being drawn.
+  function gaugeReadings() {
+    if (gaugeReadsAt && Date.now() - gaugeReadsAt < GAUGE_TTL) return Promise.resolve(gaugeReads);
+    if (gaugeReadsAsking) return gaugeReadsAsking;
+    gaugeReadsAsking = gaugeList().then(list => {
+      const ids = list.filter(g => g.open).map(g => g.id);
+      const chunks = [];
+      for (let i = 0; i < ids.length; i += GAUGE_CHUNK) chunks.push(ids.slice(i, i + GAUGE_CHUNK));
+      return Promise.all(chunks.map(ch => askJson(`${workerOrigin()}/api/qld-gauges?sites=${ch.join(',')}`)
+        .then(j => (j && j.gauges) || {}, () => null)));
+    }).then(parts => {
+      if (!parts.some(Boolean)) throw new Error('no readings');
+      for (const part of parts) for (const [id, r] of Object.entries(part || {})) gaugeReads.set(id, r);
+      gaugeReadsAt = Date.now();
+      return gaugeReads;
+    }).finally(() => { gaugeReadsAsking = null; });
+    return gaugeReadsAsking;
+  }
+
+  const GAUGE_ZERO = 'metres above the gauge’s own zero, not AHD';
+  function gaugeTime(at) { return `${at.slice(0, 10)} ${at.slice(11, 16)} (AEST)`; }
+  function gaugeStale(at) { return Date.now() - Date.parse(at) > 36 * 3600000; }
+
+  function gaugeWords(g, r) {
+    if (!g.open) return `${g.name} (${g.id}) — closed State river gauge${g.span ? `, ${g.span}` : ''}`;
+    if (!r) return `${g.name} (${g.id}) — State river gauge, no recent reading`;
+    return `${g.name} (${g.id}) — State river gauge: gauge height ${m2(r.m)} at ${gaugeTime(r.at)}`
+      + `${gaugeStale(r.at) ? ' (an old reading)' : ''}; ${GAUGE_ZERO}.`;
+  }
+
+  function runGauges(f) {
+    const d = slot(f.id);
+    if (map.getZoom() < f.minZoom) { clear(f.id); setNote(f.id, 'zoom'); return; }
+    if (d.overlay && Date.now() - gaugeReadsAt < GAUGE_TTL) { setNote(f.id, 'ok'); return; }
+    if (Date.now() - d.failedAt < FAIL_TTL) { clear(f.id); setNote(f.id, 'fail'); return; }
+    const mine = ++d.seq;
+    setNote(f.id, 'loading');
+    gaugeList().then(list => gaugeReadings().then(reads => ({ list, reads }), () => { gaugeReadsAt = Date.now() - GAUGE_TTL + FAIL_TTL; return { list, reads: gaugeReads }; }))
+      .then(({ list, reads }) => {
+        if (mine !== d.seq || !map || !on.has(f.id)) return;
+        const group = L.layerGroup();
+        for (const g of list) {
+          const r = reads.get(g.id) || null;
+          const words = gaugeWords(g, r);
+          if (!g.open) {
+            L.circleMarker([g.lat, g.lon], { pane: PANES.pins.name, radius: 3, weight: 1, color: '#fff', fillColor: '#888', fillOpacity: 0.8 })
+              .bindTooltip(words).addTo(group);
+            continue;
+          }
+          const cls = !r ? 'none' : gaugeStale(r.at) ? 'old' : 'live';
+          L.marker([g.lat, g.lon], {
+            pane: PANES.pins.name, keyboard: false, title: words, alt: words,
+            icon: L.divIcon({ className: '', iconSize: [18, 18], iconAnchor: [9, 9],
+              html: `<span class="mn-tide-pin mn-gauge-${cls}" role="img" aria-label="${escAttr(words)}">📏</span>` }),
+          }).addTo(group);
+        }
+        const had = !!d.overlay;
+        if (d.overlay) d.overlay.remove();
+        d.overlay = group.addTo(map);
+        if (!had && map.attributionControl) map.attributionControl.addAttribution(f.source.by);
+        d.count = list.filter(g => g.open).length;
+        d.latest = [...reads.values()].map(r => r.at).sort().pop() || '';
+        d.url = GAUGES;
+        setNote(f.id, 'ok');
+        rerenderMapLegend();
+      }).catch(() => {
+        if (mine !== d.seq || !map) return;
+        d.failedAt = Date.now();
+        clear(f.id);
+        setNote(f.id, 'fail');
+      });
+  }
+
   // The storm tide file is seven days of ten-minute readings from every gauge
   // (about 5 MB), so it is read once a visit — again after TIDE_TTL — and
   // only while the layer is on. -99 is the file's "no reading".
@@ -755,6 +868,7 @@ const MapFeeds = (function () {
         if (f.kind === 'network') runNetwork(f);
         else if (f.kind === 'ala') runAla(f);
         else if (f.kind === 'tide') runTides(f);
+        else if (f.kind === 'gauge') runGauges(f);
         else if (f.kind === 'pipes') runPipes(f);
         else runPicture(f);
       } catch (_) {
@@ -785,6 +899,7 @@ const MapFeeds = (function () {
         if (f.kind === 'ala') return `Drawn: ${d.count} record${d.count === 1 ? '' : 's'} in view.`;
         if (f.kind === 'pipes') return `Drawn: ${d.count} pipe${d.count === 1 ? '' : 's'} in view.${d.missed && d.missed.length ? ` <span class="txt-warn">Could not be read: ${esc(d.missed.join(', '))}.</span>` : ''}`;
         if (f.kind === 'tide') return `Drawn: ${d.count} gauges, the latest reading ${esc((d.latest || '').replace('T', ' '))} (AEST).`;
+        if (f.kind === 'gauge') return `Drawn: ${d.count} open gauges${d.latest ? `, the latest reading ${esc(gaugeTime(d.latest))}` : ', but their heights could not be read just now'}.`;
         return f.kind === 'network' ? `Drawn: ${netClassesAt(map ? map.getZoom() : 0).map(k => NET_CLASS[k].words.toLowerCase()).join(', ')}.` : 'Drawn.';
       default:        return '';
     }
@@ -887,6 +1002,11 @@ const MapFeeds = (function () {
           <span class="small">Surge 0.3 m or more above the predicted tide</span></span>
           <span class="legend-item"><span class="mn-tide-pin mn-tide-calm" aria-hidden="true">🌊</span>
           <span class="small">Within 0.3 m of the prediction</span></span>`;
+      } else if (f.kind === 'gauge') {
+        body = `<span class="legend-item"><span class="mn-tide-pin mn-gauge-live" aria-hidden="true">📏</span>
+          <span class="small">Open State gauge — gauge height, not AHD</span></span>
+          <span class="legend-item"><span class="legend-dot" style="background:#888" aria-hidden="true"></span>
+          <span class="small">Closed gauge</span></span>`;
       } else if (f.kind === 'wms') {
         body = `<span class="legend-item"><span class="mn-feed-ramp" aria-hidden="true"></span>
           <span class="small">Seen wet: rarely → nearly always</span></span>`;
@@ -1000,6 +1120,24 @@ const MapFeeds = (function () {
     ]).then(([ch, pk, cp]) => ({ ok: true,
       heritage: uniq(ch.map(r => `${attr(r, 'Name', 'NAME') || r.value} — ${r.layerId === 5 ? 'cultural heritage body' : 'cultural heritage party'}`)),
       parks: uniq([...pk, ...cp].map(r => attr(r, 'Estate name', 'ESTATENAME', 'NAME', 'Name') || r.value)) })),
+    // The nearest open State gauges and their latest heights (#295), from the
+    // same list and Worker route as the map layer. Heights are gauge height.
+    gauges: (lat, lon) => gaugeList().then(list => {
+      const here = L.latLng(lat, lon);
+      const near = list.filter(g => g.open)
+        .map(g => ({ g, km: here.distanceTo([g.lat, g.lon]) / 1000 }))
+        .filter(x => x.km <= GAUGE_NEAR_KM).sort((a, b) => a.km - b.km).slice(0, 3);
+      if (!near.length) return { ok: true, found: [] };
+      return askJson(`${workerOrigin()}/api/qld-gauges?sites=${near.map(x => x.g.id).join(',')}`)
+        .then(j => (j && j.gauges) || {}, () => null)
+        .then(reads => ({ ok: true, found: near.map(({ g, km }) => {
+          const r = reads && reads[g.id];
+          const dist = km < 10 ? km.toFixed(1) : String(Math.round(km));
+          return `${g.name} (${g.id}), ${dist} km — ${r
+            ? `gauge height ${m2(r.m)} at ${gaugeTime(r.at)}${gaugeStale(r.at) ? ', an old reading' : ''}`
+            : reads ? 'no recent reading' : 'height not available just now'}`;
+        }) }));
+    }),
     weeds: (lat, lon) => identify(BIO, [WEED_GROUP], lat, lon, 1)
       .then(rs => ({ ok: true, weeds: uniq(rs.map(r => {
         const name = attr(r, 'Common name') || r.layerName;
@@ -1040,7 +1178,7 @@ const MapFeeds = (function () {
     }),
   };
   const FIRST = ['zones'];
-  const MORE = ['floods', 'power', 'cables', 'pipes', 'land', 'weeds', 'sightings'];
+  const MORE = ['floods', 'gauges', 'power', 'cables', 'pipes', 'land', 'weeds', 'sightings'];
 
   const settled = r => !!r && (r.ok || Date.now() - r.at < FAIL_TTL);
 
@@ -1095,6 +1233,7 @@ const MapFeeds = (function () {
     pipes: `Gas and oil pipelines within about ${NEAR_M} m.`,
     cables: `Energex or Ergon lines within ${CABLE_M} m, and whether each is overhead or an underground cable. A guide only: ring Before You Dig Australia (1100) before digging.`,
     pipes: `Stormwater pipes and drains, and water, sewer and recycled water mains, within ${PIPE_M} m — only where the council or water utility publishes them (Brisbane, Unitywater’s area, Melbourne Water). A guide only: ring Before You Dig Australia (1100) before digging.`,
+    gauges: `The State’s open river gauges within ${GAUGE_NEAR_KM} km, nearest first, with their latest height. Gauge height is metres above that gauge’s own zero mark, not above sea level (AHD) — so it cannot be compared with a Flood-Net height. The State logs hourly.`,
     heritage: 'The Aboriginal or Torres Strait Islander party or body for this area under the cultural heritage laws — who to talk to before ground is disturbed.',
     parks: 'A national park, State forest or other protected area this place is in. Working in one usually needs a permit.',
     sightings: `Weeds actually recorded within ${SIGHT_KM} km, nearest first, from the Atlas of Living Australia: Queensland’s own weed records and anyone’s record of a Weed of National Significance. A record says a weed was seen there that year, not that it is still there.`,
@@ -1116,6 +1255,7 @@ const MapFeeds = (function () {
       ${row('Biosecurity zones', TERMS.zones, answer(a, 'zones', r => list(r.zones, 'none'), 'none'))}
       ${row('Past floods', TERMS.floods, answer(a, 'floods', r => list(r.past, 'none mapped here'), ''))}
       ${row('Dam-failure areas', TERMS.dams, answer(a, 'floods', r => list(r.dams, 'none'), ''))}
+      ${row('State river gauges', TERMS.gauges, answer(a, 'gauges', r => list(r.found, `none within ${GAUGE_NEAR_KM} km`), ''))}
       ${row('High-voltage lines', TERMS.lines, answer(a, 'power', r => list(r.lines, `none within ${NEAR_M} m`), ''))}
       ${row('Pipelines', TERMS.pipes, answer(a, 'power', r => list(r.pipes, `none within ${NEAR_M} m`), ''))}
       ${row('Power network', TERMS.cables, answer(a, 'cables', r => list(r.found, `none within ${CABLE_M} m`), ''))}
