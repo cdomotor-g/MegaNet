@@ -1981,12 +1981,12 @@ const Repeaters = (() => {
   // ── The CSV ───────────────────────────────────────────────────────────────
 
   // The repeaters the filter leaves, in the table's order. The station list
-  // leaving as a file needs a signed-in session — the Export tab's rule.
+  // leaving as a file needs a signed-in session — the Radio Mobile Files tab's rule.
   function exportCsv() {
     const M = model();
     if (!M) return;
     if (typeof exportMayDownload === 'function' && !exportMayDownload()) {
-      if (typeof Toast !== 'undefined') Toast.show('Sign in first — taking the station list away as a file needs a signed-in session (the Export tab\'s rule).', { kind: 'failed' });
+      if (typeof Toast !== 'undefined') Toast.show('Sign in first — taking the station list away as a file needs a signed-in session (the Radio Mobile Files tab\'s rule).', { kind: 'failed' });
       return;
     }
     const list = sorted(filtered(M));

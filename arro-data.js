@@ -1,6 +1,6 @@
 // MegaNet — arro-data.js
 //
-//   ArroData   the Plots tab (once "ARRO Data"): reads ARRO's per-sensor CSV exports in the
+//   ArroData   Charts › Plots (once "ARRO Data"): reads ARRO's per-sensor CSV exports in the
 //              browser — nothing is uploaded — links each file back to the
 //              station that produced it, runs the Bureau's 3-5-7 continuity
 //              filter over it, and draws raw against filtered.
@@ -509,7 +509,7 @@ const ArroData = (function () {
   }
 
   // ── the series boundary ──────────────────────────────────────────────────────
-  // The one door into this module, and the reason the Field Data tab is a query
+  // The one door into this module, and the reasin Charts › Field Data is a query
   // rather than a second chart. A source produces parallel arrays in whatever
   // order it happens to have them; this puts them in the order everything
   // downstream assumes, and hands back the shape runFilter(), tracks(), the
@@ -3087,7 +3087,7 @@ const ArroData = (function () {
       <div class="panel ad-panel">
         <div class="panel-header"><h2 id="ad-field-h">Field readings</h2>
           <span class="small"
-                title="Every reading on this tab comes from the Flood-Net datastore. ARRO exports live on the Plots tab and the two are never mixed."
+                title="Every reading on this tab comes from the Flood-Net datastore. ARRO exports live in Charts › Plots and the two are never mixed."
                 >${esc(dbHostLabel())}</span></div>
 
         <label class="ad-cfg-row ad-cfg-row--block">
@@ -5077,7 +5077,7 @@ const ArroData = (function () {
            its sensors and a window on the left.</p>
         <p>The chart, the Bureau's 3-5-7 continuity filter and the inspector are the Plots
            tab's, unchanged. What is different is where the numbers came from, and this tab never
-           mixes the two: ARRO exports stay on the Plots tab, and every chart and export here
+           mixes the two: ARRO exports stay in Charts › Plots, and every chart and export here
            says so on its face.</p>
         <p class="small">
           Readings arrive as counts, so the 3/5/7 thresholds are counts too and the filter runs on
@@ -8421,7 +8421,7 @@ const ArroData = (function () {
     pickToggle, pickClear, pickAllInView, editValue, editQuality, editDelete,
     revertSeries, setEditVal, setEditQ, editCell, openTableModal, closeTableModal,
     preset, unpin, setCfgFor, applyCfgAll, exportCsv, exportImg, explain, compareToggle, tableToggle, dropAll,
-    // the Field Data tab (#114)
+    // Charts › Field Data (#114)
     fieldSetStation, fieldToggleSensor, fieldAllSensors, fieldSetWindow,
     fieldSetRes, fieldSetRx, fieldSetDate, fieldRun, fieldClearError,
     // what the datastore holds, as opposed to what the registry says it should

@@ -17,11 +17,11 @@
 // arro-data.js (fieldShow), packets.js (prefillEncoder) and alert2.js for the
 // three deep links out of the detail drawer.
 //
-// What this tab is for, and why it is not the Field Data tab again:
+// What this tab is for, and why it is not Charts › Field Data again:
 //
 //   * **Watching messages arrive.** Fade-margin runs, part swaps and antenna
 //     work all end the same way — somebody in a paddock asking "did that one
-//     get in?". The Field Data tab answers with a chart of one station's
+//     get in?". Charts › Field Data answers with a chart of one station's
 //     history; this tab answers with the log itself, every station at once,
 //     newest first, with a Follow switch that keeps asking.
 //   * **The ingress pathway.** Which base heard it, which protocol carried
@@ -41,7 +41,7 @@
 // on (addr, reading_ts, value_raw) and counts the further copies, so "the log"
 // and "the readings" are the same rows read in arrival order. Raw readings age
 // out at ~90 days (the rollups survive); this tab reads the raw table only and
-// says so rather than quietly switching to rollups — the Field Data tab is the
+// says so rather than quietly switching to rollups — Charts › Field Data is the
 // one that knows how to widen.
 
 const MessageLog = (() => {
@@ -602,7 +602,7 @@ const MessageLog = (() => {
           <div class="panel-header ml-header">
             <h2>Message log</h2>
             <span class="small"
-                  title="Every row on this tab is a reading the Flood-Net datastore accepted. ARRO's numbers live on the Plots tab and the two are never mixed."
+                  title="Every row on this tab is a reading the Flood-Net datastore accepted. ARRO's numbers live in Charts › Plots and the two are never mixed."
                   >${esc(dbHostLabel())}</span>
             <span class="ml-header-tools">
               <span class="ml-viewswitch" role="group" aria-label="Table width">
@@ -764,7 +764,7 @@ const MessageLog = (() => {
     if (ml.unmatched.length) bits.push(`<span class="txt-warn">not in this database: ${ml.unmatched.map(esc).join(', ')}</span>`);
     if (ml.sel.size) bits.push(`${ml.sel.size} selected — <button class="ml-btn" onclick="MessageLog.clearSel()">clear</button>`);
     const days = (Date.now() - (windowRange(ml.q)?.t0 || Date.now())) / 86400000;
-    if (days > 80) bits.push('<span class="small">raw readings age out at ~90 days — beyond that the Field Data tab\'s rollups are what survives</span>');
+    if (days > 80) bits.push('<span class="small">raw readings age out at ~90 days — beyond that Charts › Field Data\'s rollups are what survives</span>');
     return bits.join(' · ');
   }
 
@@ -1010,7 +1010,7 @@ const MessageLog = (() => {
   }
 
   // Legacy ALERT: the 40 bits on the air, four words of ten (BitModel's frame,
-  // the one the Bit Bench and the ALERT Packets tab hold to each other).
+  // the one the Bit Bench and the Decoder's ALERT Packets view hold to each other).
   function wireAlert(addr, value) {
     const M = BitModel, L = M.layout(), tx = M.air(addr, value), T = M.bitMs();
     const KIND = { start: 'frm', stop: 'frm', A: 'addr', D: 'val', K: 'chk' };
@@ -1085,13 +1085,13 @@ const MessageLog = (() => {
           <div><span>Rebuild it</span>
             <button class="ml-btn" onclick="MessageLog.openInPackets('${escAttr(rowKey(r))}')"
                     title="Prefill the ALERT Packets encoder with this address and value — the 40-bit frame, the check bits and the bit map, in every format">
-              Rebuild the frame on the ALERT Packets tab</button>
+              Rebuild the frame in the Decoder's ALERT Packets view</button>
             <span class="small">the stored record is the decoded address and value; the framing and check bits are the encoder's to show</span></div>`);
       }
       if (proto === 'alert2') {
         out.push(`
           <div><span>Layout</span><b>ALERT2 / ERT-A2</b>
-            <span class="small">four bytes inside a concentration payload — the A2C layout on the ALERT Packets tab decodes one; a whole capture belongs on the ALERT2 / ERT-A2 tab</span></div>`);
+            <span class="small">four bytes inside a concentration payload — the A2C layout in the Decoder's ALERT Packets view decodes one; a whole capture belongs on the ALERT2 / ERT-A2 tab</span></div>`);
       }
     } else {
       out.push(`<div><span>Decode</span><b>${esc(proto)}</b>
@@ -1214,7 +1214,7 @@ const MessageLog = (() => {
         ${detailRawHtml(r)}
         <div><span>Field Data</span>
           <button class="ml-btn" onclick="MessageLog.openInField('${escAttr(rowKey(r))}')"
-                  title="Chart this address' raw readings around this moment on the Field Data tab — the 357 filter, the gaps and the rollups live there">
+                  title="Chart this address' raw readings around this moment in Charts › Field Data — the 357 filter, the gaps and the rollups live there">
             Chart <span class="mono">${esc(fieldAddr)}</span> around this reading</button></div>
       </div>`;
   }
@@ -1405,7 +1405,7 @@ const MessageLog = (() => {
   //
   // It used to be half a tray: a value-against-time plot beside the map. The
   // plot went because it answered a question this tab does not ask — raw values
-  // over a window are the Field Data tab's whole subject, and a row here has a
+  // over a window are Charts › Field Data's whole subject, and a row here has a
   // button that opens exactly that. The map takes the width back.
 
   function trayHtml() {

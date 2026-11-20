@@ -31,7 +31,7 @@
 //
 // What moved here. The header's 📂 Load stations.json (now "Load from this
 // device", beside its two siblings) and ⬇️ Load from GitHub,
-// and the Export tab's Data source and stations.json panels: none of them is
+// and the Radio Mobile Files tab's Data source and stations.json panels: none of them is
 // something done every visit, and every one of them is about the data rather
 // than about a tab's work. The hidden <input id="file-input"> stays in
 // index.html — the empty state's button uses it too.
@@ -128,7 +128,7 @@ const Admin = (function () {
         <p class="small adm-loaded">${esc(typeof dataSourceSummary === 'function' ? dataSourceSummary() : '')}</p>
       </div>
 
-      <!-- Moved from the Export tab. Two questions rather than one: what is on
+      <!-- Moved from the Radio Mobile Files tab. Two questions rather than one: what is on
            screen, and whether the database is reachable — a healthy connection
            under a list that fell back to a file is the case worth seeing. -->
       <div class="panel">
@@ -658,6 +658,7 @@ const Admin = (function () {
     return `
       <div class="page adm-page stack" style="--page-max:1200px">
         <h2 class="sr-only">Admin</h2>
+        <nav id="adm-jump" class="adm-jump" aria-label="On this page"></nav>
         <div id="adm-dash" class="stack">${typeof AdminDash !== 'undefined' ? AdminDash.render() : ''}</div>
         <div id="adm-links" class="stack">${typeof AdminLinks !== 'undefined' ? AdminLinks.render() : ''}</div>
         <div id="adm-people" class="stack">${peopleHtml()}</div>
@@ -680,7 +681,67 @@ const Admin = (function () {
       </div>`;
   }
 
+  // ── On this page ──────────────────────────────────────────────────────────
+  // The page is a dozen panels, most of them an administrator's only, so a
+  // list of what is on it, in five groups, heads it (November 2026). Built
+  // from the headings the page has drawn, so a panel this session is not
+  // shown is not listed; built again as the panels that load from the
+  // database arrive.
+  const JUMP_GROUPS = ['People', 'Data', 'Running it', 'This browser', 'Other tools'];
+  const JUMP_BY_ID = {
+    'adm-people': 'People', 'adm-teams': 'People', 'adm-roles-h': 'People',
+    'adm-tokens': 'Data', 'adm-tags': 'Data', 'adm-deleted': 'Data', 'adm-src-h': 'Data',
+    'adm-dash': 'Running it', 'adm-links': 'Running it', 'adm-costs': 'Running it',
+    'adm-push': 'This browser', 'adm-browser': 'This browser', 'adm-local-h': 'This browser',
+  };
+  function jumpGroupOf(h) {
+    if (JUMP_BY_ID[h.id]) return JUMP_BY_ID[h.id];
+    const box = h.parentElement && h.parentElement.closest('[id^="adm-"]:not(.adm-page)');
+    if (box && JUMP_BY_ID[box.id]) return JUMP_BY_ID[box.id];
+    const t = h.textContent || '';
+    if (/station data|snapshot|data source/i.test(t)) return 'Data';
+    if (/your access/i.test(t)) return 'This browser';
+    return 'Other tools';
+  }
+  function buildJump() {
+    const nav = document.getElementById('adm-jump');
+    if (!nav || state.activeTab !== 'admin') return;
+    const page = nav.closest('.adm-page');
+    // Only a panel's own heading: a panel's inner h2 (a log inside one) is
+    // reached through the panel.
+    const heads = [...page.querySelectorAll('h2:not(.sr-only)')]
+      .filter(h => h.getClientRects().length && !h.closest('details:not([open])'))
+      .filter(h => !/^bl-log-h$/.test(h.id));
+    const by = {};
+    heads.forEach((h, i) => {
+      if (!h.id) h.id = `adm-j-${i}`;
+      (by[jumpGroupOf(h)] = by[jumpGroupOf(h)] || []).push(h);
+    });
+    const groups = JUMP_GROUPS.filter(g => by[g]);
+    nav.innerHTML = groups.length < 2 ? '' : `
+      <span class="adm-jump-h">On this page</span>
+      ${groups.map(g => `
+      <span class="adm-jump-g"><strong>${esc(g)}</strong>
+        ${by[g].map(h => `<button type="button" class="link-btn" onclick="Admin.jump('${escAttr(h.id)}')">${esc(jumpName(h))}</button>`).join('<span aria-hidden="true"> · </span>')}
+      </span>`).join('')}`;
+  }
+  // A heading's words without the count badge some carry ("Users 3").
+  function jumpName(h) {
+    const c = h.cloneNode(true);
+    c.querySelectorAll('.count, .badge, .nav-count, .pill, .sr-only').forEach(x => x.remove());
+    return c.textContent.replace(/\s+/g, ' ').replace(/\s+\d+$/, '').trim();
+  }
+  function jump(id) {
+    const h = document.getElementById(id);
+    if (!h) return;
+    if (!h.hasAttribute('tabindex')) h.setAttribute('tabindex', '-1');
+    h.scrollIntoView({ block: 'start' });
+    h.focus({ preventScroll: true });
+  }
+
   function init() {
+    setTimeout(buildJump, 0);
+    setTimeout(buildJump, 1500);
     if (!state.dbStatus) dbCheck();
     if (isAdmin() && users === null && !loading) load();
     // The deleted stations, for an editor (station-history.js): asked again
@@ -707,6 +768,7 @@ const Admin = (function () {
     if (!which || which === 'access') set('adm-access', accessHtml());
     if (!which || which === 'browser') set('adm-browser', browserHtml());
     if (!which && typeof AdminCosts !== 'undefined') set('adm-costs', AdminCosts.render());
+    buildJump();
   }
 
   async function load() {
@@ -908,7 +970,7 @@ const Admin = (function () {
     if (state.activeTab === 'admin' && isAdmin()) load();
   }
 
-  return { render, init, load, authChanged, waitingCount, saveUser, deleteUser, samePerson, freeAddress, formField,
+  return { render, init, load, jump, authChanged, waitingCount, saveUser, deleteUser, samePerson, freeAddress, formField,
            saveEntry, editEntry, removeEntry, forgetKey, clearLocal, decide, setSignup,
            // What admin_users() last said (null before it answers), for the
            // Teams panel's suggestions.

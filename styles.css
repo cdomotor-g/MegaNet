@@ -29126,6 +29126,7 @@ select.kl-in { width: auto; font-family: inherit; }
 :root[data-shell="calm"] #btn-export,
 :root[data-shell="calm"] #btn-report,
 :root[data-shell="calm"] #btn-theme,
+:root[data-shell="calm"] #btn-offline,
 :root[data-shell="calm"] #btn-nav { display: none; }
 :root[data-shell="calm"] .hdr-more { display: inline-flex; }
 
@@ -31140,3 +31141,87 @@ details.tm-fold summary { cursor: pointer; }
 .hc-d-why { margin: 0 0 8px; padding-left: 18px; }
 .hc-d-why li { margin: 2px 0; }
 .hc-d-what p { margin: 0 0 6px; }
+
+/* ── The view strip (app.js, viewStripHtml) ───────────────────────────────────
+   A tab in the bar that holds several views — the Decoder's ALERT, ERT-A2 and
+   HFEM, Charts' ARRO export and Flood-Net readings — names itself and its
+   views in a row across the top of the page. The open view is underlined, the
+   way Calm's row of tabs marks the open one. It wraps rather than scrolls: at
+   most four views, so a phone has room for them on two lines. */
+.view-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .25rem 1rem;
+  margin: 0 auto .5rem;
+  padding: .35rem var(--page-pad, 1rem) 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-sub);
+}
+.view-strip-name {
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.view-strip-btns { display: flex; flex-wrap: wrap; gap: 0 .9rem; min-width: 0; }
+.view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .35rem .1rem .45rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: .92rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.view-btn:hover { color: var(--text); }
+.view-btn.active { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+.view-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The view a query in the bar's find box matched, after the tab's name. */
+.nav-via { color: var(--muted); font-weight: 400; }
+/* 📦 The Decoder's "not sure which kind?" box, under its strip
+   (decoder-sniff.js). */
+.dec-sniff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .35rem .6rem;
+  margin: -.25rem 0 .6rem;
+  padding: 0 var(--page-pad, 1rem) .5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-sub);
+}
+.dec-sniff-h { font-size: var(--fs-sm); font-weight: 600; flex: 0 0 auto; }
+.dec-sniff-in { flex: 1 1 18rem; min-width: 0; height: 2.6rem; min-height: 2.6rem; resize: vertical; font-family: var(--font-mono, monospace); font-size: var(--fs-sm); }
+.dec-sniff-said { flex: 1 1 100%; margin: 0; }
+.dec-sniff-said:empty { display: none; }
+/* A phone: the views alone, on one line where they fit — the tab's name is
+   the button lit in the bar behind ☰, and the page's own heading. */
+@media (max-width: 560px) {
+  .view-strip { padding-top: .15rem; margin-bottom: .35rem; }
+  .view-strip-name { display: none; }
+  /* The banner is full at a phone's width: 📲 Offline & Install is found in
+     the find box and Ctrl+K there, and is in the Field view's bar. */
+  #btn-offline { display: none; }
+}
+/* Admin's "On this page" list (admin.js, buildJump): the panels it holds, in
+   five groups, each a button that takes the page to that panel. */
+.adm-jump:empty { display: none; }
+.adm-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem 1.2rem;
+  padding: .55rem .8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--panel-sub);
+  font-size: var(--fs-sm);
+}
+.adm-jump-h { flex: 1 1 100%; font-weight: 600; color: var(--muted); }
+.adm-jump-g { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .35rem; }
+.adm-jump-g > strong { margin-right: .2rem; }

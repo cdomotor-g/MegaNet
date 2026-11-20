@@ -25,6 +25,26 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 288, date: '2026-11-20', items: [
+      '🗂️ <strong>The bar on the left, tidied: 62 tabs are 42 now, in 10 groups.</strong> Tools that did one job between them '
+        + 'are one tab, with their old pages as views in a row across its top: 📶 <em>Nearby Transmitters</em> (RF Environment, RF Changes), '
+        + '📡 <em>Signal Sources</em> (Reception Map, Signal Routes, Bit-Flip Sources), 🔀 <em>Bit Flipper</em> (with the Ghosting Graph), '
+        + '📦 <em>Decoder</em> (ALERT Packets, ALERT2 / ERT-A2, HFEM Messages), 📊 <em>Charts</em> (Plots, Field Data and the ARRO Launcher), '
+        + '🩺 <em>Inspections</em> (with Site Maintenance and Inspection History), 📷 <em>Photos</em> (Field Photos and the Field Camera), '
+        + '📌 <em>Near Me</em> (Nearby and Look Around), 🧪 <em>Bit Faults</em> (Bit Bench and Bit Errors), 🏞️ <em>Field Days</em>, '
+        + '🔁 <em>Repeaters</em> (with Repeater Delays), and 🗂️ <em>Guide</em> (Site Map, Capabilities, Videos). Nothing was taken away, '
+        + 'and old links and bookmarks still open the same page.',
+      '🧭 <strong>New groups:</strong> Radio &amp; signals, Field work (site visits and surveying together), Maps &amp; files, '
+        + 'Learn: radio &amp; equipment, Learn: field practice, and Admin &amp; planning. Base Stations is under Network health now.',
+      '📦 <strong>Not sure which decoder?</strong> The Decoder has a box that works out whether a pasted message is an ALERT packet, '
+        + 'ERT-A2 serial output or HFEM lines, and opens the right one with it decoded.',
+      '🚀 <strong>Knocked out of ARRO\'s administrator mode?</strong> Copy the ARRO page\'s address, press 🔎 Search (Ctrl+K) and paste it: '
+        + 'Flood-Net offers to open that same page in ARRO admin. The ARRO Launcher does the same, under Charts.',
+      '📲 <strong>Offline &amp; Install</strong> is a button in the banner now, and <strong>what the bar lists</strong> (Views) is in '
+        + '<em>Theme &amp; layout</em>. 📤 Export (the Radio Mobile files) is <em>Radio Mobile Files</em>, so it is not mixed up with ⤓ Export in the banner. '
+        + '🛠️ Admin opens with a list of what is on the page.',
+      '🔎 The find box and Ctrl+K still know every old name: type “RF Changes” or “Field Data” and you land on that view.',
+    ] },
     { n: 287, date: '2026-11-20', items: [
       '📇 <strong>Station cards, at the top of Station Health.</strong> Every station in a maintenance hub as a small card, '
         + 'north to south and west to east: the last few days of battery voltage, signal strength and every missed check signal '

@@ -121,6 +121,12 @@
       <button id="btn-report" class="hdr-btn" onclick="BugReport.open()" title="Report a bug or suggest an improvement">
         <span class="hdr-ico" aria-hidden="true">🐞</span><span class="hdr-label">Report a Bug</span>
       </button>
+      <!-- 📲 Offline & Install: done once per device, so a button here rather
+           than a row in the bar (core.js, `bar: false`). -->
+      <button id="btn-offline" class="hdr-btn" onclick="switchTab('offline')"
+              title="Offline &amp; Install — get this device ready for a site with no signal, or put Flood-Net on its home screen">
+        <span class="hdr-ico" aria-hidden="true">📲</span><span class="hdr-label">Offline</span>
+      </button>
       <button id="btn-theme" class="hdr-btn" onclick="openThemeMenu()" title="Theme">
         <span class="hdr-ico" aria-hidden="true">🌗</span><span class="hdr-label">Theme</span>
       </button>
@@ -950,6 +956,10 @@
        so nothing would actually break the other way round — the order is here
        because it states the dependency, which is what this list is for (#154). -->
   <script src="hfem-tab.js?v=20261120i"></script>
+  <!-- 📦 The Decoder's "not sure which kind?" box, under its view strip: reads
+       a pasted message and opens the decoder that fits. After the three
+       decoders it hands the message to; all runtime calls. -->
+  <script src="decoder-sniff.js?v=20261120i"></script>
   <script src="network-maps.js?v=20261120i"></script>
   <!-- The Serial Monitor's devices (#serial expansions): the codecs and the
        driver first (pure — Node requires them too), then the two device cards,

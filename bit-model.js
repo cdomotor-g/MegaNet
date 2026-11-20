@@ -9,7 +9,7 @@
 //
 // After core.js and propagation-physics.js, whose ALERT Binary map, codec,
 // seeded generator and timing figures it reads at call time — so the frame here
-// is the frame the 🎓 Radio Propagation lesson draws and the ALERT Packets tab
+// is the frame the 🎓 Radio Propagation lesson draws and the Decoder's ALERT Packets view
 // decodes, and test/bitbench.mjs holds all three to each other. No DOM, no
 // `state`, nothing at load: test/bitbench.mjs runs this file in Node's vm.
 //
@@ -184,7 +184,7 @@ const BitModel = (function () {
   // first, 9 the stop bit), and what it is — `kind` 'start', 'stop', 'A' an
   // address bit, 'D' a value bit or 'K' a check bit, with `i` the address or
   // value bit it carries or the value a check bit must hold; `data` its index
-  // among the 32 the ALERT Packets tab reads, −1 for framing.
+  // among the 32 the Decoder's ALERT Packets view reads, −1 for framing.
   let LAYOUT = null;
   function layout() {
     if (LAYOUT) return LAYOUT;

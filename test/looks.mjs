@@ -181,7 +181,10 @@ async function main() {
     const H = await page.evaluate(() => ({
       big: [...document.querySelectorAll('.hm-big')].map(b => b.dataset.go),
       small: [...document.querySelectorAll('.hm-small')].map(b => b.dataset.go),
-      shown: TAB_LIST.filter(t => tabShown(t)).map(t => t.id),
+      // Every tab, not every view of one (core.js, `parts`): a view is opened
+      // from its tab's strip, though a big tile may open one (the Camera).
+      shown: TAB_LIST.filter(t => !t.partOf && tabShown(t)).map(t => t.id),
+      parts: TAB_LIST.filter(t => t.partOf).map(t => t.id),
       dash: [...document.querySelectorAll('.hm-status .hm-chip strong')].map(s => s.textContent),
       first: TABS[0].tabs[0].id,
     }));
@@ -189,7 +192,7 @@ async function main() {
     check('Home heads Start here', H.first === 'home');
     check('six big tiles — Map, Nearby, Health, Inspect, Camera, Look Around',
       J(H.big) === J(['stations', 'nearby', 'health', 'inspections', 'camera', 'lookaround']), J(H.big));
-    check('…then every other tab once', H.small.length + H.big.length + 1 === H.shown.length
+    check('…then every other tab once', H.small.length + H.big.filter(id => !H.parts.includes(id)).length + 1 === H.shown.length
       && H.shown.every(id => every.has(id)), J({ small: H.small.length, big: H.big.length, shown: H.shown.length }));
     check('a count Station Health has not answered is a dash, not a nought', H.dash.length === 3 && H.dash.every(d => d === '—'), J(H.dash));
     await page.evaluate(() => {

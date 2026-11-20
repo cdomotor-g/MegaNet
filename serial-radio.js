@@ -925,7 +925,7 @@ const SerialRadio = (function () {
   }
 
   // The selected reading's 32 payload bits, coloured by what each one is —
-  // the ALERT Packets tab's colours.
+  // the Decoder's ALERT Packets view's colours.
   function paintDetail(c) {
     const el = document.getElementById('qs-detail-' + c.id);
     if (!el) return;

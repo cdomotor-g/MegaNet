@@ -5,7 +5,7 @@
 //              sections, each something to do:
 //
 //                1  a reading, bit by bit — an address and a value as the 40
-//                   bits ALERT Binary sends, drawn as the ALERT Packets tab
+//                   bits ALERT Binary sends, drawn as the Decoder's ALERT Packets view
 //                   draws a message (four words of coloured cells, and a
 //                   table of what each field carries); the number bench —
 //                   decimal, binary and hex side by side, every bit a button,
@@ -390,7 +390,7 @@ const BitBench = (function () {
 
   // ── 1 · A reading, bit by bit ──────────────────────────────────────────────
   // The two numbers a station sends, the 40 bits they go out as — drawn the
-  // way the ALERT Packets tab draws a message — and the number bench under
+  // way the Decoder's ALERT Packets view draws a message — and the number bench under
   // them. The bench's 13- and 11-bit widths are the frame's address and value
   // themselves, so a bit flipped on either moves in the frame too; and the
   // frame's own address and value bits flip at a press. Pointing at a bit
@@ -458,7 +458,7 @@ const BitBench = (function () {
       </figure>`;
   }
 
-  // The frame's fields, listed the way the ALERT Packets tab lists a decoded
+  // The frame's fields, listed the way the Decoder's ALERT Packets view lists a decoded
   // message: each one's bits most significant first, what they come to, and
   // where in the frame they travel. Each row wears its cells' colour, so the
   // table is the strip's key as well.
@@ -1138,7 +1138,7 @@ const BitBench = (function () {
     const link = (tab, icon, name, why, sec) => `<li><button type="button" class="link-btn bb-link" onclick="BitBench.tab('${tab}'${sec ? `, '${sec}'` : ''})"><span aria-hidden="true">${icon}</span> ${esc(name)}</button><span class="bb-aside">${esc(why)}</span></li>`;
     return `
     ${secOpen('bb-more')}
-      <p>The bench shows each fault in a paragraph. The <strong>⚡ Bit Errors</strong> lesson, in the Knowledge base, takes each in depth:
+      <p>The bench shows each fault in a paragraph. The <strong>⚡ Bit Errors</strong> lesson, beside this bench in Bit Faults, takes each in depth:
         the physics, why it leaves the marks it does, how to confirm it in the field and what fixes it.</p>
       <ul class="bb-links">
         ${link('biterrors', '⚡', 'Bit Errors — every fault in depth', 'The lesson behind this bench: symptoms, causes, fingerprints and fixes.')}

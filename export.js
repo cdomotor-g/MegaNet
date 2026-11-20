@@ -1,6 +1,6 @@
 // MegaNet — export.js
 //
-//   renderExportHtml   the Export tab: pick radio networks, get Radio Mobile
+//   renderExportHtml   the Radio Mobile Files tab: pick radio networks, get Radio Mobile
 //   and the export     and CSV output for what is on them.
 //   builders behind it
 //   stationKml         …and one station as a Google Earth KML: its pin, the
@@ -647,7 +647,7 @@ ${marks}
 
 function exportStationsView(fmt) {
   if (!exportMayDownload()) {
-    Toast.note('Sign in to take the station list away as a file — the Export tab\'s rule, and the station editor\'s.');
+    Toast.note('Sign in to take the station list away as a file — the Radio Mobile Files tab\'s rule, and the station editor\'s.');
     return;
   }
   const rows = filteredStations();

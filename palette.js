@@ -259,6 +259,36 @@ const Palette = (() => {
       } }));
   }
 
+  // ── An ARRO address, pasted ───────────────────────────────────────────────
+  // Somebody knocked out of ARRO's administrator mode copies the address of
+  // the page they were on and pastes it here: the ids are read out of it the
+  // way the ARRO Launcher reads them (arro-launcher.js, arroParseIds), and the
+  // same site's — or sensor's — admin page opens in a new tab. Only for an
+  // address: a bare number is a station's, and the station search has it.
+  function arroItems(raw) {
+    const q = raw.trim();
+    if (typeof arroParseIds !== 'function' || !/site_id=\d+|devices(?:\[\]|%5B%5D)=\d+/i.test(q)) return [];
+    const { site, device } = arroParseIds(q);
+    if (!site) return [];
+    const url = device ? arroSensorUrl(site, device) : arroSiteUrl(site);
+    const what = device ? `site ${site}, device ${device}` : `site ${site}`;
+    return [
+      { kind: 'arro', icon: '🚀', label: device ? 'Open this sensor in ARRO admin' : 'Open this site in ARRO admin',
+        sub: `${what} — in a new tab`,
+        run: () => {
+          try { arroSaveRecent(site, device || '', arroLabelForSite(site)); } catch (_) { /* recents are a convenience */ }
+          window.open(url, '_blank', 'noopener');
+        } },
+      { kind: 'arro', icon: '🚀', label: 'Open it in the ARRO Launcher', sub: `Charts › Open in ARRO, with ${what} filled in`,
+        run: () => {
+          state.arro.siteId = site;
+          state.arro.deviceId = device || '';
+          state.arro.note = 'read from the pasted URL';
+          switchTab('arro');
+        } },
+    ];
+  }
+
   // ── Places ────────────────────────────────────────────────────────────────
 
   function placeItems(raw) {
@@ -304,21 +334,29 @@ const Palette = (() => {
     if (!terms.length) return [];
     let best = 0;
     const scored = [];
+    // Every tab and every view of one (core.js, tabFamily): a view is
+    // matched on its own words and its host's name, and says which tab it is
+    // a view of.
     for (const g of TABS) {
-      for (const tab of g.tabs) {
-        if (!tabShown(tab)) continue;
-        const score = navScore(navHaystack(tab, g.group), terms);
-        if (!score) continue;
-        best = Math.max(best, score);
-        const label = tab.label.toLowerCase();
-        scored.push({ tab, group: g.group, score,
-                      label: navScore(label, terms) + (label.startsWith(terms[0]) ? 0.5 : 0) });
+      for (const host of g.tabs) {
+        for (const tab of [host, ...(host.parts || [])]) {
+          if (!tabShown(tab)) continue;
+          const own = `${navHaystack(tab, g.group)} ${(tab.view || '').toLowerCase()}`;
+          const hay = tab === host ? own : `${own} ${host.label.toLowerCase()}`;
+          const score = navScore(hay, terms);
+          if (!score) continue;
+          best = Math.max(best, score);
+          const label = tab.label.toLowerCase();
+          scored.push({ tab, host, group: g.group, score,
+                        label: navScore(label, terms) + (label.startsWith(terms[0]) ? 0.5 : 0) });
+        }
       }
     }
     return scored.filter(x => x.score === best)
       .sort((a, b) => b.label - a.label)
       .slice(0, MAX_TABS)
-      .map(x => ({ kind: 'tab', score: x.score, icon: x.tab.icon, label: x.tab.label, sub: `Tab · ${x.group}`,
+      .map(x => ({ kind: 'tab', score: x.score, icon: x.tab.icon, label: x.tab.label,
+                   sub: x.tab === x.host ? `Tab · ${x.group}` : `${x.tab.view || x.tab.label} in ${x.host.label} · ${x.group}`,
                    run: () => switchTab(x.tab.id) }));
   }
 
@@ -378,6 +416,7 @@ const Palette = (() => {
   // rest, and arriving below what is already listed moves nothing a finger
   // might be on its way to.
   const GROUPS = [
+    { key: 'arro',    title: 'ARRO' },
     { key: 'station', title: 'Stations' },
     { key: 'tab',     title: 'Tabs' },
     { key: 'action',  title: 'Actions' },
@@ -397,6 +436,7 @@ const Palette = (() => {
     const top = Math.max(0, ...found.map(i => i.score || 0));
     const answers = found.filter(i => !top || (i.score || 0) >= top || !i.score);
     return [
+      ...arroItems(raw),
       ...st.list,
       ...answers.filter(i => i.kind === 'tab'),
       ...answers.filter(i => i.kind === 'action'),

@@ -5,7 +5,7 @@
 //                gauge's own card — and every rain gauge within a distance of a
 //                station, each two ways: in ARRO, on one graph, and out of the
 //                Flood-Net datastore in a dialog of strips that hands the same
-//                gauges and window to the Field Data tab.
+//                gauges and window to Charts › Field Data.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, announce, pillText,
@@ -477,10 +477,10 @@ const GroupPlots = (function () {
           </div>
           <div id="gplot-body"></div>
           <div class="sspk-foot gplot-foot">
-            <span class="small txt-muted">The Field Data tab filters, inspects and exports these readings.</span>
+            <span class="small txt-muted">Charts › Field Data filters, inspects and exports these readings.</span>
             <span id="gplot-arro"></span>
             <button type="button" class="primary" onclick="GroupPlots.toField()"
-              title="Open these gauges on the Field Data tab over the same window">📈 Open in Field Data →</button>
+              title="Open these gauges in Charts › Field Data over the same window">📈 Open in Field Data →</button>
           </div>
         </div>`,
     });
@@ -893,7 +893,7 @@ const GroupPlots = (function () {
 
   // ── the door ──────────────────────────────────────────────────────────────
 
-  // The same gauges and window on the Field Data tab — every one of them,
+  // The same gauges and window in Charts › Field Data — every one of them,
   // past the dialog's cap. Out of full screen first and the tab switched
   // before the picker is set, as the station card's Field data → does
   // (fieldDataFromCard, app.js).

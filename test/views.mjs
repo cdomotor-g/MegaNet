@@ -1,9 +1,11 @@
 // The left bar's views (nav-views.js, 0062), driven in a real browser.
 //
 //   1. **Picking a view** — All is where every device starts, and lists every
-//      tab; the View box at the top of the bar offers All, Simple and Field in
-//      that order; Simple is All less Export, the Map Generator and the whole
-//      Interference group; Field is the site-visit list, Look Around in it;
+//      tab in the bar; the View box at the top of the bar offers All, Simple
+//      and Field in that order; Simple is All less the desk-bound radio tabs
+//      (Radio Mobile Files, the Map Generator, Nearby Transmitters, the
+//      Workbench, Where Signals Come From, Bit Faults); Field is the site-visit
+//      list;
 //      the pick is this device's and survives a reload.
 //   2. **Nothing is lost** — a tab the view leaves out, opened anyway, is in
 //      the bar under "Not in this view"; the find box answers from every tab,
@@ -124,7 +126,11 @@ async function main() {
     // Every tab this session is offered: a tab for some people only — the
     // administrators, or the ALERT2 Transition Plan's list (tabShown, core.js)
     // — is in no view of anybody else's.
-    const all = await page.evaluate(() => TAB_LIST.filter(tabShown).map(t => t.id));
+    // …that the bar lists: a view of another tab (core.js, `parts`) is not
+    // a row of its own, and Offline & Install and Views are reached from the
+    // banner (`bar: false`) — a view may still list those two.
+    const all = await page.evaluate(() => TABS.flatMap(g => g.tabs.filter(t => tabInBar(t) && tabShown(t))).map(t => t.id));
+    const offBar = await page.evaluate(() => TAB_LIST.filter(t => !t.partOf && t.bar === false).map(t => t.id));
     check('a tab for some people only is left out of every view of a session that is none of them',
       await page.evaluate(() => TAB_LIST.some(t => t.who) && NavViews.views().every(v => v.groups.every(g => g.tabs.every(t => !t.who)))));
     check('a device that has never picked is on All, and All lists every tab once',
@@ -142,21 +148,21 @@ async function main() {
 
     await page.selectOption('#nav-view-select', 'simple');
     b = await bar(page);
-    const gone = ['export', 'mapgen', 'rf', 'rfchanges', 'workbench', 'reception', 'flipsources', 'bitbench'];
-    check('Simple: All less Export, the Map Generator and the Interference group',
-      b.view === 'simple' && gone.every(t => !ids(b).includes(t)) && !b.groups.some(g => g.h === 'Interference')
+    const gone = ['export', 'mapgen', 'rf', 'workbench', 'reception', 'bitbench'];
+    check('Simple: All less the desk-bound radio tabs',
+      b.view === 'simple' && gone.every(t => !ids(b).includes(t))
         && J(ids(b)) === J(all.filter(t => !gone.includes(t))), J(ids(b)));
     check('…and the pick is kept on this device',
       await page.evaluate(() => localStorage.getItem('mn-view')) === 'simple');
 
     await page.selectOption('#nav-view-select', 'field');
     b = await bar(page);
-    const FIELD = ['nearby', 'stations', 'lookaround', 'camera', 'photos', 'inspections', 'swr', 'pinouts', 'maintenance', 'history',
+    const FIELD = ['nearby', 'stations', 'photos', 'inspections', 'swr', 'pinouts',
                    'levels', 'twopeg', 'surveyguide', 'msglog', 'health', 'offline', 'views'];
-    check('Field: the site-visit list — Nearby, Stations and Look Around first, no desk tool',
+    check('Field: the site-visit list — Near Me and Stations first, no desk tool',
       b.view === 'field' && J(ids(b)) === J(FIELD), J(b.groups));
-    check('…in groups of its own: Site visits, Surveying, Is it reporting?, Before you go',
-      J(b.groups.map(g => g.h)) === J(['Stations & networks', 'Site visits', 'Surveying', 'Is it reporting?', 'Before you go']),
+    check('…in groups of its own: Stations, Field work, Surveying, Is it reporting?, Before you go',
+      J(b.groups.map(g => g.h)) === J(['Stations', 'Field work', 'Surveying', 'Is it reporting?', 'Before you go']),
       J(b.groups.map(g => g.h)));
     await page.reload({ waitUntil: 'load' });
     await page.waitForFunction(() => !!state.data, null, { timeout: LOAD_TIMEOUT });
@@ -176,10 +182,11 @@ async function main() {
     const pick = await page.evaluate(() => document.querySelector('#nav-groups .tab-btn.nav-best')?.dataset.tab);
     check('the find box answers from every tab: "radio mobile" finds Export under "Not in this view", ↵ on it',
       b.groups.some(g => g.outside && g.tabs.includes('export')) && pick === 'export', J({ groups: b.groups, pick }));
+    // The Field Camera is a view of Photos (core.js, `parts`): found through it.
     await page.fill('#nav-search', 'camera');
     b = await bar(page);
     check('…and a tab the view has is found under the view\'s own heading',
-      b.groups.some(g => !g.outside && g.tabs.includes('camera')), J(b.groups));
+      b.groups.some(g => !g.outside && g.tabs.includes('photos')), J(b.groups));
     await page.fill('#nav-search', '');
     await page.evaluate(() => switchTab('stations'));
     await page.evaluate(() => { if (!state.navCollapsed) setNavCollapsed(true); });
@@ -208,7 +215,7 @@ async function main() {
     }));
     check('signed out: All, Simple and Field, the view in use (Field) open, read-only, and an offer to sign in',
       J(tabOut.list) === J(['All', 'Simple', 'Field']) && /Field/.test(tabOut.open || '') && tabOut.inputs === 0
-        && tabOut.newDisabled === true && tabOut.signin && tabOut.missing === all.length - FIELD.length, J(tabOut));
+        && tabOut.newDisabled === true && tabOut.signin && tabOut.missing === all.length + offBar.length - FIELD.length, J(tabOut));
     await page.click('[data-k="pick:simple"]');
     await page.click('#vw-editor [data-k="use"]');
     b = await bar(page);
@@ -235,29 +242,29 @@ async function main() {
     await p2.fill(nameBox, 'On site');
     await p2.press(nameBox, 'Enter');
     await p2.waitForFunction(() => NavViews.layout().views.some(v => v.groups && v.groups[0].name === 'On site'));
-    await p2.click('#vw-editor [data-k="t:stations:down"]');
+    await p2.click('#vw-editor [data-k="t:nearby:down"]');
     let mine = await p2.evaluate(() => NavViews.layout().views.find(v => v.name === 'Field (copy)'));
-    check('a group renamed, and Stations moved down below Look Around',
-      mine.groups[0].name === 'On site' && J(mine.groups[0].tabs) === J(['nearby', 'lookaround', 'stations']), J(mine.groups[0]));
+    check('a group renamed, and Near Me moved down below Stations',
+      mine.groups[0].name === 'On site' && J(mine.groups[0].tabs) === J(['stations', 'nearby']), J(mine.groups[0]));
     const focusAfter = await p2.evaluate(() => document.activeElement?.dataset.k);
-    check('…focus stays on the moved tab\'s ↓', focusAfter === 't:stations:down', String(focusAfter));
+    check('…focus stays on the moved tab\'s ↓', focusAfter === 't:nearby:down', String(focusAfter));
     await p2.selectOption('#vw-editor [data-k="t:health:group"]', '0');
     mine = await p2.evaluate(() => NavViews.layout().views.find(v => v.name === 'Field (copy)'));
     check('Move to… puts Station Health at the foot of On site',
-      J(mine.groups[0].tabs) === J(['nearby', 'lookaround', 'stations', 'health']) && !mine.groups[3].tabs.includes('health'), J(mine.groups));
-    await p2.click('#vw-editor [data-k="t:maintenance:remove"]');
+      J(mine.groups[0].tabs) === J(['stations', 'nearby', 'health']) && !mine.groups[3].tabs.includes('health'), J(mine.groups));
+    await p2.click('#vw-editor [data-k="t:pinouts:remove"]');
     mine = await p2.evaluate(() => NavViews.layout().views.find(v => v.name === 'Field (copy)'));
     const missingNow = await p2.evaluate(() => [...document.querySelectorAll('#vw-editor .vw-missing [data-k^="add:"]')].map(s => s.dataset.k));
-    check('✕ takes Site Maintenance out, and it is listed under Not in this view to add back',
-      !mine.groups.some(g => g.tabs.includes('maintenance')) && missingNow.includes('add:maintenance'), J(missingNow.slice(0, 5)));
+    check('✕ takes Pinouts out, and it is listed under Not in this view to add back',
+      !mine.groups.some(g => g.tabs.includes('pinouts')) && missingNow.includes('add:pinouts'), J(missingNow.slice(0, 5)));
     await p2.selectOption('#vw-editor [data-k="add:export"]', '0');
     mine = await p2.evaluate(() => NavViews.layout().views.find(v => v.name === 'Field (copy)'));
     check('Add to… puts Export in On site', mine.groups[0].tabs.includes('export'), J(mine.groups[0]));
     await p2.click('#vw-editor [data-k="use"]');
     let b2 = await bar(p2);
     check('Use this view: the bar lists it, its renamed group and moved tabs included',
-      b2.view === mine.id && b2.groups[0].h === 'On site' && J(b2.groups[0].tabs) === J(['nearby', 'lookaround', 'stations', 'health', 'export'])
-        && !ids(b2).includes('maintenance'), J(b2.groups.slice(0, 2)));
+      b2.view === mine.id && b2.groups[0].h === 'On site' && J(b2.groups[0].tabs) === J(['stations', 'nearby', 'health', 'export'])
+        && !ids(b2).includes('pinouts'), J(b2.groups.slice(0, 2)));
     await p2.waitForFunction(() => document.getElementById('vw-save')?.dataset.state === 'saved', null, { timeout: 10_000 });
     const last = db.saved[db.saved.length - 1];
     check('every change is saved to the account, in the shape 0062 accepts, the view in use with it',
@@ -267,10 +274,10 @@ async function main() {
 
     // The built-in Field, changed and put back.
     await p2.click('[data-k="pick:field"]');
-    await p2.click('#vw-editor [data-k="t:history:remove"]');
+    await p2.click('#vw-editor [data-k="t:swr:remove"]');
     let field = await p2.evaluate(() => NavViews.layout().views.find(v => v.id === 'field'));
     check('changing the built-in Field makes it the account\'s: kept as Field, with its groups written out',
-      field.preset === 'field' && Array.isArray(field.groups) && !field.groups.some(g => g.tabs.includes('history')), J(field));
+      field.preset === 'field' && Array.isArray(field.groups) && !field.groups.some(g => g.tabs.includes('swr')), J(field));
     await p2.click('#vw-editor [data-k="view-reset"]');
     field = await p2.evaluate(() => NavViews.layout().views.find(v => v.id === 'field'));
     check('Reset puts the built-in back: no list kept, so it follows the app', field.preset === 'field' && !field.groups, J(field));
@@ -290,7 +297,7 @@ async function main() {
     await p2.waitForFunction(id => !NavViews.layout().views.some(v => v.id === id), mine.id);
     b2 = await bar(p2);
     check('Delete, asked first, takes the copy away, and the bar goes back to All', b2.view === 'all'
-      && J(ids(b2)) === J(all), b2.view);
+      && J(ids(b2).filter(t => !offBar.includes(t))) === J(all), b2.view);
 
     // Signing out takes the account's views away with it.
     await p2.evaluate(() => { NavViews.duplicate('simple', 'Mine'); });

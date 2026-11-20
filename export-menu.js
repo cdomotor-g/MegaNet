@@ -39,7 +39,7 @@ const ExportMenu = (function () {
   const signedIn = () => typeof exportMayDownload === 'function' && exportMayDownload();
   // The Export tab's own rule (#191): the network leaving as a file needs a
   // signed-in session. Said the way that tab says it.
-  const GATE = 'Sign in first — taking the station list away as a file needs a signed-in session (the Export tab\'s rule).';
+  const GATE = 'Sign in first — taking the station list away as a file needs a signed-in session (the Radio Mobile Files tab\'s rule).';
   const gated = () => signedIn() ? '' : GATE;
 
   // tab id → () => [offer]. An offer: { label, sub, call: [path, ...args],
@@ -72,7 +72,7 @@ const ExportMenu = (function () {
       ];
     },
     export: () => [
-      { label: 'Radio Mobile CSVs, for the networks ticked', sub: 'the files the Export tab generates', call: ['runExport'], ready: gated,
+      { label: 'Radio Mobile CSVs, for the networks ticked', sub: 'the files the Radio Mobile Files tab generates', call: ['runExport'], ready: gated,
         empty: 'Tick at least one network on this tab first.' },
     ],
     mapgen: () => [

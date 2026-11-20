@@ -3667,23 +3667,41 @@ The tabs are a left-hand rail, grouped under headings, because a flat row of
 eleven buttons said nothing about how they relate — and wrapped to a second line
 on a narrow window.
 
-| Group | Tabs |
+| Group | Tabs (views of a tab in brackets) |
 | --- | --- |
-| **Start here** | Site Map · Offline & Install · Views |
-| **Stations & networks** | Stations · ALERT IDs · Repeaters · Repeater Delays · Export · Look Around |
-| **Printed maps** | Radio Path Maps · Map Generator |
-| **Interference** | RF Environment · RF Changes · Interference Workbench |
-| **ALERT** | Bit Flipper · Ghosting Graph · ALERT Packets · ALERT2 / ERT-A2 · HFEM Messages · Serial Monitor |
-| **Data** | ARRO Launcher · Plots · Field Data · Message Log |
-| **Site visits** | Inspections · Site Maintenance · Inspection History · Field Camera · Field Photos |
+| **Start here** | Home · Guide (Site Map, Capabilities, Videos) |
+| **Stations & networks** | Stations · ALERT IDs · Repeaters (Repeaters, Delays) |
+| **Maps & files** | Radio Path Maps · Map Generator · Radio Mobile Files |
+| **Radio & signals** | Nearby Transmitters (RF Environment, RF Changes) · Interference Workbench · Signal Sources (Reception Map, Signal Routes, Bit-Flip Sources) · Bit Flipper (Bit Flipper, Ghosting Graph) · Decoder (ALERT Packets, ALERT2 / ERT-A2, HFEM Messages) · Serial Monitor |
+| **Data** | Charts (ARRO export, Flood-Net readings, Open in ARRO) · Message Log · Base Station Traffic |
+| **Network health** | Station Health · Backbone · Base Stations · Investigations (Write-ups, How it is judged) |
+| **Field work** | Near Me (Nearby, Look Around) · Tasks · Inspections (New inspection, Council maintenance, Past records) · Photos (Library, Take a photo) · Level Survey · Two-Peg Test |
+| **Learn: radio & equipment** | Radio Propagation · Bit Faults (Bit Bench, Bit Errors) · SWR Meter · Pinouts · ERT-A2 Simulator · Radio Licensing |
+| **Learn: field practice** | How to Survey · Staff Simulator · Survey Logbook · Site Lifecycle · Field Days (Levelling Day, River Visit Day) |
+| **Admin & planning** | Admin · Network Review · ALERT2 Transition Plan · TDMA Planner |
+
+📲 **Offline & Install** and 🎛️ **Views** are out of the bar: one is the 📲 button in
+the banner, the other is opened from 🌗 *Theme & layout*. Both are still tabs — an
+address, the find box and Ctrl+K reach them.
+
+#### Views of a tab (November 2026)
+A tab that grew out of several keeps each of them whole, under its own id and its own
+address, as a **view**: `parts` on its entry in `TABS` (core.js). The bar lists the tab
+once and lights it for any of its views; a row of buttons across the top of the page
+(`viewStripHtml`, app.js) picks one. The find box and Ctrl+K match a view's own name and
+its old one, and open that view, so `?tab=rfchanges`, a bookmark or "RF Changes" typed in
+the find box still land where they did. `tabHost`, `tabFamily` and `tabGroupOf` (core.js)
+answer which tab a view belongs to. The 📦 Decoder adds a box under its row that works out
+which of its three decoders a pasted message is for (`decoder-sniff.js`).
 
 #### Views — what the bar lists (0062)
 A **View** box at the top of the bar picks what it lists. **All** is every tab, as
 the table above files them, and cannot be changed or deleted. **Simple** is All less
-Export, the Map Generator and the Interference group — a subtraction, so a tab added
-later is in it. **Field** is what a site visit needs on a phone: Stations and 🔭 Look
-Around, the camera and photos, the forms, the surveys, and the Message Log and Station
-Health. Which view shows is the device's own choice (`mn-view`). Signed in, the 🎛️
+the desk-bound radio tabs (Radio Mobile Files, the Map Generator, Nearby Transmitters,
+the Interference Workbench, Signal Sources and Bit Faults) — a subtraction, so a tab
+added later is in it. **Field** is what a site visit needs on a phone: Near Me and
+Stations, the photos, the forms, the SWR meter and pinouts, the surveys, and the Message
+Log and Station Health. Which view shows is the device's own choice (`mn-view`). Signed in, the 🎛️
 **Views** tab makes views of your own — rename a group, move a tab up, down or into
 another group (or drag it), take a tab out, add one back — saved to the account
 (`meganet.user_pref`), so they follow it to every device. A view only decides what the

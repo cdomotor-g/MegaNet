@@ -897,7 +897,7 @@ const Health = (() => {
       <div class="button-group hl-stn-links">
         <button class="ghost" onclick="goToStation('${escAttr(st.id)}')">Show on the Stations tab</button>
         <button class="ghost" onclick="Health.openLog('${escAttr(st.id)}')" title="This station's readings in the window, in the Message Log">Its readings in the Message Log</button>
-        <button class="ghost" onclick="Health.openField('${escAttr(st.id)}')" title="Chart its sensors on the Field Data tab">Chart on Field Data</button>
+        <button class="ghost" onclick="Health.openField('${escAttr(st.id)}')" title="Chart its sensors in Charts › Field Data">Chart on Field Data</button>
         ${arroLinkHtml(st)}
         <button class="ghost" onclick="Health.close()">Close</button>
       </div>

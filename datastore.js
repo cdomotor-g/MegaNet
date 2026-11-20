@@ -19,7 +19,7 @@
 // calls so the editor's unsaved bar says what the status line says; and to
 // auth.js for Auth, which reaches back here for dbSetAccessToken.
 //
-// This was three banner sections of app.js with the Export tab sitting in the
+// This was three banner sections of app.js with the Radio Mobile Files tab sitting in the
 // middle of them; they are joined here because they are one concern. The seam
 // that did not move: renderDbStatusHtml() renders into the Admin tab (it was the
 // Export tab's until the Admin tab took it) and snapshotStationsJson() is driven
@@ -86,7 +86,7 @@ async function dbPing() {
 }
 
 // Run a check and repaint the panel around it — once for "checking", once for
-// the result. Repaints the status node alone, not the tab: the Export tab's
+// the result. Repaints the status node alone, not the tab: the Radio Mobile Files tab's
 // checkboxes are DOM state, and redrawing them under the operator would reset
 // the very selection they had just made.
 async function dbCheck() {

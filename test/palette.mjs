@@ -140,7 +140,7 @@ async function main() {
     check('…and picking it lists more here, the dialog still up, the mark on the first new one',
       L.open && L.focused && L.labels.filter(x => !/^All \d+ /.test(x)).length > shown && L.activeLabel === L.labels[4], J(L.labels.slice(0, 6)));
     L = await type(page, 'bit');
-    check('"bit" still reaches the Bit Bench among the tabs', L.labels.includes('Bit Bench') && L.groups.includes('Tabs'), J(L.labels));
+    check('"bit" still reaches the Bit Faults bench among the tabs', L.labels.includes('Bit Faults') && L.groups.includes('Tabs'), J(L.labels));
     L = await type(page, '4021-4025');
     const all = L.labels.find(x => /^All \d+ matching stations$/.test(x));
     check('an address window offers every station in it, as the list\'s filter', !!all, J(L.labels));

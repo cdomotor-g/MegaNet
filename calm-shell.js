@@ -78,18 +78,16 @@ const CalmShell = (() => {
 
   // Which drawing each of TABS' groups wears.
   const GROUP_ICON = {
-    'Start here':          'start',
-    'Stations & networks': 'stations',
-    'Printed maps':        'map',
-    'Interference':        'radio',
-    'ALERT':               'code',
-    'Data':                'activity',
-    'Network health':      'heart',
-    'Site visits':         'clipboard',
-    'Surveying':           'ruler',
-    'Field training':      'learn',
-    'Knowledge base':      'book',
-    'Admin':               'shield',
+    'Start here':               'start',
+    'Stations & networks':      'stations',
+    'Maps & files':             'map',
+    'Radio & signals':          'radio',
+    'Data':                     'activity',
+    'Network health':           'heart',
+    'Field work':               'clipboard',
+    'Learn: radio & equipment': 'book',
+    'Learn: field practice':    'learn',
+    'Admin & planning':         'shield',
   };
 
   function icon(name, cls = 'calm-ico') {
@@ -99,7 +97,7 @@ const CalmShell = (() => {
   // The TABS group a tab is filed under — what its icon, and a view's group
   // made of it, are drawn from.
   function homeGroup(id) {
-    const g = TABS.find(x => x.tabs.some(t => t.id === id));
+    const g = tabGroupOf(id);
     return g ? g.group : '';
   }
 
@@ -124,7 +122,8 @@ const CalmShell = (() => {
   }
 
   function current(list = sections()) {
-    return list.find(g => g.tabs.some(t => t.id === state.activeTab)) || null;
+    const host = (tabHost(state.activeTab) || {}).id;
+    return list.find(g => g.tabs.some(t => t.id === host)) || null;
   }
 
   // ── Which tab a group opens on ────────────────────────────────────────────
@@ -207,7 +206,7 @@ const CalmShell = (() => {
   // same element either way, so everything that finds a tab's button by
   // data-tab — the Site Map's line, the checks — finds it here too.
   function tabButtonHtml(t, g, { li = true } = {}) {
-    const on = state.activeTab === t.id;
+    const on = (tabHost(state.activeTab) || {}).id === t.id;
     const cannot = tabCannot(t);
     const btn = `
           <button type="button" class="tab-btn${on ? ' active' : ''}" data-tab="${t.id}"
@@ -364,9 +363,10 @@ const CalmShell = (() => {
     const fresh = !!pill && !pill.hidden;
     const items = [
       { go: 'export', ico: 'download', label: 'Export what this tab shows', sub: 'As a file — CSV, GeoJSON, KML, PNG and the rest' },
-      { go: 'theme',  ico: 'palette',  label: 'Theme & look', sub: 'Light, dark or sunlight; Calm, Tiles, Instrument, Signs or Classic' },
+      { go: 'theme',  ico: 'palette',  label: 'Theme & layout', sub: 'Light, dark or sunlight; Calm, Tiles, Instrument, Signs or Classic; what the bar lists' },
+      { go: 'offline', ico: 'download', label: 'Offline & Install', sub: 'Get this device ready for a site with no signal, or put Flood-Net on its home screen' },
       { go: 'help',   ico: 'help',     label: 'Help for this tab', sub: 'In the side panel' },
-      { go: 'guide',  ico: 'start',    label: 'Site Map', sub: 'What every tab is for, and where it is' },
+      { go: 'guide',  ico: 'start',    label: 'Guide', sub: 'What every tab is for, and where it is' },
       { go: 'news',   ico: 'sparkle',  label: 'What\'s new', sub: fresh ? 'Changes you have not seen yet' : 'The latest changes' },
       { go: 'bug',    ico: 'bug',      label: 'Report a bug or suggest an improvement', sub: '' },
     ];
@@ -390,6 +390,7 @@ const CalmShell = (() => {
     switch (go) {
       case 'export': ExportMenu.open(); break;
       case 'theme':  openThemeMenu(); break;
+      case 'offline': Modal.close(); switchTab('offline'); break;
       case 'news':   WhatsNew.open(); break;
       case 'help':   Modal.close(); setDockTab('help'); break;
       case 'guide':  Modal.close(); switchTab('sitemap'); break;

@@ -3,7 +3,7 @@
 //   SensorSparks   a sparkline on each sensor row of the station editor — the
 //                  last seven days of what that row's address has sent, out of
 //                  the datastore — which opens a chart of it in a dialog, with
-//                  a door from there onto the Field Data tab.
+//                  a door from there onto Charts › Field Data.
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reaches back to core.js for state, esc, escAttr, pInt and announce; to
@@ -549,10 +549,10 @@ const SensorSparks = (function () {
           </div>
           <div id="sspk-body"></div>
           <div class="sspk-foot">
-            <span class="small txt-muted">The Field Data tab filters, inspects and exports these readings.${
+            <span class="small txt-muted">Charts › Field Data filters, inspects and exports these readings.${
               unsaved ? ' <strong class="sspk-unsaved">The editor has changes not saved yet — going there leaves them behind.</strong>' : ''}</span>
             <button type="button" class="primary" onclick="SensorSparks.toField()"
-              title="Open ${escAttr(addrLabel(addr))} on the Field Data tab over the same window">📈 Open in Field Data →</button>
+              title="Open ${escAttr(addrLabel(addr))} in Charts › Field Data over the same window">📈 Open in Field Data →</button>
           </div>
         </div>`,
     });
@@ -825,7 +825,7 @@ const SensorSparks = (function () {
 
   // ── the door ──────────────────────────────────────────────────────────────
 
-  // The same address and window on the Field Data tab. Out of full screen
+  // The same address and window in Charts › Field Data. Out of full screen
   // first and the tab switched before the picker is set, as the station
   // card's Field data → does (fieldDataFromCard, app.js): switchTab() is what
   // makes the field instance the one on screen.

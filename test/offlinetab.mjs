@@ -148,13 +148,19 @@ async function main() {
         active: state.activeTab,
         heading: (document.querySelector('#ot-page h2') || {}).textContent,
         button: !!document.querySelector('#tab-nav .tab-btn[data-tab="offline"]'),
+        bar: TABS[0].tabs.find(t => t.id === 'offline').bar,
+        banner: !!document.querySelector('#btn-offline'),
       }));
       // 🎛️ Views joined Start here after it (0062): what the bar lists is
       // set up before the work too. 🏠 Home heads the group since the looks
       // in pictures made it their front page, and 🎬 Videos (#263) sits with
       // Capabilities, the other page about the app.
-      check('📲 Offline & Install is under Start here, after the Site Map, Capabilities and Videos, and has its button in the nav',
-        nav.group === 'Start here' && J(nav.order) === J(['home', 'sitemap', 'capabilities', 'videos', 'offline', 'views']) && nav.button, J(nav));
+      // November 2026: done once per device, so out of the bar (`bar: false`)
+      // and a 📲 button in the banner instead; open, it is in the bar as the
+      // tab you are on, the way any tab a view leaves out is.
+      check('📲 Offline & Install is filed under Start here, opened from 📲 in the banner, and in the bar while it is open',
+        nav.group === 'Start here' && J(nav.order) === J(['home', 'sitemap', 'offline', 'views']) && nav.bar === false
+          && nav.banner && nav.button, J(nav));
       check('?tab=offline opens it', nav.active === 'offline' && /Offline & install/.test(nav.heading || ''), J(nav));
       const bare = await page.evaluate(() => {
         const had = state.data;

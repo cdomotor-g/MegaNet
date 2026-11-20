@@ -159,7 +159,7 @@ const Alert2 = (function () {
   //                       frame was exported (Application Layer §3.3.2)
   //
   // Same 13-bit address and 11-bit value as ABF/EIF, packed into bytes instead of
-  // async words. FORMATS.a2c on the ALERT Packets tab draws this same layout.
+  // async words. FORMATS.a2c in the Decoder's ALERT Packets view draws this same layout.
   // There is no status in it: whether a record is good is the frame's to say
   // (readPayload), and its fourth byte only says when the reading was taken.
   function decodeRecord(b, off) {
@@ -185,7 +185,7 @@ const Alert2 = (function () {
   // air, decoded it to its address and value, and kept only those two numbers
   // ("information on the original type of ALERT message is not retained").
   // Rebuilt in ALERT Binary format, the one Australian networks send (Appendix
-  // 2, Fig 5-5-1; FORMATS.abf on the ALERT Packets tab), the word was
+  // 2, Fig 5-5-1; FORMATS.abf in the Decoder's ALERT Packets view), the word was
   //
   //   byte 1   0 1 A5  A4  A3 A2 A1 A0
   //   byte 2   0 1 A11 A10 A9 A8 A7 A6
@@ -2951,7 +2951,7 @@ const Alert2 = (function () {
               exported the frame (§3.3.2), so the reading's own time is the stamp less this. Not a status — no part
               of a record says whether it is good.</li>
             <li>So address is 13 bits (0–8191) and value 11 bits (0–2047) — the same widths a legacy ALERT
-              sensor transmits, which is why the ALERT Packets tab decodes one of these records to the same
+              sensor transmits, which is why the Decoder's ALERT Packets view decodes one of these records to the same
               id and value under its <b>A2C</b> layout. A frame carries one reading or many, repeated to the end
               of the payload, usually the rainfall, water level and battery of one field station.</li>
             <li><b>Who heard it.</b> The four bytes are what the <b>concentrator</b> — the ALERT2 station the frame names as
@@ -3618,7 +3618,7 @@ const Alert2 = (function () {
     document.removeEventListener('drop', dropFile);
     document.addEventListener('dragover', dragOver);
     document.addEventListener('drop', dropFile);
-    // Station names come from the same two sources as the ALERT Packets tab, and
+    // Station names come from the same two sources as the Decoder's ALERT Packets view, and
     // the national address file is the fallback for addresses MegaNet has never
     // seen. It loads once for both tabs.
     Packets.loadStationsFile();

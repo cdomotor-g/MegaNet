@@ -22,7 +22,7 @@
 // It is also the question asked most often about a picture of this network.
 // "Which repeaters are on 152.4?" is answered by looking; so is "does this
 // field station's carrier run on the same channel as the one next to it", which
-// is the co-channel question the RF Environment tab exists for, one glance
+// is the co-channel question Nearby Transmitters exists for, one glance
 // earlier.
 //
 // ── One colouring at a time ──────────────────────────────────────────────────

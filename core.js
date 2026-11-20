@@ -39,6 +39,18 @@
 // twenty tabs is past the point where a rail of icons — or a column of labels
 // — is something you scan.
 //
+// ── November 2026: 62 tabs became 42, in 10 groups ───────────────────────────
+//
+// The owner asked for the tools to be rationalised. Where several tabs did one
+// job between them, they are one tab now and each old tab is a **view** of it:
+// listed in its host's `parts`, keeping its own id, address, HELP entry, Site
+// Map card and teardown, and reached through the row of view buttons across
+// the top of the page (viewStripHtml, app.js) rather than through the bar. The
+// find box and Ctrl+K score a view on its own words and open it. Offline &
+// Install and Views are `bar: false`: reached from the banner's 📲 and the
+// Theme & layout menu. The history below is how the groups came to be before
+// that; the groups now are the ten in TABS.
+//
 // ── The grouping, and where it comes from (#108) ─────────────────────────────
 //
 // Three groups held these tabs until #108, and one of the three held eight of
@@ -91,7 +103,7 @@
 // listing of the named radio-network clusters and the catchment vocabulary, and
 // every number on it is already on a tab somebody is on anyway: the network
 // each station belongs to is on its card and in the Stations filter pane, and
-// the ticks that scope an export now live on the Export tab's own rail. A tab
+// the ticks that scope an export now live on the Radio Mobile Files tab's own rail. A tab
 // that repeats what is elsewhere still costs a row in the nav and a stop for
 // every keyboard user walking it, so it was removed rather than kept for
 // symmetry. `networks` as a *word* is not gone — it is a find term on the
@@ -132,336 +144,246 @@
 // "decode": a lesson that tied with the tab a probe in nav.mjs or palette.mjs
 // is asking for must not be the answer.
 const TABS = [
+  // Before the work. 🗂️ Guide is the Site Map, 📇 Capabilities and 🎬 Videos
+  // as one tab with three views: all three answer "what can Flood-Net do, and
+  // where is it?" (November 2026). 📲 Offline & Install and 🎛️ Views are done
+  // once per device rather than visited, so they are out of the bar
+  // (`bar: false`): Offline & Install is the 📲 button in the banner, and Views
+  // is opened from the Theme & layout menu. Both are still tabs — an address,
+  // the find box, Ctrl+K and the Site Map all reach them.
   { group: 'Start here', tabs: [
-    // 🏠 Home (home.js) heads the first group because it is the front page of
-    // the three looks drawn in pictures (looks.js): the tools used most as big
-    // tiles, how the network is right now, and every other tab under them. A
-    // tab like any other in Calm and Classic. Its find words are what somebody
-    // looking for a front page types — never "screen", so that "home screen"
-    // still finds Offline & Install (nav.mjs).
-    { id: 'home',       label: 'Home',                   icon: '🏠',
+    { id: 'home', label: 'Home', icon: '🏠',
       find: 'front page start launcher dashboard tiles shortcuts most used everything all tools at a glance network now overview' },
-    { id: 'sitemap',    label: 'Site Map',               icon: '🗂️',
-      find: 'guide overview tour index directory contents orientation beginner introduction getting started help what does each every tab do explained' },
-    // 📇 Capabilities (capabilities.js), straight after the Site Map: the
-    // Site Map is a card per tab, this is a line per thing the app can do —
-    // the layers, the outside sources, the tools buried inside a tab — each
-    // naming where it is done, with a box to search them. Its find words are
-    // what somebody asking "can it do…" types, and none the Site Map, Home or
-    // Offline & Install answer to ("guide", "help", "everything", "install"),
-    // nor any nav.mjs's probes hold for other tabs ("maps", "view", "network").
-    { id: 'capabilities', label: 'Capabilities',         icon: '📇',
-      find: 'capability capabilities features feature list functions functionality abilities possible catalogue catalog inventory layers overlays outside external sources datasets feeds admin only' },
-    // 🎬 Videos (explainers.js, EPIC #262): short drawn videos about
-    // Flood-Net itself, said by the Droggies — a welcome for a first look or a
-    // meeting room, and how-tos that each show one job. Beside Capabilities,
-    // the other page about the app rather than the stations. Its find words
-    // are what somebody wanting to be shown types; none that the Site Map
-    // answers to ("guide", "tour", "introduction", "help"), and no "how" or
-    // "to", which would tie it with every tab a question starts with.
-    { id: 'videos',     label: 'Videos',                 icon: '🎬',
-      find: 'video videos watch welcome tutorial tutorials explainer explainers walkthrough demo demonstration presentation meeting room projector clicker full screen animation animated' },
-    { id: 'offline',    label: 'Offline & Install',      icon: '📲',
+    { id: 'sitemap', label: 'Guide', icon: '🗂️', view: 'Site Map',
+      find: 'guide overview tour index directory contents orientation beginner introduction getting started help what does each every tab do explained site map',
+      parts: [
+        { id: 'capabilities', label: 'Capabilities', icon: '📇', view: 'Capabilities',
+          find: 'capability capabilities features feature list functions functionality abilities possible catalogue catalog inventory layers overlays outside external sources datasets feeds admin only' },
+        { id: 'videos', label: 'Videos', icon: '🎬', view: 'Videos',
+          find: 'video videos watch welcome tutorial tutorials explainer explainers walkthrough demo demonstration presentation meeting room projector clicker full screen animation animated' }
+      ] },
+    { id: 'offline', label: 'Offline & Install', icon: '📲', bar: false,
       find: 'offline no signal no reception flight mode airplane mode install app add to home screen homescreen icon pwa progressive web app phone tablet saved cache ready set up device update new version' },
-    { id: 'views',      label: 'Views',                  icon: '🎛️',
+    { id: 'views', label: 'Views', icon: '🎛️', bar: false,
       find: 'layout customise customize personalise personalize arrange rearrange reorder order hide hidden show sidebar left bar menu preset presets simple field fewer declutter favourites favorites my own group groups rename drag drop choose pick switch' },
   ] },
+  // The stations themselves and what each repeater passes on. ⏳ Repeater
+  // Delays is a view of 🔁 Repeaters: a delay is a setting of a repeater.
   { group: 'Stations & networks', tabs: [
-    { id: 'stations',   label: 'Stations',               icon: '📍',
+    { id: 'stations', label: 'Stations', icon: '📍',
       find: 'sites list map filters networks repeaters draw measure terrain elevation profile photos editor digital twin 3d lidar blender glb site features ancillary pits outlets geojson relocate relocation move station new site best repeater which repeater better path rain gauge exposure canopy trees buildings shed latency data age stale freshness message animation pulse flash landing live snr signal strength noise signal bars' },
-    { id: 'passranges', label: 'ALERT IDs',              icon: '🔗',
+    { id: 'passranges', label: 'ALERT IDs', icon: '🔗',
       find: 'pass ranges pass range alert id ids alertids hop chain orphans gaps alertid address window coverage base allocate allocation reserve set aside spare unused free addresses fullness full blocks address space grid new id' },
-    // 🔁 Repeaters (repeaters.js) beside ALERT IDs, whose By Repeater card it
-    // grew out of (October 2026): every repeater, a map of the links between
-    // them, and a table of each one's pass ranges set against what it is heard
-    // relaying, its carrier and the stations it passes on. Its find words are
-    // the questions asked of one repeater — "what does it relay", "which
-    // stations does it carry", "its neighbours" — and never "carrier",
-    // "offset" or "fingerprint", which RF Environment and Bit-Flip Sources
-    // answer to and this earlier group would take from them.
-    { id: 'repeaters',  label: 'Repeaters',              icon: '🔁',
-      find: 'repeater repeaters by repeater relay relays relaying really heard on air links between neighbours neighbors which stations carries carried passes on station number stn sort expand' },
-    // ⏳ Repeater Delays (delay-plan.js, repeater-delays.js) sits beside Pass
-    // Ranges: the other setting programmed into every repeater, and the one
-    // that decides whether two repeaters passing the same address send their
-    // copies on top of each other. Its find words are what somebody chasing
-    // collisions types — "stagger", "simultaneous", "timing" — and never
-    // "collision" or "bit flip" alone, which the lessons and Bit-Flip Sources
-    // answer to and an earlier group would take from them.
-    { id: 'repdelays',  label: 'Repeater Delays',        icon: '⏳',
-      find: 'repeater delay delays stagger staggered staggering wait milliseconds ms timing simultaneous same time retransmit re-transmit relay copies on top overlap plan programme program setting settings recommend recommended suggestion' },
-    { id: 'export',     label: 'Export',                 icon: '📤',
-      find: 'csv radio mobile networks clusters download stations.json backup escape hatch data source' },
-    { id: 'lookaround', label: 'Look Around',            icon: '🔭',
-      find: 'ar augmented reality station finder which way direction directions nearby near me around bearing distance compass phone hold up turn facing horizon overlay sighting where is find stations' },
+    { id: 'repeaters', label: 'Repeaters', icon: '🔁', view: 'Repeaters',
+      find: 'repeater repeaters by repeater relay relays relaying really heard on air links between neighbours neighbors which stations carries carried passes on station number stn sort expand',
+      parts: [
+        { id: 'repdelays', label: 'Repeater Delays', icon: '⏳', view: 'Delays',
+          find: 'repeater delay delays stagger staggered staggering wait milliseconds ms timing simultaneous same time retransmit re-transmit relay copies on top overlap plan programme program setting settings recommend recommended suggestion' }
+      ] },
   ] },
-  // ── Printed maps: Stations & networks, cut in two ──────────────────────────
-  // Stations & networks held six — nav.mjs's ceiling — until ⏳ Repeater
-  // Delays made it seven. The cut follows HELP[id].related: Pass Ranges and
-  // Export name each other, and the new tab is a repeater setting beside Pass
-  // Ranges; Radio Path Maps names only Stations, and the Map Generator names
-  // the Radio Path Maps — the two tabs about map sheets on paper, the bundled
-  // radio-path PDFs and the ones made to order. Filed straight after, so a
-  // find word they share with a later group still goes to them.
-  { group: 'Printed maps', tabs: [
-    { id: 'maps',       label: 'Radio Path Maps',        icon: '🗺️',
+  // The network on paper and in files: the bundled radio-path PDFs, sheets
+  // made to order, and the CSVs Radio Mobile reads. 📤 was "Export", which the
+  // banner's ⤓ Export button (a different thing) also says; "export" stays a
+  // find word so the old name still lands here.
+  { group: 'Maps & files', tabs: [
+    { id: 'maps', label: 'Radio Path Maps', icon: '🗺️',
       find: 'network maps navigator pdf printed sheets radio path basin catchment region queensland' },
-    { id: 'mapgen',     label: 'Map Generator',          icon: '🖨️',
+    { id: 'mapgen', label: 'Map Generator', icon: '🖨️',
       find: 'print paper a4 svg laser cut engrave k40 whisperer contour elevation layers billet plate title block scale bar graticule sheet' },
+    { id: 'export', label: 'Radio Mobile Files', icon: '📤',
+      find: 'csv radio mobile networks clusters download stations.json backup escape hatch data source export' },
   ] },
-  { group: 'Interference', tabs: [
-    { id: 'rf',         label: 'RF Environment',         icon: '📶',
-      find: 'acma licensed transmitters spectrum frequency carrier register nearby candidates strip plot' },
-    { id: 'rfchanges',  label: 'RF Changes',             icon: '📈',
-      find: 'acma register history new licences appeared changed timeline diff when' },
-    { id: 'workbench',  label: 'Interference Workbench', icon: '🔬',
+  // Interference and ALERT were one subject in two groups: what is on the
+  // air, who is stepping on it, and what was actually sent. Merged tabs, each
+  // one bar entry with views across its top: 📶 the ACMA register now and
+  // what changed in it; 📡 every burst traced to its sender — on a map, as
+  // routes, and as the corrupted copies put down to a repeater; 🔀 one
+  // address's bit-flip variants and the whole network's ghosting; 📦 one
+  // decoder for ALERT, ERT-A2 serial and HFEM, with a box that works out which
+  // a pasted message is.
+  { group: 'Radio & signals', tabs: [
+    { id: 'rf', label: 'Nearby Transmitters', icon: '📶', view: 'RF Environment',
+      find: 'acma licensed transmitters spectrum frequency carrier register nearby candidates strip plot rf environment',
+      parts: [
+        { id: 'rfchanges', label: 'RF Changes', icon: '📈', view: 'RF Changes',
+          find: 'acma register history new licences appeared changed timeline diff when' }
+      ] },
+    { id: 'workbench', label: 'Interference Workbench', icon: '🔬',
       find: 'case hypotheses scoring evidence checklist acma complaint site visit share' },
-    { id: 'reception',  label: 'Reception Map',          icon: '📡',
-      find: 'drive survey site survey candidate repeater base station site signal strength rssi coverage gps vehicle bad packets bit flip repeater triangulate where heard receptions' },
-    { id: 'flipsources', label: 'Bit-Flip Sources',       icon: '🔎',
-      find: 'bit flip source sources corrupted corruption repeater suspect carrier fingerprint drift who culprit blame interference rate' },
-    // 🧪 Bit Bench (bit-bench.js) is the sixth, and the group's last room: a
-    // bench to try what each cause of corrupted bits does to a frame, filed
-    // beside Bit-Flip Sources, which finds who is doing it in the network's
-    // own data. Its find words are the effects people name ("intermodulation",
-    // "crystal drift", "bit shifting") and the arithmetic ("binary", "hex",
-    // "two's complement") — never "decoder", "packet" or "signal", which
-    // nav.mjs's probes hold for the tabs that answer them, nor "capture",
-    // "paste" or "stuck", which the Field Camera, HFEM Messages and Station
-    // Health answer to and an earlier group would take from them.
-    { id: 'bitbench',   label: 'Bit Bench',              icon: '🧪',
-      find: 'binary decimal hex hexadecimal bits bit shift shifting shifted flipping systematic sandbox simulate experiment impulse lightning electric fence reflections multipath fading echo collision intermodulation intermod crystal ppm pll key-up keyup clock baud uart tone twist pre-emphasis wiring inverted reversed gray xor complement whodunnit quiz mystery pairs' },
-  ] },
-  { group: 'ALERT', tabs: [
-    { id: 'bitflipper', label: 'Bit Flipper',            icon: '🔀',
-      find: 'flip alert address addresses ghosting variants corruption decimal cross-reference' },
-    { id: 'network',    label: 'Ghosting Graph',         icon: '🧬',
-      find: 'network view knowledge graph force layout nodes edges addresses collisions' },
-    { id: 'packets',    label: 'ALERT Packets',          icon: '📦',
-      find: 'decoder decode encoder encode erts message frame crc check bits hex payload spec' },
-    { id: 'alert2',     label: 'ALERT2 / ERT-A2',        icon: '🛰️',
-      find: 'erta2 elpro decode ports capture sample putty log watch follow drop' },
-    { id: 'hfem',       label: 'HFEM Messages',          icon: '🌊',
-      find: 'hydro field event message bom bureau meteorology decode paste site sensor scheme timestamp maintenance builder logger' },
-    { id: 'serial',     label: 'Serial Monitor',         icon: '🔌',     needs: 'serial',
+    { id: 'reception', label: 'Signal Sources', icon: '📡', view: 'Reception Map',
+      find: 'where signals come from reception map drive survey site survey candidate repeater base station site signal strength rssi coverage gps vehicle bad packets bit flip repeater triangulate where heard receptions',
+      parts: [
+        { id: 'signalroutes', label: 'Signal Routes', icon: '🛤️', view: 'Signal Routes',
+          find: 'routes route came in from where which repeater relayed relay relays carrier offset fingerprint heard via direct hop hops path paths pass range record off record unexplained copies concentrator concentration alert2 legacy binary iflows enhanced ascii format formats protocol protocols sankey flow diagram' },
+        { id: 'flipsources', label: 'Bit-Flip Sources', icon: '🔎', view: 'Bit-Flip Sources',
+          find: 'bit flip source sources corrupted corruption repeater suspect carrier fingerprint drift who culprit blame interference rate' }
+      ] },
+    { id: 'bitflipper', label: 'Bit Flipper', icon: '🔀', view: 'Bit Flipper',
+      find: 'flip alert address addresses ghosting variants corruption decimal cross-reference',
+      parts: [
+        { id: 'network', label: 'Ghosting Graph', icon: '🧬', view: 'Ghosting Graph',
+          find: 'network view knowledge graph force layout nodes edges addresses collisions' }
+      ] },
+    { id: 'packets', label: 'Decoder', icon: '📦', view: 'ALERT Packets',
+      find: 'alert packets decoder decode encoder encode erts message frame crc check bits hex payload spec paste anything auto detect which format',
+      parts: [
+        { id: 'alert2', label: 'ALERT2 / ERT-A2', icon: '🛰️', view: 'ALERT2 / ERT-A2',
+          find: 'erta2 elpro decode ports capture sample putty log watch follow drop' },
+        { id: 'hfem', label: 'HFEM Messages', icon: '🌊', view: 'HFEM Messages',
+          find: 'hydro field event message bom bureau meteorology decode paste site sensor scheme timestamp maintenance builder logger' }
+      ] },
+    { id: 'serial', label: 'Serial Monitor', icon: '🔌', needs: 'serial',
       find: 'com port web serial live stream terminal baud log quansheng radio uv-k5 rtl-sdr sdr usb dongle spectrum waterfall off air putty log file follow tail erta2 ert-a2 elpro alert2' },
   ] },
+  // The readings themselves. 📊 Charts is Plots and Field Data — the same
+  // chart and filter, fed from an ARRO export or from Flood-Net's own data —
+  // and 🚀 the ARRO Launcher, kept whole as a view: its pasted-URL box is how
+  // somebody knocked out of ARRO's administrator mode gets back to the page
+  // they were on. 📻 was "Telemetry", which said nothing about what it charts.
   { group: 'Data', tabs: [
-    { id: 'arro',       label: 'ARRO Launcher',          icon: '🚀',
-      find: 'contrail telemetry open station site raw id jump launch' },
-    { id: 'arrodata',   label: 'Plots',                  icon: '📊',
-      find: 'arro data csv telemetry file chart plot graph sensor continuity 3-5-7 filter noise drop demo draw line function fit curve regression trend ruler slope' },
-    { id: 'field',      label: 'Field Data',             icon: '🌡️',
-      find: 'readings telemetry datastore sensors chart plot window rainfall level quality' },
-    { id: 'msglog',     label: 'Message Log',            icon: '📨',
+    { id: 'arrodata', label: 'Charts', icon: '📊', view: 'ARRO export',
+      find: 'arro data csv telemetry file chart plot graph sensor continuity 3-5-7 filter noise drop demo draw line function fit curve regression trend ruler slope plots',
+      parts: [
+        { id: 'field', label: 'Field Data', icon: '🌡️', view: 'Flood-Net readings',
+          find: 'readings telemetry datastore sensors chart plot window rainfall level quality' },
+        { id: 'arro', label: 'ARRO Launcher', icon: '🚀', view: 'Open in ARRO',
+          find: 'contrail telemetry open station site raw id jump launch arro admin administrator mode paste url link back' }
+      ] },
+    { id: 'msglog', label: 'Message Log', icon: '📨',
       find: 'messages telemetry arrivals incoming ingest raw log fade margin ingress base pathway follow live decode calibration value volts battery converted' },
-    // 📻 Telemetry (telemetry.js) is the fifth: the readings' traffic as a
-    // whole — every named base station's tallies, charted. Its find words are
-    // the ones nobody else answers to; "telemetry" itself is shared with the
-    // four above, and the label wins it.
-    { id: 'telemetry',  label: 'Telemetry',              icon: '📻',
-      find: 'traffic bursts quality decoded undecoded failed broken frames shadows copies duplicates alert2 versus compare comparison channels frequencies heatmap chart builder pivot layered breakdown hourly rhythm weekly links edge weakest hears coverage redundancy noise snr' },
+    { id: 'telemetry', label: 'Base Station Traffic', icon: '📻',
+      find: 'traffic bursts quality decoded undecoded failed broken frames shadows copies duplicates alert2 versus compare comparison channels frequencies heatmap chart builder pivot layered breakdown hourly rhythm weekly links edge weakest hears coverage redundancy noise snr telemetry' },
   ] },
-  // ── Network health: Data, cut in two ───────────────────────────────────────
-  // Data held six — the readings, and what they say about the network — until
-  // 🕵️ Investigations would have made it seven, past nav.mjs's ceiling. The cut
-  // follows the job: the four above are the readings themselves, charted and
-  // logged; these are judgements on them — each station's health, the
-  // repeaters ranked by what is wrong with each, the write-ups of strange data
-  // and what was behind it, and ⚖️ how all of those are judged — and then ✅
-  // what is being done about them. Filed straight after Data, so Station
-  // Health keeps its place in the order and a find word it shares with a
-  // later group still goes to it.
+  // What the readings say about the network. 🖥️ Base Stations moved here from
+  // Admin: "is it checking in?" is a health question (it is still for
+  // administrators; its own page says so). ⚖️ Methodology is a view of the
+  // write-ups that lean on it, "How it is judged" in their strip — a seventh tab in the lessons group would have
+  // broken the six-a-group ceiling nav.mjs holds.
   { group: 'Network health', tabs: [
-    { id: 'health',     label: 'Station Health',         icon: '🚦',
+    { id: 'health', label: 'Station Health', icon: '🚦',
       find: 'monitoring maintenance o&m faults alarms battery trend voltage solar charge missed checks check signals timed reports silent quiet offline outage schedule repeater down receiver stopped base station network health data quality corrupted copies bit flips ghosts rain gauge blocked tipped level stuck flatline register unknown address agent ai claude briefing triage network bulletin daily weekly summary animation news droggies presenter' },
-    // 🗼 Backbone (backbone.js), headed "State of the backbone", is the second,
-    // beside Station Health, whose findings it ranks:
-    // the repeaters ranked by what has gone wrong with each over a period —
-    // off air, corrupted relays, their signal, a carrier off the fleet, power,
-    // pass ranges against the air. Its find words are the questions a meeting
-    // asks of it ("worst repeaters", "faulty", "ranked") and nothing another
-    // tab answers to: a word it shared with a later group's tab ("power",
-    // "location", "carrier offset", "relays") would now win that tab's tie,
-    // since the earlier group takes it. Never "network", "signal" or "the",
-    // which nav.mjs holds for other tabs.
-    { id: 'backbone',   label: 'Backbone',               icon: '🗼',
+    { id: 'backbone', label: 'Backbone', icon: '🗼',
       find: 'state backbone repeaters faulty worst ranked ranking rank priority priorities criticality critical issues problems relaying corrupting off air dropouts dropping out meeting monthly fortnight' },
-    // 🕵️ Investigations (investigations.js) is the third: the write-ups in
-    // investigations/, read from that folder's own list. Its find words are
-    // what somebody holding a strange chart types — "why", "weird", "what
-    // happened", "write-up" — and never "report" or "review", which Station
-    // Health's timed reports and Admin's Network Review answer to.
-    { id: 'investigations', label: 'Investigations',     icon: '🕵️',
-      find: 'investigation investigations write-up write-ups writeup writeups case study studies why weird strange odd unexplained explained explanation root cause what happened what caused findings post-mortem postmortem' },
-    // ⚖️ Methodology (methodology.js) is the fourth, and the group's last: how
-    // the three before it decide — the data they read, and each rule with its
-    // numbers, bit flips most of all. Its find words are the questions put to a
-    // finding ("how do you know", "proof", "thresholds"), never "bit" or
-    // "flips", which Station Health, earlier in the group, answers to.
-    { id: 'methodology', label: 'Methodology',           icon: '⚖️',
-      find: 'methodology methodologies method methods how do we know how does it decide proof prove evidence rules criteria thresholds assumptions attribution attribute fingerprint approach caveats limitations blind spots documentation explainer' },
-    // ✅ Tasks (tasks.js, 0095) is the fifth: the jobs handed to a team, each
-    // at a station, and the teams themselves — what a finding, an inspection
-    // or the SoRT forum leaves to be done. Listed only to administrators and
-    // the people on a team (`who: 'tasks'`). Its find words are the jobs and
-    // the people ("job", "assign", "roster", "sort forum") — never "council",
-    // which nav.mjs holds for Site Maintenance (whose own form is called
-    // Council Maintenance Tasks, and keeps "tasks" among its words: the label
-    // wins the tie for this tab), nor "the", "network" or "signal".
-    { id: 'tasks',      label: 'Tasks',                  icon: '✅',     who: 'tasks',
+    { id: 'basestations', label: 'Base Stations', icon: '🖥️',
+      find: 'ingest points receivers fleet devices heartbeat check-in checking in uptime temperature under-voltage uplink queue remote manage restart reboot update upgrade release log ssh keys login maintenance team public key' },
+    { id: 'investigations', label: 'Investigations', icon: '🕵️', view: 'Write-ups',
+      find: 'investigation investigations write-up write-ups writeup writeups case study studies why weird strange odd unexplained explained explanation root cause what happened what caused findings post-mortem postmortem',
+      parts: [
+        { id: 'methodology', label: 'Methodology', icon: '⚖️', view: 'How it is judged',
+          find: 'methodology methodologies method methods how do we know how does it decide proof prove evidence rules criteria thresholds assumptions attribution attribute fingerprint approach caveats limitations blind spots documentation explainer methodology' }
+      ] },
+  ] },
+  // Site visits and surveying, one group: the stations around you (a list,
+  // or the phone held up), the jobs handed to a team, the forms and their
+  // record, the photos taken and filed, and the levels.
+  { group: 'Field work', tabs: [
+    { id: 'nearby', label: 'Near Me', icon: '📌', view: 'Nearby',
+      find: 'nearby nearest closest close by around me how far distance which station am i at gps position location list sorted next site visit walk drive arrive start inspection directions',
+      parts: [
+        { id: 'lookaround', label: 'Look Around', icon: '🔭', view: 'Look Around',
+          find: 'ar augmented reality station finder which way direction directions nearby near me around bearing distance compass phone hold up turn facing horizon overlay sighting where is find stations' }
+      ] },
+    { id: 'tasks', label: 'Tasks', icon: '✅', who: 'tasks',
       find: 'task todo to-do job jobs work order orders assign assigned assignment hand out handout handed over follow up follow-up actions action items outstanding backlog due overdue team teams roster crew owner owners members sort forum scope builder' },
-  ] },
-  { group: 'Site visits', tabs: [
-    // 📌 Nearby (nearby.js) heads the group because it is where a visit
-    // starts: which station is this, and which is next. Its find words are
-    // the questions somebody standing at a gate asks — never "nearby" alone,
-    // which Look Around and RF Environment already answer to, and a tie it
-    // wins on its label rather than on a word the other two were given.
-    { id: 'nearby',     label: 'Nearby',                 icon: '📌',
-      find: 'nearest closest close by around me how far distance which station am i at gps position location list sorted next site visit walk drive arrive start inspection directions' },
-    { id: 'inspections', label: 'Inspections',           icon: '🩺',
-      find: 'form paper sheet checklist calibration draft photo configuration' },
-    { id: 'maintenance', label: 'Site Maintenance',      icon: '🧰',
-      find: 'council tasks form condition owner contact vegetation access' },
-    { id: 'history',    label: 'Inspection History',     icon: '📋',
-      find: 'past records read back print a4 csv timeline previous visits' },
-    { id: 'camera',     label: 'Field Camera',           icon: '📸',
-      find: 'take photo picture shoot snap capture stamp stamped watermark solocator overlay gps coordinates position compass heading bearing accuracy elevation altitude height geotag timestamp station name suggest upload offline no signal phone' },
-    { id: 'photos',     label: 'Field Photos',           icon: '📷',
-      find: 'pictures camera gps exif ocr overlay solocator geotag position heading upload bulk folder dropbox carousel unplaced' },
-  ] },
-  // A survey is a site visit too, but its three tabs would have made that
-  // group eight; filed on their own, the sheet, the level's check and the
-  // refresher sit together. The refresher stays here rather than with the
-  // lessons in Field training, just below: the sheet's own notes open it
-  // mid-survey.
-  { group: 'Surveying', tabs: [
-    { id: 'levels',     label: 'Level Survey',           icon: '📏',
+    { id: 'inspections', label: 'Inspections', icon: '🩺', view: 'New inspection',
+      find: 'form paper sheet checklist calibration draft photo configuration',
+      parts: [
+        { id: 'maintenance', label: 'Site Maintenance', icon: '🧰', view: 'Council maintenance',
+          find: 'council tasks form condition owner contact vegetation access' },
+        { id: 'history', label: 'Inspection History', icon: '📋', view: 'Past records',
+          find: 'past records read back print a4 csv timeline previous visits' }
+      ] },
+    { id: 'photos', label: 'Photos', icon: '📷', view: 'Library',
+      find: 'pictures camera gps exif ocr overlay solocator geotag position heading upload bulk folder dropbox carousel unplaced field photos',
+      parts: [
+        { id: 'camera', label: 'Field Camera', icon: '📸', view: 'Take a photo',
+          find: 'take photo picture shoot snap capture stamp stamped watermark solocator overlay gps coordinates position compass heading bearing accuracy elevation altitude height geotag timestamp station name suggest upload offline no signal phone' }
+      ] },
+    { id: 'levels', label: 'Level Survey', icon: '📏',
       find: 'levelling leveling level run height survey surveying rise and fall booking level book benchmark bm gauge zero datum ahd lgh assumed reduced level rl change point backsight foresight intermediate staff gauge boards orifice ctr cease to flow ctf misclose closure water check logger offset digital level lcd read reading ocr serial workbook excel xlsx' },
-    { id: 'twopeg',     label: 'Two-Peg Test',           icon: '🎯',
+    { id: 'twopeg', label: 'Two-Peg Test', icon: '🎯',
       find: 'two peg 2-peg collimation line of sight level check instrument error tilt pegs adjust adjustment' },
-    { id: 'surveyguide', label: 'How to Survey',         icon: '📖',
-      find: 'how to reference refresher instructions procedure steps levelling reminder booking rise fall datum benchmark two peg' },
   ] },
-  // Things to learn rather than tools to work with: read before the work, or
-  // beside it when something misbehaves. Filed after the work groups and
-  // before Admin, so a lesson's find words lose a tie to the tab a job is
-  // done on.
-  //
-  // ── Field training and the Knowledge base: one group of lessons, cut in two ─
-  // The lessons were one group of six until ⚡ Bit Errors made it seven, past
-  // nav.mjs's ceiling. HELP[id].related says where it splits, as it did for
-  // the work groups (#108): Radio Propagation and Bit Errors name radio tabs —
-  // the Bit Bench, the Bit Flipper, Bit-Flip Sources, the Reception Map — and
-  // each other; the five re-tellings of Mallee HydroTech's open training tools
-  // name the survey sheet, the two-peg test, the inspection forms and each
-  // other; nothing crosses between the two. So the five are Field training,
-  // straight after the Surveying tools they practise for, credited on each tab
-  // (knowledge-base.js, whose name is older than the split); and the Knowledge
-  // base is Flood-Net's own lessons in how a reading travels and how it goes
-  // wrong — where the Bit Bench's "in depth" buttons send people.
-  { group: 'Field training', tabs: [
-    { id: 'kbstaff',    label: 'Staff Simulator',        icon: '🪧',
-      find: 'staff reading levelling staff e staff e pattern crosshair central hair stadia hairs sight length dumpy heat haze shimmer wind gusts rocking rock plumb eyepiece reticle focus drill millimetre simulator' },
-    { id: 'kblogbook',  label: 'Survey Logbook',         icon: '📓',
-      find: 'logbook level book field book booking practice backsight foresight intermediate height of instrument hpc reduced level change point misclose closure arithmetic check cross-section cross section chainage weir recover missing readings' },
-    { id: 'kblifecycle', label: 'Site Lifecycle',        icon: '♻️',
-      find: 'lifecycle site operations routine visit visit priority triage hydrometric gauging rating decommissioning decommission site selection arrival readings departure readings safety assessment risk controls flood operations high flow adcp bubbler dissolved oxygen tipping bucket rain gauge shaft encoder workflow flowchart escalate' },
-    { id: 'kblevel',    label: 'Levelling Day',          icon: '🏞️',
-      find: 'day hydrographer levelling game walkthrough foot screws bubble e-face barcode bm01 weir cross-section close loop height of collimation sdl50 practice day policy tolerance peg spacing' },
-    { id: 'kbriver',    label: 'River Visit Day',        icon: '🛶',
-      find: 'river site visit routine visit hydrographer staff gauge gauge plate gauge board logger offset plate correction raw head gco bubbler hs40 sensor exchange calibration certificate gauging adcp adv flowtracker rating control debris departure arrival spot check discharge' },
-  ] },
-  { group: 'Knowledge base', tabs: [
-    { id: 'propagation', label: 'Radio Propagation',     icon: '🎓',
+  // Things to learn rather than tools to work with, filed after the work
+  // groups so a lesson's find words lose a tie to the tab a job is done on.
+  // 🧪 Bit Faults is the bench and the lesson on the same fourteen faults.
+  { group: 'Learn: radio & equipment', tabs: [
+    { id: 'propagation', label: 'Radio Propagation', icon: '🎓',
       find: 'learn learning lesson teach tutorial education educational explainer course training basics physics how radio works waves wavefront rf propagation vhf uhf 150 mhz 151.5 wavelength frequency fresnel zone line of sight los multipath echo echoes reflection reflections bounce diffraction bending shadow hills ridge buildings silos trees foliage forest land cover fading null interference constructive destructive phase phasor collision collisions capture effect bit flip flipped bits ghost repeater delay delays timing aloha store and forward simulation 3d three dimensional animation animated earth curvature bulge horizon fade margin attenuator step attenuator path margin test steps decibel decibels dbm watts budget transmit power antenna gain unity collinear yagi dbd dbi' },
-    // ⚡ Bit Errors (bit-errors.js): the lesson behind the Bit Bench. Its find
-    // words are the faults and the words for diagnosing them; like Radio
-    // Propagation's, none starts with "the", and none is "signal", "mobile",
-    // "network", "mount", "decode" or "guide", which nav.mjs's probes hold for
-    // other tabs.
-    { id: 'biterrors',  label: 'Bit Errors',             icon: '⚡',
-      find: 'bit errors error corrupted corrupt readings why wrong ghost ghosts cause causes symptom symptoms fingerprint diagnose diagnosis troubleshoot troubleshooting fault faults noise snr ber impulse lightning electric fence reflections multipath fading collision collisions capture aloha intermodulation intermod rusty bolt crystal ppm tcxo drift temperature pll lock key-up keyup vco clock baud uart stop bit twist pre-emphasis de-emphasis stuck wiring inverted reversed gray code crc rollover counter wrap learn lesson' },
-    // 📟 SWR Meter (swr-model.js, swr-meter.js): the through-line power and
-    // SWR meters in the field kit — hooking one up, what it measures and
-    // what its readings mean at a site, the three meters drawn and worked.
-    // A lesson and a field check at once; filed here because Site visits is
-    // full, and offered in the Field view beside the inspection form, whose
-    // Antenna Tests open it. Its find words are the meters by name, what is
-    // read off them and the faults they find — never "signal", "mobile",
-    // "network", "mount", "port", "guide", "install" or "theme", which
-    // nav.mjs's and palette.mjs's probes hold for other tabs.
-    { id: 'swr',        label: 'SWR Meter',              icon: '📟',
+    { id: 'bitbench', label: 'Bit Faults', icon: '🧪', view: 'Bit Bench',
+      find: 'binary decimal hex hexadecimal bits bit shift shifting shifted flipping systematic sandbox simulate experiment impulse lightning electric fence reflections multipath fading echo collision intermodulation intermod crystal ppm pll key-up keyup clock baud uart tone twist pre-emphasis wiring inverted reversed gray xor complement whodunnit quiz mystery pairs bit bench',
+      parts: [
+        { id: 'biterrors', label: 'Bit Errors', icon: '⚡', view: 'Bit Errors',
+          find: 'bit errors error corrupted corrupt readings why wrong ghost ghosts cause causes symptom symptoms fingerprint diagnose diagnosis troubleshoot troubleshooting fault faults noise snr ber impulse lightning electric fence reflections multipath fading collision collisions capture aloha intermodulation intermod rusty bolt crystal ppm tcxo drift temperature pll lock key-up keyup vco clock baud uart stop bit twist pre-emphasis de-emphasis stuck wiring inverted reversed gray code crc rollover counter wrap learn lesson' }
+      ] },
+    { id: 'swr', label: 'SWR Meter', icon: '📟',
       find: 'swr vswr standing wave ratio power meter watt meter wattmeter watts forward reflected reverse fwd ref rev return loss mismatch reflection coefficient gamma antenna test antenna tests feeder coax coaxial cable lmr-400 rg-58 rg-213 heliax connector connectors n-type so-239 pl-259 dummy load surecom sw-102 sw102 moonraker swr-400 swr400 avair diamond comm-connect 3030 through-line directional coupler tx ant input load calibrate cal knob needle bursts peak hold water ingress loose jumper adaptor low power decibel dbm fade margin' },
-    // 🪛 Pinouts (pinout-data.js, pinouts.js): the connectors a site visit
-    // meets, drawn pin by pin with where each pinout came from — a reference
-    // as much as a lesson, filed here beside the SWR Meter and offered in the
-    // Field view with it. Its find words are the connectors, the units by
-    // name and the signals on their pins — never "com", "port", "serial" or
-    // "elpro", which nav.mjs's probes hold for the Serial Monitor and the
-    // ALERT2 decoder, nor "install", "guide", "signal", "the", "bit" or
-    // "council", which nav.mjs's and palette.mjs's hold for others.
-    { id: 'pinouts',    label: 'Pinouts',                icon: '🪛',
+    { id: 'pinouts', label: 'Pinouts', icon: '🪛',
       find: 'pinout pinouts pin pins wiring wire wires colours colors connector plug socket male female gender changer db9 db-9 de9 de-9 db25 db-25 db15 da15 d-sub dsub rs232 rs-232 rs485 rs-485 null modem straight through loopback dte dce txd rxd rts cts dtr dsr dcd mil milspec mil-spec circular terminal terminals block sdi-12 sdi12 4-20 4-20ma milliamp current loop shunt resistor 250 ohm hs40 wl3100 kisters bubbler al200x al200 al205 campbell cr300 cr310 cr1000x cs i/o maxon sd125 sd-125 ritron rf320 beam 9602n iridium sbd satcom modem ert-a2 canister ve.direct victron tipping bucket ptt continuity buzz out multimeter n-type bnc tnc sma rp-sma' },
-    // 💾 ERT-A2 Simulator (a2-terminal.js, a2-firmware.js): the A2's console,
-    // simulated from PuTTY logs of real units — demos of its firmware upgrade
-    // (the host, the bootloader, the radio and its function image) and of its
-    // settings changed from the menus, with the unit drawn beside the laptop's
-    // screen, and the console itself to explore. Filed beside Pinouts and the
-    // SWR Meter, the other two things a site visit does to an A2. Its find
-    // words are the parts by name, the files, the buttons and the menus —
-    // never "elpro", "com", "port", "serial", "usb", "install", "guide",
-    // "signal", "the", "bit", "theme" or "network", which nav.mjs's and
-    // palette.mjs's probes hold for other tabs.
-    { id: 'a2firmware', label: 'ERT-A2 Simulator',       icon: '💾',
+    { id: 'a2firmware', label: 'ERT-A2 Simulator', icon: '💾',
       find: 'firmware upgrade update upgrading updating flash flashing reflash ert-a2 erta2 a2 host bootloader boot loader radio application function image fi fi6015 fi2044 v23 wrap bin release g rel g 10366 9967 10848 reset button test button d1 d2 d3 d4 progress leds stick thumb drive flash drive fat32 format tera term teraterm putty hyperterminal realterm terminal menu unit diagnostic update device firmware show firmware version version versions repeater tx lockup simulator emulator console menus unit config communication i/o setup station address login engineer technician tx frequency tx power report format unit type accumulators settings configuration interactive demo' },
-    // 🪪 Radio Licensing (licence-docs.js, licensing-words.js,
-    // kb-licensing-draw.js, kb-licensing.js): what the network's transmitters
-    // and receivers need by way of an ACMA licence — who needs one, how a
-    // point-to-multipoint licence works, the 30 km question, a gauge's and a
-    // base's limits, EIRP and antennas taken apart, the label on a
-    // transmitter — every rule quoted from its document and opened there. The
-    // sixth and last tab this group has room for (nav.mjs's ceiling). Its
-    // find words are the rules, the units and the antennas by name — never
-    // "council", "guide", "install", "signal", "network", "pdf", "port",
-    // "the", "what", "does", "each" or "do", which nav.mjs's and
-    // palette.mjs's probes hold for other tabs.
-    { id: 'licensing',  label: 'Radio Licensing',        icon: '🪪',
+    { id: 'licensing', label: 'Radio Licensing', icon: '🪪',
       find: 'licence license licensing licences licensed unlicensed acma apparatus class spectrum point to multipoint pmp point to point ptp fixed base master remote supplementary fill-in service area 30 km thirty kilometres radius planning rali fx16 fx19 determination act legislation law legal rule rules condition conditions penalty offence eirp erp isotropic dbi dbd dbm decibel decibels watt watts power limit duty cycle burst antenna antennas yagi collinear dipole whip omni omnidirectional directional gain beamwidth front to back polarisation receiver receive listen label labelling communal frequency assignment emission designator register rrl accredited transmitter transmitters' },
   ] },
-  // Last, so it sits at the foot of the nav: nobody's daily work, and the one
-  // group whose tab the header's load buttons and the Export tab's Data source
-  // and snapshot panels moved into.
-  { group: 'Admin', tabs: [
-    { id: 'admin',      label: 'Admin',                  icon: '🛠️',
+  // Practice for the fieldwork: the survey refresher and the re-tellings of
+  // Mallee HydroTech's open training tools (knowledge-base.js). The two
+  // walk-through days are 🏞️ Field Days, one tab with a scenario each.
+  { group: 'Learn: field practice', tabs: [
+    { id: 'surveyguide', label: 'How to Survey', icon: '📖',
+      find: 'how to reference refresher instructions procedure steps levelling reminder booking rise fall datum benchmark two peg' },
+    { id: 'kbstaff', label: 'Staff Simulator', icon: '🪧',
+      find: 'staff reading levelling staff e staff e pattern crosshair central hair stadia hairs sight length dumpy heat haze shimmer wind gusts rocking rock plumb eyepiece reticle focus drill millimetre simulator' },
+    { id: 'kblogbook', label: 'Survey Logbook', icon: '📓',
+      find: 'logbook level book field book booking practice backsight foresight intermediate height of instrument hpc reduced level change point misclose closure arithmetic check cross-section cross section chainage weir recover missing readings' },
+    { id: 'kblifecycle', label: 'Site Lifecycle', icon: '♻️',
+      find: 'lifecycle site operations routine visit visit priority triage hydrometric gauging rating decommissioning decommission site selection arrival readings departure readings safety assessment risk controls flood operations high flow adcp bubbler dissolved oxygen tipping bucket rain gauge shaft encoder workflow flowchart escalate' },
+    { id: 'kblevel', label: 'Field Days', icon: '🏞️', view: 'Levelling Day',
+      find: 'day hydrographer levelling game walkthrough foot screws bubble e-face barcode bm01 weir cross-section close loop height of collimation sdl50 practice day policy tolerance peg spacing levelling day',
+      parts: [
+        { id: 'kbriver', label: 'River Visit Day', icon: '🛶', view: 'River Visit Day',
+          find: 'river site visit routine visit hydrographer staff gauge gauge plate gauge board logger offset plate correction raw head gco bubbler hs40 sensor exchange calibration certificate gauging adcp adv flowtracker rating control debris departure arrival spot check discharge' }
+      ] },
+  ] },
+  // Last, at the foot of the bar: the housekeeping, and designing the network
+  // — reviewing it, planning the move to ALERT2 and its time slots.
+  { group: 'Admin & planning', tabs: [
+    { id: 'admin', label: 'Admin', icon: '🛠️',
       find: 'administration users accounts people roles privileges permissions groups allowlist editors sign in access database datastore data source schema load stations.json github file snapshot backup settings storage reset migration dashboard health stats statistics visitors analytics last seen online active size tables volume connections' },
-    { id: 'basestations', label: 'Base Stations',        icon: '🖥️',
-      find: 'ingest points receivers fleet devices heartbeat check-in checking in uptime temperature under-voltage uplink queue remote manage restart reboot update upgrade release log ssh keys login maintenance team public key' },
-    // 🛤️ Signal Routes (signal-routes.js), beside Base Stations: what came in
-    // from where — each burst the base stations' receivers heard followed back
-    // to the transmitter that sent it, by its carrier, set against the pass
-    // ranges on record, and split by protocol and frame format. Editors only,
-    // like most of this group; it moved here from the Data group to make room
-    // there for the Backbone beside Station Health. Its find words are the
-    // questions it answers ("which repeater", "came in", "iflows") — none
-    // starting "no", so "no signal" still finds Offline & Install on its two
-    // words, and never "network", "decode" or "packet", which nav.mjs's probes
-    // hold for other tabs.
-    { id: 'signalroutes', label: 'Signal Routes',        icon: '🛤️',
-      find: 'routes route came in from where which repeater relayed relay relays carrier offset fingerprint heard via direct hop hops path paths pass range record off record unexplained copies concentrator concentration alert2 legacy binary iflows enhanced ascii format formats protocol protocols sankey flow diagram' },
-    { id: 'review',     label: 'Network Review',         icon: '📐',
+    { id: 'review', label: 'Network Review', icon: '📐',
       find: 'network review design audit planning fade margin matrix radio mobile rm comparison calibration calibrate attenuator path margin measured field test redundancy two paths second path gateways repeater relocation move proposed site hops tdma alert2 frequency principles licence' },
-    { id: 'a2plan',     label: 'ALERT2 Transition Plan', icon: '🧭',     who: 'a2plan',
+    { id: 'a2plan', label: 'ALERT2 Transition Plan', icon: '🧭', who: 'a2plan',
       find: 'alert2 transition migration upgrade plan proposal business case management submission erta2 ert-a2 elpro 115e base station repeater backbone acquisition remediation equipment quantity cost estimate budget fte effort staff crews timeline gantt schedule duration catchment basin region scenario what if sliders network review' },
-    { id: 'tdma',       label: 'TDMA Planner',           icon: '⏱️',
+    { id: 'tdma', label: 'TDMA Planner', icon: '⏱️',
       find: 'tdma planner alert2 time slot slots frame length slot length offset schedule timing repeater field station aggregation latency capacity air time airlink buffer guard clock gps hop limit path service configuration sheet ert-a2 ind api legacy concentration aloha channel network planning transition' },
   ] },
 ];
 
-// Flattened, for the lookups that only care which tab is open (the bug
-// reporter) and don't want to know how the nav happens to be grouped.
-const TAB_LIST = TABS.flatMap(g => g.tabs);
+// Each part knows the tab it is a view of, and the flat list holds both: an
+// address, HELP, the Site Map, the teardowns and every lookup by id keep
+// working for a part exactly as for a tab. Only the bar is drawn from TABS'
+// own `tabs`, so a part is never a button there — its host's view strip
+// (viewStripHtml, app.js) is how it is reached.
+const TAB_LIST = TABS.flatMap(g => g.tabs.flatMap(t => [t, ...(t.parts || []).map(p => Object.assign(p, { partOf: t.id }))]));
+
+// The bar entry a tab is reached through: itself, or the tab it is a view of.
+function tabHost(id) {
+  const t = TAB_LIST.find(x => x.id === id);
+  if (!t) return null;
+  return t.partOf ? TAB_LIST.find(x => x.id === t.partOf) : t;
+}
+// Its views, the host first: [host, …parts] — one entry for a tab with none.
+function tabFamily(id) {
+  const h = tabHost(id);
+  return h ? [h, ...(h.parts || [])] : [];
+}
+// The TABS group a tab, or a view of one, is filed under.
+function tabGroupOf(id) {
+  const h = tabHost(id);
+  return h ? TABS.find(g => g.tabs.includes(h)) || null : null;
+}
+// Whether the bar lists it: not a part, and not one of the tabs reached from
+// the banner instead (`bar: false`).
+function tabInBar(t) { return !!t && !t.partOf && t.bar !== false; }
 
 // What a tab's own job needs from the browser (#223), for the tabs whose job is
 // a device on a cable: a `needs` on the tab above names one of these. The nav
@@ -679,7 +601,7 @@ const HELP = {
   views: {
     summary: 'What the bar on the left lists. A <strong>view</strong> is a choice of tabs, put into groups and an '
            + 'order, and the <strong>View</strong> box at the top of the bar picks one: <strong>All</strong> is every '
-           + 'tab, <strong>Simple</strong> leaves out Export, the Map Generator and the Interference group, and '
+           + 'tab, <strong>Simple</strong> leaves out the desk-bound radio tabs, and '
            + '<strong>Field</strong> is what a site visit needs on a phone — Stations, Look Around, the camera and '
            + 'photos, the forms, the surveys and whether a station is reporting. Signed in, this tab makes views '
            + 'of your own: rename a group, move a tab up, down or into another group (or drag it), take a tab '
@@ -2223,7 +2145,7 @@ const HELP = {
 
   field: {
     summary: 'Plots readings that field stations sent us, out of the Flood-Net datastore, using the '
-           + 'same chart and the same 3-5-7 filter as the Plots tab. Pick a station, its '
+           + 'same chart and the same 3-5-7 filter as Charts › Plots. Pick a station, its '
            + 'sensors and a window; the readings are fetched and drawn.',
     watch: [
       '<strong>This is not ARRO data and is never mixed with it.</strong> The chart says which '
@@ -2251,7 +2173,7 @@ const HELP = {
       + 'discarding them</strong>. That count is the only place this network\'s real path '
       + 'redundancy is visible.',
       '<strong>Readings as a table</strong>, under the chart, is the same numbers without a mouse — '
-      + 'the Plots tab\'s, unchanged, and capped at 300 rows with the cap stated.',
+      + 'Charts › Plots\'s, unchanged, and capped at 300 rows with the cap stated.',
       'A <strong>group</strong> — a river\'s height gauges, or the rain gauges around a station, '
       + 'sent here by a <em>Flood-Net plot</em> from a river\'s callout or a station\'s card — is '
       + 'listed under its own name, a row a gauge under the station it came from. Picking a '
@@ -2735,7 +2657,7 @@ const HELP = {
       'Focus the crosshairs first, then the staff. The crosshairs stay focused between examples; the staff needs refocusing each time.',
       'In the wind and rocking drills any lean makes the reading higher, so book the lowest reading, seen as the staff passes upright.',
       'In the two-peg drill you must look at Staff B before the answers can be checked. Differences are entered as absolute (positive) values.',
-      'Each Field training tab is adapted from Mallee HydroTech and ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
+      'Each tab in Learn: field practice is adapted from Mallee HydroTech and ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
     ],
     related: ['levels', 'twopeg', 'surveyguide'],
   },
@@ -2746,7 +2668,7 @@ const HELP = {
       'At a change point, the foresight goes on the old set-up\'s HI and the backsight on the new one; the staff\'s foot stays put until the backsight is booked.',
       'Rise and fall compares each reading with the previous reading from the same set-up, so after a move it starts again from the new backsight.',
       'The exercise\'s misclose limit (1 + √n mm) is not the Level Survey sheet\'s default of ±3 mm. Use your site\'s figure.',
-      'Each Field training tab is adapted from Mallee HydroTech and ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
+      'Each tab in Learn: field practice is adapted from Mallee HydroTech and ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
     ],
     related: ['levels', 'surveyguide', 'kbstaff'],
   },
@@ -2757,7 +2679,7 @@ const HELP = {
       'It is learning material, not a procedure: anything tagged <em>Your workplace\'s call</em> depends on your organisation, client, equipment or jurisdiction, and the site\'s own procedure comes first.',
       'The priority answers rest on each scenario\'s stated backup and service assumptions — change an assumption and the priority can change, which is why every card has its full situation.',
       'The drawings are shortcuts: every phase and step can also be reached from the buttons and the <em>Go to a step</em> list under them. On a phone the drawings scroll sideways inside their own box.',
-      'Each Field training tab is adapted from Mallee HydroTech and ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
+      'Each tab in Learn: field practice is adapted from Mallee HydroTech and ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
     ],
     related: ['inspections', 'maintenance', 'health'],
   },
@@ -2768,7 +2690,7 @@ const HELP = {
       'Nothing here is a real survey — the site is fictional, and the figures are for practice only.',
       'The two-peg and misclose verdicts follow the policy you save in step 2; with none saved, the honest answer is <em>No tolerance recorded</em>.',
       'Your step, policy and ticks are kept only in this browser; <strong>New practice</strong> clears them.',
-      'Each Field training tab is adapted from Mallee HydroTech and ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
+      'Each tab in Learn: field practice is adapted from Mallee HydroTech and ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
     ],
     related: ['twopeg', 'levels', 'kbstaff'],
   },
@@ -2779,7 +2701,7 @@ const HELP = {
       '<strong>It is a training fixture, not a station.</strong> Station 425010 Red Gum Reach and every figure are the game\'s own, and its 1 mm, 5 minute and 2 mm limits are the game\'s design assumptions, not an operating standard.',
       '<strong>Progress stays on this device.</strong> The step, answers and plate position are kept in this browser only; <em>Start the visit again</em> clears them.',
       '<strong>The level book is Flood-Net\'s arithmetic.</strong> Step 3\'s sums come from the same code as the Level Survey sheet, so the two always agree.',
-      'Each Field training tab is adapted from Mallee HydroTech and ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
+      'Each tab in Learn: field practice is adapted from Mallee HydroTech and ends with a <strong>Source and credit</strong> panel: the original, its licences and what Flood-Net changed.',
     ],
     related: ['inspections', 'camera', 'health'],
   },
@@ -5067,7 +4989,7 @@ const state = {
   exportNets:     null,
   // Last datastore round trip, as returned by dbPing(): null before the first
   // one, { checking:true } while one is in flight. Kept here rather than in the
-  // panel so that re-rendering the Export tab — which every checkbox on it does
+  // panel so that re-rendering the Radio Mobile Files tab — which every checkbox on it does
   // — redraws the last result instead of firing another request.
   dbStatus:       null,
   // Where the station list on screen actually came from — see loadJson(). Null
@@ -5076,7 +4998,7 @@ const state = {
   // database, with nobody told.
   dataSource:     null,
   // Why the datastore was not used, when it was not. Kept after a fallback so
-  // the Export tab can say what went wrong rather than only that something did.
+  // the Radio Mobile Files tab can say what went wrong rather than only that something did.
   loadError:      null,
   // The datastore's answer that arrived after the opening load had drawn the
   // copy this device kept, when it is not the same list: { text, source },
@@ -5198,7 +5120,7 @@ const state = {
   // re-render a successful save causes.
   editorMsg:      null,
   // ACMA RRL interference layer (all lazy — untouched until the toggle is on
-  // or the RF Environment tab is opened)
+  // or Nearby Transmitters is opened)
   acma: {
     loaded: false, loading: false, loadPromise: null, error: null,
     threats: null, dicts: null,

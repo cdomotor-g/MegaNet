@@ -197,7 +197,7 @@ const Quansheng = (function () {
   }
 
   // What each of the 32 transmitted bits is, for drawing: A address, D data,
-  // K marker, R CRC. Same letters as the ALERT Packets tab's bit cells.
+  // K marker, R CRC. Same letters as the Decoder's ALERT Packets view's bit cells.
   function payloadRoles(fmt) {
     const r = new Array(32).fill('K');
     const set = (from, n, c) => { for (let i = 0; i < n; i++) r[from + i] = c; };

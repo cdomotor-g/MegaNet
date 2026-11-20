@@ -117,7 +117,7 @@ function toggleTheme() {
 // can be compared on the page behind it; Escape or × when done.
 function openThemeMenu() {
   Modal.open({
-    title: 'Theme',
+    title: 'Theme & layout',
     html: `
       <fieldset class="theme-pick" id="theme-pick">
         <legend class="sr-only">Theme</legend>
@@ -129,10 +129,28 @@ function openThemeMenu() {
             <span class="small txt-muted">${esc(THEME_HINTS[c])}</span></span>
         </label>`).join('')}
       </fieldset>
-      ${typeof Looks !== 'undefined' ? Looks.pickerHtml() : ''}`,
+      ${typeof Looks !== 'undefined' ? Looks.pickerHtml() : ''}
+      ${viewsPickHtml()}`,
   });
   const on = document.querySelector('#theme-pick input:checked');
   if (on) on.focus();
+}
+
+// What the bar on the left lists — the Views tab's question, asked here
+// beside the theme and the look, since it is the same kind of choice
+// (November 2026: 🎛️ Views left the bar; core.js, `bar: false`). The views
+// themselves are picked and made on that tab; this says which is on and
+// opens it.
+function viewsPickHtml() {
+  if (typeof NavViews === 'undefined' || !NavViews.current) return '';
+  const v = NavViews.current();
+  return `
+      <fieldset class="theme-pick theme-views" id="theme-views">
+        <legend>What the bar lists</legend>
+        <p class="small txt-muted">Now: <strong>${esc(v.icon)} ${esc(v.name)}</strong>${v.about ? ` — ${esc(v.about)}` : ''}</p>
+        <button type="button" class="pill" onclick="Modal.close(); switchTab('views')">
+          <span aria-hidden="true">🎛️</span> Choose or make a view…</button>
+      </fieldset>`;
 }
 
 // Sunlight draws the map's lines heavier: a 1.5 px radio path is a hairline on
@@ -146,7 +164,7 @@ function mapStrokeScale() {
 const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/cdomotor-g/MegaNet/main/stations.json';
 
 // Where a station list can come from, worst-to-best-understood. The label is
-// what the operator reads in the header and on the Export tab; being able to
+// what the operator reads in the header and on the Radio Mobile Files tab; being able to
 // answer "is this the database or a file?" at a glance is the whole point.
 const SOURCE_LABELS = {
   api:     'the datastore',
@@ -1771,7 +1789,25 @@ function navScore(text, terms) {
 function navViewGroups() {
   return typeof NavViews !== 'undefined'
     ? NavViews.navGroups()
-    : TABS.map(g => ({ group: g.group, tabs: g.tabs.filter(tabShown) })).filter(g => g.tabs.length);
+    : TABS.map(g => ({ group: g.group, tabs: g.tabs.filter(t => tabInBar(t) && tabShown(t)) })).filter(g => g.tabs.length);
+}
+
+// A bar entry's views (core.js, tabFamily) are found through it: a query is
+// scored against the host and against each view, the best of them stands for
+// the entry, and the button opens the view that won. So "rf changes" lands on
+// 📶 Nearby Transmitters' RF Changes view, and the button says so.
+function navMemberScore(tab, group, terms) {
+  let best = null;
+  for (const m of [tab, ...(tab.parts || [])]) {
+    if (!tabShown(m)) continue;
+    // A view's own name on its button is matched too, and a view's host's.
+    const own = `${navHaystack(m, group)} ${(m.view || '').toLowerCase()}`;
+    const text = m === tab ? own : `${own} ${tab.label.toLowerCase()}`;
+    const n = navScore(text, terms);
+    const label = navScore(m.label.toLowerCase(), terms);
+    if (!best || n > best.score || (n === best.score && label > best.label)) best = { member: m, score: n, label };
+  }
+  return best || { member: tab, score: 0, label: 0 };
 }
 
 // The view's groups with the losing tabs removed and any group left empty
@@ -1785,7 +1821,7 @@ function navFiltered() {
   const terms = navTerms(state.navQuery);
   if (!terms.length) {
     const groups = view.map(g => ({ group: g.group, tabs: g.tabs }));
-    const open = TAB_LIST.find(t => t.id === state.activeTab);
+    const open = tabHost(state.activeTab);
     if (open && !inView.has(open.id) && tabShown(open)) groups.push({ group: outside, tabs: [open], outside: true });
     return { groups, bestId: null };
   }
@@ -1795,9 +1831,9 @@ function navFiltered() {
   const rest = TABS.flatMap(g => g.tabs.filter(t => !inView.has(t.id) && tabShown(t)).map(t => ({ t, home: g.group })));
   let best = 0;
   const score = (tab, group) => {
-    const n = navScore(navHaystack(tab, group), terms);
-    if (n > best) best = n;
-    return { tab, score: n, label: navScore(tab.label.toLowerCase(), terms) };
+    const m = navMemberScore(tab, group, terms);
+    if (m.score > best) best = m.score;
+    return { tab, score: m.score, label: m.label, member: m.member };
   };
   const scored = view.map(g => ({ group: g.group, tabs: g.tabs.map(t => score(t, g.group)) }));
   if (rest.length) scored.push({ group: outside, outside: true, tabs: rest.map(x => score(x.t, x.home)) });
@@ -1805,11 +1841,19 @@ function navFiltered() {
   const won = scored
     .map(g => ({ group: g.group, outside: g.outside, tabs: g.tabs.filter(x => x.score === best) }))
     .filter(g => g.tabs.length);
+  // On a tie a tab kept out of the bar (core.js, `bar: false`) wins: the find
+  // box is how it is reached from the bar at all, and it is listed last.
   let pick = null;
-  for (const g of won) for (const x of g.tabs) if (!pick || x.label > pick.label) pick = x;
+  for (const g of won) for (const x of g.tabs) {
+    if (!pick || x.label > pick.label
+      || (x.label === pick.label && x.tab.bar === false && pick.tab.bar !== false)) pick = x;
+  }
+  const via = {};
+  for (const g of won) for (const x of g.tabs) if (x.member !== x.tab) via[x.tab.id] = x.member;
   return {
     groups: won.map(g => ({ group: g.group, outside: g.outside, tabs: g.tabs.map(x => x.tab) })),
     bestId: pick ? pick.tab.id : null,
+    via,
   };
 }
 
@@ -1818,7 +1862,8 @@ function navFiltered() {
 // its value, its selection and its focus, and only this markup is replaced.
 function navGroupsHtml() {
   const collapsed = state.navCollapsed;
-  const { groups, bestId } = navFiltered();
+  const { groups, bestId, via = {} } = navFiltered();
+  const openHost = (tabHost(state.activeTab) || {}).id;
   // A view of somebody's own may call two groups by one name; the second
   // heading's id is told apart so the page keeps one element per id.
   const used = new Set();
@@ -1834,12 +1879,16 @@ function navGroupsHtml() {
       <h2 class="nav-heading" id="${hid}">${esc(g.group)}</h2>
       <ul class="nav-list">
         ${g.tabs.map(t => {
-          const on   = state.activeTab === t.id;
+          const on   = openHost === t.id;
           const pick = t.id === bestId;
+          // The view a query matched, when it was not the tab's first: the
+          // button opens that one, and says which (navMemberScore).
+          const goes = via[t.id] || null;
           // On the rail the label alone is not enough to place a tab — which
           // group a tooltip belongs to is exactly what the clipped heading was
           // saying — so collapsed the tooltip says both.
-          const tip = collapsed ? `${t.label} — ${g.group}` : t.label;
+          const name = goes ? `${goes.label} — in ${t.label}` : t.label;
+          const tip = collapsed ? `${name} — ${g.group}` : name;
           // A tab this browser cannot do the job of is marked (#223): 🖥️ for
           // the eye, the reason in the tooltip and, for a screen reader, in
           // the button's own name — the mark alone would be colour's mistake
@@ -1852,10 +1901,10 @@ function navGroupsHtml() {
           return `
         <li>
           <button class="tab-btn${on ? ' active' : ''}${pick ? ' nav-best' : ''}"
-                  data-tab="${t.id}" onclick="switchTab('${t.id}')"
+                  data-tab="${t.id}" onclick="switchTab('${goes ? goes.id : t.id}')"
                   ${on ? 'aria-current="page"' : ''} title="${esc(cannot ? `${tip} — ${cannot}` : tip)}">
-            <span class="nav-icon" aria-hidden="true">${t.icon}</span>
-            <span class="nav-label">${esc(t.label)}</span>
+            <span class="nav-icon" aria-hidden="true">${goes ? goes.icon : t.icon}</span>
+            <span class="nav-label">${goes ? `${esc(goes.label)}<span class="nav-via"> — in ${esc(t.label)}</span>` : esc(t.label)}</span>
             ${navCountHtml(t.id)}
             ${cannot ? `<span class="nav-needs" aria-hidden="true">🖥️</span><span class="sr-only"> — ${esc(cannot)}</span>` : ''}
             ${pick ? '<span class="nav-enter" aria-hidden="true">↵</span>' : ''}
@@ -1888,7 +1937,7 @@ function navCountHtml(id) {
 function navFoundText() {
   if (!navTerms(state.navQuery).length) return '';
   const n = navFiltered().groups.reduce((sum, g) => sum + g.tabs.length, 0);
-  return `${n} of ${TAB_LIST.filter(tabShown).length} tabs`;
+  return `${n} of ${TAB_LIST.filter(t => !t.partOf && tabShown(t)).length} tabs`;
 }
 
 function renderTabs() {
@@ -2165,6 +2214,8 @@ function switchTab(id) {
   // then reaching into a file this one has nothing else to do with. It is a
   // registry now, and each module registers itself — core.js and #142 say why.
   runTabTeardowns();
+  // Leaving the Decoder for another family forgets what its box last said.
+  if (typeof DecoderSniff !== 'undefined' && (tabHost(id) || {}).id !== (tabHost(state.activeTab) || {}).id) DecoderSniff.forget();
   state.activeTab = id;
   // A step in the browser's history, and the address saying where you are
   // (route.js, #211) — before the render, so a render that finds something
@@ -2220,7 +2271,7 @@ function switchTab(id) {
   // "Networks" alone does not say where in twenty tabs you have landed.
   if (!cameFromShell || isPhoneNav()) {
     const opened = TAB_LIST.find(t => t.id === id);
-    const group  = TABS.find(g => g.tabs.some(t => t.id === id));
+    const group  = tabGroupOf(id);
     if (opened) announce(group ? `${opened.label} — ${group.group}` : opened.label);
   }
 }
@@ -4124,9 +4175,57 @@ function renderMain() {
     case 'licensing':  el.innerHTML = KbLicensing.render(); KbLicensing.init(); break;
     default:           el.innerHTML = '<p class="table-empty">Unknown tab</p>';
   }
+  viewStripKeep(el);
   updateChromeHeight();     // three tabs size their own scrollers off it
   // The address says where the app is now, without a new step (route.js).
   if (typeof Route !== 'undefined') Route.sync();
+}
+
+// ── The view strip: one tab in the bar, several views of it ─────────────────
+// A tab that grew out of several (November 2026: Nearby Transmitters is RF
+// Environment and RF Changes; the Decoder is ALERT Packets, ALERT2 and HFEM;
+// …) keeps each of them whole, under its own id and address, as a view — and
+// this row of buttons across the top of the page is how one is picked. The
+// bar lists the host only (tabInBar, core.js) and lights it for any of its
+// views. A tab with one view draws no strip.
+function viewStripHtml(id) {
+  const fam = tabFamily(id).filter(tabShown);
+  if (fam.length < 2 || !fam.some(t => t.id === id)) return '';
+  const host = fam[0];
+  return `
+    <div id="view-strip" data-for="${escAttr(id)}">
+    <nav class="view-strip" data-tour="view-strip" aria-label="${escAttr(`${host.label}: its views`)}">
+      <span class="view-strip-name"><span aria-hidden="true">${host.icon}</span> ${esc(host.label)}</span>
+      <span class="view-strip-btns">${fam.map(t => {
+        const on = t.id === id;
+        return `<button type="button" class="view-btn${on ? ' active' : ''}" data-view="${t.id}"
+                  ${on ? 'aria-current="page"' : ''} title="${escAttr(t.label)}"
+                  onclick="switchTab('${t.id}')"><span aria-hidden="true">${t.icon}</span> ${esc(t.view || t.label)}</button>`;
+      }).join('')}</span>
+    </nav>
+    ${typeof DecoderSniff !== 'undefined' ? DecoderSniff.stripHtml(id) : ''}
+    </div>`;
+}
+
+// Puts the strip at the top of the page, and keeps it there: several views
+// redraw the whole of <main> themselves (a filter changed, a fetch landed),
+// which would take it away again, so a watch on <main>'s children puts it
+// back. Only the children — nothing inside a view is watched.
+let viewStripWatch = null;
+function viewStripKeep(el) {
+  const put = () => {
+    const html = viewStripHtml(state.activeTab);
+    const have = el.querySelector(':scope > #view-strip');
+    if (!html) { if (have) have.remove(); return; }
+    if (have && have.dataset.for === state.activeTab && el.firstElementChild === have) return;
+    if (have) have.remove();
+    el.insertAdjacentHTML('afterbegin', html);
+  };
+  put();
+  if (!viewStripWatch && typeof MutationObserver === 'function') {
+    viewStripWatch = new MutationObserver(put);
+    viewStripWatch.observe(el, { childList: true });
+  }
 }
 
 // ── Empty state ────────────────────────────────────────────────────────────────
@@ -7992,7 +8091,7 @@ function arroAdminPillHtml(s) {
            >${pillText('📊', `${pillLong('Open in ')}ARRO admin`, '↗')}</a>` : '';
 }
 
-// The station card's Data section: its readings on the Field Data tab and
+// The station card's Data section: its readings in Charts › Field Data and
 // its ARRO admin page, then its neighbours plotted with it (group-plots.js) —
 // a river height gauge's river and a rain gauge's surroundings. Field data →
 // is in In Flood-Net as well: it is both something the app does with the
@@ -8005,7 +8104,7 @@ function stnCardDataHtml(s) {
   if (!pills && !rows) return '';
   return `<div class="acma-sect stn-card-data" data-tour="card-data" id="mn-data-card-${escAttr(String(s.id))}">
       <span class="small txt-muted stn-card-rhs-head"
-        title="This station's data: its readings on the Field Data tab, its admin page in ARRO, and its neighbours plotted with it — in ARRO on one graph, or out of the Flood-Net datastore a strip each">Data</span>
+        title="This station's data: its readings in Charts › Field Data, its admin page in ARRO, and its neighbours plotted with it — in ARRO on one graph, or out of the Flood-Net datastore a strip each">Data</span>
       ${pills ? `<div class="pill-row stn-card-data-pills">${pills}</div>` : ''}
       ${rows}
     </div>`;
@@ -8053,7 +8152,7 @@ function fieldDataPillHtml(s) {
   if (typeof ArroData === 'undefined' || !ArroData.fieldOpenStation) return '';
   const n = (s.sensors || []).length;
   return `<button type="button" class="pill mn-field-data" onclick="fieldDataFromCard('${escAttr(s.id)}')"
-           title="Open the Field Data tab on this station${n
+           title="Open Charts › Field Data on this station${n
              ? ` with its ${n} sensor${n === 1 ? '' : 's'} ticked, and read the datastore`
              : ' and ask the datastore what it has heard from it'}"
            >${pillText('🌡️', 'Field data', '→')}</button>`;
@@ -9716,7 +9815,7 @@ function stnCardHtml(s) {
   const dock = [
     typeof ArroData !== 'undefined' && ArroData.fieldOpenStation
       ? `<button type="button" class="stn-cv-dockbtn" onclick="fieldDataFromCard('${escAttr(s.id)}')"
-           title="Open the Field Data tab on this station"><span class="stn-cv-dockic" aria-hidden="true">🌡️</span><span>Field data</span></button>` : '',
+           title="Open Charts › Field Data on this station"><span class="stn-cv-dockic" aria-hidden="true">🌡️</span><span>Field data</span></button>` : '',
     located
       ? `<button type="button" class="stn-cv-dockbtn" onclick="zoomToStation('${escAttr(s.id)}')"
            title="Zoom the map all the way in on this station"><span class="stn-cv-dockic" aria-hidden="true">🔍</span><span>Zoom to it</span></button>` : '',

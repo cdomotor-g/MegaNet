@@ -144,11 +144,11 @@ async function main() {
     // ── 2. The bar and the row ─────────────────────────────────────────────
     log('\n2. The bar and the row across the top\n');
     await page.evaluate(() => switchTab('stations'));
-    await page.click('#tab-nav .nav-sec >> text=Interference');
+    await page.click('#tab-nav .nav-sec >> text=Radio & signals');
     await page.waitForTimeout(SETTLE);
     S = await shell(page);
     check('a group\'s button opens its first tab the first time, and the row becomes that group\'s',
-      S.tab === 'rf' && S.current === 'Interference' && J(S.row) === J(['rf', 'rfchanges', 'workbench', 'reception', 'flipsources', 'bitbench']), J(S));
+      S.tab === 'rf' && S.current === 'Radio & signals' && J(S.row) === J(['rf', 'workbench', 'reception', 'bitflipper', 'packets', 'serial']), J(S));
     await page.click('#section-bar .tab-btn[data-tab="workbench"]');
     await page.waitForTimeout(SETTLE);
     const focus = await page.evaluate(() => ({ tab: document.activeElement?.dataset?.tab, inRow: !!document.activeElement?.closest('#section-bar') }));
@@ -159,7 +159,7 @@ async function main() {
     check('Home goes to its first tab', await page.evaluate(() => document.activeElement?.dataset?.tab) === 'rf');
     await page.click('#tab-nav .nav-sec >> text=Data');
     await page.waitForTimeout(SETTLE);
-    await page.click('#tab-nav .nav-sec >> text=Interference');
+    await page.click('#tab-nav .nav-sec >> text=Radio & signals');
     await page.waitForTimeout(SETTLE);
     check('back to a group, it opens on the tab last used in it', await page.evaluate(() => state.activeTab) === 'workbench');
     await page.evaluate(() => { switchTab('stations'); });
@@ -195,14 +195,14 @@ async function main() {
       items: [...document.querySelectorAll('#more-menu .more-item')].map(b => b.dataset.go),
       focus: document.activeElement?.dataset?.go,
     }));
-    check('⋯ opens More: export, theme & look, help, the Site Map, what\'s new and report a bug, the first in focus',
-      menu.title === 'More' && J(menu.items) === J(['export', 'theme', 'help', 'guide', 'news', 'bug']) && menu.focus === 'export', J(menu));
+    check('⋯ opens More: export, theme & layout, offline & install, help, the Guide, what\'s new and report a bug, the first in focus',
+      menu.title === 'More' && J(menu.items) === J(['export', 'theme', 'offline', 'help', 'guide', 'news', 'bug']) && menu.focus === 'export', J(menu));
     await page.click('#more-menu .more-item[data-go="theme"]');
     const dlg = await page.evaluate(() => ({ title: document.getElementById('app-modal-title')?.textContent,
       themes: document.querySelectorAll('#theme-pick input').length,
       looks: [...document.querySelectorAll('#look-pick input')].map(r => r.value + (r.checked ? '*' : '')) }));
-    check('Theme & look is the Theme dialog, with the looks under the themes, Calm picked',
-      dlg.title === 'Theme' && dlg.themes === 4 && J(dlg.looks) === J(['calm*', 'tiles', 'instrument', 'signs', 'classic']), J(dlg));
+    check('Theme & layout is the Theme dialog, with the looks under the themes, Calm picked',
+      dlg.title === 'Theme & layout' && dlg.themes === 4 && J(dlg.looks) === J(['calm*', 'tiles', 'instrument', 'signs', 'classic']), J(dlg));
 
     // ── 4. The way back ────────────────────────────────────────────────────
     log('\n4. Classic, and back\n');
@@ -295,11 +295,13 @@ async function main() {
       tabs: [...document.querySelectorAll('#tab-nav .calm-tabs .tab-btn')].filter(b => b.getClientRects().length).length,
       expanded: document.querySelector('.field-bar [data-field="more"]')?.getAttribute('aria-expanded'),
     }));
-    const shown = await page.evaluate(() => TAB_LIST.filter(tabShown).length);
+    // Every tab the bar lists — not the views of one (core.js, `parts`), nor
+    // the two reached from the banner (`bar: false`).
+    const shown = await page.evaluate(() => TAB_LIST.filter(t => tabInBar(t) && tabShown(t)).length);
     check('More opens the drawer: every group with every one of its tabs', drawer.open && drawer.tabs === shown, J({ drawer, shown }));
-    await page.click('#tab-nav .calm-tabs .tab-btn[data-tab="history"]');
+    await page.click('#tab-nav .calm-tabs .tab-btn[data-tab="inspections"]');
     await page.waitForTimeout(SETTLE);
-    check('a tab picked in the drawer opens and the drawer shuts', await page.evaluate(() => state.activeTab === 'history' && state.navCollapsed));
+    check('a tab picked in the drawer opens and the drawer shuts', await page.evaluate(() => state.activeTab === 'inspections' && state.navCollapsed));
 
     await page.click('.field-bar [data-field="nearby"]');
     await page.waitForTimeout(SETTLE);
@@ -472,7 +474,10 @@ async function main() {
       const before = errors.length;
       await page.evaluate(t => switchTab(t), id);
       await page.waitForTimeout(SETTLE);
-      const row = await page.evaluate(t => document.querySelector('#section-bar .tab-btn[aria-current="page"]')?.dataset.tab === t, id);
+      // A view of a tab (core.js, `parts`) lights its tab's button in the row,
+      // and its own in the view strip under it.
+      const row = await page.evaluate(t => document.querySelector('#section-bar .tab-btn[aria-current="page"]')?.dataset.tab === tabHost(t).id
+        && (!TAB_LIST.find(x => x.id === t).partOf || document.querySelector('#view-strip .view-btn[aria-current="page"]')?.dataset.view === t), id);
       if (errors.length > before || !row) bad.push(id);
       const audit = await auditHandlers(page);
       unresolved = unresolved.concat(audit.unresolved.map(u => `${id}: ${u.path || J(u)}`));

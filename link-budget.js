@@ -1186,7 +1186,7 @@ const LinkBudget = (function () {
       ['Earth curvature', 'k from N<sub>s</sub> at the path’s mean height, the same as the model’s', 'k = 1.3333 from N<sub>s</sub> = 301, fixed'],
       ['Antenna patterns', '<em>Not modelled</em> — one gain figure, in every direction', 'Real .ant patterns with azimuth and tilt'],
       ['Ducting, rain, multipath fading', '<em>Not modelled</em> beyond the model’s own time variability', 'The same — nothing beyond ITM'],
-      ['Interference / noise floor', '<em>Not modelled</em> — see the RF Environment tab for ACMA co-channel risk', 'Not modelled'],
+      ['Interference / noise floor', '<em>Not modelled</em> — see Nearby Transmitters for ACMA co-channel risk', 'Not modelled'],
     ];
   }
 

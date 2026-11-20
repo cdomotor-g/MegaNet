@@ -371,8 +371,9 @@ const Explainers = (() => {
   // renamed tab is drawn by its new name without the video being touched.
   function tabOf(id) {
     if (typeof TABS === 'undefined') return null;
-    for (const g of TABS) { const t = g.tabs.find(x => x.id === id); if (t) return { ...t, group: g.group, siblings: g.tabs }; }
-    return null;
+    const t = typeof TAB_LIST !== 'undefined' && TAB_LIST.find(x => x.id === id);
+    const g = t && typeof tabGroupOf === 'function' ? tabGroupOf(id) : null;
+    return t && g ? { ...t, group: g.group, siblings: g.tabs } : null;
   }
 
   // The numbers a `figure` may draw live, from what this page has loaded; each
@@ -387,7 +388,7 @@ const Explainers = (() => {
         case 'rain': return st ? st.filter(s => /rain/i.test(sensors(s))).length || null : null;
         case 'level': return st ? st.filter(s => /level|height|stage|water/i.test(sensors(s))).length || null : null;
         case 'repeaters': return st ? st.filter(s => /repeater/i.test(roles(s))).length || null : null;
-        case 'tabs': return typeof TAB_LIST !== 'undefined' ? TAB_LIST.filter(t => typeof tabShown !== 'function' || tabShown(t)).length : null;
+        case 'tabs': return typeof TAB_LIST !== 'undefined' ? TAB_LIST.filter(t => !t.partOf && (typeof tabShown !== 'function' || tabShown(t))).length : null;
         default: return null;
       }
     } catch (_) { return null; }

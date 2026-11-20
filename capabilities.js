@@ -557,7 +557,7 @@ const Capabilities = (function () {
           find: 'push notification' },
       ] },
 
-    { key: 'visits', icon: '🩺', name: 'Site visits & surveying',
+    { key: 'visits', icon: '🩺', name: 'Field work & surveying',
       blurb: 'Getting to a station, the forms, the photos and the level survey — made for a phone.',
       items: [
         { name: 'Nearby', tab: 'nearby',
@@ -803,7 +803,7 @@ const Capabilities = (function () {
       { key: 'drive', name: 'Dropbox and Google Drive', how: 'sched', match: ['Dropbox', 'Google Drive'],
         what: 'Field photos dropped in linked folders, brought in every 15 minutes.' },
       { key: 'mallee', name: 'Mallee HydroTech', url: 'https://malleehydrotech.com.au', how: 'kept', match: ['Mallee HydroTech'],
-        what: 'The open hydrographic training tools re-told in Field training, credited on each.' },
+        what: 'The open hydrographic training tools re-told under Learn: field practice, credited on each.' },
       { key: 'makers', name: 'Equipment makers', how: 'kept', match: ['Makers\' manuals', 'ELPRO'],
         what: 'ELPRO, Campbell Scientific and the rest: pinouts and the ERT-A2\'s firmware steps from their manuals.' },
       { key: 'anthropic', name: 'Anthropic (Claude)', url: 'https://www.anthropic.com', how: 'runs', match: ['Anthropic'],

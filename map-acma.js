@@ -776,7 +776,7 @@ const MapAcma = (() => {
                   title="Open the ACMA licences tool on this station: the licences round it drawn on the map with the areas they cover"
                   ><span aria-hidden="true">📜</span> Show on the map</button>
           <button type="button" class="pill" onclick="MapAcma.learn('${a.state === 'site' ? 'base' : a.state === 'na' ? 'rx' : 'km30'}')"
-                  title="Open the Knowledge base’s Radio Licensing lesson at the part that explains this verdict"
+                  title="Open the Radio Licensing lesson at the part that explains this verdict"
                   ><span aria-hidden="true">🪪</span> What the rules say</button>
           ${out('ACMA’s register', REGISTER_URL, 'ACMA’s Register of Radiocommunications Licences')}
         </p>

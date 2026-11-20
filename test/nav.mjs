@@ -122,28 +122,85 @@ try {
     const groups = [...document.querySelectorAll('#tab-nav .nav-group')].map(g => ({
       heading: g.querySelector('.nav-heading')?.textContent || '',
       labelled: g.getAttribute('aria-labelledby') === g.querySelector('.nav-heading')?.id,
-      tabs: [...g.querySelectorAll('.tab-btn')].map(b => b.querySelector('.nav-label')?.textContent || ''),
+      tabs: [...g.querySelectorAll('.tab-btn')].map(b => b.dataset.tab),
     }));
+    const bar = TABS.flatMap(g => g.tabs.filter(tabInBar));
     return {
       groups,
-      declared: TABS.map(g => ({ group: g.group, ids: g.tabs.map(t => t.id) })),
+      declared: TABS.map(g => ({ group: g.group, ids: g.tabs.flatMap(t => [t.id, ...(t.parts || []).map(p => p.id)]) })),
       labels: TAB_LIST.map(t => t.label),
       ids: TAB_LIST.map(t => t.id),
+      barIds: bar.map(t => t.id),
+      // A view (core.js, `parts`) is reached through its host's strip, and a
+      // tab out of the bar (`bar: false`) through the banner or a menu.
+      orphans: TAB_LIST.filter(t => t.partOf && !bar.some(b => b.id === t.partOf)).map(t => t.id),
+      offBar: TAB_LIST.filter(t => !t.partOf && t.bar === false).map(t => t.id),
+      offline: !!document.querySelector('#btn-offline[onclick*="offline"]'),
+      viewsMenu: typeof viewsPickHtml === 'function',
     };
   });
 
+  // The bar lists every tab that is not a view of another, and not one of
+  // the two reached from the banner instead (November 2026): a view is a
+  // button in its tab's strip across the top of the page, checked below.
   const rendered = shape.groups.flatMap(g => g.tabs);
-  check(`all ${shape.labels.length} tabs render a button`,
-    rendered.length === shape.labels.length,
-    `${rendered.length} button(s) for ${shape.labels.length} tab(s)`);
+  check(`all ${shape.barIds.length} tabs in the bar render a button`,
+    rendered.length === shape.barIds.length,
+    `${rendered.length} button(s) for ${shape.barIds.length} tab(s)`);
 
-  const missing = shape.labels.filter(l => !rendered.includes(l));
-  check('and every one of them is a tab from TAB_LIST', missing.length === 0,
+  const missing = shape.barIds.filter(id => !rendered.includes(id));
+  check('and every one of them is a tab from TABS', missing.length === 0,
     missing.length ? `not in the nav: ${missing.join(', ')}` : '');
 
   check('no tab is rendered twice', new Set(rendered).size === rendered.length,
     rendered.length !== new Set(rendered).size
       ? `duplicated: ${rendered.filter((l, i) => rendered.indexOf(l) !== i).join(', ')}` : '');
+
+  check('every view is a view of a tab the bar lists', shape.orphans.length === 0, shape.orphans.join(', '));
+  check('the tabs out of the bar are Offline & Install, from 📲 in the banner, and Views, from Theme & layout',
+    shape.offBar.join(',') === 'offline,views' && shape.offline && shape.viewsMenu,
+    `${shape.offBar.join(', ')}; 📲 ${shape.offline}; menu ${shape.viewsMenu}`);
+
+  // Each view's strip: a button for every view of its tab, the open one
+  // marked, and each one opening its own view.
+  const strips = await page.evaluate(() => {
+    const out = [];
+    for (const host of TABS.flatMap(g => g.tabs).filter(t => (t.parts || []).length)) {
+      for (const v of [host, ...host.parts]) {
+        switchTab(v.id);
+        const s = document.querySelector('#main-content > #view-strip');
+        const btns = s ? [...s.querySelectorAll('.view-btn')] : [];
+        const on = btns.filter(b => b.getAttribute('aria-current') === 'page').map(b => b.dataset.view);
+        const lit = document.querySelector('#tab-nav .tab-btn.active');
+        out.push({ id: v.id, ok: !!s && btns.length === host.parts.length + 1 && on.length === 1 && on[0] === v.id
+          && !!lit && lit.dataset.tab === host.id });
+      }
+    }
+    switchTab('stations');
+    return out.filter(x => !x.ok).map(x => x.id);
+  });
+  check('every view shows its tab\'s strip, itself marked, and lights its tab in the bar', strips.length === 0, strips.join(', '));
+
+  // 📦 The Decoder's "not sure which kind?" box (decoder-sniff.js) sends each
+  // kind of message to its own view, and says so when it is none of them.
+  const sniff = await page.evaluate(() => [
+    DecoderSniff.kindOf('1000001110111010101011111100001111111100')?.kind,
+    DecoderSniff.kindOf('07D5F8FE')?.kind,
+    DecoderSniff.kindOf(':HS=1|I1=123456|T1=20100727030000|R_1-0=1055|NN:')?.kind,
+    DecoderSniff.kindOf('2026-11-20 10:00:01 ALERT2A 01 02 03')?.kind,
+    DecoderSniff.kindOf('541155'),
+  ]);
+  check('the Decoder\'s box tells an ALERT packet, HFEM lines and ERT-A2 output apart, and a station number from all three',
+    JSON.stringify(sniff) === JSON.stringify(['packets', 'packets', 'hfem', 'alert2', null]), JSON.stringify(sniff));
+
+  // An ARRO address pasted into Ctrl+K: the same page, in ARRO admin — for
+  // somebody knocked out of administrator mode (palette.js, arroItems).
+  const arro = await page.evaluate(() => {
+    const r = Palette.results('https://arro.example/graphs/?site_id=3318&device_id=2').filter(x => x.kind === 'arro');
+    return { n: r.length, first: r[0] && r[0].label, bare: Palette.results('3318').some(x => x.kind === 'arro') };
+  });
+  check('Ctrl+K reads a pasted ARRO address and offers its page in ARRO admin, and a bare number is left to the stations',
+    arro.n === 2 && /sensor in ARRO admin/.test(arro.first || '') && !arro.bare, JSON.stringify(arro));
 
   // A tab listed under two groups in TABS would render twice above; this catches
   // the same mistake in the source, where it is easier to read.
@@ -166,9 +223,11 @@ try {
   // ── The find box ──────────────────────────────────────────────────────────
   console.log('\nThe find box — every tab is findable, and the words people type land\n');
 
+  // What a button opens: its own tab, or the view a query matched
+  // (navMemberScore, app.js) — read off its onclick.
   const find = q => page.evaluate(query => {
     navFind(query);
-    const label = b => b.querySelector('.nav-label')?.textContent || '';
+    const label = b => ((b.getAttribute('onclick') || '').match(/switchTab\('([a-z0-9]+)'\)/) || [])[1] || b.dataset.tab;
     const best = document.querySelector('#nav-groups .tab-btn.nav-best');
     return {
       shown: [...document.querySelectorAll('#tab-nav .tab-btn')].map(label),
@@ -178,15 +237,15 @@ try {
     };
   }, q);
 
-  const idOf = label => shape.ids[shape.labels.indexOf(label)];
+  const idOf = id => id;
 
   // Its own label finds it, and finds it alone or nearly so. This is the
   // assertion that a rename cannot quietly break: the box matches the label, so
   // a label changed in TABS is still typed and still found.
   let selfOk = 0;
-  for (const label of shape.labels) {
+  for (const [i, label] of shape.labels.entries()) {
     const r = await find(label);
-    if (r.shown.includes(label)) selfOk++;
+    if (r.shown.includes(shape.ids[i])) selfOk++;
     else check(`"${label}" finds itself`, false, `showed: ${r.shown.join(', ') || 'nothing'}`);
   }
   check(`every tab is found by typing its own label (${selfOk}/${shape.labels.length})`,
@@ -253,7 +312,7 @@ try {
     counted.count);
   const quiet = await find('');
   check('and says nothing while nothing is filtered', quiet.count.trim() === ''
-    && quiet.shown.length === shape.labels.length);
+    && quiet.shown.length === shape.barIds.length);
 
   // ── Its exits ─────────────────────────────────────────────────────────────
   console.log('\nExits — picking a tab and collapsing both end the query\n');
@@ -271,7 +330,7 @@ try {
   });
   check('Enter/click on the one match opens that tab', picked.tab === 'maintenance', picked.tab);
   check('and the query is cleared behind it',
-    picked.query === '' && picked.value === '' && picked.shown === shape.labels.length,
+    picked.query === '' && picked.value === '' && picked.shown === shape.barIds.length,
     `query ${JSON.stringify(picked.query)}, ${picked.shown} tab(s) back in the nav`);
 
   const railed = await page.evaluate(() => {
@@ -282,7 +341,7 @@ try {
     return out;
   });
   check('collapsing to the rail clears it too — the box is not there to clear it with',
-    railed.query === '' && railed.shown === shape.labels.length,
+    railed.query === '' && railed.shown === shape.barIds.length,
     `${railed.shown} tab(s) on the rail`);
 
   // ── The rail ──────────────────────────────────────────────────────────────
@@ -476,17 +535,24 @@ try {
 
   // The nav is taller than a 900 px window with every group in it, so the
   // last group's buttons start below its fold.
-  await page.hover('#sm-card-basestations .sm-card-h');
+  await page.hover('#sm-card-tdma .sm-card-h');
   await settle();
   L = await lead();
   check('a button below the nav\'s fold is scrolled into it, and ringed there',
-    L.lit[0] === 'basestations' && L.inView && L.rings, `lit ${L.lit.join(', ')}, in view ${L.inView}`);
+    L.lit[0] === 'tdma' && L.inView && L.rings, `lit ${L.lit.join(', ')}, in view ${L.inView}`);
 
-  await page.hover('.sm-stop-btn[data-sm-point="group:interference"]');
+  // A view's card points at the tab it is a view of: the bar lists that.
+  await page.hover('#sm-card-hfem .sm-card-h');
+  await settle();
+  L = await lead();
+  check('a view\'s card points at its tab\'s button', L.lit.length === 1 && L.lit[0] === 'packets' && L.rings,
+    L.lit.join(', ') || 'nothing lit');
+
+  await page.hover('.sm-stop-btn[data-sm-point="group:radio_signals"]');
   await settle();
   L = await lead();
   check('a group on the journey rings that whole group in the nav',
-    L.lit.length === 1 && L.lit[0] === 'Interference' && L.rings, L.lit.join(', '));
+    L.lit.length === 1 && L.lit[0] === 'Radio & signals' && L.rings, L.lit.join(', '));
 
   // Off every source: the line goes, and so does the lit button.
   await page.hover('#sm-h');
@@ -528,7 +594,9 @@ try {
   // the drawing, the one source near enough the top of a phone's page for the
   // banner to be on screen with it.
   await page.setViewportSize({ width: 375, height: 800 });
-  await page.evaluate(() => { setNavCollapsed(true); switchTab('sitemap'); window.scrollTo(0, 0); });
+  // A toast left by an earlier step (a Capabilities line that opened a tool)
+  // can sit over the key at a phone's foot; it is not what is being checked.
+  await page.evaluate(() => { document.querySelectorAll('.toast').forEach(t => t.remove()); setNavCollapsed(true); switchTab('sitemap'); window.scrollTo(0, 0); });
   await page.waitForTimeout(300);
   await page.hover('.sm-anat-key li[data-sm-point="nav"] strong');
   await settle();
@@ -573,7 +641,7 @@ try {
   w = await seen();
   check('signed out, none of them is in the bar, the find box or the Site Map',
     w.bar.every(n => n === 0) && !w.found.some(Boolean) && !w.cards.some(Boolean), JSON.stringify(w));
-  const total = await page.evaluate(() => TAB_LIST.length);
+  const total = await page.evaluate(() => TAB_LIST.filter(t => !t.partOf).length);
   check('and the find box counts only the tabs it could list', new RegExp(`of ${total - restricted.length} tabs`).test(w.count), w.count);
   await as(true, false, false);
   w = await seen();

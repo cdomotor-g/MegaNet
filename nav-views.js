@@ -57,15 +57,15 @@ const NavViews = (function () {
   const PRESETS = {
     simple: {
       name: 'Simple', icon: '🪶',
-      about: 'Everything but the desk-bound radio work: no Export, no Map Generator, and none of the Interference group.',
-      drop: ['export', 'mapgen', 'rf', 'rfchanges', 'workbench', 'reception', 'flipsources', 'bitbench'],
+      about: 'Everything but the desk-bound radio work: no Radio Mobile Files, no Map Generator, no Nearby Transmitters, Interference Workbench or Signal Sources, and no Bit Faults bench.',
+      drop: ['export', 'mapgen', 'rf', 'workbench', 'reception', 'bitbench'],
     },
     field: {
       name: 'Field', icon: '🥾',
       about: 'What a site visit needs on a phone: the nearest stations, the station and the way to it, the camera and the photos, the forms, the SWR meter and the pinouts, the surveys, and whether the station is reporting.',
       groups: [
-        { name: 'Stations & networks', tabs: ['nearby', 'stations', 'lookaround'] },
-        { name: 'Site visits',         tabs: ['camera', 'photos', 'inspections', 'swr', 'pinouts', 'maintenance', 'history'] },
+        { name: 'Stations',            tabs: ['nearby', 'stations'] },
+        { name: 'Field work',          tabs: ['photos', 'inspections', 'swr', 'pinouts'] },
         { name: 'Surveying',           tabs: ['levels', 'twopeg', 'surveyguide'] },
         { name: 'Is it reporting?',    tabs: ['msglog', 'health'] },
         { name: 'Before you go',       tabs: ['offline', 'views'] },
@@ -91,9 +91,12 @@ const NavViews = (function () {
     try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (_) { /* private mode */ }
   }
 
-  function tab(id) { return TAB_LIST.find(t => t.id === id) || null; }
+  // A view names tabs by id. One that is now a view of another tab (core.js,
+  // tabHost) is listed as that tab, so a view saved before the November 2026
+  // merges still lists what it did.
+  function tab(id) { return tabHost(id); }
   function homeGroup(id) {
-    const g = TABS.find(x => x.tabs.some(t => t.id === id));
+    const g = tabGroupOf(id);
     return g ? g.group : '';
   }
   function cleanName(s) {
@@ -143,7 +146,7 @@ const NavViews = (function () {
     let meta;
     if (v.id === 'all') {
       meta = ALL;
-      groups = TABS.map(g => ({ group: g.group, tabs: g.tabs.slice() }));
+      groups = TABS.map(g => ({ group: g.group, tabs: g.tabs.filter(tabInBar) }));
     } else {
       const p = v.preset ? PRESETS[v.preset] : null;
       meta = { name: v.name || (p ? p.name : 'My view'), icon: p ? p.icon : CUSTOM_ICON,
@@ -151,7 +154,7 @@ const NavViews = (function () {
       if (v.groups) {
         groups = v.groups.map(g => ({ group: g.name, tabs: g.tabs.map(tab).filter(Boolean) }));
       } else if (p && p.drop) {
-        groups = TABS.map(g => ({ group: g.group, tabs: g.tabs.filter(t => !p.drop.includes(t.id)) }));
+        groups = TABS.map(g => ({ group: g.group, tabs: g.tabs.filter(t => tabInBar(t) && !p.drop.includes(t.id)) }));
       } else if (p) {
         groups = p.groups.map(g => ({ group: g.name, tabs: g.tabs.map(tab).filter(Boolean) }));
       } else {
@@ -629,7 +632,7 @@ const NavViews = (function () {
     const mine = signedIn() && !v.fixed;
     const vid = escAttr(v.id);
     const shown = new Set(v.groups.flatMap(g => g.tabs.map(t => t.id)));
-    const missing = TAB_LIST.filter(t => !shown.has(t.id) && tabShown(t));
+    const missing = TAB_LIST.filter(t => !t.partOf && !shown.has(t.id) && tabShown(t));
     const groupOpts = (except) => v.groups.map((g, i) => i === except ? ''
       : `<option value="${i}">${esc(g.group)}</option>`).join('');
 

@@ -133,18 +133,16 @@ const Glyphs = (() => {
 
   // Each of TABS' groups: its picture, and its family.
   const GROUP = {
-    'Start here':          ['home',      'net'],
-    'Stations & networks': ['repeater',  'net'],
-    'Printed maps':        ['print',     'net'],
-    'Interference':        ['interfere', 'radio'],
-    'ALERT':               ['decode',    'radio'],
-    'Data':                ['data',      'data'],
-    'Network health':      ['health',    'data'],
-    'Site visits':         ['inspect',   'field'],
-    'Surveying':           ['survey',    'field'],
-    'Field training':      ['staff',     'learn'],
-    'Knowledge base':      ['learn',     'learn'],
-    'Admin':               ['admin',     'admin'],
+    'Start here':               ['home',      'net'],
+    'Stations & networks':      ['repeater',  'net'],
+    'Maps & files':             ['print',     'net'],
+    'Radio & signals':          ['interfere', 'radio'],
+    'Data':                     ['data',      'data'],
+    'Network health':           ['health',    'data'],
+    'Field work':               ['inspect',   'field'],
+    'Learn: radio & equipment': ['learn',     'learn'],
+    'Learn: field practice':    ['staff',     'learn'],
+    'Admin & planning':         ['admin',     'admin'],
   };
 
   // Every tab's picture. A tab added to TABS without one here is drawn with
@@ -223,7 +221,7 @@ const Glyphs = (() => {
 
   // The TABS group a tab is filed under.
   function homeGroup(id) {
-    const g = TABS.find(x => x.tabs.some(t => t.id === id));
+    const g = tabGroupOf(id);
     return g ? g.group : '';
   }
 

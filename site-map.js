@@ -541,29 +541,25 @@ const SiteMap = (function () {
   // site"; `step` is that sentence, cut at the commas.
   const GROUPS = {
     'Start here': { step: 'Getting set up',
-      blurb: 'Before the work: everything Flood-Net can do on one list, getting a phone or laptop ready for a site with no signal, putting Flood-Net on its home screen, and choosing what the bar on the left lists.' },
+      blurb: 'Before the work: the front page, and this guide — what every tab is for, everything Flood-Net can do on one list, and short videos. Getting a device ready for a site with no signal is the 📲 button in the banner; choosing what the bar lists is in 🎨 Theme & layout.' },
     'Stations & networks': { step: 'What is out there',
-      blurb: 'The stations themselves, what each repeater passes on and how long it waits to do it, and the files made from them. Most days start here.' },
-    'Printed maps': { step: 'On paper',
-      blurb: 'The network on map sheets: the bundled radio-path PDFs to browse, and new sheets made to order for print or a laser cutter.' },
-    'Interference': { step: 'What is stepping on it',
-      blurb: 'For readings that go bad with nothing wrong on site: the licensed transmitters nearby, what changed on the air, a case worked through to the next check, who is corrupting the readings, and a bench to try what each cause does to the bits.' },
-    'ALERT': { step: 'What it actually sent',
-      blurb: 'The messages themselves — decoded bit by bit, explained when they land on the wrong address, and heard live off the air.' },
+      blurb: 'The stations themselves, the ALERT addresses each repeater passes on, and the repeaters — with how long each waits before it passes a reading on. Most days start here.' },
+    'Maps & files': { step: 'On paper and in files',
+      blurb: 'The network on map sheets — the bundled radio-path PDFs, and new sheets made to order for print or a laser cutter — and the files Radio Mobile reads.' },
+    'Radio & signals': { step: 'What is on the air',
+      blurb: 'The licensed transmitters nearby and what changed among them, a case worked through to the next check, every burst traced back to whoever sent it, what an address could have been before a bit flipped, and one decoder for every kind of message — read live off the air too.' },
     'Data': { step: 'What the sensors said',
-      blurb: 'The readings themselves: opened in ARRO, charted from its exports and from our own receivers, and logged as they arrive.' },
+      blurb: 'The readings themselves: charted from an ARRO export or from Flood-Net\'s own data, opened in ARRO, logged as they arrive, and the base stations\' traffic charted.' },
     'Network health': { step: 'How it is holding up',
-      blurb: 'What the readings say about the network: each station\'s health, the repeaters ranked by what is wrong with each, write-ups of strange data and what was behind it, how all of it is judged — and the tasks handed to the teams that fix it.' },
-    'Site visits': { step: 'What we did on site',
-      blurb: 'The paperwork of a visit, digitised — inspections, council maintenance, the record of both, and the photos.' },
-    'Surveying': { step: 'How high it all is',
-      blurb: 'A station\'s levels on a phone: the survey sheet that reduces the run as it is read, the level\'s own two-peg check, and a refresher on doing both.' },
-    'Field training': { step: 'Practising the fieldwork',
-      blurb: 'Practice rather than tools: re-tellings of Mallee HydroTech\'s open training tools — reading a staff, keeping a level book, the life of a site, and a day on the level and on the river.' },
-    'Knowledge base': { step: 'Learning how',
-      blurb: 'Flood-Net\'s own lessons: how radio carries a reading home, why readings arrive wrong — each fault in depth, and how to tell them apart — and the power and SWR meters that check a station\'s antenna line.' },
-    'Admin': { step: 'Keeping it running',
-      blurb: 'Where the station data comes from, who may sign in, the base stations that receive it all, and the review of a network\'s design.' },
+      blurb: 'What the readings say about the network: each station\'s health, the repeaters ranked by what is wrong with each, the base stations checking in, and write-ups of strange data — with how all of it is judged.' },
+    'Field work': { step: 'What we did on site',
+      blurb: 'A visit, digitised: the stations around you, the jobs handed to a team, the inspection forms and their record, the photos taken and filed, and the levels surveyed and checked.' },
+    'Learn: radio & equipment': { step: 'Learning how',
+      blurb: 'Flood-Net\'s own lessons: how radio carries a reading home, why readings arrive wrong — a bench to try each fault and the lesson on it — the meters and connectors a visit meets, an ERT-A2 on the bench, and the licence rules.' },
+    'Learn: field practice': { step: 'Practising the fieldwork',
+      blurb: 'Practice rather than tools: a refresher on surveying, and re-tellings of Mallee HydroTech\'s open training tools — reading a staff, keeping a level book, the life of a site, and a day on the level and on the river.' },
+    'Admin & planning': { step: 'Keeping it running',
+      blurb: 'Where the station data comes from and who may sign in, and the network\'s design: its review, the plan to move it to ALERT2, and ALERT2\'s time slots.' },
   };
 
   // ── Everyday jobs ──────────────────────────────────────────────────────────
@@ -629,8 +625,11 @@ const SiteMap = (function () {
   // & Install, and is the first stop: getting a device ready comes before the
   // work.
   function workGroups() {
+    // A tab with views (core.js, tabFamily) has a card for each, straight
+    // after its own, each saying which tab it is a view of.
     return TABS
-      .map(g => ({ group: g.group, slug: slug(g.group), tabs: g.tabs.filter(t => t.id !== SELF && tabShown(t)) }))
+      .map(g => ({ group: g.group, slug: slug(g.group),
+                   tabs: g.tabs.flatMap(t => [t, ...(t.parts || [])]).filter(t => t.id !== SELF && tabShown(t)) }))
       .filter(g => g.tabs.length)
       .map((g, i) => ({ ...g, n: i + 1, hue: 'sm-g' + ((i % HUES) + 1) }));
   }
@@ -645,7 +644,7 @@ const SiteMap = (function () {
 
   function render() {
     const groups = workGroups();
-    const tabCount = groups.reduce((n, g) => n + g.tabs.length, 0);
+    const tabCount = TAB_LIST.filter(t => !t.partOf && tabShown(t)).length;
     return `
     <div class="page sm-page" id="sm-page" style="--page-max:1180px">
       ${welcomeHtml()}
@@ -766,7 +765,7 @@ const SiteMap = (function () {
   function anatomySvg() {
     // The nav column: a short bar per group heading, a row per tab.
     const top = 66, bottom = 292;
-    const nTabs = TAB_LIST.length, nGroups = TABS.length;
+    const nTabs = TABS.reduce((n, g) => n + g.tabs.length, 0), nGroups = TABS.length;
     const head = 5, gap = 4;
     const row = Math.min(9, (bottom - top - nGroups * head - (nGroups - 1) * gap) / nTabs);
     let y = top;
@@ -928,6 +927,7 @@ const SiteMap = (function () {
               <span class="sm-card-ico" aria-hidden="true">${t.icon}</span>
               <h4 class="sm-card-h">${esc(t.label)}</h4>
             </div>
+            ${t.partOf ? `<p class="sm-card-in small txt-muted">A view of <strong>${esc((tabHost(t.id) || {}).label || '')}</strong> — <em>${esc(t.view || t.label)}</em> along its top.</p>` : ''}
             <p class="sm-card-what">${esc(what)}</p>
             ${use.length ? `<ul class="sm-card-use" aria-label="Use it to">${use.map(u => `<li>${esc(u)}</li>`).join('')}</ul>` : ''}
             ${g && g.note ? `<p class="sm-card-note">${esc(g.note)}</p>` : ''}
@@ -1016,13 +1016,16 @@ const SiteMap = (function () {
     const val  = i < 0 ? '' : spec.slice(i + 1);
     let el = null;
     if (kind === 'tab') {
-      el = document.querySelector(`#tab-nav .tab-btn[data-tab="${CSS.escape(val)}"]`);
+      // A view's button is its host's: the bar lists the tab, not its views.
+      const host = (typeof tabHost === 'function' && tabHost(val)) || null;
+      const id = host ? host.id : val;
+      el = document.querySelector(`#tab-nav .tab-btn[data-tab="${CSS.escape(id)}"]`);
       // The Calm look (calm-shell.js) keeps a tab's button in the bar only in
       // a phone's drawer; wider, its group's button stands for it, and the
       // row across the top has it when its group is the one open.
       if (el && !onScreen(el)) {
         const sec = el.closest('.calm-sec');
-        el = onScreen(document.querySelector(`#section-bar .tab-btn[data-tab="${CSS.escape(val)}"]`))
+        el = onScreen(document.querySelector(`#section-bar .tab-btn[data-tab="${CSS.escape(id)}"]`))
           || (sec && sec.querySelector('.nav-sec')) || el;
       }
     } else if (kind === 'group') {
