@@ -109,7 +109,7 @@ async function main() {
         };
       });
       check('🌗 opens the four as radios, the current one checked and focused',
-        menu.title === 'Theme' && menu.values.join() === 'system,light,dark,sunlight' && menu.checked === 'system'
+        menu.title === 'Theme & layout' && menu.values.join() === 'system,light,dark,sunlight' && menu.checked === 'system'
           && menu.focused === 'system' && menu.labelled, J(menu));
       await page.click('#theme-pick input[value="sunlight"]');
       await page.waitForTimeout(50);
