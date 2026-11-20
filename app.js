@@ -7016,6 +7016,8 @@ function initMap() {
   MapFeeds.attach(state.map);
   // …and what land is under the pointer while they are drawn (map-property-tip.js).
   MapPropTip.attach(state.map);
+  // What the More map layers show under the pointer (map-feed-tip.js).
+  if (typeof MapFeedTip !== 'undefined') MapFeedTip.attach(state.map);
   // 💬 under ↺: the hover notes — that one and every other name that follows
   // the pointer — on or off, remembered (map-tip-stack.js).
   MapTipStack.attachSwitch(state.map);

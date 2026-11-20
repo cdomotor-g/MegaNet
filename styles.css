@@ -5339,6 +5339,11 @@ html[data-lat-anim][data-look="signs"] #help-panel.rail-names .dock-tab[data-doc
 
 .mn-prop-tip-h { font-weight: 700; }
 .mn-prop-tip-l { font-weight: 500; font-size: .68rem; color: #5d4037; }
+/* The More map layers under the pointer (map-feed-tip.js): wider, since a
+   power line's name and its exclusion zone run long. */
+.leaflet-tooltip.mn-road-label.mn-prop-tip.mn-feed-tip { max-width: 22rem; white-space: normal; }
+.mn-feed-tip .mn-prop-tip-l + .mn-prop-tip-l { margin-top: .1rem; }
+.mn-feed-tip-note { font-style: italic; opacity: .8; }
 
 /* A bridge's name and whose it is, on hover (map-road-owners.js). The road
    label's deal — its own near-white ground and fixed dark ink, because it sits

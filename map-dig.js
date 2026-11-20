@@ -665,6 +665,10 @@ ${list.map(x => `<tr class="${x.band}"><td>${band[x.band]}</td><td>${esc(x.what)
 
   return {
     WORDS,
+    // For the hover tip over More map layers (map-feed-tip.js): the same
+    // soil words and exclusion zones.
+    SOIL,
+    exclusionM,
     attach(m) {
       map = m;
       load();

@@ -82,6 +82,16 @@ function answer(url) {
   if (/\/identify$/.test(path)) {
     if (/Biosecurity/.test(path)) return json({ results: [{ layerId: 65, layerName: 'Fire ant', value: 'Fire ant biosecurity zone 2', attributes: { 'Biosecurity zone': 'Fire ant biosecurity zone 2' } }] });
     if (/CulturalHeritage/.test(path)) return json({ results: [{ layerId: 1, layerName: 'party', value: 'Example People', attributes: { Name: 'Example People' } }] });
+    // The hover tip (map-feed-tip.js) asks the pictures' services this way.
+    if (/Electricity_Infrastructure/.test(path)) return json({ results: [{ layerId: 2, layerName: 'Power Lines', value: 'Example 132', attributes: { 'Feature Name': 'Example 132', 'Feature Subtype': 'Overhead', Capacity_kV: '132' } }] });
+    if (/Oil_Gas_Pipelines/.test(path)) return json({ results: [{ layerId: 1, layerName: 'Gas_Pipelines', value: 'Example Gas Line', attributes: { feature_name: 'Example Gas Line', operator: 'Example Co', status: 'Operational' } }] });
+    if (/SoilsAndLandResource/.test(path)) {
+      return json({ results: [
+        { layerId: 2052, layerName: 'national', value: 'A', attributes: { 'Probability class definition': 'High probability of occurrence' } },
+        { layerId: 1952, layerName: '1:50 000', value: 'P', attributes: { 'Map code meaning': 'Potential acid sulfate soil within 1 m of the surface' } },
+        { layerId: 156, layerName: 'ASC', value: 'x', attributes: { 'Australian Soil Classification Order': 'Vertosol' } },
+      ] });
+    }
     return json({ results: [] });
   }
   if (/FeatureServer\/\d+\/query$/.test(path)) return json({ features: [] });
@@ -196,7 +206,42 @@ try {
   await page.evaluate(() => MapDig.clear());
   check('Clear takes it off the map', await page.evaluate(() => !MapDig.live() && MapDig.drawnCount() === 0));
 
-  // ── 6. Another view switches it off ──────────────────────────────────────
+  // ── 6. The hover tip over More map layers ────────────────────────────────
+  console.log('6. What the layers show under the pointer');
+  await page.evaluate(() => { MapViews.apply('dig'); MapDig.clear(); MapFeeds.setEnabled('qld-soils', true); state.map.setView([-27.5, 152.95], 17); });
+  await page.waitForTimeout(400);
+  const lines = await page.evaluate(({ lat, lon }) => MapFeedTip.linesAt(lat, lon), SPOT);
+  const has = re => lines.some(l => re.test(l));
+  check('the tip names the transmission line, its voltage, overhead, and its crane exclusion zone',
+    has(/Transmission line, overhead, 132 kV · crane exclusion zone 3 m — Example 132/), J(lines));
+  check('the gas pipeline and who runs it', has(/Gas pipeline \(high pressure\) — Example Gas Line · Example Co/), J(lines));
+  check('Energex\'s cable under the pointer, underground', has(/Energex: underground cable, low voltage/), J(lines));
+  check('the finest acid sulfate map\'s words, not the national atlas\'s', has(/Acid sulfate soil — Potential acid sulfate soil within 1 m of the surface \(1:50 000\)/), J(lines));
+  check('the soil order in plain words', has(/Soil: Vertosol — Cracking clay that swells/), J(lines));
+  check('the cultural heritage party', has(/Cultural heritage party — Example People/), J(lines));
+  check('and the wind region, with the wind layer on', has(/Wind region/), J(lines));
+  const spot = await page.evaluate(({ lat, lon }) => { const p = state.map.latLngToContainerPoint([lat, lon]); const r = state.map.getContainer().getBoundingClientRect(); return { x: r.left + p.x + 3, y: r.top + p.y + 3 }; }, SPOT);
+  await page.mouse.move(spot.x - 40, spot.y - 40);
+  await page.mouse.move(spot.x, spot.y, { steps: 4 });
+  await page.waitForFunction(() => MapFeedTip._state().shown, null, { timeout: 8000 }).catch(() => {});
+  const tipped = await page.evaluate(() => ({ ...MapFeedTip._state(), cls: !!document.querySelector('.leaflet-tooltip.mn-feed-tip') }));
+  check('resting the mouse there shows it as a hover tip, saying it is a guide, not a locate',
+    tipped.shown && tipped.cls && /Map layers here/.test(tipped.text), J(tipped));
+  await page.evaluate(() => MapFeedTip._ask(-27.4995, 152.9505));
+  await page.waitForFunction(() => MapFeedTip._state().shown && /Map layers here/.test(MapFeedTip._state().text), null, { timeout: 8000 }).catch(() => {});
+  const before = await page.evaluate(() => MapFeedTip._state().asked);
+  await page.evaluate(() => MapFeedTip._ask(-27.4995, 152.9505));
+  await page.waitForTimeout(600);
+  const after = await page.evaluate(() => MapFeedTip._state());
+  check('coming back to the same spot asks nothing again', after.asked === before, J({ before, after }));
+  await page.evaluate(() => MapTipStack.setEnabled(false));
+  await page.mouse.move(spot.x + 30, spot.y);
+  await page.waitForTimeout(900);
+  const offState = await page.evaluate(() => ({ off: MapTipStack.off(), shown: MapFeedTip._state().shown }));
+  check('with 💬 off, no tip', offState.off && !offState.shown, J(offState));
+  await page.evaluate(() => { MapTipStack.setEnabled(true); MapFeeds.setEnabled('qld-soils', false); });
+
+  // ── 7. Another view switches it off ──────────────────────────────────────
   await page.evaluate(() => { MapDig.checkAt(-27.5, 152.95); MapViews.apply('property'); });
   check('another view takes the check off', await page.evaluate(() => !MapDig.live() && !state.mapDig));
   check('no page errors', errors.length === 0, errors.join(' | '));

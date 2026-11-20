@@ -428,6 +428,17 @@ try {
   check('What is here carries the same section and asks it about the picked point',
     /data-mn-feeds="\$\{escAttr\(MapFeeds\.key\(here\)\)\}"/.test(hereSrc) && /MapFeeds\.ask\(FEEDS_ID, landPoint\(\)\)/.test(hereSrc));
 
+  // ── 5. The hover tip over the layers (map-feed-tip.js) ──────────────────
+  const tipLines = await page.evaluate(({ lat, lon }) => {
+    MapFeeds.setOnly(['qld-flood-history', 'qld-heritage']);
+    state.map.setView([lat, lon], 12);
+    return MapFeedTip.linesAt(lat, lon);
+  }, CENTER);
+  check('resting on a past flood outline and a heritage area names both in the hover tip',
+    tipLines.some(l => /Past flood reached here — 1974/.test(l)) && tipLines.some(l => /Cultural heritage party — Example People/.test(l)), JSON.stringify(tipLines));
+  await page.evaluate(() => MapFeeds.setOnly([]));
+  const none = await page.evaluate(({ lat, lon }) => MapFeedTip.linesAt(lat, lon), CENTER);
+  check('with no layer on, the hover tip asks nothing and says nothing', none.length === 0, JSON.stringify(none));
   check('no page errors', errors.length === 0, errors.join(' | '));
 } finally {
   await browser.close();

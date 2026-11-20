@@ -12,6 +12,10 @@ A tool on the Stations map (`map-dig.js`) and a view in the **Property** group o
 - **Both / Overhead (cranes) / Underground (digging)**: which services to list. Land and ground findings always show.
 - **Print check sheet / Save check sheet**: one page with the findings, what the open data leaves out, and blank lines for the Before You Dig request number, who located services, and the landholder.
 
+## Hover notes over the layers
+
+Rest the pointer on the map, or tap it with a finger, and a note titled *Map layers here* names what each More map layer you have on shows there (`map-feed-tip.js`). It works in every view, not just this one. A power line or cable gets its voltage, whether it's overhead or underground, and its crane exclusion zone. A pipe gets its size, material and depth where the owner publishes them. A pipeline gets its name and who runs it. Areas give their name: a flood outline, a dam-failure area, a park, a heritage group, a fire ant zone, a weed square, a fence, the finest acid sulfate soil map's words, the soil order in plain words. Satellite water gives how often water has been seen there. The wind region is added when the wind layer is on. Lines are found within 8 pixels of the pointer. Each service is asked once the pointer rests (0.45 s), and the answer is kept for that spot. 💬 turns it off along with the other hover notes. The gauge, tide and weed pins have hover notes of their own.
+
 ## What it reads
 
 | Finding | Source | Banding |

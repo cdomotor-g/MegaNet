@@ -32,6 +32,10 @@ const WhatsNew = (() => {
         + 'and <em>🚧 Before you dig</em> lists what is near: red to stop and look at, amber to check, with each overhead '
         + 'line\'s crane exclusion zone. Print or save it as a check sheet. A guide, not a locate: still lodge a Before You Dig request.',
       '🟫 <strong>Soil type and acid sulfate soils</strong> are new layers in <em>More map layers</em> (Queensland).',
+      '💬 <strong>Hover over any of the More map layers</strong> to see what is there: the power line or cable, its voltage, '
+        + 'overhead or underground and its crane exclusion zone; a pipe\'s size, material and depth; the pipeline and who runs it; '
+        + 'the flood outline, park, heritage group, zone, soil or acid sulfate soil; how often water has been seen there. '
+        + 'A finger taps. 💬 turns it off with the other hover notes.',
       '🎨 Each group of Views now has a band across its heading in its own colour.',
       '🔧 A station card\'s <em>Open data here → Power network</em> row said “none within 30 m” even under the wires: '
         + 'Energex and Ergon\'s service ignored the distance. It now finds them.',

@@ -1393,7 +1393,7 @@ const MapFeeds = (function () {
     // What 🚧 Before you dig (map-dig.js) asks: the same services, the same
     // ways of asking, so a fix to one is a fix to both.
     digSources() {
-      return { GA_ELEC, GA_PIPES, SOILS, NET_SERVICES, NET_CLASS, netQuery, partQuery, askJson, inBox,
+      return { GA_ELEC, GA_PIPES, SOILS, NET_SERVICES, NET_CLASS, netQuery, partQuery, askJson, inBox, identify, layersOf,
         pipeFeeds: FEEDS.filter(f => f.kind === 'pipes'), question: (n, lat, lon) => QUESTIONS[n](lat, lon),
         NOT_FOR_DIGGING };
     },

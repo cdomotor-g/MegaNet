@@ -130,7 +130,8 @@ const MapTipStack = (() => {
     return tipsOff;
   }
   const TITLE_ON = 'Hover notes are on: resting the pointer on the map says what is under it — the lot, tenure and '
-    + 'easements of the land, a road, river, bridge or survey mark, a station or a radio path. Press to turn them off.';
+    + 'easements of the land, a road, river, bridge or survey mark, a station or a radio path, and what the More map layers '
+    + 'show there — a power line, a pipe, a soil, a zone. Press to turn them off.';
   const TITLE_OFF = 'Hover notes are off: nothing pops up under the pointer. The names printed on the map stay, and a '
     + 'click still opens a card. Press to turn them back on.';
   function paint(map) {
