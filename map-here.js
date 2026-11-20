@@ -290,6 +290,16 @@ const MapHere = (function () {
       'none drawn here yet — the layer draws a viewport at a time from about zoom 12');
   }
 
+  function acmaHtml(lat, lon) {
+    const h = typeof MapAcma !== 'undefined' && MapAcma.hereHtml ? MapAcma.hereHtml(lat, lon) : '';
+    if (h) return h;
+    if (typeof MapAcma !== 'undefined' && MapAcma.load) {
+      const mine = gen;
+      MapAcma.load().then(() => { if (mine === gen && at) render(); }, () => {});
+    }
+    return '<span class="small txt-muted stn-card-rhs-head">ACMA licensing</span><div class="acma-row"><span>ACMA licences</span><span>looking them up…</span></div>';
+  }
+
   function cardHtml() {
     if (!at) return '';
     const [lat, lon] = at;
@@ -324,6 +334,9 @@ const MapHere = (function () {
         ${basinRow()}
         ${hubRow()}
       </div>
+      <!-- The radio licences whose service areas cover this point (map-acma.js),
+           above the land: ACMA's register, read at the point. -->
+      <div class="acma-sect" id="mn-here-acma">${acmaHtml(lat, lon)}</div>
       <!-- Whose ground: the lot, its tenure, who holds that kind of land, the
            council, the address and the land use — the station card's land
            section, asked about this point instead (site-land.js). -->

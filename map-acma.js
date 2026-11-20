@@ -1580,6 +1580,7 @@ const MapAcma = (() => {
         return at.length === 1 && pair ? ptpTipHtml(ptp, pair[0], pair[1])
           : `<div class="lic-tip"><span class="lic-muted">${esc(site.name)}</span><br>${tipHtml(at)}</div>`;
       }, { direction: 'top', sticky: true });
+      m.on('mouseover', hoverHide);
       m.on('click', () => MapAcma.pickLicence((at.find(l => l.no === heavyNo) || l0).no, { stay: true }));
       m.addTo(siteLayer);
     }
@@ -1760,6 +1761,104 @@ const MapAcma = (() => {
     return true;
   }
 
+  // ── Which licences cover a point ────────────────────────────────────────────
+  // The same areas drawLicences paints: a point-to-multipoint licence's circle
+  // round each transmitter, and a point-to-point licence's oval round each
+  // link. Used by the hover over the map and by the What's here card.
+
+  function inPoly(lat, lon, pts) {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const [yi, xi] = pts[i], [yj, xj] = pts[j];
+      if ((xi > lon) !== (xj > lon) && lat < (yj - yi) * (lon - xi) / (xj - xi) + yi) inside = !inside;
+    }
+    return inside;
+  }
+
+  // [{ l, km, site }] for a circle, [{ l, ends: [a, b], km }] for an oval; the
+  // licences in force first, then the nearest transmitter first.
+  function licencesAt(lat, lon, keep) {
+    if (!D) return [];
+    const out = [];
+    for (const l of D.lics) {
+      if (keep && !keep(l)) continue;
+      if (l.kind === 'pmp') {
+        const R = radiusOf(l);
+        let best = null;
+        for (const site of l.txSites) {
+          const km = acmaHaversineKm(lat, lon, site.lat, site.lon);
+          if (km <= R && (!best || km < best.km)) best = { l, km, site };
+        }
+        if (best) out.push(best);
+      } else {
+        for (const [a, b] of l.links) {
+          const len = acmaHaversineKm(a.lat, a.lon, b.lat, b.lon);
+          if (acmaHaversineKm(lat, lon, (a.lat + b.lat) / 2, (a.lon + b.lon) / 2) > len / 2 + OVAL_PAD_KM + 4.5) continue;
+          if (inPoly(lat, lon, ovalOf(a, b))) { out.push({ l, ends: [a, b], km: Math.min(acmaHaversineKm(lat, lon, a.lat, a.lon), acmaHaversineKm(lat, lon, b.lat, b.lon)) }); break; }
+        }
+      }
+    }
+    return out.sort((x, y) => (standing(x.l) === 'lapsed') - (standing(y.l) === 'lapsed') || x.km - y.km);
+  }
+
+  // One licence's few lines: who, what, how long, and why this point is under it.
+  function coverEntryHtml(h) {
+    const l = h.l;
+    const why = h.ends
+      ? `in the oval round the link ${esc(h.ends[0].name)} ↔ ${esc(h.ends[1].name)}`
+      : `inside its ${esc(String(radiusOf(l)))} km service area, ${esc(fmtKm(h.km))} from ${esc(h.site.name)}`;
+    return `<strong>${esc(l.no)}</strong> ${esc(holderName(l))}${otherTagHtml(l) ? `<br>${otherTagHtml(l)}` : ''}`
+      + `<br>${esc(kindWord(l))} · ${esc(freqText(l))}`
+      + `<br>${standing(l) === 'lapsed' ? 'not in force' : `in force to ${esc(dateText(l.expiry))}`}${standing(l) === 'soon' ? ' (expires soon)' : ''}`
+      + `<br><span class="lic-muted">${why}</span>`;
+  }
+
+  // ── The hover over a licence's area ─────────────────────────────────────────
+  let hoverTip = null, hoverRaf = 0, hoverEv = null;
+  const HOVER_MAX = 6;
+
+  function hoverHide() {
+    if (hoverRaf) { cancelAnimationFrame(hoverRaf); hoverRaf = 0; }
+    if (hoverTip && map && map.hasLayer(hoverTip)) map.closeTooltip(hoverTip);
+  }
+
+  function hoverShow(e) {
+    if (!map || !D || !F.show || !areaLayer || !e || !e.latlng) return hoverHide();
+    const heavyNo = picked && picked.type === 'licence' ? picked.id : null;
+    const hits = licencesAt(e.latlng.lat, e.latlng.lng, l => shown(l) || l.no === heavyNo);
+    if (!hits.length) { if (hoverTip && map.hasLayer(hoverTip)) map.closeTooltip(hoverTip); return; }
+    const html = `<div class="lic-tip"><span class="lic-muted">${hits.length === 1 ? 'Covered by 1 licence' : `Covered by ${hits.length} licences`}</span><br>`
+      + hits.slice(0, HOVER_MAX).map(coverEntryHtml).join('<hr>')
+      + (hits.length > HOVER_MAX ? `<hr>+ ${hits.length - HOVER_MAX} more here` : '') + '</div>';
+    hoverTip = hoverTip || L.tooltip({ direction: 'right', offset: [14, 0], opacity: 0.96, className: 'lic-cover-tip' });
+    hoverTip.setContent(html);
+    hoverTip.setLatLng(e.latlng);
+    if (!map.hasLayer(hoverTip)) map.openTooltip(hoverTip);
+  }
+
+  function onHover(e) {
+    if (e.originalEvent && e.originalEvent.buttons) return hoverHide();   // dragging the map
+    hoverEv = e;
+    if (!hoverRaf) hoverRaf = requestAnimationFrame(() => { hoverRaf = 0; hoverShow(hoverEv); });
+  }
+
+  // For the What's here card: the licences in force over a point, as a section.
+  // Null until the register has loaded.
+  function hereHtml(lat, lon) {
+    const head = '<span class="small txt-muted stn-card-rhs-head">ACMA licensing</span>';
+    if (!D) return null;
+    const hits = licencesAt(lat, lon, l => standing(l) !== 'lapsed');
+    if (!hits.length) {
+      return `${head}<div class="acma-row"><span>ACMA licences</span><span>none cover this point
+        <span class="mn-pop-note" title="${escAttr(meaning('area'))}">service areas</span></span></div>`;
+    }
+    return `${head}<div class="acma-row"><span title="${escAttr(meaning('area'))}">ACMA licences</span><span>${hits.length} cover${hits.length === 1 ? 's' : ''} this point</span></div>`
+      + hits.slice(0, 8).map(h => `<div class="acma-row"><span>
+          <button type="button" class="link-btn" onclick="MapAcma.pickLicence('${escAttr(h.l.no)}')"
+            title="Show this licence and what it covers on the map">${esc(h.l.no)}</button></span><span>${coverEntryHtml(h).replace(/^<strong>[^<]*<\/strong> /, '')}</span></div>`).join('')
+      + (hits.length > 8 ? `<div class="acma-row"><span></span><span>+ ${hits.length - 8} more</span></div>` : '');
+  }
+
   function whenLoaded(fn) {
     ensure().then(() => fn(), () => { render(); repaintCards(); });
   }
@@ -1775,6 +1874,8 @@ const MapAcma = (() => {
       pane(COVER_PANE, COVER_Z, false);
       coverRenderer = null;
       syncState();
+      m.off('mousemove', onHover).on('mousemove', onHover);
+      m.off('mouseout', hoverHide).on('mouseout', hoverHide);
       if (typeof MapAcmaCheck !== 'undefined') MapAcmaCheck.attach(m);
       // After ⚖️ Repeater comparison: the last of the tools that read the
       // network rather than change it.
@@ -1798,6 +1899,9 @@ const MapAcma = (() => {
 
     detach() {
       if (typeof MapAcmaCheck !== 'undefined') MapAcmaCheck.detach();
+      hoverHide();
+      if (map) { map.off('mousemove', onHover); map.off('mouseout', hoverHide); }
+      hoverTip = null;
       clearLayers();
       coverRenderer = null;
       body = null;
@@ -2010,6 +2114,8 @@ const MapAcma = (() => {
     // For other modules — the Stations list's column, an export line — and the checks.
     load: ensure,
     loaded() { return !!D; },
+    licencesAt,
+    hereHtml,
     stateOf(s) {
       if (!D || !s) return null;
       const a = assess(s, { light: true });

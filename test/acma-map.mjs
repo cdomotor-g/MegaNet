@@ -159,6 +159,35 @@ ok('…and a ring to press at every licensed site', drawn.rings === allSites, J(
 ok('the rail is lit and the legend says what the shapes mean', drawn.live && drawn.legend, J({ live: drawn.live, legend: drawn.legend }));
 ok('the panel says a circle is the service area ACMA plans on, not a boundary in the law', /service area — the ground ACMA plans the licence to serve, not a boundary in the law/.test(drawn.shown), drawn.shown);
 
+// Hovering the ground inside a circle lists the licence — every licence whose area the cursor is in.
+const areaHov = await page.evaluate(() => {
+  const c = MapAcma.core(), l = c.D.lics.find(x => x.kind === 'pmp' && x.txSites.length && c.standing(x) !== 'lapsed'), site = l.txSites[0];
+  state.map.setView([site.lat, site.lon], 11, { animate: false });
+  const pt = state.map.latLngToContainerPoint([site.lat, site.lon]);
+  const r = state.map.getContainer().getBoundingClientRect();
+  const all = MapAcma.licencesAt(site.lat + 0.002, site.lon + 0.002, x => c.standing(x) !== 'lapsed').map(h => h.l.no);
+  return { no: l.no, all, x: r.left + pt.x + 30, y: r.top + pt.y + 30 };
+});
+await page.waitForTimeout(400);
+await page.mouse.move(areaHov.x - 40, areaHov.y - 40);
+await page.mouse.move(areaHov.x, areaHov.y, { steps: 4 });
+await page.waitForTimeout(500);
+const tip = await page.evaluate(() => (document.querySelector('.lic-cover-tip') || {}).textContent || '');
+ok('hovering inside a circle names the licences that cover that ground', /Covered by/.test(tip) && (tip.includes(areaHov.no) || areaHov.all.length > 6), tip.slice(0, 200));
+await page.mouse.move(5, 5);
+await page.waitForTimeout(400);
+
+// The What's here card lists the licences over the picked point, above the land section.
+const here = await page.evaluate(async () => {
+  const c = MapAcma.core(), l = c.D.lics.find(x => x.kind === 'pmp' && x.txSites.length && c.standing(x) !== 'lapsed'), site = l.txSites[0];
+  MapHere.arm(true); MapHere.pick(site.lat + 0.002, site.lon + 0.002);
+  await new Promise(r => setTimeout(r, 600));
+  const card = document.getElementById('here-card');
+  const a = document.getElementById('mn-here-acma'), land = card && card.querySelector('[data-mn-land]');
+  return { no: l.no, text: a ? a.textContent.replace(/\s+/g, ' ') : '', above: !!(a && land && (a.compareDocumentPosition(land) & Node.DOCUMENT_POSITION_FOLLOWING)) };
+});
+ok('the What’s here card lists the licences over the point, above the land section', /ACMA licensing/.test(here.text) && here.text.includes(here.no) && here.above, here.text.slice(0, 200));
+
 const bureauPmp = FILE.licences.reduce((n, l, i) => n + (FILE.holders[l[5]][4] === 'bureau' && kindOf(l) === 'pmp' ? txSitesOf(i).length * (lowOf(l, i) && !stated(l) ? 2 : 1) : 0), 0);
 await page.locator('#acmalic-classes input[type="checkbox"]').first().click();
 await page.waitForTimeout(400);
