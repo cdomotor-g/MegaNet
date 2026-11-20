@@ -193,7 +193,7 @@ const MapViews = (function () {
 
   // The overlay layers a view switches, each on its own module's setter.
   const LAYER_KNOBS = ['riverLines', 'riverCatchment', 'rain', 'elev', 'catchments', 'lots', 'easements', 'tenure',
-    'roads', 'roadOwners', 'councils', 'survey', 'hubs', 'wind', 'cameras', 'photos', 'siteFeatures', 'tasks'];
+    'roads', 'roadOwners', 'councils', 'survey', 'hubs', 'wind', 'cameras', 'photos', 'siteFeatures', 'tasks', 'licensing'];
   // Not among them: Offer the digital twin at close zoom (MapTwin.setEnabled).
   // It was a view's to set until November 2026, and seven of the ten views
   // set it on — so an operator who unticked it had it ticked again by the
@@ -206,7 +206,7 @@ const MapViews = (function () {
     catchments: 'river basins', lots: 'property boundaries', easements: 'easements', tenure: 'land tenure',
     roads: 'road parcels', roadOwners: 'road owners', councils: 'council areas', survey: 'survey marks',
     hubs: 'maintenance hubs', wind: 'wind regions', cameras: 'flood cameras', photos: 'field photos',
-    siteFeatures: 'site features', tasks: 'tasks',
+    siteFeatures: 'site features', tasks: 'tasks', licensing: 'licence coverage',
   };
   const PATH_WORDS = {
     every: 'every path', best: 'the best path only', lod: 'the best path until zoomed in',
@@ -317,6 +317,25 @@ const MapViews = (function () {
         base: null, links: true, roles: ALL_ROLES, backbone: false, arrows: false, colour: 'freq', health: true,
         outlines: false, ...only('riverLines', 'photos', 'siteFeatures'),
         drawing: { paths: 'best', draw: 'flow', flow: { mode: 'live' }, auto: true, balance: 65 },
+      },
+    },
+    {
+      // Asked for 19 Nov 2026: "a whole new map layers view within that
+      // technicians group for licensing coverage … at a zoomed out level, our
+      // pin clustering could be colored to indicate licensing coverage". The
+      // 📜 ACMA licences tool's circles, ovals and rings (map-acma.js) on a
+      // light map, each field station's best path faint underneath so the
+      // repeater it reports through can be seen, the bubbles coloured by
+      // covered, uncertain or none found.
+      id: 'licensing', group: 'tech', label: 'Licence coverage',
+      say: 'Where the network is licensed to transmit: each point-to-multipoint licence\'s service area as a circle, each '
+        + 'point-to-point link as an oval round its two ends, and every transmitting station ringed — green covered, amber '
+        + 'uncertain, red none found, grey for base stations, which only receive. Zoomed out, the bubbles take the same colours.',
+      caution: 'Reads the weekly register copy (under 200 KB) the first time. Indicative: not legal advice.',
+      knobs: {
+        base: 'Light', links: true, roles: ALL_ROLES, backbone: false, arrows: false, colour: 'freq', health: false,
+        outlines: false, ...only('riverLines', 'licensing'),
+        drawing: { paths: 'lod', draw: 'lines', auto: true, balance: 30 },
       },
     },
     {
@@ -901,6 +920,7 @@ const MapViews = (function () {
     MapPhotos: () => (typeof MapPhotos !== 'undefined' ? MapPhotos : null),
     SiteFeatures: () => (typeof SiteFeatures !== 'undefined' ? SiteFeatures : null),
     MapTasks: () => (typeof MapTasks !== 'undefined' ? MapTasks : null),
+    MapAcma: () => (typeof MapAcma !== 'undefined' ? MapAcma : null),
     MapTwin: () => (typeof MapTwin !== 'undefined' ? MapTwin : null),
   };
   const M = name => MOD[name];
@@ -972,6 +992,7 @@ const MapViews = (function () {
     photos: boolKnob('mapPhotos', M('MapPhotos'), 'setEnabled'),
     siteFeatures: boolKnob('mapSiteFeatures', M('SiteFeatures'), 'setEnabled'),
     tasks: boolKnob('mapTasks', M('MapTasks'), 'setEnabled'),
+    licensing: boolKnob('mapLicensing', M('MapAcma'), 'setEnabled'),
     // More map layers (map-feeds.js, #296): which of its layers are on, as a
     // list — a kept view or a shared link puts back exactly those.
     feeds: {
@@ -1195,7 +1216,7 @@ const MapViews = (function () {
   const SHARE_V = 'm1';
   const SHARE_SWITCHES = ['links', 'backbone', 'arrows', 'health', 'outlines', 'riverLines', 'riverCatchment', 'rain',
     'elev', 'catchments', 'lots', 'easements', 'tenure', 'roads', 'roadOwners', 'councils', 'survey', 'hubs', 'wind',
-    'cameras', 'photos', 'siteFeatures', 'twinOffer', 'tasks'];
+    'cameras', 'photos', 'siteFeatures', 'twinOffer', 'tasks', 'licensing'];
   // (twinOffer keeps its place so older links still line up; it is no longer
   // a knob, so it is written as "-" and ignored when read.)
   // A base map's name, with the code's own separators kept out of it.
@@ -1600,6 +1621,7 @@ const MapViews = (function () {
     overview: 'The whole network, tidy', site: 'Photo, property lines, survey marks',
     radio: 'Tails that light up round the pointer', weak: 'Coloured by the signal to spare',
     backbone: 'Repeaters, bases and the paths between', traffic: 'Readings pulse in as they arrive',
+    licensing: 'Licence circles; stations covered or not',
     rivers: 'Rivers, basins, ground height', rain: 'Rain gauges as a heat map',
     property: 'Boundaries, easements, road owners', land: 'Parks, forests, State land, leases',
   };
@@ -1640,6 +1662,7 @@ const MapViews = (function () {
       case 'rain': b = G.light + '<circle cx="22" cy="20" r="14" fill="#7c4dff" fill-opacity=".22"/><circle cx="26" cy="22" r="7" fill="#3a2ea8" fill-opacity=".35"/><circle cx="54" cy="32" r="10" fill="#2979ff" fill-opacity=".2"/>' + river('#1f6fd1') + pin(24, 21) + pin(54, 32) + pin(10, 38); break;
       case 'property': b = G.sat + '<path d="M4 10H68M4 26H68M4 40H68M14 4V44M34 4V44M54 4V44" stroke="#fff" stroke-width=".7"/><path d="M24 4V44" stroke="#fff" stroke-width=".8" stroke-dasharray="2 2"/><path d="M0 34 L72 20" stroke="#f9a825" stroke-width="1.6"/>' + pin(44, 16); break;
       case 'tasks': b = G.light + river('#1f6fd1') + [[18, 30, '#c7401a'], [44, 16, '#9e5e00'], [58, 34, '#0b5cab']].map(([x, y, c]) => pin(x, y) + `<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="${c}" stroke-width="1.8"/><rect x="${x + 4}" y="${y - 11}" width="9" height="7" rx="3.5" fill="${c}"/>`).join('') + pin(30, 12) + pin(8, 12); break;
+      case 'licensing': b = G.light + '<circle cx="22" cy="22" r="17" fill="#2e7d32" fill-opacity=".1" stroke="#1565c0" stroke-width=".9"/>' + '<ellipse cx="54" cy="12" rx="15" ry="4" transform="rotate(-18 54 12)" fill="#1565c0" fill-opacity=".14" stroke="#1565c0" stroke-width=".8"/>' + rpt(22, 22) + [[14, 14, '#2e7d32'], [30, 30, '#2e7d32'], [44, 36, '#e08a00'], [64, 40, '#c62828']].map(([x, y, c]) => pin(x, y) + `<circle cx="${x}" cy="${y}" r="4.2" fill="none" stroke="${c}" stroke-width="1.6"/>`).join('') + pin(41, 16) + pin(67, 8); break;
       case 'land': b = G.topo + '<rect x="4" y="4" width="30" height="20" fill="#2e8b3e" opacity=".45"/><rect x="38" y="26" width="30" height="18" fill="#1b7f79" opacity=".4"/><rect x="40" y="4" width="16" height="16" fill="#d6539b" opacity=".35"/><path d="M4 24H68M34 4V44M56 4V44" stroke="#555" stroke-width=".6"/>' + river('#1f6fd1'); break;
       default: b = G.light + P.slice(0, 4).map(p => ln(p, R2, '#2979ff', 1, 0.6)).join('') + rpt(...R2);
     }
@@ -1653,6 +1676,7 @@ const MapViews = (function () {
     catchments: 'River basins', lots: 'Property lines', easements: 'Easements', tenure: 'Land tenure', roads: 'Road parcels',
     roadOwners: 'Road owners', councils: 'Council areas', survey: 'Survey marks', hubs: 'Maintenance hubs',
     wind: 'Wind regions', photos: 'Field photos', siteFeatures: 'Site features', tasks: 'Task rings',
+    licensing: 'Licence coverage',
   };
   function tagsOf(v) {
     const k = (v && v.knobs) || {};

@@ -30268,13 +30268,31 @@ select.kl-in { width: auto; font-family: inherit; }
 :root {
   --lic-bureau: #1565c0; --lic-council: #e65100; --lic-other: #6a1b9a;
   --lic-site: #2e7d32; --lic-area: #0277bd; --lic-none: #c62828; --lic-warn: #f9a825;
-  --lic-beyond: #a56a00;
+  --lic-beyond: #a56a00; --lic-unsure: #e08a00; --lic-lap: #d81b60;
 }
 [data-theme="dark"] {
   --lic-bureau: #64b5f6; --lic-council: #ffb74d; --lic-other: #ce93d8;
   --lic-site: #81c784; --lic-area: #4fc3f7; --lic-none: #ef9a9a; --lic-warn: #ffd54f;
-  --lic-beyond: #ffb300;
+  --lic-beyond: #ffb300; --lic-unsure: #ffb74d; --lic-lap: #f48fb1;
 }
+/* The Licence coverage view's bands (map-acma.js BANDS) and the spot check
+   (map-acma-check.js): a chip per band, the spot's verdict box, its marker,
+   and the crosshair while the map waits for the press. */
+.lic-band-covered { border-color: var(--lic-site); font-weight: 600; }
+.lic-band-unsure { border-color: var(--lic-unsure); font-weight: 600; }
+.lic-band-none { border-color: var(--lic-none); font-weight: 600; }
+.lic-spot { margin: var(--sp-2) 0; padding: var(--sp-2); border: 1px solid var(--border); border-left-width: 4px; border-radius: var(--r-sm); }
+.lic-spot p { margin: 0 0 var(--sp-1); }
+.lic-spot-covered { border-left-color: var(--lic-site); }
+.lic-spot-unsure { border-left-color: var(--lic-unsure); }
+.lic-spot-none { border-left-color: var(--lic-none); }
+.lic-spot-pin span {
+  display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  background: #fff; border: 3px solid var(--dot, #333); color: var(--dot, #333); font-size: 14px; line-height: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .35); cursor: grab;
+}
+.leaflet-container.lic-arming { cursor: crosshair; }
+.lic-states-h { margin-top: var(--sp-2); }
 .lic-dot {
   display: inline-block; width: .7em; height: .7em; margin-right: .35em;
   border-radius: 50%; background: var(--dot, var(--muted)); vertical-align: baseline;

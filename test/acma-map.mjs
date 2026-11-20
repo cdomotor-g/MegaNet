@@ -28,6 +28,12 @@
 //                   legislation.gov.au or acma.gov.au.
 //   8. the rail     live while something is on; 🧹 Clear the selection takes
 //                   all of it off.
+//   9. coverage     the Licence coverage view (19 Nov 2026): every station in
+//      view         one of three bands that rest on its state; the bubbles
+//                   wear them zoomed out and hold back the rings inside;
+//                   point-to-point ovals; low-power licences' 2 km circles;
+//                   same-frequency overlaps worked out again from the file;
+//                   Check a spot; 🗺️ Map views turning it all on and off.
 //
 //   npm run acmamap          (or: node acma-map.mjs)
 //   npm run acmamap -- -v    also print what passed
@@ -125,6 +131,11 @@ const kindOf = l => (/multipoint/i.test(l[2]) ? 'pmp' : 'ptp');
 const devsOf = i => FILE.devices.filter(d => d[0] === i);
 const txSitesOf = i => [...new Set(devsOf(i).filter(d => d[2] === 'T').map(d => d[1]))];
 const expectCircles = FILE.licences.reduce((n, l, i) => n + (kindOf(l) === 'pmp' ? txSitesOf(i).length : 0), 0);
+// A low-power licence — every transmitter 8.3 W EIRP or less, no service area of
+// its own in its conditions — gets a second, 2 km circle at each transmitter.
+const stated = l => l[7].some(c => /service area of (\d+(?:\.\d+)?)\s*km/i.test(FILE.conditions[c]));
+const lowOf = (l, i) => { const e = Math.max(0, ...devsOf(i).filter(d => d[2] === 'T').map(d => Number(d[7]) || 0)); return kindOf(l) === 'pmp' && e > 0 && e <= 8.3 + 1e-6; };
+const lowCircles = FILE.licences.reduce((n, l, i) => n + (lowOf(l, i) && !stated(l) ? txSitesOf(i).length : 0), 0);
 const allSites = new Set(FILE.devices.map(d => d[1])).size;
 
 await page.click('#acmalic-show');
@@ -136,22 +147,23 @@ const drawn = await page.evaluate(() => {
     if (l.options && l.options.pane === 'mnAcmaLicSite' && l instanceof L.CircleMarker) rings++;
   });
   const ptp = MapAcma.licences().map(n => MapAcma.licence(n)).filter(l => l.kind === 'ptp');
-  return { circles, lines, rings, links: ptp.reduce((n, l) => n + l.links.length, 0), ptp: ptp.length, ptpNoLink: ptp.filter(l => !l.links.length).length,
+  return { circles, lines, rings, low: MapAcma.drawn().low, ovals: MapAcma.drawn().ovals, links: ptp.reduce((n, l) => n + l.links.length, 0), ptp: ptp.length, ptpNoLink: ptp.filter(l => !l.links.length).length,
     live: MapAcma.live(), legend: (document.querySelector('.mn-mapctl[data-panel="legend"]')?.textContent || '').includes('ACMA licences'),
     shown: (document.getElementById('acmalic-shown')?.textContent || '').replace(/\s+/g, ' ') };
 });
-ok('Draw puts a circle round every point-to-multipoint base in the file', drawn.circles === expectCircles && expectCircles > 100, J({ drawn: drawn.circles, expectCircles }));
-ok('…a line — and its shaded band — on every point-to-point link, both ends from the file',
-   drawn.links > 0 && drawn.lines === 2 * drawn.links && drawn.ptpNoLink === 0, J(drawn));
+ok('Draw puts a circle round every point-to-multipoint base in the file, and a 2 km one inside each low-power licence’s',
+   drawn.circles === expectCircles + lowCircles && expectCircles > 100 && drawn.low === lowCircles && lowCircles > 0, J({ drawn: drawn.circles, expectCircles, lowCircles, low: drawn.low }));
+ok('…an oval round both ends of every point-to-point link, the link down its middle, both ends from the file',
+   drawn.links > 0 && drawn.lines === 2 * drawn.links && drawn.ovals === drawn.links && drawn.ptpNoLink === 0, J(drawn));
 ok('…and a ring to press at every licensed site', drawn.rings === allSites, J({ rings: drawn.rings, allSites }));
 ok('the rail is lit and the legend says what the shapes mean', drawn.live && drawn.legend, J({ live: drawn.live, legend: drawn.legend }));
 ok('the panel says a circle is the service area ACMA plans on, not a boundary in the law', /service area — the ground ACMA plans the licence to serve, not a boundary in the law/.test(drawn.shown), drawn.shown);
 
-const bureauPmp = FILE.licences.reduce((n, l, i) => n + (FILE.holders[l[5]][4] === 'bureau' && kindOf(l) === 'pmp' ? txSitesOf(i).length : 0), 0);
+const bureauPmp = FILE.licences.reduce((n, l, i) => n + (FILE.holders[l[5]][4] === 'bureau' && kindOf(l) === 'pmp' ? txSitesOf(i).length * (lowOf(l, i) && !stated(l) ? 2 : 1) : 0), 0);
 await page.locator('#acmalic-classes input[type="checkbox"]').first().click();
 await page.waitForTimeout(400);
 const noBureau = await page.evaluate(() => { let c = 0; state.map.eachLayer(l => { if (l.options && l.options.pane === 'mnAcmaLicArea' && l instanceof L.Circle) c++; }); return c; });
-ok('unticking the Bureau takes exactly its circles off', noBureau === expectCircles - bureauPmp, J({ noBureau, expectCircles, bureauPmp }));
+ok('unticking the Bureau takes exactly its circles off', noBureau === expectCircles + lowCircles - bureauPmp, J({ noBureau, expectCircles, bureauPmp }));
 await page.locator('#acmalic-classes input[type="checkbox"]').first().click();
 await page.selectOption('#acmalic-standing', 'soon');
 await page.waitForTimeout(400);
@@ -320,7 +332,7 @@ const cov = await page.evaluate(() => {
   state.map.eachLayer(l => { if (l.options && l.options.pane === 'mnAcmaLicCover' && l instanceof L.CircleMarker) rings++; });
   const n = k => Number(document.querySelector(`#acmalic-counts li[data-state="${k}"] strong`)?.textContent);
   const csv = MapAcma.stationsCsv().trim().split('\n'), lcsv = MapAcma.licencesCsv().trim().split('\n');
-  return { rings, shown: { site: n('site'), area: n('area'), beyond: n('beyond'), none: n('none'), na: n('na') }, counts: MapAcma.counts(),
+  return { rings, held: MapAcma.drawn().held, shown: { site: n('site'), area: n('area'), beyond: n('beyond'), none: n('none'), na: n('na') }, counts: MapAcma.counts(),
     beyondSummary: (document.querySelector('#acmalic-beyond > summary')?.textContent || '').trim(),
     beyondRows: document.querySelectorAll('#acmalic-beyond-table tbody tr').length,
     csvBeyond: csv.filter(l => l.includes(',Beyond a licence’s area,')).length,
@@ -331,7 +343,7 @@ const cov = await page.evaluate(() => {
     csvNone: csv.filter(l => l.includes(',None found,')).length, csvSays: csv[2],
     lcsvRows: lcsv.filter(l => !l.startsWith('#') && !l.startsWith('licence,')).length, n: MapAcma.summary().licences };
 });
-ok('a ring on every transmitting station, and no other', cov.rings === st.rows.length, J({ rings: cov.rings, tx: st.rows.length }));
+ok('a ring on every transmitting station not inside one of the map’s bubbles, and no other', cov.rings + cov.held === st.rows.length, J({ rings: cov.rings, held: cov.held, tx: st.rows.length }));
 ok('the counts on the panel are the counts', cov.shown.site === cov.counts.site && cov.shown.area === cov.counts.area
    && cov.shown.beyond === cov.counts.beyond && cov.shown.none === cov.counts.none && cov.shown.na === cov.counts.na, J(cov.shown));
 ok('the stations beyond a licence’s area are listed, each with the repeater it reports through',
@@ -437,6 +449,122 @@ ok('a licensed site over 2 W EIRP is told the label its transmitter must carry a
    label.fans.length >= 1 && (label.note === '' || (label.note.includes(label.fans[0]) && /Do Not Remove/.test(label.note))), label.note);
 ok('a picked licence lists each transmitter’s frequency assignment number', label.fans.every(f => label.detail.includes(f)), label.detail.slice(0, 200));
 await page.evaluate(() => MapAcma.unpick());
+
+// ── 9. the Licence coverage view ─────────────────────────────────────────────
+console.log('\nThe Licence coverage view');
+
+await page.evaluate(() => { MapAcma.clear(); MapAcma.unpick(); });
+await page.evaluate(() => MapViews.apply('licensing'));
+await page.waitForTimeout(1200);
+const view = await page.evaluate(() => {
+  const s = MapAcma.summary();
+  const tx = state.data.stations.filter(x => x.lat != null && x.lat !== '' && (!!x.repeater || (x.roles || []).includes('repeater') || stationAlertIds(x).length > 0));
+  const rows = tx.map(x => ({ id: x.id, a: MapAcma.stateOf(x).state, b: MapAcma.band(x.id), relay: !!x.repeater || (x.roles || []).includes('repeater') }));
+  return { active: MapViews.active(), on: state.mapLicensing, show: s.show, cover: s.cover, bands: MapAcma.bands(), counts: MapAcma.counts(), rows,
+    view: MapViews.VIEWS.find(v => v.id === 'licensing'), legend: (document.querySelector('.mn-mapctl[data-panel="legend"]')?.textContent || '').replace(/\s+/g, ' '),
+    chips: [...document.querySelectorAll('#acmalic-bands li[data-band] .term')].map(e => !!e.getAttribute('title')) };
+});
+ok('the Licence coverage view is one of the technicians’ views, and pressing it turns the circles and the rings on',
+   view.view && view.view.group === 'tech' && view.active === 'licensing' && view.on === true && view.show && view.cover, J({ active: view.active, on: view.on }));
+ok('every transmitting station is in one band, and the bands add up to the states',
+   view.rows.every(r => r.b && ['covered', 'unsure', 'none'].includes(r.b.band))
+   && view.bands.covered + view.bands.unsure + view.bands.none === view.rows.length && view.bands.na === view.counts.na
+   && view.bands.none === view.counts.none, J({ bands: view.bands, counts: view.counts }));
+ok('…covered rests on a licence at the site or a circle, uncertain on beyond, a repeater in another’s circle or a low-power licence’s wider circle, none on none found',
+   view.rows.every(r => (r.b.band === 'covered' ? ['site', 'area'].includes(r.a) && !(r.a === 'area' && r.relay)
+     : r.b.band === 'unsure' ? (r.a === 'beyond' && r.b.why === 'beyond') || (r.a === 'area' && ['relay', 'lowpower'].includes(r.b.why))
+     : r.a === 'none')) && view.rows.filter(r => r.a === 'area' && r.relay).every(r => r.b.why === 'relay'),
+   J(view.rows.filter(r => !r.b).slice(0, 3)));
+ok('…the band words carry their meanings, and the legend says the colours', view.chips.length === 4 && view.chips.every(Boolean)
+   && /Licensing — a ring on every transmitting station/.test(view.legend) && /bubbles take the same colours/.test(view.legend), view.legend.slice(0, 200));
+
+// Zoomed out, with the bubbles on: they wear the bands, and the rings inside them are held back.
+await page.evaluate(() => { MapCluster.setOn(true); MapCluster.setHow('worst'); state.map.setView([-27.5, 152.8], 8, { animate: false }); });
+await page.waitForTimeout(1200);
+const bub = await page.evaluate(() => {
+  const st = MapCluster._state();
+  const colours = { covered: cssVar('--lic-site', '#2e7d32'), unsure: cssVar('--lic-unsure', '#e08a00'), none: cssVar('--lic-none', '#c62828'), na: cssVar('--muted', '#888888') };
+  const rank = ['na', 'covered', 'unsure', 'none'];
+  const bad = st.bubbles.filter(b => {
+    const bands = b.ids.map(id => (MapAcma.band(id) || { band: 'na' }).band);
+    const tx = bands.filter(x => x !== 'na');
+    const worst = tx.length ? tx.reduce((a, c) => (rank.indexOf(c) > rank.indexOf(a) ? c : a)) : 'na';
+    return String(b.fill).toLowerCase() !== String(colours[worst]).toLowerCase();
+  });
+  const tipped = [...document.querySelectorAll('.leaflet-tooltip')].length;
+  return { n: st.bubbles.length, bad: bad.length, held: MapAcma.drawn().held, rings: MapAcma.drawn().rings, clustered: st.clustered, sample: bad.slice(0, 2) };
+});
+ok('zoomed out, every bubble wears the worst band among its stations', bub.n > 5 && bub.bad === 0, J({ n: bub.n, bad: bub.bad, sample: bub.sample }));
+ok('…and the rings of the stations inside a bubble are held back, the rest drawn', bub.held > 0 && bub.rings + bub.held === view.rows.length, J({ held: bub.held, rings: bub.rings }));
+await page.evaluate(() => MapAcma.set('colourBy', 'state'));
+await page.waitForTimeout(600);
+const byState = await page.evaluate(() => {
+  const st = MapCluster._state();
+  const c = { site: cssVar('--lic-site', '#2e7d32'), area: cssVar('--lic-area', '#0277bd'), beyond: cssVar('--lic-beyond', '#a56a00'), none: cssVar('--lic-none', '#c62828'), na: cssVar('--muted', '#888888') };
+  return { fills: [...new Set(st.bubbles.map(b => String(b.fill).toLowerCase()))], allowed: Object.values(c).map(x => String(x).toLowerCase()) };
+});
+ok('Colour by: each licensing state puts the bubbles in the four states’ colours', byState.fills.every(f => byState.allowed.includes(f)), J(byState));
+await page.evaluate(() => { MapAcma.set('colourBy', 'band'); MapCluster.setOn(false); });
+await page.waitForTimeout(400);
+
+// Same-frequency overlaps, worked out again here from the file.
+await page.evaluate(() => MapAcmaCheck.set('laps', true));
+await page.waitForTimeout(800);
+const lap = await page.evaluate(() => ({ which: MapAcmaCheck.which(), list: MapAcmaCheck.overlaps(), drawn: MapAcmaCheck.drawn().laps,
+  rows: document.querySelectorAll('#acmachk-lap-table tbody tr').length, live: MapAcma.live() }));
+{
+  const cur = new Set(lic.filter(l => l.current && l.kind === 'pmp').map(l => l.no));
+  const txs = [];
+  FILE.licences.forEach((l, i) => {
+    if (!cur.has(l[0])) return;
+    const L0 = lic[i];
+    for (const si of txSitesOf(i)) txs.push({ no: l[0], h: l[5], si, s: FILE.sites[si], R: L0.R, f: L0.f });
+  });
+  const want = new Set();
+  const all = new Set();
+  for (let i = 0; i < txs.length; i++) for (let j = i + 1; j < txs.length; j++) {
+    const a = txs[i], b = txs[j];
+    if (a.si === b.si) continue;
+    const f = a.f.find(x => b.f.some(y => Math.abs(x - y) < 0.002));
+    if (f == null) continue;
+    const d = hav(a.s[2], a.s[3], b.s[2], b.s[3]);
+    if (d <= 0.2 || d >= a.R + b.R) continue;
+    all.add([a.s[0], b.s[0]].sort().join('|') + '|' + f.toFixed(4));
+    if (a.h === b.h) continue;
+    want.add([a.s[0], b.s[0]].sort().join('|') + '|' + f.toFixed(4));
+  }
+  const got = new Set(lap.list.map(o => [o.aSite, o.bSite].sort().join('|') + '|' + o.f.toFixed(4)));
+  ok(`the ${want.size} same-frequency overlaps between two holders’ transmitters are the file’s, worked out again here`,
+     lap.which === 'other' && want.size > 0 && got.size === want.size && [...want].every(k => got.has(k)), J({ want: want.size, got: got.size }));
+  const every = await page.evaluate(() => { MapAcmaCheck.set('which', 'all'); const n = MapAcmaCheck.overlaps().length; MapAcmaCheck.set('which', 'other'); return n; });
+  ok(`…and Every overlap is all ${all.size} of them, one holder’s own included`, every === all.size && all.size > want.size, J({ every, all: all.size }));
+}
+ok('…each shaded on the map and listed deepest first', lap.drawn === lap.list.length && lap.rows === Math.min(80, lap.list.length)
+   && lap.list.every((o, i) => i === 0 || lap.list[i - 1].depth >= o.depth) && lap.live, J({ drawn: lap.drawn, rows: lap.rows }));
+
+// Check a spot: next to a licensed point-to-multipoint transmitter, and in the desert.
+const pmpSite = (() => { const i = FILE.licences.findIndex((l, k) => kindOf(l) === 'pmp' && lic[k].current && !lowOf(l, k)); return FILE.sites[txSitesOf(i)[0]]; })();
+const spots = await page.evaluate(([lat, lon]) => {
+  MapAcmaCheck.spotAt(lat + 0.05, lon + 0.05);
+  const near = MapAcmaCheck.spot();
+  const box = (document.getElementById('acmachk-spot')?.textContent || '').replace(/\s+/g, ' ');
+  const pin = MapAcmaCheck.drawn().spot;
+  MapAcmaCheck.spotAt(-24.5, 133.5);
+  const far = MapAcmaCheck.spot();
+  return { near, box, pin, far };
+}, [pmpSite[2], pmpSite[3]]);
+ok('Check a spot: a few km from a licensed repeater is covered, inside its circle, and says so',
+   spots.near && spots.near.band === 'covered' && spots.near.inside.length > 0 && /^Covered/.test(spots.box.replace(/^\s*Covered\s*/, 'Covered ')) && spots.pin >= 2,
+   J({ band: spots.near && spots.near.band, box: spots.box.slice(0, 160), pin: spots.pin }));
+ok('…and in the middle of the desert is none found, with the nearest circle and how far past it',
+   spots.far && spots.far.band === 'none' && spots.far.inside.length === 0 && spots.far.nearest && spots.far.nearest.gap > 100 && /^None found/.test(spots.far.text), J(spots.far && spots.far.text));
+await page.evaluate(() => MapAcmaCheck.clear());
+
+// Another view puts it all away again.
+await page.evaluate(() => MapViews.apply('radio'));
+await page.waitForTimeout(800);
+const offAgain = await page.evaluate(() => ({ on: state.mapLicensing, s: MapAcma.summary(), rings: MapAcma.drawn().rings }));
+ok('pressing another view turns the licence coverage off', offAgain.on === false && !offAgain.s.show && !offAgain.s.cover && offAgain.rings === 0, J(offAgain));
 
 // ── 8. the rail, and clearing ────────────────────────────────────────────────
 console.log('\nThe rail and Clear the selection');

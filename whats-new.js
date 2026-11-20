@@ -25,6 +25,16 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 285, date: '2026-11-20', items: [
+      '📜 <strong>Licence coverage, a new view for technicians.</strong> In the Stations map\'s <em>Views</em>, next to Radio paths '
+        + 'and Backbone: every ACMA point-to-multipoint licence\'s service area as a circle, every point-to-point link as an oval '
+        + 'round its two ends, and each transmitting station ringed green (covered), amber (uncertain) or red (none found). '
+        + 'Base stations, which only receive, are grey. Zoomed out, the bubbles take the same colours. A low-power licence '
+        + 'shows a solid 2 km circle inside its dashed 30 km one.',
+      '✚ <strong>Check a spot, and see where licences overlap.</strong> In <em>📜 ACMA licences</em>: press the map, or drag '
+        + 'the marker, to see what a station there would transmit under; and shade where two holders\' licences on one '
+        + 'frequency reach the same ground. A guide, not legal advice.',
+    ] },
     { n: 284, date: '2026-11-17', items: [
       '🚰 <strong>Water, sewer and drainage pipes.</strong> A new group in <em>More map layers</em>: Brisbane City Council\'s '
         + 'stormwater pipes and open drains; Unitywater\'s water, sewer and recycled water mains (Moreton Bay, Sunshine '

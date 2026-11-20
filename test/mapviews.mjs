@@ -148,7 +148,7 @@ const STATE_KEY = {
   rain: 'mapRain', elev: 'mapElev', catchments: 'mapCatchments', lots: 'mapLots', easements: 'mapEasements',
   tenure: 'mapTenure', roads: 'mapRoads', roadOwners: 'mapRoadOwners', councils: 'mapCouncils',
   survey: 'mapSurvey', hubs: 'mapHubs', wind: 'mapWind', cameras: 'mapCameras', photos: 'mapPhotos',
-  siteFeatures: 'mapSiteFeatures', tasks: 'mapTasks',
+  siteFeatures: 'mapSiteFeatures', tasks: 'mapTasks', licensing: 'mapLicensing',
 };
 const SPEC = {
   overview: { links: true, roles: ALL, backbone: true, arrows: false, colour: 'freq', health: false, outlines: false,
@@ -173,6 +173,9 @@ const SPEC = {
     hubs: true, drawing: { draw: 'flow', auto: true, balance: 60 } },
   traffic: { backbone: false, health: true, arrows: false,
     drawing: { paths: 'best', draw: 'flow', flowMode: 'live', auto: true, balance: 65 } },
+  licensing: { base: 'Light', links: true, roles: ALL, backbone: false, arrows: false, health: false, outlines: false,
+    licensing: true, riverLines: true, hubs: false, photos: false, cameras: false, siteFeatures: false, lots: false,
+    drawing: { paths: 'lod', draw: 'lines', auto: true, balance: 30 } },
   rivers: { base: 'OSM-Topo', links: false, backbone: false, arrows: false, roles: FIELD_ONLY, outlines: true,
     health: false, riverLines: true, riverCatchment: true, catchments: true, elev: true, rain: false, cameras: true,
     lots: false, easements: false, tenure: false, roads: false, roadOwners: false, councils: false },

@@ -72,6 +72,32 @@
 // A licence on a channel the station is known not to use counts for neither.
 // Everything else — no address, a base station (they only receive) — is "not a
 // transmitter": receiving needs no licence.
+//
+// ── Covered, uncertain or none: the Licence coverage view ────────────────────
+// The four states are for reading one station. A map of the whole network
+// wants three colours the eye takes in at once (the owner, 19 Nov 2026: "green
+// for covered, red for not covered, and maybe orange or yellow for unclear"),
+// so each state is put in a band (bandOf):
+//   covered  a licence at its site, or inside a circle — as a remote station;
+//   unsure   beyond a circle; a repeater inside somebody else's circle with no
+//            licence at its own site (a fill-in at most); or inside only a
+//            low-power licence's 30 km circle and more than its 2 km — the
+//            register does not say which model ACMA assigned it on, so the
+//            licence's power (no more than 8.3 W EIRP, RALI FX16 s 3.2) is the
+//            only clue, and the map draws both circles;
+//   none     none found;
+//   na       not a transmitter — every base station.
+// The rings and, zoomed out, MapCluster's bubbles (clusterStyle) wear the
+// band, or the four states where Colour by says so. A ring whose station is in
+// a bubble is not drawn: the bubble says it, and onClusters() redraws the
+// rings each time the bubbles change.
+//
+// A point-to-point licence covers its two ends and nothing between them, so it
+// is drawn as a narrow oval round the pair with the link down its middle — a
+// shape that says "these two belong together" without looking like an area.
+// The 🗺️ Map views › Licence coverage view (map-views.js) turns the circles,
+// the ovals and the rings on at once through setEnabled(), state.mapLicensing.
+// Same-channel overlaps and the spot check are map-acma-check.js's.
 
 const MapAcma = (() => {
   const FILE = 'acma-station-licences.json';
@@ -88,6 +114,9 @@ const MapAcma = (() => {
   const CARD_ROWS = 4, CARD_MORE = 10;
   const HIT_CAP = 8;
   const NONE_CAP = 150;
+  const LOW_EIRP_W = 8.3;       // RALI FX16 s 3.2: a low-power point-to-multipoint system's transmitters, at most this EIRP…
+  const LOW_KM = 2;             // …and the service area ACMA plans it on
+  const OVAL_PAD_KM = 0.6;      // how far a point-to-point oval reaches past each end
 
   const CLASSES = [
     ['bureau', 'Bureau of Meteorology', '--lic-bureau', '#1565c0'],
@@ -101,6 +130,15 @@ const MapAcma = (() => {
     ['none', 'None found', '--lic-none', '#c62828'],
     ['na', 'Not a transmitter', '--muted', '#888888'],
   ];
+  // The three colours of the Licence coverage view, and grey (see the header).
+  const BANDS = [
+    ['covered', 'Covered', '--lic-site', '#2e7d32'],
+    ['unsure', 'Uncertain', '--lic-unsure', '#e08a00'],
+    ['none', 'None found', '--lic-none', '#c62828'],
+    ['na', 'Not a transmitter', '--muted', '#888888'],
+  ];
+  const bandLabel = k => (BANDS.find(b => b[0] === k) || BANDS[3])[1];
+  const bandColour = k => { const b = BANDS.find(x => x[0] === k) || BANDS[3]; return cssVar(b[2], b[3]); };
   const NA = STATES.length - 1;
   const TX_STATES = ['site', 'area', 'beyond', 'none'];
   const stateLabel = k => (STATES.find(s => s[0] === k) || STATES[NA])[1];
@@ -108,7 +146,8 @@ const MapAcma = (() => {
   const classColour = k => { const c = CLASSES.find(x => x[0] === k) || CLASSES[2]; return cssVar(c[2], c[3]); };
 
   let map = null, body = null;
-  let areaLayer = null, siteLayer = null, coverLayer = null, coverRenderer = null;
+  let areaLayer = null, siteLayer = null, coverLayer = null, ringLayer = null, coverRenderer = null;
+  let ringsHeld = 0;            // rings not drawn because their station is in one of MapCluster's bubbles
   let D = null;                 // the file, indexed
   let loading = null, loadErr = '';
   let F = loadPrefs();
@@ -121,7 +160,7 @@ const MapAcma = (() => {
 
   function loadPrefs() {
     const base = { show: false, cover: false, cls: { bureau: true, council: true, other: true }, off: [],
-      types: { pmp: true, ptp: true }, status: 'all', band: 'all', radius: PLAN_KM };
+      types: { pmp: true, ptp: true }, status: 'all', band: 'all', radius: PLAN_KM, colourBy: 'band', power: true };
     try {
       const v = JSON.parse(localStorage.getItem(KEY) || 'null');
       if (!v || typeof v !== 'object') return base;
@@ -133,6 +172,8 @@ const MapAcma = (() => {
         status: ['all', 'current', 'soon', 'lapsed'].includes(v.status) ? v.status : 'all',
         band: ['all', 'vhf', 'uhf'].includes(v.band) ? v.band : 'all',
         radius: Number(v.radius) >= 1 && Number(v.radius) <= 150 ? Number(v.radius) : PLAN_KM,
+        colourBy: v.colourBy === 'state' ? 'state' : 'band',
+        power: v.power !== false,
       };
     } catch (_) { return base; }
   }
@@ -207,6 +248,22 @@ const MapAcma = (() => {
         + 'a site Flood-Net does not hold, or one no longer in use.',
       recorded: 'The licence number typed on the station’s own record in Flood-Net (a repeater’s ACMA licence, or a '
         + 'frequency’s), checked against the register copy.',
+      covered: 'Green. The station transmits under a licence: one names its own site (within 500 m), or it is a field '
+        + 'station inside a point-to-multipoint licence’s circle on its channel.',
+      unsure: 'Amber. A licence probably covers it, but not cleanly: it is beyond the circle of the licensed repeater it '
+        + 'reports through; or it is a repeater standing in somebody else’s circle with no licence at its own site; or the '
+        + `only circle it is in belongs to a low-power licence (${LOW_EIRP_W} W EIRP or less) and it is more than ${LOW_KM} km `
+        + 'from that transmitter. Worth a look, not a finding.',
+      lowpower: `A point-to-multipoint licence whose transmitters are all ${LOW_EIRP_W} W EIRP or less. ACMA plans a low-power `
+        + `system on a ${LOW_KM} km service area, not 30 km (RALI FX16 s 3.2), but the register does not say which model a `
+        + `licence was assigned on. So both are drawn: a solid ${LOW_KM} km circle and the wider one dashed, and a station `
+        + `only in the dashed part is uncertain.`,
+      power: `Draw a solid ${LOW_KM} km circle inside the circle of every low-power licence (${LOW_EIRP_W} W EIRP or less) and `
+        + `count a station that is only further out as uncertain. Untick to treat every point-to-multipoint licence alike.`,
+      oval: 'A point-to-point licence covers its two ends and nothing between them: the oval only shows which two sites '
+        + 'belong together. A station inside an oval is not covered by it.',
+      colourBy: 'What the rings round the stations — and the bubbles, zoomed out — are coloured by: three colours '
+        + '(covered, uncertain, none found), or the four licensing states this panel reads one station by.',
     };
   }
 
@@ -218,6 +275,8 @@ const MapAcma = (() => {
     ['txpower', 'TX power'], ['eirp', 'EIRP'], ['emission', 'Emission'], ['fan', 'Frequency assignment number'], ['label', 'Transmitter label'],
     ['cond', 'Special condition'],
     ['under', 'Stations under it'], ['recorded', 'On the station’s record'],
+    ['covered', 'Covered'], ['unsure', 'Uncertain'], ['lowpower', 'Low-power licence'], ['power', 'Size by power'],
+    ['oval', 'Point-to-point oval'], ['colourBy', 'Colour by'],
   ];
 
   function meaning(k) { return words()[k === 'area-state' ? 'inarea' : k]; }
@@ -293,6 +352,8 @@ const MapAcma = (() => {
       l.sites = uniq(l.devs.map(d => d.site));
       l.f = uniq(tx.map(d => d.f)).sort((a, b) => a - b);
       l.maxF = l.f.length ? l.f[l.f.length - 1] : null;
+      l.maxEirp = tx.reduce((m, d) => Math.max(m, Number(d.eirpW) || 0), 0);
+      l.low = l.kind === 'pmp' && l.maxEirp > 0 && l.maxEirp <= LOW_EIRP_W + 1e-6;
       // A link: a transmitter and the receiver it is paired with at another site.
       l.links = [];
       if (l.kind === 'ptp') {
@@ -494,6 +555,23 @@ const MapAcma = (() => {
     if (!light) a.recorded = recordedOn(s);
     return a;
   }
+
+  // The Licence coverage view's three colours (the header says why):
+  // { band: 'covered' | 'unsure' | 'none' | 'na', why: '' | 'beyond' | 'relay' | 'lowpower' }.
+  function bandOf(a) {
+    if (!a || a.state === 'na' || !a.transmits) return { band: 'na', why: '' };
+    if (a.state === 'none') return { band: 'none', why: '' };
+    if (a.state === 'beyond') return { band: 'unsure', why: 'beyond' };
+    if (a.state === 'site') return { band: 'covered', why: '' };
+    if (a.relay) return { band: 'unsure', why: 'relay' };
+    if (F.power && a.area.length && a.area.every(m => m.lic.low && m.txKm > LOW_KM)) return { band: 'unsure', why: 'lowpower' };
+    return { band: 'covered', why: '' };
+  }
+  const WHY_WORDS = {
+    beyond: 'beyond the circle of the licensed repeater it reports through',
+    relay: 'a repeater inside somebody else’s circle, no licence at its own site',
+    lowpower: `only inside a low-power licence’s wider circle, more than ${LOW_KM} km out`,
+  };
 
   const holderName = l => (l.holder ? l.holder.name : 'holder not named');
   const licBrief = l => `${l.no} (${holderName(l)}, ${kindWord(l)}, ${freqText(l)})`;
@@ -722,7 +800,7 @@ const MapAcma = (() => {
   // ── Coverage: every transmitting station's state ────────────────────────────
 
   function coverKey() {
-    return [stations().length, F.radius, JSON.stringify(F.cls), F.off.join(','), state.mapMaxLinkKm].map(String).join('|');
+    return [stations().length, F.radius, F.power, JSON.stringify(F.cls), F.off.join(','), state.mapMaxLinkKm].map(String).join('|');
   }
   function coverage() {
     if (!D) return null;
@@ -730,12 +808,18 @@ const MapAcma = (() => {
     if (cover && cover.key === key && cover.ref === (state.data && state.data.stations)) return cover;
     const rows = [];
     const counts = { site: 0, area: 0, beyond: 0, none: 0, na: 0, nopos: 0, relays: 0 };
+    const bands = { covered: 0, unsure: 0, none: 0, na: 0 };
+    const byId = new Map();     // station id → { state, band, why }, for the bubbles
     const under = new Map();    // licence → { site: n, area: n, beyond: n }
     for (const s of stations()) {
       if (!located(s)) { counts.nopos++; continue; }
-      if (!transmits(s)) { counts.na++; continue; }
+      if (!transmits(s)) { counts.na++; bands.na++; byId.set(String(s.id), { state: 'na', band: 'na', why: '' }); continue; }
       const a = assess(s, { light: true });
       counts[a.state]++;
+      const b = bandOf(a);
+      a.band = b.band; a.why = b.why;
+      bands[b.band]++;
+      byId.set(String(s.id), { state: a.state, band: b.band, why: b.why });
       if (a.relay && a.state === 'area') counts.relays++;
       const tick = (m, k) => { const u = under.get(m.lic) || { site: 0, area: 0, beyond: 0 }; u[k]++; under.set(m.lic, u); };
       for (const m of a.site) tick(m, 'site');
@@ -752,7 +836,7 @@ const MapAcma = (() => {
         beyond: ls.reduce((n, l) => n + ((under.get(l) || {}).beyond || 0), 0),
         empty: ls.filter(l => current(l) && !under.has(l)).length };
     }).filter(x => x.n).sort((x, y) => y.n - x.n);
-    cover = { key, ref: state.data && state.data.stations, rows, counts, under, holders };
+    cover = { key, ref: state.data && state.data.stations, rows, counts, bands, byId, under, holders };
     return cover;
   }
 
@@ -788,6 +872,8 @@ const MapAcma = (() => {
   }
 
   // The stations that report to a licensed transmitter from beyond its area, furthest out first.
+  const heldText = () => (ringsHeld ? `${ringsHeld} of the rings are inside the map’s bubbles, which wear their colours — zoom in to see each one.` : '');
+
   function beyondRows() {
     const C = coverage();
     return C ? C.rows.filter(a => a.state === 'beyond').sort((x, y) => y.beyond[0].gap - x.beyond[0].gap) : [];
@@ -1172,7 +1258,9 @@ const MapAcma = (() => {
           <label class="lic-check"><input type="checkbox" ${F.types.pmp !== false ? 'checked' : ''} onchange="MapAcma.set('type:pmp', this.checked)">
             ${term('pmp', 'Point to multipoint')} <span class="lic-muted">circle</span></label>
           <label class="lic-check"><input type="checkbox" ${F.types.ptp !== false ? 'checked' : ''} onchange="MapAcma.set('type:ptp', this.checked)">
-            ${term('ptp', 'Point to point')} <span class="lic-muted">line</span></label>
+            ${term('ptp', 'Point to point')} <span class="lic-muted">${term('oval', 'oval')}</span></label>
+          <label class="lic-check"><input type="checkbox" id="acmalic-power" ${F.power ? 'checked' : ''} onchange="MapAcma.set('power', this.checked)">
+            ${term('power', `A ${LOW_KM} km circle for each low-power licence`)} <span class="lic-muted">${D ? D.lics.filter(l => l.low).length : ''}</span></label>
         </div>
         <div class="sites-row lic-selects">
           <label>Status <select id="acmalic-standing" onchange="MapAcma.set('status', this.value)">
@@ -1196,7 +1284,29 @@ const MapAcma = (() => {
       const c = C.counts, tx = c.site + c.area + c.beyond + c.none;
       const pct = n => (tx ? `${Math.round(100 * n / tx)}%` : '—');
       const rows = noneRows(), far = beyondRows();
+      const b = C.bands, unsure = C.rows.filter(a => a.why === 'relay' || a.why === 'lowpower');
+      const bpct = k => (tx ? `${Math.round(100 * b[k] / tx)}%` : '—');
       inner = `
+        <ul class="lic-counts lic-bands" id="acmalic-bands" data-tour="acma-bands">
+          ${BANDS.map(([k, label]) => `<li data-band="${k}"><span class="lic-dot" style="--dot:${bandColour(k)}" aria-hidden="true"></span>
+            <strong>${b[k]}</strong> ${term(k === 'none' ? 'none' : k === 'na' ? 'na' : k, label)}${k === 'na' ? '' : ` <span class="lic-muted">${bpct(k)}</span>`}</li>`).join('')}
+        </ul>
+        <div class="sites-row lic-selects"><label>${term('colourBy', 'Colour by')} <select id="acmalic-colour-by" onchange="MapAcma.set('colourBy', this.value)">
+          ${[['band', 'Covered, uncertain or none'], ['state', 'Each licensing state']]
+            .map(([v, t]) => `<option value="${v}" ${F.colourBy === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
+        ${unsure.length ? `<details class="lic-more" id="acmalic-unsure">
+          <summary>${unsure.length} more ${term('unsure', 'uncertain')} — a repeater with no licence at its site, or only a low-power licence</summary>
+          <div class="lic-scroll"><table class="sites-table lic-table" id="acmalic-unsure-table">
+            <thead><tr><th scope="col">Station</th><th scope="col">Why</th><th scope="col" title="The nearest licence whose circle it is in.">Inside</th>
+              <th scope="col" title="Its distance from that licence’s transmitter.">Distance</th></tr></thead>
+            <tbody>${unsure.slice(0, NONE_CAP).map(a => `<tr class="sites-row-go" onclick="MapAcma.pickStation('${escAttr(a.st.id)}')">
+              <td>${esc(a.st.name)}${a.st.station_number ? ` <span class="lic-muted">#${esc(a.st.station_number)}</span>` : ''}</td>
+              <td>${esc(WHY_WORDS[a.why])}</td>
+              <td>${a.area[0] ? `${esc(a.area[0].lic.no)} <span class="lic-muted">${esc(holderName(a.area[0].lic))}</span>` : '—'}</td>
+              <td class="num">${a.area[0] ? esc(fmtKm(a.area[0].txKm)) : '—'}</td></tr>`).join('')}</tbody></table></div>
+          <p class="small txt-muted">The stations beyond a circle are in their own list below.</p>
+        </details>` : ''}
+        <p class="small txt-muted lic-states-h">The same stations by the four licensing states:</p>
         <ul class="lic-counts" id="acmalic-counts">
           ${TX_STATES.map(k => `<li data-state="${k}"><span class="lic-dot" style="--dot:${stateColour(k)}" aria-hidden="true"></span>
             <strong>${c[k]}</strong> ${term(k === 'area' ? 'inarea' : k, stateLabel(k))} <span class="lic-muted">${pct(c[k])}</span></li>`).join('')}
@@ -1279,6 +1389,7 @@ const MapAcma = (() => {
         <legend>Which stations are licensed</legend>
         <label class="lic-check lic-master"><input type="checkbox" id="acmalic-cover" ${F.cover ? 'checked' : ''}
             onchange="MapAcma.set('cover', this.checked)"> Ring every transmitting station by its licensing state</label>
+        ${F.cover ? `<p class="small txt-muted" id="acmalic-held">${esc(heldText())}</p>` : ''}
         ${inner}
         ${expiry}
         <div class="sites-actions">
@@ -1313,6 +1424,7 @@ const MapAcma = (() => {
         </fieldset>
         ${showHtml()}
         ${coverHtml()}
+        ${typeof MapAcmaCheck !== 'undefined' ? MapAcmaCheck.html() : ''}
         ${guideHtml()}
         ${glossaryHtml()}
         <p class="filter-note">${esc(CAVEAT)}</p>
@@ -1343,13 +1455,19 @@ const MapAcma = (() => {
     const bits = [];
     if (F.show || (picked && picked.type === 'licence')) {
       bits.push(`ACMA licences — a circle is a point-to-multipoint licence’s ${F.radius} km service area round its transmitter (ACMA’s plan, not a
-        boundary in the law), a line a point-to-point link between its two ends; ${CLASSES.map(([k, label]) =>
+        boundary in the law), an ${termHtml('oval', meaning('oval'))} a point-to-point link round its two ends; ${CLASSES.map(([k, label]) =>
           `<span class="lic-dot" style="--dot:${classColour(k)}" aria-hidden="true"></span>${esc(label)}`).join(' ')};
         dashed where the licence is not in force, amber where it expires within ${SOON_DAYS} days.`);
     }
+    if (F.show && F.power && D && D.lics.some(l => l.low && shown(l))) {
+      bits.push(`A solid ${LOW_KM} km circle inside a dashed one is a ${termHtml('low-power licence', meaning('lowpower'))}.`);
+    }
     if (F.cover) {
-      bits.push(`Licensing state — a ring on every transmitting station: ${STATES.slice(0, NA).map(([k, label]) =>
-        `<span class="lic-dot" style="--dot:${stateColour(k)}" aria-hidden="true"></span>${esc(label.toLowerCase())}`).join(' ')}.`);
+      const list = F.colourBy === 'state'
+        ? STATES.slice(0, NA).map(([k, label]) => `<span class="lic-dot" style="--dot:${stateColour(k)}" aria-hidden="true"></span>${esc(label.toLowerCase())}`)
+        : BANDS.map(([k, label]) => `<span class="lic-dot" style="--dot:${bandColour(k)}" aria-hidden="true"></span>${termHtml(label.toLowerCase(), meaning(k))}`);
+      bits.push(`Licensing — a ring on every transmitting station${F.colourBy === 'state' ? '' : ', dashed on a repeater with no licence at its own site'}: ${list.join(' ')};
+        zoomed out, the bubbles take the same colours.`);
     }
     if (!bits.length) return '';
     return `<span class="legend-item"><span class="legend-site" aria-hidden="true">📜</span>
@@ -1359,8 +1477,35 @@ const MapAcma = (() => {
   // ── Drawing ─────────────────────────────────────────────────────────────────
 
   function clearLayers() {
-    for (const l of [areaLayer, siteLayer, coverLayer]) if (l) l.remove();
-    areaLayer = siteLayer = coverLayer = null;
+    for (const l of [areaLayer, siteLayer, coverLayer, ringLayer]) if (l) l.remove();
+    areaLayer = siteLayer = coverLayer = ringLayer = null;
+    ringsHeld = 0;
+  }
+
+  // A narrow oval round a point-to-point link's two ends: its long axis the
+  // link, reaching OVAL_PAD_KM past each end; as wide as a tenth of the link,
+  // between 0.5 and 4 km. Worked out on a flat plane round the link's middle —
+  // good to metres at these distances.
+  function ovalOf(a, b) {
+    const lat0 = (a.lat + b.lat) / 2, lon0 = (a.lon + b.lon) / 2;
+    const kx = 111.32 * Math.cos(lat0 * Math.PI / 180), ky = 110.574;
+    const ax = (a.lon - lon0) * kx, ay = (a.lat - lat0) * ky;
+    const len = 2 * Math.hypot(ax, ay);
+    const th = Math.atan2(ay, ax);
+    const A = len / 2 + OVAL_PAD_KM, B = Math.min(4, Math.max(0.5, len / 20));
+    const pts = [];
+    for (let i = 0; i < 64; i++) {
+      const t = (i / 64) * Math.PI * 2, x = A * Math.cos(t), y = B * Math.sin(t);
+      const rx = x * Math.cos(th) - y * Math.sin(th), ry = x * Math.sin(th) + y * Math.cos(th);
+      pts.push([lat0 + ry / ky, lon0 + rx / kx]);
+    }
+    return pts;
+  }
+
+  function ptpTipHtml(l, a, b) {
+    return `<div class="lic-tip"><strong>${esc(l.no)}</strong> ${esc(holderName(l))}<br>Point to point · ${esc(freqText(l))}<br>`
+      + `${esc(a.name)} ↔ ${esc(b.name)}, ${esc(fmtKm(acmaHaversineKm(a.lat, a.lon, b.lat, b.lon)))}<br>`
+      + '<span class="lic-muted">Covers these two ends only — not the ground between them.</span></div>';
   }
 
   function tipHtml(ls) {
@@ -1377,16 +1522,26 @@ const MapAcma = (() => {
       const stroke = st === 'soon' ? cssVar('--lic-warn', '#f9a825') : colour;
       const dash = st === 'lapsed' ? '6 6' : null;
       if (l.kind === 'pmp') {
+        // A low-power licence: the 2 km ACMA would plan it on, solid, and the
+        // wider circle dashed — the register cannot say which applies.
+        const low = F.power && l.low && l.statedKm == null && radiusOf(l) > LOW_KM;
         for (const site of l.txSites) {
           L.circle([site.lat, site.lon], { pane: AREA_PANE, radius: radiusOf(l) * 1000, color: stroke, weight: heavy ? 3 : 1,
-            opacity: heavy ? 1 : 0.55, dashArray: dash, fillColor: colour, fillOpacity: st === 'lapsed' ? 0.02 : heavy ? 0.16 : 0.06,
-            interactive: false }).addTo(areaLayer);
+            opacity: heavy ? 1 : 0.55, dashArray: dash || (low ? '3 7' : null), fillColor: colour,
+            fillOpacity: st === 'lapsed' ? 0.02 : low ? 0.025 : heavy ? 0.16 : 0.06, interactive: false }).addTo(areaLayer);
+          if (low) {
+            L.circle([site.lat, site.lon], { pane: AREA_PANE, radius: LOW_KM * 1000, color: stroke, weight: heavy ? 3 : 1.5,
+              opacity: 0.9, dashArray: dash, fillColor: colour, fillOpacity: st === 'lapsed' ? 0.03 : 0.2, interactive: false,
+              mnLow: true }).addTo(areaLayer);
+          }
         }
       } else {
+        // An oval round the two ends, and the link down its middle.
         for (const [a, b] of l.links) {
-          const pts = [[a.lat, a.lon], [b.lat, b.lon]];
-          L.polyline(pts, { pane: AREA_PANE, color: colour, weight: heavy ? 14 : 9, opacity: st === 'lapsed' ? 0.08 : 0.2, lineCap: 'round', interactive: false }).addTo(areaLayer);
-          L.polyline(pts, { pane: AREA_PANE, color: stroke, weight: heavy ? 3 : 1.5, opacity: 0.9, dashArray: dash, interactive: false }).addTo(areaLayer);
+          L.polygon(ovalOf(a, b), { pane: AREA_PANE, color: stroke, weight: heavy ? 2.5 : 1, opacity: st === 'lapsed' ? 0.3 : 0.7,
+            dashArray: dash, fillColor: colour, fillOpacity: st === 'lapsed' ? 0.03 : heavy ? 0.2 : 0.1, interactive: false }).addTo(areaLayer);
+          L.polyline([[a.lat, a.lon], [b.lat, b.lon]], { pane: AREA_PANE, color: stroke, weight: heavy ? 3 : 1.5, opacity: 0.9,
+            dashArray: dash || '1 5', lineCap: 'round', interactive: false }).addTo(areaLayer);
         }
       }
       for (const site of l.sites) { const at = bySite.get(site) || []; at.push(l); bySite.set(site, at); }
@@ -1396,7 +1551,12 @@ const MapAcma = (() => {
       const m = L.circleMarker([site.lat, site.lon], { pane: SITE_PANE, radius: heavy ? 11 : 8, weight: heavy ? 4 : 2.5,
         color: classColour(l0.holder ? l0.holder.cls : 'other'), fillColor: '#fff', fillOpacity: 0.01,
         dashArray: at.every(l => standing(l) === 'lapsed') ? '3 3' : null, bubblingMouseEvents: false });
-      m.bindTooltip(() => `<div class="lic-tip"><span class="lic-muted">${esc(site.name)}</span><br>${tipHtml(at)}</div>`, { direction: 'top', sticky: true });
+      m.bindTooltip(() => {
+        const ptp = at.find(l => l.kind === 'ptp' && l.links.some(([a, b]) => a === site || b === site));
+        const pair = ptp ? ptp.links.find(([a, b]) => a === site || b === site) : null;
+        return at.length === 1 && pair ? ptpTipHtml(ptp, pair[0], pair[1])
+          : `<div class="lic-tip"><span class="lic-muted">${esc(site.name)}</span><br>${tipHtml(at)}</div>`;
+      }, { direction: 'top', sticky: true });
       m.on('click', () => MapAcma.pickLicence((at.find(l => l.no === heavyNo) || l0).no, { stay: true }));
       m.addTo(siteLayer);
     }
@@ -1426,14 +1586,8 @@ const MapAcma = (() => {
     }
     ls = [...new Set([...ls, ...extra])];
     drawLicences(ls, heavyNo);
-    if (F.cover) {
-      const C = coverage();
-      coverRenderer = coverRenderer || L.canvas({ pane: COVER_PANE });
-      for (const a of C.rows) {
-        L.circleMarker([Number(a.st.lat), Number(a.st.lon)], { pane: COVER_PANE, renderer: coverRenderer, radius: 9, weight: 3,
-          color: stateColour(a.state), opacity: 0.95, fill: false, interactive: false }).addTo(coverLayer);
-      }
-    }
+    if (typeof MapAcmaCheck !== 'undefined') MapAcmaCheck.draw();
+    drawRings();
     if (pickedSt && pa) {
       const here = [Number(pickedSt.lat), Number(pickedSt.lon)];
       L.circleMarker(here, { pane: COVER_PANE, radius: 14, weight: 4, color: stateColour(pa.state), fill: false, interactive: false }).addTo(coverLayer);
@@ -1443,6 +1597,52 @@ const MapAcma = (() => {
           dashArray: pa.state === 'none' ? '4 6' : pa.state === 'beyond' ? '10 5' : null, interactive: false }).addTo(coverLayer);
       }
     }
+  }
+
+  // A ring on every transmitting station by its band or state — but not on a
+  // station in one of MapCluster's bubbles: the bubble wears the colours.
+  // Again on its own each time the bubbles change (onClusters).
+  function drawRings() {
+    if (ringLayer) ringLayer.remove();
+    ringLayer = null;
+    ringsHeld = 0;
+    if (!map || !D || !F.cover) return;
+    ringLayer = L.layerGroup([], { pane: COVER_PANE }).addTo(map);
+    const C = coverage();
+    coverRenderer = coverRenderer || L.canvas({ pane: COVER_PANE });
+    const inBubble = typeof MapCluster !== 'undefined' && MapCluster.bubbleOf ? id => !!MapCluster.bubbleOf(id) : () => false;
+    for (const a of C.rows) {
+      if (inBubble(a.st.id)) { ringsHeld++; continue; }
+      const byBand = F.colourBy !== 'state';
+      L.circleMarker([Number(a.st.lat), Number(a.st.lon)], { pane: COVER_PANE, renderer: coverRenderer, radius: a.relay ? 11 : 9,
+        weight: 3, color: byBand ? bandColour(a.band) : stateColour(a.state), opacity: 0.95, fill: false, interactive: false,
+        dashArray: byBand && a.why === 'relay' ? '4 3' : null }).addTo(ringLayer);
+    }
+  }
+
+  // The bubbles' colours while the rings are on (map-cluster.js colouring()):
+  // { fill, ring, label, parts } as HealthGlance.clusterStyle gives them.
+  function clusterStyle(list, how) {
+    if (!D || !F.cover || !list || !list.length) return null;
+    const C = coverage();
+    const byBand = F.colourBy !== 'state';
+    const keys = byBand ? BANDS.map(b => b[0]) : STATES.map(x => x[0]);
+    const rank = k => (byBand ? ['na', 'covered', 'unsure', 'none'] : ['na', 'site', 'area', 'beyond', 'none']).indexOf(k);
+    const n = new Map();
+    for (const s of list) {
+      const r = s ? C.byId.get(String(s.id)) : null;
+      const k = r ? (byBand ? r.band : r.state) : 'na';
+      n.set(k, (n.get(k) || 0) + 1);
+    }
+    const tx = [...n.keys()].filter(k => k !== 'na');
+    let k;
+    if (!tx.length) k = 'na';
+    else if (how === 'worst') k = tx.reduce((a, b) => (rank(b) > rank(a) ? b : a));
+    else k = tx.reduce((a, b) => (n.get(b) > n.get(a) || (n.get(b) === n.get(a) && rank(b) > rank(a)) ? b : a));
+    const colour = x => (byBand ? bandColour(x) : stateColour(x));
+    const label = x => (byBand ? bandLabel(x) : stateLabel(x)).toLowerCase();
+    return { fill: colour(k), ring: '#ffffff', label: label(k),
+      parts: keys.filter(x => n.has(x)).map(x => ({ label: label(x), fill: colour(x), ring: colour(x), n: n.get(x) })) };
   }
 
   function boundsOf(l) {
@@ -1460,10 +1660,15 @@ const MapAcma = (() => {
 
   function after() {
     savePrefs();
+    syncState();
     draw();
     render();
     if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
+    // The bubbles take the rings' colours, or give them back.
+    if (typeof MapCluster !== 'undefined' && MapCluster.rebuild && map) { try { MapCluster.rebuild(); } catch (_) { /* no bubbles yet */ } }
   }
+  // What 🗺️ Map views reads for its Licence coverage knob: the circles and the rings both on.
+  function syncState() { if (typeof state !== 'undefined') state.mapLicensing = !!(F.show && F.cover); }
 
   function openPanel() {
     const wrap = document.querySelector('.mn-mapctl[data-panel="acma"]');
@@ -1491,6 +1696,8 @@ const MapAcma = (() => {
       pane(SITE_PANE, SITE_Z, true);
       pane(COVER_PANE, COVER_Z, false);
       coverRenderer = null;
+      syncState();
+      if (typeof MapAcmaCheck !== 'undefined') MapAcmaCheck.attach(m);
       // After ⚖️ Repeater comparison: the last of the tools that read the
       // network rather than change it.
       MapChrome.panel(m, {
@@ -1512,6 +1719,7 @@ const MapAcma = (() => {
     },
 
     detach() {
+      if (typeof MapAcmaCheck !== 'undefined') MapAcmaCheck.detach();
       clearLayers();
       coverRenderer = null;
       body = null;
@@ -1521,7 +1729,7 @@ const MapAcma = (() => {
     // Something of this tool's on the map, for the legend; and for the rail's
     // gold ring.
     active() { return !!D && (F.show || F.cover || !!picked); },
-    live() { return F.show || F.cover || !!picked; },
+    live() { return F.show || F.cover || !!picked || (typeof MapAcmaCheck !== 'undefined' && MapAcmaCheck.live()); },
     legendHtml,
 
     // Reset's half and the panel's Clear: everything off the map, the search
@@ -1531,7 +1739,37 @@ const MapAcma = (() => {
       F.cover = false;
       picked = null;
       hitQ = '';
+      if (typeof MapAcmaCheck !== 'undefined') MapAcmaCheck.clear({ quiet: true });
       after();
+    },
+
+    // 🗺️ Map views › Licence coverage (map-views.js): the circles, the ovals
+    // and the rings on or off at once; state.mapLicensing says which.
+    setEnabled(on) {
+      F.show = !!on;
+      F.cover = !!on;
+      if (!D) { savePrefs(); syncState(); render(); if (on) whenLoaded(() => { after(); repaintCards(); }); return; }
+      after();
+    },
+    // Whether the bubbles are to wear the rings' colours (map-cluster.js).
+    colours() { return !!D && F.cover && !!map; },
+    clusterStyle,
+    // MapCluster has regrouped: the rings of the stations now in a bubble go,
+    // and those let out come back.
+    onClusters() {
+      if (!map || !D || !F.cover) return;
+      drawRings();
+      const el = document.getElementById('acmalic-held');
+      if (el) el.textContent = heldText();
+    },
+    band(id) { const C = coverage(); const r = C && C.byId.get(String(id)); return r ? { ...r } : null; },
+    bands() { const C = coverage(); return C ? { ...C.bands } : null; },
+    repaint() { render(); if (typeof rerenderMapLegend === 'function') rerenderMapLegend(); },
+    // For map-acma-check.js: the register copy as indexed here, and the rules
+    // it is read by. Read-only by agreement.
+    core() {
+      return D ? { D, counted, current, standing, radiusOf, holderName, freqText, dateText, mhz, classColour, kmTo, located,
+        stations, stationById, term, meaning, ensure, LOW_KM, SITE_KM, SHARED_KM, SAME_MHZ } : null;
     },
 
     set(key, value) {
@@ -1544,12 +1782,15 @@ const MapAcma = (() => {
       else if (k === 'status') F.status = ['all', 'current', 'soon', 'lapsed'].includes(value) ? value : 'all';
       else if (k === 'band') F.band = ['all', 'vhf', 'uhf'].includes(value) ? value : 'all';
       else if (k === 'radius') { const n = Math.round(Number(value)); F.radius = n >= 1 && n <= 150 ? n : PLAN_KM; }
+      else if (k === 'colourBy') F.colourBy = value === 'state' ? 'state' : 'band';
+      else if (k === 'power') F.power = !!value;
       else if (k === 'noneOwner') { noneOwner = noneOwner === String(value || '') ? '' : String(value || ''); render(); return; }
       else if (k === 'noneSort') { noneSort = ['gap', 'near', 'name', 'owner'].includes(value) ? value : 'gap'; render(); return; }
       else return;
       if (!D) { savePrefs(); render(); whenLoaded(() => { after(); repaintCards(); }); return; }
       after();
       if (k === 'radius' || k === 'cls' || k === 'holder') repaintCards();
+      if (typeof MapAcmaCheck !== 'undefined' && ['radius', 'cls', 'holder', 'power', 'show', 'type', 'status', 'band'].includes(k)) MapAcmaCheck.stale();
     },
 
     setSearch(v) {
@@ -1705,6 +1946,7 @@ const MapAcma = (() => {
       if (!D) return null;
       return { asAt: asAt(), licences: D.lics.length, holders: D.holders.map(h => ({ no: h.no, name: h.name, cls: h.cls, on: holderOn(h) })),
         shown: D.lics.filter(shown).length, radius: F.radius, show: F.show, cover: F.cover, picked: picked ? { ...picked } : null,
+        colourBy: F.colourBy, power: F.power, low: D.lics.filter(l => l.low).length,
         soon: counted().filter(l => standing(l) === 'soon').length, lapsed: counted().filter(l => standing(l) === 'lapsed').length };
     },
     licence(no) {
@@ -1712,13 +1954,16 @@ const MapAcma = (() => {
       return l ? { no: l.no, kind: l.kind, cat: l.cat, status: l.status, expiry: l.expiry, holder: holderName(l), cls: l.holder ? l.holder.cls : null,
         f: l.f.slice(), sites: l.sites.map(s => ({ id: s.id, name: s.name, lat: s.lat, lon: s.lon })), txSites: l.txSites.map(s => s.id),
         links: l.links.map(([a, b]) => [a.id, b.id]), radius: l.kind === 'pmp' ? radiusOf(l) : null, statedKm: l.statedKm, conds: l.conds.slice(),
+        maxEirp: l.maxEirp, low: l.low,
         fans: l.devs.filter(d => d.tr === 'T' && d.fan).map(d => d.fan),
         standing: standing(l) } : null;
     },
     licences() { return D ? D.lics.map(l => l.no) : []; },
     drawn() {
       const n = g => { let c = 0; if (g) g.eachLayer(() => { c++; }); return c; };
-      return { areas: n(areaLayer), sites: n(siteLayer), rings: n(coverLayer) };
+      return { areas: n(areaLayer), sites: n(siteLayer), rings: n(ringLayer), held: ringsHeld, picked: n(coverLayer),
+        low: (() => { let c = 0; if (areaLayer) areaLayer.eachLayer(l => { if (l.options.mnLow) c++; }); return c; })(),
+        ovals: (() => { let c = 0; if (areaLayer) areaLayer.eachLayer(l => { if (l instanceof L.Polygon) c++; }); return c; })() };
     },
     pdfUrl,
     stationsCsv,

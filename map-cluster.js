@@ -3,7 +3,8 @@
 //   MapCluster   nearby station pins on the Stations map drawn as one bubble
 //                with how many there are, until the map is zoomed in far
 //                enough to tell them apart — under any colouring of the pins:
-//                their roles, Colour pins by health, or ⏱️ Latency.
+//                their roles, Colour pins by health, ⏱️ Latency, or the 📜 ACMA
+//                licences tool's licensing rings (map-acma.js).
 //
 // After core.js, before init.js — index.html holds the order and the reasons.
 // Reached from app.js (initMap attaches it, stopStationsMap detaches it,
@@ -86,10 +87,12 @@ const MapCluster = (function () {
       + `bubble saying how many there are, and bubbles that would overlap become one. Zoom in, or press a bubble, and they come apart; from zoom ${MAX_ZOOM + 1} every `
       + 'station has its own pin. The selected station, the map selection, a filter\'s matches and the stations a focused '
       + 'repeater serves always keep their own pins. Pointing at a bubble lights its stations\' radio paths, as pointing at a pin does.',
-    'Bubble colour': 'How a bubble is coloured while the pins are coloured by health or by ⏱️ Latency. With the pins in their '
+    'Bubble colour': 'How a bubble is coloured while the pins are coloured by health or by ⏱️ Latency, or the stations are ringed by '
+      + 'their licensing (📜 ACMA licences, or the Licence coverage view). With the pins in their '
       + 'role colours every bubble is a mix: a role is a kind, not better or worse.',
     Worst: 'The colour of the worst station in the bubble: under Colour pins by health a fault before a watch before OK; '
-      + 'under ⏱️ Latency the slowest, quietest or weakest band any of them is in. One station in trouble shows from across the map.',
+      + 'under ⏱️ Latency the slowest, quietest or weakest band any of them is in; under licensing none found before uncertain '
+      + 'before covered. One station in trouble shows from across the map.',
     Average: 'Under ⏱️ Latency, the band the stations\' average falls in — their mean age, delay, share of checks missed or SNR '
       + '(Protocol, which has no average, takes the most common). Under Colour pins by health, the class most of them are in.',
     Mix: 'A ring round the count, split by how many of the bubble\'s stations wear each colour — their roles, their health or '
@@ -220,6 +223,7 @@ const MapCluster = (function () {
   // What the pins are coloured by now, in one word.
   function colouring() {
     if (typeof MapLatency !== 'undefined' && MapLatency.on && MapLatency.on()) return 'latency';
+    if (typeof MapAcma !== 'undefined' && MapAcma.colours && MapAcma.colours()) return 'licensing';
     if (state.mapHealth && typeof HealthGlance !== 'undefined' && HealthGlance.clusterStyle) return 'health';
     return 'role';
   }
@@ -232,6 +236,7 @@ const MapCluster = (function () {
     let st = null;
     if (by === 'latency') st = MapLatency.clusterStyle(members.map(m => m.mnStation), how);
     else if (by === 'health') st = HealthGlance.clusterStyle(members.map(m => m.mnStationId), how);
+    else if (by === 'licensing') st = MapAcma.clusterStyle(members.map(m => m.mnStation), how);
     if (!st) {
       // Roles: kinds, so a mix whatever is chosen.
       const parts = new Map();
@@ -472,6 +477,8 @@ const MapCluster = (function () {
     S.hadBubbles = S.bubbles.length > 0;
     if (labels && typeof applyMapLabels === 'function') applyMapLabels();
     paintNote();
+    // 📜 ACMA licences' rings are not drawn on a station in a bubble.
+    if (typeof MapAcma !== 'undefined' && MapAcma.onClusters) MapAcma.onClusters();
   }
 
   // The pins' canvas drawn again, all of it, on its next frame. Leaflet's own
@@ -587,7 +594,7 @@ const MapCluster = (function () {
     <span class="legend-item">
       <span class="legend-cluster" aria-hidden="true">12</span>
       <span class="small">${termHtml('Nearby stations', WORDS['Group nearby pins'])}, grouped — how many; press to zoom in.
-        Coloured by their ${termHtml(HOW_LABEL[S.how].toLowerCase(), WORDS[HOW_LABEL[S.how]])} under health or ⏱️ Latency</span>
+        Coloured by their ${termHtml(HOW_LABEL[S.how].toLowerCase(), WORDS[HOW_LABEL[S.how]])} under health, ⏱️ Latency or licensing</span>
     </span>`;
   }
 
