@@ -48,6 +48,7 @@ const MapFeeds = (function () {
   const HERITAGE = `${QLD}/Boundaries/CulturalHeritageBoundaries/MapServer`;
   const PARKS    = `${QLD}/Environment/ParksTerrestrialProtectedAreas/MapServer`;
   const BIO      = `${QLD}/Farming/Biosecurity/MapServer`;
+  const SOILS    = `${QLD}/GeoscientificInformation/SoilsAndLandResource/MapServer`;
   const CAPAD    = 'https://gis.environment.gov.au/gispubmap/rest/services/ogc_services/CAPAD/MapServer';
   const DEA      = 'https://ows.dea.ga.gov.au/';
   const ENERGEX  = 'https://services.arcgis.com/bfVzktoY0OhzQCDj/ArcGIS/rest/services/Network_Energex/FeatureServer';
@@ -75,6 +76,7 @@ const MapFeeds = (function () {
     { id: 'land',      title: 'Land and access' },
     { id: 'bio',       title: 'Biosecurity and weeds' },
     { id: 'pipes',     title: 'Water, sewer and drainage pipes' },
+    { id: 'ground',    title: 'Soil and ground' },
   ];
 
   // ── The list ────────────────────────────────────────────────────────────
@@ -203,6 +205,21 @@ const MapFeeds = (function () {
       label: 'Storm tide gauges, latest reading (Qld)',
       meaning: 'The State’s storm tide gauges along the coast, each with its latest reading: the sea level measured, the tide predicted for that time, and the difference — the surge a storm or flood is adding. Heights are above each gauge’s own tide datum (usually the lowest tide), not AHD. In calm weather a gauge may only report once a day. Hover a pin for its figures.',
       source: { by: 'State of Queensland (Department of the Environment, Tourism, Science and Innovation)', licence: 'CC BY 4.0', page: 'https://www.data.qld.gov.au/dataset/coastal-data-system-near-real-time-storm-tide-data' } },
+
+    // ── Soil and ground (asked for with the Before you dig view, 20 Nov
+    // 2026). The same service site-exposure.js reads for one station; drawn
+    // here. Each sublayer keeps its own scale range, so the national atlas
+    // fills in where no finer map was made and the 1:25 000 one shows close in.
+    { id: 'qld-acid-sulfate', group: 'ground', kind: 'arcgis', url: SOILS, layers: [2052, 2002, 1952, 1902], pane: 'areas',
+      minZoom: 11, opacity: 0.5,
+      label: 'Acid sulfate soils (Qld)',
+      meaning: 'Where Queensland has mapped acid sulfate soil: low coastal land, mostly under 5 m above sea level, holding iron sulfides that turn to sulfuric acid when the soil is dug up, drained or dewatered. The acid eats concrete and steel, galvanising included, and kills fish downstream. Digging or dewatering in it needs a plan to treat the soil. The finest map made for a place is drawn (1:25 000 to 1:100 000), the national atlas elsewhere. From zoom 11.',
+      source: { by: 'State of Queensland (Department of Natural Resources and Mines, Manufacturing and Regional and Rural Development)', licence: 'CC BY 3.0 AU', page: 'https://www.data.qld.gov.au/dataset/acid-sulfate-soils-series' } },
+    { id: 'qld-soils', group: 'ground', kind: 'arcgis', url: SOILS, layers: [156], pane: 'areas',
+      minZoom: 9, opacity: 0.45,
+      label: 'Soil type (Qld)',
+      meaning: 'The kind of soil, by its order in the Australian Soil Classification — cracking clays (Vertosols) that swell and shrink and move footings, waterlogged soils (Hydrosols), deep loose sands (Arenosols), sodic clays that wash out (Sodosols) and the rest — from the best soil map the State has for each place. Often a regional map at 1:250 000 or coarser, so a guide to what to expect, not a test of the ground. From zoom 9.',
+      source: { by: 'State of Queensland (Department of Natural Resources and Mines, Manufacturing and Regional and Rural Development)', licence: 'CC BY 4.0', page: 'https://www.data.qld.gov.au/dataset/soils-and-land-resource-mapping-queensland' } },
   ];
   const byId = Object.fromEntries(FEEDS.map(f => [f.id, f]));
 
@@ -1096,10 +1113,13 @@ const MapFeeds = (function () {
         return `${r.layerId === 0 ? 'Substation' : 'Power line'}${name ? ` — ${name}` : ''}${kv ? ` (${kv} kV)` : ''}`;
       })),
       pipes: uniq(pp.map(r => `${r.layerId === 1 ? 'Gas' : 'Oil'} pipeline — ${attr(r, 'NAME', 'name', 'PIPELINE_NAME') || r.value}`)) })),
+    // A box CABLE_M round the place, then each line's true distance: the
+    // services ignore `distance` beside a point at the service level (checked
+    // live 20 Nov 2026 — every answer came back empty, so the row said "none"
+    // under the wires).
     cables: (lat, lon) => Promise.all(NET_SERVICES.map(svc => netQuery(svc,
-      [...svc.layers.sub, ...svc.layers.hv, ...svc.layers.lv], null, {
-        geometry: `${lon},${lat}`, geometryType: 'esriGeometryPoint', distance: String(CABLE_M),
-        units: 'esriSRUnit_Meter', returnGeometry: 'false', outFields: '*',
+      [...svc.layers.sub, ...svc.layers.hv, ...svc.layers.lv], boxAround([[lat, lon]], CABLE_M), {
+        outFields: 'OBJECTID', geometryPrecision: '6',
       }).then(json => ({ svc, json }), () => ({ svc, json: null }))))
       .then(rs => {
         if (rs.every(r => !r.json)) return { ok: false, why: 'Energex and Ergon’s services did not answer' };
@@ -1107,8 +1127,9 @@ const MapFeeds = (function () {
         for (const { svc, json } of rs) {
           for (const l of (json && json.layers) || []) {
             const k = netClassOf(svc, l.id);
-            if (!k || !(l.features || []).length) continue;
-            found.push(`${svc.name}: ${NET_CLASS[k].words.toLowerCase()}, ${svc.cable.has(l.id) ? 'underground' : 'overhead'} (${l.features.length})`);
+            const near = (l.features || []).filter(ft => !ft.geometry || Geo.dist([[lat, lon]], Geo.ofEsri(ft.geometry)) <= CABLE_M);
+            if (!k || !near.length) continue;
+            found.push(`${svc.name}: ${NET_CLASS[k].words.toLowerCase()}, ${svc.cable.has(l.id) ? 'underground' : 'overhead'} (${near.length})`);
           }
         }
         return { ok: true, found };
@@ -1288,10 +1309,94 @@ const MapFeeds = (function () {
     }
   }
 
+  // ── Distances on the ground ─────────────────────────────────────────────
+  // Metres on a flat sheet laid at the first point: good to well under a
+  // metre over the few hundred metres a site check spans. A shape is a list
+  // of parts, each a list of [lat, lon]; `area` marks a part that is a ring.
+  const Geo = (() => {
+    const sheet = (lat0, lon0) => {
+      const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110574;
+      return ([la, lo]) => [(lo - lon0) * kx, (la - lat0) * ky];
+    };
+    const segPt = (a, b, p) => {
+      const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
+      const t = L2 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2)) : 0;
+      return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+    };
+    const cross = (a, b, c, d) => {
+      const o = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]));
+      return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0;
+    };
+    const segSeg = (a, b, c, d) => (cross(a, b, c, d) ? 0 : Math.min(segPt(a, b, c), segPt(a, b, d), segPt(c, d, a), segPt(c, d, b)));
+    const inside = (ring, p) => {
+      let x = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const a = ring[i], b = ring[j];
+        if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]) x = !x;
+      }
+      return x;
+    };
+    // Esri JSON (paths, rings, or a point) to parts of [lat, lon].
+    function ofEsri(g) {
+      if (!g) return [];
+      if (g.paths) return g.paths.map(p => ({ pts: p.map(([x, y]) => [y, x]) }));
+      if (g.rings) return g.rings.map(p => ({ pts: p.map(([x, y]) => [y, x]), area: true }));
+      if (g.x != null) return [{ pts: [[g.y, g.x]] }];
+      return [];
+    }
+    // The least distance in metres from a dig (one point, or a line of
+    // points) to a shape; 0 when they touch, or the dig is inside a ring.
+    function dist(dig, shape) {
+      if (!dig.length || !shape.length) return Infinity;
+      const at = sheet(dig[0][0], dig[0][1]);
+      const D = dig.map(at);
+      let best = Infinity, inAny = false;
+      for (const part of shape) {
+        const P = part.pts.map(at);
+        if (part.area && D.some(p => inside(P, p))) inAny = true;
+        for (let i = 0; i < P.length; i++) {
+          const a = P[i], b = P[i + 1] || (part.area ? P[0] : null);
+          for (let j = 0; j < D.length; j++) {
+            const c = D[j], d = D[j + 1];
+            const m = b ? (d ? segSeg(a, b, c, d) : segPt(a, b, c)) : (d ? segPt(c, d, a) : Math.hypot(a[0] - c[0], a[1] - c[1]));
+            if (m < best) best = m;
+          }
+        }
+      }
+      return inAny ? 0 : best;
+    }
+    // Length of a line of [lat, lon], in metres.
+    function length(pts) {
+      if (pts.length < 2) return 0;
+      const at = sheet(pts[0][0], pts[0][1]);
+      let m = 0;
+      for (let i = 1; i < pts.length; i++) { const a = at(pts[i - 1]), b = at(pts[i]); m += Math.hypot(b[0] - a[0], b[1] - a[1]); }
+      return m;
+    }
+    return { dist, ofEsri, length, inside: (ring, p) => { const at = sheet(p[0], p[1]); return inside(ring.map(at), at(p)); } };
+  })();
+
+  // A box round some points, `m` metres out on every side, as Leaflet bounds.
+  function boxAround(pts, m) {
+    let s = 90, n = -90, w = 180, e = -180;
+    for (const [la, lo] of pts) { s = Math.min(s, la); n = Math.max(n, la); w = Math.min(w, lo); e = Math.max(e, lo); }
+    const dLat = m / 110574, dLon = m / (111320 * Math.cos(((s + n) / 2) * Math.PI / 180));
+    return L.latLngBounds([s - dLat, w - dLon], [n + dLat, e + dLon]);
+  }
+
   // ── The face it shows the rest of the app ───────────────────────────────
 
   return {
     FEEDS,
+    Geo,
+    boxAround,
+    // What 🚧 Before you dig (map-dig.js) asks: the same services, the same
+    // ways of asking, so a fix to one is a fix to both.
+    digSources() {
+      return { GA_ELEC, GA_PIPES, SOILS, NET_SERVICES, NET_CLASS, netQuery, partQuery, askJson, inBox,
+        pipeFeeds: FEEDS.filter(f => f.kind === 'pipes'), question: (n, lat, lon) => QUESTIONS[n](lat, lon),
+        NOT_FOR_DIGGING };
+    },
     attach(m) {
       map = m;
       for (const p of Object.values(PANES)) {

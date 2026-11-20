@@ -1362,6 +1362,10 @@ const SiteExposure = (function () {
     html,
     ask,
     retry,
+    // A map code's words, coarsely: 'actual', 'likely', 'possible', 'low',
+    // 'water', 'unassessed' or 'unclear' — for 🚧 Before you dig (map-dig.js),
+    // which reads the same maps and should band them the same way.
+    assLevel,
     // Everything asked and kept, forgotten — for a check that wants to start
     // clean. The queue is emptied too; what is in flight lands in nothing.
     clear() {

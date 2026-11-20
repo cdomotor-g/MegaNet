@@ -148,7 +148,7 @@ const STATE_KEY = {
   rain: 'mapRain', elev: 'mapElev', catchments: 'mapCatchments', lots: 'mapLots', easements: 'mapEasements',
   tenure: 'mapTenure', roads: 'mapRoads', roadOwners: 'mapRoadOwners', councils: 'mapCouncils',
   survey: 'mapSurvey', hubs: 'mapHubs', wind: 'mapWind', cameras: 'mapCameras', photos: 'mapPhotos',
-  siteFeatures: 'mapSiteFeatures', tasks: 'mapTasks', licensing: 'mapLicensing',
+  siteFeatures: 'mapSiteFeatures', tasks: 'mapTasks', licensing: 'mapLicensing', dig: 'mapDig',
 };
 const SPEC = {
   overview: { links: true, roles: ALL, backbone: true, arrows: false, colour: 'freq', health: false, outlines: false,
@@ -187,6 +187,9 @@ const SPEC = {
     hubs: false, wind: false },
   land: { base: 'OSM-Topo', links: false, backbone: false, roles: ALL, tenure: true, lots: true, easements: true,
     riverLines: true, catchments: true, councils: true, roads: true, elev: false, rain: false },
+  // Asked for 20 Nov 2026: what is in the way of site works.
+  dig: { base: 'Satellite', links: false, backbone: false, roles: ALL, lots: true, easements: true, roads: true,
+    wind: true, dig: true, tenure: false, rain: false, elev: false, catchments: false },
 };
 
 // The cadastre export's layers as they were before Views (git d38649d,
@@ -574,7 +577,7 @@ try {
   section('3. Every built-in view, pressed');
   await countBuilds();
   const VIEWS = await page.evaluate(() => MapViews.VIEWS.map(v => ({ id: v.id, label: v.label, knobs: v.knobs })));
-  check('the built-in views are the eleven the spec names',
+  check('the built-in views are the twelve the spec names',
     J(VIEWS.map(v => v.id)) === J(Object.keys(SPEC)), J(VIEWS.map(v => v.id)));
   for (const v of VIEWS) {
     const nErr = errors.length;

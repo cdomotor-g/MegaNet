@@ -12577,6 +12577,10 @@ details.mv-fold[open] > summary.mv-card-h { margin-bottom: .25rem; }
   padding: .4rem .55rem;
   font-size: .82rem;
   color: var(--text);
+  /* The band across the group's top, in a washed-out shade of its icon's
+     colour (owner, 20 Nov 2026), so each group reads as one block. */
+  background: color-mix(in srgb, var(--mv-role, var(--accent)) 16%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--mv-role, var(--accent)) 30%, var(--border));
 }
 .mv-role-ic {
   flex: none;
@@ -12587,6 +12591,8 @@ details.mv-fold[open] > summary.mv-card-h { margin-bottom: .25rem; }
   border-radius: 5px;
   color: var(--panel);
   background: var(--mv-role, var(--accent));
+  /* A thin ring round the icon, a step lighter than the band behind it. */
+  box-shadow: 0 0 0 1.5px var(--panel), 0 0 0 2.5px color-mix(in srgb, var(--mv-role, var(--accent)) 70%, var(--text));
 }
 .mv-role-ic svg { width: .9rem; height: .9rem; }
 .mv-role--everyone { --mv-role: var(--mv-role-everyone); }
@@ -30292,6 +30298,38 @@ select.kl-in { width: auto; font-family: inherit; }
   box-shadow: 0 1px 4px rgba(0, 0, 0, .35); cursor: grab;
 }
 .leaflet-container.lic-arming { cursor: crosshair; }
+
+/* 🚧 Before you dig (map-dig.js): the panel's buttons, its fields and the
+   banded list of what is in the way. */
+.leaflet-container.dig-arming { cursor: crosshair; }
+.dig-panel .dig-acts { display: flex; flex-wrap: wrap; gap: .35rem; margin: .45rem 0; }
+.dig-panel .dig-acts .btn[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dig-panel .dig-field { display: flex; align-items: center; gap: .45rem; margin: .35rem 0; font-size: .85rem; flex-wrap: wrap; }
+.dig-panel .dig-field select { flex: 1; min-width: 9rem; }
+.dig-panel .dig-field input[type="range"] { flex: 1; min-width: 7rem; }
+.dig-panel .dig-seg { margin: .35rem 0 .5rem; }
+.dig-sum { margin: .4rem 0; }
+.dig-list { list-style: none; margin: .3rem 0; padding: 0; display: grid; gap: .3rem; }
+.dig-row {
+  display: flex; gap: .5rem; align-items: flex-start;
+  padding: .35rem .45rem; border-radius: var(--r-sm, 4px);
+  border: 1px solid var(--border); border-left-width: 4px;
+}
+.dig-row--red   { border-left-color: #d32f2f; background: color-mix(in srgb, #d32f2f 8%, transparent); }
+.dig-row--amber { border-left-color: #ef8f00; background: color-mix(in srgb, #ef8f00 8%, transparent); }
+.dig-row--info  { border-left-color: #5c6bc0; }
+.dig-band {
+  flex: none; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+  padding: .1rem .35rem; border-radius: 3px; color: #fff; cursor: help;
+}
+.dig-band--red { background: #c62828; }
+.dig-band--amber { background: #9e5e00; }
+.dig-band--info { background: #3f51b5; }
+.dig-what { min-width: 0; }
+.dig-m { margin-left: .4rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+.dig-not { margin-top: .6rem; padding-top: .4rem; border-top: 1px solid var(--border); }
+.dig-not ul { margin: .2rem 0 .3rem 1.1rem; padding: 0; }
+.dig-not code { user-select: all; }
 .lic-states-h { margin-top: var(--sp-2); }
 /* The licensing line under a station's hover name, a bubble's lines by band,
    the tag on a licence that is not the Bureau's, and the Views section's

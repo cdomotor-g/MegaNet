@@ -424,6 +424,9 @@ const MapWind = (function () {
     // hand yet. See the block above regionState().
     regionState,
     askRegion,
+    // The polygons, fetched once (a promise): for a caller with no element
+    // to fill, such as 🚧 Before you dig.
+    ready: () => ensureData(),
 
     // On by default and remembered, since #176 — MapSurvey's terms rather than
     // MapContours'. The reasoning that kept it off was "a layer that costs a

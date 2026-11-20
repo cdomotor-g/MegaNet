@@ -6720,6 +6720,7 @@ function stopStationsMap() {
   MapBestRepeater.detach();
   MapRepCompare.detach();
   if (typeof MapAcma !== 'undefined') MapAcma.detach();
+  if (typeof MapDig !== 'undefined') MapDig.detach();
   MapHops.detach();
   MapDirect.detach();
   MapLatency.detach();
@@ -6990,6 +6991,8 @@ function initMap() {
   // 📜 ACMA licences: the licences these stations' own transmitters run
   // under, drawn with the area each covers, and which stations have one.
   if (typeof MapAcma !== 'undefined') MapAcma.attach(state.map);
+  // 🚧 Before you dig: what is in the way of digging or a crane at a spot.
+  if (typeof MapDig !== 'undefined') MapDig.attach(state.map);
   // 🪜 Hops to base: a pane for its lines, and the hops of a station lit
   // before the map was built again drawn on the new one.
   MapHops.attach(state.map);

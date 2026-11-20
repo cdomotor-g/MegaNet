@@ -25,6 +25,17 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 286, date: '2026-11-20', items: [
+      '🚧 <strong>Before you dig, a new view in the Property group.</strong> Power lines overhead and cables underground, '
+        + 'pipelines, water, sewer and stormwater pipes, property lines, road reserves, easements, cultural heritage areas, '
+        + 'acid sulfate soils and wind regions on the satellite photo. Tap the map, pick a station or draw a trench\'s line, '
+        + 'and <em>🚧 Before you dig</em> lists what is near: red to stop and look at, amber to check, with each overhead '
+        + 'line\'s crane exclusion zone. Print or save it as a check sheet. A guide, not a locate: still lodge a Before You Dig request.',
+      '🟫 <strong>Soil type and acid sulfate soils</strong> are new layers in <em>More map layers</em> (Queensland).',
+      '🎨 Each group of Views now has a band across its heading in its own colour.',
+      '🔧 A station card\'s <em>Open data here → Power network</em> row said “none within 30 m” even under the wires: '
+        + 'Energex and Ergon\'s service ignored the distance. It now finds them.',
+    ] },
     { n: 285, date: '2026-11-20', items: [
       '📜 <strong>Licence coverage, a new view for technicians.</strong> In the Stations map\'s <em>Views</em>, next to Radio paths '
         + 'and Backbone: every ACMA point-to-multipoint licence\'s service area as a circle, every point-to-point link as an oval '

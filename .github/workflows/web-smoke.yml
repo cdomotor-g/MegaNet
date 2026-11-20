@@ -821,6 +821,14 @@ jobs:
         working-directory: test
         run: npm run feeds
 
+      # 🚧 Before you dig (map-dig.js): a spot and a trench's line checked
+      # against stubbed power, pipe, cadastre and soil services, each finding
+      # banded by its distance, the view in the Property group, the sheet.
+      - name: Before you dig — what is near a spot or a trench
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run dig
+
       # Who manages each road and bridge (map-road-owners.js, site-roads.js).
       # The State's Roads and Tracks, TMR's bridge register and QLDTraffic's
       # road lookup are stubbed with a highway, a council road, an unowned

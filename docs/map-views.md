@@ -109,6 +109,7 @@ live pulses the backbone was most of what the eye saw).
 | Flood | **Rainfall** | Light; no radio paths; field stations only, outlined; the rainfall heat map over the river basins and rivers (re-read every 5 minutes). |
 | Property | **Property & easements** | Satellite; no radio paths; property boundaries, easements, road parcels and road owners, council areas, survey marks and rivers. |
 | Property | **Land & tenure** | OSM-Topo; no radio paths; land tenure, property boundaries, easements, rivers, river basins, council areas and road parcels. |
+| Property | **Before you dig** | Satellite; no radio paths; property boundaries, easements, road parcels, wind regions, rivers, field photos and site features; and from More map layers the transmission lines, pipelines, Energex/Ergon network, the published water, sewer and stormwater pipes, cultural heritage groups and acid sulfate soils. Arms 🚧 Before you dig (`map-dig.js`, the `dig` knob, `state.mapDig`): the first tap checks that spot and opens its panel. See `docs/before-you-dig.md`. Asked for 20 Nov 2026. |
 
 Each chip's tooltip says what it does and, where it applies, what turning it on
 fetches. The line under the chips says what the view in force does, or **Your own

@@ -197,7 +197,7 @@ const MapViews = (function () {
 
   // The overlay layers a view switches, each on its own module's setter.
   const LAYER_KNOBS = ['riverLines', 'riverCatchment', 'rain', 'elev', 'catchments', 'lots', 'easements', 'tenure',
-    'roads', 'roadOwners', 'councils', 'survey', 'hubs', 'wind', 'cameras', 'photos', 'siteFeatures', 'tasks', 'licensing'];
+    'roads', 'roadOwners', 'councils', 'survey', 'hubs', 'wind', 'cameras', 'photos', 'siteFeatures', 'tasks', 'licensing', 'dig'];
   // Not among them: Offer the digital twin at close zoom (MapTwin.setEnabled).
   // It was a view's to set until November 2026, and seven of the ten views
   // set it on — so an operator who unticked it had it ticked again by the
@@ -210,7 +210,7 @@ const MapViews = (function () {
     catchments: 'river basins', lots: 'property boundaries', easements: 'easements', tenure: 'land tenure',
     roads: 'road parcels', roadOwners: 'road owners', councils: 'council areas', survey: 'survey marks',
     hubs: 'maintenance hubs', wind: 'wind regions', cameras: 'flood cameras', photos: 'field photos',
-    siteFeatures: 'site features', tasks: 'tasks', licensing: 'licence coverage',
+    siteFeatures: 'site features', tasks: 'tasks', licensing: 'licence coverage', dig: 'the before-you-dig check',
   };
   const PATH_WORDS = {
     every: 'every path', best: 'the best path only', lod: 'the best path until zoomed in',
@@ -387,6 +387,28 @@ const MapViews = (function () {
       knobs: {
         base: 'OSM-Topo', links: false, roles: ALL_ROLES, backbone: false, arrows: false, health: false, outlines: false,
         ...only('tenure', 'lots', 'easements', 'riverLines', 'catchments', 'councils', 'roads', 'photos', 'siteFeatures'),
+        drawing: { paths: 'every', draw: 'lines', auto: true, balance: 40 },
+      },
+    },
+    {
+      // Asked for 20 Nov 2026: "show users anything that might impact a
+      // station infrastructure in its operation or remediation … where we
+      // can't dig and where we can't use cranes". The layers of EPIC #291
+      // that sit in the ground or over it, the property lines, the soils and
+      // the wind regions, with 🚧 Before you dig (map-dig.js) opened to check
+      // a spot or a trench's line.
+      id: 'dig', group: 'property', label: 'Before you dig',
+      say: 'Everything that can be in the way of site works on the satellite photo: power lines overhead and cables '
+        + 'underground, pipelines, water, sewer and stormwater pipes, property boundaries, road reserves, easements, cultural '
+        + 'heritage areas, acid sulfate soils and wind regions. Opens Before you dig to check a spot or the line of a trench. '
+        + 'A guide, not a locate. No radio paths.',
+      caution: 'Asks several map services as you zoom in — the power network from zoom 11, pipes from 15, property lines '
+        + 'and acid sulfate soils close in — and each of them again for a check.',
+      knobs: {
+        base: 'Satellite', links: false, roles: ALL_ROLES, backbone: false, arrows: false, health: false, outlines: false,
+        ...only('lots', 'easements', 'roads', 'wind', 'riverLines', 'photos', 'siteFeatures', 'dig'),
+        feeds: ['ga-power', 'ga-pipes', 'qld-network', 'bcc-stormwater', 'unitywater', 'melbourne-water', 'vic-drainage',
+          'qld-heritage', 'qld-acid-sulfate'],
         drawing: { paths: 'every', draw: 'lines', auto: true, balance: 40 },
       },
     },
@@ -924,6 +946,7 @@ const MapViews = (function () {
     MapPhotos: () => (typeof MapPhotos !== 'undefined' ? MapPhotos : null),
     SiteFeatures: () => (typeof SiteFeatures !== 'undefined' ? SiteFeatures : null),
     MapTasks: () => (typeof MapTasks !== 'undefined' ? MapTasks : null),
+    MapDig: () => (typeof MapDig !== 'undefined' ? MapDig : null),
     MapAcma: () => (typeof MapAcma !== 'undefined' ? MapAcma : null),
     MapTwin: () => (typeof MapTwin !== 'undefined' ? MapTwin : null),
   };
@@ -997,6 +1020,7 @@ const MapViews = (function () {
     siteFeatures: boolKnob('mapSiteFeatures', M('SiteFeatures'), 'setEnabled'),
     tasks: boolKnob('mapTasks', M('MapTasks'), 'setEnabled'),
     licensing: boolKnob('mapLicensing', M('MapAcma'), 'setEnabled'),
+    dig: boolKnob('mapDig', M('MapDig'), 'setEnabled'),
     // More map layers (map-feeds.js, #296): which of its layers are on, as a
     // list — a kept view or a shared link puts back exactly those.
     feeds: {
@@ -1220,7 +1244,7 @@ const MapViews = (function () {
   const SHARE_V = 'm1';
   const SHARE_SWITCHES = ['links', 'backbone', 'arrows', 'health', 'outlines', 'riverLines', 'riverCatchment', 'rain',
     'elev', 'catchments', 'lots', 'easements', 'tenure', 'roads', 'roadOwners', 'councils', 'survey', 'hubs', 'wind',
-    'cameras', 'photos', 'siteFeatures', 'twinOffer', 'tasks', 'licensing'];
+    'cameras', 'photos', 'siteFeatures', 'twinOffer', 'tasks', 'licensing', 'dig'];
   // (twinOffer keeps its place so older links still line up; it is no longer
   // a knob, so it is written as "-" and ignored when read.)
   // A base map's name, with the code's own separators kept out of it.
@@ -1628,6 +1652,7 @@ const MapViews = (function () {
     licensing: 'Licence circles; stations covered or not',
     rivers: 'Rivers, basins, ground height', rain: 'Rain gauges as a heat map',
     property: 'Boundaries, easements, road owners', land: 'Parks, forests, State land, leases',
+    dig: 'Power, pipes, easements, soils near a site',
   };
   // A pictogram per job, drawn in the card's own colour (styles.css).
   const ROLE_ICON = {
@@ -1667,6 +1692,7 @@ const MapViews = (function () {
       case 'property': b = G.sat + '<path d="M4 10H68M4 26H68M4 40H68M14 4V44M34 4V44M54 4V44" stroke="#fff" stroke-width=".7"/><path d="M24 4V44" stroke="#fff" stroke-width=".8" stroke-dasharray="2 2"/><path d="M0 34 L72 20" stroke="#f9a825" stroke-width="1.6"/>' + pin(44, 16); break;
       case 'tasks': b = G.light + river('#1f6fd1') + [[18, 30, '#c7401a'], [44, 16, '#9e5e00'], [58, 34, '#0b5cab']].map(([x, y, c]) => pin(x, y) + `<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="${c}" stroke-width="1.8"/><rect x="${x + 4}" y="${y - 11}" width="9" height="7" rx="3.5" fill="${c}"/>`).join('') + pin(30, 12) + pin(8, 12); break;
       case 'licensing': b = G.light + '<circle cx="22" cy="22" r="17" fill="#2e7d32" fill-opacity=".1" stroke="#1565c0" stroke-width=".9"/>' + '<ellipse cx="54" cy="12" rx="15" ry="4" transform="rotate(-18 54 12)" fill="#1565c0" fill-opacity=".14" stroke="#1565c0" stroke-width=".8"/>' + rpt(22, 22) + [[14, 14, '#2e7d32'], [30, 30, '#2e7d32'], [44, 36, '#e08a00'], [64, 40, '#c62828']].map(([x, y, c]) => pin(x, y) + `<circle cx="${x}" cy="${y}" r="4.2" fill="none" stroke="${c}" stroke-width="1.6"/>`).join('') + pin(41, 16) + pin(67, 8); break;
+      case 'dig': b = G.sat + '<path d="M4 12H68M30 4V44M54 4V44" stroke="#fff" stroke-width=".7"/><path d="M0 36 L72 26" stroke="#7b2cbf" stroke-width="1.6"/><path d="M0 20 L72 16" stroke="#795548" stroke-width="1.4" stroke-dasharray="3 2"/>' + '<circle cx="40" cy="28" r="11" fill="#d32f2f" fill-opacity=".12" stroke="#d32f2f" stroke-width="1.2" stroke-dasharray="3 2"/><path d="M40 28 L60 40" stroke="#111" stroke-width="1.8"/><circle cx="40" cy="28" r="2.4" fill="#ffd600" stroke="#111" stroke-width="1"/>'; break;
       case 'land': b = G.topo + '<rect x="4" y="4" width="30" height="20" fill="#2e8b3e" opacity=".45"/><rect x="38" y="26" width="30" height="18" fill="#1b7f79" opacity=".4"/><rect x="40" y="4" width="16" height="16" fill="#d6539b" opacity=".35"/><path d="M4 24H68M34 4V44M56 4V44" stroke="#555" stroke-width=".6"/>' + river('#1f6fd1'); break;
       default: b = G.light + P.slice(0, 4).map(p => ln(p, R2, '#2979ff', 1, 0.6)).join('') + rpt(...R2);
     }
@@ -1680,7 +1706,7 @@ const MapViews = (function () {
     catchments: 'River basins', lots: 'Property lines', easements: 'Easements', tenure: 'Land tenure', roads: 'Road parcels',
     roadOwners: 'Road owners', councils: 'Council areas', survey: 'Survey marks', hubs: 'Maintenance hubs',
     wind: 'Wind regions', photos: 'Field photos', siteFeatures: 'Site features', tasks: 'Task rings',
-    licensing: 'Licence coverage',
+    licensing: 'Licence coverage', dig: 'Dig check',
   };
   function tagsOf(v) {
     const k = (v && v.knobs) || {};
