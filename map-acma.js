@@ -1813,6 +1813,23 @@ const MapAcma = (() => {
       + `<br><span class="lic-muted">${why}</span>`;
   }
 
+  // The hover's card for one licence: its number and a standing pill on top,
+  // the holder under it, then a few label / value rows — laid out on a fixed
+  // width so a long site name wraps in its own row, not the whole tip.
+  function coverCardHtml(h) {
+    const l = h.l, st = standing(l);
+    const pill = st === 'lapsed' ? ['lapsed', 'not in force'] : st === 'soon' ? ['soon', 'expires soon'] : ['ok', 'in force'];
+    const row = (k, v) => `<span class="lic-cc-k">${esc(k)}</span><span class="lic-cc-v">${v}</span>`;
+    const covers = h.ends
+      ? `the link ${esc(h.ends[0].name)} ↔ ${esc(h.ends[1].name)}`
+      : `${esc(fmtKm(h.km))} from ${esc(h.site.name)}, inside its ${esc(String(radiusOf(l)))} km area`;
+    return `<div class="lic-cc" style="--dot:${classColour(clsOf(l))}">
+      <div class="lic-cc-top"><strong>${esc(l.no)}</strong><span class="lic-cc-pill lic-cc-${pill[0]}">${pill[1]}</span></div>
+      <div class="lic-cc-holder">${esc(holderName(l))}</div>${otherTagHtml(l)}
+      <div class="lic-cc-rows">${row('Type', esc(kindWord(l)))}${row('Frequency', esc(freqText(l)))}${row(st === 'lapsed' ? 'Ended' : 'Expires', esc(dateText(l.expiry)))}${row('Covers', covers)}</div>
+    </div>`;
+  }
+
   // ── The hover over a licence's area ─────────────────────────────────────────
   let hoverTip = null, hoverRaf = 0, hoverEv = null;
   const HOVER_MAX = 6;
@@ -1827,9 +1844,9 @@ const MapAcma = (() => {
     const heavyNo = picked && picked.type === 'licence' ? picked.id : null;
     const hits = licencesAt(e.latlng.lat, e.latlng.lng, l => shown(l) || l.no === heavyNo);
     if (!hits.length) { if (hoverTip && map.hasLayer(hoverTip)) map.closeTooltip(hoverTip); return; }
-    const html = `<div class="lic-tip"><span class="lic-muted">${hits.length === 1 ? 'Covered by 1 licence' : `Covered by ${hits.length} licences`}</span><br>`
-      + hits.slice(0, HOVER_MAX).map(coverEntryHtml).join('<hr>')
-      + (hits.length > HOVER_MAX ? `<hr>+ ${hits.length - HOVER_MAX} more here` : '') + '</div>';
+    const html = `<div class="lic-cover"><div class="lic-cover-head">📜 ${hits.length === 1 ? '1 licence covers this spot' : `${hits.length} licences cover this spot`}</div>`
+      + hits.slice(0, HOVER_MAX).map(coverCardHtml).join('')
+      + (hits.length > HOVER_MAX ? `<div class="lic-cover-more">+ ${hits.length - HOVER_MAX} more here</div>` : '') + '</div>';
     hoverTip = hoverTip || L.tooltip({ direction: 'right', offset: [14, 0], opacity: 0.96, className: 'lic-cover-tip' });
     hoverTip.setContent(html);
     hoverTip.setLatLng(e.latlng);

@@ -30434,6 +30434,26 @@ select.kl-in { width: auto; font-family: inherit; }
 .lic-disclaimer { border-left: 3px solid var(--lic-warn); padding-left: var(--sp-2); }
 .lic-tip { max-width: 18rem; white-space: normal; font-size: var(--fs-sm, .8125rem); }
 .lic-tip hr { margin: .25rem 0; border: 0; border-top: 1px solid var(--border); }
+/* The hover over a licence's area (map-acma.js hoverShow): a small card per
+   licence on a fixed width, so the tip never squeezes into a thin column. */
+.leaflet-tooltip.lic-cover-tip { width: 17.5rem; max-width: calc(100vw - 32px); padding: 8px; white-space: normal;
+  border-radius: 10px; box-shadow: 0 4px 16px rgba(0, 0, 0, .18); line-height: 1.35; }
+.lic-cover { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.lic-cover-head { font-weight: 600; color: var(--muted); font-size: 11.5px; }
+.lic-cc { border-left: 4px solid var(--dot, #888); border-radius: 6px; padding: 6px 8px;
+  background: color-mix(in srgb, var(--dot, #888) 7%, transparent); }
+.lic-cc-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.lic-cc-top strong { font-size: 13px; }
+.lic-cc-pill { padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; }
+.lic-cc-ok { background: color-mix(in srgb, var(--ok, #107c10) 15%, transparent); color: var(--ok, #107c10); }
+.lic-cc-soon { background: color-mix(in srgb, var(--lic-warn, #f9a825) 22%, transparent); color: color-mix(in srgb, var(--lic-warn, #f9a825) 70%, #000); }
+.lic-cc-lapsed { background: color-mix(in srgb, var(--muted) 18%, transparent); color: var(--muted); }
+.lic-cc-holder { font-weight: 600; margin-top: 1px; }
+.lic-cc .lic-other-tag { margin-top: 3px; }
+.lic-cc-rows { display: grid; grid-template-columns: auto 1fr; gap: 1px 8px; margin-top: 4px; }
+.lic-cc-k { color: var(--muted); }
+.lic-cc-v { overflow-wrap: anywhere; }
+.lic-cover-more { color: var(--muted); text-align: center; font-size: 11.5px; }
 /* 📜 ACMA licences: its tables read whole — wrapped, and scrolled sideways when too wide. */
 .lic-table { table-layout: auto; width: 100%; }
 .lic-table th, .lic-table td { white-space: normal; overflow: visible; text-overflow: clip; vertical-align: top; }

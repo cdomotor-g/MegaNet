@@ -173,7 +173,7 @@ await page.mouse.move(areaHov.x - 40, areaHov.y - 40);
 await page.mouse.move(areaHov.x, areaHov.y, { steps: 4 });
 await page.waitForTimeout(500);
 const tip = await page.evaluate(() => (document.querySelector('.lic-cover-tip') || {}).textContent || '');
-ok('hovering inside a circle names the licences that cover that ground', /Covered by/.test(tip) && (tip.includes(areaHov.no) || areaHov.all.length > 6), tip.slice(0, 200));
+ok('hovering inside a circle names the licences that cover that ground', /cover(s)? this spot/.test(tip) && (tip.includes(areaHov.no) || areaHov.all.length > 6), tip.slice(0, 200));
 await page.mouse.move(5, 5);
 await page.waitForTimeout(400);
 
