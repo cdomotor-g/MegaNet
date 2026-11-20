@@ -776,6 +776,7 @@ const FieldPhotos = (function () {
         const want = !meta.gps ? 'the position printed on the photo'
                    : !meta.taken ? 'the time printed on the photo' : 'the ± printed on the photo';
         item.status = 'ocr';
+        item.ocrNeeded = true;
         item.note = meta.gps ? `Reading ${want}…` : `No GPS in the file — reading ${want}…`;
         repaintQueue();
         try {
@@ -1373,15 +1374,51 @@ const FieldPhotos = (function () {
           <span class="small ${p.status === 'refused' ? 'txt-bad' : p.leftOut.length ? 'txt-warn' : ''}">${esc(p.note)}</span></li>`).join('')}</ul>`;
   }
 
+  // The stages a drop goes through, a bar each, worked out from the queue as it
+  // stands: zips opened, every photo checked for the GPS in its file, the
+  // overlay read on those without one, then the upload you start yourself.
+  function stagesOf() {
+    const q = S().queue, pk = packs();
+    const opening = pk.filter(p => p.status === 'opening').length;
+    const unread = q.filter(i => i.status === 'waiting' || i.status === 'reading').length;
+    const ocrAll = q.filter(i => i.ocrNeeded), ocrLeft = ocrAll.filter(i => i.status === 'ocr' || i.status === 'waiting' || i.status === 'reading').length;
+    const upAll = q.filter(i => ['queued', 'uploading', 'done', 'already', 'failed'].includes(i.status));
+    const upLeft = upAll.filter(i => i.status === 'queued' || i.status === 'uploading').length;
+    const gpsDone = !opening && !unread;
+    const list = [];
+    if (pk.length) list.push({ name: 'Open zip files', hint: 'Each zip is opened and its photos listed. Nothing is unpacked until a photo is read.',
+      done: pk.length - opening, total: pk.length, over: !opening });
+    if (q.length || opening) list.push({ name: 'Check photos for GPS', hint: 'Each photo is unzipped if needed and its own details read: position, time and direction the camera wrote into the file.',
+      done: q.length - unread, total: q.length, over: gpsDone });
+    if (q.length) list.push({ name: 'Read photo overlay', hint: 'For photos with no GPS in the file, the position printed over the picture by the camera app is read from the image. Slower, so only used when needed.',
+      done: ocrAll.length - ocrLeft, total: ocrAll.length, over: gpsDone && !ocrLeft, none: gpsDone && !ocrAll.length ? 'none needed' : '' });
+    if (q.length) list.push({ name: 'Upload', hint: 'Starts when you press Upload, after you have checked the positions.',
+      done: upAll.length - upLeft, total: upAll.length, over: !!upAll.length && !upLeft, idle: !upAll.length ? 'waits for you' : '' });
+    return list;
+  }
+  function stagesHtml() {
+    const list = stagesOf();
+    if (!list.length) return '';
+    return `<div class="fp-stages" aria-label="Progress">${list.map(st => {
+      const pct = st.total ? Math.round(100 * st.done / st.total) : (st.over ? 100 : 0);
+      const text = st.none || st.idle || `${st.done} / ${st.total}`;
+      const cls = st.over && !st.idle ? 'fp-stage-done' : st.done ? 'fp-stage-busy' : '';
+      return `<div class="fp-stage ${cls}"><span class="fp-stage-name" title="${escAttr(st.hint)}">${st.over && !st.idle ? '✓ ' : ''}${esc(st.name)}</span>
+        <div class="fp-stage-bar" role="progressbar" aria-label="${escAttr(st.name)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div>
+        <span class="small txt-muted fp-stage-n">${esc(text)}</span></div>`;
+    }).join('')}
+      <details class="small fp-stage-key"><summary>What the stages mean</summary><dl>${list.map(st => `<dt>${esc(st.name)}</dt><dd>${esc(st.hint)}</dd>`).join('')}</dl></details></div>`;
+  }
+
   function queueHtml() {
     const q = S().queue;
-    if (!q.length) return packsHtml();
+    if (!q.length) return stagesHtml() + packsHtml();
     const ready = q.filter(i => i.status === 'ready' || i.status === 'failed').length;
     const busy = q.some(i => ['waiting', 'reading', 'ocr', 'queued', 'uploading'].includes(i.status))
               || packs().some(p => p.status === 'opening');
     const finished = q.some(i => ['done', 'already', 'refused'].includes(i.status));
     return `
-      ${packsHtml()}
+      ${stagesHtml()}${packsHtml()}
       <div class="button-group fp-queue-actions">
         <button type="button" class="primary" id="fp-upload" onclick="FieldPhotos.uploadAll()" ${ready ? '' : 'disabled'}>⬆ Upload ${ready} photo${ready === 1 ? '' : 's'}</button>
         <button type="button" onclick="FieldPhotos.clearFinished()" ${finished ? '' : 'disabled'}>Clear finished</button>

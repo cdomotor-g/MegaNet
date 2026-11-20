@@ -30972,3 +30972,16 @@ details.tm-fold summary { cursor: pointer; }
 .mn-gauge-live { box-shadow: 0 0 0 2px #00838f; background: #e0f4f6; }
 .mn-gauge-old  { box-shadow: 0 0 0 2px #8d6e63; background: #efebe9; }
 .mn-gauge-none { opacity: .55; box-shadow: 0 0 0 2px #888; }
+
+/* Field photos: a bar for each stage of a drop. */
+.fp-stages { margin: 0 0 var(--sp-2); padding: var(--sp-2); border: 1px solid var(--border, #e1e5ea); border-radius: 8px; }
+.fp-stage { display: grid; grid-template-columns: 11em 1fr 6.5em; gap: var(--sp-2); align-items: center; margin: 4px 0; }
+.fp-stage-n { text-align: right; font-variant-numeric: tabular-nums; }
+.fp-stage-name { cursor: help; }
+.fp-stage-bar { height: 8px; border-radius: 4px; overflow: hidden; background: rgba(128,128,128,.25); }
+.fp-stage-bar i { display: block; height: 100%; background: #2f6fde; transition: width .2s; }
+.fp-stage-done .fp-stage-bar i { background: #2e9d5b; }
+.fp-stage-done .fp-stage-name { color: #2e9d5b; }
+.fp-stage-key summary { cursor: pointer; margin-top: 6px; }
+.fp-stage-key dt { font-weight: 600; } .fp-stage-key dd { margin: 0 0 4px; }
+@media (max-width: 520px) { .fp-stage { grid-template-columns: 8.5em 1fr 5em; } }
