@@ -597,6 +597,16 @@ jobs:
         working-directory: test
         run: npm run healthcard
 
+      # 📇 Station cards (health-cards.js): the magnifier's weights, the
+      # north-to-south rows, the bands from Station Health's own findings, then
+      # the demo week's cards in Chromium — the card under the pointer about 3×
+      # and still under it, the magnifier off, − + and Ctrl + scroll, the chart's
+      # callout, Escape back to the card.
+      - name: Station cards — a card per station, magnified under the pointer
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run healthcards
+
       # 🎯 Bit-Flip Sources (flip-sources.js, 0079): one request for both
       # periods, the carrier-caught repeater ranked before a broad one at the
       # network's rate, a pick joined to its stations, the CSVs, and a database

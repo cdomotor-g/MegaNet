@@ -21,8 +21,12 @@
 // common, which quarter-hour the whole network missed at once, and which
 // stored readings are corrupted copies rather than data.
 //
-// Four ways in, for four jobs:
+// Five ways in, for five jobs:
 //
+//   Station cards     every station in a maintenance hub as a card, north to
+//                     south, west to east: battery, check signals and signal
+//                     strength on one timeline, a magnifier, and a chart a
+//                     click away (health-cards.js). Which ones need a visit.
 //   Needs attention   the findings, worst first, each with its evidence and
 //                     what to do about it. The morning's list.
 //   Every sensor      All stations, sparklines: every sensor heard, a row
@@ -378,6 +382,7 @@ const Health = (() => {
     // The map first and the page's full width, under the headline and its
     // numbers: where the trouble is, seen on landing, before the list of it.
     return `
+      ${typeof HealthCards !== 'undefined' ? `<section class="panel hc-panel" id="hc-panel" aria-labelledby="hc-h">${HealthCards.render(H.A, { demo: H.demo })}</section>` : ''}
       <section class="panel hl-mapcard" aria-labelledby="hl-h-map">
         <div class="panel-header"><h3 id="hl-h-map">Where</h3>
           <span class="small">every station heard, by its worst finding</span></div>
@@ -1857,6 +1862,8 @@ const Health = (() => {
     drawMap();
   }
   function afterRender() {
+    // 📇 Station cards (health-cards.js): placed once the panel is on the page.
+    if (typeof HealthCards !== 'undefined') HealthCards.mount();
     drawMap();
     wireCharts();
     wireSpark();
@@ -2109,6 +2116,7 @@ const Health = (() => {
   function stop() {
     stopMap();
     if (typeof HealthBulletin !== 'undefined') HealthBulletin.stop();
+    if (typeof HealthCards !== 'undefined') HealthCards.stop();
   }
 
   function init() {

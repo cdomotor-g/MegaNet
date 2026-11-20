@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 287, date: '2026-11-20', items: [
+      '📇 <strong>Station cards, at the top of Station Health.</strong> Every station in a maintenance hub as a small card, '
+        + 'north to south and west to east: the last few days of battery voltage, signal strength and every missed check signal '
+        + 'on one timeline, its border nominal, watch, act on or silent — and the trace that made it act on drawn red. '
+        + 'Point at a card to magnify it and read why it is marked; click it for its chart, with the values under the pointer. '
+        + 'Pick the hub and the number of days above the cards; − and + (or Ctrl + scroll) change their size, and the magnifier turns off.',
+    ] },
     { n: 286, date: '2026-11-20', items: [
       '🚧 <strong>Before you dig, a new view in the Property group.</strong> Power lines overhead and cables underground, '
         + 'pipelines, water, sewer and stormwater pipes, property lines, road reserves, easements, cultural heritage areas, '

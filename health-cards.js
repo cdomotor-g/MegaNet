@@ -1,0 +1,688 @@
+// MegaNet — health-cards.js
+//
+//   HealthCards   Station Health's **Station cards**: every station a
+//                 maintenance hub looks after as a small card on one screen,
+//                 north to south and west to east, so a technician can see at
+//                 a glance which of hundreds need attention. Each card is the
+//                 last few days on one timeline: battery voltage on top,
+//                 signal strength underneath, and a bar for every check report
+//                 that never arrived. Its border says nominal, watch, act on
+//                 or silent, and the trace that made it act on is drawn red.
+//
+// After core.js (esc, escAttr, termHtml, announce, state), health-analysis.js
+// and health.js (Health.select, which a card's chart opens the station in);
+// before init.js. All of it at call time, so its place among the modules is
+// free (`npm run toplevel`). Nothing runs at load: health.js's bodyHtml()
+// places render() and afterRender() calls mount().
+//
+// ── Where the numbers come from ──────────────────────────────────────────────
+// Nothing is fetched here. Station Health has already read the window's
+// readings and worked them out (HealthAnalysis.run): each station's learned
+// check schedule and its slots, its battery series and overnight lows, every
+// transmission and how strongly each copy of it was heard. The cards draw that
+// analysis, so they cost the database nothing beyond what the tab already
+// reads (CLAUDE.md, *Querying the live database*).
+//
+// The bands come from the same findings as Needs attention: a power finding
+// (battery critical, low, falling, not charging) sets the battery's band, a
+// check-signal finding (silent, missed checks, frames lost) the checks' —
+// critical is act on, a warning is watch. Signal strength has no finding of its
+// own yet, so its lines are this module's: a median weaker than −100 dBm is
+// watch, −105 dBm act on, provisional until they are agreed. A level in dBFS
+// (a receiver that reports audio level, not RSSI) is drawn but not banded.
+//
+// ── The magnifier, and why rows and not a lens ───────────────────────────────
+// The card under the pointer grows to 3×, the cards round it to 2×, the next
+// ring to 1¼×. Only the rows near the pointer change height, and each row
+// packs its own cards edge to edge — so nothing is left with a gap round it,
+// and rows far away only get a little shorter. The focus is worked out from
+// where the pointer is on the undistorted grid, and each side of the focus
+// shares out only its own space, so the card under the pointer stays under it
+// and the grid does not chase the pointer about. It can be turned off.
+//
+// Cards are positioned by custom properties (--x --y --w --h) and drawn in a
+// fixed viewBox with non-scaling strokes, so a move of the magnifier sets four
+// numbers on each card and redraws nothing.
+//
+// The pure parts (weights, geoRows, fitGrid, bandsOf, signalOf) take plain
+// values, for test/health-cards.mjs.
+//
+// Exposes: HealthCards.
+
+const HealthCards = (() => {
+  const DAY = 86400000, HOUR = 3600000, MIN = 60000;
+  const NEAR = [3, 2, 1.25];        // the magnifier: focus, next ring, the ring after
+  const SPANS = [2, 4, 7, 14];      // days a card shows, out of the window loaded
+  const ZOOM_MAX = 4;
+  const RATIO = 1.35;               // a card's width to its height, at Fit all
+  const SIG_WATCH = -100, SIG_ACT = -105;   // dBm, provisional (see the header)
+  const V_LO = 11.4, V_HI = 14.4;           // the cards' battery scale, volts
+  const R_LO = -120, R_HI = -60;            // the cards' signal scale, dBm
+  const VB = 1000;                  // a card's plot is 0..VB across, 0..100 down
+  const BAND_WORD = { ok: 'Nominal', watch: 'Watch', act: 'Act on', silent: 'Silent' };
+  const STORE = 'mn-hc';
+
+  // What the words on the cards mean: the legend's hover and the fold below
+  // the cards, from one list.
+  const WORDS = {
+    hub: 'The Bureau field-maintenance area a station belongs to, as Flood-Net\'s hub layer places it. Some northern NSW stations are Brisbane Hub\'s.',
+    ok: 'Nothing on the card is past a watch line: battery, check signals and signal strength all look as they should for the days shown.',
+    watch: 'Something is heading the wrong way but has not reached its act-on line — a battery low or falling, a check or two missed, a weak signal. Station Health\'s own findings decide battery and checks.',
+    act: 'Past the line: plan a visit or a check. The trace that put it there is drawn red; the card under the pointer, and its chart, say why in words.',
+    silent: 'Nothing heard from the station: Station Health found it silent, or it was expected and not heard at all in the window.',
+    check: 'The report a station sends on a schedule even when nothing is happening, so we know it is alive. Flood-Net learns each station\'s schedule from what arrives — most are every 3 hours.',
+    miss: 'A check report that never arrived, while a receiver that hears the station was listening.',
+    partial: 'The check arrived, but some of its sensors\' frames were lost on the way.',
+    unknown: 'No receiver that hears the station was listening, so the check can\'t be counted either way.',
+    rssi: 'Signal strength: how strongly the base station heard each report, in dBm. Closer to 0 is stronger; −110 dBm is near the limit. It is not signal-to-noise (SNR), how far the signal stands above the background noise. Watch below −100 dBm, act on below −105 dBm — provisional lines.',
+    night: 'Solar night, 6 pm to 6 am at the station: the battery runs on its own, so the overnight low is the number that matters.',
+    mag: 'Grows the card under the pointer to 3×, the cards next to it to 2× and the next ones to 1¼×, so more of it can be read without clicking.',
+    size: '− and + (or Ctrl + scroll over the cards) make every card smaller or bigger; Fit all puts them all on the screen again.',
+  };
+  const GLOSSARY = [['hub', 'Maintenance hub'], ['ok', 'Nominal'], ['watch', 'Watch'], ['act', 'Act on'], ['silent', 'Silent'],
+                    ['check', 'Check signal'], ['miss', 'Missed check'], ['partial', 'Frames lost'], ['unknown', 'Not listening'],
+                    ['rssi', 'Signal strength'], ['night', 'Night'], ['mag', 'Magnifier'], ['size', 'Card size']];
+
+  const C = {
+    A: null, demo: false, hub: null, span: 4, zoom: 1, mag: true,
+    cards: [], G: null, focus: null, open: null, hov: null,
+    els: [], raf: 0, ro: null, wheel: null, loaded: false,
+  };
+
+  // ── 1. pure ────────────────────────────────────────────────────────────────
+
+  // Fisheye weights along a line of n cells, summing to n: near[0] for the
+  // focus f, near[1] and near[2] either side. Each side shares out only its
+  // own space, so the focus stays centred where its cell was; near an edge the
+  // in-between sizes give way first, and no cell goes much below 0.35.
+  function weights(n, f, near) {
+    const w = [];
+    if (f == null || n <= 0) { for (let i = 0; i < n; i++) w.push(1); return w; }
+    f = Math.max(0, Math.min(n - 1, f));
+    const ext = (near[0] - 1) / 2;
+    const side = (dir, count) => {
+      let nearN = 0;
+      for (let d = 1; d <= 2; d++) { const j = f + dir * d; if (j >= 0 && j < n) nearN++; }
+      const far = count - nearN, room = count - ext;
+      const nearSum = (nearN >= 1 ? near[1] : 0) + (nearN >= 2 ? near[2] : 0);
+      const forFar = Math.max(far * 0.35, room - nearSum);
+      const forNear = Math.max(nearN * 0.6, room - forFar);
+      const s = nearSum ? forNear / nearSum : 1;
+      return { 1: near[1] * s, 2: near[2] * s, k: far ? Math.max(0.35, (room - nearSum * s) / far) : 1 };
+    };
+    const L = side(-1, f), R = side(1, n - 1 - f);
+    for (let i = 0; i < n; i++) {
+      const d = Math.abs(i - f), S = i < f ? L : R;
+      w.push(d === 0 ? near[0] : d <= 2 ? S[d] : S.k);
+    }
+    const tot = w.reduce((a, b) => a + b, 0);
+    return w.map(x => x * n / tot);
+  }
+
+  // Rows of `cols`, north to south; each row west to east. Items: {lat, lon}.
+  // → [[index…], …]
+  function geoRows(items, cols) {
+    const has = i => isFinite(items[i].lat) && isFinite(items[i].lon);
+    const order = items.map((_, i) => i).sort((a, b) =>
+      (has(b) - has(a)) || ((items[b].lat || 0) - (items[a].lat || 0)));
+    const rows = [];
+    for (let i = 0; i < order.length; i += cols) {
+      rows.push(order.slice(i, i + cols).sort((a, b) => (items[a].lon || 0) - (items[b].lon || 0)));
+    }
+    return rows;
+  }
+
+  // The card size that fits n cards in W × H at about RATIO wide to high; then
+  // `zoom` times bigger, with whole columns across W and rows running on past H.
+  function fitGrid(n, W, H, zoom) {
+    let best = null;
+    for (let c = 1; c <= 120; c++) {
+      const rows = Math.ceil(n / c), cw = W / c, rh = H / rows;
+      const sc = Math.min(cw / RATIO, rh);
+      if (!best || sc > best.sc) best = { cw, rh: Math.min(rh, cw / 0.9), sc };
+    }
+    const ratio = best.rh / best.cw;
+    const cols = Math.max(1, Math.min(n || 1, Math.floor(W / (best.cw * (zoom || 1)) + 1e-6)));
+    const cw = W / cols;
+    return { cols, cw, rh: cw * ratio, rows: Math.ceil(n / cols) };
+  }
+
+  // A station's signal over [a, b): for each transmission, the strongest copy
+  // heard. → { pts: [{t, v}], unit, med }
+  function signalOf(txs, a, b) {
+    const pts = [];
+    let unit = null;
+    (txs || []).forEach(tx => {
+      if (tx.t < a || tx.t >= b) return;
+      let best = null;
+      (tx.copies || []).forEach(c => {
+        if (c.lvl == null || !isFinite(c.lvl)) return;
+        if (best == null || c.lvl > best) { best = c.lvl; unit = unit || c.lvlUnit || null; }
+      });
+      if (best != null) pts.push({ t: tx.t, v: best });
+    });
+    pts.sort((p, q) => p.t - q.t);
+    const vs = pts.map(p => p.v).sort((x, y) => x - y);
+    return { pts, unit, med: vs.length ? vs[Math.floor(vs.length / 2)] : null };
+  }
+
+  // The card's band and why. findings: the station's own (Station Health's);
+  // sig: signalOf()'s; silent: expected and not heard at all.
+  // → { band, battRed, sigRed, reasons: [{b, k, t}] }
+  function bandsOf(findings, sig, silent) {
+    const reasons = [];
+    const live = (findings || []).filter(f => f.severity === 'critical' || f.severity === 'warn');
+    const bandOf = f => (f.severity === 'critical' ? 'act' : 'watch');
+    let battRed = false, sigRed = false, isSilent = !!silent;
+    live.forEach(f => {
+      const cat = f.category || '';
+      if (cat === 'power') {
+        if (f.severity === 'critical') battRed = true;
+        reasons.push({ b: bandOf(f), k: 'Battery', t: f.title });
+      } else if (cat === 'comms') {
+        if (f.kind === 'silent') isSilent = true;
+        reasons.push({ b: bandOf(f), k: f.kind === 'silent' || f.kind === 'silent-spell' ? 'Silent' : 'Checks', t: f.title });
+      }
+    });
+    if (silent && !reasons.length) reasons.push({ b: 'act', k: 'Silent', t: 'Expected and not heard at all in the window' });
+    if (sig && sig.med != null && (sig.unit || 'dBm') === 'dBm') {
+      const m = Math.round(sig.med);
+      if (sig.med < SIG_ACT) { sigRed = true; reasons.push({ b: 'act', k: 'Signal', t: `Typically ${fmtNeg(m)} dBm — weaker than ${fmtNeg(SIG_ACT)} dBm` }); }
+      else if (sig.med < SIG_WATCH) reasons.push({ b: 'watch', k: 'Signal', t: `Typically ${fmtNeg(m)} dBm — weaker than ${fmtNeg(SIG_WATCH)} dBm` });
+    }
+    reasons.sort((x, y) => (y.b === 'act') - (x.b === 'act'));
+    const band = isSilent ? 'silent' : reasons.some(r => r.b === 'act') ? 'act' : reasons.length ? 'watch' : 'ok';
+    return { band, battRed, sigRed, reasons };
+  }
+
+  function fmtNeg(v) { return String(v).replace('-', '−'); }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  // ── 2. the cards' models ───────────────────────────────────────────────────
+
+  function hubName(id) {
+    const h = ((state.data && state.data.hubs) || []).find(x => x.id === id);
+    return h ? h.name : id ? id.charAt(0).toUpperCase() + id.slice(1) + ' Hub' : 'No hub';
+  }
+
+  // Every station the analysis knows, heard or expected, with its hub.
+  function everyStation(A) {
+    const out = [];
+    A.stations.forEach(S => out.push({ st: S.st, S }));
+    (A.notHeard || []).forEach(n => { if (n.st && !A.stations.has(n.st.id)) out.push({ st: n.st, S: null }); });
+    return out;
+  }
+
+  function hubsOf(A) {
+    const n = new Map();
+    everyStation(A).forEach(x => { const h = x.st.hub_id || ''; n.set(h, (n.get(h) || 0) + 1); });
+    return [...n.entries()].map(([id, count]) => ({ id, name: id ? hubName(id) : 'No hub', count }))
+      .sort((a, b) => b.count - a.count);
+  }
+
+  function windowDays(A) { return Math.max(1, Math.round((A.t1 - A.t0) / DAY)); }
+  function spanOf(A) { const a = Math.max(A.t0, A.t1 - C.span * DAY); return { a, b: A.t1 }; }
+
+  // Solar night (6 pm – 6 am at the station's longitude) across [a, b), as
+  // [from, to] pairs.
+  function nightsOf(lon, a, b) {
+    const off = (isFinite(lon) ? lon : 150) / 15 * HOUR;
+    const out = [];
+    const day0 = Math.floor((a + off) / DAY) - 1;
+    for (let d = day0; d * DAY - off < b + DAY; d++) {
+      const from = d * DAY + 18 * HOUR - off, to = from + 12 * HOUR;
+      if (to > a && from < b) out.push([Math.max(a, from), Math.min(b, to)]);
+    }
+    return out;
+  }
+
+  function cardOf(x, A) {
+    const { st, S } = x;
+    const { a, b } = spanOf(A);
+    const slots = S && S.slots ? S.slots.filter(sl => sl.t >= a && sl.t < b) : [];
+    const batt = S && S.battery && S.battery.series ? S.battery.series.filter(p => p.t >= a && p.t < b) : [];
+    const sig = signalOf(S ? S.txs : [], a, b);
+    const findings = S ? S.findings : [];
+    const J = bandsOf(findings, sig, !S);
+    const P = S && S.schedule ? S.schedule.P : null;
+    const counts = { due: 0, got: 0, miss: 0, part: 0 };
+    slots.forEach(sl => {
+      if (sl.outcome === 'unknown') return;
+      counts.due++;
+      if (sl.outcome === 'hit' || sl.outcome === 'partial') counts.got++;
+      if (sl.outcome === 'partial') counts.part++;
+      if (sl.outcome === 'miss' || sl.outcome === 'net') counts.miss++;
+    });
+    const lows = S && S.battery && S.battery.nights ? S.battery.nights.filter(n => n.t >= a && n.t < b) : [];
+    if (!J.reasons.length) {
+      const bits = [];
+      if (lows.length) bits.push(`overnight low ${lows[lows.length - 1].v.toFixed(2)} V`);
+      if (counts.due) bits.push(`${counts.got} of ${counts.due} checks in`);
+      if (sig.med != null) bits.push(`signal ${fmtNeg(Math.round(sig.med))} ${sig.unit || 'dBm'}`);
+      J.reasons.push({ b: 'ok', k: 'Nominal', t: bits.length ? bits.join(', ') : 'nothing past a watch line' });
+    }
+    return { id: st.id, st, S, a, b, slots, batt, sig, lows, P, counts, others: (findings || []).filter(f => f.severity !== 'info' && f.category !== 'power' && f.category !== 'comms'), ...J };
+  }
+
+  function build() {
+    const A = C.A;
+    if (!A) { C.cards = []; return; }
+    const hubs = hubsOf(A);
+    if (!C.hub || !hubs.some(h => h.id === C.hub)) C.hub = hubs.length ? hubs[0].id : '';
+    const days = windowDays(A);
+    if (C.span > days) C.span = SPANS.filter(s => s <= days).pop() || days;
+    C.cards = everyStation(A).filter(x => (x.st.hub_id || '') === C.hub).map(x => cardOf(x, A));
+  }
+
+  // ── 3. drawing a card ──────────────────────────────────────────────────────
+
+  function xOf(t, a, b) { return ((t - a) / (b - a)) * VB; }
+  function linePath(pts, a, b, y0, h, lo, hi, gapMs) {
+    let d = '', prev = null;
+    pts.forEach(p => {
+      const x = xOf(p.t, a, b), y = y0 + h - ((clamp(p.v, lo, hi) - lo) / (hi - lo)) * h;
+      d += (prev != null && p.t - prev <= gapMs ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+      prev = p.t;
+    });
+    return d || 'M0 0';
+  }
+  function barsPath(slots, want, P, a, b, y0, h) {
+    let d = '';
+    const w = Math.max(2, ((P || 3 * HOUR) / (b - a)) * VB * 0.8);
+    slots.forEach(sl => {
+      if (!want.includes(sl.outcome)) return;
+      const x = xOf(sl.t, a, b) - w / 2;
+      d += `M${x.toFixed(1)} ${y0}h${w.toFixed(1)}v${h}h${(-w).toFixed(1)}Z `;
+    });
+    return d || 'M0 0';
+  }
+  function nightPath(lon, a, b, y0, h) {
+    return nightsOf(lon, a, b).map(([f, t]) => {
+      const x0 = xOf(f, a, b), x1 = xOf(t, a, b);
+      return `M${x0.toFixed(1)} ${y0}H${x1.toFixed(1)}V${y0 + h}H${x0.toFixed(1)}Z`;
+    }).join(' ') || 'M0 0';
+  }
+  function gapOf(c) { return Math.max(2 * (c.P || 3 * HOUR), 4 * HOUR); }
+
+  function cardHtml(c, i) {
+    const word = BAND_WORD[c.band];
+    const why = c.reasons.map(r => `<span class="hc-why-line hc-why--${r.b}"><b>${esc(r.k)}</b> ${esc(r.t)}</span>`).join('');
+    const label = `${c.st.name}: ${word}. ${c.reasons.map(r => `${r.k}: ${r.t}`).join('. ')}. Open its chart.`;
+    return `<button type="button" class="hc-card hc-card--${c.band}" data-i="${i}" aria-label="${escAttr(label)}">
+      <span class="hc-top"><span class="hc-name">${esc(c.st.name)}</span><span class="hc-chip hc-chip--${c.band}">${esc(word)}</span></span>
+      <svg class="hc-plot" viewBox="0 0 ${VB} 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <path class="hc-night" d="${nightPath(c.st.lon, c.a, c.b, 0, 100)}"/>
+        <path class="hc-s-unknown" d="${barsPath(c.slots, ['unknown'], c.P, c.a, c.b, 0, 100)}"/>
+        <path class="hc-s-partial" d="${barsPath(c.slots, ['partial'], c.P, c.a, c.b, 0, 100)}"/>
+        <path class="hc-s-miss" d="${barsPath(c.slots, ['miss', 'net'], c.P, c.a, c.b, 0, 100)}"/>
+        <path class="hc-mid" d="M0 50H${VB}"/>
+        <path class="hc-batt${c.battRed ? ' hc-red' : ''}" d="${linePath(c.batt.map(p => ({ t: p.t, v: p.V })), c.a, c.b, 3, 44, V_LO, V_HI, gapOf(c))}"/>
+        <path class="hc-sig${c.sigRed ? ' hc-red' : ''}" d="${linePath(c.sig.pts, c.a, c.b, 54, 43, c.sig.unit === 'dBFS' ? -60 : R_LO, c.sig.unit === 'dBFS' ? 0 : R_HI, gapOf(c))}"/>
+      </svg>
+      <span class="hc-why">${why}</span>
+    </button>`;
+  }
+
+  // ── 4. the panel ───────────────────────────────────────────────────────────
+
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORE) || '{}');
+      if (s.hub) C.hub = s.hub;
+      if (SPANS.includes(s.span)) C.span = s.span;
+      if (s.mag === false) C.mag = false;
+    } catch { /* storage refused: defaults */ }
+    C.loaded = true;
+  }
+  function save() {
+    try { localStorage.setItem(STORE, JSON.stringify({ hub: C.hub, span: C.span, mag: C.mag })); } catch { /* fine */ }
+  }
+
+  function countsText() {
+    const n = b => C.cards.filter(c => c.band === b).length;
+    return `${C.cards.length.toLocaleString()} stations · ${n('act')} act on · ${n('watch')} watch · ${n('ok')} nominal · ${n('silent')} silent`;
+  }
+
+  function render(A, opts) {
+    if (!C.loaded) load();
+    C.A = A || null;
+    C.demo = !!(opts && opts.demo);
+    build();
+    if (!A) return '';
+    const hubs = hubsOf(A), days = windowDays(A);
+    const t = (k, w) => termHtml(w, WORDS[k]);
+    const sw = (cls, k, w) => `<span class="hc-key"><i class="hc-sw ${cls}" aria-hidden="true"></i>${t(k, w)}</span>`;
+    return `
+      <div class="panel-header"><h3 id="hc-h">Station cards</h3>
+        <span class="small" id="hc-count">${esc(countsText())}</span></div>
+      <p class="sub hc-sub">Every station in a ${t('hub', 'maintenance hub')} as a card, north to south and west to east, over the last
+        ${C.span} days: battery voltage on top, ${t('rssi', 'signal strength')} underneath, and a bar for every ${t('check', 'check signal')} that went missing.
+        Point at a card to magnify it and see why it is marked; click it for its chart.${C.demo ? ' These are the demo week\'s made-up readings.' : ''}</p>
+      <div class="hc-tools" role="toolbar" aria-label="Station cards">
+        <label class="hc-hub">${t('hub', 'Maintenance hub')}
+          <select id="hc-hub" onchange="HealthCards.setHub(this.value)">
+            ${hubs.map(h => `<option value="${escAttr(h.id)}"${h.id === C.hub ? ' selected' : ''}>${esc(h.name)} (${h.count.toLocaleString()})</option>`).join('')}
+          </select></label>
+        <span class="hl-seg" role="group" aria-label="Days on each card">
+          ${SPANS.map(s => `<button class="hl-chip${C.span === s ? ' hl-chip--on' : ''}" aria-pressed="${C.span === s}"${s > days ? ` disabled title="Load ${s} days or more above first"` : ''}
+            onclick="HealthCards.setSpan(${s})">${s} days</button>`).join('')}
+        </span>
+        <span class="hc-zoom" role="group" aria-label="${escAttr('Card size: ' + WORDS.size)}">
+          <button onclick="HealthCards.zoomBy(-1)" aria-label="Smaller cards">−</button>
+          <button onclick="HealthCards.zoomBy(0)" id="hc-zoom-txt" aria-label="Fit every card on the screen">${zoomText()}</button>
+          <button onclick="HealthCards.zoomBy(1)" aria-label="Bigger cards">+</button>
+        </span>
+        <button class="hl-chip${C.mag ? ' hl-chip--on' : ''}" id="hc-mag" aria-pressed="${C.mag}" onclick="HealthCards.toggleMag()" title="${escAttr(WORDS.mag)}">Magnifier ${C.mag ? 'on' : 'off'}</button>
+        <button onclick="HealthCards.fullscreen()" title="The cards on the whole screen; Esc comes back">Full screen</button>
+      </div>
+      <div class="hc-legend small">
+        <span class="hc-key"><i class="hc-ln hc-ln--batt" aria-hidden="true"></i>battery (V)</span>
+        <span class="hc-key"><i class="hc-ln hc-ln--sig" aria-hidden="true"></i>${t('rssi', 'signal strength')} (dBm)</span>
+        <span class="hc-key"><i class="hc-ln hc-ln--red" aria-hidden="true"></i>the trace that makes it act on</span>
+        ${sw('hc-sw--miss', 'miss', 'missed check')}${sw('hc-sw--partial', 'partial', 'frames lost')}${sw('hc-sw--night', 'night', 'night')}
+        ${sw('hc-sw--ok', 'ok', 'nominal')}${sw('hc-sw--watch', 'watch', 'watch')}${sw('hc-sw--act', 'act', 'act on')}${sw('hc-sw--silent', 'silent', 'silent')}
+      </div>
+      <div id="hc-grid" class="hc-grid" role="region" aria-label="Station cards, north to south and west to east" tabindex="0">
+        <div id="hc-inner" class="hc-inner"></div>
+        ${C.cards.length ? '' : '<p class="small hc-empty">No stations in this hub were heard or expected in the window.</p>'}
+      </div>
+      <details class="hc-words"><summary>What the words on these cards mean</summary>
+        <dl>${GLOSSARY.map(([k, w]) => `<div><dt>${esc(w)}</dt><dd>${esc(WORDS[k])}</dd></div>`).join('')}</dl>
+      </details>
+      <dialog id="hc-dialog" class="hc-dialog" aria-label="A station's chart"></dialog>`;
+  }
+
+  function zoomText() { return C.zoom <= 1.001 ? 'Fit all' : Math.round(C.zoom * 100) + '%'; }
+
+  // ── 5. placing the cards ───────────────────────────────────────────────────
+
+  function mount() {
+    const grid = document.getElementById('hc-grid'), inner = document.getElementById('hc-inner');
+    if (!grid || !inner) return;
+    inner.innerHTML = gridHtml();
+    C.els = [...inner.querySelectorAll('.hc-card')];
+    if (C.ro) C.ro.disconnect();
+    if (typeof ResizeObserver !== 'undefined') { C.ro = new ResizeObserver(() => relayout()); C.ro.observe(grid); }
+    grid.addEventListener('pointermove', onMove);
+    grid.addEventListener('pointerleave', () => setFocus(null));
+    grid.addEventListener('click', onClick);
+    C.wheel = e => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      setZoom(C.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15));
+    };
+    grid.addEventListener('wheel', C.wheel, { passive: false });
+    relayout();
+  }
+
+  // The cards in their geographic order: north to south in rows, west to east
+  // along each. Written once; a zoom or a resize only moves them.
+  function gridHtml() {
+    if (!C.cards.length) return '';
+    return C.cards.map((c, i) => cardHtml(c, i)).join('');
+  }
+
+  function relayout() {
+    const grid = document.getElementById('hc-grid');
+    if (!grid || !C.cards.length) return;
+    const W = Math.max(120, grid.clientWidth - 2), H = Math.max(160, grid.clientHeight - 2);
+    const g = fitGrid(C.cards.length, W, H, C.zoom);
+    const rows = geoRows(C.cards.map(c => ({ lat: c.st.lat, lon: c.st.lon })), g.cols);
+    const cell = new Array(C.cards.length);
+    rows.forEach((row, r) => row.forEach((i, col) => { cell[i] = { r, c: col }; }));
+    C.G = { ...g, W, rows, cell };
+    if (C.focus && (C.focus.r >= rows.length)) C.focus = null;
+    place();
+  }
+
+  function place() {
+    const G = C.G, inner = document.getElementById('hc-inner');
+    if (!G || !inner) return;
+    const f = C.mag ? C.focus : null;
+    const wr = weights(G.rows.length, f ? f.r : null, NEAR);
+    const tops = [0];
+    for (let r = 0; r < G.rows.length; r++) tops.push(tops[r] + wr[r] * G.rh);
+    inner.style.setProperty('--hc-h', tops[G.rows.length].toFixed(0) + 'px');
+    G.rows.forEach((row, r) => {
+      const dr = f ? Math.abs(r - f.r) : 99;
+      const ws = dr <= 2 ? weights(row.length, f.c, [NEAR[dr], NEAR[Math.max(dr, 1)], NEAR[Math.max(dr, 2)]]) : weights(row.length, null, NEAR);
+      let x = 0;
+      row.forEach((i, col) => {
+        const el = C.els[i];
+        if (!el) return;
+        const w = ws[col] * G.cw - 3, h = wr[r] * G.rh - 3;
+        const d = f ? Math.max(dr, Math.abs(col - f.c)) : 99;
+        el.style.setProperty('--x', x.toFixed(1) + 'px');
+        el.style.setProperty('--y', tops[r].toFixed(1) + 'px');
+        el.style.setProperty('--w', w.toFixed(1) + 'px');
+        el.style.setProperty('--h', h.toFixed(1) + 'px');
+        const size = d === 0 && h >= 54 && w >= 90 ? 'big' : d === 1 && h >= 44 && w >= 80 ? 'mid' : h < 22 || w < 34 ? 'tiny' : '';
+        el.classList.toggle('hc-card--big', size === 'big');
+        el.classList.toggle('hc-card--mid', size === 'mid');
+        el.classList.toggle('hc-card--tiny', size === 'tiny');
+        el.classList.toggle('hc-card--focus', d === 0);
+        x += ws[col] * G.cw;
+      });
+    });
+  }
+
+  function onMove(e) {
+    if (!C.mag || !C.G) return;
+    const inner = document.getElementById('hc-inner');
+    if (!inner) return;
+    const b = inner.getBoundingClientRect();
+    const x = e.clientX - b.left, y = e.clientY - b.top;
+    const G = C.G;
+    const r = clamp(Math.floor(y / G.rh), 0, G.rows.length - 1);
+    const c = clamp(Math.floor(x / G.cw), 0, G.rows[r].length - 1);
+    if (!C.focus || C.focus.r !== r || C.focus.c !== c) setFocus({ r, c });
+  }
+  function setFocus(f) {
+    if (!f && !C.focus) return;
+    C.focus = f;
+    if (C.raf) return;
+    C.raf = requestAnimationFrame(() => { C.raf = 0; place(); });
+  }
+  function onClick(e) {
+    const el = e.target.closest && e.target.closest('.hc-card');
+    if (!el) return;
+    openChart(Number(el.dataset.i), el);
+  }
+
+  // ── 6. the controls ────────────────────────────────────────────────────────
+
+  function repaint() {
+    const box = document.getElementById('hc-panel');
+    if (!box || !C.A) return;
+    box.innerHTML = render(C.A, { demo: C.demo });
+    mount();
+  }
+  function setHub(id) { C.hub = id; C.focus = null; C.zoom = 1; save(); repaint(); announce(`${hubName(id)}: ${countsText()}.`); }
+  function setSpan(d) { C.span = d; save(); repaint(); }
+  function setZoom(z) {
+    C.zoom = clamp(z, 1, ZOOM_MAX);
+    C.focus = null;
+    const t = document.getElementById('hc-zoom-txt');
+    if (t) t.textContent = zoomText();
+    relayout();
+  }
+  function zoomBy(dir) { setZoom(dir === 0 ? 1 : C.zoom * (dir > 0 ? 1.4 : 1 / 1.4)); }
+  function toggleMag() {
+    C.mag = !C.mag; C.focus = null; save();
+    const b = document.getElementById('hc-mag');
+    if (b) { b.setAttribute('aria-pressed', String(C.mag)); b.classList.toggle('hl-chip--on', C.mag); b.textContent = 'Magnifier ' + (C.mag ? 'on' : 'off'); }
+    place();
+  }
+  function fullscreen() {
+    const box = document.getElementById('hc-panel');
+    if (!box) return;
+    if (document.fullscreenElement) { document.exitFullscreen(); return; }
+    if (box.requestFullscreen) box.requestFullscreen().catch(() => {});
+  }
+
+  // ── 7. a card's chart ──────────────────────────────────────────────────────
+
+  const CH = { W: 1060, L: 62, R: 14, BY: 26, BH: 160, KY: 214, KH: 26, SY: 268, SH: 160 };
+
+  function fmtTime(t) {
+    return new Date(t).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+  function fmtDay(t) { return new Date(t).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }); }
+
+  function chartSvg(c) {
+    const { W, L, R, BY, BH, KY, KH, SY, SH } = CH, PW = W - L - R;
+    const x = t => L + ((t - c.a) / (c.b - c.a)) * PW;
+    const dbfs = c.sig.unit === 'dBFS';
+    const sLo = dbfs ? -60 : R_LO, sHi = dbfs ? 0 : R_HI;
+    const yB = v => BY + BH - ((clamp(v, V_LO, V_HI) - V_LO) / (V_HI - V_LO)) * BH;
+    const yS = v => SY + SH - ((clamp(v, sLo, sHi) - sLo) / (sHi - sLo)) * SH;
+    const path = (pts, y) => { let d = '', prev = null; pts.forEach(p => { d += (prev != null && p.t - prev <= gapOf(c) ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.v).toFixed(1) + ' '; prev = p.t; }); return d || 'M0 0'; };
+    let grid = '', txt = '';
+    [11.5, 12, 12.5, 13, 13.5, 14].forEach(v => { grid += `M${L} ${yB(v).toFixed(1)}H${L + PW} `; txt += `<text class="hc-ax" x="${L - 6}" y="${(yB(v) + 4).toFixed(1)}" text-anchor="end">${v.toFixed(1)}</text>`; });
+    (dbfs ? [-60, -45, -30, -15, 0] : [-120, -110, -100, -90, -80, -70, -60]).forEach(v => { grid += `M${L} ${yS(v).toFixed(1)}H${L + PW} `; txt += `<text class="hc-ax" x="${L - 6}" y="${(yS(v) + 4).toFixed(1)}" text-anchor="end">${fmtNeg(v)}</text>`; });
+    let days = '';
+    const d0 = new Date(c.a); d0.setHours(0, 0, 0, 0);
+    for (let t = d0.getTime() + DAY; t < c.b; t += DAY) {
+      if (t <= c.a) continue;
+      days += `M${x(t).toFixed(1)} ${BY}V${SY + SH} `;
+      if (x(t) > W - R - 70) continue;
+      txt += `<text class="hc-ax hc-ax--day" x="${(x(t) + 4).toFixed(1)}" y="${SY + SH + 16}">${esc(fmtDay(t))}</text>`;
+    }
+    const nights = nightsOf(c.st.lon, c.a, c.b).map(([f, t]) => `M${x(f).toFixed(1)} ${BY}H${x(t).toFixed(1)}V${SY + SH}H${x(f).toFixed(1)}Z`).join(' ');
+    const slotW = Math.max(3, ((c.P || 3 * HOUR) / (c.b - c.a)) * PW * 0.8);
+    const bars = want => c.slots.filter(sl => want.includes(sl.outcome)).map(sl => `M${(x(sl.t) - slotW / 2).toFixed(1)} ${KY}h${slotW.toFixed(1)}v${KH}h${(-slotW).toFixed(1)}Z`).join(' ') || 'M0 0';
+    const ref = (y, cls) => `<path class="${cls}" d="M${L} ${y.toFixed(1)}H${L + PW}"/>`;
+    return `<svg class="hc-chart" id="hc-chart" viewBox="0 0 ${W} ${SY + SH + 26}" role="img" tabindex="0"
+        aria-label="${escAttr(`${c.st.name}: battery voltage, check signals and signal strength from ${fmtTime(c.a)} to ${fmtTime(c.b)}. Arrow keys step through the readings.`)}">
+      <path class="hc-c-night" d="${nights || 'M0 0'}"/>
+      <path class="hc-c-grid" d="${grid}"/><path class="hc-c-day" d="${days || 'M0 0'}"/>
+      ${ref(yB(12.2), 'hc-c-watch')}${ref(yB(11.8), 'hc-c-act')}
+      ${dbfs ? '' : ref(yS(SIG_WATCH), 'hc-c-watch') + ref(yS(SIG_ACT), 'hc-c-act')}
+      <path class="hc-c-hit" d="${bars(['hit'])}"/><path class="hc-c-partial" d="${bars(['partial'])}"/>
+      <path class="hc-c-miss" d="${bars(['miss', 'net'])}"/><path class="hc-c-unknown" d="${bars(['unknown'])}"/>
+      <path class="hc-c-batt${c.battRed ? ' hc-red' : ''}" d="${path(c.batt.map(p => ({ t: p.t, v: p.V })), yB)}"/>
+      <path class="hc-c-sig${c.sigRed ? ' hc-red' : ''}" d="${path(c.sig.pts, yS)}"/>
+      <text class="hc-c-title${c.battRed ? ' hc-red-t' : ''}" x="${L}" y="${BY - 9}">Battery voltage (V)</text>
+      <text class="hc-c-title" x="${L}" y="${KY - 6}">Check signals${c.P ? ` — every ${esc(fmtEvery(c.P))}` : ''}</text>
+      <text class="hc-c-title${c.sigRed ? ' hc-red-t' : ''}" x="${L}" y="${SY - 9}">${dbfs ? 'Signal level (dBFS) — how loud the receiver heard it' : 'Signal strength — RSSI (dBm), how strongly the base station heard it'}</text>
+      ${c.sig.pts.length ? '' : `<text class="hc-ax" x="${L + PW / 2}" y="${SY + SH / 2}" text-anchor="middle">No signal strength came with these reports${c.S ? '' : ' — nothing was heard'}</text>`}
+      ${c.batt.length ? '' : `<text class="hc-ax" x="${L + PW / 2}" y="${BY + BH / 2}" text-anchor="middle">No battery readings in these days</text>`}
+      ${txt}
+      <g id="hc-cross" class="hc-cross" visibility="hidden"><path d="M0 ${BY}V${SY + SH}"/></g>
+    </svg>`;
+  }
+  function fmtEvery(P) { const h = P / HOUR; return h === 1 ? 'hour' : Number.isInteger(h) ? `${h} hours` : `${Math.round(P / MIN)} minutes`; }
+
+  function openChart(i, from) {
+    const c = C.cards[i], dlg = document.getElementById('hc-dialog');
+    if (!c || !dlg) return;
+    C.open = i; C.hov = null; C.from = from || null;
+    const word = BAND_WORD[c.band];
+    const why = c.band === 'ok' ? 'Why it is nominal' : c.band === 'silent' ? 'Why it is silent' : `Why it is marked ${word.toLowerCase()}`;
+    dlg.innerHTML = `
+      <div class="hc-d-head">
+        <h3 id="hc-d-h">${esc(c.st.name)}</h3><span class="hc-chip hc-chip--${c.band}">${esc(word)}</span>
+        <span class="small hc-d-sub">${esc(hubName(c.st.hub_id))}${c.st.station_number ? ' · station ' + esc(c.st.station_number) : ''}${c.P ? ' · checks every ' + esc(fmtEvery(c.P)) : ''} · ${esc(fmtTime(c.a))} to ${esc(fmtTime(c.b))}</span>
+        <button onclick="HealthCards.closeChart()">Close</button>
+      </div>
+      <div class="hc-d-plot" id="hc-d-plot">${chartSvg(c)}<div class="hc-tip" id="hc-tip" hidden></div></div>
+      <div class="hc-d-cols">
+        <div><h4>${esc(why)}</h4>
+          <ul class="hc-d-why">${c.reasons.map(r => `<li class="hc-why--${r.b}"><b>${esc(r.k)}</b> ${esc(r.t)}</li>`).join('')}</ul>
+          ${c.others.length ? `<p class="small">Station Health also found: ${c.others.map(f => esc(f.title)).join('; ')}.</p>` : ''}
+          ${c.S ? `<button onclick="HealthCards.openStation()">Open it in Station Health</button>` : ''}
+        </div>
+        <div class="small hc-d-what"><h4>What this shows</h4>
+          <p><b>Battery voltage (V)</b> — the voltage in each report the station sent. It climbs by day as the solar panel charges and sags overnight; the overnight low is the number that matters. Dashed lines: 12.2 V watch, 11.8 V act on.</p>
+          <p><b>Check signals</b> — a slot for each check report the station should have sent, on the schedule Flood-Net has learned for it. Filled: arrived. Paler: arrived with frames lost. Strong: never came. Dashed: no receiver that hears it was listening.</p>
+          <p><b>${c.sig.unit === 'dBFS' ? 'Signal level (dBFS)' : 'Signal strength — RSSI (dBm)'}</b> — ${c.sig.unit === 'dBFS'
+            ? 'how loud the report was at the receiver\'s input, in decibels below full scale; this receiver does not report RSSI, so no watch or act-on line is drawn.'
+            : 'how strongly the base station heard each report: the strongest copy, if more than one heard it. Closer to 0 is stronger: −70 dBm is strong, −110 dBm near the limit. It is not signal-to-noise (SNR, how far the signal stands above the background noise). Dashed lines: −100 dBm watch, −105 dBm act on (provisional).'}</p>
+        </div>
+      </div>`;
+    const svg = document.getElementById('hc-chart');
+    if (svg) {
+      svg.addEventListener('pointermove', e => hoverAt(pointerTime(e, svg)));
+      svg.addEventListener('pointerleave', () => hoverAt(null));
+      svg.addEventListener('keydown', chartKey);
+    }
+    dlg.addEventListener('close', onClose, { once: true });
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+  }
+  function onClose() { const f = C.from; C.open = null; C.hov = null; if (f && f.isConnected) f.focus(); }
+  function closeChart() { const dlg = document.getElementById('hc-dialog'); if (dlg && dlg.open) dlg.close(); }
+  function openStation() {
+    const c = C.cards[C.open];
+    closeChart();
+    if (c && c.S && typeof Health !== 'undefined') Health.select(c.id);
+  }
+
+  function pointerTime(e, svg) {
+    const b = svg.getBoundingClientRect(), c = C.cards[C.open];
+    if (!c || !b.width) return null;
+    const px = ((e.clientX - b.left) / b.width) * CH.W;
+    if (px < CH.L - 8 || px > CH.W - CH.R + 8) return null;
+    return c.a + ((px - CH.L) / (CH.W - CH.L - CH.R)) * (c.b - c.a);
+  }
+  // Every moment worth stepping to: a reading, a transmission, a check slot.
+  function moments(c) {
+    return [...new Set([...c.batt.map(p => p.t), ...c.sig.pts.map(p => p.t), ...c.slots.map(s => s.t)])].sort((a, b) => a - b);
+  }
+  function chartKey(e) {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const c = C.cards[C.open];
+    if (!c) return;
+    const ts = moments(c);
+    if (!ts.length) return;
+    const cur = C.hov == null ? (e.key === 'ArrowLeft' ? Infinity : -Infinity) : C.hov;
+    const next = e.key === 'ArrowRight' ? ts.find(t => t > cur) : [...ts].reverse().find(t => t < cur);
+    hoverAt(next == null ? (e.key === 'ArrowRight' ? ts[ts.length - 1] : ts[0]) : next, true);
+  }
+  function nearest(pts, t, within) {
+    let best = null, bd = Infinity;
+    pts.forEach(p => { const d = Math.abs(p.t - t); if (d < bd) { bd = d; best = p; } });
+    return best && bd <= within ? best : null;
+  }
+  function hoverAt(t, said) {
+    const c = C.cards[C.open], tip = document.getElementById('hc-tip'), cross = document.getElementById('hc-cross');
+    if (!c || !tip || !cross) return;
+    if (t == null) { C.hov = null; tip.hidden = true; cross.setAttribute('visibility', 'hidden'); return; }
+    C.hov = t;
+    const P = c.P || 3 * HOUR, win = Math.max(P / 2, 45 * MIN);
+    const bp = nearest(c.batt.map(p => ({ t: p.t, v: p.V })), t, win);
+    const sp = nearest(c.sig.pts, t, win);
+    const sl = nearest(c.slots, t, P / 2);
+    const at = (sl && sl.t) || (bp && bp.t) || (sp && sp.t) || t;
+    const { W, L, R } = CH, PW = W - L - R;
+    const px = L + ((at - c.a) / (c.b - c.a)) * PW;
+    cross.setAttribute('transform', `translate(${px.toFixed(1)} 0)`);
+    cross.setAttribute('visibility', 'visible');
+    const O = { hit: 'arrived', partial: 'arrived, frames lost', miss: 'missed', net: 'missed network-wide', unknown: 'no receiver listening' };
+    const rows = [
+      ['hc-ln--batt' + (c.battRed ? ' hc-ln--red' : ''), 'Battery', bp ? bp.v.toFixed(2) + ' V' : '—'],
+      ['hc-ln--sig' + (c.sigRed ? ' hc-ln--red' : ''), c.sig.unit === 'dBFS' ? 'Signal level' : 'Signal strength', sp ? fmtNeg(Math.round(sp.v)) + ' ' + (c.sig.unit || 'dBm') : '—'],
+      ['hc-ln--chk hc-ln--chk-' + (sl ? sl.outcome : 'none'), 'Check', sl ? O[sl.outcome] || sl.outcome : 'no check due'],
+    ];
+    tip.innerHTML = `<b>${esc(fmtTime(at))}</b>${rows.map(([cls, k, v]) => `<span class="hc-tip-row"><i class="hc-ln ${cls}" aria-hidden="true"></i><span>${esc(k)}</span><b>${esc(v)}</b></span>`).join('')}`;
+    const frac = px / W;
+    tip.style.setProperty('--tx', (frac * 100).toFixed(2) + '%');
+    tip.classList.toggle('hc-tip--left', frac > 0.72);
+    tip.hidden = false;
+    if (said) announce(`${fmtTime(at)}: ${rows.map(r => `${r[1]} ${r[2]}`).join(', ')}.`);
+  }
+
+  // Station Health's analysis has changed, or the tab was drawn: the panel is
+  // already in the page (render()), so only the cards need placing.
+  function stop() {
+    if (C.ro) { C.ro.disconnect(); C.ro = null; }
+    if (C.raf) { cancelAnimationFrame(C.raf); C.raf = 0; }
+    C.els = [];
+  }
+
+  return {
+    render, mount, stop, setHub, setSpan, zoomBy, toggleMag, fullscreen, closeChart, openStation,
+    // the pure parts, for test/health-cards.mjs
+    weights, geoRows, fitGrid, signalOf, bandsOf, nightsOf, WORDS, GLOSSARY,
+  };
+})();
