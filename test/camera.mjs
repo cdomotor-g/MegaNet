@@ -1,4 +1,4 @@
-// The Field Camera (field-camera.js, photo-stamp.js) — 📸 under Site visits.
+// The Field Camera (field-camera.js, photo-stamp.js) — 📸, a view of Photos under Field work.
 //
 // Everything this tab does is out of sight of `smoke`, which opens it and sees
 // a Start button. The camera, the GPS and the compass are not running until
@@ -345,11 +345,12 @@ try {
   section('The tab, before anything is pressed');
   const navBtn = await page.evaluate(() => {
     const t = TAB_LIST.find(x => x.id === 'camera');
-    const g = TABS.find(x => x.tabs.some(y => y.id === 'camera'));
-    return { label: t && t.label, icon: t && t.icon, group: g && g.group, help: !!HELP.camera };
+    const g = tabGroupOf('camera');
+    return { label: t && t.label, icon: t && t.icon, group: g && g.group, help: !!HELP.camera, host: t && t.partOf };
   });
-  check('📸 Field Camera is a tab under Site visits, with its help', navBtn.label === 'Field Camera' && navBtn.icon === '📸'
-    && navBtn.group === 'Site visits' && navBtn.help, J(navBtn));
+  // November 2026: a view of 📷 Photos, under Field work (core.js, `parts`).
+  check('📸 Field Camera is a view of Photos under Field work, with its help', navBtn.label === 'Field Camera' && navBtn.icon === '📸'
+    && navBtn.group === 'Field work' && navBtn.host === 'photos' && navBtn.help, J(navBtn));
   await page.evaluate(() => switchTab('camera'));
   await page.waitForSelector('#cam-panel');
   let d = await dbg(page);

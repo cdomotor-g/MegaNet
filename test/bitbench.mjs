@@ -248,11 +248,11 @@ try {
     hues: new Set([...document.querySelectorAll('#bb-page .bb-sec')].map(sec => getComputedStyle(sec).borderTopColor)).size,
     canv: [...document.querySelectorAll('#bb-page canvas')].map(c => !!c.getAttribute('aria-label')),
     fx: document.querySelectorAll('input[name="bb-fx"]').length,
-    group: TABS.find(g => g.tabs.some(t => t.id === 'bitbench')).group,
+    group: tabGroupOf('bitbench').group,
   }));
   ok('six sections, every canvas named', shape.secs.length === 6 && shape.canv.length >= 4 && shape.canv.every(Boolean), JSON.stringify(shape));
   ok('every section\'s heading wears a picture, each panel its own colour', shape.tiles.length === 6 && shape.tiles.every(Boolean) && shape.hues === 6, JSON.stringify(shape));
-  ok('fourteen faults to pick from, under Interference', shape.fx === 14 && shape.group === 'Interference', JSON.stringify(shape));
+  ok('fourteen faults to pick from, under Learn: radio & equipment', shape.fx === 14 && shape.group === 'Learn: radio & equipment', JSON.stringify(shape));
 
   console.log('\nThe site in 3-D\n');
   await page.evaluate(() => document.getElementById('bb-site').scrollIntoView());
@@ -456,12 +456,13 @@ try {
   const les = await page.evaluate(() => ({
     secs: document.querySelectorAll('#be-page .be-sec').length,
     focus: document.activeElement && document.activeElement.id,
-    group: TABS.find(g => g.tabs.some(t => t.id === 'biterrors')).group,
-    field: TABS.find(g => g.group === 'Field training').tabs.map(t => t.id),
+    group: tabGroupOf('biterrors').group,
+    host: tabHost('biterrors').id,
+    field: TABS.find(g => g.group === 'Learn: field practice').tabs.flatMap(t => [t.id, ...(t.parts || []).map(p => p.id)]),
   }));
   ok('the bench\'s "in depth" opens the lesson at its section, focus on its heading', les.focus === 'be-crystal-h', les.focus);
-  ok('fifteen sections, in the Knowledge base; the five adapted lessons in Field training', les.secs === 15 && les.group === 'Knowledge base'
-    && JSON.stringify(les.field) === JSON.stringify(['kbstaff', 'kblogbook', 'kblifecycle', 'kblevel', 'kbriver']), JSON.stringify(les));
+  ok('fifteen sections, a view of Bit Faults beside the bench; the five adapted lessons in Learn: field practice', les.secs === 15 && les.group === 'Learn: radio & equipment' && les.host === 'bitbench'
+    && JSON.stringify(les.field) === JSON.stringify(['surveyguide', 'kbstaff', 'kblogbook', 'kblifecycle', 'kblevel', 'kbriver']), JSON.stringify(les));
   await page.waitForTimeout(300);
   const ink = await page.evaluate(() => [...document.querySelectorAll('#be-page canvas[data-draw]')].map(cv => {
     const c = cv.getContext('2d');

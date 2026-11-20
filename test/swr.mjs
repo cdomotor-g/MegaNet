@@ -182,14 +182,14 @@ try {
   let { context, page } = await openTab({ reducedMotion: 'reduce' });
   const shape = await page.evaluate(() => ({
     secs: ['swm-bench', 'swm-hook', 'swm-waves', 'swm-db', 'swm-field', 'swm-case', 'swm-more'].filter(id => document.getElementById(id)),
-    group: TABS.find(g => g.tabs.some(t => t.id === 'swr')).group,
+    group: tabGroupOf('swr').group,
     canv: [...document.querySelectorAll('#swm-page canvas')].map(c => !!c.getAttribute('aria-label')),
     svgs: [...document.querySelectorAll('#swm-page svg[role="img"]')].map(s => !!(s.querySelector('title') || {}).textContent),
     picks: document.querySelectorAll('.swm-pick-btn').length,
     playing: SwrMeter.state().playing,
     play: document.getElementById('swm-play').getAttribute('aria-pressed'),
   }));
-  ok('seven sections, in the Knowledge base, four meters to pick from', shape.secs.length === 7 && shape.group === 'Knowledge base' && shape.picks === 4, J(shape));
+  ok('seven sections, in Learn: radio & equipment, four meters to pick from', shape.secs.length === 7 && shape.group === 'Learn: radio & equipment' && shape.picks === 4, J(shape));
   ok('every canvas and every drawing named', shape.canv.length === 2 && shape.canv.every(Boolean) && shape.svgs.length >= 3 && shape.svgs.every(Boolean), J(shape));
   ok('a device asking for reduced motion starts still, with ▶ to run it', shape.playing === false && shape.play === 'false', J(shape));
   const opening = await page.evaluate(() => ({ tx: SwrMeter.state().tx, checked: document.querySelector('input[name="swm-tx"]:checked').value,

@@ -200,7 +200,7 @@ async function openTab(opts = {}) {
 try {
   let { context, page } = await openTab();
   const shape = await page.evaluate(() => ({
-    group: TABS.find(g => g.tabs.some(t => t.id === 'pinouts')).group,
+    group: tabGroupOf('pinouts').group,
     secs: ['po-lib', 'po-view', 'po-cables', 'po-loop', 'po-rf', 'po-read'].filter(id => document.getElementById(id)).length,
     cards: document.querySelectorAll('.po-card').length, n: PinoutData.CONNECTORS.length,
     pins: document.querySelectorAll('#po-face .po-pin[role="button"]').length,
@@ -208,8 +208,8 @@ try {
     named: [...document.querySelectorAll('#po-page svg[role="img"], #po-page svg[role="group"]')].every(s => !!s.getAttribute('aria-label') && !!(s.querySelector('title') || {}).textContent),
     pressed: document.querySelector('.po-card[aria-pressed="true"] .po-card-name').textContent,
   }));
-  ok('six sections in the Knowledge base, a card for every connector, the DE-9 computer end open with nine pins and nine rows',
-    shape.group === 'Knowledge base' && shape.secs === 6 && shape.cards === shape.n && shape.pins === 9 && shape.rows === 9 && /DE-9 male/.test(shape.pressed), J(shape));
+  ok('six sections in Learn: radio & equipment, a card for every connector, the DE-9 computer end open with nine pins and nine rows',
+    shape.group === 'Learn: radio & equipment' && shape.secs === 6 && shape.cards === shape.n && shape.pins === 9 && shape.rows === 9 && /DE-9 male/.test(shape.pressed), J(shape));
   ok('every drawing named', shape.named);
 
   // A pin on the drawing lights its row; a row's button lights the pin.

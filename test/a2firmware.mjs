@@ -291,15 +291,15 @@ const look = page => page.evaluate(() => ({
 try {
   let { context, page } = await openTab();
   const shape = await page.evaluate(() => ({
-    group: TABS.find(g => g.tabs.some(t => t.id === 'a2firmware')).group,
+    group: tabGroupOf('a2firmware').group,
     secs: ['fw-walk', 'fw-prep', 'fw-ver', 'fw-list', 'fw-leds', 'fw-trouble', 'fw-src'].filter(id => document.getElementById(id)).length,
     paths: document.querySelectorAll('.fw-path').length, nPaths: Object.keys(A2Firmware.PATHS).length,
     dots: document.querySelectorAll('.fw-dot').length,
     listed: document.querySelectorAll('.fw-step').length,
     named: [...document.querySelectorAll('#fw-page svg[role="img"]')].every(s => !!(s.querySelector('title') || {}).textContent),
   }));
-  ok('in the Knowledge base: seven sections, a button for every path, a dot for each of the whole upgrade\'s steps and each written out',
-    shape.group === 'Knowledge base' && shape.secs === 7 && shape.paths === shape.nPaths && shape.dots === shape.listed && shape.dots > 20, J(shape));
+  ok('in Learn: radio & equipment: seven sections, a button for every path, a dot for each of the whole upgrade\'s steps and each written out',
+    shape.group === 'Learn: radio & equipment' && shape.secs === 7 && shape.paths === shape.nPaths && shape.dots === shape.listed && shape.dots > 20, J(shape));
   ok('the board is named', shape.named);
   // It plays while it is on screen: scrolled to, as somebody reading would.
   await page.evaluate(() => document.getElementById('fw-stage').scrollIntoView({ block: 'center' }));

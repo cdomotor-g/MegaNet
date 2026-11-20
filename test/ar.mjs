@@ -290,19 +290,22 @@ try {
     window.removeEventListener = (t, fn, o) => { if (/^deviceorientation/.test(t)) window.__orient.delete(t); return rem(t, fn, o); };
   });
 
-  // 🔭 Look Around is a tab of its own now, last under Stations & networks —
-  // and the Stations side panel has no 🔭 left in its strip.
+  // 🔭 Look Around is a view of 📌 Near Me under Field work (November 2026)
+  // — and the Stations side panel has no 🔭 left in its strip.
   if (await page.isVisible('#btn-side')) await page.click('#btn-side');
   const where = await page.evaluate(() => {
-    const g = TABS.find(x => x.tabs.some(t => t.id === 'lookaround'));
-    return { group: g && g.group, last: g && g.tabs[g.tabs.length - 1].id,
+    const g = tabGroupOf('lookaround');
+    return { group: g && g.group, host: tabHost('lookaround').id,
              strip: [...document.querySelectorAll('#help-panel .dock-tab')].map(b => b.dataset.dock) };
   });
-  check('🔭 Look Around is a tab under Stations & networks, and gone from the Stations side panel',
-    where.group === 'Stations & networks' && where.last === 'lookaround' && !where.strip.includes('ar'), JSON.stringify(where));
-  // A phone reaches it the way it reaches any tab: ☰, then the button.
+  check('🔭 Look Around is a view of Near Me under Field work, and gone from the Stations side panel',
+    where.group === 'Field work' && where.host === 'nearby' && !where.strip.includes('ar'), JSON.stringify(where));
+  // A phone reaches it the way it reaches any view: ☰, Near Me, then its
+  // button in the row across the top.
   await page.click('#btn-nav');
-  await page.click('#tab-nav .tab-btn[data-tab="lookaround"]');
+  await page.click('#tab-nav .tab-btn[data-tab="nearby"]');
+  await page.waitForTimeout(300);
+  await page.click('#view-strip .view-btn[data-view="lookaround"]');
   await page.waitForTimeout(300);
   const pane = await page.evaluate(() => ({
     tab: state.activeTab,
