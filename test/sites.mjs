@@ -172,7 +172,7 @@ const panel = await page.evaluate(() => {
     title: wrap && wrap.querySelector('.mn-mapctl-title')?.textContent,
     label: strip.find(b => b.dataset.dock === 'map-sites')?.getAttribute('aria-label'),
     group: group('[data-dock="map-sites"]'),
-    afterPolar: at('[data-dock="map-sites"]') === at('[data-dock="map-polar"]') + 1,
+    afterDig: at('[data-dock="map-sites"]') === at('[data-dock="map-dig"]') + 1,
     beforeRelocate: at('[data-dock="map-relocate"]') === at('[data-dock="map-sites"]') + 1,
     runDisabled: document.getElementById('sites-run')?.disabled,
     status: document.getElementById('sites-status')?.textContent || '',
@@ -181,8 +181,8 @@ const panel = await page.evaluate(() => {
 ok('🗼 Move/New Repeater is a pane of the side panel, open from its button in the strip',
    panel.present && panel.docked && panel.shown && panel.showing === 'map-sites'
      && panel.title === 'Move/New Repeater' && /^Move\/New Repeater — /.test(panel.label || ''), JSON.stringify(panel));
-ok('…in the tools group, straight after the polar plot and straight before the station relocation finder',
-   panel.group === 'tools' && panel.afterPolar && panel.beforeRelocate, JSON.stringify(panel));
+ok('…in the tools group, straight after Before you dig (3e20a91 put it after the polar plot) and straight before the station relocation finder',
+   panel.group === 'tools' && panel.afterDig && panel.beforeRelocate, JSON.stringify(panel));
 ok('Find sites is disabled with nothing to serve, and the panel says what is missing',
    panel.runDisabled === true && /Add the sites/.test(panel.status), panel.status);
 

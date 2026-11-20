@@ -119,7 +119,7 @@ const PANEL_IDS = ['map-display-block', 'map-legend', 'map-latency-panel', 'map-
 const STRIP = ['dock-names',
                'dock-fold', 'stations', 'places', 'paths', 'twin',
                'dock-fold', 'map-display', 'map-legend', 'map-latency', 'mn-map-3d', 'mn-map-north', 'mn-map-tilt',
-               'dock-fold', 'map-draw', 'map-polar', 'map-sites', 'map-relocate', 'map-bestrep', 'map-repcompare', 'map-acma', 'mn-map-here', 'mn-map-magnify',
+               'dock-fold', 'map-draw', 'map-polar', 'map-dig', 'map-sites', 'map-relocate', 'map-bestrep', 'map-repcompare', 'map-acma', 'mn-map-here', 'mn-map-magnify',
                'mn-map-clear', 'mn-map-full',
                'help'];
 const BUTTONS = STRIP.filter(k => k.startsWith('mn-map-'));
@@ -1244,7 +1244,7 @@ try {
   // 24 px WCAG 2.2 sets as a target's least.
   check('…holding ❔, 🧹, the two 📍, 〽️ and every one of the map\'s controls, in the corner\'s order, each 36 px square',
     JSON.stringify(phone.strip) === JSON.stringify(PHONE_STRIP) && phone.square.every(([w, h]) => w === 36 && h === 36)
-      && phone.panels.length === 11 && phone.panels.every(x => x === 'pane') && phone.buttons.every(Boolean),
+      && phone.panels.length === 12 && phone.panels.every(x => x === 'pane') && phone.buttons.every(Boolean),
     JSON.stringify(phone));
   const phoneCorner = await cornerNow();
   check('…the map ending where the rail begins, measured to it, and only ↺ standing on it, at its top right',
@@ -1786,7 +1786,7 @@ try {
     const unfolded = await rail();
     check('a heading folds its section away, and back, remembered',
       folded.tools === 0 && folded.folded === 'tools' && folded.heads[2][1] === 'false'
-        && unfolded.tools === 9 && unfolded.folded === '' && unfolded.heads[2][1] === 'true', JSON.stringify({ folded, unfolded }));
+        && unfolded.tools === 10 && unfolded.folded === '' && unfolded.heads[2][1] === 'true', JSON.stringify({ folded, unfolded }));
     // The toggle: icons alone, and back.
     const wide = r.mapW;
     await page.click('#help-panel .dock-names');

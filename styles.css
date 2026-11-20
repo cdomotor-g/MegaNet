@@ -31004,12 +31004,12 @@ details.tm-fold summary { cursor: pointer; }
 .fp-stage-n { text-align: right; font-variant-numeric: tabular-nums; }
 .fp-stage-name { cursor: help; }
 .fp-stage-bar { height: 8px; border-radius: 4px; overflow: hidden; background: rgba(128,128,128,.25); }
-.fp-stage-bar i { display: block; height: 100%; background: #2f6fde; transition: width .2s; }
+.fp-stage-bar i { display: block; height: 100%; width: var(--fp-pct, 0%); background: #2f6fde; transition: width .2s; }
 .fp-stage-done .fp-stage-bar i { background: #2e9d5b; }
 .fp-stage-done .fp-stage-name { color: #2e9d5b; }
 .fp-stage-key summary { cursor: pointer; margin-top: 6px; }
 .fp-stage-key dt { font-weight: 600; } .fp-stage-key dd { margin: 0 0 4px; }
-@media (max-width: 520px) { .fp-stage { grid-template-columns: 8.5em 1fr 5em; } }
+@media (max-width: 560px) { .fp-stage { grid-template-columns: 8.5em 1fr 5em; } }
 
 /* ── 📇 Station cards (health-cards.js) ─────────────────────────────────────
    Every station in a maintenance hub as a card. Cards are placed by the
@@ -31067,7 +31067,6 @@ details.tm-fold summary { cursor: pointer; }
   background: var(--panel); border: 1.5px solid var(--hc-ok);
   transition: left 120ms ease-out, top 120ms ease-out, width 120ms ease-out, height 120ms ease-out;
 }
-@media (prefers-reduced-motion: reduce) { .hc-card { transition: none; } }
 .hc-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; z-index: 4; }
 .hc-card--watch { border: 2px solid var(--hc-watch); background: var(--hc-watch-bg); }
 .hc-card--act { border: 3px solid var(--hc-act); background: var(--hc-act-bg); }

@@ -1404,7 +1404,7 @@ const FieldPhotos = (function () {
       const text = st.none || st.idle || `${st.done} / ${st.total}`;
       const cls = st.over && !st.idle ? 'fp-stage-done' : st.done ? 'fp-stage-busy' : '';
       return `<div class="fp-stage ${cls}"><span class="fp-stage-name" title="${escAttr(st.hint)}">${st.over && !st.idle ? '✓ ' : ''}${esc(st.name)}</span>
-        <div class="fp-stage-bar" role="progressbar" aria-label="${escAttr(st.name)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div>
+        <div class="fp-stage-bar" role="progressbar" aria-label="${escAttr(st.name)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="--fp-pct:${pct}%"></i></div>
         <span class="small txt-muted fp-stage-n">${esc(text)}</span></div>`;
     }).join('')}
       <details class="small fp-stage-key"><summary>What the stages mean</summary><dl>${list.map(st => `<dt>${esc(st.name)}</dt><dd>${esc(st.hint)}</dd>`).join('')}</dl></details></div>`;

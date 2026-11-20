@@ -277,11 +277,14 @@ try {
   // finishes the land's answer for a road reserve, "council or TMR". The
   // mobile coverage section (site-mobile.js) follows, then Open data here
   // (map-feeds.js, #291), before the nearest stations.
-  check('…between the ground’s facts and the nearest stations, the road and bridge section under it, then mobile coverage, then open data',
+  // 52848a8 put the radio licences over the point (#mn-here-acma) between the
+  // ground's facts and the land, on purpose.
+  check('…after the ground’s facts and the radio licences over the point, before the nearest stations: the road and bridge section under it, then mobile coverage, then open data',
     await page.evaluate(() => {
       const kids = [...document.getElementById('here-card').children];
       const i = kids.findIndex(e => e.id === 'mn-land-here');
-      return i > 0 && /Ground height/.test(kids[i - 1].textContent) && kids[i + 1].id === 'mn-roads-here'
+      return i > 1 && kids[i - 1].id === 'mn-here-acma' && /Ground height/.test(kids[i - 2].textContent)
+        && kids[i + 1].id === 'mn-roads-here'
         && kids[i + 2].id === 'mn-mobile-here' && kids[i + 3].id === 'mn-feeds-here'
         && /Nearest station/.test(kids[i + 4].textContent);
     }));
