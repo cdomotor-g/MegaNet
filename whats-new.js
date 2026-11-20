@@ -34,6 +34,10 @@ const WhatsNew = (() => {
       '✚ <strong>Check a spot, and see where licences overlap.</strong> In <em>📜 ACMA licences</em>: press the map, or drag '
         + 'the marker, to see what a station there would transmit under; and shade where two holders\' licences on one '
         + 'frequency reach the same ground. A guide, not legal advice.',
+      '🖱️ <strong>Hover for the licence.</strong> With Licence coverage on, pointing at a station says whether it is covered, '
+        + 'uncertain or has none found, and which licence; pointing at a bubble lists its stations by colour, none found first. '
+        + 'A licence held by a council or a water authority says it is not the Bureau\'s, and the Views section has boxes for '
+        + 'whose licences are shown. Signed in with a Bureau address, the view starts with the Bureau\'s licences only.',
     ] },
     { n: 284, date: '2026-11-17', items: [
       '🚰 <strong>Water, sewer and drainage pipes.</strong> A new group in <em>More map layers</em>: Brisbane City Council\'s '

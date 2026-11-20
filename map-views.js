@@ -179,6 +179,10 @@ const MapViews = (function () {
     Balance: 'Which comes forward, the map underneath or the network on it. Toward Network the base map turns grey and darker '
       + '(up to 85 % grey) and the lines get up to half as strong again; toward Photo the map keeps its colours and the lines '
       + 'fade, to under half at the end.',
+    'Licences shown': 'Whose radio licences the Licence coverage view\'s circles, ovals and rings are read from. The Bureau of '
+      + 'Meteorology\'s are this network\'s own; councils and water and other authorities hold licences of their own on the same '
+      + 'channels, which are not the Bureau\'s. The same boxes as in 📜 ACMA licences. Someone signed in with a Bureau address '
+      + 'starts with the Bureau\'s only; whatever you tick is remembered.',
     Easement: 'A strip of a lot that someone other than its owner has a right to use — a council drain, a power line, a neighbour’s driveway. The land stays the owner’s. Drawn as a dashed white line under the property lines; a station card’s land details name the easements at that site.',
     'Land tenure': 'How the land is held: freehold (owned privately), leased from the State, or kept by the State as a national park, State forest, reserve or unallocated State land. Freehold is left clear; each other kind is a pale colour of its own, under the property lines (Queensland only).',
   };
@@ -2129,9 +2133,26 @@ const MapViews = (function () {
     ${presentHtml()}
     ${chipsHtml(act)}
     ${nowHtml()}
+    ${licHtml()}
     ${moreHtml(c)}
     ${saveHtml()}
     ${wordsHtml()}`;
+  }
+
+  // While licence coverage is on (the Licence coverage view, or 📜 ACMA
+  // licences' own boxes), whose licences are drawn — the same boxes as the
+  // tool's, linked both ways: each writes MapAcma's setting, and the tool
+  // redraws this section when it changes (owner, 20 Nov 2026).
+  function licHtml() {
+    if (!state.mapLicensing || typeof MapAcma === 'undefined' || !MapAcma.classes) return '';
+    const cls = MapAcma.classes();
+    const meaning = WORDS['Licences shown'];
+    return `<fieldset class="mv-lic" data-tour="views-licences">
+      <legend>${termHtml('Licences shown', meaning)}</legend>
+      ${cls.map(c => `<label class="lic-check"><input type="checkbox" id="mv-lic-${c.k}" ${c.on ? 'checked' : ''}
+          onchange="MapAcma.set('cls:${c.k}', this.checked)">
+        <span class="lic-dot" style="--dot:${c.colour}" aria-hidden="true"></span>${esc(c.label)}${c.k === 'bureau' ? '' : ' <span class="lic-muted">not the Bureau’s</span>'}</label>`).join('')}
+    </fieldset>`;
   }
 
   function blockEl() {

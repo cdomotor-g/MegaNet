@@ -30293,6 +30293,26 @@ select.kl-in { width: auto; font-family: inherit; }
 }
 .leaflet-container.lic-arming { cursor: crosshair; }
 .lic-states-h { margin-top: var(--sp-2); }
+/* The licensing line under a station's hover name, a bubble's lines by band,
+   the tag on a licence that is not the Bureau's, and the Views section's
+   linked holder boxes. The words are darkened from the band's colour so the
+   amber reads on a white tip. */
+.leaflet-tooltip.mn-pin-label.mn-pin-lic { white-space: normal; width: max-content; max-width: 300px; padding: 2px 6px; }
+.lic-hover { margin-top: 2px; font-weight: 400; font-size: 12px; line-height: 1.35; }
+.lic-hover-band, .lic-tip-line {
+  border-left: 4px solid var(--dot, #888); padding-left: 5px; font-weight: 700;
+  color: color-mix(in srgb, var(--dot, #888) 72%, #000);
+}
+.lic-tip-lines { display: flex; flex-direction: column; gap: 1px; margin: 3px 0; }
+.lic-tip-line { font-weight: 400; }
+.lic-tip-line strong { font-weight: 700; }
+.lic-other-tag {
+  display: inline-block; margin-top: 2px; padding: 0 5px; border: 1px dashed var(--dot, #e65100); border-radius: 4px;
+  font-size: 11px; font-weight: 600; color: color-mix(in srgb, var(--dot, #e65100) 75%, #000);
+}
+.mv-lic { margin: var(--sp-2) 0; padding: var(--sp-1) var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-sm); }
+.mv-lic legend { font-size: var(--fs-sm, .8125rem); font-weight: 600; padding: 0 4px; }
+.mv-lic .lic-check { display: block; }
 .lic-dot {
   display: inline-block; width: .7em; height: .7em; margin-right: .35em;
   border-radius: 50%; background: var(--dot, var(--muted)); vertical-align: baseline;

@@ -560,6 +560,77 @@ ok('…and in the middle of the desert is none found, with the nearest circle an
    spots.far && spots.far.band === 'none' && spots.far.inside.length === 0 && spots.far.nearest && spots.far.nearest.gap > 100 && /^None found/.test(spots.far.text), J(spots.far && spots.far.text));
 await page.evaluate(() => MapAcmaCheck.clear());
 
+// The hover: a station's licensing under its name, a bubble's by band, none found first.
+await page.evaluate(() => MapViews.apply('licensing'));
+await page.waitForTimeout(800);
+const hov = await page.evaluate(() => {
+  const tx = state.data.stations.filter(x => x.lat != null && x.lat !== '');
+  const pick = b => tx.find(x => (MapAcma.band(x.id) || {}).band === b);
+  const council = tx.find(x => { const r = MapAcma.band(x.id); return r && r.cls === 'council' && r.band !== 'none'; });
+  const base = tx.find(x => (x.roles || []).includes('base') && !(x.roles || []).includes('repeater') && !x.repeater && stationAlertIds(x).length === 0);
+  const h = x => (x ? MapAcma.hoverHtml(x) : '');
+  // A real hover on a covered pin, through app.js's own handler.
+  const cov = pick('covered');
+  const m = state.mapMarkers.find(k => k.mnStation && String(k.mnStation.id) === String(cov.id));
+  let tipText = '';
+  if (m) { onStationPinOver({ target: m }); const t = document.querySelector('.leaflet-tooltip.mn-pin-lic'); tipText = t ? t.textContent.replace(/\s+/g, ' ') : ''; clearStationPinHover(); }
+  const list = tx.slice(0, 400);
+  const tip = MapAcma.clusterTipHtml(list, { how: 'worst' });
+  const d = document.createElement('div'); d.innerHTML = tip;
+  return { covered: h(cov), none: h(pick('none')), unsure: h(pick('unsure')), base: h(base), council: h(council), tipText, name: cov.name,
+    lines: [...d.querySelectorAll('.lic-tip-line')].map(e => ({ t: e.textContent.trim(), dot: e.style.getPropertyValue('--dot') })),
+    tagged: !!d.querySelector('.lic-other-tag') };
+});
+ok('hovering a station in the view says its band and the licence it rests on, under its name',
+   /Covered/.test(hov.covered) && /\d+\/\d+/.test(hov.covered) && hov.tipText.startsWith(hov.name) && /Covered/.test(hov.tipText),
+   J({ tip: hov.tipText.slice(0, 120) }));
+ok('…none found names the nearest licence, uncertain says why, a base station that it only receives',
+   /None found/.test(hov.none) && /Uncertain/.test(hov.unsure) && /only receives/.test(hov.base), J({ none: hov.none.slice(0, 160), base: hov.base.slice(0, 120) }));
+ok('…and a station under a council’s licence says it is not the Bureau’s', /Council licence — not the Bureau’s/.test(hov.council), hov.council.slice(0, 200));
+ok('a bubble’s hover lists its stations a line per band in the band’s colour, none found first and not a transmitter last',
+   hov.lines.length >= 3 && /none found/.test(hov.lines[0].t) && /not a transmitter/.test(hov.lines[hov.lines.length - 1].t)
+   && hov.lines.every(l => !!l.dot) && hov.tagged, J(hov.lines));
+
+// The Views section's linked boxes: the tool's holder classes, both ways.
+const linked = await page.evaluate(async () => {
+  const box = document.getElementById('mv-lic-council');
+  if (!box) return { box: false };
+  box.click();
+  await new Promise(r => setTimeout(r, 400));
+  const off = MapAcma.summary().cls.council;
+  const tool = document.querySelector('#acmalic-classes input[onchange*="cls:council"]');
+  const toolOff = tool ? tool.checked : null;
+  MapAcma.set('cls:council', true);
+  await new Promise(r => setTimeout(r, 400));
+  return { box: true, off, toolOff, back: !!(document.getElementById('mv-lic-council') || {}).checked, legend: !!document.querySelector('.mv-lic legend .term') };
+});
+ok('the Views section shows whose licences are drawn, and its boxes and the tool’s are the same switch',
+   linked.box && linked.off === false && linked.toolOff !== true && linked.back && linked.legend, J(linked));
+
+// A Bureau address's first landing: the Bureau's licences only, then whatever was ticked.
+const bom = await page.evaluate(async () => {
+  const real = Auth.email;
+  Auth.email = () => 'someone@bom.gov.au';
+  MapViews.apply('radio'); MapAcma._resetPrefs();
+  MapViews.apply('licensing');
+  await new Promise(r => setTimeout(r, 500));
+  const first = MapAcma.summary().cls;
+  MapAcma.set('cls:council', true);
+  MapViews.apply('radio'); MapViews.apply('licensing');
+  await new Promise(r => setTimeout(r, 500));
+  const again = MapAcma.summary().cls;
+  Auth.email = () => 'someone@example.com';
+  MapViews.apply('radio'); MapAcma._resetPrefs(); MapViews.apply('licensing');
+  await new Promise(r => setTimeout(r, 500));
+  const outside = MapAcma.summary().cls;
+  Auth.email = real;
+  return { first, again, outside };
+});
+ok('signed in with a Bureau address, the first Licence coverage view shows only the Bureau’s licences',
+   bom.first.bureau && !bom.first.council && !bom.first.other, J(bom.first));
+ok('…a council ticked back on is remembered the next time', bom.again.bureau && bom.again.council && !bom.again.other, J(bom.again));
+ok('…and anybody else starts with every holder', bom.outside.bureau && bom.outside.council && bom.outside.other, J(bom.outside));
+
 // Another view puts it all away again.
 await page.evaluate(() => MapViews.apply('radio'));
 await page.waitForTimeout(800);

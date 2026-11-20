@@ -97,6 +97,18 @@
 // shape that says "these two belong together" without looking like an area.
 // The 🗺️ Map views › Licence coverage view (map-views.js) turns the circles,
 // the ovals and the rings on at once through setEnabled(), state.mapLicensing.
+//
+// While the rings are on, a station's hover name says its band and the
+// licence it rests on (hoverHtml, read by app.js onStationPinOver), and a
+// bubble's says its stations by band, none found first (clusterTipHtml). A
+// licence that is not the Bureau's says whose it is wherever it is named —
+// "Council licence — not the Bureau's" — because the tool lists councils' and
+// water authorities' licences too (owner, 20 Nov 2026).
+//
+// The first time somebody signed in with a Bureau address (@bom.gov.au) turns
+// the view on, only the Bureau's licences are ticked; anybody else starts
+// with every holder. Ticking a class here or in the Views section's linked
+// boxes (map-views.js licHtml) is remembered from then on (F.clsChosen).
 // Same-channel overlaps and the spot check are map-acma-check.js's.
 
 const MapAcma = (() => {
@@ -144,6 +156,15 @@ const MapAcma = (() => {
   const stateLabel = k => (STATES.find(s => s[0] === k) || STATES[NA])[1];
   const stateColour = k => { const s = STATES.find(x => x[0] === k) || STATES[NA]; return cssVar(s[2], s[3]); };
   const classColour = k => { const c = CLASSES.find(x => x[0] === k) || CLASSES[2]; return cssVar(c[2], c[3]); };
+  // Whose a licence is, said where it is named when it is not the Bureau's.
+  const CLASS_TAG = { council: 'Council licence — not the Bureau’s', other: 'Water or other authority’s licence — not the Bureau’s' };
+  const clsOf = l => (l && l.holder ? l.holder.cls : 'other');
+  const otherTagHtml = l => (clsOf(l) === 'bureau' ? ''
+    : `<span class="lic-other-tag" style="--dot:${classColour(clsOf(l))}">${esc(CLASS_TAG[clsOf(l)] || CLASS_TAG.other)}</span>`);
+  const isBureauUser = () => {
+    try { const e = typeof Auth !== 'undefined' && Auth.email ? Auth.email() : ''; return /@bom\.gov\.au$/i.test(String(e || '').trim()); }
+    catch (_) { return false; }
+  };
 
   let map = null, body = null;
   let areaLayer = null, siteLayer = null, coverLayer = null, ringLayer = null, coverRenderer = null;
@@ -160,7 +181,7 @@ const MapAcma = (() => {
 
   function loadPrefs() {
     const base = { show: false, cover: false, cls: { bureau: true, council: true, other: true }, off: [],
-      types: { pmp: true, ptp: true }, status: 'all', band: 'all', radius: PLAN_KM, colourBy: 'band', power: true };
+      types: { pmp: true, ptp: true }, status: 'all', band: 'all', radius: PLAN_KM, colourBy: 'band', power: true, clsChosen: false };
     try {
       const v = JSON.parse(localStorage.getItem(KEY) || 'null');
       if (!v || typeof v !== 'object') return base;
@@ -174,6 +195,7 @@ const MapAcma = (() => {
         radius: Number(v.radius) >= 1 && Number(v.radius) <= 150 ? Number(v.radius) : PLAN_KM,
         colourBy: v.colourBy === 'state' ? 'state' : 'band',
         power: v.power !== false,
+        clsChosen: !!v.clsChosen,
       };
     } catch (_) { return base; }
   }
@@ -819,7 +841,8 @@ const MapAcma = (() => {
       const b = bandOf(a);
       a.band = b.band; a.why = b.why;
       bands[b.band]++;
-      byId.set(String(s.id), { state: a.state, band: b.band, why: b.why });
+      const rest = a.site[0] || a.area[0] || a.beyond[0] || null;
+      byId.set(String(s.id), { state: a.state, band: b.band, why: b.why, cls: rest && rest.lic.holder ? rest.lic.holder.cls : null });
       if (a.relay && a.state === 'area') counts.relays++;
       const tick = (m, k) => { const u = under.get(m.lic) || { site: 0, area: 0, beyond: 0 }; u[k]++; under.set(m.lic, u); };
       for (const m of a.site) tick(m, 'site');
@@ -1503,13 +1526,13 @@ const MapAcma = (() => {
   }
 
   function ptpTipHtml(l, a, b) {
-    return `<div class="lic-tip"><strong>${esc(l.no)}</strong> ${esc(holderName(l))}<br>Point to point · ${esc(freqText(l))}<br>`
+    return `<div class="lic-tip"><strong>${esc(l.no)}</strong> ${esc(holderName(l))}${otherTagHtml(l) ? `<br>${otherTagHtml(l)}` : ''}<br>Point to point · ${esc(freqText(l))}<br>`
       + `${esc(a.name)} ↔ ${esc(b.name)}, ${esc(fmtKm(acmaHaversineKm(a.lat, a.lon, b.lat, b.lon)))}<br>`
       + '<span class="lic-muted">Covers these two ends only — not the ground between them.</span></div>';
   }
 
   function tipHtml(ls) {
-    return ls.slice(0, 4).map(l => `<strong>${esc(l.no)}</strong> ${esc(holderName(l))}<br>${esc(l.cat)} · ${esc(freqText(l))}`
+    return ls.slice(0, 4).map(l => `<strong>${esc(l.no)}</strong> ${esc(holderName(l))}${otherTagHtml(l) ? `<br>${otherTagHtml(l)}` : ''}<br>${esc(l.cat)} · ${esc(freqText(l))}`
       + `<br>${standing(l) === 'lapsed' ? 'not in force' : `in force to ${esc(dateText(l.expiry))}`}`).join('<hr>')
       + (ls.length > 4 ? `<hr>+ ${ls.length - 4} more at this site` : '') + '<br><em>click for the licence</em>';
   }
@@ -1626,7 +1649,8 @@ const MapAcma = (() => {
     if (!D || !F.cover || !list || !list.length) return null;
     const C = coverage();
     const byBand = F.colourBy !== 'state';
-    const keys = byBand ? BANDS.map(b => b[0]) : STATES.map(x => x[0]);
+    // Listed and ringed worst first: none found at the top (owner, 20 Nov 2026).
+    const keys = byBand ? ['none', 'unsure', 'covered', 'na'] : ['none', 'beyond', 'area', 'site', 'na'];
     const rank = k => (byBand ? ['na', 'covered', 'unsure', 'none'] : ['na', 'site', 'area', 'beyond', 'none']).indexOf(k);
     const n = new Map();
     for (const s of list) {
@@ -1643,6 +1667,58 @@ const MapAcma = (() => {
     const label = x => (byBand ? bandLabel(x) : stateLabel(x)).toLowerCase();
     return { fill: colour(k), ring: '#ffffff', label: label(k),
       parts: keys.filter(x => n.has(x)).map(x => ({ label: label(x), fill: colour(x), ring: colour(x), n: n.get(x) })) };
+  }
+
+  // A station's hover name, the line under it while the rings are on.
+  function hoverHtml(s) {
+    if (!D || !F.cover || !s || !located(s)) return '';
+    const chipOf = (k, label) => `<span class="lic-hover-band" style="--dot:${F.colourBy === 'state' ? stateColour(k) : bandColour(k)}">${esc(label)}</span>`;
+    if (!transmits(s)) {
+      const isBase = Array.isArray(s.roles) && s.roles.includes('base');
+      return `<div class="lic-hover">${chipOf('na', bandLabel('na'))} ${isBase ? 'a base station: it only receives, and needs no licence' : 'receives only: nothing to license'}</div>`;
+    }
+    const a = assess(s, { light: true });
+    const b = bandOf(a);
+    const head = F.colourBy === 'state' ? chipOf(a.state, stateLabel(a.state)) : chipOf(b.band, bandLabel(b.band));
+    let say = '', lic = null;
+    if (a.state === 'site') { lic = a.site[0].lic; say = `licence at its site: ${lic.no}, ${holderName(lic)}`; }
+    else if (a.state === 'area') {
+      const m = a.area[0]; lic = m.lic;
+      say = b.why === 'relay' ? `a repeater in ${lic.no}’s circle — no licence at its own site`
+        : b.why === 'lowpower' ? `only in low-power licence ${lic.no}’s wider circle, ${fmtKm(m.txKm)} from its transmitter`
+          : `inside ${lic.no}’s circle, ${fmtKm(m.txKm)} from its transmitter — ${holderName(lic)}`;
+    } else if (a.state === 'beyond') {
+      const m = a.beyond[0]; lic = m.lic;
+      say = `${fmtKm(Math.max(0, m.gap))} beyond ${lic.no}’s circle, reporting through ${m.via.name}`;
+    } else if (a.nearestPmp) {
+      say = `nearest ${a.nearestPmp.lic.no}, ${fmtKm(Math.max(0, a.nearestPmp.gap))} past its circle`;
+    } else say = 'no point-to-multipoint licence on its channel';
+    return `<div class="lic-hover">${head} ${esc(say)}${lic && otherTagHtml(lic) ? `<br>${otherTagHtml(lic)}` : ''}</div>`;
+  }
+
+  // A bubble's hover, while it wears the rings' colours (map-cluster.js
+  // tipHtml): one coloured line per band, none found first, and how many of
+  // them rest on a licence that is not the Bureau's.
+  function clusterTipHtml(list, c) {
+    const st = clusterStyle(list, c && c.how);
+    if (!st) return '';
+    const C = coverage();
+    const n = list.length;
+    const others = { council: 0, other: 0 };
+    for (const s of list) { const r = s && C.byId.get(String(s.id)); if (r && r.cls && r.cls !== 'bureau' && r.band !== 'none') others[r.cls === 'council' ? 'council' : 'other']++; }
+    const how = c && c.parts ? 'coloured as a mix' : `coloured by its ${c && c.how === 'worst' ? 'worst' : 'most common'}: ${esc(st.label)}`;
+    const lines = st.parts.map(q => `<span class="lic-tip-line" style="--dot:${q.fill}"><strong>${q.n.toLocaleString()}</strong> ${esc(q.label)}</span>`).join('');
+    const tag = (k, text) => `<span class="lic-other-tag" style="--dot:${classColour(k)}">${esc(text)} — not the Bureau’s</span><br>`;
+    return `<strong>${n.toLocaleString()} stations</strong> · ${how}<div class="lic-tip-lines">${lines}</div>`
+      + (others.council ? tag('council', `${others.council} under a council’s licence`) : '')
+      + (others.other ? tag('other', `${others.other} under a water or other authority’s licence`) : '')
+      + '<span class="small txt-muted">Press to zoom in to them</span>';
+  }
+
+  // The holder classes, for the Views section's linked boxes (map-views.js).
+  function classes() {
+    return CLASSES.map(([k, label]) => ({ k, label, on: F.cls[k] !== false, colour: classColour(k),
+      n: D ? D.lics.filter(l => l.holder && l.holder.cls === k).length : null }));
   }
 
   function boundsOf(l) {
@@ -1666,6 +1742,8 @@ const MapAcma = (() => {
     if (typeof rerenderMapLegend === 'function') rerenderMapLegend();
     // The bubbles take the rings' colours, or give them back.
     if (typeof MapCluster !== 'undefined' && MapCluster.rebuild && map) { try { MapCluster.rebuild(); } catch (_) { /* no bubbles yet */ } }
+    // The Views section's linked holder boxes follow.
+    if (typeof MapViews !== 'undefined' && MapViews.rerender) { try { MapViews.rerender(); } catch (_) { /* not drawn */ } }
   }
   // What 🗺️ Map views reads for its Licence coverage knob: the circles and the rings both on.
   function syncState() { if (typeof state !== 'undefined') state.mapLicensing = !!(F.show && F.cover); }
@@ -1748,12 +1826,23 @@ const MapAcma = (() => {
     setEnabled(on) {
       F.show = !!on;
       F.cover = !!on;
+      // A Bureau address's first landing: the Bureau's licences only.
+      if (on && !F.clsChosen && isBureauUser()) {
+        F.cls = { ...F.cls, bureau: true, council: false, other: false };
+        F.clsChosen = true;
+        if (typeof mapNote === 'function') {
+          mapNote('Showing the Bureau’s licences only. Councils’ and other authorities’ can be ticked under Views, or in 📜 ACMA licences.', 7000);
+        }
+      }
       if (!D) { savePrefs(); syncState(); render(); if (on) whenLoaded(() => { after(); repaintCards(); }); return; }
       after();
     },
     // Whether the bubbles are to wear the rings' colours (map-cluster.js).
     colours() { return !!D && F.cover && !!map; },
     clusterStyle,
+    clusterTipHtml,
+    hoverHtml,
+    classes,
     // MapCluster has regrouped: the rings of the stations now in a bubble go,
     // and those let out come back.
     onClusters() {
@@ -1776,8 +1865,8 @@ const MapAcma = (() => {
       const [k, arg] = String(key).split(':');
       if (k === 'show') F.show = !!value;
       else if (k === 'cover') F.cover = !!value;
-      else if (k === 'cls' && F.cls[arg] !== undefined) F.cls[arg] = !!value;
-      else if (k === 'holder') { F.off = F.off.filter(n => n !== arg); if (!value) F.off.push(arg); }
+      else if (k === 'cls' && F.cls[arg] !== undefined) { F.cls[arg] = !!value; F.clsChosen = true; }
+      else if (k === 'holder') { F.clsChosen = true; F.off = F.off.filter(n => n !== arg); if (!value) F.off.push(arg); }
       else if (k === 'type' && F.types[arg] !== undefined) F.types[arg] = !!value;
       else if (k === 'status') F.status = ['all', 'current', 'soon', 'lapsed'].includes(value) ? value : 'all';
       else if (k === 'band') F.band = ['all', 'vhf', 'uhf'].includes(value) ? value : 'all';
@@ -1946,7 +2035,7 @@ const MapAcma = (() => {
       if (!D) return null;
       return { asAt: asAt(), licences: D.lics.length, holders: D.holders.map(h => ({ no: h.no, name: h.name, cls: h.cls, on: holderOn(h) })),
         shown: D.lics.filter(shown).length, radius: F.radius, show: F.show, cover: F.cover, picked: picked ? { ...picked } : null,
-        colourBy: F.colourBy, power: F.power, low: D.lics.filter(l => l.low).length,
+        colourBy: F.colourBy, power: F.power, low: D.lics.filter(l => l.low).length, cls: { ...F.cls }, clsChosen: F.clsChosen,
         soon: counted().filter(l => standing(l) === 'soon').length, lapsed: counted().filter(l => standing(l) === 'lapsed').length };
     },
     licence(no) {
@@ -1968,6 +2057,8 @@ const MapAcma = (() => {
     pdfUrl,
     stationsCsv,
     licencesCsv,
+    // For a check: the settings as a first visit has them.
+    _resetPrefs() { try { localStorage.removeItem(KEY); } catch (_) { /* none */ } F = loadPrefs(); syncState(); },
     // For a check that stands a register copy of its own in.
     _use(raw) { D = index(raw); loading = Promise.resolve(D); loadErr = ''; cover = null; if (map) { draw(); render(); } repaintCards(); },
   };

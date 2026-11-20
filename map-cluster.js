@@ -257,6 +257,11 @@ const MapCluster = (function () {
   }
 
   function tipHtml(c) {
+    // Licensing says its bands a line each, in their colours (map-acma.js).
+    if (c.by === 'licensing' && typeof MapAcma !== 'undefined' && MapAcma.clusterTipHtml) {
+      const t = MapAcma.clusterTipHtml(c.members.map(m => m.mnStation), { how: S.how, parts: c.parts });
+      if (t) return t;
+    }
     const n = c.members.length;
     const lines = c.words.map(q => `${q.n.toLocaleString()} ${esc(q.label)}`);
     const how = c.by === 'role' ? '' : c.parts ? ' · coloured as a mix'

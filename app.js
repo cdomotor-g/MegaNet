@@ -8352,11 +8352,14 @@ function onStationPinOver(e) {
   // The pin under the pointer lights its paths under Tails and brings back
   // the ones Best path only leaves out (map-views.js) — named on the map or not.
   MapViews.hover(s.id);
-  if (m.getTooltip()) return;              // already named on the map
+  // While 📜 ACMA licences rings the stations (the Licence coverage view), the
+  // hover says the station's licensing too — even on a pin already named.
+  const lic = typeof MapAcma !== 'undefined' && MapAcma.hoverHtml ? MapAcma.hoverHtml(s) : '';
+  if (m.getTooltip() && !lic) return;      // already named on the map
   const tip = L.tooltip({
-    className: 'mn-pin-label', direction: 'top',
+    className: lic ? 'mn-pin-label mn-pin-lic' : 'mn-pin-label', direction: 'top',
     offset: [0, -((m.mnRadius || 6) + 2)], interactive: false,
-  }).setContent(esc(s.name)).setLatLng(m.getLatLng()).addTo(state.map);
+  }).setContent(`${esc(s.name)}${lic}`).setLatLng(m.getLatLng()).addTo(state.map);
   // A hovered stack fans out under the pointer (map-spider.js), and the name
   // goes with its pin rather than staying on the stack it came out of.
   m.on('move', followStationPinHover);
