@@ -286,6 +286,9 @@ async function main() {
 
     // ── 6. The app's own markup ──────────────────────────────────────────────
     log('\n6. The app\'s own markup\n');
+    // The fixtures above sit fixed at the top of the window; the banner's Search
+    // button now lies under one, so put them away before pointing at the banner.
+    await page.evaluate(() => { for (const id of ['tt-top', 'tt-right']) document.getElementById(id)?.remove(); });
     await page.mouse.move(5, 790);
     await page.waitForTimeout(700);
     const want = await page.evaluate(() => document.getElementById('btn-palette').getAttribute('title'));

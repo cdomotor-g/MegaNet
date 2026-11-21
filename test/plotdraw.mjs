@@ -3,7 +3,7 @@
 // test/plotlines.mjs holds the arithmetic to known answers in Node; this is
 // the other half — that a person can actually get each kind of line onto the
 // chart: type a function and press Enter, pick readings and fit a curve, draw
-// freehand, rule a line and read its slope. And that the tab is called Plots.
+// freehand, rule a line and read its slope. And that the tab is called Charts (renamed in the November 2026 tabs rationalisation, 2ff02b2).
 //
 //   npm run plotdraw          (-- --shot to save a screenshot to the temp directory)
 
@@ -39,7 +39,7 @@ try {
 
   const label = await page.evaluate(() => TABS.flatMap(g => g.tabs)
     .find(t => t.id === 'arrodata')?.label);
-  ok('the tab is called Plots', label === 'Plots', String(label));
+  ok('the tab is called Charts', label === 'Charts', String(label));
 
   await page.evaluate(async () => {
     switchTab('arrodata');

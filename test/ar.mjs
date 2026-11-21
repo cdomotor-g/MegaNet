@@ -285,6 +285,12 @@ try {
     g.watchPosition = (...a) => { const id = watch(...a); window.__geo.add(id); return id; };
     g.clearWatch = id => { window.__geo.delete(id); return clear(id); };
     const add = window.addEventListener.bind(window), rem = window.removeEventListener.bind(window);
+    // Newer Chromium gives Android a requestPermission() on DeviceOrientationEvent
+    // (an older one has none); in a test with nobody to press Allow it refuses, so
+    // stand in for a phone that was allowed.
+    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission = async () => 'granted';
+    }
     window.__orient = new Set();
     window.addEventListener = (t, fn, o) => { if (/^deviceorientation/.test(t)) window.__orient.add(t); return add(t, fn, o); };
     window.removeEventListener = (t, fn, o) => { if (/^deviceorientation/.test(t)) window.__orient.delete(t); return rem(t, fn, o); };
@@ -563,7 +569,9 @@ try {
     if (md) { const gum = md.getUserMedia.bind(md); md.getUserMedia = (...a) => { window.__gum++; return gum(...a); }; }
   }, CENTRE);
   // The tab has no map: leaving Stations is what keeps where it was looking.
-  await dp.click('#tab-nav .tab-btn[data-tab="lookaround"]');
+  await dp.click('#tab-nav .tab-btn[data-tab="nearby"]');
+  await dp.waitForTimeout(300);
+  await dp.click('#view-strip .view-btn[data-view="lookaround"]');
   await dp.waitForFunction(() => state.activeTab === 'lookaround' && !state.map
     && !!document.getElementById('ar-pane-map') && !document.getElementById('ar-pane-map').disabled, null, { timeout: 10_000 });
   await dp.click('#ar-pane-map');
