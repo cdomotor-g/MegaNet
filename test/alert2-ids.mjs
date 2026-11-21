@@ -33,7 +33,8 @@ const J = x => JSON.stringify(x);
 const ctx = vm.createContext({ console, Math, Number, String, Array, JSON, Object, Set, Map, Date, Error, Promise,
                                isFinite, parseInt, parseFloat, window: {} });
 vm.runInContext(fs.readFileSync(repo('alert2-ids.js'), 'utf8') + '\n;this.Alert2Ids = Alert2Ids;', ctx, { filename: 'alert2-ids.js' });
-const A = ctx.Alert2Ids;
+vm.runInContext(fs.readFileSync(repo('alert2-space.js'), 'utf8') + '\n;this.Alert2Space = Alert2Space;', ctx, { filename: 'alert2-space.js' });
+const A = ctx.Alert2Ids, SP = ctx.Alert2Space;
 
 const stations = [
   { id: 'bromelton_weir_hw_tm', name: 'Bromelton Weir HW TM', alert2_station_id: 11047, sensors: [{ alert2_sensor_id: 7 }, { alert2_sensor_id: 8 }] },
@@ -42,8 +43,8 @@ const stations = [
   { id: 'cg_tw', name: 'Cedar Grove Weir TW TM', alert2_station_id: 11081, sensors: [] },
   { id: 'x1', name: 'Clash A', alert2_station_id: 500, sensors: [{ alert2_sensor_id: 7 }] },
   { id: 'x2', name: 'Clash B', alert2_station_id: 500, sensors: [{ alert2_sensor_id: 7 }] },
-  { id: 'gympie', name: 'Gympie Weir TM', alert2_station_id: 8233, sensors: [] },
-  { id: 'crosby', name: 'Mt Crosby AL', alert2_station_id: 10019, sensors: [] },
+  { id: 'gympie', name: 'Gympie Weir TM', alert2_station_id: 8233, hub_id: 'brisbane', sensors: [] },
+  { id: 'crosby', name: 'Mt Crosby AL', alert2_station_id: 10019, hub_id: 'cairns', sensors: [] },
   { id: 'nothing', name: 'No ALERT2', sensors: [] },
 ];
 const channels = [{ freq_mhz: 151.5375, slot_s: 0.5, frame_s: 60 }, { freq_mhz: 152.4625, slot_s: 0.5, frame_s: 60 }];
@@ -97,6 +98,34 @@ console.log('\nFree\n');
 ok('from 10018: skip 10019', J(A.free(R, 10018, 3)) === J([10018, 10020, 10021]));
 ok('from 10115: skip it', A.free(R, 10115, 1)[0] === 10116);
 ok('blocks of a thousand', J(A.blocks(R).map(b => [b.lo, b.n])) === J([[0, 1], [8000, 1], [9000, 1], [10000, 3], [11000, 3]]));
+
+console.log('\nThe wheel and the grid\n');
+const I = SP.index(R, [{ id: 'cairns', name: 'Cairns Hub', ord: 2 }, { id: 'brisbane', name: 'Brisbane Hub', ord: 1 }]);
+const st = (a, sc = 'all') => SP.statusOf(I, sc, a);
+ok('the hubs that hold any, in their order', J(I.hubList.map(h => h.id)) === J(['brisbane', 'cairns']));
+ok('one holder: in use', st(8233) === 'use');
+ok('shared and told apart: shared', st(11047) === 'shared');
+ok('shared, a holder with no sensor numbers: not told apart', st(11081) === 'clash');
+ok('shared, one sensor on two: not told apart', st(500) === 'clash');
+ok('on the slot table, no station', st(9999) === 'slot');
+ok('heard, no station', st(10290) === 'stranger' && st(10115) === 'stranger');
+ok('free in a thousand in use, open in one nobody uses', st(10020) === 'free' && st(30000) === 'open');
+ok('0 and past 65,534 are no IDs', st(0) === 'void' && st(65535) === 'void');
+ok('a hub: its own in use, another hub\'s faint', st(8233, 'hub:brisbane') === 'use' && st(10019, 'hub:brisbane') === 'elsewhere');
+ok('on air: heard sending, passing on only, on file only', SP.airOf(I, 10290) === 3 && SP.airOf(I, 10019) === 2 && SP.airOf(I, 9999) === 1 && SP.airOf(I, 10020) === 0);
+const W = SP.wedges(I, 'all');
+ok('66 wedges of a thousand', W.length === 66 && W[10].lo === 10000 && W[10].hi === 10999);
+ok('a wedge counts its colours', W[11].held === 2 && W[11].stranger === 1 && W[11].free === 997, J(W[11]));
+ok('a wedge with nothing in it is all open', W[30].taken === 0 && W[30].open === 1000);
+ok('the wedge at the top starts at 1', W[0].n === 999);
+const G = SP.gaps(I, 3);
+ok('the biggest gaps between IDs in use, biggest first', J(G.runs.map(g => [g.lo, g.hi, g.n])) === J([[501, 8232, 7732], [8234, 9998, 1765], [10291, 11046, 756]]), J(G.runs));
+ok('…and where nothing is used below or above', G.lo === 500 && G.hi === 11081);
+ok('the grid\'s thousands: each in use, and one asked for', J(SP.thousands(I, [30500])) === J([0, 8, 9, 10, 11, 30]));
+ok('the filter box: an ID, a range, or nothing', J(SP.boxOf('11047')) === J({ id: 11047, range: null }) && J(SP.boxOf('10100 – 10000')) === J({ id: null, range: { lo: 10000, hi: 10100 } })
+  && J(SP.boxOf('bromelton')) === J({ id: null, range: null }) && SP.boxOf('70000').id === null);
+ok('a holder carries its hub', row(8233).holders[0].hub === 'brisbane');
+ok('the wheel\'s words have meanings a sentence long', Object.values(SP.WORDS).every(m => typeof m === 'string' && m.length > 30 && /\.$/.test(m)) && SP.GLOSSARY.every(([k]) => SP.WORDS[k]));
 
 console.log('\n0121\n');
 const sql = fs.readFileSync(repo('db/migrations/0121_alert2_shared_ids.sql'), 'utf8');

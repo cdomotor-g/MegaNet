@@ -24,7 +24,8 @@
 // Exposes: Alert2Ids.
 // Requires at call time: core.js (esc, escAttr, termHtml, csvEscape, dlText,
 // stationSensors, state), datastore.js (dbRpc), tdma-slots.js (TdmaSlots),
-// app.js (goToStation, openEditor).
+// app.js (goToStation, openEditor), alert2-space.js (Alert2Space: the wheel and
+// the grid, drawn between the free-ID finder and the table).
 
 const Alert2Ids = (function () {
   const HEARD_DAYS = 90;
@@ -66,7 +67,7 @@ const Alert2Ids = (function () {
     const by = new Map();
     const row = id => { if (!by.has(id)) by.set(id, { id, holders: [], sites: [], heard: [] }); return by.get(id); };
     for (const s of stations) if (s && s.alert2_station_id != null && s.alert2_station_id !== '') {
-      row(Number(s.alert2_station_id)).holders.push({ id: s.id, name: s.name || s.id, slots: slotsOfStation(s) });
+      row(Number(s.alert2_station_id)).holders.push({ id: s.id, name: s.name || s.id, hub: s.hub_id || '', slots: slotsOfStation(s) });
     }
     const chan = new Map(channels.map(c => [fkey(c.freq_mhz), c]));
     const siteBy = new Map();
@@ -199,6 +200,7 @@ const Alert2Ids = (function () {
         <p id="a2i-found" class="sr-only" role="status" aria-live="polite">${filter ? esc(`${shown.length} of ${all.length} ALERT2 IDs`) : ''}</p>
       </div>
       ${freeHtml(all)}
+      ${typeof Alert2Space !== 'undefined' ? Alert2Space.cardsHtml() : ''}
       <div id="a2i-table">${tableHtml(shown, all.length)}</div>
       ${wordsHtml()}`;
   }
@@ -240,8 +242,9 @@ const Alert2Ids = (function () {
       <p class="small txt-muted">Free here means unused as far as Flood-Net knows. Check with whoever manages the network before you set one.</p></div>`;
   }
   function wordsHtml() {
+    const more = typeof Alert2Space !== 'undefined' ? Alert2Space.GLOSSARY.map(([k, l]) => [l, Alert2Space.WORDS[k]]) : [];
     return `<details class="panel tdp-more"><summary>What the words on this page mean</summary>
-      <dl class="tds-words small">${GLOSSARY.map(([k, l]) => `<dt>${esc(l)}</dt><dd>${esc(WORDS[k])}</dd>`).join('')}</dl></details>`;
+      <dl class="tds-words small">${GLOSSARY.map(([k, l]) => [l, WORDS[k]]).concat(more).map(([l, m]) => `<dt>${esc(l)}</dt><dd>${esc(m)}</dd>`).join('')}</dl></details>`;
   }
 
   function onFilter(v) {
@@ -249,6 +252,14 @@ const Alert2Ids = (function () {
     const all = current(), shown = all.filter(r => matches(r, filter));
     const el = document.getElementById('a2i-table'); if (el) el.innerHTML = tableHtml(shown, all.length);
     const f = document.getElementById('a2i-found'); if (f) f.textContent = filter ? `${shown.length} of ${all.length} ALERT2 IDs` : '';
+    if (typeof Alert2Space !== 'undefined') Alert2Space.onFilter();
+  }
+  // The filter box written from elsewhere — an ID pressed on the wheel or
+  // the grid — as typing it would.
+  function setFilter(v) {
+    const box = document.getElementById('a2i-filter');
+    if (box) box.value = String(v || '');
+    onFilter(v);
   }
   function onFrom(v) {
     const n = parseInt(v, 10); if (!Number.isFinite(n)) return;
@@ -256,6 +267,7 @@ const Alert2Ids = (function () {
     const next = free(current(), from, 8);
     const el = document.getElementById('a2i-next');
     if (el) el.innerHTML = next.length ? `The next free: <strong>${next.join(', ')}</strong>` : 'None free above that number.';
+    if (typeof Alert2Space !== 'undefined') Alert2Space.onFilter();
   }
   function repaint() {
     if (typeof document === 'undefined') return;
@@ -263,6 +275,7 @@ const Alert2Ids = (function () {
     if (!el) return;
     const had = document.activeElement && el.contains(document.activeElement) ? document.activeElement.id : '';
     el.innerHTML = bodyHtml();
+    if (typeof Alert2Space !== 'undefined') Alert2Space.init();
     if (had) { const x = document.getElementById(had); if (x) { x.focus(); if (x.type === 'search') x.setSelectionRange(x.value.length, x.value.length); } }
   }
   function exportCsv() {
@@ -274,7 +287,11 @@ const Alert2Ids = (function () {
     if (typeof announce === 'function') announce('Saved the ALERT2 IDs as CSV.');
   }
 
-  return { WORDS, pageHtml, onFilter, onFrom, exportCsv, repaint,
+  // The page drawn: its wheel and grid painted once they are on screen.
+  function init() { if (typeof Alert2Space !== 'undefined') Alert2Space.init(); }
+
+  return { WORDS, pageHtml, init, onFilter, onFrom, exportCsv, repaint, current, setFilter,
+           getFilter: () => filter, getFrom: () => from,
            // Pure, for the tests.
            rows, matches, free, blocks };
 })();

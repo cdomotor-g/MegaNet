@@ -31225,3 +31225,15 @@ details.tm-fold summary { cursor: pointer; }
 .adm-jump-h { flex: 1 1 100%; font-weight: 600; color: var(--muted); }
 .adm-jump-g { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .35rem; }
 .adm-jump-g > strong { margin-right: .2rem; }
+/* The ALERT2 half's wheel and grid (alert2-space.js): the legacy half's
+   colours (address-space.js) and four of its own — shared at one site, an ID
+   held in another hub, on the slot table with no station, heard with none. */
+.as-page { --a2-shared: var(--ad-series-4); --a2-stranger: var(--ad-series-7); }
+.as-c-shared    { --c: var(--a2-shared); }
+.as-c-elsewhere { --c: color-mix(in srgb, var(--as-use) 42%, transparent); }
+.as-c-slot      { --c: var(--as-alloc); }
+.as-c-a2free    { --c: color-mix(in srgb, var(--as-free) 30%, transparent); }
+.as-c-stranger  { --c: var(--a2-stranger); }
+.a2s-sensors { margin: var(--sp-1) 0; }
+.a2s-sensors svg { display: block; width: 100%; max-width: 32rem; height: auto; aspect-ratio: 4 / 1; }
+.a2s-sensors p { margin: 0 0 var(--sp-1); }

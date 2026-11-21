@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 289, date: '2026-11-21', items: [
+      '🔗 <strong>ALERT2 IDs have a wheel and a grid now</strong>, as the legacy ALERT addresses do: on <em>ALERT IDs</em>, switch to '
+        + '<em>ALERT2</em>. The wheel goes round every ID from 1 to 65,534, a wedge a thousand, with who holds each, what the base stations '
+        + 'heard and what the slot table has; the grid shows each thousand in use a hundred to a row. Press an ID on either and it goes into '
+        + 'the filter box; press a gap and the free-ID finder starts from it. Show one hub or all of them, and an ID\'s sensor numbers are '
+        + 'drawn 0–255, so you can see which station of a shared ID takes which.',
+    ] },
     { n: 288, date: '2026-11-20', items: [
       '🗂️ <strong>The bar on the left, tidied: 62 tabs are 42 now, in 10 groups.</strong> Tools that did one job between them '
         + 'are one tab, with their old pages as views in a row across its top: 📶 <em>Nearby Transmitters</em> (RF Environment, RF Changes), '

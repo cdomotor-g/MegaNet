@@ -2053,7 +2053,8 @@ jobs:
 
       # Node only. The ALERT2 half of the ALERT IDs tab (alert2-ids.js) and
       # 0121's shared addresses: a row an ID from the register, the slot table
-      # and what was heard, the checks, the filter, the free-ID finder.
+      # and what was heard, the checks, the filter, the free-ID finder, and
+      # the wheel and grid's colours, wedges and gaps (alert2-space.js).
       - name: ALERT2 IDs — the rows, the checks, shared addresses, free IDs
         if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
         working-directory: test

@@ -119,6 +119,7 @@ function setPassRangeProto(p) {
   if (!host) return;
   host.innerHTML = renderPassRangesHtml();
   if (state.prProto === 'alert') AddressSpace.init();
+  else if (typeof Alert2Ids !== 'undefined') Alert2Ids.init();
   const btn = host.querySelector('.pr-proto-btn.active');
   if (btn) btn.focus();
 }
