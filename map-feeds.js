@@ -1252,7 +1252,7 @@ const MapFeeds = (function () {
     floods: 'Past floods whose mapped outline covers this place. Only the floods the State has mapped — not every flood there has been.',
     dams: 'Modelled flooding below a dam the State lists because its failure would put people at risk. A worst case, not a forecast.',
     lines: `Geoscience Australia’s high-voltage lines and substations within about ${NEAR_M} m.`,
-    pipes: `Gas and oil pipelines within about ${NEAR_M} m.`,
+    pipelines: `Gas and oil pipelines within about ${NEAR_M} m.`,
     cables: `Energex or Ergon lines within ${CABLE_M} m, and whether each is overhead or an underground cable. A guide only: ring Before You Dig Australia (1100) before digging.`,
     pipes: `Stormwater pipes and drains, and water, sewer and recycled water mains, within ${PIPE_M} m — only where the council or water utility publishes them (Brisbane, Unitywater’s area, Melbourne Water). A guide only: ring Before You Dig Australia (1100) before digging.`,
     gauges: `The State’s open river gauges within ${GAUGE_NEAR_KM} km, nearest first, with their latest height. Gauge height is metres above that gauge’s own zero mark, not above sea level (AHD) — so it cannot be compared with a Flood-Net height. The State logs hourly.`,
@@ -1279,7 +1279,7 @@ const MapFeeds = (function () {
       ${row('Dam-failure areas', TERMS.dams, answer(a, 'floods', r => list(r.dams, 'none'), ''))}
       ${row('State river gauges', TERMS.gauges, answer(a, 'gauges', r => list(r.found, `none within ${GAUGE_NEAR_KM} km`), ''))}
       ${row('High-voltage lines', TERMS.lines, answer(a, 'power', r => list(r.lines, `none within ${NEAR_M} m`), ''))}
-      ${row('Pipelines', TERMS.pipes, answer(a, 'power', r => list(r.pipes, `none within ${NEAR_M} m`), ''))}
+      ${row('Pipelines', TERMS.pipelines, answer(a, 'power', r => list(r.pipes, `none within ${NEAR_M} m`), ''))}
       ${row('Power network', TERMS.cables, answer(a, 'cables', r => list(r.found, `none within ${CABLE_M} m`), ''))}
       ${row('Pipes', TERMS.pipes, answer(a, 'pipes', r => (r.none ? `<span class="txt-muted">none published for this area</span>` : list(r.found, `none within ${PIPE_M} m`)), ''))}
       ${row('Cultural heritage', TERMS.heritage, answer(a, 'land', r => list(r.heritage, 'none listed'), ''))}
