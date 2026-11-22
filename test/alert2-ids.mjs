@@ -138,6 +138,16 @@ ok('ingest() resolves by address and slot', sql.includes('meganet.resolve_a2_sen
 ok('resolve_readings() too', sql.includes('meganet.resolve_a2_sensor(r.a2_station, r.a2_sensor),'));
 ok('the unique index goes', sql.includes('drop index if exists meganet.station_alert2_unique_idx'));
 
+// A station's name is anybody's typing: every place the sensor grid shows it,
+// the tooltip inside each cell included, it goes through esc().
+ctx.esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+ctx.escAttr = ctx.esc;
+{
+  const bad = '</title><img src=x onerror=alert(1)>';
+  const html = SP.sensorsHtml({ id: 12345, holders: [{ id: 'x', name: bad, slots: [3] }] });
+  ok('the sensor grid escapes station names, tooltips too', !html.includes('<img') && html.includes('&lt;/title&gt;&lt;img'), html.match(/<title>Sensor 3[^]*?<\/title>/)?.[0]);
+}
+
 console.log('\nThe words\n');
 ok('every word has a meaning of its own, a sentence long', Object.values(A.WORDS).every(m => typeof m === 'string' && m.length > 40 && /\.$/.test(m)));
 

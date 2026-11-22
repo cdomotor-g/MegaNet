@@ -255,7 +255,7 @@ const Alert2Space = (function () {
     for (let n = 0; n < 256; n++) {
       const l = by.get(n), x = n % 32, y = Math.floor(n / 32);
       const fill = !l ? 'color-mix(in srgb, var(--muted) 18%, transparent)' : l.length > 1 ? 'var(--as-clash)' : `var(${SERIES[l[0] % SERIES.length]})`;
-      cells += `<rect x="${x}" y="${y}" width="0.86" height="0.86" style="fill:${fill}"><title>Sensor ${n}${l ? `: ${l.map(i => r.holders[i].name).join(' and ')}` : ' — free'}</title></rect>`;
+      cells += `<rect x="${x}" y="${y}" width="0.86" height="0.86" style="fill:${fill}"><title>Sensor ${n}${l ? `: ${esc(l.map(i => r.holders[i].name).join(' and '))}` : ' — free'}</title></rect>`;
     }
     const used = by.size;
     const legend = r.holders.map((h, i) => `<span class="sr-key"><span class="sr-sw" style="--c:var(${SERIES[i % SERIES.length]})" aria-hidden="true"></span>${esc(h.name)}: ${h.slots.length ? esc(h.slots.join(', ')) : '<span class="txt-warn">none listed</span>'}</span>`).join('');
@@ -900,6 +900,6 @@ const Alert2Space = (function () {
   return { WORDS, GLOSSARY, cardsHtml, init, stop, onFilter, setScope, lookup, keep, gapPick, findFrom, toGrid,
            wheelHover, wheelClick, wheelKey, gridHover, gridClick, state: state_,
            // Pure, for the tests.
-           index, statusOf, airOf, stretch, wedges, gaps, thousands, boxOf };
+           index, statusOf, airOf, stretch, wedges, gaps, thousands, boxOf, sensorsHtml };
 })();
 if (typeof window !== 'undefined') window.Alert2Space = Alert2Space;
