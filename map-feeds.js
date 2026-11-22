@@ -306,6 +306,7 @@ const MapFeeds = (function () {
     weedsAsking = askJson(`${BIO}?f=json`).then(json => {
       weeds = ((json && json.layers) || [])
         .filter(l => l.parentLayerId === WEED_GROUP && !l.subLayerIds)
+        .filter(l => Number.isInteger(l.id))
         .map(l => ({ id: l.id, name: String(l.name || '').trim() }))
         .sort((a, b) => a.name.localeCompare(b.name));
       if (!weeds.some(w => w.id === weedId)) {
@@ -687,7 +688,7 @@ const MapFeeds = (function () {
           const words = gaugeWords(g, r);
           if (!g.open) {
             L.circleMarker([g.lat, g.lon], { pane: PANES.pins.name, radius: 3, weight: 1, color: '#fff', fillColor: '#888', fillOpacity: 0.8 })
-              .bindTooltip(words).addTo(group);
+              .bindTooltip(esc(words)).addTo(group);
             continue;
           }
           const cls = !r ? 'none' : gaugeStale(r.at) ? 'old' : 'live';

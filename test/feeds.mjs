@@ -61,7 +61,7 @@ function answer(url) {
     return json({ features: open
       ? [{ attributes: { identifier: '540001A', title: 'Test Creek at Example', basin: 'CONDAMINE', latitude: -28.25, longitude: 152.2156 } },
          { attributes: { identifier: '540002B', title: 'Quiet Creek at Nowhere', basin: 'CONDAMINE', latitude: CENTER.lat, longitude: CENTER.lon } }]
-      : [{ attributes: { identifier: '540003C', title: 'Old Creek', latitude: CENTER.lat + 0.001, longitude: CENTER.lon, commence: '1960', cease: '1999' } }] });
+      : [{ attributes: { identifier: '540003C', title: 'Old Creek <img src=x onerror="window.__feedXss=1">', latitude: CENTER.lat + 0.001, longitude: CENTER.lon, commence: '1960', cease: '1999' } }] });
   }
   if (u.host === 'ows.dea.ga.gov.au') return png();
   if (/^services\d\.arcgis\.com$/.test(u.host)) {
@@ -106,6 +106,8 @@ function answer(url) {
       { id: 200, name: 'Weed distribution', parentLayerId: -1, subLayerIds: [202, 310] },
       { id: 202, name: 'African boxthorn', parentLayerId: 200 },
       { id: 310, name: 'Lantana', parentLayerId: 200 },
+      // An id that is not a number is not a layer: it never reaches the page.
+      { id: '1"><img src=x onerror="window.__feedXss=2">', name: 'Zz bogus', parentLayerId: 200 },
     ] });
   }
   if (/\/identify$/.test(u.pathname)) {
@@ -271,7 +273,7 @@ try {
   check('picking another weed draws that one',
     asked.some(a => /Biosecurity\/MapServer\/export$/.test(a.path) && a.params.layers === 'show:202'));
   const sel = await page.evaluate(() => [...document.querySelectorAll('#mn-feed-weed option')].map(o => o.textContent));
-  check('the weed list is the service’s, alphabetical', sel.join('|') === 'African boxthorn|Lantana', sel.join('|'));
+  check('the weed list is the service’s, alphabetical', sel.join('|') === 'African boxthorn|Lantana' && !(await page.evaluate(() => window.__feedXss || !!document.querySelector('#mn-feed-weed img'))), sel.join('|'));
 
   // The Atlas's weed records and the storm tide gauges.
   asked.length = 0;
@@ -306,6 +308,11 @@ try {
   // The State's river gauges (#295): a pin per open gauge with its latest
   // height from our Worker, "gauge height, not AHD"; closed ones grey dots.
   asked.length = 0;
+  // Leaflet sets a string tooltip as HTML, so what is handed to it is noted.
+  await page.evaluate(() => {
+    const bind = L.Layer.prototype.bindTooltip; window.__tips = [];
+    L.Layer.prototype.bindTooltip = function (c, o) { if (typeof c === 'string') window.__tips.push(c); return bind.call(this, c, o); };
+  });
   await page.evaluate(() => MapFeeds.setEnabled('qld-gauges', true));
   await page.waitForFunction(() => (MapFeeds._state().drawn['qld-gauges'] || {}).note === 'ok', null, { timeout: 15_000 }).catch(() => {});
   const gpins = await page.evaluate(() => [...document.querySelectorAll('.leaflet-mnFeedPins-pane .mn-tide-pin')]
@@ -320,6 +327,11 @@ try {
     gAsk.length === 1 && gAsk[0].params.sites === '540001A,540002B' && !asked.some(a => /water-monitoring/.test(a.host)), JSON.stringify(gAsk));
   const gNote = await page.evaluate(() => document.getElementById('mn-feed-note-qld-gauges').textContent);
   check('the note counts the open gauges and gives the latest reading', new RegExp(`Drawn: 2 open gauges, the latest reading ${GAUGE_SAYS} \\(AEST\\)`).test(gNote), gNote);
+  // A closed gauge's words are the State's text, shown as text: its title
+  // carries markup here, and the tooltip must show it, not run it.
+  const gTip = await page.evaluate(() => (window.__tips || []).filter(t => t.includes('Old Creek')));
+  check('a closed gauge\u2019s tooltip shows the State\u2019s words as text, never as markup',
+    gTip.length === 1 && !gTip[0].includes('<img') && gTip[0].includes('Old Creek &lt;img'), JSON.stringify(gTip));
   await page.evaluate(() => MapFeeds.setEnabled('qld-gauges', false));
 
   // Pipes (#294): Brisbane's stormwater drawn; Unitywater and Melbourne Water,
