@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-15T20:21:08.615579+00:00",
+  "generated": "2026-11-22T20:20:42.868808+00:00",
   "generator": "acma_prefilter.py",
   "source": "spectra_rrl.zip",
   "attribution": "Contains ACMA Register of Radiocommunications Licences data, CC BY 4.0",
@@ -27,33 +27,33 @@
     ]
   },
   "counts": {
-    "sites": 2126,
-    "devices": 9009,
-    "licences": 6037,
-    "clients": 578,
+    "sites": 2127,
+    "devices": 9010,
+    "licences": 6038,
+    "clients": 579,
     "antennas": 720,
-    "text_blocks": 14124
+    "text_blocks": 14127
   },
   "file_bytes": {
     "access_area.csv": 838,
     "antenna.csv": 51678,
     "antenna_pattern.csv": 214429,
     "antenna_polarity.csv": 295,
-    "applic_text_block.csv": 5465507,
+    "applic_text_block.csv": 5466479,
     "bsl_area.csv": 11058,
     "class_of_station.csv": 449,
-    "client.csv": 74113,
+    "client.csv": 74275,
     "client_type.csv": 163,
-    "device_details.csv": 2110661,
+    "device_details.csv": 2110863,
     "fee_status.csv": 65,
     "industry_cat.csv": 652,
-    "licence.csv": 747720,
+    "licence.csv": 747838,
     "licence_service.csv": 494,
     "licence_status.csv": 332,
     "licence_subservice.csv": 3853,
     "licensing_area.csv": 131,
     "nature_of_service.csv": 903,
-    "site.csv": 304146
+    "site.csv": 304294
   },
-  "total_bytes": 8987487
+  "total_bytes": 8989089
 }
