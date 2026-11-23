@@ -2821,8 +2821,8 @@ const Alert2 = (function () {
     }).join('');
 
     return `
-      <div class="panel">
-        <div class="panel-header"><h3>Two ways in — and which one has the RSSI</h3></div>
+      <details class="panel a2-fold">
+        <summary>Two ways in — and which one has the RSSI</summary>
         <p class="sub">An ERT-A2 emits two different things on two different ports, and they do not carry the same
           information. This tab reads both; paste either and it works out which it is looking at.</p>
 
@@ -3035,7 +3035,7 @@ const Alert2 = (function () {
             first attempt at this fail. The Serial Monitor's ERT-A2 card follows a log the same way, as a live
             dashboard.</p>
         </details>
-      </div>`;
+      </details>`;
   }
 
   const ROLE_VAR = { ident: 'ident', addr: 'addr', time: 'time', status: 'status', len: 'hd' };
@@ -3093,42 +3093,51 @@ const Alert2 = (function () {
 
   const ROW_STEP = 400;
 
+  // The paste box is a bar pinned to the top of the tab: paste, and the page below
+  // decodes at once and stays in view while you read it. The other ways in (a file,
+  // a watched log, the reception log) and the long explanation fold away under it.
   function inputPanel() {
     const a = state.a2;
     const w = a.watch;
     return `
-      <div class="panel">
-        <div class="panel-header"><h3>Capture</h3></div>
-        <p class="sub">Three things can go in here. Paste an <b>ALERT2 ASCII log</b> from the RS232 port —
+      <div class="panel a2-capture">
+        <div class="a2-capbar">
+          <textarea id="a2-text" class="a2-input" spellcheck="false" rows="3"
+                  aria-label="Capture — paste an ALERT2 ASCII log or USB hex here"
+                  placeholder="ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,10,41.296,0,0,0,0,0,1,0,0,0,7,7,9999,74,64,F0,7E,18,15,00&#10;41 4C 45 52 54 32 4D 75 01 01 18 02 27 0F 77 05 45 4C 50 52 4F …"
+                  oninput="state.a2.text=this.value" onpaste="Alert2.onPaste()">${esc(a.text)}</textarea>
+          <div class="a2-capbtns">
+            <button class="primary" onclick="Alert2.decode()" title="Decode what is in the box (pasting decodes on its own)">Decode</button>
+            <button class="ghost" onclick="Alert2.loadSample('ascii')">Sample — RS232 ASCII</button>
+            <button class="ghost" onclick="Alert2.loadSample('bin')">Sample — USB hex</button>
+            <button class="ghost" onclick="Alert2.clear()">Clear</button>
+          </div>
+        </div>
+        <div id="a2-status" class="note compact pkt-block"${a.source ? '' : ' hidden'}>${esc(a.source)}</div>
+        ${a.watchErr ? '<div class="note compact warn pkt-block">' + a.watchErr + '</div>' : ''}
+        <details class="a2-more"${(a.moreOpen || a.rx || w || a.rxNote) ? ' open' : ''} ontoggle="state.a2.moreOpen=this.open">
+          <summary>Other ways to load a capture, and what each one holds</summary>
+          <p class="sub">Three things can go in here. Paste an <b>ALERT2 ASCII log</b> from the RS232 port —
           session banners, wrapped lines and terminal timestamps are all handled, so paste it as it comes. Or paste
           the <b>hex from the USB port</b>, straight out of Ranger's Serial Data pane or any terminal: that one
           carries the RSSI. Either way, pick a file instead if that is easier. Or, signed in as an editor, read what a
           receiver sending to Flood-Net heard — a Raspberry Pi's RTL-SDR or the Serial Monitor — out of the
           <b>reception log</b>.</p>
-        <div class="a2-modes">
+          <div class="a2-modes">
           <span class="spec">Read as</span>
           ${modeBtn('auto', 'Auto-detect', 'Look at the capture and decide — right for anything pasted whole')}
           ${modeBtn('ascii', 'ALERT2A ASCII', 'The comma-delimited protocol on the secondary RS232 port')}
           ${modeBtn('bin', 'USB hex', 'The binary framing the USB port emits — the one with RSSI in it')}
         </div>
-        <textarea id="a2-text" class="a2-input" spellcheck="false" rows="7"
-                  aria-label="Capture — paste an ALERT2 ASCII log or USB hex here"
-                  placeholder="ALERT2A,1,9999,ELPRO,N,1,2026,6,8,19,10,41.296,0,0,0,0,0,1,0,0,0,7,7,9999,74,64,F0,7E,18,15,00&#10;41 4C 45 52 54 32 4D 75 01 01 18 02 27 0F 77 05 45 4C 50 52 4F …"
-                  oninput="state.a2.text=this.value">${esc(a.text)}</textarea>
-        <div class="row pkt-block">
-          <div class="fit"><button class="primary" onclick="Alert2.decode()">Decode</button></div>
-          <div class="fit"><button class="ghost" onclick="Alert2.chooseFile()">Choose log file…</button></div>
-          ${w ? '<div class="fit"><button class="ghost" onclick="Alert2.stopWatching()">Stop watching ' + esc(w.name) + '</button></div>'
-              : LogFollow.canPick() ? '<div class="fit"><button class="ghost" onclick="Alert2.watchFile()">Watch a log file…</button></div>' : ''}
-          <div class="fit"><button class="ghost" onclick="Alert2.loadSample('ascii')">Sample — RS232 ASCII</button></div>
-          <div class="fit"><button class="ghost" onclick="Alert2.loadSample('bin')">Sample — USB hex</button></div>
-          <div class="fit"><button class="ghost" onclick="Alert2.clear()">Clear</button></div>
-        </div>
-        ${rxRow()}
-        <input type="file" id="a2-file" accept=".txt,.log,.csv,.hex,.dat,text/plain" hidden onchange="Alert2.onFile(this)">
-        <div id="a2-status" class="note compact pkt-block"${a.source ? '' : ' hidden'}>${esc(a.source)}</div>
-        ${a.watchErr ? '<div class="note compact warn pkt-block">' + a.watchErr + '</div>' : ''}
+          <div class="row pkt-block">
+            <div class="fit"><button class="ghost" onclick="Alert2.chooseFile()">Choose log file…</button></div>
+            ${w ? '<div class="fit"><button class="ghost" onclick="Alert2.stopWatching()">Stop watching ' + esc(w.name) + '</button></div>'
+                : LogFollow.canPick() ? '<div class="fit"><button class="ghost" onclick="Alert2.watchFile()">Watch a log file…</button></div>' : ''}
+          </div>
+          ${rxRow()}
+          <input type="file" id="a2-file" accept=".txt,.log,.csv,.hex,.dat,text/plain" hidden onchange="Alert2.onFile(this)">
         ${w ? '' : '<div class="spec a2-drop-hint">To <b>watch a log as PuTTY writes it</b>, drag the file — or the folder it logs into — onto this tab from File Explorer. It is re-read as it grows, and that works even where IT has switched the browser\'s file picker off.</div>'}
+        </details>
       </div>`;
   }
 
@@ -3220,11 +3229,12 @@ const Alert2 = (function () {
       </div>
 
       ${inputPanel()}
-      ${referencePanel()}
+      ${p ? '' : '<div class="note compact">Paste a capture above, or press a Sample button, and it decodes straight away, right here.</div>'}
       ${p ? summaryPanel(p, res) : ''}
       ${p && res ? ambiguityPanel(res) : ''}
       ${p && res ? mapPanel(p, res) : ''}
       ${p ? viewPanel(p, res) : ''}
+      ${referencePanel()}
 
     </div>`;
   }
@@ -3237,6 +3247,8 @@ const Alert2 = (function () {
     const el = document.getElementById('a2-text');
     if (el) state.a2.text = el.value;
   }
+  // Pasting is the cue to decode: wait a tick for the browser to put the text in the box.
+  function onPaste()    { setTimeout(decode, 0); }
   function decode()     { readBox(); state.a2.limit = ROW_STEP; refresh(); }
   function clear()      { state.a2.text = ''; state.a2.parsed = null; state.a2.parsedKey = ''; state.a2.source = ''; state.a2.sel = null; state.a2.mapView = null;
                           state.a2.rx = null; state.a2.rxNote = ''; state.a2.traceSrc = null; stopWatch(); refresh(); }
@@ -3651,7 +3663,7 @@ const Alert2 = (function () {
   // parse/decodeRecord are the codec on its own, with no DOM behind it — the
   // form a live feed would call, and the form this is testable in. parse takes
   // the mode, so both wire formats are reachable without a page.
-  return { render, init, stop, decode, clear, loadSample, more, setView, setMode, setOpt,
+  return { render, init, stop, onPaste, decode, clear, loadSample, more, setView, setMode, setOpt,
            openFrame, pick, clearPicks, select, trace: traceId, traceSource, openInPackets,
            loadReceptions, setRxWindow, setRxPoint, parseRx, concentrators, twins, traceAddress: trace,
            chooseFile, onFile, watchFile, stopWatch, stopWatching, dragOver, dropFile, exportCsv, exportJson,

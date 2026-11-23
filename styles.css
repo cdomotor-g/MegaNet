@@ -31237,3 +31237,14 @@ details.tm-fold summary { cursor: pointer; }
 .a2s-sensors { margin: var(--sp-1) 0; }
 .a2s-sensors svg { display: block; width: 100%; max-width: 32rem; height: auto; aspect-ratio: 4 / 1; }
 .a2s-sensors p { margin: 0 0 var(--sp-1); }
+
+/* ALERT2 tab: the capture box is a bar pinned to the top, so what you paste and what
+   it decodes to are in view together. The extra ways in and the long explainer fold. */
+.a2 .a2-capture { position: sticky; top: 0; z-index: 1100; }
+.a2 .a2-capbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+.a2 .a2-capbar .a2-input { flex: 1 1 320px; min-width: 0; min-height: 0; }
+.a2 .a2-capbtns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.a2 details.a2-more { margin-top: 10px; }
+.a2 details.a2-more > summary, .a2 details.a2-fold > summary { cursor: pointer; font-weight: 600; }
+.a2 details.a2-more[open] { max-height: 60vh; overflow-y: auto; }
+@media (max-height: 640px) { .a2 .a2-capture { position: static; } }

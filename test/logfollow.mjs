@@ -474,6 +474,7 @@ try {
 
   // ── the ALERT2 tab ─────────────────────────────────────────────────────────
   await page.evaluate(() => switchTab('alert2'));
+  await page.click('.a2-more > summary');   // the other ways in fold under the pinned paste bar
   await page.click('button:has-text("Watch a log file")');
   await waitFor(() => /switched off/.test(document.body.textContent), null, 'the ALERT2 tab says the picker is switched off');
   fs.writeFileSync(file('a2.log'), BANNER + ERT.join('\r\n') + '\r\n');
