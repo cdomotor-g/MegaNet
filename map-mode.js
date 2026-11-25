@@ -156,6 +156,14 @@ const MapMode = (function () {
       leave() { MapBestRepeater.arm(false); },
     },
     {
+      key: 'riverscout', own: false,
+      on() {
+        if (typeof MapRiverScout === 'undefined' || !MapRiverScout.armed()) return null;
+        return { icon: '🌊', title: 'Riverside sites', how: 'click the map where a station might stand, near a river.' };
+      },
+      leave() { MapRiverScout.arm(false); },
+    },
+    {
       key: 'drive', own: true,
       on() {
         if (!MapDrive.picking()) return null;

@@ -799,6 +799,39 @@ const MapRiverLines = (function () {
     return best;
   }
 
+  // Closest point of a run to a point, with its distance: the line's own
+  // nearest spot, for map-riverscout.js, which snaps a click onto the river.
+  function closestOn(lat, lon, run) {
+    const ll = run.ll, kx = Math.cos(lat * Math.PI / 180) * 111320, ky = 110540;
+    let best = null;
+    for (let i = 2; i < ll.length; i += 2) {
+      const ax = (ll[i - 1] - lon) * kx, ay = (ll[i - 2] - lat) * ky;
+      const bx = (ll[i + 1] - lon) * kx, by = (ll[i] - lat) * ky;
+      const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+      const t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
+      const px = ax + t * dx, py = ay + t * dy, d = Math.hypot(px, py);
+      if (!best || d < best.m) best = { m: d, lat: lat + py / ky, lon: lon + px / kx };
+    }
+    return best;
+  }
+
+  // The nearest line to a point within `maxM` metres, of every river drawn:
+  // { river, m, lat, lon } or null. Rivers whose box is too far are skipped
+  // unread, as nearestLine does.
+  function nearestWithin(lat, lon, maxM) {
+    const dLat = maxM / 110540, dLon = maxM / (111320 * Math.cos(lat * Math.PI / 180));
+    let best = null;
+    for (const r of rivers) {
+      for (const run of r.runs) {
+        const b = run.box;
+        if (lat < b[0] - dLat || lat > b[2] + dLat || lon < b[1] - dLon || lon > b[3] + dLon) continue;
+        const c = closestOn(lat, lon, run);
+        if (c && c.m <= maxM && (!best || c.m < best.m)) best = { river: r, ...c };
+      }
+    }
+    return best;
+  }
+
   // The stations along a river: the ones whose stream names it (stationsOn),
   // then the ones with no stream recorded whose nearest line, within NEAR_M,
   // is this river's. Each says how it got there.
@@ -1193,6 +1226,21 @@ const MapRiverLines = (function () {
       return r ? stationsAlong(r) : [];
     },
     loaded() { return !!data; },
+    // map-riverscout.js: the nearest river line within `maxM` metres of a
+    // point, as { id, title, area, m, lat, lon } (lat, lon the spot on the
+    // line) — null when none is that close — after the national file and the
+    // tiles round the point have arrived; and a river's lines as arrays of
+    // [lat, lon] pairs, one per stretch the file keeps it in.
+    nearestTo(lat, lon, maxM) {
+      return this.near(lat, lon).then(() => {
+        const hit = nearestWithin(lat, lon, maxM);
+        return hit ? { id: idOf(hit.river), title: hit.river.title, area: hit.river.area, m: hit.m, lat: hit.lat, lon: hit.lon } : null;
+      }, () => null);
+    },
+    courseOf(id) {
+      const r = riverById(id);
+      return r ? r.runs.map(latLngs) : [];
+    },
     near(lat, lon) {
       return ensureData().then(() => (isFinite(lat) && isFinite(lon)
         ? ensureTiles(lat - 0.05, lon - 0.05, lat + 0.05, lon + 0.05) : null));

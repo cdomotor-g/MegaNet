@@ -25,6 +25,13 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 291, date: '2026-11-25', items: [
+      '🌊 <strong>Riverside sites</strong> — a new tool on the Stations map (the 🌊 in the side panel\'s Tools, after ACMA licences). Click a place '
+        + 'near a river and it scores how good a home a station would have there: how well the repeaters and base stations near it would hear it, '
+        + 'how cleanly the stations already standing round it are heard (for signed-in editors), and how close it is to the river. '
+        + '<em>Score this river</em> then does the same for every place a few kilometres either way, and draws the river as a strip, coloured '
+        + 'green, yellow or red, with the best five pinned on the map. Hover any word for what it means.',
+    ] },
     { n: 290, date: '2026-11-25', items: [
       '🕰️ <strong>Imagery over time: a slider through old pictures of the ground.</strong> On the Stations map, open '
         + '<em>🕰️ Imagery over time</em> in the side panel and pick a source; a slider appears at the foot of the map. '

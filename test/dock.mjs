@@ -119,7 +119,7 @@ const PANEL_IDS = ['map-display-block', 'map-legend', 'map-latency-panel', 'map-
 const STRIP = ['dock-names',
                'dock-fold', 'stations', 'places', 'paths', 'twin',
                'dock-fold', 'map-display', 'map-history', 'map-legend', 'map-latency', 'mn-map-3d', 'mn-map-north', 'mn-map-tilt',
-               'dock-fold', 'map-draw', 'map-polar', 'map-dig', 'map-sites', 'map-relocate', 'map-bestrep', 'map-repcompare', 'map-acma', 'mn-map-here', 'mn-map-magnify',
+               'dock-fold', 'map-draw', 'map-polar', 'map-dig', 'map-sites', 'map-relocate', 'map-bestrep', 'map-repcompare', 'map-acma', 'map-riverscout', 'mn-map-here', 'mn-map-magnify',
                'mn-map-clear', 'mn-map-full',
                'help'];
 const BUTTONS = STRIP.filter(k => k.startsWith('mn-map-'));
@@ -288,7 +288,7 @@ try {
   check('the strip holds every one of the map\'s controls but ↺, in the corner\'s order, from the first render',
     JSON.stringify(s.strip) === JSON.stringify(STRIP), JSON.stringify(s.strip));
   const panels = {};
-  for (const id of ['display', 'legend', 'latency', 'draw', 'polar', 'sites', 'relocate', 'bestrep', 'repcompare', 'acma', '3d']) panels[id] = await wrapAt(id);
+  for (const id of ['display', 'legend', 'latency', 'draw', 'polar', 'sites', 'relocate', 'bestrep', 'repcompare', 'acma', 'riverscout', '3d']) panels[id] = await wrapAt(id);
   check('every panel is a pane of the side panel, whole, one of each',
     Object.values(panels).every(p => p.n === 1 && p.where === 'dock' && p.whole),
     JSON.stringify(panels));
@@ -1786,7 +1786,7 @@ try {
     const unfolded = await rail();
     check('a heading folds its section away, and back, remembered',
       folded.tools === 0 && folded.folded === 'tools' && folded.heads[2][1] === 'false'
-        && unfolded.tools === 10 && unfolded.folded === '' && unfolded.heads[2][1] === 'true', JSON.stringify({ folded, unfolded }));
+        && unfolded.tools === 11 && unfolded.folded === '' && unfolded.heads[2][1] === 'true', JSON.stringify({ folded, unfolded }));
     // The toggle: icons alone, and back.
     const wide = r.mapW;
     await page.click('#help-panel .dock-names');

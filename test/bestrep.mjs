@@ -111,7 +111,7 @@ const panel = await page.evaluate(() => {
     title: wrap && wrap.querySelector('.mn-mapctl-title')?.textContent,
     group: strip.find(b => b.dataset.dock === 'map-bestrep')?.closest('.dock-group')?.dataset.group,
     afterRelocate: at('[data-dock="map-bestrep"]') === at('[data-dock="map-relocate"]') + 1,
-    beforeHere: at('.mn-map-here') === at('[data-dock="map-bestrep"]') + 3
+    beforeHere: at('.mn-map-here') === at('[data-dock="map-bestrep"]') + 4
       && at('[data-dock="map-repcompare"]') === at('[data-dock="map-bestrep"]') + 1,
     runDisabled: document.getElementById('bestrep-run')?.disabled,
     status: document.getElementById('bestrep-status')?.textContent || '',
@@ -121,7 +121,7 @@ const panel = await page.evaluate(() => {
 ok('a 🎯 Best repeater is a pane of the side panel, open from its button in the strip',
    panel.present && panel.docked && panel.shown && panel.showing === 'map-bestrep' && panel.title === 'Best repeater',
    JSON.stringify(panel));
-ok('…in the tools group, straight after the relocation finder, with ⚖️ Repeater comparison between it and What is here',
+ok('…in the tools group, straight after the relocation finder, with ⚖️ Repeater comparison, 📜 ACMA licences and 🌊 Riverside sites between it and What is here',
    panel.group === 'tools' && panel.afterRelocate && panel.beforeHere, JSON.stringify(panel));
 ok('Find the best repeater is off with no station, and the panel says what is missing',
    panel.runDisabled === true && /Pick a station/.test(panel.status), panel.status);

@@ -1617,6 +1617,18 @@ jobs:
         working-directory: test
         run: npm run bestrep
 
+      # 🌊 The riverside site finder (map-riverscout.js), on the same hilly world,
+      # the committed register and the committed rivers: the weights and the
+      # three figures' end points, a real click on a river station scored with
+      # its first hop the card's arithmetic to the last bit, the neighbours'
+      # record said to be for editors signed out and counted when handed one,
+      # the river walked a place every step in order and on the line, the
+      # strip's cells, the best five pinned, the CSV whole, and Clear.
+      - name: Riverside site finder — a place on a river, and the river walked
+        if: ${{ !cancelled() && steps.syntax.outcome == 'success' }}
+        working-directory: test
+        run: npm run riverscout
+
       # ⚖️ Repeater comparison (map-repcompare.js), on the same hilly world and
       # the committed register: only repeaters offered and taken, the shared
       # sites exactly what two or more of them carry by their pass ranges,

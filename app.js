@@ -5180,9 +5180,10 @@ function stationsMapPanels(map) {
   // 📡 Polar radio coverage is tools/20 — MapPolar.attach(), which runs later —
   // 🗼 Repeater site finder tools/25, from MapSites.attach() after it,
   // 🚚 Station relocation finder tools/26, from MapRelocate.attach() after that,
-  // 🎯 Best repeater tools/27, from MapBestRepeater.attach() after that, and
+  // 🎯 Best repeater tools/27, from MapBestRepeater.attach() after that,
   // ⚖️ Repeater comparison tools/28, from MapRepCompare.attach() after that,
-  // and 📜 ACMA licences tools/29, from MapAcma.attach() last.
+  // 📜 ACMA licences tools/29, from MapAcma.attach() after that, and
+  // 🌊 Riverside sites tools/29.5, from MapRiverScout.attach() last.
   //
   // What is here (#186) — arm it, click the map, and the card in the opposite
   // corner says what the app knows about that point. A plain corner button
@@ -6597,6 +6598,7 @@ function mapLegendHtml() {
     MapRelocate.active() ? MapRelocate.legendHtml() : '',
     MapBestRepeater.active() ? MapBestRepeater.legendHtml() : '',
     MapRepCompare.active() ? MapRepCompare.legendHtml() : '',
+    typeof MapRiverScout !== 'undefined' && MapRiverScout.active() ? MapRiverScout.legendHtml() : '',
     typeof MapAcma !== 'undefined' && MapAcma.active() ? MapAcma.legendHtml() : '',
     MapHops.active() ? MapHops.legendHtml() : '',
     MapDirect.active() ? MapDirect.legendHtml() : '',
@@ -6821,6 +6823,7 @@ function stopStationsMap() {
   MapRelocate.detach();
   MapBestRepeater.detach();
   MapRepCompare.detach();
+  if (typeof MapRiverScout !== 'undefined') MapRiverScout.detach();
   if (typeof MapAcma !== 'undefined') MapAcma.detach();
   if (typeof MapDig !== 'undefined') MapDig.detach();
   if (typeof MapHistory !== 'undefined') MapHistory.detach();
@@ -7094,6 +7097,10 @@ function initMap() {
   // ⚖️ Repeater comparison: two or more masts already standing go in, and the
   // sites they both carry come out, each path up to each of them side by side.
   MapRepCompare.attach(state.map);
+  // 🌊 Riverside site finder: a place clicked on the map comes out scored for
+  // how well a station there would be heard, and the river it is on, place by
+  // place, as a strip.
+  if (typeof MapRiverScout !== 'undefined') MapRiverScout.attach(state.map);
   // 📜 ACMA licences: the licences these stations' own transmitters run
   // under, drawn with the area each covers, and which stations have one.
   if (typeof MapAcma !== 'undefined') MapAcma.attach(state.map);

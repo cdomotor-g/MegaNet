@@ -748,7 +748,17 @@
        terrain.js and path-profile.js for its paths, map-fade.js for the hops
        on, map-backbone.js for the windows. All runtime calls, so the position
        states the dependencies rather than being required by them (#154). -->
-  <script src="map-bestrep.js?v=20261125e"></script>
+  <script src="map-bestrep.js?v=20261125c"></script>
+  <!-- 🌊 Riverside site finder: a place clicked on the map is scored for how
+       well a station there would be heard — the repeaters and bases near it
+       priced the link budget card's way, how cleanly the stations round it are
+       heard from the reception rollup, how close it is to a river — and, on a
+       button, every place along that river a few km either way, as a strip.
+       Beside the best repeater finder, whose paths it prices the same way.
+       path-profile.js, terrain.js, map-river-lines.js and datastore.js, all
+       at runtime, so the position states the dependencies rather than being
+       required by them (#154). -->
+  <script src="map-riverscout.js?v=20261125c"></script>
   <!-- ⚖️ Repeater comparison: two or more repeaters already in the network go
        in, and the sites two or more of them both carry come out — each site's
        path up to every one of them priced the link budget card's way, side by
@@ -803,7 +813,7 @@
   <script src="map-direct.js?v=20261125e"></script>
   <!-- The banner that names the Stations map's mode while it is in one. It
        asks map-draw.js, map-move-pin.js, site-features.js, link-budget.js,
-       map-here.js, map-bestrep.js and map-drive.js whether theirs is on, all
+       map-here.js, map-bestrep.js, map-riverscout.js and map-drive.js whether theirs is on, all
        at runtime, and each of them tells it when theirs changes — so its
        position is free (#154). -->
   <script src="map-mode.js?v=20261125e"></script>

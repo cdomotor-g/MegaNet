@@ -214,6 +214,10 @@ MegaNet/
 │                             station or a new site against every repeater and base
 │                             within reach, ranked by the weaker of its own hop and
 │                             the route on to a base
+├── map-riverscout.js       ← MapRiverScout — 🌊 the riverside site finder: a place
+│                             clicked near a river, scored for how well a station
+│                             there would be heard, then the river walked place by
+│                             place as a strip
 ├── map-repcompare.js       ← MapRepCompare — ⚖️ repeater comparison: two or more
 │                             repeaters, the sites they both carry, and each
 │                             site's path up to each of them side by side

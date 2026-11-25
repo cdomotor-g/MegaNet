@@ -31460,3 +31460,72 @@ details.tm-fold summary { cursor: pointer; }
 .map-pill-opt.is-on { font-weight: 700; background: var(--panel-sub); }
 .map-pill-opt.is-on::before { content: "✓ "; }
 .map-pill-sub { display: block; font-size: .72rem; font-weight: 400; color: var(--muted); }
+
+/* ── Riverside site finder (map-riverscout.js) ───────────────────────────── */
+/* The finders' shared dialog (.sites-fs, .sites-actions, .bestrep-words) and
+   only what is its own: the strip along the river, its key, the score and the
+   small tables under it. Bands use the fade margin layer's three colours. */
+
+.leaflet-container.mn-riverscout-picking { cursor: crosshair; }
+
+#riverscout-arm.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.rscout-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 4.5rem;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm, 4px);
+  background: var(--surface-2, transparent);
+}
+
+.rscout-cell {
+  flex: 1 1 0;
+  min-width: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 1px;
+  cursor: pointer;
+}
+
+.rscout-cell.is-site { box-shadow: 0 0 0 1px var(--text, #000); }
+.rscout-cell.is-on { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.rscout-bg-good { background: var(--map-fade-good, #00e676); }
+.rscout-bg-ok   { background: var(--map-fade-ok, #ffab00); }
+.rscout-bg-bad  { background: var(--map-fade-bad, #e53935); }
+.rscout-bg-none { background: var(--muted, #888); opacity: .5; }
+
+.rscout-ends { display: flex; justify-content: space-between; margin: var(--sp-1) 0; }
+
+.rscout-key { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); }
+.rscout-sw { display: inline-block; width: .9em; height: .9em; border-radius: 2px; }
+
+.rscout-best { margin: var(--sp-1) 0 0; padding-left: 1.4em; }
+
+.rscout-head { display: flex; align-items: baseline; gap: var(--sp-2); margin: var(--sp-2) 0 var(--sp-1); }
+
+.rscout-score {
+  min-width: 2.2em;
+  padding: 0 .4em;
+  border-radius: var(--r-pill);
+  font-size: 1.15rem;
+  text-align: center;
+  color: #111;
+}
+.rscout-score.rscout-good, .rscout-chip.rscout-good { background: var(--map-fade-good, #00e676); }
+.rscout-score.rscout-ok,   .rscout-chip.rscout-ok   { background: var(--map-fade-ok, #ffab00); }
+.rscout-score.rscout-bad,  .rscout-chip.rscout-bad  { background: var(--map-fade-bad, #e53935); color: #fff; }
+.rscout-score.rscout-none, .rscout-chip.rscout-none { background: var(--muted, #888); color: #fff; }
+
+.rscout-chip { padding: 0 .45em; border-radius: var(--r-pill); white-space: nowrap; color: #111; }
+.rscout-chip.rscout-bad { color: #fff; }
+
+.rscout-table { width: 100%; border-collapse: collapse; font-size: .82rem; margin: var(--sp-1) 0; }
+.rscout-table th, .rscout-table td { padding: .15rem .3rem; text-align: left; border-bottom: 1px solid var(--border); }
