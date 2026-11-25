@@ -1,16 +1,16 @@
 // The left bar's views (nav-views.js, 0062), driven in a real browser.
 //
 //   1. **Picking a view** — All is where every device starts, and lists every
-//      tab in the bar; the View box at the top of the bar offers All, Simple
+//      tab in the bar; the View box at the foot of the bar offers All, Simple
 //      and Field in that order; Simple is All less the desk-bound radio tabs
 //      (Radio Mobile Files, the Map Generator, Nearby Transmitters, the
 //      Workbench, Where Signals Come From, Bit Faults); Field is the site-visit
 //      list;
 //      the pick is this device's and survives a reload.
 //   2. **Nothing is lost** — a tab the view leaves out, opened anyway, is in
-//      the bar under "Not in this view"; the find box answers from every tab,
-//      the view's own first; on the icon rail the view is one button that
-//      opens the bar with the cursor on the View box.
+//      the bar under "Not in this view"; on the icon rail the view is one
+//      button that opens the bar with the cursor on the View box. (The find box
+//      in the bar was Classic's: archive/classic/test/views.mjs.)
 //   3. **The Views tab, signed out** — the three views, Field open read-only,
 //      and an offer to sign in rather than controls that would do nothing.
 //   4. **An account's own views** — with the database stood in for (whoami,
@@ -52,8 +52,8 @@ const J = v => JSON.stringify(v);
 const bar = page => page.evaluate(() => ({
   view: document.getElementById('nav-view-select')?.value || null,
   options: [...document.querySelectorAll('#nav-view-select option')].map(o => o.textContent.trim()),
-  groups: [...document.querySelectorAll('#nav-groups .nav-group')].map(g => ({
-    h: g.querySelector('.nav-heading').textContent.trim(),
+  groups: [...document.querySelectorAll('#nav-groups .calm-sec')].map(g => ({
+    h: g.querySelector('.nav-sec .nav-label').textContent.trim(),
     tabs: [...g.querySelectorAll('.tab-btn')].map(b => b.dataset.tab),
     outside: g.classList.contains('nav-outside'),
   })),
@@ -137,14 +137,10 @@ async function main() {
       b.view === 'all' && J(ids(b)) === J(all) && !b.groups.some(g => g.outside), J({ view: b.view, n: ids(b).length }));
     check('the View box, at the top of the bar, offers All, Simple and Field in that order',
       J(b.options) === J(['All', 'Simple', 'Field']), J(b.options));
-    const head = await page.evaluate(() => {
-      const h = document.querySelector('#tab-nav .nav-head');
-      const kids = [...h.children].map(c => c.className.split(' ')[0]);
-      return { kids, label: document.querySelector('label[for="nav-view-select"]')?.textContent.trim() };
-    });
-    check('…under the collapse toggle and over the find box, labelled View',
-      head.kids.indexOf('nav-toggle') < head.kids.indexOf('nav-view') && head.kids.indexOf('nav-view') < head.kids.indexOf('nav-find')
-        && /View/.test(head.label || ''), J(head));
+    const head = await page.evaluate(() => ({
+      inFoot: !!document.querySelector('#tab-nav .calm-foot .nav-view #nav-view-select'),
+      label: document.querySelector('label[for="nav-view-select"]')?.textContent.trim() }));
+    check('…at the foot of the bar, labelled View', head.inFoot && /View/.test(head.label || ''), J(head));
 
     await page.selectOption('#nav-view-select', 'simple');
     b = await bar(page);
@@ -177,17 +173,8 @@ async function main() {
     const cur = await page.evaluate(() => document.querySelector('#tab-nav .tab-btn[aria-current="page"]')?.dataset.tab);
     check('a tab Field leaves out, opened anyway, is in the bar under "Not in this view", as the tab you are on',
       out && out.h === 'Not in this view' && J(out.tabs) === J(['export']) && cur === 'export', J({ out, cur }));
-    await page.fill('#nav-search', 'radio mobile');
-    b = await bar(page);
-    const pick = await page.evaluate(() => document.querySelector('#nav-groups .tab-btn.nav-best')?.dataset.tab);
-    check('the find box answers from every tab: "radio mobile" finds Export under "Not in this view", ↵ on it',
-      b.groups.some(g => g.outside && g.tabs.includes('export')) && pick === 'export', J({ groups: b.groups, pick }));
-    // The Field Camera is a view of Photos (core.js, `parts`): found through it.
-    await page.fill('#nav-search', 'camera');
-    b = await bar(page);
-    check('…and a tab the view has is found under the view\'s own heading',
-      b.groups.some(g => !g.outside && g.tabs.includes('photos')), J(b.groups));
-    await page.fill('#nav-search', '');
+    // (The find box that answered from every tab, "Not in this view" included,
+    // was the Classic bar's; Ctrl+K answers from every tab — npm run palette.)
     await page.evaluate(() => switchTab('stations'));
     await page.evaluate(() => { if (!state.navCollapsed) setNavCollapsed(true); });
     const rail = await page.evaluate(() => {
@@ -203,7 +190,7 @@ async function main() {
 
     // ═══════════════════════════════════════════════════════════════════════
     log('\n3. The Views tab, signed out\n');
-    await page.click('#tab-nav .tab-btn[data-tab="views"]');
+    await page.evaluate(() => switchTab('views'));
     await page.waitForFunction(() => !!document.getElementById('vw-editor'));
     const tabOut = await page.evaluate(() => ({
       list: [...document.querySelectorAll('.vw-item .vw-item-name')].map(n => n.textContent.trim()),

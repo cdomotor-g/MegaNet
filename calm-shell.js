@@ -363,7 +363,7 @@ const CalmShell = (() => {
     const fresh = !!pill && !pill.hidden;
     const items = [
       { go: 'export', ico: 'download', label: 'Export what this tab shows', sub: 'As a file — CSV, GeoJSON, KML, PNG and the rest' },
-      { go: 'theme',  ico: 'palette',  label: 'Theme & layout', sub: 'Light, dark or sunlight; Calm, Tiles, Instrument, Signs or Classic; what the bar lists' },
+      { go: 'theme',  ico: 'palette',  label: 'Theme & layout', sub: 'Light, dark or sunlight; Calm, Tiles, Instrument or Signs; what the bar lists' },
       { go: 'offline', ico: 'download', label: 'Offline & Install', sub: 'Get this device ready for a site with no signal, or put Flood-Net on its home screen' },
       { go: 'help',   ico: 'help',     label: 'Help for this tab', sub: 'In the side panel' },
       { go: 'guide',  ico: 'start',    label: 'Guide', sub: 'What every tab is for, and where it is' },

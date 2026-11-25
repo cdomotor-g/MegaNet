@@ -209,7 +209,7 @@ const server  = await startServer();
 const browser = await launchBrowser();
 const errors  = [];
 
-const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, oldMap: true });
 const page    = await context.newPage();
 await applyNetworkPolicy(page, server.origin);
 

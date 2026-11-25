@@ -23,12 +23,12 @@ shared overlay canvas in `map-overlay.js`. Easements and land tenure, which the
 Property services views use, are on the cadastre layer in `map-lots.js`.
 
 Until somebody picks something, the map draws every path, with the person's own
-Link opacity and no Balance, as **Flow** (since 7 Nov 2026; under the Classic
-look too since 8 Nov). A stored drawing from before that says Lines under
-Classic is read as the old default (settings version 3); under another look it
-was a choice and is kept. An address can say otherwise for that page only,
+Link opacity and no Balance, as **Flow** (since 7 Nov 2026, under every look).
+A stored drawing from before that, saying Lines, is read as the old default
+(settings version 3 or older, before Classic's retirement it was the same for
+Classic at version 2 too); one stored since is a choice and is kept. An address can say otherwise for that page only,
 `?draw=lines` (or `flow`, `tails`): nothing is stored, and it is taken out of
-the address, as `?rail=` is. The browser checks open Classic pages with it
+the address, as `?rail=` is. The browser checks open their pages with it
 (`test/lib/browser.mjs`), since they were written against the lines.
 Under Flow the backbone is drawn amber and glowing, with pulses running along
 it, and the map's own black-dashed backbone steps back.

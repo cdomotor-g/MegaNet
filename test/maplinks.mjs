@@ -98,7 +98,7 @@ const browser = await launchBrowser();
 const errors = [];
 
 try {
-  const context = await browser.newContext({ viewport: { width: 1500, height: 950 } });
+  const context = await browser.newContext({ viewport: { width: 1500, height: 950 }, oldMap: true });
   const page = await context.newPage();
   await applyNetworkPolicy(page, server.origin);
   page.on('pageerror', (e) => errors.push(e.message));

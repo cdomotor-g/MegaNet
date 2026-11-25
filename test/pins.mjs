@@ -128,6 +128,8 @@ const missing = (want, got) => [...want].filter((x) => !got.has(x)).slice(0, 5).
 
 async function open(browser, server, { viewport = { width: 1400, height: 950 }, slsGate = null, slsAbort = false } = {}) {
   const context = await browser.newContext({ viewport });
+  // Calm starts the forecast outlines off (core.js, CALM_MAP_OFF); this check is about them.
+  await context.addInitScript(() => { try { if (!localStorage.getItem('mn-pin-sls')) localStorage.setItem('mn-pin-sls', 'on'); } catch (_) {} });
   const page = await context.newPage();
   await applyNetworkPolicy(page, server.origin);
   // Registered after the policy, so it is asked first (Playwright runs routes

@@ -4247,18 +4247,20 @@ function themeStored() {
 }
 
 // ── Look: how the app is laid out around the tabs ────────────────────────────
-// Calm (the default since October 2026), the three drawn in pictures — Tiles,
-// Instrument and Signs — or Classic: the registry, the switch and the reasons
-// are looks.js's. The choice lives here,
+// Calm (the default since October 2026) or one of the three drawn in pictures —
+// Tiles, Instrument and Signs: the registry, the switch and the reasons are
+// looks.js's. Classic, the way it looked before, was retired in November 2026
+// and is archived (archive/classic/README.md); a stored or addressed 'classic'
+// is handed Calm, as any unknown id is. The choice lives here,
 // beside the theme's, for the theme's reason: `state` below is built from it,
 // before looks.js has loaded, and so are the map defaults a look changes.
 //
-// The address can name one — `?look=classic` — which is the way back that
+// The address can name one — `?look=signs` — which is a way to a look that
 // needs no menu at all: a person who cannot find the switch can be sent a
 // link. Read here as well as stored by Looks.start(), because a state built
 // from the stored value alone would draw the first page in the old look and
 // change under the reader.
-const LOOK_CHOICES = ['calm', 'tiles', 'instrument', 'signs', 'classic'];
+const LOOK_CHOICES = ['calm', 'tiles', 'instrument', 'signs'];
 
 // The side panel's rail, names or icons, as the address or this device asked
 // for it — `?rail=names` or `?rail=icons`, which app.js stores and takes out of
@@ -4280,13 +4282,13 @@ function lookStored() {
   return LOOK_CHOICES.includes(v) ? v : 'calm';
 }
 
-// Every look but Classic is drawn by CalmShell (calm-shell.js) — the groups
+// Every look is drawn by CalmShell (calm-shell.js) — the groups
 // down the side, the open group's tabs across the top, ⋯ in the banner and a
 // phone's bar along its foot — and starts the Stations map quiet. The three
 // in pictures are Calm with its line drawings swapped for pictograms
 // (glyphs.js) and a stylesheet of their own, so a rule written for Calm's
 // shell is written once, here, for all four.
-function lookUsesCalmShell(look = state.look) { return look !== 'classic'; }
+function lookUsesCalmShell(look = state.look) { return LOOK_CHOICES.includes(look); }
 
 // Tiles, Instrument and Signs: the looks that draw a tab, a group and a
 // station's state as a pictogram (Glyphs), with 🏠 Home as their front page.
@@ -4295,8 +4297,8 @@ function lookHasSymbols(look = state.look) { return look === 'tiles' || look ===
 // The Stations map's context layers the Calm look starts without: each one
 // still a tick away in 🗺️ Map display, and each still remembered once ticked
 // — a stored 'on' or 'off' means what it always meant, in either look. Only a
-// browser that has never said starts from the look's answer: Classic's, every
-// one of them on; Calm's, every one of them off, so the map opens as the
+// browser that has never said starts from the look's answer: every one of
+// them off, so the map opens as the
 // network on a plain ground — the pins and the radio paths between them. The
 // three looks in pictures start from Calm's answer. A state key and the
 // storage key its switch writes.
@@ -4315,7 +4317,7 @@ const CALM_MAP_OFF = [
 function mapLayerStored(key) {
   let v = null;
   try { v = localStorage.getItem(key); } catch (_) {}
-  return v == null ? lookStored() === 'classic' : v !== 'off';
+  return v == null ? false : v !== 'off';
 }
 
 // The digital twin's card at close zoom (map-twin.js): only once ticked.
@@ -5717,7 +5719,7 @@ function mapLinkColourFromStorage() {
   // map with no choice of its own draws every link in one colour (styles.css gives Calm a quiet one): seven channel hues across
   // the south-east read as noise to anybody not asking which channel a hop is
   // on. The radio group in 🗺️ Map display puts any other back, remembered.
-  return fade === 'on' ? 'fade' : lookStored() !== 'classic' ? 'plain' : 'freq';
+  return fade === 'on' ? 'fade' : 'plain';
 }
 
 // The fallback is not decoration. A token misspelt here resolves to the empty

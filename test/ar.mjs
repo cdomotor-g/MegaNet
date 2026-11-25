@@ -339,10 +339,9 @@ try {
   });
   check('🔭 Look Around is a view of Near Me under Field work, and gone from the Stations side panel',
     where.group === 'Field work' && where.host === 'nearby' && !where.strip.includes('ar'), JSON.stringify(where));
-  // A phone reaches it the way it reaches any view: ☰, Near Me, then its
-  // button in the row across the top.
-  await page.click('#btn-nav');
-  await page.click('#tab-nav .tab-btn[data-tab="nearby"]');
+  // A phone reaches it the way it reaches any view: Nearby in the bar along
+  // the foot (Calm), then its button in the row across the top.
+  await page.evaluate(() => switchTab('nearby'));
   await page.waitForTimeout(300);
   await page.click('#view-strip .view-btn[data-view="lookaround"]');
   await page.waitForTimeout(300);
@@ -608,7 +607,7 @@ try {
     if (md) { const gum = md.getUserMedia.bind(md); md.getUserMedia = (...a) => { window.__gum++; return gum(...a); }; }
   }, CENTRE);
   // The tab has no map: leaving Stations is what keeps where it was looking.
-  await dp.click('#tab-nav .tab-btn[data-tab="nearby"]');
+  await dp.evaluate(() => switchTab('nearby'));
   await dp.waitForTimeout(300);
   await dp.click('#view-strip .view-btn[data-view="lookaround"]');
   await dp.waitForFunction(() => state.activeTab === 'lookaround' && !state.map

@@ -145,7 +145,7 @@ const Capabilities = (function () {
         { name: 'Your own views', tab: 'views', who: 'signin',
           what: 'Rename groups, reorder, hide or add tabs; your views follow your account to every device.' },
         { name: 'Looks and themes', act: 'theme', where: 'the banner › Theme',
-          what: 'Five layouts — Calm, Tiles, Instrument, Signs and Classic — in light, dark, or Sunlight for full sun.',
+          what: 'Four layouts — Calm, Tiles, Instrument and Signs — in light, dark, or Sunlight for full sun.',
           find: 'dark mode contrast colour color' },
         { name: 'What\'s new', act: 'whatsnew', where: 'the banner › ✨ What\'s new',
           what: 'The changes since this device last looked, written for the people using the app.',

@@ -233,7 +233,7 @@ async function main() {
     check('closing the card takes the station out of the address, in place',
       w0.station === null && w0.tab === 'stations' && viewNear(w0.map, A.lat, A.lon, 13) && w0.push === opened.push, J(w0));
 
-    await page.click('#tab-nav .tab-btn[data-tab="passranges"]');
+    await page.evaluate(() => switchTab('passranges')); // its button is in a closed group under Calm
     await page.waitForFunction(() => state.activeTab === 'passranges', null, { timeout: 10_000 });
     let w = await where(page);
     check('a tab picked from the nav is a step, and the address names it alone',

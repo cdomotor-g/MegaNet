@@ -383,6 +383,8 @@ async function main() {
         await page.evaluate(() => DigitalTwin._infoFold(null));
         await page.evaluate(() => { MapTwin.setEnabled(true); showStationCard('abbieglassie_al'); showStationCard('gatton'); state.map.setView([-27.555, 152.275], 18, { animate: false }); });
         await page.waitForFunction(() => { const el = document.getElementById('map-twin-offer'); return !!el && !el.hidden; }, null, { timeout: LOAD_TIMEOUT });
+        // The trail's list opens over the offer once a second card is shown; put it away.
+        await page.evaluate(() => { const p = document.getElementById('stn-trail-pill'); if (p && p.getAttribute('aria-expanded') === 'true') StationTrail.toggle(); });
         await page.tap('#map-twin-offer .map-twin-offer-open');
         await page.waitForFunction(() => { const d = DigitalTwin.debug(); return MapTwin.active() && d.built && !d.status.endsWith('…'); }, null, { timeout: BUILD_TIMEOUT });
         await page.waitForTimeout(300);

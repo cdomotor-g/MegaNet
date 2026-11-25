@@ -336,7 +336,7 @@ try {
     stale.map(s => s.selector).join(', '));
 
   const ring = await page.evaluate(() => {
-    const btn = document.querySelector('#tab-nav .tab-btn');
+    const btn = document.querySelector('#section-bar .tab-btn');
     btn.focus();
     const cs = getComputedStyle(btn);
     return { width: cs.outlineWidth, style: cs.outlineStyle, colour: cs.outlineColor };
@@ -523,7 +523,7 @@ try {
   console.log('\nA tab switch — where focus goes, and what is said\n');
 
   const current = await page.evaluate(() => {
-    const on = [...document.querySelectorAll('#tab-nav [aria-current]')];
+    const on = [...document.querySelectorAll('#tab-nav [aria-current="page"]')];
     return {
       count: on.length,
       label: on[0]?.querySelector('.nav-label')?.textContent,
@@ -531,7 +531,7 @@ try {
       matches: on[0]?.classList.contains('active'),
     };
   });
-  check('exactly one nav item is aria-current', current.count === 1, String(current.count));
+  check('exactly one nav item is aria-current=page (its group is current=true)', current.count === 1, String(current.count));
   check('and it is the open tab', current.matches === true, `${current.label} / ${current.active}`);
 
   const fromNav = await page.evaluate(async () => {

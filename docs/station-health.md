@@ -19,8 +19,7 @@ how many findings need attention and at how many stations, how bad, how many
 stations Flood-Net is not hearing now and what share of the checks due came in — above the
 numbers it comes from, then the map across the page's full width, and **See
 them** goes straight to Needs attention, under the map. The paragraph explaining
-the tab is two lines deep until *More about this tab*. The Classic look shows
-the numbers without the sentence.
+the tab is two lines deep until *More about this tab*.
 
 ## 📺 Network Bulletin
 

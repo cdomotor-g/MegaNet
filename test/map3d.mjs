@@ -191,7 +191,7 @@ const browser = await launchBrowser();
 const errors  = [];
 let demHits = 0, demBlocked = false;
 
-const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, oldMap: true });
 const page    = await context.newPage();
 await applyNetworkPolicy(page, server.origin);
 // Registered after the policy so they are consulted first: the terrain server

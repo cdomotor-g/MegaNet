@@ -1,4 +1,5 @@
-// The left nav: grouping, coverage, and the find box (#108).
+// The left nav: grouping, coverage and who sees what (#108), under Calm.
+// (The find box in the bar was Classic's, retired: archive/classic/test/nav.mjs.)
 //
 // `npm run smoke` opens all twenty tabs and asserts each one renders, but it
 // opens them by calling `switchTab(id)` — it never touches the nav. So the whole
@@ -119,9 +120,9 @@ try {
   console.log('\nCoverage — every tab is in the nav, once, under one heading\n');
 
   const shape = await page.evaluate(() => {
-    const groups = [...document.querySelectorAll('#tab-nav .nav-group')].map(g => ({
-      heading: g.querySelector('.nav-heading')?.textContent || '',
-      labelled: g.getAttribute('aria-labelledby') === g.querySelector('.nav-heading')?.id,
+    const groups = [...document.querySelectorAll('#tab-nav .calm-sec')].map(g => ({
+      heading: g.querySelector('.nav-sec .nav-label')?.textContent || '',
+      labelled: g.getAttribute('aria-labelledby') === g.querySelector('.nav-sec')?.id,
       tabs: [...g.querySelectorAll('.tab-btn')].map(b => b.dataset.tab),
     }));
     const bar = TABS.flatMap(g => g.tabs.filter(tabInBar));
@@ -220,178 +221,9 @@ try {
   check('no group is larger than six tabs', biggest <= 6,
     `largest group holds ${biggest}`);
 
-  // ── The find box ──────────────────────────────────────────────────────────
-  console.log('\nThe find box — every tab is findable, and the words people type land\n');
-
-  // What a button opens: its own tab, or the view a query matched
-  // (navMemberScore, app.js) — read off its onclick.
-  const find = q => page.evaluate(query => {
-    navFind(query);
-    const label = b => ((b.getAttribute('onclick') || '').match(/switchTab\('([a-z0-9]+)'\)/) || [])[1] || b.dataset.tab;
-    const best = document.querySelector('#nav-groups .tab-btn.nav-best');
-    return {
-      shown: [...document.querySelectorAll('#tab-nav .tab-btn')].map(label),
-      best: best ? label(best) : null,
-      count: document.getElementById('nav-found')?.textContent || '',
-      none: !!document.querySelector('#tab-nav .nav-none'),
-    };
-  }, q);
-
-  const idOf = id => id;
-
-  // Its own label finds it, and finds it alone or nearly so. This is the
-  // assertion that a rename cannot quietly break: the box matches the label, so
-  // a label changed in TABS is still typed and still found.
-  let selfOk = 0;
-  for (const [i, label] of shape.labels.entries()) {
-    const r = await find(label);
-    if (r.shown.includes(shape.ids[i])) selfOk++;
-    else check(`"${label}" finds itself`, false, `showed: ${r.shown.join(', ') || 'nothing'}`);
-  }
-  check(`every tab is found by typing its own label (${selfOk}/${shape.labels.length})`,
-    selfOk === shape.labels.length);
-
-  // Two claims per probe, and the second is the stronger one: the tab has to be
-  // in the list *and* be the one marked ↵, because that is the tab Enter opens.
-  // A probe that merely appears among five is not an answer to "would they find
-  // it without scanning".
-  for (const p of PROBES) {
-    const r = await find(p.q);
-    const ids = r.shown.map(idOf);
-    check(`"${p.q}" → ${p.want}`, ids.includes(p.want),
-      `${p.why}; showed: ${r.shown.join(', ') || 'nothing'}`);
-    check(`  …and it is the one Enter takes`, r.best !== null && idOf(r.best) === p.want,
-      `marked: ${r.best || 'none'}`);
-  }
-
-  // ── The rule ──────────────────────────────────────────────────────────────
-  console.log('\nBest score wins — narrows as you type, survives words that mean nothing\n');
-
-  const broad  = await find('alert');
-  const narrow = await find('alert packets');
-  check('a second term narrows rather than widens', narrow.shown.length < broad.shown.length,
-    `"alert" → ${broad.shown.length}, "alert packets" → ${narrow.shown.length}`);
-  // The tie, and the reason the ↵ mark exists. Every tab under the ALERT
-  // heading scores on "alert", and three of them carry "decode" as well —
-  // ALERT Packets in its find words, ALERT2 in its, HFEM Messages in its — so
-  // all three tie at 2 and the topmost of the three is not the one asked for.
-  // (Until the heading was shortened to "ALERT" the same tie came from the
-  // word "packets" sitting in the old heading "Addresses & packets"; the tie
-  // moved, the rule that resolves it did not.)
-  const tied = await find('alert decode');
-  check('the label breaks a tie three tabs score equally on',
-    tied.shown.length > 1 && tied.best !== null && idOf(tied.best) === 'packets',
-    `showed ${tied.shown.join(', ')}; marked ${tied.best}`);
-
-  // Word starts, not bare substrings. Both of these matched under the first
-  // version — "the" inside *hypotheses*, "rf" inside *interference* — and both
-  // pulled the Interference Workbench into a query that was not about it.
-  const inner = await find('the');
-  check('a term only matches from the start of a word', inner.none,
-    `"the" showed: ${inner.shown.join(', ') || 'nothing'}`);
-
-  // What "best score" buys over "every term must match": a word on no tab adds
-  // nothing everywhere, so it changes no ranking. Under the stricter rule this
-  // query found nothing, because "view" is a find word on one tab and "the" is
-  // on none — three terms, no tab carrying all three.
-  const noise = await find('the rf environment view');
-  check('a word on no tab costs nothing, and one on the wrong tab cannot win',
-    noise.shown.length > 0 && noise.shown.map(idOf).includes('rf'),
-    `showed: ${noise.shown.join(', ') || 'nothing'}`);
-
-  // And a query where the best score is zero is a real empty result. This is the
-  // case the stricter rule got backwards: with every term dropped as dead, it
-  // fell through to "no filter" and showed all nineteen.
-  const nothing = await find('zzzznotatab');
-  check('a query that matches nothing says so, rather than showing everything',
-    nothing.none && nothing.shown.length === 0,
-    `${nothing.shown.length} tab(s) shown`);
-
-  const counted = await find('acma');
-  check('the live region counts what survived', /^\d+ of \d+ tabs$/.test(counted.count.trim()),
-    counted.count);
-  const quiet = await find('');
-  check('and says nothing while nothing is filtered', quiet.count.trim() === ''
-    && quiet.shown.length === shape.barIds.length);
-
-  // ── Its exits ─────────────────────────────────────────────────────────────
-  console.log('\nExits — picking a tab and collapsing both end the query\n');
-
-  const picked = await page.evaluate(() => {
-    navFind('council');
-    const btn = document.querySelector('#nav-groups .tab-btn');
-    btn.click();
-    return {
-      tab: state.activeTab,
-      query: state.navQuery,
-      shown: document.querySelectorAll('#tab-nav .tab-btn').length,
-      value: document.getElementById('nav-search')?.value,
-    };
-  });
-  check('Enter/click on the one match opens that tab', picked.tab === 'maintenance', picked.tab);
-  check('and the query is cleared behind it',
-    picked.query === '' && picked.value === '' && picked.shown === shape.barIds.length,
-    `query ${JSON.stringify(picked.query)}, ${picked.shown} tab(s) back in the nav`);
-
-  const railed = await page.evaluate(() => {
-    navFind('council');
-    setNavCollapsed(true);
-    const out = { query: state.navQuery, shown: document.querySelectorAll('#tab-nav .tab-btn').length };
-    setNavCollapsed(false);
-    return out;
-  });
-  check('collapsing to the rail clears it too — the box is not there to clear it with',
-    railed.query === '' && railed.shown === shape.barIds.length,
-    `${railed.shown} tab(s) on the rail`);
-
-  // ── The rail ──────────────────────────────────────────────────────────────
-  console.log('\nThe rail — an icon still says which tab, and which group\n');
-
-  const rail = await page.evaluate(() => {
-    setNavCollapsed(true);
-    const btns = [...document.querySelectorAll('#tab-nav .tab-btn')];
-    const out = {
-      named: btns.every(b => (b.textContent || '').trim().length > 0),
-      grouped: btns.every(b => (b.getAttribute('title') || '').includes(' — ')),
-      icons: btns.map(b => b.querySelector('.nav-icon')?.textContent || ''),
-      searchHidden: document.getElementById('nav-search')?.offsetParent === null,
-      findBtn: !!document.querySelector('#tab-nav .nav-find-btn'),
-    };
-    setNavCollapsed(false);
-    return out;
-  });
-  check('every rail button keeps its accessible name', rail.named);
-  check('and its tooltip names the group the clipped heading was giving it', rail.grouped);
-  check('every tab has an icon, and no two share one',
-    rail.icons.every(Boolean) && new Set(rail.icons).size === rail.icons.length,
-    rail.icons.join(' '));
-  check('the find box is off the rail, and its button is on it',
-    rail.searchHidden && rail.findBtn);
-
-  // The rail's 🔎 is the way back to the box from the rail. Ctrl+K used to be
-  // too; it opens the palette now (palette.js, #221, held by `npm run palette`),
-  // and it is registered on the document in init.js — nothing else here would
-  // notice if that listener stopped being added.
-  const railFind = await page.evaluate(async () => {
-    setNavCollapsed(true);
-    document.querySelector('#tab-nav .nav-find-btn').click();
-    await new Promise(r => setTimeout(r, 50));
-    return {
-      open: !state.navCollapsed,
-      focused: document.activeElement === document.getElementById('nav-search'),
-    };
-  });
-  check('the rail\'s 🔎 opens the nav', railFind.open);
-  check('and puts the cursor in the find box', railFind.focused);
-  const chord = await page.evaluate(async () => {
-    setNavCollapsed(true);
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
-    await new Promise(r => setTimeout(r, 50));
-    const out = { palette: document.activeElement === document.getElementById('pal-q') };
-    Modal.close();
-    return out;
-  });
-  check('Ctrl+K opens the palette, the cursor in its box', chord.palette);
+  // The find box, its rule, its exits and the icon rail were the Classic bar's:
+  // Calm's search is the banner's (npm run palette), and its bar has no box to
+  // type in. Those sections are kept, whole, in archive/classic/test/nav.mjs.
 
   // ── The site map ──────────────────────────────────────────────────────────
   // The nav's guide, so it is held here: a card for every tab the nav lists,
@@ -400,7 +232,7 @@ try {
   // the line has to find that button wherever the nav has put it.
   console.log('\nThe site map — a card for every tab, and a line from each to its button\n');
 
-  await page.evaluate(() => { navFind(''); setNavCollapsed(false); switchTab('sitemap'); });
+  await page.evaluate(() => { setNavCollapsed(false); switchTab('sitemap'); });
   await page.waitForTimeout(150);
 
   const sm = await page.evaluate(() => {
@@ -518,19 +350,22 @@ try {
     };
   });
   const settle = () => page.waitForTimeout(150);
+  // Under Calm a tab's button is lit when its group is open; when it is not,
+  // the line ends on the group's own heading button (nav-h-<group>) instead.
+  const onNav = (L, id) => L.lit.length === 1 && (L.lit[0] === id || /^nav-h-/.test(L.lit[0]));
 
   await page.hover('#sm-card-packets .sm-card-h');
   await settle();
   let L = await lead();
   check('pointing at a card draws the line', L.on);
-  check('  …to that tab\'s button in the nav, and nothing else', L.lit.length === 1 && L.lit[0] === 'packets',
+  check('  …to that tab\'s button in the nav, and nothing else', onNav(L, 'packets'),
     L.lit.join(', ') || 'nothing lit');
   check('  …ending on a ring round it', L.rings);
 
   await page.hover('#sm-card-packets .sm-pair[data-sm-point="tab:bitflipper"]');
   await settle();
   L = await lead();
-  check('a related tab on a card points at its own button', L.lit.length === 1 && L.lit[0] === 'bitflipper',
+  check('a related tab on a card points at its own button', onNav(L, 'bitflipper'),
     L.lit.join(', '));
 
   // The nav is taller than a 900 px window with every group in it, so the
@@ -539,20 +374,20 @@ try {
   await settle();
   L = await lead();
   check('a button below the nav\'s fold is scrolled into it, and ringed there',
-    L.lit[0] === 'tdma' && L.inView && L.rings, `lit ${L.lit.join(', ')}, in view ${L.inView}`);
+    (L.lit[0] === 'tdma' || /^nav-h-/.test(L.lit[0])) && L.inView && L.rings, `lit ${L.lit.join(', ')}, in view ${L.inView}`);
 
   // A view's card points at the tab it is a view of: the bar lists that.
   await page.hover('#sm-card-hfem .sm-card-h');
   await settle();
   L = await lead();
-  check('a view\'s card points at its tab\'s button', L.lit.length === 1 && L.lit[0] === 'packets' && L.rings,
+  check('a view\'s card points at its tab\'s button', onNav(L, 'packets') && L.rings,
     L.lit.join(', ') || 'nothing lit');
 
   await page.hover('.sm-stop-btn[data-sm-point="group:radio_signals"]');
   await settle();
   L = await lead();
   check('a group on the journey rings that whole group in the nav',
-    L.lit.length === 1 && L.lit[0] === 'Radio & signals' && L.rings, L.lit.join(', '));
+    L.lit.length === 1 && L.lit[0] === 'calm-sec sm-lit' && L.rings, L.lit.join(', '));
 
   // Off every source: the line goes, and so does the lit button.
   await page.hover('#sm-h');
@@ -569,7 +404,7 @@ try {
   await settle();
   L = await lead();
   check('focus on a card\'s button draws the same line, without a pointer',
-    L.on && L.lit[0] === 'rf' && L.rings, L.lit.join(', '));
+    L.on && onNav(L, 'rf') && L.rings, L.lit.join(', '));
   await page.evaluate(() => document.activeElement.blur());
 
   // Shrunk to the icon rail, the nav is rewritten (renderTabs) — the line has
@@ -580,7 +415,7 @@ try {
   await settle();
   L = await lead();
   check('with the nav shrunk to icons, the line ends on the icon',
-    L.on && L.lit[0] === 'health' && L.rings, L.lit.join(', '));
+    L.on && onNav(L, 'health') && L.rings, L.lit.join(', '));
   await page.evaluate(() => setNavCollapsed(false));
   await page.waitForTimeout(300);
 
@@ -601,14 +436,14 @@ try {
   await page.hover('.sm-anat-key li[data-sm-point="nav"] strong');
   await settle();
   L = await lead();
-  check('on a phone, with the bar put away, the line ends on ☰ in the banner',
-    L.on && L.lit.length === 1 && L.lit[0] === 'btn-nav' && L.rings, L.lit.join(', ') || 'nothing lit');
+  check('on a phone the line ends on More, in the bar along the foot',
+    L.on && L.lit.length === 1 && L.lit[0] === 'field-btn sm-lit' && L.rings, L.lit.join(', ') || 'nothing lit');
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.hover('#sm-card-history .sm-card-h');
   await settle();
   L = await lead();
-  check('and once the banner has scrolled away, no line at all rather than one off the screen',
-    !L.on, `on ${L.on}, lit ${L.lit.join(', ')}`);
+  check('and the bar along the foot stays on screen as the page scrolls, so the line stays with it',
+    L.on && L.lit[0] === 'field-btn sm-lit', `on ${L.on}, lit ${L.lit.join(', ')}`);
 
   // ── Who sees what ─────────────────────────────────────────────────────────
   console.log('\nWho sees what — a tab for some people is listed to nobody else\n');
@@ -616,7 +451,6 @@ try {
   // Who this session is: signed in or not, an administrator or not, on the
   // ALERT2 Transition Plan's list or not, on a team or not.
   const as = (signedIn, admin, onList, onTeam = false) => page.evaluate(([signedIn, admin, onList, onTeam]) => {
-    navFind('');
     Auth.isSignedIn = () => signedIn; Auth.isAdmin = () => admin;
     Auth.role = () => (admin ? 'admin' : signedIn ? 'editor' : null); Auth.a2plan = () => onList;
     Auth.tasks = () => onTeam;
@@ -626,23 +460,19 @@ try {
   check('at least one tab is listed only to some people', restricted.length > 0, restricted.map(t => `${t.id} (${t.who})`).join(', '));
   const seen = () => page.evaluate((ids) => {
     setNavCollapsed(false);
-    navFind('');
     const bar = [...document.querySelectorAll('#tab-nav .tab-btn')].map(b => b.dataset.tab);
-    const found = ids.map(t => { navFind(t.label); const got = [...document.querySelectorAll('#tab-nav .tab-btn')].map(b => b.dataset.tab); navFind(''); return got.includes(t.id); });
+    const found = ids.map(t => Palette.results(t.label).some(x => x.kind === 'tab' && x.label === t.label));
     switchTab('sitemap');
     const cards = [...document.querySelectorAll('#main-content .sm-card')].map(c => c.dataset.tab);
-    return { bar: ids.map(t => bar.filter(x => x === t.id).length), found, cards: ids.map(t => cards.includes(t.id)),
-             count: (navFind('a'), document.getElementById('nav-found').textContent) };
+    return { bar: ids.map(t => bar.filter(x => x === t.id).length), found, cards: ids.map(t => cards.includes(t.id)) };
   }, restricted);
   let w = await seen();
-  check('somebody each is for has it in the bar once, finds it by name, and has its Site Map card',
+  check('somebody each is for has it in the bar once, finds it by name in Ctrl+K, and has its Site Map card',
     w.bar.every(n => n === 1) && w.found.every(Boolean) && w.cards.every(Boolean), JSON.stringify(w));
   await as(false, false, false);
   w = await seen();
-  check('signed out, none of them is in the bar, the find box or the Site Map',
+  check('signed out, none of them is in the bar, Ctrl+K or the Site Map',
     w.bar.every(n => n === 0) && !w.found.some(Boolean) && !w.cards.some(Boolean), JSON.stringify(w));
-  const total = await page.evaluate(() => TAB_LIST.filter(t => !t.partOf).length);
-  check('and the find box counts only the tabs it could list', new RegExp(`of ${total - restricted.length} tabs`).test(w.count), w.count);
   await as(true, false, false);
   w = await seen();
   check('signed in without being anybody they are for, the same', w.bar.every(n => n === 0) && !w.found.some(Boolean) && !w.cards.some(Boolean), JSON.stringify(w));
@@ -694,4 +524,4 @@ if (failed.length) {
   console.log('  looking for it. A tab renamed there keeps its id. See #108.\n');
   process.exit(1);
 }
-console.log('PASS — every tab is in the nav once, and findable by name and by what it does.');
+console.log('PASS — every tab is in the nav once, under a group, and listed only to the people it is for.');

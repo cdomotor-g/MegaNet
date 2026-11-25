@@ -24,7 +24,7 @@
 //   6. **Signs.** Larger type, black and yellow for the button that acts, the
 //      street map; on a phone the inspection sheet's sections a row of signs,
 //      each one a way to its section.
-//   7. **Classic untouched.** No counts, no 🏠, the emoji back.
+//   7. **Calm untouched.** No counts, no 🏠.
 //   8. **The pages that matter, in each.** Home, Stations, Nearby, Health and
 //      Inspections open in each of the three with a clean console, and every
 //      on*= handler on Home resolves.
@@ -132,12 +132,12 @@ async function main() {
 
   try {
     // ── 1. The choice ──────────────────────────────────────────────────────
-    log('\n1. Five looks, each one pick away\n');
+    log('\n1. Four looks, each one pick away\n');
     let { context, page } = await open(browser, server, { viewport: { width: 1440, height: 900 },
       storage: { 'mn-tab': 'sitemap', 'mn-look-intro': 'seen' }, errors });
     await page.evaluate(() => openThemeMenu());
     const dlg = await page.evaluate(() => [...document.querySelectorAll('#look-pick input')].map(r => r.value + (r.checked ? '*' : '')));
-    check('the Theme dialog lists the five, Calm picked', J(dlg) === J(['calm*', 'tiles', 'instrument', 'signs', 'classic']), J(dlg));
+    check('the Theme dialog lists the four, Calm picked', J(dlg) === J(['calm*', 'tiles', 'instrument', 'signs']), J(dlg));
     for (const id of ['tiles', 'instrument', 'signs']) {
       await page.click(`#look-pick input[value="${id}"]`);
       await page.waitForTimeout(SETTLE);
@@ -147,9 +147,11 @@ async function main() {
         S.look === id && S.shell === 'calm' && await page.evaluate(() => localStorage.getItem('mn-look')) === id
         && said === `Look: ${await page.evaluate(i => Looks.label(i), id)}`, J({ S: { look: S.look, shell: S.shell }, said }));
     }
-    await page.click('#look-pick input[value="classic"]');
+    check('Classic is not among them: asked for by name, the look stays what it was',
+      await page.evaluate(() => { const was = state.look; Looks.set('classic'); return state.look === was && !document.querySelector('#look-pick input[value="classic"]'); }));
+    // Ctrl+K lists every look but the one on, so back to Calm for the words below.
+    await page.click('#look-pick input[value="calm"]');
     await page.waitForTimeout(SETTLE);
-    check('Classic wears its own shell', (await shell(page)).shell === 'classic');
     await page.keyboard.press('Escape');
     const words = await page.evaluate(() => ({
       tiles: Palette.results('tiles look').filter(x => x.kind === 'action').map(x => x.label),
@@ -157,7 +159,7 @@ async function main() {
       signs: Palette.results('high contrast signs').filter(x => x.kind === 'action').map(x => x.label),
     }));
     check('Ctrl+K finds each of the three by its word',
-      /Tiles/.test(words.tiles[0] || '') && /Instrument/.test(words.instrument[0] || '') && /Signs/.test(words.signs[0] || ''), J(words));
+      /Tiles/.test(words.tiles[0] || '') && /Instrument/.test(words.instrument[0] || '') && words.signs.some(l => /Signs/.test(l)), J(words));
     await context.close();
 
     // ── 2. Every picture ───────────────────────────────────────────────────
@@ -309,15 +311,14 @@ async function main() {
     check('a sign pressed opens its section, and is marked', G.on === 2 && G.shown === 2, J(G));
     await context.close();
 
-    // ── 7. Classic ─────────────────────────────────────────────────────────
-    log('\n7. Classic untouched\n');
+    // ── 7. Calm untouched ─────────────────────────────────────────────────────────
+    log('\n7. Calm untouched\n');
     ({ context, page } = await open(browser, server, { viewport: { width: 1440, height: 900 },
       storage: { 'mn-look': 'instrument', 'mn-tab': 'sitemap' }, errors }));
-    await page.evaluate(() => Looks.set('classic'));
+    await page.evaluate(() => Looks.set('calm'));
     await page.waitForTimeout(SETTLE);
     S = await shell(page);
-    check('no counts, no 🏠, and the emoji back', S.status === null && !S.home
-      && S.ico['btn-palette'] === '🔎' && S.ico['btn-auth'] === '🔑', J(S));
+    check('Calm, after Instrument: no counts and no 🏠 in the banner', S.status === null && !S.home, J(S));
     await context.close();
 
     // ── 8. The pages that matter ───────────────────────────────────────────
@@ -348,7 +349,7 @@ async function main() {
   const failed = results.filter(r => !r.ok);
   log(failed.length
     ? `\nFAIL — ${failed.length} of ${results.length}:\n${failed.map(f => `  ✗ ${f.label}`).join('\n')}`
-    : `\nPASS — the looks in pictures: five to choose from, a picture for everything, Home, Tiles, Instrument, Signs and Classic untouched (${results.length} checks).`);
+    : `\nPASS — the looks in pictures: four to choose from, a picture for everything, Home, Tiles, Instrument, Signs and Calm untouched (${results.length} checks).`);
   process.exit(failed.length ? 1 : 0);
 }
 

@@ -384,7 +384,7 @@ function addBaseLayers(map, opts = {}) {
   // full quota or a hand-edited value must still give a map.
   const pick = {};
   const dark = state.theme === 'dark';
-  const first = { classic: names[0], instrument: 'Dark', signs: dark ? 'Dark' : 'OpenStreetMap' }[state.look]
+  const first = { instrument: 'Dark', signs: dark ? 'Dark' : 'OpenStreetMap' }[state.look]
              || (dark ? 'Dark' : 'Light');
   for (const n of names) pick[n] = { on: n === first, op: 1 };
   // …and in what order, bottom first. Reorderable (drag the ⠿ grip, or arrow

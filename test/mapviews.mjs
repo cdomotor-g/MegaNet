@@ -69,10 +69,10 @@
 //  14. **The 3-D view in a link** (WebGL2 only): its tilt and turn in the
 //      address while it is up, gone when it is put away, and a link opened
 //      elsewhere opens it at the same tilt and turn.
-//  11. **Flow for everybody**: a Classic page that has never chosen draws
-//      Flow; Lines kept at version 2 under Classic is read as the old default,
-//      under any other look as a choice; `?draw=lines` draws lines for that
-//      page without storing anything, and leaves the address.
+//  11. **Flow for everybody**: a page that has never chosen draws
+//      Flow; Lines kept at version 2 was chosen, and stays; `?draw=lines`
+//      draws lines for that page without storing anything, and leaves the
+//      address.
 //
 // Everything off-origin is refused (lib/network.mjs) except the cadastre's
 // export, the base-map tiles and — for section 9 only — the terrain tiles,
@@ -226,7 +226,7 @@ const browser = await launchBrowser();
 const errors = [];
 
 try {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, oldMap: true });
   const page = await context.newPage();
   await applyNetworkPolicy(page, server.origin);
   page.on('pageerror', e => errors.push(`${e.message}\n${(e.stack || '').split('\n').slice(1, 4).join('\n')}`));
@@ -1171,10 +1171,10 @@ try {
 
   await context.close();
 
-  // ── 11. Flow for everybody, Classic too ─────────────────────────────────
+  // ── 11. Flow for everybody ──────────────────────────────────────────────
   // Every other context here opens with `?draw=lines` (lib/browser.mjs pins
-  // it under Classic); this one asks for the app's own default.
-  section('11. Flow for everybody who has not chosen, Classic too');
+  // it); this one asks for the app's own default.
+  section('11. Flow for everybody who has not chosen');
   {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, draw: null });
     const pg = await ctx.newPage();
@@ -1186,17 +1186,14 @@ try {
       return pg.evaluate(() => ({ draw: MapViews.settings().draw, look: lookStored(), address: location.search }));
     };
     const fresh = await open();
-    check('Classic, never chosen: the paths drawn as Flow', fresh.look === 'classic' && fresh.draw === 'flow', J(fresh));
+    check('Calm, never chosen: the paths drawn as Flow', fresh.look === 'calm' && fresh.draw === 'flow', J(fresh));
     const v2 = J({ v: 2, paths: 'every', draw: 'lines' });
     await pg.evaluate(v => localStorage.setItem('mn-map-drawing', v), v2);
-    const classicOld = await open();
-    check('…and Lines kept under Classic before today (version 2) read as that old default: Flow',
-      classicOld.look === 'classic' && classicOld.draw === 'flow', J(classicOld));
     const calmOld = await open('/index.html?look=calm');
-    check('…but Lines kept under any other look at version 2 was chosen, and stays',
+    check('…but Lines kept at version 2 was chosen, and stays (Classic, whose version 2 default it was, is retired)',
       calmOld.look === 'calm' && calmOld.draw === 'lines', J(calmOld));
     await pg.evaluate(() => localStorage.removeItem('mn-map-drawing'));
-    const door = await open('/index.html?look=classic&draw=lines');
+    const door = await open('/index.html?look=calm&draw=lines');
     const stored = await pg.evaluate(() => localStorage.getItem('mn-map-drawing'));
     check('?draw=lines: the plain lines for that page, nothing stored, and the address tidied',
       door.draw === 'lines' && stored === null && !/draw=/.test(door.address), J({ door, stored }));
@@ -1483,4 +1480,4 @@ if (bad.length) {
 }
 console.log(`\nPASS — ${results.length} checks: Views under the find box and found by it, every built-in view set and pressed and put back,\n`
   + '       a kept view through a reload, which paths, tails, flow, auto-contrast, Balance, 3-D, easements and tenure,\n'
-  + '       and Flow for everybody who has not chosen, Classic too.');
+  + '       and Flow for everybody who has not chosen.');

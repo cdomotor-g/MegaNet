@@ -23,6 +23,7 @@
 // Run:  npm run exports
 //       npm run exports -- -v
 
+import { viaMore } from './lib/more.mjs';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
@@ -66,7 +67,7 @@ const menu = page => page.evaluate(() => {
 // Opens ⤓ Export on the tab, picks the offer whose label starts with `label`,
 // and waits for the file it writes.
 async function take(page, label) {
-  await page.click('#btn-export');
+  await viaMore(page, 'export');
   await page.waitForSelector('#exm', { timeout: 5_000 });
   const i = await page.evaluate(l => [...document.querySelectorAll('#exm .exm-opt')]
     .findIndex(b => b.querySelector('.exm-label').textContent.startsWith(l)), label);
@@ -110,17 +111,23 @@ async function main() {
     // ═══════════════════════════════════════════════════════════════════════
     log('\n2. The banner\'s ⤓ Export\n');
     const btn = await page.evaluate(() => {
-      const b = document.getElementById('btn-export');
-      return b && { text: b.textContent.trim(), title: b.title, shown: b.offsetParent !== null };
+      const b = document.getElementById('btn-more');
+      return b && { shown: b.offsetParent !== null };
     });
-    check('⤓ Export is in the banner, saying what it does', btn && btn.shown && /Export/.test(btn.text) && /what this tab shows/.test(btn.title), J(btn));
-    await page.click('#btn-export');
+    await page.click('#btn-more');
+    const item = await page.evaluate(() => {
+      const b = document.querySelector('#more-menu .more-item[data-go="export"]');
+      return b && { text: b.textContent.trim(), shown: b.offsetParent !== null };
+    });
+    await page.keyboard.press('Escape');
+    check('⤓ Export is behind ⋯ in the banner, saying what it does', btn && btn.shown && item && item.shown && /Export what this tab shows/.test(item.text), J({ btn, item }));
+    await viaMore(page, 'export');
     let M = await menu(page);
     check('on Stations it opens the tab\'s offers, named for the tab, the first ready one focused',
       M && M.title === 'Export — Stations' && M.offers.length >= 6 && M.focus, J(M && { title: M.title, n: M.offers.length, focus: M.focus }));
     await page.keyboard.press('Escape');
     await page.evaluate(() => switchTab('bitflipper'));
-    await page.click('#btn-export');
+    await viaMore(page, 'export');
     M = await menu(page);
     check('on an exempt tab it says why there is nothing to save', M && M.offers.length === 0 && /calculator/.test(M.none), J(M));
     await page.keyboard.press('Escape');
@@ -129,7 +136,7 @@ async function main() {
     // ═══════════════════════════════════════════════════════════════════════
     log('\n3. Offers that cannot run, and writers with nothing to write\n');
     await page.evaluate(() => { Auth.isSignedIn = () => false; });
-    await page.click('#btn-export');
+    await viaMore(page, 'export');
     M = await menu(page);
     const listOff = M.offers.filter(o => o.label.startsWith('The station list'));
     check('signed out, the station list is offered and says why it cannot be had — the Export tab\'s rule',
@@ -147,7 +154,7 @@ async function main() {
     await page.keyboard.press('Escape');
     await page.evaluate(() => Toast.clear());
     // A writer that finds nothing: no polar plot is drawn.
-    await page.click('#btn-export');
+    await viaMore(page, 'export');
     const pi = await page.evaluate(() => [...document.querySelectorAll('#exm .exm-opt')].findIndex(b => /polar/.test(b.textContent)));
     await page.click(`#exm .exm-opt[data-exm="${pi}"]`);
     const said = await page.waitForFunction(() => {

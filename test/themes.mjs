@@ -19,6 +19,7 @@
 // Run:  npm run themes
 //       npm run themes -- -v
 
+import { viaMore } from './lib/more.mjs';
 import { startServer } from './lib/server.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { applyNetworkPolicy } from './lib/network.mjs';
@@ -97,7 +98,7 @@ async function main() {
     {
       const { context, page } = await open(browser, server, errors);
       await page.waitForFunction(() => !!state.data && !!state.map && state.mapLines.length > 0, null, { timeout: LOAD_TIMEOUT });
-      await page.click('#btn-theme');
+      await viaMore(page, 'theme');
       const menu = await page.evaluate(() => {
         const radios = [...document.querySelectorAll('#theme-pick input[type="radio"]')];
         return {
@@ -173,7 +174,7 @@ async function main() {
       const { context, page } = await open(browser, server, errors);
       await page.emulateMedia({ forcedColors: 'active' });
       const mark = await page.evaluate(() => {
-        const b = document.querySelector('#tab-nav .tab-btn.active');
+        const b = document.querySelector('#section-bar .tab-btn.active, #tab-nav .tab-btn.active');
         const cs = b && getComputedStyle(b);
         return cs ? { style: cs.outlineStyle, width: cs.outlineWidth } : null;
       });

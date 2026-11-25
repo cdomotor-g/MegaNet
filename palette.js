@@ -381,8 +381,7 @@ const Palette = (() => {
         find: 'theme dark light colour color night mode', run: () => toggleTheme() },
       { icon: '☀️', label: 'Choose a theme — System, Light, Dark or Sunlight', find: 'theme sunlight contrast outdoors system device',
         run: () => openThemeMenu() },
-      // The other looks (looks.js) — the way back to Classic for somebody who
-      // knew where everything was, and the way to each of the rest from it.
+      // The other looks (looks.js) — the way to each from the one that is on.
       ...LOOK_CHOICES.filter(id => id !== state.look).map(id => ({
         icon: Looks.LOOKS[id].icon, label: `Switch to the ${Looks.label(id)} look — ${Looks.LOOKS[id].brief}`,
         find: `look layout interface design switch ${Looks.LOOKS[id].find}`, run: () => Looks.set(id) })),

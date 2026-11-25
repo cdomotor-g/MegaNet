@@ -335,15 +335,15 @@ MegaNet/
 │                             or a view an account makes on the 🎛️ Views tab, kept in
 │                             the database (0062: user_pref, save_my_views)
 ├── looks.js                ← Looks     — the look: Calm (the default), Tiles, Instrument,
-│                             Signs or Classic, the choice, ?look=, and the switch in
-│                             the Theme dialog
+│                             or Signs, the choice, ?look=, and the switch in the
+│                             Theme dialog (Classic retired; archive/classic/)
 ├── glyphs.js               ← Glyphs    — the pictograms the looks in pictures draw with:
 │                             one for every tab, group, station state and inspection
 │                             section, and the six colours of the groups' families
 ├── home.js                 ← Home      — 🏠 Home: how the network is now, the six tools
 │                             used most as big tiles and every other as a small one; and
 │                             🏠 and Instrument's counts in the banner
-├── calm-shell.js           ← CalmShell — the shell of every look but Classic: the groups
+├── calm-shell.js           ← CalmShell — the shell every look wears: the groups
 │                             down the side, the open group's tabs across the top, ⋯ in
 │                             the banner, and a phone's bar along the foot
 │                             (docs/design-system.md §8)

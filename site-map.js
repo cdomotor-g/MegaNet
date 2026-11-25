@@ -758,7 +758,7 @@ const SiteMap = (function () {
               <div>${lookUsesCalmShell()
                 ? `<strong>The banner</strong> — ${lookHasSymbols() && state.look !== 'instrument' ? '🏠 Home, ' : ''}🔎 Search,
                   🔗 Share (a link to what you are looking at), 🔑 Sign in (only needed to edit), and ⋯ for the rest: export, theme &amp; look — this is
-                  ${esc(Looks.label())}, one of five, Classic among them — help and Report a Bug.`
+                  ${esc(Looks.label())}, one of four — help and Report a Bug.`
                 : `<strong>The banner</strong> — 🔗 Share (a link to what you are looking at),
                 🔑 Sign in (only needed to edit), 🐞 Report a Bug,
                 and 🌗 light or dark — and the look, Classic or Calm.`}</div>

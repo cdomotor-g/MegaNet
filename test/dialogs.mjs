@@ -31,6 +31,7 @@
 // Run:  npm run dialogs
 //       npm run dialogs -- -v
 
+import { viaMore } from './lib/more.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as acorn from 'acorn';
@@ -162,12 +163,12 @@ async function main() {
 
     // The shell's own first dialog first: before anything else has opened
     // one, Escape hands focus back to the button that opened it.
-    await page.click('#btn-theme');
+    await viaMore(page, 'theme');
     await page.keyboard.press('Escape');
     const firstBack = await page.evaluate(() => document.activeElement && document.activeElement.id);
-    check('the first dialog the shell ever opens hands focus back to what opened it', firstBack === 'btn-theme', J(firstBack));
+    check('the first dialog the shell ever opens hands focus back to what opened it (⋯, under Calm)', firstBack === 'btn-more', J(firstBack));
 
-    await page.focus('#btn-theme');
+    await page.focus('#btn-auth');
     await ask({ title: 'Delete “Gatton”?', message: 'It is removed from the list.\n\nThe record is kept.', confirm: 'Delete the station', danger: true });
     let A = await asked(page);
     check('an alertdialog, modal, named by its question and described by what follows, in paragraphs',
@@ -183,7 +184,7 @@ async function main() {
     await page.keyboard.press('Escape');
     let v = await ans();
     const back = await page.evaluate(() => ({ gone: !document.querySelector('#app-ask .modal-card'), focus: document.activeElement && document.activeElement.id }));
-    check('Escape is "no", it goes, and focus is back where it was', v === false && back.gone && back.focus === 'btn-theme', J({ v, back }));
+    check('Escape is "no", it goes, and focus is back where it was', v === false && back.gone && back.focus === 'btn-auth', J({ v, back }));
 
     await ask({ title: 'Upload the table?', confirm: 'Upload the table' });
     A = await asked(page);

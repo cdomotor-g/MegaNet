@@ -360,7 +360,7 @@ const CORS = {
 };
 
 try {
-  const context = await browser.newContext({ viewport: { width: 1400, height: 950 } });
+  const context = await browser.newContext({ viewport: { width: 1400, height: 950 }, oldMap: true });
   const page = await context.newPage();
   await applyNetworkPolicy(page, server.origin);
   page.on('pageerror', e => errors.push(e.message));
@@ -409,7 +409,7 @@ try {
   await page.evaluate(() => shutDock({ instant: true }));
   await page.waitForTimeout(400);
 
-  const view = (lat, lon, z) => page.evaluate(([a, b, c]) => state.map.setView([a, b], c, { animate: false }), [lat, lon, z]);
+  const view = (lat, lon, z) => page.evaluate(([a, b, c]) => { state.map.setView([a, b], c, { animate: false }); }, [lat, lon, z]);
   const note = () => page.evaluate(() => (document.getElementById('map-cameras-note') || {}).textContent || '');
   const pins = () => page.evaluate(() => [...document.querySelectorAll('.leaflet-mnCameras-pane .mn-cam-icon')].map(el => {
     const r = el.querySelector('.mn-cam-pin').getBoundingClientRect();

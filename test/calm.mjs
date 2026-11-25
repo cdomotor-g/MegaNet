@@ -1,9 +1,9 @@
 // The Calm look (looks.js, calm-shell.js) and what came with it: 📌 Nearby
 // (nearby.js) and the inspection sheet a section at a time on a phone.
 //
-// Every other browser check opens the app in Classic (lib/browser.mjs says
-// why), so this is the one that opens it as a person does — in the default —
-// and holds the default to what it promises:
+// Every other browser check opens the app in Calm, pinned (lib/browser.mjs
+// says why), so this is the one that opens it as a person does — with no pin
+// at all — and holds the default to what it promises:
 //
 //   1. **The default.** A device that has never chosen opens in Calm: the bar
 //      down the side is one button a group, the open group's tabs are a row
@@ -14,11 +14,12 @@
 //      view (Field lists its own groups).
 //   3. **The banner.** Search is a box, Export, Report a Bug and Theme are
 //      behind ⋯, and ⋯ opens a list whose Theme & look carries the switch.
-//   4. **The way back.** Classic from the Theme dialog is the old bar, whole,
-//      remembered; Calm again from the same dialog; `?look=classic` is taken
-//      as a choice and taken out of the address; Ctrl+K finds it by "classic".
-//   5. **The note** for a device that knew Classic: once, with the way back,
-//      and gone for good once it is closed.
+//   4. **Classic is retired** (archive/classic/): not in the Theme dialog, not
+//      in Ctrl+K; `?look=classic` and a stored 'classic' are handed Calm, the
+//      stored pick cleared, nothing said; `?look=signs` is still a choice,
+//      taken out of the address; Calm again from the same dialog.
+//   5. **The note** for a device that knew the old app: once, and gone for
+//      good once it is closed.
 //   6. **A phone.** The bar along the foot; ⋯ More is the drawer, every group
 //      with its tabs; 📌 Nearby nearest first from the map's centre; a station's
 //      Start inspection opens the sheet filled in with it, a section at a time,
@@ -26,11 +27,11 @@
 //   7. **Less to read first.** A tab's long introduction two lines deep with
 //      More about this tab, remembered once opened, a short one left alone;
 //      Station Health's answer in a sentence above its numbers, See them going
-//      down to the list; Classic showing neither.
+//      down to the list.
 //   8. **A quiet map.** The Stations map on the Light canvas (Dark in the dark
 //      theme), every link one colour, the context layers off with nothing
 //      stored; Map display naming them with Turn them all on, which turns and
-//      remembers them; a reload keeping each as left; Classic as before.
+//      remembers them; a reload keeping each as left.
 //   9. **Every tab, in Calm.** Opened one by one with a clean console, and every
 //      on*= handler on the page — the bar's, the row's, ⋯'s — resolving.
 //
@@ -202,19 +203,17 @@ async function main() {
       themes: document.querySelectorAll('#theme-pick input').length,
       looks: [...document.querySelectorAll('#look-pick input')].map(r => r.value + (r.checked ? '*' : '')) }));
     check('Theme & layout is the Theme dialog, with the looks under the themes, Calm picked',
-      dlg.title === 'Theme & layout' && dlg.themes === 4 && J(dlg.looks) === J(['calm*', 'tiles', 'instrument', 'signs', 'classic']), J(dlg));
+      dlg.title === 'Theme & layout' && dlg.themes === 4 && J(dlg.looks) === J(['calm*', 'tiles', 'instrument', 'signs']), J(dlg));
 
-    // ── 4. The way back ────────────────────────────────────────────────────
-    log('\n4. Classic, and back\n');
-    await page.click('#look-pick input[value="classic"]');
+    // ── 4. Classic is retired ──────────────────────────────────────────────
+    log('\n4. Classic is retired: nothing reaches it\n');
+    await page.click('#look-pick input[value="signs"]');
     await page.waitForTimeout(SETTLE);
     S = await shell(page);
     const said = await page.evaluate(() => document.getElementById('app-status').textContent);
-    check('Classic: the old bar, every tab under its heading, and no row across the top',
-      S.look === 'classic' && S.sections.length === 0 && S.navTabsShown > 30 && !S.bar, J({ look: S.look, tabs: S.navTabsShown, bar: S.bar }));
-    check('…the banner\'s buttons back and ⋯ gone, the choice remembered, and said',
-      S.btn['btn-export'] && S.btn['btn-report'] && S.btn['btn-theme'] && !S.btn['btn-more']
-      && await page.evaluate(() => localStorage.getItem('mn-look')) === 'classic' && said === 'Look: Classic', J({ btn: S.btn, said }));
+    check('another look from the dialog: Signs, on Calm\'s shell, remembered, and said',
+      S.look === 'signs' && S.bar && await page.evaluate(() => document.documentElement.getAttribute('data-shell')) === 'calm'
+      && await page.evaluate(() => localStorage.getItem('mn-look')) === 'signs' && said === 'Look: Signs', J({ look: S.look, said }));
     check('…and the dialog stays, so the two can be compared', await page.evaluate(() => !!document.getElementById('look-pick')));
     await page.click('#look-pick input[value="calm"]');
     await page.waitForTimeout(SETTLE);
@@ -222,24 +221,40 @@ async function main() {
     check('Calm again from the same dialog', S.look === 'calm' && S.bar && S.sections.length > 0, S.look);
     await page.keyboard.press('Escape');
     const pal = await page.evaluate(() => Palette.results('classic').filter(x => x.kind === 'action').map(x => x.label));
-    check('Ctrl+K finds the way to Classic by name', pal.some(l => /Classic/.test(l)), J(pal));
+    check('Ctrl+K offers no way to Classic', !pal.some(l => /Classic/.test(l)), J(pal));
+    const set = await page.evaluate(() => { Looks.set('classic'); return state.look; });
+    check('Looks.set(\'classic\') does nothing: the look stays Calm', set === 'calm', set);
     await context.close();
 
     ({ context, page } = await open(browser, server, { viewport: { width: 1440, height: 900 }, url: '?look=classic&tab=packets', errors }));
     const addr = await page.evaluate(() => ({ look: state.look, attr: document.documentElement.getAttribute('data-look'),
+      shell: document.documentElement.getAttribute('data-shell'),
       search: location.search, stored: localStorage.getItem('mn-look'), tab: state.activeTab }));
-    check('?look=classic opens Classic and is kept as the choice, then taken out of the address — the rest of it left',
-      addr.look === 'classic' && addr.attr === 'classic' && addr.stored === 'classic' && !/look=/.test(addr.search)
+    check('?look=classic opens Calm, stores nothing, and is taken out of the address — the rest of it left',
+      addr.look === 'calm' && addr.attr === 'calm' && addr.shell === 'calm' && addr.stored !== 'classic' && !/look=/.test(addr.search)
       && /tab=packets/.test(addr.search) && addr.tab === 'packets', J(addr));
-    check('Classic keeps the forecast outlines on, as it always had them', await page.evaluate(() => state.mapPinSls === true));
+    check('Calm keeps the forecast outlines off, as it starts', await page.evaluate(() => state.mapPinSls === false));
+    await context.close();
+
+    ({ context, page } = await open(browser, server, { viewport: { width: 1440, height: 900 }, storage: { 'mn-look': 'classic', 'mn-tab': 'stations' }, errors }));
+    const old = await page.evaluate(() => ({ look: state.look, stored: localStorage.getItem('mn-look'), intro: !!document.querySelector('.look-intro') }));
+    check('a device that had picked Classic is handed Calm, its pick cleared, and told nothing',
+      old.look === 'calm' && old.stored === null && !old.intro, J(old));
+    await context.close();
+
+    ({ context, page } = await open(browser, server, { viewport: { width: 1440, height: 900 }, url: '?look=signs', errors }));
+    const sg = await page.evaluate(() => ({ look: state.look, stored: localStorage.getItem('mn-look'), search: location.search }));
+    check('?look=signs is still a choice: kept, and taken out of the address',
+      sg.look === 'signs' && sg.stored === 'signs' && !/look=/.test(sg.search), J(sg));
     await context.close();
 
     // ── 5. The note ────────────────────────────────────────────────────────
-    log('\n5. The note for somebody who knew Classic\n');
+    log('\n5. The note for somebody who knew the old app\n');
     ({ context, page } = await open(browser, server, { viewport: { width: 1440, height: 900 }, storage: { 'mn-tab': 'stations' }, errors }));
     S = await shell(page);
-    check('a device that has been here before, with no look chosen, is told once, with the way back', S.intro
-      && await page.evaluate(() => /Switch back to Classic/.test(document.querySelector('.look-intro').textContent)), J(S.intro));
+    check('a device that has been here before, with no look chosen, is told once, with no way back to Classic', S.intro
+      && await page.evaluate(() => !/Classic/.test(document.querySelector('.look-intro').textContent)
+        && !document.querySelector('.look-intro .link-btn')), J(S.intro));
     await page.click('.look-intro-x');
     await page.waitForTimeout(150);
     check('× closes it for good, and focus goes on along the row',
@@ -408,12 +423,6 @@ async function main() {
     await page.click('.hl-verdict .link-btn');
     check('See them goes down to Needs attention, its heading in focus',
       await page.evaluate(() => document.activeElement && document.activeElement.id === 'hl-h-attn'));
-    await page.evaluate(() => Looks.set('classic'));
-    await page.evaluate(() => Health.demo());
-    await page.waitForSelector('.hl-kpis', { timeout: 15_000 });
-    const classic = await page.evaluate(() => ({ verdict: !!document.querySelector('.hl-verdict'),
-      fold: !!document.querySelector('.lede-fold'), more: !!document.querySelector('.lede-more') }));
-    check('Classic: the whole introduction and the numbers alone, as before', !classic.verdict && !classic.fold && !classic.more, J(classic));
     await context.close();
 
     // ── 8. The Stations map, quiet ─────────────────────────────────────────
@@ -455,11 +464,7 @@ async function main() {
     await page.evaluate(() => { for (const [, key] of CALM_MAP_OFF) localStorage.removeItem(key); setTheme('dark'); switchTab('stations'); });
     await page.waitForFunction(() => !!(state.map && state.map.mnBases), null, { timeout: 15_000 });
     check('in the dark theme the ground is the Dark canvas instead', await page.evaluate(() => state.map.mnBaseName) === 'Dark');
-    await page.evaluate(() => { setTheme('light'); Looks.set('classic'); });
-    await page.waitForFunction(() => !!(state.map && state.map.mnBases), null, { timeout: 15_000 });
-    Q = await quiet();
-    check('Classic: OSM-Topo, links coloured by channel, and every layer on, as before',
-      Q.base === 'OSM-Topo' && Q.links === 'freq' && Q.on.length === await page.evaluate(() => CALM_MAP_OFF.length), J(Q));
+    await page.evaluate(() => { setTheme('light'); });
     await context.close();
 
     // ── 9. Every tab ───────────────────────────────────────────────────────

@@ -86,6 +86,9 @@ try {
     A.repaint();
     return { t0: A.ad.view.t0, t1: A.ad.view.t1, rec0: t0, rec1: t1 };
   });
+  // Calm's row across the top and its folded introduction leave the strips
+  // lower on the page than Classic did; bring them on screen, where a hand is.
+  await page.evaluate(() => { const e = document.getElementById('ad-ov') || document.getElementById('ad-vov'); if (e) e.scrollIntoView({ block: 'center' }); });
   await page.waitForTimeout(120);
 
   // ── 1. The handles are things a hand can land on ──────────────────────────

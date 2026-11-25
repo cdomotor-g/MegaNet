@@ -502,7 +502,7 @@ async function main() {
     });
     check('the bar shows the administrator how many accounts wait, and says it aloud; a note says it once',
       badge.n === '2' && /2 accounts waiting for approval/.test(badge.said || '') && /2 accounts are waiting for your approval/.test(badge.toast), J(badge));
-    await p6.click('#tab-nav .tab-btn[data-tab="admin"]');
+    await p6.evaluate(() => switchTab('admin')); // the tab's button is in a closed group under Calm
     await p6.waitForSelector('#adm-waiting .adm-wait-row', { timeout: 10_000 });
     const list = await p6.evaluate(() => ({
       rows: [...document.querySelectorAll('#adm-waiting .adm-wait-row')].map(r => r.dataset.user),

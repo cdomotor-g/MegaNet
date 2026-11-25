@@ -1658,14 +1658,17 @@ next rather than to a tab still waiting:
 
 ---
 
-## 8. Looks — Calm, the three in pictures, and Classic
+## 8. Looks — Calm, and the three in pictures
 
 Added October 2026, after people using the app said it was too much at once:
 forty-odd tabs down the side, six buttons in a blue banner, an emoji on every
 line and a map ringed in four colours. The answer is another way of laying the
 same app out, not a cull — every tab, action and address is the same in each.
 Three more followed the same month, asked for by the same people: an app read
-at a glance rather than read, in pictures.
+at a glance rather than read, in pictures. The way it looked before, **Classic**,
+was retired on 25 November 2026 and archived (`archive/classic/README.md`):
+Calm is what a person landing on Flood-Net sees, and what everything is
+checked and mocked up against.
 
 | Look | Where it lives | What it is |
 |---|---|---|
@@ -1673,7 +1676,6 @@ at a glance rather than read, in pictures.
 | **🔲 Tiles** | Calm's, plus `glyphs.js`, `home.js` and `:root[data-look="tiles"]` | Calm with a coloured tile for every group and tool — each a pictogram on its family's colour — pictograms for the banner's buttons, and 🏠 **Home** in the banner: the network's counts, the six tools used most as big tiles, every other tab as a small one. A phone's foot trades Camera for Home. |
 | **🎚️ Instrument** | Calm's, plus `:root[data-look="instrument"]` | A dark frame — banner, rail, row of tabs, a phone's foot — round the page in whichever theme it is in, done by restating the theme's tokens on those four. The groups a rail of pictures (collapsed to start), the OK / on watch / at fault counts across the banner (`#hdr-status`), and the Stations map on the Dark base with its pins coloured by health (`mapHealthStored`, core.js). |
 | **🪧 Signs** | Calm's, plus `:root[data-look="signs"]` | Black on yellow, thick edges and a step larger type, for full sun and a gloved thumb: every pictogram on a yellow sign, the button that acts black with yellow text (yellow on black in the dark theme), the street map, and 🏠 Home as six big signs. On a phone the inspection sheet's sections are a row of signs, each a way to its section. |
-| **Classic** | everything else in `app.js` and `styles.css` | The app as it was: every tab in the bar under its group's heading, every button in the banner, ☰ on a phone. |
 
 **The pictures** are `glyphs.js`: a 24-unit grid, a 2-unit stroke with round
 ends, in `currentColor` — so one drawing sits white on a tile, black on a sign
@@ -1686,10 +1688,9 @@ without a line in `Glyphs.TAB` draws its group's picture, and `npm run looks`
 fails until it has its own.
 
 **The side panel's rail** on the Stations tab is drawn in every look's own
-hand, Calm and Classic included: `Glyphs.rail(name)` writes one drawing per
+hand, Calm's included: `Glyphs.rail(name)` writes one drawing per
 control (`Glyphs.RAIL`) with every dress in the markup, and the stylesheet
-picks one — a 1.8 line in the strip's ink under Calm, the emoji beside it
-under Classic, and under the three looks in pictures the same drawing at 2
+picks one — a 1.8 line in the strip's ink under Calm, and under the three looks in pictures the same drawing at 2
 (2.4 under Signs) on a 28 px tile: its family's colour under Tiles, the dark
 frame's ground under Instrument (whose frame takes the rail in), a yellow sign
 under Signs. Under Tiles the control that is on has its tile gilded in the
@@ -1707,14 +1708,14 @@ switch is on); a count not yet known is a dash, never a nought.
 **The choice** is `state.look`, built in `core.js` (`lookStored()`) from
 `?look=` in the address, then `mn-look` in storage, then the default — the
 theme's pattern, for the theme's reason. `Looks.start()` (init.js) puts it on
-`<html data-look>` — and `data-shell="calm"` for every look but Classic, which
-wears `data-shell="classic"` — keeps an address's `?look=` as the choice and
-takes it out of the address. The switch is in the Theme dialog (Classic's 🌗, Calm's ⋯ → Theme &
-look) and in Ctrl+K; `Looks.set()` redraws the shell at once. A device that knew
-Classic and has not chosen is told once, under the row across the top, with the
-way back.
+`<html data-look>` — and `data-shell="calm"`, which every look wears — keeps an
+address's `?look=` as the choice and takes it out of the address. The switch is
+in the Theme dialog (⋯ → Theme & look) and in Ctrl+K; `Looks.set()` redraws the
+shell at once. A device that had picked Classic, or an address that names it, is
+handed Calm with nothing said. A device that knew the old app and has not
+chosen is told once, under the row across the top, what Calm is.
 
-**The rules that keep five looks one app:**
+**The rules that keep four looks one app:**
 
 - **Scope, don't fork.** Calm's shell CSS is under `:root[data-shell="calm"]`,
   a look's own under `:root[data-look="<id>"]`; the code asks
@@ -1747,16 +1748,17 @@ way back.
   and gives Needs attention most of the width. The next tab to follow it gets
   the same treatment the same way: the sentence only under Calm.
 
-**Checks.** Every browser check but two opens the app in Classic — the
-checks were written against it and it is still a look people use;
-`test/lib/browser.mjs` pins it through `?look=classic`, which (unlike a stored
-key) leaves a first visit a first visit. `npm run calm` opens the default and
-holds Calm to the above, a phone and every tab included; `npm run looks` holds
-the three in pictures, Home and the pictures themselves.
+**Checks.** Every browser check opens the app in Calm, the default — the one a
+person lands on; `test/lib/browser.mjs` pins it through `?look=calm`, which
+(unlike a stored key) leaves a first visit a first visit. `npm run calm` opens
+the app with no pin at all and holds Calm to the above, a phone and every tab
+included; `npm run looks` holds the three in pictures, Home and the pictures
+themselves. **Mock-ups and screenshots are Calm's** too, unless a look is the
+point.
 
 **Adding another look:** an entry in `LOOKS` (looks.js) and `LOOK_CHOICES`
 (core.js), its CSS under its own `data-look`, and — if it draws the bar
 differently from Calm — a branch in `renderTabs()` handing the bar to its
-renderer, the way every look but Classic goes to `CalmShell.render()`. Its
+renderer, the way every look goes to `CalmShell.render()`. Its
 checks in `npm run looks`, or a check of its own like `npm run calm`, opening
 with `browser.newContext({ look: null })` and `mn-look` stored.

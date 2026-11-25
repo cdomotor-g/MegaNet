@@ -1408,12 +1408,20 @@ try {
   await page.evaluate(() => setDockTab('map-legend', { instant: true }));
   await page.waitForTimeout(200);
   p = await phoneLook();
-  const foot = await page.evaluate(() => ({ chrome: Math.round(document.querySelector('header').getBoundingClientRect().bottom
-      + (document.getElementById('mem-bar').hidden ? 0 : document.getElementById('mem-bar').offsetHeight)),
-    scrollH: document.documentElement.scrollHeight, winH: innerHeight }));
+  // Under Calm a phone has the row across the top under the banner, and the
+  // bar along the foot over the screen's last 56 px or so (--mn-footbar): the
+  // rail and the drawer run from the first to the second.
+  const foot = await page.evaluate(() => {
+    const sb = document.getElementById('section-bar');
+    const top = Math.max(document.querySelector('header').getBoundingClientRect().bottom,
+                         sb && sb.getClientRects().length ? sb.getBoundingClientRect().bottom : 0);
+    return { chrome: Math.round(top + (document.getElementById('mem-bar').hidden ? 0 : document.getElementById('mem-bar').offsetHeight)),
+      footbar: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mn-footbar')) || 0,
+      scrollH: document.documentElement.scrollHeight, winH: innerHeight };
+  });
   check('…and the page does not scroll under the map: the rail and the drawer beside it run from the banner\'s foot to the screen\'s',
-    foot.scrollH <= foot.winH + 1 && Math.abs(p.strip.t - foot.chrome) <= 1 && p.strip.b === p.winH
-      && p.drawer.t === p.strip.t && p.drawer.b === p.winH, JSON.stringify({ p, foot }));
+    foot.scrollH <= foot.winH + 1 && Math.abs(p.strip.t - foot.chrome) <= 4 && Math.abs(p.strip.b - (p.winH - foot.footbar)) <= 1
+      && p.drawer.t === p.strip.t && Math.abs(p.drawer.b - (p.winH - foot.footbar)) <= 1, JSON.stringify({ p, foot }));
   await page.evaluate(() => { shutDock({ instant: true }); scrollTo(0, 0); });
   await page.setViewportSize({ width: 375, height: 700 });
   await page.waitForTimeout(600);
@@ -1624,7 +1632,10 @@ try {
   const arrive = await page.evaluate(() => {
     const m = document.getElementById('leaflet-map').getBoundingClientRect();
     const h = document.querySelector('header').getBoundingClientRect();
-    return { mapTop: Math.round(m.top), hdrBottom: Math.round(h.bottom), mapBottom: Math.round(m.bottom),
+    const sb = document.getElementById('section-bar');
+    const top = Math.max(h.bottom, sb && sb.getClientRects().length ? sb.getBoundingClientRect().bottom : 0);
+    return { mapTop: Math.round(m.top), hdrBottom: Math.round(top), mapBottom: Math.round(m.bottom),
+             footbar: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mn-footbar')) || 0,
              scrollH: document.documentElement.scrollHeight, winH: innerHeight };
   });
   check('a phone arriving on the Stations tab gets the map across the whole screen: no drawer, the rail away, ⋮ saying so',
@@ -1633,7 +1644,7 @@ try {
   // Down to the credit line: one line of it, under the map, and nothing under
   // that — the page does not scroll.
   check('…and down it, from under the banner to a one-line credit at the screen\'s foot, with no page to scroll',
-    arrive.mapTop - arrive.hdrBottom <= 4 && arrive.winH - arrive.mapBottom <= 28 && arrive.scrollH <= arrive.winH + 1,
+    arrive.mapTop - arrive.hdrBottom <= 4 && arrive.winH - arrive.footbar - arrive.mapBottom <= 28 && arrive.scrollH <= arrive.winH + 1,
     JSON.stringify(arrive));
   // The credit line is one line with an ellipsis; a tap lays the rest out,
   // and a second folds it. It shares the screen's height with the map, so the

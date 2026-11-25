@@ -609,9 +609,9 @@ async function main() {
     const escaped = await page.evaluate(() => {
       const card = document.getElementById('stn-card');
       const esc = () => card.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      // The theme button: on the page at every width (the first header button
+      // The sign-in button: on the page at every width (the first header button
       // is the phone-only ☰, which refuses focus on a desktop).
-      const opener = document.getElementById('btn-theme');
+      const opener = document.getElementById('btn-auth');
       opener.focus();
       showStationCard(state.stnCard.id, { takeFocus: true });
       const focusedIn = document.activeElement === card;
@@ -1128,7 +1128,7 @@ async function main() {
     // strip, not on the map, and a tip pointing at the map would send the
     // operator looking for a button that is not there.
     check('a first visit is told about Layers, where it is, once',
-      tip.shown && /Layers/.test(tip.text) && /layers/.test(tip.text) && /side panel/.test(tip.text)
+      tip.shown && /Layers/.test(tip.text) && /quiet/.test(tip.text) && /side panel/.test(tip.text)
         && !/on the map/.test(tip.text) && tip.seen === '1',
       `shown=${tip.shown} seen=${tip.seen} "${tip.text}"`);
     await fp.reload({ waitUntil: 'load', timeout: LOAD_TIMEOUT });

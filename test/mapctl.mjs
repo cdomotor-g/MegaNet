@@ -529,6 +529,7 @@ try {
   };
   await setBase('OSM-Topo', true);
   await setBase('Satellite', true);
+  await setBase('Light', false);
   await setBase('OpenStreetMap', false);
   await setBase('Dark', false);
   await setOpacity('OSM-Topo', 70);

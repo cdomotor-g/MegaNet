@@ -485,7 +485,7 @@ const MapViews = (function () {
   // Anything in range kept, anything else back to its default: storage can
   // hold a value from an older version, or one typed into the console.
   // How the paths are drawn until somebody chooses: Flow, under every look
-  // (the owner's call, 7 Nov 2026, and for Classic too on 8 Nov) — unless the
+  // (the owner's call, 7 Nov 2026) — unless the
   // address said otherwise (fromAddress, below).
   function defaultDraw() {
     return S.addressDraw || 'flow';
@@ -493,7 +493,7 @@ const MapViews = (function () {
   // `?draw=lines` (or flow, tails): how this page draws the paths until
   // somebody chooses, for this page only. A link that shows the plain lines,
   // and the door the browser checks open on them by (test/lib/browser.mjs pins
-  // it under Classic, as it pins the look). Never stored, and taken out of the
+  // it, as it pins the look). Never stored, and taken out of the
   // address, as `?rail=` is (app.js, dockNamesFromAddress). Called from
   // init.js, after Route has seen the address.
   function fromAddress() {
@@ -515,7 +515,7 @@ const MapViews = (function () {
   function oldDefaultLines(raw) {
     if (!raw || typeof raw !== 'object' || raw.draw !== 'lines' || raw.v === DRAWING_V) return false;
     if (raw.v !== 2) return true;
-    try { return typeof lookStored === 'function' && lookStored() === 'classic'; } catch (_) { return false; }
+    return false; // Classic, whose 2 still meant lines, is retired (archive/classic/)
   }
   function clean(c) {
     const d = Object.assign({}, DEFAULTS, { draw: defaultDraw() });

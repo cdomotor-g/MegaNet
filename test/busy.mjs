@@ -1,5 +1,5 @@
 // The busy wheel at the far right of the banner (busy.js). In Chromium, over
-// the real app in the default (Calm) look and in Classic:
+// the real app in the default (Calm) look:
 //
 //   1. **Quiet when nothing is happening.** Loaded and settled, the wheel is
 //      put away — not drawn, not focusable — and its slot is the same width
@@ -20,11 +20,10 @@
 //   7. **Pressing it** opens the card: what is happening, live, and the key;
 //      Escape closes it and gives focus back.
 //   8. **Reduced motion**: the rings stand still and the light fades instead.
-//   9. **A phone, and Classic**: in the row on an iPhone 12 mini's screen
+//   9. **A phone**: in the row on an iPhone 12 mini's screen
 //      (375 px, a touch screen) with no sideways scroll, and round there —
 //      the touch-target floor makes every button 2 rem tall, and a wheel drawn
-//      to the button went oval; it is drawn in a square of its own now — and
-//      the Classic banner's own colours.
+//      to the button went oval; it is drawn in a square of its own now.
 //
 // Run:  npm run busy
 //       npm run busy -- -v    also print what passed
@@ -310,8 +309,8 @@ async function main() {
     await settle(page);
     await context.close();
 
-    // ── 9. A phone, and Classic ────────────────────────────────────────────
-    log('\n9. A phone, and Classic\n');
+    // ── 9. A phone ────────────────────────────────────────────
+    log('\n9. A phone\n');
     // An iPhone 12 mini's screen, as Playwright describes it.
     const phone = await open(browser, server, { look: 'calm', viewport: { width: 375, height: 629 }, screen: { width: 375, height: 812 },
       deviceScaleFactor: 3, isMobile: true, hasTouch: true }, errors);
@@ -346,16 +345,6 @@ async function main() {
     check('on a touch screen the button is tall enough to press, and the wheel in it is round — not stretched to the button',
       R.coarse && R.button.h >= 32 && round(R.face) && round(R.out) && round(R.tick), J(R));
     await phone.context.close();
-
-    const classic = await open(browser, server, { look: 'classic' }, errors);
-    await classic.page.evaluate(() => { fetch('/busy-test/1500/classic'); });
-    await until(classic.page, () => document.getElementById('busy').dataset.state === 'spin');
-    const C = await classic.page.evaluate(() => ({
-      load: getComputedStyle(document.getElementById('busy')).getPropertyValue('--busy-load').trim(),
-      shown: getComputedStyle(document.getElementById('busy')).visibility,
-    }));
-    check('Classic: it spins there too, in the blue banner\'s lighter colours', C.shown === 'visible' && /^#a9d8ff$/i.test(C.load), J(C));
-    await classic.context.close();
   } finally {
     await browser.close();
     server.close();

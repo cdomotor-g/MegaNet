@@ -62,22 +62,21 @@ export async function launchBrowser(opts = {}) {
 }
 
 // ── Which look a page opens in ───────────────────────────────────────────────
-// The app has two looks (looks.js): Calm, the default since October 2026, and
-// Classic, the one every check written before it was written against — its
-// banner buttons, its bar of every tab under its group's heading, ☰ on a phone.
-// Those checks are about Classic, and Classic is still one pick away for
-// anybody who wants it, so they go on checking it: every context opens the app
-// in Classic unless it asks for another, `browser.newContext({ look: 'calm' })`,
-// or for none at all, `{ look: null }` — the app's own default, which is what
-// `npm run calm` checks.
+// The app's default look is Calm (looks.js), and Calm is what a person who
+// lands on Flood-Net sees, so Calm is what the checks are written against:
+// every context opens the app in it unless it asks for another,
+// `browser.newContext({ look: 'tiles' })`, or for none at all, `{ look: null }`
+// — the app's own default, which is what `npm run calm` checks. (Classic, the
+// look every check was once written against, was retired in November 2026 and
+// is archived, archive/classic/README.md; `?look=classic` is now handed Calm.)
 //
-// A context in Classic also opens the Stations map's paths drawn as plain
+// A context that does not ask for a look also opens the Stations map's paths drawn as plain
 // lines, `?draw=lines` (map-views.js, fromAddress): those checks were written
 // against the lines, and Views draws Flow for anybody who has not chosen (the
 // owner's call, for Classic too since 8 Nov 2026). `{ draw: null }` asks for
 // the app's own default; `npm run mapviews` §11 checks it.
 //
-// Pinned through the address, `?look=classic`, rather than through storage:
+// Pinned through the address, `?look=calm`, rather than through storage:
 // the address is a door the app keeps for exactly this (somebody sent a link
 // back to Classic), it takes the parameter out again before anything reads the
 // address, and — the reason storage would not do — a key written before the
@@ -93,8 +92,24 @@ export async function launchBrowser(opts = {}) {
 function pinLook(browser) {
   const newContext = browser.newContext.bind(browser);
   browser.newContext = async (opts = {}) => {
-    const { look = 'classic', rail = 'icons', draw = look === 'classic' ? 'lines' : null, ...rest } = opts || {};
+    const o = opts || {};
+    const { look = 'calm', rail = 'icons', draw = 'look' in o ? null : 'lines', oldMap = false, ...rest } = o;
     const context = await newContext(rest);
+    // `oldMap: true` — the Stations map the way every check was written
+    // against it, before Calm started it quiet (core.js, CALM_MAP_OFF): the
+    // context layers on, the links coloured by frequency. Written to storage,
+    // as somebody who had ticked each would have, so a check about a layer
+    // does not begin by turning it on.
+    if (oldMap) {
+      await context.addInitScript(() => {
+        try {
+          for (const k of ['mn-pin-sls', 'mn-rivers', 'mn-wind', 'mn-survey', 'mn-roads', 'mn-property-boundaries', 'mn-map-arrows', 'mn-map-backbone']) {
+            if (localStorage.getItem(k) == null) localStorage.setItem(k, 'on');
+          }
+          if (localStorage.getItem('mn-map-link-colour') == null) localStorage.setItem('mn-map-link-colour', 'freq');
+        } catch (_) {}
+      });
+    }
     if (look || rail || draw) {
       await context.addInitScript(([wantLook, wantRail, wantDraw]) => {
         try {

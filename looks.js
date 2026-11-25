@@ -3,8 +3,10 @@
 //   Looks   how Flood-Net is laid out around its tabs — the banner, the bar
 //           down the side, what a phone shows along its foot — as one choice
 //           a person can make and take back: 🪷 Calm, the default since
-//           October 2026; three drawn in pictures — 🔲 Tiles, 🎚️ Instrument
-//           and 🪧 Signs; or 🗂️ Classic, the way it looked before.
+//           October 2026; or one of three drawn in pictures — 🔲 Tiles,
+//           🎚️ Instrument and 🪧 Signs. 🗂️ Classic, the way it looked before,
+//           was retired in November 2026 and is archived: see
+//           archive/classic/README.md.
 //
 // After core.js (state, LOOK_CHOICES, lookStored, CALM_MAP_OFF, mapLayerStored,
 // announce, esc, escAttr),
@@ -26,11 +28,9 @@
 // address is the same in both: a look changes what is in front of you, not
 // what the app can do.
 //
-// Classic stays, whole, for anybody who had learnt where everything was. It is
-// one pick away from either look — Theme in the banner (Classic), ⋯ → Theme &
-// look (Calm), Ctrl+K → "classic" — and an address can carry it,
-// `?look=classic`, which is the way back for somebody who cannot find the
-// switch and the way the browser checks pin it (test/lib/browser.mjs).
+// Classic, the way it looked before, was retired in November 2026 and
+// archived (archive/classic/README.md): it no longer connects to anything. A
+// device that had picked it, or an address that names it, is handed Calm.
 //
 // ── The three in pictures ────────────────────────────────────────────────────
 // Asked for after Calm, by the same people: an app read at a glance rather
@@ -51,7 +51,7 @@
 // ── Adding another ───────────────────────────────────────────────────────────
 // A look is an entry in LOOKS below and in LOOK_CHOICES (core.js). Everything
 // Calm's shell draws is scoped to `:root[data-shell="calm"]` in styles.css,
-// which every look but Classic wears; what one look changes is scoped to
+// which every look wears; what one look changes is scoped to
 // `:root[data-look="<id>"]`. Nothing about a look is stored but its id, so a
 // look can be withdrawn without a migration: a browser holding an id nobody
 // knows is handed the default, as lookStored() does for any other junk.
@@ -100,13 +100,6 @@ const Looks = (() => {
       brief: 'black on yellow and large, for full sun',
       find: 'signs high contrast large big buttons glove yellow symbols pictures',
     },
-    classic: {
-      label: 'Classic', icon: '🗂️',
-      hint: 'Every tab listed down the side and every button in the banner, as Flood-Net looked until '
-          + 'October 2026.',
-      brief: 'every tab in the bar, every button in the banner',
-      find: 'classic old back previous',
-    },
   };
 
   const current = () => state.look;
@@ -118,7 +111,7 @@ const Looks = (() => {
   function apply() {
     const root = document.documentElement;
     root.setAttribute('data-look', state.look);
-    root.setAttribute('data-shell', lookUsesCalmShell() ? 'calm' : 'classic');
+    root.setAttribute('data-shell', 'calm');
   }
 
   // Called once from init.js, after Route.start() (which has to see the
@@ -133,6 +126,8 @@ const Looks = (() => {
     if (q && q.has('look')) {
       if (LOOK_CHOICES.includes(asked)) {
         try { localStorage.setItem(KEY, asked); localStorage.setItem(INTRO_KEY, 'seen'); } catch (_) {}
+      } else if (asked === 'classic') {
+        try { localStorage.setItem(INTRO_KEY, 'seen'); } catch (_) {}
       }
       q.delete('look');
       const rest = q.toString();
@@ -148,6 +143,16 @@ const Looks = (() => {
     if (typeof Route !== 'undefined' && Route.newDevice()) {
       try { localStorage.setItem(INTRO_KEY, 'seen'); } catch (_) {}
     }
+    // Classic was retired in November 2026 (archive/classic/README.md): a
+    // device that had picked it is handed Calm, its choice cleared so that it
+    // is a device with no choice, as any other, and told nothing — it knew
+    // the app already.
+    try {
+      if (localStorage.getItem(KEY) === 'classic') {
+        localStorage.removeItem(KEY);
+        localStorage.setItem(INTRO_KEY, 'seen');
+      }
+    } catch (_) {}
     apply();
   }
 
@@ -189,8 +194,8 @@ const Looks = (() => {
   // ── The map's layers under Calm ─────────────────────────────────────────
   // What the Calm look (or one of the three it shares its map with) left off
   // the Stations map and is still off, named, for the line at the top of
-  // 🗺️ Map display (mapDisplayControlsHtml, app.js) — empty under Classic,
-  // and once every one of them is on.
+  // 🗺️ Map display (mapDisplayControlsHtml, app.js) — empty once every one
+  // of them is on.
   function layersOff() {
     if (!lookUsesCalmShell()) return [];
     return CALM_MAP_OFF.filter(([key]) => !state[key]).map(([, , name]) => name);
@@ -248,8 +253,7 @@ const Looks = (() => {
     return `
       <div class="look-intro" role="note">
         <span>Flood-Net has a calmer look: the same tabs, filed under their groups, fewer buttons in the
-          banner, and a quieter map — Layers, in the side panel, turns them back on. Prefer the old look?</span>
-        <button type="button" class="link-btn" onclick="Looks.set('classic')">Switch back to Classic</button>
+          banner, and a quieter map — Layers, in the side panel, turns them back on.</span>
         <button type="button" class="look-intro-x" onclick="Looks.dismissIntro()"
                 aria-label="Keep the calm look and hide this note" title="Keep this look">×</button>
       </div>`;
