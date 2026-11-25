@@ -1,6 +1,6 @@
 // MegaNet — map-pills.js
 //
-//   MapPills   two small pills in the bottom-left corner of the Stations map,
+//   MapPills   two small pills along the top of the Stations map, toward the right,
 //              so the two choices a person changes most while looking at the
 //              ground are one tap from the map rather than inside the Layers
 //              panel:
@@ -101,10 +101,6 @@ const MapPills = (() => {
       (vl == null ? '' : `<div class="map-pill-wrap">${menu('view')}${pill('view', 'View', vl, VIEW_SAY)}</div>`)
       + (showImg ? `<div class="map-pill-wrap">${menu('imagery')}${pill('imagery', 'Imagery', label ? label.label : 'Auto', IMAGERY_SAY)}</div>` : '');
     root.hidden = !root.innerHTML;
-    // The slider's card stands at the foot of the map on the left (map-history.js);
-    // the pills ride above it rather than under it.
-    const bar = map && map.getContainer().querySelector('.mn-history-bar');
-    root.style.marginBottom = bar ? `calc(${bar.offsetHeight}px + 2.6rem)` : '';
   }
 
   function onClick(e) {
@@ -134,7 +130,12 @@ const MapPills = (() => {
       detach();
       if (typeof L === 'undefined') return;
       map = m;
-      ctl = L.control({ position: 'bottomleft' });
+      // Leaflet has no corner for a row left of its right-hand button column,
+      // so this one is made: absolutely placed, the menus open downward.
+      if (map._controlCorners && !map._controlCorners.toprow && map._controlContainer) {
+        map._controlCorners.toprow = L.DomUtil.create('div', 'leaflet-toprow', map._controlContainer);
+      }
+      ctl = L.control({ position: 'toprow' });
       ctl.onAdd = () => {
         root = L.DomUtil.create('div', 'map-pills');
         root.setAttribute('data-tour', 'map-pills');
@@ -158,7 +159,12 @@ const MapPills = (() => {
     document.removeEventListener('click', onDoc, true);
     document.removeEventListener('keydown', onKey, true);
     document.removeEventListener('mn-imagery-history', render);
-    if (map) { map.off('mnbasemix mnimagerychange', render); if (ctl) map.removeControl(ctl); }
+    if (map) {
+      map.off('mnbasemix mnimagerychange', render);
+      if (ctl) map.removeControl(ctl);
+      const c = map._controlCorners && map._controlCorners.toprow;
+      if (c) { c.remove(); delete map._controlCorners.toprow; }
+    }
     map = ctl = root = null;
     openMenu = null;
   }

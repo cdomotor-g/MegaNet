@@ -7157,7 +7157,7 @@ function initMap() {
   // after every module whose mode it names, so a mode that survives the
   // rebuild (a draw tool, site features) is named on the new map at once.
   MapMode.attach(state.map);
-  // The View and Imagery pills, bottom left (map-pills.js): after the base layers
+  // The View and Imagery pills, along the top, toward the right (map-pills.js): after the base layers
   // and the views they read.
   MapPills.attach(state.map);
   // Shapes survive a tab switch, so a line drawn earlier still has a profile to

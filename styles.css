@@ -31440,8 +31440,10 @@ details.tm-fold summary { cursor: pointer; }
 .mn-history-words dd { margin: 0; }
 .mn-history-credit { color: var(--muted); }
 
-/* The View and Imagery pills in the Stations map's bottom-left corner (map-pills.js). */
-.map-pills { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 1.4rem .6rem !important; pointer-events: auto; }
+/* The View and Imagery pills along the top of the Stations map, left of its right-hand button column (map-pills.js). */
+.leaflet-toprow { position: absolute; top: 10px; right: 56px; left: 56px; z-index: 1000; pointer-events: none; display: flex; justify-content: flex-end; }
+.leaflet-toprow .leaflet-control { margin: 0; float: none; }
+.map-pills { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .4rem; margin: 0 !important; pointer-events: auto; }
 .map-pills[hidden] { display: none; }
 .map-pill-wrap { position: relative; }
 .map-pill {
@@ -31454,7 +31456,7 @@ details.tm-fold summary { cursor: pointer; }
 .map-pill-k { color: var(--muted); }
 .map-pill b { font-weight: 700; }
 .map-pill-menu {
-  position: absolute; left: 0; bottom: calc(100% + .35rem); min-width: 12rem; max-height: min(60vh, 24rem); overflow: auto;
+  position: absolute; right: 0; top: calc(100% + .35rem); min-width: 12rem; max-height: min(60vh, 24rem); overflow: auto;
   padding: .3rem; border-radius: .6rem; border: 1px solid var(--border); background: var(--panel); color: var(--text);
   box-shadow: 0 4px 14px rgba(0, 0, 0, .35); z-index: 1200;
 }
