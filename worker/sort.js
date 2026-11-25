@@ -70,7 +70,7 @@ export const PASS_SHA256 = 'b87a14ebb7e631669eee14b11e9fd377f169585dd35db9a35ad7
 const PASS_HEADER = 'X-SoRT-Passphrase';
 const PASS_MAX = 1024;
 
-export const SORT_RATE = Object.freeze({ binding: 'SORT_RATE_LIMIT', limit: 120, period: 60 });
+export const SORT_RATE = Object.freeze({ binding: 'SORT_RATE_LIMIT', limit: 300, period: 60 });
 export const SORT_AUTH_FAIL = Object.freeze({ binding: 'SORT_AUTH_FAIL', limit: 10, period: 60 });
 
 // The pages that may read the answers: SoRT's (GitHub Pages) and Flood-Net's.

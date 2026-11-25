@@ -67,7 +67,7 @@ browser needs none and, with the passphrase, can use the store as SoRT does.
 **Brakes** (Cloudflare's rate limiting bindings, `wrangler.toml`; per
 Cloudflare location, keyed by a hash of the address):
 
-- `SORT_RATE_LIMIT` — **120 requests a minute** from one address, every request
+- `SORT_RATE_LIMIT` — **300 requests a minute** from one address, every request
   but the preflight.
 - `SORT_AUTH_FAIL` — **10 wrong passphrases a minute** from one address; the
   11th is `429` rather than `401`. Only wrong ones are counted, and the right
@@ -75,7 +75,7 @@ Cloudflare location, keyed by a hash of the address):
   passphrase behind an office's shared address cannot lock the others out.
 
 All the forum computers in one office usually reach the internet through one
-address, so the 120 a minute is theirs together.
+address, so the 300 a minute is theirs together.
 
 ## Where the files are
 

@@ -162,7 +162,7 @@ name = "SORT_RATE_LIMIT"
 namespace_id = "1107"
 
   [ratelimits.simple]
-  limit = 120
+  limit = 300
   period = 60
 
 [[ratelimits]]

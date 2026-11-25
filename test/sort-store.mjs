@@ -386,7 +386,7 @@ check('one that is not a SHA-256 in hex is nothing to hold to (null), not a fall
   for (let i = 0; i < SORT_RATE.limit + 1; i++) seq.push(await go(env, 'GET', '/check', { ip }));
   const last = seq[seq.length - 1];
   check(`${SORT_RATE.limit} requests a minute from one address, then 429 {"error":"slow down"} with Retry-After: 60`,
-    SORT_RATE.limit === 120 && SORT_RATE.period === 60 && seq.slice(0, -1).every(r => r.status === 200)
+    SORT_RATE.limit === 300 && SORT_RATE.period === 60 && seq.slice(0, -1).every(r => r.status === 200)
       && last.status === 429 && last.text === '{"error":"slow down"}' && last.headers.get('Retry-After') === '60', J(seq.slice(-3).map(r => r.status)));
   const lastSort = await go(env, 'GET', '/check', { ip, origin: SORT_ORIGIN });
   check('… readable by SoRT\'s page', lastSort.status === 429 && lastSort.headers.get('Access-Control-Allow-Origin') === SORT_ORIGIN);
