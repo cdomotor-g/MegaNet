@@ -78,11 +78,12 @@ const HealthCards = (() => {
     night: 'Solar night, 6 pm to 6 am at the station: the battery runs on its own, so the overnight low is the number that matters.',
     mag: 'Grows the card under the pointer to 3×, the cards next to it to 2× and the next ones to 1¼×, so more of it can be read without clicking.',
     traffic: 'The bars on the right-hand axis: how many messages the base stations that hear this station picked up from anyone in each check-signal period — a busy network can crowd a check out. Counted from the hourly totals of what Flood-Net\'s base stations heard, so it is in whole hours.',
+    snr: 'Signal-to-noise ratio, in dB: how far the signal stood above the background noise at the base station that heard it best. Bigger is better — 10 dB is marginal, 20 dB or more is comfortable. Only receivers that report a noise floor give one; a station without it shows no line.',
     size: '− and + (or Ctrl + scroll over the cards) make every card smaller or bigger; Fit all puts them all on the screen again.',
   };
   const GLOSSARY = [['hub', 'Maintenance hub'], ['ok', 'Nominal'], ['watch', 'Watch'], ['act', 'Act on'], ['silent', 'Silent'],
                     ['check', 'Check signal'], ['miss', 'Missed check'], ['partial', 'Frames lost'], ['unknown', 'Not listening'],
-                    ['rssi', 'Signal strength'], ['night', 'Night'], ['mag', 'Magnifier'], ['size', 'Card size'], ['traffic', 'Network traffic']];
+                    ['rssi', 'Signal strength'], ['night', 'Night'], ['mag', 'Magnifier'], ['size', 'Card size'], ['traffic', 'Network traffic'], ['snr', 'Signal-to-noise (SNR)']];
 
   const C = {
     A: null, demo: false, hub: null, span: 4, zoom: 1, mag: true,
@@ -167,6 +168,21 @@ const HealthCards = (() => {
     return { pts, unit, med: vs.length ? vs[Math.floor(vs.length / 2)] : null };
   }
 
+  // The best signal-to-noise (dB) of each transmission's copies. Not every
+  // receiver reports one, so the list can be empty.
+  function snrOf(txs, a, b) {
+    const pts = [];
+    (txs || []).forEach(tx => {
+      if (tx.t < a || tx.t >= b) return;
+      let best = null;
+      (tx.copies || []).forEach(c => { if (c.snr != null && isFinite(c.snr) && (best == null || c.snr > best)) best = c.snr; });
+      if (best != null) pts.push({ t: tx.t, v: best });
+    });
+    pts.sort((p, q) => p.t - q.t);
+    const top = pts.reduce((m, p) => Math.max(m, p.v), 0);
+    return { pts, hi: Math.min(60, Math.max(30, Math.ceil(top / 10) * 10)) };
+  }
+
   // The card's band and why. findings: the station's own (Station Health's);
   // sig: signalOf()'s; silent: expected and not heard at all.
   // → { band, battRed, sigRed, reasons: [{b, k, t}] }
@@ -244,6 +260,7 @@ const HealthCards = (() => {
     const slots = S && S.slots ? S.slots.filter(sl => sl.t >= a && sl.t < b) : [];
     const batt = S && S.battery && S.battery.series ? S.battery.series.filter(p => p.t >= a && p.t < b) : [];
     const sig = signalOf(S ? S.txs : [], a, b);
+    const snr = snrOf(S ? S.txs : [], a, b);
     const findings = S ? S.findings : [];
     const J = bandsOf(findings, sig, !S);
     const P = S && S.schedule ? S.schedule.P : null;
@@ -263,7 +280,7 @@ const HealthCards = (() => {
       if (sig.med != null) bits.push(`signal ${fmtNeg(Math.round(sig.med))} ${sig.unit || 'dBm'}`);
       J.reasons.push({ b: 'ok', k: 'Nominal', t: bits.length ? bits.join(', ') : 'nothing past a watch line' });
     }
-    return { id: st.id, st, S, a, b, slots, batt, sig, lows, P, counts, others: (findings || []).filter(f => f.severity !== 'info' && f.category !== 'power' && f.category !== 'comms'), ...J };
+    return { id: st.id, st, S, a, b, slots, batt, sig, snr, lows, P, counts, others: (findings || []).filter(f => f.severity !== 'info' && f.category !== 'power' && f.category !== 'comms'), ...J };
   }
 
   function build() {
@@ -561,7 +578,7 @@ const HealthCards = (() => {
 
   // ── 7. a card's chart ──────────────────────────────────────────────────────
 
-  const CH = { W: 1060, L: 62, R: 54, BY: 26, BH: 160, KY: 214, KH: 26, SY: 268, SH: 160 };
+  const CH = { W: 1060, L: 108, R: 54, BY: 26, BH: 160, KY: 214, KH: 26, SY: 268, SH: 160 };
 
   function fmtTime(t) {
     return new Date(t).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -665,6 +682,13 @@ const HealthCards = (() => {
     const nights = nightsOf(c.st.lon, c.a, c.b).map(([f, t]) => `M${x(f).toFixed(1)} ${BY}H${x(t).toFixed(1)}V${SY + SH}H${x(f).toFixed(1)}Z`).join(' ');
     const slotW = Math.max(3, ((c.P || 3 * HOUR) / (c.b - c.a)) * PW * 0.8);
     const bars = want => c.slots.filter(sl => want.includes(sl.outcome)).map(sl => `M${(x(sl.t) - slotW / 2).toFixed(1)} ${KY}h${slotW.toFixed(1)}v${KH}h${(-slotW).toFixed(1)}Z`).join(' ') || 'M0 0';
+    const yN = v => SY + SH - (clamp(v, 0, c.snr.hi) / c.snr.hi) * SH;
+    let snrSvg = '';
+    if (c.snr.pts.length) {
+      for (let v = 0; v <= c.snr.hi; v += 10) txt += `<text class="hc-ax hc-ax--snr" x="${L - 48}" y="${(yN(v) + 4).toFixed(1)}" text-anchor="end">${v}</text>`;
+      txt += `<text class="hc-c-title hc-c-title--snr" x="${L - 48}" y="${SY - 9}" text-anchor="end">SNR (dB)</text>`;
+      snrSvg = `<path class="hc-c-snr" d="${path(c.snr.pts, yN)}"/>`;
+    }
     const TR = c.traffic && c.traffic.bins.length ? c.traffic : null;
     const yT = n => SY + SH - (n / TR.max) * SH;
     let trafficSvg = '';
@@ -686,6 +710,7 @@ const HealthCards = (() => {
       <path class="hc-c-hit" d="${bars(['hit'])}"/><path class="hc-c-partial" d="${bars(['partial'])}"/>
       <path class="hc-c-miss" d="${bars(['miss', 'net'])}"/><path class="hc-c-unknown" d="${bars(['unknown'])}"/>
       <path class="hc-c-batt${c.battRed ? ' hc-red' : ''}" d="${path(c.batt.map(p => ({ t: p.t, v: p.V })), yB)}"/>
+      ${snrSvg}
       <path class="hc-c-sig${c.sigRed ? ' hc-red' : ''}" d="${path(c.sig.pts, yS)}"/>
       <text class="hc-c-title${c.battRed ? ' hc-red-t' : ''}" x="${L}" y="${BY - 9}">Battery voltage (V)</text>
       <text class="hc-c-title" x="${L}" y="${KY - 6}">Check signals${c.P ? ` — every ${esc(fmtEvery(c.P))}` : ''}</text>
@@ -711,7 +736,7 @@ const HealthCards = (() => {
         <button onclick="HealthCards.closeChart()">Close</button>
       </div>
       <div class="hc-d-plot" id="hc-d-plot">${chartSvg(c)}<div class="hc-tip" id="hc-tip" hidden></div></div>
-      <p class="small hc-d-key" id="hc-d-key">${trafficKey(c)}</p>
+      <p class="small hc-d-key" id="hc-d-key">${keyLine(c)}</p>
       <div class="hc-d-cols">
         <div><h4>${esc(why)}</h4>
           <ul class="hc-d-why">${c.reasons.map(r => `<li class="hc-why--${r.b}"><b>${esc(r.k)}</b> ${esc(r.t)}</li>`).join('')}</ul>
@@ -721,6 +746,7 @@ const HealthCards = (() => {
         <div class="small hc-d-what"><h4>What this shows</h4>
           <p><b>Battery voltage (V)</b> — the voltage in each report the station sent. It climbs by day as the solar panel charges and sags overnight; the overnight low is the number that matters. Dashed lines: 12.2 V watch, 11.8 V act on.</p>
           <p><b>Check signals</b> — a slot for each check report the station should have sent, on the schedule Flood-Net has learned for it. Filled: arrived. Paler: arrived with frames lost. Strong: never came. Dashed: no receiver that hears it was listening.</p>
+          <p><b>Signal-to-noise (SNR)</b> — the violet line, on the second axis at the left, in dB: how far the best-heard copy of each report stood above the background noise at the base station. Higher is better. Not every receiver reports it, so some stations have no line.</p>
           <p><b>Messages heard nearby</b> — the grey bars on the right-hand axis: how many messages the base stations that hear this station picked up, from anybody, in each check-signal period. They sit under the signal trace and line up with the check slots, so a tall bar by a missed check says the network was busy then.</p>
           <p><b>${c.sig.unit === 'dBFS' ? 'Signal level (dBFS)' : 'Signal strength — RSSI (dBm)'}</b> — ${c.sig.unit === 'dBFS'
             ? 'how loud the report was at the receiver\'s input, in decibels below full scale; this receiver does not report RSSI, so no watch or act-on line is drawn.'
@@ -747,12 +773,19 @@ const HealthCards = (() => {
     const had = document.activeElement && document.activeElement.id === 'hc-chart';
     const svg = plot.querySelector('svg');
     if (svg) svg.outerHTML = chartSvg(c);
-    if (key) key.innerHTML = trafficKey(c);
+    if (key) key.innerHTML = keyLine(c);
     bindChart();
     if (had) { const n = document.getElementById('hc-chart'); if (n) n.focus({ preventScroll: true }); }
     if (C.hov != null) hoverAt(C.hov);
   }
   // The line under the chart that says what the bars are, or why there are none.
+  function snrKey(c) {
+    const t = termHtml('Signal-to-noise (SNR)', WORDS.snr);
+    return c.snr.pts.length
+      ? `<b>${t}</b> (violet line, second left axis) — how far the best-heard copy of each report stood above the background noise. Higher is better.`
+      : `<b>${t}</b> — not drawn: none of the receivers that heard this station reported a noise floor, so there is no SNR to plot.`;
+  }
+  function keyLine(c) { return trafficKey(c) + '<br>' + snrKey(c); }
   function trafficKey(c) {
     const t = termHtml('Messages heard nearby', WORDS.traffic);
     if (C.demo) return `<b>${t}</b> — not drawn for the demo week: the bars come from what Flood-Net's base stations really heard.`;
@@ -781,7 +814,7 @@ const HealthCards = (() => {
   }
   // Every moment worth stepping to: a reading, a transmission, a check slot.
   function moments(c) {
-    return [...new Set([...c.batt.map(p => p.t), ...c.sig.pts.map(p => p.t), ...c.slots.map(s => s.t)])].sort((a, b) => a - b);
+    return [...new Set([...c.batt.map(p => p.t), ...c.sig.pts.map(p => p.t), ...c.snr.pts.map(p => p.t), ...c.slots.map(s => s.t)])].sort((a, b) => a - b);
   }
   function chartKey(e) {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
@@ -808,7 +841,8 @@ const HealthCards = (() => {
     const bp = nearest(c.batt.map(p => ({ t: p.t, v: p.V })), t, win);
     const sp = nearest(c.sig.pts, t, win);
     const sl = nearest(c.slots, t, P / 2);
-    const at = (sl && sl.t) || (bp && bp.t) || (sp && sp.t) || t;
+    const np = nearest(c.snr.pts, t, win);
+    const at = (sl && sl.t) || (bp && bp.t) || (sp && sp.t) || (np && np.t) || t;
     const { W, L, R } = CH, PW = W - L - R;
     const px = L + ((at - c.a) / (c.b - c.a)) * PW;
     cross.setAttribute('transform', `translate(${px.toFixed(1)} 0)`);
@@ -817,6 +851,7 @@ const HealthCards = (() => {
     const rows = [
       ['hc-ln--batt' + (c.battRed ? ' hc-ln--red' : ''), 'Battery', bp ? bp.v.toFixed(2) + ' V' : '—'],
       ['hc-ln--sig' + (c.sigRed ? ' hc-ln--red' : ''), c.sig.unit === 'dBFS' ? 'Signal level' : 'Signal strength', sp ? fmtNeg(Math.round(sp.v)) + ' ' + (c.sig.unit || 'dBm') : '—'],
+      ...(c.snr.pts.length ? [['hc-ln--snr', 'SNR', np ? np.v.toFixed(1) + ' dB' : '—']] : []),
       ['hc-ln--chk hc-ln--chk-' + (sl ? sl.outcome : 'none'), 'Check', sl ? O[sl.outcome] || sl.outcome : 'no check due'],
     ];
     if (c.traffic && c.traffic.bins.length) {
@@ -842,6 +877,6 @@ const HealthCards = (() => {
   return {
     render, mount, stop, setHub, setSpan, zoomBy, toggleMag, fullscreen, closeChart, openStation,
     // the pure parts, for test/health-cards.mjs
-    weights, geoRows, fitGrid, signalOf, bandsOf, nightsOf, trafficBins, WORDS, GLOSSARY,
+    weights, geoRows, fitGrid, signalOf, snrOf, bandsOf, nightsOf, trafficBins, WORDS, GLOSSARY,
   };
 })();

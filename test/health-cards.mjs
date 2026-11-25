@@ -135,6 +135,12 @@ const NEAR = [3, 2, 1.25];
   ok('traffic: the right axis tops out on a round number above the tallest bar', HC.trafficBins(byBase, ['A'], slots, P, a, a + 12 * H).max === 100);
 }
 {
+  const tx = (t, ...snr) => ({ t, copies: snr.map(v => ({ snr: v })) });
+  const r = HC.snrOf([tx(10, 8, 14), tx(20), tx(30, null, 22), tx(99, 5)], 0, 50);
+  ok('snr: the best copy of each transmission, none where no copy has one, outside the window left out', r.pts.length === 2 && r.pts[0].v === 14 && r.pts[1].v === 22, JSON.stringify(r.pts));
+  ok('snr: the axis tops out at 30 dB or the next ten above the highest, never past 60', r.hi === 30 && HC.snrOf([tx(1, 44)], 0, 5).hi === 50 && HC.snrOf([tx(1, 90)], 0, 5).hi === 60);
+}
+{
   ok('words: every glossary entry has a meaning', HC.GLOSSARY.every(([k]) => typeof HC.WORDS[k] === 'string' && HC.WORDS[k].length > 30));
   const night = HC.nightsOf(150, Date.UTC(2026, 10, 17), Date.UTC(2026, 10, 19));
   ok('nights: two days hold two nights or three part ones, each 12 h or less', night.length >= 2 && night.length <= 3 && night.every(([a, b]) => b > a && b - a <= 12 * 3600000 + 1));
