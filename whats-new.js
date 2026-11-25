@@ -29,6 +29,7 @@ const WhatsNew = (() => {
       '🪷 <strong>The Classic look has been retired.</strong> Calm is the look for everybody now, and <em>Classic</em> is gone from '
         + '<em>Theme &amp; layout</em>. Anybody who had picked it is on Calm, with every tab filed under its group: the same tabs, the same '
         + 'addresses, and <em>Layers</em> in the side panel for the map layers Calm starts without. Tiles, Instrument and Signs are as they were.',
+    ] },
     { n: 291, date: '2026-11-25', items: [
       '🌊 <strong>Riverside sites</strong> — a new tool on the Stations map (the 🌊 in the side panel\'s Tools, after ACMA licences). Click a place '
         + 'near a river and it scores how good a home a station would have there: how well the repeaters and base stations near it would hear it, '
