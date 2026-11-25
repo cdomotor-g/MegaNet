@@ -128,6 +128,8 @@ const HealthAnalysis = (() => {
   // 11.8 V is the point past which a station's radio starts to brown out.
   const BATT_WARN_V = 12.2;
   const BATT_CRIT_V = 11.8;
+  // A battery reading heard this many dB under the station's usual signal-to-noise is suspect.
+  const WEAK_SNR_DB = 8;
   const BATT_OVER_V = 15.0;
   const BATT_FALL_V_PER_DAY = -0.04;
   const BATT_SWING_MIN_V = 0.15;
@@ -801,6 +803,24 @@ const HealthAnalysis = (() => {
     return tips * rain.mmPerTip;
   }
 
+  // Battery readings heard far under the station's usual signal-to-noise AND
+  // well off their clearly-heard neighbours are interference, not the battery.
+  // series [{t, V, snr}]; allSnr every transmission's best SNR (null if none).
+  function screenWeakSnr(series, allSnr) {
+    const snrs = allSnr.filter(x => x != null);
+    const snrMed = snrs.length >= 8 ? median(snrs) : null;
+    const weak = p => snrMed != null && p.snr != null && p.snr <= snrMed - WEAK_SNR_DB;
+    const strongV = series.filter(p => !weak(p));
+    const doubtful = [];
+    const trusted = series.filter(p => {
+      if (!weak(p)) return true;
+      const near = strongV.filter(q => Math.abs(q.t - p.t) <= 6 * HOUR).map(q => q.V);
+      if (near.length >= 2 && Math.abs(p.V - median(near)) > 0.6) { doubtful.push(p); return false; }
+      return true;
+    });
+    return { snrMed, trusted, doubtful };
+  }
+
   // One-reading spikes: a value far from both neighbours while the neighbours
   // agree — and a few bits from them, which is what a flip is and a real
   // change seldom is. A corrupted copy that arrived without its clean twin
@@ -827,6 +847,7 @@ const HealthAnalysis = (() => {
 
   const ACTION = {
     'battery-critical':  'Visit: replace or recharge the battery and check the charging circuit before the radio browns out.',
+    'battery-low-weak':  'No visit yet: the low readings arrived with a weak signal and look corrupted. Check again once the signal is clear; if it repeats at a clear signal, treat it as battery low.',
     'battery-low':       'Plan a visit: test the battery under load, and the panel, regulator and fuse.',
     'battery-falling':   'Check the solar panel (shade, dirt, cable), regulator and fuse while there is margin left.',
     'battery-no-charge': 'Check the panel, its cable, the regulator and the fuse — no daily charge is reaching the battery.',
@@ -872,10 +893,10 @@ const HealthAnalysis = (() => {
   // fifteen minutes with nobody's browser open (#215, 0059), and what the
   // station card and its pin take from there (health-glance.js).
   const CURRENT_KINDS = ['silent', 'repeater-down', 'area-silence', 'receiver-silent',
-    'battery-critical', 'battery-low', 'battery-no-charge'];
+    'battery-critical', 'battery-low', 'battery-low-weak', 'battery-no-charge'];
 
   const CATEGORY = {
-    'battery-critical': 'power', 'battery-low': 'power', 'battery-falling': 'power', 'battery-no-charge': 'power',
+    'battery-critical': 'power', 'battery-low': 'power', 'battery-low-weak': 'power', 'battery-falling': 'power', 'battery-no-charge': 'power',
     'battery-float': 'power', 'battery-overcharge': 'power',
     'silent': 'comms', 'silent-spell': 'comms', 'missed-rising': 'comms', 'missed-checks': 'comms', 'partial-checks': 'comms',
     'corrupt-copies': 'comms', 'clock-drift': 'comms',
@@ -1309,7 +1330,9 @@ const HealthAnalysis = (() => {
       // Battery.
       const batt = S.sensors.filter(x => x.kind === 'battery').sort((a, b) => b.n - a.n)[0];
       if (batt) {
-        const raw = batt.txs.map(tx => ({ t: tx.t, V: round(tx.v / 10, 1) }));
+        // Best signal-to-noise any copy of the report was heard with.
+        const snrOf = tx => { let m = null; for (const c of tx.copies || []) if (c.snr != null && (m == null || c.snr > m)) m = c.snr; return m; };
+        const raw = batt.txs.map(tx => ({ t: tx.t, V: round(tx.v / 10, 1), snr: snrOf(tx) }));
         const ok = raw.filter(p => p.V >= SensorValues.BATT_MIN_V && p.V <= SensorValues.BATT_MAX_V);
         if (raw.length >= 4 && ok.length < raw.length * 0.5) {
           const med = median(batt.txs.map(tx => tx.v));
@@ -1320,9 +1343,14 @@ const HealthAnalysis = (() => {
             evidence: { aid: batt.aid, medianRaw: med, implausible: raw.length - ok.length, n: raw.length },
           }));
         } else if (ok.length >= 3) {
-          const spikes = spikesOf(ok.map(p => ({ t: p.t, v: p.V })), 0.6, p => Math.round(p.v * 10));
+          // A reading heard far below this station's usual signal-to-noise, and
+          // well off its neighbours that were heard clearly, is interference
+          // flipping bits, not the battery. Set aside — pairs and runs included,
+          // which the one-reading spike test below cannot see.
+          const { snrMed, trusted, doubtful } = screenWeakSnr(ok, S.txs.map(snrOf));
+          const spikes = spikesOf(trusted.map(p => ({ t: p.t, v: p.V })), 0.6, p => Math.round(p.v * 10));
           const cleanSet = new Set(spikes.map(s => s.t));
-          const clean = ok.filter(p => !cleanSet.has(p.t));
+          const clean = trusted.filter(p => !cleanSet.has(p.t));
           const B = batteryOf(clean, st, now);
           S.battery = Object.assign(B || {}, { addr: batt.addr, aid: batt.aid, series: clean, spikes: spikes.length });
           if (B) {
@@ -1341,6 +1369,14 @@ const HealthAnalysis = (() => {
                 title: `Battery low — ${L.toFixed(1)} V`,
                 detail: `${where[0].toUpperCase() + where.slice(1)} was ${L.toFixed(1)} V, under ${BATT_WARN_V} V (about half charge at rest).`,
                 evidence: { lastNightV: B.lastNight, latestV: B.latest.V },
+              }));
+            } else if (doubtful.some(p => p.V <= BATT_WARN_V)) {
+              const lowest = Math.min(...doubtful.map(p => p.V));
+              F.push(finding('battery-low-weak', 'warn', {
+                stationId: st.id, addr: batt.addr,
+                title: `Low battery readings, heard with weak signal — ${lowest.toFixed(1)} V`,
+                detail: `${plural(doubtful.length, 'reading')} as low as ${lowest.toFixed(1)} V, each heard ${WEAK_SNR_DB} dB or more below this station's usual signal-to-noise while the readings around it were fine — most likely interference corrupting the report, not the battery. Watch whether it repeats with a clear signal.`,
+                evidence: { readings: doubtful.length, lowestV: lowest, usualSnrDb: round(snrMed, 1), snrDb: doubtful.map(p => round(p.snr, 1)) },
               }));
             }
             if (B.slope != null && B.slope <= BATT_FALL_V_PER_DAY && B.nights.length >= 4
@@ -2144,7 +2180,7 @@ const HealthAnalysis = (() => {
     // counted on them (dup_count, 0096).
     copiesHeard,
     // The arithmetic, for test/health.mjs.
-    _detectSchedule: detectSchedule, _theilSen: theilSen, _batteryOf: batteryOf, _rainOf: rainOf,
+    _detectSchedule: detectSchedule, _screenWeakSnr: screenWeakSnr, _theilSen: theilSen, _batteryOf: batteryOf, _rainOf: rainOf,
     _transmissions: transmissions, _normalise: normalise, _pop: pop, _receivers: receivers,
     // A rain gauge's tips with the counter's wraps, resets and corrupted
     // frames taken out, and the one-reading spikes a battery or a level

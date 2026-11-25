@@ -319,10 +319,20 @@ try {
     const sTx = HealthAnalysis._transmissions(HealthAnalysis._normalise(storm));
     const flip = [rec(7002, t0, 133), rec(7002, t0 + 2100, 133 ^ 8), rec(7002, t0 + 3 * H, 134), rec(7002, t0 + 6 * H, 133)];
     const fTx = HealthAnalysis._transmissions(HealthAnalysis._normalise(flip));
-    return { P: sch && sch.P / 60000, stormBad: sTx.reduce((n, tx) => n + tx.bad.length, 0), stormTx: sTx.length,
+    // A station heard at ~33 dB whose battery reads 13 V; three readings at 11.4 / 11.4 / 10.5 V
+    // arrive at 4-10 dB (interference), and one real 12.0 V dip arrives clear.
+    const bs = [];
+    for (let k = 0; k < 24; k++) bs.push({ t: t0 + k * 3 * H, V: 13, snr: 33 });
+    bs[10] = { t: bs[10].t, V: 11.4, snr: 10 }; bs[11] = { t: bs[11].t, V: 11.4, snr: 4 }; bs[20] = { t: bs[20].t, V: 10.5, snr: 9 };
+    bs[15] = { t: bs[15].t, V: 12, snr: 33 };
+    const scr = HealthAnalysis._screenWeakSnr(bs, bs.map(p => p.snr));
+    const lowNoSnr = HealthAnalysis._screenWeakSnr(bs.map(p => ({ t: p.t, V: p.V, snr: null })), bs.map(() => null));
+    return { weakDoubt: scr.doubtful.map(p => p.V).join(','), weakKept: scr.trusted.length, weakNoSnr: lowNoSnr.doubtful.length, P: sch && sch.P / 60000, stormBad: sTx.reduce((n, tx) => n + tx.bad.length, 0), stormTx: sTx.length,
       flipBad: fTx.reduce((n, tx) => n + tx.bad.length, 0), flipTruth: fTx[0] && fTx[0].v };
   });
   ok('a 3-hour station that misses every fourth check and went silent for two days is still 3-hourly', rules.P === 180, 'period ' + rules.P + ' min');
+  ok('battery dips heard far under the usual signal-to-noise are set aside, even in a run', rules.weakDoubt === '11.4,11.4,10.5' && rules.weakKept === 21, JSON.stringify(rules));
+  ok('…a real dip heard clearly, and any dip with no signal figure, are kept', rules.weakNoSnr === 0, JSON.stringify(rules));
   ok('a rain gauge tipping every 7 s through a storm is reporting, not corrupted', rules.stormBad === 0 && rules.stormTx === 12, JSON.stringify(rules));
   ok('a battery copy with a bit flipped 2 s after the clean one is a corrupted copy of it', rules.flipBad === 1 && rules.flipTruth === 133, JSON.stringify(rules));
 
