@@ -328,7 +328,7 @@ const HealthCards = (() => {
     const why = c.reasons.map(r => `<span class="hc-why-line hc-why--${r.b}"><b>${esc(r.k)}</b> ${esc(r.t)}</span>`).join('');
     const label = `${c.st.name}: ${word}. ${c.reasons.map(r => `${r.k}: ${r.t}`).join('. ')}. Open its chart.`;
     return `<button type="button" class="hc-card hc-card--${c.band}" data-i="${i}" aria-label="${escAttr(label)}">
-      <span class="hc-top"><span class="hc-name">${esc(c.st.name)}</span><span class="hc-chip hc-chip--${c.band}">${esc(word)}</span></span>
+      <span class="hc-top"><span class="hc-name">${esc(c.st.name)}</span><span class="hc-chip hc-chip--${c.band}" title="${escAttr(`${word}: ${WORDS[c.band] || ''}`)}">${esc(word)}</span></span>
       <svg class="hc-plot" viewBox="0 0 ${VB} 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
         <path class="hc-night" d="${nightPath(c.st.lon, c.a, c.b, 0, 100)}"/>
         <path class="hc-s-unknown" d="${barsPath(c.slots, ['unknown'], c.P, c.a, c.b, 0, 100)}"/>
@@ -668,6 +668,12 @@ const HealthCards = (() => {
     const yB = v => BY + BH - ((clamp(v, V_LO, V_HI) - V_LO) / (V_HI - V_LO)) * BH;
     const yS = v => SY + SH - ((clamp(v, sLo, sHi) - sLo) / (sHi - sLo)) * SH;
     const path = (pts, y) => { let d = '', prev = null; pts.forEach(p => { d += (prev != null && p.t - prev <= gapOf(c) ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.v).toFixed(1) + ' '; prev = p.t; }); return d || 'M0 0'; };
+    // A dot on every data point, in this enlarged chart only: a line needs two
+    // points joined, so a trace of one lone reading (or readings further apart
+    // than the gap that breaks a line) would otherwise draw nothing and the
+    // plot would look empty. One path of zero-length strokes with round caps,
+    // so a few thousand points are one element.
+    const dots = (pts, y) => pts.map(p => `M${x(p.t).toFixed(1)} ${y(p.v).toFixed(1)}h0.01`).join('') || 'M0 0';
     let grid = '', txt = '';
     [11.5, 12, 12.5, 13, 13.5, 14].forEach(v => { grid += `M${L} ${yB(v).toFixed(1)}H${L + PW} `; txt += `<text class="hc-ax" x="${L - 6}" y="${(yB(v) + 4).toFixed(1)}" text-anchor="end">${v.toFixed(1)}</text>`; });
     (dbfs ? [-60, -45, -30, -15, 0] : [-120, -110, -100, -90, -80, -70, -60]).forEach(v => { grid += `M${L} ${yS(v).toFixed(1)}H${L + PW} `; txt += `<text class="hc-ax" x="${L - 6}" y="${(yS(v) + 4).toFixed(1)}" text-anchor="end">${fmtNeg(v)}</text>`; });
@@ -712,6 +718,8 @@ const HealthCards = (() => {
       <path class="hc-c-batt${c.battRed ? ' hc-red' : ''}" d="${path(c.batt.map(p => ({ t: p.t, v: p.V })), yB)}"/>
       ${snrSvg}
       <path class="hc-c-sig${c.sigRed ? ' hc-red' : ''}" d="${path(c.sig.pts, yS)}"/>
+      <path class="hc-c-dots hc-c-dots--batt${c.battRed ? ' hc-red' : ''}" d="${dots(c.batt.map(p => ({ t: p.t, v: p.V })), yB)}"/>
+      <path class="hc-c-dots hc-c-dots--sig${c.sigRed ? ' hc-red' : ''}" d="${dots(c.sig.pts, yS)}"/>
       <text class="hc-c-title${c.battRed ? ' hc-red-t' : ''}" x="${L}" y="${BY - 9}">Battery voltage (V)</text>
       <text class="hc-c-title" x="${L}" y="${KY - 6}">Check signals${c.P ? ` — every ${esc(fmtEvery(c.P))}` : ''}</text>
       <text class="hc-c-title${c.sigRed ? ' hc-red-t' : ''}" x="${L}" y="${SY - 9}">${dbfs ? 'Signal level (dBFS) — how loud the receiver heard it' : 'Signal strength — RSSI (dBm), how strongly the base station heard it'}</text>
@@ -744,6 +752,7 @@ const HealthCards = (() => {
           ${c.S ? `<button onclick="HealthCards.openStation()">Open it in Station Health</button>` : ''}
         </div>
         <div class="small hc-d-what"><h4>What this shows</h4>
+          <p>Each <b>dot</b> on the battery and signal lines is one report heard; a line joins dots heard close together, so a single report, or ones far apart, shows as a dot alone.</p>
           <p><b>Battery voltage (V)</b> — the voltage in each report the station sent. It climbs by day as the solar panel charges and sags overnight; the overnight low is the number that matters. Dashed lines: 12.2 V watch, 11.8 V act on.</p>
           <p><b>Check signals</b> — a slot for each check report the station should have sent, on the schedule Flood-Net has learned for it. Filled: arrived. Paler: arrived with frames lost. Strong: never came. Dashed: no receiver that hears it was listening.</p>
           <p><b>Signal-to-noise (SNR)</b> — the violet line, on the second axis at the left, in dB: how far the best-heard copy of each report stood above the background noise at the base station. Higher is better. Not every receiver reports it, so some stations have no line.</p>

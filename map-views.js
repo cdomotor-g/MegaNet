@@ -2192,6 +2192,7 @@ const MapViews = (function () {
   // Redrawn whole — it is small — with what a person was in the middle of
   // kept: the control they were on, a name half typed, the words fold open.
   function rerender(opts = {}) {
+    if (typeof MapPills !== 'undefined') safely(() => MapPills.sync(), 'MapPills.sync');
     const el = blockEl();
     if (!el) return;
     const a = document.activeElement;

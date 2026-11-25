@@ -386,6 +386,23 @@ try {
     /(today|yesterday|\d{2}:\d{2})/.test(falling.heard || '') && /ago/.test(falling.heard) && /checks every 3 h/.test(falling.heard), falling.heard);
   check('…its night lows, falling, and when they reach 11.8 V',
     /V last night/.test(falling.battery || '') && /falling 0\.\d\d V a day/.test(falling.battery) && /11\.8 V in about \d+ day/.test(falling.battery), falling.battery);
+  check('…and the last battery value beside it, with how long ago it was heard',
+    /last heard \d{2}\.\d V, .*ago/.test(falling.battery || ''), falling.battery);
+  // What each measurement last said, from the rows the card holds already.
+  const lastv = await page.evaluate(({ rows, R }) => {
+    const pick = id => {
+      const s = state.data.stations.find(x => x.id === id);
+      const ids = new Set(stationAlertIds(s).map(String));
+      const mine = rows.filter(r => ids.has(String(r.alert_id)));
+      const g = HealthGlance.glanceFrom(s, mine, Date.now());
+      return g && g.last;
+    };
+    return { rain: pick(R.blocked), level: pick(R.flatline), batt: pick(R.steady) };
+  }, { rows: W.rows, R: W.roles }).catch(e => ({ err: String(e) }));
+  check('the last values: the week\'s rain with its last tip, level as a raw count where no unit was recorded, battery in volts — and none where the station has no such sensor',
+    lastv && lastv.batt && /^\d+\.\d V$/.test((lastv.batt.battery || {}).text || '') && /^\d+(\.\d)? mm in the week$/.test((lastv.batt.rain || {}).text || '')
+      && /^\d+ tips? \(\d+(\.\d)? mm\)$/.test((lastv.batt.rain || {}).tipText || '') && /\(raw count\)$/.test((lastv.batt.level || {}).text || '')
+      && lastv.rain && lastv.rain.rain && lastv.rain.rain.tipT == null && lastv.level && lastv.level.level === null, J(lastv));
   check('…its findings worst first, the battery among them, every one listed under the line',
     /Battery (low|falling)/.test(falling.findings || '') && falling.items.length >= 2 && falling.items.some(t => /Battery falling/.test(t)), J(falling.items));
   check('…and its class a watch, as a word and a glyph beside the colour', /Watch/.test(falling.badge || '') && /⚠/.test(falling.badge) && falling.cls === 'watch', falling.badge);

@@ -42,13 +42,17 @@
 //
 // Then Chromium:
 //
-//   * the tab opens with the bulletin first: its status, headline and Play;
-//     no page errors; every scene's drawing parses as SVG
+//   * paused (BULLETINS_PAUSED, for cost): the Network Bulletins view says the
+//     service is paused and draws no player, and fetches nothing; Station
+//     Health's page no longer opens with the bulletin. The rest is checked with
+//     the service switched back on (HealthBulletinTab._pause(false))
+//   * the Network Bulletins tab opens with the bulletin: its status, headline
+//     and Play; no page errors; every scene's drawing parses as SVG
 //   * Play runs it: the scene moves on, the caption is revealed, the bar fills;
 //     pause freezes it; a scene picked from the bar is drawn finished
-//   * the week's readings landing redraw the tab around it and leave a playing
+//   * Station Health working out a week while the tab is open leaves a playing
 //     bulletin where it is — the same stage, still playing
-//   * a station named in the scene opens on the tab below
+//   * a station named in the scene opens in Station Health
 //   * dailies Tuesday to Friday, the weekly on Mondays in their place:
 //     Friday's daily is not stale until Tuesday afternoon; its signoff (drawn,
 //     and the draft's) says Monday and the week, the weekly's Tuesday
@@ -528,21 +532,39 @@ async function page(opts = {}) {
   });
   await pg.goto(server.origin + '/index.html', { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => typeof state !== 'undefined' && state.data && Array.isArray(state.data.stations), null, { timeout: LOAD_TIMEOUT });
-  await pg.evaluate(() => switchTab('health'));
+  // The service is paused for cost (BULLETINS_PAUSED); the player is checked
+  // with it switched back on.
+  await pg.evaluate(paused => { HealthBulletinTab._pause(paused); switchTab('bulletins'); }, !!opts.paused);
   return { pg, context, errors };
 }
 const until = (pg, fn, arg, timeout = 20_000) => pg.waitForFunction(fn, arg, { timeout });
 try {
+  // ── paused: the notice, and nothing fetched ──
+  {
+    let fetched = 0;
+    const p = await page({ paused: true });
+    p.pg.on('request', r => { if (/data\/bulletins\//.test(r.url())) fetched++; });
+    await p.pg.waitForTimeout(800);
+    const note = await p.pg.evaluate(() => ({ tab: state.activeTab, text: (document.getElementById('hbt-panel') || {}).textContent || '', player: !!document.getElementById('hb-panel'),
+      strip: [...document.querySelectorAll('#view-strip .view-btn')].map(b => b.textContent.replace(/\s+/g, ' ').trim()), hlRest: !!document.getElementById('hl-rest') }));
+    ok('the Network Bulletins tab says the service is paused due to cost constraints, and draws no player', note.tab === 'bulletins' && /currently paused due to cost constraints/.test(note.text) && !note.player, JSON.stringify(note));
+    ok('…a view beside Station Health\'s own, reached from the strip', note.strip.some(t => /Network Bulletins/.test(t)) && note.strip.some(t => /Station Health/.test(t)), JSON.stringify(note.strip));
+    ok('…and nothing of the bulletin is fetched while it is paused', fetched === 0, String(fetched));
+    await p.pg.evaluate(() => switchTab('health'));
+    await p.pg.waitForSelector('#hl-rest');
+    ok('Station Health no longer opens with the bulletin', await p.pg.evaluate(() => !document.getElementById('hb-panel') && !document.getElementById('hb-slot') && document.querySelector('.hl-page').firstElementChild.id === 'hl-rest'));
+    await p.context.close();
+  }
   // ── the bulletin first ──
   const { pg, context, errors } = await page();
   await until(pg, () => !!document.querySelector('#hb-stage svg'));
   const first = await pg.evaluate(() => {
     const panel = document.getElementById('hb-panel');
     const page = document.querySelector('.hl-page');
-    return { firstChild: page && page.firstElementChild && page.firstElementChild.id, text: panel.textContent.replace(/\s+/g, ' '),
+    return { firstChild: page && page.firstElementChild && page.firstElementChild.id, onHealth: !!document.getElementById('hl-rest'), text: panel.textContent.replace(/\s+/g, ' '),
              play: !!document.querySelector('.hb-bigplay'), still: document.getElementById('hb-stage').classList.contains('is-still') };
   });
-  ok('the tab opens with the bulletin, above everything else', first.firstChild === 'hb-slot');
+  ok('the bulletin has a tab of its own (a view of Station Health), and Station Health\'s page no longer opens with it', first.firstChild === 'hb-panel' && !first.onHealth);
   ok('…its status, headline and Play showing, drawn finished', /A few need attention/.test(first.text) && /Ten stations around Henderson Creek/.test(first.text) && first.play && first.still, first.text.slice(0, 300));
   const words = await pg.evaluate(() => ({ heading: document.getElementById('hb-h').textContent, term: (document.querySelector('.hb-issued .term') || {}).title || '',
     key: [...document.querySelectorAll('.hb-transcript .hb-key dt')].map(d => d.textContent) }));
@@ -592,9 +614,9 @@ try {
   ok('Play: the caption is said a word at a time, the bar fills, the presenter talks', playing.said > 0 && playing.said < playing.all && playing.fill > 0 && playing.talking, JSON.stringify(playing));
   const stage = await pg.$('#hb-stage');
   await pg.evaluate(() => Health.demo());
-  await until(pg, () => !!document.querySelector('.hl-attn'));
+  await pg.waitForTimeout(500);
   const kept = await pg.evaluate(el => ({ same: document.getElementById('hb-stage') === el, playing: HealthBulletin._state().playing }), stage);
-  ok('the week landing redraws the tab around a playing bulletin and leaves it playing', kept.same && kept.playing, JSON.stringify(kept));
+  ok('Station Health working out a week (its demo) while the bulletin tab is open leaves a playing bulletin where it is', kept.same && kept.playing, JSON.stringify(kept));
   await pg.evaluate(() => HealthBulletin.next());
   ok('⏭ moves to the next scene', await pg.evaluate(() => HealthBulletin._state().scene === 1 && /Ten quiet around Logan/.test(document.getElementById('hb-lower').textContent)));
   // Paused at a scene's very start is drawn finished (is-still), not frozen:
@@ -646,7 +668,7 @@ try {
   ok('…and space pauses it', await pg.evaluate(() => !HealthBulletin._state().playing));
   await pg.reload({ waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => typeof state !== 'undefined' && state.data && Array.isArray(state.data.stations), null, { timeout: LOAD_TIMEOUT });
-  await pg.evaluate(() => switchTab('health'));
+  await pg.evaluate(() => { HealthBulletinTab._pause(false); switchTab('bulletins'); });
   await until(pg, () => !!document.querySelector('#hb-stage svg'));
   ok('…the speed remembered when the page is opened again', await pg.evaluate(() => HealthBulletin._state().rate === 1.25 && document.getElementById('hb-speed').textContent === '1.25×'));
   await pg.evaluate(() => HealthBulletin.setRate(1));
@@ -657,7 +679,11 @@ try {
   await pg.click('#hb-chips button');
   await pg.waitForTimeout(300);
   const opened = await pg.evaluate(() => Health.picked());
-  ok('a station named in the scene opens on the tab below', opened === 'henderson_ck_al', String(opened));
+  ok('a station named in the scene opens in Station Health, the tab switched to', opened === 'henderson_ck_al' && await pg.evaluate(() => state.activeTab === 'health'), String(opened));
+
+  // Back to the bulletin's own tab for the rest.
+  await pg.evaluate(() => switchTab('bulletins'));
+  await until(pg, () => !!document.querySelector('#hb-stage svg'));
 
   // ── dailies Tuesday to Friday: Friday's daily holds until Tuesday's ──
   const wk = await pg.evaluate(() => {

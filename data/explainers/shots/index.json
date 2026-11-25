@@ -73,8 +73,8 @@
     }
    },
    "selectors": {
-    "bulletin": "#hb-player",
-    "kinds": ".hb-tools"
+    "bulletin": "section[aria-labelledby='hl-h']",
+    "kinds": ".hl-seg"
    }
   },
   "home": {

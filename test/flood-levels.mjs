@@ -96,6 +96,15 @@ function arithmetic(FV) {
     fp && fp.bed === 20 && near(fp.max.depth, 3) && near(fp.max.v, FV.manning(3, 0.001, 0.06).v));
   check('the fastest level is the rarest flood\'s',
     ch && ch.max.key === 'aep_0_066_m' && ch.levels.length === 2);
+  // The tower pin: the station's own ground height, the floodplain's roughness; no height, no number.
+  const pinE = FV.estimate({ ...base, elevation_ahd: 19 });
+  check('the tower pin is the station\'s own ground height at the floodplain\'s roughness',
+    pinE.pin && pinE.pin.ok && pinE.pin.bed === 19 && pinE.pin.n === 0.06 && near(pinE.pin.max.depth, 4)
+      && near(pinE.pin.max.v, FV.manning(4, 0.001, 0.06).v), JSON.stringify(pinE.pin));
+  check('…and with no ground height on record it says there is not enough to go on, with no number',
+    e.pin && e.pin.ok === false && /no ground height/.test(e.pin.why) && e.pin.max === undefined, JSON.stringify(e.pin));
+  check('…nor where the station\'s height is 30 m or more from the sheet\'s ground',
+    FV.estimate({ ...base, elevation_ahd: 80 }).pin.ok === false);
 
   const storage = FV.estimate({ ...base, name: 'Test Dam HW AL' });
   check('a storage\'s gauge zero is no bed',
@@ -328,8 +337,8 @@ async function main() {
     check('…carrying the module\'s own figures for both settings, flagged indicative',
       f.vel && f.vel.includes(`≈ ${FV.speed(ch.max.v)} m/s channel`) && f.vel.includes(`${FV.speed(fp.max.v)} floodplain`)
         && /indicative/.test(f.vel), JSON.stringify({ card: f.vel, ch: ch.max.v, fp: fp.max.v }));
-    check('the section gives a line per setting and the workings behind a disclosure',
-      f.velLines.length === 2 && f.velLines[0].startsWith('Channel') && f.how, JSON.stringify(f.velLines));
+    check('the section gives a line per setting, one for the tower pin, and the workings behind a disclosure',
+      f.velLines.length === 3 && f.velLines[0].startsWith('Channel') && f.velLines[2].startsWith('Tower pin') && f.how, JSON.stringify(f.velLines));
 
     if (bare) {
       const b = await read(bare.id);

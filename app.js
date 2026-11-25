@@ -4142,6 +4142,7 @@ function renderMain() {
     case 'msglog':     el.innerHTML = MessageLog.render();      MessageLog.init(); break;
     case 'telemetry':  el.innerHTML = Telemetry.render();       Telemetry.init();  break;
     case 'health':     el.innerHTML = Health.render();          Health.init();     break;
+    case 'bulletins':  el.innerHTML = HealthBulletinTab.render(); HealthBulletinTab.init(); break;
     case 'signalroutes': el.innerHTML = SignalRoutes.render(); SignalRoutes.init(); break;
     case 'mapgen':     el.innerHTML = MapGen.render();          MapGen.init();     break;
     case 'inspections': el.innerHTML = Inspections.render();  Inspections.init(); break;
@@ -6780,6 +6781,7 @@ function stopStationsMap() {
   // is a WebGL context that must not outlive the map (map-twin.js).
   MapTwin.detach();
   MapMode.detach();
+  MapPills.detach();
   // The pill over the map's stage goes with the stage; the trail is kept.
   StationTrail.detach();
   MapSpider.detach();
@@ -6798,6 +6800,7 @@ function stopStationsMap() {
   MapPaths.detach();
   MapElevation.detach();
   MapHere.detach();
+  MapStreetView.detach();
   MapMagnify.detach();
   MapDraw.detach();
   LinkBudget.detach();
@@ -7041,6 +7044,9 @@ function initMap() {
   // Before MapDraw, for MapMovePin's reason: the tools that take a map click
   // have to know which map before anybody arms one.
   MapHere.attach(state.map);
+  // Right-click or press and hold anywhere: a link to street view there
+  // (map-streetview.js).
+  MapStreetView.attach(state.map);
   // Above `lg` the tab renders straight into side by side — and the height the
   // map needs cannot be known until the markup is in the document and the
   // cards have gone to the side panel.
@@ -7144,6 +7150,9 @@ function initMap() {
   // after every module whose mode it names, so a mode that survives the
   // rebuild (a draw tool, site features) is named on the new map at once.
   MapMode.attach(state.map);
+  // The View and Imagery pills, bottom left (map-pills.js): after the base layers
+  // and the views they read.
+  MapPills.attach(state.map);
   // Shapes survive a tab switch, so a line drawn earlier still has a profile to
   // show on the map that has just been rebuilt.
   PathProfile.sync();

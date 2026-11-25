@@ -5783,6 +5783,26 @@ void main() {
     return !!(F && !F.none && F.level != null && S().flood && sc.flood);
   }
 
+  // How far a height is above (+) or below (−) the station's instruments, in
+  // metres: the logger and radio's own height, from the dashed Instruments
+  // mark. Null where the station is drawn with no instruments to measure from
+  // (a collector, a staff, a post) and for the Instruments mark itself.
+  function floodInstrumentAhd() {
+    const r = floodRefs().find(x => x.id === 'instruments');
+    return r ? r.ahd : null;
+  }
+  function vsInstruments(ahd, instAhd) {
+    if (instAhd == null || ahd == null || !isFinite(ahd - instAhd)) return null;
+    const d = ahd - instAhd;
+    return `${Math.abs(d) < 0.005 ? '' : d > 0 ? '+' : '\u2212'}${Math.abs(d).toFixed(2)} m`;
+  }
+  function vsWords(ahd, instAhd) {
+    const v = vsInstruments(ahd, instAhd);
+    if (v == null) return '';
+    const d = ahd - instAhd;
+    return ` (${v} vs instruments: ${Math.abs(d) < 0.005 ? 'level with them' : d > 0 ? 'above them, so water here is into the logger and radio' : 'below them'}.)`;
+  }
+
   // Every level said in full, for a label's title and the track's reading.
   function floodLevelWords(l, onGauge) {
     const F = tw.flood, b = F && F.lad.borrowed;
@@ -5801,7 +5821,7 @@ void main() {
            + (onGauge && l.gauge != null ? `, ${FloodStages.gaugeText(l.gauge, where)}${b ? '' : ' today'}` : '')
            + (!b ? '' : b.mode === 'ahd' ? ', as lent in m AHD' : ', laid over this channel');
     }
-    return `${FloodStages.levelText(l)}${l.kind !== 'aep' && l.gauge != null ? `${b ? ` ${where}` : ''} (${FloodStages.ahdText(l.ahd)})` : l.gauge != null ? ` (${FloodStages.gaugeText(l.gauge, where)})` : ''}${lent}`;
+    return `${FloodStages.levelText(l)}${l.kind !== 'aep' && l.gauge != null ? `${b ? ` ${where}` : ''} (${FloodStages.ahdText(l.ahd)})` : l.gauge != null ? ` (${FloodStages.gaugeText(l.gauge, where)})` : ''}${lent}${vsWords(l.ahd, floodInstrumentAhd())}`;
   }
 
   // ── the station on the scale ──
@@ -5841,14 +5861,15 @@ void main() {
     const at = `${FloodStages.ahdText(r.ahd)}${onGauge && r.gauge != null ? `, ${FloodStages.gaugeText(r.gauge, floodGaugeWord(tw.flood))}` : ''}`;
     const off = r.where === 'above' ? ' It is above the highest level on this scale, so it is marked at the top.'
       : r.where === 'below' ? ' It is below the foot of this scale, so it is marked at the foot.' : '';
-    return `${r.label}: ${at}. ${r.means}${off}`;
+    return `${r.label}: ${at}. ${r.means}${off}${r.id === 'instruments' ? '' : vsWords(r.ahd, floodInstrumentAhd())}`;
   }
   // The same two, where a finger can read them: a line in the Scene panel.
   function floodRefsLineHtml() {
     const refs = floodScaleOn() ? floodRefs() : [];
     if (!refs.length) return '';
     const onGauge = tw.flood.lad.levels.every(l => l.gauge != null);
-    return `<strong>Also on the scale</strong> (dashed marks): ${refs.map(r => esc(floodRefWords(r, onGauge))).join(' ')}`;
+    const vs = refs.some(r => r.id === 'instruments') ? ` ${termHtml('vs instruments', WORDS.vsInstruments)}: ${esc(WORDS.vsInstruments)}` : '';
+    return `<strong>Also on the scale</strong> (dashed marks): ${refs.map(r => esc(floodRefWords(r, onGauge))).join(' ')}${vs}`;
   }
   function refreshFloodRefsLine() {
     const el = document.getElementById('twin-flood-refs');
@@ -5895,6 +5916,12 @@ void main() {
     const refPos = all.slice(F.lad.levels.length);
     F.scale = { px, onGauge, pos, k: F.logK, refs: refs.map((r, i) => ({ ...r, mark: refPos[i].mark, at: refPos[i].at, shown: refPos[i].shown })) };
     const byKey = new Map(F.lad.levels.map(l => [l.key, l]));
+    // Each name's height against the instruments, small, after the name.
+    const instAhd = (refs.find(r => r.id === 'instruments') || {}).ahd;
+    const vsSpan = ahd => {
+      const v = vsInstruments(ahd, instAhd);
+      return v == null ? '' : ` <span class="twin-scale-vs" title="${escAttr(WORDS.vsInstruments)}">(${esc(v)})</span>`;
+    };
     // Where each is drawn first: its old place when it is gliding from one.
     const glide = !!from && !reducedMotion();
     const markAt = p => (glide && from.has(p.key) ? from.get(p.key).mark : p.mark);
@@ -5912,7 +5939,7 @@ void main() {
       const words = floodLevelWords(l, onGauge);
       return `<button type="button" class="twin-scale-label${l.kind === 'peak' ? ' is-peak' : ''}" data-flood="${escAttr(p.key)}" aria-pressed="false"
                 style="--y:${nameAt(p).toFixed(1)}px" onclick="DigitalTwin.floodAt('${escAttr(p.key)}')"
-                title="Hold the water at ${escAttr(words)}" aria-label="Hold the water at ${escAttr(words)}"><span class="twin-flood-sw" style="--sw:${escAttr(FloodStages.colourOf(l, pal))}" aria-hidden="true"></span>${esc(FloodStages.scaleText(l, onGauge))}</button>`;
+                title="Hold the water at ${escAttr(words)}" aria-label="Hold the water at ${escAttr(words)}"><span class="twin-flood-sw" style="--sw:${escAttr(FloodStages.colourOf(l, pal))}" aria-hidden="true"></span>${esc(FloodStages.scaleText(l, onGauge))}${vsSpan(l.ahd)}</button>`;
     }).join('') + F.scale.refs.filter(r => r.shown).map(r => {
       const words = floodRefWords(r, onGauge);
       const arrow = r.where === 'above' ? '▲ ' : r.where === 'below' ? '▼ ' : '';
@@ -5922,7 +5949,7 @@ void main() {
       const t = px > 0 ? 1 - r.mark / px : 0;
       const press = r.where === 'in' ? ` onclick="DigitalTwin.setFloodFraction(${t.toFixed(4)})"` : ' aria-disabled="true"';
       return `<button type="button" class="twin-scale-ref" data-ref="${escAttr(r.id)}" style="--y:${r.at.toFixed(1)}px"${press}
-                title="${escAttr(words)}${r.where === 'in' ? ' Press to hold the water here.' : ''}" aria-label="${escAttr(words)}"><span class="twin-flood-sw" style="--sw:${REF_COLOURS[r.id]}" aria-hidden="true"></span>${esc(text)}</button>`;
+                title="${escAttr(words)}${r.where === 'in' ? ' Press to hold the water here.' : ''}" aria-label="${escAttr(words)}"><span class="twin-flood-sw" style="--sw:${REF_COLOURS[r.id]}" aria-hidden="true"></span>${esc(text)}${r.id === 'instruments' ? '' : vsSpan(r.ahd)}</button>`;
     }).join('');
     refreshFloodRefsLine();
     if (had) { const back = labels.querySelector(`[data-flood="${CSS.escape(had)}"]`); if (back) back.focus(); }
@@ -7816,6 +7843,7 @@ void main() {
     far: 'Ground past the edge of the modelled area. It comes from ~30 m heights, not the LiDAR, so it is good to a few metres only.',
     ownGauge: 'The peak as it read on that site\'s own gauge board: metres above that gauge\'s own zero. Two sites\' figures in this column cannot be compared with each other, because every gauge has a different zero.',
     against: 'How much higher (+) or lower (−) the water peaked at this site than at the reference site in the same flood, in metres — one level in m AHD less the other. Blank where either site has no level in AHD for that flood.',
+    vsInstruments: 'Against the instruments: how far a height is above (+) or below (\u2212) the foot of the station\'s instrument cabinet or enclosure, in metres. Above means water at that height would be into the logger and radio; below means they would still be dry.',
     sameFlood: 'Peaks within three days of each other at different sites are taken to be the same flood: a flood takes hours to a day or two to pass down a reach.',
   };
 
@@ -8251,7 +8279,8 @@ void main() {
   function wordsFoldHtml() {
     const rows = [['AHD', WORDS.ahd], ['LGH — local gauge height', WORDS.lgh], ['Gauge zero', WORDS.zero], ['The channel bed', WORDS.channel],
                   ['Ground area', WORDS.area], ['Ground detail', WORDS.detail], ['Sample', WORDS.sample], ['Apart', WORDS.apart],
-                  ['Fall, rise and slope', WORDS.fall], ['Cross-section', WORDS.section], ['Far ground', WORDS.far]];
+                  ['Fall, rise and slope', WORDS.fall], ['Cross-section', WORDS.section], ['Far ground', WORDS.far],
+                  ['Against the instruments (vs instruments)', WORDS.vsInstruments]];
     return `<details class="twin-details twin-words">
         <summary>What the words here mean</summary>
         <dl class="twin-words-list">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>

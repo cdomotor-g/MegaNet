@@ -1092,6 +1092,8 @@ try {
       pin: !!document.querySelector('.mn-here'),
       text: el.textContent.replace(/\s+/g, ' '),
       stnCardShut: !state.stnCard.id,
+      street: (a => a && { href: a.getAttribute('href'), rel: a.rel, target: a.target })(
+        el.querySelector('a[href*="map_action=pano"]')),
     };
   });
   check('the tool arms, and the click that answers it disarms it again',
@@ -1112,6 +1114,9 @@ try {
     /no terrain tile|unavailable/.test(here.text), here.text.slice(0, 200));
   check('opening it closes the station card — one card in that rectangle',
     here.stnCardShut, String(here.stnCardShut));
+  check('the card carries a Street View link for the point, in a new tab, noopener',
+    !!here.street && /^https:\/\/www\.google\.com\/maps\/@\?api=1&map_action=pano&viewpoint=-26\.66/.test(here.street.href)
+      && here.street.target === '_blank' && /noopener/.test(here.street.rel), JSON.stringify(here.street));
 
   const closed = await page.evaluate(() => {
     MapHere.close();
@@ -1120,6 +1125,64 @@ try {
   });
   check('closing it takes the card and the pin', !closed.shown && !closed.pin,
     JSON.stringify(closed));
+
+  // ── Street view from any point (map-streetview.js) ─────────────────────────
+  // Right-click on the map, or press and hold: a callout at that spot with one
+  // plain link — Google's pano URL at that point, a new tab, noopener, nothing
+  // embedded and nothing sent until it is pressed. And the same link on the
+  // What's here? card, for a keyboard that has no right button.
+  const closeAll = () => page.evaluate(() => { state.map.closePopup(); document.querySelectorAll('.leaflet-popup').forEach(p => p.remove()); });
+  await closeAll();
+  const box = await page.evaluate(() => {
+    const r = state.map.getContainer().getBoundingClientRect();
+    return { x: Math.round(r.x + r.width * 0.62), y: Math.round(r.y + r.height * 0.55) };
+  });
+  await page.mouse.click(box.x, box.y, { button: 'right' });
+  const sv = await page.evaluate(({ x, y }) => {
+    const a = document.querySelector('.leaflet-popup .mn-sv-link');
+    const ll = state.map.mouseEventToLatLng({ clientX: x, clientY: y });
+    const m = a && /viewpoint=(-?[\d.]+),(-?[\d.]+)$/.exec(a.getAttribute('href'));
+    return { has: !!a, href: a && a.getAttribute('href'), rel: a && a.rel, target: a && a.target,
+             text: a && a.textContent.trim(), lat: m && +m[1], lng: m && +m[2], want: [ll.lat, ll.wrap().lng],
+             };
+  }, box);
+  check('a right-click on the map opens a callout with "Open street view here"',
+    sv.has && /Open street view here/.test(sv.text), JSON.stringify(sv));
+  check('…a plain link to Google Street View at that point, in a new tab, noopener',
+    /^https:\/\/www\.google\.com\/maps\/@\?api=1&map_action=pano&viewpoint=-?[\d.]+,-?[\d.]+$/.test(sv.href)
+      && sv.target === '_blank' && /noopener/.test(sv.rel), JSON.stringify(sv));
+  check('…at the point that was right-clicked, to the six decimals it is written to',
+    sv.lat != null && Math.abs(sv.lat - sv.want[0]) < 2e-6 && Math.abs(sv.lng - sv.want[1]) < 2e-6, JSON.stringify(sv));
+
+  await page.evaluate(() => state.map.closePopup());
+  const held = await page.evaluate(async () => {
+    const c = state.map.getContainer(), r = c.getBoundingClientRect();
+    const at = (type, x, y, id = 7) => c.dispatchEvent(new PointerEvent(type,
+      { pointerType: 'touch', pointerId: id, clientX: x, clientY: y, bubbles: true, cancelable: true }));
+    const wait = ms => new Promise(f => setTimeout(f, ms));
+    const open = () => !!document.querySelector('.leaflet-popup .mn-sv-link');
+    const x = r.x + r.width * 0.4, y = r.y + r.height * 0.4;
+    // A finger down and still: after the hold, the callout.
+    at('pointerdown', x, y); await wait(250);
+    const early = open();
+    await wait(500);
+    const after = open();
+    at('pointerup', x, y);
+    state.map.closePopup();
+    // A finger that moves has started a pan, not a press and hold.
+    at('pointerdown', x, y, 8); at('pointermove', x + 40, y, 8); await wait(750);
+    const moved = open();
+    at('pointerup', x + 40, y, 8);
+    // Two fingers are a pinch.
+    at('pointerdown', x, y, 9); at('pointerdown', x + 50, y, 10); await wait(750);
+    const pinch = open();
+    at('pointerup', x, y, 9); at('pointerup', x + 50, y, 10);
+    return { early, after, moved, pinch };
+  });
+  check('a finger held still opens it after about half a second, not before',
+    !held.early && held.after, JSON.stringify(held));
+  check('…but not a finger that moves, nor two',
+    !held.moved && !held.pinch, JSON.stringify(held));
 
   check('no pageerror', errors.length === 0, errors.join(' | '));
 } finally {

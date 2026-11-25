@@ -261,7 +261,11 @@ const TABS = [
   // broken the six-a-group ceiling nav.mjs holds.
   { group: 'Network health', tabs: [
     { id: 'health', label: 'Station Health', icon: '🚦',
-      find: 'monitoring maintenance o&m faults alarms battery trend voltage solar charge missed checks check signals timed reports silent quiet offline outage schedule repeater down receiver stopped base station network health data quality corrupted copies bit flips ghosts rain gauge blocked tipped level stuck flatline register unknown address agent ai claude briefing triage network bulletin daily weekly summary animation news droggies presenter' },
+      find: 'monitoring maintenance o&m faults alarms battery trend voltage solar charge missed checks check signals timed reports silent quiet offline outage schedule repeater down receiver stopped base station network health data quality corrupted copies bit flips ghosts rain gauge blocked tipped level stuck flatline register unknown address agent ai claude briefing triage',
+      parts: [
+        { id: 'bulletins', label: 'Network Bulletins', icon: '📺', view: 'Network Bulletins',
+          find: 'network bulletin bulletins daily weekly summary animation animated news droggies presenter presenters video paused cost' }
+      ] },
     { id: 'backbone', label: 'Backbone', icon: '🗼',
       find: 'state backbone repeaters faulty worst ranked ranking rank priority priorities criticality critical issues problems relaying corrupting off air dropouts dropping out meeting monthly fortnight' },
     { id: 'basestations', label: 'Base Stations', icon: '🖥️',
@@ -2288,10 +2292,7 @@ const HELP = {
 
   health: {
     summary: 'What the readings landing in the datastore say about each field station and the '
-           + 'network carrying them, ranked by what needs doing. It opens with <strong>📺 Network Bulletin</strong>: '
-           + 'the last 24 hours (or the week) as a short animated bulletin, presented by one of the Droggies and '
-           + 'written by Claude each morning Tuesday to Friday, and the week on Mondays — what went wrong, what the findings have in common, and what the '
-           + 'carrier fingerprints say about who really transmitted. <strong>Needs attention</strong> '
+           + 'network carrying them, ranked by what needs doing. <strong>Needs attention</strong> '
            + 'is the morning\'s list: stations gone silent, missed check signals rising, batteries '
            + 'sliding or not charging, rain gauges dry through their neighbours\' rain, levels that '
            + 'did not move, receivers that stopped, repeaters that a run of silences has in common — '
@@ -2929,6 +2930,16 @@ const HELP = {
       { label: 'The investigations as a page of their own', href: 'investigations/' },
     ],
     related: ['health', 'backbone', 'flipsources', 'arrodata', 'bitbench'],
+  },
+
+  bulletins: {
+    summary: 'The <strong>Network Bulletin</strong>: the network\'s last day, or week, as a short animated bulletin presented by one of the '
+           + 'Droggies. <strong>The bulletin service is currently paused due to cost constraints</strong>, so this tab shows only that '
+           + 'notice for now; the findings a bulletin would have told are all on Station Health.',
+    watch: [
+      'Nothing is fetched, written or voiced while the service is paused, and no earlier bulletins are shown.',
+    ],
+    related: ['health', 'backbone', 'investigations', 'methodology'],
   },
 
   methodology: {

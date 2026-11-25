@@ -687,9 +687,28 @@ const RiverDetails = (function () {
       return `<span class="mn-pop-line mn-pop-indent">${name}${est.recorded ? ' (recorded)' : ''}: `
         + `≈ ${esc(FloodVelocity.speed(t.max.v))} m/s at ${esc(t.max.label)} AEP${esc(tail)}${fast}</span>`;
     });
+    // The tower pin: the station's own spot, over its own ground height — or
+    // the plain admission that there is not enough to work it out from.
+    const pin = est.pin;
+    const pinName = typeof termHtml === 'function' ? termHtml('Tower pin', VEL_TERMS[0][1]) : 'Tower pin';
+    if (pin && pin.ok) {
+      const first = pin.levels[0];
+      const tail = pin.max !== first && first.v > 0 ? `, ${FloodVelocity.speed(first.v)} at ${first.label}` : '';
+      const fast = pin.fast ? ' <span class="txt-warn">— above 5 m/s: check the slope and depth</span>' : '';
+      lines.push(`<span class="mn-pop-line mn-pop-indent">${pinName}: `
+        + `≈ ${esc(FloodVelocity.speed(pin.max.v))} m/s at ${esc(pin.max.label)} AEP${esc(tail)}${fast}</span>`);
+    } else if (pin) {
+      lines.push(`<span class="mn-pop-line mn-pop-indent">${pinName}: <span class="mn-pop-note">not enough information — ${esc(pin.why)}</span></span>`);
+    }
     return `<div class="stn-card-ids stn-card-aep-vel"><span class="small txt-muted">Flood velocity</span>`
       + ` <span class="mn-pop-note">indicative</span><br>${lines.join('<br>')}</div>`;
   }
+
+  // What the words in the velocity block mean — the hover and the line in the
+  // workings below are this list.
+  const VEL_TERMS = [
+    ['Tower pin', 'The flood velocity at the station’s own spot, where its tower or pole stands: the same equation as the channel’s and the floodplain’s, with the depth measured over the station’s recorded ground height and the floodplain’s roughness (n 0.060 unless one is entered). Not worked out where the station has no ground height on record.'],
+  ];
 
   // The workings, as sentences rather than label/value rows: they are read,
   // not scanned, and a right-aligned paragraph is hard to read. `s` is the
@@ -702,7 +721,7 @@ const RiverDetails = (function () {
     const line = (label, html) => `<p class="stn-card-aep-line"><span class="txt-muted">${esc(label)}</span> ${html}</p>`;
     const lines = [
       line('Method', esc('Manning’s equation, V = (1/n)·R^⅔·S^½, with R taken as the depth (a flood wide against its depth), '
-        + 'and V held to critical flow.')),
+        + 'and V held to critical flow. The same equation is worked three ways: in the channel, on the floodplain and at the tower pin.')),
       line('Slope', `${esc(FloodVelocity.slopeRatio(sl.raw))}${sl.source === 'default' ? ' (assumed)' : ''} — ${esc(sl.basis + bounded)}.`),
     ];
     for (const t of est.settings) {
@@ -713,6 +732,13 @@ const RiverDetails = (function () {
         esc(`n ${t.n.toFixed(3)}${t.nSource === 'entered' ? ' (entered)' : ''}; bed ${fig(t.bed, 2)} m AHD, `
           + `${t.bedBasis}; ${depth} deep across the levels given.`)
         + (t.levels.some(l => l.capped) ? ' Held to critical flow.' : '')));
+    }
+    if (est.pin) {
+      lines.push(line('Tower pin', est.pin.ok
+        ? esc(`n ${est.pin.n.toFixed(3)}${est.pin.nSource === 'entered' ? ' (entered)' : ''}; ground ${fig(est.pin.bed, 2)} m AHD, ${est.pin.bedBasis}; `
+          + `${Math.max(0, ...est.pin.levels.map(l => l.depth)).toFixed(1)} m deep at the highest level given. ${VEL_TERMS[0][1]}`)
+          + (est.pin.levels.some(l => l.capped) ? ' Held to critical flow.' : '')
+        : esc(`Not enough information: ${est.pin.why}. ${VEL_TERMS[0][1]}`)));
     }
     if (est.storage) {
       lines.push(line('Storage', 'A dam or headwater gauge: its gauge zero is not taken as a bed, and water a structure holds has little velocity to speak of.'));

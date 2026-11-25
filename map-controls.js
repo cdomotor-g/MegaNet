@@ -209,12 +209,79 @@ function makeBaseLayers() {
 // answers 404, or a transparent PNG past its border, and Esri shows through.
 // maxZoom is the caller's: a layer's maxZoom is a map's zoom limit (see above).
 function makeStateImagery(opts = {}) {
+  const Soft = softTileClass();
   return [
-    { url: 'https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Imagery/MapServer/tile/{z}/{y}/{x}',
-      bounds: [[-37.6, 140.9], [-28.1, 153.7]], attribution: 'Imagery © Spatial Services NSW' },
-    { url: 'https://spatial-img.information.qld.gov.au/arcgis/rest/services/Basemaps/LatestStateProgram_AllUsers/ImageServer/tile/{z}/{y}/{x}',
-      bounds: [[-29.6, 137.6], [-8.9, 153.9]], attribution: 'Imagery © State of Queensland' },
-  ].map(s => L.tileLayer(s.url, { maxNativeZoom: 20, maxZoom: 19, minZoom: 6, ...opts, bounds: s.bounds, attribution: s.attribution }));
+    { id: 'nsw', url: 'https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Imagery/MapServer/tile/{z}/{y}/{x}',
+      bounds: [[-37.6, 140.9], [-28.1, 153.7]], attribution: 'Imagery © Spatial Services NSW', soft: true },
+    { id: 'qld', url: 'https://spatial-img.information.qld.gov.au/arcgis/rest/services/Basemaps/LatestStateProgram_AllUsers/ImageServer/tile/{z}/{y}/{x}',
+      bounds: [[-29.6, 137.6], [-8.9, 153.9]], attribution: 'Imagery © State of Queensland', soft: false },
+  ].map(s => {
+    const l = new Soft(s.url, { maxNativeZoom: 20, maxZoom: 19, minZoom: 6, ...opts, bounds: s.bounds, attribution: s.attribution,
+      crossOrigin: s.soft ? 'anonymous' : false, hideSoft: s.soft });
+    l.mnImagery = s.id;
+    return l;
+  });
+}
+
+// ── NSW's stretched tiles ────────────────────────────────────────────────────
+// SIX Maps answers every level to 23, but where it holds nothing flown that
+// close — most of the bush, past level 18 — it hands back the last real picture
+// stretched and smoothed, a 200 OK like any other. Laid over Esri that mush
+// replaced the sharp picture the operator had just been looking at, which read
+// as the imagery "swapping to something blurry" at the next zoom. A tile from
+// level 19 up is checked against its own parent: if it is the parent's quarter
+// stretched (they differ by about 1 grey level in ten thousand pixels, where a
+// genuinely flown tile differs by about 9) it adds nothing and is left
+// invisible, so what is under it shows. Tiles that fail the check's own fetch
+// are kept. Needs the host's CORS header, which it sends (`*`); a host that
+// does not simply keeps every tile.
+const SOFT_FROM_Z = 19;
+const SOFT_MAX_DIFF = 3.5;
+const softSeen = new Map();
+let SoftTiles = null;
+function softLoad(url) {
+  return new Promise((resolve, reject) => {
+    const im = new Image();
+    im.crossOrigin = 'anonymous';
+    im.onload = () => resolve(im);
+    im.onerror = reject;
+    im.src = url;
+  });
+}
+function softCheck(layer, coords, tile) {
+  const key = `${coords.z}/${coords.x}/${coords.y}`;
+  if (softSeen.has(key)) return Promise.resolve(softSeen.get(key));
+  const parentUrl = L.Util.template(layer._url, { x: coords.x >> 1, y: coords.y >> 1, z: coords.z - 1 });
+  return softLoad(parentUrl).then(parent => {
+    const mk = () => { const c = document.createElement('canvas'); c.width = c.height = 256; return c.getContext('2d', { willReadFrequently: true }); };
+    const a = mk(), b = mk();
+    a.drawImage(tile, 0, 0, 256, 256);
+    b.drawImage(parent, (coords.x & 1) * 128, (coords.y & 1) * 128, 128, 128, 0, 0, 256, 256);
+    const da = a.getImageData(0, 0, 256, 256).data, db = b.getImageData(0, 0, 256, 256).data;
+    let sum = 0, n = 0;
+    for (let i = 0; i < da.length; i += 16) {   // every fourth pixel
+      sum += Math.abs((da[i] + da[i + 1] + da[i + 2]) - (db[i] + db[i + 1] + db[i + 2])) / 3;
+      n++;
+    }
+    const soft = n > 0 && sum / n < SOFT_MAX_DIFF;
+    if (softSeen.size > 4000) softSeen.clear();
+    softSeen.set(key, soft);
+    return soft;
+  });
+}
+function softTileClass() {
+  if (SoftTiles) return SoftTiles;
+  SoftTiles = L.TileLayer.extend({
+    createTile(coords, done) {
+      return L.TileLayer.prototype.createTile.call(this, coords, (err, tile) => {
+        if (err || !this.options.hideSoft || coords.z < SOFT_FROM_Z) return done(err, tile);
+        softCheck(this, coords, tile).then(
+          soft => { tile.style.visibility = soft ? 'hidden' : ''; done(null, tile); },
+          () => done(null, tile));
+      });
+    },
+  });
+  return SoftTiles;
 }
 
 // The place names Esri publishes for the three bases that carry none, as fresh
@@ -368,11 +435,38 @@ function addBaseLayers(map, opts = {}) {
   // A base at 0 % is ticked but not fetched: it keeps its place in the mix
   // without costing a tile request for pixels nobody can see.
   const showing = n => pick[n].on && pick[n].op > 0;
+  // Which aerial photos ride over Satellite: Auto lays each State's program
+  // over Esri where it has one (NSW's stretched tiles left out — makeStateImagery),
+  // the others pin it to one source. Kept on this device, shared by every map.
+  const IMG_KEY = 'mn-imagery-source';
+  const IMAGERY = [
+    { id: 'auto', label: 'Auto', say: 'Esri everywhere, with each State\u2019s own aerial photos over it where it has them (NSW, Queensland). NSW tiles that are only a stretched copy of a lower zoom are left out, so the sharper picture underneath shows.' },
+    { id: 'esri', label: 'Esri only', say: 'Only Esri\u2019s world imagery, with no State photos over it.' },
+    { id: 'nsw', label: 'NSW (SIX Maps)', say: 'Spatial Services NSW\u2019s aerial photos over Esri, every tile as NSW serves it, including the stretched ones past about zoom 18 in the bush.' },
+    { id: 'qld', label: 'Queensland', say: 'The Queensland Government\u2019s latest aerial and satellite program over Esri.' },
+  ];
+  let imagery = 'auto';
+  try { const v = localStorage.getItem(IMG_KEY); if (IMAGERY.some(o => o.id === v)) imagery = v; } catch (_) { /* private browsing: Auto */ }
+  for (const l of companions.Satellite || []) if (l.mnImagery === 'nsw') l.options.hideSoft = imagery !== 'nsw';
+  const allows = l => !l.mnImagery || imagery === 'auto' || imagery === l.mnImagery;
   function sync(n) {
     for (const l of [layers[n], ...(companions[n] || [])]) {
-      if (showing(n)) { l.setOpacity(pick[n].op); if (!map.hasLayer(l)) l.addTo(map); }
+      if (showing(n) && allows(l)) { l.setOpacity(pick[n].op); if (!map.hasLayer(l)) l.addTo(map); }
       else if (map.hasLayer(l)) map.removeLayer(l);
     }
+  }
+  function setImagery(id) {
+    if (!IMAGERY.some(o => o.id === id) || id === imagery) return false;
+    imagery = id;
+    try { localStorage.setItem(IMG_KEY, id); } catch (_) { /* kept for this visit only */ }
+    for (const l of companions.Satellite || []) {
+      if (!l.mnImagery) continue;
+      l.options.hideSoft = l.mnImagery === 'nsw' && imagery !== 'nsw';
+      if (map.hasLayer(l)) l.redraw();
+    }
+    sync('Satellite');
+    map.fire('mnimagerychange', { source: imagery });
+    return true;
   }
 
   // Which base this map is "on", published on the map itself as mnBaseName.
@@ -388,6 +482,7 @@ function addBaseLayers(map, opts = {}) {
   function publish() {
     const was = map.mnBaseName;
     map.mnBaseName = lead();
+    map.fire('mnbasemix');
     // Only said when the answer moved: a slider drag is dozens of input
     // events, and each baseChanged() replaces the 3-D view's raster source (a
     // no-op unless 3-D is actually open).
@@ -632,7 +727,7 @@ function addBaseLayers(map, opts = {}) {
   // What a host panel needs, and what a check can read back without scraping
   // the tile panes: a copy of the mix, never the live object. `set` is the one
   // way in from code (above).
-  map.mnBases = { html, bind, mix: () => JSON.parse(JSON.stringify(pick)), order: () => order.slice(), set };
+  map.mnBases = { imagery: { get: () => imagery, set: setImagery, options: () => IMAGERY.map(o => ({ ...o })) }, html, bind, mix: () => JSON.parse(JSON.stringify(pick)), order: () => order.slice(), set };
 
   // First in the corner, and first in the group about what the map shows:
   // every other icon in that group is a way of drawing something *over* this.

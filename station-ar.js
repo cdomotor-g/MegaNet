@@ -428,7 +428,8 @@ const StationAR = (function () {
   let plan = null;
   let pick = null;                     // { id } — the station whose sheet is open
   let pinEls = [];
-  let proj = { f: 500, w: 0, h: 0 };
+  let proj = { f: 500, w: 0, h: 0, fov: PLAIN_HFOV };
+  let mapUp = false;                   // the map from above (station-ar-map.js) is on the screen
   let raf = 0, drag = null, wake = null;
   let shownHeading = null;
   let slsWaiting = false;              // the SLS sent for, and not yet back
@@ -535,6 +536,15 @@ const StationAR = (function () {
                class="ar-letter" aria-hidden="true">${LETTER[r]}</span>${esc(SHORT[r])}</button>`).join('')}</div>`;
   }
 
+  // What the map's few words mean — hovered where they are drawn (the key under
+  // the map) and listed in full in the page's How it works, where a finger can
+  // read them.
+  const MAP_WORDS = [
+    { term: 'You', meaning: 'Where you are standing: your GPS fix, or the middle of the Stations map if you opened this from there.' },
+    { term: 'View wedge', meaning: 'The shaded slice of the map the camera is looking at. It points the way the phone faces, and its angle is how much the camera sees across the screen — about 60° to 66°. A station inside it is on your screen.' },
+    { term: 'Dots', meaning: 'Each station within the distance you set, in its type’s colour — green field, blue repeater, orange base. Press one to open it, as you would its pin.' },
+  ];
+
   // The tab's page (renderMain): what the finder does, the two ways in, the
   // distance and the types, and how it works. The ids keep the names they had
   // as the Stations side panel's pane (ar-pane-*), which the view's own
@@ -571,8 +581,11 @@ const StationAR = (function () {
               and press <em>I'm facing it</em> to bring every pin into line.</p>
             <p class="small">It shows the stations the Stations tab's filters leave — set a filter there and it applies here
               too. Stations are gathered by direction, nearest first, so a pin is the nearest station that way and its number
-              counts the rest; the pin's sheet lists them. The little circle is the same directions from above, the way you
-              face at the top.</p>
+              counts the rest; the pin's sheet lists them. The map under the picture is the same stations from above, north
+              up: the shaded <strong>view wedge</strong> turns as you do, so a station inside it is on your screen, and a dot
+              outside it is behind you or off to one side. Drag the map to look elsewhere and <em>Recentre</em> to come
+              back. Where the map cannot load, a little circle at the top of the picture shows the directions instead.</p>
+            <ul class="small ar-pane-words">${MAP_WORDS.map(w => `<li><strong>${esc(w.term)}</strong> — ${esc(w.meaning)}</li>`).join('')}</ul>
             <p class="small">Forecast and information locations are the Bureau's, from its Service Level Specification — the
               ones the Stations map outlines in solid and dashed pink. At a <strong>forecast</strong> location the Bureau predicts a
               height; at an <strong>information</strong> location it reports and classifies the heights but does not predict
@@ -679,10 +692,18 @@ const StationAR = (function () {
         </svg>
       </div>
       <p class="ar-hint" id="ar-hint" hidden></p>
-      <div class="ar-bottom">
-        ${rangeHtml('ar')}
-        ${rolesHtml()}
-        <p class="ar-count" id="ar-count"></p>
+      <div class="ar-map" id="ar-map-pane">
+        <div class="ar-map-canvas" id="ar-map"></div>
+        <div class="ar-map-key" id="ar-map-key">
+          <ul class="ar-map-words">${MAP_WORDS.map(w => `<li>${termHtml(w.term, w.meaning)}</li>`).join('')}</ul>
+          <button type="button" class="ar-tool" onclick="StationAR.recentreMap()"
+                  title="Put the map back on you, at the distance you set">⌖ Recentre</button>
+        </div>
+        <div class="ar-bottom">
+          ${rangeHtml('ar')}
+          ${rolesHtml()}
+          <p class="ar-count" id="ar-count"></p>
+        </div>
       </div>
       <section class="ar-detail" id="ar-detail" tabindex="-1" aria-labelledby="ar-detail-h" hidden></section>`;
   }
@@ -723,6 +744,7 @@ const StationAR = (function () {
       if (isMobile()) startCamera();
     }
     holdWake();
+    openMap();
     measure();
     replan();
     view.focus({ preventScroll: true });
@@ -742,6 +764,8 @@ const StationAR = (function () {
     document.removeEventListener('visibilitychange', onVisible);
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
+    if (mapUp) StationArMap.close();
+    mapUp = false;
     view.remove();
     view = null;
     pinEls = [];
@@ -751,6 +775,37 @@ const StationAR = (function () {
     if (refocus && back && back.focus && document.contains(back) && back.getClientRects().length) {
       back.focus({ preventScroll: true });
     }
+  }
+
+  // ── The map from above ─────────────────────────────────────────────────────
+  // Half the screen (styles.css, .ar-view.has-map), made after the view is in
+  // the page so Leaflet reads a size. The class goes on first because the
+  // camera half's width is what measure() takes the field of view from. Where
+  // the map cannot be made the class comes off again and the view is the one it
+  // always was, the little radar circle included.
+  function openMap() {
+    mapUp = false;
+    if (typeof StationArMap === 'undefined') return;
+    view.classList.add('has-map');
+    const el = $('ar-map');
+    const up = StationArMap.open(el, id => pickStation(id));
+    if (!up) { view.classList.remove('has-map'); return; }
+    mapUp = true;
+    const pane = $('ar-map-pane');
+    pane.setAttribute('role', 'region');
+    pane.setAttribute('aria-label', 'Map from above: you, the stations, and the wedge the camera sees');
+    StationArMap.resize();
+  }
+
+  // The stations, you and the distance — whenever the directions are gathered.
+  function syncMap() {
+    if (!mapUp) return;
+    StationArMap.setStations(plan ? plan.clusters : [], pick ? pick.id : null);
+    StationArMap.setHere(here, RANGES_KM[rangeIdx]);
+  }
+
+  function recentreMap() {
+    if (mapUp) StationArMap.recentre();
   }
 
   // ── Where the view stands ──────────────────────────────────────────────────
@@ -950,10 +1005,10 @@ const StationAR = (function () {
       f = (w / 2) / Math.tan(PLAIN_HFOV / 2 * RAD);
     }
     const moved = Math.abs(f - proj.f) > 1 || w !== proj.w || h !== proj.h;
-    proj = { f, w, h };
+    const half = Math.atan((w / 2) / f);
+    proj = { f, w, h, fov: 2 * half / RAD };
     const fov = $('ar-radar-fov');
     if (fov) {
-      const half = Math.atan((w / 2) / f);
       const x = (46 * Math.sin(half)).toFixed(2), y = (-46 * Math.cos(half)).toFixed(2);
       fov.setAttribute('d', `M0 0 L${-x} ${y} A46 46 0 0 1 ${x} ${y} Z`);
     }
@@ -992,6 +1047,7 @@ const StationAR = (function () {
     if (pick && !findPick()) pick = null;
     renderPins();
     renderRadar();
+    syncMap();
     renderDetail();
     renderCount();
     status();
@@ -1213,6 +1269,7 @@ const StationAR = (function () {
     }
     const rot = $('ar-radar-rot');
     if (rot) rot.style.setProperty('--ar-rot', `${H == null ? 0 : (-H).toFixed(1)}deg`);
+    if (mapUp) StationArMap.setView(H, proj.fov);
     paintEdge(H, w, f, ce);
     paintHint(H, pitch);
   }
@@ -1295,6 +1352,7 @@ const StationAR = (function () {
       if (on) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
     });
     renderRadar();
+    if (mapUp) StationArMap.setPicked(id);
     renderDetail();
     const el = $('ar-detail');
     if (el && !el.hidden) el.focus({ preventScroll: true });
@@ -1310,6 +1368,7 @@ const StationAR = (function () {
       el.querySelector('.ar-pin-box').removeAttribute('aria-current');
     });
     renderRadar();
+    if (mapUp) StationArMap.setPicked(null);
     renderDetail();
     const pin = at && pinEls[at.k];
     if (pin && !pin.hidden) pin.querySelector('button').focus({ preventScroll: true });
@@ -1396,6 +1455,7 @@ const StationAR = (function () {
 
   function onResize() {
     if (!view) return;
+    if (mapUp) StationArMap.resize();
     if (measure()) replan(); else touch();
   }
 
@@ -1442,6 +1502,7 @@ const StationAR = (function () {
     showOnMap,
     alignHere,
     unalign,
+    recentreMap,
     turnTo,
     turn,
     useMap,
@@ -1471,6 +1532,7 @@ const StationAR = (function () {
         })) : null,
         visible: pinEls.filter(el => !el.hidden).map(el => el.dataset.id),
         pick: pick ? pick.id : null,
+        map: mapUp, fov: proj.fov,
         listening, tracks: stream ? stream.getTracks().filter(t => t.readyState === 'live').length : 0,
       };
     },

@@ -153,7 +153,7 @@ const Glyphs = (() => {
     stations: 'map', maps: 'route', passranges: 'chain', repeaters: 'repeater', repdelays: 'hourglass', export: 'download', mapgen: 'print', lookaround: 'look',
     rf: 'spectrum', rfchanges: 'trend', workbench: 'interfere', reception: 'drive', flipsources: 'search', bitbench: 'bits',
     bitflipper: 'flip', network: 'graph', packets: 'decode', alert2: 'packet', hfem: 'message', serial: 'plug',
-    arro: 'launch', arrodata: 'data', field: 'level', msglog: 'inbox', telemetry: 'traffic', health: 'health', signalroutes: 'routes',
+    arro: 'launch', arrodata: 'data', field: 'level', msglog: 'inbox', telemetry: 'traffic', health: 'health', bulletins: 'screen', signalroutes: 'routes',
     nearby: 'nearby', inspections: 'inspect', maintenance: 'tools', history: 'history', camera: 'camera', photos: 'photos',
     levels: 'survey', twopeg: 'pegs', surveyguide: 'book',
     propagation: 'waves', biterrors: 'bolt', swr: 'meter', pinouts: 'dsub', a2firmware: 'flash', licensing: 'licence', kbstaff: 'staff', kblogbook: 'logbook', kblifecycle: 'cycle', kblevel: 'solar', kbriver: 'gauge',

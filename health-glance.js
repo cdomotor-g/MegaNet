@@ -151,8 +151,10 @@ const HealthGlance = (() => {
   // the one exception, and not HealthAnalysis's: the channel a base station
   // heard each reading on, for the Heard on line under the card's frequencies
   // (channelsFrom, frequencies.js) — a column on the same request, not a second.
+  // So are value and unit, for the last values the Health section shows: the
+  // datastore's own conversion where the source sent one (a level in metres).
   const CARD_SELECT = 'addr,alert_id,a2_station,a2_sensor,station_number,channel,station_id,'
-                    + 'reading_ts,received_at,value_raw,protocol,path,freq_mhz';
+                    + 'reading_ts,received_at,value_raw,value,unit,protocol,path,freq_mhz';
   // `online` and `since` say how long the ingest has been hearing a station:
   // see "The classes" above.
   const NET_SELECT = 'station_id,online,since,last_seen_at,last_reading_at';
@@ -276,6 +278,54 @@ const HealthGlance = (() => {
     };
   }
 
+  // What each measurement last said, from what the analysis already worked out
+  // over the card's readings (no new request): { battery, rain, level }, each
+  // null where the station has no such sensor heard in the window.
+  //   battery  { t, text }            the last volts heard
+  //   rain     { t, text, tipT, tipText, mm }   the week's tips, and the last one
+  //   level    { t, text, unit }      the last reading — in the unit the datastore
+  //                                   recorded, or the raw count where none is
+  function lastValues(s, S) {
+    const pick = kind => (S.sensors || []).filter(x => x.kind === kind && x.txs && x.txs.length)
+      .sort((a, b) => b.n - a.n)[0] || null;
+    const out = { battery: null, rain: null, level: null };
+    // The stored row a transmission was heard as (its first copy), whose value
+    // and unit the datastore may have recorded; the count is the transmission's.
+    const rowOf = tx => (tx.copies && tx.copies[0] && tx.copies[0].r) || { value_raw: tx.v };
+    const bs = pick('battery');
+    if (bs) {
+      const tx = bs.txs[bs.txs.length - 1];
+      const v = SensorValues.rowValue(rowOf(tx), { kind: 'battery', st: s });
+      if (v && v.value != null && v.plausible !== false) out.battery = { t: tx.t, text: `${v.value.toFixed(1)} V` };
+    }
+    const rs = pick('rain');
+    if (rs) {
+      const tx = rs.txs[rs.txs.length - 1];
+      const R = S.rain;
+      const steps = R && R.steps ? R.steps : [];
+      const tip = steps.length ? steps[steps.length - 1] : null;
+      const per = R && R.mmPerTip ? R.mmPerTip : 0.2;
+      const mm = x => `${Math.round(x * 10) / 10} mm`;
+      out.rain = {
+        t: tx.t,
+        mm: R ? R.mm : null,
+        text: R ? `${mm(R.mm)} in the week` : '',
+        tipT: tip ? tip.t : null,
+        tipText: tip ? `${tip.tips} tip${tip.tips === 1 ? '' : 's'} (${mm(tip.tips * per)})` : '',
+      };
+    }
+    const ls = pick('level');
+    if (ls) {
+      const tx = ls.txs[ls.txs.length - 1];
+      const v = SensorValues.rowValue(rowOf(tx), { kind: 'level', st: s });
+      const raw = Number(tx.v);
+      out.level = v && v.value != null && !v.inferred
+        ? { t: tx.t, text: `${v.value} ${v.unit || ''}`.trim(), unit: v.unit || '' }
+        : { t: tx.t, text: `${raw} (raw count)`, unit: '' };
+    }
+    return out;
+  }
+
   // One station's readings — any shape meganet.reading returns, newest first
   // or not — into what its card says. Pure: no fetch, no DOM.
   //   { lastHeard, firstHeard, P, battery, hasBattery, findings, sev, rows,
@@ -309,6 +359,7 @@ const HealthGlance = (() => {
     const findings = S.findings.filter(f => f.stationId === s.id)
       .slice().sort((a, b) => SEV[a.severity].rank - SEV[b.severity].rank || (b.since || 0) - (a.since || 0));
     return {
+      last: lastValues(s, S),
       lastHeard, firstHeard, P: S.schedule ? S.schedule.P : null,
       battery: B ? { lastNight: B.lastNight, latest: B.latest ? B.latest.V : null, slope: B.slope,
                      daysTo: B.daysTo, nights: (B.nights || []).length, aid: B.aid } : null,
@@ -975,6 +1026,15 @@ const HealthGlance = (() => {
     return `<span class="hg-sev ${c.txt}"><span aria-hidden="true">${c.icon}</span><span class="sr-only">${esc(c.word)}:</span></span>`;
   }
   const row = (label, html) => `<div class="acma-row"><span>${esc(label)}</span><span>${html}</span></div>`;
+  // The same, its label already HTML — a word with its meaning on hover.
+  const rowT = (labelHtml, html) => `<div class="acma-row"><span>${labelHtml}</span><span>${html}</span></div>`;
+  // What the last-value lines mean, one list: hovered on each label, and said
+  // under the lines for a finger or a keyboard (the section's foot).
+  const LAST_WORDS = {
+    battery: 'The battery voltage in the station\'s newest battery reading, and how long ago it was heard. The night low above it is the lowest of the night, which is what shows a battery failing.',
+    rain: 'Rain the gauge tipped in the week of readings this card works from (each tip is one bucket of rain, usually 0.2 mm), and its newest tip: how much, and when.',
+    level: 'The newest water-level reading and when it was heard. Shown in the unit the source sent (such as metres); where none was recorded it is the raw count, which is not a depth.',
+  };
   // A door into the Station Health tab, on this station, at `part` of it.
   const go = (id, part, html, title) => `<button type="button" class="link-btn hg-go"
       onclick="HealthGlance.open('${escAttr(id)}', '${part}')" title="${esc(title)}">${html}</button>`;
@@ -1121,11 +1181,27 @@ const HealthGlance = (() => {
     lines.push(row('Last heard', `<span title="${esc(heardTitle(h, now))}">${heardLineHtml(h, now,
         t => go(id, 'checks', t, `Open the Station Health tab on ${name} — its checks, slot by slot`))}</span>`
       + (k.P ? `<br><span class="mn-pop-note">checks every ${esc(HealthAnalysis.fmtPeriod(k.P))}</span>` : '')));
+    const L = g.last || {};
+    // What each measurement last said, beside it: heard from the readings this
+    // card already holds (lastValues), so none of it is a new request.
+    const battNow = L.battery
+      ? `<br><span class="mn-pop-note" title="${esc(LAST_WORDS.battery)}">last heard ${esc(L.battery.text)}, ${esc(ago(L.battery.t, now))}</span>` : '';
     if (g.battery) {
       lines.push(row('Battery', go(id, 'battery', esc(batteryText(g.battery)),
-        `Open the Station Health tab on ${name} — its battery across its solar day, night lows ringed`)));
+        `Open the Station Health tab on ${name} — its battery across its solar day, night lows ringed`) + battNow));
     } else if (g.hasBattery) {
-      lines.push(row('Battery', '<span class="txt-muted small">too few readings for a trend</span>'));
+      lines.push(row('Battery', L.battery
+        ? `<span title="${esc(LAST_WORDS.battery)}">${esc(L.battery.text)}, ${esc(ago(L.battery.t, now))}</span>`
+          + '<br><span class="txt-muted small">too few readings for a trend</span>'
+        : '<span class="txt-muted small">too few readings for a trend</span>'));
+    }
+    if (L.rain) {
+      lines.push(rowT(termHtml('Rain', LAST_WORDS.rain), L.rain.tipT != null
+        ? `${esc(L.rain.text)}<br><span class="mn-pop-note">last tip ${esc(L.rain.tipText)}, ${esc(ago(L.rain.tipT, now))}</span>`
+        : `<span class="txt-muted">no tips in the week</span><br><span class="mn-pop-note">last heard ${esc(ago(L.rain.t, now))}</span>`));
+    }
+    if (L.level) {
+      lines.push(rowT(termHtml('Level', LAST_WORDS.level), `${esc(L.level.text)}<br><span class="mn-pop-note">${esc(ago(L.level.t, now))}</span>`));
     }
     lines.push(row('Findings', worst
       ? go(id, 'findings', `${sevHtml(worst.severity)} ${esc(worst.title)}`,
@@ -1158,7 +1234,9 @@ const HealthGlance = (() => {
         + (k.judged
           ? `; whether it is unheard, and the rest the server keeps, as the server last worked it out over every receiver’s week — ${esc(ago(g.serverAt || net.serverAt, now))}.`
           : '; whether its receivers were listening is Station Health’s to weigh.'));
-    return wrap(head(cls) + lines.join('') + list + strip + `<p class="small txt-muted stn-card-exp-foot">${foot}</p>`);
+    const lastKey = (L.battery ? ` Battery: ${LAST_WORDS.battery}` : '') + (L.rain ? ` Rain: ${LAST_WORDS.rain}` : '')
+      + (L.level ? ` Level: ${LAST_WORDS.level}` : '');
+    return wrap(head(cls) + lines.join('') + list + strip + `<p class="small txt-muted stn-card-exp-foot">${foot}${esc(lastKey)}</p>`);
   }
 
   // Paint the section in place, if the card is still on this station.

@@ -707,6 +707,12 @@
        runtime, from a click — so this position states the dependency rather
        than being required by it (#154). -->
   <script src="map-here.js?v=20261125c"></script>
+  <!-- Right-click or press and hold anywhere on the Stations map for a link to
+       Google Street View at that point. Reads core.js and, to ask whether 3-D or
+       the twin is up, map-3d.js and map-twin.js — every one of them at runtime,
+       from a gesture, so the position states the dependency rather than being
+       required by it (#154). -->
+  <script src="map-streetview.js?v=20261125c"></script>
   <!-- Radio Mobile's Single polar radio coverage. Last of the terrain group
        because it stands on all of it — terrain.js for the elevation grid,
        itm.js for the model, path-profile.js for the radio-system and
@@ -801,6 +807,9 @@
        at runtime, and each of them tells it when theirs changes — so its
        position is free (#154). -->
   <script src="map-mode.js?v=20261125c"></script>
+  <!-- The View and Imagery pills in the Stations map's bottom-left corner (map-pills.js): reads
+       MapViews and the map's base-layer set at runtime only, so its position is free. -->
+  <script src="map-pills.js?v=20261125c"></script>
   <!-- The Stations map in three dimensions: MapLibre GL over the same terrarium
        tiles terrain.js decodes, with the same base map draped on the relief and
        the same pins and links mirrored onto it. Last of the terrain group
@@ -877,6 +886,11 @@
        station that is not the list. All runtime calls (#154); the camera, the
        GPS and the compass are opened by a press and closed with the view. -->
   <script src="station-ar.js?v=20261125c"></script>
+  <!-- Look Around's map from above: the stations, you and the camera's view wedge.
+       Called only from station-ar.js's view, from inside its functions, and reads
+       map-controls.js's base layers at that time, so the position states the
+       dependency rather than being required by it (#154). -->
+  <script src="station-ar-map.js?v=20261125c"></script>
   <!-- 📌 Nearby: the stations closest to where you stand, nearest first, and
        Start inspection, Photos and Directions for the one you pick. Reads
        app.js, inspections.js, field-camera.js and toast.js at call time;
@@ -1214,11 +1228,12 @@
        init.js calls restoreFromUrl(). -->
   <script src="sort-benchmarks.js?v=20261125c"></script>
   <script src="health-agent.js?v=20261125c"></script>
-  <!-- 📺 Network Bulletin, at the top of Station Health: the network's last day
+  <!-- 📺 Network Bulletins, a view of Station Health (paused for cost: see
+       BULLETINS_PAUSED in the file): the network's last day
        or week as a short animated bulletin, presented by one of the Droggies —
        drawn from data/bulletins/, which a scheduled Claude Code task writes
-       Tuesday to Friday, and the week on Mondays (tools/bulletin/README.md). After health.js, whose page
-       draws its panel and whose stations its links open, read at call time;
+       Tuesday to Friday, and the week on Mondays (tools/bulletin/README.md). After health.js, whose
+       stations its links open, read at call time;
        nothing runs at load. -->
   <script src="health-bulletin.js?v=20261125c"></script>
   <!-- A station's health where people already look (#218): last heard, its

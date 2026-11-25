@@ -332,15 +332,13 @@ const Health = (() => {
 
   // ── rendering: the page ────────────────────────────────────────────────────
 
-  // The page: 📺 Network Bulletin first (health-bulletin.js), then the tab's
-  // own. The bulletin sits in a slot of its own because this page redraws
-  // itself when the week's readings land, a few seconds after it opens —
-  // rerender() redraws what follows the slot and leaves a bulletin that is
-  // playing where it is.
+  // The page. 📺 Network Bulletin used to open it; it has a view of its own now
+  // (HealthBulletinTab, health-bulletin.js), so nothing here makes room for it.
+  // The page redraws itself when the week's readings land, a few seconds after
+  // it opens — rerender() redraws what is inside #hl-rest.
   function render() {
     return `
     <div class="page hl-page" style="--page-max:1400px">
-      ${typeof HealthBulletin !== 'undefined' ? `<div id="hb-slot">${HealthBulletin.render()}</div>` : ''}
       <div id="hl-rest" class="hl-rest">${restHtml()}</div>
     </div>`;
   }
@@ -1817,7 +1815,7 @@ const Health = (() => {
     if (!el || state.activeTab !== 'health') return;
     stopMap();
     const rest = document.getElementById('hl-rest');
-    if (rest && document.getElementById('hb-slot')) {
+    if (rest) {
       rest.innerHTML = restHtml();
       // The Calm look folds the tab's introduction by watching #main-content's
       // own children, which a redraw inside #hl-rest does not touch: told.
@@ -2115,7 +2113,6 @@ const Health = (() => {
 
   function stop() {
     stopMap();
-    if (typeof HealthBulletin !== 'undefined') HealthBulletin.stop();
     if (typeof HealthCards !== 'undefined') HealthCards.stop();
   }
 
@@ -2124,7 +2121,6 @@ const Health = (() => {
     registerTabTeardown('Health', stop);
     askOwners();
     afterRender();
-    if (typeof HealthBulletin !== 'undefined') HealthBulletin.init();
     if (H.sel) loadInspections(H.sel);
     // The first visit fetches on its own, as the Message Log's does: the tab's
     // whole point is what the readings say now. After that, the board stands

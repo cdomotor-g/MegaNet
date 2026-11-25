@@ -436,11 +436,12 @@ try {
   const dr = await pg.evaluate(() => ({ st: Explainers._state(), says: (document.querySelector('#xp-panel .hb-issued') || {}).textContent || '' }));
   ok('a draft plays silent, and says why', !dr.st.voiced && /Draft/.test(dr.says), JSON.stringify(dr));
   ok('no page errors', !errors.length, errors.join('\n'));
-  // The bulletin, on its own tab, still the bulletin.
-  await pg.evaluate(() => switchTab('health'));
+  // The bulletin, on its own tab, still the bulletin (switched back on: it is
+  // paused for cost, BULLETINS_PAUSED in health-bulletin.js).
+  await pg.evaluate(() => { HealthBulletinTab._pause(false); switchTab('bulletins'); });
   await until(pg, () => !!document.getElementById('hb-panel'));
   const hb = await pg.evaluate(() => ({ panel: !!document.getElementById('hb-panel'), xp: !!document.getElementById('xp-panel'), heading: (document.getElementById('hb-h') || {}).textContent || '' }));
-  ok('the Network Bulletin still has its own panel on Station Health', hb.panel && !hb.xp && /Network Bulletin/.test(hb.heading), JSON.stringify(hb));
+  ok('the Network Bulletin still has its own panel on the Network Bulletins tab', hb.panel && !hb.xp && /Network Bulletin/.test(hb.heading), JSON.stringify(hb));
   ok('no page errors after it', !errors.length, errors.join('\n'));
   await context.close();
 

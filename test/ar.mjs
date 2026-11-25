@@ -199,6 +199,39 @@ async function gathered(page, here, km, label, roles = null) {
   return { want, dbg };
 }
 
+// The map from above, against the same heading and the same camera: half the
+// screen, a dot for every station gathered, and a wedge whose two edges stand
+// half the camera's field of view either side of the way it faces — bearings
+// taken here, not by the module's own arithmetic.
+async function mapAgrees(page, label) {
+  await frames(page);
+  const got = await page.evaluate(() => {
+    const d = StationAR.debug(), m = StationArMap.debug();
+    const st = document.getElementById('ar-stage').getBoundingClientRect();
+    const mp = document.getElementById('ar-map-pane').getBoundingClientRect();
+    const cv = document.getElementById('ar-map').getBoundingClientRect();
+    return { d, m, stage: { w: st.width, h: st.height }, map: { w: mp.width, h: mp.height, x: mp.x, y: mp.y }, canvas: { w: cv.width, h: cv.height },
+             win: { w: innerWidth, h: innerHeight } };
+  });
+  const { d, m } = got;
+  const members = d.clusters.reduce((n, c) => n + c.n, 0);
+  const fov = 2 * Math.atan(d.w / 2 / d.f) / rad;
+  const pts = m.wedge.map(([lat, lon]) => ({ lat, lon }));
+  const edges = pts.length > 2 ? [bearing(pts[0], pts[1]), bearing(pts[0], pts[pts.length - 1])] : [];
+  const wide = got.win.w > got.win.h;
+  check(`the map takes half the screen, the camera the other half (${label})`,
+    d.map && (wide ? Math.abs(got.stage.w - got.win.w / 2) <= 1 && Math.abs(got.map.w - got.win.w / 2) <= 1
+                   : Math.abs(got.stage.h - got.win.h / 2) <= 1 && Math.abs(got.map.h - got.win.h / 2) <= 1 && got.map.y >= got.win.h / 2 - 1)
+      && got.canvas.h > got.win.h * 0.25,
+    JSON.stringify({ stage: got.stage, map: got.map, canvas: got.canvas, win: got.win }));
+  check(`a dot for every station gathered, and where you stand (${label})`,
+    m.open && m.dots === members && members > 0 && near(m.here.lat, d.here.lat, 1e-9) && near(m.here.lon, d.here.lon, 1e-9),
+    JSON.stringify({ dots: m.dots, members, here: m.here }));
+  check(`the view wedge fans out the way the camera faces, its angle the camera's field of view (${label})`,
+    edges.length === 2 && angNear(edges[0], d.heading - fov / 2, 0.05) && angNear(edges[1], d.heading + fov / 2, 0.05),
+    JSON.stringify({ edges, heading: d.heading, fov, mapFov: d.fov }));
+}
+
 // The pins on the screen, against the directions in view at this heading.
 async function pinsAgree(page, label) {
   await frames(page);
@@ -363,6 +396,12 @@ try {
   const head = await page.textContent('#ar-heading');
   check('the heading is written as a bearing and a point', /^\d{3}° [NSEW]{1,3}$/.test(head.trim()), head);
   await pinsAgree(page, 'facing the nearest station');
+  await mapAgrees(page, 'on a phone, facing the nearest station');
+  // Turn: the wedge follows, with nothing else touched.
+  await absolute(page, (nearest[1].b + 90) % 360, decl);
+  await mapAgrees(page, 'on a phone, turned 90° right');
+  await absolute(page, nearest[1].b, decl);
+  await frames(page);
 
   // The pins say what they are: their letter, their colour, their count.
   const pins = await page.evaluate(() => [...document.querySelectorAll('.ar-pin:not([hidden])')].map(el => ({
@@ -599,6 +638,7 @@ try {
   check('a drag of 200 px to the right turns the view left by 200 px of it',
     angNear(dragged.heading, 355 - 200 / (dragged.f * rad), 0.01), JSON.stringify({ heading: dragged.heading, f: dragged.f }));
   await pinsAgree(dp, 'after the drag');
+  await mapAgrees(dp, 'on a desktop, after the drag');
   await dp.click('.ar-close');
   check('✕ shuts it, focus back on the button that opened it',
     await dp.evaluate(() => !document.getElementById('ar-view') && document.activeElement?.id === 'ar-pane-map'));

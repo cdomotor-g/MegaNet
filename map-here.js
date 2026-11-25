@@ -370,6 +370,7 @@ const MapHere = (function () {
         ${copyLatLonPillHtml({ lat, lon })}
         <button type="button" class="pill" onclick="MapHere.zoom()"
                 title="Zoom the map in on this point">🔍 Zoom here</button>
+        ${(typeof mapViewPillParts === 'function' && (mapViewPillParts({ lat, lon }) || {}).street) || ''}
         <button type="button" class="pill${armed ? ' is-on' : ''}" onclick="MapHere.arm()"
                 aria-pressed="${armed}"
                 title="Pick another point">📍 ${armed ? 'Click the map…' : 'Pick another point'}</button>

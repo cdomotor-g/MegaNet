@@ -355,6 +355,12 @@ const SiteMap = (function () {
         'Ask Claude to investigate and write the briefing',
       ],
     },
+    bulletins: {
+      what: 'The network\'s last day or week as a short animated news bulletin. The bulletin service is paused for now due to cost constraints, so this tab says so.',
+      use: [
+        'Check whether the bulletin service has been switched back on',
+      ],
+    },
     nearby: {
       what: 'The stations closest to where you stand, nearest first, with how far and which way.',
       use: [

@@ -199,6 +199,19 @@ try {
   await page.mouse.move(px + 6, py + 4, { steps: 2 });
   await page.waitForTimeout(300);
   ok('chromium: a small move keeps the same card magnified', (await sizeAt()).underIsFocus);
+  // The band's chip stands on the card's right edge, turned a quarter, and no
+  // longer takes the name's row: the name runs the card's width, the chip sits
+  // in the gutter beside it, inside the card, with its meaning on hover.
+  const pill = await page.evaluate(() => {
+    const c = document.querySelector('.hc-card--big');
+    if (!c) return null;
+    const chip = c.querySelector('.hc-chip'), name = c.querySelector('.hc-name');
+    const cb = c.getBoundingClientRect(), pb = chip.getBoundingClientRect(), nb = name.getBoundingClientRect();
+    return { vertical: getComputedStyle(chip).writingMode, tall: pb.height > pb.width, inside: pb.left >= cb.left && pb.right <= cb.right + 0.5 && pb.top >= cb.top && pb.bottom <= cb.bottom + 0.5,
+      clear: nb.right <= pb.left + 0.5, title: chip.title.length > 10, trunc: name.scrollWidth > name.clientWidth + 1, nameW: nb.width, cardW: cb.width };
+  });
+  ok('chromium: the band chip stands on the right edge, turned, inside the card, clear of the name, with its meaning on hover',
+    pill && /vertical/.test(pill.vertical) && pill.tall && pill.inside && pill.clear && pill.title, JSON.stringify(pill));
 
   await page.evaluate(() => HealthCards.toggleMag());
   await page.waitForTimeout(300);
@@ -233,6 +246,11 @@ try {
   await page.waitForTimeout(200);
   const tip = await page.evaluate(() => { const t = document.getElementById('hc-tip'); return t && !t.hidden ? t.innerText : ''; });
   ok('chromium: the chart\'s callout names the time and the battery', /\d{1,2}:\d{2}/.test(tip) && /Battery/.test(tip) && /Check/.test(tip), tip);
+  const dots = await page.evaluate(() => ({ chart: document.querySelectorAll('#hc-chart .hc-c-dots').length, pts: [...document.querySelectorAll('#hc-chart .hc-c-dots')].map(p => (p.getAttribute('d').match(/h0\.01/g) || []).length),
+    lines: [...document.querySelectorAll('#hc-chart .hc-c-batt, #hc-chart .hc-c-sig')].map(p => (p.getAttribute('d').match(/[ML]/g) || []).length), card: document.querySelectorAll('.hc-card .hc-c-dots').length,
+    round: getComputedStyle(document.querySelector('#hc-chart .hc-c-dots')).strokeLinecap }));
+  ok('chromium: the enlarged chart marks every battery and signal reading with a dot, and the small card draws none',
+    dots.chart === 2 && dots.pts[0] === dots.lines[0] && (dots.pts[1] === dots.lines[1] || (dots.pts[1] === 0 && dots.lines[1] === 1)) && dots.pts[0] > 0 && dots.card === 0 && dots.round === 'round', JSON.stringify(dots));
   const dlg = await page.evaluate(() => ({ name: (document.querySelector('#hc-dialog h3') || {}).textContent || '', why: document.querySelectorAll('.hc-d-why li').length }));
   ok('chromium: the chart is named for its station and says why', dlg.name.length > 2 && dlg.why >= 1, JSON.stringify(dlg));
   await page.keyboard.press('Escape');

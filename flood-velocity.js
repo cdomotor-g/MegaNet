@@ -52,6 +52,19 @@
 //                    which is not a bed. Otherwise the sheet's ground. n 0.040.
 //   on the floodplain  the bed is the sheet's ground. n 0.060.
 //
+// ── At the tower pin ─────────────────────────────────────────────────────────
+// A third figure beside the channel's and the floodplain's: the velocity at
+// the station's own pin — where its tower or pole stands. The same equation,
+// with the depth taken over the ground height recorded for the station
+// (`elevation_ahd`, surveyed or modelled) rather than the sheet's ground or
+// the gauge zero, the slope the other two use, and the floodplain's roughness
+// (the pin is on the ground, not in the channel; an n entered for a floodplain
+// station is used). Where the station has no ground height — or one so far
+// from the sheet's ground that the sheet's levels cannot be for the same
+// place (PIN_MAX_APART) — there is no sensible depth, and the answer is
+// `pin: { ok: false, why }`: the card says it has not enough to go on rather
+// than guess.
+//
 // Above 5 m/s the card says so: few measured floods run faster, and a figure
 // up there is usually a deep channel whose hydraulic radius is well short of
 // its depth, or a slope that is not the one at the gauge.
@@ -139,6 +152,7 @@ const FloodVelocity = (function () {
   const SLOPE_MAX = 0.02;
   const ZERO_MAX_BELOW = 30;   // m — a gauge zero further below the ground is no bed
   const FAST = 5;              // m/s — above this the card says to check the inputs
+  const PIN_MAX_APART = 30;    // m — a pin's ground this far from the sheet's ground is not the same place
   // A station whose water a structure holds: its gauge zero is not a bed.
   const STORAGE_RE = /\b(dam|hw|headwater|storage|spillway)\b/i;
 
@@ -310,7 +324,32 @@ const FloodVelocity = (function () {
       return { key: t.key, label: t.label, short: t.short, n, nSource: own != null ? 'entered' : 'default',
                bed, bedBasis, levels, max, fast: max.v > FAST };
     });
-    return { row, slope, settings, recorded, storage, chosen: recorded || 'channel' };
+    return { row, slope, settings, recorded, storage, chosen: recorded || 'channel',
+             pin: atPin(s, row, given, slope, ground, recorded) };
+  }
+
+  // The velocity at the station's own pin (see "At the tower pin"):
+  //   { ok: true, key: 'pin', label, short, n, nSource, bed, bedBasis, source,
+  //     levels, max, fast }   or   { ok: false, why }.
+  function atPin(s, row, given, slope, ground, recorded) {
+    const pinGround = num(s && s.elevation_ahd);
+    if (pinGround == null) return { ok: false, why: 'the station has no ground height on record to measure the depth from' };
+    const apart = Math.abs(pinGround - ground);
+    if (apart > PIN_MAX_APART) {
+      return { ok: false, why: `the station’s ground height is ${apart.toFixed(0)} m from the sheet’s ground, so the sheet’s levels are not for this spot` };
+    }
+    const own = recorded === 'floodplain' ? num(row.manning_n) : null;
+    const n = own != null ? own : SETTINGS.find(t => t.key === 'floodplain').n;
+    const levels = given.map(l => {
+      const level = num(row[l.key]);
+      const depth = level - pinGround;
+      const m = manning(depth, slope.used, n);
+      return { key: l.key, label: l.label, oneIn: l.oneIn, level, depth, v: m.v, capped: m.capped };
+    });
+    const max = levels.reduce((a, b) => (b.v > a.v ? b : a), levels[0]);
+    return { ok: true, key: 'pin', label: 'At the tower pin', short: 'pin', n, nSource: own != null ? 'entered' : 'default',
+             bed: pinGround, bedBasis: s.elevation_source ? 'the station’s ground height (modelled)' : 'the station’s ground height',
+             levels, max, fast: max.v > FAST };
   }
 
   // 0.8, 2.4, 12 — a velocity to the tenth below 10 m/s, and never "0.0" for

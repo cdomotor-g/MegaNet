@@ -175,15 +175,36 @@ const SLS = (function () {
   // The classes the document states, in metres of the gauge's datum — AHD
   // where the NSW document says the gauge reads AHD — and then the ones it
   // says have not been defined yet, which is not the same as not saying.
-  function classesText(loc) {
-    const parts = [];
-    const unit = loc.gauge_datum === 'AHD' ? '\u00a0m\u00a0AHD' : '\u00a0m';
-    if (loc.class_minor != null)    parts.push(keep(`minor ${loc.class_minor}`));
-    if (loc.class_moderate != null) parts.push(keep(`moderate ${loc.class_moderate}`));
-    if (loc.class_major != null)    parts.push(keep(`major ${loc.class_major}`));
-    if (parts.length) parts[parts.length - 1] += unit;
-    for (const c of loc.classes_undefined || []) parts.push(keep(`${c} not yet defined`));
-    return parts.length ? parts.join(' · ') : null;
+  // One class a line. Where the gauge reads from its own zero and the app
+  // knows that zero in AHD (the station's gauge survey, via FloodStages), each
+  // height carries its AHD equivalent in brackets — the gauge height plus the
+  // zero. No known zero, or a gauge that already reads AHD: no brackets.
+  function ahdZeroOf(s) {
+    try {
+      const z = s && typeof FloodStages !== 'undefined' ? FloodStages.ladder(s).ahdZero : null;
+      return Number.isFinite(z) ? z : null;
+    } catch (_) { return null; }
+  }
+  function classLines(loc, zero) {
+    const own = loc.gauge_datum === 'AHD';
+    const lines = [];
+    for (const [name, v] of [['minor', loc.class_minor], ['moderate', loc.class_moderate], ['major', loc.class_major]]) {
+      if (v == null) continue;
+      const n = Number(v);
+      lines.push({ text: keep(`${name} ${v}${own ? ' m AHD' : ' m'}`),
+                   ahd: !own && zero != null && Number.isFinite(n) ? `${(n + zero).toFixed(2)} m AHD` : null });
+    }
+    for (const c of loc.classes_undefined || []) lines.push({ text: keep(`${c} not yet defined`), ahd: null });
+    return lines;
+  }
+  const AHD_WORDS = (zero) => `The same height in metres AHD (the Australian Height Datum, about mean sea level): the gauge height plus the gauge zero, which is ${Number(zero).toFixed(2)} m AHD for this station.`;
+  function classesHtml(loc, zero) {
+    const lines = classLines(loc, zero);
+    if (!lines.length) return '';
+    const any = lines.some(l => l.ahd);
+    return lines.map(l => `<span class="mn-sls-class">${esc(l.text)}${l.ahd
+        ? ` ${termHtml(`(${l.ahd})`, AHD_WORDS(zero))}` : ''}</span>`).join('')
+      + (any ? `<span class="small txt-muted mn-sls-class-key">In brackets: the same height in m AHD, the gauge height plus the gauge zero (${esc(Number(zero).toFixed(2))} m AHD).</span>` : '');
   }
 
   function roleText(loc) {
@@ -286,7 +307,7 @@ const SLS = (function () {
   // a gauge nobody can interrogate over the radio is not a telemetry fault when
   // it goes quiet, and 902 of the locations in these documents are read by
   // hand.
-  function html(loc) {
+  function html(loc, s) {
     if (!loc) return '';
     const manual = (loc.gauge_type || '').toLowerCase() === 'manual';
     const role = roleText(loc);
@@ -303,7 +324,7 @@ const SLS = (function () {
              title="Read by a person, not telemetered. It reports nothing over the radio, so silence from it is not a fault.">Manual — read by hand</span></span></div>`
           : row('Gauge', esc(loc.gauge_type || ''))}
         ${row('Role', role ? `${esc(role)}${fast ? ` · ${fast}` : ''}` : fast)}
-        ${row('Flood classes', esc(classesText(loc) || ''))}
+        ${row('Flood classes', classesHtml(loc, ahdZeroOf(s)))}
         ${row('Gauge datum', datumHtml(loc))}
         ${row('Prediction', serviceLines(loc)
             .map(t => `<span class="mn-sls-target">${esc(t)}</span>`).join('') + interim)}
@@ -320,7 +341,7 @@ const SLS = (function () {
 
   // Every document's block for a station: nothing for one no document lists.
   function htmlFor(s) {
-    return entriesFor(s).map(html).join('');
+    return entriesFor(s).map(loc => html(loc, s)).join('');
   }
 
   // What the card renders before the file is on hand, and what replaces it.

@@ -461,9 +461,9 @@ try {
       && /New South Wales and the Australian Capital Territory/.test(lis[0].name)
       && lis[0].title.includes(`version ${NSWDOC.version}`) && lis[0].title.includes(NSWDOC.published),
     JSON.stringify({ href: lis[0].href, label: lis[0].label, title: lis[0].title }));
-  check('an AHD gauge\'s flood classes are the file\'s, in metres AHD',
+  check('an AHD gauge\'s flood classes are the file\'s, one a line, in metres AHD',
     JSON.stringify(lis[0].rows['Flood classes'])
-      === JSON.stringify([`minor ${LISMORE.class_minor} · moderate ${LISMORE.class_moderate} · major ${LISMORE.class_major} m AHD`]),
+      === JSON.stringify([`minor ${LISMORE.class_minor} m AHD`, `moderate ${LISMORE.class_moderate} m AHD`, `major ${LISMORE.class_major} m AHD`]),
     JSON.stringify(lis[0].rows['Flood classes']));
   check('…with the gauge datum, the AWRC number and the owner beside them',
     LISMORE.gauge_datum === 'AHD' && JSON.stringify(lis[0].rows['Gauge datum']) === '["AHD"]'
@@ -495,7 +495,7 @@ try {
   check('a class the NSW SES has not defined is said in words, after the ones it has',
     JSON.stringify(REPTON.classes_undefined) === '["moderate"]'
       && JSON.stringify(rep.rows['Flood classes'])
-        === JSON.stringify([`minor ${REPTON.class_minor} · major ${REPTON.class_major} m AHD · moderate not yet defined`]),
+        === JSON.stringify([`minor ${REPTON.class_minor} m AHD`, `major ${REPTON.class_major} m AHD`, 'moderate not yet defined']),
     JSON.stringify(rep.rows['Flood classes']));
   check('…and that is not called an irregularity', !/irregular/.test(rep.text), rep.text.slice(-120));
 

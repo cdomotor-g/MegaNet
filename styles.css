@@ -4761,6 +4761,9 @@ tr.hops-picked td { background: color-mix(in srgb, var(--accent) 12%, transparen
    wrapped in a narrow card. */
 .mn-sls-target { display: block; }
 .mn-sls-target + .mn-sls-target { margin-top: .2rem; }
+/* A flood class a line, its AHD equivalent in brackets beside it. */
+.mn-sls-class { display: block; }
+.mn-sls-class-key { margin-top: .2rem; }
 
 /* The river height station details on the station card (0031): the same
    label/value rows, a section of their own for the same reason the SLS has
@@ -21540,6 +21543,8 @@ body.has-sort-bridge .signin-nudge { display: none; }
 .twin-scale-leaders polyline.is-ref { stroke-dasharray: 3 2; }
 .twin-scale-ref[aria-disabled="true"] { cursor: default; }
 .twin-scale-ref:hover { background: var(--panel); }
+/* The height against the instruments, after a name: small and quiet. */
+.twin-scale-vs { margin-left: .3em; font-size: .85em; font-style: normal; color: var(--muted, var(--text)); opacity: .8; }
 .twin-scale-ref .twin-flood-sw { flex: 0 0 auto; }
 
 /* The lines from the marks to the names. */
@@ -24067,6 +24072,111 @@ a.adm-kpi--go:hover::after, a.adm-kpi--go:focus-visible::after { color: var(--ac
   font-size: var(--fs-xs);
 }
 
+/* ── The map from above (station-ar-map.js) ─────────────────────────────────
+   Half the view. The pane holds the map, its key and the distance and types
+   bar, so where the map cannot be made (no .has-map) the pane dissolves
+   (display: contents) and the bar is the view's own third row again, as it
+   was. With it, the view is two halves: the camera (stage, top bar, hint) and
+   the map pane — stacked in portrait, side by side where the window is wider
+   than it is tall. The stage is sized to its half, because the field of view
+   the pins and the wedge use is read off its width (measure()). */
+.ar-map { display: contents; }
+.ar-map-canvas,
+.ar-map-key { display: none; }
+
+.ar-view.has-map {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+}
+.ar-view.has-map .ar-stage { inset: 0 0 50% 0; }
+.ar-view.has-map .ar-top,
+.ar-view.has-map .ar-hint { grid-column: 1; grid-row: 1; }
+.ar-view.has-map .ar-top { align-self: start; }
+.ar-view.has-map .ar-hint { align-self: end; }
+.ar-view.has-map .ar-radar { display: none; }    /* the map is the directions from above now */
+.ar-view.has-map .ar-detail { max-height: min(50%, 32rem); }   /* over the map half, so the camera's bar stays pressable */
+
+.ar-view.has-map .ar-map {
+  grid-column: 1;
+  grid-row: 2;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.ar-view.has-map .ar-map-canvas {
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  z-index: 0;
+  isolation: isolate;        /* Leaflet's panes (z 400+) stay inside the map */
+  background: var(--bg);
+}
+
+.ar-view.has-map .ar-map-key {
+  /* Over the top of the map, so it costs the map no height: the words at the
+     left, Recentre under Leaflet's zoom buttons at the right. Only they take a
+     press; the map under the rest of the strip still drags. */
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  display: block;
+  font-size: var(--fs-xs);
+  pointer-events: none;
+}
+
+.ar-view.has-map .ar-map-key .ar-tool {
+  position: absolute;
+  top: 6.25rem;
+  right: .65rem;
+  pointer-events: auto;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  color: var(--text);
+}
+
+.ar-map-words {
+  position: absolute;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--sp-3);
+  margin: 0;
+  padding: .2rem .55rem;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  list-style: none;
+  pointer-events: auto;
+}
+
+.ar-view.has-map .ar-bottom { gap: var(--sp-1); padding: var(--sp-2) var(--sp-3); }
+
+.ar-map-words .term { cursor: help; }
+.ar-pane-words { margin: var(--sp-2) 0 0; padding-left: 1.2em; }
+
+@media (min-aspect-ratio: 1 / 1) {
+  .ar-view.has-map {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .ar-view.has-map .ar-stage { inset: 0 50% 0 0; }
+  .ar-view.has-map .ar-map {
+    grid-column: 2;
+    grid-row: 1;
+    border-top: 0;
+    border-left: 1px solid var(--border);
+  }
+  .ar-view.has-map .ar-detail { left: 50%; max-height: min(100%, 32rem); }
+}
+
 /* A finger's size where a finger is what presses them. */
 @media (pointer: coarse) {
   .ar-role,
@@ -24622,6 +24732,7 @@ a.adm-kpi--go:hover::after, a.adm-kpi--go:focus-visible::after { color: var(--ac
 .hl-chip--on .hb-new { background: #fff; color: var(--accent); }
 .hb-pick select { max-width: 13rem; }
 .hb-folded, .hb-note { margin: 0; }
+.hb-paused-note { margin: 0 0 var(--sp-2); max-width: 72ch; }
 .hb-issued { margin: 0 0 var(--sp-2); color: var(--muted); }
 .hb-player { --hb-bar: #07192a; border-radius: 14px; background: var(--hb-bar); color: var(--hb-ink); container-type: inline-size;
   box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 6px 22px rgba(5,18,30,.25); }
@@ -31105,7 +31216,15 @@ details.tm-fold summary { cursor: pointer; }
 .hc-why-line { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 .hc-why--act { color: var(--hc-act); }
 .hc-why--watch { color: var(--text); }
-.hc-card--big .hc-chip { display: inline-block; }
+/* The band's chip stands on the card's right edge, turned a quarter (reading top
+   to bottom), so the station's name keeps the whole row: the chip used to sit
+   beside it and cut it to "Upp…". The card reserves a 17px gutter for it, and a
+   card too short for the word lets it clip rather than overflow. */
+.hc-card--big { padding-right: 17px; }
+.hc-card--big .hc-chip {
+  display: block; position: absolute; top: 3px; right: 2px; bottom: auto; max-height: calc(100% - 6px); overflow: hidden;
+  writing-mode: vertical-rl; padding: 4px 2px; line-height: 1.1; border-radius: 9px;
+}
 .hc-card--big .hc-name { font-size: 12px; font-weight: 700; color: var(--text); }
 .hc-card--big .hc-top { padding: 3px 5px 1px; }
 .hc-card--big .hc-why { display: block; }
@@ -31147,6 +31266,11 @@ details.tm-fold summary { cursor: pointer; }
 .hc-c-batt, .hc-c-sig { fill: none; stroke-width: 2; stroke-linejoin: round; }
 .hc-c-batt { stroke: var(--hc-batt); }
 .hc-c-sig { stroke: var(--hc-sig); }
+/* The chart's data points (the enlarged view only; the small card draws none). */
+.hc-c-dots { fill: none; stroke-width: 6; stroke-linecap: round; }
+.hc-c-dots--batt { stroke: var(--hc-batt); }
+.hc-c-dots--sig { stroke: var(--hc-sig); }
+.hc-c-dots.hc-red { stroke: var(--hc-red); }
 .hc-cross path { stroke: var(--text); stroke-opacity: 0.6; stroke-width: 1; }
 .hc-tip { position: absolute; top: 34px; left: var(--tx, 50%); margin-left: 12px; width: 220px; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); font-size: 12px; line-height: 1.55; display: flex; flex-direction: column; pointer-events: none; }
 .hc-tip--left { margin-left: -232px; }
@@ -31307,3 +31431,31 @@ details.tm-fold summary { cursor: pointer; }
 .mn-history-words dt { font-weight: 600; margin-top: var(--sp-1); }
 .mn-history-words dd { margin: 0; }
 .mn-history-credit { color: var(--muted); }
+
+/* The View and Imagery pills in the Stations map's bottom-left corner (map-pills.js). */
+.map-pills { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 1.4rem .6rem !important; pointer-events: auto; }
+.map-pills[hidden] { display: none; }
+.map-pill-wrap { position: relative; }
+.map-pill {
+  display: inline-flex; align-items: center; gap: .35rem; padding: .3rem .65rem; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--panel); color: var(--text); font: inherit; font-size: .8rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .25); cursor: pointer; min-height: 2rem;
+}
+.map-pill:hover, .map-pill.is-open { background: var(--panel-sub); }
+.map-pill:focus-visible, .map-pill-opt:focus-visible { outline: 3px solid #1a73e8; outline-offset: 2px; }
+.map-pill-k { color: var(--muted); }
+.map-pill b { font-weight: 700; }
+.map-pill-menu {
+  position: absolute; left: 0; bottom: calc(100% + .35rem); min-width: 12rem; max-height: min(60vh, 24rem); overflow: auto;
+  padding: .3rem; border-radius: .6rem; border: 1px solid var(--border); background: var(--panel); color: var(--text);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .35); z-index: 1200;
+}
+.map-pill-grp { padding: .35rem .5rem .15rem; font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.map-pill-opt {
+  display: block; width: 100%; text-align: left; padding: .45rem .6rem; border: 0; border-radius: .4rem; background: transparent;
+  color: inherit; font: inherit; font-size: .85rem; cursor: pointer; min-height: 2.2rem;
+}
+.map-pill-opt:hover { background: var(--panel-sub); }
+.map-pill-opt.is-on { font-weight: 700; background: var(--panel-sub); }
+.map-pill-opt.is-on::before { content: "✓ "; }
+.map-pill-sub { display: block; font-size: .72rem; font-weight: 400; color: var(--muted); }

@@ -34,13 +34,12 @@
   {
    "name": "health",
    "path": "?tab=health",
-   "ready": "#hb-player",
+   "ready": "section[aria-labelledby='hl-h']",
    "settle": 3000,
    "targets": {
-    "bulletin": "#hb-player",
-    "kinds": ".hb-tools"
-   },
-   "css": ".hb-bigplay { display: none !important; }"
+    "bulletin": "section[aria-labelledby='hl-h']",
+    "kinds": ".hl-seg"
+   }
   },
   {
    "name": "rf",

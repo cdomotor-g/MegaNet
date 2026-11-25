@@ -2066,7 +2066,9 @@ function makeShowPlayer(cfg = {}) {
     if (cfg.open) { cfg.open(id); return; }
     if (typeof Health === 'undefined') return;
     const st = Health.state && Health.state();
-    if (st && st.A && st.A.stations && st.A.stations.has(id) && Health.select) Health.select(id);
+    // On Station Health itself the station is picked where it is; from the
+    // bulletin's own tab it is Health.showStation that switches to the tab.
+    if (st && st.A && st.A.stations && st.A.stations.has(id) && Health.select && state.activeTab === 'health') Health.select(id);
     else if (Health.showStation) Health.showStation(id);
   }
 
@@ -2151,4 +2153,49 @@ function makeShowPlayer(cfg = {}) {
 
 const HealthBulletin = makeShowPlayer();
 
-if (typeof window !== 'undefined') { window.HealthBulletin = HealthBulletin; window.makeShowPlayer = makeShowPlayer; }
+// ── 📺 Network Bulletins: a view of Station Health, in Network health ─────────
+// The bulletin has a tab of its own now (a view beside Station Health's own,
+// reached from the strip across the top of either) instead of the top of
+// Station Health's page, where it took the first screen before anything else.
+//
+// PAUSED: the bulletin service is paused for cost constraints (the scheduled
+// task that writes each bulletin, and the voices ElevenLabs says them in, are
+// what cost). While BULLETINS_PAUSED is true the tab draws one notice and
+// nothing else: the index is not fetched, no player is made, nothing plays.
+// Nothing else is removed — the player above, the data/bulletins/ files and
+// the scheduled task's tools are all as they were — so turning the service
+// back on is this one constant going to false (and the scheduled task being
+// switched on again, which is not in this file).
+const BULLETINS_PAUSED = true;
+
+const HealthBulletinTab = (function () {
+  const TAB = 'bulletins';
+  let paused = BULLETINS_PAUSED;
+
+  function pausedHtml() {
+    return `<section class="panel hb-paused" id="hbt-panel" aria-labelledby="hbt-h">
+        <div class="panel-header"><h2 id="hbt-h"><span aria-hidden="true">📺</span> Network Bulletins</h2></div>
+        <p class="hb-paused-note" role="status"><strong>The bulletin service is currently paused due to cost constraints.</strong>
+          No new bulletins are being written or voiced, and none are shown here until it is switched back on.</p>
+        <p class="small">A bulletin was the network's last day, or week, told as a short animated news item. Station Health
+          has the same findings, in full, on its own tab.</p>
+        <p class="small"><button class="link-btn" onclick="switchTab('health')">Open Station Health</button></p>
+      </section>`;
+  }
+
+  function render() {
+    return `<div class="page hl-page">${paused ? pausedHtml() : HealthBulletin.render()}</div>`;
+  }
+  function init() {
+    // Safe to repeat: the registry replaces rather than stacks.
+    registerTabTeardown('Bulletins', stop);
+    if (!paused) HealthBulletin.init();
+  }
+  function stop() { if (!paused) HealthBulletin.stop(); }
+  // For the tests, which turn the service on to draw the player they check.
+  function _pause(on) { paused = !!on; }
+
+  return { TAB, render, init, stop, isPaused: () => paused, _pause };
+})();
+
+if (typeof window !== 'undefined') { window.HealthBulletin = HealthBulletin; window.makeShowPlayer = makeShowPlayer; window.HealthBulletinTab = HealthBulletinTab; }
