@@ -1244,7 +1244,7 @@ try {
   // 24 px WCAG 2.2 sets as a target's least.
   check('…holding ❔, 🧹, the two 📍, 〽️ and every one of the map\'s controls, in the corner\'s order, each 36 px square',
     JSON.stringify(phone.strip) === JSON.stringify(PHONE_STRIP) && phone.square.every(([w, h]) => w === 36 && h === 36)
-      && phone.panels.length === 13 && phone.panels.every(x => x === 'pane') && phone.buttons.every(Boolean),
+      && phone.panels.length === 14 && phone.panels.every(x => x === 'pane') && phone.buttons.every(Boolean),
     JSON.stringify(phone));
   const phoneCorner = await cornerNow();
   check('…the map ending where the rail begins, measured to it, and only ↺ standing on it, at its top right',
