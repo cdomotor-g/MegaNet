@@ -77,11 +77,12 @@ const HealthCards = (() => {
     rssi: 'Signal strength: how strongly the base station heard each report, in dBm. Closer to 0 is stronger; −110 dBm is near the limit. It is not signal-to-noise (SNR), how far the signal stands above the background noise. Watch below −100 dBm, act on below −105 dBm — provisional lines.',
     night: 'Solar night, 6 pm to 6 am at the station: the battery runs on its own, so the overnight low is the number that matters.',
     mag: 'Grows the card under the pointer to 3×, the cards next to it to 2× and the next ones to 1¼×, so more of it can be read without clicking.',
+    traffic: 'The bars on the right-hand axis: how many messages the base stations that hear this station picked up from anyone in each check-signal period — a busy network can crowd a check out. Counted from the hourly totals of what Flood-Net\'s base stations heard, so it is in whole hours.',
     size: '− and + (or Ctrl + scroll over the cards) make every card smaller or bigger; Fit all puts them all on the screen again.',
   };
   const GLOSSARY = [['hub', 'Maintenance hub'], ['ok', 'Nominal'], ['watch', 'Watch'], ['act', 'Act on'], ['silent', 'Silent'],
                     ['check', 'Check signal'], ['miss', 'Missed check'], ['partial', 'Frames lost'], ['unknown', 'Not listening'],
-                    ['rssi', 'Signal strength'], ['night', 'Night'], ['mag', 'Magnifier'], ['size', 'Card size']];
+                    ['rssi', 'Signal strength'], ['night', 'Night'], ['mag', 'Magnifier'], ['size', 'Card size'], ['traffic', 'Network traffic']];
 
   const C = {
     A: null, demo: false, hub: null, span: 4, zoom: 1, mag: true,
@@ -195,6 +196,7 @@ const HealthCards = (() => {
     return { band, battRed, sigRed, reasons };
   }
 
+  function fmtN(v) { return Number(v).toLocaleString('en-AU'); }
   function fmtNeg(v) { return String(v).replace('-', '−'); }
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
@@ -423,8 +425,8 @@ const HealthCards = (() => {
   }
 
   function relayout() {
-    const grid = document.getElementById('hc-grid');
-    if (!grid || !C.cards.length) return;
+    const grid = document.getElementById('hc-grid'), inner = document.getElementById('hc-inner');
+    if (!grid || !inner || !C.cards.length) return;
     const W = Math.max(120, grid.clientWidth - 2), H = Math.max(160, grid.clientHeight - 2);
     const g = fitGrid(C.cards.length, W, H, C.zoom);
     const rows = geoRows(C.cards.map(c => ({ lat: c.st.lat, lon: c.st.lon })), g.cols);
@@ -432,35 +434,72 @@ const HealthCards = (() => {
     rows.forEach((row, r) => row.forEach((i, col) => { cell[i] = { r, c: col }; }));
     C.G = { ...g, W, rows, cell };
     if (C.focus && (C.focus.r >= rows.length)) C.focus = null;
+    // One wrapper a row, so that a row far from the pointer is one write (its
+    // top and height) and not one per card. Moving cards into new wrappers
+    // drops the focus a keyboard user had on one: put it back.
+    const had = document.activeElement && C.els.includes(document.activeElement) ? document.activeElement : null;
+    inner.textContent = '';
+    C.rowEls = rows.map(row => {
+      const el = document.createElement('div');
+      el.className = 'hc-row';
+      row.forEach(i => { if (C.els[i]) el.appendChild(C.els[i]); });
+      inner.appendChild(el);
+      return el;
+    });
+    C.els.forEach(el => { el._hc = null; });
+    C.rowSet = rows.map(() => null);
+    if (had) had.focus({ preventScroll: true });
     place();
+  }
+
+  // Writes a custom property only when its value has changed since the last
+  // write — a style write the browser has to look at is the cost here, not
+  // the arithmetic.
+  function setVar(el, k, v) {
+    const m = el._v || (el._v = {});
+    if (m[k] === v) return;
+    m[k] = v;
+    el.style.setProperty(k, v);
   }
 
   function place() {
     const G = C.G, inner = document.getElementById('hc-inner');
-    if (!G || !inner) return;
+    if (!G || !inner || !C.rowEls) return;
     const f = C.mag ? C.focus : null;
     const wr = weights(G.rows.length, f ? f.r : null, NEAR);
     const tops = [0];
     for (let r = 0; r < G.rows.length; r++) tops.push(tops[r] + wr[r] * G.rh);
-    inner.style.setProperty('--hc-h', tops[G.rows.length].toFixed(0) + 'px');
+    setVar(inner, '--hc-h', tops[G.rows.length].toFixed(0) + 'px');
     G.rows.forEach((row, r) => {
       const dr = f ? Math.abs(r - f.r) : 99;
+      const rowEl = C.rowEls[r];
+      setVar(rowEl, '--hc-ry', tops[r].toFixed(1) + 'px');
+      setVar(rowEl, '--hc-rh', (wr[r] * G.rh - 3).toFixed(1) + 'px');
+      // Rows the magnifier does not reach are an even row, which is the same
+      // as it was a moment ago: skip them once they have been placed so.
+      const key = dr <= 2 ? 'f' + f.c + ':' + dr : 'even' + (wr[r] * G.rh - 3 < 22 ? ':tiny' : '');
+      rowEl.classList.toggle('hc-row--anim', dr <= 3);
+      if (dr > 2 && C.rowSet[r] === key) return;
+      C.rowSet[r] = key;
       const ws = dr <= 2 ? weights(row.length, f.c, [NEAR[dr], NEAR[Math.max(dr, 1)], NEAR[Math.max(dr, 2)]]) : weights(row.length, null, NEAR);
+      const h = wr[r] * G.rh - 3;
       let x = 0;
       row.forEach((i, col) => {
         const el = C.els[i];
         if (!el) return;
-        const w = ws[col] * G.cw - 3, h = wr[r] * G.rh - 3;
+        const w = ws[col] * G.cw - 3;
         const d = f ? Math.max(dr, Math.abs(col - f.c)) : 99;
-        el.style.setProperty('--x', x.toFixed(1) + 'px');
-        el.style.setProperty('--y', tops[r].toFixed(1) + 'px');
-        el.style.setProperty('--w', w.toFixed(1) + 'px');
-        el.style.setProperty('--h', h.toFixed(1) + 'px');
+        setVar(el, '--x', x.toFixed(1) + 'px');
+        setVar(el, '--w', w.toFixed(1) + 'px');
         const size = d === 0 && h >= 54 && w >= 90 ? 'big' : d === 1 && h >= 44 && w >= 80 ? 'mid' : h < 22 || w < 34 ? 'tiny' : '';
-        el.classList.toggle('hc-card--big', size === 'big');
-        el.classList.toggle('hc-card--mid', size === 'mid');
-        el.classList.toggle('hc-card--tiny', size === 'tiny');
-        el.classList.toggle('hc-card--focus', d === 0);
+        const cls = size + (d === 0 ? ' focus' : '');
+        if (el._hc !== cls) {
+          el._hc = cls;
+          el.classList.toggle('hc-card--big', size === 'big');
+          el.classList.toggle('hc-card--mid', size === 'mid');
+          el.classList.toggle('hc-card--tiny', size === 'tiny');
+          el.classList.toggle('hc-card--focus', d === 0);
+        }
         x += ws[col] * G.cw;
       });
     });
@@ -522,12 +561,87 @@ const HealthCards = (() => {
 
   // ── 7. a card's chart ──────────────────────────────────────────────────────
 
-  const CH = { W: 1060, L: 62, R: 14, BY: 26, BH: 160, KY: 214, KH: 26, SY: 268, SH: 160 };
+  const CH = { W: 1060, L: 62, R: 54, BY: 26, BH: 160, KY: 214, KH: 26, SY: 268, SH: 160 };
 
   function fmtTime(t) {
     return new Date(t).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   }
   function fmtDay(t) { return new Date(t).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }); }
+
+  // ── network traffic near the station ───────────────────────────────────────
+  // Bars on the signal panel's right-hand axis: what the base stations that hear
+  // this station picked up, from anybody, in each check-signal period. Read from
+  // telemetry_traffic(), the public hourly roll-up (never the raw receptions),
+  // once for the window and kept ten minutes. An hour is the finest it goes, so
+  // a check every hour or more often is shown by the hour, and a longer period
+  // adds up the hours it covers (a part-hour counted in proportion).
+  const T = { rows: null, at: 0, days: 0, ask: null };
+  const T_MS = 10 * MIN;
+  async function trafficRows(days) {
+    if (T.rows && T.days >= days && Date.now() - T.at < T_MS) return T.rows;
+    if (T.ask && T.askDays >= days) return T.ask;
+    T.askDays = days;
+    T.ask = (async () => {
+      const raw = await dbRpc('telemetry_traffic', { p_days: days, p_hourly: true });
+      const cols = (raw && raw.cols) || [];
+      const ti = cols.indexOf('t'), bi = cols.indexOf('base'), ni = cols.indexOf('n');
+      const by = new Map();
+      ((raw && raw.rows) || []).forEach(r => {
+        const name = String(r[bi] || ''), t = Number(r[ti]) * 1000, n = Number(r[ni]) || 0;
+        if (!name || !isFinite(t)) return;
+        let m = by.get(name); if (!m) by.set(name, m = new Map());
+        m.set(t, (m.get(t) || 0) + n);
+      });
+      T.rows = by; T.at = Date.now(); T.days = days;
+      return by;
+    })().finally(() => { T.ask = null; });
+    return T.ask;
+  }
+  // The base stations that heard the station in the window, by name.
+  function hearers(c) {
+    const names = new Set();
+    const SV = typeof SensorValues !== 'undefined' ? SensorValues : null;
+    ((c.S && c.S.txs) || []).forEach(tx => {
+      if (tx.t < c.a || tx.t >= c.b) return;
+      (tx.copies || []).forEach(cp => {
+        const at = SV && cp.host ? SV.baseOf(cp.host) : null;
+        if (at && at.name) names.add(at.name);
+      });
+    });
+    return [...names];
+  }
+  // → { bins: [{ t0, t1, mid, n }], max, names, hourly } — pure, for the check.
+  function trafficBins(byBase, names, slots, P, a, b) {
+    const hours = new Map();
+    names.forEach(nm => { const m = byBase.get(nm); if (m) m.forEach((n, t) => hours.set(t, (hours.get(t) || 0) + n)); });
+    const per = Math.max(P || 3 * HOUR, HOUR), hourly = !P || P <= HOUR;
+    const spans = hourly
+      ? (() => { const out = []; for (let t = Math.ceil(a / HOUR) * HOUR; t + HOUR <= b; t += HOUR) out.push([t, t + HOUR, t + HOUR / 2]); return out; })()
+      : slots.map(sl => [sl.t - per / 2, sl.t + per / 2, sl.t]);
+    const bins = spans.map(([t0, t1, mid]) => {
+      let n = 0;
+      hours.forEach((v, t) => { const o = Math.min(t1, t + HOUR) - Math.max(t0, t); if (o > 0) n += v * (o / HOUR); });
+      return { t0, t1, mid, n: Math.round(n) };
+    });
+    const top = Math.max(0, ...bins.map(x => x.n));
+    const mag = Math.pow(10, Math.floor(Math.log10(top || 1))), f = top / mag;
+    const max = Math.max(5, (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * mag);
+    return { bins, max, names, hourly };
+  }
+  async function loadTraffic(c) {
+    if (c.traffic !== undefined || C.demo || !c.S || typeof dbRpc !== 'function') return;
+    c.traffic = null;
+    try {
+      if (typeof SensorValues !== 'undefined') await SensorValues.loadBases();
+      const names = hearers(c);
+      if (!names.length) { c.traffic = { bins: [], max: 0, names, none: true }; return; }
+      const days = clamp(Math.ceil((Date.now() - c.a) / DAY) + 1, 1, 14);
+      const by = await trafficRows(days);
+      c.traffic = trafficBins(by, names, c.slots, c.P, c.a, c.b);
+    } catch (_) { c.traffic = { bins: [], max: 0, names: [], failed: true }; }
+    const i = C.cards.indexOf(c);
+    if (C.open === i) drawPlot(c);
+  }
 
   function chartSvg(c) {
     const { W, L, R, BY, BH, KY, KH, SY, SH } = CH, PW = W - L - R;
@@ -551,6 +665,16 @@ const HealthCards = (() => {
     const nights = nightsOf(c.st.lon, c.a, c.b).map(([f, t]) => `M${x(f).toFixed(1)} ${BY}H${x(t).toFixed(1)}V${SY + SH}H${x(f).toFixed(1)}Z`).join(' ');
     const slotW = Math.max(3, ((c.P || 3 * HOUR) / (c.b - c.a)) * PW * 0.8);
     const bars = want => c.slots.filter(sl => want.includes(sl.outcome)).map(sl => `M${(x(sl.t) - slotW / 2).toFixed(1)} ${KY}h${slotW.toFixed(1)}v${KH}h${(-slotW).toFixed(1)}Z`).join(' ') || 'M0 0';
+    const TR = c.traffic && c.traffic.bins.length ? c.traffic : null;
+    const yT = n => SY + SH - (n / TR.max) * SH;
+    let trafficSvg = '';
+    if (TR) {
+      const bw = Math.max(3, (TR.hourly ? HOUR : (c.P || 3 * HOUR)) / (c.b - c.a) * PW * 0.8);
+      const d = TR.bins.filter(b => b.n > 0).map(b => `M${(x(b.mid) - bw / 2).toFixed(1)} ${(SY + SH).toFixed(1)}V${yT(b.n).toFixed(1)}h${bw.toFixed(1)}V${(SY + SH).toFixed(1)}Z`).join(' ');
+      trafficSvg = `<path class="hc-c-traffic" d="${d || 'M0 0'}"/>`;
+      [0, 0.5, 1].forEach(f => { txt += `<text class="hc-ax hc-ax--r" x="${L + PW + 6}" y="${(yT(TR.max * f) + 4).toFixed(1)}">${fmtN(Math.round(TR.max * f))}</text>`; });
+      txt += `<text class="hc-c-title hc-c-title--r" x="${L + PW}" y="${SY - 9}" text-anchor="end">Messages heard nearby (bars, right axis)</text>`;
+    }
     const ref = (y, cls) => `<path class="${cls}" d="M${L} ${y.toFixed(1)}H${L + PW}"/>`;
     return `<svg class="hc-chart" id="hc-chart" viewBox="0 0 ${W} ${SY + SH + 26}" role="img" tabindex="0"
         aria-label="${escAttr(`${c.st.name}: battery voltage, check signals and signal strength from ${fmtTime(c.a)} to ${fmtTime(c.b)}. Arrow keys step through the readings.`)}">
@@ -558,6 +682,7 @@ const HealthCards = (() => {
       <path class="hc-c-grid" d="${grid}"/><path class="hc-c-day" d="${days || 'M0 0'}"/>
       ${ref(yB(12.2), 'hc-c-watch')}${ref(yB(11.8), 'hc-c-act')}
       ${dbfs ? '' : ref(yS(SIG_WATCH), 'hc-c-watch') + ref(yS(SIG_ACT), 'hc-c-act')}
+      ${trafficSvg}
       <path class="hc-c-hit" d="${bars(['hit'])}"/><path class="hc-c-partial" d="${bars(['partial'])}"/>
       <path class="hc-c-miss" d="${bars(['miss', 'net'])}"/><path class="hc-c-unknown" d="${bars(['unknown'])}"/>
       <path class="hc-c-batt${c.battRed ? ' hc-red' : ''}" d="${path(c.batt.map(p => ({ t: p.t, v: p.V })), yB)}"/>
@@ -586,6 +711,7 @@ const HealthCards = (() => {
         <button onclick="HealthCards.closeChart()">Close</button>
       </div>
       <div class="hc-d-plot" id="hc-d-plot">${chartSvg(c)}<div class="hc-tip" id="hc-tip" hidden></div></div>
+      <p class="small hc-d-key" id="hc-d-key">${trafficKey(c)}</p>
       <div class="hc-d-cols">
         <div><h4>${esc(why)}</h4>
           <ul class="hc-d-why">${c.reasons.map(r => `<li class="hc-why--${r.b}"><b>${esc(r.k)}</b> ${esc(r.t)}</li>`).join('')}</ul>
@@ -595,19 +721,48 @@ const HealthCards = (() => {
         <div class="small hc-d-what"><h4>What this shows</h4>
           <p><b>Battery voltage (V)</b> — the voltage in each report the station sent. It climbs by day as the solar panel charges and sags overnight; the overnight low is the number that matters. Dashed lines: 12.2 V watch, 11.8 V act on.</p>
           <p><b>Check signals</b> — a slot for each check report the station should have sent, on the schedule Flood-Net has learned for it. Filled: arrived. Paler: arrived with frames lost. Strong: never came. Dashed: no receiver that hears it was listening.</p>
+          <p><b>Messages heard nearby</b> — the grey bars on the right-hand axis: how many messages the base stations that hear this station picked up, from anybody, in each check-signal period. They sit under the signal trace and line up with the check slots, so a tall bar by a missed check says the network was busy then.</p>
           <p><b>${c.sig.unit === 'dBFS' ? 'Signal level (dBFS)' : 'Signal strength — RSSI (dBm)'}</b> — ${c.sig.unit === 'dBFS'
             ? 'how loud the report was at the receiver\'s input, in decibels below full scale; this receiver does not report RSSI, so no watch or act-on line is drawn.'
             : 'how strongly the base station heard each report: the strongest copy, if more than one heard it. Closer to 0 is stronger: −70 dBm is strong, −110 dBm near the limit. It is not signal-to-noise (SNR, how far the signal stands above the background noise). Dashed lines: −100 dBm watch, −105 dBm act on (provisional).'}</p>
         </div>
       </div>`;
+    bindChart();
+    dlg.addEventListener('close', onClose, { once: true });
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+    loadTraffic(c);
+  }
+  function bindChart() {
     const svg = document.getElementById('hc-chart');
     if (svg) {
       svg.addEventListener('pointermove', e => hoverAt(pointerTime(e, svg)));
       svg.addEventListener('pointerleave', () => hoverAt(null));
       svg.addEventListener('keydown', chartKey);
     }
-    dlg.addEventListener('close', onClose, { once: true });
-    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+  }
+  // The traffic has come in: the same chart again with the bars, the tip kept.
+  function drawPlot(c) {
+    const plot = document.getElementById('hc-d-plot'), key = document.getElementById('hc-d-key');
+    if (!plot) return;
+    const had = document.activeElement && document.activeElement.id === 'hc-chart';
+    const svg = plot.querySelector('svg');
+    if (svg) svg.outerHTML = chartSvg(c);
+    if (key) key.innerHTML = trafficKey(c);
+    bindChart();
+    if (had) { const n = document.getElementById('hc-chart'); if (n) n.focus({ preventScroll: true }); }
+    if (C.hov != null) hoverAt(C.hov);
+  }
+  // The line under the chart that says what the bars are, or why there are none.
+  function trafficKey(c) {
+    const t = termHtml('Messages heard nearby', WORDS.traffic);
+    if (C.demo) return `<b>${t}</b> — not drawn for the demo week: the bars come from what Flood-Net's base stations really heard.`;
+    if (!c.S) return `<b>${t}</b> — not drawn: no base station has heard this station in these days.`;
+    const T0 = c.traffic;
+    if (T0 === undefined || T0 === null) return `<b>${t}</b> — reading the hourly totals…`;
+    if (T0.failed) return `<b>${t}</b> — could not be read just now; close and open the chart to try again.`;
+    if (T0.none) return `<b>${t}</b> — not drawn: none of the base stations that hear this station could be named.`;
+    const by = T0.names.length > 3 ? T0.names.slice(0, 3).join(', ') + ` and ${T0.names.length - 3} more` : T0.names.join(', ');
+    return `<b>${t}</b> (grey bars, right-hand axis) — everything ${esc(by)} heard from any station in each ${T0.hourly ? 'hour' : 'check period (every ' + esc(fmtEvery(c.P)) + ')'}, lined up with the check slots above. A tall bar is a busy network, which can crowd a check out.${T0.hourly ? ' Checks come more often than hourly, and the totals are hourly, so the bars are by the hour.' : ''}`;
   }
   function onClose() { const f = C.from; C.open = null; C.hov = null; if (f && f.isConnected) f.focus(); }
   function closeChart() { const dlg = document.getElementById('hc-dialog'); if (dlg && dlg.open) dlg.close(); }
@@ -664,6 +819,10 @@ const HealthCards = (() => {
       ['hc-ln--sig' + (c.sigRed ? ' hc-ln--red' : ''), c.sig.unit === 'dBFS' ? 'Signal level' : 'Signal strength', sp ? fmtNeg(Math.round(sp.v)) + ' ' + (c.sig.unit || 'dBm') : '—'],
       ['hc-ln--chk hc-ln--chk-' + (sl ? sl.outcome : 'none'), 'Check', sl ? O[sl.outcome] || sl.outcome : 'no check due'],
     ];
+    if (c.traffic && c.traffic.bins.length) {
+      const tb = c.traffic.bins.find(b => at >= b.t0 && at < b.t1);
+      rows.push(['hc-ln--traffic', 'Messages nearby', tb ? fmtN(tb.n) + (c.traffic.hourly ? ' that hour' : ' in the period') : '—']);
+    }
     tip.innerHTML = `<b>${esc(fmtTime(at))}</b>${rows.map(([cls, k, v]) => `<span class="hc-tip-row"><i class="hc-ln ${cls}" aria-hidden="true"></i><span>${esc(k)}</span><b>${esc(v)}</b></span>`).join('')}`;
     const frac = px / W;
     tip.style.setProperty('--tx', (frac * 100).toFixed(2) + '%');
@@ -683,6 +842,6 @@ const HealthCards = (() => {
   return {
     render, mount, stop, setHub, setSpan, zoomBy, toggleMag, fullscreen, closeChart, openStation,
     // the pure parts, for test/health-cards.mjs
-    weights, geoRows, fitGrid, signalOf, bandsOf, nightsOf, WORDS, GLOSSARY,
+    weights, geoRows, fitGrid, signalOf, bandsOf, nightsOf, trafficBins, WORDS, GLOSSARY,
   };
 })();

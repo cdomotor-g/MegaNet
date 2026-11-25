@@ -31059,15 +31059,23 @@ details.tm-fold summary { cursor: pointer; }
 .hc-grid { position: relative; height: clamp(360px, calc(100vh - 230px), 980px); overflow-y: auto; overflow-x: hidden; border-radius: var(--r-md, 8px); }
 .hc-panel:fullscreen .hc-grid { flex: 1 1 auto; height: auto; min-height: 0; }
 .hc-grid:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.hc-inner { position: relative; height: var(--hc-h, 100%); }
+.hc-inner { position: relative; height: var(--hc-h); }
 .hc-empty { padding: 24px; }
+/* Not inherited, so moving a row restyles the row and not the card, the plot
+   and the words inside it: 1,000 cards moved a pointer slowly before. */
+@property --hc-ry { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --hc-rh { syntax: '<length>'; inherits: false; initial-value: 44px; }
+@property --hc-h { syntax: '<length>'; inherits: false; initial-value: 0px; }
+.hc-row { position: absolute; left: 0; right: 0; top: var(--hc-ry); height: calc(var(--hc-rh) + 3px); contain: layout style; }
+.hc-row:has(.hc-card--focus) { z-index: 3; }
+.hc-row--anim { transition: top 120ms ease-out, height 120ms ease-out; }
 .hc-card {
-  position: absolute; left: var(--x, 0); top: var(--y, 0); width: var(--w, 60px); height: var(--h, 44px);
+  position: absolute; left: var(--x, 0); top: 0; width: var(--w, 60px); height: calc(100% - 3px); contain: layout style;
   box-sizing: border-box; margin: 0; padding: 0; overflow: hidden; display: flex; flex-direction: column;
   text-align: left; font: inherit; color: var(--text); cursor: pointer; border-radius: 4px;
   background: var(--panel); border: 1.5px solid var(--hc-ok);
-  transition: left 120ms ease-out, top 120ms ease-out, width 120ms ease-out, height 120ms ease-out;
 }
+.hc-row--anim .hc-card { transition: left 120ms ease-out, width 120ms ease-out, height 120ms ease-out; }
 .hc-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; z-index: 4; }
 .hc-card--watch { border: 2px solid var(--hc-watch); background: var(--hc-watch-bg); }
 .hc-card--act { border: 3px solid var(--hc-act); background: var(--hc-act-bg); }
@@ -31127,6 +31135,11 @@ details.tm-fold summary { cursor: pointer; }
 .hc-c-act { stroke: var(--hc-red); stroke-width: 1.2; stroke-dasharray: 5 4; fill: none; }
 .hc-c-hit { fill: color-mix(in srgb, var(--muted) 30%, var(--panel)); }
 .hc-c-unknown { fill: none; stroke: var(--border); stroke-dasharray: 2 2; }
+.hc-c-traffic { fill: color-mix(in srgb, var(--muted) 45%, transparent); }
+.hc-ln--traffic { background: color-mix(in srgb, var(--muted) 55%, var(--panel)); height: 8px; width: 4px; }
+.hc-ax--r { text-anchor: start; }
+.hc-c-title--r { font-weight: 500; fill: var(--muted); }
+.hc-d-key { margin: 6px 0 0; }
 .hc-c-batt, .hc-c-sig { fill: none; stroke-width: 2; stroke-linejoin: round; }
 .hc-c-batt { stroke: var(--hc-batt); }
 .hc-c-sig { stroke: var(--hc-sig); }

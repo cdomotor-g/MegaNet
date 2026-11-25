@@ -124,6 +124,17 @@ const NEAR = [3, 2, 1.25];
   ok('bands: act on first among the reasons', b.band === 'act' && b.reasons[0].b === 'act' && !b.battRed);
 }
 {
+  const H = 3600000, a = Date.UTC(2026, 10, 1), P = 3 * H;
+  const byBase = new Map([['A', new Map([[a, 10], [a + H, 20], [a + 2 * H, 30], [a + 3 * H, 40]])], ['B', new Map([[a, 5]])]]);
+  const slots = [{ t: a + 1.5 * H }, { t: a + 4.5 * H }];
+  let tb = HC.trafficBins(byBase, ['A', 'B'], slots, P, a, a + 12 * H);
+  ok('traffic: a slot\'s bar adds the hours of its period, both base stations', tb.bins.length === 2 && tb.bins[0].t0 === a && tb.bins[0].n === 65 && !tb.hourly, JSON.stringify(tb.bins));
+  ok('traffic: the next slot adds its own hours only', tb.bins[1].n === 40, JSON.stringify(tb.bins[1]));
+  tb = HC.trafficBins(byBase, ['A'], slots, H, a, a + 4 * H);
+  ok('traffic: a check every hour or faster is drawn by the hour', tb.hourly && tb.bins.length === 4 && tb.bins[1].n === 20);
+  ok('traffic: the right axis tops out on a round number above the tallest bar', HC.trafficBins(byBase, ['A'], slots, P, a, a + 12 * H).max === 100);
+}
+{
   ok('words: every glossary entry has a meaning', HC.GLOSSARY.every(([k]) => typeof HC.WORDS[k] === 'string' && HC.WORDS[k].length > 30));
   const night = HC.nightsOf(150, Date.UTC(2026, 10, 17), Date.UTC(2026, 10, 19));
   ok('nights: two days hold two nights or three part ones, each 12 h or less', night.length >= 2 && night.length <= 3 && night.every(([a, b]) => b > a && b - a <= 12 * 3600000 + 1));
