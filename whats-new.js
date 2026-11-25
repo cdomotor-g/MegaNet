@@ -25,6 +25,14 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 290, date: '2026-11-25', items: [
+      '🕰️ <strong>Imagery over time: a slider through old pictures of the ground.</strong> On the Stations map, open '
+        + '<em>🕰️ Imagery over time</em> in the side panel and pick a source; a slider appears at the foot of the map. '
+        + '<em>Esri Wayback</em> goes back to 2014 anywhere in Australia, with the day each photo was taken; '
+        + '<em>Satellite years</em> is Geoscience Australia\'s picture of every year since 1986, coarse but everywhere; '
+        + '<em>Queensland photos</em> and <em>NSW photos</em> are the States\' own aerial photos, back to the 1990s in Queensland '
+        + 'towns and to 1943 in parts of NSW. The dates are found for the middle of the map each time you move it.',
+    ] },
     { n: 289, date: '2026-11-21', items: [
       '🔗 <strong>ALERT2 IDs have a wheel and a grid now</strong>, as the legacy ALERT addresses do: on <em>ALERT IDs</em>, switch to '
         + '<em>ALERT2</em>. The wheel goes round every ID from 1 to 65,534, a wedge a thousand, with who holds each, what the base stations '

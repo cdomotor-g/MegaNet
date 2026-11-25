@@ -6820,6 +6820,7 @@ function stopStationsMap() {
   MapRepCompare.detach();
   if (typeof MapAcma !== 'undefined') MapAcma.detach();
   if (typeof MapDig !== 'undefined') MapDig.detach();
+  if (typeof MapHistory !== 'undefined') MapHistory.detach();
   MapHops.detach();
   MapDirect.detach();
   MapLatency.detach();
@@ -7092,6 +7093,10 @@ function initMap() {
   if (typeof MapAcma !== 'undefined') MapAcma.attach(state.map);
   // 🚧 Before you dig: what is in the way of digging or a crane at a spot.
   if (typeof MapDig !== 'undefined') MapDig.attach(state.map);
+  // 🕰️ Imagery over time: a slider through dated pictures of the ground —
+  // Esri Wayback, Geoscience Australia's satellite years, the States' old
+  // aerial photos (map-history.js).
+  if (typeof MapHistory !== 'undefined') MapHistory.attach(state.map);
   // 🪜 Hops to base: a pane for its lines, and the hops of a station lit
   // before the map was built again drawn on the new one.
   MapHops.attach(state.map);
