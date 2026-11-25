@@ -31272,6 +31272,11 @@ details.tm-fold summary { cursor: pointer; }
 .hc-c-dots--sig { stroke: var(--hc-sig); }
 .hc-c-dots--snr { stroke: var(--hc-snr); }
 .hc-c-dots.hc-red { stroke: var(--hc-red); }
+.hc-c-off { fill: var(--panel); stroke: var(--hc-batt); stroke-width: 1.5; }
+.hc-c-off.hc-red { stroke: var(--hc-red); }
+.hc-d-tog { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin: 8px 0 0; }
+.hc-d-tog button { padding: 3px 10px; }
+.hc-d-tog button[aria-pressed="true"] { background: var(--accent); color: var(--panel); border-color: var(--accent); }
 /* Bright green so the hover line reads against the dark chart and the grey bars. */
 .hc-cross path { stroke: #39ff14; stroke-opacity: 1; stroke-width: 2; }
 .hc-tip { position: absolute; top: 34px; left: var(--tx, 50%); margin-left: 12px; width: 220px; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); font-size: 12px; line-height: 1.55; display: flex; flex-direction: column; pointer-events: none; }

@@ -78,6 +78,7 @@ const HealthCards = (() => {
     night: 'Solar night, 6 pm to 6 am at the station: the battery runs on its own, so the overnight low is the number that matters.',
     mag: 'Grows the card under the pointer to 3×, the cards next to it to 2× and the next ones to 1¼×, so more of it can be read without clicking.',
     traffic: 'The bars on the right-hand axis: how many messages the base stations that hear this station picked up from anyone in each check-signal period — a busy network can crowd a check out. Counted from the hourly totals of what Flood-Net\'s base stations heard, so it is in whole hours.',
+    offslot: 'A battery reading heard more than 30 minutes from any check slot. It is probably not this station\'s own scheduled check but another transmission or one delayed in a busy network, so it is drawn hollow and, by default, left out of the line.',
     snr: 'Signal-to-noise ratio, in dB: how far the signal stood above the background noise at the base station that heard it best. Bigger is better — 10 dB is marginal, 20 dB or more is comfortable. Only receivers that report a noise floor give one; a station without it shows no line.',
     size: '− and + (or Ctrl + scroll over the cards) make every card smaller or bigger; Fit all puts them all on the screen again.',
   };
@@ -671,6 +672,15 @@ const HealthCards = (() => {
     const sigOn = !(dbfs && snrOn) && (c.sig.pts.length > 0 || !snrOn);
     return { snrOn, sigOn, dbfs, two: sigOn && snrOn, L: sigOn && snrOn ? CH.L2 : CH.L };
   }
+  // A battery report that lands well away from every check slot is probably not
+  // this station's scheduled check: more likely another transmission, or one
+  // heard late or garbled in a busy network. Within 30 minutes of a slot (less
+  // for stations that check very often) counts as on schedule.
+  function offSlot(c, t) {
+    if (!c.P || !c.slots.length) return false;
+    return !nearest(c.slots, t, Math.min(30 * MIN, c.P / 4));
+  }
+  function checkOnlyOn(c) { return C.checkOnly !== false && !!c.P && c.slots.length > 0; }
   function chartSvg(c) {
     const PN = panelOf(c);
     const { W, R, BY, BH, KY, KH, SY, SH } = CH, L = PN.L, PW = W - L - R;
@@ -722,6 +732,10 @@ const HealthCards = (() => {
       [0, 0.5, 1].forEach(f => { txt += `<text class="hc-ax hc-ax--r" x="${L + PW + 6}" y="${(yT(TR.max * f) + 4).toFixed(1)}">${fmtN(Math.round(TR.max * f))}</text>`; });
       txt += `<text class="hc-c-title hc-c-title--r" x="${L + PW}" y="${SY - 9}" text-anchor="end">Messages heard nearby (bars, right axis)</text>`;
     }
+    const battAll = c.batt.map(p => ({ t: p.t, v: p.V }));
+    const battOn = battAll.filter(p => !offSlot(c, p.t)), battOff = battAll.filter(p => offSlot(c, p.t));
+    const battLine = checkOnlyOn(c) ? battOn : battAll;
+    const rings = (pts, y) => pts.map(p => { const px = x(p.t).toFixed(1), py = y(p.v).toFixed(1); return `M${(+px - 3.2).toFixed(1)} ${py}a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0 -6.4 0`; }).join('') || 'M0 0';
     const ref = (y, cls) => `<path class="${cls}" d="M${L} ${y.toFixed(1)}H${L + PW}"/>`;
     return `<svg class="hc-chart" id="hc-chart" viewBox="0 0 ${W} ${SY + SH + 26}" role="img" tabindex="0"
         aria-label="${escAttr(`${c.st.name}: battery voltage, check signals and signal strength from ${fmtTime(c.a)} to ${fmtTime(c.b)}. Arrow keys step through the readings.`)}">
@@ -732,10 +746,11 @@ const HealthCards = (() => {
       ${trafficSvg}
       <path class="hc-c-hit" d="${bars(['hit'])}"/><path class="hc-c-partial" d="${bars(['partial'])}"/>
       <path class="hc-c-miss" d="${bars(['miss', 'net'])}"/><path class="hc-c-unknown" d="${bars(['unknown'])}"/>
-      <path class="hc-c-batt${c.battRed ? ' hc-red' : ''}" d="${path(c.batt.map(p => ({ t: p.t, v: p.V })), yB)}"/>
+      <path class="hc-c-batt${c.battRed ? ' hc-red' : ''}" d="${path(battLine, yB)}"/>
       ${snrSvg}
       ${PN.sigOn ? `<path class="hc-c-sig${c.sigRed ? ' hc-red' : ''}" d="${path(c.sig.pts, yS)}"/>` : ''}
-      <path class="hc-c-dots hc-c-dots--batt${c.battRed ? ' hc-red' : ''}" d="${dots(c.batt.map(p => ({ t: p.t, v: p.V })), yB)}"/>
+      <path class="hc-c-dots hc-c-dots--batt${c.battRed ? ' hc-red' : ''}" d="${dots(battOn, yB)}"/>
+      <path class="hc-c-off${c.battRed ? ' hc-red' : ''}" d="${rings(battOff, yB)}"/>
       ${PN.sigOn ? `<path class="hc-c-dots hc-c-dots--sig${c.sigRed ? ' hc-red' : ''}" d="${dots(c.sig.pts, yS)}"/>` : ''}
       <text class="hc-c-title${c.battRed ? ' hc-red-t' : ''}" x="${L}" y="${BY - 9}">Battery voltage (V)</text>
       <text class="hc-c-title" x="${L}" y="${KY - 6}">Check signals${c.P ? ` — every ${esc(fmtEvery(c.P))}` : ''}</text>
@@ -760,6 +775,11 @@ const HealthCards = (() => {
         <span class="small hc-d-sub">${esc(hubName(c.st.hub_id))}${c.st.station_number ? ' · station ' + esc(c.st.station_number) : ''}${c.P ? ' · checks every ' + esc(fmtEvery(c.P)) : ''} · ${esc(fmtTime(c.a))} to ${esc(fmtTime(c.b))}</span>
         <button onclick="HealthCards.closeChart()">Close</button>
       </div>
+      ${c.P && c.slots.length ? `<div class="hc-d-tog small" role="group" aria-label="Which battery readings the line joins">
+        <span>${termHtml('Battery line', WORDS.offslot)}:</span>
+        <button type="button" id="hc-tog-chk" aria-pressed="${checkOnlyOn(c)}" onclick="HealthCards.setCheckOnly(true)">Check readings only</button>
+        <button type="button" id="hc-tog-all" aria-pressed="${!checkOnlyOn(c)}" onclick="HealthCards.setCheckOnly(false)">All readings</button>
+      </div>` : ''}
       <div class="hc-d-plot" id="hc-d-plot">${chartSvg(c)}<div class="hc-tip" id="hc-tip" hidden></div></div>
       <p class="small hc-d-key" id="hc-d-key">${keyLine(c)}</p>
       <div class="hc-d-cols">
@@ -771,6 +791,7 @@ const HealthCards = (() => {
         <div class="small hc-d-what"><h4>What this shows</h4>
           <p>Each <b>dot</b> on the battery, signal and SNR lines is one report heard; a line joins dots heard close together, so a single report, or ones far apart, shows as a dot alone.</p>
           <p><b>Battery voltage (V)</b> — the voltage in each report the station sent. It climbs by day as the solar panel charges and sags overnight; the overnight low is the number that matters. Dashed lines: 12.2 V watch, 11.8 V act on.</p>
+          <p><b>Hollow battery dots</b> — a reading heard more than 30 minutes from any check slot, so probably not this station\'s own scheduled check but noise in a busy network. <b>Check readings only</b> (the default) joins just the on-schedule dots; <b>All readings</b> joins every dot.</p>
           <p><b>Check signals</b> — a slot for each check report the station should have sent, on the schedule Flood-Net has learned for it. Filled: arrived. Paler: arrived with frames lost. Strong: never came. Dashed: no receiver that hears it was listening.</p>
           <p><b>Signal-to-noise (SNR)</b> — the violet line, on the left axis (beside the signal strength axis where that is drawn), in dB: how far the best-heard copy of each report stood above the background noise at the base station. Higher is better. Not every receiver reports it, so some stations have no line.</p>
           <p><b>Messages heard nearby</b> — the grey bars on the right-hand axis: how many messages the base stations that hear this station picked up, from anybody, in each check-signal period. They sit under the signal trace and line up with the check slots, so a tall bar by a missed check says the network was busy then.</p>
@@ -811,7 +832,20 @@ const HealthCards = (() => {
       ? `<b>${t}</b> (violet line, left axis) — how far the best-heard copy of each report stood above the background noise. Higher is better.`
       : `<b>${t}</b> — not drawn: none of the receivers that heard this station reported a noise floor, so there is no SNR to plot.`;
   }
-  function keyLine(c) { return trafficKey(c) + '<br>' + snrKey(c); }
+  function offKey(c) {
+    if (!c.P || !c.slots.length) return '';
+    const n = c.batt.filter(p => offSlot(c, p.t)).length;
+    if (!n) return '';
+    return `<br><b>${termHtml('Hollow battery dots', WORDS.offslot)}</b> (${n}) — readings heard more than 30 minutes from any check slot. They may be network noise rather than this station's own check, so ${checkOnlyOn(c) ? 'the line skips them' : 'the line joins them'}.`;
+  }
+  function keyLine(c) { return trafficKey(c) + '<br>' + snrKey(c) + offKey(c); }
+  function setCheckOnly(on) {
+    C.checkOnly = !!on;
+    const c = C.cards[C.open];
+    if (!c) return;
+    ['chk', 'all'].forEach(k => { const b = document.getElementById('hc-tog-' + k); if (b) b.setAttribute('aria-pressed', String((k === 'chk') === checkOnlyOn(c))); });
+    drawPlot(c);
+  }
   function trafficKey(c) {
     const t = termHtml('Messages heard nearby', WORDS.traffic);
     if (C.demo) return `<b>${t}</b> — not drawn for the demo week: the bars come from what Flood-Net's base stations really heard.`;
@@ -876,7 +910,7 @@ const HealthCards = (() => {
     cross.setAttribute('visibility', 'visible');
     const O = { hit: 'arrived', partial: 'arrived, frames lost', miss: 'missed', net: 'missed network-wide', unknown: 'no receiver listening' };
     const rows = [
-      ['hc-ln--batt' + (c.battRed ? ' hc-ln--red' : ''), 'Battery', bp ? bp.v.toFixed(2) + ' V' : '—'],
+      ['hc-ln--batt' + (c.battRed ? ' hc-ln--red' : ''), 'Battery', bp ? bp.v.toFixed(2) + ' V' + (offSlot(c, bp.t) ? ' (off schedule, may be noise)' : '') : '—'],
       ...(panelOf(c).sigOn ? [['hc-ln--sig' + (c.sigRed ? ' hc-ln--red' : ''), c.sig.unit === 'dBFS' ? 'Signal level' : 'Signal strength', sp ? fmtNeg(Math.round(sp.v)) + ' ' + (c.sig.unit || 'dBm') : '—']] : []),
       ...(c.snr.pts.length ? [['hc-ln--snr', 'SNR', np ? np.v.toFixed(1) + ' dB' : '—']] : []),
       ['hc-ln--chk hc-ln--chk-' + (sl ? sl.outcome : 'none'), 'Check', sl ? O[sl.outcome] || sl.outcome : 'no check due'],
@@ -902,7 +936,7 @@ const HealthCards = (() => {
   }
 
   return {
-    render, mount, stop, setHub, setSpan, zoomBy, toggleMag, fullscreen, closeChart, openStation,
+    render, mount, stop, setCheckOnly, setHub, setSpan, zoomBy, toggleMag, fullscreen, closeChart, openStation,
     // the pure parts, for test/health-cards.mjs
     weights, geoRows, fitGrid, signalOf, snrOf, bandsOf, nightsOf, trafficBins, WORDS, GLOSSARY,
   };
