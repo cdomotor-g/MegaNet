@@ -578,7 +578,7 @@ const HealthCards = (() => {
 
   // ── 7. a card's chart ──────────────────────────────────────────────────────
 
-  const CH = { W: 1060, L: 108, R: 54, BY: 26, BH: 160, KY: 214, KH: 26, SY: 268, SH: 160 };
+  const CH = { W: 1060, L: 62, L2: 108, R: 54, BY: 26, BH: 160, KY: 214, KH: 26, SY: 268, SH: 160 };
 
   function fmtTime(t) {
     return new Date(t).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -660,10 +660,22 @@ const HealthCards = (() => {
     if (C.open === i) drawPlot(c);
   }
 
-  function chartSvg(c) {
-    const { W, L, R, BY, BH, KY, KH, SY, SH } = CH, PW = W - L - R;
-    const x = t => L + ((t - c.a) / (c.b - c.a)) * PW;
+  // Which traces the signal panel draws. A level in dBFS is the same shape as
+  // the signal-to-noise over the receiver's noise floor, so where there is an
+  // SNR the dBFS trace is left off (asked 25 Nov 2026). An RSSI in dBm is a
+  // different measure and stays beside it, on its own axis. The left margin
+  // holds two axes only when two are drawn.
+  function panelOf(c) {
+    const snrOn = c.snr.pts.length > 0;
     const dbfs = c.sig.unit === 'dBFS';
+    const sigOn = !(dbfs && snrOn) && (c.sig.pts.length > 0 || !snrOn);
+    return { snrOn, sigOn, dbfs, two: sigOn && snrOn, L: sigOn && snrOn ? CH.L2 : CH.L };
+  }
+  function chartSvg(c) {
+    const PN = panelOf(c);
+    const { W, R, BY, BH, KY, KH, SY, SH } = CH, L = PN.L, PW = W - L - R;
+    const x = t => L + ((t - c.a) / (c.b - c.a)) * PW;
+    const dbfs = PN.dbfs;
     const sLo = dbfs ? -60 : R_LO, sHi = dbfs ? 0 : R_HI;
     const yB = v => BY + BH - ((clamp(v, V_LO, V_HI) - V_LO) / (V_HI - V_LO)) * BH;
     const yS = v => SY + SH - ((clamp(v, sLo, sHi) - sLo) / (sHi - sLo)) * SH;
@@ -676,7 +688,7 @@ const HealthCards = (() => {
     const dots = (pts, y) => pts.map(p => `M${x(p.t).toFixed(1)} ${y(p.v).toFixed(1)}h0.01`).join('') || 'M0 0';
     let grid = '', txt = '';
     [11.5, 12, 12.5, 13, 13.5, 14].forEach(v => { grid += `M${L} ${yB(v).toFixed(1)}H${L + PW} `; txt += `<text class="hc-ax" x="${L - 6}" y="${(yB(v) + 4).toFixed(1)}" text-anchor="end">${v.toFixed(1)}</text>`; });
-    (dbfs ? [-60, -45, -30, -15, 0] : [-120, -110, -100, -90, -80, -70, -60]).forEach(v => { grid += `M${L} ${yS(v).toFixed(1)}H${L + PW} `; txt += `<text class="hc-ax" x="${L - 6}" y="${(yS(v) + 4).toFixed(1)}" text-anchor="end">${fmtNeg(v)}</text>`; });
+    if (PN.sigOn) (dbfs ? [-60, -45, -30, -15, 0] : [-120, -110, -100, -90, -80, -70, -60]).forEach(v => { grid += `M${L} ${yS(v).toFixed(1)}H${L + PW} `; txt += `<text class="hc-ax" x="${L - 6}" y="${(yS(v) + 4).toFixed(1)}" text-anchor="end">${fmtNeg(v)}</text>`; });
     let days = '';
     const d0 = new Date(c.a); d0.setHours(0, 0, 0, 0);
     for (let t = d0.getTime() + DAY; t < c.b; t += DAY) {
@@ -690,10 +702,15 @@ const HealthCards = (() => {
     const bars = want => c.slots.filter(sl => want.includes(sl.outcome)).map(sl => `M${(x(sl.t) - slotW / 2).toFixed(1)} ${KY}h${slotW.toFixed(1)}v${KH}h${(-slotW).toFixed(1)}Z`).join(' ') || 'M0 0';
     const yN = v => SY + SH - (clamp(v, 0, c.snr.hi) / c.snr.hi) * SH;
     let snrSvg = '';
-    if (c.snr.pts.length) {
-      for (let v = 0; v <= c.snr.hi; v += 10) txt += `<text class="hc-ax hc-ax--snr" x="${L - 48}" y="${(yN(v) + 4).toFixed(1)}" text-anchor="end">${v}</text>`;
-      txt += `<text class="hc-c-title hc-c-title--snr" x="${L - 48}" y="${SY - 9}" text-anchor="end">SNR (dB)</text>`;
-      snrSvg = `<path class="hc-c-snr" d="${path(c.snr.pts, yN)}"/>`;
+    if (PN.snrOn) {
+      const ax = PN.two ? L - 48 : L - 6;
+      for (let v = 0; v <= c.snr.hi; v += 10) {
+        txt += `<text class="hc-ax hc-ax--snr" x="${ax}" y="${(yN(v) + 4).toFixed(1)}" text-anchor="end">${v}</text>`;
+        if (!PN.two) grid += `M${L} ${yN(v).toFixed(1)}H${L + PW} `;
+      }
+      if (PN.two) txt += `<text class="hc-c-title hc-c-title--snr" x="${ax}" y="${SY - 9}" text-anchor="end">SNR (dB)</text>`;
+      else txt += `<text class="hc-c-title hc-c-title--snr" x="${L}" y="${SY - 9}">Signal-to-noise (SNR, dB) — how far the signal stood above the noise</text>`;
+      snrSvg = `<path class="hc-c-snr" d="${path(c.snr.pts, yN)}"/><path class="hc-c-dots hc-c-dots--snr" d="${dots(c.snr.pts, yN)}"/>`;
     }
     const TR = c.traffic && c.traffic.bins.length ? c.traffic : null;
     const yT = n => SY + SH - (n / TR.max) * SH;
@@ -711,19 +728,19 @@ const HealthCards = (() => {
       <path class="hc-c-night" d="${nights || 'M0 0'}"/>
       <path class="hc-c-grid" d="${grid}"/><path class="hc-c-day" d="${days || 'M0 0'}"/>
       ${ref(yB(12.2), 'hc-c-watch')}${ref(yB(11.8), 'hc-c-act')}
-      ${dbfs ? '' : ref(yS(SIG_WATCH), 'hc-c-watch') + ref(yS(SIG_ACT), 'hc-c-act')}
+      ${dbfs || !PN.sigOn ? '' : ref(yS(SIG_WATCH), 'hc-c-watch') + ref(yS(SIG_ACT), 'hc-c-act')}
       ${trafficSvg}
       <path class="hc-c-hit" d="${bars(['hit'])}"/><path class="hc-c-partial" d="${bars(['partial'])}"/>
       <path class="hc-c-miss" d="${bars(['miss', 'net'])}"/><path class="hc-c-unknown" d="${bars(['unknown'])}"/>
       <path class="hc-c-batt${c.battRed ? ' hc-red' : ''}" d="${path(c.batt.map(p => ({ t: p.t, v: p.V })), yB)}"/>
       ${snrSvg}
-      <path class="hc-c-sig${c.sigRed ? ' hc-red' : ''}" d="${path(c.sig.pts, yS)}"/>
+      ${PN.sigOn ? `<path class="hc-c-sig${c.sigRed ? ' hc-red' : ''}" d="${path(c.sig.pts, yS)}"/>` : ''}
       <path class="hc-c-dots hc-c-dots--batt${c.battRed ? ' hc-red' : ''}" d="${dots(c.batt.map(p => ({ t: p.t, v: p.V })), yB)}"/>
-      <path class="hc-c-dots hc-c-dots--sig${c.sigRed ? ' hc-red' : ''}" d="${dots(c.sig.pts, yS)}"/>
+      ${PN.sigOn ? `<path class="hc-c-dots hc-c-dots--sig${c.sigRed ? ' hc-red' : ''}" d="${dots(c.sig.pts, yS)}"/>` : ''}
       <text class="hc-c-title${c.battRed ? ' hc-red-t' : ''}" x="${L}" y="${BY - 9}">Battery voltage (V)</text>
       <text class="hc-c-title" x="${L}" y="${KY - 6}">Check signals${c.P ? ` — every ${esc(fmtEvery(c.P))}` : ''}</text>
-      <text class="hc-c-title${c.sigRed ? ' hc-red-t' : ''}" x="${L}" y="${SY - 9}">${dbfs ? 'Signal level (dBFS) — how loud the receiver heard it' : 'Signal strength — RSSI (dBm), how strongly the base station heard it'}</text>
-      ${c.sig.pts.length ? '' : `<text class="hc-ax" x="${L + PW / 2}" y="${SY + SH / 2}" text-anchor="middle">No signal strength came with these reports${c.S ? '' : ' — nothing was heard'}</text>`}
+      ${PN.sigOn ? `<text class="hc-c-title${c.sigRed ? ' hc-red-t' : ''}" x="${L}" y="${SY - 9}">${dbfs ? 'Signal level (dBFS) — how loud the receiver heard it' : 'Signal strength — RSSI (dBm), how strongly the base station heard it'}</text>` : ''}
+      ${c.sig.pts.length || PN.snrOn ? '' : `<text class="hc-ax" x="${L + PW / 2}" y="${SY + SH / 2}" text-anchor="middle">No signal strength came with these reports${c.S ? '' : ' — nothing was heard'}</text>`}
       ${c.batt.length ? '' : `<text class="hc-ax" x="${L + PW / 2}" y="${BY + BH / 2}" text-anchor="middle">No battery readings in these days</text>`}
       ${txt}
       <g id="hc-cross" class="hc-cross" visibility="hidden"><path d="M0 ${BY}V${SY + SH}"/></g>
@@ -752,14 +769,14 @@ const HealthCards = (() => {
           ${c.S ? `<button onclick="HealthCards.openStation()">Open it in Station Health</button>` : ''}
         </div>
         <div class="small hc-d-what"><h4>What this shows</h4>
-          <p>Each <b>dot</b> on the battery and signal lines is one report heard; a line joins dots heard close together, so a single report, or ones far apart, shows as a dot alone.</p>
+          <p>Each <b>dot</b> on the battery, signal and SNR lines is one report heard; a line joins dots heard close together, so a single report, or ones far apart, shows as a dot alone.</p>
           <p><b>Battery voltage (V)</b> — the voltage in each report the station sent. It climbs by day as the solar panel charges and sags overnight; the overnight low is the number that matters. Dashed lines: 12.2 V watch, 11.8 V act on.</p>
           <p><b>Check signals</b> — a slot for each check report the station should have sent, on the schedule Flood-Net has learned for it. Filled: arrived. Paler: arrived with frames lost. Strong: never came. Dashed: no receiver that hears it was listening.</p>
-          <p><b>Signal-to-noise (SNR)</b> — the violet line, on the second axis at the left, in dB: how far the best-heard copy of each report stood above the background noise at the base station. Higher is better. Not every receiver reports it, so some stations have no line.</p>
+          <p><b>Signal-to-noise (SNR)</b> — the violet line, on the left axis (beside the signal strength axis where that is drawn), in dB: how far the best-heard copy of each report stood above the background noise at the base station. Higher is better. Not every receiver reports it, so some stations have no line.</p>
           <p><b>Messages heard nearby</b> — the grey bars on the right-hand axis: how many messages the base stations that hear this station picked up, from anybody, in each check-signal period. They sit under the signal trace and line up with the check slots, so a tall bar by a missed check says the network was busy then.</p>
-          <p><b>${c.sig.unit === 'dBFS' ? 'Signal level (dBFS)' : 'Signal strength — RSSI (dBm)'}</b> — ${c.sig.unit === 'dBFS'
+          ${panelOf(c).sigOn ? `<p><b>${c.sig.unit === 'dBFS' ? 'Signal level (dBFS)' : 'Signal strength — RSSI (dBm)'}</b> — ${c.sig.unit === 'dBFS'
             ? 'how loud the report was at the receiver\'s input, in decibels below full scale; this receiver does not report RSSI, so no watch or act-on line is drawn.'
-            : 'how strongly the base station heard each report: the strongest copy, if more than one heard it. Closer to 0 is stronger: −70 dBm is strong, −110 dBm near the limit. It is not signal-to-noise (SNR, how far the signal stands above the background noise). Dashed lines: −100 dBm watch, −105 dBm act on (provisional).'}</p>
+            : 'how strongly the base station heard each report: the strongest copy, if more than one heard it. Closer to 0 is stronger: −70 dBm is strong, −110 dBm near the limit. It is not signal-to-noise (SNR, how far the signal stands above the background noise). Dashed lines: −100 dBm watch, −105 dBm act on (provisional).'}</p>` : ''}
         </div>
       </div>`;
     bindChart();
@@ -791,7 +808,7 @@ const HealthCards = (() => {
   function snrKey(c) {
     const t = termHtml('Signal-to-noise (SNR)', WORDS.snr);
     return c.snr.pts.length
-      ? `<b>${t}</b> (violet line, second left axis) — how far the best-heard copy of each report stood above the background noise. Higher is better.`
+      ? `<b>${t}</b> (violet line, left axis) — how far the best-heard copy of each report stood above the background noise. Higher is better.`
       : `<b>${t}</b> — not drawn: none of the receivers that heard this station reported a noise floor, so there is no SNR to plot.`;
   }
   function keyLine(c) { return trafficKey(c) + '<br>' + snrKey(c); }
@@ -818,12 +835,13 @@ const HealthCards = (() => {
     const b = svg.getBoundingClientRect(), c = C.cards[C.open];
     if (!c || !b.width) return null;
     const px = ((e.clientX - b.left) / b.width) * CH.W;
-    if (px < CH.L - 8 || px > CH.W - CH.R + 8) return null;
-    return c.a + ((px - CH.L) / (CH.W - CH.L - CH.R)) * (c.b - c.a);
+    const L = panelOf(c).L;
+    if (px < L - 8 || px > CH.W - CH.R + 8) return null;
+    return c.a + ((px - L) / (CH.W - L - CH.R)) * (c.b - c.a);
   }
   // Every moment worth stepping to: a reading, a transmission, a check slot.
   function moments(c) {
-    return [...new Set([...c.batt.map(p => p.t), ...c.sig.pts.map(p => p.t), ...c.snr.pts.map(p => p.t), ...c.slots.map(s => s.t)])].sort((a, b) => a - b);
+    return [...new Set([...c.batt.map(p => p.t), ...(panelOf(c).sigOn ? c.sig.pts : []).map(p => p.t), ...c.snr.pts.map(p => p.t), ...c.slots.map(s => s.t)])].sort((a, b) => a - b);
   }
   function chartKey(e) {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
@@ -848,18 +866,18 @@ const HealthCards = (() => {
     C.hov = t;
     const P = c.P || 3 * HOUR, win = Math.max(P / 2, 45 * MIN);
     const bp = nearest(c.batt.map(p => ({ t: p.t, v: p.V })), t, win);
-    const sp = nearest(c.sig.pts, t, win);
+    const sp = panelOf(c).sigOn ? nearest(c.sig.pts, t, win) : null;
     const sl = nearest(c.slots, t, P / 2);
     const np = nearest(c.snr.pts, t, win);
     const at = (sl && sl.t) || (bp && bp.t) || (sp && sp.t) || (np && np.t) || t;
-    const { W, L, R } = CH, PW = W - L - R;
+    const { W, R } = CH, L = panelOf(c).L, PW = W - L - R;
     const px = L + ((at - c.a) / (c.b - c.a)) * PW;
     cross.setAttribute('transform', `translate(${px.toFixed(1)} 0)`);
     cross.setAttribute('visibility', 'visible');
     const O = { hit: 'arrived', partial: 'arrived, frames lost', miss: 'missed', net: 'missed network-wide', unknown: 'no receiver listening' };
     const rows = [
       ['hc-ln--batt' + (c.battRed ? ' hc-ln--red' : ''), 'Battery', bp ? bp.v.toFixed(2) + ' V' : '—'],
-      ['hc-ln--sig' + (c.sigRed ? ' hc-ln--red' : ''), c.sig.unit === 'dBFS' ? 'Signal level' : 'Signal strength', sp ? fmtNeg(Math.round(sp.v)) + ' ' + (c.sig.unit || 'dBm') : '—'],
+      ...(panelOf(c).sigOn ? [['hc-ln--sig' + (c.sigRed ? ' hc-ln--red' : ''), c.sig.unit === 'dBFS' ? 'Signal level' : 'Signal strength', sp ? fmtNeg(Math.round(sp.v)) + ' ' + (c.sig.unit || 'dBm') : '—']] : []),
       ...(c.snr.pts.length ? [['hc-ln--snr', 'SNR', np ? np.v.toFixed(1) + ' dB' : '—']] : []),
       ['hc-ln--chk hc-ln--chk-' + (sl ? sl.outcome : 'none'), 'Check', sl ? O[sl.outcome] || sl.outcome : 'no check due'],
     ];

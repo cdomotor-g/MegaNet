@@ -31270,6 +31270,7 @@ details.tm-fold summary { cursor: pointer; }
 .hc-c-dots { fill: none; stroke-width: 6; stroke-linecap: round; }
 .hc-c-dots--batt { stroke: var(--hc-batt); }
 .hc-c-dots--sig { stroke: var(--hc-sig); }
+.hc-c-dots--snr { stroke: var(--hc-snr); }
 .hc-c-dots.hc-red { stroke: var(--hc-red); }
 .hc-cross path { stroke: var(--text); stroke-opacity: 0.6; stroke-width: 1; }
 .hc-tip { position: absolute; top: 34px; left: var(--tx, 50%); margin-left: 12px; width: 220px; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); font-size: 12px; line-height: 1.55; display: flex; flex-direction: column; pointer-events: none; }
