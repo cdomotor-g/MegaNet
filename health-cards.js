@@ -732,6 +732,7 @@ const HealthCards = (() => {
       [0, 0.5, 1].forEach(f => { txt += `<text class="hc-ax hc-ax--r" x="${L + PW + 6}" y="${(yT(TR.max * f) + 4).toFixed(1)}">${fmtN(Math.round(TR.max * f))}</text>`; });
       txt += `<text class="hc-c-title hc-c-title--r" x="${L + PW}" y="${SY - 9}" text-anchor="end">Messages heard nearby (bars, right axis)</text>`;
     }
+    c.geo = { x, yB, yS, yN };
     const battAll = c.batt.map(p => ({ t: p.t, v: p.V }));
     const battOn = battAll.filter(p => !offSlot(c, p.t)), battOff = battAll.filter(p => offSlot(c, p.t));
     const battLine = checkOnlyOn(c) ? battOn : battAll;
@@ -759,6 +760,7 @@ const HealthCards = (() => {
       ${c.batt.length ? '' : `<text class="hc-ax" x="${L + PW / 2}" y="${BY + BH / 2}" text-anchor="middle">No battery readings in these days</text>`}
       ${txt}
       <g id="hc-cross" class="hc-cross" visibility="hidden"><path d="M0 ${BY}V${SY + SH}"/></g>
+      <g id="hc-marks" class="hc-marks" aria-hidden="true"></g>
     </svg>`;
   }
   function fmtEvery(P) { const h = P / HOUR; return h === 1 ? 'hour' : Number.isInteger(h) ? `${h} hours` : `${Math.round(P / MIN)} minutes`; }
@@ -896,7 +898,7 @@ const HealthCards = (() => {
   function hoverAt(t, said) {
     const c = C.cards[C.open], tip = document.getElementById('hc-tip'), cross = document.getElementById('hc-cross');
     if (!c || !tip || !cross) return;
-    if (t == null) { C.hov = null; tip.hidden = true; cross.setAttribute('visibility', 'hidden'); return; }
+    if (t == null) { C.hov = null; tip.hidden = true; cross.setAttribute('visibility', 'hidden'); const mk0 = document.getElementById('hc-marks'); if (mk0) mk0.innerHTML = ''; return; }
     C.hov = t;
     const P = c.P || 3 * HOUR, win = Math.max(P / 2, 45 * MIN);
     const bp = nearest(c.batt.map(p => ({ t: p.t, v: p.V })), t, win);
@@ -908,6 +910,13 @@ const HealthCards = (() => {
     const px = L + ((at - c.a) / (c.b - c.a)) * PW;
     cross.setAttribute('transform', `translate(${px.toFixed(1)} 0)`);
     cross.setAttribute('visibility', 'visible');
+    // Ring the very points the card is quoting, so a reading heard off the
+    // check slot is not mistaken for the slot's own.
+    const mk = document.getElementById('hc-marks'), G = c.geo;
+    if (mk && G) {
+      const ring = (p, y) => p ? `<circle cx="${G.x(p.t).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="7"/>` : '';
+      mk.innerHTML = ring(bp, G.yB) + (panelOf(c).sigOn ? ring(sp, G.yS) : '') + (c.snr.pts.length ? ring(np, G.yN) : '');
+    }
     const O = { hit: 'arrived', partial: 'arrived, frames lost', miss: 'missed', net: 'missed network-wide', unknown: 'no receiver listening' };
     const rows = [
       ['hc-ln--batt' + (c.battRed ? ' hc-ln--red' : ''), 'Battery', bp ? bp.v.toFixed(2) + ' V' + (offSlot(c, bp.t) ? ' (off schedule, may be noise)' : '') : '—'],
