@@ -126,6 +126,16 @@ const MessageLog = (() => {
       title: 'How strongly the kept copy was heard: dBm from a radio or an ERT-A2; dBFS from an RTL-SDR, which is not calibrated in dBm, so it compares only within one receiver at one gain.' },
     { key: 'snr',      label: 'SNR',      narrow: false, since: 2, w: 84,
       title: 'The kept copy\'s signal over the receiver\'s own noise floor, in dB — the figure that compares between receivers, and the nearest a base station gets to a measured fade margin.' },
+    // Last hop and Offset are looked up, not stored with the reading: every
+    // copy a base station heard is kept for three days (reception_public,
+    // 0116), and a legacy ALERT burst is put down to the repeater whose
+    // carrier it sits on, as the agent API does. `opt` keeps them out of the
+    // default set — they cost a second read — so they are switched on under
+    // Columns, or by choosing a Last hop filter.
+    { key: 'lasthop',  label: 'Last hop', narrow: false, opt: true, since: 4, w: 150,
+      title: 'Who sent each copy of this reading on to the base station — "direct" when the station itself, else the repeater whose carrier the copy sits on (its fingerprint) — with that copy\'s SNR at the base station. Looked up from the base stations\' last three days; legacy ALERT only. Blank means no copy was found there.' },
+    { key: 'offset',   label: 'Offset',   narrow: false, opt: true, since: 4, w: 84,
+      title: 'The carrier frequency offset the base station measured on that copy, in Hz — the fingerprint of whoever last transmitted it. A repeater\'s offset stays within a few Hz from message to message, so the same figure each time means the same repeater. One line for each last hop, in the Last hop column\'s order.' },
     { key: 'dup',      label: 'Copies',   narrow: false,
       title: 'How many times this reading was heard in total. Three copies is one transmission heard direct and via two repeaters — the network working.' },
   ];
@@ -138,7 +148,7 @@ const MessageLog = (() => {
   // time a column is added. 3 is the Sensor column, and Value joining the
   // narrow view: a battery reading 133 is 13.3 V, and the phone in the paddock
   // is exactly where that should not need working out.
-  const ML_COLSET = 3;
+  const ML_COLSET = 4;
 
   // The table wrapper's height, as three named steps rather than a drag edge —
   // a draggable edge on a box that already scrolls two ways is a fight with the
@@ -172,7 +182,7 @@ const MessageLog = (() => {
   // ── state ──────────────────────────────────────────────────────────────────
 
   function defaultCols(view) {
-    return ML_COLS.filter(c => view === 'wide' || c.narrow).map(c => c.key);
+    return ML_COLS.filter(c => !c.opt && (view === 'wide' || c.narrow)).map(c => c.key);
   }
 
   function storedCols(view) {
@@ -232,9 +242,11 @@ const MessageLog = (() => {
       freq:    '',             // MHz, exact — '' = any
       dupsOnly: false,         // only readings heard more than once
       unresolvedOnly: false,   // only rows no station has claimed yet
+      hop:     '',             // last hop: '' = any, 'direct', or a repeater's station id
       order:   'received.desc',
     },
     rows:     null,    // what the last query returned, or null before the first
+    fetched:  0,       // rows the datastore sent, before the Last hop filter — where the next page starts
     capped:   false,
     more:     false,   // the last page came back full, so there is another
     loading:  false,
@@ -269,6 +281,11 @@ const MessageLog = (() => {
     // picker, whether a write is in flight, and what the database said. One at a
     // time, because it hangs off the one open detail drawer.
     claim:    null,        // { key, query, busy, msg }
+    // Last hop: the repeater carriers each base station's stick found (by UTC
+    // day), the copies heard in the span on screen (kept between Follow polls
+    // so only the new minutes are asked for), and each reading's copies.
+    lh: { carriers: null, carriersAt: 0, rx: new Map(), key: '', from: 0, through: 0,
+          by: new Map(), note: '', stations: null, stationsFor: null },
   };
 
   // ── small helpers ──────────────────────────────────────────────────────────
@@ -469,6 +486,240 @@ const MessageLog = (() => {
       : `or=(${hosts.map(h => `path.like.${clean(h)}`).join(',')})`;
   }
 
+  // ── last hop ───────────────────────────────────────────────────────────────
+  // A reading is kept once, so the log cannot say which repeater carried it:
+  // the copies are what know. Every copy a named base station heard in the
+  // last three days is public (reception_public, 0116) with the carrier
+  // offset the receiver measured, and each base station's stick's repeater
+  // carriers for the UTC day are public beside it (repeater_carrier_public).
+  // A legacy ALERT copy within 30 Hz of exactly one repeater's carrier, of an
+  // address that repeater passes, was sent by that repeater; on none, by the
+  // station itself — unless the decoder had heard it already, when no repeater
+  // on record explains it. The same rules as the agent API's receptions (0077).
+  // ALERT2 names its path in the message, so it is not looked up here.
+  //
+  // reception is the database's biggest table on a small disk budget, so a
+  // lookup reads only the newest LH_SPAN_MS of the rows on screen, by heard_at,
+  // for the legacy protocol and decoded copies, and Follow asks only for what
+  // is new since the last poll.
+
+  const LH_SPAN_MS    = 4 * 3600e3;
+  const LH_CARRIER_HZ = 30;
+  const LH_MATCH_MS   = 120e3;     // a copy and its reading are the same transmission within this
+  const LH_PAGE       = 1000;      // PostgREST's cap on this project
+  const LH_MAX_PAGES  = 15;
+  const LH_CARRIERS_MS = 10 * 60e3;
+  const LH_KEPT_MS    = 3 * 86400e3;
+
+  const isoOf = t => encodeURIComponent(new Date(t).toISOString());
+
+  function stationById(id) {
+    const data = state.data;
+    if (ml.lh.stationsFor !== data || !ml.lh.stations) {
+      ml.lh.stations = new Map(((data && data.stations) || []).map(s => [String(s.id), s]));
+      ml.lh.stationsFor = data;
+    }
+    return ml.lh.stations.get(String(id)) || null;
+  }
+  const stationName = id => { const s = stationById(id); return s ? s.name : String(id); };
+
+  // Could this repeater have sent this address — one it passes, or its own?
+  function mayHaveSent(id, alertId) {
+    const s = stationById(id);
+    return !!(s && ((s.repeater && passRangeCoversId(s.repeater, alertId)) || stationAlertIds(s).includes(alertId)));
+  }
+
+  // The server side of a Last hop filter: legacy ALERT only, and for a repeater
+  // only the addresses it passes — so a page of the log is not mostly rows that
+  // cannot match. The exact test is still made on the copies.
+  function hopFilter(hop) {
+    if (!hop) return null;
+    const out = { protocol: 'protocol=eq.1', or: '' };
+    const s = hop === 'direct' ? null : stationById(hop);
+    if (!s) return out;
+    const parts = ((s.repeater && s.repeater.pass_ranges) || [])
+      .filter(r => Number.isFinite(+r.low) && Number.isFinite(+r.high))
+      .map(r => `and(alert_id.gte.${+r.low},alert_id.lte.${+r.high})`);
+    const own = stationAlertIds(s);
+    if (own.length) parts.push(`alert_id.in.(${own.join(',')})`);
+    if (parts.length) out.or = `or=(${parts.join(',')})`;
+    return out;
+  }
+
+  async function selectPaged(path, maxPages) {
+    const all = [];
+    for (let pg = 0; pg < maxPages; pg++) {
+      const rows = await dbSelect(`${path}&limit=${LH_PAGE}&offset=${pg * LH_PAGE}`);
+      all.push(...rows);
+      if (rows.length < LH_PAGE) return { rows: all, whole: true };
+    }
+    return { rows: all, whole: false };
+  }
+
+  async function loadCarriers() {
+    const lh = ml.lh;
+    if (lh.carriers && Date.now() - lh.carriersAt < LH_CARRIERS_MS) return;
+    const day = new Date(Date.now() - 4 * 86400e3).toISOString().slice(0, 10);
+    const got = await selectPaged(`repeater_carrier_public?select=day,path,station_id,centre_hz&day=gte.${day}&order=day.asc,path.asc,station_id.asc`, 8);
+    const m = new Map();
+    for (const c of got.rows) {
+      const hz = Number(c.centre_hz);
+      if (!Number.isFinite(hz)) continue;
+      const k = `${String(c.day).slice(0, 10)}|${c.path}`;
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push({ id: c.station_id, hz });
+    }
+    lh.carriers = m;
+    lh.carriersAt = Date.now();
+  }
+
+  // Every repeater whose carrier a base station found in the last days, by
+  // name — the choices the Last hop filter offers.
+  function hopOptions() {
+    const ids = new Set();
+    for (const list of (ml.lh.carriers || new Map()).values()) for (const c of list) ids.add(c.id);
+    if (ml.q.hop && ml.q.hop !== 'direct') ids.add(ml.q.hop);
+    return [...ids].map(id => ({ id, name: stationName(id) })).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  function hopOptionsHtml() {
+    return `<option value="">any</option>
+      <option value="direct" ${ml.q.hop === 'direct' ? 'selected' : ''}>direct — the station itself</option>
+      ${hopOptions().map(o => `<option value="${escAttr(o.id)}" ${ml.q.hop === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}`;
+  }
+
+  // Repaint just the choices, once the carriers are known — the page around
+  // them is left alone so nothing being typed is lost.
+  function refreshHopOptions() {
+    const el = document.getElementById('ml-hop');
+    if (el && state.activeTab === 'msglog') el.innerHTML = hopOptionsHtml();
+  }
+
+  // The copies in [t0, t1], kept between calls so a Follow poll asks only for
+  // the minutes since the last one. A different base station, or an earlier
+  // start, begins again.
+  async function fetchCopies(t0, t1) {
+    const lh = ml.lh, base = ml.q.base || '';
+    if (lh.key !== base || !lh.through || t0 < lh.from) {
+      lh.rx = new Map(); lh.from = t0; lh.through = 0; lh.key = base;
+    }
+    const to = t1 + LH_MATCH_MS + 60e3;
+    const from = lh.through ? lh.through - 180e3 : t0;
+    if (from >= to) return true;
+    const path = 'reception_public?select=id,heard_at,base_station,path,alert_id,value_raw,copy,cfo_hz,cfo_split,snr_db,rssi_dbm,level_dbfs'
+      + `&protocol=eq.alert&ok=eq.true&heard_at=gte.${isoOf(from)}&heard_at=lt.${isoOf(to)}`
+      + (base ? `&base_station=eq.${encodeURIComponent(base)}` : '')
+      + '&order=heard_at.asc,id.asc';
+    const got = await selectPaged(path, LH_MAX_PAGES);
+    for (const r of got.rows) lh.rx.set(r.id, r);
+    lh.through = got.whole ? to : Date.parse(got.rows[got.rows.length - 1].heard_at);
+    for (const [id, r] of lh.rx) if (Date.parse(r.heard_at) < t0 - 600e3) lh.rx.delete(id);
+    return got.whole;
+  }
+
+  // Who sent this copy on: the repeater whose carrier it sits on, else the station.
+  function hopOfCopy(c) {
+    const cfo = c.cfo_hz == null ? NaN : Number(c.cfo_hz);
+    if (!Number.isFinite(cfo) || c.cfo_split) return { kind: 'none', ids: [] };
+    const found = (ml.lh.carriers && ml.lh.carriers.get(`${String(c.heard_at).slice(0, 10)}|${c.path}`)) || [];
+    const claims = found.filter(f => Math.abs(cfo - f.hz) <= LH_CARRIER_HZ && mayHaveSent(f.id, Number(c.alert_id)));
+    const ids = [...new Set(claims.map(f => f.id))];
+    if (ids.length === 1) return { kind: 'repeater', ids, hz: claims[0].hz };
+    if (ids.length > 1) return { kind: 'either', ids };
+    return { kind: c.copy ? 'unexplained' : 'station', ids: [] };
+  }
+
+  // Put each legacy row's copies beside it. A row older than what was asked
+  // for is left unset (shown blank), where one with no copy found is set empty.
+  async function annotateHops(rows) {
+    const lh = ml.lh;
+    lh.note = '';
+    const legacy = rows.filter(r => r.protocol === 1 && r.alert_id != null && Number.isFinite(Date.parse(r.reading_ts)));
+    if (!legacy.length) return;
+    const ts = legacy.map(r => Date.parse(r.reading_ts));
+    const newest = Math.max(...ts), oldest = Math.min(...ts);
+    const t0 = Math.max(oldest, newest - LH_SPAN_MS, Date.now() - LH_KEPT_MS + 3600e3);
+    await loadCarriers();
+    const whole = await fetchCopies(t0, newest);
+    if (!whole) lh.note = 'the copies list was too long to read whole — the newest copies are missing, so the newest rows may show blank';
+    const idx = new Map();
+    for (const c of lh.rx.values()) {
+      const k = `${c.alert_id}|${Number(c.value_raw)}`;
+      if (!idx.has(k)) idx.set(k, []);
+      idx.get(k).push(c);
+    }
+    for (const r of legacy) {
+      const t = Date.parse(r.reading_ts);
+      if (t < t0) continue;
+      const tr = Date.parse(r.received_at);
+      const copies = (idx.get(`${r.alert_id}|${Number(r.value_raw)}`) || [])
+        .filter(c => { const h = Date.parse(c.heard_at); return Math.abs(h - t) <= LH_MATCH_MS || Math.abs(h - tr) <= 2 * LH_MATCH_MS; })
+        .map(c => ({ hop: hopOfCopy(c), cfo: c.cfo_hz == null ? null : Number(c.cfo_hz), base: c.base_station,
+                     snr: c.snr_db == null ? null : Number(c.snr_db), at: c.heard_at }));
+      lh.by.set(rowKey(r), copies);
+    }
+  }
+
+  // One entry for each distinct last hop among a reading's copies, the
+  // strongest copy standing for it. null = not looked up for this row.
+  function hopGroups(r) {
+    const copies = ml.lh.by.get(rowKey(r));
+    if (!copies) return null;
+    const groups = new Map();
+    for (const c of copies) {
+      const k = `${c.hop.kind}|${c.hop.ids.join(',')}`;
+      const g = groups.get(k);
+      if (!g || (c.snr != null && (g.snr == null || c.snr > g.snr))) groups.set(k, c);
+    }
+    return [...groups.values()];
+  }
+
+  function hopLabel(h) {
+    switch (h.kind) {
+      case 'repeater':    return { text: stationName(h.ids[0]), strong: true };
+      case 'either':      return { text: 'either ' + h.ids.map(stationName).join(' or '), strong: false };
+      case 'station':     return { text: 'direct', strong: false };
+      case 'unexplained': return { text: 'unexplained', strong: false };
+      default:            return { text: 'no offset', strong: false };
+    }
+  }
+
+  const fmtHz = v => v == null || !Number.isFinite(Number(v)) ? '—' : `${v > 0 ? '+' : ''}${Math.round(v)} Hz`;
+
+  function copyTip(c) {
+    const l = hopLabel(c.hop);
+    const how = c.hop.kind === 'repeater' ? `sits on ${l.text}'s carrier that day (${fmtHz(c.hop.hz)})`
+      : c.hop.kind === 'either' ? 'sits on the carrier of more than one repeater that passes this address'
+      : c.hop.kind === 'station' ? 'on no repeater\'s carrier — the station itself, straight to the base station'
+      : c.hop.kind === 'unexplained' ? 'a copy that no repeater on record accounts for'
+      : 'the base station measured no single offset on this copy';
+    return `Heard at ${c.base || 'a base station'}${c.at ? ' at ' + fmtTs(c.at) : ''}: offset ${fmtHz(c.cfo)}, SNR ${c.snr != null ? fmtDb(c.snr) + ' dB' : 'not given'} — ${how}.`;
+  }
+
+  function hopCellHtml(r, which) {
+    const g = hopGroups(r);
+    if (!g) {
+      const why = r.protocol !== 1 ? 'Looked up for legacy ALERT readings only — ALERT2 names its path in the message (open the row).'
+        : 'Not looked up for this row: only the newest four hours of what is on screen are, and only while the base stations still hold the copies (three days).';
+      return `<td class="small txt-muted" title="${escAttr(why)}">—</td>`;
+    }
+    if (!g.length) return `<td class="small txt-muted" title="No copy of this reading was found in the base stations' last three days — it may have come from a base station with no name on file, or from another path.">—</td>`;
+    return `<td class="small${which === 'offset' ? ' mono' : ''}">${g.map(c => {
+      const l = hopLabel(c.hop);
+      const inner = which === 'offset' ? esc(fmtHz(c.cfo))
+        : `${l.strong ? `<b>${esc(l.text)}</b>` : esc(l.text)}${c.snr != null ? ` <span class="mono">${esc(fmtDb(c.snr))} dB</span>` : ''}`;
+      return `<div title="${escAttr(copyTip(c))}">${inner}</div>`;
+    }).join('')}</td>`;
+  }
+
+  const hopColsShown = () => ml.cols[ml.view].some(k => k === 'lasthop' || k === 'offset');
+  const needHops = () => !!ml.q.hop || hopColsShown();
+
+  function hopMatches(r) {
+    const want = ml.q.hop;
+    return (hopGroups(r) || []).some(c => want === 'direct' ? c.hop.kind === 'station' : c.hop.ids.includes(want));
+  }
+
   function buildQueryPath(q, win, resolved, offset) {
     const parts = [
       `reading_ts=gte.${encodeURIComponent(new Date(win.t0).toISOString())}`,
@@ -487,6 +738,9 @@ const MessageLog = (() => {
     // is 152.400 and is not 152.4125. numeric in the table, so no float fuzz.
     const mhz = freqFilter(q.freq);
     if (mhz != null)       parts.push(`freq_mhz=eq.${mhz}`);
+    const hopQ = hopFilter(q.hop);
+    if (hopQ && q.protocol === '') parts.push(hopQ.protocol);
+    if (hopQ && hopQ.or)   parts.push(hopQ.or);
     if (q.dupsOnly)        parts.push('dup_count=gt.0');
     if (q.unresolvedOnly)  parts.push('station_id=is.null');
     const [col, dir] = q.order.split('.');
@@ -540,7 +794,7 @@ const MessageLog = (() => {
     ml.loading = true;
     if (!silent) renderNote();
 
-    const offset = more && ml.rows ? ml.rows.length : 0;
+    const offset = more && ml.rows ? ml.fetched : 0;
     let page;
     try {
       page = await dbSelect(buildQueryPath(q, win, resolved, offset));
@@ -554,12 +808,33 @@ const MessageLog = (() => {
     }
     if (ml.seq !== seq) return;   // superseded
 
+    // Last hop: the copies behind each row, and — when a hop is asked for —
+    // only the rows one of them matches. A short read is not fatal: the log
+    // stands, the columns show blank, and the note says why.
+    const full = page.length === ML_PAGE;
+    ml.fetched = offset + page.length;
+    if (needHops()) {
+      try {
+        await annotateHops(page);
+      } catch (err) {
+        ml.lh.note = `the base stations' copies could not be read (${err && err.message || err})`;
+        if (ml.q.hop) {
+          if (ml.seq !== seq) return;
+          ml.loading = false;
+          ml.error = `Could not look up the last hop — ${ml.lh.note}. The Last hop filter needs them; clear it to see the log without.`;
+          renderNote(); return;
+        }
+      }
+      if (ml.seq !== seq) return;
+      if (ml.q.hop) page = page.filter(hopMatches);
+    }
+
     ml.loading = false;
     ml.at = Date.now();
     ml.rows = more && ml.rows ? ml.rows.concat(page) : page;
     ml.capped = ml.rows.length >= ML_MAX_ROWS;
     // A full page means there may be more; the Load more button is the next one.
-    ml.more = page.length === ML_PAGE && !ml.capped;
+    ml.more = full && !ml.capped;
 
     // Drop selections and the open drawer for rows that are no longer here —
     // but keep every key that survived, so Follow does not un-tick the tray.
@@ -667,6 +942,9 @@ const MessageLog = (() => {
           <button class="ml-chip${q.win === 'custom' ? ' ml-chip--on' : ''}" aria-pressed="${q.win === 'custom'}"
                   onclick="MessageLog.setWin('custom')">Custom…</button>
         </div>
+        <label class="ml-f" title="Only readings one of whose copies was sent on to a base station by this repeater — told by the carrier offset the base station measured, which is each transmitter's fingerprint — or 'direct' for the station itself. Legacy ALERT only; the base stations keep their copies three days, and the newest four hours of the rows are checked. Pair it with Base station and Follow to watch a path test arrive.">
+          <span>Last hop</span>
+          <select id="ml-hop" onchange="MessageLog.setHop(this.value)">${hopOptionsHtml()}</select></label>
         ${q.win === 'custom' ? `
         <div class="ml-f ml-f--dates">
           <label><span>From</span>
@@ -761,6 +1039,8 @@ const MessageLog = (() => {
     else if (ml.more) bits.push('more available — <button class="ml-btn" onclick="MessageLog.loadMore()">load more</button>');
     if (ml.at) bits.push(`as at ${fmtTs(ml.at)}`);
     if (ml.follow) bits.push('following');
+    if (ml.q.hop) bits.push('<span class="small">last hop checked on the newest four hours of what the base stations still hold (three days)</span>');
+    if (ml.lh.note) bits.push(`<span class="txt-warn">${esc(ml.lh.note)}</span>`);
     if (ml.unmatched.length) bits.push(`<span class="txt-warn">not in this database: ${ml.unmatched.map(esc).join(', ')}</span>`);
     if (ml.sel.size) bits.push(`${ml.sel.size} selected — <button class="ml-btn" onclick="MessageLog.clearSel()">clear</button>`);
     const days = (Date.now() - (windowRange(ml.q)?.t0 || Date.now())) / 86400000;
@@ -824,6 +1104,8 @@ const MessageLog = (() => {
         return at ? `<td class="small" title="${escAttr(`${at.base.name}${at.base.at ? `, at ${at.base.at}` : ''} — path ${r.path}`)}"><b>${esc(at.base.name)}</b>${at.rest ? ` <span class="mono">${esc(at.rest)}</span>` : ''}</td>`
           : `<td class="small mono">${esc(r.path || '—')}</td>`;
       }
+      case 'lasthop':  return hopCellHtml(r, 'lasthop');
+      case 'offset':   return hopCellHtml(r, 'offset');
       case 'freq':     return `<td class="small mono">${esc(fmtFreq(r.freq_mhz))}</td>`;
       case 'signal': {
         const s = signalOf(r);
@@ -1569,6 +1851,18 @@ const MessageLog = (() => {
   function setText(kind, v)  { ml.q[kind] = v; run(); }
   function setFlag(kind, v)  { ml.q[kind] = !!v; run(); }
   function setOrder(v)       { ml.q.order = v; run(); }
+  // Choosing a last hop shows the two columns that say why a row is there.
+  function setHop(v) {
+    ml.q.hop = v || '';
+    if (ml.q.hop) {
+      const cols = ml.cols[ml.view];
+      if (!cols.includes('lasthop') || !cols.includes('offset')) {
+        ml.cols[ml.view] = ML_COLS.map(c => c.key).filter(k => k === 'lasthop' || k === 'offset' || cols.includes(k));
+        saveCols(ml.view);
+      }
+    }
+    run();
+  }
   function loadMore()        { run({ more: true }); }
 
   function setFollow(on) {
@@ -1608,6 +1902,10 @@ const MessageLog = (() => {
     }
     saveCols(ml.view);
     renderTable();
+    if (on && (key === 'lasthop' || key === 'offset') && ml.rows && ml.rows.some(r => !ml.lh.by.has(rowKey(r)))) {
+      annotateHops(ml.rows).then(() => { if (state.activeTab === 'msglog') { renderNote(); renderTable(); } })
+        .catch(err => { ml.lh.note = `the base stations' copies could not be read (${err && err.message || err})`; renderNote(); });
+    }
   }
 
   function resetCols() {
@@ -1859,7 +2157,9 @@ const MessageLog = (() => {
                   // Last, so a reader of the older layout finds every column
                   // where it was: what the address measures and what the
                   // count is worth, worked out here when nobody recorded it.
-                  'sensor_type', 'value_shown', 'unit_shown', 'value_inferred', 'value_rule'];
+                  'sensor_type', 'value_shown', 'unit_shown', 'value_inferred', 'value_rule',
+                  // Looked up, so blank unless the Last hop columns have been asked for.
+                  'last_hop', 'last_hop_offset_hz'];
     const lines = [head.join(',')];
     for (const r of rows) {
       const res = rowStation(r);
@@ -1876,6 +2176,8 @@ const MessageLog = (() => {
         csvEscape(sensorLabel(res)),
         v && v.value != null ? v.value : '', csvEscape(v && v.value != null ? v.unit || '' : ''),
         v ? (v.inferred ? 'true' : 'false') : '', csvEscape(v ? v.rule + (v.note ? ' — ' + v.note : '') : ''),
+        csvText((hopGroups(r) || []).map(c => hopLabel(c.hop).text).join(' | ')),
+        csvEscape((hopGroups(r) || []).map(c => c.cfo == null ? '' : Math.round(c.cfo)).join(' | ')),
       ].join(','));
     }
     dlText(`floodnet-message-log-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'));
@@ -1902,6 +2204,7 @@ const MessageLog = (() => {
     // registry replaces rather than stacks (#142).
     registerTabTeardown('MessageLog', stop);
     loadBases();
+    loadCarriers().then(refreshHopOptions).catch(() => {});
     fetchVocab().then(() => {
       // Codes on screen before the vocabulary landed read as bare numbers;
       // one repaint turns them into words. Nothing else moves.
@@ -1935,7 +2238,7 @@ const MessageLog = (() => {
 
   return {
     render, init, stop, run,
-    setWin, setDate, setFind, findKey, setCode, setText, setFlag, setOrder, loadMore,
+    setWin, setDate, setFind, findKey, setCode, setText, setFlag, setOrder, setHop, loadMore,
     setFollow, setView, setCol, resetCols, setHeight, resetWidths, colGrip,
     rowClick, toggleRow, pickClick, setSel, selAll, clearSel, trayToggle,
     fetchRaw, showStation, openInField, openInPackets, openInAlert2, showReading, showWindow,

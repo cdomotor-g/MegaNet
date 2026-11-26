@@ -105,6 +105,27 @@ are not kept here. Every copy, with its level, is what the
 [Reception Map](reception-map.md) keeps (signed in). The **Freq (MHz)** filter
 under *More filters* matches exactly — `152.4` finds 152.400 and not 152.4125.
 
+**Last hop and Offset say which repeater sent each copy.** A reading is kept
+once, so the table cannot say which repeater carried it; the copies can. Every
+copy a named base station heard in the last three days is public, with the
+carrier offset the receiver measured, and each base station's repeater carriers
+for the UTC day are public beside it. A legacy ALERT copy within 30 Hz of exactly
+one repeater's carrier, of an address that repeater passes, was sent by that
+repeater (the same rule as the agent API's receptions); on no carrier it is the
+station itself (*direct*); and a copy the decoder had already heard that no
+repeater on record explains reads *unexplained*. Each line shows the SNR that
+copy had at the base station — the number to read for a path test's fade margin —
+and the **Offset** column the measured offset in Hz, in the same order.
+
+The **Last hop** filter (beside the time window) keeps the readings one of whose
+copies a chosen repeater sent, or *direct*. Pick a **Base station** (*More
+filters*), a repeater, and **follow**, and the log shows only what that
+repeater sends that base station, as it arrives. Choosing a hop switches the two
+columns on; otherwise they are under *Columns* and off by default, because they
+cost a second read. Limits: legacy ALERT only (ALERT2 names its path in the
+message — open the row); the base stations keep copies three days; only the
+newest four hours of the rows on screen are looked up, the rest read `—`.
+
 **Station names are a resolution, not a claim the message made.** The address
 is the identity (a packet carries an address; which station that is may be
 unknown). Where the datastore has backfilled `station_id`, that wins; failing

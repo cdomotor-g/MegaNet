@@ -14,6 +14,10 @@
 //      the time window, and "any" takes the filter off.
 //   3. With the list refused (not an editor): no filter, paths as kept, and
 //      the log still loads.
+//   5. Last hop: the copies the base stations heard (reception_public) and the
+//      repeater carriers (repeater_carrier_public) put each legacy reading's
+//      copies beside it — which repeater, its offset and SNR — and a Last hop
+//      filter keeps only the readings one of whose copies a repeater sent.
 //
 // Run:  npm run msglogbase
 
@@ -55,11 +59,12 @@ async function main() {
   const errors = [];
   const asked = [];
 
-  async function open(editor, named = false) {
+  async function open(editor, named = false, seed = null) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
     await applyNetworkPolicy(page, server.origin);
     page.on('pageerror', e => errors.push(e.message));
+    if (seed) await page.addInitScript(({ c, p }) => { window.__carriers = c; window.__copies = p; }, seed);
     await page.goto(`${server.origin}/index.html`, { waitUntil: 'load', timeout: LOAD_TIMEOUT });
     await page.waitForFunction(() => typeof state !== "undefined" && state.data && typeof MessageLog !== 'undefined', null, { timeout: LOAD_TIMEOUT });
     await page.exposeFunction('__asked', q => { asked.push(q); });
@@ -74,6 +79,9 @@ async function main() {
             { name: 'Depot base', receiver: 'serial-monitor/rpi-6dfef7f4', station_id: null }] : [];
         }
         if (q.startsWith('ingest_point_latest')) { if (!editor) throw new Error('permission denied'); return points; }
+        // Last hop (0116): the repeater carriers and the copies, when a test supplies them.
+        if (q.startsWith('repeater_carrier_public')) return window.__carriers || [];
+        if (q.startsWith('reception_public')) return window.__copies || [];
         if (q.startsWith('reading?')) return /path=like|or=\(path\.like/.test(q) ? rows.slice(0, 1) : rows;
         return [];
       };
@@ -159,6 +167,59 @@ async function main() {
       w && J(w.groups) === J(['11111011', '10111111', '11011110', '········']) && w.kinds === 'a'.repeat(8) + 'vvvaaaaa' + 'v'.repeat(8) + 'f'.repeat(8) && w.key === 3, J(w));
     w = await wire(k(ROWS[4]));
     check('numbers too big for a frame are drawn as the two numbers, not a frame', w && J(w.groups) === J(['0010011100010000', '00000000101']) && /two numbers/.test(w.title), J(w));
+
+    console.log('\n5. Last hop: whose carrier each copy sat on');
+    const base = 'serial-monitor/rpi-83071968-sdr1-151.5375';
+    const day = new Date().toISOString().slice(0, 10);
+    const at = ms => new Date(Date.now() - ms).toISOString();
+    const copy = (id, a, v, ms, cfo, dup, snr) => ({ id, heard_at: at(ms), base_station: 'Hilltop base', path: base, alert_id: a,
+      value_raw: v, copy: dup, cfo_hz: cfo, cfo_split: false, snr_db: snr, rssi_dbm: null, level_dbfs: null });
+    const rd = (i, a, v, ms) => ({ ...row(i, base), alert_id: a, value_raw: v, reading_ts: at(ms), received_at: at(ms - 2000) });
+    const R5 = [rd(1, 5702, 11, 120000), rd(2, 5710, 12, 90000), rd(3, 9999, 13, 60000)];
+    const seed = {
+      c: [{ day, path: base, station_id: 'amiens_knob_al', centre_hz: 212 }],
+      p: [
+        copy(1, 5702, 11, 120500, -35, false, 9.1),    // the station itself, straight in
+        copy(2, 5702, 11, 119000, 213, true, 14.2),    // the same transmission, on Amiens Knob's carrier
+        copy(3, 5710, 12, 90400, -35, false, 8.0),     // heard direct only
+        copy(4, 9999, 13, 60300, 212, true, 6.5),      // on the carrier, of an address it does not pass
+      ] };
+    const p5 = await open(false, true, seed);
+    await p5.evaluate(rows => {
+      const prev = window.dbSelect;
+      window.dbSelect = async q => { if (q.startsWith('reading?')) { window.__asked(q); return rows; } return prev(q); };
+    }, R5);
+    const hopOpts = await p5.evaluate(() => { const el = document.getElementById('ml-hop'); return el && [...el.options].map(o => o.textContent.trim()); });
+    check('the Last hop filter lists direct and each repeater whose carrier was found, by name', hopOpts && /^any$/.test(hopOpts[0]) && /direct/.test(hopOpts[1]) && hopOpts.includes('Amiens Knob AL'), J(hopOpts));
+    asked.length = 0;
+    await p5.evaluate(() => MessageLog.setHop('amiens_knob_al'));
+    await p5.waitForFunction(() => document.querySelectorAll('#main-content table tbody tr').length === 1, null, { timeout: 15000 }).catch(() => {});
+    const rq = asked.find(x => x.startsWith('reading?')) || '', cq = asked.find(x => x.startsWith('reception_public')) || '';
+    check('a repeater asks only for legacy ALERT addresses it passes', /protocol=eq\.1/.test(rq) && /and\(alert_id\.gte\.5700,alert_id\.lte\.5739\)/.test(rq) && /alert_id\.in\.\(5702/.test(rq), rq);
+    check('the copies are read by heard_at, legacy and decoded only', /protocol=eq\.alert/.test(cq) && /ok=eq\.true/.test(cq) && /heard_at=gte\./.test(cq) && /heard_at=lt\./.test(cq), cq);
+    const grid = () => p5.evaluate(() => {
+      const heads = [...document.querySelectorAll('#main-content table thead th')].map(h => h.textContent.trim());
+      const col = re => heads.findIndex(h => re.test(h));
+      const [a, h, o] = [col(/^AlertID/), col(/^Last hop/), col(/^Offset/)];
+      return { heads, rows: [...document.querySelectorAll('#main-content table tbody tr')].filter(tr => tr.children[a]).map(tr => ({
+        alert: tr.children[a].textContent.trim(), hop: h < 0 ? null : tr.children[h].textContent.trim().replace(/\s+/g, ' '),
+        off: o < 0 ? null : [...tr.children[o].querySelectorAll('div')].map(d => d.textContent.trim()) })) };
+    });
+    let g = await grid();
+    check('only the reading a copy of which Amiens Knob sent is left', g.rows.length === 1 && g.rows[0].alert === '5702', J(g.rows));
+    check('choosing a hop shows the Last hop and Offset columns', g.heads.some(x => /^Last hop/.test(x)) && g.heads.some(x => /^Offset/.test(x)), J(g.heads));
+    check('…the repeater by name with that copy\'s SNR, and the station direct', g.rows[0] && /Amiens Knob AL 14\.2 dB/.test(g.rows[0].hop) && /direct 9\.1 dB/.test(g.rows[0].hop), J(g.rows[0]));
+    check('…each copy\'s offset in Hz, in the same order', g.rows[0] && g.rows[0].off.length === 2 && g.rows[0].off.includes('+213 Hz') && g.rows[0].off.includes('-35 Hz'), J(g.rows[0]));
+    await p5.evaluate(() => MessageLog.setHop('direct'));
+    await p5.waitForFunction(() => document.querySelectorAll('#main-content table tbody tr').length === 2, null, { timeout: 15000 }).catch(() => {});
+    g = await grid();
+    check('direct keeps every reading the station itself was heard on, not the repeater-only one', J(g.rows.map(r => r.alert)) === J(['5702', '5710']), J(g.rows));
+    await p5.evaluate(() => MessageLog.setHop(''));
+    await p5.waitForFunction(() => document.querySelectorAll('#main-content table tbody tr').length === 3, null, { timeout: 15000 }).catch(() => {});
+    g = await grid();
+    check('with no filter the columns stay: an address no repeater passes is unexplained, not blamed', g.rows[2] && /unexplained/.test(g.rows[2].hop), J(g.rows));
+    await p5.context().close();
+
     check('no page errors', errors.length === 0, errors.join(' | '));
   } finally {
     await browser.close();

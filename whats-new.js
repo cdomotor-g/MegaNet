@@ -25,6 +25,12 @@ const WhatsNew = (() => {
 
   // Newest first. `html` is trusted markup — it is written here, not typed in.
   const ENTRIES = [
+    { n: 293, date: '2026-11-26', items: [
+      '📡 <strong>Last hop in the Message Log</strong> — two new columns, <em>Last hop</em> and <em>Offset</em> (under <em>Columns</em>), say which repeater '
+        + 'sent each copy of a reading on to the base station, told by its carrier offset, with that copy\'s SNR. A new <em>Last hop</em> filter keeps only the '
+        + 'readings a chosen repeater sent (or the station itself, <em>direct</em>). Pick a <em>Base station</em>, a repeater and <em>follow</em> '
+        + 'to watch a path test arrive as it happens. Legacy ALERT only, and the base stations keep their copies three days.',
+    ] },
     { n: 292, date: '2026-11-25', items: [
       '🪷 <strong>The Classic look has been retired.</strong> Calm is the look for everybody now, and <em>Classic</em> is gone from '
         + '<em>Theme &amp; layout</em>. Anybody who had picked it is on Calm, with every tab filed under its group: the same tabs, the same '
