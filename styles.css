@@ -24297,6 +24297,59 @@ a.adm-kpi--go:hover::after, a.adm-kpi--go:focus-visible::after { color: var(--ac
   font-size: var(--fs-sm);
 }
 
+.ar-detail { transition: max-height var(--motion-fast) var(--ease); }
+.ar-detail.is-tall { max-height: calc(100dvh - 4.5rem); }
+.ar-grow { font-size: 1.1rem; }
+
+/* 🎯 Aim mode: which way to turn, and "Target acquired" once the camera faces
+   the station. Over the picture, under the heading. */
+.ar-aim {
+  position: absolute;
+  top: 7rem;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: max-content;
+  max-width: min(26rem, calc(100% - 1.5rem));
+  padding: .5rem .5rem .5rem .9rem;
+  border-radius: var(--r-lg);
+  border: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  box-shadow: var(--shadow-2);
+  font-size: var(--fs-md, 1rem);
+  font-weight: 600;
+}
+.ar-aim[hidden] { display: none; }
+.ar-aim-arrow { font-size: 1.6rem; line-height: 1; }
+.ar-aim-text { flex: 1 1 auto; min-width: 0; }
+.ar-aim.is-left { justify-content: flex-start; }
+.ar-aim.is-on { border-color: #3ddc84; background: color-mix(in srgb, #0c3b1f 90%, transparent); color: #d9ffe8; }
+.ar-aim-x { flex: 0 0 auto; width: 2.5rem; height: 2.5rem; padding: 0; border-radius: 50%; }
+
+.ar-find {
+  position: absolute;
+  top: 6.5rem;
+  left: 50%;
+  z-index: 4;
+  transform: translateX(-50%);
+  width: min(26rem, calc(100% - 1.5rem));
+  padding: var(--sp-2);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-2);
+}
+.ar-find[hidden] { display: none; }
+.ar-find-q { width: 100%; min-height: 2.75rem; }
+.ar-find-hits { list-style: none; margin: var(--sp-1) 0 0; padding: 0; display: grid; gap: 2px; max-height: 40vh; overflow-y: auto; }
+.ar-find-hits button { width: 100%; min-height: 2.75rem; text-align: left; display: flex; gap: var(--sp-2); align-items: baseline; }
+.ar-find-n, .ar-find-d { color: var(--muted); font-size: var(--fs-sm); font-weight: 400; }
+.ar-find-d { margin-left: auto; }
+.ar-find-none { padding: var(--sp-2); color: var(--muted); font-size: var(--fs-sm); }
+
 .ar-detail-kind { color: var(--muted); }
 .ar-detail-actions { margin-top: var(--sp-3); }
 
@@ -24466,14 +24519,16 @@ a.adm-kpi--go:hover::after, a.adm-kpi--go:focus-visible::after { color: var(--ac
 
 .cam-block {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sp-2);
   justify-items: center;
 }
 
 .cam-stage {
   position: relative;
-  width: min(100%, calc(70vh * var(--cam-aspect, 4 / 3)));
+  width: min(100%, calc((100dvh - 12rem) * var(--cam-aspect, 4 / 3)));
   aspect-ratio: var(--cam-aspect, 4 / 3);
+  touch-action: pan-y;
   overflow: hidden;
   border-radius: var(--r-lg);
   /* A viewfinder's letterbox is black in any theme; the stage wears the dark
@@ -24490,6 +24545,82 @@ a.adm-kpi--go:hover::after, a.adm-kpi--go:focus-visible::after { color: var(--ac
   height: 100%;
 }
 .cam-video { object-fit: contain; }
+.cam-video { transform-origin: 50% 50%; }
+/* The little map over the picture's top-right corner: Look Around's map. */
+.cam-map {
+  position: absolute;
+  top: .5rem;
+  right: .5rem;
+  z-index: 2;
+  width: min(38%, 11rem);
+  aspect-ratio: 1;
+  border-radius: var(--r-md);
+  border: 2px solid rgba(255,255,255,.8);
+  overflow: hidden;
+  touch-action: none;
+}
+.cam-map[hidden] { display: none; }
+.cam-map .leaflet-control-zoom, .cam-map .leaflet-control-attribution { display: none; }
+.cam-round[aria-pressed="true"] { outline: 2px solid var(--accent); }
+
+.cam-zoom { display: flex; align-items: center; gap: var(--sp-2); width: min(100%, 36rem); }
+.cam-zoom[hidden] { display: none; }
+.cam-zoom-steps { display: inline-flex; gap: 4px; }
+.cam-zoom-step { min-width: 2.5rem; min-height: 2.5rem; padding: 0 .5rem; border-radius: 999px; }
+.cam-zoom-step[aria-pressed="true"] { background: var(--accent); color: var(--on-accent, #fff); }
+.cam-zoom-range { flex: 1 1 0; width: 0; min-width: 4rem; }
+.cam-zoom-out { min-width: 2.5rem; text-align: right; }
+
+/* A phone turned on its side: the picture fills the screen, the shutter and
+   the rest down its right edge, the numbers over its foot. */
+@media (orientation: landscape) and (pointer: coarse) and (max-height: 640px) {
+  .cam-block.is-live {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: block;
+    padding: 0;
+    background: #000;
+  }
+  .cam-block.is-live .cam-stage {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: min(100vw, calc(100dvh * var(--cam-aspect, 4 / 3)));
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+  .cam-block.is-live .cam-controls {
+    position: absolute;
+    top: 50%;
+    right: .75rem;
+    transform: translateY(-50%);
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    width: auto;
+    gap: var(--sp-2);
+  }
+  .cam-block.is-live .cam-controls-side { flex-direction: column; gap: .3rem; }
+  .cam-block.is-live .cam-round { width: 2.25rem; height: 2.25rem; font-size: 1rem; }
+  .cam-block.is-live .cam-shutter { width: 3.6rem; height: 3.6rem; }
+  .cam-block.is-live .cam-shutter span { width: 2.7rem; height: 2.7rem; }
+  .cam-block.is-live .cam-last { width: 2.25rem; height: 2.25rem; }
+  .cam-block.is-live .cam-zoom {
+    position: absolute;
+    left: .75rem;
+    bottom: .5rem;
+    z-index: 3;
+    width: min(18rem, 40vw);
+    padding: .25rem .5rem;
+    border-radius: var(--r-md);
+    background: rgba(0,0,0,.45);
+    color: #fff;
+  }
+  /* The stamp over the picture already says the position and the heading. */
+  .cam-block.is-live .cam-readout { display: none; }
+}
+
 .cam-video[hidden] { display: none; }
 .cam-overlay { pointer-events: none; }
 
@@ -24520,12 +24651,12 @@ a.adm-kpi--go:hover::after, a.adm-kpi--go:focus-visible::after { color: var(--ac
 
 .cam-controls {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
   width: min(100%, 36rem);
 }
-.cam-controls-side { display: flex; gap: var(--sp-2); align-items: center; }
+.cam-controls-side { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .cam-controls-end { justify-content: flex-end; }
 
 .cam-shutter {

@@ -44,6 +44,7 @@ const StationArMap = (function () {
   let wedgeKey = '';          // what the wedge was last drawn for
   let pickedId = null, here = null, maxKm = 0, onPick = null;
   let nudging = false;        // a move this file made, not the person
+  let accCircle = null;       // the circle the GPS's ± makes round you (Field Camera's map)
 
   // The base the person chose on the Stations map: the first one switched on in
   // the mix map-controls.js remembers, in its saved order. A street map when
@@ -146,7 +147,7 @@ const StationArMap = (function () {
 
   function close() {
     if (map) map = removeMap(map);
-    map = host = markers = youDot = wedge = renderer = onPick = null;
+    map = host = markers = youDot = wedge = renderer = onPick = accCircle = null;
     byId = new Map();
     here = null;
   }
@@ -227,6 +228,14 @@ const StationArMap = (function () {
     wedge.setLatLngs(wedgePoints(here.lat, here.lon, heading, fov, maxKm * 1000));
   }
 
+  // The GPS's ±, in metres, as a circle round you; null takes it off.
+  function setAccuracy(m) {
+    if (!map) return;
+    if (!here || !(m > 0)) { if (accCircle) { accCircle.remove(); accCircle = null; } return; }
+    if (!accCircle) accCircle = L.circle([here.lat, here.lon], { pane: 'mnArWedge', interactive: false, radius: m, weight: 1, color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.12 }).addTo(map);
+    else { accCircle.setLatLng([here.lat, here.lon]); accCircle.setRadius(m); }
+  }
+
   function recentre() {
     if (!map || !here) return;
     follow = true;
@@ -246,6 +255,7 @@ const StationArMap = (function () {
     setPicked,
     setHere,
     setView,
+    setAccuracy,
     recentre,
     resize,
 

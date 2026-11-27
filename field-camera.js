@@ -158,6 +158,8 @@ const FieldCamera = (function () {
   let framesOf = null, checkedAt = 0;                   // the stream frames have been seen from; the last check
   let revives = 0, revived = false, liveAt = 0;         // restarts in a row; one under way; when the stream last came
   let torch = false;
+  let zoom = 1, zoomHw = null, pinch = null;   // the zoom asked for; the camera's own range, where it has one; a two-finger pinch under way
+  let mapUp = false, mapKey = '';              // the little map over the picture is open; what it was last told
   let watchId = null, gps = null, gpsError = '';
   let compass = 'off';           // 'off' | 'waiting' | 'absolute' | 'ios' | 'relative' | 'none'
   let listening = false, seenRelative = false, sensorTimer = 0;
@@ -248,13 +250,16 @@ const FieldCamera = (function () {
     settings = {
       project: typeof s.project === 'string' ? s.project : DEFAULT_PROJECT,
       auto: s.auto !== false,
-      copy: s.copy === true,
+      // A copy of each photo on the phone is on by default (settings saved before
+      // that carry no copyV, so their old "off" is not held against the new default).
+      copy: s.copyV === 2 ? s.copy === true : true,
       place: s.place !== false,
+      map: s.map === true,
     };
     return settings;
   }
   function savePrefs() {
-    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(prefs())); } catch (_) { /* a private window */ }
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...prefs(), copyV: 2 })); } catch (_) { /* a private window */ }
   }
   function setPref(key, value) {
     const s = prefs();
@@ -264,6 +269,7 @@ const FieldCamera = (function () {
     if (key === 'auto' && s.auto) pump();
     if (key === 'place' && !s.place) { locality = null; localityAt = null; }
     if (key === 'place' && s.place) askLocality(true);
+    if (key === 'map') { syncMap(); paintControls(); }
     paintReadout();
     paintOutbox();
   }
@@ -468,6 +474,8 @@ const FieldCamera = (function () {
         stream = s;
         track = s.getVideoTracks()[0] || null;
         torch = false;
+        zoomHw = zoomCaps();
+        zoom = 1;
         cam = 'on';
         liveAt = performance.now();
         watchTrack(track);
@@ -491,6 +499,14 @@ const FieldCamera = (function () {
   function attach() {
     const v = $('cam-video');
     if (!stream || !v) return;
+    const st = $('cam-stage');
+    if (st && !st.dataset.pinch) {
+      st.dataset.pinch = '1';
+      st.addEventListener('pointerdown', pinchDown);
+      st.addEventListener('pointermove', pinchMove);
+      st.addEventListener('pointerup', pinchUp);
+      st.addEventListener('pointercancel', pinchUp);
+    }
     if (v.srcObject !== stream) {
       v.muted = true;
       v.setAttribute('playsinline', '');
@@ -503,6 +519,9 @@ const FieldCamera = (function () {
     replay();
     fitStage();
     paintStage();
+    paintZoom();
+    applyZoom();
+    syncMap();
     loop();
   }
   function replay() {
@@ -514,9 +533,10 @@ const FieldCamera = (function () {
 
   function stopCamera() {
     if (stream) stream.getTracks().forEach(t => t.stop());
-    stream = null; track = null; torch = false;
+    stream = null; track = null; torch = false; zoomHw = null;
+    closeMap();
     const v = $('cam-video');
-    if (v) { v.srcObject = null; v.hidden = true; }
+    if (v) { v.srcObject = null; v.hidden = true; v.style.transform = ''; }
     if (cam === 'on' || cam === 'asking' || cam === 'lost') cam = 'off';
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
@@ -659,6 +679,181 @@ const FieldCamera = (function () {
   function canTorch() {
     try { return !!(track && track.getCapabilities && track.getCapabilities().torch); } catch (_) { return false; }
   }
+
+  // ── Zoom ───────────────────────────────────────────────────────────────────
+  // The camera's own zoom where the browser gives it (most Androids), a
+  // digital one — the picture cropped to its middle — where it does not
+  // (Safari). Either way the photo is what the stage shows.
+  const DIGITAL_MAX = 5;
+  function zoomCaps() {
+    try {
+      const c = track && track.getCapabilities ? track.getCapabilities() : null;
+      if (c && c.zoom && isFinite(c.zoom.min) && isFinite(c.zoom.max) && c.zoom.max > c.zoom.min) {
+        return { min: c.zoom.min, max: Math.min(c.zoom.max, 10), step: c.zoom.step || 0.1 };
+      }
+    } catch (_) { /* digital */ }
+    return null;
+  }
+  function zoomBounds() { return zoomHw ? { min: Math.max(1, zoomHw.min), max: zoomHw.max } : { min: 1, max: DIGITAL_MAX }; }
+  function setZoom(z) {
+    const b = zoomBounds();
+    zoom = Math.max(b.min, Math.min(b.max, Number(z) || 1));
+    applyZoom();
+    const out = $('cam-zoom-out');
+    if (out) out.textContent = zoomText();
+    const r = $('cam-zoom-range');
+    if (r && Number(r.value) !== zoom) r.value = String(zoom);
+    document.querySelectorAll('.cam-zoom-step').forEach(b2 => b2.setAttribute('aria-pressed', String(Math.abs(Number(b2.dataset.z) - zoom) < 0.05)));
+  }
+  function zoomText() { return `${zoom < 10 ? zoom.toFixed(1).replace(/\.0$/, '') : Math.round(zoom)}×`; }
+  function applyZoom() {
+    const v = $('cam-video');
+    if (zoomHw && track && track.applyConstraints) {
+      if (v) v.style.transform = '';
+      track.applyConstraints({ advanced: [{ zoom }] }).catch(() => {
+        // The camera would not take it: fall back to the digital one.
+        zoomHw = null;
+        applyZoom();
+        paintZoom();
+      });
+    } else if (v) {
+      v.style.transform = zoom > 1 ? `scale(${zoom})` : '';
+    }
+  }
+  function zoomSteps() {
+    const b = zoomBounds();
+    return [1, 2, 3, 5, 8].filter(z => z >= b.min - 0.01 && z <= b.max + 0.01);
+  }
+  function paintZoom() {
+    const el = $('cam-zoom');
+    if (!el) return;
+    if (cam !== 'on') { el.hidden = true; el.innerHTML = ''; return; }
+    const b = zoomBounds();
+    el.hidden = false;
+    el.innerHTML = `
+      <span class="cam-zoom-steps" role="group" aria-label="Zoom">${zoomSteps().map(z => `<button type="button" class="cam-zoom-step"
+        data-z="${z}" aria-pressed="${Math.abs(z - zoom) < 0.05}" onclick="FieldCamera.setZoom(${z})">${z}×</button>`).join('')}</span>
+      <input type="range" id="cam-zoom-range" class="cam-zoom-range" min="${b.min}" max="${b.max}" step="${zoomHw ? zoomHw.step : 0.1}"
+             value="${zoom}" aria-label="Zoom" oninput="FieldCamera.setZoom(this.value)">
+      <output id="cam-zoom-out" class="cam-zoom-out small">${zoomText()}</output>`;
+  }
+  // Two fingers on the picture zoom it.
+  function pinchDown(e) {
+    if (cam !== 'on' || e.pointerType === 'mouse') return;
+    pinch = pinch || { pts: new Map(), d0: 0, z0: 1 };
+    pinch.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch.pts.size === 2) { pinch.d0 = pinchDist(); pinch.z0 = zoom; }
+  }
+  function pinchDist() {
+    const [a, b] = [...pinch.pts.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y) || 1;
+  }
+  function pinchMove(e) {
+    if (!pinch || !pinch.pts.has(e.pointerId)) return;
+    pinch.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch.pts.size === 2 && pinch.d0) setZoom(pinch.z0 * pinchDist() / pinch.d0);
+  }
+  function pinchUp(e) {
+    if (!pinch) return;
+    pinch.pts.delete(e.pointerId);
+    if (!pinch.pts.size) pinch = null;
+  }
+
+  // ── Level: pitch and roll ──────────────────────────────────────────────────
+  // How the phone is tilted, drawn over the picture (not on the photo): a
+  // horizon line that stays level with the world as the phone rolls, and the
+  // two figures. Green within a degree.
+  function screenAngle() {
+    const so = window.screen && window.screen.orientation;
+    if (so && typeof so.angle === 'number') return so.angle;
+    return typeof window.orientation === 'number' ? window.orientation : 0;
+  }
+  function rollNow() { return vec && typeof StationAR !== 'undefined' && StationAR.rollOf ? StationAR.rollOf(vec, screenAngle()) : null; }
+  function signed(x) { const r = Math.round(x * 10) / 10; return `${r > 0 ? '+' : r < 0 ? '−' : ''}${Math.abs(r).toFixed(1)}°`; }
+  function drawLevel(ctx, w, h) {
+    const pitch = pitchNow(), roll = rollNow();
+    if (!known(pitch) || !known(roll)) return;
+    const u = Math.min(w, h) / 100;
+    const flatUp = Math.abs(pitch) > FLAT_PITCH;
+    const levelRoll = !flatUp && Math.abs(roll) <= 1;
+    const levelPitch = Math.abs(pitch) <= 1;
+    const good = '#3ddc84', plain = 'rgba(255,255,255,.9)';
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    // the fixed marks: where level is
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = Math.max(1, u * .25);
+    for (const sx of [-1, 1]) { ctx.beginPath(); ctx.moveTo(sx * u * 17, 0); ctx.lineTo(sx * u * 21, 0); ctx.stroke(); }
+    if (!flatUp) {
+      // the world's horizon, turned the way the phone is rolled
+      ctx.rotate(roll * RAD);
+      ctx.strokeStyle = levelRoll ? good : plain; ctx.lineWidth = Math.max(1.5, u * .45);
+      ctx.beginPath(); ctx.moveTo(-u * 15, 0); ctx.lineTo(-u * 4, 0); ctx.moveTo(u * 4, 0); ctx.lineTo(u * 15, 0); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, u * 1.2, 0, 2 * Math.PI); ctx.stroke();
+    }
+    ctx.restore();
+    // the figures, top middle
+    const fs = Math.max(12, u * 3.4);
+    ctx.save();
+    ctx.font = `600 ${fs}px system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    const label = flatUp ? `Pitch ${signed(pitch)} · camera pointing ${pitch > 0 ? 'up' : 'down'}` : `Pitch ${signed(pitch)} · Roll ${signed(roll)}`;
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = 'rgba(0,0,0,.5)';
+    ctx.fillRect(w / 2 - tw / 2 - fs * .6, fs * .5, tw + fs * 1.2, fs * 1.6);
+    ctx.fillStyle = levelRoll && levelPitch ? good : '#fff';
+    ctx.fillText(label, w / 2, fs * .75);
+    ctx.restore();
+  }
+
+  // ── The map over the picture ───────────────────────────────────────────────
+  // To check the position is right: you, the circle the GPS's ± makes, the
+  // way the camera faces, and the stations near you, on the map the Stations
+  // tab last used. It is Look Around's map (station-ar-map.js), a corner of the
+  // picture; it asks the browser for map tiles and sends nothing of yours.
+  function roleOfStation(s) {
+    return Array.isArray(s.roles) && typeof primaryRole === 'function' ? primaryRole(s) : 'field';
+  }
+  function syncMap() {
+    const el = $('cam-map');
+    if (!el) return;
+    if (!prefs().map || cam !== 'on') { closeMap(); return; }
+    if (typeof StationArMap === 'undefined') { say('The map is not available on this page.', 'warn'); return; }
+    if (!mapUp || !el.classList.contains('leaflet-container')) {
+      mapUp = StationArMap.open(el, id => pickStation(id));
+      mapKey = '';
+      if (!mapUp) { say('The map could not be made here — it needs a connection for its tiles.', 'warn'); return; }
+    }
+    el.hidden = false;
+    StationArMap.resize();
+    updateMap();
+  }
+  function closeMap() {
+    const el = $('cam-map');
+    if (mapUp && typeof StationArMap !== 'undefined') StationArMap.close();
+    mapUp = false; mapKey = '';
+    if (el) el.hidden = true;
+  }
+  function updateMap() {
+    if (!mapUp || typeof StationArMap === 'undefined') return;
+    const st = chosen();
+    const list = suggestions.slice(0, SUGGEST_N).map(x => x.s);
+    if (st && !list.includes(st)) list.push(st);
+    let km = 0.5;
+    if (st && gps && located(st)) km = Math.min(25, Math.max(0.3, metres(gps.lat, gps.lon, st.lat, st.lon) / 1000 * 1.3));
+    else if (suggestions.length) km = Math.min(25, Math.max(0.5, suggestions[0].m / 1000 * 1.3));
+    const key = `${list.map(s => s.id).join()}|${st ? st.id : ''}|${km.toFixed(1)}`;
+    if (key !== mapKey) {
+      mapKey = key;
+      StationArMap.setStations(list.filter(located).map(s => ({ members: [{ s, role: roleOfStation(s) }] })), st ? st.id : null);
+      StationArMap.setHere(gps ? { lat: gps.lat, lon: gps.lon } : null, km);
+    } else if (gps) {
+      StationArMap.setHere({ lat: gps.lat, lon: gps.lon }, km);
+    }
+    if (StationArMap.setAccuracy) StationArMap.setAccuracy(gps && known(gps.acc) ? gps.acc : null);
+    StationArMap.setView(headingNow(), 60);
+  }
+  function toggleMap() { setPref('map', !prefs().map); }
+
   function toggleFull() {
     const el = $('cam-block');
     if (!el) return;
@@ -676,7 +871,7 @@ const FieldCamera = (function () {
       raf = 0;
       if (cam !== 'on' || !$('cam-overlay')) return;
       if (t - lastPaint >= PREVIEW_MS) { lastPaint = t; paintPreview(); }
-      if (t - lastRead >= 500) { lastRead = t; paintReadout(); }
+      if (t - lastRead >= 500) { lastRead = t; paintReadout(); updateMap(); }
       if (t - lastCheck >= 1000) { lastCheck = t; checkPicture(); }
       if (cam !== 'on') return;
       raf = requestAnimationFrame(tick);
@@ -695,6 +890,7 @@ const FieldCamera = (function () {
     ctx.clearRect(0, 0, w, h);
     if (cam !== 'on') return;
     PhotoStamp.draw(ctx, w, h, facts(new Date()));
+    drawLevel(ctx, w, h);
   }
 
   // ── What the stamp says, now ───────────────────────────────────────────────
@@ -726,7 +922,7 @@ const FieldCamera = (function () {
     return {
       lat: gps ? gps.lat : null, lon: gps ? gps.lon : null, accuracy: gps ? gps.acc : null,
       alt: h ? h.m : null, altRef: h ? h.ref : null, height: h,
-      heading, headingRef: 'T', pitch: pitchNow(),
+      heading, headingRef: 'T', pitch: pitchNow(), roll: rollNow(),
       when: PhotoStamp.moment(when, zoneName(when)),
       station: brief(st), how: stationHow(), suggested: suggestions.map(x => x.s.id),
       project: prefs().project,
@@ -856,8 +1052,11 @@ const FieldCamera = (function () {
       const W = Math.round(v.videoWidth * scale), H = Math.round(v.videoHeight * scale);
       const cv = document.createElement('canvas');
       cv.width = W; cv.height = H;
-      cv.getContext('2d').drawImage(v, 0, 0, W, H);
-      await keepShot(cv, f, { source: 'camera' });
+      // A digital zoom is the middle of the frame; the camera's own is already in it.
+      const dz = !zoomHw && zoom > 1 ? zoom : 1;
+      const sw = v.videoWidth / dz, sh = v.videoHeight / dz;
+      cv.getContext('2d').drawImage(v, (v.videoWidth - sw) / 2, (v.videoHeight - sh) / 2, sw, sh, 0, 0, W, H);
+      await keepShot(cv, f, { source: 'camera', zoom });
     } catch (err) {
       say(`The photo could not be kept — ${(err && err.message) || err}.`, 'error');
     } finally {
@@ -1003,6 +1202,8 @@ const FieldCamera = (function () {
         ? { m: Math.round(ground.m * 100) / 100, datum: 'AHD', source: ground.source, dataset: ground.dataset } : null,
       station: { how, suggested: f.suggested || [] },
       locality: f.locality ? { name: f.locality, source: 'OpenStreetMap' } : null,
+      tilt: known(f.pitch) ? { pitch: Math.round(f.pitch * 10) / 10, roll: known(f.roll) ? Math.round(f.roll * 10) / 10 : null } : null,
+      zoom: from.zoom && from.zoom > 1.01 ? Math.round(from.zoom * 10) / 10 : null,
       project: f.project || null,
     };
     // What is on the stamp is what the photo is filed under: the station, or
@@ -1352,6 +1553,25 @@ const FieldCamera = (function () {
     if (!s) return;
     const b = await bytesOf(id).catch(() => ({ jpeg: null }));
     if (!b.jpeg) { say('That photo has been uploaded and its bytes let go here — open it in Field Photos to save it.', 'warn'); return; }
+    // On an iPhone or iPad a download is a question over the page; the share
+    // sheet's Save Image puts it straight into Photos.
+    if (asksBeforeDownload() && navigator.share && navigator.canShare) {
+      try {
+        const file = new File([b.jpeg], s.name, { type: 'image/jpeg' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file] });
+          if (s.copy === 'wanted') {
+            s.copy = 'saved';
+            await saveShot(s);
+            if (s.status === 'done' || s.status === 'already') await dropBytes(s.id);
+            paintOutbox();
+          }
+          return;
+        }
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;   // closed the sheet: still waiting
+      }
+    }
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([b.jpeg], { type: 'image/jpeg' })), download: s.name,
     });
@@ -1390,6 +1610,14 @@ const FieldCamera = (function () {
       paintOutbox();
       pump();
     }, () => { memOnly = true; paintOutbox(); });
+    // Turning the phone: the stage takes the new shape at once, filling the
+    // screen sideways (styles.css), not a moment later when the stream says.
+    const turned = () => { fitStage(); const m = $('cam-map'); if (m && !m.hidden && typeof StationArMap !== 'undefined') StationArMap.resize(); };
+    window.addEventListener('resize', turned);
+    window.addEventListener('orientationchange', () => setTimeout(turned, 250));
+    if (window.screen && window.screen.orientation && window.screen.orientation.addEventListener) {
+      window.screen.orientation.addEventListener('change', () => setTimeout(turned, 100));
+    }
     window.addEventListener('online', () => pump(true));
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'visible') return;
@@ -1427,14 +1655,19 @@ const FieldCamera = (function () {
       <div class="panel-header"><h2>Field Camera</h2><span class="small" id="cam-sum">${sumHtml()}</span></div>
       <p class="small cam-lead">Photos taken here carry the stamp Solocator prints — the way the camera faced,
         the position and its ±, the height, the time — and the station they are of. Each is kept on this device,
-        then goes into <strong>Field Photos</strong> under that station by itself, as soon as there is a signal.</p>
+        then goes into <strong>Field Photos</strong> under that station by itself, as soon as there is a signal.
+        On the picture, <strong>pitch</strong> is how far the camera points up (+) or down (−) and <strong>roll</strong> is how far the phone
+        leans to one side; the line stays level with the ground and turns green within a degree. Pinch or use 1× 2× 3× to zoom, and 🗺️ shows
+        where the phone thinks it is on a map.</p>
       <div class="cam-block" id="cam-block">
         <div class="cam-stage" id="cam-stage" data-theme="dark" style="--cam-aspect: 4 / 3">
           <video id="cam-video" class="cam-video" playsinline muted hidden></video>
           <canvas id="cam-overlay" class="cam-overlay" aria-hidden="true"></canvas>
+          <div class="cam-map" id="cam-map" hidden></div>
           <div class="cam-flash" id="cam-flash" aria-hidden="true"></div>
           <div class="cam-idle" id="cam-idle">${idleHtml()}</div>
         </div>
+        <div class="cam-zoom" id="cam-zoom" hidden></div>
         <div class="cam-controls" id="cam-controls">${controlsHtml()}</div>
         <div class="cam-readout small" id="cam-readout" aria-live="off">${readoutHtml()}</div>
       </div>
@@ -1461,7 +1694,7 @@ const FieldCamera = (function () {
           onchange="FieldCamera.setPref('auto', this.checked)"> Upload each photo by itself as soon as it can</label>
         <label class="cam-check small"><input type="checkbox" id="cam-copy" ${s.copy ? 'checked' : ''}
           onchange="FieldCamera.setPref('copy', this.checked)"> Also save a copy of each photo on this device${asksBeforeDownload()
-            ? ' — on an iPhone or iPad, by pressing Save a copy in the list below once the photos are taken' : ''}</label>
+            ? ' — on an iPhone or iPad, press Save a copy in the list below and choose Save Image' : ' (to your Downloads folder)'}</label>
         <label class="cam-check small"><input type="checkbox" id="cam-place" ${s.place ? 'checked' : ''}
           onchange="FieldCamera.setPref('place', this.checked)"> Print the town or locality (asks OpenStreetMap where you are)</label>
       </details>
@@ -1528,6 +1761,8 @@ const FieldCamera = (function () {
             onclick="FieldCamera.setTorch(${!torch})">🔦</button>` : ''}
         ${on && document.fullscreenEnabled ? `<button type="button" class="cam-round" aria-label="Full screen" title="Full screen"
             onclick="FieldCamera.toggleFull()">⛶</button>` : ''}
+        ${on ? `<button type="button" class="cam-round" aria-pressed="${!!prefs().map}" aria-label="Map: check your position" title="Map — check your position is right"
+            onclick="FieldCamera.toggleMap()">🗺️</button>` : ''}
         ${on ? `<button type="button" class="cam-round" aria-label="Stop the camera" title="Stop the camera"
             onclick="FieldCamera.off()">✕</button>` : ''}
       </div>
@@ -1719,6 +1954,9 @@ const FieldCamera = (function () {
     if (idle) { idle.innerHTML = idleHtml(); idle.hidden = cam === 'on'; }
     const v = $('cam-video');
     if (v && cam !== 'on') v.hidden = true;
+    const blk = $('cam-block');
+    if (blk) blk.classList.toggle('is-live', cam === 'on');
+    paintZoom();
     paintControls();
     if (cam !== 'on') paintPreview();
   }
@@ -1769,7 +2007,7 @@ const FieldCamera = (function () {
 
   return {
     render, init, stop, boot, authChanged,
-    start, off, shoot, fromFiles, setTorch, toggleFull,
+    start, off, shoot, fromFiles, setTorch, toggleFull, setZoom, toggleMap,
     pickStation, pickNone, pickAuto, findStation, setCaption, tapCaption, setPref,
     retry, sendNow, sendUnfiled, removeShot, clearDone, saveCopy, openShot, showList,
     // The arithmetic, for the check — none of it touches the page.

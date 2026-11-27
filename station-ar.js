@@ -427,6 +427,10 @@ const StationAR = (function () {
   let decl = 0, declAt = null;
   let plan = null;
   let pick = null;                     // { id } — the station whose sheet is open
+  let target = null;                   // { id } — the station the phone is being aimed at (🎯)
+  let aimShown = '', aimOn = false;    // what the aim banner last said; whether it was last on target
+  let tall = false;                    // the station's sheet stretched up the screen
+  let finding = false;                 // the find-a-station box is open
   let pinEls = [];
   let proj = { f: 500, w: 0, h: 0, fov: PLAIN_HFOV };
   let mapUp = false;                   // the map from above (station-ar-map.js) is on the screen
@@ -565,6 +569,8 @@ const StationAR = (function () {
           <div class="button-group ar-pane-go">
             <button type="button" class="primary" id="ar-pane-gps" onclick="StationAR.open('gps')"
                     title="Your position by GPS, the way you face by the compass, and the camera's picture">🔭 Look around</button>
+            <button type="button" id="ar-pane-aim" onclick="StationAR.open('gps'); StationAR.findToggle()"
+                    title="Pick a station and the phone tells you which way to turn to face it — the way you aim a yagi at a repeater">🎯 Aim at a station</button>
             <button type="button" id="ar-pane-map" onclick="StationAR.open('map')" ${centre ? '' : 'disabled aria-describedby="ar-pane-map-why"'}
                     title="Stand where the Stations map was last looking instead — no GPS and no camera; turn by the compass, by dragging or with the arrow keys">From the map's centre</button>
           </div>
@@ -678,6 +684,8 @@ const StationAR = (function () {
           <div class="ar-tools">
             <button type="button" class="ar-tool" id="ar-use-map" onclick="StationAR.useMap()" hidden>Use the map's centre</button>
             <button type="button" class="ar-tool" id="ar-unalign" onclick="StationAR.unalign()" hidden></button>
+            <button type="button" class="ar-tool" id="ar-find-btn" onclick="StationAR.findToggle()"
+                    title="Pick a station by name, number or ALERT ID and the phone tells you which way to turn to face it">🎯 Aim at a station</button>
           </div>
         </div>
         <svg class="ar-radar" viewBox="-50 -50 100 100" aria-hidden="true" focusable="false">
@@ -691,6 +699,12 @@ const StationAR = (function () {
           <circle class="ar-radar-me" r="3"></circle>
         </svg>
       </div>
+      <div class="ar-find" id="ar-find" hidden>
+        <input type="search" id="ar-find-q" class="ar-find-q" placeholder="Station name, number or ALERT ID"
+               aria-label="Find a station to aim at" autocomplete="off" oninput="StationAR.findType(this.value)">
+        <ul class="ar-find-hits" id="ar-find-hits"></ul>
+      </div>
+      <div class="ar-aim" id="ar-aim" role="status" hidden></div>
       <p class="ar-hint" id="ar-hint" hidden></p>
       <div class="ar-map" id="ar-map-pane">
         <div class="ar-map-canvas" id="ar-map"></div>
@@ -769,7 +783,7 @@ const StationAR = (function () {
     view.remove();
     view = null;
     pinEls = [];
-    plan = null; pick = null; here = null; planAt = null; drag = null; vec = null; iosOff = null;
+    plan = null; pick = null; target = null; finding = false; aimShown = ''; aimOn = false; here = null; planAt = null; drag = null; vec = null; iosOff = null;
     const back = opener;
     opener = null;
     if (refocus && back && back.focus && document.contains(back) && back.getClientRects().length) {
@@ -1183,6 +1197,9 @@ const StationAR = (function () {
       <div class="ar-detail-head role-${m.role}">
         <span class="ar-letter" aria-hidden="true">${LETTER[m.role]}</span>
         <h3 class="ar-detail-name" id="ar-detail-h">${esc(s.name || 'Unnamed station')}</h3>
+        <button type="button" class="ar-x ar-grow" onclick="StationAR.toggleTall()" aria-pressed="${tall}"
+                aria-label="${tall ? 'Make the station card shorter' : 'Make the station card taller'}"
+                title="${tall ? 'Make the card shorter' : 'Stretch the card up the screen'}">${tall ? '⤓' : '⤒'}</button>
         <button type="button" class="ar-x" onclick="StationAR.unpick()" aria-label="Close the station's details" title="Close (Esc)">✕</button>
       </div>
       <p class="ar-detail-line">${esc(ROLE_LABEL[m.role])} · ${s.station_number
@@ -1196,6 +1213,8 @@ const StationAR = (function () {
         ${sensorLive()
           ? `<button type="button" onclick="StationAR.alignHere()" title="Point the phone straight at this station — a mast or a hut you can see — and press: every pin moves to agree">I'm facing it — align</button>`
           : `<button type="button" onclick="StationAR.turnTo()">Turn to it</button>`}
+        <button type="button" onclick="StationAR.aimAt(this.dataset.id)" data-id="${escAttr(s.id)}"
+                title="Turn the phone to face this station: it says which way to turn, and tells you when you are on it">🎯 Aim at it</button>
       </div>
       ${others.length ? `<h4 class="ar-more-h">${others.length} more this way</h4>
       <ul class="ar-more">${others.slice(0, MORE_CAP).map(x => `<li><button type="button" class="ar-more-row role-${x.role}"
@@ -1217,6 +1236,7 @@ const StationAR = (function () {
       return;
     }
     el.innerHTML = detailHtml(at);
+    el.classList.toggle('is-tall', tall);
     el.hidden = false;
     if (inside) el.focus({ preventScroll: true });
   }
@@ -1272,6 +1292,114 @@ const StationAR = (function () {
     if (mapUp) StationArMap.setView(H, proj.fov);
     paintEdge(H, w, f, ce);
     paintHint(H, pitch);
+    paintAim(H);
+  }
+
+  // ── Aim mode ───────────────────────────────────────────────────────────────
+  // Pick a station and the phone says which way to turn: how many degrees left
+  // or right of where the camera faces, and "Target acquired" once it is
+  // within AIM_DEG — the way to point a yagi at a repeater you cannot see.
+  const AIM_DEG = 3;
+  function targetStation() {
+    if (!target || !state.data) return null;
+    return state.data.stations.find(s => s.id === target.id && hasPos(s)) || null;
+  }
+  function aimLine(H) {
+    const s = targetStation();
+    if (!s) return null;
+    if (!here) return { text: 'Finding where you are…', on: false, dir: 0 };
+    const b = bearingDeg(here.lat, here.lon, s.lat, s.lon);
+    const d = acmaHaversineKm(here.lat, here.lon, s.lat, s.lon);
+    const name = s.name || 'Unnamed station';
+    const where = `${name} · ${fmtKm(d)} · bearing ${bearingText(b)}`;
+    if (H == null) return { text: `${where} — waiting for the compass…`, on: false, dir: 0 };
+    const delta = wrap180(b - H);
+    const off = Math.abs(delta);
+    if (off <= AIM_DEG) return { text: `Target acquired — ${where}`, on: true, dir: 0, off };
+    const turn = off < 10 ? `${off.toFixed(0)}°` : `${Math.round(off)}°`;
+    return { text: `${delta < 0 ? 'Turn left' : 'Turn right'} ${turn} — ${where}`, on: false, dir: delta < 0 ? -1 : 1, off };
+  }
+  function paintAim(H) {
+    const el = $('ar-aim');
+    if (!el) return;
+    const a = aimLine(H);
+    if (!a) { if (!el.hidden) el.hidden = true; aimShown = ''; aimOn = false; return; }
+    const arrow = a.on ? '🎯' : a.dir < 0 ? '◀' : '▶';
+    const html = `<span class="ar-aim-arrow" aria-hidden="true">${arrow}</span><span class="ar-aim-text">${esc(a.text)}</span>
+      <button type="button" class="ar-aim-x" onclick="StationAR.aimOff()" aria-label="Stop aiming" title="Stop aiming">✕</button>`;
+    const key = html;
+    if (key !== aimShown) {
+      aimShown = key;
+      el.innerHTML = html;
+    }
+    el.hidden = false;
+    el.classList.toggle('is-on', a.on);
+    el.classList.toggle('is-left', a.dir < 0);
+    el.classList.toggle('is-right', a.dir > 0);
+    if (a.on !== aimOn) {
+      aimOn = a.on;
+      if (a.on) {
+        try { if (navigator.vibrate) navigator.vibrate([40, 40, 40]); } catch (_) { /* no buzz */ }
+        announce(a.text);
+      }
+    }
+  }
+  function aimAt(id) {
+    if (!id) return;
+    if (!view) {
+      if (!state.data) return;
+      target = { id };
+      open('gps');
+      return;
+    }
+    target = { id };
+    aimShown = ''; aimOn = false;
+    findClose();
+    touch();
+  }
+  function aimOff() { target = null; aimShown = ''; aimOn = false; touch(); }
+  function toggleTall() {
+    tall = !tall;
+    renderDetail();
+  }
+
+  // The find box: the Stations tab's own matcher, nearest first, every station
+  // with a position — not only the ones inside the distance the finder looks.
+  function findToggle() { if (finding) findClose(); else findOpen(); }
+  function findOpen() {
+    const box = $('ar-find');
+    if (!box) return;
+    finding = true;
+    box.hidden = false;
+    const q = $('ar-find-q');
+    if (q) { q.value = ''; q.focus(); }
+    findType('');
+  }
+  function findClose() {
+    finding = false;
+    const box = $('ar-find');
+    if (box) box.hidden = true;
+  }
+  function findType(text) {
+    const out = $('ar-find-hits');
+    if (!out) return;
+    const t = String(text || '').trim();
+    if (!t || !state.data) { out.innerHTML = '<li class="ar-find-none">Type part of a name, a station number or an ALERT ID.</li>'; return; }
+    const prep = typeof prepareSearch === 'function' ? prepareSearch(t) : null;
+    const hits = [];
+    for (const s of state.data.stations) {
+      if (!hasPos(s)) continue;
+      const ok = prep && typeof stationMatchesSearch === 'function'
+        ? stationMatchesSearch(s, prep)
+        : (s.name || '').toLowerCase().includes(t.toLowerCase()) || String(s.station_number || '').includes(t);
+      if (ok) hits.push(s);
+    }
+    if (here) hits.sort((a, b) => acmaHaversineKm(here.lat, here.lon, a.lat, a.lon) - acmaHaversineKm(here.lat, here.lon, b.lat, b.lon));
+    out.innerHTML = hits.length
+      ? hits.slice(0, 8).map(s => `<li><button type="button" data-id="${escAttr(s.id)}" onclick="StationAR.aimAt(this.dataset.id)">${esc(s.name || 'Unnamed station')}${s.station_number
+          ? ` <span class="ar-find-n">Stn # ${esc(String(s.station_number))}</span>` : ''}${here
+          ? ` <span class="ar-find-d">${esc(fmtKm(acmaHaversineKm(here.lat, here.lon, s.lat, s.lon)))}</span>` : ''}</button></li>`).join('')
+      : '<li class="ar-find-none">No station with a position matches that.</li>';
   }
 
   // A label cut by the screen's edge slides back onto it — as far as it can
@@ -1467,7 +1595,7 @@ const StationAR = (function () {
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
-      if (pick) unpick(); else close();
+      if (finding) findClose(); else if (pick) unpick(); else if (target) aimOff(); else close();
       return;
     }
     if (e.key === 'Tab') {
@@ -1506,6 +1634,12 @@ const StationAR = (function () {
     turnTo,
     turn,
     useMap,
+    aimAt,
+    aimOff,
+    findToggle,
+    findType,
+    toggleTall,
+    aimLine,
 
     // The arithmetic, for the checks (test/ar.mjs) — none of it touches the page.
     wmmField,
